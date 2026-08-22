@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { addBlock, duplicateBlock, nextBlockId, type ReportDraft } from '../report-model';
 import type { ReportSpecWire } from '../custom-reports-api';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
+
+/** The block words, from the pack a host would pass. */
+const BUILDER = PT_BR_REPORT_SCREENS_COPY.builder;
 
 /**
  * GAP 6 — *Duplicar* in the block's configuration panel.
@@ -37,7 +41,7 @@ function draftOfThree(): ReportDraft {
 
 describe('duplicateBlock', () => {
   it('puts the copy directly after its source, not at the end', () => {
-    const draft = duplicateBlock(draftOfThree(), 'bloco-1');
+    const draft = duplicateBlock(draftOfThree(), 'bloco-1', BUILDER);
     expect(draft.blocks.map((block) => block.title)).toEqual([
       'Um',
       'Um (cópia)',
@@ -48,7 +52,7 @@ describe('duplicateBlock', () => {
 
   it('gives the copy a fresh id', () => {
     const before = draftOfThree();
-    const after = duplicateBlock(before, 'bloco-2');
+    const after = duplicateBlock(before, 'bloco-2', BUILDER);
     const ids = after.blocks.map((block) => block.id);
     expect(new Set(ids).size).toBe(ids.length);
     // And the id is the one the canvas predicted, which is how it knows what
@@ -57,7 +61,7 @@ describe('duplicateBlock', () => {
   });
 
   it('keeps the copy independent of its source', () => {
-    const after = duplicateBlock(draftOfThree(), 'bloco-1');
+    const after = duplicateBlock(draftOfThree(), 'bloco-1', BUILDER);
     const source = after.blocks[0];
     const copy = after.blocks[1];
     expect(copy?.spec).toEqual(source?.spec);
@@ -77,16 +81,16 @@ describe('duplicateBlock', () => {
         block.id === 'bloco-1' ? { ...block, span: 12 } : block,
       ),
     };
-    expect(duplicateBlock(widened, 'bloco-1').blocks[1]?.span).toBe(12);
+    expect(duplicateBlock(widened, 'bloco-1', BUILDER).blocks[1]?.span).toBe(12);
   });
 
   it('is a no-op for an id the report does not have', () => {
     const before = draftOfThree();
-    expect(duplicateBlock(before, 'bloco-99')).toEqual(before);
+    expect(duplicateBlock(before, 'bloco-99', BUILDER)).toEqual(before);
   });
 
   it('names an untitled block rather than producing " (cópia)"', () => {
     const draft = addBlock({ name: 'P', description: '', blocks: [] }, spec('method'), '');
-    expect(duplicateBlock(draft, 'bloco-1').blocks[1]?.title).toBe('Bloco sem título (cópia)');
+    expect(duplicateBlock(draft, 'bloco-1', BUILDER).blocks[1]?.title).toBe('Bloco sem título (cópia)');
   });
 });

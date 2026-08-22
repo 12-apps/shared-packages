@@ -10,6 +10,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import type { BlockTemplate, BlockTemplateGroup } from "../server/block-templates";
 import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
+import { useReportCopy } from "./transport-context";
 
 /**
  * A template is a CARD, and dismissing is not.
@@ -133,6 +134,7 @@ function TemplateTile({
   cardRef?: React.Ref<HTMLButtonElement>;
   onSelect: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   return (
     <Button
       ref={cardRef}
@@ -145,7 +147,7 @@ function TemplateTile({
       // The description is the reason to pick this one, so it is part of the
       // control's name rather than adjacent text a screen reader announces
       // separately (or not at all).
-      aria-label={`${template.title} — ${template.description}`}
+      aria-label={copy.templateOption(template.title, template.description)}
     >
       <Card variant="outlined" sx={TEMPLATE_CARD_INNER_SX}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: "flex-start", width: "100%" }}>
@@ -240,6 +242,7 @@ export function BlockTemplatePicker({
   onClose: () => void;
   testId?: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const firstRef = useRef<HTMLButtonElement | null>(null);
 
   // Focus the first template on open. Without this, focus stays on the trigger
@@ -261,7 +264,7 @@ export function BlockTemplatePicker({
              * grid of eight named things provokes — "am I committing to
              * one?" — before it is asked. */}
             <Text variant="body" size="sm" color="secondary" data-testid={`${testId}-subtitle`}>
-              Comece de um modelo pronto — você ajusta tudo depois.
+              {copy.templateHint}
             </Text>
           </Stack>
 

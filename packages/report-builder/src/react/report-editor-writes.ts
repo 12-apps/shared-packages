@@ -15,6 +15,7 @@ import {
 } from "./custom-reports-api";
 import type { Result } from "./lib/rest-result";
 import type { PersistedEditorState } from "./report-editor-source";
+import type { ReportBuilderPanelCopy, ReportEditorCopy } from "./screens-copy";
 import { documentFromDraft } from "./report-model";
 import type { ReportBuilderTransport } from "./transport";
 
@@ -40,10 +41,14 @@ function toSaveInput(state: PersistedEditorState): ReportWorkingCopyWire {
  * a report that is not finished, so autosave simply does not run until it can
  * succeed rather than flashing a red alert at every keystroke.
  */
-export function documentGuardError(state: PersistedEditorState): string | null {
-  if (state.draft.name.trim() === "") return "Dê um nome ao relatório antes de salvar.";
-  if (state.draft.blocks.length === 0) return "Adicione ao menos um bloco ao relatório.";
-  return publishGuardError(state.publish);
+export function documentGuardError(
+  state: PersistedEditorState,
+  copy: ReportEditorCopy,
+  builderCopy: ReportBuilderPanelCopy,
+): string | null {
+  if (state.draft.name.trim() === "") return copy.needsName;
+  if (state.draft.blocks.length === 0) return copy.needsBlock;
+  return publishGuardError(state.publish, builderCopy);
 }
 
 /** Who a write is for: which tenant, which report, and which promise it makes. */

@@ -33,6 +33,8 @@ import { ReportBlockFrame, ReportGridItem } from "./report-grid";
 import { ReportRenderView } from "./report-render";
 import { blockLabel, type ReportBlockDraft } from "./report-model";
 import type { ReportRange } from "./reports-api";
+import type { ReportEditorCopy } from "./screens-copy";
+import { useReportCopy } from "./transport-context";
 
 /**
  * The ring a block wears when it is FOCUSED or SELECTED — the block group is a
@@ -72,13 +74,14 @@ function BlockPreview({
   fill: boolean;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   const preview = useRunReport(tenantSlug, spec, range);
   if (preview.isError) {
     return (
       <Alert severity="error" data-testid={`${testId}-error`}>
         {preview.error instanceof Error
           ? preview.error.message
-          : "Não foi possível executar este bloco."}
+          : copy.blockRunFailed}
       </Alert>
     );
   }
@@ -100,6 +103,7 @@ function BlockTitleSlot({
   testId: string;
   onTitleChange: (title: string) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   // A floor, not `minWidth: 0` (FUT-755). A title slot allowed to shrink to
   // zero always wins the argument with the chrome beside it: at 1024px with
   // the panel open the input measured 36px against 170px of title and the
@@ -121,15 +125,15 @@ function BlockTitleSlot({
         // The label names the keyboard path too. A shortcut nobody is told
         // about is only half an alternative to the drag.
         aria-label="Arraste para posicionar. Ou use Alt e as setas."
-        title="Arraste ou Alt+↑/↓"
+        title={copy.blockDragHint}
         data-testid={`${testId}-drag-handle`}
       >
         <GripIcon />
       </Box>
       <Input
         size="sm"
-        aria-label="Título do bloco"
-        placeholder="Título do bloco"
+        aria-label={copy.blockTitleLabel}
+        placeholder={copy.blockTitleLabel}
         value={block.title}
         onChange={(event) => onTitleChange(event.target.value)}
         data-testid={`${testId}-title`}
@@ -156,17 +160,21 @@ function BlockTitleSlot({
  * permanent menu items always has a trigger to render, so the escape hatch
  * that ✎ and 🗑 overflow into is never itself missing.
  */
-function moveItems(block: ReportBlockDraft, keyboard: KeyboardReorder): DropdownMenuItem[] {
+function moveItems(
+  block: ReportBlockDraft,
+  keyboard: KeyboardReorder,
+  copy: ReportEditorCopy,
+): DropdownMenuItem[] {
   return [
     {
       id: "move-up",
-      label: "Mover para cima",
+      label: copy.moveUp,
       disabled: !keyboard.canMove(block.id, -1),
       onClick: () => keyboard.move(block.id, -1),
     },
     {
       id: "move-down",
-      label: "Mover para baixo",
+      label: copy.moveDown,
       disabled: !keyboard.canMove(block.id, 1),
       onClick: () => keyboard.move(block.id, 1),
     },
@@ -202,6 +210,7 @@ function BlockActions({
   onEdit: () => void;
   onRemove: () => void;
 }): JSX.Element | null {
+  const copy = useReportCopy().screens.editor;
   return (
     <OverflowToolCluster
       tools={[
@@ -221,9 +230,9 @@ function BlockActions({
           danger: true,
         },
       ]}
-      menuItems={moveItems(block, keyboard)}
+      menuItems={moveItems(block, keyboard, copy)}
       menuTestId={`${testId}-menu`}
-      menuLabel="Mais ações do bloco"
+      menuLabel={copy.blockMenu}
     />
   );
 }
@@ -238,6 +247,21 @@ function BlockActions({
  * case is a click "in the middle of the canvas, on the body of another block",
  * so the whole frame selects, not just the ✎.
  */
+/**
+ * Enter on the BLOCK ITSELF selects it.
+ *
+ * The keyboard equivalent of clicking its body, and the only way to reach the
+ * panel without tabbing past the block's chrome. The target check is what
+ * keeps Enter in the title field — which bubbles from inside this group —
+ * from being read as a selection.
+ */
+function selectOnEnter(event: React.KeyboardEvent, onSelect: () => void): void {
+  if (event.defaultPrevented || event.key !== "Enter") return;
+  if (event.target !== event.currentTarget) return;
+  event.preventDefault();
+  onSelect();
+}
+
 function BlockGroup({
   tenantSlug,
   block,
@@ -261,6 +285,7 @@ function BlockGroup({
   onTitleChange: (title: string) => void;
   onRemove: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const reorder = keyboard.blockProps(block.id);
 
   return (
@@ -268,21 +293,13 @@ function BlockGroup({
       {...reorder}
       {...{ [BLOCK_ID_ATTR]: block.id }}
       role="group"
-      aria-label={blockLabel(block)}
+      aria-label={blockLabel(block, copy)}
       aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
       data-selected={selected ? "true" : undefined}
       onClick={onSelect}
       onKeyDown={(event) => {
         reorder.onKeyDown(event);
-        // Enter on the BLOCK ITSELF selects it — the keyboard equivalent of
-        // clicking its body, and the only way to reach the panel without
-        // tabbing past the block's chrome. The target check is what keeps
-        // Enter in the title field (which bubbles from inside this group)
-        // from being read as a selection.
-        if (event.defaultPrevented || event.key !== "Enter") return;
-        if (event.target !== event.currentTarget) return;
-        event.preventDefault();
-        onSelect();
+        selectOnEnter(event, onSelect);
       }}
       sx={{
         borderRadius: `${CONTAINER_RADIUS_PX}px`,

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { widenAction, widenLabel, widerRange } from '../lib/widen-range';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
+
+/** The period words, from the pack a host would pass. */
+const RANGES = PT_BR_REPORT_SCREENS_COPY.ranges;
 
 /**
  * FUT-391: an empty block offers the widening rather than reporting a dead end.
@@ -37,15 +41,15 @@ describe('widerRange', () => {
 
 describe('widenLabel', () => {
   it('names the period it would switch to', () => {
-    expect(widenLabel('7d')).toBe('Ver 7 dias');
-    expect(widenLabel('30d')).toBe('Ver 30 dias');
+    expect(widenLabel('7d', RANGES)).toBe('Ver 7 dias');
+    expect(widenLabel('30d', RANGES)).toBe('Ver 30 dias');
   });
 });
 
 describe('widenAction', () => {
   it('builds an action that widens the canvas', () => {
     const onRangeChange = vi.fn();
-    const action = widenAction('today', onRangeChange);
+    const action = widenAction('today', onRangeChange, RANGES);
 
     expect(action?.label).toBe('Ver 7 dias');
     action?.onClick();
@@ -55,12 +59,12 @@ describe('widenAction', () => {
   it('offers NOTHING at the widest period', () => {
     // An offer the reader cannot take is worse than none — it implies the
     // emptiness has a fix when it does not.
-    expect(widenAction('30d', vi.fn())).toBeUndefined();
+    expect(widenAction('30d', vi.fn(), RANGES)).toBeUndefined();
   });
 
   it('does not fire until the action is taken', () => {
     const onRangeChange = vi.fn();
-    widenAction('7d', onRangeChange);
+    widenAction('7d', onRangeChange, RANGES);
     expect(onRangeChange).not.toHaveBeenCalled();
   });
 });

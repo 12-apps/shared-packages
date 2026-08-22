@@ -14,6 +14,7 @@
  * Why hand-rolled rather than `@dnd-kit`: `decisions/0001-drag-implementation.md`.
  */
 import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useReportCopy } from "../transport-context";
 
 // A dedicated type keeps foreign drags out: dragged text or files never carry
 // it, so they neither highlight rows nor trigger a reorder even when their
@@ -148,6 +149,7 @@ export function useKeyboardReorder({
   items: readonly ReorderItem[];
   onMove: (id: string, delta: -1 | 1) => void;
 }): KeyboardReorder {
+  const copy = useReportCopy().screens.builder;
   const [announcement, setAnnouncement] = useState("");
   const nodes = useRef(new Map<string, HTMLElement>());
   // Written by a move, consumed by the effect below. Focus cannot be restored
@@ -184,7 +186,7 @@ export function useKeyboardReorder({
     if (!item) return;
     onMove(id, delta);
     refocus.current = id;
-    setAnnouncement(`${item.label} movido para a posição ${from + delta + 1} de ${items.length}`);
+    setAnnouncement(copy.moved(item.label, from + delta + 1, items.length));
   }
 
   return {

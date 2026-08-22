@@ -31,7 +31,7 @@ import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
 import { ReportRenderView } from "./report-render";
 import { widenAction } from "./lib/widen-range";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
-import { useReportSurface } from "./transport-context";
+import { useReportCopy, useReportSurface } from "./transport-context";
 
 interface BlockProps {
   tenantSlug: string;
@@ -63,6 +63,7 @@ function DashboardBlock({
   grain,
   onRangeChange,
 }: BlockProps): JSX.Element {
+  const { system: copy, ranges } = useReportCopy().screens;
   const query = useSystemReport(tenantSlug, reportKey, range, grain);
   const testId = `system-dashboard-block-${reportKey}`;
   // The catalog title, so the frame is labelled while the run is still in
@@ -98,13 +99,13 @@ function DashboardBlock({
       >
         {query.isError ? (
           <Alert severity="error" data-testid={`${testId}-error`}>
-            Não foi possível carregar este relatório.
+            {copy.blockFailed}
           </Alert>
         ) : report ? (
           <ReportRenderView
             render={report.render}
             dataTestId={`${testId}-render`}
-            onWidenRange={widenAction(range, onRangeChange)}
+            onWidenRange={widenAction(range, onRangeChange, ranges)}
             asTable={tableView.asTable}
           />
         ) : (
@@ -116,6 +117,7 @@ function DashboardBlock({
 }
 
 export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
+  const { system: copy, builder: builderCopy } = useReportCopy().screens;
   const { dashboardKey = "" } = useParams();
   const [range, setRange] = useState<ReportRange>("30d");
   const [grain, setGrain] = useState<ReportGrain>("day");
@@ -125,8 +127,8 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
   if (!dashboard) {
     return (
       <ErrorState
-        title="Painel não encontrado"
-        message="Este painel não existe mais. Use o menu lateral para escolher outro."
+        title={copy.dashboardMissingTitle}
+        message={copy.dashboardMissingBody}
         dataTestId="page-system-dashboard-error"
       />
     );
@@ -143,7 +145,7 @@ export function SystemDashboardPage({ tenantSlug }: { tenantSlug: string }): JSX
     <Stack spacing={3} data-testid="page-system-dashboard" {...{ [PRINT_REGION_ATTR]: "" }}>
       <PrintStyles />
       <ReportPageHeader
-        back={sectionBackTarget(tenantSlug, surface.sections, dashboard.section)}
+        back={sectionBackTarget(tenantSlug, surface.sections, dashboard.section, builderCopy)}
         title={dashboard.title}
         description={dashboard.description}
         titleTestId="system-dashboard-title"

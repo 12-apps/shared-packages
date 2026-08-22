@@ -18,6 +18,66 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
+## Migrating 5.5.x → 5.6.0 — the SCREENS take their words too (FUT-760)
+
+5.5.0 moved the ENGINE's words out. This is the other thirty-eight files: the
+list, the editor, the viewer, the settings dialog and the built-in dashboards,
+which between them compiled about a hundred Portuguese sentences into the
+package with no field a host could decline them with.
+
+**It is a MINOR, despite being breaking** — same rule as 5.5.0 below: only an
+explicit `RELEASE-MAJOR` line spends a major, and this change does not carry
+one. So the upgrade is 5.5.x → 5.6.0 and the config gains one required key.
+
+### What changes
+
+`ReportBuilderCopy` gains a third half:
+
+```ts
+import { PT_BR_REPORT_SCREENS_COPY } from "@12-apps/report-builder/react";
+
+createWebReportBuilder({
+  copy: {
+    engine: PT_BR_REPORT_ENGINE_COPY,
+    blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+    screens: PT_BR_REPORT_SCREENS_COPY,   // <- new, required
+  },
+  // …
+});
+```
+
+Passing the pack reproduces today's wording exactly, verbatim. What changes is
+that the words are now chosen in your diff rather than inherited.
+
+### Exported helpers whose signature changed
+
+Only relevant if you import them directly; the surface itself is unaffected.
+
+| before | after |
+|---|---|
+| `REPORT_SCOPE_LABELS` | `reportScopeLabels(copy)` |
+| `REPORT_RANGE_LABELS[range]` | `reportRangeLabel(range, copy)` |
+| `REPORT_GRAIN_LABELS[grain]` | `reportGrainLabel(grain, copy)` |
+| `OPERATOR_LABELS[op]` | `operatorLabel(op, copy)` |
+| `AGGREGATION_LABELS[agg]` | `aggregationLabel(agg, copy)` |
+| `blockCountLabel(n)` | `blockCountLabel(n, copy)` |
+| `visibilityLabel(v)` | `visibilityLabel(v, copy)` |
+| `relativeReportTime(at, now)` | `relativeReportTime(at, now, copy)` |
+| `blockLabel(block)` | `blockLabel(block, copy)` |
+| `heightSegments()` | `heightSegments(copy)` |
+
+A module-scope `Record` cannot read config, which is why each of these became a
+function. Where the value is interpolated — a count, a term, a position — the
+copy entry is a FUNCTION rather than a template with a placeholder: Portuguese
+agrees the noun with the count and puts the number where the sentence wants it,
+so a `{count}` slot would be this package deciding word order for a translator.
+
+### Rendering a screen in a test
+
+`useReportCopy` throws outside `ReportBuilderProvider`, so a component test is
+a host too. The package's own suites go through one `renderWithCopy` helper
+that wraps the provider; do the same rather than repeating the wiring.
+
 ## Migrating 5.4.x → 5.5.0 — the host now declares its own WORDS (FUT-760)
 
 4.0.0 moved the host's DATA out of this package. This move is the same argument

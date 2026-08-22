@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, screen, within } from '@testing-library/react';
+import { renderWithCopy as render } from './with-copy';
 
 import type { PresentationShape } from '../../layout';
 import { BlockHeightPicker } from '../block-height-picker';
 import { BlockWidthPicker } from '../block-width-picker';
 import {
   SIZE_TILE_HEIGHT_PX,
-  SIZE_TILE_MIN_WIDTH_PX,
-} from '../lib/size-picker-tile';
+  SIZE_TILE_MIN_WIDTH_PX } from '../lib/size-picker-tile';
 
 /**
  * EVERY OPTION TILE IS THE SAME SIZE, in both size pickers (FUT-755): "all
