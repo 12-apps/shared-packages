@@ -3,8 +3,9 @@
  *
  * One factory: {@link createWebAppShell}. Everything else exported here is either a
  * seam a consumer legitimately needs on its own (`lazyRoute` for a route table,
- * `useDeviceDetection` for a login button, `createAppTheme` for a second theme) or a
- * type it needs to satisfy the config.
+ * `useDeviceDetection` for a login button, `createAppTheme` for a second theme,
+ * `useCollapsedSections` / `useSidebarRail` for a collapsible nav) or a type it needs
+ * to satisfy the config.
  *
  * The contract a consumer is held to, in two lines:
  *
@@ -59,3 +60,10 @@ export {
   messagesOf,
   type AppShellMessages,
 } from './messages';
+
+export {
+  sidebarPanelBg,
+  sidebarStorageKey,
+  useCollapsedSections,
+  useSidebarRail,
+} from './sidebar-state';
