@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { failureFor } from '../activation/failure';
+import { PT_BR_ACTIVATION_COPY } from '../activation/pt-BR';
 import { verificationCardPublicKey, verifyProviderCharge } from '../activation/verify-charge';
 import { ProviderRequestError, UnknownProviderError } from '../core/errors';
 import type { ChargeSnapshot } from '../core/types';
@@ -276,16 +277,16 @@ describe('failureFor transport classification', () => {
   it('a network failure with a transport cause is transport', () => {
     const outage = new TypeError('fetch failed');
     (outage as { cause?: unknown }).cause = { code: 'ECONNRESET' };
-    expect(failureFor(outage).transport).toBe(true);
+    expect(failureFor(outage, PT_BR_ACTIVATION_COPY).transport).toBe(true);
   });
 
   it('a status-less ProviderRequestError is transport (the response never parsed)', () => {
     const error = new ProviderRequestError('infinitepay', 'socket hang up', { retriable: true });
-    expect(failureFor(error).transport).toBe(true);
+    expect(failureFor(error, PT_BR_ACTIVATION_COPY).transport).toBe(true);
   });
 
   it('a bug of ours is NOT transport — no outage without evidence', () => {
-    expect(failureFor(new TypeError('reading undefined')).transport).toBeUndefined();
+    expect(failureFor(new TypeError('reading undefined'), PT_BR_ACTIVATION_COPY).transport).toBeUndefined();
   });
 
   it('a real provider refusal (HTTP status) is NOT transport', () => {
@@ -293,7 +294,7 @@ describe('failureFor transport classification', () => {
       retriable: false,
       httpStatus: 422,
     });
-    expect(failureFor(refusal).transport).toBeUndefined();
+    expect(failureFor(refusal, PT_BR_ACTIVATION_COPY).transport).toBeUndefined();
   });
 });
 

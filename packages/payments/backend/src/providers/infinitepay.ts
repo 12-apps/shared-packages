@@ -12,6 +12,7 @@ import {
   paymentCheck,
   NAME,
 } from './infinitepay-http';
+import type { InfinitePayCopy } from './copy';
 import { probeFailure } from './infinitepay-probe';
 import { infinitePaySetupGuide } from './infinitepay-setup-guide';
 import {
@@ -124,31 +125,35 @@ function linkPayload(
   };
 }
 
-const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = async (credentials) => {
-  if (!credentials.stub && !handleOf(credentials)) {
-    return { ok: false, message: 'Handle não configurado.' };
-  }
-  try {
-    // Inside the try, deliberately. A scripted outage THROWS, exactly as the
-    // real HTTP layer does, so it flows through the same classifier — a script
-    // that returned the verdict directly would skip the code it exists to
-    // exercise. And `verifyCredentials` must never throw at all (the port says
-    // so), which is a rule the catch is what enforces.
-    const scripted = stubOutcomeOf(credentials);
-    if (scripted) {
-      const answer = stubProbe(scripted);
-      if (answer) return answer;
+function verifyCredentialsWith(
+  copy: InfinitePayCopy,
+): NonNullable<PaymentProviderAdapter['verifyCredentials']> {
+  return async (credentials) => {
+    if (!credentials.stub && !handleOf(credentials)) {
+      return { ok: false, message: copy.handleMissing };
     }
-    if (credentials.stub) return { ok: true, message: 'stub mode' };
-    // There is no authenticated "whoami" to call — the closest probe is a
-    // payment_check for a reference that cannot exist. A valid handle
-    // answers "not found"; an invalid one is rejected outright.
-    await paymentCheck(credentials, { orderNsu: `verify-${Date.now()}` });
-    return { ok: true };
-  } catch (error) {
-    return probeFailure(error);
-  }
-};
+    try {
+      // Inside the try, deliberately. A scripted outage THROWS, exactly as the
+      // real HTTP layer does, so it flows through the same classifier — a script
+      // that returned the verdict directly would skip the code it exists to
+      // exercise. And `verifyCredentials` must never throw at all (the port says
+      // so), which is a rule the catch is what enforces.
+      const scripted = stubOutcomeOf(credentials);
+      if (scripted) {
+        const answer = stubProbe(scripted, copy);
+        if (answer) return answer;
+      }
+      if (credentials.stub) return { ok: true, message: 'stub mode' };
+      // There is no authenticated "whoami" to call — the closest probe is a
+      // payment_check for a reference that cannot exist. A valid handle
+      // answers "not found"; an invalid one is rejected outright.
+      await paymentCheck(credentials, { orderNsu: `verify-${Date.now()}` });
+      return { ok: true };
+    } catch (error) {
+      return probeFailure(error, copy);
+    }
+  };
+}
 
 /**
  * The stub's answer to a look-up, or `undefined` for "not stubbed at all".
@@ -234,66 +239,71 @@ const findChargeByReference: NonNullable<
   }
 };
 
-const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
-  const scripted = stubOutcomeOf(credentials);
-  if (scripted) stubCreateFault(scripted);
-  if (credentials.stub) {
+function createChargeWith(
+  copy: InfinitePayCopy,
+): NonNullable<PaymentProviderAdapter['createCharge']> {
+  return async (input, credentials) => {
+    const scripted = stubOutcomeOf(credentials);
+    if (scripted) stubCreateFault(scripted);
+    if (credentials.stub) {
+      return {
+        ...stubCharge(NAME, input, credentials),
+        status: 'PENDING',
+        hostedCheckoutUrl: `https://checkout.example.invalid/stub/${stubChargeId(NAME, input.reference)}`,
+      };
+    }
+    const link = await createCheckoutLink(credentials, linkPayload(input, credentials));
+    if (!link.url) {
+      throw new ProviderRequestError(NAME, copy.noCheckoutUrl, {
+        retriable: false,
+      });
+    }
+    const slug = invoiceSlugOf(link);
     return {
-      ...stubCharge(NAME, input, credentials),
+      provider: NAME,
+      // The reference we sent, so a later look-up needs nothing we did not choose.
+      providerChargeId: input.reference,
+      // The SAME value, carried as what it actually is. The two being equal here
+      // is exactly why the id alone cannot identify a charge for this provider —
+      // see `ChargeSnapshot.reference`.
+      reference: input.reference,
       status: 'PENDING',
-      hostedCheckoutUrl: `https://checkout.example.invalid/stub/${stubChargeId(NAME, input.reference)}`,
+      amount: input.amount,
+      method: input.method,
+      hostedCheckoutUrl: link.url,
+      // `payment_check` demands the invoice code, and this response is the ONLY
+      // place it appears — a caller that does not keep it here can never confirm
+      // the charge it just created.
+      ...(slug ? { settlementHints: { slug } } : {}),
+      raw: link,
     };
-  }
-  const link = await createCheckoutLink(credentials, linkPayload(input, credentials));
-  if (!link.url) {
-    throw new ProviderRequestError(NAME, 'InfinitePay não retornou a URL do checkout.', {
-      retriable: false,
-    });
-  }
-  const slug = invoiceSlugOf(link);
-  return {
-    provider: NAME,
-    // The reference we sent, so a later look-up needs nothing we did not choose.
-    providerChargeId: input.reference,
-    // The SAME value, carried as what it actually is. The two being equal here
-    // is exactly why the id alone cannot identify a charge for this provider —
-    // see `ChargeSnapshot.reference`.
-    reference: input.reference,
-    status: 'PENDING',
-    amount: input.amount,
-    method: input.method,
-    hostedCheckoutUrl: link.url,
-    // `payment_check` demands the invoice code, and this response is the ONLY
-    // place it appears — a caller that does not keep it here can never confirm
-    // the charge it just created.
-    ...(slug ? { settlementHints: { slug } } : {}),
-    raw: link,
   };
-};
+}
 
 // ONE field. `webhookSecret` was offered here and it was a trap: InfinitePay
 // sends no headers a merchant can configure, so a stored secret caused the
 // verify step to reject every GENUINE delivery — a production store had one
 // set, and no notification InfinitePay sent it ever got through. The verify
 // step now ignores any stored value; the real control is `payment_check`.
-const credentialSchema: PaymentProviderAdapter['credentialSchema'] = [
-  {
-    key: 'handle',
-    label: 'InfiniteTag ($usuario)',
-    secret: false,
-    required: true,
-    // The two flags exist for THIS field: it is short, unchecksummed, and
-    // decides which account is paid. Monospace so `0` and `O` are told
-    // apart by eye; confirmed on save so the value is read back once more
-    // before it starts receiving the store's money.
-    mono: true,
-    confirmOnSave: true,
-    placeholder: '$suatag',
-    pattern: '^\\$[a-zA-Z0-9][a-zA-Z0-9._-]{2,}$',
-    helperText:
-      'Confira caractere por caractere. Mostramos a tag em fonte monoespaçada para você distinguir 0 de O e l de 1.',
-  },
-];
+function credentialSchemaFor(copy: InfinitePayCopy): PaymentProviderAdapter['credentialSchema'] {
+  return [
+    {
+      key: 'handle',
+      label: copy.fields.handle,
+      secret: false,
+      required: true,
+      // The two flags exist for THIS field: it is short, unchecksummed, and
+      // decides which account is paid. Monospace so `0` and `O` are told
+      // apart by eye; confirmed on save so the value is read back once more
+      // before it starts receiving the store's money.
+      mono: true,
+      confirmOnSave: true,
+      placeholder: '$suatag',
+      pattern: '^\\$[a-zA-Z0-9][a-zA-Z0-9._-]{2,}$',
+      helperText: copy.handleHelp,
+    },
+  ];
+}
 
 /**
  * The identity a host used to keep in name-keyed tables, declared by the
@@ -335,7 +345,7 @@ const identity = {
   referenceOfDelivery: infinitePayDeliveryReference,
 } satisfies Partial<PaymentProviderAdapter>;
 
-export function infinitePayProvider(): PaymentProviderAdapter {
+export function infinitePayProvider(copy: InfinitePayCopy): PaymentProviderAdapter {
   return {
     name: NAME,
     displayName: 'InfinitePay',
@@ -356,13 +366,13 @@ export function infinitePayProvider(): PaymentProviderAdapter {
       // `payment_check` confirms — a different protocol, the same proof.
       activationCharge: true,
     },
-    credentialSchema,
+    credentialSchema: credentialSchemaFor(copy),
     customerSchema,
     // The buyer finishes on the provider's own page — no card form, no PIX pane.
     checkoutScreen: 'hosted-link',
 
-    verifyCredentials,
-    createCharge,
+    verifyCredentials: verifyCredentialsWith(copy),
+    createCharge: createChargeWith(copy),
 
     async getCharge(providerChargeId, credentials, hints) {
       if (credentials.stub) return stubPendingSnapshot(NAME, providerChargeId);

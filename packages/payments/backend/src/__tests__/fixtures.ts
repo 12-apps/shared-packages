@@ -32,6 +32,7 @@ import {
 } from '../providers/shared';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * The adapter the GATEWAY tests run against.
@@ -141,7 +142,7 @@ export function setupGatewayWorld(onWebhookEvent?: WebhookEventHandler) {
   // stubbing one leaks nothing into the next test.
   const providers = defineProviders({
     stone: adapter,
-    infinitepay: infinitePayProvider(),
+    infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
   } as const);
   const gateway = createPaymentsGateway({
     providers,
@@ -295,7 +296,7 @@ export function stoneDelivery(
 /** Fresh settings-service world (providers + config store), per test. */
 export function setupSettingsWorld() {
   const store = createMemoryProviderConfigStore();
-  const providers = defineProviders({ stone: stoneProvider(), stripe: stripeProvider() } as const);
+  const providers = defineProviders({ stone: stoneProvider(PT_BR_STONE_COPY), stripe: stripeProvider(PT_BR_STRIPE_COPY) } as const);
   const settings = createSettingsService(providers, store, { allowStubMode: true });
   return { store, providers, settings };
 }
@@ -303,7 +304,7 @@ export function setupSettingsWorld() {
 /** Settings world with stub mode DISALLOWED (the production default). */
 export function setupStrictSettings() {
   const store = createMemoryProviderConfigStore();
-  const providers = defineProviders({ stone: stoneProvider(), stripe: stripeProvider() } as const);
+  const providers = defineProviders({ stone: stoneProvider(PT_BR_STONE_COPY), stripe: stripeProvider(PT_BR_STRIPE_COPY) } as const);
   return { store, providers, settings: createSettingsService(providers, store) };
 }
 
@@ -322,10 +323,10 @@ export function setupCredentialsHttpWorld(): {
 } {
   const store = createMemoryProviderConfigStore();
   const providers = defineProviders({
-    infinitepay: infinitePayProvider(),
-    pagbank: pagbankProvider(),
-    stone: stoneProvider(),
-    stripe: stripeProvider(),
+    infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+    pagbank: pagbankProvider(PT_BR_PAGBANK_COPY),
+    stone: stoneProvider(PT_BR_STONE_COPY),
+    stripe: stripeProvider(PT_BR_STRIPE_COPY),
   } as const);
   const charges = createMemoryChargeStore();
   const http = createPaymentsHttp({

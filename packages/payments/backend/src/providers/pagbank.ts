@@ -1,4 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import type { PagbankCopy } from './copy';
 import { stubDeliveryTrusted } from '../core/stub-mode';
 import type { ChargeInput, NormalizedWebhookEvent, ResolvedCredentials } from '../core/types';
 import {
@@ -225,26 +226,28 @@ const webhookPath = (tenantSlug: string): string =>
   `/api/webhooks/pagseguro/${tenantSlug}/notifications`;
 
 /** What connecting a PagBank account collects. Hoisted for the size gate. */
-const credentialSchema = [
-  { key: 'token', label: 'Token do PagBank', secret: true, required: true },
-  { key: 'publicKey', label: 'Chave pública (cartão)', secret: false, required: false },
-  // Optional since FUT-678: webhook verification defaults to the account
-  // token (PagBank's documented signing secret); this field is only an
-  // explicit override for deployments that configured a dedicated one.
-  { key: 'webhookToken', label: 'Token de webhook', secret: true, required: false, role: 'webhookSecret' },
-  // The merchant's id at PagBank as Google Pay's `gatewayMerchantId`
-  // (FUT-471). Optional and NOT secret — it is baked into every integrating
-  // page — and the Google Pay button simply does not render for a connection
-  // that has none. Whose id applies under Connect (platform vs connected
-  // seller) is undocumented by PagBank and still an open question on the
-  // ticket; a per-connection field can hold either answer.
-  {
-    key: 'googlePayMerchantId',
-    label: 'Google Pay: ID do lojista (gatewayMerchantId)',
-    secret: false,
-    required: false,
-  },
-] as const;
+function credentialSchemaFor(copy: PagbankCopy): PaymentProviderAdapter['credentialSchema'] {
+  return [
+    { key: 'token', label: copy.fields.token, secret: true, required: true },
+    { key: 'publicKey', label: copy.fields.publicKey, secret: false, required: false },
+    // Optional since FUT-678: webhook verification defaults to the account
+    // token (PagBank's documented signing secret); this field is only an
+    // explicit override for deployments that configured a dedicated one.
+    { key: 'webhookToken', label: copy.fields.webhookToken, secret: true, required: false, role: 'webhookSecret' },
+    // The merchant's id at PagBank as Google Pay's `gatewayMerchantId`
+    // (FUT-471). Optional and NOT secret — it is baked into every integrating
+    // page — and the Google Pay button simply does not render for a connection
+    // that has none. Whose id applies under Connect (platform vs connected
+    // seller) is undocumented by PagBank and still an open question on the
+    // ticket; a per-connection field can hold either answer.
+    {
+      key: 'googlePayMerchantId',
+      label: copy.fields.googlePayMerchantId,
+      secret: false,
+      required: false,
+    },
+  ];
+}
 
 /**
  * The card-encryption public key, minted with the store's OWN token when none
@@ -262,7 +265,7 @@ const browserKey = {
     }),
 };
 
-export function pagbankProvider(): PaymentProviderAdapter {
+export function pagbankProvider(copy: PagbankCopy): PaymentProviderAdapter {
   return {
     name: NAME,
     displayName: 'PagBank',
@@ -288,14 +291,14 @@ export function pagbankProvider(): PaymentProviderAdapter {
       tokenization: 'PUBLIC_KEY',
       activationCharge: true,
     },
-    credentialSchema,
+    credentialSchema: credentialSchemaFor(copy),
     customerSchema,
     // A PIX code and a card typed on OUR page (FUT-596). Named for the SHAPE,
     // not for this vendor: Stone's flow is the same shape and declares the same
     // id rather than forking a second screen.
     checkoutScreen: 'pix-and-card',
 
-    verifyCredentials: verifyPagbankCredentials,
+    verifyCredentials: verifyPagbankCredentials(copy),
     createCharge,
     oauth: pagbankOAuth,
 

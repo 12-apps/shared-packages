@@ -12,6 +12,7 @@ import {
   PaymentProviderSettings,
   type PaymentProviderSettingsProps,
 } from '../components/PaymentProviderSettings';
+import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 
 /**
  * Which activation flow a host renders for Stripe (FUT-689).
@@ -25,7 +26,7 @@ import {
  * a card form Stripe could satisfy replaced by a link it will never mint.
  */
 
-const stripe = stripeProvider();
+const stripe = stripeProvider(PT_BR_STRIPE_COPY);
 
 /** The real adapter as the settings API would describe it — nothing invented. */
 const VIEW = {

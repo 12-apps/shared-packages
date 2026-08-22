@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProbeCheck, ResolvedCredentials } from '../core/types';
 import { stripeProvider } from '../providers/stripe';
+import { PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * What "Testar conexão" establishes about a Stripe connection (FUT-796).
@@ -55,7 +56,7 @@ describe('stripe credential probe', () => {
   it('asks the account endpoint, so the answer can name the account', async () => {
     const { urls } = stubAccount(ACCOUNT);
 
-    await stripeProvider().verifyCredentials(pastedKeys());
+    await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(pastedKeys());
 
     // `/v1/balance` authenticated the key and told the owner nothing else.
     expect(urls[0]).toBe('https://api.stripe.com/v1/account');
@@ -64,7 +65,7 @@ describe('stripe credential probe', () => {
   it('given a pasted secret key alone, then it reports which credentials are still missing', async () => {
     stubAccount(ACCOUNT);
 
-    const probe = await stripeProvider().verifyCredentials({
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials({
       environment: 'PRODUCTION',
       fields: { secretKey: 'sk_live_abc' },
     });
@@ -83,7 +84,7 @@ describe('stripe credential probe', () => {
   it('given a wrong webhook secret, then the probe reports it rather than the first payment', async () => {
     stubAccount(ACCOUNT);
 
-    const probe = await stripeProvider().verifyCredentials(
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(
       pastedKeys({ webhookSecret: 'sk_live_oops' }),
     );
 
@@ -100,7 +101,7 @@ describe('stripe credential probe', () => {
   it('given a well-formed webhook secret, then it is reported unchecked, not passed', async () => {
     stubAccount(ACCOUNT);
 
-    const probe = await stripeProvider().verifyCredentials(pastedKeys());
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(pastedKeys());
 
     expect(probe.ok).toBe(true);
     const webhook = checkFor(probe.checks, 'webhookSecret');
@@ -111,7 +112,7 @@ describe('stripe credential probe', () => {
   it('given a pasted key, then the probe names the Stripe account it resolves to', async () => {
     stubAccount(ACCOUNT);
 
-    const probe = await stripeProvider().verifyCredentials(pastedKeys());
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(pastedKeys());
 
     expect(checkFor(probe.checks, 'secretKey')?.message).toContain('acct_live_1');
   });
@@ -124,7 +125,7 @@ describe('stripe credential probe', () => {
   it('given a test publishable key beside a live secret key, then the probe refuses', async () => {
     stubAccount(ACCOUNT);
 
-    const probe = await stripeProvider().verifyCredentials(
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(
       pastedKeys({ publishableKey: 'pk_test_abc' }),
     );
 
@@ -140,7 +141,7 @@ describe('stripe credential probe', () => {
   it('given an account Stripe has not released for charging, then the probe says so', async () => {
     stubAccount({ ...ACCOUNT, charges_enabled: false });
 
-    const probe = await stripeProvider().verifyCredentials(pastedKeys());
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(pastedKeys());
 
     expect(probe.ok).toBe(false);
     expect(checkFor(probe.checks, 'secretKey')?.status).toBe('FAIL');
@@ -150,7 +151,7 @@ describe('stripe credential probe', () => {
   it('given a connectedAccountId naming another account, then the mismatch is refused', async () => {
     stubAccount(ACCOUNT);
 
-    const probe = await stripeProvider().verifyCredentials(
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(
       pastedKeys({ connectedAccountId: 'acct_someone_else' }),
     );
 
@@ -169,7 +170,7 @@ describe('stripe credential probe', () => {
   it('given an OAuth connection, then the absent webhook secret is not a failure', async () => {
     stubAccount(ACCOUNT);
 
-    const probe = await stripeProvider().verifyCredentials({
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials({
       environment: 'PRODUCTION',
       fields: { accessToken: 'sk_live_grant', publishableKey: 'pk_live_grant' },
     });
@@ -194,7 +195,7 @@ describe('stripe credential probe', () => {
       });
     });
 
-    const probe = await stripeProvider().verifyCredentials(pastedKeys());
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials(pastedKeys());
 
     expect(probe.ok).toBe(false);
     expect(probe.fault).toBe('UNREACHABLE');
@@ -202,7 +203,7 @@ describe('stripe credential probe', () => {
   });
 
   it('given a stub connection, then it passes without a network call', async () => {
-    const probe = await stripeProvider().verifyCredentials({
+    const probe = await stripeProvider(PT_BR_STRIPE_COPY).verifyCredentials({
       environment: 'SANDBOX',
       fields: {},
       stub: true,

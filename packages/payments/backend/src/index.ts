@@ -176,6 +176,11 @@ export {
 // `./providers/*`, which the provider-catalog contract reserves for ADAPTER
 // modules), and no browser build reaches any subpath.
 
+// The adapters' copy ports and pt-BR packs. Listed in `providers/index.ts`
+// (this file is at the size gate), which also carries the reason those two
+// modules are exempt from the rule above: neither has a runtime dependency.
+export * from './providers/index';
+
 export type {
   CardDetails,
   ChargeInput,

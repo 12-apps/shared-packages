@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { infinitePayProvider } from '../providers/infinitepay';
+import { PT_BR_INFINITEPAY_COPY } from '../providers/pt-BR';
 
 /**
  * "Testar conexão" for InfinitePay, which has no API key: the probe asks
@@ -31,14 +32,14 @@ describe('infinitepay verifyCredentials', () => {
 
   it('passes when the handle resolves (200, no such payment)', async () => {
     answerWith(200, { success: false });
-    await expect(infinitePayProvider().verifyCredentials(CREDS)).resolves.toMatchObject({
+    await expect(infinitePayProvider(PT_BR_INFINITEPAY_COPY).verifyCredentials(CREDS)).resolves.toMatchObject({
       ok: true,
     });
   });
 
   it('FAILS on 404 — that is InfinitePay saying the handle does not exist', async () => {
     answerWith(404, { success: false, message: 'Not found' });
-    const result = await infinitePayProvider().verifyCredentials(CREDS);
+    const result = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).verifyCredentials(CREDS);
     expect(result.ok).toBe(false);
     // Named, because "não foi possível conectar" would send an owner auditing
     // a connection whose only problem is a mistyped @.
@@ -47,14 +48,14 @@ describe('infinitepay verifyCredentials', () => {
 
   it('still passes on 422 — the handle resolved, only the reference was refused', async () => {
     answerWith(422, { success: false });
-    await expect(infinitePayProvider().verifyCredentials(CREDS)).resolves.toMatchObject({
+    await expect(infinitePayProvider(PT_BR_INFINITEPAY_COPY).verifyCredentials(CREDS)).resolves.toMatchObject({
       ok: true,
     });
   });
 
   it('fails a rejected handle (401/403) without claiming it is unknown', async () => {
     answerWith(403, { success: false });
-    const result = await infinitePayProvider().verifyCredentials(CREDS);
+    const result = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).verifyCredentials(CREDS);
     expect(result.ok).toBe(false);
   });
 
@@ -76,7 +77,7 @@ describe('infinitepay verifyCredentials', () => {
     vi.stubGlobal('fetch', async () => {
       throw new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } });
     });
-    const result = await infinitePayProvider().verifyCredentials(CREDS);
+    const result = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).verifyCredentials(CREDS);
     expect(result).toMatchObject({ ok: false, fault: 'UNREACHABLE' });
   });
 
@@ -85,7 +86,7 @@ describe('infinitepay verifyCredentials', () => {
     vi.stubGlobal('fetch', async () => {
       throw new TypeError("Cannot read properties of undefined (reading 'handle')");
     });
-    const result = await infinitePayProvider().verifyCredentials(CREDS);
+    const result = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).verifyCredentials(CREDS);
     expect(result.ok).toBe(false);
     // Anything but UNREACHABLE, because UNREACHABLE is the verdict that is
     // never written down — and a fault nobody records is a fault nobody fixes.
@@ -96,7 +97,7 @@ describe('infinitepay verifyCredentials', () => {
   it('reports missing credentials without calling the provider at all', async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    const result = await infinitePayProvider().verifyCredentials({ ...CREDS, fields: {} });
+    const result = await infinitePayProvider(PT_BR_INFINITEPAY_COPY).verifyCredentials({ ...CREDS, fields: {} });
     expect(result.ok).toBe(false);
     expect(fetchSpy).not.toHaveBeenCalled();
   });

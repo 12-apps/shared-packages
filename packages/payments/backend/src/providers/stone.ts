@@ -1,4 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import type { StoneCopy } from './copy';
 import { stubDeliveryTrusted } from '../core/stub-mode';
 import type {
   NormalizedWebhookEvent,
@@ -10,11 +11,11 @@ import { secureEquals, sha256Hex } from './shared';
 import { NAME } from './stone-http';
 import {
   cancelCharge,
-  createCharge,
+  createChargeWith,
   findChargeByReference,
   getCharge,
   refund,
-  verifyCredentials,
+  verifyCredentialsWith,
 } from './stone-operations';
 import { methodOf, orderSnapshot, settledCharge, type StoneCharge, type StoneOrder } from './stone-orders';
 import { stoneSetupGuide } from './stone-setup-guide';
@@ -123,7 +124,7 @@ function parseStoneEvent(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
   ];
 }
 
-export function stoneProvider(): PaymentProviderAdapter {
+export function stoneProvider(copy: StoneCopy): PaymentProviderAdapter {
   return {
     name: NAME,
     displayName: 'Stone',
@@ -144,10 +145,10 @@ export function stoneProvider(): PaymentProviderAdapter {
       activationCharge: true,
     },
     credentialSchema: [
-      { key: 'secretKey', label: 'Chave secreta (sk_...)', secret: true, required: true },
-      { key: 'publicKey', label: 'Chave pública (pk_...)', secret: false, required: true },
-      { key: 'webhookUser', label: 'Usuário do webhook', secret: false, required: true },
-      { key: 'webhookPassword', label: 'Senha do webhook', secret: true, required: true },
+      { key: 'secretKey', label: copy.fields.secretKey, secret: true, required: true },
+      { key: 'publicKey', label: copy.fields.publicKey, secret: false, required: true },
+      { key: 'webhookUser', label: copy.fields.webhookUser, secret: false, required: true },
+      { key: 'webhookPassword', label: copy.fields.webhookPassword, secret: true, required: true },
     ],
     /**
      * What Stone asks of the buyer (FUT-595) — the honest reading of what
@@ -162,8 +163,8 @@ export function stoneProvider(): PaymentProviderAdapter {
       { key: 'taxId', type: 'CPF', required: false },
     ],
 
-    verifyCredentials,
-    createCharge,
+    verifyCredentials: verifyCredentialsWith(copy),
+    createCharge: createChargeWith(copy),
     getCharge,
     findChargeByReference,
     cancelCharge,

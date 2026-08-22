@@ -1,4 +1,5 @@
 import type { ActivationContext } from '../activation/context';
+import { PT_BR_ACTIVATION_COPY } from '../activation/pt-BR';
 import type { PendingVerification, StoredProviderConfig } from '../config/types';
 import type {
   DeliveryPaymentProof,
@@ -138,6 +139,9 @@ export function activationContextFor(options: {
   const row: { current: StoredProviderConfig | null } = { current: options.config ?? null };
   return {
     providers: options.providers,
+    // The pack a host would pass. Every assertion below reads the sentences it
+    // produces, so a test still fails on wording that changed by accident.
+    copy: PT_BR_ACTIVATION_COPY,
     config: {
       get: async () => row.current,
       save: async (_merchant, config) => {

@@ -2,7 +2,29 @@ import { createRequire } from 'node:module';
 
 import { describe, expect, it } from 'vitest';
 
+import type { ProviderCopyPacks } from '../providers/copy';
 import { providerCatalog } from '../providers/catalog';
+import { PT_BR_PROVIDER_COPY } from '../providers/pt-BR';
+
+/**
+ * The catalog with each factory's pack already bound, so the sweeps below stay
+ * about the ADAPTERS rather than about who supplies their words.
+ *
+ * Enumerated from `providerCatalog` itself, for the reason the catalog exists:
+ * a helper that retyped the four names would stop covering the fifth adapter
+ * the moment one is added, which is precisely the failure this file guards.
+ */
+function catalogWithCopy(): Record<string, () => ReturnType<typeof providerCatalog.stone>> {
+  return Object.fromEntries(
+    Object.entries(providerCatalog).map(([name, create]) => [
+      name,
+      () =>
+        (create as (pack: ProviderCopyPacks[keyof ProviderCopyPacks]) => ReturnType<typeof create>)(
+          PT_BR_PROVIDER_COPY[name as keyof ProviderCopyPacks],
+        ),
+    ]),
+  );
+}
 
 /**
  * FUT-595 — the guard that keeps the contract sweeps whole.
@@ -63,7 +85,7 @@ describe('the provider catalog is the canonical adapter list (FUT-595)', () => {
     // What makes the comparison above meaningful: the manifest speaks in URL
     // subpaths and the catalog in registry names, so they are the same set only
     // while an adapter's name matches the subpath it is published under.
-    for (const [name, createAdapter] of Object.entries(providerCatalog)) {
+    for (const [name, createAdapter] of Object.entries(catalogWithCopy())) {
       expect(createAdapter().name, `catalog key "${name}"`).toBe(name);
     }
   });
@@ -84,7 +106,7 @@ describe('the provider catalog is the canonical adapter list (FUT-595)', () => {
   it('builds a fresh adapter per call, so no sweep can leak into another', () => {
     // The catalog holds factories precisely so a sweep that stubs or mutates an
     // adapter cannot hand the next one a used instance.
-    for (const createAdapter of Object.values(providerCatalog)) {
+    for (const createAdapter of Object.values(catalogWithCopy())) {
       expect(createAdapter()).not.toBe(createAdapter());
     }
   });
