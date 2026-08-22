@@ -1,6 +1,7 @@
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { ResolvedCredentials } from '../core/types';
+import type { StoneCopy } from './copy';
 import { unreachableOutcome } from './probe-shared';
 import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
 import { NAME, stoneRequest } from './stone-http';
@@ -18,45 +19,51 @@ import {
  * (identity, capabilities, webhooks) and this file holds the calls it makes.
  */
 
-export const verifyCredentials: PaymentProviderAdapter['verifyCredentials'] = async (
-  credentials,
-) => {
-  if (credentials.stub) return { ok: true, message: 'stub mode' };
-  if (!credentials.fields['secretKey']) {
-    return { ok: false, message: 'Chave secreta não configurada.' };
-  }
-  try {
-    // Cheapest authenticated probe: one page of orders. A wrong key → 401.
-    await stoneRequest('/orders?size=1', credentials, { method: 'GET' });
-    return { ok: true };
-  } catch (error) {
-    // Transport first: without the UNREACHABLE fault, a network blip during
-    // "Testar conexão" persisted FAILED over a good key (FUT-695).
-    const unreachable = unreachableOutcome(error, 'a Stone/Pagar.me');
-    if (unreachable) return unreachable;
-    const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
-    if (status === 401 || status === 403) {
-      return { ok: false, fault: 'REFUSED', message: 'Chave recusada pela Stone/Pagar.me.' };
+export function verifyCredentialsWith(
+  copy: StoneCopy,
+): NonNullable<PaymentProviderAdapter['verifyCredentials']> {
+  return async (credentials) => {
+    if (credentials.stub) return { ok: true, message: 'stub mode' };
+    if (!credentials.fields['secretKey']) {
+      return { ok: false, message: copy.secretKeyMissing };
     }
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
-  }
-};
+    try {
+      // Cheapest authenticated probe: one page of orders. A wrong key → 401.
+      await stoneRequest('/orders?size=1', credentials, { method: 'GET' });
+      return { ok: true };
+    } catch (error) {
+      // Transport first: without the UNREACHABLE fault, a network blip during
+      // "Testar conexão" persisted FAILED over a good key (FUT-695).
+      const unreachable = unreachableOutcome(error, copy.unreachable);
+      if (unreachable) return unreachable;
+      const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
+      if (status === 401 || status === 403) {
+        return { ok: false, fault: 'REFUSED', message: copy.refused };
+      }
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  };
+}
 
-export const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
-  if (credentials.stub) return stubCharge(NAME, input, credentials);
-  const order = await stoneRequest<StoneOrder>('/orders', credentials, {
-    method: 'POST',
-    body: orderPayload(input),
-    idempotencyKey: input.idempotencyKey ?? input.reference,
-  });
-  // A refused card comes back as a 200 carrying a `failed` charge — mapped to
-  // a DECLINED snapshot by `orderSnapshot`, never thrown.
-  return orderSnapshot(order, {
-    amountCents: input.amount.amountCents,
-    currency: input.amount.currency,
-    method: input.method,
-  });
-};
+export function createChargeWith(
+  copy: StoneCopy,
+): NonNullable<PaymentProviderAdapter['createCharge']> {
+  return async (input, credentials) => {
+    if (credentials.stub) return stubCharge(NAME, input, credentials);
+    const order = await stoneRequest<StoneOrder>('/orders', credentials, {
+      method: 'POST',
+      body: orderPayload(input, copy),
+      idempotencyKey: input.idempotencyKey ?? input.reference,
+    });
+    // A refused card comes back as a 200 carrying a `failed` charge — mapped to
+    // a DECLINED snapshot by `orderSnapshot`, never thrown.
+    return orderSnapshot(order, {
+      amountCents: input.amount.amountCents,
+      currency: input.amount.currency,
+      method: input.method,
+    });
+  };
+}
 
 /**
  * Fetch whatever a provider charge id points at, normalized to an order.

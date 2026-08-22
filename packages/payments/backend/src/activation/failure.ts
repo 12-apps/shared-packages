@@ -1,5 +1,6 @@
 import { ProviderRequestError } from '../core/errors';
 import { isTransportError } from '../core/failover';
+import type { ActivationCopy } from './copy';
 
 /**
  * How a verification failure is told to the owner (FUT-463 / FUT-489 /
@@ -72,6 +73,10 @@ export interface VerificationFailure {
  * the owner to "complete the homologação" sent them after a task that was
  * never theirs. Say who is responsible and stop there.
  *
+ * WHICH of the two it is stays the classification above; the sentence itself
+ * is `copy.platformApproval`, which is why only that key is taken. Every other
+ * branch reports the provider's own words, and those are not ours to write.
+ *
  * `transport` marks a failure with NO answer: DNS, a timeout, a reset. The
  * provider refused nothing, so nothing the owner has told us is called into
  * question — which matters because callers REVOKE the owner's "Checkout
@@ -82,7 +87,10 @@ export interface VerificationFailure {
  * classifies, FUT-581), and a status-less `ProviderRequestError` (the response
  * never parsed) — `providerFetch` only wraps a RESPONSE.
  */
-export function failureFor(error: unknown): VerificationFailure {
+export function failureFor(
+  error: unknown,
+  copy: Pick<ActivationCopy, 'platformApproval'>,
+): VerificationFailure {
   const message = error instanceof Error ? error.message : String(error);
   const raw = rawExchange(error, message);
   const transport =
@@ -91,10 +99,7 @@ export function failureFor(error: unknown): VerificationFailure {
 
   if (message.includes('ACCESS_DENIED') || message.includes('whitelist')) {
     return {
-      reason:
-        'O PagBank ainda não liberou cobranças reais para esta plataforma. Isso é resolvido ' +
-        'por nós, não pela sua loja — nossa equipe já está tratando e avisaremos assim que ' +
-        'estiver liberado.',
+      reason: copy.platformApproval,
       providerMessage: raw,
       ...(transport ? { transport } : {}),
     };
@@ -110,20 +115,6 @@ export function failureFor(error: unknown): VerificationFailure {
     providerMessage: raw,
     ...(transport ? { transport } : {}),
   };
-}
-
-/**
- * What to TELL the owner when we could not reach the provider at all.
- *
- * Composed where the adapter is in hand so it can name the vendor: "não
- * conseguimos falar com o provedor" is the same sentence with the one useful
- * word removed. The raw exchange still rides along in `providerMessage`; this
- * replaces only the sentence an owner is expected to act on, and the action it
- * asks for — wait, try again — is the correct one for an outage and the wrong
- * one for every other failure, which is why it is gated on `transport`.
- */
-export function unreachableReason(displayName: string): string {
-  return `Não conseguimos falar com a ${displayName} agora. Tente de novo em instantes.`;
 }
 
 /**

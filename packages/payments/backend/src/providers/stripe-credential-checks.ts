@@ -1,4 +1,5 @@
 import type { ProbeCheck, ResolvedCredentials } from '../core/types';
+import type { StripeCredentialCopy } from './copy';
 
 /**
  * What "Testar conexão" can actually establish about a Stripe connection,
@@ -44,8 +45,6 @@ function expectedLiveMode(credentials: ResolvedCredentials): boolean {
   return credentials.environment === 'PRODUCTION';
 }
 
-const MODE_WORD = (live: boolean) => (live ? 'produção (live)' : 'teste (test)');
-
 /**
  * The key charges authenticate as: the OAuth grant's token, or a pasted secret
  * key. `apiKeyOf` resolves them in this order and so must this — a probe that
@@ -67,23 +66,18 @@ function apiKeyFieldOf(credentials: ResolvedCredentials): { key: string; value: 
  * is the precise shape of "a success that does not predict a working checkout".
  */
 function secretKeyCheck(
+  copy: StripeCredentialCopy,
   credentials: ResolvedCredentials,
   account: StripeAccountFacts,
 ): ProbeCheck {
   const { key, value } = apiKeyFieldOf(credentials);
   const accountId = typeof account.id === 'string' ? account.id : null;
+  // The one FACT the sentence turns on, passed as a fact: a grant and a pasted
+  // key are the same credential to Stripe and two different nouns to an owner.
   const viaGrant = Boolean(credentials.fields['accessToken']);
-  const source = viaGrant ? 'A autorização' : 'A chave secreta';
 
   if (account.charges_enabled === false) {
-    return {
-      key,
-      status: 'FAIL',
-      message:
-        `${source} funciona${accountId ? ` (conta ${accountId})` : ''}, mas a Stripe ainda ` +
-        'não liberou cobranças nesta conta. Conclua o cadastro da empresa no painel da Stripe — ' +
-        'enquanto isso, toda cobrança será recusada.',
-    };
+    return { key, status: 'FAIL', message: copy.chargesDisabled(viaGrant, accountId) };
   }
 
   const mode = liveModeOf(value);
@@ -92,9 +86,7 @@ function secretKeyCheck(
     return {
       key,
       status: 'FAIL',
-      message:
-        `${source} é de ${MODE_WORD(mode)}, mas esta conexão está configurada como ` +
-        `${MODE_WORD(wanted)}. Use a chave do ambiente correspondente.`,
+      message: copy.secretKeyModeMismatch(viaGrant, { key: mode, connection: wanted }),
     };
   }
 
@@ -102,8 +94,8 @@ function secretKeyCheck(
     key,
     status: 'PASS',
     message: accountId
-      ? `${source} responde pela conta ${accountId}.`
-      : `${source} foi aceita pela Stripe.`,
+      ? copy.secretKeyResolved(viaGrant, accountId)
+      : copy.secretKeyAccepted(viaGrant),
   };
 }
 
@@ -116,24 +108,15 @@ function secretKeyCheck(
  * card: the browser mints a token in the wrong mode and Stripe refuses the
  * charge with an error about the token, not about the key.
  */
-function publishableKeyCheck(credentials: ResolvedCredentials): ProbeCheck {
+function publishableKeyCheck(
+  copy: StripeCredentialCopy,
+  credentials: ResolvedCredentials,
+): ProbeCheck {
   const key = 'publishableKey';
   const value = credentials.fields[key];
-  if (!value) {
-    return {
-      key,
-      status: 'FAIL',
-      message:
-        'Sem a chave publicável o navegador não consegue tokenizar cartões, então o checkout ' +
-        'com cartão não funciona nesta loja.',
-    };
-  }
+  if (!value) return { key, status: 'FAIL', message: copy.publishableKeyMissing };
   if (!value.startsWith('pk_')) {
-    return {
-      key,
-      status: 'FAIL',
-      message: 'Isto não parece uma chave publicável — ela começa com `pk_`.',
-    };
+    return { key, status: 'FAIL', message: copy.publishableKeyShape };
   }
   const mode = liveModeOf(value);
   const wanted = expectedLiveMode(credentials);
@@ -141,16 +124,10 @@ function publishableKeyCheck(credentials: ResolvedCredentials): ProbeCheck {
     return {
       key,
       status: 'FAIL',
-      message:
-        `A chave publicável é de ${MODE_WORD(mode)} e esta conexão é ${MODE_WORD(wanted)}. ` +
-        'O cartão do comprador seria recusado sem explicação.',
+      message: copy.publishableKeyModeMismatch({ key: mode, connection: wanted }),
     };
   }
-  return {
-    key,
-    status: 'PASS',
-    message: `Chave publicável de ${MODE_WORD(wanted)}, coerente com o ambiente desta conexão.`,
-  };
+  return { key, status: 'PASS', message: copy.publishableKeyOk(wanted) };
 }
 
 /**
@@ -161,32 +138,24 @@ function publishableKeyCheck(credentials: ResolvedCredentials): ProbeCheck {
  * verdict, and it is more useful than a green tick: it tells the owner which
  * part of a passing probe they may NOT rely on.
  */
-function webhookSecretCheck(credentials: ResolvedCredentials): ProbeCheck {
+function webhookSecretCheck(
+  copy: StripeCredentialCopy,
+  credentials: ResolvedCredentials,
+): ProbeCheck {
   const key = 'webhookSecret';
   const value = credentials.fields[key] || credentials.fields['platformWebhookSecret'];
   if (!value) {
+    const viaGrant = Boolean(credentials.fields['accessToken']);
     return {
       key,
-      status: credentials.fields['accessToken'] ? 'UNCHECKED' : 'FAIL',
-      message: credentials.fields['accessToken']
-        ? 'Contas conectadas por autorização usam o endpoint da plataforma — nada a cadastrar.'
-        : 'Sem o segredo de assinatura, as confirmações de pagamento da Stripe serão recusadas.',
+      status: viaGrant ? 'UNCHECKED' : 'FAIL',
+      message: viaGrant ? copy.webhookSecretViaGrant : copy.webhookSecretMissing,
     };
   }
   if (!value.startsWith('whsec_')) {
-    return {
-      key,
-      status: 'FAIL',
-      message: 'Isto não parece um segredo de assinatura — ele começa com `whsec_`.',
-    };
+    return { key, status: 'FAIL', message: copy.webhookSecretShape };
   }
-  return {
-    key,
-    status: 'UNCHECKED',
-    message:
-      'O formato está certo. A Stripe não oferece como conferir se o segredo é o correto — ' +
-      'isso só aparece na primeira notificação recebida.',
-  };
+  return { key, status: 'UNCHECKED', message: copy.webhookSecretShapeOnly };
 }
 
 /**
@@ -198,6 +167,7 @@ function webhookSecretCheck(credentials: ResolvedCredentials): ProbeCheck {
  * webhooks to this store.
  */
 function connectedAccountCheck(
+  copy: StripeCredentialCopy,
   credentials: ResolvedCredentials,
   account: StripeAccountFacts,
 ): ProbeCheck | null {
@@ -206,27 +176,22 @@ function connectedAccountCheck(
   if (!declared) return null;
   const resolved = typeof account.id === 'string' ? account.id : null;
   if (resolved && declared !== resolved) {
-    return {
-      key,
-      status: 'FAIL',
-      message:
-        `A chave informada responde pela conta ${resolved}, e não por ${declared}. ` +
-        'Uma das duas está errada — e é ela que decide para qual conta o dinheiro vai.',
-    };
+    return { key, status: 'FAIL', message: copy.connectedAccountMismatch(resolved, declared) };
   }
-  return { key, status: 'PASS', message: `Confere com a conta que a chave resolve (${declared}).` };
+  return { key, status: 'PASS', message: copy.connectedAccountOk(declared) };
 }
 
 /** Every verdict this adapter can produce, for one resolved connection. */
 export function stripeCredentialChecks(
+  copy: StripeCredentialCopy,
   credentials: ResolvedCredentials,
   account: StripeAccountFacts,
 ): ProbeCheck[] {
-  const connected = connectedAccountCheck(credentials, account);
+  const connected = connectedAccountCheck(copy, credentials, account);
   return [
-    secretKeyCheck(credentials, account),
-    publishableKeyCheck(credentials),
-    webhookSecretCheck(credentials),
+    secretKeyCheck(copy, credentials, account),
+    publishableKeyCheck(copy, credentials),
+    webhookSecretCheck(copy, credentials),
     ...(connected ? [connected] : []),
   ];
 }
@@ -238,12 +203,15 @@ export function stripeCredentialChecks(
  * as credenciais" is advice an owner can follow all afternoon: with four
  * credentials on the form, which one is wrong IS the answer.
  */
-export function stripeChecksSummary(checks: readonly ProbeCheck[]): string | undefined {
+export function stripeChecksSummary(
+  copy: Pick<StripeCredentialCopy, 'severalFailed'>,
+  checks: readonly ProbeCheck[],
+): string | undefined {
   const failed = checks.filter((check) => check.status === 'FAIL');
   if (failed.length === 0) return undefined;
   // One failure speaks for itself; several need naming, and the first one's
   // sentence is still the most actionable thing to lead with.
   return failed.length === 1
     ? failed[0]!.message
-    : `${failed.length} credenciais precisam de atenção. ${failed[0]!.message}`;
+    : copy.severalFailed(failed.length, failed[0]!.message);
 }

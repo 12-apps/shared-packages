@@ -17,7 +17,9 @@ describe('pagbankConnectError', () => {
     expect(named).toContain('invalid_token');
     expect(named).toMatch(/Bearer/i);
     // The whole point: it must steer AWAY from the credentials that are fine.
-    expect(named).toMatch(/TOKEN DA CONTA/);
+    // The gloss is English now (FUT-760 — a developer reads this, in a log),
+    // so the phrase moved; what it has to say did not.
+    expect(named).toMatch(/PLATFORM ACCOUNT TOKEN/);
   });
 
   /**
@@ -32,7 +34,7 @@ describe('pagbankConnectError', () => {
 
   /** Not about our request at all — about the URL registered for our client. */
   it.each(['41013', '41014', '41015', '41016'])('explains %s as the public-key URL', (code) => {
-    expect(pagbankConnectError(`401: ${code} something`)).toMatch(/URL|chave pública/i);
+    expect(pagbankConnectError(`401: ${code} something`)).toMatch(/URL|public key/i);
   });
 
   it('covers every documented code', () => {

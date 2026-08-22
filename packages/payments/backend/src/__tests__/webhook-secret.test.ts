@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CredentialStore } from '../core/ports';
 import { withPlatformWebhookSecret } from '../core/webhook-secret';
 import { stripeProvider } from '../providers/stripe';
+import { PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * Connect deliveries are signed with the PLATFORM's endpoint secret, and the
@@ -131,7 +132,7 @@ describe('withPlatformWebhookSecret', () => {
     const mac = createHmac('sha256', 'whsec_rolled').update(`1700000000.${rawBody}`).digest('hex');
 
     await expect(
-      stripeProvider().webhook.verify(
+      stripeProvider(PT_BR_STRIPE_COPY).webhook.verify(
         {
           provider: 'stripe',
           rawBody,

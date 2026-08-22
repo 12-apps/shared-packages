@@ -4,6 +4,7 @@ import { ProviderRequestError } from '../core/errors';
 import type { ResolvedCredentials } from '../core/types';
 import { pagbankProvider } from '../providers/pagbank';
 import { cardInput } from './fixtures';
+import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
 /**
  * PagBank card vaulting (FUT-478 / FUT-183) — saving/validating a card WITHOUT
@@ -62,7 +63,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     // The omission is load-bearing: PagBank documents no endpoint that deletes
     // a stored card token, so the gateway must answer UnsupportedOperationError
     // for a removal rather than fake one — the host decides about its pointer.
-    const vault = pagbankProvider().vault;
+    const vault = pagbankProvider(PT_BR_PAGBANK_COPY).vault;
     expect(vault?.begin).toBeTypeOf('function');
     expect(vault?.complete).toBeTypeOf('function');
     expect(vault?.forget).toBeUndefined();
@@ -74,7 +75,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
       // how to encrypt. Nothing exists at the provider yet.
       const calls = stubFetch([{ body: {} }]);
 
-      const session = await pagbankProvider().vault!.begin(
+      const session = await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.begin(
         { reference: 'sub-1', customer: { name: 'Bar do Ze', email: 'dono@bar.com' } },
         LIVE,
       );
@@ -92,7 +93,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
       // dead — refused here with a reason, not later as an opaque SDK error.
       const calls = stubFetch([{ body: {} }]);
 
-      const error = await pagbankProvider()
+      const error = await pagbankProvider(PT_BR_PAGBANK_COPY)
         .vault!.begin(
           { reference: 'sub-1', customer: { name: 'Loja' } },
           { environment: 'SANDBOX', fields: { token: 'tok_live' } },
@@ -108,7 +109,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     it('answers a stub connection without a key instead of refusing it', async () => {
       // No key on a stub is exactly the state the host's mock tokenization
       // exists for — the same gate the checkout config applies.
-      const session = await pagbankProvider().vault!.begin(
+      const session = await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.begin(
         { reference: 'sub-1', customer: { name: 'Loja' } },
         STUB,
       );
@@ -121,7 +122,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     it('sends only the encrypted blob, bearer-authenticated, to the sandbox host', async () => {
       const calls = stubFetch([{ body: STORED_CARD }]);
 
-      await pagbankProvider().vault!.complete(
+      await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.complete(
         { reference: 'sub-1', token: 'ENCRYPTED_BLOB' },
         LIVE,
       );
@@ -138,7 +139,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     it('keeps the token and display metadata — and drops everything else', async () => {
       stubFetch([{ body: STORED_CARD }]);
 
-      const vaulted = await pagbankProvider().vault!.complete(
+      const vaulted = await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.complete(
         { reference: 'sub-1', token: 'ENCRYPTED_BLOB' },
         LIVE,
       );
@@ -161,7 +162,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     it('routes PRODUCTION credentials at the live host', async () => {
       const calls = stubFetch([{ body: STORED_CARD }]);
 
-      await pagbankProvider().vault!.complete(
+      await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.complete(
         { reference: 'sub-1', token: 'BLOB' },
         { environment: 'PRODUCTION', fields: { token: 't', publicKey: 'pk' } },
       );
@@ -172,7 +173,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     it('drops an unparseable display expiry rather than answering NaN', async () => {
       stubFetch([{ body: { ...STORED_CARD, exp_month: 'ab', exp_year: undefined } }]);
 
-      const vaulted = await pagbankProvider().vault!.complete(
+      const vaulted = await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.complete(
         { reference: 'sub-1', token: 'BLOB' },
         LIVE,
       );
@@ -186,7 +187,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
       // back, so without the blob there is nothing to store.
       const calls = stubFetch([{ body: STORED_CARD }]);
 
-      const error = await pagbankProvider()
+      const error = await pagbankProvider(PT_BR_PAGBANK_COPY)
         .vault!.complete({ reference: 'sub-1', sessionId: 'seti_wrong_provider' }, LIVE)
         .catch((thrown: unknown) => thrown);
 
@@ -199,7 +200,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
       // A "stored" card the host cannot ever charge is not a success.
       stubFetch([{ body: { brand: 'visa', last_digits: '4242' } }]);
 
-      const error = await pagbankProvider()
+      const error = await pagbankProvider(PT_BR_PAGBANK_COPY)
         .vault!.complete({ reference: 'sub-1', token: 'BLOB' }, LIVE)
         .catch((thrown: unknown) => thrown);
 
@@ -225,7 +226,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
         },
       ]);
       try {
-        await pagbankProvider().vault!.complete({ reference: 'sub-1', token: 'BAD_BLOB' }, LIVE);
+        await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.complete({ reference: 'sub-1', token: 'BAD_BLOB' }, LIVE);
       } catch (error) {
         return error as ProviderRequestError;
       }
@@ -258,7 +259,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     it('keeps a provider outage retriable', async () => {
       stubFetch([{ status: 503, body: {} }]);
 
-      const error = await pagbankProvider()
+      const error = await pagbankProvider(PT_BR_PAGBANK_COPY)
         .vault!.complete({ reference: 'sub-1', token: 'BLOB' }, LIVE)
         .catch((thrown: unknown) => thrown);
 
@@ -270,7 +271,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
     it('completes deterministically and touches nothing', async () => {
       const calls = stubFetch([{ body: {} }]);
 
-      const vaulted = await pagbankProvider().vault!.complete(
+      const vaulted = await pagbankProvider(PT_BR_PAGBANK_COPY).vault!.complete(
         { reference: 'sub-9', token: 'mock_tok_1' },
         STUB,
       );
@@ -291,7 +292,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
       // "bad card caught at entry" branch without a live account.
       const calls = stubFetch([{ body: {} }]);
 
-      const error = await pagbankProvider()
+      const error = await pagbankProvider(PT_BR_PAGBANK_COPY)
         .vault!.complete({ reference: 'sub-9', token: 'tok-declined' }, STUB)
         .catch((thrown: unknown) => thrown);
 
@@ -311,7 +312,7 @@ describe('pagbank adapter — card vault (FUT-478/FUT-183)', () => {
       { body: STORED_CARD },
       { body: { id: 'ORDE_1', charges: [{ id: 'CHAR_1', status: 'PAID' }] } },
     ]);
-    const adapter = pagbankProvider();
+    const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
 
     const vaulted = await adapter.vault!.complete({ reference: 'sub-1', token: 'BLOB' }, LIVE);
     await adapter.createCharge(

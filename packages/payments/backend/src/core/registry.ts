@@ -33,9 +33,9 @@ function assertPaymentProofPaired(name: string, adapter: PaymentProviderAdapter)
  *
  * @example
  * const providers = defineProviders({
- *   stone: stoneProvider(),
- *   infinitepay: infinitePayProvider(),
- *   stripe: stripeProvider(),
+ *   stone: stoneProvider(PT_BR_STONE_COPY),
+ *   infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+ *   stripe: stripeProvider(PT_BR_STRIPE_COPY),
  * } as const);
  * type AppProvider = (typeof providers.names)[number]; // 'stone' | ...
  */

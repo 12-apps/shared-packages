@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pagbankProvider } from '../providers/pagbank';
 
 import { cardInput, pixInput } from './fixtures';
+import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
 /**
  * The IDS a PagBank snapshot carries, and which field each one lands in.
@@ -58,7 +59,7 @@ describe('pagbank snapshots — the three ids stay distinct', () => {
       ],
     });
 
-    const snapshot = await pagbankProvider().createCharge(cardInput(), CREDS);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput(), CREDS);
 
     // Three ids from one payload, three destinations. Asserted together on
     // purpose: any pair being swapped is the failure this pins, and checking
@@ -85,7 +86,7 @@ describe('pagbank snapshots — the three ids stay distinct', () => {
       ],
     });
 
-    const snapshot = await pagbankProvider().createCharge(
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       cardInput('order-2', 'tok_one_time_blob'),
       CREDS,
     );
@@ -102,7 +103,7 @@ describe('pagbank snapshots — the three ids stay distinct', () => {
       charges: [{ id: 'CHAR_C', status: 'PAID', payment_response: { code: '20000' } }],
     });
 
-    const snapshot = await pagbankProvider().createCharge(cardInput(), CREDS);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput(), CREDS);
 
     expect(snapshot.card?.vaultToken).toBeUndefined();
   });
@@ -118,7 +119,7 @@ describe('pagbank snapshots — the three ids stay distinct', () => {
       qr_codes: [{ text: '00020126-emv', expiration_date: '2030-01-01T00:00:00Z' }],
     });
 
-    const snapshot = await pagbankProvider().createCharge(pixInput(), CREDS);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(pixInput(), CREDS);
 
     expect(snapshot.settlementHints?.orderId).toBe('ORDE_D');
     expect(snapshot.providerChargeId).toBe('ORDE_D');
@@ -133,7 +134,7 @@ describe('pagbank snapshots — the three ids stay distinct', () => {
       charges: [{ id: 'CHAR_E', status: 'PAID', amount: { value: 1234 } }],
     });
 
-    const snapshot = await pagbankProvider().getCharge('ORDE_E', CREDS);
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).getCharge('ORDE_E', CREDS);
 
     expect(snapshot.settlementHints?.orderId).toBe('ORDE_E');
     expect(snapshot.providerChargeId).toBe('CHAR_E');

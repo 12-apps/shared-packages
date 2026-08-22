@@ -4,6 +4,7 @@ import {
   buildPlatformHomologacaoAnexo,
   type PlatformHomologacaoAnexoInput,
 } from '../platform/homologacao-anexo';
+import { PT_BR_HOMOLOGACAO_ANSWERS } from '../platform/pt-BR';
 
 /**
  * The platform's anexo generator (FUT-483, packaged by FUT-573). Pinned:
@@ -23,6 +24,10 @@ function input(over: Partial<PlatformHomologacaoAnexoInput> = {}): PlatformHomol
     publicBaseUrl: 'https://app.example.com',
     demoStoreUrl: 'https://app.example.com/demo-balcao/menu',
     webhookUrl: 'https://app.example.com/api/webhooks/pagseguro/demo-balcao/notifications',
+    integrationSummary: PT_BR_HOMOLOGACAO_ANSWERS.integrationSummary({
+      demoStoreUrl: 'https://app.example.com/demo-balcao/menu',
+      webhookUrl: 'https://app.example.com/api/webhooks/pagseguro/demo-balcao/notifications',
+    }),
     ...over,
   };
 }

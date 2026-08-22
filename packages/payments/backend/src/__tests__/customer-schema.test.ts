@@ -16,6 +16,7 @@ import {
   createMemoryCredentialStore,
 } from '../memory';
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
+import { PT_BR_PROVIDER_COPY } from '../providers/pt-BR';
 import { gateIssuesOf, nothingWasAttempted } from '../core/walk-failure';
 import { allProviderAdapters } from '../providers/catalog';
 import { infinitePayProvider } from '../providers/infinitepay';
@@ -23,6 +24,7 @@ import { pagbankProvider } from '../providers/pagbank';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
 import { STUB_CREDS, TENANT, pixInput } from './fixtures';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 
 /**
  * FUT-595 — buyer requirements declared by the adapter.
@@ -43,7 +45,7 @@ import { STUB_CREDS, TENANT, pixInput } from './fixtures';
  * itself pinned against the package's `exports` map by
  * `provider-catalog.test.ts`, so a new adapter reaches this list on its own.
  */
-const LIVE_ADAPTERS: PaymentProviderAdapter[] = allProviderAdapters();
+const LIVE_ADAPTERS: PaymentProviderAdapter[] = allProviderAdapters(PT_BR_PROVIDER_COPY);
 
 /** A CPF/CNPJ pair that satisfy their check digits, and ones that do not. */
 const VALID_CPF = '123.456.789-09';
@@ -71,7 +73,7 @@ describe('per-adapter declarations (the FUT-595 matrix)', () => {
   });
 
   it('pagbank requires the CPF — the one field criar-pedido marks required', () => {
-    const schema = pagbankProvider().customerSchema;
+    const schema = pagbankProvider(PT_BR_PAGBANK_COPY).customerSchema;
     expect(required(schema, 'PIX')).toEqual(['taxId']);
     expect(required(schema, 'CARD')).toEqual(['taxId']);
     // Phone is asked (forwarded all-or-nothing, FUT-488) but never demanded.
@@ -79,7 +81,7 @@ describe('per-adapter declarations (the FUT-595 matrix)', () => {
   });
 
   it('infinitepay requires the phone and has NO taxId field at all', () => {
-    const schema = infinitePayProvider().customerSchema;
+    const schema = infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema;
     expect(required(schema, 'PIX')).toEqual(['phone']);
     expect(required(schema, 'CARD')).toEqual(['phone']);
     // Not merely optional — absent: linkPayload has nowhere to send a CPF, so
@@ -104,7 +106,7 @@ describe('per-adapter declarations (the FUT-595 matrix)', () => {
   });
 
   it('stripe scopes its demands to BOLETO — per-method, not per-provider', () => {
-    const schema = stripeProvider().customerSchema;
+    const schema = stripeProvider(PT_BR_STRIPE_COPY).customerSchema;
     // Boleto refuses without billing_details name+email and boleto.tax_id.
     // (A full billing address is ALSO required but CustomerInfo cannot say so
     // yet — see the adapter comment; FUT-596 carries the form-side gap.)
@@ -118,8 +120,8 @@ describe('per-adapter declarations (the FUT-595 matrix)', () => {
   });
 
   it('stone declares honestly: everything it sends is optional, phone unasked', () => {
-    const schema = stoneProvider().customerSchema;
-    for (const method of stoneProvider().capabilities.methods) {
+    const schema = stoneProvider(PT_BR_STONE_COPY).customerSchema;
+    for (const method of stoneProvider(PT_BR_STONE_COPY).capabilities.methods) {
       expect(required(schema, method)).toEqual([]);
     }
     expect(asked(schema, 'PIX')).not.toContain('phone');
@@ -127,7 +129,7 @@ describe('per-adapter declarations (the FUT-595 matrix)', () => {
 });
 
 describe('validation follows the field type', () => {
-  const schema = pagbankProvider().customerSchema;
+  const schema = pagbankProvider(PT_BR_PAGBANK_COPY).customerSchema;
 
   it('accepts a CPF and a CNPJ by their check digits', () => {
     for (const taxId of [VALID_CPF, VALID_CNPJ]) {
@@ -187,7 +189,7 @@ describe('validation follows the field type', () => {
   });
 
   it('MOBILE is stricter: InfinitePay demands a mobile, so a landline is INVALID', () => {
-    const infinitepay = infinitePayProvider().customerSchema;
+    const infinitepay = infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema;
     for (const phone of ['(11) 98888-7777', '+55 11 98888-7777', '55 11 98888 7777']) {
       expect(validateCustomer(infinitepay, 'PIX', { phone }), phone).toEqual([]);
     }
@@ -206,7 +208,7 @@ describe('validation follows the field type', () => {
   });
 
   it('stripe BOLETO blocks on name, e-mail and tax id — and only for BOLETO', () => {
-    const stripe = stripeProvider().customerSchema;
+    const stripe = stripeProvider(PT_BR_STRIPE_COPY).customerSchema;
     expect(validateCustomer(stripe, 'BOLETO', {})).toEqual([
       { field: 'name', reason: 'MISSING', required: true },
       { field: 'email', reason: 'MISSING', required: true },
@@ -233,12 +235,12 @@ describe('validation follows the field type', () => {
     // InfinitePay asks for no taxId, Stripe asks none for CARD: garbage there
     // must produce NO issue — this is the "never block a charge" property.
     expect(
-      validateCustomer(infinitePayProvider().customerSchema, 'PIX', {
+      validateCustomer(infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema, 'PIX', {
         taxId: 'garbage',
         phone: '11988887777',
       }),
     ).toEqual([]);
-    expect(validateCustomer(stripeProvider().customerSchema, 'CARD', { taxId: 'garbage' })).toEqual(
+    expect(validateCustomer(stripeProvider(PT_BR_STRIPE_COPY).customerSchema, 'CARD', { taxId: 'garbage' })).toEqual(
       [],
     );
   });
@@ -252,7 +254,7 @@ describe('validation follows the field type', () => {
 describe('the union a checkout collects up front', () => {
   it('merges a chain, strictest requiredness winning', () => {
     const union = unionCustomerFields(
-      [pagbankProvider().customerSchema, infinitePayProvider().customerSchema],
+      [pagbankProvider(PT_BR_PAGBANK_COPY).customerSchema, infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema],
       'CARD',
     );
     const byKey = Object.fromEntries(union.map((field) => [field.key, field]));
@@ -273,7 +275,7 @@ describe('the union a checkout collects up front', () => {
 
   it('the narrower type wins whichever order the chain is in', () => {
     const reversed = unionCustomerFields(
-      [infinitePayProvider().customerSchema, pagbankProvider().customerSchema],
+      [infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema, pagbankProvider(PT_BR_PAGBANK_COPY).customerSchema],
       'CARD',
     );
     expect(reversed.find((field) => field.key === 'phone')).toMatchObject({
@@ -283,7 +285,7 @@ describe('the union a checkout collects up front', () => {
   });
 
   it('resolves per method before merging', () => {
-    const union = unionCustomerFields([stripeProvider().customerSchema], 'CARD');
+    const union = unionCustomerFields([stripeProvider(PT_BR_STRIPE_COPY).customerSchema], 'CARD');
     expect(union.map((field) => field.key)).not.toContain('taxId');
   });
 });
@@ -294,9 +296,9 @@ function customerWorld(...chain: Array<'pagbank' | 'infinitepay' | 'stone'>) {
   const attempts = createMemoryAttemptLedger();
   const gateway = createPaymentsGateway({
     providers: defineProviders({
-      pagbank: pagbankProvider(),
-      infinitepay: infinitePayProvider(),
-      stone: stoneProvider(),
+      pagbank: pagbankProvider(PT_BR_PAGBANK_COPY),
+      infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+      stone: stoneProvider(PT_BR_STONE_COPY),
     } as const),
     credentials,
     charges: createMemoryChargeStore(),
@@ -512,7 +514,7 @@ describe('publication in the client config (what the checkout renders from)', ()
   it('clientConfig carries the active provider schema, normalized', async () => {
     const world = customerWorld('infinitepay');
     const config = await world.gateway.clientConfig(TENANT);
-    expect(config?.customerSchema).toEqual(infinitePayProvider().customerSchema);
+    expect(config?.customerSchema).toEqual(infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema);
   });
 
   it('clientConfigChain carries every member schema, in failover order', async () => {
@@ -520,8 +522,8 @@ describe('publication in the client config (what the checkout renders from)', ()
     const configs = await world.gateway.clientConfigChain(TENANT);
     expect(configs.map((config) => config.provider)).toEqual(['pagbank', 'infinitepay']);
     expect(configs.map((config) => config.customerSchema)).toEqual([
-      pagbankProvider().customerSchema,
-      infinitePayProvider().customerSchema,
+      pagbankProvider(PT_BR_PAGBANK_COPY).customerSchema,
+      infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema,
     ]);
   });
 });

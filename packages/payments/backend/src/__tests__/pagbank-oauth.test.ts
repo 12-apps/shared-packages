@@ -308,7 +308,8 @@ describe('pagbank OAuth — error codes are explained', () => {
 
     // The raw body survives — it is the evidence — with the meaning appended.
     expect(failure).toContain('invalid_token');
-    expect(failure).toMatch(/TOKEN DA CONTA/);
+    // The gloss is English now (FUT-760); what it must steer away from is not.
+    expect(failure).toMatch(/PLATFORM ACCOUNT TOKEN/);
   });
 
   /** An unrecognised failure is passed through untouched, not decorated. */

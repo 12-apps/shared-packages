@@ -1,6 +1,7 @@
 import { ProviderRequestError } from '../core/errors';
 import type { ChargeSnapshot, ProbeOutcome, ResolvedCredentials } from '../core/types';
 
+import type { InfinitePayCopy } from './copy';
 import { NAME } from './infinitepay-http';
 
 /**
@@ -95,14 +96,12 @@ function unreachable(): ProviderRequestError {
 }
 
 /** The scripted answer to the credential probe, or null to run the plain stub. */
-export function stubProbe(outcome: StubOutcome): ProbeOutcome | null {
+export function stubProbe(outcome: StubOutcome, copy: InfinitePayCopy): ProbeOutcome | null {
   if (outcome === 'handle-not-found') {
-    return {
-      ok: false,
-      fault: 'NOT_FOUND',
-      message:
-        'Não encontramos essa InfiniteTag na InfinitePay. Confira a tag no app e tente de novo.',
-    };
+    // The SAME sentence the live 404 produces, from the same key: a stub that
+    // answered in different words would be scripting a screen the real
+    // provider never draws.
+    return { ok: false, fault: 'NOT_FOUND', message: copy.tagNotFound };
   }
   // Not a returned outcome: an outage is a THROW at the HTTP layer, and the
   // adapter's own catch is what turns it into `UNREACHABLE`. Returning the

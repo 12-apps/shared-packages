@@ -58,6 +58,23 @@ export interface PlatformHomologacaoAnexoInput {
   demoStoreUrl: string;
   /** Where PagBank delivers webhooks for that storefront (`notification_urls`). */
   webhookUrl: string;
+  /**
+   * The "Fluxo da integração" paragraph — how THIS deployment's checkout uses
+   * the calls captured below (FUT-760).
+   *
+   * Required, and the host's, because a homologação is a declaration about the
+   * host's own system that a PagBank reviewer reads and the host is
+   * accountable for. The text this package used to write described a
+   * multi-tenant menu platform selling through demo stores, so every other
+   * adopter would have submitted somebody else's architecture under its own
+   * brand.
+   *
+   * The captured request/response evidence around it is the package's, and so
+   * is the rest of this header: `ANEXO DE HOMOLOGAÇÃO`, `Ambiente dos testes`,
+   * `Credenciais` and the redaction note are the document's own Portuguese
+   * structure, which is what PagBank's reviewer expects to read.
+   */
+  integrationSummary: string;
   /** Override the sandbox origin — tests only. */
   sandboxApiBase?: string;
 }
@@ -101,15 +118,7 @@ function renderAnexo(input: PlatformHomologacaoAnexoInput, calls: CapturedCall[]
     `Data: ${new Date().toISOString()}`,
     'Token de autenticação redigido por segurança (Bearer ***REDACTED***).',
     '',
-    'Fluxo da integração: a plataforma opera lojas multi-tenant; o checkout da',
-    `loja de demonstração (${input.demoStoreUrl}) cria o pedido`,
-    'com QR Code PIX (1); o cliente paga pelo app do banco; o PagBank envia webhook para',
-    input.webhookUrl,
-    'e a confirmação é validada consultando o pedido (2) antes de marcar como pago.',
-    'A chave pública (3) alimenta a criptografia de cartão no navegador.',
-    'Via API Connect (/oauth2/*), cada lojista autoriza a aplicação da plataforma',
-    'na própria conta PagBank (authorization_code + refresh), com os tokens',
-    'resultantes usados nas mesmas APIs de Pedidos acima.',
+    input.integrationSummary,
     '',
   ].join('\n');
   return header + '\n' + calls.map(renderCall).join('\n');

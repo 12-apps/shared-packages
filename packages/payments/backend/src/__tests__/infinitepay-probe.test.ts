@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { infinitePayProvider } from '../providers/infinitepay';
+import { PT_BR_INFINITEPAY_COPY } from '../providers/pt-BR';
 
 /**
  * The InfinitePay RECONCILIATION PROBE, and the one distinction it exists to
@@ -37,7 +38,7 @@ describe('infinitepay findChargeByReference', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const probe = () =>
-    infinitePayProvider().findChargeByReference!(REFERENCE, CREDS, HINTS);
+    infinitePayProvider(PT_BR_INFINITEPAY_COPY).findChargeByReference!(REFERENCE, CREDS, HINTS);
 
   it('answers NO CHARGE when the handle is live and nobody has paid', async () => {
     // `200 {"success": false}` — a real handle, no payment. The exact body the
@@ -110,7 +111,7 @@ describe('infinitepay getCharge keeps the PENDING mapping', () => {
       }),
     );
     await expect(
-      infinitePayProvider().getCharge('order-1', CREDS, { slug: 's', transactionNsu: 't' }),
+      infinitePayProvider(PT_BR_INFINITEPAY_COPY).getCharge('order-1', CREDS, { slug: 's', transactionNsu: 't' }),
     ).resolves.toMatchObject({ status: 'PENDING' });
   });
 });

@@ -9,6 +9,7 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 
 /**
  * Can a connected store actually REACH the step that switches it on?
@@ -43,14 +44,14 @@ interface Case {
 
 const CASES: Case[] = [
   {
-    adapter: stripeProvider(),
+    adapter: stripeProvider(PT_BR_STRIPE_COPY),
     // OAuth stores fill in nothing; the grant IS the credential.
     stored: {},
     restingSection: 'dashboard',
     confirmLabel: /Já configurei minha conta na Stripe/i,
   },
   {
-    adapter: stoneProvider(),
+    adapter: stoneProvider(PT_BR_STONE_COPY),
     stored: {
       secretKey: { configured: true },
       publicKey: { configured: true, hint: 'pk_test_1' },
@@ -61,7 +62,7 @@ const CASES: Case[] = [
     confirmLabel: /Já cadastrei a URL no painel/i,
   },
   {
-    adapter: infinitePayProvider(),
+    adapter: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
     stored: { handle: { configured: true, hint: '$loja' } },
     restingSection: 'enable',
     // Authors no `confirmLabel`, so the renderer's fallback applies — this is

@@ -1,4 +1,5 @@
 import type { ProviderSetupGuide, SetupGuideContext, SetupProgress } from '../core/types';
+import type { InfinitePaySetupGuideCopy } from './setup-guide-copy';
 
 /**
  * InfinitePay's onboarding walkthrough.
@@ -34,14 +35,17 @@ import type { ProviderSetupGuide, SetupGuideContext, SetupProgress } from '../co
  * caller that cannot say what is done must not be shown a guide that has
  * decided for them.
  */
-export function infinitePaySetupGuide(ctx: SetupGuideContext): ProviderSetupGuide {
+export function infinitePaySetupGuide(
+  copy: InfinitePaySetupGuideCopy,
+  ctx: SetupGuideContext,
+): ProviderSetupGuide {
   const stages = [
-    { id: 'handle', label: 'Informar InfiniteTag' },
-    { id: 'enable', label: 'Habilitar o Checkout' },
-    { id: 'activate', label: 'Ativar vendas' },
+    { id: 'handle', label: copy.stages.handle },
+    { id: 'enable', label: copy.stages.enable },
+    { id: 'activate', label: copy.stages.activate },
   ];
 
-  const sections = [handleSection(ctx), enableSection(ctx)];
+  const sections = [handleSection(copy, ctx), enableSection(copy, ctx)];
   if (!ctx.progress) return { stages, sections };
   return { stages, sections, activeStage: activeStageOf(ctx.progress) };
 }
@@ -66,18 +70,20 @@ function activeStageOf(progress: SetupProgress): number {
  * enabled Checkout Integrado, but on an account the handle does not reach, and
  * letting them tick it off would carry a wrong tag into a real payment.
  */
-function enableSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][number] {
+function enableSection(
+  copy: InfinitePaySetupGuideCopy,
+  ctx: SetupGuideContext,
+): ProviderSetupGuide['sections'][number] {
   return {
     id: 'enable',
-    title: 'Passo 2 · Habilite o Checkout Integrado',
-    doneSummary: { label: 'Checkout Integrado', value: 'Habilitado na conta InfinitePay' },
-    intro:
-      'Em contas InfinitePay o Checkout Integrado vem **desligado**. Sem ele nenhum link de pagamento é criado — mesmo com a InfiniteTag certa.',
+    title: copy.enable.title,
+    doneSummary: { label: copy.enable.doneLabel, value: copy.enable.doneValue },
+    intro: copy.enable.intro,
     steps: [
       {
-        text: 'No app InfinitePay: **Vendas › Checkout › Configurações › Habilitar Checkout Integrado**.',
+        text: copy.enable.enableStep,
         button: {
-          label: 'Abrir as configurações do checkout',
+          label: copy.enable.settingsButton,
           url: 'https://app.infinitepay.io/external-checkout#configuracoes',
         },
       },
@@ -86,7 +92,7 @@ function enableSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][n
         // owners hunting for a registration screen that does not exist, and
         // folding it away is the same correction in layout form.
         copy: {
-          label: 'URL de notificação (você não precisa cadastrar)',
+          label: copy.enable.webhookUrlLabel,
           text: ctx.webhookUrl,
           collapsible: true,
         },
@@ -105,12 +111,14 @@ function enableSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][n
  * had just exposed them to only on the way back. A warning below the action it
  * warns about is a post-mortem.
  */
-function handleSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][number] {
+function handleSection(
+  copy: InfinitePaySetupGuideCopy,
+  ctx: SetupGuideContext,
+): ProviderSetupGuide['sections'][number] {
   return {
     id: 'handle',
-    title: 'Passo 1 · Informe sua InfiniteTag',
-    intro:
-      'A InfinitePay identifica sua conta pela InfiniteTag — o mesmo @ que aparece no topo do app. Não há chave de API para copiar.',
+    title: copy.handle.title,
+    intro: copy.handle.intro,
     steps: [
       {
         // InfinitePay's own warning on that page, repeated because the button
@@ -118,11 +126,11 @@ function handleSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][n
         // every link they have already sent out deserves to read this before
         // going there rather than discover it after.
         tone: 'warning',
-        text: 'A página da InfinitePay também permite **alterar** a tag — não altere. Mudar a InfiniteTag quebra suas cobranças, sua Loja Online e os links de pagamento já enviados, que precisam ser reemitidos.',
+        text: copy.handle.doNotChange,
       },
       {
         tone: 'warning',
-        text: `A InfiniteTag define para **qual conta** o dinheiro vai. Uma tag errada envia os pagamentos desta loja para outra pessoa, e não há como reverter por ${ctx.brandName} — confira caractere por caractere.`,
+        text: copy.handle.wrongTagPaysAStranger(ctx.brandName),
       },
       {
         // No prose: the button says what it does, and the field under it says
@@ -133,7 +141,7 @@ function handleSection(ctx: SetupGuideContext): ProviderSetupGuide['sections'][n
         // field that decides where their money goes. This page states the
         // current tag outright, which is what the step needs.
         button: {
-          label: 'Ver a minha InfiniteTag',
+          label: copy.handle.seeMyTagButton,
           url: 'https://app.infinitepay.io/settings/change/infinite-tag',
         },
       },

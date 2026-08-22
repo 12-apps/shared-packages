@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { allProviderAdapters } from '../providers/catalog';
+import { PT_BR_PROVIDER_COPY } from '../providers/pt-BR';
 
 /**
  * The capabilities audit (FUT-692): a capability an adapter declares `true`
@@ -17,7 +18,7 @@ import { allProviderAdapters } from '../providers/catalog';
  * off the adapter object belongs in that capability's own behavior tests.
  */
 describe('capabilities contract — no capability true without an implementation', () => {
-  const adapters = allProviderAdapters();
+  const adapters = allProviderAdapters(PT_BR_PROVIDER_COPY);
 
   it('Given the catalog, Then it is non-empty (the sweep sweeps something)', () => {
     expect(adapters.length).toBeGreaterThan(0);
