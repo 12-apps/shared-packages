@@ -179,7 +179,6 @@ function SortFieldRow({
   onClick: () => void;
   testId: string;
 }): React.JSX.Element {
-  const copy = useDataViewsCopy();
   return (
     <Box
       component="button"
@@ -250,7 +249,6 @@ function densityGlyph(
   tile: { gap: number; columns: number },
   active: boolean,
 ): React.JSX.Element {
-  const copy = useDataViewsCopy();
   if (layout === "cards") return <GridGlyph n={tile.columns} active={active} />;
   // A wider column means FEWER of them across the same board, so the
   // comfortable end draws two fat columns and the compact end four thin ones.

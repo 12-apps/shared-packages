@@ -69,8 +69,9 @@ export function CategoryPanel({
       sx={(theme) => ({ ...panelSx(theme), ...(sheet ? sheetSx(theme) : {}) })}
     >
       <CategoryPanelHead
+        copy={copy}
         query={state.query}
-        placeholder={single ? 'Buscar categoria…' : 'Buscar categoria ou subcategoria'}
+        placeholder={single ? copy.search.placeholderSingle : copy.search.placeholderMulti}
         sheet={sheet}
         quickActions={
           single ? undefined : <CategoryQuickActions state={state} dataTestId={dataTestId} />
@@ -80,7 +81,7 @@ export function CategoryPanel({
         dataTestId={dataTestId}
       />
       {!single && !loading && (
-        <PinnedTray state={state} chips={chips} dataTestId={dataTestId} />
+        <PinnedTray state={state} chips={chips} dataTestId={dataTestId} copy={copy} />
       )}
       <CategoryPanelList copy={copy}
         groups={state.visibleGroups}
@@ -107,6 +108,7 @@ export function CategoryPanel({
         changed={changed}
         single={single}
         sheet={sheet}
+        copy={copy}
         onApply={onApply}
         onCancel={onCancel}
         dataTestId={dataTestId}
@@ -120,9 +122,11 @@ function PinnedTray({
   state,
   chips,
   dataTestId,
-}: Pick<CategoryPanelProps, 'state' | 'chips' | 'dataTestId'>): React.JSX.Element {
+  copy,
+}: Pick<CategoryPanelProps, 'state' | 'chips' | 'dataTestId' | 'copy'>): React.JSX.Element {
   return (
     <CategoryPinnedTray
+      copy={copy}
       chips={chips}
       onRemove={(chipId) => state.setDraft(removeChip(state.allGroups, chipId, state.draft))}
       dataTestId={dataTestId}
@@ -139,18 +143,22 @@ function PanelFooter({
   onApply,
   onCancel,
   dataTestId,
+  copy,
 }: Pick<
   CategoryPanelProps,
-  'state' | 'changed' | 'single' | 'sheet' | 'onApply' | 'onCancel' | 'dataTestId'
+  'state' | 'changed' | 'single' | 'sheet' | 'onApply' | 'onCancel' | 'dataTestId' | 'copy'
 >): React.JSX.Element {
   if (single) {
-    return <CategorySingleFoot sheet={sheet} onCancel={onCancel} dataTestId={dataTestId} />;
+    return (
+      <CategorySingleFoot sheet={sheet} onCancel={onCancel} dataTestId={dataTestId} copy={copy} />
+    );
   }
   return (
     <CategoryMultiFoot
       count={state.draft.size}
       changed={changed}
       sheet={sheet}
+      copy={copy}
       onClear={() => state.setDraft(new Set())}
       onApply={onApply}
       dataTestId={dataTestId}

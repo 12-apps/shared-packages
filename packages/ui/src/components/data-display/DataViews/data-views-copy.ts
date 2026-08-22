@@ -41,6 +41,7 @@ export interface ManageViewsCopy {
   otherUserTag: string;
   deleteTitle: string;
   deleteBody: string;
+  deleteConfirm: string;
 }
 
 export interface SaveViewCopy {
@@ -58,11 +59,22 @@ export interface SaveViewCopy {
   descriptionPlaceholder: string;
   submitEditing: string;
   submitCreating: string;
+  nameLabel: string;
+  /** The pin toggle. Its share twin reuses `sharedDescription` below. */
+  pinnedTitle: string;
+  pinnedDescription: string;
+  sharedTitle: string;
+  /** An example of a view worth saving, in the host's own domain. */
+  namePlaceholder: string;
+  /** The two rows of the preview block. */
+  previewFilters: string;
+  previewHiddenColumns: string;
 }
 
 export interface DataViewsColumnsCopy {
   visibleCount(visible: number, total: number): string;
   reset: string;
+  showAll: string;
 }
 
 export interface DataViewsDisplayCopy {
@@ -89,12 +101,16 @@ export interface DataViewsDisplayCopy {
   boardUnavailable: string;
   /** Density is unavailable because the viewport only fits one card per row. */
   densityUnavailableNarrow: string;
+  /** The control that opens this panel. */
+  trigger: string;
 }
 
 export interface DataViewsExportCopy {
   /** Format labels and hints, keyed by format id. */
   formats: Readonly<Record<string, { label: string; hint: string }>>;
   visibleColumns(columnCount: number): string;
+  /** The control that opens the menu. */
+  trigger: string;
 }
 
 export interface DataViewsGridCopy {
@@ -112,6 +128,17 @@ export interface DataViewsFiltersCopy {
   /** The day-range presets' labels, keyed by preset id. */
   rangePresets: Readonly<Record<string, string>>;
   scopesLabel: string;
+  /** The slide-in panel, and the button that opens it. */
+  panelTitle: string;
+  /** Drop every applied filter. Two spellings: the bar has room for one word. */
+  clear: string;
+  clearAll: string;
+  /** Drop one range filter, named. */
+  clearRange(label: string): string;
+  /** The multi-select dropdowns this surface mounts. */
+  allOption: string;
+  optionSearchPlaceholder: string;
+  optionsEmpty: string;
 }
 
 export interface DataViewsSelectionCopy {
@@ -119,6 +146,8 @@ export interface DataViewsSelectionCopy {
   clearSelection: string;
   selectAll: string;
   onThisPage(count: number): string;
+  /** One row's checkbox, which carries no visible label of its own. */
+  selectRow: string;
 }
 
 export interface DataViewsNavCopy {
@@ -135,6 +164,23 @@ export interface DataViewsNavCopy {
   /** The inline error when a view could not be refreshed or saved. */
   updateFailed: string;
   saveFailed: string;
+  /** Reopen the save dialog over an existing view. */
+  editView: string;
+  pinToSidebar: string;
+  shareWithTeam: string;
+}
+
+/** The search box on the toolbar, and the one inside the filter panel. */
+export interface DataViewsSearchCopy {
+  placeholder: string;
+  /** The input's accessible name — it says what the term is matched against. */
+  allColumnsLabel: string;
+  /** The panel's keyword box, which commits on Enter rather than as you type. */
+  keywordPlaceholder: string;
+  /** The icon button that reveals the input on a narrow bar. */
+  open: string;
+  close: string;
+  clear: string;
 }
 
 /** Every word this component family renders, in one object a host passes once. */
@@ -162,4 +208,5 @@ export interface DataViewsCopy {
   filters: DataViewsFiltersCopy;
   selection: DataViewsSelectionCopy;
   nav: DataViewsNavCopy;
+  search: DataViewsSearchCopy;
 }

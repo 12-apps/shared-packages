@@ -78,7 +78,7 @@ export function ColumnsTab({
           </Box>
         </Text>
         <Box sx={{ display: "flex", gap: 1 }}>
-          <LinkButton label="Mostrar todas" onClick={onShowAll} testId={`${testIdPrefix}-columns-show-all`} />
+          <LinkButton label={copy.columns.showAll} onClick={onShowAll} testId={`${testIdPrefix}-columns-show-all`} />
           <LinkButton label={copy.columns.reset} onClick={onReset} testId={`${testIdPrefix}-columns-reset`} muted />
         </Box>
       </Box>
@@ -119,7 +119,6 @@ function LinkButton({
   testId: string;
   muted?: boolean;
 }): React.JSX.Element {
-  const copy = useDataViewsCopy();
   return (
     <Box
       component="button"

@@ -90,11 +90,11 @@ function NoResults({
 }): React.JSX.Element {
   return (
     <Box sx={emptySx} data-testid={`${dataTestId}-no-results`}>
-      <strong>Nada encontrado para “{query}”</strong>
-      <p>Tente outro termo ou verifique a grafia.</p>
+      <strong>{copy.noResults.title(query)}</strong>
+      <p>{copy.noResults.hint}</p>
       <Box sx={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
         <Button variant="outlined" size="small" sx={SENTENCE_CASE} onClick={onClearQuery}>
-          Limpar busca
+          {copy.noResults.clearSearch}
         </Button>
         {onCreateCategory && (
           <Button
@@ -104,7 +104,7 @@ function NoResults({
             data-testid={`${dataTestId}-create`}
             onClick={() => onCreateCategory(query.trim())}
           >
-            Criar “{query.trim()}”
+            {copy.noResults.create(query.trim())}
           </Button>
         )}
       </Box>

@@ -125,15 +125,15 @@ function FlagsSwitches({
     <Stack spacing={0}>
       <FlagRow
         icon={<PushPinOutlinedIcon fontSize="small" />}
-        title="Fixar na barra lateral"
-        description="Aparece como atalho no menu, abaixo desta tela."
+        title={copy.saveView.pinnedTitle}
+        description={copy.saveView.pinnedDescription}
         checked={pinned}
         onChange={setPinned}
         testId={`${testIdPrefix}-save-pinned`}
       />
       <FlagRow
         icon={<GroupOutlinedIcon fontSize="small" />}
-        title="Compartilhar com a equipe"
+        title={copy.saveView.sharedTitle}
         description={copy.saveView.sharedDescription}
         checked={shared}
         onChange={setShared}
@@ -166,7 +166,6 @@ function SummaryRow({
   items: string[];
   testId: string;
 }): React.JSX.Element | null {
-  const copy = useDataViewsCopy();
   if (items.length === 0) return null;
   return (
     <Box sx={{ display: "flex", gap: 1.5 }} data-testid={testId}>
@@ -208,8 +207,8 @@ function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JSX.Eleme
         </Text>
       ) : (
         <Stack spacing={0.75}>
-          <SummaryRow label="Filtros" items={preview.filters} testId={`${testIdPrefix}-preview-filters`} />
-          <SummaryRow label="Colunas ocultas" items={preview.columns} testId={`${testIdPrefix}-preview-columns`} />
+          <SummaryRow label={copy.saveView.previewFilters} items={preview.filters} testId={`${testIdPrefix}-preview-filters`} />
+          <SummaryRow label={copy.saveView.previewHiddenColumns} items={preview.columns} testId={`${testIdPrefix}-preview-columns`} />
           <SummaryRow label={copy.saveView.sortRowLabel} items={preview.sort} testId={`${testIdPrefix}-preview-sort`} />
         </Stack>
       )}
@@ -328,8 +327,8 @@ export function SaveViewModal<T extends Record<string, unknown>>({
           <Input
             size="sm"
             fullWidth
-            label="Nome"
-            placeholder="Ex.: Recusados no PIX desta semana"
+            label={copy.saveView.nameLabel}
+            placeholder={copy.saveView.namePlaceholder}
             value={form.name}
             onChange={(event) => form.setName(event.target.value)}
             data-testid={`${testIdPrefix}-save-name`}

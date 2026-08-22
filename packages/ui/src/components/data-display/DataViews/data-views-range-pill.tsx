@@ -155,6 +155,7 @@ function ClearAffordance({
   onClear: () => void;
   testId: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const clear = (event: React.SyntheticEvent): void => {
     event.stopPropagation();
     onClear();
@@ -164,7 +165,7 @@ function ClearAffordance({
       component="span"
       role="button"
       tabIndex={0}
-      aria-label={`Limpar ${label}`}
+      aria-label={copy.filters.clearRange(label)}
       data-testid={testId}
       onClick={clear}
       onKeyDown={(event: React.KeyboardEvent) => {

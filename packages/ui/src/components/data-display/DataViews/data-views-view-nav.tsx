@@ -198,10 +198,10 @@ export function ViewActions({
         </Box>
       </Box>
       <Box sx={{ my: 0.5, borderTop: 1, borderColor: "divider" }} />
-      {action("edit", EditOutlinedIcon, "Renomear e editar", () => onEditView(view))}
+      {action("edit", EditOutlinedIcon, copy.nav.editView, () => onEditView(view))}
       {action("default", StarOutlineRoundedIcon2, copy.nav.setDefault, () => onPatchView(view, { isDefault: !view.isDefault }), { on: view.isDefault })}
-      {action("pin", PushPinOutlinedIcon, "Fixar na barra lateral", () => onPatchView(view, { pinned: !view.pinned }), { on: view.pinned })}
-      {action("share", GroupOutlinedIcon, "Compartilhar com a equipe", () => onPatchView(view, { shared: !view.shared }), { on: view.shared })}
+      {action("pin", PushPinOutlinedIcon, copy.nav.pinToSidebar, () => onPatchView(view, { pinned: !view.pinned }), { on: view.pinned })}
+      {action("share", GroupOutlinedIcon, copy.nav.shareWithTeam, () => onPatchView(view, { shared: !view.shared }), { on: view.shared })}
       <Box sx={{ my: 0.5, borderTop: 1, borderColor: "divider" }} />
       {action("delete", DeleteOutlineRoundedIcon, copy.nav.deleteView, () => onDeleteView(view), { danger: true })}
     </Box>

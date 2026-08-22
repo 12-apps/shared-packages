@@ -17,6 +17,8 @@ import type {
  * screen — what changes is that the words are chosen in a diff.
  */
 export const PT_BR_SECTION_ONBOARDING_COPY: SectionOnboardingCopy = {
+  edit: "Editar",
+  collapse: "Ocultar",
   start: "Começar",
 };
 
@@ -31,6 +33,27 @@ export const PT_BR_CATEGORY_SELECT_COPY: CategorySelectCopy = {
   clearSelection: "Limpar seleção",
   emptyTitle: "Nenhuma categoria ainda",
   createCategory: "Criar categoria",
+  noResults: {
+    title: (query) => `Nada encontrado para “${query}”`,
+    hint: "Tente outro termo ou verifique a grafia.",
+    clearSearch: "Limpar busca",
+    create: (query) => `Criar “${query}”`,
+  },
+  search: {
+    placeholderSingle: "Buscar categoria…",
+    placeholderMulti: "Buscar categoria ou subcategoria",
+    clear: "Limpar busca",
+    removeChip: (label) => `Remover ${label}`,
+    pinnedLabel: (count) => `Selecionadas · ${count}`,
+  },
+  footer: {
+    selectedCount: (count) => `${count} selecionada${count === 1 ? "" : "s"}`,
+    clear: "Limpar",
+    apply: "Aplicar",
+    close: "Fechar",
+    singleHint: "Escolha uma categoria",
+    cancel: "Cancelar",
+  },
 };
 
 export const PT_BR_CEP_FIELD_COPY: CepFieldCopy = {
@@ -96,6 +119,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     otherUserTag: "De outro usuário",
     deleteTitle: "Excluir a visão salva?",
     deleteBody: "Os filtros e colunas guardados nela são perdidos. Não é possível restaurar.",
+    deleteConfirm: "Excluir",
   },
   saveView: {
     sharedDescription: "Qualquer pessoa da loja poderá abrir e usar esta visão.",
@@ -111,10 +135,18 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     descriptionPlaceholder: "Para que serve esta visão",
     submitEditing: "Salvar alterações",
     submitCreating: "Salvar visão",
+    nameLabel: "Nome",
+    pinnedTitle: "Fixar na barra lateral",
+    pinnedDescription: "Aparece como atalho no menu, abaixo desta tela.",
+    sharedTitle: "Compartilhar com a equipe",
+    namePlaceholder: "Ex.: Recusados no PIX desta semana",
+    previewFilters: "Filtros",
+    previewHiddenColumns: "Colunas ocultas",
   },
   columns: {
     visibleCount: (visible, total) => `${visible} de ${total} visíveis`,
     reset: "Padrão",
+    showAll: "Mostrar todas",
   },
   display: {
     sortTab: "Ordenar",
@@ -142,12 +174,14 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     boardUnavailable: "Esta tela não declara etapas, então não oferece quadro.",
     densityUnavailableNarrow:
       "Um card por linha nesta largura — a densidade volta em telas maiores.",
+    trigger: "Exibir",
   },
   export: {
     formats: {
       json: { label: "JSON (.json)", hint: "Para integrações" },
     },
     visibleColumns: (columnCount) => `${columnCount} colunas visíveis, na ordem atual`,
+    trigger: "Exportar",
   },
   grid: {
     rowActions: "Ações",
@@ -168,12 +202,20 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
       ano: "Este ano",
     },
     scopesLabel: "Situação",
+    panelTitle: "Filtros",
+    clear: "Limpar",
+    clearAll: "Limpar filtros",
+    clearRange: (label) => `Limpar ${label}`,
+    allOption: "Todas",
+    optionSearchPlaceholder: "Buscar…",
+    optionsEmpty: "Nenhum resultado",
   },
   selection: {
     selectAllOnPage: "Selecionar todos nesta página",
     clearSelection: "Limpar seleção",
     selectAll: "Selecionar tudo",
     onThisPage: (count) => `${count} nesta página`,
+    selectRow: "Selecionar",
   },
   nav: {
     mainView: "Visão principal",
@@ -188,6 +230,17 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     save: "Salvar visão",
     updateFailed: "Não foi possível atualizar a visão",
     saveFailed: "Não foi possível salvar a alteração da visão.",
+    editView: "Renomear e editar",
+    pinToSidebar: "Fixar na barra lateral",
+    shareWithTeam: "Compartilhar com a equipe",
+  },
+  search: {
+    placeholder: "Buscar…",
+    allColumnsLabel: "Buscar em todas as colunas",
+    keywordPlaceholder: "Pressione Enter para filtrar",
+    open: "Buscar",
+    close: "Fechar busca",
+    clear: "Limpar busca",
   },
 };
 

@@ -1,7 +1,5 @@
 "use client";
 
-import type { ConfirmActionCopy } from "../../../copy";
-import type { SavedViewsLabels } from "../../layout/ContentToolbar/ContentToolbar.types";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { Alert } from "../Alert";
 import { SavedViewsMenu } from "../../layout/ContentToolbar";

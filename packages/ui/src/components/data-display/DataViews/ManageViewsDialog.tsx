@@ -101,11 +101,11 @@ function ManageViewRow({
               entityName: view.name,
               description:
                 copy.manageViews.deleteBody,
-              confirmText: 'Excluir',
+              confirmText: copy.manageViews.deleteConfirm,
             }}
             dataTestId={`${testIdPrefix}-manage-delete-${view.id}`}
           >
-            Excluir
+            {copy.manageViews.deleteConfirm}
           </ConfirmButton>
         </Stack>
       )}

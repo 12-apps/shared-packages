@@ -263,6 +263,7 @@ function DisplayTrigger({
   onOpen: (anchor: HTMLElement) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Button
       variant="outline"
@@ -270,14 +271,14 @@ function DisplayTrigger({
       color="neutral"
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-display-trigger`}
-      aria-label="Exibir"
-      title={compact ? "Exibir" : undefined}
+      aria-label={copy.display.trigger}
+      title={compact ? copy.display.trigger : undefined}
     >
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
         <DisplaySettingsRoundedIcon fontSize="small" />
         {!compact && (
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-            Exibir
+            {copy.display.trigger}
           </Box>
         )}
         {dirty && (

@@ -20,7 +20,6 @@ export function emitPillDiff(
   after: readonly string[],
   onTogglePill: (fieldId: string, value: string, checked: boolean) => void,
 ): void {
-  const copy = useDataViewsCopy();
   const had = new Set(before);
   const wants = new Set(after);
   after.forEach((value) => {
@@ -90,10 +89,10 @@ export function PillControl<T extends Record<string, unknown>>({
       selected={new Set(selected)}
       onToggle={(value, checked) => onTogglePill(fieldId, value, checked)}
       onClear={() => onClearField(fieldId)}
-      allLabel="Todas"
+      allLabel={copy.filters.allOption}
       searchable={pill.searchEnabled ? true : undefined}
-      searchPlaceholder="Buscar…"
-      noResultsLabel="Nenhum resultado"
+      searchPlaceholder={copy.filters.optionSearchPlaceholder}
+      noResultsLabel={copy.filters.optionsEmpty}
       layout={layout}
       onOpenChange={onOpenChange}
       data-testid={testId}

@@ -16,6 +16,9 @@
 export interface SectionOnboardingCopy {
   /** The button that begins the guided section. */
   start: string;
+  /** The reveal toggle in the configured state, and its collapsed twin. */
+  edit: string;
+  collapse: string;
 }
 
 export interface ConfirmActionCopy {
@@ -45,6 +48,46 @@ export interface CategorySelectCopy {
   /** The empty state, when the host has no categories at all. */
   emptyTitle: string;
   createCategory: string;
+  /**
+   * The search found nothing.
+   *
+   * Two of the four interpolate the term typed, so they are functions rather
+   * than strings with a placeholder to substitute: where the term sits in the
+   * sentence is the translator's call, not ours.
+   */
+  noResults: {
+    title: (query: string) => string;
+    hint: string;
+    clearSearch: string;
+    create: (query: string) => string;
+  };
+  /**
+   * The panel's two footers.
+   *
+   * `selectedCount` is a function because Portuguese agrees the participle with
+   * the count and English does not — the shape has to let a translator decide
+   * the whole sentence, not fill a slot in ours.
+   */
+  /** The search box above the list, and the chips beneath it. */
+  search: {
+    /** Two placeholders: a single-select picker offers no subcategories. */
+    placeholderSingle: string;
+    placeholderMulti: string;
+    clear: string;
+    removeChip(label: string): string;
+    /** The tray above the list, counting what is already picked. */
+    pinnedLabel(count: number): string;
+  };
+  footer: {
+    selectedCount(count: number): string;
+    clear: string;
+    /** The primary button, which reads `close` while the draft is unchanged. */
+    apply: string;
+    close: string;
+    /** The single-select footer: what to do, and the way out. */
+    singleHint: string;
+    cancel: string;
+  };
 }
 
 export interface CepFieldCopy {

@@ -93,6 +93,7 @@ function ExportTrigger({
   /** Icon only — step 2 of the toolbar's degradation ladder. */
   compact?: boolean;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Button
       variant="outline"
@@ -101,9 +102,9 @@ function ExportTrigger({
       disabled={busy}
       onClick={(event) => onOpen(event.currentTarget as HTMLElement)}
       dataTestId={`${testIdPrefix}-export-trigger`}
-      aria-label="Exportar"
+      aria-label={copy.export.trigger}
       // The label is gone, so the tooltip is the only thing naming the control.
-      title={compact ? "Exportar" : undefined}
+      title={compact ? copy.export.trigger : undefined}
     >
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
         {busy ? <CircularProgress size={14} /> : <DownloadRoundedIcon fontSize="small" />}
@@ -214,7 +215,6 @@ export function DataViewsExportMenu({
   testIdPrefix,
   compact,
 }: ExportMenuProps): React.JSX.Element {
-  const copy = useDataViewsCopy();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
 

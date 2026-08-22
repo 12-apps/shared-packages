@@ -11,7 +11,6 @@ import type {
   UseConfirmActionResult,
 } from './ConfirmAction.types';
 
-const DEFAULT_CANCEL_TEXT = 'Cancelar';
 const DEFAULT_TEST_ID = 'confirm-action';
 
 /**
@@ -108,7 +107,7 @@ export function ConfirmActionDialog({
   description,
   entityName,
   confirmText,
-  cancelText = DEFAULT_CANCEL_TEXT,
+  cancelText,
   typeToConfirm,
   typeToConfirmLabel,
   tone = 'destructive',
