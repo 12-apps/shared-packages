@@ -8,6 +8,8 @@
     "./server": "./src/server/index.ts",
     "./react": "./src/react/index.ts",
     "./hono": "./src/hono/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -21,6 +23,7 @@
     "prisma:sync:check": "node scripts/sync-entitlements-schema.mjs --check"
   },
   "peerDependencies": {
+    "@12-apps/wiring": ">=1.3.0",
     "hono": ">=4.0.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0"
@@ -39,6 +42,7 @@
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
@@ -83,5 +87,11 @@
   ],
   "dependencies": {
     "@12-apps/ui": "workspace:*"
+  },
+  "wiring": {
+    "db": {
+      "partial": "prisma/entitlements.prisma",
+      "migrations": "prisma/migrations"
+    }
   }
 }

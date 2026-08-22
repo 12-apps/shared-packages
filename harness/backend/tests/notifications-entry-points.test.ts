@@ -11,6 +11,8 @@ import * as core from '@12-apps/notifications';
 import * as server from '@12-apps/notifications/server';
 import * as hono from '@12-apps/notifications/hono';
 import * as webPush from '@12-apps/notifications/web-push';
+import * as manifest from '@12-apps/notifications/manifest';
+import * as manifestServer from '@12-apps/notifications/manifest/server';
 
 /**
  * Every published subpath, imported from the INSTALLED tarball and touched.
@@ -47,8 +49,25 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
       exports: Record<string, unknown>;
     };
     const advertised = Object.keys(manifest.exports).sort();
-    const proven = [...['.', './server', './hono', './web-push'], ...Object.keys(COVERED_ELSEWHERE)].sort();
+    const proven = [
+      ...['.', './server', './hono', './web-push', './manifest', './manifest/server'],
+      ...Object.keys(COVERED_ELSEWHERE),
+    ].sort();
     expect(advertised).toEqual(proven);
+  });
+
+  it('the MANIFEST subpaths carry the wiring declaration a host adopts', () => {
+    // The subpath a consumer's `adoptServer` reads, imported from the TARBALL
+    // rather than from source — which is the only place the `files` globs,
+    // the `exports` keys and `.gitignore` are made to agree.
+    expect(manifest.notificationsManifest.name).toBe('@12-apps/notifications');
+    expect(manifest.notificationsManifest.contract).toBe(1);
+    expect(manifest.notificationsManifest.server).toEqual(['http']);
+
+    // The runtime half, and its wire view: a factory, not data.
+    expect(manifestServer.notificationsServerManifest.name).toBe('@12-apps/notifications');
+    expect(typeof manifestServer.createWireApiNotifications).toBe('function');
+    expect(typeof manifestServer.notificationsServerManifest.http.create).toBe('function');
   });
 
   it('the ROOT entry carries the framework-free core', () => {
