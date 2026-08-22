@@ -77,6 +77,7 @@ export {
  * say about one.
  */
 export {
+  advertisableCombos,
   comboOffersForItem,
   type ComboOffer,
   type ComboOffersInput,
