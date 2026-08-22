@@ -1,7 +1,8 @@
 import { Box } from "@12-apps/ui/mui/Box";
 import { Text } from "@12-apps/ui/typography/Text";
 
-import { AI_CAPABILITIES, type AiCapability } from "../guide";
+import type { AiCapability } from "../guide";
+import type { AiCapabilitiesCopy } from "./copy";
 import { CapabilityIcon } from "./ai-icons";
 
 /** One marketing card: an icon, a headline and an example prompt (as a bubble). */
@@ -64,22 +65,25 @@ function CapabilityCard({ capability }: { capability: AiCapability }): React.JSX
  * Marketing block for the AI integration: a headline + a responsive grid of
  * capability cards. Shown on the onboarding landing (before the owner starts) to
  * sell the feature — "here's what the assistant does for you". `capabilities`
- * defaults to the shared set; apps can pass their own.
+ * and `copy` are REQUIRED host copy — the package ships no default sentence
+ * (FUT-760).
  */
 export function AiCapabilities({
-  capabilities = AI_CAPABILITIES,
+  capabilities,
+  copy,
 }: {
-  capabilities?: readonly AiCapability[];
+  capabilities: readonly AiCapability[];
+  copy: AiCapabilitiesCopy;
 }): React.JSX.Element {
   return (
     <Box data-testid="ai-capability-examples" sx={{ width: "100%" }}>
       <Box sx={{ mb: 3 }}>
         <Text variant="heading" size="sm" as="h2">
-          O que o assistente faz por você
+          {copy.heading}
         </Text>
         <Box sx={{ mt: 0.5 }}>
           <Text variant="body" size="sm" as="p" color="secondary">
-            Sem planilhas, sem cliques — é só perguntar na conversa.
+            {copy.subheading}
           </Text>
         </Box>
       </Box>

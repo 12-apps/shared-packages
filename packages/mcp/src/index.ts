@@ -13,9 +13,6 @@ export * from "./types";
 // truth for BOTH the `@12-apps/mcp/react` onboarding UI and the server-side connect
 // tools, so what an agent reads via MCP cannot drift from what owners see.
 export {
-  aiHostGuides,
-  AI_CAPABILITIES,
-  AI_PERMISSION_MODEL,
   aiConnectPrompt,
   type AiConnectPromptSpec,
   providerForHostId,
@@ -99,3 +96,11 @@ export {
   type AuthorizationServerMetadataInput,
   type AuthorizationServerPaths,
 } from "./auth/authorization-server-metadata";
+
+export type { AiConnectPromptCopy } from "./guide";
+export {
+  PT_BR_AI_CAPABILITIES,
+  PT_BR_AI_CONNECT_PROMPT,
+  PT_BR_AI_HOST_GUIDES,
+  PT_BR_AI_PERMISSION_MODEL,
+} from "./pt-BR";

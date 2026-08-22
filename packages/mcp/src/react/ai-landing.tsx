@@ -10,19 +10,42 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
-import { AI_CAPABILITIES, AI_PERMISSION_MODEL, type AiCapability } from "../guide";
+import type { AiCapability } from "../guide";
+import type { AiCapabilitiesCopy, AiLandingCopy } from "./copy";
 import { AiCapabilities } from "./ai-capabilities";
 import { FeatureBadge, type FeatureBadgeItem } from "./feature-badge";
 
-const FEATURES: FeatureBadgeItem[] = [
-  { icon: <LockOpenOutlinedIcon />, label: "Usa o seu próprio login", caption: "Sem chaves ou credenciais extras" },
-  { icon: <BoltOutlinedIcon />, label: "Sem instalar nada", caption: "Conecta em poucos minutos" },
-  { icon: <VerifiedUserOutlinedIcon />, label: "Só o que você pode", caption: "As suas permissões, nada além" },
-  { icon: <LanguageOutlinedIcon />, label: "Navegador ou app", caption: "Claude, ChatGPT, Codex" },
-];
+/**
+ * The ICONS for the landing's reassurance strip, keyed by the copy's own ids.
+ *
+ * The package keeps the icons and the host keeps the words: an icon is not
+ * copy, and a pack that had to ship React elements could not be a plain data
+ * file. An id the map does not know renders without an icon rather than
+ * throwing — a host adding a fifth point should get its words on screen.
+ */
+const TRUST_ICONS: Readonly<Record<string, React.JSX.Element>> = {
+  login: <LockOpenOutlinedIcon />,
+  install: <BoltOutlinedIcon />,
+  permissions: <VerifiedUserOutlinedIcon />,
+  surface: <LanguageOutlinedIcon />,
+};
+
+function trustBadges(trust: AiLandingCopy["trust"]): FeatureBadgeItem[] {
+  return trust.map((point) => ({
+    icon: TRUST_ICONS[point.id],
+    label: point.label,
+    caption: point.caption,
+  }));
+}
 
 /** The single-column marketing hero: eyebrow + headline + description + CTA. */
-function Hero({ onStart }: { onStart: () => void }): React.JSX.Element {
+function Hero({
+  onStart,
+  copy,
+}: {
+  onStart: () => void;
+  copy: AiLandingCopy;
+}): React.JSX.Element {
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 680 }}>
       <Box
@@ -34,19 +57,17 @@ function Hero({ onStart }: { onStart: () => void }): React.JSX.Element {
           textTransform: "uppercase",
         }}
       >
-        Integração com IA
+        {copy.eyebrow}
       </Box>
       <Text variant="heading" size="xl" weight="bold" as="h1">
         Conecte{" "}
         <Box component="span" sx={{ color: "primary.main" }}>
           assistentes de IA
         </Box>{" "}
-        à sua loja
+        {copy.titleTail}
       </Text>
       <Text variant="body" color="secondary" as="p">
-        Deixe o Claude, o ChatGPT e outros assistentes responderem sobre o seu cardápio, estoque e
-        pedidos — e executarem ações por você, direto na conversa. Com segurança e sem instalar
-        nada.
+        {copy.lede}
       </Text>
       <Box sx={{ pt: 1 }}>
         <Button onClick={onStart} data-testid="ai-landing-start">
@@ -61,20 +82,25 @@ function Hero({ onStart }: { onStart: () => void }): React.JSX.Element {
  * Homepage-style marketing landing for the AI integration (shown before the
  * owner starts): a hero, the permission reassurance, a trust/feature strip, and
  * the capability highlights. `onStart` begins the guided flow. `permissionModel`
- * and `capabilities` default to the shared copy; apps can override.
+ * and `capabilities` are REQUIRED host copy — the package ships no default
+ * sentence (FUT-760).
  */
 export function AiLanding({
   onStart,
-  permissionModel = AI_PERMISSION_MODEL,
-  capabilities = AI_CAPABILITIES,
+  permissionModel,
+  capabilities,
+  copy,
+  capabilitiesCopy,
 }: {
   onStart: () => void;
-  permissionModel?: string;
-  capabilities?: readonly AiCapability[];
+  permissionModel: string;
+  capabilities: readonly AiCapability[];
+  copy: AiLandingCopy;
+  capabilitiesCopy: AiCapabilitiesCopy;
 }): React.JSX.Element {
   return (
     <Stack spacing={6} data-testid="ai-landing">
-      <Hero onStart={onStart} />
+      <Hero onStart={onStart} copy={copy} />
 
       <Stack
         direction="row"
@@ -111,14 +137,14 @@ export function AiLanding({
             gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
           }}
         >
-          {FEATURES.map((f) => (
+          {trustBadges(copy.trust).map((f) => (
             <FeatureBadge key={f.label} icon={f.icon} label={f.label} caption={f.caption} />
           ))}
         </Box>
       </Box>
 
       <Box>
-        <AiCapabilities capabilities={capabilities} />
+        <AiCapabilities capabilities={capabilities} copy={capabilitiesCopy} />
       </Box>
     </Stack>
   );

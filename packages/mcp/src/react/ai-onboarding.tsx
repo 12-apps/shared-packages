@@ -1,5 +1,6 @@
 "use client";
 
+import type { McpAiCopy } from "./copy";
 import {
   GuidedSection,
   OnboardingProvider,
@@ -9,9 +10,6 @@ import {
 } from "@12-apps/onboarding";
 
 import {
-  AI_CAPABILITIES,
-  aiHostGuides,
-  AI_PERMISSION_MODEL,
   type AiCapability,
   type AiHostGuide,
 } from "../guide";
@@ -44,20 +42,20 @@ export interface AiIntegrationOnboardingProps {
   /** Show the dev-only "reset onboarding" button. @default false */
   devReset?: boolean;
   /**
-   * The platform operating this MCP server, as its OAuth consent button names
-   * it. REQUIRED, and it is the reason `hosts` can have a default at all: one
-   * ChatGPT step tells the owner which "Sign in with …" button to click, and
-   * that button carries whoever runs the server. It used to be a hard-coded
-   * name — of a single STORE on one deployment, not even the product — so every
-   * other adopter pointed its owners at a button that does not exist.
+   * Assistants offered in the flow, with their step-by-step instructions.
+   *
+   * REQUIRED since FUT-760. These used to default to this package's own pt-BR
+   * walkthrough, so a host that said nothing shipped one product's Portuguese
+   * and had no field to decline it. `PT_BR_AI_HOST_GUIDES(platformName)` is that
+   * exact content, now chosen by name.
    */
-  platformName: string;
-  /** Assistants offered in the flow. @default aiHostGuides(platformName) */
-  hosts?: readonly AiHostGuide[];
-  /** Capability cards on the landing. @default the shared AI_CAPABILITIES */
-  capabilities?: readonly AiCapability[];
-  /** Permission reassurance copy on the landing. @default AI_PERMISSION_MODEL */
-  permissionModel?: string;
+  hosts: readonly AiHostGuide[];
+  /** Capability cards on the landing. REQUIRED — see `hosts`. */
+  capabilities: readonly AiCapability[];
+  /** Permission reassurance copy on the landing. REQUIRED — see `hosts`. */
+  permissionModel: string;
+  /** Every sentence the screens render. REQUIRED — see `hosts`. */
+  copy: McpAiCopy;
   /**
    * Message the owner pastes into the assistant on the Conectar step.
    *
@@ -97,6 +95,7 @@ interface FlowProps {
   onRetest: () => void;
   onDisconnect: DisconnectHandler | undefined;
   devReset: boolean;
+  copy: McpAiCopy;
 }
 
 /**
@@ -116,6 +115,7 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
     onRetest,
     onDisconnect,
     devReset,
+    copy,
   } = props;
   const { state } = useOnboarding();
   const selectedHost =
@@ -128,6 +128,7 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
     connectPrompt,
     connections,
     onRetest,
+    copy,
   });
   const connectedHostId = (state.data.connectedHost ??
     state.data.selectedHost) as string | undefined;
@@ -135,24 +136,27 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
   return (
     <GuidedSection
       steps={steps}
-      title="Conecte assistentes de IA à sua loja"
-      startLabel="Ver como conectar"
+      title={copy.onboarding.title}
+      startLabel={copy.landing.start}
       renderLanding={(start) => (
         <AiLanding
           onStart={start}
           permissionModel={permissionModel}
           capabilities={capabilities}
+          copy={copy.landing}
+          capabilitiesCopy={copy.capabilities}
         />
       )}
-      configuredTitle={connectedTitle(connections, hosts, connectedHostId)}
-      configuredSummary={connectedSummary(connections)}
-      editLabel="Conectar IA"
+      configuredTitle={connectedTitle(connections, hosts, connectedHostId, copy.summary)}
+      configuredSummary={connectedSummary(connections, copy.summary)}
+      editLabel={copy.onboarding.editLabel}
       completedContent={(nav) => (
         <StatusBoard
           nav={nav}
           connections={connections}
           hosts={hosts}
           onDisconnect={onDisconnect}
+          copy={copy}
         />
       )}
       devReset={devReset}
@@ -179,15 +183,15 @@ export function AiIntegrationOnboarding({
   connections,
   featureKey = DEFAULT_FEATURE_KEY,
   devReset = false,
-  platformName,
-  hosts = aiHostGuides(platformName),
-  capabilities = AI_CAPABILITIES,
-  permissionModel = AI_PERMISSION_MODEL,
+  hosts,
+  capabilities,
+  permissionModel,
   connectPrompt,
   onRetest = () => {
     if (typeof window !== "undefined") window.location.reload();
   },
   onDisconnect,
+  copy,
 }: AiIntegrationOnboardingProps): React.JSX.Element {
   return (
     <OnboardingProvider
@@ -205,6 +209,7 @@ export function AiIntegrationOnboarding({
         onRetest={onRetest}
         onDisconnect={onDisconnect}
         devReset={devReset}
+        copy={copy}
       />
     </OnboardingProvider>
   );
