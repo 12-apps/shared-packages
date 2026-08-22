@@ -1,3 +1,8 @@
+import {
+  PT_BR_INFINITEPAY_SETUP_GUIDE_COPY,
+  PT_BR_STONE_SETUP_GUIDE_COPY,
+  PT_BR_STRIPE_SETUP_GUIDE_COPY,
+} from './setup-guide-pt-BR';
 import type {
   InfinitePayCopy,
   PagbankCopy,
@@ -30,6 +35,7 @@ const MODE_WORD = (live: boolean): string => (live ? 'produção (live)' : 'test
 const SOURCE = (viaGrant: boolean): string => (viaGrant ? 'A autorização' : 'A chave secreta');
 
 export const PT_BR_STRIPE_COPY: StripeCopy = {
+  setupGuide: PT_BR_STRIPE_SETUP_GUIDE_COPY,
   unreachable:
     'Não conseguimos falar com a Stripe agora. ' +
     'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
@@ -77,6 +83,7 @@ export const PT_BR_STRIPE_COPY: StripeCopy = {
 };
 
 export const PT_BR_STONE_COPY: StoneCopy = {
+  setupGuide: PT_BR_STONE_SETUP_GUIDE_COPY,
   unreachable:
     'Não conseguimos falar com a Stone/Pagar.me agora. ' +
     'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
@@ -103,9 +110,11 @@ export const PT_BR_PAGBANK_COPY: PagbankCopy = {
     webhookToken: 'Token de webhook',
     googlePayMerchantId: 'Google Pay: ID do lojista (gatewayMerchantId)',
   },
+  payer: { lineItemName: 'Pedido' },
 };
 
 export const PT_BR_INFINITEPAY_COPY: InfinitePayCopy = {
+  setupGuide: PT_BR_INFINITEPAY_SETUP_GUIDE_COPY,
   unreachable:
     'Não conseguimos falar com a InfinitePay agora. Sua tag foi salva — teste a conexão de novo em instantes.',
   handleMissing: 'Handle não configurado.',

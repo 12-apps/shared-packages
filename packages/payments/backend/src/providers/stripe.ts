@@ -260,7 +260,7 @@ export function stripeProvider(copy: StripeCopy): PaymentProviderAdapter {
       parse: async (delivery) => parseStripeEvent(delivery),
     },
 
-    setupGuide: stripeSetupGuide,
+    setupGuide: (ctx) => stripeSetupGuide(copy.setupGuide, ctx),
 
     clientConfig(credentials) {
       return {

@@ -13,6 +13,7 @@ import {
   NAME,
 } from './infinitepay-http';
 import type { InfinitePayCopy } from './copy';
+import { infinitePayCredentialSchema } from './infinitepay-credential-schema';
 import { probeFailure } from './infinitepay-probe';
 import { infinitePaySetupGuide } from './infinitepay-setup-guide';
 import {
@@ -280,30 +281,6 @@ function createChargeWith(
   };
 }
 
-// ONE field. `webhookSecret` was offered here and it was a trap: InfinitePay
-// sends no headers a merchant can configure, so a stored secret caused the
-// verify step to reject every GENUINE delivery — a production store had one
-// set, and no notification InfinitePay sent it ever got through. The verify
-// step now ignores any stored value; the real control is `payment_check`.
-function credentialSchemaFor(copy: InfinitePayCopy): PaymentProviderAdapter['credentialSchema'] {
-  return [
-    {
-      key: 'handle',
-      label: copy.fields.handle,
-      secret: false,
-      required: true,
-      // The two flags exist for THIS field: it is short, unchecksummed, and
-      // decides which account is paid. Monospace so `0` and `O` are told
-      // apart by eye; confirmed on save so the value is read back once more
-      // before it starts receiving the store's money.
-      mono: true,
-      confirmOnSave: true,
-      placeholder: '$suatag',
-      pattern: '^\\$[a-zA-Z0-9][a-zA-Z0-9._-]{2,}$',
-      helperText: copy.handleHelp,
-    },
-  ];
-}
 
 /**
  * The identity a host used to keep in name-keyed tables, declared by the
@@ -366,7 +343,7 @@ export function infinitePayProvider(copy: InfinitePayCopy): PaymentProviderAdapt
       // `payment_check` confirms — a different protocol, the same proof.
       activationCharge: true,
     },
-    credentialSchema: credentialSchemaFor(copy),
+    credentialSchema: infinitePayCredentialSchema(copy),
     customerSchema,
     // The buyer finishes on the provider's own page — no card form, no PIX pane.
     checkoutScreen: 'hosted-link',
@@ -398,7 +375,7 @@ export function infinitePayProvider(copy: InfinitePayCopy): PaymentProviderAdapt
       parse: parseInfinitePayEvent,
     },
 
-    setupGuide: infinitePaySetupGuide,
+    setupGuide: (ctx) => infinitePaySetupGuide(copy.setupGuide, ctx),
 
     clientConfig() {
       // Redirect flow: the client needs nothing but the per-charge

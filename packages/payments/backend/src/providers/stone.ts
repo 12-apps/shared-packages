@@ -175,7 +175,7 @@ export function stoneProvider(copy: StoneCopy): PaymentProviderAdapter {
       parse: async (delivery) => parseStoneEvent(delivery),
     },
 
-    setupGuide: stoneSetupGuide,
+    setupGuide: (ctx) => stoneSetupGuide(copy.setupGuide, ctx),
 
     clientConfig(credentials) {
       return {

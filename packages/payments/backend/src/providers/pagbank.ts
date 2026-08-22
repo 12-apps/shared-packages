@@ -93,7 +93,7 @@ function cardCharge(input: ChargeInput) {
   };
 }
 
-function cardPayload(input: ChargeInput, credentials: ResolvedCredentials) {
+function cardPayload(input: ChargeInput, credentials: ResolvedCredentials, copy: PagbankCopy) {
   return {
     reference_id: input.reference,
     customer: customerPayload(input.customer),
@@ -102,7 +102,7 @@ function cardPayload(input: ChargeInput, credentials: ResolvedCredentials) {
     items: [
       {
         reference_id: input.reference,
-        name: 'Pedido',
+        name: copy.payer.lineItemName,
         quantity: 1,
         unit_amount: input.amount.amountCents,
       },
@@ -112,27 +112,31 @@ function cardPayload(input: ChargeInput, credentials: ResolvedCredentials) {
   };
 }
 
-const createCharge: PaymentProviderAdapter['createCharge'] = async (input, credentials) => {
-  if (credentials.stub) return stubCharge(NAME, input, credentials);
-  // The provider-side idempotency key: a retried create is deduped by PagBank
-  // itself, on top of the gateway's own guarantees.
-  const idempotencyKey = input.idempotencyKey ?? input.reference;
-  if (input.method === 'PIX') {
-    const expiresAt = new Date(Date.now() + PIX_TTL_MS).toISOString();
-    const res = await pagbankRequest<PagBankPixResponse>('/orders', credentials, {
+function createChargeWith(
+  copy: PagbankCopy,
+): NonNullable<PaymentProviderAdapter['createCharge']> {
+  return async (input, credentials) => {
+    if (credentials.stub) return stubCharge(NAME, input, credentials);
+    // The provider-side idempotency key: a retried create is deduped by PagBank
+    // itself, on top of the gateway's own guarantees.
+    const idempotencyKey = input.idempotencyKey ?? input.reference;
+    if (input.method === 'PIX') {
+      const expiresAt = new Date(Date.now() + PIX_TTL_MS).toISOString();
+      const res = await pagbankRequest<PagBankPixResponse>('/orders', credentials, {
+        method: 'POST',
+        body: pixPayload(input, credentials, expiresAt),
+        idempotencyKey,
+      });
+      return mapPix(res, input, expiresAt);
+    }
+    const res = await pagbankRequest<PagBankCardResponse>('/orders', credentials, {
       method: 'POST',
-      body: pixPayload(input, credentials, expiresAt),
+      body: cardPayload(input, credentials, copy),
       idempotencyKey,
     });
-    return mapPix(res, input, expiresAt);
-  }
-  const res = await pagbankRequest<PagBankCardResponse>('/orders', credentials, {
-    method: 'POST',
-    body: cardPayload(input, credentials),
-    idempotencyKey,
-  });
-  return mapCard(res, input);
-};
+    return mapCard(res, input);
+  };
+}
 
 /**
  * PagBank signs deliveries with `x-authenticity-token` =
@@ -299,7 +303,7 @@ export function pagbankProvider(copy: PagbankCopy): PaymentProviderAdapter {
     checkoutScreen: 'pix-and-card',
 
     verifyCredentials: verifyPagbankCredentials(copy),
-    createCharge,
+    createCharge: createChargeWith(copy),
     oauth: pagbankOAuth,
 
     // Card vaulting WITHOUT a purchase (FUT-478/FUT-183) — the dedicated

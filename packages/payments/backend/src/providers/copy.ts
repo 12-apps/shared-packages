@@ -1,3 +1,9 @@
+import type {
+  InfinitePaySetupGuideCopy,
+  StoneSetupGuideCopy,
+  StripeSetupGuideCopy,
+} from './setup-guide-copy';
+
 /**
  * Every owner-facing sentence the four built-in adapters can produce, as ports
  * (FUT-760).
@@ -51,6 +57,8 @@ export interface ProbeUnreachableCopy {
 
 /** Stone/Pagar.me — the credential form, its probe, and the boleto it prints. */
 export interface StoneCopy extends ProbeUnreachableCopy {
+  /** The onboarding walkthrough's words. */
+  setupGuide: StoneSetupGuideCopy;
   /** Nothing to authenticate with — the probe never leaves the process. */
   secretKeyMissing: string;
   /** Stone answered 401/403: the key itself is refused. */
@@ -102,10 +110,24 @@ export interface PagbankCopy extends ProbeUnreachableCopy {
     webhookToken: string;
     googlePayMerchantId: string;
   };
+  payer: {
+    /**
+     * The single summary line on a card order, which is what the BUYER sees
+     * on the receipt PagBank issues.
+     *
+     * The Orders API requires `items`, and the detail stays in the host's own
+     * database — so this one word is the whole description of the purchase,
+     * written by this package, printed by somebody else, in one product's
+     * vocabulary. Unaccented, which is why only the vocabulary gate saw it.
+     */
+    lineItemName: string;
+  };
 }
 
 /** InfinitePay — the tag that decides where the money lands. */
 export interface InfinitePayCopy extends ProbeUnreachableCopy {
+  /** The onboarding walkthrough's words. */
+  setupGuide: InfinitePaySetupGuideCopy;
   /** No handle stored yet. */
   handleMissing: string;
   /**
@@ -197,6 +219,8 @@ export interface StripeCredentialCopy {
 /** Stripe — the credential form, the probe, and its per-credential verdicts. */
 export interface StripeCopy extends ProbeUnreachableCopy {
   checks: StripeCredentialCopy;
+  /** The onboarding walkthrough's words. */
+  setupGuide: StripeSetupGuideCopy;
   /**
    * Stripe answered 401/403, with its own explanation when it sent one.
    *
@@ -231,3 +255,4 @@ export interface ProviderCopyPacks {
   infinitepay: InfinitePayCopy;
   stripe: StripeCopy;
 }
+
