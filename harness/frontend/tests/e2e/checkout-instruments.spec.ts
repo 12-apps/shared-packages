@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { fillCard, openCase, openPage, payCard, reachPayment } from './helpers/checkout';
+import { HARNESS_CHECKOUT_COPY } from '../../src/payments/checkout-copy';
 
 /**
  * Reusing a vaulted card, and the refusal that must not read as a decline
@@ -58,7 +59,13 @@ test('an owned card this store cannot charge is "not usable here", not declined'
   // The remedy really is available: the new-card form is one tap away and the
   // pay bar is still live, because this failure IS the buyer's to fix.
   await expect(page.getByTestId('card-pay')).toBeVisible();
-  await page.getByTestId('saved-cards').getByRole('radio', { name: 'Novo cartão' }).click();
+  // Named from the host's OWN pack rather than typed here: this harness words
+  // the card fields itself (FUT-760), so a literal would be asserting the
+  // package's retired default and would drift the moment either side moved.
+  await page
+    .getByTestId('saved-cards')
+    .getByRole('radio', { name: HARNESS_CHECKOUT_COPY.views.screens.card.fields.newCard })
+    .click();
   await fillCard(page);
   await payCard(page);
   await expect(page.getByTestId('payment-paid')).toBeVisible();

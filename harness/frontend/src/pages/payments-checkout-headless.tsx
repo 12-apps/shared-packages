@@ -25,6 +25,7 @@
  */
 import {
   CardPayBar,
+  CheckoutCopyProvider,
   NewCardForm,
   buyerFieldsFor,
   createCheckoutClient,
@@ -39,6 +40,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { PageIntro } from '../payments/panel';
 import { WireProbe } from '../payments/probe';
 import { createHarnessStore, type HarnessWorld } from '../payments/store';
+import { HARNESS_CHECKOUT_COPY } from '../payments/checkout-copy';
 
 const CHAIN = [
   {
@@ -82,11 +84,17 @@ async function mintForHead(
   card: CardDetails,
 ): Promise<{ ok: true; token: string } | { ok: false; why: string }> {
   const head = config.chain?.[0];
-  const minted = await tokenizeForCheckout(card, {
-    provider: head?.provider ?? null,
-    publicKey: head?.publicKey ?? null,
-    mockTokenization: head?.mockTokenization ?? false,
-  });
+  const minted = await tokenizeForCheckout(
+    card,
+    {
+      provider: head?.provider ?? null,
+      publicKey: head?.publicKey ?? null,
+      mockTokenization: head?.mockTokenization ?? false,
+    },
+    // Composing by hand means supplying the words by hand too: the mint's
+    // refusals are this host's sentences (FUT-760).
+    HARNESS_CHECKOUT_COPY.views.screens.card,
+  );
   return minted.ok ? { ok: true, token: minted.data.token } : { ok: false, why: minted.error };
 }
 
@@ -136,7 +144,9 @@ export function PaymentsCheckoutHeadlessPage(): JSX.Element {
     .join(',');
 
   return (
-    <>
+    // No factory above this page, so the card primitives' copy provider is
+    // this host's to open — the same line `FlowsShell` would have written.
+    <CheckoutCopyProvider copy={HARNESS_CHECKOUT_COPY.views.screens}>
       <PageIntro title="Checkout · composed by hand (no factory)">
         The flat exports only: the bound fetch client, the chain-derived buyer fields, the
         tokenizer and the card primitives. Same mount, same wire, no{' '}
@@ -168,6 +178,6 @@ export function PaymentsCheckoutHeadlessPage(): JSX.Element {
 
       <p data-testid="headless-outcome">{state.outcome ?? '(not paid)'}</p>
       <WireProbe world={world} label="headless" />
-    </>
+    </CheckoutCopyProvider>
   );
 }

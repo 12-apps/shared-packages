@@ -20,6 +20,12 @@ import type { CheckoutCopyFE } from '@12-apps/payments-frontend';
  * compiled-in Portuguese (the `PT_BR_CHECKOUT_VIEW_COPY` pack is that text,
  * named); this host words them itself for the same reason as everything else.
  *
+ * And `views.screens`, which reaches deeper still: the card fields and every
+ * refusal a tokenizer can produce, plus the buyer-details inputs. Same rule
+ * again, and the same reason for spelling them out here rather than importing
+ * the pack — a host that borrows another product's sentences cannot notice
+ * when the package starts supplying them again.
+ *
  * Every field is spelled out rather than spread over a base: the type is the
  * checklist, and a partial object would compile only because some other host's
  * table filled the gaps, which is the arrangement being removed.
@@ -72,6 +78,54 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
       amountLabel: 'Total pago',
       referenceLabel: 'Referência',
       receiptEmailLabel: 'Recibo enviado para',
+    },
+    screens: {
+      card: {
+        fields: {
+          unknownBrand: 'Cartão',
+          numberLabel: 'Número do cartão',
+          numberRequired: 'Informe o número do cartão.',
+          numberIncomplete: 'Faltam dígitos no número do cartão.',
+          numberInvalid: 'Esse número de cartão não confere.',
+          holderLabel: 'Nome como está no cartão',
+          holderRequired: 'Informe o nome como está no cartão.',
+          expiryLabel: 'Validade (MM/AA)',
+          cvvLabel: 'CVV',
+          monthInvalid: 'O mês da validade não existe.',
+          expired: 'Este cartão já venceu.',
+          expiryInvalid: 'A validade não confere ou já passou.',
+          cvvInvalid: 'O CVV não confere.',
+          cvvDigits: (length) => `O CVV deste cartão tem ${length} dígitos.`,
+          cpfRequired: 'Informe o CPF.',
+          cpfInvalid: 'Esse CPF não confere.',
+          savedCardsLabel: 'Cartão',
+          newCard: 'Usar outro cartão',
+          newCardDescription: 'Digitar os dados agora',
+          saveCard: 'Guardar este cartão nesta loja',
+        },
+        tokenize: {
+          sdkUnavailable: 'O meio de pagamento não carregou. Recarregue a página.',
+          cardNotProcessed: 'Não deu para ler o cartão. Confira os dados e tente de novo.',
+          providerUnreachable: 'Não deu para falar com a operadora. Verifique sua conexão.',
+          providerTimedOut: 'A operadora demorou demais para responder.',
+          providerRefused: (status, response) =>
+            `A operadora recusou os dados do cartão (HTTP ${status}). Resposta: ${response}`,
+          noPublicKey:
+            'Esta loja está sem a chave de cartão. Tente de novo em instantes ou escolha outra forma de pagar.',
+          cardUnavailable:
+            'Esta loja não está aceitando cartão agora. Recarregue a página, escolha outra forma de pagar ou combine com a loja.',
+        },
+      },
+      buyer: {
+        emailInvalid: 'Esse e-mail não parece válido.',
+        emailRequired: 'Informe o e-mail.',
+        nameRequired: 'Informe o nome.',
+        phoneRequired: 'Informe o telefone.',
+        fieldsHint: (names) =>
+          names.length === 0
+            ? 'Nome, e-mail e telefone são opcionais — servem apenas para o recibo.'
+            : `Informe ${names.join(', ')} para pagar. Os outros campos são opcionais.`,
+      },
     },
   },
   unavailableTitle: 'Pagamento online indisponível',
