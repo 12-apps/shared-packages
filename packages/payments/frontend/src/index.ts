@@ -98,9 +98,19 @@ export type {
   StatusOutcomeCopy,
 } from './components/checkout/view-copy';
 export {
+  PT_BR_CHECKOUT_COPY,
   PT_BR_CHECKOUT_VIEW_COPY,
   PT_BR_PAYMENT_STATUS_COPY,
 } from './components/checkout/pt-BR';
+// The provider the card fields and buyer inputs read their words from — a host
+// mounting a screen BELOW `CheckoutFlow` (or composing by hand) opens it
+// itself; `CheckoutFlow` and `FlowsShell` already do (FUT-760).
+export {
+  CheckoutCopyProvider,
+  useCheckoutCopy,
+  type BuyerInfoCopy,
+  type CheckoutCopy,
+} from './components/checkout/copy-context';
 export { fetchCheckoutConfig } from './components/checkout/client';
 /**
  * The `sessionStorage` key the hosted-checkout return leg parks the raised
@@ -199,7 +209,11 @@ export {
   validateExpiry,
   validateHolder,
   NEW_CARD,
+  PT_BR_CARD_COPY,
   type CardBrand,
+  type CardCopy,
+  type CardFieldCopy,
+  type CardTokenizeCopy,
   type CardDetails,
   type CardFieldErrors,
   type CardToken,
