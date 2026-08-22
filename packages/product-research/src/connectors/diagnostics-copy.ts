@@ -1,5 +1,3 @@
-import type { FetchFailure } from './types';
-
 /**
  * Every sentence this package's connectors put in front of a store owner when a
  * price source fails, as REQUIRED host config (FUT-760).
