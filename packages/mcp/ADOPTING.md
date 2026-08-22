@@ -372,6 +372,25 @@ now chosen in a diff.
   own name, so a required prop that did nothing has been removed rather than
   left to mislead.
 
+### The persistence namespace is the host's too
+
+`featureKey` is REQUIRED as well, for the same reason and with a worse failure
+mode than a wrong sentence. It defaulted to `"ai_integration"` — one adopter's
+key — while the host's own onboarding API only serves the keys its
+`featureKeys` allow-list declares. A host whose backend calls this feature `ai`
+or `mcp_connect` and passed nothing wrote every step to a namespace its API
+rejects: the wizard saves, the save 400s, and a refresh resumes from nothing.
+Nothing warns, because a silent default is indistinguishable from a deliberate
+one, and the symptom — an onboarding that forgets — reads as a bug in the
+host's persistence rather than as a key nobody chose.
+
+```ts
+<AiIntegrationOnboarding
+  featureKey="ai_integration"   // whatever YOUR onboarding API serves
+  …
+/>
+```
+
 ### The screens each take their own slice
 
 `AiLanding`, `AiCapabilities`, `AiStatusBoard` and `HostSelectStep` are exported
