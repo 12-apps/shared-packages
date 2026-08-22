@@ -27,7 +27,9 @@ export default defineConfig({
   entry: {
     'index': 'src/index.ts',
     'server/index': 'src/server/index.ts',
-    'hono/index': 'src/hono/index.ts'
+    'hono/index': 'src/hono/index.ts',
+    'manifest/index': 'src/manifest/index.ts',
+    'manifest/server': 'src/manifest/server.ts',
 },
   format: ['esm'],
   dts: true,
