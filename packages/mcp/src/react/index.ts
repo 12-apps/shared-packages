@@ -29,9 +29,6 @@ export { McpEndpointUrl } from "./mcp-endpoint-url";
 export { HostBrandAvatar, CapabilityIcon } from "./ai-icons";
 export { FeatureBadge, type FeatureBadgeItem } from "./feature-badge";
 export {
-  aiHostGuides,
-  AI_CAPABILITIES,
-  AI_PERMISSION_MODEL,
   aiConnectPrompt,
   type AiConnectPromptSpec,
   providerForHostId,
@@ -42,3 +39,24 @@ export {
   type AiProvider,
   type AiCapability,
 } from "../guide";
+
+export {
+  PT_BR_AI_CAPABILITIES,
+  PT_BR_AI_CONNECT_PROMPT,
+  PT_BR_AI_HOST_GUIDES,
+  PT_BR_AI_PERMISSION_MODEL,
+} from "../pt-BR";
+
+export type {
+  AiCapabilitiesCopy,
+  AiConnectGuideCopy,
+  AiConnectionSummaryCopy,
+  AiFlowCopy,
+  AiHostSelectCopy,
+  AiLandingCopy,
+  AiOnboardingCopy,
+  AiStatusBoardCopy,
+  AiTrustPoint,
+  McpAiCopy,
+} from "./copy";
+export { PT_BR_MCP_AI_COPY } from "./pt-BR";

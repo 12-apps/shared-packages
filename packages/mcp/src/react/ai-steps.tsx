@@ -1,5 +1,6 @@
 "use client";
 
+import type { McpAiCopy } from "./copy";
 import { type GuidedNav, type GuidedStep } from "@12-apps/onboarding";
 
 import { providerForHostId, type AiHostGuide } from "../guide";
@@ -24,11 +25,13 @@ export function StatusBoard({
   connections,
   hosts,
   onDisconnect,
+  copy,
 }: {
   nav: GuidedNav;
   connections: readonly AiConnection[];
   hosts: readonly AiHostGuide[];
   onDisconnect?: DisconnectHandler;
+  copy: McpAiCopy;
 }): React.JSX.Element {
   const legacyHostId = (nav.data.connectedHost ?? nav.data.selectedHost) as string | undefined;
 
@@ -43,7 +46,7 @@ export function StatusBoard({
     return {
       host,
       connected: connection !== null,
-      detail: connection ? activeAgo(connection.lastActiveAt) : undefined,
+      detail: connection ? activeAgo(connection.lastActiveAt, copy.summary) : undefined,
     };
   });
 
@@ -78,19 +81,20 @@ export function StatusBoard({
     : undefined;
 
   return (
-    <AiStatusBoard statuses={statuses} onConnect={goToConnect} onDisconnect={disconnect} />
+    <AiStatusBoard copy={copy.statusBoard} statuses={statuses} onConnect={goToConnect} onDisconnect={disconnect} />
   );
 }
 
 /** The first step (host picker) — picking a card advances to the right path. */
-function selectStep(hosts: readonly AiHostGuide[]): GuidedStep {
+function selectStep(hosts: readonly AiHostGuide[], copy: McpAiCopy): GuidedStep {
   return {
     id: "select",
-    label: "Escolher",
+    label: copy.flow.steps.select,
     render: (nav: GuidedNav) => (
       <HostSelectStep
         hosts={hosts}
         selectedId={(nav.data.selectedHost as string | undefined) ?? null}
+        copy={copy.hostSelect}
         onSelect={(hostId) =>
           nav.goTo(hosts.find((h) => h.id === hostId)?.pluginUrl ? "install" : "copy", {
             selectedHost: hostId,
@@ -102,11 +106,11 @@ function selectStep(hosts: readonly AiHostGuide[]): GuidedStep {
 }
 
 /** The Copiar-URL step, shared by every manual flow. */
-function copyStep(endpointUrl: string): GuidedStep {
+function copyStep(endpointUrl: string, copy: McpAiCopy): GuidedStep {
   return {
     id: "copy",
-    label: "Copiar URL",
-    render: (nav: GuidedNav) => <CopyUrlStep nav={nav} endpointUrl={endpointUrl} />,
+    label: copy.flow.steps.copyUrl,
+    render: (nav: GuidedNav) => <CopyUrlStep copy={copy} nav={nav} endpointUrl={endpointUrl} />,
   };
 }
 
@@ -120,44 +124,70 @@ function manualMiddle(
   hosts: readonly AiHostGuide[],
   endpointUrl: string,
   connectPrompt: string,
+  copy: McpAiCopy,
 ): GuidedStep[] {
   if (host.configureStages && host.configureStages.length > 0) {
     return [
-      copyStep(endpointUrl),
+      copyStep(endpointUrl, copy),
       ...host.configureStages.map((stage) => ({
         id: stage.id,
         label: stage.label,
         render: (nav: GuidedNav) => (
-          <ConfigureStageStep nav={nav} host={resolveHost(hosts, nav.data.selectedHost)} stage={stage} />
+          <ConfigureStageStep
+            nav={nav}
+            host={resolveHost(hosts, nav.data.selectedHost)}
+            stage={stage}
+            copy={copy}
+          />
         ),
       })),
     ];
   }
   return [
-    copyStep(endpointUrl),
+    copyStep(endpointUrl, copy),
     {
       id: "configure",
-      label: "Configurar",
-      render: (nav: GuidedNav) => <ConfigureStep nav={nav} host={resolveHost(hosts, nav.data.selectedHost)} />,
+      label: copy.flow.steps.configure,
+      render: (nav: GuidedNav) => (
+        <ConfigureStep
+          nav={nav}
+          host={resolveHost(hosts, nav.data.selectedHost)}
+          copy={copy}
+        />
+      ),
     },
     {
       id: "connect",
-      label: "Conectar",
+      label: copy.flow.steps.connect,
       render: (nav: GuidedNav) => (
-        <ConnectStep nav={nav} host={resolveHost(hosts, nav.data.selectedHost)} connectPrompt={connectPrompt} />
+        <ConnectStep
+          nav={nav}
+          host={resolveHost(hosts, nav.data.selectedHost)}
+          connectPrompt={connectPrompt}
+          copy={copy}
+        />
       ),
     },
   ];
 }
 
 /** The single middle step for the simplified plugin flow: install. */
-function simpleMiddle(hosts: readonly AiHostGuide[], connectPrompt: string): GuidedStep[] {
+function simpleMiddle(
+  hosts: readonly AiHostGuide[],
+  connectPrompt: string,
+  copy: McpAiCopy,
+): GuidedStep[] {
   return [
     {
       id: "install",
-      label: "Instalar",
+      label: copy.flow.steps.install,
       render: (nav: GuidedNav) => (
-        <InstallStep nav={nav} host={resolveHost(hosts, nav.data.selectedHost)} connectPrompt={connectPrompt} />
+        <InstallStep
+          nav={nav}
+          host={resolveHost(hosts, nav.data.selectedHost)}
+          connectPrompt={connectPrompt}
+          copy={copy}
+        />
       ),
     },
   ];
@@ -176,17 +206,24 @@ export function buildFlowSteps(opts: {
   connectPrompt: string;
   connections: readonly AiConnection[];
   onRetest: () => void;
+  copy: McpAiCopy;
 }): GuidedStep[] {
-  const { host, hosts, endpointUrl, connectPrompt, connections, onRetest } = opts;
+  const { host, hosts, endpointUrl, connectPrompt, connections, onRetest, copy } = opts;
   const middle = host.pluginUrl
-    ? simpleMiddle(hosts, connectPrompt)
-    : manualMiddle(host, hosts, endpointUrl, connectPrompt);
+    ? simpleMiddle(hosts, connectPrompt, copy)
+    : manualMiddle(host, hosts, endpointUrl, connectPrompt, copy);
   const confirm: GuidedStep = {
     id: "confirm",
-    label: "Confirmar",
+    label: copy.flow.steps.confirm,
     render: (nav: GuidedNav) => (
-      <ConfirmStep nav={nav} connections={connections} hosts={hosts} onRetest={onRetest} />
+      <ConfirmStep
+        nav={nav}
+        connections={connections}
+        hosts={hosts}
+        onRetest={onRetest}
+        copy={copy}
+      />
     ),
   };
-  return [selectStep(hosts), ...middle, confirm];
+  return [selectStep(hosts, copy), ...middle, confirm];
 }

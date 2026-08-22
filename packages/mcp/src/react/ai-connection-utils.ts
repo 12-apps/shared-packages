@@ -1,3 +1,4 @@
+import type { AiConnectionSummaryCopy } from "./copy";
 import { providerForHostId, type AiHostGuide, type AiProvider } from "../guide";
 
 /**
@@ -54,14 +55,14 @@ export function connectionForHost(
   );
 }
 
-/** Short pt-BR "ativo há X" from a timestamp (agora / min / h / dias). */
-export function activeAgo(date: Date): string {
+/** The recency line from a timestamp, in the host's own words. */
+export function activeAgo(date: Date, copy: AiConnectionSummaryCopy): string {
   const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
-  if (minutes < 1) return "ativo agora";
-  if (minutes < 60) return `ativo há ${minutes} min`;
+  if (minutes < 1) return copy.activeNow;
+  if (minutes < 60) return copy.activeMinutes(minutes);
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `ativo há ${hours} h`;
-  return `ativo há ${Math.floor(hours / 24)} dias`;
+  if (hours < 24) return copy.activeHours(hours);
+  return copy.activeDays(Math.floor(hours / 24));
 }
 
 /** The most-recently-active connection across all providers (null when none). */
@@ -77,20 +78,24 @@ export function connectedTitle(
   connections: readonly AiConnection[],
   hosts: readonly AiHostGuide[],
   connectedHostId: string | undefined,
+  copy: AiConnectionSummaryCopy,
 ): string {
   const providers = [...new Set(connections.map((c) => c.host).filter((h): h is AiProvider => h !== null))];
-  if (providers.length === 1) return `${PROVIDER_LABEL[providers[0]!]} Conectado`;
+  if (providers.length === 1) return `${PROVIDER_LABEL[providers[0]!]} ${copy.connectedSuffix}`;
   if (providers.length > 1) {
-    return `${providers.map((p) => PROVIDER_LABEL[p]).join(", ")} conectados`;
+    return copy.connectedSeveral(providers.map((p) => PROVIDER_LABEL[p]).join(", "));
   }
   // Legacy connection with no attributed provider — name the completed host.
-  if (connections.length > 0) return `${hostLabel(hosts, connectedHostId)} Conectado`;
-  return "IA conectada";
+  if (connections.length > 0) return `${hostLabel(hosts, connectedHostId)} ${copy.connectedSuffix}`;
+  return copy.connectedGeneric;
 }
 
 /** The completed summary line (second line) for the configured-state header. */
-export function connectedSummary(connections: readonly AiConnection[]): string {
+export function connectedSummary(
+  connections: readonly AiConnection[],
+  copy: AiConnectionSummaryCopy,
+): string {
   const recent = mostRecent(connections);
-  if (!recent) return "Integração configurada";
-  return activeAgo(recent.lastActiveAt);
+  if (!recent) return copy.configured;
+  return activeAgo(recent.lastActiveAt, copy);
 }

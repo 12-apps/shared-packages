@@ -13,7 +13,7 @@ library updates, every host updates with **no app changes**. Same contract
 | **Core** | `@12-apps/mcp` | `generateTools(openapi)`, `createToolRegistry`, `dispatchTool` (bearer passthrough), `buildManifest`, the surface lock, and both discovery-document builders. |
 | **OAuth AS** | `@12-apps/mcp/oauth` | `createApiMcpOauth({ stores, resolveSession })` → `routes` + named `handlers` + `verifyBearer`. register / authorize / token, the JWKS, and both `.well-known` documents, with PKCE, stateless codes, hashed rotating refresh tokens and replay revocation inside. |
 | **Hono** | `@12-apps/mcp/hono` | `const oauth = mcpOauthRouter({ … }); app.route('/', oauth.router)` — at the ORIGIN ROOT (see rule 2). `hono` is an OPTIONAL peer. |
-| **React** | `@12-apps/mcp/react` | The AI-connect onboarding UI and status board (pt-BR, overridable). |
+| **React** | `@12-apps/mcp/react` | The AI-connect onboarding UI and status board. Every word is REQUIRED host config — see below. |
 | **`mcp:generate` / `mcp:check`** | `@12-apps/mcp/generate` | Your script becomes `mcpGenerateCli({ document, version, source, versionLocation, outputs, check })`. `12-apps/ci`'s `mcp-contract.yml` shells out to your `mcp:check` package script and keeps working unchanged. |
 | **`mcp:coverage`** | `@12-apps/mcp/coverage` | `mcpCoverageCli({ appDir, endpoints, exclusionsPath, actionMapPath })` — the route/action completeness gate. |
 | **Prisma** | `prisma/mcp.prisma` + `prisma/migrations/*` | `pnpm --filter @12-apps/mcp prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma; a symlinked partial dangles under `turbo prune`). |
@@ -320,3 +320,71 @@ Deliberate deltas to reconcile:
   (12-23's scope).
 - **Authorization codes as rows.** They are stateless signed blobs, so there is no
   table and nothing to sweep — only the replay store (rule 8).
+
+## The AI screens take their words (FUT-760)
+
+`@12-apps/mcp/react` used to ship this surface's pt-BR: the walkthrough for each
+assistant, the capability cards, the permission reassurance, every step label
+and every button. `hosts`, `capabilities` and `permissionModel` were OPTIONAL
+props that fell back to it, and `guide.ts` described them as "the shared
+defaults" — so a host that configured nothing published one product's
+Portuguese, and had no field to decline it.
+
+They are required now, and the retired wording ships as NAMED packs:
+
+```ts
+import {
+  PT_BR_AI_CAPABILITIES,
+  PT_BR_AI_CONNECT_PROMPT,
+  PT_BR_AI_HOST_GUIDES,
+  PT_BR_AI_PERMISSION_MODEL,
+} from "@12-apps/mcp";
+import { PT_BR_MCP_AI_COPY } from "@12-apps/mcp/react";
+
+<AiIntegrationOnboarding
+  hosts={PT_BR_AI_HOST_GUIDES(platformName)}
+  capabilities={PT_BR_AI_CAPABILITIES}
+  permissionModel={PT_BR_AI_PERMISSION_MODEL}
+  connectPrompt={PT_BR_AI_CONNECT_PROMPT({ announceTool, probeTool, probeSubject, identifierName })}
+  copy={PT_BR_MCP_AI_COPY}
+  …
+/>
+```
+
+Nothing changes on screen if you adopt them — they are the same sentences,
+now chosen in a diff.
+
+### What moved
+
+- **`aiHostGuides(platformName)` → `PT_BR_AI_HOST_GUIDES(platformName)`**, in
+  `@12-apps/mcp` (from `./guide`, which now carries types only). The guides are
+  data as much as copy — which assistants are offered, their stage ids and
+  brands — and both halves travel together, because a step label and the stage
+  it labels are useless apart.
+- **`AI_CAPABILITIES` → `PT_BR_AI_CAPABILITIES`**, same move.
+- **`AI_PERMISSION_MODEL` → `PT_BR_AI_PERMISSION_MODEL`**. The export left
+  behind is now the TYPE `AiPermissionModel`.
+- **`aiConnectPrompt(spec)` → `aiConnectPrompt(spec, copy)`**, where `copy` is a
+  template. It already took the host's tool NAMES; the words around them are the
+  host's too now. `PT_BR_AI_CONNECT_PROMPT` is that template.
+- **`platformName` is gone from `<AiIntegrationOnboarding>`.** It existed only
+  to build the default guides. The host builds its own now and interpolates its
+  own name, so a required prop that did nothing has been removed rather than
+  left to mislead.
+
+### The screens each take their own slice
+
+`AiLanding`, `AiCapabilities`, `AiStatusBoard` and `HostSelectStep` are exported
+standalone, so each takes the slice it renders (`copy.landing`,
+`copy.capabilities`, `copy.statusBoard`, `copy.hostSelect`) rather than the whole
+object — a host mounting only the status board should not have to supply words
+for a wizard it never renders. `<AiIntegrationOnboarding>` takes the whole
+`McpAiCopy` and passes the slices down.
+
+### The icons stayed
+
+The landing's reassurance strip is keyed by the pack's own ids (`login`,
+`install`, `permissions`, `surface`) against an icon map inside the package. An
+icon is not copy, and a pack that had to ship React elements could not be a
+plain data file. An id the map does not know renders without an icon rather
+than throwing, so a host adding a fifth point still gets its words on screen.

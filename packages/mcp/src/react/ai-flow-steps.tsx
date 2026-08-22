@@ -1,5 +1,6 @@
 "use client";
 
+import type { McpAiCopy } from "./copy";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { useEffect, useState } from "react";
@@ -32,21 +33,21 @@ const POLL_INTERVAL_MS = 3000;
 function StepNav({
   nav,
   onNext,
-  nextLabel = "Próximo",
+  nextLabel,
   nextDisabled = false,
   nextTestId,
+  copy,
 }: {
   nav: GuidedNav;
   onNext: () => void;
   nextLabel?: string;
   nextDisabled?: boolean;
   nextTestId?: string;
+  copy: McpAiCopy;
 }): React.JSX.Element {
   return (
     <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-      <Button variant="ghost" onClick={() => nav.back()} data-testid="ai-step-back">
-        Voltar
-      </Button>
+      <Button variant="ghost" onClick={() => nav.back()} data-testid="ai-step-back">{copy.flow.back}</Button>
       <Button onClick={onNext} disabled={nextDisabled} data-testid={nextTestId}>
         {nextLabel}
       </Button>
@@ -55,39 +56,53 @@ function StepNav({
 }
 
 /** Step 2 — copy the store URL; copying is the action that advances the wizard. */
-export function CopyUrlStep({ nav, endpointUrl }: { nav: GuidedNav; endpointUrl: string }): React.JSX.Element {
+export function CopyUrlStep({
+  nav,
+  endpointUrl,
+  copy,
+}: {
+  nav: GuidedNav;
+  endpointUrl: string;
+  copy: McpAiCopy;
+}): React.JSX.Element {
   return (
     <Stack spacing={3} data-testid="ai-copy-step">
       <Box>
         <Text variant="heading" size="sm" as="h2">
-          Copie a URL da sua loja
+          {copy.flow.copyUrlTitle}
         </Text>
         <Text variant="caption" as="p" color="secondary">
-          É o único dado que você cola no assistente — ao copiar, seguimos para o próximo passo.
+          {copy.flow.urlCaption}
         </Text>
       </Box>
-      <EndpointCopyBlock endpointUrl={endpointUrl} copied={false} onCopy={() => nav.next()} />
+      <EndpointCopyBlock copy={copy.connectGuide} flowCopy={copy.flow} endpointUrl={endpointUrl} copied={false} onCopy={() => nav.next()} />
       <Box>
-        <Button variant="ghost" onClick={() => nav.back()} data-testid="ai-step-back">
-          Voltar
-        </Button>
+        <Button variant="ghost" onClick={() => nav.back()} data-testid="ai-step-back">{copy.flow.back}</Button>
       </Box>
     </Stack>
   );
 }
 
 /** Step 3 — open the host's connectors and add + configure the custom connector. */
-export function ConfigureStep({ nav, host }: { nav: GuidedNav; host: AiHostGuide }): React.JSX.Element {
+export function ConfigureStep({
+  nav,
+  host,
+  copy,
+}: {
+  nav: GuidedNav;
+  host: AiHostGuide;
+  copy: McpAiCopy;
+}): React.JSX.Element {
   // Hosts with no direct link (e.g. Claude Desktop) have nothing to open, so
   // "Próximo" is available immediately; otherwise it unlocks on the open click.
   const [opened, setOpened] = useState(!host.link);
   return (
     <Stack spacing={2.5} data-testid="ai-configure-step">
-      <HostConnectHeader host={host} />
+      <HostConnectHeader copy={copy.connectGuide} host={host} />
       <HostOpenButton host={host} onOpen={() => setOpened(true)} />
       <HostStepList steps={host.steps.slice(0, CONFIGURE_STEP_COUNT)} start={1} />
-      <HostDocsLink host={host} />
-      <StepNav nav={nav} onNext={() => nav.next()} nextDisabled={!opened} nextTestId="ai-configure-next" />
+      <HostDocsLink copy={copy.connectGuide} host={host} />
+      <StepNav copy={copy} nav={nav} onNext={() => nav.next()} nextDisabled={!opened} nextTestId="ai-configure-next" />
     </Stack>
   );
 }
@@ -101,15 +116,17 @@ export function ConfigureStageStep({
   nav,
   host,
   stage,
+  copy,
 }: {
   nav: GuidedNav;
   host: AiHostGuide;
   stage: AiHostConfigureStage;
+  copy: McpAiCopy;
 }): React.JSX.Element {
   const [opened, setOpened] = useState(!stage.link);
   return (
     <Stack spacing={2.5} data-testid={`ai-stage-${stage.id}`}>
-      <HostConnectHeader host={host} />
+      <HostConnectHeader copy={copy.connectGuide} host={host} />
       {stage.link && (
         <Box>
           <Button
@@ -125,8 +142,8 @@ export function ConfigureStageStep({
         </Box>
       )}
       <HostStepList steps={stage.steps} start={1} />
-      <HostDocsLink host={host} />
-      <StepNav
+      <HostDocsLink copy={copy.connectGuide} host={host} />
+      <StepNav copy={copy}
         nav={nav}
         onNext={() => nav.next()}
         nextDisabled={!opened}
@@ -141,22 +158,24 @@ export function ConnectStep({
   nav,
   host,
   connectPrompt,
+  copy,
 }: {
   nav: GuidedNav;
   host: AiHostGuide;
   connectPrompt: string;
+  copy: McpAiCopy;
 }): React.JSX.Element {
   return (
     <Stack spacing={2.5} data-testid="ai-connect-step">
-      <HostConnectHeader host={host} />
+      <HostConnectHeader copy={copy.connectGuide} host={host} />
       <HostStepList steps={host.steps.slice(CONFIGURE_STEP_COUNT)} start={CONFIGURE_STEP_COUNT + 1} />
-      <PromptCopyBlock
-        title="Cole esta mensagem no assistente"
-        caption="Assim ele se conecta, se identifica (Claude, ChatGPT…) e registramos a conexão."
+      <PromptCopyBlock flowCopy={copy.flow}
+        title={copy.flow.pasteTitle}
+        caption={copy.flow.promptCaption}
         message={connectPrompt}
       />
-      <HostDocsLink host={host} />
-      <StepNav nav={nav} onNext={() => nav.next()} nextLabel="Continuar" nextTestId="ai-connect-done" />
+      <HostDocsLink copy={copy.connectGuide} host={host} />
+      <StepNav copy={copy} nav={nav} onNext={() => nav.next()} nextLabel={copy.flow.advance} nextTestId="ai-connect-done" />
     </Stack>
   );
 }
@@ -170,18 +189,19 @@ export function InstallStep({
   nav,
   host,
   connectPrompt,
+  copy,
 }: {
   nav: GuidedNav;
   host: AiHostGuide;
   connectPrompt: string;
+  copy: McpAiCopy;
 }): React.JSX.Element {
   const [opened, setOpened] = useState(false);
   return (
     <Stack spacing={2.5} data-testid="ai-install-step">
-      <HostConnectHeader host={host} />
+      <HostConnectHeader copy={copy.connectGuide} host={host} />
       <Text variant="body" as="p" color="secondary">
-        Abra o plugin da sua loja, clique em Instalar e autorize o acesso — sem copiar URL nem gerar
-        credenciais.
+        {copy.flow.installBody}
       </Text>
       {host.pluginUrl && (
         <Box>
@@ -192,21 +212,21 @@ export function InstallStep({
             }}
             data-testid="ai-install-open"
           >
-            Instalar o plugin da loja
+            {copy.flow.installAction}
             <OpenInNewIcon sx={{ fontSize: 16, ml: 0.5 }} />
           </Button>
         </Box>
       )}
-      <PromptCopyBlock
-        title="Peça ao assistente para conectar"
-        caption="Cole no assistente para ele se conectar, se identificar e confirmar o acesso."
+      <PromptCopyBlock flowCopy={copy.flow}
+        title={copy.flow.askTitle}
+        caption={copy.flow.pasteInstallCaption}
         message={connectPrompt}
       />
-      <HostDocsLink host={host} />
-      <StepNav
+      <HostDocsLink copy={copy.connectGuide} host={host} />
+      <StepNav copy={copy}
         nav={nav}
         onNext={() => nav.next()}
-        nextLabel="Continuar"
+        nextLabel={copy.flow.advance}
         nextDisabled={!opened}
         nextTestId="ai-install-done"
       />
@@ -225,11 +245,13 @@ export function ConfirmStep({
   connections,
   hosts,
   onRetest,
+  copy,
 }: {
   nav: GuidedNav;
   connections: readonly AiConnection[];
   hosts: readonly AiHostGuide[];
   onRetest: () => void;
+  copy: McpAiCopy;
 }): React.JSX.Element {
   const selectedHostId = nav.data.selectedHost as string | undefined;
   const connection = connectionForHost(connections, selectedHostId);
@@ -250,15 +272,15 @@ export function ConfirmStep({
           <CheckCircleIcon sx={{ color: "success.main" }} />
           <Box>
             <Text variant="body" weight="bold" as="p">
-              {label} está conectado à sua loja.
+              {copy.flow.connectedTo(label)}
             </Text>
             <Text variant="caption" as="p" color="secondary">
-              {activeAgo(connection.lastActiveAt)}
+              {activeAgo(connection.lastActiveAt, copy.summary)}
             </Text>
           </Box>
         </Stack>
         <Box>
-          <Button onClick={() => nav.complete({ connectedHost: selectedHostId })}>Concluir</Button>
+          <Button onClick={() => nav.complete({ connectedHost: selectedHostId })}>{copy.flow.finish}</Button>
         </Box>
       </Stack>
     );
@@ -270,20 +292,18 @@ export function ConfirmStep({
         <Progress variant="circular" circularSize={22} thickness={4} dataTestId="ai-confirm-spinner" />
         <Box>
           <Text variant="body" weight="bold" as="p">
-            Esperando conexão
+            {copy.flow.waitingTitle}
           </Text>
           <Text variant="caption" as="p" color="secondary">
-            Assim que você autorizar o acesso no {label}, ela aparece aqui automaticamente.
+            {copy.flow.waitingBody(label)}
           </Text>
         </Box>
       </Stack>
       <Stack direction="row" spacing={1}>
         <Button variant="ghost" size="sm" onClick={onRetest} data-testid="ai-confirm-retest">
-          Testar agora
+          {copy.flow.testNow}
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => nav.back()}>
-          Voltar
-        </Button>
+        <Button variant="ghost" size="sm" onClick={() => nav.back()}>{copy.flow.back}</Button>
       </Stack>
     </Stack>
   );
