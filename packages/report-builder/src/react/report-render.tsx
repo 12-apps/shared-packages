@@ -21,7 +21,7 @@ import { Box } from "@12-apps/ui/mui/Box";
 import type { ValueFormatCopy } from "../copy";
 import { formatKpiFigure, formatReportValue } from "../format";
 
-import { useReportEngineCopy } from "./transport-context";
+import { useReportCopy, useReportEngineCopy } from "./transport-context";
 import { chartColumnsOf } from "./chart-as-table";
 import type { ExportColumn } from "./lib/export-rows";
 import {
@@ -370,6 +370,7 @@ export function ReportRenderView({
   asTable = false,
   fill = false,
 }: ReportRenderViewProps): JSX.Element {
+  const rangeCopy = useReportCopy().screens.ranges;
   if (render.kind === "kpi") {
     // A KPI over an empty period renders its tiles with "—", not EmptyState —
     // in a dashboard grid the metric's absence should still say which metric.
@@ -379,8 +380,8 @@ export function ReportRenderView({
     return (
       <EmptyState
         variant="minimal"
-        title="Sem dados no período"
-        description="Nenhum registro encontrado para o período selecionado."
+        title={rangeCopy.emptyTitle}
+        description={rangeCopy.emptyBody}
         primaryAction={onWidenRange}
         dataTestId={dataTestId}
       />

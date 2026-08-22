@@ -17,6 +17,7 @@ import { measureOptions, measureSortKey, type MeasureDraft } from "./builder-mea
 import type { ReportEntityFields, ReportField, ReportSpecWire } from "./custom-reports-api";
 import type { PublishDraft } from "./lib/publish-section";
 import type { ReportGrain } from "./reports-api";
+import type { ReportBuilderPanelCopy, ReportRangeCopy } from "./screens-copy";
 
 export interface DimensionDraft {
   field: string;
@@ -71,14 +72,10 @@ export interface BuilderDraft {
   stacked: boolean;
 }
 
-export const OPERATOR_LABELS: Record<string, string> = {
-  eq: "igual a",
-  neq: "diferente de",
-  in: "é um de",
-  gte: "a partir de",
-  lte: "até",
-  between: "entre",
-};
+/** What an operator is CALLED, from the host. Which ones exist is ours. */
+export function operatorLabel(operator: string, copy: ReportBuilderPanelCopy): string {
+  return copy.operators[operator] ?? operator;
+}
 
 /**
  * `prototype.html`'s own words, verbatim. `kpi` was "KPI (número único)" here:
@@ -86,21 +83,20 @@ export const OPERATOR_LABELS: Record<string, string> = {
  * forced the picker's tiles onto a ragged grid — one cell wide enough for the
  * sentence and the rest not. The prototype calls it `Número`.
  */
-const CHART_LABELS: Record<ChartKind, string> = {
-  table: "Tabela",
-  kpi: "Número",
-  line: "Linha",
-  bar: "Barras",
-  area: "Área",
-  pie: "Pizza",
-  donut: "Rosca",
-};
+function chartLabel(kind: ChartKind, copy: ReportBuilderPanelCopy): string {
+  return copy.charts[kind] ?? kind;
+}
 
-export const GRAIN_LABELS: Record<ReportGrain, string> = {
-  day: "Dia",
-  week: "Semana",
-  month: "Mês",
-};
+/**
+ * The grain names the BUILDER offers.
+ *
+ * From the RANGE slice, not the builder's: the viewer's own grain control
+ * names the same three buckets, and two spellings of "Semana" in one product
+ * is exactly the drift a shared key prevents.
+ */
+export function grainLabel(grain: ReportGrain, copy: ReportRangeCopy): string {
+  return copy.grains[grain] ?? grain;
+}
 
 function emptyDraft(entity: string): BuilderDraft {
   return {
@@ -123,9 +119,12 @@ function emptyDraft(entity: string): BuilderDraft {
  * nobody beyond author+admins, which "Somente autor e admins" already says
  * honestly. Block the save with an actionable message instead.
  */
-export function publishGuardError(publish: PublishDraft): string | null {
+export function publishGuardError(
+  publish: PublishDraft,
+  copy: ReportBuilderPanelCopy,
+): string | null {
   if (publish.visibility === "roles" && publish.visibilityRoles.length === 0) {
-    return "Escolha ao menos uma função para compartilhar — ou mude a visibilidade para 'Somente autor e admins'.";
+    return copy.needsRole;
   }
   return null;
 }
@@ -182,10 +181,11 @@ export function chartOptions(
   draft: BuilderDraft,
   fields: Map<string, ReportField>,
   copy: PresentationCopy,
+  words: ReportBuilderPanelCopy,
 ): Array<{ value: ChartKind; label: string; disabledReason: string | null }> {
   return presentationCompatibility(draftShape(draft, fields), copy).map((entry) => ({
     value: entry.option,
-    label: CHART_LABELS[entry.option],
+    label: chartLabel(entry.option, words),
     disabledReason: entry.disabledReason,
   }));
 }

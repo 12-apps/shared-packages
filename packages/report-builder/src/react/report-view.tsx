@@ -21,6 +21,8 @@ import { ConfirmDialog } from "./lib/confirm-dialog";
 import { ReportBlockBody, ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
 import { viewBlocks } from "./report-model";
 import { useTransport } from "./transport-context";
+import type { ReportArchiveCopy } from "./screens-copy";
+import { useReportCopy } from "./transport-context";
 
 /**
  * One block on the viewer's canvas: title, what it asks for, result, and the
@@ -81,23 +83,26 @@ export function ReportViewCanvas({ view }: { view: SavedReportView }): JSX.Eleme
 }
 
 /** Archive/restore copy, which differs enough to be worth a lookup. */
-function archiveCopy(archived: boolean): {
+function archiveCopy(
+  archived: boolean,
+  words: ReportArchiveCopy,
+): {
   action: string;
   title: string;
   description: string;
 } {
   if (archived) {
     return {
-      action: "Restaurar",
-      title: "Restaurar relatório?",
-      description: "Ele volta para a lista de relatórios da loja.",
+      action: words.restoreAction,
+      title: words.restoreTitle,
+      description: words.restoreBody,
     };
   }
   return {
-    action: "Arquivar",
-    title: "Arquivar relatório?",
+    action: words.archiveAction,
+    title: words.archiveTitle,
     description:
-      "Ele sai da lista de relatórios, mas nada é perdido — você pode restaurá-lo depois em “Mostrar arquivados”.",
+      words.archiveBodyFromViewer,
   };
 }
 
@@ -116,12 +121,13 @@ export function ReportActionsMenu({
   /** Told which lifecycle the report landed in, so the page can re-pick. */
   onChanged: (status: ReportStatusWire) => void;
 }): JSX.Element {
+  const words = useReportCopy().screens.archive;
   const navigate = useNavigate();
   const transport = useTransport();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const archived = view.status === "archived";
-  const copy = archiveCopy(archived);
+  const copy = archiveCopy(archived, words);
 
   async function onConfirm(): Promise<void> {
     const next: ReportStatusWire = archived ? "published" : "archived";
@@ -157,7 +163,7 @@ export function ReportActionsMenu({
           // tint — 4.10:1 for its glyph against 4.47:1 for the outlined button
           // next to it. It is also the only route to Editar, so it should read
           // as a control rather than as a mark someone left on the page.
-          <Button variant="outline" size="sm" aria-label="Ações do relatório" dataTestId="report-actions">
+          <Button variant="outline" size="sm" aria-label={words.reportMenu} dataTestId="report-actions">
             ⋮
           </Button>
         }

@@ -25,9 +25,10 @@ import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { exportColumnsFor, ReportRenderView } from "./report-render";
 import { useSystemReport, type ReportGrain, type ReportRange } from "./reports-api";
-import { useReportEngineCopy, useReportSurface } from "./transport-context";
+import { useReportCopy, useReportEngineCopy, useReportSurface } from "./transport-context";
 
 export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
+  const { system: systemCopy, builder: builderCopy } = useReportCopy().screens;
   const { reportKey = "" } = useParams();
   const [range, setRange] = useState<ReportRange>("30d");
   const [grain, setGrain] = useState<ReportGrain>("day");
@@ -41,8 +42,8 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   if (query.isError) {
     return (
       <ErrorState
-        title="Não foi possível carregar o relatório"
-        message="Verifique sua permissão ou tente novamente em instantes."
+        title={systemCopy.reportFailedTitle}
+        message={systemCopy.reportFailedBody}
         retryLabel="Tentar novamente"
         onRetry={() => {
           void query.refetch();
@@ -61,7 +62,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
     <Stack spacing={3} data-testid="page-system-report" {...{ [PRINT_REGION_ATTR]: "" }}>
       <PrintStyles />
       <ReportPageHeader
-        back={sectionBackTarget(tenantSlug, surface.sections, section)}
+        back={sectionBackTarget(tenantSlug, surface.sections, section, builderCopy)}
         title={report.title}
         description={report.description}
         titleTestId="system-report-title"

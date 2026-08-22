@@ -21,14 +21,16 @@ import { Text } from "@12-apps/ui/typography/Text";
 import type { SystemReportSection } from "../../server/system-reports";
 
 import {
-  REPORT_GRAIN_LABELS,
+  reportGrainLabel,
   REPORT_GRAINS,
-  REPORT_RANGE_LABELS,
+  reportRangeLabel,
   REPORT_ROLLING_RANGES,
   type ReportGrain,
   type ReportRange,
 } from "../reports-api";
 import { NO_PRINT_CLASS, PrintExportButton } from "./print-export";
+import type { ReportBuilderPanelCopy, ReportRangeCopy } from "../screens-copy";
+import { useReportCopy } from "../transport-context";
 
 /**
  * ROLLING presets only — no `Personalizado…` on a built-in surface (FUT-755).
@@ -39,15 +41,19 @@ import { NO_PRINT_CLASS, PrintExportButton } from "./print-export";
  * pill would send `preset=custom` with nothing to resolve — a 400 from a
  * control that looked fine. `Este mês` needs no dates, so it IS offered here.
  */
-const RANGE_OPTIONS = REPORT_ROLLING_RANGES.map((range) => ({
-  value: range,
-  label: REPORT_RANGE_LABELS[range],
-}));
+function rangeOptions(copy: ReportRangeCopy): Array<{ value: ReportRange; label: string }> {
+  return REPORT_ROLLING_RANGES.map((range) => ({
+    value: range,
+    label: reportRangeLabel(range, copy),
+  }));
+}
 
-const GRAIN_OPTIONS = REPORT_GRAINS.map((grain) => ({
-  value: grain,
-  label: REPORT_GRAIN_LABELS[grain],
-}));
+function grainOptions(copy: ReportRangeCopy): Array<{ value: ReportGrain; label: string }> {
+  return REPORT_GRAINS.map((grain) => ({
+    value: grain,
+    label: reportGrainLabel(grain, copy),
+  }));
+}
 
 interface ReportControlsProps {
   range: ReportRange;
@@ -73,6 +79,8 @@ export function ReportControls({
   printTitle,
   onExport,
 }: ReportControlsProps): JSX.Element {
+  const ranges = useReportCopy().screens.ranges;
+  const copy = useReportCopy().screens.builder;
   return (
     <Stack
       direction="row"
@@ -83,19 +91,19 @@ export function ReportControls({
       <ToggleGroup
         variant="exclusive"
         size="sm"
-        options={RANGE_OPTIONS}
+        options={rangeOptions(ranges)}
         value={range}
         onChange={(_event, next) => {
           if (typeof next === "string") onRangeChange(next as ReportRange);
         }}
-        aria-label="Período"
+        aria-label={copy.period}
         dataTestId="report-range"
       />
       {showGrain ? (
         <ToggleGroup
           variant="exclusive"
           size="sm"
-          options={GRAIN_OPTIONS}
+          options={grainOptions(ranges)}
           value={grain}
           onChange={(_event, next) => {
             if (typeof next === "string") onGrainChange(next as ReportGrain);
@@ -135,9 +143,10 @@ export function sectionBackTarget(
   tenantSlug: string,
   sections: readonly SystemReportSection[],
   section: string | undefined,
+  copy: ReportBuilderPanelCopy,
 ): { href: string; label: string } {
   const declared = sections.find((candidate) => candidate.key === section);
-  if (!declared) return { href: `/${tenantSlug}/reports`, label: "Relatórios" };
+  if (!declared) return { href: `/${tenantSlug}/reports`, label: copy.backToList };
   return { href: `/${tenantSlug}/${declared.path}`, label: declared.label };
 }
 

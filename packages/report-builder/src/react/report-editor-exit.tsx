@@ -17,6 +17,7 @@ import type { JSX } from "react";
 
 import { ConfirmDialog } from "./lib/confirm-dialog";
 import type { PublishDraft } from "./lib/publish-section";
+import { useReportCopy } from "./transport-context";
 
 /**
  * True when leaving would leave something behind worth naming.
@@ -41,17 +42,14 @@ export function ExitConfirmDialog({
   onLeave: () => void;
   onStay: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   const published = publish.status === "published";
   return (
     <ConfirmDialog
       open={open}
-      title="Sair sem publicar?"
-      description={
-        published
-          ? "Suas alterações estão guardadas, mas ainda não foram publicadas. Quem abre o relatório continua vendo a versão publicada até você salvar."
-          : "Suas alterações estão guardadas, mas o relatório ainda não foi publicado. Ninguém mais vê estas alterações até você salvar."
-      }
-      confirmText="Sair sem publicar"
+      title={copy.exitTitle}
+      description={published ? copy.exitPublishedBody : copy.exitDraftBody}
+      confirmText={copy.exitConfirm}
       onConfirm={onLeave}
       onCancel={onStay}
       dataTestId="report-editor-exit-confirm"

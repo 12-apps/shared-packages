@@ -9,6 +9,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { ConfirmDialog } from "./lib/confirm-dialog";
 import { CONTAINER_RADIUS_PX, CONTROL_ROW_SX, stateChipSx } from "./lib/report-surface";
 import type { UnpublishedChanges } from "./report-editor-state";
+import { useReportCopy } from "./transport-context";
 
 /**
  * "Este relatório tem alterações não publicadas" — the strip the editor shows
@@ -36,6 +37,7 @@ export function UnpublishedChangesBar({
   unpublished: UnpublishedChanges;
 }): JSX.Element | null {
   const theme = useTheme();
+  const copy = useReportCopy().screens.editor;
   const [confirming, setConfirming] = useState(false);
   if (!unpublished.present) return null;
 
@@ -62,11 +64,10 @@ export function UnpublishedChangesBar({
               one: a state that only changes colour is invisible to a screen
               reader, and this one says who can see what. */}
           <Text variant="body" size="sm" weight="semibold" role="status">
-            Alterações não publicadas
+            {copy.unpublishedTitle}
           </Text>
           <Text variant="body" size="xs">
-            Quem abre o relatório continua vendo a versão publicada. Salve para publicar estas
-            alterações.
+            {copy.unpublishedBody}
           </Text>
         </Stack>
         <Button
@@ -76,16 +77,16 @@ export function UnpublishedChangesBar({
           onClick={() => setConfirming(true)}
           dataTestId="report-editor-discard-changes"
         >
-          {unpublished.discarding ? "Descartando…" : "Descartar alterações"}
+          {unpublished.discarding ? copy.discarding : copy.discard}
         </Button>
       </Stack>
 
       <ConfirmDialog
         open={confirming}
         destructive
-        title="Descartar alterações não publicadas?"
-        description="As alterações que você ainda não publicou serão perdidas e o relatório volta à versão publicada. Não dá para desfazer."
-        confirmText="Descartar alterações"
+        title={copy.discardTitle}
+        description={copy.discardBody}
+        confirmText={copy.discardConfirm}
         onConfirm={() => {
           setConfirming(false);
           unpublished.discard();

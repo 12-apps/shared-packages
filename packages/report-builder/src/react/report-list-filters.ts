@@ -1,3 +1,4 @@
+import type { ReportListCopy, ReportRelativeTimeCopy } from "./screens-copy";
 import type { SavedReportSummary } from "./custom-reports-api";
 
 /**
@@ -16,11 +17,21 @@ import type { SavedReportSummary } from "./custom-reports-api";
 
 export type ReportScope = "active" | "mine" | "archived";
 
-export const REPORT_SCOPE_LABELS: Record<ReportScope, string> = {
-  active: "Todos",
-  mine: "Meus",
-  archived: "Arquivados",
-};
+/**
+ * The pill labels, from the host's own words.
+ *
+ * A function rather than the constant it replaces: the labels are copy now,
+ * and a module-scope constant cannot read config.
+ */
+export function reportScopeLabels(
+  copy: ReportListCopy,
+): Record<ReportScope, string> {
+  return {
+    active: copy.scopes.active ?? "",
+    mine: copy.scopes.mine ?? "",
+    archived: copy.scopes.archived ?? "",
+  };
+}
 
 /** Pill order, left to right — the prototype's `Todos / Meus / Arquivados`. */
 export const REPORT_SCOPES: readonly ReportScope[] = ["active", "mine", "archived"];
@@ -71,16 +82,22 @@ export function filterReports(
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-/** "3 blocos" / "1 bloco" — the plural the card's footer opens with. */
-export function blockCountLabel(count: number): string {
-  return `${count} ${count === 1 ? "bloco" : "blocos"}`;
+/**
+ * "3 blocos" / "1 bloco" — the plural the card's footer opens with.
+ *
+ * The whole string comes from the host, not a count spliced into a template:
+ * agreement is the translator's rule, not this package's.
+ */
+export function blockCountLabel(count: number, copy: ReportListCopy): string {
+  return copy.blockCount(count);
 }
 
 /** Who can read it, in the card footer's words. */
-export function visibilityLabel(visibility: SavedReportSummary["visibility"]): string {
-  if (visibility === "private") return "Só você";
-  if (visibility === "roles") return "Cargos específicos";
-  return "Toda a equipe";
+export function visibilityLabel(
+  visibility: SavedReportSummary["visibility"],
+  copy: ReportListCopy,
+): string {
+  return copy.visibility[visibility] ?? "";
 }
 
 const MINUTE_MS = 60_000;
@@ -102,7 +119,11 @@ const WEEK_MS = 7 * DAY_MS;
  * still counted in weeks rather than switching to a date, because the question
  * the footer answers is "is this stale?", not "which Tuesday was it?".
  */
-export function relativeReportTime(updatedAt: string, now: Date): string {
+export function relativeReportTime(
+  updatedAt: string,
+  now: Date,
+  copy: ReportRelativeTimeCopy,
+): string {
   const then = Date.parse(updatedAt);
   // An unparseable timestamp is not "just now": say nothing rather than
   // inventing a freshness the row does not have.
@@ -110,15 +131,14 @@ export function relativeReportTime(updatedAt: string, now: Date): string {
   const elapsed = now.getTime() - then;
   // A clock skewed the other way (a server ahead of the browser) is still
   // "now", not a negative age counted in weeks.
-  if (elapsed < MINUTE_MS) return "agora";
-  if (elapsed < HOUR_MS) return `há ${Math.floor(elapsed / MINUTE_MS)} min`;
-  if (elapsed < DAY_MS) {
-    const hours = Math.floor(elapsed / HOUR_MS);
-    return `há ${hours} ${hours === 1 ? "hora" : "horas"}`;
-  }
+  // The STEPS stay here — minutes, hours, a named yesterday, days, weeks — and
+  // only the words leave. Where a language breaks the scale is a product
+  // decision about staleness; how it says each step is the translator's.
+  if (elapsed < MINUTE_MS) return copy.now;
+  if (elapsed < HOUR_MS) return copy.minutes(Math.floor(elapsed / MINUTE_MS));
+  if (elapsed < DAY_MS) return copy.hours(Math.floor(elapsed / HOUR_MS));
   const days = Math.floor(elapsed / DAY_MS);
-  if (days === 1) return "ontem";
-  if (elapsed < WEEK_MS) return `há ${days} dias`;
-  const weeks = Math.floor(elapsed / WEEK_MS);
-  return `há ${weeks} ${weeks === 1 ? "semana" : "semanas"}`;
+  if (days === 1) return copy.yesterday;
+  if (elapsed < WEEK_MS) return copy.days(days);
+  return copy.weeks(Math.floor(elapsed / WEEK_MS));
 }

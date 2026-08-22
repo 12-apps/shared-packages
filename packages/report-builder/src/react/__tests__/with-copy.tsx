@@ -3,6 +3,7 @@ import type { JSX, ReactElement, ReactNode } from "react";
 
 import { PT_BR_REPORT_ENGINE_COPY } from "../../pt-BR";
 import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from "../../server/pt-BR";
+import { PT_BR_REPORT_SCREENS_COPY } from "../pt-BR";
 import { httpTransport } from "../transport";
 import { ReportBuilderProvider } from "../transport-context";
 
@@ -30,6 +31,7 @@ function CopyWrapper({ children }: { children: ReactNode }): JSX.Element {
       copy={{
         engine: PT_BR_REPORT_ENGINE_COPY,
         blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+        screens: PT_BR_REPORT_SCREENS_COPY,
       }}
     >
       {children}

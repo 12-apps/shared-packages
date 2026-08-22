@@ -7,6 +7,7 @@ import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'r
 import { reportSpecSchema, type ReportSpec } from '@12-apps/report-builder';
 import { reportBuilderManifest } from '@12-apps/report-builder/manifest';
 import { reportBuilderWebManifest } from '@12-apps/report-builder/manifest/web';
+import { PT_BR_REPORT_SCREENS_COPY } from '@12-apps/report-builder/react';
 import type { BlockTemplateGroup, ReportBuilderSurface } from '@12-apps/report-builder/react';
 import { createWiringHost } from '@12-apps/wiring/consumer';
 
@@ -240,6 +241,7 @@ const { surface: reportsSurface } = webWiring.adoptWeb({
         copy: {
           engine: PT_BR_REPORT_ENGINE_COPY,
           blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+          screens: PT_BR_REPORT_SCREENS_COPY,
         },
         // NOT standalone. `standalone` wraps the surface in a `MemoryRouter`,
         // which is what a host with no router at all needs — and a memory

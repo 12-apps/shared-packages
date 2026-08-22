@@ -1,4 +1,5 @@
-import { REPORT_RANGE_LABELS, type ReportRange } from "../reports-api";
+import { reportRangeLabel, type ReportRange } from "../reports-api";
+import type { ReportRangeCopy } from "../screens-copy";
 
 /**
  * The widening ladder, narrow → wide. Its OWN list, and no longer the toggle's.
@@ -32,8 +33,8 @@ export function widerRange(range: ReportRange): ReportRange | null {
 }
 
 /** "Ver 30 dias" — the action label for widening to `range`. */
-export function widenLabel(range: ReportRange): string {
-  return `Ver ${REPORT_RANGE_LABELS[range]}`;
+export function widenLabel(range: ReportRange, copy: ReportRangeCopy): string {
+  return copy.widen(reportRangeLabel(range, copy));
 }
 
 /**
@@ -46,8 +47,9 @@ export function widenLabel(range: ReportRange): string {
 export function widenAction(
   range: ReportRange,
   onRangeChange: (range: ReportRange) => void,
+  copy: ReportRangeCopy,
 ): { label: string; onClick: () => void } | undefined {
   const wider = widerRange(range);
   if (!wider) return undefined;
-  return { label: widenLabel(wider), onClick: () => onRangeChange(wider) };
+  return { label: widenLabel(wider, copy), onClick: () => onRangeChange(wider) };
 }

@@ -24,6 +24,7 @@ import type {
   SavedReportSummary,
   SavedReportView,
 } from "./custom-reports-api";
+import type { ReportBuilderPanelCopy } from "./screens-copy";
 
 export interface ReportBlockDraft {
   id: string;
@@ -121,13 +122,17 @@ export function addBlock(draft: ReportDraft, spec: ReportSpecWire, title: string
  *
  * An unknown id is a no-op, matching every other mutation in this file.
  */
-export function duplicateBlock(draft: ReportDraft, id: string): ReportDraft {
+export function duplicateBlock(
+  draft: ReportDraft,
+  id: string,
+  words: ReportBuilderPanelCopy,
+): ReportDraft {
   const index = draft.blocks.findIndex((block) => block.id === id);
   const source = draft.blocks[index];
   if (source === undefined) return draft;
   const copy: ReportBlockDraft = {
     id: nextBlockId(draft.blocks),
-    title: `${blockLabel(source)} (cópia)`,
+    title: words.copyOf(blockLabel(source, words)),
     span: source.span,
     ...(source.height === undefined ? {} : { height: source.height }),
     // A spec is pure JSON by contract (see `spec.ts`), so this round-trip is a
@@ -198,9 +203,9 @@ export function updateBlockSpec(
  * out ("Bloco 4 movido para a posição 3" describes a block that no longer
  * exists under that name).
  */
-export function blockLabel(block: ReportBlockDraft): string {
+export function blockLabel(block: ReportBlockDraft, copy: ReportBuilderPanelCopy): string {
   const title = block.title.trim();
-  return title === "" ? "Bloco sem título" : title;
+  return title === "" ? copy.untitledBlock : title;
 }
 
 /** Move a block one position up (-1) or down (+1); out-of-range is a no-op. */

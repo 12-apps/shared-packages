@@ -39,6 +39,8 @@ import {
   SIZE_TILE_LABEL_SX,
   SIZE_TILE_SX,
 } from "./lib/size-picker-tile";
+import type { ReportBuilderPanelCopy } from "./screens-copy";
+import { useReportCopy } from "./transport-context";
 
 /** One segment: `height: undefined` is the content-height default. */
 interface HeightSegment {
@@ -58,12 +60,12 @@ interface HeightSegment {
  * accepts 1..3 and `clampBlockHeight` guarantees it), so every storable value
  * already has a segment.
  */
-export function heightSegments(): HeightSegment[] {
+export function heightSegments(copy: ReportBuilderPanelCopy): HeightSegment[] {
   return [
-    { height: undefined, label: "Auto" },
-    { height: 1, label: "Baixa" },
-    { height: 2, label: "Média" },
-    { height: 3, label: "Alta" },
+    { height: undefined, label: copy.heights.auto ?? "" },
+    { height: 1, label: copy.heights["1"] ?? "" },
+    { height: 2, label: copy.heights["2"] ?? "" },
+    { height: 3, label: copy.heights["3"] ?? "" },
   ];
 }
 
@@ -96,13 +98,14 @@ export function BlockHeightPicker({
   onChange: (height: number | undefined) => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   return (
     <Stack spacing={1}>
       <Text variant="heading" size="xs" color="secondary" as="h3" style={SECTION_LABEL_STYLE}>
-        Altura
+        {copy.height}
       </Text>
       <Box data-testid={testId} sx={SIZE_TILE_GRID_SX}>
-        {heightSegments().map((segment) => (
+        {heightSegments(copy).map((segment) => (
           <Button
             key={segmentTestId(testId, segment.height)}
             variant={segment.height === height ? "solid" : "outline"}

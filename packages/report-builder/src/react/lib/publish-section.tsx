@@ -17,6 +17,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import type { ReportStatusWire, ReportVisibilityWire } from "../custom-reports-api";
 import { useTenantRoles } from "./tenant-roles";
+import { useReportCopy } from "../transport-context";
 
 export interface PublishDraft {
   status: ReportStatusWire;
@@ -70,18 +71,19 @@ export function RolesAllowlist({
   value: PublishDraft;
   onChange: (next: PublishDraft) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const rolesQuery = useTenantRoles(tenantSlug, true);
   if (rolesQuery.isPending) {
     return (
       <Text variant="body" size="sm" color="secondary" data-testid="publish-roles-loading">
-        Carregando funções…
+        {copy.rolesLoading}
       </Text>
     );
   }
   if (rolesQuery.isError) {
     return (
       <Text variant="body" size="sm" color="danger" data-testid="publish-roles-error">
-        Não foi possível carregar as funções. Recarregue a página e tente novamente antes de
+        {copy.rolesFailed}
         salvar.
       </Text>
     );
@@ -90,11 +92,11 @@ export function RolesAllowlist({
   return (
     <Stack spacing={0.5} data-testid="publish-roles">
       <Text variant="body" size="sm" color="secondary">
-        Funções com acesso (autor e admins sempre veem):
+        {copy.rolesHeading}
       </Text>
       {roles.length === 0 ? (
         <Text variant="body" size="sm" color="secondary">
-          Nenhuma função disponível nesta loja.
+          {copy.rolesEmpty}
         </Text>
       ) : null}
       {roles.map((role) => (

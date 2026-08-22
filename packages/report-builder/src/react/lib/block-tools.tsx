@@ -27,7 +27,7 @@ import type { ReportRender } from "../reports-api";
 import { exportRows } from "./export-rows";
 import { Glyph } from "./glyph";
 import { OverflowToolCluster, type BlockTool } from "./tool-cluster";
-import { useReportEngineCopy } from "../transport-context";
+import { useReportCopy, useReportEngineCopy } from "../transport-context";
 
 /** Grid — "show me the numbers this was drawn from". */
 function TableGlyph(): JSX.Element {
@@ -123,12 +123,13 @@ export function BlockToolCluster({
   csv?: { filename: string; dataTestId: string };
 }): JSX.Element | null {
   const copy = useReportEngineCopy();
+  const words = useReportCopy().screens.builder;
   const { render } = view;
   const tools: BlockTool[] = [];
   if (view.canToggle) {
     tools.push({
       id: "as-table",
-      label: view.asTable ? "Ver como gráfico" : "Ver como tabela",
+      label: view.asTable ? words.viewAsChart : words.viewAsTable,
       icon: view.asTable ? <ChartGlyph /> : <TableGlyph />,
       pressed: view.asTable,
       onSelect: view.toggle,
@@ -151,7 +152,7 @@ export function BlockToolCluster({
     <OverflowToolCluster
       tools={tools}
       menuTestId={menuTestId}
-      menuLabel="Mais ações do bloco"
+      menuLabel={words.blockMenu}
       reveal
     />
   );

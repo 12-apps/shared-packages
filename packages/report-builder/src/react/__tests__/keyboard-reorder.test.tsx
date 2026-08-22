@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from '../../server/pt-BR';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
 import { useState, type JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { renderWithCopy as render } from './with-copy';
 
 import { createWebReportBuilder } from '../create-report-builder';
 import { TEST_SURFACE } from './surface-fixture';
@@ -11,12 +13,14 @@ import type {
   ReportEntityFields,
   ReportSpecWire,
   SavedReportSummary,
-  SavedReportView,
-} from '../custom-reports-api';
+  SavedReportView } from '../custom-reports-api';
 import { useKeyboardReorder } from '../lib/drag-reorder';
 import { blockLabel, moveBlock, type ReportDraft } from '../report-model';
 import type { ReportRender } from '../reports-api';
 import type { ReportBuilderTransport } from '../transport';
+
+/** The block words, from the pack a host would pass. */
+const BUILDER = PT_BR_REPORT_SCREENS_COPY.builder;
 
 /**
  * Keyboard reordering on the editor canvas (FUT-755) — the `@drag @a11y`
@@ -58,8 +62,7 @@ const BLOCK_SPEC: ReportSpecWire = {
   measures: [{ field: 'revenueCents', aggregation: 'sum' }],
   filters: [],
   sort: [],
-  presentation: { kind: 'table' },
-};
+  presentation: { kind: 'table' } };
 
 const RENDER: ReportRender = {
   kind: 'table',
@@ -67,14 +70,12 @@ const RENDER: ReportRender = {
     { key: 'method', label: 'Forma de pagamento', format: 'text' },
     { key: 'revenueCents', label: 'Receita', format: 'brl' },
   ],
-  rows: [{ method: 'PIX', revenueCents: 123456 }],
-};
+  rows: [{ method: 'PIX', revenueCents: 123456 }] };
 
 const RANGE = {
   preset: '30d' as const,
   from: '2026-01-02T03:00:00.000Z',
-  toExclusive: '2026-02-01T03:00:00.000Z',
-};
+  toExclusive: '2026-02-01T03:00:00.000Z' };
 
 const SUMMARY: SavedReportSummary = {
   id: REPORT_ID,
@@ -87,8 +88,7 @@ const SUMMARY: SavedReportSummary = {
   status: 'published',
   visibility: 'tenant',
   ownedByMe: true,
-  updatedAt: '2026-02-01T12:00:00.000Z',
-};
+  updatedAt: '2026-02-01T12:00:00.000Z' };
 
 const VIEW: SavedReportView = {
   id: REPORT_ID,
@@ -105,18 +105,14 @@ const VIEW: SavedReportView = {
       id: `bloco-${index + 1}`,
       title,
       span: 6,
-      spec: BLOCK_SPEC,
-    })),
-  },
+      spec: BLOCK_SPEC })) },
   blocks: TITLES.map((title, index) => ({
     id: `bloco-${index + 1}`,
     title,
     span: 6,
     sentence: 'soma de Receita por Forma de pagamento',
     status: 'ok' as const,
-    render: RENDER,
-  })),
-};
+    render: RENDER })) };
 
 const ENTITY: ReportEntityFields = {
   entity: 'orders',
@@ -124,8 +120,7 @@ const ENTITY: ReportEntityFields = {
   fields: [
     { field: 'method', label: 'Forma de pagamento', type: 'string', role: 'dimension' },
     { field: 'revenueCents', label: 'Receita', type: 'money', role: 'measure' },
-  ],
-};
+  ] };
 
 /**
  * The whole backend, in memory. `ReportBuilderTransport` is this package's
@@ -147,21 +142,21 @@ function stubTransport(): ReportBuilderTransport {
     send: <T,>() =>
       Promise.resolve({
         ok: true as const,
-        data: { range: RANGE, render: RENDER } as unknown as T,
-      }),
-  };
+        data: { range: RANGE, render: RENDER } as unknown as T }) };
 }
 
 /** The editor, opened on the saved five-block report. */
 function renderEditor(): void {
   const { page: Surface } = createWebReportBuilder({
     surface: TEST_SURFACE,
-    copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+    copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY },
     tenantSlug: TENANT,
     transport: stubTransport(),
     standalone: true,
-    initialPath: `/${TENANT}/reports/${REPORT_ID}/edit`,
-  });
+    initialPath: `/${TENANT}/reports/${REPORT_ID}/edit` });
   render(<Surface />);
 }
 
@@ -227,8 +222,7 @@ beforeEach(() => {
     removeListener: () => undefined,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia;
+    dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
 });
 
 afterEach(() => {
@@ -407,13 +401,10 @@ function ReorderHarness(): JSX.Element {
       id: `bloco-${index + 1}`,
       title,
       span: 6,
-      spec: BLOCK_SPEC,
-    })),
-  }));
+      spec: BLOCK_SPEC })) }));
   const keyboard = useKeyboardReorder({
-    items: draft.blocks.map((block) => ({ id: block.id, label: blockLabel(block) })),
-    onMove: (id, delta) => setDraft((current) => moveBlock(current, id, delta)),
-  });
+    items: draft.blocks.map((block) => ({ id: block.id, label: blockLabel(block, BUILDER) })),
+    onMove: (id, delta) => setDraft((current) => moveBlock(current, id, delta)) });
   return (
     <div>
       {draft.blocks.map((block, position) => (
@@ -437,8 +428,7 @@ describe('useKeyboardReorder — focus follows the block, not the position', () 
     screen.getByRole('group', { name: 'Beta' }).focus();
     fireEvent.keyDown(screen.getByRole('group', { name: 'Beta' }), {
       key: 'ArrowUp',
-      altKey: true,
-    });
+      altKey: true });
 
     await waitFor(() => {
       expect(screen.getByTestId('harness-live-region').textContent).toBe(
@@ -473,7 +463,7 @@ describe('useKeyboardReorder — focus follows the block, not the position', () 
 
 describe('blockLabel — what a move is announced as', () => {
   it('speaks a block by its own title', () => {
-    expect(blockLabel({ id: 'bloco-1', title: 'Receita por dia', span: 6, spec: BLOCK_SPEC })).toBe(
+    expect(blockLabel({ id: 'bloco-1', title: 'Receita por dia', span: 6, spec: BLOCK_SPEC }, BUILDER)).toBe(
       'Receita por dia',
     );
   });
@@ -481,6 +471,6 @@ describe('blockLabel — what a move is announced as', () => {
   it.each(['', '   '])('names an untitled block without using its position', (title) => {
     // Not "Bloco 4": a positional name renames itself as the block moves, so
     // the announcement would describe a block that no longer exists under it.
-    expect(blockLabel({ id: 'bloco-4', title, span: 6, spec: BLOCK_SPEC })).toBe('Bloco sem título');
+    expect(blockLabel({ id: 'bloco-4', title, span: 6, spec: BLOCK_SPEC }, BUILDER)).toBe('Bloco sem título');
   });
 });

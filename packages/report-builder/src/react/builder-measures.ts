@@ -6,6 +6,7 @@
  */
 import type { BuilderDraft } from "./builder-model";
 import type { ReportField } from "./custom-reports-api";
+import type { ReportBuilderPanelCopy } from "./screens-copy";
 
 export interface MeasureDraft {
   field: string;
@@ -26,18 +27,10 @@ export interface MeasureDraft {
 
 type MeasureOptions = Pick<MeasureDraft, "denominator" | "minSample" | "format">;
 
-export const AGGREGATION_LABELS: Record<string, string> = {
-  sum: "Soma",
-  avg: "Média",
-  count: "Contagem",
-  count_distinct: "Contagem distinta",
-  min: "Mínimo",
-  max: "Máximo",
-  p50: "Mediana (p50)",
-  p90: "Percentil 90 (p90)",
-  p95: "Percentil 95 (p95)",
-  ratio: "Proporção (soma ÷ soma)",
-};
+/** What an aggregation is CALLED, from the host. */
+export function aggregationLabel(aggregation: string, copy: ReportBuilderPanelCopy): string {
+  return copy.aggregations[aggregation] ?? aggregation;
+}
 
 /** The pass-through options of a measure, omitting the ones it doesn't carry. */
 export function measureOptions(measure: MeasureOptions): MeasureOptions {

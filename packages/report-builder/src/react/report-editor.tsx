@@ -38,6 +38,7 @@ import { UnpublishedChangesBar } from "./report-editor-unpublished";
 import { ReportSettingsDialog } from "./report-settings-dialog";
 import { CONTROL_ROW_SX, EDITOR_SURFACE_SX, useReportPortalTheme } from "./lib/report-surface";
 import type { ReportRange } from "./reports-api";
+import { useReportCopy } from "./transport-context";
 
 /**
  * The preview period — all that is left on the page above the canvas.
@@ -56,6 +57,7 @@ function EditorActions({
   range: ReportRange;
   onRangeChange: (next: ReportRange) => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   return (
     <Stack
       direction="row"
@@ -65,7 +67,7 @@ function EditorActions({
       <RangeToggle value={range} onChange={onRangeChange} dataTestId="report-editor-range" />
       <Box sx={{ ml: "auto" }}>
         <Text variant="body" size="sm" color="secondary">
-          Pré-visualização com dados reais
+          {copy.previewBanner}
         </Text>
       </Box>
     </Stack>
@@ -247,6 +249,7 @@ function editorGate(
 }
 
 export function ReportEditorPage({ tenantSlug }: { tenantSlug: string }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   const { reportId } = useParams();
   const editing = Boolean(reportId);
   const fieldsQuery = useReportFields(tenantSlug);
@@ -263,9 +266,9 @@ export function ReportEditorPage({ tenantSlug }: { tenantSlug: string }): JSX.El
   if (gate === "error") {
     return (
       <ErrorState
-        title="Não foi possível abrir o editor"
-        message="Verifique sua permissão ou tente novamente."
-        retryLabel="Tentar novamente"
+        title={copy.openFailedTitle}
+        message={copy.openFailedBody}
+        retryLabel={copy.retry}
         onRetry={() => {
           void fieldsQuery.refetch();
           if (editing) void savedQuery.refetch();

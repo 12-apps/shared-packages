@@ -36,7 +36,7 @@ import { ArchiveFromListDialog } from "./report-list-archive";
 import type { ReportScope } from "./report-list-filters";
 import { ReportScreen } from "./report-screen";
 import type { ReportRangeSelection, ReportRollingRange } from "./reports-api";
-import { useReportSurface } from "./transport-context";
+import { useReportCopy, useReportSurface } from "./transport-context";
 
 /** What a report opens on when it stores no "Período padrão ao abrir". */
 const FALLBACK_RANGE: ReportRollingRange = "30d";
@@ -104,11 +104,12 @@ function useSelectedRange(
 
 /** The list itself could not be read — a whole-page state, not an empty grid. */
 function ReportsLoadError({ onRetry }: { onRetry: () => void }): JSX.Element {
+  const copy = useReportCopy().screens.list;
   return (
     <ErrorState
-      title="Não foi possível carregar os relatórios"
-      message="Tente novamente em instantes."
-      retryLabel="Tentar novamente"
+      title={copy.loadFailedTitle}
+      message={copy.loadFailedBody}
+      retryLabel={copy.retry}
       onRetry={onRetry}
       dataTestId="page-reports-error"
     />
@@ -117,13 +118,14 @@ function ReportsLoadError({ onRetry }: { onRetry: () => void }): JSX.Element {
 
 /** The area's title and one-line explanation of what a report is now. */
 function ReportsHeading(): JSX.Element {
+  const copy = useReportCopy().screens.list;
   return (
     <Stack spacing={0.5} className={NO_PRINT_CLASS}>
       <Box component="h1" sx={PAGE_TITLE_SX}>
-        Relatórios
+        {copy.title}
       </Box>
       <Text variant="body" size="sm" color="secondary">
-        Seus painéis: escolha um para ver, ou monte outro com os blocos que quiser.
+        {copy.subtitle}
       </Text>
     </Stack>
   );

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { PT_BR_BLANK_BLOCK_TEMPLATE_COPY } from '../../server/pt-BR';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
@@ -166,7 +167,11 @@ function stubTransport(view: SavedReportView): ReportBuilderTransport {
 async function openEditor(path: string, view: SavedReportView = savedView(1)): Promise<void> {
   const { page: Surface } = createWebReportBuilder({
     surface: { ...TEST_SURFACE, blockTemplates: HOST_TEMPLATES },
-    copy: { engine: PT_BR_REPORT_ENGINE_COPY, blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY },
+    copy: {
+      engine: PT_BR_REPORT_ENGINE_COPY,
+      blankTemplate: PT_BR_BLANK_BLOCK_TEMPLATE_COPY,
+      screens: PT_BR_REPORT_SCREENS_COPY,
+    },
     tenantSlug: TENANT,
     transport: stubTransport(view),
     standalone: true,

@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithCopy as render } from './with-copy';
 import { MemoryRouter } from 'react-router-dom';
 
 import type { SavedReportSummary, SavedReportView } from '../custom-reports-api';
 import { ReportCard, reportCardChip } from '../report-card';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
 import { editorSource } from '../report-editor-source';
 import { UnpublishedChangesBar } from '../report-editor-unpublished';
 import type { UnpublishedChanges } from '../report-editor-state';
+
+/** The chip's words, from the pack a host would pass. */
+const LIST = PT_BR_REPORT_SCREENS_COPY.list;
 
 /**
  * "If I started editing it save a draft version" (FUT-755), at the surface.
@@ -25,8 +30,7 @@ const SPEC = {
   measures: [{ field: 'totalCents' }],
   filters: [],
   sort: [],
-  presentation: { kind: 'table' as const },
-};
+  presentation: { kind: 'table' as const } };
 
 const EDITED_SPEC = { ...SPEC, dimensions: [{ field: 'createdAt' }] };
 
@@ -43,8 +47,7 @@ beforeEach(() => {
     removeListener: () => undefined,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia;
+    dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
 });
 
 afterEach(() => {
@@ -66,8 +69,7 @@ function summary(patch: Partial<SavedReportSummary> = {}): SavedReportSummary {
     ownedByMe: true,
     hasUnpublishedChanges: false,
     updatedAt: NOW.toISOString(),
-    ...patch,
-  } as SavedReportSummary;
+    ...patch } as SavedReportSummary;
 }
 
 function view(patch: Partial<SavedReportView> = {}): SavedReportView {
@@ -83,22 +85,21 @@ function view(patch: Partial<SavedReportView> = {}): SavedReportView {
     spec: { kind: 'dashboard', blocks: [{ id: 'bloco-1', span: 12, spec: SPEC }] },
     blocks: [],
     range: { preset: '7d', from: '2026-08-03', toExclusive: '2026-08-10' },
-    ...patch,
-  } as SavedReportView;
+    ...patch } as SavedReportView;
 }
 
 describe('which chip a report card carries', () => {
   it('says Rascunho for a report that was never published', () => {
-    expect(reportCardChip(summary({ status: 'draft' }))?.label).toBe('Rascunho');
+    expect(reportCardChip(summary({ status: 'draft' }), LIST)?.label).toBe('Rascunho');
   });
 
   it('says Arquivado once it is retired', () => {
-    expect(reportCardChip(summary({ status: 'archived' }))?.label).toBe('Arquivado');
+    expect(reportCardChip(summary({ status: 'archived' }), LIST)?.label).toBe('Arquivado');
   });
 
   /** The state this feature added, and the one it must not be confused with. */
   it('says Alterações não publicadas for a LIVE report being edited', () => {
-    const chip = reportCardChip(summary({ hasUnpublishedChanges: true }));
+    const chip = reportCardChip(summary({ hasUnpublishedChanges: true }), LIST);
     expect(chip?.label).toBe('Alterações não publicadas');
     // Never the draft word: this report has not been taken down.
     expect(chip?.label).not.toContain('Rascunho');
@@ -109,19 +110,19 @@ describe('which chip a report card carries', () => {
    * unpublished RELATIVE to, so the lifecycle claim wins the single chip slot.
    */
   it('keeps saying Rascunho when a never-published report is also being edited', () => {
-    expect(reportCardChip(summary({ status: 'draft', hasUnpublishedChanges: true }))?.label).toBe(
+    expect(reportCardChip(summary({ status: 'draft', hasUnpublishedChanges: true }), LIST)?.label).toBe(
       'Rascunho',
     );
   });
 
   it('says nothing about a published report nobody is editing', () => {
-    expect(reportCardChip(summary())).toBeNull();
+    expect(reportCardChip(summary(), LIST)).toBeNull();
   });
 
   it('reads as none when the field is missing from a cached response', () => {
     const cached = summary();
     delete (cached as { hasUnpublishedChanges?: boolean }).hasUnpublishedChanges;
-    expect(reportCardChip(cached)).toBeNull();
+    expect(reportCardChip(cached, LIST)).toBeNull();
   });
 
   it('renders the chip on the card itself', () => {
@@ -147,9 +148,7 @@ describe('what the editor opens on', () => {
       view({
         workingCopy: {
           name: 'Vendas por dia',
-          spec: { kind: 'dashboard', blocks: [{ id: 'bloco-1', span: 12, spec: EDITED_SPEC }] },
-        },
-      }),
+          spec: { kind: 'dashboard', blocks: [{ id: 'bloco-1', span: 12, spec: EDITED_SPEC }] } } }),
     );
 
     expect(source.initial.draft.name).toBe('Vendas por dia');
@@ -187,9 +186,7 @@ describe('what the editor opens on', () => {
         defaultRange: '7d',
         workingCopy: {
           name: 'Vendas',
-          spec: { kind: 'dashboard', blocks: [{ id: 'bloco-1', span: 12, spec: SPEC }] },
-        },
-      }),
+          spec: { kind: 'dashboard', blocks: [{ id: 'bloco-1', span: 12, spec: SPEC }] } } }),
     );
 
     expect(source.initial.publish.visibility).toBe('private');
@@ -208,9 +205,7 @@ function recorder(): { calls: string[]; unpublished: UnpublishedChanges } {
       present: true,
       autosave: 'idle',
       discarding: false,
-      discard: () => calls.push('discard'),
-    },
-  };
+      discard: () => calls.push('discard') } };
 }
 
 describe('the editor tells the author about unpublished changes', () => {

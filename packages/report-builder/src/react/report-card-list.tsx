@@ -26,6 +26,7 @@ import type { SavedReportSummary } from "./custom-reports-api";
 import { NewReportCard, ReportCard } from "./report-card";
 import { filterReports, type ReportScope } from "./report-list-filters";
 import { ReportListToolbar } from "./report-list-toolbar";
+import { useReportCopy } from "./transport-context";
 
 /** The prototype's `minmax(268px, 1fr)` — two cards on a phone-wide tablet. */
 const CARD_MIN_WIDTH_PX = 268;
@@ -40,6 +41,7 @@ const CARD_MIN_WIDTH_PX = 268;
  * created anything.
  */
 function NoMatches({ searching, onCreate }: { searching: boolean; onCreate: () => void }): JSX.Element {
+  const copy = useReportCopy().screens.list;
   return (
     <Box
       sx={{
@@ -56,13 +58,13 @@ function NoMatches({ searching, onCreate }: { searching: boolean; onCreate: () =
     >
       <EmptyState
         variant="minimal"
-        title="Nenhum relatório aqui."
+        title={copy.emptyTitle}
         description={
           searching
-            ? "Tente outro termo."
-            : "Monte o primeiro com receita por dia, top produtos e ticket médio."
+            ? copy.emptySearchBody
+            : copy.emptyBody
         }
-        primaryAction={{ label: "Novo relatório", onClick: onCreate }}
+        primaryAction={{ label: copy.create, onClick: onCreate }}
         dataTestId="reports-empty"
       />
     </Box>

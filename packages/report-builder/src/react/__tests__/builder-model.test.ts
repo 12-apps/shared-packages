@@ -14,6 +14,10 @@ import {
   type BuilderDraft,
 } from '../builder-model';
 import type { ReportEntityFields, ReportField, ReportSpecWire } from '../custom-reports-api';
+import { PT_BR_REPORT_SCREENS_COPY } from '../pt-BR';
+
+/** The picker's own words, from the pack a host would pass. */
+const BUILDER = PT_BR_REPORT_SCREENS_COPY.builder;
 
 /**
  * FUT-308 in the form model: the picker disables what the compiler rejects,
@@ -74,6 +78,7 @@ describe('chartOptions', () => {
       }),
       byName,
     PT_BR_REPORT_ENGINE_COPY.presentation,
+    BUILDER,
 );
     const reasonOf = (value: string): string | null | undefined =>
       options.find((option) => option.value === value)?.disabledReason;
@@ -98,6 +103,7 @@ describe('chartOptions', () => {
       }),
       byName,
     PT_BR_REPORT_ENGINE_COPY.presentation,
+    BUILDER,
 );
     expect(options.find((option) => option.value === 'bar')?.disabledReason).toContain('medida');
     expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
@@ -107,7 +113,7 @@ describe('chartOptions', () => {
     // The bug report: an AREA chart whose x-axis was CARD → PIX. A line or an
     // area asserts the space BETWEEN two points is a value; half-way between
     // two payment methods is not one.
-    const options = chartOptions(draft({ dimensions: [{ field: 'method', timeGrain: 'day' }] }), byName, PT_BR_REPORT_ENGINE_COPY.presentation);
+    const options = chartOptions(draft({ dimensions: [{ field: 'method', timeGrain: 'day' }] }), byName, PT_BR_REPORT_ENGINE_COPY.presentation, BUILDER);
     const reasonOf = (value: string): string | null | undefined =>
       options.find((option) => option.value === value)?.disabledReason;
 
@@ -125,6 +131,7 @@ describe('chartOptions', () => {
       draft({ dimensions: [{ field: 'hourOfDay', timeGrain: 'day' }] }),
       byName,
     PT_BR_REPORT_ENGINE_COPY.presentation,
+    BUILDER,
 );
 
     expect(options.find((option) => option.value === 'line')?.disabledReason).toBeNull();
@@ -132,7 +139,7 @@ describe('chartOptions', () => {
   });
 
   it('refuses line and area over a BOOLEAN axis', () => {
-    const options = chartOptions(draft({ dimensions: [{ field: 'closed', timeGrain: 'day' }] }), byName, PT_BR_REPORT_ENGINE_COPY.presentation);
+    const options = chartOptions(draft({ dimensions: [{ field: 'closed', timeGrain: 'day' }] }), byName, PT_BR_REPORT_ENGINE_COPY.presentation, BUILDER);
 
     expect(options.find((option) => option.value === 'line')?.disabledReason).not.toBeNull();
     expect(options.find((option) => option.value === 'bar')?.disabledReason).toBeNull();
@@ -148,6 +155,7 @@ describe('chartOptions', () => {
       }),
       byName,
     PT_BR_REPORT_ENGINE_COPY.presentation,
+    BUILDER,
 );
     expect(options.find((option) => option.value === 'bar')?.disabledReason).toBeNull();
     expect(options.find((option) => option.value === 'pie')?.disabledReason).toContain(
@@ -169,7 +177,7 @@ describe('chartOptions', () => {
 describe('chartOptions — no grouping', () => {
   const reasonsFor = (measures: BuilderDraft['measures']): Map<string, string | null> =>
     new Map(
-      chartOptions(draft({ dimensions: [], measures }), byName, PT_BR_REPORT_ENGINE_COPY.presentation).map((option) => [
+      chartOptions(draft({ dimensions: [], measures }), byName, PT_BR_REPORT_ENGINE_COPY.presentation, BUILDER).map((option) => [
         option.value,
         option.disabledReason,
       ]),
@@ -199,7 +207,7 @@ describe('chartOptions — no grouping', () => {
   });
 
   it('offers the table again the moment a grouping exists', () => {
-    const options = chartOptions(draft({ measures: THREE }), byName, PT_BR_REPORT_ENGINE_COPY.presentation);
+    const options = chartOptions(draft({ measures: THREE }), byName, PT_BR_REPORT_ENGINE_COPY.presentation, BUILDER);
     expect(options.find((option) => option.value === 'table')?.disabledReason).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { renderWithCopy as render } from './with-copy';
 
 import { FiltersSection } from '../builder-sections';
 import type { BuilderDraft } from '../builder-model';
@@ -31,16 +32,14 @@ const STATUS: ReportField = {
     { value: 'PAID', label: 'Pago' },
     { value: 'FAILED', label: 'Falhou' },
   ],
-  ops: ['eq', 'neq', 'in'],
-};
+  ops: ['eq', 'neq', 'in'] };
 
 const TOTAL: ReportField = {
   field: 'total',
   label: 'Total',
   type: 'money',
   role: 'measure',
-  ops: ['eq', 'neq', 'gte', 'lte', 'between'],
-};
+  ops: ['eq', 'neq', 'gte', 'lte', 'between'] };
 
 const FIELDS = [STATUS, TOTAL];
 
@@ -54,8 +53,7 @@ function draftWith(filter: BuilderDraft['filters'][number]): BuilderDraft {
     filters: [filter],
     sort: [],
     chartType: 'table',
-    stacked: false,
-  };
+    stacked: false };
 }
 
 /** Render one filter row and hand back the spy the section patches through. */
@@ -119,8 +117,7 @@ describe('`in` — the set is PICKED, never typed', () => {
     fireEvent.click(screen.getByTestId('builder-filter-value-0-option-FAILED'));
 
     expect(update).toHaveBeenCalledWith({
-      filters: [{ field: 'status', operator: 'in', value: '', values: ['PAID', 'FAILED'] }],
-    });
+      filters: [{ field: 'status', operator: 'in', value: '', values: ['PAID', 'FAILED'] }] });
   });
 
   it('names the set control by its role and index', () => {
@@ -164,8 +161,7 @@ describe('`between` — two bounds, on a line of their own', () => {
     fireEvent.change(screen.getByLabelText('Filtro 1 — até'), { target: { value: '90' } });
 
     expect(update).toHaveBeenCalledWith({
-      filters: [{ field: 'total', operator: 'between', value: '', from: '10', to: '90' }],
-    });
+      filters: [{ field: 'total', operator: 'between', value: '', from: '10', to: '90' }] });
   });
 
   it('leaves the second line to the operator and the remove control alone', () => {

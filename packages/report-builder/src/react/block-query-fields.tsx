@@ -26,6 +26,7 @@ import {
   SplitBySection,
 } from "./builder-sections";
 import type { ReportEntityFields, ReportField } from "./custom-reports-api";
+import { useReportCopy } from "./transport-context";
 
 export function fieldMapOf(entity: ReportEntityFields | undefined): Map<string, ReportField> {
   return new Map((entity?.fields ?? []).map((field) => [field.field, field]));
@@ -51,6 +52,7 @@ export function BlockQueryFields({
   onHeightChange: (height: number | undefined) => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const entity = entities.find((candidate) => candidate.entity === draft.entity);
   const fields = entity?.fields ?? [];
   const update = (patch: Partial<BuilderDraft>): void => apply({ ...draft, ...patch });
@@ -62,7 +64,7 @@ export function BlockQueryFields({
     <Stack spacing={2}>
       <Select
         size="sm"
-        label="Coleção"
+        label={copy.collection}
         options={entities.map((candidate) => ({
           value: candidate.entity,
           label: candidate.label,

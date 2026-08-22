@@ -14,6 +14,8 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import { REPORT_ROLLING_RANGES, type ReportRollingRange } from "../reports-api";
 import { SECTION_LABEL_STYLE } from "./report-surface";
+import { useReportCopy } from "../transport-context";
+import type { ReportBuilderPanelCopy } from "../screens-copy";
 
 /** One labelled block inside the dialog — the eyebrow plus whatever it labels. */
 export function Field({
@@ -38,12 +40,9 @@ export function Field({
  * context ("30 dias"), a select in a settings list has to say what it is
  * choosing without it, and `prototype.html` writes it out the same way.
  */
-const DEFAULT_RANGE_LABELS: Record<ReportRollingRange, string> = {
-  today: "Hoje",
-  "7d": "Últimos 7 dias",
-  "30d": "Últimos 30 dias",
-  month: "Este mês",
-};
+function defaultRangeLabel(range: ReportRollingRange, copy: ReportBuilderPanelCopy): string {
+  return copy.defaultRanges[range] ?? range;
+}
 
 /**
  * Every ROLLING preset, and no `Personalizado…`.
@@ -53,10 +52,14 @@ const DEFAULT_RANGE_LABELS: Record<ReportRollingRange, string> = {
  * it would freeze the report on one window and open it there forever. `Este
  * mês` needs no dates, which is exactly why it belongs here (FUT-755).
  */
-const DEFAULT_RANGE_OPTIONS = REPORT_ROLLING_RANGES.map((value) => ({
-  value,
-  label: DEFAULT_RANGE_LABELS[value],
-}));
+function defaultRangeOptions(
+  copy: ReportBuilderPanelCopy,
+): Array<{ value: ReportRollingRange; label: string }> {
+  return REPORT_ROLLING_RANGES.map((value) => ({
+    value,
+    label: defaultRangeLabel(value, copy),
+  }));
+}
 
 /**
  * Guard the wire's word before it reaches state — a stale value opens nothing.
@@ -76,11 +79,12 @@ export function DefaultRangeField({
   onChange: (next: ReportRollingRange) => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   return (
-    <Field label="Período padrão ao abrir">
+    <Field label={copy.defaultRange}>
       <Select
-        aria-label="Período padrão ao abrir"
-        options={DEFAULT_RANGE_OPTIONS}
+        aria-label={copy.defaultRange}
+        options={defaultRangeOptions(copy)}
         value={value}
         onChange={(event) => onChange(asDefaultRange(String(event.target.value)))}
         size="sm"

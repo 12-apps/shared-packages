@@ -26,6 +26,7 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { Breadcrumbs } from "@12-apps/ui/navigation/Breadcrumbs";
 
 import { NO_PRINT_CLASS } from "./print-export";
+import { useReportCopy } from "../transport-context";
 
 /** One level of the trail. */
 export interface ReportCrumb {
@@ -90,6 +91,7 @@ export function ReportBreadcrumbs({
    */
   onBeforeNavigate?: (href: string) => boolean;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const navigate = useNavigate();
 
   const items = crumbs.map((crumb) => {
@@ -124,7 +126,7 @@ export function ReportBreadcrumbs({
         // claim otherwise.
         showHomeIcon={false}
         separatorType="chevron"
-        ariaLabel="Trilha de navegação"
+        ariaLabel={copy.breadcrumbAria}
         {...(dataTestId ? { dataTestId } : {})}
       />
     </Box>
