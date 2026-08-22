@@ -55,7 +55,7 @@ describe('platformHomologacaoGuide', () => {
    * The answer is the HOST's now (FUT-760), so the guide can no longer promise
    * it fits — what the package still owes is PagBank's number, stated where a
    * host writing that answer will find it. Measured against the sample pack,
-   * with a realistically long store URL: that is the wording future-pay
+   * with a realistically long store URL: that is the wording the origin host
    * submits, and it must not be lengthened without re-checking.
    */
   it('states the form cap, and the sample answer fits it', () => {
