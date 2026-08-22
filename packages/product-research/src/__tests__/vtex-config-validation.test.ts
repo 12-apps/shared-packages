@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import type { ConnectorContext, FetchOutcome } from '../connectors/types';
 import { vtexConnector } from '../connectors/vtex';
@@ -36,6 +37,7 @@ const statusCtx = (
   seen: Seen = { urls: [] },
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => Promise.resolve(null),
   fetchJsonStatus: (url) => {
     seen.urls.push(url);
@@ -45,6 +47,7 @@ const statusCtx = (
 
 const plainCtx = (respond: (url: string) => unknown | null, seen: Seen = { urls: [] }): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: (url) => {
     seen.urls.push(url);
     return Promise.resolve(respond(url));
@@ -58,6 +61,7 @@ const plainCtx = (respond: (url: string) => unknown | null, seen: Seen = { urls:
  */
 const resultCtx = (outcome: FetchOutcome, seen: Seen = { urls: [] }): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => Promise.resolve(null),
   fetchJsonResult: (url) => {
     seen.urls.push(url);
@@ -429,6 +433,7 @@ describe('validateVtexSourceConfig with an application key', () => {
     probes: Probe[] = [],
   ): ConnectorContext => ({
     logger: silentLogger,
+    diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     fetchJson: () => Promise.resolve(null),
     fetchJsonResult: (url, init) => {
       const probe = {

@@ -89,7 +89,7 @@ export const deliverableSkus = async (
     init,
   );
   if (!outcome.ok) {
-    ctx.logger.info(vtexFailureMessage('simulation', outcome.failure, url, init !== undefined));
+    ctx.logger.info(vtexFailureMessage('simulation', outcome.failure, url, ctx.diagnostics, init !== undefined));
     return null;
   }
 

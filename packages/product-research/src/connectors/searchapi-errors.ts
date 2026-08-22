@@ -1,3 +1,4 @@
+import type { SearchApiCopy } from './diagnostics-copy';
 import type { FetchFailure } from './types';
 
 /**
@@ -39,30 +40,23 @@ import type { FetchFailure } from './types';
 const budgetSeconds = (timeoutMs: number): string => `${Math.round(timeoutMs / 1000)}s`;
 
 /** What a vendor HTTP status means for a paid search, in the operator's terms. */
-const httpReason = (status: number): string => {
-  if (status === 401 || status === 403) {
-    return `chave recusada pelo provedor (HTTP ${status}) — verifique a chave da integração`;
-  }
-  if (status === 429) return 'limite de consultas do provedor atingido (HTTP 429)';
-  if (status === 404) return 'endpoint do provedor não encontrado (HTTP 404)';
-  if (status >= 500) return `provedor com erro interno (HTTP ${status}) — instabilidade momentânea`;
-  return `provedor recusou a consulta (HTTP ${status})`;
+const httpReason = (status: number, copy: SearchApiCopy): string => {
+  if (status === 401 || status === 403) return copy.keyRefused(status);
+  if (status === 429) return copy.rateLimited;
+  if (status === 404) return copy.endpointNotFound;
+  if (status >= 500) return copy.providerError(status);
+  return copy.rejected(status);
 };
 
-const failureReason = (failure: FetchFailure, timeoutMs: number): string => {
-  if (failure.kind === 'http') return httpReason(failure.status);
-  if (failure.kind === 'body') {
-    return `resposta HTTP ${failure.status} não era JSON — provável página de erro do provedor`;
-  }
+const failureReason = (failure: FetchFailure, timeoutMs: number, copy: SearchApiCopy): string => {
+  if (failure.kind === 'http') return httpReason(failure.status, copy);
+  if (failure.kind === 'body') return copy.notJson(failure.status);
   if (failure.kind === 'timeout') {
     // The credit note is deliberate: the vendor bills successful searches, and
     // a search it completed AFTER we hung up is successful on its side — so a
     // timeout can cost a credit that bought nothing. Saying so is what makes
     // the `costUnits 1` on this stat make sense to whoever reads the run.
-    return (
-      `sem resposta no tempo limite de ${budgetSeconds(timeoutMs)} ` +
-      '(o crédito pago pode ter sido consumido)'
-    );
+    return copy.timedOutMaybeSpent(budgetSeconds(timeoutMs));
   }
   if (failure.kind === 'deadline') {
     // The mirror image of the timeout arm above, and the credit note flips with
@@ -70,14 +64,9 @@ const failureReason = (failure: FetchFailure, timeoutMs: number): string => {
     // was billed. Without its own arm this fell through to the transport clause
     // below and read as "falha de conexão com o provedor (rede, DNS ou TLS)" —
     // a network diagnosis for a search we ourselves declined to send.
-    return (
-      'a busca nesta fonte atingiu o tempo total permitido antes desta consulta ' +
-      '(nenhum crédito pago foi consumido)'
-    );
+    return copy.deadlineNotSpent;
   }
-  return failure.code === undefined
-    ? 'falha de conexão com o provedor (rede, DNS ou TLS)'
-    : `falha de conexão com o provedor (rede, DNS ou TLS: ${failure.code})`;
+  return failure.code === undefined ? copy.transport : copy.transportCoded(failure.code);
 };
 
 /**
@@ -90,7 +79,8 @@ export const searchApiFailureMessage = (
   engine: string,
   failure: FetchFailure,
   timeoutMs: number,
-): string => `SearchApi ${engine}: ${failureReason(failure, timeoutMs)}`;
+  copy: SearchApiCopy,
+): string => copy.prefixed(engine, failureReason(failure, timeoutMs, copy));
 
 /**
  * How much of the vendor's own wording is echoed. Every real body observed on
@@ -129,14 +119,12 @@ export const boundVendorText = (raw: string): string => {
  * admin route is named either: this package is host-agnostic and does not know
  * the URL the tenant would click.
  */
-export const searchApiKeyMissingMessage = (engine: string): string =>
-  `SearchApi ${engine}: chave de API não configurada — conecte a integração ` +
-  'de busca de preços com a chave da sua conta SearchApi.io';
+export const searchApiKeyMissingMessage = (engine: string, copy: SearchApiCopy): string =>
+  copy.keyMissing(engine);
 
 /** A 2xx that is not a JSON object: there is no result list to read at all. */
-export const searchApiPayloadShapeMessage = (engine: string): string =>
-  `SearchApi ${engine}: o provedor respondeu em um formato inesperado — ` +
-  'nenhuma oferta pôde ser lida';
+export const searchApiPayloadShapeMessage = (engine: string, copy: SearchApiCopy): string =>
+  copy.payloadShape(engine);
 
 /**
  * The vendor answered, and said no: a quota, a rejected parameter, an engine it
@@ -146,10 +134,12 @@ export const searchApiPayloadShapeMessage = (engine: string): string =>
  * A vendor that refuses without a reason gets its own arm instead of an empty
  * pair of quotes.
  */
-export const searchApiVendorErrorMessage = (engine: string, vendorError: string): string => {
+export const searchApiVendorErrorMessage = (
+  engine: string,
+  vendorError: string,
+  copy: SearchApiCopy,
+): string => {
   const detail = boundVendorText(vendorError);
-  if (detail === '') {
-    return `SearchApi ${engine}: o provedor recusou a consulta sem informar o motivo`;
-  }
-  return `SearchApi ${engine}: o provedor recusou a consulta — resposta do provedor: "${detail}"`;
+  if (detail === '') return copy.vendorRefusedSilently(engine);
+  return copy.vendorError(engine, detail);
 };

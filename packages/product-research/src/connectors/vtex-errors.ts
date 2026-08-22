@@ -1,4 +1,5 @@
 import { describeFetchFailure, diagnosticUrl } from './fetch-reason';
+import type { ResearchDiagnosticsCopy } from './diagnostics-copy';
 import type { FetchFailure } from './types';
 
 /**
@@ -16,12 +17,6 @@ import type { FetchFailure } from './types';
  */
 type VtexTier = 'catalog' | 'regions' | 'intelligent-search' | 'simulation';
 
-const TIER_LABEL: Record<VtexTier, string> = {
-  catalog: 'Busca no catálogo VTEX',
-  regions: 'Consulta de regiões VTEX',
-  'intelligent-search': 'Busca inteligente VTEX',
-  simulation: 'Simulação de entrega VTEX',
-};
 
 /**
  * A 401/403 on a request that CARRIED the source's application key has a second
@@ -31,9 +26,6 @@ const TIER_LABEL: Record<VtexTier, string> = {
  * the store's edge for something they can fix in their own dialog. Appended as
  * a CLAUSE, and about the field — no credential value is ever echoed.
  */
-const KEY_CLAUSE =
-  ' A chave de aplicação da fonte também pode não ser mais válida — ' +
-  'confira a chave em Fontes de preços.';
 
 const AUTH_STATUSES = new Set([401, 403]);
 
@@ -50,12 +42,14 @@ export const vtexFailureMessage = (
   tier: VtexTier,
   failure: FetchFailure,
   url: string,
+  copy: ResearchDiagnosticsCopy,
   keyed = false,
 ): string => {
   const keyDoubt =
-    keyed && failure.kind === 'http' && AUTH_STATUSES.has(failure.status) ? KEY_CLAUSE : '';
-  return (
-    `${TIER_LABEL[tier]} falhou: ${describeFetchFailure(failure)}. ` +
-    `Endereço: ${diagnosticUrl(url)}${keyDoubt}`
+    keyed && failure.kind === 'http' && AUTH_STATUSES.has(failure.status) ? copy.vtex.keyDoubt : '';
+  const tierFailed = copy.vtex.tierFailed(
+    copy.vtex.tiers[tier] ?? tier,
+    describeFetchFailure(failure, copy.fetch),
   );
+  return `${tierFailed} ${copy.vtex.endpoint(diagnosticUrl(url, copy.fetch))}${keyDoubt}`;
 };

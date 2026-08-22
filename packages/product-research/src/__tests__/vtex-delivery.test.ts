@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import type { ConnectorContext, FetchOutcome } from '../connectors/types';
@@ -27,6 +28,7 @@ const ctxWithPost = (
   captured: Captured = {},
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: () => Promise.resolve(null),
   postJsonResult: (url, body) => {
     captured.url = url;
@@ -114,7 +116,7 @@ describe('deliverableSkus', () => {
 
   it('claims nothing when the host mounts no POST seam', async () => {
     const deliverable = await deliverableSkus(
-      { logger: silentLogger, fetchJson: () => Promise.resolve(null) },
+      { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS },
       BASE,
       '2',
       '31610-000',

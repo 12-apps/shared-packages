@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import type { ConnectorContext, PriceSourceConnector } from '../connectors/types';
@@ -35,7 +36,7 @@ const OFFER: RawOffer = {
   availability: 'IN_STOCK',
 };
 
-const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
 
 const query = { term: 'Coca-Cola Lata 350ml', brand: 'Coca-Cola', quantity: 1 };
 
@@ -67,6 +68,7 @@ const makeHarness = (sources: SourceRecord[]): Harness => {
       cache: new InMemoryCache(),
       budget: new FixedBudget(10),
       logger,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
       events: {
         sourceDegraded: () => undefined,
         runProgress: (event) => {

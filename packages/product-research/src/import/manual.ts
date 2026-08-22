@@ -1,3 +1,4 @@
+import type { ManualImportCopy } from '../connectors/diagnostics-copy';
 import { z } from 'zod';
 import { parseMoneyToCents } from '../normalize/money';
 
@@ -71,6 +72,7 @@ const parseDateString = (value: string): Date | null => {
 export const normalizeManualRows = (
   rows: ManualPriceRowInput[],
   options: { defaultValidUntil: Date },
+  copy: ManualImportCopy,
 ): { entries: NormalizedManualRow[]; problems: ManualRowProblem[] } => {
   const entries: NormalizedManualRow[] = [];
   const problems: ManualRowProblem[] = [];
@@ -79,7 +81,7 @@ export const normalizeManualRows = (
     const line = index + 1;
     const priceCents = parseMoneyToCents(row.price);
     if (priceCents === null || priceCents <= 0) {
-      problems.push({ line, reason: `preço não reconhecido: "${String(row.price)}"` });
+      problems.push({ line, reason: copy.unreadablePrice(String(row.price)) });
       return;
     }
 
@@ -87,7 +89,7 @@ export const normalizeManualRows = (
     if (row.ean !== undefined && ean !== undefined && !EAN_PATTERN.test(ean)) {
       problems.push({
         line,
-        reason: `EAN inválido ignorado: "${row.ean}" (linha importada sem código de barras)`,
+        reason: copy.invalidEan(row.ean),
       });
       ean = undefined;
     }
@@ -98,7 +100,7 @@ export const normalizeManualRows = (
       if (parsedDate === null) {
         problems.push({
           line,
-          reason: `validade inválida ignorada: "${row.validUntil}" (usada a validade padrão)`,
+          reason: copy.invalidValidUntil(row.validUntil),
         });
       } else {
         validUntil = parsedDate;
@@ -248,10 +250,11 @@ export interface CsvParseInput {
  */
 export const parseCsvPriceList = (
   input: CsvParseInput,
+  copy: ManualImportCopy,
 ): { rows: ManualPriceRowInput[]; problems: ManualRowProblem[] } => {
   const lines = input.content.split(/\r?\n/).filter((line) => line.trim() !== '');
   if (lines.length < 2) {
-    return { rows: [], problems: [{ line: 0, reason: 'arquivo sem linhas de dados' }] };
+    return { rows: [], problems: [{ line: 0, reason: copy.emptyFile }] };
   }
 
   const headerLine = lines[0] ?? '';
@@ -264,7 +267,7 @@ export const parseCsvPriceList = (
         {
           line: 0,
           reason:
-            'colunas obrigatórias não encontradas (produto e preço) — informe o mapeamento de colunas',
+            copy.missingRequiredColumns,
         },
       ],
     };
@@ -293,7 +296,7 @@ export const parseCsvPriceList = (
       const first = parsed.error.issues[0];
       problems.push({
         line: index + 1,
-        reason: `linha não importável: ${first?.path.join('.') ?? 'linha'} — ${first?.message ?? 'inválida'}`,
+        reason: copy.unimportableRow(first?.path.join('.') ?? '', first?.message ?? ''),
       });
       return;
     }

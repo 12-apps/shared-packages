@@ -1,3 +1,4 @@
+import type { SourceBudgetCopy } from '../connectors/diagnostics-copy';
 import type { ConnectorContext, FetchInit, FetchOutcome } from '../connectors/types';
 
 /**
@@ -43,10 +44,7 @@ export const hitCeiling = (deadlineAt: number): boolean => Date.now() >= deadlin
  * It also blames us rather than the store, because that is what happened: the
  * store was never given the chance to answer this part.
  */
-export const SOURCE_CEILING_ERROR =
-  'A consulta a esta fonte atingiu o tempo total permitido e foi interrompida antes de ' +
-  'terminar. Nenhuma oferta chegou a tempo. Tente novamente; se repetir, a loja está ' +
-  'respondendo devagar demais para esta pesquisa.';
+export const sourceCeilingError = (copy: SourceBudgetCopy): string => copy.ceilingReached;
 
 /** The deadline stamped onto whatever the connector asked for, `timeoutMs` intact. */
 const withDeadline = (init: FetchInit | undefined, deadlineAt: number): FetchInit => ({

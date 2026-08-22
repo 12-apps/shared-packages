@@ -1,9 +1,10 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import type { ConnectorContext, PriceSourceConnector } from '../connectors/types';
 import { FixedBudget, InMemoryCache, InMemoryResearchStore, silentLogger } from '../memory';
 import { runResearch } from '../pipeline/run-research';
-import { SOURCE_CEILING_ERROR } from '../pipeline/source-budget';
+import { sourceCeilingError } from '../pipeline/source-budget';
 import { cacheKey } from '../ports';
 import type { BudgetPort, ResearchDeps, SourceDegradedEvent } from '../ports';
 import type { RawOffer, SourceRecord } from '../types';
@@ -33,7 +34,7 @@ const stubConnector = (
   },
 });
 
-const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
 
 const makeHarness = (
   sources: SourceRecord[],
@@ -43,7 +44,7 @@ const makeHarness = (
   store.sources = sources;
   return {
     store,
-    deps: { store, cache: new InMemoryCache(), budget, logger: silentLogger },
+    deps: { store, cache: new InMemoryCache(), budget, logger: silentLogger, diagnostics: PT_BR_RESEARCH_DIAGNOSTICS },
   };
 };
 
@@ -633,7 +634,7 @@ describe('runResearch — the per-source ceiling (FUT-516)', () => {
     const stat = result.sourceStats[0];
     expect(stat?.status).toBe('FAILED');
     expect(stat?.truncated).toBe(true);
-    expect(stat?.error).toBe(SOURCE_CEILING_ERROR);
+    expect(stat?.error).toBe(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget));
     expect(stat?.error).not.toContain('unreachable');
     // The latch stays open: `markSourceDegraded` notifies every
     // research-permission holder, and there is nothing here to notify about.
@@ -676,6 +677,7 @@ describe('runResearch — the per-source ceiling (FUT-516)', () => {
       cache: new InMemoryCache(() => clock.value),
       budget: new FixedBudget(10),
       logger: silentLogger,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     };
     const calls = { count: 0 };
     const registry = new ConnectorRegistry().register(stubConnector('VTEX', [OFFER], calls));
@@ -695,6 +697,7 @@ describe('runResearch — the per-source ceiling (FUT-516)', () => {
       cache: new InMemoryCache(() => clock.value),
       budget: new FixedBudget(10),
       logger: silentLogger,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     };
     const wholeCalls = { count: 0 };
     const wholeRegistry = new ConnectorRegistry().register(stubConnector('VTEX', [OFFER], wholeCalls));

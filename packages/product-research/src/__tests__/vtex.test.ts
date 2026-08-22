@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { parseVtexResponse, salesChannelFor, vtexConnector } from '../connectors/vtex';
 import type { ConnectorContext, FetchOutcome } from '../connectors/types';
@@ -27,6 +28,7 @@ const ctxWith = (
   seen: string[] = [],
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: (url) => {
     seen.push(url);
     return Promise.resolve(responder(url));
@@ -362,6 +364,7 @@ const reasonCtx = (
   options: { seen?: string[]; logger?: LoggerPort } = {},
 ): ConnectorContext => ({
   logger: options.logger ?? silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   // Present but never used by the connector: `fetchJsonResult` is the richest
   // seam, so `fetchJsonOutcome` must prefer it.
   fetchJson: () => Promise.resolve(null),
@@ -525,6 +528,7 @@ describe('vtexConnector failure reasons (FUT-495)', () => {
       source(ATACADAO),
       {
         logger: silentLogger,
+        diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
         fetchJson: () => Promise.resolve(null),
         fetchJsonStatus: () => Promise.resolve({ status: 403, payload: null }),
       },
@@ -579,6 +583,7 @@ describe('vtexConnector failure reasons (FUT-495)', () => {
           logisticsInfo: [{ slas: [] }, { slas: [] }],
         }),
         logger: logCollector(lines),
+        diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
       },
     );
 
@@ -669,6 +674,7 @@ describe('vtexConnector application key (FUT-520)', () => {
   /** Every tier of one search, recorded with the init it actually ran under. */
   const tieredCtx = (calls: Exchange[]): ConnectorContext => ({
     logger: silentLogger,
+    diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     fetchJson: () => Promise.resolve(null),
     fetchJsonResult: (url, init) => {
       calls.push({ url, headers: init?.headers, credentialsRequired: init?.credentialsRequired });

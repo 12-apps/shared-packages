@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { createSerpConnector, parseSerpResponse } from '../connectors/serp';
 import { regionToLocation } from '../connectors/serp-location';
@@ -84,6 +85,7 @@ const ctxWith = (
   seen: { url: string; headers?: Record<string, string> }[] = [],
 ): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: (url, init) => {
     seen.push({ url, headers: init?.headers });
     return Promise.resolve(responder(url));

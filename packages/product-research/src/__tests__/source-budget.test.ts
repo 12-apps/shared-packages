@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConnectorContext, FetchInit, FetchOutcome } from '../connectors/types';
@@ -5,7 +6,7 @@ import { silentLogger } from '../memory';
 import {
   budgetedContext,
   hitCeiling,
-  SOURCE_CEILING_ERROR,
+  sourceCeilingError,
   sourceDeadlineAt,
 } from '../pipeline/source-budget';
 
@@ -35,6 +36,7 @@ const answered: FetchOutcome = { ok: true, payload: { ok: 1 } };
 
 const fullContext = (seen: Seen): ConnectorContext => ({
   logger: silentLogger,
+  diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
   fetchJson: (_url, init) => {
     seen.fetchJson.push(init ?? {});
     return Promise.resolve({ ok: 1 });
@@ -132,7 +134,7 @@ describe('budgetedContext — the deadline on every seam', () => {
   });
 
   it('leaves an unmounted seam unmounted — it must not invent one', () => {
-    const bare: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+    const bare: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
     const ctx = budgetedContext(bare, sourceDeadlineAt(CLOCK_BASE, BUDGET_MS));
 
     expect(ctx.fetchJsonResult).toBeUndefined();
@@ -191,12 +193,12 @@ describe('budgetedContext — past the ceiling', () => {
   });
 });
 
-describe('SOURCE_CEILING_ERROR', () => {
+describe('sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)', () => {
   it('is pt-BR, blames the ceiling, and names no url, endpoint or query string', () => {
-    expect(SOURCE_CEILING_ERROR).toContain('tempo total permitido');
-    expect(SOURCE_CEILING_ERROR).not.toContain('http');
-    expect(SOURCE_CEILING_ERROR).not.toContain('://');
-    expect(SOURCE_CEILING_ERROR).not.toContain('?');
-    expect(SOURCE_CEILING_ERROR).not.toContain('=');
+    expect(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)).toContain('tempo total permitido');
+    expect(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)).not.toContain('http');
+    expect(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)).not.toContain('://');
+    expect(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)).not.toContain('?');
+    expect(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)).not.toContain('=');
   });
 });

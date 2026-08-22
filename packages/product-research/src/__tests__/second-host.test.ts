@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { ConnectorRegistry } from '../connectors/registry';
 import type { ConnectorContext } from '../connectors/types';
@@ -29,7 +30,7 @@ const makeDentalCatalog = (): CatalogAdapter => {
   };
 };
 
-const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+const ctx: ConnectorContext = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
 
 describe('second host (dental vertical)', () => {
   it('runs the same pipeline over a dental catalog and vendor', async () => {
@@ -78,6 +79,7 @@ describe('second host (dental vertical)', () => {
         cache: new InMemoryCache(),
         budget: new FixedBudget(10),
         logger: silentLogger,
+        diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
       },
       registry,
       ctx,

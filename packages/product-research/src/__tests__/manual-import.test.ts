@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import {
   guessHeaderMapping,
@@ -38,7 +39,7 @@ const source = (): SourceRecord => ({
 
 describe('parseCsvPriceList', () => {
   it('parses the distributor sheet and surfaces the unmappable row', () => {
-    const { rows, problems } = parseCsvPriceList({ content: DISTRIBUTOR_CSV });
+    const { rows, problems } = parseCsvPriceList({ content: DISTRIBUTOR_CSV }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
 
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({
@@ -56,7 +57,7 @@ describe('parseCsvPriceList', () => {
   });
 
   it('fails loudly when required columns cannot be found', () => {
-    const { rows, problems } = parseCsvPriceList({ content: 'Foo;Bar\n1;2' });
+    const { rows, problems } = parseCsvPriceList({ content: 'Foo;Bar\n1;2' }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
     expect(rows).toEqual([]);
     expect(problems[0]?.reason).toContain('colunas obrigatórias');
   });
@@ -66,7 +67,7 @@ describe('parseCsvPriceList', () => {
     const { rows, problems } = parseCsvPriceList({
       content: csv,
       mapping: { title: 'Item', price: 'Custo' },
-    });
+    }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
     expect(problems).toEqual([]);
     expect(rows[0]).toMatchObject({ title: 'Café Torrado 1kg', price: 'R$ 89,90' });
   });
@@ -102,8 +103,8 @@ describe('readCsvHeaders / guessHeaderMapping', () => {
 describe('normalizeManualRows', () => {
   it('converts BR money to cents and applies the default validity', () => {
     const defaultValidUntil = new Date('2026-08-04T00:00:00Z');
-    const { rows } = parseCsvPriceList({ content: DISTRIBUTOR_CSV });
-    const { entries, problems } = normalizeManualRows(rows, { defaultValidUntil });
+    const { rows } = parseCsvPriceList({ content: DISTRIBUTOR_CSV }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
+    const { entries, problems } = normalizeManualRows(rows, { defaultValidUntil }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
 
     expect(entries).toHaveLength(3);
     expect(entries[0]?.priceCents).toBe(4290);
@@ -119,6 +120,7 @@ describe('normalizeManualRows', () => {
     const { entries, problems } = normalizeManualRows(
       [{ title: 'Item bom', price: '10,00' }, { title: 'Item ruim', price: 'a combinar' }],
       { defaultValidUntil: new Date('2026-08-04T00:00:00Z') },
+      PT_BR_RESEARCH_DIAGNOSTICS.manualImport,
     );
     expect(entries).toHaveLength(1);
     expect(problems).toEqual([{ line: 2, reason: expect.stringContaining('preço não reconhecido') }]);
@@ -146,7 +148,7 @@ describe('createManualConnector', () => {
     const result = await connector.search(
       { term: 'Coca-Cola Lata 350ml', quantity: 12 },
       source(),
-      { logger: silentLogger, fetchJson: () => Promise.resolve(null) },
+      { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS },
     );
 
     expect(result.ok).toBe(true);
@@ -169,7 +171,7 @@ describe('createManualConnector', () => {
     const result = await connector.search(
       { term: 'x', quantity: 1 },
       source(),
-      { logger: silentLogger, fetchJson: () => Promise.resolve(null) },
+      { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS },
     );
     expect(result).toEqual({ ok: false, error: expect.stringContaining('db down') });
   });
@@ -211,10 +213,11 @@ describe('manual offers through the pipeline', () => {
       cache: spyCache,
       budget: new FixedBudget(10),
       logger: silentLogger,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
       now: () => new Date('2026-07-28T12:00:00Z'),
     };
     const registry = new ConnectorRegistry().register(connector);
-    const ctx = { logger: silentLogger, fetchJson: () => Promise.resolve(null) };
+    const ctx = { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS };
     const input = {
       clientId: 'tenant-1',
       requestId: 'req-1',

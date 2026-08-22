@@ -16,7 +16,11 @@ import {
 import packageJson from '../../../package.json';
 import { createApiProductResearch } from '../../http';
 import { createResearchBudgetBlueprint } from '../../notifications';
-import { PT_BR_RESEARCH_BUDGET_COPY, PT_BR_RESEARCH_MESSAGES } from '../../pt-BR';
+import {
+  PT_BR_RESEARCH_BUDGET_COPY,
+  PT_BR_RESEARCH_DIAGNOSTICS,
+  PT_BR_RESEARCH_MESSAGES,
+} from '../../pt-BR';
 import { RESEARCH_JOBS } from '../../jobs';
 import { productResearchManifest } from '../index';
 import { productResearchServerManifest } from '../server';
@@ -44,6 +48,7 @@ describe('the shared manifest', () => {
     expect(productResearchManifest.permissions?.ids).toEqual(['research:read', 'research:write']);
     const { routes } = createApiProductResearch({
       store: {} as never,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
       checks: {} as never,
       credentials: {} as never,
       messages: PT_BR_RESEARCH_MESSAGES,

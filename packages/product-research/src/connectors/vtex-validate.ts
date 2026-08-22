@@ -1,3 +1,4 @@
+import type { ResearchDiagnosticsCopy, VtexValidateCopy } from './diagnostics-copy';
 import { z } from 'zod';
 import { CREDENTIALS_STRIPPED, describeFetchFailure, fetchJsonOutcome } from './fetch-reason';
 import type { ConnectorContext, FetchFailure, FetchInit, SourceConfigCheck } from './types';
@@ -29,9 +30,6 @@ import { vtexAuthInit } from './vtex-auth';
 
 const configSchema = z.object({ baseUrl: z.string().url() });
 
-const INVALID_URL_ERROR =
-  'URL da loja inválida ou não informada. Informe o endereço completo, ' +
-  'como https://www.loja.com.br.';
 
 /**
  * Refusing credentials in the store URL is a SAVE-TIME decision, not just
@@ -43,9 +41,6 @@ const INVALID_URL_ERROR =
  * the userinfo section is refused at the dialog rather than carried around and
  * redacted downstream. The message names the shape, never the value.
  */
-const CREDENTIALS_IN_URL_ERROR =
-  'A URL da loja não pode conter usuário e senha (o trecho antes do "@"). ' +
-  'Informe apenas o endereço público da loja, como https://www.loja.com.br.';
 
 /** Why a configured `baseUrl` cannot be probed at all. */
 type BaseUrlProblem = 'invalid' | 'credentials';
@@ -197,23 +192,29 @@ const isApexHost = (hostname: string): boolean => {
  * that is the single most useful thing to try next. Only the hostname travels
  * into the text, so a URL's query string or userinfo never can.
  */
-const apexHint = (base: URL): string =>
-  isApexHost(base.hostname) ? ` Se a loja usa "www", tente https://www.${base.hostname}.` : '';
-
-const HINT_RETRY = 'Tente novamente em alguns minutos.';
+const apexHint = (base: URL, copy: VtexValidateCopy): string =>
+  isApexHost(base.hostname) ? copy.apexHint(base.hostname) : '';
 
 /** Nothing answered at all: DNS, TLS, a refused connection, a blocked hop. */
-const unreachable = (failure: FetchFailure, base: URL): SourceConfigCheck => ({
+const unreachable = (
+  failure: FetchFailure,
+  base: URL,
+  copy: ResearchDiagnosticsCopy,
+): SourceConfigCheck => ({
   ok: false,
-  error:
-    'A loja não respondeu (fora do ar, bloqueando nosso acesso, ou endereço errado): ' +
-    `${describeFetchFailure(failure)}. Confira a URL e tente novamente.${apexHint(base)}`,
+  error: copy.vtexValidate.unreachable(
+    describeFetchFailure(failure, copy.fetch),
+    apexHint(base, copy.vtexValidate),
+  ),
 });
 
 /** The store was reached but ran out of time — an address worth retrying. */
-const timedOut = (base: URL): SourceConfigCheck => ({
+const timedOut = (base: URL, copy: ResearchDiagnosticsCopy): SourceConfigCheck => ({
   ok: false,
-  error: `A loja não respondeu dentro do tempo limite. ${HINT_RETRY}${apexHint(base)}`,
+  error: copy.vtexValidate.timedOut(
+    copy.vtexValidate.retryHint,
+    apexHint(base, copy.vtexValidate),
+  ),
 });
 
 /**
@@ -225,17 +226,22 @@ const timedOut = (base: URL): SourceConfigCheck => ({
  * `describeFetchFailure`'s, so the dialog and the run screen say the same
  * thing about the same status.
  */
-const notNow = (failure: FetchFailure): SourceConfigCheck => ({
+const notNow = (failure: FetchFailure, copy: ResearchDiagnosticsCopy): SourceConfigCheck => ({
   ok: false,
-  error: `Não foi possível validar a loja agora: ${describeFetchFailure(failure)}. ${HINT_RETRY}`,
+  error: copy.vtexValidate.unverifiable(
+    describeFetchFailure(failure, copy.fetch),
+    copy.vtexValidate.retryHint,
+  ),
 });
 
 /** The address answered, but not as a VTEX catalog — the URL is the fix. */
-const notVtex = (base: URL, status?: number): SourceConfigCheck => ({
+const notVtex = (
+  base: URL,
+  copy: ResearchDiagnosticsCopy,
+  status?: number,
+): SourceConfigCheck => ({
   ok: false,
-  error:
-    `O endereço respondeu${status === undefined ? '' : ` (HTTP ${status})`}, mas não parece ser ` +
-    `uma loja VTEX (resposta inesperada na API de catálogo). Confira a URL da loja.${apexHint(base)}`,
+  error: copy.vtexValidate.notVtex(status, apexHint(base, copy.vtexValidate)),
 });
 
 /**
@@ -245,12 +251,9 @@ const notVtex = (base: URL, status?: number): SourceConfigCheck => ({
  * authentication: adding the key is the only thing that changed. Names the
  * fields and where they come from — never a value, never a fragment of one.
  */
-const keyRejected = (): SourceConfigCheck => ({
+const keyRejected = (copy: ResearchDiagnosticsCopy): SourceConfigCheck => ({
   ok: false,
-  error:
-    'A loja recusou a chave de aplicação informada — a mesma consulta sem chave foi aceita. ' +
-    'Confira a chave e o token gerados no admin da própria loja e as permissões do papel ' +
-    'no License Manager.',
+  error: copy.vtexValidate.keyRejected,
 });
 
 /**
@@ -260,11 +263,12 @@ const keyRejected = (): SourceConfigCheck => ({
  * is the address field, so the message points at it instead of reading as
  * "não parece ser uma loja VTEX".
  */
-const credentialsStripped = (base: URL): SourceConfigCheck => ({
+const credentialsStripped = (
+  base: URL,
+  copy: ResearchDiagnosticsCopy,
+): SourceConfigCheck => ({
   ok: false,
-  error:
-    'A loja redireciona para outro endereço e a chave de aplicação não pode viajar junto. ' +
-    `Configure aqui o endereço final da loja.${apexHint(base)}`,
+  error: copy.vtexValidate.redirectsAway(apexHint(base, copy.vtexValidate)),
 });
 
 /**
@@ -280,8 +284,12 @@ const isTransientStatus = (status: number): boolean =>
   status >= 500 || TRANSIENT_STATUSES.has(status);
 
 /** Turn a fetch failure into the verdict the operator reads. */
-const judgeFailure = (failure: FetchFailure, base: URL): SourceConfigCheck => {
-  if (failure.kind === 'timeout') return timedOut(base);
+const judgeFailure = (
+  failure: FetchFailure,
+  base: URL,
+  copy: ResearchDiagnosticsCopy,
+): SourceConfigCheck => {
+  if (failure.kind === 'timeout') return timedOut(base, copy);
   // OUR ceiling ran out, not the store's patience (FUT-516). Unreachable in
   // practice — this probe runs on the operator's SAVE request, which arms no
   // per-source deadline — but it must never fall through to the tail below,
@@ -289,11 +297,13 @@ const judgeFailure = (failure: FetchFailure, base: URL): SourceConfigCheck => {
   // store" about a request we chose not to send would have them rewrite a URL
   // that was already right. `timedOut` is the honest neighbour: nothing came
   // back in the time available, and a retry is the action either way.
-  if (failure.kind === 'deadline') return timedOut(base);
-  if (failure.kind === 'transport') return unreachable(failure, base);
+  if (failure.kind === 'deadline') return timedOut(base, copy);
+  if (failure.kind === 'transport') return unreachable(failure, base, copy);
   // A 2xx that was not JSON is a storefront/challenge page, not a catalog API.
-  if (failure.kind === 'body') return notVtex(base, failure.status);
-  return isTransientStatus(failure.status) ? notNow(failure) : notVtex(base, failure.status);
+  if (failure.kind === 'body') return notVtex(base, copy, failure.status);
+  return isTransientStatus(failure.status)
+    ? notNow(failure, copy)
+    : notVtex(base, copy, failure.status);
 };
 
 /** The only statuses where the application key is itself a candidate culprit. */
@@ -319,13 +329,15 @@ const judgeKeyedFailure = async (
   url: string,
 ): Promise<SourceConfigCheck> => {
   if (failure.kind === 'transport' && failure.code === CREDENTIALS_STRIPPED) {
-    return credentialsStripped(base);
+    return credentialsStripped(base, ctx.diagnostics);
   }
   if (failure.kind !== 'http' || !KEY_REJECTION_STATUSES.has(failure.status)) {
-    return judgeFailure(failure, base);
+    return judgeFailure(failure, base, ctx.diagnostics);
   }
   const unkeyed = await fetchJsonOutcome(ctx, url);
-  return unkeyed.ok && looksLikeVtex(unkeyed.payload) ? keyRejected() : judgeFailure(failure, base);
+  return unkeyed.ok && looksLikeVtex(unkeyed.payload)
+    ? keyRejected(ctx.diagnostics)
+    : judgeFailure(failure, base, ctx.diagnostics);
 };
 
 /**
@@ -349,15 +361,16 @@ export const validateVtexSourceConfig = async (
   ctx: ConnectorContext,
 ): Promise<SourceConfigCheck> => {
   const base = parseBaseUrl(config);
-  if (base === 'invalid') return { ok: false, error: INVALID_URL_ERROR };
-  if (base === 'credentials') return { ok: false, error: CREDENTIALS_IN_URL_ERROR };
+  const copy = ctx.diagnostics;
+  if (base === 'invalid') return { ok: false, error: copy.vtexValidate.urlMissing };
+  if (base === 'credentials') return { ok: false, error: copy.vtexValidate.urlHasCredentials };
   const url = probeUrl(base);
   const auth: FetchInit | undefined = vtexAuthInit({ config });
   const outcome = await fetchJsonOutcome(ctx, url, auth);
   if (!outcome.ok) {
     return auth === undefined
-      ? judgeFailure(outcome.failure, base)
+      ? judgeFailure(outcome.failure, base, copy)
       : judgeKeyedFailure(ctx, outcome.failure, base, url);
   }
-  return looksLikeVtex(outcome.payload) ? { ok: true } : notVtex(base);
+  return looksLikeVtex(outcome.payload) ? { ok: true } : notVtex(base, copy);
 };

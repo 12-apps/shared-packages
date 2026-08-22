@@ -1,3 +1,4 @@
+import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { createMercadoLivreConnector, parseMercadoLivreSearch } from '../connectors/mercado-livre';
 import { createMercadoLivreAuth } from '../connectors/mercado-livre-auth';
@@ -142,6 +143,7 @@ const transportWith = (
     posts,
     ctx: {
       logger: silentLogger,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
       fetchJson: (url, init) => {
         gets.push({ url, token: init?.headers?.["Authorization"] });
         return Promise.resolve(respond(url));
@@ -433,7 +435,7 @@ describe('mercado livre in the pipeline', () => {
     store.sources = [source()];
     return {
       store,
-      deps: { store, cache: new InMemoryCache(), budget: new FixedBudget(10), logger: silentLogger },
+      deps: { store, cache: new InMemoryCache(), budget: new FixedBudget(10), logger: silentLogger, diagnostics: PT_BR_RESEARCH_DIAGNOSTICS },
     };
   };
 

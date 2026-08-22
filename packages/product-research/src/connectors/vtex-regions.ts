@@ -56,7 +56,7 @@ export const resolveVtexRegion = async (
   const url = `${root}/api/checkout/pub/regions?country=BRA&postalCode=${cep}`;
   const outcome = await fetchJsonOutcome(ctx, url, init);
   if (!outcome.ok) {
-    ctx.logger.info(vtexFailureMessage('regions', outcome.failure, url, init !== undefined));
+    ctx.logger.info(vtexFailureMessage('regions', outcome.failure, url, ctx.diagnostics, init !== undefined));
     return { kind: 'unknown' };
   }
   const parsed = regionsSchema.safeParse(outcome.payload);

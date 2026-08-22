@@ -163,7 +163,7 @@ const regionProducts = async (
   const outcome = await fetchJsonOutcome(ctx, url, init);
   if (!outcome.ok) {
     ctx.logger.info(
-      vtexFailureMessage('intelligent-search', outcome.failure, url, init !== undefined),
+      vtexFailureMessage('intelligent-search', outcome.failure, url, ctx.diagnostics, init !== undefined),
     );
     return null;
   }
@@ -210,7 +210,7 @@ const catalogPayload = async (
   const outcome = await fetchJsonOutcome(ctx, url, init);
   return outcome.ok
     ? { ok: true, payload: outcome.payload }
-    : { ok: false, error: vtexFailureMessage('catalog', outcome.failure, url, init !== undefined) };
+    : { ok: false, error: vtexFailureMessage('catalog', outcome.failure, url, ctx.diagnostics, init !== undefined) };
 };
 
 /**

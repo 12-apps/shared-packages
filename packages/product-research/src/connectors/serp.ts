@@ -170,7 +170,7 @@ export const createSerpConnector = (options: SerpConnectorOptions): PriceSourceC
       // 'Busca web' is the tenant-facing name of this integration everywhere
       // else (the admin card, the seeded source), so the reason names what the
       // operator sees rather than the internal `SERP` type.
-      return { ok: false, error: invalidConfigMessage('Busca web', config.error) };
+      return { ok: false, error: invalidConfigMessage('Busca web', config.error, ctx.diagnostics.sourceConfig) };
     }
     const result = await callSearchApi(ctx, {
       engine: GOOGLE_SHOPPING_ENGINE,

@@ -166,7 +166,7 @@ export const createAmazonConnector = (options: AmazonConnectorOptions): PriceSou
   ): Promise<ConnectorResult> {
     const config = configSchema.safeParse(source.config);
     if (!config.success) {
-      return { ok: false, error: invalidConfigMessage('Amazon', config.error) };
+      return { ok: false, error: invalidConfigMessage('Amazon', config.error, ctx.diagnostics.sourceConfig) };
     }
     const domain = config.data.amazonDomain ?? AMAZON_BRAZIL_DOMAIN;
     const result = await callSearchApi(ctx, {

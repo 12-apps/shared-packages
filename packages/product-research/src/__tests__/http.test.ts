@@ -6,7 +6,7 @@ import {
   type ResearchHttpStore,
   type ResearchRoute,
 } from '../http';
-import { PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
+import { PT_BR_RESEARCH_DIAGNOSTICS, PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 
 /**
  * The sixteen descriptors, driven the way a host adapter drives them. The
@@ -84,6 +84,7 @@ function api(overrides: Partial<ResearchApiConfig> = {}): {
   const store = fakeStore();
   const { routes } = createApiProductResearch({
     store,
+    diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     checks: {
       integrationCredentials: async () => null,
       sourceConfig: async () => null,

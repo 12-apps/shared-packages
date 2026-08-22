@@ -1,5 +1,7 @@
 import type { ZodError } from 'zod';
 
+import type { SourceConfigCopy } from './diagnostics-copy';
+
 /**
  * The "this source's config does not parse" sentence, shared by the connectors
  * that validate `PriceSource.config` with zod (FUT-517).
@@ -22,14 +24,16 @@ import type { ZodError } from 'zod';
  * a SearchApi concern: `vtex.ts` and `mercado-livre.ts` build the identical
  * English string today and can adopt this without a second move.
  */
-export const invalidConfigMessage = (sourceLabel: string, error: ZodError): string => {
+export const invalidConfigMessage = (
+  sourceLabel: string,
+  error: ZodError,
+  copy: SourceConfigCopy,
+): string => {
   // A path is empty when the whole config failed (a non-object, say), and zod
   // reports one issue per failing field — de-duplicated because two issues on
   // one field must not name it twice.
   const named = error.issues.map((issue) => issue.path.map(String).join('.'));
   const fields = [...new Set(named.filter((field) => field !== ''))];
-  if (fields.length === 0) {
-    return `Configuração da fonte ${sourceLabel} inválida — revise os campos da fonte`;
-  }
-  return `Configuração da fonte ${sourceLabel} inválida — revise: ${fields.join(', ')}`;
+  if (fields.length === 0) return copy.invalid(sourceLabel);
+  return copy.invalidFields(sourceLabel, fields);
 };
