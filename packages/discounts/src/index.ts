@@ -77,6 +77,7 @@ export {
  * say about one.
  */
 export {
+  advertisableCombos,
   comboOffersForItem,
   type ComboOffer,
   type ComboOffersInput,
@@ -87,8 +88,14 @@ export {
  * "aplicado 2x", "faltam 2 refrigerantes" — needs the same match the evaluator
  * priced, and re-deriving it host-side is how a receipt and a cart start
  * disagreeing about what was in the bundle.
+ *
+ * `comboSlotAcceptsLine` is the same reason one level down: a storefront
+ * ADVERTISING a combo has to fill "escolha 2 refrigerantes" with sodas rather
+ * than with everything the combo names, and a host answering that itself is how
+ * a menu offers a product the matcher will not accept.
  */
 export {
+  comboSlotAcceptsLine,
   freshComboPool,
   matchCombo,
   type ComboMatch,

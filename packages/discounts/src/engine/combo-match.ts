@@ -368,3 +368,24 @@ export function comboCoveredLineIds(
 export function comboRuleAcceptsLine(rule: DiscountRule, line: DiscountCartLine): boolean {
   return prepareSlots(rule.comboRequirements ?? []).some((slot) => slotAccepts(slot, line));
 }
+
+/**
+ * Whether ONE slot accepts this line — the same predicate, asked per group.
+ *
+ * A storefront advertising a combo has to answer a question the cart never
+ * does: not "does this product take part" but "which GROUP does it fill", so
+ * that "escolha 2 refrigerantes" offers sodas and not burgers. That is
+ * `slotAccepts` with nothing added, and it is exported rather than reimplemented
+ * because a second copy is how a menu ends up offering a product the matcher
+ * will not accept — a combo the buyer can assemble on screen and never earn.
+ *
+ * It takes a `ComboRequirement` rather than a whole rule, because the caller is
+ * iterating a rule's groups and needs to know which one it is looking at.
+ */
+export function comboSlotAcceptsLine(
+  requirement: ComboRequirement,
+  line: DiscountCartLine,
+): boolean {
+  const [slot] = prepareSlots([requirement]);
+  return slot !== undefined && slotAccepts(slot, line);
+}

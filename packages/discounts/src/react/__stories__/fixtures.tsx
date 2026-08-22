@@ -143,6 +143,35 @@ export const STORY_DISCOUNTS: DiscountWireRecord[] = [
     createdAt: "2026-08-18T00:00:00.000Z",
   },
   {
+    id: "d-combo-amount",
+    name: "Combo lanche -R$ 5",
+    type: "FIXED_AMOUNT",
+    percentOffBp: null,
+    amountOffCents: 500,
+    scope: "COMBO",
+    trigger: "AUTOMATIC",
+    code: null,
+    startsAt: null,
+    endsAt: null,
+    minSubtotalCents: null,
+    usageLimit: null,
+    perBuyerLimit: null,
+    usageCount: 4,
+    stackable: true,
+    active: true,
+    categoryIds: [],
+    menuItemIds: [],
+    // The other half of what a combo can give: the same groups, R$ 5,00 off
+    // what they add up to. Percentage and amount are the ONLY two rewards a
+    // combo offers now — a flat price for the group reprices it, and goes
+    // silently wrong the first time one of its items changes price.
+    comboRequirements: [
+      { menuItemIds: [], categoryIds: ["c-sodas"], quantity: 2 },
+      { menuItemIds: ["m-burger"], categoryIds: [], quantity: 1 },
+    ],
+    createdAt: "2026-08-21T00:00:00.000Z",
+  },
+  {
     id: "d-item",
     name: "Hambúrguer da casa",
     type: "PERCENTAGE",

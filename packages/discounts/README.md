@@ -349,20 +349,49 @@ between them.
 ### Authoring a combo
 
 The four discount types and the four scopes are not independent, and the form
-is where that stops being a table in a README:
+is where that stops being a table in a README. It asks ONE question — what KIND
+of promotion is this — and derives the pair (`src/react/form-kind.ts`):
 
-| the offer | scope | type | what the operator fills in |
+| the operator picks | type | scope | and is then asked |
 |---|---|---|---|
-| "leve 3, pague 2" | `COMBO` | `FREE_UNITS` | one group of 3, and 1 free |
-| "2 refrigerantes, 2 hambúrgueres e 2 batatas por R$ 25" | `COMBO` | `BUNDLE_PRICE` | three groups of 2, and the price |
-| the same six items at 20% off | `COMBO` | `PERCENTAGE` | three groups of 2, and the rate |
+| Porcentagem | `PERCENTAGE` | ORDER / CATEGORY / ITEM | the rate, and what it covers |
+| Valor fixo | `FIXED_AMOUNT` | ORDER / CATEGORY / ITEM | the amount, and what it covers |
+| Combo | `PERCENTAGE` or `FIXED_AMOUNT` | `COMBO` | the groups, and which of the two rewards |
+| Itens grátis | `FREE_UNITS` | `COMBO` | the products, how many, how many free |
 
-Picking `COMBO` swaps the single target picker for the **group builder**: each
+So the offers a merchant describes map one to one onto what they fill in:
+
+| the offer | kind | what the operator fills in |
+|---|---|---|
+| "leve 3, pague 2" | Itens grátis | 3 hambúrgueres, 1 free |
+| "2 refrigerantes, 2 hambúrgueres e 2 batatas com 20% de desconto" | Combo | three groups of 2, and the rate |
+| the same six items at R$ 5,00 off | Combo | three groups of 2, and the amount |
+
+Two consequences of asking the kind instead of the pair:
+
+- **`COMBO` is not a scope anybody picks.** A combo covers the groups it is
+  made of, so the scope toggle offers the three that are genuinely a choice.
+  Offering the fourth is what let an operator build "preço de combo,
+  abrangência: pedido" and have the write path refuse it.
+- **`BUNDLE_PRICE` is no longer offered.** A flat price for the group reprices
+  it, and goes silently wrong the first time one of its items changes price —
+  so a combo gives a percentage or an amount OFF what its items add up to. The
+  type is still legal in the engine and in the database, and the kind toggle
+  grows a fifth option on the form of a rule that already carries it, so an
+  older promotion opens, edits and saves as what it is.
+
+Picking Combo swaps the single target picker for the **group builder**: each
 group is a quantity plus the rows that can fill it, and a group may name
 categories AND products at once, because a real menu mixes them — "any drink,
 or specifically the large fries" is one group. Every registered
 `DiscountableCollection` gets a picker inside every group, so a host that
 registers a third dimension gets it here with no change to this package.
+
+"Itens grátis" gets a builder of its own instead (`free-units-builder.tsx`):
+one group, PRODUCTS only, and the two numbers side by side — "o cliente leva 3,
+1 sai de graça". It is the same stored shape as a one-group combo, which is
+what lets the two kinds share a validator, a write path and a row; nobody
+describing "leve 3, pague 2" is building a combo, so nobody is asked to.
 
 Three consequences worth stating, because each is a bug this shape prevents:
 

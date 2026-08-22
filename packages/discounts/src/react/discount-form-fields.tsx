@@ -8,28 +8,32 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
-import { DISCOUNT_SCOPES, DISCOUNT_TRIGGERS, DISCOUNT_TYPES } from "../engine/kinds";
+import { DISCOUNT_TRIGGERS } from "../engine/kinds";
 
 import type { DiscountsWebCopy } from "./copy";
+import { COMBO_REWARDS, isComboKind, SELECTABLE_DISCOUNT_SCOPES, type DiscountKind } from "./form-kind";
 
 /**
  * The form's inputs, split from the form itself for the 400-line file gate —
  * comments count toward it, and the container plus these would not fit.
  *
- * Every option list is built FROM the vocabulary arrays rather than spelled out
+ * Every option list is built FROM a vocabulary array rather than spelled out
  * again: those arrays back the database's CHECK constraints, so an option an
  * operator can pick is by construction a value the column will store. A
  * hand-written list is how a form offers a fifth type the database refuses.
+ *
+ * The KIND is what the form asks first, and every other input here is a
+ * consequence of it (see `./form-kind` for the mapping and why it exists). That
+ * is the difference from the version this replaces, where type and scope were
+ * two free choices and most of their sixteen combinations were not offers.
  */
 
 /**
  * A field with a sentence under it.
  *
  * `Fields.TextField` has no helper-text slot — deliberately, it is a thin bind
- * over `Input` — and two of the combo inputs are meaningless without one:
- * "itens grátis" and "combos por pedido" are both numbers whose UNIT an
- * operator cannot guess. So the caption is composed here rather than pushed
- * into `@12-apps/ui`, where it would be a prop every other consumer ignores.
+ * over `Input` — and the combo cap is meaningless without one: "combos por
+ * pedido" is a number whose blank value an operator cannot guess.
  */
 function HintedField({
   name,
@@ -57,51 +61,6 @@ function optionsFor<TKey extends string>(
 }
 
 /**
- * The reward, in whichever unit the chosen type actually stores.
- *
- * One input per type, and the wrong one must never be mounted: the four value
- * columns are mutually exclusive at the database (`discounts_value_check`), so
- * a leftover value from another branch is a 500 on a form the operator filled
- * in correctly. Mounting rather than hiding is what guarantees it — an unmounted
- * field cannot carry a stale number to submit.
- *
- * The two combo rewards read differently from the two plain ones, and that is
- * the whole point of FUT-268: BUNDLE_PRICE is what the matched group COSTS
- * ("2 refrigerantes, 2 hambúrgueres e 2 batatas por R$ 49,90"), FREE_UNITS is
- * how many of the matched units are given away ("leve 3, pague 2"). Both are
- * money-or-count fields like the two above them; what makes them combos is the
- * scope, and the scope is what the builder below hangs off.
- */
-function ValueField({
-  copy,
-  currencyField,
-}: {
-  copy: DiscountsWebCopy;
-  currencyField: CurrencyFieldComponent;
-}): JSX.Element {
-  const { values } = useFormContext();
-  const Currency = currencyField;
-  if (values.type === "FIXED_AMOUNT") {
-    return <Currency name="amountOff" label={copy.form.amountOff} />;
-  }
-  if (values.type === "BUNDLE_PRICE") {
-    return <Currency name="bundlePrice" label={copy.form.bundlePrice} />;
-  }
-  if (values.type === "FREE_UNITS") {
-    return (
-      <HintedField name="freeUnits" label={copy.form.freeUnits} hint={copy.form.freeUnitsHint} />
-    );
-  }
-  return (
-    <Fields.TextField
-      name="percentOff"
-      label={copy.form.percentOff}
-      placeholder={copy.form.percentPlaceholder}
-    />
-  );
-}
-
-/**
  * A money input, supplied by the host.
  *
  * Currency entry is a host decision — masking, the symbol's side, whether cents
@@ -110,6 +69,106 @@ function ValueField({
  * special passes a plain text field.
  */
 export type CurrencyFieldComponent = (props: { name: string; label: string }) => JSX.Element;
+
+/**
+ * What kind of promotion this is — the form's first and most consequential
+ * question, and the only one that decides what the rest of it looks like.
+ *
+ * The option list comes from the caller rather than from the constant, because
+ * it is one longer when a legacy `BUNDLE_PRICE` rule is being edited.
+ */
+export function KindField({
+  copy,
+  kinds,
+}: {
+  copy: DiscountsWebCopy;
+  kinds: readonly DiscountKind[];
+}): JSX.Element {
+  return (
+    <Fields.ToggleField
+      name="kind"
+      label={copy.form.kind}
+      options={optionsFor(kinds, copy.labels.kind)}
+    />
+  );
+}
+
+/**
+ * A combo's reward: which of the two, and how much.
+ *
+ * Both are here rather than split between the top of the form and the bottom,
+ * because to a merchant they are one sentence — "este combo dá 15% de
+ * desconto". The two are the ONLY rewards a combo can give: a flat bundle price
+ * reprices the group and goes silently wrong the first time one of its items
+ * changes price, so it is not offered (see `./form-kind`).
+ */
+function ComboRewardFields({
+  copy,
+  currencyField,
+}: {
+  copy: DiscountsWebCopy;
+  currencyField: CurrencyFieldComponent;
+}): JSX.Element {
+  const { values } = useFormContext();
+  const Currency = currencyField;
+  return (
+    <Stack spacing={0.5}>
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+        <Fields.ToggleField
+          name="comboReward"
+          label={copy.form.comboReward}
+          options={optionsFor(COMBO_REWARDS, copy.labels.type)}
+        />
+        {values.comboReward === "FIXED_AMOUNT" ? (
+          <Currency name="amountOff" label={copy.form.amountOff} />
+        ) : (
+          <Fields.TextField
+            name="percentOff"
+            label={copy.form.percentOff}
+            placeholder={copy.form.percentPlaceholder}
+          />
+        )}
+      </Box>
+      <Text variant="caption">{copy.form.comboRewardHint}</Text>
+    </Stack>
+  );
+}
+
+/**
+ * The reward, in whichever unit the chosen KIND actually stores.
+ *
+ * One input per kind, and the wrong one must never be mounted: the four value
+ * columns are mutually exclusive at the database (`discounts_value_check`), so
+ * a leftover value from another branch is a 500 on a form the operator filled
+ * in correctly. Mounting rather than hiding is what guarantees it — an
+ * unmounted field cannot carry a stale number to submit.
+ *
+ * `FREE_UNITS` is the one kind with nothing here: its reward is a count of the
+ * units it gives away, which only reads as an offer beside the units it takes,
+ * so the free-units builder carries both.
+ */
+export function RewardFields({
+  copy,
+  currencyField,
+}: {
+  copy: DiscountsWebCopy;
+  currencyField: CurrencyFieldComponent;
+}): JSX.Element | null {
+  const { values } = useFormContext();
+  const Currency = currencyField;
+  const kind = values.kind ?? "PERCENTAGE";
+  if (kind === "COMBO") return <ComboRewardFields copy={copy} currencyField={currencyField} />;
+  if (kind === "FREE_UNITS") return null;
+  if (kind === "BUNDLE_PRICE") return <Currency name="bundlePrice" label={copy.form.bundlePrice} />;
+  if (kind === "FIXED_AMOUNT") return <Currency name="amountOff" label={copy.form.amountOff} />;
+  return (
+    <Fields.TextField
+      name="percentOff"
+      label={copy.form.percentOff}
+      placeholder={copy.form.percentPlaceholder}
+    />
+  );
+}
 
 /** The coupon input, shown only for a CODE-triggered rule. */
 function CodeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
@@ -124,22 +183,10 @@ function CodeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
   );
 }
 
-/** Type + value + trigger + code, the four that decide WHAT and HOW. */
-export function RuleFields({
-  copy,
-  currencyField,
-}: {
-  copy: DiscountsWebCopy;
-  currencyField: CurrencyFieldComponent;
-}): JSX.Element {
+/** What makes the promotion fire, and the code it fires on. */
+export function TriggerFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-      <Fields.ToggleField
-        name="type"
-        label={copy.form.type}
-        options={optionsFor(DISCOUNT_TYPES, copy.labels.type)}
-      />
-      <ValueField copy={copy} currencyField={currencyField} />
       <Fields.ToggleField
         name="trigger"
         label={copy.form.trigger}
@@ -150,13 +197,22 @@ export function RuleFields({
   );
 }
 
-/** The scope toggle, which decides which target picker is shown below it. */
-export function ScopeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
+/**
+ * What the discount covers — and ONLY for the kinds where that is a question.
+ *
+ * A combo covers the groups it is made of, so `COMBO` scope is not one of four
+ * choices, it is what those two kinds mean. Offering it anyway is what let an
+ * operator build "preço de combo, abrangência: pedido" and have the write path
+ * refuse it.
+ */
+export function ScopeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+  const { values } = useFormContext();
+  if (isComboKind(values.kind ?? "PERCENTAGE")) return null;
   return (
     <Fields.ToggleField
       name="scope"
       label={copy.form.scope}
-      options={optionsFor(DISCOUNT_SCOPES, copy.labels.scope)}
+      options={optionsFor(SELECTABLE_DISCOUNT_SCOPES, copy.labels.scope)}
     />
   );
 }
@@ -164,18 +220,30 @@ export function ScopeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
 /**
  * How many times one cart may claim the combo.
  *
- * Only at COMBO scope, because it is the only scope where the question means
+ * Only for a combo kind, because it is the only place the question means
  * anything: an order-wide or category discount applies once by construction. A
  * blank field is "as often as it fits", which is the merchant's usual answer
  * and therefore the default rather than a number they have to type.
+ *
+ * It sits with the builder rather than with the redemption limits next to it:
+ * "combos por pedido" is a fact about THIS combo, and among "limite de usos"
+ * and "limite por cliente" it read as a third redemption cap.
  */
-function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
-  if (values.scope !== "COMBO") return null;
+  const kind = values.kind ?? "PERCENTAGE";
+  if (!isComboKind(kind)) return null;
   return (
     <HintedField
       name="maxComboApplications"
-      label={copy.form.maxComboApplications}
+      // Same column, same rule, two words for it: nobody calls "leve 3, pague
+      // 2" a combo, so "Combos por pedido" reads as a control for a promotion
+      // the operator is not creating.
+      label={
+        kind === "FREE_UNITS"
+          ? copy.form.maxFreeUnitsApplications
+          : copy.form.maxComboApplications
+      }
       hint={copy.form.maxComboApplicationsHint}
     />
   );
@@ -205,7 +273,6 @@ export function LimitFields({
       <Currency name="minSubtotal" label={copy.form.minSubtotal} />
       <Fields.TextField name="usageLimit" label={copy.form.usageLimit} type="number" />
       <Fields.TextField name="perBuyerLimit" label={copy.form.perBuyerLimit} type="number" />
-      <ComboCapField copy={copy} />
     </Box>
   );
 }
