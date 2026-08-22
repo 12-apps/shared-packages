@@ -1,3 +1,5 @@
+import type { CategorySelectCopy, ConfirmActionCopy } from "@12-apps/ui/copy";
+import type { DataViewsCopy } from "@12-apps/ui/data-display/DataViews";
 import type {
   DiscountScope,
   DiscountTrigger,
@@ -245,6 +247,17 @@ export interface DiscountsWebCopy {
   readonly targets: DiscountsTargetCopy;
   readonly actions: DiscountsActionsCopy;
   readonly card: DiscountsCardCopy;
+  /**
+   * The words of the `@12-apps/ui` components these screens MOUNT but do not
+   * own — the confirmation popup and the category picker.
+   *
+   * They arrive here because that package stopped shipping defaults for them
+   * (FUT-760): a design system's Portuguese reached every adopter silently,
+   * so its copy is required config now and this surface is one of its hosts.
+   */
+  readonly confirmAction: ConfirmActionCopy;
+  readonly categorySelect: CategorySelectCopy;
+  readonly dataViews: DataViewsCopy;
 }
 
 /**
@@ -291,6 +304,12 @@ export function missingWebCopy(
 ): string[] {
   return leafPaths(reference).filter((path) => {
     const value = read(copy, path);
+    // A leaf is satisfied by a non-blank string OR a function. The `@12-apps/ui`
+    // packs folded in below carry entries that take the interpolated value as
+    // an argument — `noResults.title(query)`, `footer.selectedCount(count)` —
+    // because Portuguese decides word order and plural agreement per sentence.
+    // Demanding a string here would report every one of them as missing.
+    if (typeof value === "function") return false;
     return typeof value !== "string" || value.trim() === "";
   });
 }

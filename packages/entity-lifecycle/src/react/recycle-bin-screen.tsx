@@ -89,6 +89,7 @@ function useBinActions(
         confirmText={copy.purgeConfirmText}
         typeToConfirm={purging.label}
         typeToConfirmLabel={copy.purgeTypeToConfirmLabel(purging.label)}
+        copy={copy.confirmAction}
         dataTestId="recycle-bin-purge-confirm"
       />
     ) : null,

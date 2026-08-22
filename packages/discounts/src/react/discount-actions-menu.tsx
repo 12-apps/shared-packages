@@ -69,6 +69,7 @@ export function DiscountActionsMenu({
     description: copy.actions.deleteDescription,
     confirmText: copy.actions.delete,
     fallbackError: copy.actions.deleteFailed,
+    copy: copy.confirmAction,
     dataTestId: "discount-delete-confirm",
   });
 

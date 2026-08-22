@@ -150,6 +150,7 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
       configuredTitle={connectedTitle(connections, hosts, connectedHostId, copy.summary)}
       configuredSummary={connectedSummary(connections, copy.summary)}
       editLabel={copy.onboarding.editLabel}
+      collapseLabel={copy.onboarding.collapseLabel}
       completedContent={(nav) => (
         <StatusBoard
           nav={nav}

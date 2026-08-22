@@ -6,8 +6,15 @@ import { useSearchParams } from "react-router-dom";
 import AddIcon from "@mui/icons-material/Add";
 
 import { useServerDataViews } from "@12-apps/app-shell/react";
-import { CardActionsProvider, useRowConfirm } from "@12-apps/ui/data-display/CardKit";
-import { DataViewsGrid, type DataViewState } from "@12-apps/ui/data-display/DataViews";
+import {
+  CardActionsProvider,
+  useRowConfirm,
+} from "@12-apps/ui/data-display/CardKit";
+import {
+  DataViewsCopyProvider,
+  DataViewsGrid,
+  type DataViewState,
+} from "@12-apps/ui/data-display/DataViews";
 import type { RowAction } from "@12-apps/ui/data-display/DataViews";
 import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
@@ -87,6 +94,7 @@ function useBulkDelete(
             confirmText: copy.actions.delete,
           },
     errorText: copy.actions.deleteFailed,
+    copy: copy.confirmAction,
     dataTestId: "discount-bulk-delete-confirm",
   });
 }
@@ -103,7 +111,9 @@ function HeaderControls({
 }): JSX.Element {
   return (
     <>
-      <Dashboard.Info title={copy.screen.aboutTitle}>{copy.screen.aboutBody}</Dashboard.Info>
+      <Dashboard.Info title={copy.screen.aboutTitle}>
+        {copy.screen.aboutBody}
+      </Dashboard.Info>
       <Dashboard.Spacer />
       <Dashboard.Export
         formats={[
@@ -246,12 +256,16 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   // "now"s could disagree about which of them is still running.
   const rows = useMemo(() => {
     const now = new Date();
-    return (data.page?.data ?? []).map((record) => toListItem(record, formatters, copy, now));
+    return (data.page?.data ?? []).map((record) =>
+      toListItem(record, formatters, copy, now),
+    );
   }, [data.page, formatters, copy]);
 
   // Seeded ONCE from the URL. Re-applying it on every render would wipe the
   // operator's column-visibility choices each time the query synced back.
-  const [appliedState] = useState<DataViewState>(() => discountsAppliedState(searchParams, copy));
+  const [appliedState] = useState<DataViewState>(() =>
+    discountsAppliedState(searchParams, copy),
+  );
 
   const server = useServerDataViews({
     totalCount: data.page?.pagination.total ?? 0,
@@ -260,7 +274,14 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
     toParams: discountsQueryToParams,
   });
 
-  const menu: MenuBinding = { api, copy, formatters, currencyField, groups: data.groups, onError };
+  const menu: MenuBinding = {
+    api,
+    copy,
+    formatters,
+    currencyField,
+    groups: data.groups,
+    onError,
+  };
 
   if (data.loading) return <LoadingState dataTestId="discounts-loading" />;
   if (data.error !== null) {
@@ -275,40 +296,48 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   }
 
   return (
-    <Dashboard testIdPrefix="discounts-dashboard">
-      {breadcrumb && <Dashboard.Breadcrumb items={[...breadcrumb]} />}
-      <Dashboard.Header title={copy.screen.title}>
-        <HeaderControls rows={visibleRows} copy={copy} onCreate={() => setCreateOpen(true)} />
-      </Dashboard.Header>
-      <Dashboard.Body>
-        <CreateDialog
-          open={createOpen}
-          menu={menu}
-          onClose={() => setCreateOpen(false)}
-          onSaved={() => {
-            setCreateOpen(false);
-            data.refresh();
-          }}
-        />
-        <CardActionsProvider
-          // The menus read the refresh and the error channel from here; the
-          // tenant is already baked into `apiBase`, so there is nothing for a
-          // slug to do but be a second place it could disagree.
-          tenantSlug=""
-          onRefresh={data.refresh}
-          errorTitle={copy.actions.actionFailed}
-        >
-          <DiscountsGrid
-            rows={rows}
+    // The grid, its toolbar and its saved-view dialogs read their words from
+    // here: `@12-apps/ui` ships none and throws rather than falling back.
+    <DataViewsCopyProvider copy={copy.dataViews}>
+      <Dashboard testIdPrefix="discounts-dashboard">
+        {breadcrumb && <Dashboard.Breadcrumb items={[...breadcrumb]} />}
+        <Dashboard.Header title={copy.screen.title}>
+          <HeaderControls
+            rows={visibleRows}
             copy={copy}
-            menu={menu}
-            appliedState={appliedState}
-            server={server}
-            onVisibleRowsChange={setVisibleRows}
-            bulkDelete={bulkDelete}
+            onCreate={() => setCreateOpen(true)}
           />
-        </CardActionsProvider>
-      </Dashboard.Body>
-    </Dashboard>
+        </Dashboard.Header>
+        <Dashboard.Body>
+          <CreateDialog
+            open={createOpen}
+            menu={menu}
+            onClose={() => setCreateOpen(false)}
+            onSaved={() => {
+              setCreateOpen(false);
+              data.refresh();
+            }}
+          />
+          <CardActionsProvider
+            // The menus read the refresh and the error channel from here; the
+            // tenant is already baked into `apiBase`, so there is nothing for a
+            // slug to do but be a second place it could disagree.
+            tenantSlug=""
+            onRefresh={data.refresh}
+            errorTitle={copy.actions.actionFailed}
+          >
+            <DiscountsGrid
+              rows={rows}
+              copy={copy}
+              menu={menu}
+              appliedState={appliedState}
+              server={server}
+              onVisibleRowsChange={setVisibleRows}
+              bulkDelete={bulkDelete}
+            />
+          </CardActionsProvider>
+        </Dashboard.Body>
+      </Dashboard>
+    </DataViewsCopyProvider>
   );
 }
