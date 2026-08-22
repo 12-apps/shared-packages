@@ -25,8 +25,6 @@ import {
 
 export type { AiConnection } from "./ai-steps";
 
-const DEFAULT_FEATURE_KEY = "ai_integration";
-
 /** Props for the reusable AI-connect onboarding flow. */
 export interface AiIntegrationOnboardingProps {
   /** Persistence seam — the app wires this to its own backend (server actions). */
@@ -37,8 +35,21 @@ export interface AiIntegrationOnboardingProps {
   initialState: OnboardingStateSnapshot | null;
   /** The live MCP connections (one per connected assistant; empty when none). */
   connections: readonly AiConnection[];
-  /** Onboarding feature key (persistence namespace). @default "ai_integration" */
-  featureKey?: string;
+  /**
+   * The onboarding namespace this flow's progress is stored under — the key
+   * `@12-apps/onboarding` reads and writes, and the one the host's own
+   * `featureKeys` allow-list has to contain.
+   *
+   * REQUIRED, on the same grounds as `hosts` and `copy` below. It defaulted to
+   * `"ai_integration"`, which is one adopter's key: a host whose backend
+   * declares `ai` or `mcp_connect` and says nothing here writes to a namespace
+   * its own API rejects, so the wizard loses every step it saves and resumes
+   * from nothing. Nothing warns, because a silent default is indistinguishable
+   * from a deliberate one — and the failure only shows up as a refresh that
+   * forgets, which reads as a bug in the host's persistence rather than as a
+   * key nobody chose.
+   */
+  featureKey: string;
   /** Show the dev-only "reset onboarding" button. @default false */
   devReset?: boolean;
   /**
@@ -173,16 +184,19 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
  * a refresh resumes exactly where the owner left off. The live MCP connection
  * signal drives the verify step and the completed status board.
  *
- * App-agnostic: the app supplies the persistence `store`, the `endpointUrl`, and
- * the live `connections` (one per connected assistant); content (hosts,
- * capabilities, copy) defaults to the shared guide but can be overridden per app.
+ * App-agnostic: the app supplies the persistence `store`, the `endpointUrl`, the
+ * `featureKey` its own onboarding API serves, the live `connections` (one per
+ * connected assistant), and every word on screen (`hosts`, `capabilities`,
+ * `permissionModel`, `copy`). Nothing here has a default, because each of those
+ * is a fact only the host holds and a default for it is silently wrong rather
+ * than loudly missing.
  */
 export function AiIntegrationOnboarding({
   store,
   endpointUrl,
   initialState,
   connections,
-  featureKey = DEFAULT_FEATURE_KEY,
+  featureKey,
   devReset = false,
   hosts,
   capabilities,
