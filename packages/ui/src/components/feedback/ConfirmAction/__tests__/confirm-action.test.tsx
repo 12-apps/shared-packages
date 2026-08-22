@@ -54,6 +54,34 @@ describe('ConfirmAction', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  /**
+   * The dismiss button's word comes from the COPY the caller was made to
+   * supply — not from `AlertDialog`'s own default, which is English.
+   *
+   * This is the regression the required-copy sweep itself introduced: the
+   * component's `cancelText = 'Cancelar'` default was deleted and the word
+   * moved into `ConfirmActionCopy`, where nothing read it. A pt-BR host that
+   * dutifully passed the pack still got `Cancel` in every confirmation that
+   * named no `cancelText` of its own — which is most of them, including both
+   * CardKit hooks.
+   */
+  it('takes the dismiss button from the copy it was given', () => {
+    renderConfirmAction(vi.fn());
+
+    fireEvent.click(trigger());
+
+    expect(cancelButton()).toHaveTextContent(PT_BR_CONFIRM_ACTION_COPY.cancel);
+  });
+
+  /** An explicit `cancelText` still wins — the copy is the fallback, not a lock. */
+  it('lets a call site override the dismiss button', () => {
+    renderConfirmAction(vi.fn(), { cancelText: 'Manter o insumo' });
+
+    fireEvent.click(trigger());
+
+    expect(cancelButton()).toHaveTextContent('Manter o insumo');
+  });
+
   it('runs nothing when the operator cancels', async () => {
     const onConfirm = vi.fn();
     renderConfirmAction(onConfirm);
