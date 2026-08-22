@@ -36,7 +36,7 @@ sidebar; the nearest one catches, so nothing doubles.
 | Subpath | What is in it |
 |---|---|
 | `.` | Framework-free: `apiFetch` / `ApiError`, `restResult`, `joinApiPath` / `stripTrailingSlashes`, the WCAG brand-palette correction, pt-BR money and duration formatters, the stale-chunk recovery, the consent wire. |
-| `./react` | `createWebAppShell` — the provider tower (boundary included), the theme, `lazyRoute`, the consent gate, `useDeviceDetection`, `useServerDataViews`. |
+| `./react` | `createWebAppShell` — the provider tower (boundary included), the theme, `lazyRoute`, the consent gate, `useDeviceDetection`, `useServerDataViews`, and the collapsible nav's persisted state (`useCollapsedSections`, `useSidebarRail`). |
 | `./server` | `createApiAppShell` — the consent status/accept descriptors, framework-neutral. |
 | `./hono` | The forty-line adapter. `hono` is an optional peer. |
 | `./vite` | `appShellOptimizeDeps()` — the dependency pre-bundling preset. Compiled, and it has to be. |

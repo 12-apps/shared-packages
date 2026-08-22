@@ -131,6 +131,44 @@ already open when the terms changed. It is an **accelerator** — the fetch rema
 the thing that decides, because a best-effort bus loses events by contract and a
 prompt that existed only on the stream would miss anyone whose connection dropped.
 
+### Wiring the collapsible nav's persisted state
+
+```ts
+import {
+  sidebarPanelBg,
+  sidebarStorageKey,
+  useCollapsedSections,
+  useSidebarRail,
+} from '@12-apps/app-shell/react';
+
+// YOUR prefix, then whatever scopes the preference: a tenant-scoped shell keys
+// by tenant AND operator, a console that is not keys by the operator alone.
+const storeKey = sidebarStorageKey('admin-sidebar', tenantSlug, userKey);
+//             = sidebarStorageKey('platform-sidebar', userKey)   // the other shell
+
+const [collapsedSections, toggleSection] = useCollapsedSections(storeKey);
+const [rail, toggleRail] = useSidebarRail(storeKey);
+```
+
+`sidebarPanelBg` comes with them: the tint that separates the panel from the
+content beside it, as a function of the theme rather than a second hard-coded
+grey — `<Box sx={{ bgcolor: sidebarPanelBg }}>`.
+
+Both hooks read and write ONE `localStorage` entry per key, and both re-read it
+when the key changes. Three things to know:
+
+- **The prefix is yours.** Two shells of the same product on one origin share a
+  `localStorage`, so a package-supplied prefix would make them share an entry.
+- **A `null` key persists nothing** — that is what `sidebarStorageKey` returns
+  for an empty segment, so a shell rendered before its session resolves does not
+  write into an entry every such visitor shares. The nav still works; only the
+  preference is not kept.
+- **A key CHANGES more often than a tenant switcher.** The common case is a
+  session resolving, which turns that `null` into a real key on the second
+  render — which is why re-reading is the hooks' job rather than the caller's.
+  A copy of these hooks that dropped the re-key on the grounds that its console
+  had no tenant switcher showed every operator a default nav.
+
 ## Wiring the backend half
 
 ```ts
