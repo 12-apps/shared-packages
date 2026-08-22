@@ -2,29 +2,25 @@
  * Every string the legacy checkout views render — required props, with NO
  * defaults, deliberately (the payments extraction's own doctrine, FUT-760):
  * a default in the origin host's language reads as finished to the next host
- * right up until a buyer sees it. These three views proved the point — the
- * flows factory's copy port existed, was REQUIRED, declared
+ * right up until a buyer sees it. These views proved the point — the flows
+ * factory's copy port existed, was REQUIRED, declared
  * `unavailableWithRemedyTitle` and `emptyCartAction`, and the views simply
  * never read it, so a host that dutifully passed copy still rendered another
  * product's voice.
+ *
+ * The store-cannot-charge screen is NOT here any more. It shipped as a second
+ * component beside the factory's own — same two branches, but with the origin
+ * host's dining room welded into its API (`waiterAvailable`, `onCallWaiter`, a
+ * `checkout-call-waiter` test id) and a copy shape whose field names asked
+ * every adopter to name a waiter. The factory's screen says the same two
+ * things through `CheckoutAvailability.remedy` — a `{ label, onSelect }` the
+ * host fills with whatever its own remedy is — so the twin was deleted rather
+ * than renamed.
  *
  * A pt-BR host imports {@link PT_BR_CHECKOUT_VIEW_COPY} from `./pt-BR` (the
  * package root re-exports it) and passes it by hand — one reviewable line,
  * never a silence.
  */
-
-/** The screen shown when the store cannot take money online. */
-export interface PaymentsUnavailableCopy {
-  /** No remedy: the store simply does not charge online. */
-  title: string;
-  body: string;
-  /** A remedy exists (the origin host: the waiter; a clinic: the front desk). */
-  remedyTitle: string;
-  remedyBody: string;
-  /** The remedy button, idle and in flight. */
-  callAction: string;
-  callingAction: string;
-}
 
 /** The stepper's three labels, in flow order. */
 export interface CheckoutStepperCopy {
