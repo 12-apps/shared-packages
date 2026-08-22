@@ -29,7 +29,9 @@ export default defineConfig({
     'server/index': 'src/server/index.ts',
     'hono/index': 'src/hono/index.ts',
     'react/index': 'src/react/index.ts',
-    'web-push/index': 'src/web-push/index.ts'
+    'web-push/index': 'src/web-push/index.ts',
+    'manifest/index': 'src/manifest/index.ts',
+    'manifest/server': 'src/manifest/server.ts',
 },
   format: ['esm'],
   dts: true,
