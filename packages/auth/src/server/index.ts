@@ -51,6 +51,34 @@ export * from "../prisma";
  */
 export { auth, authConfig, authHandler, handlers } from "./auth-handler";
 
+// The request-session seam: one function every guard calls, so a SECOND way
+// to authenticate does not fork them. `ExtendedSession` is this package's
+// shape, and building it by hand in a host is how the `isSuperadmin` claim
+// drifts from the resolver the sign-in path uses.
+export {
+  createBearerForwarder,
+  createRequestSession,
+  getBearerVerifier,
+  readBearerToken,
+  setBearerVerifier,
+} from "./request-session";
+export type {
+  BearerVerifier,
+  RequestSession,
+  RequestSessionConfig,
+  VerifiedBearerIdentity,
+} from "./request-session";
+
+// Minting a session cookie by hand, for a cross-domain sign-in handoff. Every
+// derivation here mirrors one Auth.js already makes and fails SILENTLY when it
+// is wrong — a cookie nothing looks for, and a host that stays logged out.
+export {
+  encodeSessionToken,
+  sessionCookieHeader,
+  sessionCookieName,
+} from "./session-token";
+export type { SessionTokenConfig, SessionTokenIdentity } from "./session-token";
+
 export { createApiAuth } from "../create-api-auth";
 export type { ApiAuth, ApiAuthConfig } from "../create-api-auth";
 
