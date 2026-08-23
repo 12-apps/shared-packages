@@ -84,7 +84,7 @@ describe("ObservabilitySelfCheck", () => {
     render(<ObservabilitySelfCheck />);
 
     const panel = screen.getByTestId("self-check-status");
-    expect(panel.textContent).toContain("inicializado");
+    expect(panel.textContent).toContain("initialised");
     expect(panel.textContent).toContain("production");
     expect(panel.textContent).toContain("89002e82");
   });
@@ -108,7 +108,7 @@ describe("ObservabilitySelfCheck", () => {
     render(<ObservabilitySelfCheck />);
 
     expect(screen.getByTestId("self-check-off")).toBeDefined();
-    expect(screen.getByTestId("self-check-status").textContent).toContain("NAO inicializado");
+    expect(screen.getByTestId("self-check-status").textContent).toContain("NOT initialised");
   });
 
   it("throws during RENDER so an error boundary catches it", () => {
@@ -134,21 +134,21 @@ describe("ObservabilitySelfCheck", () => {
   it("keeps looking until the SDK initialises, instead of snapshotting at mount", async () => {
     // The regression this guards. Init is deliberately deferred behind a fetch
     // of /api/observability-config so reporting never gates first paint, so at
-    // mount there is no client yet. Reading once would show a confident "NAO
-    // inicializado" forever on a perfectly healthy build — the exact lie this
+    // mount there is no client yet. Reading once would show a confident "NOT
+    // initialised" forever on a perfectly healthy build — the exact lie this
     // page exists to expose, produced by the page itself.
     render(<ObservabilitySelfCheck />);
-    expect(screen.getByTestId("self-check-status").textContent).toContain("NAO inicializado");
+    expect(screen.getByTestId("self-check-status").textContent).toContain("NOT initialised");
 
     // The SDK finishes initialising a moment later, as it does in production.
     clientWith({ dsn: "https://k@o1.ingest.sentry.io/9", environment: "production", release: "r1" });
 
-    // Assert on the RELEASE, not on "inicializado" — "NAO inicializado"
+    // Assert on the RELEASE, not on "initialised" — "NOT initialised"
     // contains that substring, so the obvious assertion passes without the fix.
     await waitFor(() => {
       expect(screen.getByTestId("self-check-status").textContent).toContain("r1");
     });
-    expect(screen.getByTestId("self-check-status").textContent).not.toContain("NAO inicializado");
+    expect(screen.getByTestId("self-check-status").textContent).not.toContain("NOT initialised");
   });
 
   it("throttles repeated presses so one leaning finger is not a flood", async () => {
@@ -159,7 +159,7 @@ describe("ObservabilitySelfCheck", () => {
     fireEvent.click(screen.getByTestId("self-check-warning"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("self-check-note").textContent).toContain("Aguarde");
+      expect(screen.getByTestId("self-check-note").textContent).toContain("Wait");
     });
   });
 });

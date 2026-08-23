@@ -23,6 +23,7 @@ export const PT_BR_CARD_COPY: CardCopy = {
     monthInvalid: 'Mês inválido.',
     expired: 'Cartão expirado.',
     expiryInvalid: 'Validade inválida ou expirada.',
+    cvvRequired: 'Informe o CVV.',
     cvvInvalid: 'CVV inválido.',
     cvvDigits: (length) => `CVV deve ter ${length} dígitos.`,
     cpfRequired: 'CPF obrigatório.',

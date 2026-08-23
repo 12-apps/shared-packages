@@ -98,6 +98,7 @@ export const PT_BR_MCP_AI_COPY: McpAiCopy = {
     connectedGeneric: "IA conectada",
   },
   hostSelect: {
+    heading: 'Escolha o seu assistente',
     caption: "Selecione onde você usa a IA — o passo a passo é feito sob medida para ele.",
   },
   connectGuide: {

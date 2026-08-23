@@ -131,6 +131,8 @@ export interface AiConnectionSummaryCopy {
 }
 
 export interface AiHostSelectCopy {
+  /** The step's own heading, above the host tiles. */
+  heading: string;
   /** Why the owner is picking, under the host tiles. */
   caption: string;
 }

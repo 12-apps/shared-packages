@@ -109,7 +109,11 @@ const CONNECTED: SetupProgress = { configured: { tag: true }, connected: true, p
  */
 export const AllSections: StoryObj = {
   name: "Todas as seções de uma vez — o renderizador cru",
-  render: () => <ProviderSetupGuide guide={auroraGuide()} activeStage={1} />,
+  render: () => (
+    <SettingsStoryHost>
+      <ProviderSetupGuide guide={auroraGuide()} activeStage={1} />
+    </SettingsStoryHost>
+  ),
 };
 
 /** The stage rail for the hand-built sections below. */
@@ -170,7 +174,11 @@ export const HostAction: StoryObj = {
  */
 export const HostActionMissing: StoryObj = {
   name: "Ação sem handler — o texto fica de pé, o botão não",
-  render: () => <ProviderSetupGuide guide={ANEXO_GUIDE} activeStage={1} />,
+  render: () => (
+    <SettingsStoryHost>
+      <ProviderSetupGuide guide={ANEXO_GUIDE} activeStage={1} />
+    </SettingsStoryHost>
+  ),
 };
 
 const URLS_SECTION: SetupSection = {
@@ -217,7 +225,11 @@ const URLS_GUIDE: Guide = {
  */
 export const CopyReference: StoryObj = {
   name: "Campos de copiar — o aberto e o recolhido",
-  render: () => <ProviderSetupGuide guide={URLS_GUIDE} activeStage={1} />,
+  render: () => (
+    <SettingsStoryHost>
+      <ProviderSetupGuide guide={URLS_GUIDE} activeStage={1} />
+    </SettingsStoryHost>
+  ),
 };
 
 // ---------------------------------------------------------------------------

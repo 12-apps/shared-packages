@@ -71,7 +71,7 @@ function Hero({
       </Text>
       <Box sx={{ pt: 1 }}>
         <Button onClick={onStart} data-testid="ai-landing-start">
-          Ver como conectar
+          {copy.start}
         </Button>
       </Box>
     </Stack>

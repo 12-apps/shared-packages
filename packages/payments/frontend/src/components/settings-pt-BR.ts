@@ -108,6 +108,7 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
       `Pagamentos já aprovados e estornos em andamento seguem normalmente pelo ${displayName}.`,
     removeRestartsSetup: 'Para reconectar, os passos recomeçam do zero.',
     pauseInstead: 'Só pausar o recebimento',
+    cancel: 'Cancelar',
   },
   credentials: {
     configuredKeepBlank: 'Configurado — deixe em branco para manter o valor atual.',
@@ -165,5 +166,7 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     defaultConfirmLabel: 'Já habilitei o Checkout Integrado',
     confirmedByYou: 'Confirmado por você',
     reviewAction: 'Revisar',
+    copyValue: (fieldLabel) => `Copiar ${fieldLabel}`,
+    copied: 'Copiado',
   },
 };

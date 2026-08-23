@@ -17,6 +17,16 @@ import { createWebStorage } from '../create-web-storage';
 
 const KEY = 'products/minha-loja/3f2504e0-4f89-41d3-9a0c-0305e82c3301/full.webp';
 
+/**
+ * The two labels `ImageField` now requires. Spread into every render below —
+ * none of these cases is about the words, and a host that forgot them is a
+ * typecheck failure rather than something a test has to catch.
+ */
+const LABELS = {
+  label: PT_BR_WEB_STORAGE_MESSAGES({ limit: '8 MB' }).fieldLabel,
+  removeLabel: PT_BR_WEB_STORAGE_MESSAGES({ limit: '8 MB' }).fieldRemove,
+} as const;
+
 interface Sent {
   url: string;
   method: string | undefined;
@@ -66,7 +76,7 @@ describe('createWebStorage', () => {
     const { sent, fetchImpl } = stubFetch(accepted);
     const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     const changes: (string | null)[] = [];
-    render(<storage.ImageField onChange={(key) => changes.push(key)} />);
+    render(<storage.ImageField {...LABELS} onChange={(key) => changes.push(key)} />);
 
     pick(png());
 
@@ -84,7 +94,7 @@ describe('createWebStorage', () => {
     installBrowserGaps();
     const { fetchImpl } = stubFetch(accepted);
     const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
-    render(<storage.ImageField onChange={() => undefined} />);
+    render(<storage.ImageField {...LABELS} onChange={() => undefined} />);
 
     pick(png());
 
@@ -102,7 +112,7 @@ describe('createWebStorage', () => {
     );
     const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
     const changes: (string | null)[] = [];
-    render(<storage.ImageField onChange={(key) => changes.push(key)} />);
+    render(<storage.ImageField {...LABELS} onChange={(key) => changes.push(key)} />);
 
     pick(png());
 
@@ -129,7 +139,7 @@ describe('createWebStorage', () => {
         forbidden: 'Peça a um gerente para enviar a foto.',
       }),
     });
-    render(<storage.ImageField onChange={() => undefined} />);
+    render(<storage.ImageField {...LABELS} onChange={() => undefined} />);
 
     pick(png());
 
@@ -147,7 +157,7 @@ describe('createWebStorage', () => {
         }),
     );
     const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', fetchImpl });
-    render(<storage.ImageField onChange={() => undefined} />);
+    render(<storage.ImageField {...LABELS} onChange={() => undefined} />);
 
     pick(png());
 
@@ -159,7 +169,7 @@ describe('createWebStorage', () => {
     installBrowserGaps();
     const { sent, fetchImpl } = stubFetch(accepted);
     const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api', maxBytes: 1024, fetchImpl });
-    render(<storage.ImageField onChange={() => undefined} />);
+    render(<storage.ImageField {...LABELS} onChange={() => undefined} />);
 
     pick(new File([new Uint8Array(4096)], 'p.png', { type: 'image/png' }));
 
@@ -195,6 +205,7 @@ describe('createWebStorage', () => {
     const changes: (string | null)[] = [];
     render(
       <storage.ImageField
+        {...LABELS}
         value={KEY}
         previewUrl="https://cdn.test/a.webp"
         onChange={(key) => changes.push(key)}

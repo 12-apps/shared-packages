@@ -51,6 +51,8 @@ export interface CardFieldCopy {
    * the expiry as one string and only learns it is unusable.
    */
   expiryInvalid: string;
+  /** No CVV typed at all — distinct from one of the wrong length. */
+  cvvRequired: string;
   cvvInvalid: string;
   /**
    * The CVV is the wrong length for the detected network — Amex wants four,

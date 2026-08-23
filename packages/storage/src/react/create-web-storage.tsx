@@ -85,6 +85,7 @@ export function createWebStorage(config: WebStorageConfig): WebStorage {
           value={imageKey}
           onChange={setImageKey}
           label={messages.fieldLabel}
+          removeLabel={messages.fieldRemove}
           helperText={messages.fieldHelper}
         />
       </Stack>

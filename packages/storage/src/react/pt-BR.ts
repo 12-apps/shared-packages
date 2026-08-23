@@ -34,5 +34,6 @@ export function PT_BR_WEB_STORAGE_MESSAGES(
     pageIntro: `Envie um PNG, JPG, WebP ou GIF de até ${context.limit}.`,
     fieldLabel: 'Foto do produto',
     fieldHelper: 'A imagem é reduzida no navegador antes do envio.',
+    fieldRemove: 'Remover imagem',
   };
 }
