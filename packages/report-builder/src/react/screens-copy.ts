@@ -76,8 +76,12 @@ export interface ReportViewCopy {
   /** The breadcrumb back to the list. */
   breadcrumbList: string;
   export: string;
+  /** The viewer's kebab action that opens the editor. */
+  edit: string;
   loadFailedTitle: string;
   loadFailedBody: string;
+  /** The retry beside a load failure. */
+  retry: string;
 }
 
 /** The editor: its header, its exit guards, its canvas and one block. */
@@ -132,6 +136,14 @@ export interface ReportEditorCopy {
   /** One block's own chrome. */
   blockRunFailed: string;
   blockDragHint: string;
+  /** The block's own kebab actions. */
+  editBlock: string;
+  removeBlock: string;
+  /** The custom-range dialog's two buttons. */
+  rangeApply: string;
+  rangeCancel: string;
+  /** The confirm dialog's way out. */
+  confirmCancel: string;
   blockTitleLabel: string;
   moveUp: string;
   moveDown: string;
@@ -179,6 +191,8 @@ export interface ReportSystemCopy {
   dashboardMissingBody: string;
   reportFailedTitle: string;
   reportFailedBody: string;
+  /** The retry beside a failed system report. */
+  retry: string;
 }
 
 /**
@@ -202,7 +216,18 @@ export interface ReportBuilderPanelCopy {
   viewAsChart: string;
   viewAsTable: string;
   blockMenu: string;
+  /** The per-row remove affordances, numbered because the rows are unlabelled. */
+  removeFilter(position: number): string;
+  removeMeasure(position: number): string;
+  /** The plain remove button at the foot of the panel. */
+  remove: string;
+  /** The panel header's dismiss, which carries no visible label. */
+  closePanel: string;
+  /** The panel's own heading, which names whether a block is selected. */
+  panelIdle: string;
+  panelEditing: string;
   /** The template picker. */
+  templateTitle: string;
   templateOption(title: string, description: string): string;
   templateHint: string;
   cancel: string;
@@ -292,6 +317,10 @@ export interface ReportSettingsCopy {
   scheduleLabel: string;
   scheduleValue: string;
   scheduleReason: string;
+  /** The audience field's own label, above the cards. */
+  visibilityLabel: string;
+  /** The dialog's dismiss, which carries no visible label. */
+  close: string;
 }
 
 /** Everything these screens render, in one object a host passes once. */

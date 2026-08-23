@@ -121,7 +121,8 @@ export function ReportActionsMenu({
   /** Told which lifecycle the report landed in, so the page can re-pick. */
   onChanged: (status: ReportStatusWire) => void;
 }): JSX.Element {
-  const words = useReportCopy().screens.archive;
+  const screens = useReportCopy().screens;
+  const words = screens.archive;
   const navigate = useNavigate();
   const transport = useTransport();
   const [confirming, setConfirming] = useState(false);
@@ -141,7 +142,7 @@ export function ReportActionsMenu({
   const items: DropdownMenuItem[] = [
     {
       id: "edit",
-      label: "Editar",
+      label: screens.view.edit,
       onClick: () => void navigate(`/${tenantSlug}/reports/${view.id}/edit`),
     },
     {
@@ -173,6 +174,7 @@ export function ReportActionsMenu({
         title={copy.title}
         description={copy.description}
         confirmText={copy.action}
+        cancelText={screens.editor.confirmCancel}
         onConfirm={() => void onConfirm()}
         onCancel={() => setConfirming(false)}
         dataTestId="report-archive-confirm"

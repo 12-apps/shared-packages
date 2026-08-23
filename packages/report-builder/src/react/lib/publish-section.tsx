@@ -84,7 +84,6 @@ export function RolesAllowlist({
     return (
       <Text variant="body" size="sm" color="danger" data-testid="publish-roles-error">
         {copy.rolesFailed}
-        salvar.
       </Text>
     );
   }

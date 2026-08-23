@@ -44,7 +44,7 @@ export function SystemReportPage({ tenantSlug }: { tenantSlug: string }): JSX.El
       <ErrorState
         title={systemCopy.reportFailedTitle}
         message={systemCopy.reportFailedBody}
-        retryLabel="Tentar novamente"
+        retryLabel={systemCopy.retry}
         onRetry={() => {
           void query.refetch();
         }}

@@ -108,10 +108,11 @@ function PickerFooter({
   onClose: () => void;
   dataTestId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.editor;
   return (
     <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
       <Button variant="outline" size="sm" onClick={onClose} dataTestId={`${dataTestId}-cancel`}>
-        Cancelar
+        {copy.rangeCancel}
       </Button>
       <Button
         variant="solid"
@@ -125,7 +126,7 @@ function PickerFooter({
         }}
         dataTestId={`${dataTestId}-apply`}
       >
-        Aplicar
+        {copy.rangeApply}
       </Button>
     </Stack>
   );

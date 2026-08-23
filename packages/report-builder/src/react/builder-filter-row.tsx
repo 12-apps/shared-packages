@@ -291,7 +291,7 @@ export function FilterRow({
           variant="ghost"
           size="sm"
           onClick={onRemove}
-          aria-label={`Remover filtro ${index + 1}`}
+          aria-label={copy.removeFilter(index + 1)}
         >
           <CloseIcon />
         </Button>

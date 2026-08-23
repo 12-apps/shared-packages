@@ -212,7 +212,7 @@ function SharingFields({
         </Stack>
       </Field>
 
-      <Field label="Quem pode ver">
+      <Field label={copy.visibilityLabel}>
         <Stack spacing={0.75}>
           {visibilityCards(copy).map((option) => (
             <RadioCard
@@ -248,7 +248,7 @@ function DialogHeader({ testId, onClose }: { testId: string; onClose: () => void
         variant="ghost"
         color="neutral"
         size="sm"
-        aria-label="Fechar"
+        aria-label={copy.close}
         onClick={onClose}
         dataTestId={`${testId}-close`}
       >

@@ -91,8 +91,6 @@ import { useReportCopy, useReportEngineCopy } from "./transport-context";
  * opened saying nothing about the one it had just been pointed at. The heading
  * now says what the panel is DOING, and the sentence below it says to what.
  */
-const IDLE_HEADING = "Bloco";
-const EDITING_HEADING = "Editando bloco";
 
 /** Why *Duplicar* is refused — the canvas's own wording for the same ceiling. */
 
@@ -327,6 +325,7 @@ export function BlockEditorPanel({
   onRemove,
   testId,
 }: BlockEditorPanelProps): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const tier = usePanelTier();
   const asSheet = tier === "sheet";
   const layout = TIER_LAYOUT[tier];
@@ -359,16 +358,15 @@ export function BlockEditorPanel({
         dataTestId={testId}
       >
         {asSheet ? <SheetGrip onDismiss={onClose} /> : null}
-        {/* Not "Close drawer" (FUT-755): this is a docked side panel, and
-            `specs/editor-config-panel.feature` asks the close control to say
-            what it closes. */}
+        {/* Not "Close drawer" (FUT-755): a docked side panel, and the spec asks
+            the close control to say WHAT it closes. */}
         <DrawerHeader
           onClose={onClose}
-          closeLabel="Fechar painel"
+          closeLabel={copy.closePanel}
           dataTestId={`${testId}-header`}
         >
           <Text variant="heading" size="sm" as="h2">
-            {block === null ? IDLE_HEADING : EDITING_HEADING}
+            {block === null ? copy.panelIdle : copy.panelEditing}
           </Text>
         </DrawerHeader>
         <PanelBody

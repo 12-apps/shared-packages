@@ -258,7 +258,7 @@ export function BlockTemplatePicker({
         <Stack spacing={3}>
           <Stack spacing={0.5}>
             <Text variant="heading" size="lg" weight="semibold" as="h2">
-              Adicionar bloco
+              {copy.templateTitle}
             </Text>
             {/* The line the picker was missing. It answers the question a
              * grid of eight named things provokes — "am I committing to
@@ -287,7 +287,7 @@ export function BlockTemplatePicker({
               sx={{ borderRadius: `${CONTROL_RADIUS_PX}px` }}
               data-testid={`${testId}-cancel`}
             >
-              Cancelar
+              {copy.cancel}
             </Button>
           </Stack>
         </Stack>

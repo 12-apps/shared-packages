@@ -124,7 +124,7 @@ function BlockTitleSlot({
         sx={{ cursor: "grab", userSelect: "none", display: "inline-flex", color: "text.secondary" }}
         // The label names the keyboard path too. A shortcut nobody is told
         // about is only half an alternative to the drag.
-        aria-label="Arraste para posicionar. Ou use Alt e as setas."
+        aria-label={copy.blockDragHint}
         title={copy.blockDragHint}
         data-testid={`${testId}-drag-handle`}
       >
@@ -216,14 +216,14 @@ function BlockActions({
       tools={[
         {
           id: "edit",
-          label: "Editar bloco",
+          label: copy.editBlock,
           icon: <PencilIcon />,
           onSelect: onEdit,
           dataTestId: `${testId}-edit`,
         },
         {
           id: "remove",
-          label: "Remover bloco",
+          label: copy.removeBlock,
           icon: <TrashIcon />,
           onSelect: onRemove,
           dataTestId: `${testId}-remove`,

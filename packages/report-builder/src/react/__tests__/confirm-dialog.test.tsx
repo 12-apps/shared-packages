@@ -32,6 +32,7 @@ function renderDialog(): void {
       title="Remover bloco?"
       description="O bloco sai do relatório."
       confirmText="Remover"
+      cancelText="Cancelar"
       onConfirm={() => undefined}
       onCancel={() => undefined}
       dataTestId="confirm"
