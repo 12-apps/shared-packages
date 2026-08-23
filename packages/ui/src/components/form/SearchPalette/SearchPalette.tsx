@@ -27,7 +27,6 @@ import type { SearchPaletteProps } from './SearchPalette.types';
  */
 
 const DEFAULT_MAX_ITEMS = 5;
-const defaultSubmitLabel = (q: string): string => `Todos os resultados para "${q}"`;
 
 /** Non-string option defaults (numbers / flags / arrays). */
 function resolveOpts<T>(props: SearchPaletteProps<T>): {
@@ -56,9 +55,9 @@ function resolveText<T>(props: SearchPaletteProps<T>): {
   dataTestId: string;
 } {
   return {
-    submitAllLabel: props.submitAllLabel ?? defaultSubmitLabel,
-    noResultsLabel: props.noResultsLabel ?? 'Nenhum resultado encontrado',
-    placeholder: props.placeholder ?? 'Buscar…',
+    submitAllLabel: props.submitAllLabel,
+    noResultsLabel: props.noResultsLabel,
+    placeholder: props.placeholder,
     dataTestId: props.dataTestId ?? 'search-palette',
   };
 }

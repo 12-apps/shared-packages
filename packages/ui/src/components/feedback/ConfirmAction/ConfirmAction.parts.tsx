@@ -60,9 +60,12 @@ function TypeToConfirmField({
   onChange,
   disabled,
   dataTestId,
+  copy,
 }: {
   expected: string;
   label?: string;
+  /** The words this prompt renders. REQUIRED — no default copy. */
+  copy: ConfirmActionCopy;
   value: string;
   onChange: (next: string) => void;
   disabled: boolean;
@@ -71,7 +74,7 @@ function TypeToConfirmField({
   return (
     <Stack spacing={1} sx={{ mt: 2 }}>
       <Typography variant="body2" color="text.secondary">
-        {label ?? `Digite "${expected}" para confirmar.`}
+        {label ?? copy.typeToConfirm(expected)}
       </Typography>
       <TextField
         size="small"
@@ -81,7 +84,7 @@ function TypeToConfirmField({
         // On the INPUT rather than the wrapper: a test id on MUI's TextField
         // lands on the outer div, which is not the node a test can type into.
         inputProps={{
-          'aria-label': label ?? `Digite ${expected} para confirmar`,
+          'aria-label': label ?? copy.typeToConfirm(expected),
           'data-testid': `${dataTestId}-type-to-confirm`,
         }}
       />
@@ -161,6 +164,7 @@ export function ConfirmActionDialog({
           onChange={setTyped}
           disabled={state.pending}
           dataTestId={dataTestId}
+          copy={copy}
         />
       )}
     </AlertDialog>

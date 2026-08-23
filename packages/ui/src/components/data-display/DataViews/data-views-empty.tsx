@@ -7,6 +7,8 @@ import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
+
 /**
  * TWO EMPTY STATES, NOT ONE.
  *
@@ -34,6 +36,7 @@ export function DataViewsEmpty({
   emptyState?: React.ReactNode;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const Icon = filtered ? FilterAltOffRoundedIcon : InboxRoundedIcon;
   return (
     <Box
@@ -63,12 +66,12 @@ export function DataViewsEmpty({
         <>
           <Text variant="body" as="p">
             <Box component="span" sx={{ fontWeight: 600 }}>
-              Nenhum resultado para esses filtros
+              {copy.grid.emptyFilteredTitle}
             </Box>
           </Text>
           <Text variant="caption" as="p">
             <Box component="span" sx={{ display: "block", mt: 0.5, mb: 2, color: "text.secondary", maxWidth: 380 }}>
-              Ajuste ou remova os filtros.
+              {copy.grid.emptyFilteredHint}
             </Box>
           </Text>
           <Button
@@ -78,7 +81,7 @@ export function DataViewsEmpty({
             onClick={onClearFilters}
             dataTestId={`${testIdPrefix}-empty-clear`}
           >
-            Limpar filtros
+            {copy.grid.emptyFilteredAction}
           </Button>
         </>
       ) : (

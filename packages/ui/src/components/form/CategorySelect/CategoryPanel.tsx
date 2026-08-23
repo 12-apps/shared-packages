@@ -74,7 +74,7 @@ export function CategoryPanel({
         placeholder={single ? copy.search.placeholderSingle : copy.search.placeholderMulti}
         sheet={sheet}
         quickActions={
-          single ? undefined : <CategoryQuickActions state={state} dataTestId={dataTestId} />
+          single ? undefined : <CategoryQuickActions state={state} dataTestId={dataTestId} copy={copy} />
         }
         onQueryChange={state.setQuery}
         searchInputRef={searchInputRef}

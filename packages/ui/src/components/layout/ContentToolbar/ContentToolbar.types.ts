@@ -4,6 +4,12 @@ import type { ReactNode } from 'react';
 
 /** Props for {@link ContentToolbar} — the shared content-page toolbar. */
 export interface ContentToolbarProps {
+  /**
+   * The select-all checkbox's accessible name. It carries no visible label of
+   * its own, so this is the only thing a screen reader gets for it. REQUIRED:
+   * this package ships no default copy.
+   */
+  selectAllLabel: string;
   /** Whether the page is in selection mode (shows Clear All + count + actions). */
   hasSelection: boolean;
   /** Number of currently selected items. */
@@ -129,6 +135,12 @@ export interface MultiSelectDropdownProps<TValue extends string = string> {
   onClear: () => void;
   /** Text when nothing or everything is selected. @default "All" */
   allLabel?: string;
+  /**
+   * The clear affordance's accessible name. The pill's own label is already on
+   * screen, so this is all a screen reader gets for the little cross.
+   * REQUIRED: this package ships no default copy.
+   */
+  clearLabel: string;
   /** Extra toggles under a labelled "Options" section. */
   extraOptions?: MultiSelectExtraOption[];
   /**

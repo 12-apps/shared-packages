@@ -87,7 +87,7 @@ function ManageViewRow({
             onClick={() => onEdit(view)}
             dataTestId={`${testIdPrefix}-manage-edit-${view.id}`}
           >
-            Editar
+            {copy.manageViews.edit}
           </Button>
           {/* Confirm-gated (FUT-546): a saved view is a filter set somebody
               built by hand, and there is no undo behind this. */}

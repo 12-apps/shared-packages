@@ -261,6 +261,7 @@ export function RangePill<T extends Record<string, unknown>>({
   onOpenChange?: (open: boolean) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const active = isRangeSet(value);
   const testId = `${testIdPrefix}-range-${field.id}`;
@@ -303,7 +304,7 @@ export function RangePill<T extends Record<string, unknown>>({
               data-testid={`${testId}-clear`}
               sx={{ textTransform: 'none' }}
             >
-              Limpar
+              {copy.filters.clear}
             </Button>
           </Box>
         )}

@@ -26,11 +26,18 @@ export const PT_BR_CONFIRM_ACTION_COPY: ConfirmActionCopy = {
   cancel: "Cancelar",
   defaultError: "Não foi possível concluir a ação. Tente novamente.",
   irreversible: "Esta ação não pode ser desfeita.",
+  typeToConfirm: (expected) => `Digite "${expected}" para confirmar.`,
 };
 
 export const PT_BR_CATEGORY_SELECT_COPY: CategorySelectCopy = {
   purpose: "Categorias organizam o cardápio e os filtros da loja.",
   clearSelection: "Limpar seleção",
+  selectAll: "Marcar tudo",
+  deselectAll: "Desmarcar tudo",
+  expandAll: "Expandir tudo",
+  collapseAll: "Recolher tudo",
+  placeholderSingle: "Mover para…",
+  placeholderMulti: "Categoria",
   emptyTitle: "Nenhuma categoria ainda",
   createCategory: "Criar categoria",
   noResults: {
@@ -102,19 +109,23 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     countOnPage: (label, count) => `${label}: ${count} nesta página`,
     onThisPage: (count) => `${count} nesta página`,
     pageSum: (sum) => `Soma desta página: ${sum}`,
+    emptyColumn: "Nada nesta etapa",
     pageScopeNote:
       "As contagens e somas abaixo referem-se apenas aos itens desta página.",
   },
   deleteView: {
     title: "Excluir visão",
+    target: (viewName) => `Excluir "${viewName}"?`,
     sharedWarning: "Esta visão está compartilhada — a equipe perderá o acesso a ela.",
     rowsUnaffected: (entityLabel) =>
       `${entityLabel} não são afetados; apenas o recorte salvo é removido.`,
     confirm: "Excluir visão",
+    cancel: "Cancelar",
   },
   manageViews: {
     title: "Gerenciar visões",
     empty: "Nenhuma visão salva.",
+    edit: "Editar",
     defaultTag: "Padrão",
     otherUserTag: "De outro usuário",
     deleteTitle: "Excluir a visão salva?",
@@ -148,6 +159,9 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     visibleCount: (visible, total) => `${visible} de ${total} visíveis`,
     reset: "Padrão",
     showAll: "Mostrar todas",
+    dragHint: "Arraste para reordenar as colunas.",
+    moveUp: (columnLabel) => `Mover ${columnLabel} para cima`,
+    moveDown: (columnLabel) => `Mover ${columnLabel} para baixo`,
   },
   display: {
     sortTab: "Ordenar",
@@ -187,6 +201,9 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
   grid: {
     rowActions: "Ações",
     bulkActions: (selectedCount) => `Ações (${selectedCount}) ▾`,
+    emptyFilteredTitle: "Nenhum resultado para esses filtros",
+    emptyFilteredHint: "Ajuste ou remova os filtros.",
+    emptyFilteredAction: "Limpar filtros",
   },
   filters: {
     moreFilters: (count) => `Mais filtros: ${count} sem espaço na barra`,
@@ -229,6 +246,8 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     label: "Visão",
     update: "Atualizar visão",
     save: "Salvar visão",
+    saveAs: "Salvar como nova",
+    reset: "Redefinir",
     updateFailed: "Não foi possível atualizar a visão",
     saveFailed: "Não foi possível salvar a alteração da visão.",
     editView: "Renomear e editar",
