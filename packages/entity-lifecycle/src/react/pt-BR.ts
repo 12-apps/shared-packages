@@ -78,5 +78,8 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
   draftBanner: {
     title: 'Este item tem um rascunho não publicado.',
     updatedAtPrefix: 'Atualizado em',
+    load: 'Carregar rascunho',
+    publish: 'Publicar',
+    discard: 'Descartar',
   },
 };

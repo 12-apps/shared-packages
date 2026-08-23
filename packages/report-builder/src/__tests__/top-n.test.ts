@@ -2,7 +2,7 @@ import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { compileReport } from '../compile';
-import { createMemoryDataSource, executeCompiledQuery, OTHERS_BUCKET_LABEL } from '../memory';
+import { createMemoryDataSource, executeCompiledQuery } from '../memory';
 import { runReport } from '../run';
 import { reportSpecSchema, type ReportSpecInput } from '../spec';
 import { defineCatalog } from '../catalog';
@@ -47,7 +47,7 @@ const TOTAL_CENTS = 7800;
 
 function run(input: ReportSpecInput, rows = salesRows()) {
   const query = compileReport(reportSpecSchema.parse(input), catalog);
-  return executeCompiledQuery(rows, query);
+  return executeCompiledQuery(rows, query, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
 }
 
 const TOP_5: ReportSpecInput = {
@@ -62,7 +62,7 @@ describe('top-N with an "Outros" bucket', () => {
   it('returns N + 1 rows: the leaders and the remainder', () => {
     const rows = run(TOP_5);
     expect(rows).toHaveLength(6);
-    expect(rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+    expect(rows.at(-1)?.product).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 
   it('keeps the total intact — that is the whole point', () => {
@@ -86,7 +86,7 @@ describe('top-N with an "Outros" bucket', () => {
 
   it('adds no bucket when the groups already fit', () => {
     expect(run({ ...TOP_5, limit: 20 }).map((row) => row.product)).not.toContain(
-      OTHERS_BUCKET_LABEL,
+      PT_BR_REPORT_ENGINE_COPY.labels.othersBucket,
     );
   });
 
@@ -95,7 +95,7 @@ describe('top-N with an "Outros" bucket', () => {
     // remainder would claim a total the report never computed.
     const rows = run({ entity: 'sales', dimensions: [{ field: 'product' }], measures: [{ field: 'cents' }] });
     expect(rows).toHaveLength(12);
-    expect(rows.map((row) => row.product)).not.toContain(OTHERS_BUCKET_LABEL);
+    expect(rows.map((row) => row.product)).not.toContain(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 
   it('honours the host’s row cap when the spec asks for MORE than it', async () => {
@@ -115,11 +115,11 @@ describe('top-N with an "Outros" bucket', () => {
         sort: [{ by: 'sum_cents', direction: 'desc' }],
         limit: 10_000,
       },
-      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5, copy: PT_BR_REPORT_ENGINE_COPY },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket), maxRows: 5, copy: PT_BR_REPORT_ENGINE_COPY },
     );
 
     expect(result.render.rows).toHaveLength(5);
-    expect(result.render.rows.map((row) => row.product)).not.toContain(OTHERS_BUCKET_LABEL);
+    expect(result.render.rows.map((row) => row.product)).not.toContain(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 
   it('treats a limit at or below the cap as the author’s top-N', async () => {
@@ -136,11 +136,11 @@ describe('top-N with an "Outros" bucket', () => {
         sort: [{ by: 'sum_cents', direction: 'desc' }],
         limit: 5,
       },
-      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), maxRows: 5, copy: PT_BR_REPORT_ENGINE_COPY },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket), maxRows: 5, copy: PT_BR_REPORT_ENGINE_COPY },
     );
 
     expect(result.render.rows).toHaveLength(6);
-    expect(result.render.rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+    expect(result.render.rows.at(-1)?.product).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 
   it('leaves a SPLIT query truncated rather than guessing a series', () => {
@@ -154,7 +154,7 @@ describe('top-N with an "Outros" bucket', () => {
       limit: 5,
     });
     expect(rows).toHaveLength(5);
-    expect(rows.map((row) => row.product)).not.toContain(OTHERS_BUCKET_LABEL);
+    expect(rows.map((row) => row.product)).not.toContain(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 });
 
@@ -182,7 +182,7 @@ describe('the bucket is exact, not a blend of finished values', () => {
 
     // Leader is A (1000). "Outros" folds B's three 10s and C's 100 → mean 32.5.
     // An average of the two group averages would be (10 + 100) / 2 = 55.
-    expect(out.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+    expect(out.at(-1)?.product).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
     expect(out.at(-1)?.avg_cents).toBe(32.5);
   });
 
@@ -205,7 +205,7 @@ describe('the bucket is exact, not a blend of finished values', () => {
     );
 
     // B, C and D fold together: {PIX, CARD} = 2 distinct, not 1 per group.
-    expect(out.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+    expect(out.at(-1)?.product).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
     expect(out.at(-1)?.count_distinct_method).toBe(2);
   });
 
@@ -229,10 +229,10 @@ describe('the bucket is exact, not a blend of finished values', () => {
 
 describe('the memory data source honours it too', () => {
   it('folds through the published adapter seam', async () => {
-    const source = createMemoryDataSource({ sales: salesRows() });
+    const source = createMemoryDataSource({ sales: salesRows() }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
     const rows = await source.execute(compileReport(reportSpecSchema.parse(TOP_5), catalog));
     expect(rows).toHaveLength(6);
-    expect(rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+    expect(rows.at(-1)?.product).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 });
 
@@ -247,12 +247,12 @@ describe('the bucket survives the whole pipeline', () => {
   it('reaches the caller through runReport, not just the executor', async () => {
     const result = await runReport(TOP_5, {
       catalog,
-      adapter: createMemoryDataSource({ sales: salesRows() }),
+      adapter: createMemoryDataSource({ sales: salesRows() }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket),
       copy: PT_BR_REPORT_ENGINE_COPY,
     });
 
     expect(result.rows).toHaveLength(6);
-    expect(result.rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+    expect(result.rows.at(-1)?.product).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
 
     const shown = result.rows.reduce((total, row) => total + Number(row.sum_cents), 0);
     expect(shown).toBe(TOTAL_CENTS);
@@ -261,10 +261,10 @@ describe('the bucket survives the whole pipeline', () => {
   it('is present in the rendered table model too', async () => {
     const result = await runReport(
       { ...TOP_5, presentation: { kind: 'table' } },
-      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }), copy: PT_BR_REPORT_ENGINE_COPY },
+      { catalog, adapter: createMemoryDataSource({ sales: salesRows() }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket), copy: PT_BR_REPORT_ENGINE_COPY },
     );
 
     if (result.render.kind !== 'table') throw new Error('expected a table render');
-    expect(result.render.rows.at(-1)?.product).toBe(OTHERS_BUCKET_LABEL);
+    expect(result.render.rows.at(-1)?.product).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 });

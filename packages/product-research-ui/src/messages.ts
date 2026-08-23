@@ -24,6 +24,12 @@ export interface ResearchMessages {
   formSubmitBusy: string;
   formTermRequired: string;
   formStartFailed: string;
+  /**
+   * The run screen could not be read. Covers both halves of the same failure:
+   * a poll that rejected with something carrying no message of its own, and
+   * the error banner when the phase is `error` with nothing to show.
+   */
+  runLoadFailed: string;
 
   statusTitle: string;
   statusQuerying: string;

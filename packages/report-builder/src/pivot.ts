@@ -1,4 +1,4 @@
-import { OTHERS_BUCKET_LABEL } from './memory';
+import type { RenderLabelCopy } from './copy';
 import type {
   Aggregation,
   CompiledQuery,
@@ -38,8 +38,6 @@ import type {
  * the legend and the table fallback render.
  */
 
-/** A split value that is null or empty still needs a name in the legend. */
-const EMPTY_SPLIT_LABEL = '(sem valor)';
 
 /**
  * Aggregations whose per-group results may be ADDED, and therefore the only
@@ -98,8 +96,12 @@ function seriesKey(splitAlias: string, index: number): string {
  * declares a closed set (so a chart says "Cartão", not `CARD`), else the stored
  * value.
  */
-function splitLabel(field: FieldDef | undefined, raw: ReportCellValue): string {
-  if (raw === null || raw === '') return EMPTY_SPLIT_LABEL;
+function splitLabel(
+  field: FieldDef | undefined,
+  raw: ReportCellValue,
+  emptyLabel: string,
+): string {
+  if (raw === null || raw === '') return emptyLabel;
   const text = String(raw);
   return field?.values?.find((option) => option.value === text)?.label ?? text;
 }
@@ -112,6 +114,7 @@ function collect(
   rows: ReportRow[],
   aliases: SplitAliases,
   field: FieldDef | undefined,
+  emptyLabel: string,
 ): { axis: AxisBucket[]; buckets: SplitBucket[] } {
   const axis: AxisBucket[] = [];
   const seen = new Set<string>();
@@ -125,7 +128,7 @@ function collect(
     }
     const splitValue = row[aliases.split] ?? null;
     const bucket = upsertBucket(buckets, String(splitValue), () =>
-      splitLabel(field, splitValue),
+      splitLabel(field, splitValue, emptyLabel),
     );
     const measured = row[aliases.measure] ?? null;
     bucket.total += numeric(measured);
@@ -158,8 +161,8 @@ function rank(buckets: SplitBucket[]): SplitBucket[] {
 }
 
 /** Merge everything past `keep` into one "Outros" column, cell by cell. */
-function foldTail(ranked: SplitBucket[], keep: number): SplitBucket[] {
-  const others: SplitBucket = { label: OTHERS_BUCKET_LABEL, total: 0, cells: new Map() };
+function foldTail(ranked: SplitBucket[], keep: number, othersLabel: string): SplitBucket[] {
+  const others: SplitBucket = { label: othersLabel, total: 0, cells: new Map() };
   for (const bucket of ranked.slice(keep)) {
     others.total += bucket.total;
     bucket.cells.forEach((value, axisKey) => {
@@ -190,9 +193,10 @@ function capSeries(
   ranked: SplitBucket[],
   maxSeries: number,
   aggregation: Aggregation,
+  othersLabel: string,
 ): SplitBucket[] {
   if (ranked.length <= maxSeries || !ADDITIVE_AGGREGATIONS.has(aggregation)) return ranked;
-  return foldTail(ranked, maxSeries - 1);
+  return foldTail(ranked, maxSeries - 1, othersLabel);
 }
 
 /**
@@ -231,17 +235,27 @@ function toWideRow(
   return row;
 }
 
+/** The two labels {@link pivotSplit} needs — the render copy's own subset. */
+type SplitPivotCopy = Pick<RenderLabelCopy, 'othersBucket' | 'emptySplit'>;
+
 /**
  * Reshape a two-dimension result into one series per split value.
  *
  * `maxSeries` is the caller's palette length: the render layer owns the colour
  * decision, and the cap exists because of it.
+ *
+ * The two WORDS this reshaping invents — the folded remainder and the name a
+ * null split value carries — come from the host, for the same reason every
+ * other rendered word does. They were module constants (`'Outros'`,
+ * `'(sem valor)'`), which put them out of reach of both portability gates and
+ * of every adopting host at once.
  */
 export function pivotSplit(
   query: CompiledQuery,
   entity: EntityDef,
   rows: ReportRow[],
   maxSeries: number,
+  copy: SplitPivotCopy,
 ): SplitPivot {
   const axis = query.dimensions[0];
   const split = query.dimensions[1];
@@ -255,8 +269,13 @@ export function pivotSplit(
     split: split.alias,
     measure: measure.alias,
   };
-  const { axis: axisBuckets, buckets } = collect(rows, aliases, entity.fields[split.field]);
-  const series = capSeries(rank(buckets), maxSeries, measure.aggregation);
+  const { axis: axisBuckets, buckets } = collect(
+    rows,
+    aliases,
+    entity.fields[split.field],
+    copy.emptySplit,
+  );
+  const series = capSeries(rank(buckets), maxSeries, measure.aggregation, copy.othersBucket);
   const absent = absentCell(measure.aggregation);
   return {
     series: series.map((bucket, index) => ({

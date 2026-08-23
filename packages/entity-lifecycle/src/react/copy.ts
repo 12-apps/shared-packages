@@ -90,6 +90,10 @@ export interface DraftBannerCopy {
   title: string;
   /** "Atualizado em" — the date renders right after it. */
   updatedAtPrefix: string;
+  /** The three actions, in the order they render. */
+  load: string;
+  publish: string;
+  discard: string;
 }
 
 export interface LifecycleWebCopy {

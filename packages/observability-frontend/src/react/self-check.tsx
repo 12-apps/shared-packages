@@ -257,7 +257,7 @@ export function ObservabilitySelfCheck(): JSX.Element {
   // the browser reporting surface, and is worth checking on its own.
   const throwInHandler = useCallback((): void => {
     if (throttled()) return;
-    setNote("Erro lancado no handler — deve chegar via window.onerror.");
+    setNote("Error thrown in a handler — it should arrive via window.onerror.");
     setTimeout(() => {
       throw new Error(syntheticMessage("handler error"));
     }, 0);
@@ -266,7 +266,7 @@ export function ObservabilitySelfCheck(): JSX.Element {
   const sendWarning = useCallback((): void => {
     if (throttled()) return;
     reportWarning(syntheticMessage("warning"), { synthetic: SYNTHETIC_TAG });
-    setNote("Warning enviado via reportWarning.");
+    setNote("Warning sent via reportWarning.");
   }, [throttled]);
 
   const crashRender = useCallback((): void => {

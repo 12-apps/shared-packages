@@ -6,11 +6,12 @@ import { executeCompiledQuery } from '../memory';
 import { reportSpecSchema, type ReportSpecInput } from '../spec';
 import { isSuppressed, SUPPRESSED } from '../types';
 import { salesCatalog } from './fixtures';
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 
 type SourceRow = Record<string, unknown>;
 
 function run(input: ReportSpecInput, rows: SourceRow[]) {
-  return executeCompiledQuery(rows, compileReport(reportSpecSchema.parse(input), salesCatalog));
+  return executeCompiledQuery(rows, compileReport(reportSpecSchema.parse(input), salesCatalog), PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
 }
 
 function compile(input: ReportSpecInput) {

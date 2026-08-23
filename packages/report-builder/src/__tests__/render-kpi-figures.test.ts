@@ -23,7 +23,7 @@ import { orderRows, salesCatalog } from './fixtures';
 function kpiModelFor(input: ReportSpecInput) {
   const spec = reportSpecSchema.parse(input);
   const query = compileReport(spec, salesCatalog);
-  const rows = executeCompiledQuery(orderRows, query);
+  const rows = executeCompiledQuery(orderRows, query, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   const model = renderReport(query, spec.presentation, salesCatalog, rows, PT_BR_REPORT_ENGINE_COPY.labels);
   if (model.kind !== 'kpi') throw new Error(`Expected a kpi model, got "${model.kind}".`);
   return model;

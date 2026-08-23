@@ -97,10 +97,10 @@ export function validateExpiry(
   now: Date = new Date(),
 ): string | undefined {
   const match = /^(\d{2})\/(\d{2})$/.exec(value.trim());
-  if (!match) return "Validade incompleta (MM/AA).";
+  if (!match) return copy.expiryIncomplete;
   const mm = match[1];
   const yy = match[2];
-  if (mm === undefined || yy === undefined) return "Validade incompleta (MM/AA).";
+  if (mm === undefined || yy === undefined) return copy.expiryIncomplete;
   const month = Number(mm);
   if (month < 1 || month > 12) return copy.monthInvalid;
   const endOfMonth = new Date(2000 + Number(yy), month, 0, 23, 59, 59, 999);

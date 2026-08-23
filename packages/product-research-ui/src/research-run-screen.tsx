@@ -211,6 +211,7 @@ export function ResearchRunScreen({
   const sources = useSourceRoster(client);
   const { phase, request, run, sourceStats, error, reload } = useResearchRun(client, requestId, {
     channel: runChannel,
+    networkError: t.runLoadFailed,
   });
 
   if (phase === 'loading') {
@@ -220,7 +221,7 @@ export function ResearchRunScreen({
     return (
       <Alert
         variant="danger"
-        title={error ?? 'erro'}
+        title={error ?? t.runLoadFailed}
         data-testid="research-run-error"
         onClick={reload}
       />

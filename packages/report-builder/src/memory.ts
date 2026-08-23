@@ -135,8 +135,7 @@ function rowComparator(query: CompiledQuery): (a: ReportRow, b: ReportRow) => nu
   };
 }
 
-/** The label the folded remainder carries on the grouping dimension. */
-export const OTHERS_BUCKET_LABEL = 'Outros';
+
 
 /**
  * Fold every group past `topN` into ONE, labelled "Outros" (FUT-391).
@@ -155,12 +154,16 @@ export const OTHERS_BUCKET_LABEL = 'Outros';
  * than begged. That fold is the render layer's, so it applies to every adapter
  * alike; this one stays the in-memory source's own top-N.
  */
-function foldOthers(ordered: Group[], query: CompiledQuery): Group[] | null {
+function foldOthers(
+  ordered: Group[],
+  query: CompiledQuery,
+  othersLabel: string,
+): Group[] | null {
   const topN = query.topN;
   if (topN === undefined || query.dimensions.length !== 1 || ordered.length <= topN) return null;
 
   const bucket: Group = {
-    key: [OTHERS_BUCKET_LABEL],
+    key: [othersLabel],
     accumulators: query.measures.map(() => newAccumulator()),
   };
   for (const group of ordered.slice(topN)) {
@@ -172,9 +175,22 @@ function foldOthers(ordered: Group[], query: CompiledQuery): Group[] | null {
   return [...ordered.slice(0, topN), bucket];
 }
 
-/** Execute a compiled query over in-memory rows (exported for host adapters
- * that fetch raw rows and fold in process). */
-export function executeCompiledQuery(rows: SourceRow[], query: CompiledQuery): ReportRow[] {
+/**
+ * Execute a compiled query over in-memory rows (exported for host adapters
+ * that fetch raw rows and fold in process).
+ *
+ * `othersLabel` is REQUIRED, and is the label the folded remainder carries on
+ * the grouping dimension. It held `'Outros'` as a module constant and was
+ * therefore one of the few strings a HOST could not reach at all: not a prop,
+ * not a copy key, not on either portability ledger — a Portuguese word this
+ * engine wrote into a chart legend and a table cell from inside a query fold.
+ * Pass `RenderLabelCopy.othersBucket`.
+ */
+export function executeCompiledQuery(
+  rows: SourceRow[],
+  query: CompiledQuery,
+  othersLabel: string,
+): ReportRow[] {
   const filtered = rows.filter((row) => query.filters.every((filter) => matchesFilter(row, filter)));
   const compare = rowComparator(query);
   // Groups are sorted by the row they PRODUCE — the author's ordering is
@@ -189,14 +205,18 @@ export function executeCompiledQuery(rows: SourceRow[], query: CompiledQuery): R
   // author's top-N, so slicing to it would chop off the very bucket the fold
   // just created and put the numbers back out of balance. A fold is already
   // bounded at topN + 1.
-  const folded = foldOthers(ordered, query);
+  const folded = foldOthers(ordered, query, othersLabel);
   const output = (folded ?? ordered).map((group) => toReportRow(group, query));
   return folded ? output : output.slice(0, query.limit);
 }
 
 /** Build a DataSource over plain per-entity row arrays. */
-export function createMemoryDataSource(tables: Record<string, SourceRow[]>): ReportDataSource {
+export function createMemoryDataSource(
+  tables: Record<string, SourceRow[]>,
+  othersLabel: string,
+): ReportDataSource {
   return {
-    execute: (query) => Promise.resolve(executeCompiledQuery(tables[query.entity] ?? [], query)),
+    execute: (query) =>
+      Promise.resolve(executeCompiledQuery(tables[query.entity] ?? [], query, othersLabel)),
   };
 }

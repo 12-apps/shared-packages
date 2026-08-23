@@ -85,7 +85,7 @@ describe('the wire view', () => {
       messages: CLINIC_MESSAGES,
       db: () => Promise.resolve(db),
       contacts: memoryContacts({ u1: { email: 'buyer@example.com', phone: null } }),
-      transports: [{ channel: 'EMAIL', driver: 'log' }],
+      transports: [{ channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' }],
     });
   }
 
