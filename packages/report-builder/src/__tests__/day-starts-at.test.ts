@@ -5,6 +5,7 @@ import { createMemoryDataSource, executeCompiledQuery } from '../memory';
 import { reportSpecSchema, type ReportSpecInput } from '../spec';
 import { truncateDateToGrain } from '../time';
 import { salesCatalog } from './fixtures';
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 
 /**
  * Plan entry 5's outstanding half: a trading day that does not end at midnight
@@ -91,7 +92,7 @@ describe('dayStartsAt end to end', () => {
   };
 
   const bucketsFor = (input: ReportSpecInput) =>
-    executeCompiledQuery(ROWS, compileReport(reportSpecSchema.parse(input), salesCatalog));
+    executeCompiledQuery(ROWS, compileReport(reportSpecSchema.parse(input), salesCatalog), PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
 
   it('splits the night across two days when the day starts at midnight', () => {
     // 20:00 on the 1st and 01:00 on the 2nd are different civil days.
@@ -112,7 +113,7 @@ describe('dayStartsAt end to end', () => {
   it('takes the boundary from the host when the spec omits it', () => {
     const query = compileReport(reportSpecSchema.parse(SPEC), salesCatalog, { dayStartsAt: 5 });
     expect(query.dayStartsAt).toBe(5);
-    expect(executeCompiledQuery(ROWS, query)).toHaveLength(1);
+    expect(executeCompiledQuery(ROWS, query, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket)).toHaveLength(1);
   });
 
   it('lets the spec override the host', () => {
@@ -120,7 +121,7 @@ describe('dayStartsAt end to end', () => {
       dayStartsAt: 5,
     });
     expect(query.dayStartsAt).toBe(0);
-    expect(executeCompiledQuery(ROWS, query)).toHaveLength(2);
+    expect(executeCompiledQuery(ROWS, query, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket)).toHaveLength(2);
   });
 
   it('rejects a boundary outside 0-23 at the schema edge', () => {
@@ -131,7 +132,7 @@ describe('dayStartsAt end to end', () => {
   it('is reachable through the packaged data source', async () => {
     // `createMemoryDataSource` is what a host without SQL runs on; the boundary
     // must survive that path too, not only a direct `executeCompiledQuery`.
-    const source = createMemoryDataSource({ orders: ROWS });
+    const source = createMemoryDataSource({ orders: ROWS }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
     const query = compileReport(reportSpecSchema.parse({ ...SPEC, dayStartsAt: 5 }), salesCatalog);
     await expect(source.execute(query)).resolves.toHaveLength(1);
   });

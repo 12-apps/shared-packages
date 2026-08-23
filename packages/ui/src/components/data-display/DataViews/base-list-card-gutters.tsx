@@ -132,6 +132,7 @@ export function DiscloseSlot({
   controls: string;
   testId?: string;
 }): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   if (!expandable) return reserve ? <Box data-slot="disclose" /> : null;
   return (
     // z-index 1 and flex for the same reasons the other two gutters use them:
@@ -145,7 +146,7 @@ export function DiscloseSlot({
         size="small"
         aria-expanded={expanded}
         aria-controls={expanded ? controls : undefined}
-        aria-label={expanded ? "Recolher detalhes" : "Expandir detalhes"}
+        aria-label={expanded ? copy.selection.collapseRow : copy.selection.expandRow}
         data-testid={testId}
         onClick={(event) => {
           event.stopPropagation();

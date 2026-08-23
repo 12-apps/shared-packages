@@ -2,7 +2,7 @@ import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 
 import { compileReport } from '../compile';
-import { executeCompiledQuery, OTHERS_BUCKET_LABEL } from '../memory';
+import { executeCompiledQuery } from '../memory';
 import { renderReport } from '../render';
 import { reportSpecSchema, type ReportSpecInput } from '../spec';
 import { orderRows, productSplitRows, salesCatalog, splitRows } from './fixtures';
@@ -123,7 +123,7 @@ describe('renderReport — chart colour scheme', () => {
 function runSplit(input: ReportSpecInput, rows: Array<Record<string, unknown>> = splitRows) {
   const spec = reportSpecSchema.parse(input);
   const query = compileReport(spec, salesCatalog);
-  const executed = executeCompiledQuery(rows, query);
+  const executed = executeCompiledQuery(rows, query, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   const model = renderReport(query, spec.presentation, salesCatalog, executed, PT_BR_REPORT_ENGINE_COPY.labels);
   return { executed, model };
 }
@@ -285,7 +285,7 @@ describe('renderReport — a split caps its series', () => {
     const { chartSpec } = splitChart(SPLIT_BY_PRODUCT, productSplitRows(6));
 
     expect(chartSpec.series).toHaveLength(6);
-    expect(chartSpec.series.map((series) => series.label)).not.toContain(OTHERS_BUCKET_LABEL);
+    expect(chartSpec.series.map((series) => series.label)).not.toContain(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 
   it('folds the tail into a VISIBLE "Outros" series past it', () => {
@@ -303,7 +303,7 @@ describe('renderReport — a split caps its series', () => {
       'Produto 03',
       'Produto 04',
     ]);
-    expect(labels[5]).toBe(OTHERS_BUCKET_LABEL);
+    expect(labels[5]).toBe(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
 
     const drawn = rows[0]!;
     expect(drawn[chartSpec.series[5]!.key]).toBe(500 + 400 + 300 + 200 + 100);
@@ -320,7 +320,7 @@ describe('renderReport — a split caps its series', () => {
     );
 
     expect(chartSpec.series).toHaveLength(10);
-    expect(chartSpec.series.map((series) => series.label)).not.toContain(OTHERS_BUCKET_LABEL);
+    expect(chartSpec.series.map((series) => series.label)).not.toContain(PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
   });
 });
 

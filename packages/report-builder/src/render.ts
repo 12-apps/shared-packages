@@ -221,7 +221,7 @@ function toSplitChartModel(
     // compileReport already rejects this; kept as a defensive invariant.
     throw new Error('A split chart requires one axis dimension and one measure.');
   }
-  const pivot = pivotSplit(query, entity, withoutSuppressedCells(rows), MAX_SPLIT_SERIES);
+  const pivot = pivotSplit(query, entity, withoutSuppressedCells(rows), MAX_SPLIT_SERIES, copy);
   return {
     kind: 'chart',
     chartSpec: {

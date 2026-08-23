@@ -275,11 +275,11 @@ describe('sentenceParts', () => {
     // this and it is rewriting the text.
     const sentence = blockSentence(SPEC, catalog, PT_BR_REPORT_ENGINE_COPY.spec);
 
-    expect(sentenceParts(sentence).map((part) => part.text).join('')).toBe(sentence);
+    expect(sentenceParts(sentence, PT_BR_REPORT_ENGINE_COPY.spec).map((part) => part.text).join('')).toBe(sentence);
   });
 
   it('emphasises the author’s terms and not the words joining them', () => {
-    const parts = sentenceParts(blockSentence(SPEC, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
+    const parts = sentenceParts(blockSentence(SPEC, catalog, PT_BR_REPORT_ENGINE_COPY.spec), PT_BR_REPORT_ENGINE_COPY.spec);
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',
@@ -295,7 +295,7 @@ describe('sentenceParts', () => {
   });
 
   it('emphasises the top-N count, which is a choice the author made', () => {
-    const parts = sentenceParts(blockSentence(TOP_N, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
+    const parts = sentenceParts(blockSentence(TOP_N, catalog, PT_BR_REPORT_ENGINE_COPY.spec), PT_BR_REPORT_ENGINE_COPY.spec);
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',
@@ -314,7 +314,7 @@ describe('sentenceParts', () => {
       dimensions: [{ field: 'createdAt', timeGrain: 'day' }, { field: 'method' }],
       filters: [],
     };
-    const parts = sentenceParts(blockSentence(split, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
+    const parts = sentenceParts(blockSentence(split, catalog, PT_BR_REPORT_ENGINE_COPY.spec), PT_BR_REPORT_ENGINE_COPY.spec);
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',
@@ -332,7 +332,7 @@ describe('sentenceParts', () => {
         { field: 'product', operator: 'eq', value: 'Café' },
       ],
     };
-    const parts = sentenceParts(blockSentence(twoFilters, catalog, PT_BR_REPORT_ENGINE_COPY.spec));
+    const parts = sentenceParts(blockSentence(twoFilters, catalog, PT_BR_REPORT_ENGINE_COPY.spec), PT_BR_REPORT_ENGINE_COPY.spec);
 
     expect(parts.filter((part) => part.strong).map((part) => part.text)).toEqual([
       'soma de receita',
@@ -344,6 +344,6 @@ describe('sentenceParts', () => {
   });
 
   it('emphasises nothing in an empty sentence', () => {
-    expect(sentenceParts('')).toEqual([]);
+    expect(sentenceParts('', PT_BR_REPORT_ENGINE_COPY.spec)).toEqual([]);
   });
 });

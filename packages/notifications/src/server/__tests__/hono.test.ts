@@ -33,7 +33,7 @@ beforeEach(() => {
     db: () => Promise.resolve(db),
     contacts: memoryContacts({ u1: { email: 'buyer@example.com', phone: null } }),
     generators: [ORDER_PAID as never],
-    transports: [{ channel: 'EMAIL', driver: 'log' }],
+    transports: [{ channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' }],
     logger: { info: () => undefined, error: () => undefined },
     // The host's whole authorization seam: a header stands in for a session.
     resolveActor: (c) => {

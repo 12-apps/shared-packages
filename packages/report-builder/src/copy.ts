@@ -76,6 +76,20 @@ export interface SpecSentenceCopy {
   list(parts: readonly string[]): string;
   /** The whole sentence, assembled from its clauses. No trailing period. */
   sentence(parts: SpecSentenceParts): string;
+  /**
+   * Every phrase the members above JOIN clauses with, longest first.
+   *
+   * The panel bolds a sentence by splitting it back apart on these and
+   * emphasising everything between them, so this pack is the only thing that
+   * knows them: a host writing its own words joined with `", where "` and
+   * `" by "` would otherwise get one unbroken bold run, because the splitter
+   * held a pt-BR list.
+   *
+   * Longest first is load-bearing: a regex alternation takes the first branch
+   * that matches at a position, so `", "` before `", onde "` cuts every clause
+   * boundary short and leaves `onde ` emphasised as if it were a field label.
+   */
+  connectives: readonly string[];
 }
 
 /**
@@ -101,6 +115,18 @@ export interface RenderLabelCopy {
   };
   /** A qualified heading: (`Receita`, `contagem`) → `Receita (contagem)`. */
   qualified(base: string, qualifier: string): string;
+  /**
+   * The folded remainder, in the legend and in the grouping column: everything
+   * past `topN` merged into one. It is a WORD on the chart, not a key — the
+   * engine held `'Outros'` as a module constant, which is what kept it out of
+   * reach of every gate and of every host.
+   */
+  othersBucket: string;
+  /**
+   * A split value that is null or empty. It still needs a name in the legend,
+   * and "no value" is a sentence rather than an absence.
+   */
+  emptySplit: string;
 }
 
 /**

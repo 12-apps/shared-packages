@@ -42,7 +42,7 @@ function mount(overrides: Partial<Parameters<typeof createApiNotifications>[0]> 
       'u-nophone': { email: 'nophone@example.com', phone: null },
     }),
     generators: [ORDER_PAID as never],
-    transports: [{ channel: 'EMAIL', driver: 'log' }],
+    transports: [{ channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' }],
     onInboxChanged: (userId) => changed.push(userId),
     logger: { info: () => undefined, error: () => undefined },
     ...overrides,

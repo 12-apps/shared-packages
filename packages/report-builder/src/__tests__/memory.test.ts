@@ -5,10 +5,11 @@ import { createMemoryDataSource, executeCompiledQuery } from '../memory';
 import { reportSpecSchema, type ReportSpecInput } from '../spec';
 import { truncateDateToGrain } from '../time';
 import { orderRows, salesCatalog } from './fixtures';
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 
 function run(input: ReportSpecInput, options?: { maxRows?: number }) {
   const query = compileReport(reportSpecSchema.parse(input), salesCatalog, options);
-  return executeCompiledQuery(orderRows, query);
+  return executeCompiledQuery(orderRows, query, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
 }
 
 describe('truncateDateToGrain', () => {
@@ -138,6 +139,7 @@ describe('executeCompiledQuery', () => {
         { method: 'PIX', totalCents: 200 },
       ],
       query,
+      PT_BR_REPORT_ENGINE_COPY.labels.othersBucket,
     );
     expect(rows).toEqual([
       { method: null, sum_totalCents: 100 },
@@ -148,7 +150,7 @@ describe('executeCompiledQuery', () => {
 
 describe('createMemoryDataSource', () => {
   it('resolves rows for the requested entity and empty for unknown tables', async () => {
-    const adapter = createMemoryDataSource({ orders: orderRows });
+    const adapter = createMemoryDataSource({ orders: orderRows }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
     const query = compileReport(
       reportSpecSchema.parse({ entity: 'orders', measures: [{ field: 'totalCents' }] }),
       salesCatalog,

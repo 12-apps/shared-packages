@@ -145,6 +145,7 @@ function CategoryGroupRows({
           onToggleExpanded={() => props.onToggleExpanded(categoryId)}
           onActivate={() => props.onActivateCategory(group)}
           dataTestId={props.dataTestId}
+          copy={props.copy}
         />
       )}
       {(expanded || asHeading) &&

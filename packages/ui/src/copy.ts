@@ -61,6 +61,13 @@ export interface CategorySelectCopy {
   expandAll: string;
   collapseAll: string;
   /**
+   * ONE row's chevron, in its two states — a glyph button inside the row
+   * button, so this pair is the whole of what a screen reader reads for it.
+   * The category's own name is appended by the caller.
+   */
+  expandCategory(name: string): string;
+  collapseCategory(name: string): string;
+  /**
    * What the closed control invites, and it differs by mode: picking ONE
    * category is a move, picking several is a filter. Both were pt-BR defaults
    * behind an optional prop, which is the arrangement this port removes.

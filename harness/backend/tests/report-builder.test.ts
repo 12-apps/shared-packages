@@ -54,30 +54,35 @@ const catalog = defineCatalog({
   },
 });
 
-const adapter = createMemoryDataSource({
-  orders: [
-    {
-      id: "o1",
-      createdAt: "2026-07-01T10:00:00Z",
-      method: "PIX",
-      totalCents: 1000,
-    },
-    {
-      id: "o2",
-      createdAt: "2026-07-01T22:30:00Z",
-      method: "CARD",
-      totalCents: 2000,
-    },
-    // 02:00Z is 23:00 the PREVIOUS day in America/Sao_Paulo — the late-night
-    // sale that moves between days if buckets are computed in UTC.
-    {
-      id: "o3",
-      createdAt: "2026-07-02T02:00:00Z",
-      method: "PIX",
-      totalCents: 3000,
-    },
-  ],
-});
+// `othersLabel` is REQUIRED: a top-N query FOLDS its tail, and the bucket it
+// makes is a ROW the reader sees, so the engine cannot name it.
+const adapter = createMemoryDataSource(
+  {
+    orders: [
+      {
+        id: "o1",
+        createdAt: "2026-07-01T10:00:00Z",
+        method: "PIX",
+        totalCents: 1000,
+      },
+      {
+        id: "o2",
+        createdAt: "2026-07-01T22:30:00Z",
+        method: "CARD",
+        totalCents: 2000,
+      },
+      // 02:00Z is 23:00 the PREVIOUS day in America/Sao_Paulo — the late-night
+      // sale that moves between days if buckets are computed in UTC.
+      {
+        id: "o3",
+        createdAt: "2026-07-02T02:00:00Z",
+        method: "PIX",
+        totalCents: 3000,
+      },
+    ],
+  },
+  PT_BR_REPORT_ENGINE_COPY.labels.othersBucket,
+);
 
 const options = {
   catalog,

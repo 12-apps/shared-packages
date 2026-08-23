@@ -51,6 +51,13 @@ export interface ResearchRunState {
 }
 
 export interface UseResearchRunOptions {
+  /**
+   * What the screen says when a poll fails with something that is not an
+   * `Error` and therefore carries no message of its own. REQUIRED — this was
+   * `'erro de rede'`, so every host of this hook showed a Brazilian sentence
+   * to a buyer the moment a fetch rejected with a non-Error.
+   */
+  networkError: string;
   intervalMs?: number;
   /**
    * Host-injected realtime subscription (FUT-439). Must be referentially
@@ -63,13 +70,13 @@ const DEFAULT_INTERVAL_MS = 1200;
 
 const TERMINAL_STATUSES = new Set(['COMPLETED', 'FAILED']);
 
-function resolveOptions(options?: UseResearchRunOptions): {
+function resolveOptions(options: UseResearchRunOptions): {
   intervalMs: number;
   useChannel: UseResearchRunChannel;
 } {
   return {
-    intervalMs: options?.intervalMs ?? DEFAULT_INTERVAL_MS,
-    useChannel: options?.channel ?? useDisconnectedRunChannel,
+    intervalMs: options.intervalMs ?? DEFAULT_INTERVAL_MS,
+    useChannel: options.channel ?? useDisconnectedRunChannel,
   };
 }
 
@@ -155,6 +162,8 @@ interface LoopHandles {
   setRequest: Dispatch<SetStateAction<ResearchRequestView | null>>;
   setRun: Dispatch<SetStateAction<ResearchRunView | null>>;
   setError: Dispatch<SetStateAction<string | null>>;
+  /** The host's sentence for a rejection that carries none of its own. */
+  networkError: string;
 }
 
 /**
@@ -181,7 +190,7 @@ function createPollingLoop(handles: LoopHandles): { tick: () => void; stop: () =
       }
     } catch (caught) {
       if (cancelled) return;
-      handles.setError(caught instanceof Error ? caught.message : 'erro de rede');
+      handles.setError(caught instanceof Error ? caught.message : handles.networkError);
     }
   };
 
@@ -201,7 +210,8 @@ function usePollingLoop(
   tickRef: RefObject<(() => void) | null>,
   setLiveStats: Dispatch<SetStateAction<SourceStatView[]>>,
 ): void {
-  const { client, connected, requestId, intervalMs, setRequest, setRun, setError } = handles;
+  const { client, connected, requestId, intervalMs, setRequest, setRun, setError, networkError } =
+    handles;
   useEffect(() => {
     const loop = createPollingLoop({
       client,
@@ -211,6 +221,7 @@ function usePollingLoop(
       setRequest,
       setRun,
       setError,
+      networkError,
     });
     tickRef.current = loop.tick;
     setRequest(null);
@@ -224,7 +235,19 @@ function usePollingLoop(
     };
     // `client`/`connected` are refs and the setters are stable — the loop
     // restarts only on a new request, a new cadence, or a reload.
-  }, [client, connected, requestId, intervalMs, epoch, setRequest, setRun, setError, setLiveStats, tickRef]);
+  }, [
+    client,
+    connected,
+    requestId,
+    intervalMs,
+    epoch,
+    setRequest,
+    setRun,
+    setError,
+    networkError,
+    setLiveStats,
+    tickRef,
+  ]);
 }
 
 /**
@@ -258,7 +281,7 @@ function useLiveStatsReset(
 export function useResearchRun(
   client: ResearchApiClient,
   requestId: string,
-  options?: UseResearchRunOptions,
+  options: UseResearchRunOptions,
 ): ResearchRunState {
   const { intervalMs, useChannel } = resolveOptions(options);
   const [request, setRequest] = useState<ResearchRequestView | null>(null);
@@ -289,7 +312,16 @@ export function useResearchRun(
   connectedRef.current = connected;
 
   usePollingLoop(
-    { client: clientRef, connected: connectedRef, requestId, intervalMs, setRequest, setRun, setError },
+    {
+      client: clientRef,
+      connected: connectedRef,
+      requestId,
+      intervalMs,
+      setRequest,
+      setRun,
+      setError,
+      networkError: options.networkError,
+    },
     epoch,
     tickRef,
     setLiveStats,

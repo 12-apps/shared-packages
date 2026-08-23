@@ -52,7 +52,7 @@ describe('driver resolution', () => {
   it('names the drivers it knows when a vendor key is a typo', () => {
     // A typo'd vendor silently disabling a channel is the failure this seam
     // exists to remove, so it throws at MOUNT rather than at the first send.
-    expect(() => emailTransport({ channel: 'EMAIL', driver: 'resnd' })).toThrow(
+    expect(() => emailTransport({ channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'resnd' })).toThrow(
       /unknown EMAIL driver "resnd".*Known drivers: log, resend/s,
     );
   });
@@ -60,11 +60,11 @@ describe('driver resolution', () => {
   it('accepts a HOST driver with no change to the package', () => {
     const sent: string[] = [];
     const transport = emailTransport(
-      { channel: 'EMAIL', driver: 'ses' },
+      { channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'ses' },
       { ses: () => ({ send: (to) => { sent.push(to); return Promise.resolve(); } }) },
     );
     expect(transport.channel).toBe('EMAIL');
-    return transport.send(formatEmail(CONTENT, { channel: 'EMAIL', driver: 'ses' }), reachable).then(() => {
+    return transport.send(formatEmail(CONTENT, { channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'ses' }), reachable).then(() => {
       expect(sent).toEqual(['buyer@example.com']);
     });
   });
@@ -77,6 +77,7 @@ describe('the email transport', () => {
     apiKey: 'key_1',
     from: 'Loja <no-reply@example.com>',
     appUrl: 'https://loja.example.com',
+    linkLabel: 'Ver detalhes',
   } as const;
 
   it('formats subject/text/html and turns the link into an absolute CTA', () => {
@@ -89,7 +90,7 @@ describe('the email transport', () => {
   it('drops the link when no app URL is configured', () => {
     // A relative path is useless in an inbox and a fabricated localhost link is
     // worse than none.
-    const message = formatEmail(CONTENT, { channel: 'EMAIL', driver: 'log' });
+    const message = formatEmail(CONTENT, { channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' });
     expect(message.text).toBe('Pedido A1 pago.');
     expect(message.html).not.toContain('<a ');
   });
@@ -97,7 +98,7 @@ describe('the email transport', () => {
   it('escapes HTML in the content rather than rendering it', () => {
     const message = formatEmail(
       { title: '<script>x</script>', body: 'a & b "c"' },
-      { channel: 'EMAIL', driver: 'log' },
+      { channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' },
     );
     expect(message.html).toContain('&lt;script&gt;');
     expect(message.html).toContain('a &amp; b &quot;c&quot;');
@@ -132,7 +133,7 @@ describe('the email transport', () => {
     // `!== null` passed an empty string — a very ordinary value for a nullable
     // column — so the channel earned a delivery row and then failed forever
     // against `send`'s own truthiness check. Two gates, one answer.
-    const transport = emailTransport({ channel: 'EMAIL', driver: 'log' });
+    const transport = emailTransport({ channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' });
     expect(transport.supports({ ...reachable, email: null })).toBe(false);
     expect(transport.supports({ ...reachable, email: '' })).toBe(false);
     expect(transport.supports(reachable)).toBe(true);
@@ -143,7 +144,7 @@ describe('the email transport', () => {
 
   it('logs no destination address on the log driver — an inbox address is PII', () => {
     const info = vi.fn();
-    const transport = emailTransport({ channel: 'EMAIL', driver: 'log', logger: { info, error: vi.fn() } });
+    const transport = emailTransport({ channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log', logger: { info, error: vi.fn() } });
     return transport.send(formatEmail(CONTENT, declaration), reachable).then(() => {
       expect(info).toHaveBeenCalledTimes(1);
       expect(String(info.mock.calls[0]?.[0])).not.toContain('buyer@example.com');
@@ -366,7 +367,7 @@ describe('the registry', () => {
   };
 
   it('answers null for a channel the host never declared', () => {
-    const registry = createTransportRegistry([{ channel: 'EMAIL', driver: 'log' }], subscriptions);
+    const registry = createTransportRegistry([{ channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' }], subscriptions);
     expect(registry.get('EMAIL')).not.toBeNull();
     expect(registry.get('SMS')).toBeNull();
     expect(registry.list()).toHaveLength(1);
@@ -385,8 +386,8 @@ describe('the registry', () => {
     expect(() =>
       createTransportRegistry(
         [
-          { channel: 'EMAIL', driver: 'log' },
-          { channel: 'EMAIL', driver: 'resend', apiKey: 'k', from: 'f' },
+          { channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' },
+          { channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'resend', apiKey: 'k', from: 'f' },
         ],
         subscriptions,
       ),

@@ -36,6 +36,8 @@ export const PT_BR_CATEGORY_SELECT_COPY: CategorySelectCopy = {
   deselectAll: "Desmarcar tudo",
   expandAll: "Expandir tudo",
   collapseAll: "Recolher tudo",
+  expandCategory: (name) => `Expandir ${name}`,
+  collapseCategory: (name) => `Recolher ${name}`,
   placeholderSingle: "Mover para…",
   placeholderMulti: "Categoria",
   emptyTitle: "Nenhuma categoria ainda",
@@ -234,6 +236,8 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     selectAll: "Selecionar tudo",
     onThisPage: (count) => `${count} nesta página`,
     selectRow: "Selecionar",
+    expandRow: "Expandir detalhes",
+    collapseRow: "Recolher detalhes",
   },
   nav: {
     mainView: "Visão principal",

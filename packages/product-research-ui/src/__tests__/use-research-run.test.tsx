@@ -13,6 +13,9 @@ import { fakeClient, requestView, runView } from './fake-client';
 
 const RUN_STAMP = { id: 'run-1', status: 'x', startedAt: null, finishedAt: null };
 
+/** The host's sentence for a rejection carrying none of its own — now required. */
+const NETWORK_ERROR = 'Não foi possível carregar a pesquisa.';
+
 describe('useResearchRun', () => {
   it('walks queued → running → completed and then stops polling', async () => {
     const state = { runStatus: null as string | null, runCalls: 0 };
@@ -27,7 +30,7 @@ describe('useResearchRun', () => {
       },
     });
 
-    const { result } = renderHook(() => useResearchRun(client, 'req-1', { intervalMs: 5 }));
+    const { result } = renderHook(() => useResearchRun(client, 'req-1', { intervalMs: 5, networkError: NETWORK_ERROR }));
 
     await waitFor(() => expect(result.current.phase).toBe('queued'));
     state.runStatus = 'RUNNING';
@@ -55,7 +58,7 @@ describe('useResearchRun', () => {
       getRun: () => Promise.resolve(runView()),
     });
 
-    const { result } = renderHook(() => useResearchRun(client, 'req-1', { intervalMs: 5 }));
+    const { result } = renderHook(() => useResearchRun(client, 'req-1', { intervalMs: 5, networkError: NETWORK_ERROR }));
     await waitFor(() => expect(result.current.phase).toBe('error'));
     expect(result.current.error).toBe('rede fora');
 
@@ -86,7 +89,7 @@ describe('useResearchRun with a realtime channel (FUT-439)', () => {
   it('resolves per-source stats from events without a poll tick, then re-reads on run-finished', async () => {
     const { state, client, channel } = streamingHarness();
     const { result } = renderHook(() =>
-      useResearchRun(client, 'req-1', { intervalMs: 60_000, channel: channel.useChannel }),
+      useResearchRun(client, 'req-1', { intervalMs: 60_000, channel: channel.useChannel, networkError: NETWORK_ERROR }),
     );
     await waitFor(() => expect(result.current.phase).toBe('running'));
 
@@ -123,7 +126,7 @@ describe('useResearchRun with a realtime channel (FUT-439)', () => {
   it('re-reads once for a source that reported offers, and not for one that did not', async () => {
     const { state, client, channel } = streamingHarness();
     const { result } = renderHook(() =>
-      useResearchRun(client, 'req-1', { intervalMs: 60_000, channel: channel.useChannel }),
+      useResearchRun(client, 'req-1', { intervalMs: 60_000, channel: channel.useChannel, networkError: NETWORK_ERROR }),
     );
     await waitFor(() => expect(result.current.phase).toBe('running'));
     act(() => channel.setConnected(true));
@@ -143,7 +146,7 @@ describe('useResearchRun with a realtime channel (FUT-439)', () => {
   it('ignores events from a run it is not watching', async () => {
     const { state, client, channel } = streamingHarness();
     const { result } = renderHook(() =>
-      useResearchRun(client, 'req-1', { intervalMs: 60_000, channel: channel.useChannel }),
+      useResearchRun(client, 'req-1', { intervalMs: 60_000, channel: channel.useChannel, networkError: NETWORK_ERROR }),
     );
     await waitFor(() => expect(result.current.phase).toBe('running'));
     act(() => channel.setConnected(true));
@@ -165,7 +168,7 @@ describe('useResearchRun with a realtime channel (FUT-439)', () => {
     });
     const channel = channelHarness(); // never connected
     const { result } = renderHook(() =>
-      useResearchRun(client, 'req-1', { intervalMs: 5, channel: channel.useChannel }),
+      useResearchRun(client, 'req-1', { intervalMs: 5, channel: channel.useChannel, networkError: NETWORK_ERROR }),
     );
 
     await waitFor(() => expect(result.current.phase).toBe('running'));
@@ -178,7 +181,7 @@ describe('useResearchRun with a realtime channel (FUT-439)', () => {
   it('resumes the polling loop the moment the channel drops', async () => {
     const { state, client, channel } = streamingHarness();
     const { result } = renderHook(() =>
-      useResearchRun(client, 'req-1', { intervalMs: 5, channel: channel.useChannel }),
+      useResearchRun(client, 'req-1', { intervalMs: 5, channel: channel.useChannel, networkError: NETWORK_ERROR }),
     );
     await waitFor(() => expect(result.current.phase).toBe('running'));
     act(() => channel.setConnected(true));

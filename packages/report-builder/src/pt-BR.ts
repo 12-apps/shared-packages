@@ -62,6 +62,18 @@ export const PT_BR_REPORT_ENGINE_COPY: ReportEngineCopy = {
       if (limit !== undefined) sentence += `, top ${limit}`;
       return sentence;
     },
+    // Every phrase the members above join with, longest first. `dividido por`
+    // is `ratio`'s; the rest come from `sentence` and `list`.
+    connectives: [
+      ', separado por ',
+      ', dividido por ',
+      ', onde ',
+      ', top ',
+      ' por ',
+      ' em ',
+      ' e ',
+      ', ',
+    ],
   },
   labels: {
     grains: {
@@ -75,6 +87,8 @@ export const PT_BR_REPORT_ENGINE_COPY: ReportEngineCopy = {
       ratio: 'proporção',
     },
     qualified: (base, qualifier) => `${base} (${qualifier})`,
+    othersBucket: 'Outros',
+    emptySplit: '(sem valor)',
   },
   presentation: {
     needsGrouping:

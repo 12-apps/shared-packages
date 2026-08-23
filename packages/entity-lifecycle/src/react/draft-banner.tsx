@@ -109,7 +109,7 @@ export function DraftBanner({
           onClick={() => onLoad(draft)}
           dataTestId={`${testIdPrefix}-load`}
         >
-          Carregar rascunho
+          {copy.load}
         </Button>
         <Button
           size="sm"
@@ -117,7 +117,7 @@ export function DraftBanner({
           onClick={() => void actions.publish()}
           dataTestId={`${testIdPrefix}-publish`}
         >
-          Publicar
+          {copy.publish}
         </Button>
         <Button
           variant="text"
@@ -127,7 +127,7 @@ export function DraftBanner({
           onClick={() => void actions.discard()}
           dataTestId={`${testIdPrefix}-discard`}
         >
-          Descartar
+          {copy.discard}
         </Button>
       </Stack>
       {actions.error && (
