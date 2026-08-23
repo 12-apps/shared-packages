@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { CepField } from './CepField';
 import type { CepAddress } from './CepField.types';
+import { PT_BR_CEP_FIELD_COPY } from '../../../pt-BR';
 
 const ADDRESS: CepAddress = {
   cep: '01310100',
@@ -14,6 +15,7 @@ const ADDRESS: CepAddress = {
 };
 
 const meta: Meta<typeof CepField> = {
+  args: { copy: PT_BR_CEP_FIELD_COPY },
   title: 'Form/CepField/Tests',
   component: CepField,
   parameters: {
@@ -47,7 +49,7 @@ function Harness({
 }): React.ReactElement {
   const [value, setValue] = useState(initial);
   return (
-    <CepField
+    <CepField copy={PT_BR_CEP_FIELD_COPY}
       value={value}
       onChange={setValue}
       onLookup={onLookup}
@@ -270,7 +272,7 @@ export const ExposesAccessibleStatus: Story = {
 export const RendersACallerError: Story = {
   render: function ErrorStory() {
     const [value, setValue] = useState('123');
-    return <CepField value={value} onChange={setValue} error="CEP inválido." />;
+    return <CepField copy={PT_BR_CEP_FIELD_COPY} value={value} onChange={setValue} error="CEP inválido." />;
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

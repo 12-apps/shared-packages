@@ -49,7 +49,7 @@ function injectedCss(): string {
 function renderModal(actions?: React.ReactNode): void {
   render(
     <StackedModalProvider>
-      <StackedModal
+      <StackedModal backLabel="Voltar"
         open
         onClose={() => undefined}
         navigationTitle="Novo produto"

@@ -19,7 +19,14 @@ const testId = (base: string | undefined, suffix: string, fallback: string) =>
 export interface HoverCardContentProps
   extends Pick<
     HoverCardProps,
-    'variant' | 'title' | 'description' | 'avatar' | 'loading' | 'loadingComponent' | 'children'
+    | 'variant'
+    | 'title'
+    | 'description'
+    | 'avatar'
+    | 'loading'
+    | 'loadingComponent'
+    | 'loadingText'
+    | 'children'
   > {
   dataTestId?: string;
 }
@@ -113,6 +120,7 @@ const DetailedContent: React.FC<HoverCardContentProps> = ({
 export const HoverCardContent: React.FC<HoverCardContentProps> = (props) => {
   const { variant, title, description, avatar, loading, loadingComponent, children, dataTestId } =
     props;
+  const { loadingText } = props;
 
   if (loading) {
     return (
@@ -120,7 +128,7 @@ export const HoverCardContent: React.FC<HoverCardContentProps> = (props) => {
         {loadingComponent || (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress size={20} />
-            <Typography variant="body2">Loading...</Typography>
+            <Typography variant="body2">{loadingText}</Typography>
           </Box>
         )}
       </LoadingContainer>

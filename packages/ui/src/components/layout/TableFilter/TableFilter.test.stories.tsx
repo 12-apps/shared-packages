@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { FilterTrigger } from '../ContentToolbar/FilterTrigger';
 import { TableFilter } from './TableFilter';
 import type { TableFilterRange } from './TableFilter.types';
+import { PT_BR_TABLE_FILTER_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TableFilter> = {
   title: 'Dashboards/TableFilter/Tests',
@@ -29,7 +30,7 @@ function Harness(): React.JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: 360 }}>
       <FilterTrigger open={open} onOpenChange={setOpen} hasActiveFilters={cats.size > 0} data-testid="funnel" />
-      <TableFilter open={open} onOpenChange={setOpen} hasActiveFilters={cats.size > 0}>
+      <TableFilter copy={PT_BR_TABLE_FILTER_COPY} open={open} onOpenChange={setOpen} hasActiveFilters={cats.size > 0}>
         <TableFilter.Layout>
           <TableFilter.Main>
             <Box data-testid="main">main</Box>

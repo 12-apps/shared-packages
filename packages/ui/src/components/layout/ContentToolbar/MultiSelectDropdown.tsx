@@ -62,6 +62,8 @@ export function MultiSelectDropdown<TValue extends string = string>({
   onClear,
   allLabel = 'All',
   clearLabel,
+  clearText,
+  extraOptionsHeading,
   extraOptions,
   searchable,
   searchPlaceholder = 'Search…',
@@ -111,7 +113,7 @@ export function MultiSelectDropdown<TValue extends string = string>({
     <>
       {renderTrigger()}
       <MultiSelectMenu
-        anchorEl={anchorEl}
+        extraOptionsHeading={extraOptionsHeading} clearText={clearText} anchorEl={anchorEl}
         open={open}
         close={close}
         options={options}
@@ -184,6 +186,8 @@ interface MultiSelectMenuProps<TValue extends string> {
   onQueryChange: (value: string) => void;
   searchPlaceholder: string;
   noResultsLabel: string;
+  extraOptionsHeading: string;
+  clearText: string;
   /** Match the menu width to the trigger and left-align it (stacked select). */
   matchAnchorWidth?: boolean;
   testId?: string;
@@ -211,6 +215,8 @@ function MultiSelectMenu<TValue extends string>({
   selected,
   onToggle,
   extraOptions,
+  extraOptionsHeading,
+  clearText,
   clearDisabled,
   onClear,
   showSearch,
@@ -267,25 +273,30 @@ function MultiSelectMenu<TValue extends string>({
         ? [
             <Divider key="extra-divider" />,
             <ListSubheader key="extra-label" sx={{ px: 1, py: 0.75, fontSize: '0.75rem', fontWeight: 600 }}>
-              Options
+              {extraOptionsHeading}
             </ListSubheader>,
             ...extraOptions.map((extra) => (
               <CheckboxRow key={extra.id} label={extra.label} checked={extra.checked} onToggle={(next) => extra.onCheckedChange(next)} />
             )),
           ]
         : null}
-      <MenuClearFooter clearDisabled={clearDisabled} onClear={onClear} close={close} testId={testId} />
+      <MenuClearFooter
+        clearText={clearText} clearDisabled={clearDisabled} onClear={onClear}
+        close={close} testId={testId}
+      />
     </Menu>
   );
 }
 
 /** The bottom "Clear" footer that resets the selection and closes the menu. */
 function MenuClearFooter({
+  clearText,
   clearDisabled,
   onClear,
   close,
   testId,
 }: {
+  clearText: string;
   clearDisabled: boolean;
   onClear: () => void;
   close: () => void;
@@ -320,7 +331,7 @@ function MenuClearFooter({
         }}
         sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: '0.75rem', fontWeight: 400, textTransform: 'none', color: 'text.secondary' }}
       >
-        Clear
+        {clearText}
       </Button>
     </Box>
   );

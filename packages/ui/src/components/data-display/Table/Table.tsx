@@ -299,10 +299,13 @@ const TableLoadingState: React.FC<{
 const TableEmptyState: React.FC<{
   shell: TableShellProps;
   emptyStateComponent?: React.ReactNode;
+  emptyText: string;
   colSpan: number;
-}> = ({ shell, emptyStateComponent, colSpan }) => (
+}> = ({ shell, emptyStateComponent, emptyText, colSpan }) => (
   <TableShell {...shell}>
-    <EmptyRow colSpan={colSpan}>{emptyStateComponent || <NoDataPlaceholder />}</EmptyRow>
+    <EmptyRow colSpan={colSpan}>
+      {emptyStateComponent || <NoDataPlaceholder emptyText={emptyText} />}
+    </EmptyRow>
   </TableShell>
 );
 
@@ -316,6 +319,7 @@ export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
       loading,
       loadingComponent,
       emptyStateComponent,
+      emptyText,
       children,
       ...props
     } = resolved;
@@ -345,6 +349,7 @@ export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
         <TableEmptyState
           shell={shell}
           emptyStateComponent={emptyStateComponent}
+          emptyText={emptyText}
           colSpan={finalColumns?.length || 1}
         />
       );

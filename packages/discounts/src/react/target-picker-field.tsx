@@ -1,6 +1,6 @@
 "use client";
 
-import type { CategorySelectCopy } from "@12-apps/ui/copy";
+import type { AutocompleteCopy, CategorySelectCopy } from "@12-apps/ui/copy";
 import { useState, type JSX } from "react";
 
 import { Autocomplete } from "@12-apps/ui/form/Autocomplete";
@@ -35,10 +35,12 @@ function TargetField({
   ids,
   onChange,
   dataTestId,
+  autocompleteCopy,
 }: {
   label: string;
   placeholder: string;
   requiredMessage: string | undefined;
+  autocompleteCopy: AutocompleteCopy;
   options: readonly WireTarget[];
   ids: readonly string[];
   onChange: (next: string[]) => void;
@@ -57,6 +59,7 @@ function TargetField({
       <FormLabel error={missing}>{label}</FormLabel>
       <div data-testid={dataTestId}>
         <Autocomplete<WireTarget>
+          copy={autocompleteCopy}
           multiple
           value={query}
           onChange={setQuery}
@@ -102,6 +105,7 @@ export function TargetPickerField({
   onChange,
   dataTestId,
   copy,
+  autocompleteCopy,
 }: {
   group: WireTargetGroup;
   label: string;
@@ -112,6 +116,8 @@ export function TargetPickerField({
   dataTestId: string;
   /** `CategorySelect`'s own words — required since FUT-760, never defaulted. */
   copy: CategorySelectCopy;
+  /** `Autocomplete`'s, for the flat branch. Same rule, same wave. */
+  autocompleteCopy: AutocompleteCopy;
 }): JSX.Element {
   if (group.nests) {
     return (
@@ -130,6 +136,7 @@ export function TargetPickerField({
   }
   return (
     <TargetField
+      autocompleteCopy={autocompleteCopy}
       label={label}
       placeholder={placeholder}
       requiredMessage={requiredMessage}

@@ -6,6 +6,7 @@ import { CodeEditor } from './CodeEditor';
 import type { EditorLanguage } from './CodeEditor.types';
 
 const meta: Meta<typeof CodeEditor> = {
+  args: { copy: PT_BR_CODE_EDITOR_COPY },
   title: 'Form/CodeEditor',
   component: CodeEditor,
   parameters: {
@@ -467,6 +468,7 @@ Import and use components in your React application:
 
 \`\`\`jsx
 import { Button, Card, Dialog } from '@company/ui-components';
+import { PT_BR_CODE_EDITOR_COPY } from '../../../pt-BR';
 
 function App() {
   return (
@@ -549,7 +551,7 @@ const AllLanguagesComponent = () => {
         ))}
       </Stack>
 
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language={activeLanguage}
         value={sampleCode[activeLanguage as keyof typeof sampleCode]}
         height="500px"
@@ -606,7 +608,7 @@ export const ReadOnlyMode: Story = {
       <Alert severity="info">
         This editor is in read-only mode. Users can view and copy but cannot edit.
       </Alert>
-      <CodeEditor {...args} />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} {...args} />
     </Stack>
   ),
 };
@@ -630,7 +632,7 @@ const LiveEditorComponent = () => {
 
       {saved && <Alert severity="success">Code saved successfully!</Alert>}
 
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language="javascript"
         value={code}
         onChange={setCode}
@@ -685,7 +687,7 @@ const CustomFontSizeComponent = () => {
         ))}
       </Stack>
 
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language="python"
         value={sampleCode.python}
         fontSize={fontSize}
@@ -737,7 +739,7 @@ export const AutoFormat: Story = {
       <Stack spacing={3}>
         <Alert severity="info">This editor will automatically format the code when it loads</Alert>
 
-        <CodeEditor
+        <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
           language="javascript"
           value={unformattedCode}
           autoFormat={true}
@@ -761,7 +763,7 @@ export const ComparisonView: Story = {
         <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
           <Stack spacing={1}>
             <Typography variant="subtitle2">Original (JavaScript)</Typography>
-            <CodeEditor
+            <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
               language="javascript"
               value={originalCode}
               height="400px"
@@ -772,7 +774,7 @@ export const ComparisonView: Story = {
 
           <Stack spacing={1}>
             <Typography variant="subtitle2">Modified (TypeScript)</Typography>
-            <CodeEditor
+            <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
               language="typescript"
               value={modifiedCode}
               height="400px"
@@ -790,13 +792,13 @@ export const ComparisonView: Story = {
 export const AllVariants: Story = {
   render: () => (
     <Stack spacing={4}>
-      <CodeEditor language="javascript" value="console.log('Default variant');" />
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="console.log('Default variant');" />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language="typescript"
         value="const message: string = 'TypeScript variant';"
         theme="dark"
       />
-      <CodeEditor language="json" value='{"variant": "JSON with minimap"}' minimap />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="json" value='{"variant": "JSON with minimap"}' minimap />
     </Stack>
   ),
 };
@@ -804,14 +806,14 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Stack spacing={4}>
-      <CodeEditor language="javascript" value="// Small size" height="200px" fontSize={12} />
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="// Small size" height="200px" fontSize={12} />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language="javascript"
         value="// Medium size (default)"
         height="400px"
         fontSize={14}
       />
-      <CodeEditor language="javascript" value="// Large size" height="600px" fontSize={16} />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="// Large size" height="600px" fontSize={16} />
     </Stack>
   ),
 };
@@ -819,9 +821,9 @@ export const AllSizes: Story = {
 export const AllStates: Story = {
   render: () => (
     <Stack spacing={4}>
-      <CodeEditor language="javascript" value="// Normal state" />
-      <CodeEditor language="javascript" value="// Read-only state" readOnly />
-      <CodeEditor language="javascript" value="" placeholder="Empty state with placeholder" />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="// Normal state" />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="// Read-only state" readOnly />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="" placeholder="Empty state with placeholder" />
     </Stack>
   ),
 };
@@ -837,8 +839,8 @@ const InteractiveComponent = () => {
 
   return (
     <Stack spacing={4}>
-      <CodeEditor language="javascript" value={code1} onChange={setCode1} onSave={handleSave} />
-      <CodeEditor language="typescript" value={code2} onChange={setCode2} wordWrap autoFormat />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value={code1} onChange={setCode1} onSave={handleSave} />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="typescript" value={code2} onChange={setCode2} wordWrap autoFormat />
     </Stack>
   );
 };
@@ -858,7 +860,7 @@ export const Responsive: Story = {
     },
   },
   render: () => (
-    <CodeEditor
+    <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
       language="javascript"
       value={`// Responsive code editor
 // This editor adapts to different screen sizes

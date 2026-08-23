@@ -6,6 +6,7 @@ import type { AddressAutocompleteProps } from './AddressAutocomplete.types';
 import { AddressTextField } from './AddressTextField';
 
 export interface AddressFallbackFieldProps {
+  copy: AddressAutocompleteProps['copy'];
   variant: AddressAutocompleteProps['variant'];
   label?: string;
   placeholder?: string;
@@ -18,6 +19,7 @@ export interface AddressFallbackFieldProps {
 // Stands in for the Autocomplete before Google Maps is usable: a disabled field
 // that either spins or explains why it never loaded.
 export const AddressFallbackField: FC<AddressFallbackFieldProps> = ({
+  copy,
   variant,
   label,
   placeholder,
@@ -33,7 +35,7 @@ export const AddressFallbackField: FC<AddressFallbackFieldProps> = ({
       <AddressTextField
         addressVariant={variant}
         label={floating ? undefined : label}
-        placeholder="Loading Google Maps..."
+        placeholder={copy.loadingMaps}
         disabled
         fullWidth={fullWidth}
         InputProps={{
@@ -57,7 +59,7 @@ export const AddressFallbackField: FC<AddressFallbackFieldProps> = ({
         InputProps={{ startAdornment }}
       />
       <Alert severity="error" sx={{ mt: 1 }}>
-        Google Maps API failed to load. Please check your API key and internet connection.
+        {copy.mapsLoadFailed}
       </Alert>
     </Box>
   );

@@ -7,6 +7,8 @@ export type ModalPanelRole = 'primary' | 'secondary' | 'background';
 export type PanelMaxWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false;
 
 export interface StackedModalProps {
+  /** The back arrow's accessible name — it carries a glyph only. REQUIRED. */
+  backLabel: string;
   /** Controls the visibility of the modal */
   open: boolean;
   /** Callback fired when the component requests to be closed */

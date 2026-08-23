@@ -1,4 +1,4 @@
-import type { CategorySelectCopy, ConfirmActionCopy } from "../../../copy";
+import type { CategorySelectCopy, ConfirmActionCopy, TableFilterCopy } from "../../../copy";
 import type { SavedViewsLabels } from "../../layout/ContentToolbar/ContentToolbar.types";
 /**
  * Every word the DataViews family renders, as REQUIRED host config (FUT-760).
@@ -177,6 +177,16 @@ export interface DataViewsFiltersCopy {
    * dates alone — and getting it wrong silently drops or adds a day's rows.
    */
   rangeInclusiveNote: string;
+  /** The FROM half of a range, in the box itself. */
+  rangeStart: string;
+  /**
+   * The day field's mask, which IS its placeholder — so the expected ORDER is
+   * on screen before the first keystroke rather than discovered by getting it
+   * wrong. `dd/mm/aaaa` is one locale's order and one locale's letters.
+   */
+  dayMask: string;
+  /** Drop every applied filter, spelled out in the panel where there is room. */
+  clearAllFilters: string;
   /** The day-range presets' labels, keyed by preset id. */
   rangePresets: Readonly<Record<string, string>>;
   scopesLabel: string;
@@ -197,6 +207,11 @@ export interface DataViewsFiltersCopy {
   allOption: string;
   optionSearchPlaceholder: string;
   optionsEmpty: string;
+  /**
+   * The heading over a dropdown's EXTRA toggles — the section below the option
+   * list, not the list itself. It only appears when a pill supplies extras.
+   */
+  optionsHeading: string;
 }
 
 export interface DataViewsSelectionCopy {
@@ -233,6 +248,10 @@ export interface DataViewsNavCopy {
   updateFailed: string;
   /** The dismiss on that failure's alert — a glyph with no visible label. */
   dismissError: string;
+  /** The filter panel's back arrow — a glyph with no visible label. */
+  goBack: string;
+  /** The label in front of the page-size select. */
+  pageSize: string;
   saveFailed: string;
   /** Reopen the save dialog over an existing view. */
   editView: string;
@@ -267,6 +286,13 @@ export interface DataViewsCopy {
   savedViewsMenu: SavedViewsLabels;
   confirmAction: ConfirmActionCopy;
   categorySelect: CategorySelectCopy;
+  /**
+   * The filter shell's own words. DataViews mounts three of its parts — the
+   * panel, the keyword box and the numeric range field — so all five are on
+   * screen; the range's two ends are `Mínimo`/`Máximo` rather than the day
+   * range's `De`/`Até`, which is why this cannot be derived from `filters`.
+   */
+  tableFilter: TableFilterCopy;
   board: DataViewsBoardCopy;
   deleteView: DeleteViewCopy;
   manageViews: ManageViewsCopy;

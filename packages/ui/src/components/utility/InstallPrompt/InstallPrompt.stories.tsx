@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 import { InstallPrompt } from './InstallPrompt';
 import type { BeforeInstallPromptEvent } from './InstallPrompt.types';
+import { PT_BR_INSTALL_PROMPT_COPY } from '../../../pt-BR';
 
 /**
  * The component listens for a browser event that Storybook will never fire, so
@@ -33,6 +34,7 @@ const useCleanDismissalState = (storageKey: string) => {
 };
 
 const meta: Meta<typeof InstallPrompt> = {
+  args: { copy: PT_BR_INSTALL_PROMPT_COPY },
   title: 'Utility/InstallPrompt',
   component: InstallPrompt,
   tags: ['autodocs', 'component:InstallPrompt'],
@@ -58,7 +60,7 @@ const DefaultComponent = () => {
   useCleanDismissalState('sb-install-default');
   useSyntheticInstallEvent();
 
-  return <InstallPrompt storageKey="sb-install-default" />;
+  return <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} storageKey="sb-install-default" />;
 };
 
 export const Default: Story = {
@@ -70,7 +72,7 @@ const WithDescriptionComponent = () => {
   useSyntheticInstallEvent();
 
   return (
-    <InstallPrompt
+    <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY}
       storageKey="sb-install-described"
       title="Install FutureDrink"
       description="Order faster next time — the menu opens straight from your home screen."
@@ -88,7 +90,7 @@ const LocalisedComponent = () => {
   useSyntheticInstallEvent();
 
   return (
-    <InstallPrompt
+    <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY}
       storageKey="sb-install-ptbr"
       title="Instalar o FutureDrink"
       description="Peça mais rápido na próxima visita, direto da tela de início."
@@ -109,7 +111,7 @@ const NotInstallableComponent = () => (
       No install event was dispatched, so the component renders nothing. This is what a browser
       with no install route, an already-installed app, and a recent dismissal all look like.
     </Typography>
-    <InstallPrompt storageKey="sb-install-absent" />
+    <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} storageKey="sb-install-absent" />
   </Box>
 );
 

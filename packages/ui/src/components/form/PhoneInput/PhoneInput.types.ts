@@ -1,6 +1,13 @@
 import type { CountryCode } from 'libphonenumber-js';
+import type { PhoneInputCopy } from '../../../copy';
 
 export interface PhoneInputProps {
+  /**
+   * Every word this field renders on its own account — the picker's accessible
+   * name and the invalid-number sentence. REQUIRED: this package ships no
+   * default copy, and the shopper reads both at the checkout.
+   */
+  copy: PhoneInputCopy;
   variant?: 'glass' | 'outlined' | 'filled';
   label?: string;
   placeholder?: string;

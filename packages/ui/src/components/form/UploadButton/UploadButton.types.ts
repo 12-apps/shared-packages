@@ -1,6 +1,14 @@
 import type { ReactNode } from 'react';
 
+import type { UploadButtonCopy } from '../../../copy';
+
 export interface UploadButtonProps {
+  /**
+   * What this control says beyond the host's own button label. REQUIRED: three
+   * of the four are announcements only a screen reader ever receives, which is
+   * how they stayed English through every language pass.
+   */
+  copy: UploadButtonCopy;
   /** Button variant style */
   variant?: 'default' | 'outline' | 'ghost' | 'dropzone';
 

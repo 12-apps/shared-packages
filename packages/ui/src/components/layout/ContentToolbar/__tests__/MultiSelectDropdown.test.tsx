@@ -23,6 +23,8 @@ describe('MultiSelectDropdown search (FUT-169)', () => {
   it('auto-shows a search box for long lists and filters options case-insensitively', async () => {
     render(
       <MultiSelectDropdown
+        extraOptionsHeading="Options"
+        clearText="Clear"
         clearLabel="Clear filter"
         label="Categoria"
         options={MANY_OPTIONS}
@@ -48,6 +50,8 @@ describe('MultiSelectDropdown search (FUT-169)', () => {
   it('shows the empty state when nothing matches', async () => {
     render(
       <MultiSelectDropdown
+        extraOptionsHeading="Options"
+        clearText="Clear"
         clearLabel="Clear filter"
         label="Categoria"
         options={MANY_OPTIONS}
@@ -68,6 +72,8 @@ describe('MultiSelectDropdown search (FUT-169)', () => {
   it('does NOT render a search box for short lists', async () => {
     render(
       <MultiSelectDropdown
+        extraOptionsHeading="Options"
+        clearText="Clear"
         clearLabel="Clear filter"
         label="Ativo"
         options={[
@@ -92,6 +98,8 @@ describe('MultiSelectDropdown search (FUT-169)', () => {
     const onToggle = vi.fn();
     render(
       <MultiSelectDropdown
+        extraOptionsHeading="Options"
+        clearText="Clear"
         clearLabel="Clear filter"
         label="Categoria"
         options={MANY_OPTIONS}
@@ -117,6 +125,8 @@ describe('MultiSelectDropdown stacked trigger accessibility', () => {
   it("names the trigger by the field label AND value so it isn't announced as just its value", () => {
     render(
       <MultiSelectDropdown
+        extraOptionsHeading="Options"
+        clearText="Clear"
         clearLabel="Clear filter"
         label="Papéis"
         layout="stacked"

@@ -25,6 +25,7 @@ export function ViewSelector({
   onViewModeChange,
   zoom,
   onZoomChange,
+  cardSizeLabel,
 }: ViewSelectorProps): React.JSX.Element {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
@@ -37,7 +38,7 @@ export function ViewSelector({
         <Box sx={{ width: 96, display: 'flex', alignItems: 'center' }}>
           <Slider
             data-testid="resize-card-slider"
-            aria-label="Card size"
+            aria-label={cardSizeLabel}
             value={zoom[0] ?? 0}
             onChange={(_, value) => onZoomChange([value as number])}
             min={0}

@@ -13,6 +13,11 @@ export interface MenubarItem {
 }
 
 export interface MenubarProps {
+  /**
+   * The bar's accessible name. REQUIRED: it is a `role="toolbar"` whose items
+   * are the host's own, so only the host can say what this bar navigates.
+   */
+  ariaLabel: string;
   items: MenubarItem[];
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'bordered';
   size?: SizeValue;

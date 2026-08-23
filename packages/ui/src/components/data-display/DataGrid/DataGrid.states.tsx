@@ -87,14 +87,14 @@ export function DataGridError(
 }
 
 export function DataGridEmpty(
-  props: StateProps & { emptyState?: React.ReactNode },
+  props: StateProps & { emptyState?: React.ReactNode; emptyText: string },
 ): React.JSX.Element {
-  const { emptyState, ...rest } = props;
+  const { emptyState, emptyText, ...rest } = props;
   return (
     <Placeholder {...rest} flag="data-empty">
       {emptyState ?? (
         <Typography variant="body1" color="text.secondary">
-          No data available
+          {emptyText}
         </Typography>
       )}
     </Placeholder>

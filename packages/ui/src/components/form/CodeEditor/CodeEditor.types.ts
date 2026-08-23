@@ -1,10 +1,17 @@
 // Types for CodeEditor component
+import type { CodeEditorCopy } from '../../../copy';
 
 export type EditorLanguage = 'json' | 'javascript' | 'typescript' | 'css' | 'html' | 'yaml' | 'markdown' | 'sql' | 'python';
 
 export type EditorTheme = 'light' | 'dark' | 'auto';
 
 export interface CodeEditorProps {
+  /**
+   * The editor's chrome — the loading line, the read-only badge and the four
+   * toolbar tooltips, which are also those buttons' accessible names.
+   * REQUIRED: this package ships no default copy.
+   */
+  copy: CodeEditorCopy;
   /** Programming language for syntax highlighting */
   language: EditorLanguage;
   /** Editor height (default: '400px') */

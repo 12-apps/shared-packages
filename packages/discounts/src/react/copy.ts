@@ -1,4 +1,4 @@
-import type { CategorySelectCopy, ConfirmActionCopy } from "@12-apps/ui/copy";
+import type { AutocompleteCopy, CategorySelectCopy, ConfirmActionCopy } from "@12-apps/ui/copy";
 import type { DataViewsCopy } from "@12-apps/ui/data-display/DataViews";
 import type {
   DiscountScope,
@@ -289,6 +289,13 @@ export interface DiscountsWebCopy {
    */
   readonly confirmAction: ConfirmActionCopy;
   readonly categorySelect: CategorySelectCopy;
+  /**
+   * The flat half of the target picker. A group that NESTS renders a
+   * `CategorySelect`; one that does not renders an `Autocomplete`, and that
+   * component stopped shipping defaults for its loading row, its empty row and
+   * its placeholder in the same wave.
+   */
+  readonly autocomplete: AutocompleteCopy;
   readonly dataViews: DataViewsCopy;
 }
 

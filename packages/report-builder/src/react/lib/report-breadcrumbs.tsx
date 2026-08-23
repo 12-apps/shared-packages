@@ -119,6 +119,7 @@ export function ReportBreadcrumbs({
     // come out as a stray line of navigation above it.
     <Box className={NO_PRINT_CLASS} sx={CRUMBS_SX}>
       <Breadcrumbs
+        copy={copy.breadcrumb}
         items={items}
         size="sm"
         // No house glyph: the first level here is "Relatórios", a section of

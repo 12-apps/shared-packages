@@ -18,6 +18,8 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
   threshold = 150,
   loadMore,
   loader,
+  loadingText,
+  endText,
   endMessage,
   error,
   errorComponent,
@@ -45,9 +47,9 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
   // The tail of the list is one of four things: the end message, an error, a
   // spinner, or the sentinel that asks for the next page.
   const renderSentinel = () => {
-    if (!hasMore) return endMessage || <DefaultEndMessage />;
+    if (!hasMore) return endMessage || <DefaultEndMessage endText={endText} />;
     if (error) return errorComponent || <DefaultError error={error} />;
-    if (loading) return loader || <DefaultLoader />;
+    if (loading) return loader || <DefaultLoader loadingText={loadingText} />;
 
     return (
       <div

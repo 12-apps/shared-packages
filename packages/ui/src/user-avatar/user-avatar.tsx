@@ -6,6 +6,7 @@ import { Avatar } from '../components/data-display/Avatar';
 import { Button } from '../components/form/Button';
 import { Text } from '../components/typography/Text';
 import { Card } from '../components/layout/Card';
+import type { UserAvatarCopy } from '../copy';
 
 /**
  * Generate initials from a name
@@ -60,12 +61,17 @@ export interface UserMenuProps {
     image?: string | null;
   };
   onSignOut: () => void;
+  /**
+   * The card's one action. REQUIRED: this package ships no default copy, and
+   * the button is the only thing on this card a host does not already supply.
+   */
+  copy: UserAvatarCopy;
 }
 
 /**
  * User menu with avatar, info, and sign out button
  */
-export function UserMenu({ user, onSignOut }: UserMenuProps): React.ReactElement {
+export function UserMenu({ user, onSignOut, copy }: UserMenuProps): React.ReactElement {
   return (
     <Card variant="elevated" borderRadius="md">
       <Box sx={{ p: 2 }}>
@@ -93,7 +99,7 @@ export function UserMenu({ user, onSignOut }: UserMenuProps): React.ReactElement
             size="sm"
             onClick={onSignOut}
           >
-            Sign out
+            {copy.signOut}
           </Button>
         </Stack>
       </Box>

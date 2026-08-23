@@ -23,6 +23,7 @@ import {
 } from '../InstallPrompt.helpers';
 import type { BeforeInstallPromptEvent } from '../InstallPrompt.types';
 import { usePwaInstall } from '../usePwaInstall';
+import { PT_BR_INSTALL_PROMPT_COPY } from '../../../../pt-BR';
 
 const STORAGE_KEY = 'pwa-install-dismissed';
 
@@ -201,7 +202,7 @@ describe('InstallPrompt', () => {
   });
 
   it('renders nothing until the browser offers a prompt', async () => {
-    render(<InstallPrompt />);
+    render(<InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} />);
 
     await waitFor(() => {
       expect(screen.queryByTestId('install-prompt')).not.toBeInTheDocument();
@@ -209,7 +210,7 @@ describe('InstallPrompt', () => {
   });
 
   it('appears with an install button once the prompt is captured', async () => {
-    render(<InstallPrompt title="Install FutureDrink" />);
+    render(<InstallPrompt copy={{ ...PT_BR_INSTALL_PROMPT_COPY, title: 'Install FutureDrink' }} />);
     fireEvent(window, createPromptEvent('accepted'));
 
     await waitFor(() => {
@@ -221,7 +222,7 @@ describe('InstallPrompt', () => {
   it('fires the native prompt and reports the accepted outcome', async () => {
     const onInstall = vi.fn();
 
-    render(<InstallPrompt onInstall={onInstall} />);
+    render(<InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} onInstall={onInstall} />);
     const event = createPromptEvent('accepted');
     fireEvent(window, event);
 
@@ -237,7 +238,7 @@ describe('InstallPrompt', () => {
   });
 
   it('records a dismissal when the user declines the native dialog', async () => {
-    render(<InstallPrompt onInstall={vi.fn()} />);
+    render(<InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} onInstall={vi.fn()} />);
     fireEvent(window, createPromptEvent('dismissed'));
 
     await waitFor(() => {
@@ -254,7 +255,7 @@ describe('InstallPrompt', () => {
   it('hides and persists the dismissal when the close button is used', async () => {
     const onDismiss = vi.fn();
 
-    render(<InstallPrompt onDismiss={onDismiss} />);
+    render(<InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} onDismiss={onDismiss} />);
     fireEvent(window, createPromptEvent('accepted'));
 
     await waitFor(() => {

@@ -4,6 +4,7 @@ import { Box } from "../../../mui/Box";
 import { Pagination } from "../../navigation/Pagination";
 
 import type { DataViewsController } from "./use-data-views-state";
+import { useDataViewsCopy } from "./data-views-copy-context";
 
 /**
  * The server-mode pagination control rendered beneath the grid — shown only
@@ -17,10 +18,12 @@ export function DataViewsPagination<T extends Record<string, unknown>>({
   c: DataViewsController<T>;
   testIdPrefix: string;
 }): React.JSX.Element | null {
+  const copy = useDataViewsCopy();
   if (!c.serverMode || c.serverPageCount <= 1) return null;
   return (
     <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
       <Pagination
+        pageSizeLabel={copy.nav.pageSize}
         page={c.serverPage}
         count={c.serverPageCount}
         onChange={(_event, page) => c.changePage(page)}

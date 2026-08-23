@@ -30,6 +30,7 @@
 import { TextField } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 
+
 /** `AAAA-MM-DD` (the wire) → `dd/mm/aaaa` (what the merchant reads). */
 export function isoToBr(iso: string): string {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -112,6 +113,7 @@ export function DayBoundInput({
   testId,
   error = false,
   describedBy,
+  mask,
 }: {
   label: string;
   /** The applied bound, `AAAA-MM-DD`, or undefined when this end is open. */
@@ -127,6 +129,17 @@ export function DayBoundInput({
   error?: boolean;
   /** Id of the element carrying that complaint, so it is read WITH the field. */
   describedBy?: string;
+  /**
+   * The day mask, which IS the placeholder — so the expected ORDER is on
+   * screen before the first keystroke rather than discovered by getting it
+   * wrong. `dd/mm/aaaa` is one locale's order and one locale's letters.
+   *
+   * A PROP rather than a context read: this field has two callers, and only
+   * one of them is inside DataViews. `DateRangePicker` mounts it standalone
+   * with its own message table, so a context read here throws for every host
+   * of that picker — which is exactly what it did.
+   */
+  mask: string;
 }): React.JSX.Element {
   const applied = value ?? '';
   const [text, setText] = useState(() => isoToBr(applied));
@@ -146,9 +159,7 @@ export function DayBoundInput({
       type="text"
       label={label}
       error={error}
-      // The mask IS the placeholder, so the expected order is on screen before
-      // the first keystroke rather than discovered by getting it wrong.
-      placeholder="dd/mm/aaaa"
+      placeholder={mask}
       value={text}
       onChange={(event) => {
         const next = maskBrDate(event.target.value);

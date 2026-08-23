@@ -84,6 +84,8 @@ export function PillControl<T extends Record<string, unknown>>({
   }
   return (
     <MultiSelectDropdown
+      extraOptionsHeading={copy.filters.optionsHeading}
+      clearText={copy.filters.clear}
       clearLabel={copy.filters.clearRange(pill.label)}
       label={pill.label}
       options={pill.options}

@@ -18,6 +18,7 @@ import React, {  } from 'react';
 import { countries } from './countries';
 import { usePhoneInput } from './PhoneInput.hooks';
 import type { CountryData,PhoneInputProps } from './PhoneInput.types';
+import type { PhoneInputCopy } from '../../../copy';
 
 // Country data with expanded support
 
@@ -81,8 +82,10 @@ const PhoneField: React.FC<{
   onBlur: () => void;
   onCountryOpen: (event: React.MouseEvent<HTMLElement>) => void;
   onCountryOpenViaKeyboard: (element: HTMLElement) => void;
+  copy: PhoneInputCopy;
 }> = ({
   TextFieldComponent,
+  copy,
   variant,
   label,
   placeholder,
@@ -118,6 +121,7 @@ const PhoneField: React.FC<{
         InputProps={{
           startAdornment: (
             <CountryAdornment
+              selectCountryLabel={copy.selectCountry}
               country={selectedCountry}
               menuOpen={Boolean(anchorEl)}
               onOpen={onCountryOpen}
@@ -157,12 +161,13 @@ const CountryAdornment: React.FC<{
   menuOpen: boolean;
   onOpen: (event: React.MouseEvent<HTMLElement>) => void;
   onOpenViaKeyboard: (element: HTMLElement) => void;
-}> = ({ country, menuOpen, onOpen, onOpenViaKeyboard }) => (
+  selectCountryLabel: string;
+}> = ({ country, menuOpen, onOpen, onOpenViaKeyboard, selectCountryLabel }) => (
   <InputAdornment position="start" data-testid="phone-input-start-adornment">
     <CountrySelector
       onClick={onOpen}
       role="button"
-      aria-label="Select country"
+      aria-label={selectCountryLabel}
       aria-expanded={menuOpen}
       tabIndex={0}
       data-testid="country-selector"
@@ -267,7 +272,8 @@ const resolveValidation = ({
   value,
   isFocused,
   helper,
-  countryName }: {
+  countryName,
+  copy }: {
   error: boolean;
   errorMessage?: string;
   isValid: boolean;
@@ -275,6 +281,7 @@ const resolveValidation = ({
   isFocused: boolean;
   helper?: React.ReactNode;
   countryName?: string;
+  copy: PhoneInputCopy;
 }) => {
   const looksInvalid = !isValid && value !== '' && !isFocused;
 
@@ -282,10 +289,11 @@ const resolveValidation = ({
     hasError: error || looksInvalid,
     helperText:
       errorMessage ||
-      (looksInvalid ? `Invalid phone number for ${countryName || 'selected country'}` : helper) };
+      (looksInvalid ? copy.invalidNumber(countryName || copy.unknownCountry) : helper) };
 };
 
 export const PhoneInput: FC<PhoneInputProps> = (props) => {
+  const { copy } = props;
   const {
     variant,
     label,
@@ -322,13 +330,15 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     value,
     isFocused,
     helper,
-    countryName: selectedCountry?.name });
+    countryName: selectedCountry?.name,
+    copy });
 
   const TextFieldComponent = variant === 'glass' ? GlassTextField : TextField;
 
   return (
     <Box data-testid="phone-input-container">
       <PhoneField
+        copy={copy}
         TextFieldComponent={TextFieldComponent}
         variant={variant}
         label={floating ? undefined : label}

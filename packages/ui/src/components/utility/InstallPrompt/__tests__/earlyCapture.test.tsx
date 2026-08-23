@@ -25,6 +25,7 @@ import {
   PWA_INSTALL_AVAILABLE_EVENT,
 } from '../InstallPrompt.earlyCapture';
 import type { BeforeInstallPromptEvent } from '../InstallPrompt.types';
+import { PT_BR_INSTALL_PROMPT_COPY } from '../../../../pt-BR';
 
 const STORAGE_KEY = 'early-capture-test';
 
@@ -54,7 +55,9 @@ const bootPageWithOffer = (): MockPromptEvent => {
   return event;
 };
 
-const renderPrompt = () => render(<InstallPrompt storageKey={STORAGE_KEY} title="Install" />);
+const renderPrompt = () => render(
+    <InstallPrompt copy={{ ...PT_BR_INSTALL_PROMPT_COPY, title: 'Install' }} storageKey={STORAGE_KEY} />,
+  );
 
 // `resetPwaInstallStash` unwinds listeners as well as data, so no case can
 // leak a live capture into the next one.

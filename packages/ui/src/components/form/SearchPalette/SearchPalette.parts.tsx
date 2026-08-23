@@ -208,6 +208,7 @@ export function ResultRow(props: {
 /** The "see all results — Press ENTER" footer row. */
 export function SubmitAllFooter(props: {
   label: string;
+  keyLabel: string;
   selected: boolean;
   onSelect: () => void;
   onHover: () => void;
@@ -226,7 +227,7 @@ export function SubmitAllFooter(props: {
         {props.label}
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
-        <Typography variant="caption">Enter</Typography>
+        <Typography variant="caption">{props.keyLabel}</Typography>
         <KeyboardReturnIcon sx={{ fontSize: 14 }} />
       </Box>
     </ListItemButton>
@@ -245,6 +246,7 @@ export interface BodyView<T> {
   activeIndex: number;
   trimmed: string;
   submitAllLabel: (q: string) => string;
+  submitKeyLabel: string;
   getKey: (item: T) => string;
   getPrimary: (item: T) => string;
   getSecondary?: (item: T) => string | undefined;
@@ -293,6 +295,7 @@ export function PaletteBody<T>(view: BodyView<T>): React.JSX.Element | null {
       {view.showFooter && (
         <SubmitAllFooter
           label={view.submitAllLabel(view.trimmed)}
+          keyLabel={view.submitKeyLabel}
           selected={view.activeIndex === view.footerIndex}
           onSelect={() => view.onSubmitAll?.(view.trimmed)}
           onHover={() => view.setActiveIndex(view.footerIndex)}

@@ -119,6 +119,11 @@ export interface GridEditing<T = Record<string, unknown>> {
 }
 
 export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAttributes<HTMLElement> {
+  /**
+   * What an empty result reads as. REQUIRED — the fallback was the English
+   * "No data available", on the package every host renders.
+   */
+  emptyText: string;
   /** Dataset (client mode uses this array; server mode renders current page) */
   rows: T[];
   /** Stable row id accessor */

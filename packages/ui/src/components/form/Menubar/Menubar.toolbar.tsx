@@ -7,6 +7,7 @@ import { MenubarSeparator } from './Menubar.separator';
 import type { MenubarItem, MenubarProps } from './Menubar.types';
 
 export interface MenubarToolbarProps {
+  ariaLabel: string;
   barSx: CSSObject;
   items: MenubarItem[];
   size: NonNullable<MenubarProps['size']>;
@@ -31,6 +32,7 @@ export interface MenubarToolbarProps {
  * wrapping it differs.
  */
 export const MenubarToolbar: React.FC<MenubarToolbarProps> = ({
+  ariaLabel,
   barSx,
   items,
   size,
@@ -53,7 +55,7 @@ export const MenubarToolbar: React.FC<MenubarToolbarProps> = ({
   return (
     <Toolbar
       role="toolbar"
-      aria-label="Main navigation"
+      aria-label={ariaLabel}
       sx={{
         ...barSx,
         width: fullWidth ? '100%' : 'auto',

@@ -71,7 +71,16 @@ const trackPromiseWithToasts = async <T,>(
   }
 };
 
-export const SonnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const SonnerProvider: React.FC<{
+  children: React.ReactNode;
+  /**
+   * The dismiss button's accessible name, for every toast this provider
+   * raises. REQUIRED and mounted ONCE — the shortcut helpers
+   * (`sonner.success(…)`) take a message and nothing else by design, so the
+   * word cannot be a per-call argument without changing what they are for.
+   */
+  dismissLabel: string;
+}> = ({ children, dismissLabel }) => {
   const [toasts, setToasts] = useState<SonnerItem[]>([]);
   const toastCounter = useRef(0);
 
@@ -106,7 +115,7 @@ export const SonnerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const makeShortcut = useCallback(
     (type: SonnerProps['type'], extra?: Partial<SonnerProps>) =>
       (message: React.ReactNode, options?: Partial<SonnerProps>) =>
-        addToast({ ...options, ...extra, title: message }, type),
+        addToast({ dismissLabel, ...options, ...extra, title: message }, type),
     [addToast],
   );
 
@@ -306,4 +315,7 @@ export const Toaster: React.FC<{
   expand?: boolean;
   richColors?: boolean;
   closeButton?: boolean;
-}> = ({ children }) => <SonnerProvider>{children}</SonnerProvider>;
+  dismissLabel: string;
+}> = ({ children, dismissLabel }) => (
+  <SonnerProvider dismissLabel={dismissLabel}>{children}</SonnerProvider>
+);
