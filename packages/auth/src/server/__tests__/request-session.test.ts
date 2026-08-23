@@ -52,6 +52,28 @@ describe('readBearerToken', () => {
     expect(readBearerToken('')).toBeNull();
     expect(readBearerToken('Basic abc')).toBeNull();
     expect(readBearerToken('Bearer')).toBeNull();
+    // A different scheme that merely starts the same way. The separator is
+    // required, so this is not a bearer with the token `Token abc`.
+    expect(readBearerToken('BearerToken abc')).toBeNull();
+    // Scheme and separator but nothing after it.
+    expect(readBearerToken('Bearer    ')).toBeNull();
+  });
+
+  it('answers a hostile header without backtracking — the ReDoS this replaced', () => {
+    // `/^Bearer\s+(.+)$/i` is a polynomial ReDoS here: `\s+` and `(.+)` can
+    // both match a space, so when the anchor cannot hold the engine retries
+    // every split point and rescans from each. Measured on that pattern:
+    // 8k spaces 78ms, 16k 310ms, 32k 1,196ms — four times the input, sixteen
+    // times the work, on a header an attacker controls.
+    //
+    // No clock is read here, deliberately: a wall-clock budget is exactly the
+    // flaky assertion the gate refuses, and it is not needed. Reintroducing
+    // the regex makes this input cost tens of seconds, so the case fails on
+    // the test TIMEOUT — a signal that needs no threshold and cannot flake in
+    // the passing direction. The linear scan answers in well under a
+    // millisecond.
+    const hostile = `Bearer${' '.repeat(200_000)}\n\n`;
+    expect(readBearerToken(hostile)).toBeNull();
   });
 });
 

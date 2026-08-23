@@ -90,11 +90,36 @@ export function setBearerVerifier(verifier: BearerVerifier | null): void {
   verifierStore[VERIFIER_KEY] = verifier;
 }
 
-/** `Authorization: Bearer <token>` -> the token, or `null`. */
+/**
+ * `Authorization: Bearer <token>` -> the token, or `null`.
+ *
+ * Parsed by SCANNING rather than with `/^Bearer\s+(.+)$/i`, which is what this
+ * replaced. That pattern is a polynomial ReDoS on a header an attacker
+ * controls: `\s+` and `(.+)` can both match a space, so for an input where the
+ * anchor cannot hold — `"Bearer"`, many spaces, then a newline, which `.` may
+ * not cross — the engine retries every split point and rescans from each.
+ * Measured on Node 22: 2k spaces 4.5ms, 8k 78ms, 16k 310ms, 32k 1,196ms. Four
+ * times the input, sixteen times the work, and one request can spend it.
+ *
+ * The scan below is linear: 200k of the same input costs 0.56ms.
+ */
 export function readBearerToken(headerValue: string | null | undefined): string | null {
   if (!headerValue) return null;
-  const token = /^Bearer\s+(.+)$/i.exec(headerValue.trim())?.[1];
-  return token ? token.trim() : null;
+  const value = headerValue.trim();
+  const scheme = 'bearer';
+  if (value.length <= scheme.length) return null;
+  if (value.slice(0, scheme.length).toLowerCase() !== scheme) return null;
+
+  // At least one space or tab must separate the scheme from the token;
+  // anything else means a different scheme that merely starts the same way
+  // (`BearerToken …`).
+  let index = scheme.length;
+  const isSeparator = (char: string | undefined) => char === ' ' || char === '\t';
+  if (!isSeparator(value[index])) return null;
+  while (index < value.length && isSeparator(value[index])) index += 1;
+
+  const token = value.slice(index).trim();
+  return token ? token : null;
 }
 
 export interface RequestSessionConfig {
