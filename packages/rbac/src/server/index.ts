@@ -121,6 +121,18 @@ export {
   type ImpersonationCeilingConfig,
 } from './impersonation-ceiling';
 
+// The tenant-ROLE axis, whose order is the escalation fix: the bound is checked
+// before anything can grant, and the platform short-circuit is unreachable
+// while impersonating. A host with two authority resolvers is how that came to
+// be checked in one of them and not the other.
+export {
+  createTenantGuards,
+  type TenantGrant,
+  type TenantGrantOutcome,
+  type TenantGuardActor,
+  type TenantGuardsConfig,
+} from './tenant-guards';
+
 export {
   parseRolePermissions,
   serializeRolePermissions,
