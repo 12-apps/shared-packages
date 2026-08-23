@@ -350,7 +350,15 @@ export function notificationsHost(pg: PGlite) {
       },
     },
     transports: [
-      { channel: 'EMAIL', driver: 'harness', appUrl: 'https://harness.test' },
+      // `linkLabel` is REQUIRED, and this is what that requirement looks like
+      // from a host: the CTA's own words, stated once, instead of a package
+      // default in the origin product's language landing in a stranger's inbox.
+      {
+        channel: 'EMAIL',
+        driver: 'harness',
+        appUrl: 'https://harness.test',
+        linkLabel: 'Ver detalhes',
+      },
       // `defaultCountryCode` is REQUIRED on both phone channels, and this is what
       // that requirement looks like from a host: one line, stated once, instead
       // of a package-level guess that turns a foreign number into a local one.
