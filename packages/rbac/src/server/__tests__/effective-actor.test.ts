@@ -181,3 +181,70 @@ describe('attributionOf', () => {
     });
   });
 });
+
+describe('createEffectiveActor — a host\'s own impersonation fields', () => {
+  /**
+   * A host that mints sessions carries fields the swap has no opinion about.
+   * `allowWrites` is the live example from the first adopter: its write gate
+   * reads that field off the same state the guards resolve, so a resolver that
+   * narrowed the value to `ActorImpersonation` would force the host to
+   * re-attach a field it had already assembled correctly on the way in.
+   */
+  interface HostImpersonation extends ActorImpersonation {
+    allowWrites: boolean;
+    startedBy: string;
+  }
+
+  const HOST_STATE: HostImpersonation = {
+    kind: 'operator',
+    tenantId: 'client-1',
+    realUserId: 'real',
+    previewRoleName: null,
+    subjectUserId: 'target',
+    allowWrites: true,
+    startedBy: 'support@example.com',
+  };
+
+  const hostResolver = (
+    over: Partial<EffectiveActorConfig<HostImpersonation>> = {},
+  ): ReturnType<typeof createEffectiveActor<HostImpersonation>> =>
+    createEffectiveActor<HostImpersonation>({
+      resolveIdentity: async () => ({
+        email: 'op@example.com',
+        userId: 'real',
+        isPlatformAdmin: true,
+      }),
+      readImpersonation: async () => HOST_STATE,
+      ...over,
+    });
+
+  it('returns the host state it was given, extra fields and all', async () => {
+    const actor = await hostResolver()();
+    // Typed, not cast: the assertion is that `allowWrites` is reachable without
+    // one. A narrowed return would fail to compile here rather than at runtime.
+    expect(actor.impersonation?.allowWrites).toBe(true);
+    expect(actor.impersonation?.startedBy).toBe('support@example.com');
+    expect(actor.impersonation).toBe(HOST_STATE);
+  });
+
+  it('still drops the operator\'s own platform authority', async () => {
+    expect(await hostResolver()()).toMatchObject({ isSuper: false, userId: 'target' });
+  });
+
+  it('hands the host state to the revocation check unnarrowed', async () => {
+    const seen: HostImpersonation[] = [];
+    const actor = await hostResolver({
+      stillHoldsPlatformAuthority: (impersonation) => {
+        seen.push(impersonation);
+        return impersonation.allowWrites;
+      },
+    })();
+    expect(seen).toEqual([HOST_STATE]);
+    expect(actor.impersonation).toBe(HOST_STATE);
+  });
+
+  it('answers a null impersonation without inventing the host fields', async () => {
+    const actor = await hostResolver({ readImpersonation: async () => null })();
+    expect(actor).toMatchObject({ isSuper: true, userId: 'real', impersonation: null });
+  });
+});

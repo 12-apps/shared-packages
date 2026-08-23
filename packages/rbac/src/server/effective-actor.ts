@@ -37,8 +37,20 @@ export interface ActorImpersonation extends CeilingImpersonation {
   subjectUserId: string;
 }
 
-/** The resolved authorization actor for a request. */
-export interface EffectiveActor {
+/**
+ * The resolved authorization actor for a request.
+ *
+ * Generic over the impersonation so a host's own state survives the round trip.
+ * `TImp` is only ever WIDER than {@link ActorImpersonation} — a host that mints
+ * sessions carries fields the swap has no opinion about (whether writes were
+ * opted into, which operator approved it, what the banner should say), and this
+ * resolver is the one place all of them pass through. Fixing the field to the
+ * minimum would force every such host to re-attach its own fields on the way
+ * out, from a value it had already assembled correctly on the way in — which is
+ * a translation layer bought for nothing, and the exact shape this package
+ * exists to stop a host from writing.
+ */
+export interface EffectiveActor<TImp extends ActorImpersonation = ActorImpersonation> {
   /** The session identity everything is derived from. */
   email: string | null;
   /**
@@ -60,7 +72,7 @@ export interface EffectiveActor {
    */
   realUserId: string | null;
   /** The impersonation in force, or `null`. */
-  impersonation: ActorImpersonation | null;
+  impersonation: TImp | null;
 }
 
 /** What the host resolves from its own session and user store. */
@@ -72,14 +84,14 @@ export interface ResolvedIdentity {
   isPlatformAdmin: boolean;
 }
 
-export interface EffectiveActorConfig {
+export interface EffectiveActorConfig<TImp extends ActorImpersonation = ActorImpersonation> {
   /** The session identity, resolved fresh per request. */
   resolveIdentity: (request?: Request) => Promise<ResolvedIdentity>;
   /**
    * The impersonation in force for this request, already collapsed into
    * {@link ActorImpersonation}. Answers `null` on every doubt.
    */
-  readImpersonation: (realUserId: string, request?: Request) => Promise<ActorImpersonation | null>;
+  readImpersonation: (realUserId: string, request?: Request) => Promise<TImp | null>;
   /**
    * THE REVOCATION PATH, and it is only ever asked of the unbounded kind.
    *
@@ -98,12 +110,16 @@ export interface EffectiveActorConfig {
    * unbounded kind at all.
    */
   stillHoldsPlatformAuthority?: (
-    impersonation: ActorImpersonation,
+    impersonation: TImp,
     identity: ResolvedIdentity,
   ) => Promise<boolean> | boolean;
 }
 
-const ANONYMOUS: EffectiveActor = {
+// `never` for the impersonation, not the default: this value is returned from
+// every instantiation, and `EffectiveActor<ActorImpersonation>` would not be
+// assignable to a host's narrower one. `never | null` is exactly `null`, which
+// is what an anonymous actor's impersonation is under any TImp.
+const ANONYMOUS: EffectiveActor<never> = {
   email: null,
   userId: null,
   isSuper: false,
@@ -132,12 +148,16 @@ const ANONYMOUS: EffectiveActor = {
  * the gate went on refusing their writes as impersonated — a lockout with no
  * visible cause and no exit.
  */
-export function createEffectiveActor(config: EffectiveActorConfig) {
-  return async function resolveEffectiveActor(request?: Request): Promise<EffectiveActor> {
+export function createEffectiveActor<TImp extends ActorImpersonation = ActorImpersonation>(
+  config: EffectiveActorConfig<TImp>,
+) {
+  return async function resolveEffectiveActor(
+    request?: Request,
+  ): Promise<EffectiveActor<TImp>> {
     const identity = await config.resolveIdentity(request);
     if (!identity.email) return ANONYMOUS;
 
-    const base: EffectiveActor = {
+    const base: EffectiveActor<TImp> = {
       email: identity.email,
       userId: identity.userId,
       isSuper: identity.isPlatformAdmin,
