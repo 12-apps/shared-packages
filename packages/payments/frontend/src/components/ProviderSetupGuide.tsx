@@ -31,6 +31,7 @@ import {
 } from './panel-tokens';
 
 import { richText } from './rich-text';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * Renders a provider's step-by-step onboarding walkthrough — the reusable
@@ -104,6 +105,7 @@ function CopyField({
 }
 
 function CopyRow({ label, text }: { label: string; text: string }) {
+  const copy = usePaymentsSettingsCopy().setupGuide;
   const [copied, setCopied] = useState(false);
   return (
     <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
@@ -114,7 +116,7 @@ function CopyRow({ label, text }: { label: string; text: string }) {
       */}
       <TextField fullWidth size="small" disabled value={text} />
       <IconButton
-        aria-label={copied ? 'Copiado' : `Copiar ${label}`}
+        aria-label={copied ? copy.copied : copy.copyValue(label)}
         onClick={() => {
           void navigator.clipboard.writeText(text).then(() => setCopied(true));
         }}

@@ -100,13 +100,15 @@ export interface WebStorageMessages {
   /**
    * The standalone upload page's own chrome — heading, the one-line
    * instruction (which carries the ceiling, same rule as the refusals), the
-   * field label and its helper. These rendered as literals inside
-   * `createWebStorage` until copy became required config.
+   * field label, its helper, and the button that clears a chosen image.
+   * These rendered as literals inside `createWebStorage` until copy became
+   * required config.
    */
   pageTitle: string;
   pageIntro: string;
   fieldLabel: string;
   fieldHelper: string;
+  fieldRemove: string;
 }
 
 /** Copy that only makes sense with the configured ceiling in it. */

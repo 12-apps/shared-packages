@@ -34,7 +34,10 @@ export interface ImageFieldProps {
   previewUrl?: string | null;
   /** Called with the new key, or `null` when the image is removed. */
   onChange: (imageKey: string | null) => void;
-  label?: string;
+  /** The dropzone's own label. REQUIRED — this package ships no default copy. */
+  label: string;
+  /** The button that clears a chosen image. REQUIRED, for the same reason. */
+  removeLabel: string;
   helperText?: string;
   /** Passed through per upload — `{ optimize: false }` for a rendered canvas. */
   uploadOptions?: UploadOptions;
@@ -89,7 +92,7 @@ export function ImageField(props: BoundImageFieldProps): JSX.Element {
       ) : null}
       <UploadButton
         variant="dropzone"
-        label={props.label ?? 'Enviar imagem'}
+        label={props.label}
         accept={ACCEPT}
         disabled={props.disabled || uploader.uploading}
         uploading={uploader.uploading}
@@ -100,7 +103,7 @@ export function ImageField(props: BoundImageFieldProps): JSX.Element {
       {preview ? (
         <Box>
           <Button variant="text" onClick={handleRemove} dataTestId={`${testId}-remove`}>
-            Remover imagem
+            {props.removeLabel}
           </Button>
         </Box>
       ) : null}

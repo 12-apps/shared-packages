@@ -84,7 +84,7 @@ export function HostSelectStep({
     <Stack spacing={3} data-testid="ai-host-select">
       <Box>
         <Text variant="heading" size="sm" as="h2">
-          Escolha o seu assistente
+          {copy.heading}
         </Text>
         <Text variant="caption" as="p" color="secondary">
           {copy.caption}
