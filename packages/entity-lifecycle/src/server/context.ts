@@ -151,8 +151,16 @@ function toApiError(error: unknown, messages: LifecycleMessages): LifecycleApiEr
 }
 
 /**
- * Run a lifecycle call, translating library failures to the HTTP surface —
- * the descriptor-side twin of the origin host's `runLifecycle`.
+ * Run a lifecycle call, translating library failures to the HTTP surface.
+ *
+ * EXPORTED from `./index`, and that is the whole point of it being here: a host
+ * funnelling its OWN create/update/delete routes through
+ * `lifecycleEntity(type).lifecycle` catches exactly these failures without
+ * going through a packaged descriptor, and until this was reachable it had no
+ * way to reach {@link ERROR_SURFACE} — so it restated the eight-row table and
+ * the pt-BR sentences beside it. That copy is the drift this export deletes.
+ * `LifecycleApiError` and `PT_BR_LIFECYCLE_MESSAGES` were already public; the
+ * function that PAIRS them was the missing third.
  */
 export async function foldLifecycle<T>(
   messages: LifecycleMessages,

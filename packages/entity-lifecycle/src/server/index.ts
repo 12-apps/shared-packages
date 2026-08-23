@@ -16,6 +16,7 @@ export {
   LifecycleApiError,
   contextOf,
   draftJson,
+  foldLifecycle,
   messagesOf,
   writeOutcome,
   type LifecycleActor,
