@@ -1,3 +1,5 @@
+import type { CardCopy } from '../card/copy';
+
 /**
  * The three sentences the card activation charge has to put on screen itself
  * (FUT-763).
@@ -8,6 +10,14 @@
  * product's voice reaches every adopter. No defaults, and the field is required.
  */
 export interface ActivationChargeCopy {
+  /**
+   * The card form's own words — its labels, its field-level refusals, and
+   * everything a tokenizer can fail with.
+   *
+   * The activation charge IS a card form, so it carries the same port the
+   * buyer checkout does rather than a second one shaped almost like it.
+   */
+  card: CardCopy;
   /**
    * No tokenizer is registered for this provider, so nothing can be encrypted
    * and there is no charge to make.

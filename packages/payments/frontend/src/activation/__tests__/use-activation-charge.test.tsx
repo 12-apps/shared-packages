@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ActivationChargeCopy } from '../charge-copy';
 import { useActivationCharge } from '../use-activation-charge';
+import { PT_BR_CARD_COPY } from '../../card/pt-BR';
 
 /**
  * The card half of the activation step.
@@ -33,6 +34,7 @@ const { tokenizeCard, tokenizerFor } = await import('../../card');
 const realCard = await vi.importActual<typeof import('../../card')>('../../card');
 
 const COPY: ActivationChargeCopy = {
+  card: PT_BR_CARD_COPY,
   noTokenizer: 'copy:no-tokenizer for {provider}',
   chargeFailed: 'copy:charge-failed',
   unreachable: 'copy:unreachable',
@@ -411,7 +413,12 @@ describe('useActivationCharge — what the charge will cost', () => {
     // One GET, and both facts came out of it — the amount on screen and the key
     // the card was encrypted with are the same endpoint's same answer.
     expect(io.calls.filter((call) => call.method === 'GET')).toHaveLength(1);
-    expect(tokenizeCard).toHaveBeenCalledWith(expect.anything(), 'PUBKEY', expect.anything());
+    expect(tokenizeCard).toHaveBeenCalledWith(
+      expect.anything(),
+      'PUBKEY',
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it('says nothing about the cost until the endpoint has answered', async () => {
@@ -448,7 +455,12 @@ describe('useActivationCharge — what the charge will cost', () => {
 
     // The body WAS read — its key reached the tokenizer — so the null is the
     // host's answer, not a request that failed.
-    expect(tokenizeCard).toHaveBeenCalledWith(expect.anything(), 'ONLY-KEY', expect.anything());
+    expect(tokenizeCard).toHaveBeenCalledWith(
+      expect.anything(),
+      'ONLY-KEY',
+      expect.anything(),
+      expect.anything(),
+    );
     expect(result.current.amountCents).toBeNull();
   });
 
@@ -465,7 +477,12 @@ describe('useActivationCharge — what the charge will cost', () => {
 
     // Read through the SAME body that carried the key, so the null is the
     // guard's doing rather than an answer that had not arrived yet.
-    expect(tokenizeCard).toHaveBeenCalledWith(expect.anything(), 'ONLY-KEY', expect.anything());
+    expect(tokenizeCard).toHaveBeenCalledWith(
+      expect.anything(),
+      'ONLY-KEY',
+      expect.anything(),
+      expect.anything(),
+    );
     expect(result.current.amountCents).toBeNull();
   });
 });
@@ -503,6 +520,7 @@ describe('useActivationCharge — moving between providers', () => {
     expect(tokenizeCard).not.toHaveBeenCalledWith(
       expect.anything(),
       'PAGBANK-KEY',
+      expect.anything(),
       expect.anything(),
     );
   });

@@ -25,6 +25,8 @@ import {
   type SettingsStorySpec,
 } from "./settings-store";
 import type { SettingsStoryProvider } from "./settings-store-adapter";
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
+import { SettingsStoryHost } from "./settings-story-host";
 
 /**
  * THE CONNECTION COMPONENTS, one level below the settings page:
@@ -124,13 +126,15 @@ function ConnectionScene(props: { spec: SettingsStorySpec; provider: string }): 
   if (!view) return null;
   const { descriptor, config } = providerOf(view, props.provider);
   return (
-    <ProviderConnection
-      descriptor={descriptor}
-      config={config}
-      client={client}
-      prepareConnect={prepareConnect}
-      onChanged={reload}
-    />
+    <SettingsStoryHost>
+      <ProviderConnection
+        descriptor={descriptor}
+        config={config}
+        client={client}
+        prepareConnect={prepareConnect}
+        onChanged={reload}
+      />
+    </SettingsStoryHost>
   );
 }
 
@@ -477,10 +481,11 @@ function StatusBarGallery(): JSX.Element | null {
 
   if (!view) return null;
   return (
+    <SettingsStoryHost>
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {GALLERY_ROWS.map((row) => {
         const { descriptor, config } = providerOf(view, row.provider);
-        const badge = statusBadge(config, descriptor);
+        const badge = statusBadge(PT_BR_PAYMENTS_SETTINGS_COPY.status, config, descriptor);
         return (
           <section key={row.provider}>
             <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 4px" }}>
@@ -496,6 +501,7 @@ function StatusBarGallery(): JSX.Element | null {
         );
       })}
     </div>
+    </SettingsStoryHost>
   );
 }
 

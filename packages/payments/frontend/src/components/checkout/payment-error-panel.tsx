@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { useState, type JSX } from "react";
 
+import { useCheckoutCopy } from "./copy-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
 import { useCheckoutComponents } from "./ui";
 
@@ -35,13 +36,14 @@ export function PaymentErrorPanel({
   onRetry: () => void;
 }): JSX.Element {
   const { Alert } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.error;
   const unresolved = code === UNRESOLVED_CODE;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Alert
         variant={unresolved ? "warning" : "danger"}
-        title={unresolved ? "Estamos confirmando seu pagamento" : "Não foi possível continuar"}
+        title={unresolved ? copy.confirming : copy.cannotContinue}
         description={message}
         showIcon
         data-testid={unresolved ? "checkout-unresolved" : "checkout-error"}
@@ -62,13 +64,14 @@ function RetryAffordance({
   onRetry: () => void;
 }): JSX.Element {
   const { Button, Input } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.error;
   const [altEmail, setAltEmail] = useState("");
 
   if (!emailFlagged) {
     return (
       <Box>
         <Button variant="solid" color="primary" size="md" onClick={onRetry} dataTestId="checkout-retry-payment">
-          Tentar novamente
+          {copy.retryAction}
         </Button>
       </Box>
     );
@@ -76,20 +79,20 @@ function RetryAffordance({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Input
-        label="E-mail para o pagamento"
+        label={copy.emailLabel}
         type="email"
         variant="outlined"
         size="md"
         fullWidth
         autoComplete="email"
-        placeholder="use um e-mail diferente do da loja"
+        placeholder={copy.emailMustDifferHint}
         value={altEmail}
         onChange={(event) => setAltEmail(event.target.value)}
         data-testid="checkout-alt-email"
       />
       <Box>
         <Button variant="solid" color="primary" size="md" disabled={!altEmail.trim()} onClick={() => onUseEmail(altEmail.trim())} dataTestId="checkout-use-alt-email">
-          Usar este e-mail e continuar
+          {copy.useEmailAction}
         </Button>
       </Box>
     </Box>

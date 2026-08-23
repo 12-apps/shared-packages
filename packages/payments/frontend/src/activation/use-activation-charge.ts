@@ -18,6 +18,7 @@ import {
 } from '../card';
 
 import type { ActivationChargeCopy } from './charge-copy';
+import type { CardCopy } from '../card/copy';
 
 /**
  * The activation charge for a provider whose payer pays HERE (FUT-463, moved
@@ -166,16 +167,17 @@ function useActivationProbe(verifyChargeUrl: string): ActivationProbe {
 }
 
 /** Local validation — nothing reaches the provider until the card is well-formed. */
-function validateAll(card: CardDetails, cpf: string) {
+function validateAll(card: CardDetails, cpf: string, copy: CardCopy) {
   const brand = detectBrand(onlyDigits(card.number));
+  const fields = copy.fields;
   return {
     fieldErrors: {
-      number: validateCardNumber(card.number),
-      holder: validateHolder(card.holder),
-      expiry: validateExpiry(card.expiry),
-      cvv: validateCvv(card.cvv, brand),
+      number: validateCardNumber(card.number, fields),
+      holder: validateHolder(card.holder, fields),
+      expiry: validateExpiry(card.expiry, fields),
+      cvv: validateCvv(card.cvv, fields, brand),
     } satisfies CardFieldErrors,
-    cpfError: validateCpf(cpf),
+    cpfError: validateCpf(cpf, fields),
   };
 }
 
@@ -205,7 +207,7 @@ async function runCharge(request: ChargeRequest): Promise<ActivationChargeState>
     };
   }
 
-  const tokenized = await tokenizeCard(request.card, request.publicKey, tokenizer);
+  const tokenized = await tokenizeCard(request.card, request.publicKey, request.copy.card, tokenizer);
   if (!tokenized.ok) return { kind: 'failed', reason: tokenized.error };
 
   try {
@@ -259,7 +261,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
   const { card, cpf, setFieldErrors, setCpfError, clear } = form;
 
   const submit = useCallback(async () => {
-    const validation = validateAll(card, cpf);
+    const validation = validateAll(card, cpf, options.copy.card);
     setFieldErrors(validation.fieldErrors);
     setCpfError(validation.cpfError);
     if (Object.values(validation.fieldErrors).some(Boolean) || validation.cpfError) return;

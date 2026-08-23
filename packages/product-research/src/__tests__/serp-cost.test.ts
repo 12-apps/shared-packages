@@ -8,6 +8,7 @@ import { runResearch } from '../pipeline/run-research';
 import { defaultResearchConfig } from '../ports';
 import type { ResearchDeps } from '../ports';
 import type { ResearchQuery, SourceRecord } from '../types';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
 /**
  * Cost control for the paid SERP source (FUT-418). The reference system
@@ -80,7 +81,7 @@ const makeHarness = (budget = new FixedBudget(10)): Harness => {
   };
 
   const registry = new ConnectorRegistry().register(
-    createSerpConnector({ getApiKey: () => 'test-key' }),
+    createSerpConnector({ getApiKey: () => 'test-key', vocabulary: PT_BR_MARKET_VOCABULARY }),
   );
   return { deps, store, registry, vendorCalls, setTtls, clock };
 };

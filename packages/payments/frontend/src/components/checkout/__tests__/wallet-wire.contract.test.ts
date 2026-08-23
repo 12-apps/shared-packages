@@ -17,6 +17,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { chargeWallet } from "../client";
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "../screens-pt-BR";
 
 /**
  * THE WALLET WIRE, DRIVEN FROM BOTH ENDS (FUT-471) — `charge-wire.contract`'s
@@ -173,7 +174,7 @@ describe("@12-apps/payments-frontend's chargeWallet against createPaymentFlowsBE
       orderId: REF,
       wallet: { type: "GOOGLE_PAY", key: "gp_tok_from_the_sheet" },
       taxId: "12345678909",
-    });
+    }, PT_BR_CHECKOUT_SCREENS_COPY.transport);
 
     expect(charged.ok).toBe(true);
     expect(charged.ok && charged.data.status).toBe("PAID");
@@ -200,7 +201,7 @@ describe("@12-apps/payments-frontend's chargeWallet against createPaymentFlowsBE
       orderId: REF,
       wallet: { type: "APPLE_PAY", key: paymentData },
       taxId: "12345678909",
-    });
+    }, PT_BR_CHECKOUT_SCREENS_COPY.transport);
 
     expect(charged.ok).toBe(true);
     expect(seen[0]?.card?.wallet).toEqual({ type: "APPLE_PAY", key: paymentData });
@@ -213,7 +214,7 @@ describe("@12-apps/payments-frontend's chargeWallet against createPaymentFlowsBE
     const charged = await chargeWallet({
       orderId: REF,
       wallet: { type: "GOOGLE_PAY", key: "gp_tok" },
-    });
+    }, PT_BR_CHECKOUT_SCREENS_COPY.transport);
 
     expect(charged.ok).toBe(false);
     expect(!charged.ok && charged.code).toBe("MISSING_BUYER_FIELD");

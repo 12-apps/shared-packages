@@ -18,6 +18,7 @@ import {
   type SettingsStorySpec,
 } from "./settings-store";
 import type { SettingsStoryProvider } from "./settings-store-adapter";
+import { SettingsStoryHost } from "./settings-story-host";
 
 /**
  * THE FAILOVER CHAIN on its own — `ProviderPriorityList` against the same live
@@ -87,7 +88,11 @@ function ChainScene({ spec, otherTab }: ChainSceneProps): JSX.Element {
     })();
   }, [client]);
   if (!view) return <CircularProgress />;
-  return <ProviderPriorityList view={view} client={client} onReordered={setView} />;
+  return (
+    <SettingsStoryHost>
+      <ProviderPriorityList view={view} client={client} onReordered={setView} />
+    </SettingsStoryHost>
+  );
 }
 
 /** One story = one merchant's chain (and, optionally, a concurrent write). */

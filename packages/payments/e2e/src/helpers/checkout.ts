@@ -24,6 +24,19 @@ export const GOOD_PAN = '4111 1111 1111 1111';
 /** The sandbox PAN that always declines, honoured by the shipped tokenizer. */
 export const DECLINE_PAN = '4000 0000 0000 0002';
 
+/** The expiry {@link fillCard} types — two-digit, as a card is embossed. */
+const CARD_EXPIRY_TYPED = '12/31';
+
+/**
+ * How a saved-card list restates {@link CARD_EXPIRY_TYPED}: the same date,
+ * with the year in full.
+ *
+ * Exported so a step can assert the DIGITS a screen shows without asserting
+ * the host's word for them (FUT-760) — "Validade", "Vence em" and "Expires"
+ * are all the same fact, and only one of them is any given host's.
+ */
+export const CARD_EXPIRY_SHOWN = '12/2031';
+
 /** Fill the Dados step's CPF. */
 export async function fillCpf(page: Page, cpf: string = VALID_CPF): Promise<void> {
   await page.getByTestId('buyer-cpf').fill(cpf);
@@ -33,7 +46,7 @@ export async function fillCpf(page: Page, cpf: string = VALID_CPF): Promise<void
 export async function fillCard(page: Page, pan: string = GOOD_PAN): Promise<void> {
   await page.getByTestId('card-number').fill(pan);
   await page.getByTestId('card-holder').fill('ANA COMPRADORA');
-  await page.getByTestId('card-expiry').fill('12/31');
+  await page.getByTestId('card-expiry').fill(CARD_EXPIRY_TYPED);
   await page.getByTestId('card-cvv').fill('123');
 }
 

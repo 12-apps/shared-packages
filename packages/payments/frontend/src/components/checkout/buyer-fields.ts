@@ -28,7 +28,7 @@
  * the two must not disagree about what a chain needs.
  */
 
-import { validateCpf } from "../../card";
+import { isValidCpf } from "../../card";
 
 import type { CheckoutChainLink, CheckoutCustomerField, PaymentMethod } from "./types";
 
@@ -105,8 +105,10 @@ const RULES: Record<CheckoutCustomerField["type"], (value: string) => boolean> =
   PHONE: (value) => /^\d{10,11}$/.test(value.replace(/\D/g, "")),
   MOBILE: (value) => /^\d{2}9\d{8}$/.test(value.replace(/\D/g, "")),
   // The real check-digit rule, not a length test: the same validator the CPF
-  // input has always used, so the form and the gate cannot disagree.
-  CPF: (value) => validateCpf(value) === undefined,
+  // input has always used, so the form and the gate cannot disagree. The
+  // PREDICATE rather than the message — this is a gate, and it would only be
+  // throwing the sentence away (FUT-760).
+  CPF: (value) => isValidCpf(value),
 };
 
 /** Whether a declared field is satisfied by what the buyer typed. */

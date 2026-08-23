@@ -14,7 +14,7 @@
  * there; a payment that did not go through fires nothing, because that shopper
  * still has a basket to retry with.
  */
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "./test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useCheckoutController, type CheckoutHostPorts } from "../use-checkout-controller";

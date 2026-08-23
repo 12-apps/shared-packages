@@ -17,7 +17,7 @@
  * "Continuar", carries the CPF, respects the LGPD checkbox, and the step
  * advances no matter what the host does with the call.
  */
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "./test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useCheckoutController, type CheckoutHostPorts } from "../use-checkout-controller";

@@ -29,15 +29,15 @@ import type { CheckoutScreens } from "./types";
 import { useAddCard, type AddCardController } from "./use-add-card";
 
 /** `visa •••• 4242`, or just the brand when the provider shared no last4. */
-function displayLabel(display: VaultedCardDisplay): string {
-  const brand = display.brand ?? "Cartão";
+function displayLabel(copy: CheckoutCopyFE, display: VaultedCardDisplay): string {
+  const brand = display.brand ?? copy.cardUnknownBrand;
   return display.last4 ? `${brand} •••• ${display.last4}` : brand;
 }
 
 /** `Validade 12/2031`, or nothing when the provider shared no expiry. */
-function expiryLabel(display: VaultedCardDisplay): string | null {
+function expiryLabel(copy: CheckoutCopyFE, display: VaultedCardDisplay): string | null {
   if (display.expMonth === null || display.expYear === null) return null;
-  return `Validade ${String(display.expMonth).padStart(2, "0")}/${display.expYear}`;
+  return copy.cardExpiry(String(display.expMonth).padStart(2, "0"), display.expYear);
 }
 
 /** The card is on file — display metadata only, never the vault token. */
@@ -49,7 +49,7 @@ function SavedConfirmation({
   copy: CheckoutCopyFE;
 }): JSX.Element {
   const { Alert, Text } = useCheckoutComponents();
-  const expiry = expiryLabel(display);
+  const expiry = expiryLabel(copy, display);
   return (
     <Box data-testid="add-card-saved" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <Alert
@@ -60,7 +60,7 @@ function SavedConfirmation({
       />
       <Box>
         <Text variant="body" size="sm" weight="semibold" as="p">
-          {displayLabel(display)}
+          {displayLabel(copy, display)}
         </Text>
         {expiry ? (
           <Text variant="caption" size="xs" color="secondary" as="p">
@@ -195,12 +195,12 @@ function useInstrumentList(
 }
 
 /** The list itself, or the empty-state sentence. Read-only by design. */
-function CardList({ cards, emptyCopy }: { cards: SavedCard[]; emptyCopy: string }): JSX.Element {
+function CardList({ cards, copy }: { cards: SavedCard[]; copy: CheckoutCopyFE }): JSX.Element {
   const { Text } = useCheckoutComponents();
   if (cards.length === 0) {
     return (
       <Text variant="body" size="sm" color="secondary" as="p" data-testid="manage-cards-empty">
-        {emptyCopy}
+        {copy.manageCardsEmpty}
       </Text>
     );
   }
@@ -213,7 +213,7 @@ function CardList({ cards, emptyCopy }: { cards: SavedCard[]; emptyCopy: string 
           </Text>
           {card.expMonth && card.expYear ? (
             <Text variant="caption" size="xs" color="secondary" as="p">
-              {`Validade ${String(card.expMonth).padStart(2, "0")}/${card.expYear}`}
+              {copy.cardExpiry(String(card.expMonth).padStart(2, "0"), card.expYear)}
             </Text>
           ) : null}
         </Box>
@@ -235,7 +235,7 @@ function ManageCardsBody({ runtime }: { runtime: FlowsRuntime }): JSX.Element {
       <Text variant="heading" size="md" weight="bold" as="h2">
         {copy.manageCardsTitle}
       </Text>
-      {pending ? null : <CardList cards={cards} emptyCopy={copy.manageCardsEmpty} />}
+      {pending ? null : <CardList cards={cards} copy={copy} />}
       {adding ? (
         <AddCardSection runtime={runtime} onSaved={() => setRefresh((count) => count + 1)} />
       ) : (

@@ -1,3 +1,6 @@
+import { PT_BR_CARD_COPY } from "../../card/pt-BR";
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "./screens-pt-BR";
+import type { CheckoutCopy } from "./copy-context";
 import type { CheckoutViewCopy, PaymentStatusCopy } from "./view-copy";
 
 /**
@@ -39,7 +42,31 @@ export const PT_BR_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
   receiptEmailLabel: "Comprovante enviado para",
 };
 
+/**
+ * The words the checkout's deeper screens read from context — the card form,
+ * its tokenizers, and the buyer-details step's own fields.
+ *
+ * Same rule as everything else in this file: a NAMED pack a host passes by
+ * hand at the mount, never a default the package reaches for.
+ */
+export const PT_BR_CHECKOUT_COPY: CheckoutCopy = {
+  card: PT_BR_CARD_COPY,
+  screens: PT_BR_CHECKOUT_SCREENS_COPY,
+  buyer: {
+    emailInvalid: "E-mail inválido.",
+    emailRequired: "E-mail obrigatório.",
+    nameRequired: "Nome obrigatório.",
+    phoneRequired: "Telefone obrigatório.",
+    fieldsHint: (names) =>
+      names.length === 0
+        ? "Nome, e-mail e telefone são opcionais — usados apenas para o comprovante."
+        : `Informe seu ${names.join(", ")} (${names.length === 1 ? "obrigatório" : "obrigatórios"} ` +
+          "para o pagamento). Os demais campos são opcionais — usados apenas para o comprovante.",
+  },
+};
+
 export const PT_BR_CHECKOUT_VIEW_COPY: CheckoutViewCopy = {
+  screens: PT_BR_CHECKOUT_COPY,
   steps: {
     dados: "Dados",
     payment: "Pagamento",

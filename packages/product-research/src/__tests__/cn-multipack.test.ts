@@ -8,6 +8,7 @@ import { parsePack } from '../normalize/pack';
 import { runResearch } from '../pipeline/run-research';
 import type { ResearchDeps } from '../ports';
 import type { ResearchQuery, ScoredOffer, SourceRecord } from '../types';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 import {
   CN_MULTIPACK_FIXTURE,
   CN_MULTIPACK_TITLE,
@@ -48,7 +49,7 @@ const ctx: ConnectorContext = {
 
 const runFixture = async (): Promise<ScoredOffer[]> => {
   const registry = new ConnectorRegistry().register(
-    createSerpConnector({ getApiKey: () => 'test-key' }),
+    createSerpConnector({ getApiKey: () => 'test-key', vocabulary: PT_BR_MARKET_VOCABULARY }),
   );
   const result = await runResearch(makeDeps(), registry, ctx, {
     clientId: 'future-drink',

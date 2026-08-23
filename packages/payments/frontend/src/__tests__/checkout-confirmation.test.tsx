@@ -7,6 +7,7 @@ import type { MerchantSettingsView, ProviderSetupGuide } from '@12-apps/payments
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { CHECKOUT_CONFIRM_ACTION } from '../components/SetupGuideSection';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * The setup step no API can answer, and what it holds back.
@@ -84,6 +85,7 @@ function renderSettings(chargeVerifiedAt: string | null = null) {
   const seen: Array<{ blocked: boolean; hidden: boolean }> = [];
   render(
     <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
       client={fakeClient(viewWith(chargeVerifiedAt))}
       initialProvider="infinitepay"
       renderVerification={({ blocked, hidden }) => {

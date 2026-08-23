@@ -37,6 +37,17 @@ export {
   type CheckoutPaymentProps,
   type SavedCardOption,
 } from './components/CheckoutPayment';
+// The words that step renders — required on the prop above, so a host wiring
+// the legacy surface has to answer them (FUT-760).
+export type {
+  CheckoutPaymentCopy,
+  LegacyCardCopy,
+  LegacyMethodCopy,
+  LegacyMoneyCopy,
+  LegacyPixCopy,
+  LegacyRefusalCopy,
+} from './components/checkout-payment-copy';
+export { PT_BR_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-pt-BR';
 
 // ---------------------------------------------------------------------------
 // The buyer checkout surface (FUT-564) — the storefront's three-step flow,
@@ -80,6 +91,7 @@ export {
   type BuyerVaultSession,
   type CheckoutClient,
   type CheckoutTransport,
+  type CheckoutTransportBinding,
   type CompleteVaultInput,
   type VaultedCardDisplay,
 } from './components/checkout/transport';
@@ -98,9 +110,37 @@ export type {
   StatusOutcomeCopy,
 } from './components/checkout/view-copy';
 export {
+  PT_BR_CHECKOUT_COPY,
   PT_BR_CHECKOUT_VIEW_COPY,
   PT_BR_PAYMENT_STATUS_COPY,
 } from './components/checkout/pt-BR';
+// The provider the card fields and buyer inputs read their words from — a host
+// mounting a screen BELOW `CheckoutFlow` (or composing by hand) opens it
+// itself; `CheckoutFlow` and `FlowsShell` already do (FUT-760).
+export {
+  CheckoutCopyProvider,
+  useCheckoutCopy,
+  type BuyerInfoCopy,
+  type CheckoutCopy,
+} from './components/checkout/copy-context';
+// The screens BELOW the steps — the method tiles, the PIX and card panes, the
+// wallet buttons, the hosted handover and the transport's own three sentences.
+// Every slice is named on the barrel, not just the whole: a host writing its
+// pack section by section types the section it is writing (FUT-760).
+export type {
+  CardPaneCopy,
+  CheckoutScreensCopy,
+  CheckoutTransportCopy,
+  CheckoutValidationCopy,
+  HostedHandoverCopy,
+  MethodPickerCopy,
+  PayerSummaryCopy,
+  PaymentErrorCopy,
+  PixPaneCopy,
+  SettlingCopy,
+  WalletCopy,
+} from './components/checkout/screens-copy';
+export { PT_BR_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-pt-BR';
 export { fetchCheckoutConfig } from './components/checkout/client';
 /**
  * The `sessionStorage` key the hosted-checkout return leg parks the raised
@@ -199,7 +239,11 @@ export {
   validateExpiry,
   validateHolder,
   NEW_CARD,
+  PT_BR_CARD_COPY,
   type CardBrand,
+  type CardCopy,
+  type CardFieldCopy,
+  type CardTokenizeCopy,
   type CardDetails,
   type CardFieldErrors,
   type CardToken,
@@ -207,6 +251,25 @@ export {
   type CardTokenizer,
   type SavedCard,
 } from './card';
+// The settings surface's words. `PaymentProviderSettings` takes the pack as a
+// required prop and mounts the provider; the provider is exported for a host
+// that composes the pieces itself (FUT-760).
+export {
+  PaymentsSettingsCopyProvider,
+  usePaymentsSettingsCopy,
+} from './components/settings-copy-context';
+export { PT_BR_PAYMENTS_SETTINGS_COPY } from './components/settings-pt-BR';
+export type {
+  ConnectionBadgeCopy,
+  ConnectionCardCopy,
+  ConnectionStatusCopy,
+  CredentialFormCopy,
+  EnvironmentCopy,
+  OAuthConnectionCopy,
+  PaymentsSettingsCopy,
+  ProviderPriorityCopy,
+  SetupGuideCopy,
+} from './components/settings-copy';
 export {
   ProviderConnection,
   type ProviderConnectionProps,

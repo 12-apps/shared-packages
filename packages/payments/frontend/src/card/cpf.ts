@@ -1,3 +1,4 @@
+import type { CardFieldCopy } from "./copy";
 import { onlyDigits } from "./format";
 
 /**
@@ -19,8 +20,14 @@ export function formatCpf(value: string): string {
   return out;
 }
 
-/** Verify the two CPF check digits (rejects all-same-digit sequences too). */
-function isValidCpf(value: string): boolean {
+/**
+ * Verify the two CPF check digits (rejects all-same-digit sequences too).
+ *
+ * Exported as the PREDICATE beside {@link validateCpf}'s sentence, because a
+ * caller that only needs the verdict should not have to hold the words to get
+ * it — `buyer-fields.ts` gates a field on this and threw the message away.
+ */
+export function isValidCpf(value: string): boolean {
   const d = onlyDigits(value);
   if (d.length !== 11) return false;
   if (/^(\d)\1{10}$/.test(d)) return false;
@@ -36,7 +43,7 @@ function isValidCpf(value: string): boolean {
 }
 
 /** Field validator: returns an error message, or `undefined` when valid. */
-export function validateCpf(value: string): string | undefined {
-  if (!onlyDigits(value)) return "CPF obrigatório.";
-  return isValidCpf(value) ? undefined : "CPF inválido.";
+export function validateCpf(value: string, copy: CardFieldCopy): string | undefined {
+  if (!onlyDigits(value)) return copy.cpfRequired;
+  return isValidCpf(value) ? undefined : copy.cpfInvalid;
 }

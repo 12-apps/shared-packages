@@ -12,6 +12,12 @@
  * injected `fetch` reaches for `createPaymentFlows({ transport })` instead;
  * nothing about these functions changes when it does.
  *
+ * Each takes the transport's COPY (FUT-760). Unbound is about the mount, not
+ * about the language: a wire failure still has to say something to a buyer,
+ * and the one thing this package must not do is pick those words itself. The
+ * caller is `client-context.tsx`, which reads them from the checkout's copy
+ * context — so no screen passes them by hand.
+ *
  * Order CREATION and the buyer-profile save are deliberately NOT here: both
  * are host domain (the cart, the account) and reach the flow as ports
  * (`createOrder` / `saveBuyerContact` on `CheckoutFlowProps`).
@@ -24,6 +30,7 @@
 import type { SavedCard } from "../../card";
 import type { Result } from "../../result";
 
+import type { CheckoutTransportCopy } from "./screens-copy";
 import { createCheckoutClient } from "./transport";
 import type {
   ChargeCardInput,
@@ -34,14 +41,23 @@ import type {
 } from "./types";
 
 /**
- * The default binding: `/api/checkout` on the ambient `fetch`. Built once, but
- * it resolves `fetch` per call, so a suite that stubs the global still wins.
+ * The default binding: `/api/checkout` on the ambient `fetch`, saying what the
+ * caller's copy says when the wire fails.
+ *
+ * Built per call rather than once, because the words are now an argument. It
+ * costs one closure and resolves `fetch` per call either way, so a suite that
+ * stubs the global still wins.
  */
-const defaultClient = createCheckoutClient();
+function defaultClient(copy: CheckoutTransportCopy) {
+  return createCheckoutClient({ copy });
+}
 
 /** Poll an order's reconciled status (async provider webhook confirmation). */
-export async function pollOrderStatus(orderId: string): Promise<Result<OrderStatus>> {
-  return defaultClient.getStatus(orderId);
+export async function pollOrderStatus(
+  orderId: string,
+  copy: CheckoutTransportCopy,
+): Promise<Result<OrderStatus>> {
+  return defaultClient(copy).getStatus(orderId);
 }
 
 /**
@@ -52,8 +68,9 @@ export async function pollOrderStatus(orderId: string): Promise<Result<OrderStat
  */
 export async function fetchCheckoutConfig(
   tenantSlug: string,
+  copy: CheckoutTransportCopy,
 ): Promise<Result<CheckoutProviderConfig>> {
-  return defaultClient.getConfig(tenantSlug);
+  return defaultClient(copy).getConfig(tenantSlug);
 }
 
 /**
@@ -63,10 +80,11 @@ export async function fetchCheckoutConfig(
  * (the web page resolved it server-side) and for the FUT-174 rotated-key
  * self-heal retry.
  */
-export async function refreshCardPublicKey(input: {
-  orderId: string;
-}): Promise<Result<{ publicKey: string | null }>> {
-  return defaultClient.refreshBrowserKey(input);
+export async function refreshCardPublicKey(
+  input: { orderId: string },
+  copy: CheckoutTransportCopy,
+): Promise<Result<{ publicKey: string | null }>> {
+  return defaultClient(copy).refreshBrowserKey(input);
 }
 
 /**
@@ -74,8 +92,11 @@ export async function refreshCardPublicKey(input: {
  * `hostedCheckoutUrl` when the provider demands the buyer finish on its own
  * page (3-D Secure, FUT-698) — the caller then hands the buyer over.
  */
-export async function chargeCard(input: ChargeCardInput): Promise<Result<ChargeOutcome>> {
-  return defaultClient.charge(input);
+export async function chargeCard(
+  input: ChargeCardInput,
+  copy: CheckoutTransportCopy,
+): Promise<Result<ChargeOutcome>> {
+  return defaultClient(copy).charge(input);
 }
 
 /**
@@ -83,11 +104,17 @@ export async function chargeCard(input: ChargeCardInput): Promise<Result<ChargeO
  * `/charge` route as {@link chargeCard}, carrying `wallet: { type, key }` in
  * place of a card token.
  */
-export async function chargeWallet(input: ChargeWalletInput): Promise<Result<ChargeOutcome>> {
-  return defaultClient.chargeWallet(input);
+export async function chargeWallet(
+  input: ChargeWalletInput,
+  copy: CheckoutTransportCopy,
+): Promise<Result<ChargeOutcome>> {
+  return defaultClient(copy).chargeWallet(input);
 }
 
 /** List saved cards available for reuse (empty on any error — non-blocking). */
-export async function listSavedCards(tenantSlug?: string): Promise<SavedCard[]> {
-  return defaultClient.listInstruments(tenantSlug);
+export async function listSavedCards(
+  copy: CheckoutTransportCopy,
+  tenantSlug?: string,
+): Promise<SavedCard[]> {
+  return defaultClient(copy).listInstruments(tenantSlug);
 }

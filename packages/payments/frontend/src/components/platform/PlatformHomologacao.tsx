@@ -28,9 +28,13 @@ import {
  * mounted routes (`platformHomologacaoGuide`, `createHomologationRecordService`
  * and `buildPlatformHomologacaoAnexo` in `@12-apps/payments-backend`), so the
  * host page is a thin mount.
+ *
+ * English, like the rest of this platform surface (FUT-760) — see
+ * `ConnectApplicationPanel` for why. The only Portuguese that reaches the
+ * screen is PagBank's own form field names, carried on `guide.fieldLabels`.
  */
 export interface PlatformHomologacaoProps {
-  /** The recorded outcome; null renders the honest "não solicitada". */
+  /** The recorded outcome; null renders the honest "not submitted". */
   record: PlatformHomologationRecordView | null;
   /** The paste-ready answers, computed by the host's backend. */
   guide: HomologacaoGuide;
@@ -58,7 +62,7 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
     try {
       await onGenerate();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível gerar o anexo.');
+      setError(cause instanceof Error ? cause.message : 'Could not generate the attachment.');
     } finally {
       setBusy(false);
     }
@@ -67,13 +71,13 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
   return (
     <Stack spacing={1.5} data-testid="homologacao-anexo-card" sx={CARD_SX}>
       <Typography variant="body2" fontWeight={600}>
-        Anexo de evidências
+        Evidence attachment
       </Typography>
       <Typography variant="body2" color="text.secondary" component="p">
-        O formulário exige os requests e responses das requisições enviadas às APIs do
-        PagBank. O botão abaixo faz as chamadas reais no ambiente de testes (Sandbox) com o
-        token da própria plataforma — nada é cobrado de verdade — e baixa o arquivo pronto
-        para anexar, com o token redigido.
+        The form demands the requests and responses of the calls sent to PagBank's APIs. The
+        button below makes those calls for real against the test environment (Sandbox), on the
+        platform's own token — nothing is actually charged — and downloads the file ready to
+        attach, with the token redacted.
       </Typography>
       <Box>
         <Button
@@ -83,7 +87,7 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
           onClick={() => void generate()}
           data-testid="homologacao-anexo-button"
         >
-          Gerar anexo
+          Generate attachment
         </Button>
       </Box>
       {error !== null ? (

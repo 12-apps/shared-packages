@@ -1,7 +1,9 @@
 import { Box } from "@mui/material";
 import type { JSX } from "react";
 
+import { useCheckoutCopy } from "./copy-context";
 import { CreditCardIcon, PixIcon } from "./icons";
+import type { MethodPickerCopy } from "./screens-copy";
 import type { PaymentMethod } from "./types";
 import { useCheckoutComponents } from "./ui";
 
@@ -12,10 +14,25 @@ interface MethodOption {
   icon: JSX.Element;
 }
 
-const OPTIONS: MethodOption[] = [
-  { value: "PIX", label: "PIX", description: "Aprovação imediata", icon: <PixIcon /> },
-  { value: "CARD", label: "Cartão", description: "Crédito à vista", icon: <CreditCardIcon /> },
-];
+/**
+ * The two tiles, named by the HOST (FUT-760).
+ *
+ * Built per render rather than as a module constant, because the words are no
+ * longer this package's: a frozen `OPTIONS` array could only hold the origin
+ * host's Portuguese. The order and the icons are still ours — that is layout,
+ * not language.
+ */
+function methodOptions(copy: MethodPickerCopy): MethodOption[] {
+  return [
+    { value: "PIX", label: copy.pixLabel, description: copy.pixDescription, icon: <PixIcon /> },
+    {
+      value: "CARD",
+      label: copy.cardLabel,
+      description: copy.cardDescription,
+      icon: <CreditCardIcon />,
+    },
+  ];
+}
 
 /** Text/icon color for a tile's state — one place, so the ternaries stay flat. */
 function tileColor(unavailable: boolean, selected: boolean, muted: string): string {
@@ -36,6 +53,7 @@ function MethodTile({
   onSelect: () => void;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.method;
   const cursor = unavailable ? "not-allowed" : "pointer";
   return (
     <Box
@@ -79,7 +97,7 @@ function MethodTile({
           {option.label}
         </Text>
         <Text variant="caption" size="xs" color="secondary" as="p">
-          {unavailable ? "Indisponível nesta loja" : option.description}
+          {unavailable ? copy.unavailableHere : option.description}
         </Text>
       </Box>
     </Box>
@@ -104,8 +122,13 @@ function MethodTile({
  * leave an unexplained one-option "choice". The caller preselects the sole
  * remaining method, so no extra tap is demanded either.
  */
-function visibleOptions(offered: PaymentMethod[] | null): MethodOption[] {
-  return OPTIONS.filter((option) => offered === null || offered.includes(option.value));
+function visibleOptions(
+  copy: MethodPickerCopy,
+  offered: PaymentMethod[] | null,
+): MethodOption[] {
+  return methodOptions(copy).filter(
+    (option) => offered === null || offered.includes(option.value),
+  );
 }
 
 export function MethodPicker({
@@ -123,15 +146,16 @@ export function MethodPicker({
   offered?: PaymentMethod[] | null;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
-  const options = visibleOptions(offered);
+  const copy = useCheckoutCopy().screens.method;
+  const options = visibleOptions(copy, offered);
   return (
     <Box>
       <Text variant="body" size="sm" weight="bold" as="p" style={{ marginBottom: 8 }}>
-        Forma de pagamento
+        {copy.groupLabel}
       </Text>
       <Box
         role="radiogroup"
-        aria-label="Forma de pagamento"
+        aria-label={copy.groupLabel}
         data-testid="checkout-method"
         sx={{ display: "flex", gap: 1 }}
       >

@@ -10,7 +10,7 @@
  * provider on purpose (raw-MUI defaults carry the load-bearing test ids);
  * jest-dom is not a dependency here — DOM properties are asserted directly.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "./test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentStep } from "../checkout-steps";

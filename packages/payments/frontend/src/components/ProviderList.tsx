@@ -7,6 +7,7 @@ import type { MaskedProviderConfig, MerchantSettingsView, ProviderDescriptor } f
 import type { PaymentsSettingsClient } from '../client';
 import { connectionBadge } from './connection-state';
 import { ProviderPriorityList, chainOf } from './ProviderPriorityList';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * Provider picker — one card per provider, click to open it.
@@ -26,6 +27,7 @@ function ProviderPicker({
   activeName: string | null;
   onSelect: (name: string) => void;
 }) {
+  const copy = usePaymentsSettingsCopy().listBadge;
   return (
     <Box
       data-testid="payments-provider-picker"
@@ -38,7 +40,7 @@ function ProviderPicker({
     >
       {providers.map((provider) => {
         const config = configs.find((c) => c.provider === provider.name) ?? null;
-        const badge = connectionBadge(config);
+        const badge = connectionBadge(copy, config);
         const selected = provider.name === activeName;
         return (
           <Box
@@ -93,6 +95,7 @@ export function ProviderList({
   reload: () => Promise<void>;
   onSelect: (name: string) => void;
 }) {
+  const copy = usePaymentsSettingsCopy().providerList;
   return (
     <Box data-testid="payments-provider-settings">
       {/*
@@ -111,9 +114,9 @@ export function ProviderList({
           />
         </Box>
       ) : null}
-      <Typography variant="subtitle1">Escolha o provedor de pagamento</Typography>
+      <Typography variant="subtitle1">{copy.heading}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Selecione onde sua loja recebe — a configuração é feita sob medida para ele.
+        {copy.subheading}
       </Typography>
       <ProviderPicker
         providers={view.providers}

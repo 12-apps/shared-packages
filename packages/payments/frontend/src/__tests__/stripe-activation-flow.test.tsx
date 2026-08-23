@@ -13,6 +13,7 @@ import {
   type PaymentProviderSettingsProps,
 } from '../components/PaymentProviderSettings';
 import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * Which activation flow a host renders for Stripe (FUT-689).
@@ -77,6 +78,7 @@ describe('stripe activation flow (FUT-689)', () => {
   it('Stripe never renders the hosted-redirect activation flow', async () => {
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient()}
         initialProvider={stripe.name}
         renderVerification={hostActivationStep}

@@ -1,7 +1,12 @@
 import { Box } from "@mui/material";
 import { useRef, type JSX } from "react";
 
+import { useCheckoutCopy } from "./copy-context";
+import type { WalletCopy } from "./screens-copy";
 import type { CheckoutOrder } from "./types";
+
+/** The Apple half of {@link WalletCopy} — what this button and its sheet say. */
+type ApplePayCopy = WalletCopy["applePay"];
 
 /**
  * The Apple-owned pay button (FUT-472), on `ApplePaySession` — the API Safari
@@ -85,13 +90,16 @@ export function applePaySupported(): boolean {
 }
 
 /** The sheet's payment request, from the server-authoritative order total. */
-function paymentRequest(order: CheckoutOrder): ApplePayPaymentRequest {
+function paymentRequest(order: CheckoutOrder, copy: ApplePayCopy): ApplePayPaymentRequest {
   return {
     countryCode: "BR",
     currencyCode: "BRL",
     supportedNetworks: APPLE_PAY_SUPPORTED_NETWORKS,
     merchantCapabilities: ["supports3DS"],
-    total: { label: "Total do pedido", amount: (order.totalCents / 100).toFixed(2) },
+    // The one line Apple's own sheet renders from us, so it is the host's
+    // (FUT-760) — the rest of that sheet is Apple's, in the buyer's own
+    // system language.
+    total: { label: copy.orderTotal, amount: (order.totalCents / 100).toFixed(2) },
   };
 }
 
@@ -109,8 +117,8 @@ export interface ApplePayButtonProps {
    * The host's merchant-validation port: exchange `validationURL` for an
    * Apple merchant session, SERVER-SIDE (the merchant identity certificate
    * must never reach a browser). Absent — the external prerequisites are not
-   * done, or the host has not wired it — the session aborts with a pt-BR
-   * message and the card form remains the way to pay.
+   * done, or the host has not wired it — the session aborts with the host's
+   * `cannotStart` sentence and the card form remains the way to pay.
    */
   validateMerchant?: (validationURL: string) => Promise<unknown>;
 }
@@ -120,20 +128,21 @@ function runSession(
   Session: ApplePaySessionClass,
   order: CheckoutOrder,
   handlers: ApplePayButtonProps,
+  copy: ApplePayCopy,
 ): void {
-  const session = new Session(APPLE_PAY_VERSION, paymentRequest(order));
+  const session = new Session(APPLE_PAY_VERSION, paymentRequest(order, copy));
   session.onvalidatemerchant = (event) => {
     const validate = handlers.validateMerchant;
     if (!validate) {
       session.abort();
-      handlers.onError("Não foi possível iniciar o Apple Pay nesta loja. Pague com cartão.");
+      handlers.onError(copy.cannotStart);
       return;
     }
     validate(event.validationURL)
       .then((merchantSession) => session.completeMerchantValidation(merchantSession))
       .catch(() => {
         session.abort();
-        handlers.onError("Não foi possível iniciar o Apple Pay. Tente novamente ou pague com cartão.");
+        handlers.onError(copy.cannotComplete);
       });
   };
   session.onpaymentauthorized = (event) => {
@@ -162,15 +171,16 @@ export function ApplePayButton(props: ApplePayButtonProps): JSX.Element | null {
   // over a stale charge target.
   const current = useRef(props);
   current.current = props;
+  const copy = useCheckoutCopy().screens.wallet.applePay;
   const Session = applePaySessionClass();
   if (!Session || !applePaySupported()) return null;
   return (
     <Box
       component="button"
       type="button"
-      aria-label="Pagar com Apple Pay"
+      aria-label={copy.payAction}
       data-testid="apple-pay-button"
-      onClick={() => runSession(Session, current.current.order, current.current)}
+      onClick={() => runSession(Session, current.current.order, current.current, copy)}
       sx={{
         WebkitAppearance: "-apple-pay-button",
         // Apple draws the button; these only give it room. The fallback

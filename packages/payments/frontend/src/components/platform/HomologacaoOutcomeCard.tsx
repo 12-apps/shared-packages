@@ -45,9 +45,9 @@ export interface HomologacaoSaveState {
 }
 
 const STATUS_LABEL: Record<PlatformHomologationStatus, string> = {
-  SUBMITTED: 'Solicitada',
-  APPROVED: 'Aprovada',
-  REJECTED: 'Recusada',
+  SUBMITTED: 'Submitted',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
 };
 
 const STATUS_COLOR: Record<PlatformHomologationStatus, 'warning' | 'success' | 'error'> = {
@@ -60,7 +60,7 @@ function StatusChip({ record }: { record: PlatformHomologationRecordView | null 
   if (record === null) {
     return (
       <Chip
-        label="Não solicitada"
+        label="Not submitted"
         size="small"
         variant="outlined"
         data-testid="homologacao-status-chip"
@@ -77,14 +77,22 @@ function StatusChip({ record }: { record: PlatformHomologationRecordView | null 
   );
 }
 
-const formatDateTime = (iso: string): string => new Date(iso).toLocaleString('pt-BR');
+/**
+ * The trail's timestamps, in the READER's own locale.
+ *
+ * No tag passed, deliberately (FUT-760): this screen is the platform
+ * integrator's, and it was pinned to `pt-BR` — which showed a Brazilian date
+ * to an operator whose browser is set to anything else. The runtime default is
+ * the one thing here that is genuinely theirs.
+ */
+const formatDateTime = (iso: string): string => new Date(iso).toLocaleString();
 
 function RecordTrail({ record }: { record: PlatformHomologationRecordView }): ReactNode {
   return (
     <Typography variant="caption" color="text.secondary" component="p">
-      {record.submittedAt ? `Solicitada em ${formatDateTime(record.submittedAt)}. ` : ''}
-      {record.decidedAt ? `Decidida em ${formatDateTime(record.decidedAt)}. ` : ''}
-      {record.updatedBy ? `Registrado por ${record.updatedBy}.` : ''}
+      {record.submittedAt ? `Submitted ${formatDateTime(record.submittedAt)}. ` : ''}
+      {record.decidedAt ? `Decided ${formatDateTime(record.decidedAt)}. ` : ''}
+      {record.updatedBy ? `Recorded by ${record.updatedBy}.` : ''}
     </Typography>
   );
 }
@@ -106,7 +114,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
     <Stack spacing={1.5} data-testid="homologacao-outcome-card" sx={CARD_SX}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Typography variant="body2" fontWeight={600}>
-          Situação da homologação
+          Homologation status
         </Typography>
         <StatusChip record={record} />
       </Box>
@@ -115,7 +123,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
         <TextField
           select
           size="small"
-          label="Situação"
+          label="Status"
           value={status}
           onChange={(event) => setStatus(event.target.value as PlatformHomologationStatus)}
           slotProps={{
@@ -131,16 +139,16 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
         </TextField>
         <TextField
           size="small"
-          aria-label="Protocolo"
-          placeholder="Protocolo (cartão do Pipefy / chamado)"
+          aria-label="Protocol"
+          placeholder="Protocol (Pipefy card / ticket)"
           value={protocol}
           onChange={(event) => setProtocol(event.target.value)}
           slotProps={{ htmlInput: { 'data-testid': 'homologacao-protocol' } }}
         />
         <TextField
           size="small"
-          aria-label="Observações"
-          placeholder="Observações (resposta do PagBank, contexto…)"
+          aria-label="Notes"
+          placeholder="Notes (PagBank's reply, context…)"
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           slotProps={{ htmlInput: { 'data-testid': 'homologacao-notes' } }}
@@ -152,7 +160,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
           onClick={() => onSave({ status, protocol, notes })}
           data-testid="homologacao-save"
         >
-          Registrar
+          Record
         </Button>
       </Box>
       {save.error !== null ? (
@@ -162,7 +170,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
       ) : null}
       {save.success ? (
         <Alert severity="success" data-testid="homologacao-save-ok">
-          Registro atualizado.
+          Record updated.
         </Alert>
       ) : null}
     </Stack>

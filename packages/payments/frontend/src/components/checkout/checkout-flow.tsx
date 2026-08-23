@@ -6,6 +6,7 @@ import { DadosStep, EmptyCart, PaymentStep } from "./checkout-steps";
 import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
+import { CheckoutCopyProvider } from "./copy-context";
 import { CheckoutComponentsProvider, useCheckoutComponents, type CheckoutComponents } from "./ui";
 import type { CheckoutViewCopy } from "./view-copy";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
@@ -245,7 +246,9 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
 export function CheckoutFlow({ components, ...props }: CheckoutFlowProps): JSX.Element {
   return (
     <CheckoutComponentsProvider components={components}>
-      <CheckoutFlowBody {...props} />
+      <CheckoutCopyProvider copy={props.copy.screens}>
+        <CheckoutFlowBody {...props} />
+      </CheckoutCopyProvider>
     </CheckoutComponentsProvider>
   );
 }

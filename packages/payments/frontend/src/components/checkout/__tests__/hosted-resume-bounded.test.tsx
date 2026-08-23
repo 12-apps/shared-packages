@@ -17,7 +17,7 @@
  * when it does fire the order must be left exactly as it was — still pending,
  * still reconcilable, never restated as failed.
  */
-import { act, render, renderHook, screen } from "@testing-library/react";
+import { act, render, renderHook, screen } from "./test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JSX, ReactNode } from "react";

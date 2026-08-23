@@ -50,7 +50,10 @@ function priceListRoutes(config: ResearchApiConfig): ResearchRoute[] {
           ? (record['rows'] as ManualPriceRowInput[])
           : [];
         if (record['csv'] !== undefined) {
-          const parsed = parseCsvPriceList(record['csv'] as never, config.diagnostics.manualImport);
+          const parsed = parseCsvPriceList(
+            { ...(record['csv'] as object), headerAliases: config.vocabulary.headerAliases } as never,
+            config.diagnostics.manualImport,
+          );
           rows = [...rows, ...parsed.rows];
           problems.push(...parsed.problems);
         }

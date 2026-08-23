@@ -24,6 +24,7 @@ import {
 import { RESEARCH_JOBS } from '../../jobs';
 import { productResearchManifest } from '../index';
 import { productResearchServerManifest } from '../server';
+import { PT_BR_MARKET_VOCABULARY } from '../../normalize/pt-BR';
 
 describe('the shared manifest', () => {
   it('passes the producer assertions — the contract is a devDependency, so the check lives here', () => {
@@ -49,6 +50,7 @@ describe('the shared manifest', () => {
     const { routes } = createApiProductResearch({
       store: {} as never,
       diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
+      vocabulary: PT_BR_MARKET_VOCABULARY,
       checks: {} as never,
       credentials: {} as never,
       messages: PT_BR_RESEARCH_MESSAGES,

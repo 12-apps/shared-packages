@@ -44,4 +44,6 @@ export const STORY_CHECKOUT_COPY: CheckoutCopyFE = {
   manageCardsTitle: "Meus cartões",
   manageCardsEmpty: "Você ainda não tem cartões salvos.",
   manageCardsAdd: "Adicionar cartão",
+  cardUnknownBrand: "Cartão",
+  cardExpiry: (month, year) => `Validade ${month}/${year}`,
 };

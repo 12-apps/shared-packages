@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // fireEvent/render from @testing-library/react (act()-wrapped) — same choice
 // and reasoning as the context tests: user-event is not a dependency here.
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from './settings-test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MaskedProviderConfig, MerchantSettingsView } from '@12-apps/payments-backend';

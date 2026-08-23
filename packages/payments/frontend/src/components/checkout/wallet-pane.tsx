@@ -3,6 +3,7 @@ import { useState, type JSX } from "react";
 
 import { ApplePayButton, applePaySupported } from "./apple-pay-button";
 import { CardView } from "./card-view";
+import { useCheckoutCopy } from "./copy-context";
 import { GooglePayButton } from "./google-pay-button";
 import {
   applePayDeclared,
@@ -37,11 +38,12 @@ type WalletPaneProps = ProviderCheckoutScreenProps & {
 /** Post-submit confirmation, error > timeout > spinner — the card view's order. */
 function WalletProcessing({ wallet }: { wallet: WalletCharge }): JSX.Element {
   const { Alert, LoadingState } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.settling;
   if (wallet.pollError) {
     return (
       <Alert
         variant="danger"
-        title="Não foi possível confirmar o pagamento"
+        title={copy.cannotConfirm}
         description={wallet.pollError}
         showIcon
         data-testid="wallet-poll-error"
@@ -52,8 +54,8 @@ function WalletProcessing({ wallet }: { wallet: WalletCharge }): JSX.Element {
     return (
       <Alert
         variant="warning"
-        title="O pagamento está demorando mais que o esperado"
-        description="Você pode aguardar ou verificar seu pedido em instantes — não realize um novo pagamento."
+        title={copy.takingLonger}
+        description={copy.takingLongerHelp}
         showIcon
         data-testid="wallet-poll-timeout"
       />
@@ -63,7 +65,7 @@ function WalletProcessing({ wallet }: { wallet: WalletCharge }): JSX.Element {
     <LoadingState
       variant="spinner"
       size="md"
-      message="Processando pagamento…"
+      message={copy.processing}
       dataTestId="wallet-processing"
     />
   );
@@ -77,10 +79,11 @@ function WalletProcessing({ wallet }: { wallet: WalletCharge }): JSX.Element {
  */
 function WalletUnresolved({ message }: { message: string }): JSX.Element {
   const { Alert } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.settling;
   return (
     <Alert
       variant="warning"
-      title="Estamos confirmando seu pagamento"
+      title={copy.confirming}
       description={message}
       showIcon
       data-testid="wallet-unresolved"
@@ -105,6 +108,7 @@ function WalletButtons({
   onSheetError: (message: string) => void;
 }): JSX.Element | null {
   const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.wallet;
   const [googleReady, setGoogleReady] = useState(false);
   const googlePay = googlePayConfig(props.config);
   const applePay = applePayDeclared(props.config) && applePaySupported();
@@ -131,7 +135,7 @@ function WalletButtons({
       {applePay || googleReady ? (
         <Divider>
           <Text variant="caption" size="xs" color="secondary" as="span">
-            ou pague com cartão
+            {copy.orPayWithCard}
           </Text>
         </Divider>
       ) : null}
@@ -142,6 +146,7 @@ function WalletButtons({
 /** The CARD pane: wallet fast lane above, the card form below. */
 export function WalletCardPane(props: WalletPaneProps): JSX.Element {
   const { Alert } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.settling;
   const { order, buyer, config, tenantSlug, onResolved, pollIntervalMs } = props;
   const wallet = useWalletCharge(order, buyer, onResolved, pollIntervalMs);
   // A sheet failure the wallet reported before any charge existed (pay.js
@@ -158,7 +163,7 @@ export function WalletCardPane(props: WalletPaneProps): JSX.Element {
       {wallet.error ? (
         <Alert
           variant="danger"
-          title="Não foi possível pagar"
+          title={copy.cannotPay}
           description={wallet.error}
           showIcon
           data-testid="wallet-error"
@@ -167,7 +172,7 @@ export function WalletCardPane(props: WalletPaneProps): JSX.Element {
       {sheetError && !wallet.error ? (
         <Alert
           variant="danger"
-          title="Não foi possível pagar"
+          title={copy.cannotPay}
           description={sheetError}
           showIcon
           data-testid="wallet-sheet-error"

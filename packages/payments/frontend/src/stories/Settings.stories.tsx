@@ -12,6 +12,7 @@ import type { PaymentProviderSettingsProps } from "../index";
 import { SettingsScene } from "./settings-host";
 import type { SettingsStorySpec } from "./settings-store";
 import { TAG_FIELD, type SettingsStoryProvider } from "./settings-store-adapter";
+import { SettingsStoryHost } from "./settings-story-host";
 
 /**
  * THE MERCHANT SETTINGS SURFACE, against a real mount (workstream B).
@@ -188,12 +189,14 @@ export const ReverifyWarningAtRest: StoryObj = scene(
 export const ConfirmMoneyDestination: StoryObj = {
   name: "Confirmação — o campo que decide quem recebe",
   render: () => (
-    <ConfirmCredentialSave
-      pending={{ spec: TAG_FIELD, value: "$loja-da-ana" }}
-      busy={false}
-      onCancel={() => undefined}
-      onConfirm={() => undefined}
-    />
+    <SettingsStoryHost>
+      <ConfirmCredentialSave
+        pending={{ spec: TAG_FIELD, value: "$loja-da-ana" }}
+        busy={false}
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+      />
+    </SettingsStoryHost>
   ),
 };
 
@@ -318,10 +321,12 @@ export const ProductionEnvironment: StoryObj = scene(
 export const EnvironmentElsewhereNote: StoryObj = {
   name: "Aviso de ambiente — a loja usa o outro",
   render: () => (
-    <Stack spacing={2}>
-      <EnvironmentNotice environment="SANDBOX" active="PRODUCTION" />
-      <EnvironmentNotice environment="PRODUCTION" active="SANDBOX" />
-    </Stack>
+    <SettingsStoryHost>
+      <Stack spacing={2}>
+        <EnvironmentNotice environment="SANDBOX" active="PRODUCTION" />
+        <EnvironmentNotice environment="PRODUCTION" active="SANDBOX" />
+      </Stack>
+    </SettingsStoryHost>
   ),
 };
 

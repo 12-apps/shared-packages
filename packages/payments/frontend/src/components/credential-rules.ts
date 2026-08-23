@@ -6,6 +6,7 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PendingSave } from './ConfirmCredentialSave';
+import type { CredentialFormCopy } from './settings-copy';
 
 /**
  * The DECISIONS the credential form makes, with no JSX anywhere near them.
@@ -91,11 +92,15 @@ export function fieldsWellFormed(
  * is the more useful of the two truths. Naming one of Stripe's four would be a
  * lie about what the button writes, which is why only the fallback changes.
  */
-export function saveLabel(descriptor: ProviderDescriptor, complete: boolean): string {
+export function saveLabel(
+  copy: CredentialFormCopy,
+  descriptor: ProviderDescriptor,
+  complete: boolean,
+): string {
   const required = descriptor.credentialSchema.filter((field) => field.required);
   const only = required.length === 1 ? required[0] : undefined;
-  if (!only) return complete ? 'Salvar e testar conexão' : 'Salvar';
-  return `Salvar ${only.label.replace(/\s*\([^)]*\)\s*$/, '')}`;
+  if (!only) return complete ? copy.saveAndTest : copy.save;
+  return copy.saveOnly(only.label.replace(/\s*\([^)]*\)\s*$/, ''));
 }
 
 /**

@@ -89,4 +89,16 @@ export interface CheckoutCopyFE {
   manageCardsTitle: string;
   manageCardsEmpty: string;
   manageCardsAdd: string;
+  /**
+   * How a card on file READS — the network's name when the provider shared
+   * none, and the expiry line beside it.
+   *
+   * Both were Portuguese literals inside this screen ("Cartão", "Validade
+   * MM/AAAA"), which is the whole of what a buyer sees of a saved card when
+   * the provider is stingy with metadata. `cardExpiry` is a function because
+   * the order of month and year, and whether the word leads or trails, is the
+   * translator's call — the two numbers arrive already padded.
+   */
+  cardUnknownBrand: string;
+  cardExpiry(month: string, year: number): string;
 }

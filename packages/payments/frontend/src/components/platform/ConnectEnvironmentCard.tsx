@@ -7,15 +7,18 @@ import type { ConnectApplicationStatus, PaymentEnvironment } from '@12-apps/paym
 
 /**
  * One environment's Connect application (FUT-479, packaged by FUT-573).
- * Sandbox and produção are SEPARATE applications with separate id/secret
+ * Sandbox and production are SEPARATE applications with separate id/secret
  * pairs, so each card stands on its own: configured or not, what PagBank says
  * is registered, and whether the registered redirect URI matches the
  * deployment's callback.
+ *
+ * English, like the rest of this platform surface (FUT-760) — see
+ * `ConnectApplicationPanel` for why.
  */
 
 const ENV_LABEL: Record<PaymentEnvironment, string> = {
   SANDBOX: 'Sandbox',
-  PRODUCTION: 'Produção',
+  PRODUCTION: 'Production',
 };
 
 /** The bordered-card look every block of these screens shares. */
@@ -47,22 +50,23 @@ function MismatchAlert({ status }: { status: ConnectApplicationStatus }): ReactN
   if (status.redirectUriMismatch === true) {
     return (
       <Alert severity="error" data-testid={`connect-mismatch-${status.environment}`}>
-        A redirect_uri registrada no PagBank é diferente do callback desta instalação. O fluxo
-        de autorização OAuth falha silenciosamente até o cadastro ser corrigido no PagBank.
+        The redirect_uri registered with PagBank differs from the callback this deployment
+        uses. The OAuth authorization flow fails silently until the registration is corrected
+        at PagBank.
       </Alert>
     );
   }
   if (status.redirectUriMismatch === false) {
     return (
       <Alert severity="success" data-testid={`connect-match-${status.environment}`}>
-        A redirect_uri registrada confere com o callback desta instalação.
+        The registered redirect_uri matches the callback this deployment uses.
       </Alert>
     );
   }
   return (
     <Alert severity="warning" data-testid={`connect-unknown-${status.environment}`}>
-      A resposta do PagBank não informou a redirect_uri — não foi possível comparar com o
-      callback desta instalação.
+      The PagBank response carried no redirect_uri, so it could not be compared with the
+      callback this deployment uses.
     </Alert>
   );
 }
@@ -75,16 +79,16 @@ function ApplicationFields({ status }: { status: ConnectApplicationStatus }): Re
   return (
     <Stack spacing={1.5}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5 }}>
-        <Field label="Nome (exibido ao lojista)">{app.name ?? '—'}</Field>
+        <Field label="Name (shown to the merchant)">{app.name ?? '—'}</Field>
         <Field label="Site">{app.site ?? '—'}</Field>
-        <Field label="Descrição">{app.description ?? '—'}</Field>
+        <Field label="Description">{app.description ?? '—'}</Field>
         <Field label="Logo">{app.logo ?? '—'}</Field>
-        <Field label="redirect_uri registrada">{app.redirectUri ?? 'não informada'}</Field>
+        <Field label="Registered redirect_uri">{app.redirectUri ?? 'not reported'}</Field>
       </Box>
       {extraKeys.length > 0 ? (
         <Box data-testid={`connect-extra-${status.environment}`}>
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            Outros campos retornados (schema não documentado)
+            Other fields returned (undocumented schema)
           </Typography>
           <Box component="pre" sx={{ m: 0, fontSize: 12, overflowX: 'auto' }}>
             {JSON.stringify(app.extra, null, 2)}
@@ -117,13 +121,13 @@ function ConfigHelp({
         onClick={() => setOpen((value) => !value)}
         data-testid={`connect-config-toggle-${environment}`}
       >
-        {open ? 'Ocultar variáveis de ambiente' : 'Ver variáveis de ambiente'}
+        {open ? 'Hide environment variables' : 'Show environment variables'}
       </Button>
       {open ? (
         <Box data-testid={`connect-config-details-${environment}`}>
           <Typography variant="caption" color="text.secondary" component="p">
-            A aplicação deste ambiente é resolvida estritamente por estas variáveis (sem
-            fallback entre ambientes):
+            This environment's application is resolved strictly from these variables, with no
+            fallback between environments:
           </Typography>
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
             {configVars.map((name) => (
@@ -159,7 +163,7 @@ export function ConnectEnvironmentCard({
       </Box>
       {!status.configured ? (
         <Typography variant="body2" color="text.secondary">
-          Nenhuma aplicação configurada neste ambiente.
+          No application configured in this environment.
         </Typography>
       ) : null}
       {status.error !== null ? (

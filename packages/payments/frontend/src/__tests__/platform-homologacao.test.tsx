@@ -33,6 +33,13 @@ const GUIDE: HomologacaoGuide = {
   demoStoreUrl: 'https://app.example.com/demo-balcao/menu',
   productsDescription: 'Plataforma Aurora de cardápio digital.',
   slaText: 'Prazo (SLA): até 4 dias úteis.',
+  fieldLabels: {
+    integrationType: 'Selecione o tipo de integração',
+    services: 'Selecione qual serviço você integrou (marque OS DOIS)',
+    accessInstructions: 'Instruções de acesso ao seu ambiente (limite de 255 caracteres)',
+    siteUrl: 'URL do site',
+    productsDescription: 'Detalhe quais produtos/serviços serão comercializados',
+  },
 };
 
 const IDLE: HomologacaoSaveState = { pending: false, error: null, success: false };
@@ -72,7 +79,7 @@ describe('PlatformHomologacao', () => {
   it('renders the absent record as "não solicitada" — displayed, never a choice', () => {
     renderScreen();
 
-    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Não solicitada');
+    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Not submitted');
     const select = screen.getByTestId<HTMLSelectElement>('homologacao-status-select');
     const offered = Array.from(select.options).map((option) => option.value);
     expect(offered).toEqual(['SUBMITTED', 'APPROVED', 'REJECTED']);
@@ -83,16 +90,16 @@ describe('PlatformHomologacao', () => {
       record: record({ status: 'APPROVED', decidedAt: '2026-08-05T09:00:00.000Z' }),
     });
 
-    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Aprovada');
+    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Approved');
     expect(screen.getByTestId('homologacao-outcome-card').textContent).toContain(
-      'Registrado por ops@example.com.',
+      'Recorded by ops@example.com.',
     );
   });
 
   it('shows the rejected outcome too — a refusal is a first-class answer', () => {
     renderScreen({ record: record({ status: 'REJECTED' }) });
 
-    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Recusada');
+    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Rejected');
   });
 
   it('names BOTH services and links the official form', () => {
@@ -136,7 +143,7 @@ describe('PlatformHomologacao', () => {
 
     renderScreen({ save: { pending: false, error: null, success: true } });
     expect(screen.getByTestId('homologacao-save-ok').textContent).toContain(
-      'Registro atualizado.',
+      'Record updated.',
     );
   });
 

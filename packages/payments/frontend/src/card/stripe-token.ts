@@ -19,6 +19,7 @@
 import { err, ok, type Result } from "../result";
 
 import type { CardDetails, CardToken } from "./types";
+import type { CardCopy } from "./copy";
 
 /** Stripe payment-methods endpoint — the publishable key authenticates. */
 const STRIPE_PAYMENT_METHODS_URL = "https://api.stripe.com/v1/payment_methods";
@@ -37,11 +38,12 @@ export async function tokenizeWithStripe(
   publicKey: string,
   brand: string,
   last4: string,
+  copy: CardCopy,
   /** Deadline for the round trip; an abort reads as "could not contact". */
   signal?: AbortSignal,
 ): Promise<Result<CardToken>> {
   const match = /^(\d{2})\/(\d{2})$/.exec(card.expiry.trim());
-  if (!match) return err("Validade inválida ou expirada.");
+  if (!match) return err(copy.fields.expiryInvalid);
 
   // Stripe's API speaks form-encoding, not JSON.
   const body = new URLSearchParams({
@@ -65,7 +67,7 @@ export async function tokenizeWithStripe(
       signal,
     });
   } catch {
-    return err("Não foi possível contatar o provedor do cartão. Verifique sua conexão.");
+    return err(copy.tokenize.providerUnreachable);
   }
 
   const parsed = (await response.json().catch(() => null)) as {
@@ -75,10 +77,7 @@ export async function tokenizeWithStripe(
   if (!response.ok || typeof parsed?.id !== "string") {
     const reason =
       typeof parsed?.error?.message === "string" ? parsed.error.message : JSON.stringify(parsed);
-    return err(
-      `O provedor recusou os dados do cartão (HTTP ${response.status}). ` +
-        `Resposta: ${String(reason).slice(0, 300)}`,
-    );
+    return err(copy.tokenize.providerRefused(response.status, String(reason).slice(0, 300)));
   }
   return ok({ token: parsed.id, brand, last4 });
 }

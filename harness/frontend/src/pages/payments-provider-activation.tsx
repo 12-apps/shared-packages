@@ -35,6 +35,8 @@ import { aurora } from '../payments/admin-adapter';
 import { adminCase } from '../payments/admin-cases';
 import type { AdminWorld } from '../payments/admin-store';
 import { CaseTabs, PageIntro, type HarnessCase } from '../payments/panel';
+import { CheckoutCopyProvider } from '@12-apps/payments-frontend';
+import { HARNESS_CHECKOUT_COPY } from '../payments/checkout-copy';
 
 type VerificationContext = Parameters<
   NonNullable<PaymentProviderSettingsProps['renderVerification']>
@@ -60,19 +62,25 @@ function stubTokenFor(card: CardDetails, attempt: number): string {
   return onlyDigits(card.number) === DECLINE_DIGITS ? `${base}-declined` : base;
 }
 
-/** Local validation, through the package's own validators. */
+/**
+ * Local validation, through the package's own validators.
+ *
+ * They take THIS host's words now (FUT-760) — the package decides which
+ * refusal a value earns and says nothing about how to word it.
+ */
 function validationErrors(card: CardDetails, cpf: string): {
   fields: CardFieldErrors;
   cpf: string | undefined;
 } {
+  const copy = HARNESS_CHECKOUT_COPY.views.screens.card.fields;
   return {
     fields: {
-      number: validateCardNumber(card.number),
-      holder: validateHolder(card.holder),
-      expiry: validateExpiry(card.expiry),
-      cvv: validateCvv(card.cvv, detectBrand(onlyDigits(card.number))),
+      number: validateCardNumber(card.number, copy),
+      holder: validateHolder(card.holder, copy),
+      expiry: validateExpiry(card.expiry, copy),
+      cvv: validateCvv(card.cvv, copy, detectBrand(onlyDigits(card.number))),
     },
-    cpf: validateCpf(cpf),
+    cpf: validateCpf(cpf, copy),
   };
 }
 
@@ -136,6 +144,10 @@ function useActivationCharge(world: AdminWorld, ctx: VerificationContext): Charg
 /** The form half: the SHARED card fields, the CPF, the refusal, the button. */
 function ActivationForm({ state }: { state: ChargeState }): JSX.Element {
   return (
+    // The shared card fields read their words from context, and this page
+    // mounts them outside any checkout flow — so the provider is this host's
+    // to open, exactly as it would be for a hand-composed screen.
+    <CheckoutCopyProvider copy={HARNESS_CHECKOUT_COPY.views.screens}>
     <div style={{ maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <NewCardForm
         card={state.card}
@@ -161,6 +173,7 @@ function ActivationForm({ state }: { state: ChargeState }): JSX.Element {
         Pagar R$ 0,01 e ativar
       </button>
     </div>
+    </CheckoutCopyProvider>
   );
 }
 

@@ -19,6 +19,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "../components/checkout/screens-pt-BR";
 import { createCheckoutClient } from "../components/checkout/transport";
 import type { CheckoutComponents } from "../components/checkout/ui";
 import { storyFlows } from "../stories/host";
@@ -250,7 +251,10 @@ describe("the transport pair", () => {
       urls.push(String(input));
       return world.fetchImpl(input, init);
     };
-    const client = createCheckoutClient({ fetchImpl: recording as typeof fetch });
+    const client = createCheckoutClient({
+      fetchImpl: recording as typeof fetch,
+      copy: PT_BR_CHECKOUT_SCREENS_COPY.transport,
+    });
 
     const begun = await client.beginVault();
     expect(begun).toEqual({

@@ -6,6 +6,7 @@ import type { MerchantSettingsView } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * Controlled selection — the mode a host uses when the open provider lives in
@@ -38,7 +39,7 @@ function fakeClient(): PaymentsSettingsClient {
 
 describe('PaymentProviderSettings — host-controlled selection', () => {
   it('opens the provider the host names, on the first render', async () => {
-    render(<PaymentProviderSettings client={fakeClient()} selectedProvider="pagbank" />);
+    render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={fakeClient()} selectedProvider="pagbank" />);
 
     // No handover tick to wait for: a controlled host has the answer at mount.
     expect(await screen.findByTestId('payments-provider-back')).toBeDefined();
@@ -50,7 +51,7 @@ describe('PaymentProviderSettings — host-controlled selection', () => {
    * to internal state and strand the owner in the provider they last opened.
    */
   it('shows the list when the host says null', async () => {
-    render(<PaymentProviderSettings client={fakeClient()} selectedProvider={null} />);
+    render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={fakeClient()} selectedProvider={null} />);
     expect(await screen.findByTestId('payments-provider-picker')).toBeDefined();
   });
 
@@ -62,6 +63,7 @@ describe('PaymentProviderSettings — host-controlled selection', () => {
     const onProviderChange = vi.fn();
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient()}
         selectedProvider="pagbank"
         onProviderChange={onProviderChange}
@@ -81,14 +83,14 @@ describe('PaymentProviderSettings — host-controlled selection', () => {
   it('follows the host on each change, in both directions', async () => {
     const client = fakeClient();
     const { rerender } = render(
-      <PaymentProviderSettings client={client} selectedProvider="pagbank" />,
+      <PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} selectedProvider="pagbank" />,
     );
     await screen.findByTestId('payments-provider-back');
 
-    rerender(<PaymentProviderSettings client={client} selectedProvider={null} />);
+    rerender(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} selectedProvider={null} />);
     expect(await screen.findByTestId('payments-provider-picker')).toBeDefined();
 
-    rerender(<PaymentProviderSettings client={client} selectedProvider="stripe" />);
+    rerender(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} selectedProvider="stripe" />);
     await waitFor(() => expect(screen.queryByTestId('payments-provider-picker')).toBeNull());
   });
 
@@ -100,6 +102,7 @@ describe('PaymentProviderSettings — host-controlled selection', () => {
     const onProviderChange = vi.fn();
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient()}
         initialProvider="pagbank"
         onProviderChange={onProviderChange}

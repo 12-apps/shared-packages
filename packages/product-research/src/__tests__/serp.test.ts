@@ -5,6 +5,7 @@ import { regionToLocation } from '../connectors/serp-location';
 import type { ConnectorContext } from '../connectors/types';
 import { silentLogger } from '../memory';
 import type { SourceRecord } from '../types';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
 // Shape mirrors a SearchApi.io `google_shopping` response for a gl=br query
 // (documented response reference, 2026-07), trimmed to the fields the parser
@@ -92,11 +93,11 @@ const ctxWith = (
   },
 });
 
-const serpConnector = () => createSerpConnector({ getApiKey: () => 'test-key' });
+const serpConnector = () => createSerpConnector({ getApiKey: () => 'test-key', vocabulary: PT_BR_MARKET_VOCABULARY });
 
 describe('parseSerpResponse', () => {
   it('extracts BRL offers through the price waterfall, merchant as supplier', () => {
-    const offers = parseSerpResponse(SEARCHAPI_FIXTURE);
+    const offers = parseSerpResponse(SEARCHAPI_FIXTURE, PT_BR_MARKET_VOCABULARY);
     expect(offers).toHaveLength(3);
     // extracted_price wins when present.
     expect(offers[0]).toMatchObject({
@@ -125,7 +126,7 @@ describe('parseSerpResponse', () => {
   // its availability signal — so every Google Shopping offer reported unknown
   // shipping while carrying a merchant statement about it.
   it('reads shipping from the delivery line, and from nothing else', () => {
-    const offers = parseSerpResponse(SEARCHAPI_FIXTURE);
+    const offers = parseSerpResponse(SEARCHAPI_FIXTURE, PT_BR_MARKET_VOCABULARY);
     // "Frete grátis" is a stated price of zero, not an absence of one.
     expect(offers[1]?.shippingCents).toBe(0);
     // "Retirada na loja" is a collection option, not a freight quote.
@@ -140,45 +141,51 @@ describe('parseSerpResponse', () => {
 
   it('parses a quoted freight amount and leaves a delivery-time promise unknown', () => {
     const priced = { price: 'R$ 10,00', extracted_price: 10 };
-    const offers = parseSerpResponse({
-      shopping_results: [
-        { title: 'A', seller: 'X', ...priced, delivery: 'Frete: R$ 12,90' },
-        { title: 'B', seller: 'Y', ...priced, delivery: 'Entrega em 2 dias' },
-        { title: 'C', seller: 'Z', ...priced, delivery: 'Entrega grátis' },
-      ],
-    });
+    const offers = parseSerpResponse(
+      {
+        shopping_results: [
+          { title: 'A', seller: 'X', ...priced, delivery: 'Frete: R$ 12,90' },
+          { title: 'B', seller: 'Y', ...priced, delivery: 'Entrega em 2 dias' },
+          { title: 'C', seller: 'Z', ...priced, delivery: 'Entrega grátis' },
+        ],
+      },
+      PT_BR_MARKET_VOCABULARY,
+    );
     expect(offers.map((offer) => offer.shippingCents)).toEqual([1290, undefined, 0]);
     // The delivery line keeps feeding availability exactly as before.
     expect(offers.map((offer) => offer.availability)).toEqual([undefined, undefined, undefined]);
   });
 
   it('drops non-BRL results and results with neither price nor availability', () => {
-    const offers = parseSerpResponse(SEARCHAPI_FIXTURE);
+    const offers = parseSerpResponse(SEARCHAPI_FIXTURE, PT_BR_MARKET_VOCABULARY);
     const suppliers = offers.map((offer) => offer.supplierName);
     expect(suppliers).not.toContain('US Import Store');
     expect(suppliers).not.toContain('Loja sem preço');
   });
 
   it('drops an explicit non-BRL currency field even when the price text is bare', () => {
-    const offers = parseSerpResponse({
-      shopping_results: [
-        { title: 'Import', seller: 'X', price: '24,99', extracted_price: 24.99, currency: 'USD' },
-      ],
-    });
+    const offers = parseSerpResponse(
+      {
+        shopping_results: [
+          { title: 'Import', seller: 'X', price: '24,99', extracted_price: 24.99, currency: 'USD' },
+        ],
+      },
+      PT_BR_MARKET_VOCABULARY,
+    );
     expect(offers).toEqual([]);
   });
 
   it('keeps unknown payload fields in raw for offline replay', () => {
-    const offers = parseSerpResponse(SEARCHAPI_FIXTURE);
+    const offers = parseSerpResponse(SEARCHAPI_FIXTURE, PT_BR_MARKET_VOCABULARY);
     const raw = offers[0]?.raw as Record<string, unknown>;
     expect(raw.position).toBe(1);
     expect(raw.product_id).toBe('1111111111111111111');
   });
 
   it('tolerates unexpected payload shapes by returning no offers', () => {
-    expect(parseSerpResponse(null)).toEqual([]);
-    expect(parseSerpResponse([])).toEqual([]);
-    expect(parseSerpResponse({ error: 'weird' })).toEqual([]);
+    expect(parseSerpResponse(null, PT_BR_MARKET_VOCABULARY)).toEqual([]);
+    expect(parseSerpResponse([], PT_BR_MARKET_VOCABULARY)).toEqual([]);
+    expect(parseSerpResponse({ error: 'weird' }, PT_BR_MARKET_VOCABULARY)).toEqual([]);
   });
 });
 
@@ -256,7 +263,7 @@ describe('createSerpConnector', () => {
   });
 
   it('reports a missing API key as a connector error, never throws', async () => {
-    const keyless = createSerpConnector({ getApiKey: () => undefined });
+    const keyless = createSerpConnector({ getApiKey: () => undefined, vocabulary: PT_BR_MARKET_VOCABULARY });
     const seen: { url: string }[] = [];
     const result = await keyless.search(
       { term: 'Guaraná Antarctica 350ml', quantity: 1 },
@@ -276,7 +283,7 @@ describe('createSerpConnector', () => {
   });
 
   it('runs on the tenant credential from source.config even without a host env key', async () => {
-    const keyless = createSerpConnector({ getApiKey: () => undefined });
+    const keyless = createSerpConnector({ getApiKey: () => undefined, vocabulary: PT_BR_MARKET_VOCABULARY });
     const seen: { url: string; headers?: Record<string, string> }[] = [];
     const result = await keyless.search(
       { term: 'Guaraná Antarctica 350ml', quantity: 1 },

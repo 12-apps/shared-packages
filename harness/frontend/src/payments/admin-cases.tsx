@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from '
 
 import {
   PaymentProviderSettings,
+  PT_BR_PAYMENTS_SETTINGS_COPY,
   type PaymentProviderSettingsProps,
 } from '@12-apps/payments-frontend';
 
@@ -91,7 +92,7 @@ function useConnectOutcome(query: URLSearchParams, enabled: boolean): ConnectOut
 }
 
 /** The `error` name a refusal body carries, or the bare status. */
-async function refusalTag(response: Response): Promise<string> {
+export async function refusalTag(response: Response): Promise<string> {
   const raw = await response.text();
   try {
     const parsed = JSON.parse(raw) as { error?: string };
@@ -260,9 +261,15 @@ function SettingsMount({ props, world, query, outcome }: MountArgs): JSX.Element
           Remounting on `connected` makes the fresh mount's `GET /settings`
           strictly follow the write — and hands `initialProvider` its land-once
           moment on a screen whose view can actually show the connection. */}
+      {/* `copy` is the NAMED pack, passed by hand — the package ships no
+          default (FUT-760). Unlike the checkout copy beside it, this host
+          adopts the pt-BR wording rather than inventing its own: the settings
+          specs assert on these exact sentences, and a second vocabulary here
+          would test the fixture rather than the surface. */}
       <PaymentProviderSettings
         key={outcome.connected ?? 'live'}
         client={world.client}
+        copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         prepareConnect={props.connect ? world.prepareConnect : undefined}
         initialProvider={outcome.connected}
         selectedProvider={controlled ? query.get('provider') : undefined}
@@ -357,43 +364,5 @@ export function ReleaseVerifyButton({ world }: { world: AdminWorld }): JSX.Eleme
     <button type="button" data-testid="admin-release-verify" onClick={() => world.releaseVerify()}>
       Liberar verificação
     </button>
-  );
-}
-
-/**
- * The two `assertReorderOnly` refusals the package's own reorder control can
- * never send (it always permutes the rendered chain), issued raw at the
- * mount. Both land in the shared `admin-priorities-refusal` fact as
- * `"<status> <error>"`.
- */
-export function PriorityRefusalButtons({
-  world,
-  legs,
-}: {
-  world: AdminWorld;
-  legs: { testid: string; label: string; providers: string[] }[];
-}): JSX.Element {
-  const [refusal, setRefusal] = useState('(none)');
-  const put = async (providers: string[]): Promise<void> => {
-    const response = await world.fetchImpl(`${world.baseUrl}/settings/priorities`, {
-      method: 'PUT',
-      body: JSON.stringify({ providers }),
-    });
-    setRefusal(`${response.status} ${await refusalTag(response)}`);
-  };
-  return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-      {legs.map((leg) => (
-        <button
-          key={leg.testid}
-          type="button"
-          data-testid={leg.testid}
-          onClick={() => void put(leg.providers)}
-        >
-          {leg.label}
-        </button>
-      ))}
-      <output data-testid="admin-priorities-refusal">{refusal}</output>
-    </div>
   );
 }

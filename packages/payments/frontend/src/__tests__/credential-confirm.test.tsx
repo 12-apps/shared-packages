@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from './settings-test-utils';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +8,7 @@ import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments
 import type { PaymentsSettingsClient } from '../client';
 import { ProviderForm } from '../components/ProviderCredentialForm';
 import { statusBadge } from '../components/ProviderStatusBar';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 // jest-dom is not a dependency here — assert DOM properties directly.
 
@@ -167,12 +168,15 @@ describe('saving a credential that decides where the money goes', () => {
  * answers yes with Checkout Integrado switched off, which mints no links at
  * all. Only `chargeVerifiedAt` is a payment that actually landed.
  */
+/** The pack a host passes; these assertions read the sentences it produces. */
+const STATUS_COPY = PT_BR_PAYMENTS_SETTINGS_COPY.status;
+
 describe('what the status chip is allowed to claim', () => {
   it('separates reaching the account from being able to charge', () => {
-    expect(statusBadge(null).label).toBe('NÃO VERIFICADO');
-    expect(statusBadge(configWith('$loja')).label).toBe('NÃO VERIFICADO');
+    expect(statusBadge(STATUS_COPY, null).label).toBe('NÃO VERIFICADO');
+    expect(statusBadge(STATUS_COPY, configWith('$loja')).label).toBe('NÃO VERIFICADO');
 
-    const probed = statusBadge(configWith('$loja', 'VERIFIED'));
+    const probed = statusBadge(STATUS_COPY, configWith('$loja', 'VERIFIED'));
     expect(probed.label).toBe('CONEXÃO OK');
     expect(probed.color).not.toBe('success');
 
@@ -180,14 +184,14 @@ describe('what the status chip is allowed to claim', () => {
       ...configWith('$loja', 'VERIFIED'),
       chargeVerifiedAt: '2026-07-30T12:00:00.000Z',
     } as MaskedProviderConfig;
-    expect(statusBadge(paid)).toEqual({ label: 'VERIFICADO', color: 'success' });
+    expect(statusBadge(STATUS_COPY, paid)).toEqual({ label: 'VERIFICADO', color: 'success' });
   });
 
   it('says RECONECTAR rather than a bare failure when a grant lapsed', () => {
-    expect(statusBadge(configWith('$loja', 'RECONNECT_REQUIRED')).label).toBe('RECONECTAR');
+    expect(statusBadge(STATUS_COPY, configWith('$loja', 'RECONNECT_REQUIRED')).label).toBe('RECONECTAR');
     // A failed probe is NOT a third state: the store cannot take money yet,
     // which is what NÃO VERIFICADO already says. The probe's own sentence
     // beneath the chip is what names the tag and the fix.
-    expect(statusBadge(configWith('$loja', 'FAILED')).label).toBe('NÃO VERIFICADO');
+    expect(statusBadge(STATUS_COPY, configWith('$loja', 'FAILED')).label).toBe('NÃO VERIFICADO');
   });
 });

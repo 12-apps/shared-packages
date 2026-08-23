@@ -15,6 +15,9 @@ import {
 } from "../index";
 
 import { StoryFlow, storyFlows } from "./host";
+import { CheckoutCopyProvider } from "../components/checkout/copy-context";
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "../components/checkout/screens-pt-BR";
+import { STORY_CHECKOUT_COPY } from "./demo-copy";
 
 /**
  * The two claims that are not about any single screen (FUT-741/742).
@@ -157,7 +160,10 @@ function HandComposed(): JSX.Element {
   const [world] = useState(
     () => storyFlows({ chain: [{ name: "aurora", methods: ["CARD"], ...STUB }] }).world,
   );
-  const [client] = useState(() => createCheckoutClient({ fetchImpl: world.fetchImpl }));
+  const [client] = useState(() => createCheckoutClient({
+      fetchImpl: world.fetchImpl,
+      copy: PT_BR_CHECKOUT_SCREENS_COPY.transport,
+    }));
   const [config, setConfig] = useState<CheckoutProviderConfig | null>(null);
   const [card, setCard] = useState<CardDetails>({ number: "", holder: "", expiry: "", cvv: "" });
   const [fieldErrors, setFieldErrors] = useState<CardFieldErrors>({});
@@ -175,27 +181,29 @@ function HandComposed(): JSX.Element {
 
   return (
     <CheckoutComponentsProvider>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <p style={{ fontSize: 12, opacity: 0.7 }}>
-          Composto à mão: <code>createCheckoutClient</code> +{" "}
-          <code>CheckoutComponentsProvider</code> + <code>NewCardForm</code> +{" "}
-          <code>CardPayBar</code>. Nenhuma fábrica envolvida.
-        </p>
-        <p style={{ fontSize: 12, opacity: 0.7 }}>
-          /config respondeu com {config?.chain?.length ?? 0} provedor(es); tokenização{" "}
-          <code>{config?.tokenization ?? "—"}</code>.
-        </p>
-        <NewCardForm
-          card={card}
-          fieldErrors={fieldErrors}
-          brand={detectBrand(onlyDigits(card.number))}
-          saveCard={saveCard}
-          setCard={setCard}
-          setFieldErrors={setFieldErrors}
-          onSaveCardChange={setSaveCard}
-        />
-        <CardPayBar totalLabel="R$ 75,00" submitting={false} onPay={() => undefined} />
-      </div>
+      <CheckoutCopyProvider copy={STORY_CHECKOUT_COPY.views.screens}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p style={{ fontSize: 12, opacity: 0.7 }}>
+            Composto à mão: <code>createCheckoutClient</code> +{" "}
+            <code>CheckoutComponentsProvider</code> + <code>NewCardForm</code> +{" "}
+            <code>CardPayBar</code>. Nenhuma fábrica envolvida.
+          </p>
+          <p style={{ fontSize: 12, opacity: 0.7 }}>
+            /config respondeu com {config?.chain?.length ?? 0} provedor(es); tokenização{" "}
+            <code>{config?.tokenization ?? "—"}</code>.
+          </p>
+          <NewCardForm
+            card={card}
+            fieldErrors={fieldErrors}
+            brand={detectBrand(onlyDigits(card.number))}
+            saveCard={saveCard}
+            setCard={setCard}
+            setFieldErrors={setFieldErrors}
+            onSaveCardChange={setSaveCard}
+          />
+          <CardPayBar totalLabel="R$ 75,00" submitting={false} onPay={() => undefined} />
+        </div>
+      </CheckoutCopyProvider>
     </CheckoutComponentsProvider>
   );
 }

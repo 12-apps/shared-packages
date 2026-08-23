@@ -1,12 +1,17 @@
+import type { CardBrand, CardFieldCopy } from "./copy";
+
 /**
  * Client-side card formatting + validation (FUT-58).
  *
- * Pure helpers with no imports — the card form uses them to format input live and
- * to validate before tokenizing. They never transmit anything; the PAN is only
- * checked locally (Luhn + brand + length) then handed to the tokenizer.
+ * Pure helpers — the card form uses them to format input live and to validate
+ * before tokenizing. They never transmit anything; the PAN is only checked
+ * locally (Luhn + brand + length) then handed to the tokenizer.
+ *
+ * The validators take the host's words (FUT-760). WHICH refusal a value earns
+ * is the rule, and it stays here; the sentence is not ours.
  */
 
-export type CardBrand = "Visa" | "Mastercard" | "Amex" | "Elo" | "Cartão";
+export type { CardBrand } from "./copy";
 
 /** Strip everything but digits. */
 export function onlyDigits(value: string): string {
@@ -19,7 +24,7 @@ export function detectBrand(digits: string): CardBrand {
   if (/^(5[1-5]|2[2-7])/.test(digits)) return "Mastercard";
   if (/^3[47]/.test(digits)) return "Amex";
   if (/^6/.test(digits)) return "Elo";
-  return "Cartão";
+  return "Unknown";
 }
 
 /** Expected CVV length for a brand (Amex uses 4, everyone else 3). */
@@ -71,33 +76,44 @@ function luhnValid(digits: string): boolean {
 }
 
 /** @returns an error message, or `undefined` when valid. */
-export function validateCardNumber(value: string): string | undefined {
+export function validateCardNumber(
+  value: string,
+  copy: CardFieldCopy,
+): string | undefined {
   const digits = onlyDigits(value);
-  if (!digits) return "Informe o número do cartão.";
-  if (digits.length < 13) return "Número de cartão incompleto.";
-  if (!luhnValid(digits)) return "Número de cartão inválido.";
+  if (!digits) return copy.numberRequired;
+  if (digits.length < 13) return copy.numberIncomplete;
+  if (!luhnValid(digits)) return copy.numberInvalid;
   return undefined;
 }
 
-export function validateHolder(value: string): string | undefined {
-  return value.trim().length < 2 ? "Informe o nome impresso no cartão." : undefined;
+export function validateHolder(value: string, copy: CardFieldCopy): string | undefined {
+  return value.trim().length < 2 ? copy.holderRequired : undefined;
 }
 
-export function validateExpiry(value: string, now: Date = new Date()): string | undefined {
+export function validateExpiry(
+  value: string,
+  copy: CardFieldCopy,
+  now: Date = new Date(),
+): string | undefined {
   const match = /^(\d{2})\/(\d{2})$/.exec(value.trim());
   if (!match) return "Validade incompleta (MM/AA).";
   const mm = match[1];
   const yy = match[2];
   if (mm === undefined || yy === undefined) return "Validade incompleta (MM/AA).";
   const month = Number(mm);
-  if (month < 1 || month > 12) return "Mês inválido.";
+  if (month < 1 || month > 12) return copy.monthInvalid;
   const endOfMonth = new Date(2000 + Number(yy), month, 0, 23, 59, 59, 999);
-  return endOfMonth.getTime() < now.getTime() ? "Cartão expirado." : undefined;
+  return endOfMonth.getTime() < now.getTime() ? copy.expired : undefined;
 }
 
-export function validateCvv(value: string, brand: CardBrand = "Cartão"): string | undefined {
+export function validateCvv(
+  value: string,
+  copy: CardFieldCopy,
+  brand: CardBrand = "Unknown",
+): string | undefined {
   const digits = onlyDigits(value);
   if (!digits) return "Informe o CVV.";
   const len = cvvLength(brand);
-  return digits.length === len ? undefined : `CVV deve ter ${len} dígitos.`;
+  return digits.length === len ? undefined : copy.cvvDigits(len);
 }

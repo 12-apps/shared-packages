@@ -12,6 +12,7 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * The rendered SHAPE of the redesigned panel, asserted where a screenshot
@@ -65,6 +66,7 @@ function renderPanel(enabled = false) {
 
   render(
     <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
       client={client}
       initialProvider="stripe"
       prepareConnect={async () => ({ state: 's', redirectUri: 'https://h.test/cb' })}
@@ -187,6 +189,7 @@ describe('the redesigned provider panel', () => {
 
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={client}
         initialProvider="stripe"
         prepareConnect={async () => ({ state: 's', redirectUri: 'https://h.test/cb' })}

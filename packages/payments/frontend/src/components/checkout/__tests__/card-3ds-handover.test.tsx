@@ -11,7 +11,7 @@
  * over exactly as a redirect provider's link does (FUT-556): park the order,
  * navigate, and start NO poll in a tab that is being torn down.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JSX } from "react";

@@ -143,11 +143,12 @@ export function useAddCard(
 
   const brand = detectBrand(onlyDigits(card.number));
 
+  const fieldCopy = runtime.copy.views.screens.card.fields;
   const validate = (): CardFieldErrors => ({
-    number: validateCardNumber(card.number),
-    holder: validateHolder(card.holder),
-    expiry: validateExpiry(card.expiry),
-    cvv: validateCvv(card.cvv, brand),
+    number: validateCardNumber(card.number, fieldCopy),
+    holder: validateHolder(card.holder, fieldCopy),
+    expiry: validateExpiry(card.expiry, fieldCopy),
+    cvv: validateCvv(card.cvv, fieldCopy, brand),
   });
 
   const submit = async (): Promise<void> => {
@@ -158,7 +159,11 @@ export function useAddCard(
     if (Object.values(errors).some(Boolean)) return;
 
     setSaving(true);
-    const minted = await tokenizeForCheckout(card, sessionTokenization(phase.session, config));
+    const minted = await tokenizeForCheckout(
+      card,
+      sessionTokenization(phase.session, config),
+      runtime.copy.views.screens.card,
+    );
     if (!minted.ok) {
       setError(minted.error);
       setSaving(false);

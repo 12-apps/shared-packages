@@ -27,6 +27,7 @@ import { CheckoutClientProvider } from "../components/checkout/client-context";
 import { CheckoutNavigateProvider } from "../components/checkout/navigate-context";
 import type { CheckoutClient } from "../components/checkout/transport";
 import type { CheckoutProviderConfig } from "../components/checkout/types";
+import { CheckoutCopyProvider } from "../components/checkout/copy-context";
 import { CheckoutComponentsProvider } from "../components/checkout/ui";
 
 import type { CheckoutCopyFE } from "./copy";
@@ -102,7 +103,7 @@ export function useResolvedConfig(runtime: FlowsRuntime): CheckoutConfigState {
   return provided ?? own;
 }
 
-/** Slots, transport and the navigate port — what a screen cannot work without. */
+/** Slots, WORDS, transport and the navigate port — what a screen cannot work without. */
 export function FlowsShell({
   runtime,
   children,
@@ -112,9 +113,16 @@ export function FlowsShell({
 }): JSX.Element {
   return (
     <CheckoutComponentsProvider components={runtime.config.components}>
-      <CheckoutClientProvider client={runtime.client}>
-        <CheckoutNavigateProvider navigate={runtime.navigate}>{children}</CheckoutNavigateProvider>
-      </CheckoutClientProvider>
+      {/* The factory's STANDALONE screens (add-card, manage-cards) render the
+          same card fields the checkout does, so they need the same words —
+          and they are mounted here rather than under `CheckoutFlow`. */}
+      <CheckoutCopyProvider copy={runtime.config.copy.views.screens}>
+        <CheckoutClientProvider client={runtime.client}>
+          <CheckoutNavigateProvider navigate={runtime.navigate}>
+            {children}
+          </CheckoutNavigateProvider>
+        </CheckoutClientProvider>
+      </CheckoutCopyProvider>
     </CheckoutComponentsProvider>
   );
 }

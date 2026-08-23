@@ -103,6 +103,10 @@ export {
 export type { ResearchRunWireEvent } from './pipeline/progress-wire';
 export { normalizeText, tokenize, volumeTokenToMl } from './normalize/text';
 export { availabilityFromText } from './normalize/availability';
+// The words this package READS in somebody else's data — required config, and
+// the Brazilian pack a host passes by hand (FUT-760).
+export type { MarketVocabulary } from './normalize/vocabulary';
+export { PT_BR_MARKET_VOCABULARY } from './normalize/pt-BR';
 export { isBrlPrice } from './normalize/currency';
 export { parseMoneyToCents } from './normalize/money';
 export { parsePack } from './normalize/pack';

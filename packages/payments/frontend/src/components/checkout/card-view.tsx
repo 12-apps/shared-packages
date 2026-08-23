@@ -8,6 +8,7 @@ import {
   type CardTokenizationConfig,
 } from "../../card";
 
+import { useCheckoutCopy } from "./copy-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, CheckoutOrder, OrderStatus } from "./types";
@@ -28,11 +29,12 @@ function SubmittedState({
   pollTimedOut: boolean;
 }): JSX.Element {
   const { Alert, LoadingState } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.settling;
   if (pollError) {
     return (
       <Alert
         variant="danger"
-        title="Não foi possível confirmar o pagamento"
+        title={copy.cannotConfirm}
         description={pollError}
         showIcon
         data-testid="card-poll-error"
@@ -43,8 +45,8 @@ function SubmittedState({
     return (
       <Alert
         variant="warning"
-        title="O pagamento está demorando mais que o esperado"
-        description="Você pode aguardar ou verificar seu pedido em instantes — não realize um novo pagamento."
+        title={copy.takingLonger}
+        description={copy.takingLongerHelp}
         showIcon
         data-testid="card-poll-timeout"
       />
@@ -54,7 +56,7 @@ function SubmittedState({
     <LoadingState
       variant="spinner"
       size="md"
-      message="Processando pagamento…"
+      message={copy.processing}
       dataTestId="card-processing"
     />
   );
@@ -76,11 +78,12 @@ function ChargeFailure({
   unresolved: boolean;
 }): JSX.Element {
   const { Alert } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.settling;
   if (unresolved) {
     return (
       <Alert
         variant="warning"
-        title="Estamos confirmando seu pagamento"
+        title={copy.confirming}
         description={message}
         showIcon
         data-testid="card-unresolved"
@@ -88,7 +91,7 @@ function ChargeFailure({
     );
   }
   return (
-    <Alert variant="danger" title="Não foi possível pagar" description={message} showIcon data-testid="card-error" />
+    <Alert variant="danger" title={copy.cannotPay} description={message} showIcon data-testid="card-error" />
   );
 }
 
@@ -127,6 +130,7 @@ export function CardView({
   pollIntervalMs?: number;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.card;
   const cc = useCardCheckout(order, buyer, providerConfig, onResolved, pollIntervalMs, tenantSlug, providerChain);
   // A charge NOBODY can confirm yet is not a decline (FUT-563). Some provider
   // may be holding the buyer's money, so it gets its own presentation: the
@@ -141,7 +145,7 @@ export function CardView({
   return (
     <Box data-testid="card-view" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <Text variant="heading" size="md" weight="bold" as="h2">
-        Pague com cartão
+        {copy.heading}
       </Text>
 
       {cc.savedCards.length > 0 ? (

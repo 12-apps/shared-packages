@@ -17,6 +17,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { chargeCard } from "../client";
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "../screens-pt-BR";
 
 /**
  * THE WIRE, DRIVEN FROM BOTH ENDS (FUT-740).
@@ -207,7 +208,7 @@ describe("@12-apps/payments-frontend's chargeCard against createPaymentFlowsBE",
       saveCard: true,
       cardMeta: { brand: "visa", last4: "4242", expMonth: 12, expYear: 2030, holder: "ANA B" },
       taxId: "12345678909",
-    });
+    }, PT_BR_CHECKOUT_SCREENS_COPY.transport);
 
     expect(charged.ok).toBe(true);
     expect(charged.ok && charged.data.status).toBe("PAID");
@@ -249,7 +250,7 @@ describe("@12-apps/payments-frontend's chargeCard against createPaymentFlowsBE",
       orderId: REF,
       token: "tok_from_the_browser",
       saveCard: false,
-    });
+    }, PT_BR_CHECKOUT_SCREENS_COPY.transport);
 
     expect(charged.ok).toBe(false);
     expect(!charged.ok && charged.code).toBe("MISSING_BUYER_FIELD");

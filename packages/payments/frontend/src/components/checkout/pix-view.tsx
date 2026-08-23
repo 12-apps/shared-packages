@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 import { useEffect, useState, type JSX } from "react";
 import QRCode from "react-qr-code";
 
+import { useCheckoutCopy } from "./copy-context";
 import { ContentCopyIcon } from "./icons";
 import type { CheckoutOrder, OrderStatus, PixCharge } from "./types";
 import { useCheckoutComponents } from "./ui";
@@ -17,6 +18,7 @@ import { usePaymentPolling } from "./use-payment-polling";
 /** The copyable "copia e cola" strip with its copy button. */
 function PixCodeBox({ pix }: { pix: PixCharge }): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.pix;
   const [copied, setCopied] = useState(false);
 
   const copyCode = async (): Promise<void> => {
@@ -63,7 +65,7 @@ function PixCodeBox({ pix }: { pix: PixCharge }): JSX.Element {
         }}
         dataTestId="pix-copy"
       >
-        {copied ? "Copiado!" : "Copiar"}
+        {copied ? copy.copiedAction : copy.copyAction}
       </Button>
     </Box>
   );
@@ -72,11 +74,12 @@ function PixCodeBox({ pix }: { pix: PixCharge }): JSX.Element {
 /** The live footer: poll error, or the pulsing "awaiting payment" indicator. */
 function PixPollFooter({ error }: { error: string | null }): JSX.Element {
   const { Alert, Text } = useCheckoutComponents();
+  const { pix, settling } = useCheckoutCopy().screens;
   if (error) {
     return (
       <Alert
         variant="danger"
-        title="Não foi possível confirmar o pagamento"
+        title={settling.cannotConfirm}
         description={error}
         showIcon
         data-testid="pix-poll-error"
@@ -87,7 +90,7 @@ function PixPollFooter({ error }: { error: string | null }): JSX.Element {
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "text.secondary" }}>
       <LoadingDot />
       <Text variant="caption" size="xs" color="secondary" as="span" data-testid="pix-awaiting">
-        Aguardando pagamento…
+        {pix.awaiting}
       </Text>
     </Box>
   );
@@ -103,6 +106,7 @@ export function PixView({
   pollIntervalMs?: number;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.pix;
   const { status, error } = usePaymentPolling(order.orderId, { intervalMs: pollIntervalMs });
 
   // Bubble a terminal status up once, so the parent can advance to the status step.
@@ -116,12 +120,15 @@ export function PixView({
   if (!pix) {
     return (
       <Text variant="body" size="sm" color="danger" as="p" data-testid="pix-missing">
-        Não foi possível gerar o código PIX.
+        {copy.chargeMissing}
       </Text>
     );
   }
 
-  const validUntil = new Date(pix.expiresAt).toLocaleTimeString("pt-BR", {
+  // The locale is the HOST's (FUT-760): it decides what a buyer reads off the
+  // clock, so it travels with the sentence it feeds rather than being frozen
+  // to the origin host's here.
+  const validUntil = new Date(pix.expiresAt).toLocaleTimeString(copy.expiryLocale, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -132,16 +139,16 @@ export function PixView({
       sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, textAlign: "center" }}
     >
       <Text variant="heading" size="md" weight="bold" as="h2">
-        Pague com PIX
+        {copy.heading}
       </Text>
       <Text variant="body" size="sm" color="secondary" as="p">
-        Escaneie o QR code no app do seu banco ou copie o código. Total {order.totalLabel}.
+        {copy.instructions(order.totalLabel)}
       </Text>
 
       <Box
         data-testid="pix-qr"
         role="img"
-        aria-label="QR Code PIX para pagamento"
+        aria-label={copy.qrAlt}
         sx={{ bgcolor: "background.paper", p: 2, borderRadius: 2, border: "1px solid", borderColor: "divider" }}
       >
         <QRCode value={pix.copyPaste} size={200} />
@@ -150,7 +157,7 @@ export function PixView({
       <PixCodeBox pix={pix} />
 
       <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry">
-        Válido até {validUntil}. A confirmação é automática.
+        {copy.validUntil(validUntil)}
       </Text>
 
       <PixPollFooter error={error} />

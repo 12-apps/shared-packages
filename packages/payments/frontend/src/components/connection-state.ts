@@ -1,4 +1,5 @@
 import type { MaskedProviderConfig } from '@12-apps/payments-backend';
+import type { ConnectionBadgeCopy } from './settings-copy';
 
 /**
  * Is there actually a connection here?
@@ -77,21 +78,32 @@ export function expiryProximity(
   return at - now.getTime() <= EXPIRY_WARNING_WINDOW_MS ? 'NEAR' : 'SAFE';
 }
 
-/** What a provider card reports at a glance. */
+/**
+ * What a provider card reports at a glance.
+ *
+ * The union used to spell its four labels in Portuguese — an exported TYPE
+ * carrying one product's words, which is the structural half of the same leak
+ * `CardBrand` had (FUT-760). It names the STATE now; the word is the host's.
+ */
 type ConnectionBadge =
-  | { label: 'Ativo'; color: 'success' }
-  | { label: 'Conectado'; color: 'default' }
-  | { label: 'Reconectar'; color: 'error' }
-  | { label: 'Não conectado'; color: 'warning' };
+  | { label: string; state: 'ACTIVE'; color: 'success' }
+  | { label: string; state: 'CONNECTED'; color: 'default' }
+  | { label: string; state: 'RECONNECT'; color: 'error' }
+  | { label: string; state: 'NOT_CONNECTED'; color: 'warning' };
 
 /**
  * `enabled` is deliberately checked first: it is the only state that means
  * money can move, and a store reading `Ativo` has already passed everything
  * below it.
  */
-export function connectionBadge(config: MaskedProviderConfig | null): ConnectionBadge {
-  if (config?.enabled) return { label: 'Ativo', color: 'success' };
-  if (config?.status === 'RECONNECT_REQUIRED') return { label: 'Reconectar', color: 'error' };
-  if (isConnected(config)) return { label: 'Conectado', color: 'default' };
-  return { label: 'Não conectado', color: 'warning' };
+export function connectionBadge(
+  copy: ConnectionBadgeCopy,
+  config: MaskedProviderConfig | null,
+): ConnectionBadge {
+  if (config?.enabled) return { label: copy.active, state: 'ACTIVE', color: 'success' };
+  if (config?.status === 'RECONNECT_REQUIRED') {
+    return { label: copy.reconnect, state: 'RECONNECT', color: 'error' };
+  }
+  if (isConnected(config)) return { label: copy.connected, state: 'CONNECTED', color: 'default' };
+  return { label: copy.notConnected, state: 'NOT_CONNECTED', color: 'warning' };
 }

@@ -4,8 +4,11 @@ import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/ma
 
 import type { VerifiedProviderConfig } from '@12-apps/payments-backend';
 
-import { ENVIRONMENT_LABELS } from './EnvironmentTabs';
+import { environmentLabels } from './EnvironmentTabs';
+import type { CredentialFormCopy } from './settings-copy';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX } from './panel-tokens';
+import { richText } from './rich-text';
 
 /**
  * The credential step's alerts and its one button.
@@ -41,14 +44,13 @@ export function ProbeAlert({
   onRetry: () => void;
 }) {
   if (probe.ok) return null;
-  const where = ENVIRONMENT_LABELS[probe.environment];
+  const copy = usePaymentsSettingsCopy();
+  const where = environmentLabels(copy.environment)[probe.environment];
   // The ADAPTER's sentence when it has one. Only it knows the provider's name,
   // what that provider's own app calls this field and which screen states it —
   // "confira as credenciais deste ambiente" is advice you can follow all
   // afternoon without ever finding the value you were asked to check.
-  const message =
-    probe.message ??
-    `Não foi possível conectar em ${where}. Confira as credenciais deste ambiente.`;
+  const message = probe.message ?? copy.credentials.probeFailed(where);
 
   // An outage is not a rejection. The credential is already SAVED and may well
   // be perfect; nothing was learned about it. So it is amber rather than red,
@@ -69,7 +71,7 @@ export function ProbeAlert({
             data-testid="payments-verify-retry"
             sx={{ textTransform: 'none' }}
           >
-            Testar conexão
+            {copy.credentials.probeAction}
           </Button>
         ) : undefined
       }
@@ -94,11 +96,13 @@ const SCREEN_READER_ONLY = {
 } as const;
 
 /** How each verdict reads at a glance — the mark, and what it is called. */
-const CHECK_MARKS = {
-  PASS: { mark: '✓', color: 'success.main', label: 'Verificado' },
-  FAIL: { mark: '✕', color: 'error.main', label: 'Corrigir' },
-  UNCHECKED: { mark: '–', color: 'text.secondary', label: 'Não verificável' },
-} as const;
+function checkMarks(copy: CredentialFormCopy) {
+  return {
+    PASS: { mark: '✓', color: 'success.main', label: copy.checkPass },
+    FAIL: { mark: '✕', color: 'error.main', label: copy.checkFail },
+    UNCHECKED: { mark: '–', color: 'text.secondary', label: copy.uncheckable },
+  } as const;
+}
 
 /**
  * What the probe established, credential by credential (FUT-796).
@@ -122,12 +126,13 @@ export function ProbeChecklist({
   /** Keep only the verdicts this predicate accepts — see `ProviderForm`. */
   only?: (key: string) => boolean;
 }) {
+  const marks = checkMarks(usePaymentsSettingsCopy().credentials);
   const shown = (probe.checks ?? []).filter((check) => only?.(check.key) ?? true);
   if (shown.length === 0) return null;
   return (
     <Stack spacing={0.5} data-testid="payments-probe-checks">
       {shown.map((check) => {
-        const { mark, color, label } = CHECK_MARKS[check.status];
+        const { mark, color, label } = marks[check.status];
         return (
           <Stack
             key={check.key}
@@ -164,11 +169,11 @@ export function ProbeChecklist({
  * correct and entirely invisible, and an owner who came to fix a typo deserves
  * to learn it before typing rather than from a quiet storefront.
  */
-export function ReverifyWarning() {
+export function ReverifyWarning({ displayName }: { displayName: string }) {
+  const copy = usePaymentsSettingsCopy().credentials;
   return (
     <Alert severity="warning" data-testid="payments-reverify-warning">
-      Esta loja já está verificada. Trocar a InfiniteTag <strong>exige uma nova verificação</strong>{' '}
-      e a loja <strong>para de receber</strong> por este provedor até que ela termine.
+      {richText(copy.reverifyWarning(displayName))}
     </Alert>
   );
 }
@@ -187,23 +192,27 @@ export function ReverifyWarning() {
 export function FormActions({
   busy,
   label,
+  willTest,
   disabled,
   onSave,
 }: {
   busy: string | null;
   label: string;
+  /** Whether pressing save will also SEND the set to the provider. */
+  willTest: boolean;
   disabled: boolean;
   onSave: () => void;
 }) {
   // The bar states what pressing it costs, which is the half a verb cannot
   // carry: a complete set is sent to the provider on save, and a partial one is
   // only written down. The owner reads the promise and the button in one line.
+  const copy = usePaymentsSettingsCopy().credentials;
   const message =
     busy === 'verify'
-      ? 'Testando a conexão…'
-      : label.includes('testar')
-        ? 'Salvamos e testamos as chaves no provedor antes de seguir.'
-        : 'Guardamos o que você já preencheu. Complete os campos para testar.';
+      ? copy.probeRunning
+      : willTest
+        ? copy.probeSaveNote
+        : copy.probeIncompleteNote;
 
   return (
     <Box sx={BAR_SX} data-testid="payments-form-bar">

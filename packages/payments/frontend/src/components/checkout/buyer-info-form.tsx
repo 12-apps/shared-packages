@@ -6,6 +6,8 @@ import { formatCpf, validateCpf } from "../../card";
 import { fieldSatisfied } from "./buyer-fields";
 import type { BuyerField, BuyerInfo, CheckoutCustomerField } from "./types";
 import { useCheckoutComponents } from "./ui";
+import type { CardFieldCopy } from "../../card/copy";
+import { useCheckoutCopy, type BuyerInfoCopy } from "./copy-context";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -62,18 +64,20 @@ function deriveErrors(
   value: BuyerInfo,
   fieldError: FieldError,
   required: ReadonlySet<InputKey>,
+  copy: BuyerInfoCopy,
+  cardCopy: CardFieldCopy,
 ): BuyerFieldErrors {
   const override = (field: BuyerField): string | undefined =>
     fieldError?.field === field ? fieldError.message : undefined;
   const localEmail =
-    value.email && !EMAIL_PATTERN.test(value.email) ? "E-mail inválido." : undefined;
+    value.email && !EMAIL_PATTERN.test(value.email) ? copy.emailInvalid : undefined;
   const missing = (key: InputKey, message: string): string | undefined =>
     required.has(key) && !valueOf(value, key).trim() ? message : undefined;
   return {
-    cpf: override("cpf") ?? (value.taxId ? validateCpf(value.taxId) : undefined),
-    email: override("email") ?? localEmail ?? missing("email", "E-mail obrigatório."),
-    name: override("name") ?? missing("name", "Nome obrigatório."),
-    phone: override("phone") ?? missing("phone", "Telefone obrigatório."),
+    cpf: override("cpf") ?? (value.taxId ? validateCpf(value.taxId, cardCopy) : undefined),
+    email: override("email") ?? localEmail ?? missing("email", copy.emailRequired),
+    name: override("name") ?? missing("name", copy.nameRequired),
+    phone: override("phone") ?? missing("phone", copy.phoneRequired),
   };
 }
 
@@ -82,17 +86,11 @@ function deriveErrors(
  * declared. It used to name the CPF unconditionally, which is wrong the moment
  * a store's provider wants something else (or nothing).
  */
-function instructionFor(required: ReadonlySet<InputKey>): string {
+function instructionFor(required: ReadonlySet<InputKey>, copy: BuyerInfoCopy): string {
   const names = FIELD_ORDER.filter((key) => required.has(key)).map((key) =>
     key === "taxId" ? "CPF" : INPUTS[key].label.toLowerCase(),
   );
-  if (names.length === 0) {
-    return "Nome, e-mail e telefone são opcionais — usados apenas para o comprovante.";
-  }
-  return (
-    `Informe seu ${names.join(", ")} (${names.length === 1 ? "obrigatório" : "obrigatórios"} ` +
-    "para o pagamento). Os demais campos são opcionais — usados apenas para o comprovante."
-  );
+  return copy.fieldsHint(names);
 }
 
 /** Which inputs to render, and which of them are required. */
@@ -184,12 +182,13 @@ export function BuyerInfoForm({
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const { shown, required } = resolveShape(fields);
-  const errors = deriveErrors(value, fieldError ?? null, required);
+  const copy = useCheckoutCopy();
+  const errors = deriveErrors(value, fieldError ?? null, required, copy.buyer, copy.card.fields);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <Text variant="caption" size="xs" color="secondary" as="p">
-        {instructionFor(required)}
+        {instructionFor(required, copy.buyer)}
       </Text>
 
       {shown.map((key) => (

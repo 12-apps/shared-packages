@@ -24,6 +24,7 @@ import {
   SETTINGS_BASE_URL,
   type SettingsStorySpec,
 } from "./settings-store";
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * The host's OAuth state mint. The REAL one is a server endpoint that pins
@@ -134,6 +135,7 @@ export function SettingsScene({
   const [selected, setSelected] = useState<string | null>(provider);
   return (
     <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
       client={client}
       prepareConnect={withPrepareConnect ? prepareConnect : undefined}
       selectedProvider={selected}
