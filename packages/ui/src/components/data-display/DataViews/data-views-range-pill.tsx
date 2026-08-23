@@ -133,7 +133,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
           data-testid={`${testId}-inclusive`}
           sx={{ mt: 0.75, fontSize: '0.75rem', color: 'text.disabled' }}
         >
-          Ambas as datas entram no resultado.
+          {copy.filters.rangeInclusiveNote}
         </Typography>
       )}
     </Box>

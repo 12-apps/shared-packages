@@ -151,7 +151,7 @@ export function SortTab({
       </Box>
       <Text variant="caption" as="p">
         <Box component="span" sx={{ px: 0.5, color: "text.secondary" }}>
-          Campo
+          {copy.display.fieldHeading}
         </Box>
       </Text>
       {fields.map((field) => (
@@ -326,7 +326,7 @@ export function DisplayTab({ testIdPrefix }: { testIdPrefix: string }): React.JS
     <Box sx={{ p: 1 }}>
       <Text variant="caption" as="p">
         <Box component="span" sx={{ px: 0.5, color: "text.secondary" }}>
-          Formato
+          {copy.display.formatHeading}
         </Box>
       </Text>
       <Box

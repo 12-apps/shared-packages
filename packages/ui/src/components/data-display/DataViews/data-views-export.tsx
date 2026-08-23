@@ -110,7 +110,7 @@ function ExportTrigger({
         {busy ? <CircularProgress size={14} /> : <DownloadRoundedIcon fontSize="small" />}
         {!compact && (
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-            Exportar
+            {copy.export.triggerLabel}
           </Box>
         )}
         {/* Dropped with the label — see the note on the Exibir trigger. */}

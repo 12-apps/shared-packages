@@ -260,7 +260,7 @@ export function BlockPanelFooter({
           onClick={canDuplicate ? onDuplicate : undefined}
           dataTestId={`${testId}-duplicate`}
         >
-          Duplicar
+          {copy.duplicate}
         </Button>
         <Button
           variant="outline"

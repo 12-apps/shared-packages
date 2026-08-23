@@ -60,9 +60,9 @@ function Hero({
         {copy.eyebrow}
       </Box>
       <Text variant="heading" size="xl" weight="bold" as="h1">
-        Conecte{" "}
+        {copy.titleLead}{" "}
         <Box component="span" sx={{ color: "primary.main" }}>
-          assistentes de IA
+          {copy.titleEmphasis}
         </Box>{" "}
         {copy.titleTail}
       </Text>

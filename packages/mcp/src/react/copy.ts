@@ -33,7 +33,15 @@ export interface AiTrustPoint {
 export interface AiLandingCopy {
   /** Small line above the headline. */
   eyebrow: string;
-  /** The headline's second half, after the assistant names. */
+  /**
+   * The headline, in the three runs it renders as: lead, the EMPHASISED
+   * middle (drawn in the accent colour), then the tail. `titleTail` was the
+   * only one a host could set, so two thirds of this product's headline —
+   * `Conecte` and `assistentes de IA` — shipped as literals around it.
+   */
+  titleLead: string;
+  titleEmphasis: string;
+  /** The headline's last run, after the emphasised middle. */
   titleTail: string;
   /** The paragraph under the headline. */
   lede: string;

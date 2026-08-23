@@ -50,15 +50,16 @@ function fieldOptions(fields: ReportField[], role?: ReportField["role"]): Array<
 /** The X axis, plus its granularity when the field is a date. */
 export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Element {
   const ranges = useReportCopy().screens.ranges;
+  const copy = useReportCopy().screens.builder;
   const byName = new Map(fields.map((field) => [field.field, field]));
   const dimension = dimensionAt(draft, 0);
   return (
     <Stack spacing={1}>
-      <SectionHeading>Agrupar por</SectionHeading>
+      <SectionHeading>{copy.groupBy}</SectionHeading>
       <Stack direction="row" spacing={1}>
         <Select
           size="sm"
-          label="Eixo X"
+          label={copy.axisLabel}
           options={[NONE, ...fieldOptions(fields, "dimension")]}
           value={dimension.field}
           onChange={(event) => update(withDimension(draft, 0, { field: event.target.value as string }))}
@@ -67,7 +68,7 @@ export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Ele
         {byName.get(dimension.field)?.type === "date" ? (
           <Select
             size="sm"
-            label="Por"
+            label={copy.grainLabel}
             options={REPORT_GRAINS.map((value: GrainId) => ({ value, label: grainLabel(value, ranges) }))}
             value={dimension.timeGrain}
             onChange={(event) =>
@@ -171,11 +172,12 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
 }
 
 export function FiltersSection({ draft, fields, update }: SectionProps): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const byName = new Map(fields.map((field) => [field.field, field]));
   const options = [NONE, ...fieldOptions(fields)];
   return (
     <Stack spacing={1}>
-      <SectionHeading>Filtros</SectionHeading>
+      <SectionHeading>{copy.filtersHeading}</SectionHeading>
       {draft.filters.map((filter, index) => (
         <FilterRow
           key={index}
@@ -231,6 +233,7 @@ function StackedToggle({
   disabledReason: string | null;
   onToggle: () => void;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const [asking, setAsking] = useState(false);
   const blocked = disabledReason !== null;
   const showing = blocked && asking;
@@ -251,7 +254,7 @@ function StackedToggle({
         onBlur={() => setAsking(false)}
         data-testid={STACKED_TEST_ID}
       >
-        Empilhado
+        {copy.stacked}
       </Button>
       {/* One callout, only when asked for — `role="note"` and no live region,
           because the button already carries this same sentence as its

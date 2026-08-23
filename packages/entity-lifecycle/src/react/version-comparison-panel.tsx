@@ -159,7 +159,7 @@ function ComparisonTable({
           <Box component="tr">
             <Box component="th" scope="col" sx={{ ...CELL_SX, minWidth: 120 }}>
               <Text variant="heading" size="sm" as="span">
-                Campo
+                {copy.fieldColumn}
               </Text>
             </Box>
             {comparison.columns.map((column) => (

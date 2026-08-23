@@ -67,6 +67,7 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
     retryAction: 'Tentar novamente',
   },
   comparison: {
+    fieldColumn: 'Campo',
     roles: { previous: 'Anterior', selected: 'Selecionada', next: 'Seguinte', current: 'Atual' },
     booleanTrue: 'Sim',
     booleanFalse: 'Não',

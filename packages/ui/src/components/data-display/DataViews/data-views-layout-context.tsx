@@ -7,6 +7,7 @@ import GridViewOutlinedIcon from "@mui/icons-material/GridViewOutlined";
 import { Slider } from "../../form/Slider";
 import { Box } from "../../../mui/Box";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { DATA_VIEWS_LAYOUTS, type DataViewsLayout } from "./data-views-types";
 
 /**
@@ -322,6 +323,7 @@ export function useDataViewsLayout(): DataViewsLayoutValue {
  */
 export function DataViewsZoomSlider({ testIdPrefix }: { testIdPrefix: string }): React.JSX.Element | null {
   const { layout, zoom, setZoom } = useDataViewsLayout();
+  const copy = useDataViewsCopy();
   if (layout !== "cards" && layout !== "board") return null;
   return (
     <Box
@@ -342,7 +344,7 @@ export function DataViewsZoomSlider({ testIdPrefix }: { testIdPrefix: string }):
           max={100}
           step={5}
           onChange={(_event, next) => setZoom(Array.isArray(next) ? (next[0] ?? 0) : next)}
-          aria-label="Tamanho dos cards"
+          aria-label={copy.display.cardZoom}
           data-testid={`${testIdPrefix}-card-zoom`}
         />
       </Box>

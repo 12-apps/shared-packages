@@ -255,6 +255,25 @@ export interface ReportBuilderPanelCopy {
   groupBy: string;
   aggregation: string;
   visualization: string;
+  /**
+   * The visible LABELS on the builder's own controls, as distinct from the
+   * numbered accessible names above. Every one was a bare literal on the
+   * element, so a host could set what a screen reader heard and not what the
+   * eye read — the worse half to have got wrong.
+   */
+  widthHeading: string;
+  filtersHeading: string;
+  fieldLabel: string;
+  axisLabel: string;
+  grainLabel: string;
+  stacked: string;
+  duplicate: string;
+  exportCsv: string;
+  grouping: string;
+  discard: string;
+  statusLabel: string;
+  nameLabel: string;
+  done: string;
   operators: Readonly<Record<string, string>>;
   charts: Readonly<Record<string, string>>;
   aggregations: Readonly<Record<string, string>>;

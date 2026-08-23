@@ -249,7 +249,7 @@ export function FilterRow({
     <Stack spacing={1}>
       <Select
         size="sm"
-        label="Campo"
+        label={copy.fieldLabel}
         aria-label={copy.filterField(index + 1)}
         options={fieldOptions}
         value={filter.field}
