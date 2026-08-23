@@ -16,6 +16,7 @@ import {
 
 import { StoryFlow, storyFlows } from "./host";
 import { CheckoutCopyProvider } from "../components/checkout/copy-context";
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "../components/checkout/screens-pt-BR";
 import { STORY_CHECKOUT_COPY } from "./demo-copy";
 
 /**
@@ -159,7 +160,10 @@ function HandComposed(): JSX.Element {
   const [world] = useState(
     () => storyFlows({ chain: [{ name: "aurora", methods: ["CARD"], ...STUB }] }).world,
   );
-  const [client] = useState(() => createCheckoutClient({ fetchImpl: world.fetchImpl }));
+  const [client] = useState(() => createCheckoutClient({
+      fetchImpl: world.fetchImpl,
+      copy: PT_BR_CHECKOUT_SCREENS_COPY.transport,
+    }));
   const [config, setConfig] = useState<CheckoutProviderConfig | null>(null);
   const [card, setCard] = useState<CardDetails>({ number: "", holder: "", expiry: "", cvv: "" });
   const [fieldErrors, setFieldErrors] = useState<CardFieldErrors>({});

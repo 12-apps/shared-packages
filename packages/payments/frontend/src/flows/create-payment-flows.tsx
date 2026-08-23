@@ -40,7 +40,14 @@ const ALWAYS_PAYABLE: CheckoutAvailability = { payable: true };
 
 /** Build the runtime every screen closes over. */
 function buildRuntime(config: PaymentFlowsConfig): FlowsRuntime {
-  const client = createCheckoutClient(config.transport);
+  // The transport's own failure sentences come from the SAME copy pack the
+  // screens read (FUT-760), so a host answers the question once. A `transport`
+  // that names its own `copy` still wins — a second mount may talk to a
+  // different surface with a different voice.
+  const client = createCheckoutClient({
+    copy: config.copy.views.screens.screens.transport,
+    ...config.transport,
+  });
   const navigate =
     config.ports.navigate ??
     ((url: string) => {

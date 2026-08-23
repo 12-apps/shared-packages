@@ -7,7 +7,6 @@ import {
 } from "../../card";
 import { err, ok, type Result } from "../../result";
 
-import { refreshCardPublicKey } from "./client";
 import type { CardChainLink } from "./method-capability";
 import type { SavedCardMeta } from "./types";
 import type { CardCopy } from "../../card/copy";
@@ -16,8 +15,10 @@ import type { CardCopy } from "../../card/copy";
  * The order-scoped key refresh, as a parameter (FUT-741).
  *
  * The self-heal is a call to OUR OWN mount, so it has to go through whichever
- * transport the surrounding checkout was bound to. Defaulted to the unbound
- * module function, which is exactly what it always called.
+ * transport the surrounding checkout was bound to. Required since FUT-760: the
+ * default was the unbound module call, and that now needs words this module
+ * has no business choosing. Every real caller already passed the bound
+ * `client.refreshBrowserKey`.
  */
 export type RefreshBrowserKey = (input: {
   orderId: string;
@@ -243,10 +244,10 @@ export async function resolveNewCardToken(
   chain: readonly CardChainLink[],
   /** The words a failed mint reports with — the host's (FUT-760). */
   copy: CardCopy,
+  /** The bound key refresh (FUT-741) — the surrounding checkout's transport. */
+  refreshKey: RefreshBrowserKey,
   /** Per-entry mint deadline. Overridable so tests need not wait it out. */
   timeoutMs: number = MINT_TIMEOUT_MS,
-  /** The bound key refresh (FUT-741); defaults to the unbound module call. */
-  refreshKey: RefreshBrowserKey = refreshCardPublicKey,
 ): Promise<Result<CardInstruments>> {
   // No chain served (an older host, or a fetch blip): the active provider
   // alone, exactly the pre-FUT-563 behaviour.

@@ -37,7 +37,10 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from "../components/checkout/types";
-import type { CheckoutTransport, VaultedCardDisplay } from "../components/checkout/transport";
+import type {
+  CheckoutTransportBinding,
+  VaultedCardDisplay,
+} from "../components/checkout/transport";
 import type { useCheckoutController } from "../components/checkout/use-checkout-controller";
 import type { Result } from "../result";
 
@@ -88,7 +91,7 @@ export interface CheckoutPorts {
 /** What `createPaymentFlows` is configured with. */
 export interface PaymentFlowsConfig {
   /** Where the `createPaymentFlowsBE` mount lives. Default `/api/checkout`. */
-  transport?: CheckoutTransport;
+  transport?: CheckoutTransportBinding;
 
   /**
    * The store being paid. A HOOK because the host's router owns it: taking a

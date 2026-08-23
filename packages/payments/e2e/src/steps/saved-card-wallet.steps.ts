@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { DECLINE_PAN, fillCard } from '../helpers/checkout.js';
+import { CARD_EXPIRY_SHOWN, DECLINE_PAN, fillCard } from '../helpers/checkout.js';
 
 import { paymentsWorld } from '../world.js';
 
@@ -51,10 +51,19 @@ Then('the card is stored and appears in the list', async ({ page }) => {
 Then('the list shows only the brand and the last digits', async ({ page }) => {
   // Display metadata ONLY. The vault token — the thing that can charge —
   // never reaches this screen; what she reads back is brand + last4 + expiry.
-  // The quoted strings are the screen's pt-BR product copy, asserted as-is.
+  //
+  // Asserted as DIGITS, not as sentences (FUT-760). The expiry line used to be
+  // matched on the word "Validade", which was the package's own hard-coded
+  // label — so the assertion held only for a host that had inherited it, and
+  // said nothing at all about the host under test. "Validade", "Vence em" and
+  // "Expires" are one fact worded three ways; the numbers beside them are the
+  // fact, and the mask is what proves the PAN is not on screen.
   const list = page.getByTestId('manage-cards-list');
-  await expect(list).toContainText('••••');
-  await expect(list).toContainText('Validade');
+  // A mask and exactly four digits after it — the shape, not which four: the
+  // last4 is whatever the store's vault answered, and pinning it here would
+  // make this journey a test of one host's stub.
+  await expect(list).toContainText(/•••• {0,1}\d{4}/);
+  await expect(list).toContainText(CARD_EXPIRY_SHOWN);
 });
 
 Then('the refusal explains why and the form stays on screen', async ({ page }) => {

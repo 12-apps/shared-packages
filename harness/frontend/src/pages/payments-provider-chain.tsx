@@ -18,7 +18,8 @@
 import type { JSX, ReactNode } from 'react';
 
 import { aurora, boreal, cerrado, dunas } from '../payments/admin-adapter';
-import { adminCase, PriorityRefusalButtons } from '../payments/admin-cases';
+import { adminCase } from '../payments/admin-cases';
+import { PriorityRefusalButtons } from '../payments/admin-priority-refusals';
 import type { AdminStoreSpec, AdminWorld } from '../payments/admin-store';
 import { CaseTabs, PageIntro, type HarnessCase } from '../payments/panel';
 

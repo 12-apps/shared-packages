@@ -21,10 +21,12 @@ import type { CheckoutCopyFE } from '@12-apps/payments-frontend';
  * named); this host words them itself for the same reason as everything else.
  *
  * And `views.screens`, which reaches deeper still: the card fields and every
- * refusal a tokenizer can produce, plus the buyer-details inputs. Same rule
- * again, and the same reason for spelling them out here rather than importing
- * the pack — a host that borrows another product's sentences cannot notice
- * when the package starts supplying them again.
+ * refusal a tokenizer can produce, the buyer-details inputs, the method tiles,
+ * the PIX and card panes, the wallet buttons, the hosted handover and the
+ * three sentences the transport itself falls back on. Same rule again, and the
+ * same reason for spelling them out here rather than importing the pack — a
+ * host that borrows another product's sentences cannot notice when the package
+ * starts supplying them again.
  *
  * Every field is spelled out rather than spread over a base: the type is the
  * checklist, and a partial object would compile only because some other host's
@@ -126,6 +128,94 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
             ? 'Nome, e-mail e telefone são opcionais — servem apenas para o recibo.'
             : `Informe ${names.join(', ')} para pagar. Os outros campos são opcionais.`,
       },
+      screens: {
+        method: {
+          groupLabel: 'Como você quer pagar',
+          pixLabel: 'PIX',
+          cardLabel: 'Cartão',
+          pixDescription: 'Cai na hora',
+          cardDescription: 'Crédito em uma vez',
+          unavailableHere: 'Esta loja não aceita esta opção',
+        },
+        settling: {
+          cannotConfirm: 'Não deu para confirmar o pagamento',
+          takingLonger: 'O pagamento está levando mais tempo que o normal',
+          takingLongerHelp:
+            'Espere um pouco ou confira seu pedido em instantes — não pague de novo.',
+          processing: 'Enviando o pagamento…',
+          confirming: 'Conferindo seu pagamento',
+          cannotPay: 'Não deu para pagar',
+        },
+        pix: {
+          heading: 'Pagar com PIX',
+          instructions: (totalLabel) =>
+            `Leia o QR code no app do seu banco ou copie o código. São ${totalLabel}.`,
+          qrAlt: 'Código QR do PIX',
+          copyAction: 'Copiar código',
+          copiedAction: 'Código copiado!',
+          validUntil: (time) => `Vale até ${time}. A baixa é automática.`,
+          expiryLocale: 'pt-BR',
+          awaiting: 'Esperando o pagamento…',
+          chargeMissing: 'Não deu para gerar o código PIX.',
+        },
+        card: {
+          heading: 'Pagar com cartão',
+        },
+        payer: {
+          taxId: (formatted) => `CPF ${formatted}`,
+          taxIdAlreadyKnown: 'CPF que você já tinha informado',
+          payingAs: (name) => `Em nome de ${name}`,
+          payingWithSavedDetails: 'Com os dados que você já deixou aqui',
+          changeAction: 'Trocar',
+        },
+        error: {
+          confirming: 'Conferindo seu pagamento',
+          cannotContinue: 'Não deu para seguir',
+          retryAction: 'Tentar de novo',
+          emailLabel: 'E-mail deste pagamento',
+          emailMustDifferHint: 'informe um e-mail que não seja o da loja',
+          useEmailAction: 'Seguir com este e-mail',
+        },
+        wallet: {
+          applePay: {
+            orderTotal: 'Total a pagar',
+            cannotStart: 'Esta loja não consegue abrir o Apple Pay. Pague com cartão.',
+            cannotComplete: 'O Apple Pay não abriu. Tente de novo ou pague com cartão.',
+            payAction: 'Pagar pelo Apple Pay',
+          },
+          googlePay: {
+            cannotComplete:
+              'O pagamento pelo Google Pay não foi concluído. Tente de novo ou pague com cartão.',
+            buttonLocale: 'pt',
+          },
+          orPayWithCard: 'ou use o cartão',
+        },
+        hosted: {
+          destinationNamed: (displayName) => `para a página de pagamento da ${displayName}`,
+          destinationGeneric: 'para a página de pagamento do provedor',
+          methodsChoice: (methods) => `, onde dá para pagar com ${methods}`,
+          pixAndCard: 'PIX ou cartão',
+          pixOnly: 'PIX',
+          cardOnly: 'cartão',
+          handoff: (destination, choice) => `Vamos te levar ${destination}${choice}.`,
+          afterwards: 'Terminando o pagamento lá, você volta para cá e confirmamos o pedido.',
+          startAction: 'Ir para o pagamento',
+          preparing: 'Abrindo o pagamento',
+        },
+        transport: {
+          failed: 'Não deu para concluir. Tente de novo.',
+          invalidResponse: 'O servidor respondeu algo inesperado.',
+          offline: 'Sem conexão. Confira a sua internet e tente de novo.',
+        },
+        validation: {
+          taxIdInvalid: 'Esse CPF não confere.',
+          nameRequired: 'Informe o nome.',
+          emailInvalid: 'Esse e-mail não parece válido.',
+          phoneInvalid: 'Esse telefone não confere.',
+          required: 'Preencha este campo.',
+        },
+        generatingPayment: 'Criando o pagamento…',
+      },
     },
   },
   unavailableTitle: 'Pagamento online indisponível',
@@ -154,4 +244,6 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
   manageCardsTitle: 'Meus cartões',
   manageCardsEmpty: 'Você ainda não tem cartões salvos.',
   manageCardsAdd: 'Adicionar cartão',
+  cardUnknownBrand: 'Cartão',
+  cardExpiry: (month, year) => `Vence em ${month}/${year}`,
 };

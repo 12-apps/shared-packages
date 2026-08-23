@@ -1,4 +1,5 @@
 import { PT_BR_CARD_COPY } from "../../card/pt-BR";
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "./screens-pt-BR";
 import type { CheckoutCopy } from "./copy-context";
 import type { CheckoutViewCopy, PaymentStatusCopy } from "./view-copy";
 
@@ -50,6 +51,7 @@ export const PT_BR_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
  */
 export const PT_BR_CHECKOUT_COPY: CheckoutCopy = {
   card: PT_BR_CARD_COPY,
+  screens: PT_BR_CHECKOUT_SCREENS_COPY,
   buyer: {
     emailInvalid: "E-mail inválido.",
     emailRequired: "E-mail obrigatório.",

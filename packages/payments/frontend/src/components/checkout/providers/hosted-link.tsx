@@ -32,7 +32,9 @@
 import { Box } from "@mui/material";
 import type { JSX } from "react";
 
+import { useCheckoutCopy } from "../copy-context";
 import { offeredMethods } from "../method-capability";
+import type { HostedHandoverCopy } from "../screens-copy";
 import type { CheckoutProviderConfig } from "../types";
 import { useCheckoutComponents } from "../ui";
 
@@ -47,9 +49,9 @@ import type { ProviderCheckoutScreenProps } from "./types";
  * true sentence rather than our internal id ("infinitepay") dressed up as a
  * brand.
  */
-function destinationLabel(config: CheckoutProviderConfig | null): string {
+function destinationLabel(copy: HostedHandoverCopy, config: CheckoutProviderConfig | null): string {
   const name = config?.chain?.[0]?.displayName?.trim();
-  return name ? `à página de pagamento da ${name}` : "à página de pagamento segura do provedor";
+  return name ? copy.destinationNamed(name) : copy.destinationGeneric;
 }
 
 /**
@@ -60,21 +62,27 @@ function destinationLabel(config: CheckoutProviderConfig | null): string {
  * keeps this honest for a provider that takes only one of the two: a hosted
  * PIX-only store must not promise a card.
  */
-function methodsPhrase(config: CheckoutProviderConfig | null): string | null {
+function methodsPhrase(
+  copy: HostedHandoverCopy,
+  config: CheckoutProviderConfig | null,
+): string | null {
   const offered = offeredMethods(config);
   const pix = offered === null || offered.includes("PIX");
   const card = offered === null || offered.includes("CARD");
-  if (pix && card) return "PIX ou cartão";
-  if (pix) return "PIX";
-  if (card) return "cartão";
+  if (pix && card) return copy.pixAndCard;
+  if (pix) return copy.pixOnly;
+  if (card) return copy.cardOnly;
   return null;
 }
 
 /** The full "where you are going and what happens there" sentence. */
-function handoffMessage(config: CheckoutProviderConfig | null): string {
-  const methods = methodsPhrase(config);
-  const choice = methods ? `, onde você escolhe pagar com ${methods}` : "";
-  return `Você será levado ${destinationLabel(config)}${choice}.`;
+function handoffMessage(
+  copy: HostedHandoverCopy,
+  config: CheckoutProviderConfig | null,
+): string {
+  const methods = methodsPhrase(copy, config);
+  const choice = methods ? copy.methodsChoice(methods) : "";
+  return copy.handoff(destinationLabel(copy, config), choice);
 }
 
 /** The invitation: what happens next, and the one button that starts it. */
@@ -86,16 +94,17 @@ function HandOffInvite({
   onStart: () => void;
 }): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.hosted;
   return (
     <Box
       data-testid="checkout-handoff-invite"
       sx={{ display: "flex", flexDirection: "column", gap: 2 }}
     >
       <Text variant="body" size="md" as="p">
-        {handoffMessage(config)}
+        {handoffMessage(copy, config)}
       </Text>
       <Text variant="caption" size="sm" as="p" color="secondary">
-        Assim que o pagamento for concluído, você volta para cá e nós confirmamos o pedido.
+        {copy.afterwards}
       </Text>
       <Button
         variant="solid"
@@ -105,7 +114,7 @@ function HandOffInvite({
         onClick={onStart}
         dataTestId="checkout-handoff-start"
       >
-        Seguir para o pagamento
+        {copy.startAction}
       </Button>
     </Box>
   );
@@ -121,17 +130,18 @@ function HandOffInvite({
  */
 function HandOffPending({ config }: { config: CheckoutProviderConfig | null }): JSX.Element {
   const { Text, LoadingState } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.hosted;
   return (
     <Box
       data-testid="checkout-handoff-pending"
       sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", py: 4 }}
     >
-      <LoadingState variant="spinner" message="Preparando o pagamento" size="md" />
+      <LoadingState variant="spinner" message={copy.preparing} size="md" />
       <Text variant="body" size="md" as="p">
-        {handoffMessage(config)}
+        {handoffMessage(copy, config)}
       </Text>
       <Text variant="caption" size="sm" as="p" color="secondary">
-        Assim que o pagamento for concluído, você volta para cá e nós confirmamos o pedido.
+        {copy.afterwards}
       </Text>
     </Box>
   );

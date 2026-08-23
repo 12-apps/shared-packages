@@ -19,8 +19,6 @@ import { resolveNewCardToken } from "../card-instruments";
 import type { CardChainLink } from "../method-capability";
 import { PT_BR_CARD_COPY } from "../../../card/pt-BR";
 
-vi.mock("../client", () => ({ refreshCardPublicKey: vi.fn() }));
-
 const CARD = { number: "4111111111111111", holder: "VERA CADEIA", expiry: "12/34", cvv: "123" };
 
 /** Stub mode: the head mints locally, with no network and no key. */
@@ -68,6 +66,9 @@ describe("minting the chain is bounded and concurrent", () => {
       false,
       [HEAD, STONE],
       PT_BR_CARD_COPY,
+      // The bound key refresh, required since FUT-760 — this suite never
+      // reaches the self-heal, so a stub that would fail the test if it did.
+      vi.fn(),
       20,
     );
 
@@ -96,6 +97,7 @@ describe("minting the chain is bounded and concurrent", () => {
       false,
       [HEAD, STONE, STRIPE],
       PT_BR_CARD_COPY,
+      vi.fn(),
       deadlineMs,
     );
     // Both requests are in flight well inside ONE deadline — which they could

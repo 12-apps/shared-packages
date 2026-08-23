@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, useState, type JSX } from "react";
 
+import { useCheckoutCopy } from "./copy-context";
 import type { CheckoutOrder } from "./types";
 
 /**
@@ -219,11 +220,13 @@ export function GooglePayButton({
   onReady,
 }: GooglePayButtonProps): JSX.Element | null {
   const client = useGooglePayClient(api, environment);
+  const copy = useCheckoutCopy().screens.wallet.googlePay;
   const container = useRef<HTMLDivElement | null>(null);
   // The latest handlers/order, so the Google-rendered button — mounted once —
-  // never closes over a stale charge target.
-  const current = useRef({ order, params, onKey, onError, onReady });
-  current.current = { order, params, onKey, onError, onReady };
+  // never closes over a stale charge target. The words ride along for the same
+  // reason: the sheet's failure is reported from inside that one-time closure.
+  const current = useRef({ order, params, onKey, onError, onReady, copy });
+  current.current = { order, params, onKey, onError, onReady, copy };
 
   useEffect(() => {
     if (client) current.current.onReady?.();
@@ -234,23 +237,32 @@ export function GooglePayButton({
     if (!client || !mount) return undefined;
     const button = client.createButton({
       onClick: () => {
-        const { order: forOrder, params: forParams, onKey: emit, onError: fail } = current.current;
+        const {
+          order: forOrder,
+          params: forParams,
+          onKey: emit,
+          onError: fail,
+          copy: words,
+        } = current.current;
         client
           .loadPaymentData(paymentDataRequest(forParams, forOrder))
           .then((data) => emit(data.paymentMethodData.tokenizationData.token))
           .catch((error: unknown) => {
             if (sheetDismissed(error)) return;
-            fail("Não foi possível concluir o pagamento com o Google Pay. Tente novamente ou pague com cartão.");
+            fail(words.cannotComplete);
           });
       },
       buttonSizeMode: "fill",
-      buttonLocale: "pt",
+      // Google draws this button's own label, so the language it draws it in
+      // is the host's say (FUT-760) — a translated checkout with a Portuguese
+      // pay button is two languages on one screen.
+      buttonLocale: copy.buttonLocale,
     });
     mount.replaceChildren(button);
     return () => {
       mount.replaceChildren();
     };
-  }, [client]);
+  }, [client, copy.buttonLocale]);
 
   if (!client) return null;
   return (

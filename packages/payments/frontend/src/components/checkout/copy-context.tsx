@@ -3,6 +3,7 @@
 import { createContext, useContext, type JSX, type ReactNode } from 'react';
 
 import type { CardCopy } from '../../card/copy';
+import type { CheckoutScreensCopy } from './screens-copy';
 
 /**
  * The buyer checkout's words, for the screens too deep to reach by prop
@@ -23,6 +24,12 @@ export interface CheckoutCopy {
   card: CardCopy;
   /** The buyer-details step's own fields and their refusals. */
   buyer: BuyerInfoCopy;
+  /**
+   * Everything inside the steps — the method tiles, the PIX and card panes,
+   * the wallet buttons, the hosted handover, and the refusals any of them can
+   * produce.
+   */
+  screens: CheckoutScreensCopy;
 }
 
 /**

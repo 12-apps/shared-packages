@@ -11,7 +11,7 @@
  * So this page uses NO factory. It reaches only for what `.` exports and writes
  * the glue itself:
  *
- *   - `createCheckoutClient({ fetchImpl })` — the bound transport, pointed at
+ *   - `createCheckoutClient({ fetchImpl, copy })` — the bound transport, pointed at
  *     the same real `createPaymentFlowsBE` mount every other page uses;
  *   - `buyerFieldsFor(chain, method)` — what this chain says it needs, resolved
  *     for the method actually being paid;
@@ -124,7 +124,14 @@ async function payByHand(
 
 export function PaymentsCheckoutHeadlessPage(): JSX.Element {
   const [world] = useState(() => createHarnessStore({ chain: CHAIN }));
-  const [client] = useState(() => createCheckoutClient({ fetchImpl: world.fetchImpl }));
+  const [client] = useState(() =>
+    createCheckoutClient({
+      fetchImpl: world.fetchImpl,
+      // This page composes the transport by hand, so it answers the transport's
+      // own words by hand too — from this host's pack, like everything else.
+      copy: HARNESS_CHECKOUT_COPY.views.screens.screens.transport,
+    }),
+  );
   const [state, setState] = useState<HandRolled>({
     config: null,
     card: EMPTY_CARD,

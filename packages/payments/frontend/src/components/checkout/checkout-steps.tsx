@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import { BuyerInfoForm } from "./buyer-info-form";
+import { useCheckoutCopy } from "./copy-context";
 import { LockOutlinedIcon } from "./icons";
 import { useMethodChoice } from "./method-choice";
 import { MethodPicker } from "./method-picker";
@@ -345,6 +346,7 @@ export function PaymentStep({
   onResolved,
 }: PaymentStepProps): JSX.Element {
   const { LoadingState } = useCheckoutComponents();
+  const screens = useCheckoutCopy().screens;
   const config = providerConfig ?? null;
   const choice = useMethodChoice(config, method, onMethodChange);
   useAutoRaiseOrder(order, method, creating, createError, onGenerate);
@@ -381,7 +383,7 @@ export function PaymentStep({
           raised, and two stacked spinners saying the same thing is what the
           buyer actually saw. */}
       {!order && creating && !choice.atProvider ? (
-        <LoadingState variant="spinner" size="md" message="Gerando pagamento…" dataTestId="payment-generating" />
+        <LoadingState variant="spinner" size="md" message={screens.generatingPayment} dataTestId="payment-generating" />
       ) : null}
 
       {!order && method && createError ? (

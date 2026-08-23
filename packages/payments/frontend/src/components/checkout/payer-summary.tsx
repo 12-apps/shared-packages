@@ -3,13 +3,14 @@ import type { JSX } from "react";
 
 import { formatCpf } from "../../card";
 
+import { useCheckoutCopy } from "./copy-context";
 import { PersonOutlineIcon } from "./icons";
+import type { PayerSummaryCopy } from "./screens-copy";
 import { useCheckoutComponents } from "./ui";
 
-
 /** What the CPF line reads, given whether the buyer typed one this time. */
-function cpfLabel(taxId: string | undefined): string {
-  return taxId?.trim() ? `CPF ${formatCpf(taxId)}` : "CPF já cadastrado";
+function cpfLabel(copy: PayerSummaryCopy, taxId: string | undefined): string {
+  return taxId?.trim() ? copy.taxId(formatCpf(taxId)) : copy.taxIdAlreadyKnown;
 }
 
 /**
@@ -42,6 +43,7 @@ export function PayerSummary({
   onEdit?: () => void;
 }): JSX.Element | null {
   const { Button, Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.payer;
   if (!onEdit) return null;
 
   return (
@@ -61,10 +63,10 @@ export function PayerSummary({
       <PersonOutlineIcon sx={{ fontSize: 20, color: "text.secondary", flex: "0 0 auto" }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Text variant="body" size="sm" as="p" data-testid="checkout-payer-name">
-          {name ? `Pagando como ${name}` : "Pagando com os seus dados salvos"}
+          {name ? copy.payingAs(name) : copy.payingWithSavedDetails}
         </Text>
         <Text variant="caption" size="xs" color="secondary" as="p" data-testid="checkout-payer-cpf">
-          {cpfLabel(taxId)}
+          {cpfLabel(copy, taxId)}
         </Text>
       </Box>
       <Button
@@ -74,7 +76,7 @@ export function PayerSummary({
         onClick={onEdit}
         dataTestId="checkout-payer-edit"
       >
-        Alterar
+        {copy.changeAction}
       </Button>
     </Box>
   );

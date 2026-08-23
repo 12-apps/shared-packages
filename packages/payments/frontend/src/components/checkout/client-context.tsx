@@ -15,8 +15,14 @@
  *
  * The default is built from the `client.ts` bindings LAZILY (inside each
  * arrow), so a suite that `vi.mock`s that module still intercepts the call.
+ *
+ * Since FUT-760 that default also needs the transport's WORDS, and it takes
+ * them from the checkout's copy context — which is why {@link
+ * useCheckoutClientApi} builds it instead of holding it as a module constant.
+ * No screen passes them: a screen already has the copy provider above it, or
+ * it would not render at all.
  */
-import { createContext, useContext, type JSX, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type JSX, type ReactNode } from "react";
 
 import {
   chargeCard,
@@ -26,22 +32,26 @@ import {
   pollOrderStatus,
   refreshCardPublicKey,
 } from "./client";
+import { useCheckoutCopy } from "./copy-context";
+import type { CheckoutTransportCopy } from "./screens-copy";
 import { createCheckoutClient, type CheckoutClient } from "./transport";
 
 /** The unbound client: `/api/checkout` on the ambient `fetch`. */
-const DEFAULT_CLIENT: CheckoutClient = {
-  getConfig: (tenantSlug) => fetchCheckoutConfig(tenantSlug),
-  getStatus: (ref) => pollOrderStatus(ref),
-  charge: (input) => chargeCard(input),
-  chargeWallet: (input) => chargeWallet(input),
-  listInstruments: (tenantSlug) => listSavedCards(tenantSlug),
-  // The vault pair (FUT-183) has no `client.ts` free function to bind — it is
-  // newer than that module. Built lazily from the default transport instead,
-  // which is the same wire: `/api/checkout`, ambient `fetch` resolved per call.
-  beginVault: () => createCheckoutClient().beginVault(),
-  completeVault: (input) => createCheckoutClient().completeVault(input),
-  refreshBrowserKey: (input) => refreshCardPublicKey(input),
-};
+function unboundClient(copy: CheckoutTransportCopy): CheckoutClient {
+  return {
+    getConfig: (tenantSlug) => fetchCheckoutConfig(tenantSlug, copy),
+    getStatus: (ref) => pollOrderStatus(ref, copy),
+    charge: (input) => chargeCard(input, copy),
+    chargeWallet: (input) => chargeWallet(input, copy),
+    listInstruments: (tenantSlug) => listSavedCards(copy, tenantSlug),
+    // The vault pair (FUT-183) has no `client.ts` free function to bind — it is
+    // newer than that module. Built lazily from the default transport instead,
+    // which is the same wire: `/api/checkout`, ambient `fetch` resolved per call.
+    beginVault: () => createCheckoutClient({ copy }).beginVault(),
+    completeVault: (input) => createCheckoutClient({ copy }).completeVault(input),
+    refreshBrowserKey: (input) => refreshCardPublicKey(input, copy),
+  };
+}
 
 const CheckoutClientContext = createContext<CheckoutClient | null>(null);
 
@@ -58,7 +68,9 @@ export function CheckoutClientProvider({
   );
 }
 
-/** The bound client, or the module default when no provider sits above. */
+/** The bound client, or the unbound one when no provider sits above. */
 export function useCheckoutClientApi(): CheckoutClient {
-  return useContext(CheckoutClientContext) ?? DEFAULT_CLIENT;
+  const provided = useContext(CheckoutClientContext);
+  const copy = useCheckoutCopy().screens.transport;
+  return useMemo(() => provided ?? unboundClient(copy), [provided, copy]);
 }

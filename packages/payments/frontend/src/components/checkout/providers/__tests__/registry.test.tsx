@@ -14,7 +14,7 @@
  * that store would see an empty pane — a total checkout outage produced by an
  * ordinary version skew, with a clean build log.
  */
-import { render, screen } from "@testing-library/react";
+import { render, screen } from "../../__tests__/test-utils";
 import type { JSX } from "react";
 import { describe, expect, it, vi } from "vitest";
 

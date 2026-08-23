@@ -80,6 +80,7 @@ export {
   type BuyerVaultSession,
   type CheckoutClient,
   type CheckoutTransport,
+  type CheckoutTransportBinding,
   type CompleteVaultInput,
   type VaultedCardDisplay,
 } from './components/checkout/transport';
@@ -111,6 +112,24 @@ export {
   type BuyerInfoCopy,
   type CheckoutCopy,
 } from './components/checkout/copy-context';
+// The screens BELOW the steps — the method tiles, the PIX and card panes, the
+// wallet buttons, the hosted handover and the transport's own three sentences.
+// Every slice is named on the barrel, not just the whole: a host writing its
+// pack section by section types the section it is writing (FUT-760).
+export type {
+  CardPaneCopy,
+  CheckoutScreensCopy,
+  CheckoutTransportCopy,
+  CheckoutValidationCopy,
+  HostedHandoverCopy,
+  MethodPickerCopy,
+  PayerSummaryCopy,
+  PaymentErrorCopy,
+  PixPaneCopy,
+  SettlingCopy,
+  WalletCopy,
+} from './components/checkout/screens-copy';
+export { PT_BR_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-pt-BR';
 export { fetchCheckoutConfig } from './components/checkout/client';
 /**
  * The `sessionStorage` key the hosted-checkout return leg parks the raised

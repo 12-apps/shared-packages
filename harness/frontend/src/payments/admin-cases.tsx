@@ -92,7 +92,7 @@ function useConnectOutcome(query: URLSearchParams, enabled: boolean): ConnectOut
 }
 
 /** The `error` name a refusal body carries, or the bare status. */
-async function refusalTag(response: Response): Promise<string> {
+export async function refusalTag(response: Response): Promise<string> {
   const raw = await response.text();
   try {
     const parsed = JSON.parse(raw) as { error?: string };
@@ -364,43 +364,5 @@ export function ReleaseVerifyButton({ world }: { world: AdminWorld }): JSX.Eleme
     <button type="button" data-testid="admin-release-verify" onClick={() => world.releaseVerify()}>
       Liberar verificação
     </button>
-  );
-}
-
-/**
- * The two `assertReorderOnly` refusals the package's own reorder control can
- * never send (it always permutes the rendered chain), issued raw at the
- * mount. Both land in the shared `admin-priorities-refusal` fact as
- * `"<status> <error>"`.
- */
-export function PriorityRefusalButtons({
-  world,
-  legs,
-}: {
-  world: AdminWorld;
-  legs: { testid: string; label: string; providers: string[] }[];
-}): JSX.Element {
-  const [refusal, setRefusal] = useState('(none)');
-  const put = async (providers: string[]): Promise<void> => {
-    const response = await world.fetchImpl(`${world.baseUrl}/settings/priorities`, {
-      method: 'PUT',
-      body: JSON.stringify({ providers }),
-    });
-    setRefusal(`${response.status} ${await refusalTag(response)}`);
-  };
-  return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-      {legs.map((leg) => (
-        <button
-          key={leg.testid}
-          type="button"
-          data-testid={leg.testid}
-          onClick={() => void put(leg.providers)}
-        >
-          {leg.label}
-        </button>
-      ))}
-      <output data-testid="admin-priorities-refusal">{refusal}</output>
-    </div>
   );
 }
