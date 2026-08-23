@@ -133,6 +133,18 @@ export {
   type TenantGuardsConfig,
 } from './tenant-guards';
 
+// The resolver BOTH axes sit on. A host that resolves authority in two places
+// will eventually apply an impersonation to one of them.
+export {
+  attributionOf,
+  createEffectiveActor,
+  type ActorAttribution,
+  type ActorImpersonation,
+  type EffectiveActor,
+  type EffectiveActorConfig,
+  type ResolvedIdentity,
+} from './effective-actor';
+
 export {
   parseRolePermissions,
   serializeRolePermissions,
