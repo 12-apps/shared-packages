@@ -192,6 +192,9 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     densityUnavailableNarrow:
       "Um card por linha nesta largura — a densidade volta em telas maiores.",
     trigger: "Exibir",
+    fieldHeading: "Campo",
+    formatHeading: "Formato",
+    cardZoom: "Tamanho dos cards",
   },
   export: {
     formats: {
@@ -199,6 +202,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     },
     visibleColumns: (columnCount) => `${columnCount} colunas visíveis, na ordem atual`,
     trigger: "Exportar",
+    triggerLabel: "Exportar",
   },
   grid: {
     rowActions: "Ações",
@@ -211,9 +215,12 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     moreFilters: (count) => `Mais filtros: ${count} sem espaço na barra`,
     moreFiltersApplied: (count, appliedCount) =>
       `Mais filtros: ${count} sem espaço na barra, ${appliedCount} aplicado(s)`,
+    moreTriggerLabel: "Mais",
+    moreHeading: "Mais filtros",
     overflowNote: "sem espaço na barra",
     rangeEnd: "Até",
     rangeInvalid: "O início precisa ser menor que o fim.",
+    rangeInclusiveNote: "Ambas as datas entram no resultado.",
     rangePresets: {
       hoje: "Hoje",
       ontem: "Ontem",

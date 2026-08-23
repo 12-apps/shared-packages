@@ -108,7 +108,7 @@ export function ReportControls({
           onChange={(_event, next) => {
             if (typeof next === "string") onGrainChange(next as ReportGrain);
           }}
-          aria-label="Agrupamento"
+          aria-label={copy.grouping}
           dataTestId="report-grain"
         />
       ) : null}
@@ -116,7 +116,7 @@ export function ReportControls({
         <PrintExportButton title={printTitle} />
         {onExport ? (
           <Button variant="outline" size="sm" onClick={onExport} data-testid="report-export-csv">
-            Exportar CSV
+            {copy.exportCsv}
           </Button>
         ) : null}
       </Box>

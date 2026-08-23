@@ -193,9 +193,10 @@ function SharingFields({
   testId: string;
 }): JSX.Element {
   const copy = useReportCopy().screens.settings;
+  const builder = useReportCopy().screens.builder;
   return (
     <>
-      <Field label="Status">
+      <Field label={builder.statusLabel}>
         <Stack spacing={0.75}>
           {statusCards(copy).map((option) => (
             <RadioCard
@@ -269,10 +270,11 @@ function IdentityFields({
   onChange: (next: ReportSettingsValue) => void;
 }): JSX.Element {
   const copy = useReportCopy().screens.settings;
+  const builder = useReportCopy().screens.builder;
   return (
     <>
       <Input
-        label="Nome"
+        label={builder.nameLabel}
         value={value.name}
         onChange={(event) => onChange({ ...value, name: event.target.value })}
         data-testid={`${testId}-name`}
@@ -313,6 +315,7 @@ export function ReportSettingsDialog({
   testId?: string;
 }): JSX.Element {
   const copy = useReportCopy().screens.settings;
+  const builder = useReportCopy().screens.builder;
   return (
     <Modal open={open} onClose={onClose} size="sm" dataTestId={testId}>
       <ModalContent dataTestId={`${testId}-content`}>
@@ -351,7 +354,7 @@ export function ReportSettingsDialog({
             sx={{ width: "100%" }}
             dataTestId={`${testId}-done`}
           >
-            Concluir
+            {builder.done}
           </Button>
         </Stack>
       </ModalContent>

@@ -30,6 +30,7 @@ import {
   SIZE_TILE_LABEL_SX,
   SIZE_TILE_SX,
 } from "./lib/size-picker-tile";
+import { useReportCopy } from "./transport-context";
 
 /**
  * Every fraction the twelve-column grid states EXACTLY — and why there is no
@@ -106,11 +107,12 @@ export function BlockWidthPicker({
   onChange: (span: number) => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const min = minSpanForPresentation(presentation);
   return (
     <Stack spacing={1}>
       <Text variant="heading" size="xs" color="secondary" as="h3" style={SECTION_LABEL_STYLE}>
-        Largura
+        {copy.widthHeading}
       </Text>
       <Box data-testid={testId} sx={SIZE_TILE_GRID_SX}>
         {widthSegments(span, presentation).map((segment) => {

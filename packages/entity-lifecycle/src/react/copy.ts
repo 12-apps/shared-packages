@@ -77,6 +77,8 @@ export interface VersionHistoryCopy {
 }
 
 export interface VersionComparisonCopy {
+  /** The comparison table's first column: the field whose values differ. */
+  fieldColumn: string;
   roles: { previous: string; selected: string; next: string; current: string };
   booleanTrue: string;
   booleanFalse: string;
