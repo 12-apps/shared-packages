@@ -6,6 +6,7 @@ import { createSerpConnector } from '../connectors/serp';
 import type { ConnectorContext } from '../connectors/types';
 import { CREDENTIALS_KEY } from '../integrations';
 import { silentLogger } from '../memory';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
 /**
  * The SearchApi.io credential seams (FUT-434): `resolveSearchApiKey` puts the
@@ -144,8 +145,8 @@ describe('validateSearchApiKey', () => {
   });
 
   it('is mounted as validateCredentials on both SearchApi connectors', async () => {
-    const serp = createSerpConnector({ getApiKey: () => undefined });
-    const amazon = createAmazonConnector({ getApiKey: () => undefined });
+    const serp = createSerpConnector({ getApiKey: () => undefined, vocabulary: PT_BR_MARKET_VOCABULARY });
+    const amazon = createAmazonConnector({ getApiKey: () => undefined, vocabulary: PT_BR_MARKET_VOCABULARY });
     const ctx = ctxWithStatus(() => ({ status: 401, payload: { error: 'Invalid API key.' } }));
 
     expect(await serp.validateCredentials?.({ apiKey: 'sk-bad' }, ctx)).toMatchObject({ ok: false });

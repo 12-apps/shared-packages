@@ -3,6 +3,7 @@ import { availabilityFromText } from '../normalize/availability';
 import { isBrlPrice } from '../normalize/currency';
 import { parseMoneyToCents } from '../normalize/money';
 import { shippingCentsFromText } from '../normalize/shipping';
+import type { MarketVocabulary } from '../normalize/vocabulary';
 import { normalizeText } from '../normalize/text';
 import type { RawOffer, ResearchQuery, SourceRecord } from '../types';
 import { invalidConfigMessage } from './config-errors';
@@ -102,15 +103,24 @@ const deliveryTextsOf = (result: OrganicResult): string[] => {
   return [...texts, ...(result.shipping_info ? [result.shipping_info] : [])];
 };
 
-/** "Receba hoje/amanhã" is a literal promise; anything vaguer stays unknown. */
-const etaDaysOf = (deliveryText: string): number | undefined => {
+/**
+ * "Receba hoje/amanhã" is a literal promise; anything vaguer stays unknown.
+ *
+ * WHICH day counts as 0 and which as 1 is this module's answer; the words a
+ * merchant names them with are the market's (FUT-760).
+ */
+const etaDaysOf = (deliveryText: string, vocabulary: MarketVocabulary): number | undefined => {
   const text = normalizeText(deliveryText);
-  if (/\bhoje\b/.test(text)) return 0;
-  if (/\bamanha\b/.test(text)) return 1;
+  if (vocabulary.sameDay.test(text)) return 0;
+  if (vocabulary.nextDay.test(text)) return 1;
   return undefined;
 };
 
-const toRawOffer = (result: OrganicResult, domain: string): RawOffer => {
+const toRawOffer = (
+  result: OrganicResult,
+  domain: string,
+  vocabulary: MarketVocabulary,
+): RawOffer => {
   const deliveryTexts = deliveryTextsOf(result);
   const deliveryText = deliveryTexts.join(' ');
   const asin = result.asin?.trim() || undefined;
@@ -128,22 +138,24 @@ const toRawOffer = (result: OrganicResult, domain: string): RawOffer => {
     // The Prime badge is a shipping statement in its own right, so it stays an
     // explicit override ahead of the text; everything else is the shared
     // parser, on the delivery texts only.
-    shippingCents: result.is_prime === true ? 0 : shippingCentsFromText(deliveryTexts),
-    availability: availabilityFromText([result.availability, ...deliveryTexts]),
-    etaDays: etaDaysOf(deliveryText),
+    shippingCents:
+      result.is_prime === true ? 0 : shippingCentsFromText(deliveryTexts, vocabulary),
+    availability: availabilityFromText([result.availability, ...deliveryTexts], vocabulary),
+    etaDays: etaDaysOf(deliveryText, vocabulary),
     raw: result,
   };
 };
 
 export const parseAmazonResponse = (
   payload: unknown,
+  vocabulary: MarketVocabulary,
   domain: string = AMAZON_BRAZIL_DOMAIN,
 ): RawOffer[] => {
   const parsed = responseSchema.safeParse(payload);
   if (!parsed.success) return [];
   return (parsed.data.organic_results ?? []).flatMap((result) => {
     if (!isBrlPrice(result.currency, result.price)) return [];
-    const offer = toRawOffer(result, domain);
+    const offer = toRawOffer(result, domain, vocabulary);
     // Neither a price nor an availability signal: nothing rankable, discard.
     if (offer.priceCents === undefined && offer.availability === undefined) return [];
     return [offer];
@@ -154,6 +166,13 @@ export interface AmazonConnectorOptions {
   /** Host env fallback seam (env/Doppler) — read per search, never cached.
    * The tenant credential in `source.config` (FUT-434) always wins over it. */
   getApiKey: SearchApiKeySource;
+  /**
+   * The words this connector reads in a merchant's stock and delivery lines
+   * — the MARKET's, required and with no default (FUT-760). Without it, a
+   * host outside Brazil would get a connector that parses cleanly and reports
+   * unknown availability, unknown shipping and unknown ETA on every offer.
+   */
+  vocabulary: MarketVocabulary;
 }
 
 export const createAmazonConnector = (options: AmazonConnectorOptions): PriceSourceConnector => ({
@@ -175,7 +194,7 @@ export const createAmazonConnector = (options: AmazonConnectorOptions): PriceSou
       apiKey: resolveSearchApiKey(source, options.getApiKey),
     });
     if (!result.ok) return result;
-    return { ok: true, offers: parseAmazonResponse(result.payload, domain) };
+    return { ok: true, offers: parseAmazonResponse(result.payload, options.vocabulary, domain) };
   },
   validateCredentials: validateSearchApiKey,
 });

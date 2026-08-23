@@ -12,6 +12,7 @@ import { ConnectorRegistry } from '../connectors/registry';
 import { FixedBudget, InMemoryCache, InMemoryResearchStore, silentLogger } from '../memory';
 import { runResearch } from '../pipeline/run-research';
 import type { SourceRecord } from '../types';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
 /**
  * The FUT-415 acceptance sheet: a distributor CSV with mixed volumes,
@@ -39,7 +40,7 @@ const source = (): SourceRecord => ({
 
 describe('parseCsvPriceList', () => {
   it('parses the distributor sheet and surfaces the unmappable row', () => {
-    const { rows, problems } = parseCsvPriceList({ content: DISTRIBUTOR_CSV }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
+    const { rows, problems } = parseCsvPriceList({ content: DISTRIBUTOR_CSV, headerAliases: PT_BR_MARKET_VOCABULARY.headerAliases }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
 
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({
@@ -57,16 +58,17 @@ describe('parseCsvPriceList', () => {
   });
 
   it('fails loudly when required columns cannot be found', () => {
-    const { rows, problems } = parseCsvPriceList({ content: 'Foo;Bar\n1;2' }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
+    const { rows, problems } = parseCsvPriceList(
+      { content: 'Foo;Bar\n1;2', headerAliases: PT_BR_MARKET_VOCABULARY.headerAliases },
+      PT_BR_RESEARCH_DIAGNOSTICS.manualImport,
+    );
     expect(rows).toEqual([]);
     expect(problems[0]?.reason).toContain('colunas obrigatórias');
   });
 
   it('honors an explicit column mapping and comma delimiter', () => {
     const csv = 'Item,Custo\nCafé Torrado 1kg,"R$ 89,90"';
-    const { rows, problems } = parseCsvPriceList({
-      content: csv,
-      mapping: { title: 'Item', price: 'Custo' },
+    const { rows, problems } = parseCsvPriceList({ content: csv, headerAliases: PT_BR_MARKET_VOCABULARY.headerAliases, mapping: { title: 'Item', price: 'Custo' },
     }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
     expect(problems).toEqual([]);
     expect(rows[0]).toMatchObject({ title: 'Café Torrado 1kg', price: 'R$ 89,90' });
@@ -87,7 +89,7 @@ describe('readCsvHeaders / guessHeaderMapping', () => {
 
   it('guesses the same columns the parser resolves, as header names', () => {
     const { headers } = readCsvHeaders(DISTRIBUTOR_CSV);
-    expect(guessHeaderMapping(headers)).toEqual({
+    expect(guessHeaderMapping(headers, PT_BR_MARKET_VOCABULARY.headerAliases)).toEqual({
       title: 'Produto',
       brand: 'Marca',
       packQuantity: 'Embalagem',
@@ -96,14 +98,14 @@ describe('readCsvHeaders / guessHeaderMapping', () => {
       validUntil: 'Validade',
     });
     // Unrecognized headers simply do not map — the UI asks the buyer.
-    expect(guessHeaderMapping(['Foo', 'Bar'])).toEqual({});
+    expect(guessHeaderMapping(['Foo', 'Bar'], PT_BR_MARKET_VOCABULARY.headerAliases)).toEqual({});
   });
 });
 
 describe('normalizeManualRows', () => {
   it('converts BR money to cents and applies the default validity', () => {
     const defaultValidUntil = new Date('2026-08-04T00:00:00Z');
-    const { rows } = parseCsvPriceList({ content: DISTRIBUTOR_CSV }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
+    const { rows } = parseCsvPriceList({ content: DISTRIBUTOR_CSV, headerAliases: PT_BR_MARKET_VOCABULARY.headerAliases }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
     const { entries, problems } = normalizeManualRows(rows, { defaultValidUntil }, PT_BR_RESEARCH_DIAGNOSTICS.manualImport);
 
     expect(entries).toHaveLength(3);

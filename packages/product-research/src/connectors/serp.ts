@@ -3,6 +3,7 @@ import { availabilityFromText } from '../normalize/availability';
 import { isBrlPrice } from '../normalize/currency';
 import { parseMoneyToCents } from '../normalize/money';
 import { shippingCentsFromText } from '../normalize/shipping';
+import type { MarketVocabulary } from '../normalize/vocabulary';
 import type { RawOffer, ResearchQuery, SourceRecord } from '../types';
 import { invalidConfigMessage } from './config-errors';
 import {
@@ -106,10 +107,17 @@ const priceCentsOf = (result: ShoppingResult): number | undefined => {
   return extensionPriceCents(result.extensions ?? []);
 };
 
-const availabilityOf = (result: ShoppingResult): RawOffer['availability'] =>
-  availabilityFromText([result.tag, result.delivery, ...(result.extensions ?? [])]);
+const availabilityOf = (
+  result: ShoppingResult,
+  vocabulary: MarketVocabulary,
+): RawOffer['availability'] =>
+  availabilityFromText([result.tag, result.delivery, ...(result.extensions ?? [])], vocabulary);
 
-const toRawOffer = (result: ShoppingResult, priceCents: number | undefined): RawOffer => ({
+const toRawOffer = (
+  result: ShoppingResult,
+  priceCents: number | undefined,
+  vocabulary: MarketVocabulary,
+): RawOffer => ({
   // The MERCHANT is the supplier — never the source's own name: a SERP row is
   // an offer by "Magazine Luiza", not by "Busca web".
   supplierName: result.seller ?? result.source ?? 'Google Shopping',
@@ -123,18 +131,18 @@ const toRawOffer = (result: ShoppingResult, priceCents: number | undefined): Raw
   // documents that those carry installment prices ("R$ 3,79 em 12x"), so a
   // money parse there would report a financing term as freight — inventing a
   // shipping cost the merchant never quoted.
-  shippingCents: shippingCentsFromText([result.delivery]),
-  availability: availabilityOf(result),
+  shippingCents: shippingCentsFromText([result.delivery], vocabulary),
+  availability: availabilityOf(result, vocabulary),
   raw: result,
 });
 
-export const parseSerpResponse = (payload: unknown): RawOffer[] => {
+export const parseSerpResponse = (payload: unknown, vocabulary: MarketVocabulary): RawOffer[] => {
   const parsed = responseSchema.safeParse(payload);
   if (!parsed.success) return [];
   return (parsed.data.shopping_results ?? []).flatMap((result) => {
     if (!isBrlPrice(result.currency, result.price)) return [];
     const priceCents = priceCentsOf(result);
-    const offer = toRawOffer(result, priceCents);
+    const offer = toRawOffer(result, priceCents, vocabulary);
     // Neither a price nor an availability signal: nothing rankable, discard.
     if (offer.priceCents === undefined && offer.availability === undefined) return [];
     return [offer];
@@ -155,6 +163,13 @@ export interface SerpConnectorOptions {
   /** Host env fallback seam (env/Doppler) — read per search, never cached.
    * The tenant credential in `source.config` (FUT-434) always wins over it. */
   getApiKey: SearchApiKeySource;
+  /**
+   * The words this connector reads in a merchant's stock and delivery lines
+   * — the MARKET's, required and with no default (FUT-760). Without it, a
+   * host outside Brazil would get a connector that parses cleanly and reports
+   * unknown availability and unknown shipping on every single offer.
+   */
+  vocabulary: MarketVocabulary;
 }
 
 export const createSerpConnector = (options: SerpConnectorOptions): PriceSourceConnector => ({
@@ -178,7 +193,7 @@ export const createSerpConnector = (options: SerpConnectorOptions): PriceSourceC
       apiKey: resolveSearchApiKey(source, options.getApiKey),
     });
     if (!result.ok) return result;
-    return { ok: true, offers: parseSerpResponse(result.payload) };
+    return { ok: true, offers: parseSerpResponse(result.payload, options.vocabulary) };
   },
   validateCredentials: validateSearchApiKey,
 });

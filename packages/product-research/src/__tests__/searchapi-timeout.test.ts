@@ -14,6 +14,7 @@ import type {
 import { vtexConnector } from '../connectors/vtex';
 import { silentLogger } from '../memory';
 import type { ResearchQuery, SourceRecord, SourceType } from '../types';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
 /**
  * Unit (FUT-502): the PER-CONNECTOR fetch budget, and the reasons a paid
@@ -67,8 +68,8 @@ const resultCtx = (
 
 const failing = (failure: FetchFailure) => (): FetchOutcome => ({ ok: false, failure });
 
-const serp = () => createSerpConnector({ getApiKey: () => 'sk-host-fallback' });
-const amazon = () => createAmazonConnector({ getApiKey: () => 'sk-host-fallback' });
+const serp = () => createSerpConnector({ getApiKey: () => 'sk-host-fallback', vocabulary: PT_BR_MARKET_VOCABULARY });
+const amazon = () => createAmazonConnector({ getApiKey: () => 'sk-host-fallback', vocabulary: PT_BR_MARKET_VOCABULARY });
 
 describe('the SearchApi budget reaches the transport', () => {
   it('asks for its own budget on a SERP search, not the host default', async () => {
@@ -199,7 +200,7 @@ describe('every SearchApi arm speaks pt-BR (FUT-517)', () => {
     return result.ok ? '' : result.error;
   };
 
-  const keyless = () => createSerpConnector({ getApiKey: () => undefined });
+  const keyless = () => createSerpConnector({ getApiKey: () => undefined, vocabulary: PT_BR_MARKET_VOCABULARY });
 
   /** The payload each non-fetch arm reacts to; the key arm never gets that far. */
   const armPayloads: [PriceSourceConnector, unknown][] = [

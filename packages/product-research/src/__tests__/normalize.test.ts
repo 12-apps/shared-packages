@@ -3,6 +3,7 @@ import { parseMoneyToCents } from '../normalize/money';
 import { parsePack } from '../normalize/pack';
 import { shippingCentsFromText } from '../normalize/shipping';
 import { normalizeText, tokenize, volumeTokenToMl } from '../normalize/text';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
 describe('normalizeText / tokenize', () => {
   it('folds accents and case', () => {
@@ -46,43 +47,43 @@ describe('parseMoneyToCents', () => {
 // be reached by guessing.
 describe('shippingCentsFromText', () => {
   it('reads free delivery in every casing, accent and verb the vendors send', () => {
-    expect(shippingCentsFromText(['Entrega grátis'])).toBe(0);
-    expect(shippingCentsFromText(['Frete grátis'])).toBe(0);
-    expect(shippingCentsFromText(['FRETE GRATIS'])).toBe(0);
-    expect(shippingCentsFromText(['Envio grátis para todo o Brasil'])).toBe(0);
-    expect(shippingCentsFromText(['Entrega GRÁTIS: amanhã'])).toBe(0);
+    expect(shippingCentsFromText(['Entrega grátis'], PT_BR_MARKET_VOCABULARY)).toBe(0);
+    expect(shippingCentsFromText(['Frete grátis'], PT_BR_MARKET_VOCABULARY)).toBe(0);
+    expect(shippingCentsFromText(['FRETE GRATIS'], PT_BR_MARKET_VOCABULARY)).toBe(0);
+    expect(shippingCentsFromText(['Envio grátis para todo o Brasil'], PT_BR_MARKET_VOCABULARY)).toBe(0);
+    expect(shippingCentsFromText(['Entrega GRÁTIS: amanhã'], PT_BR_MARKET_VOCABULARY)).toBe(0);
   });
 
   it('reads a stated BRL amount, in the shapes a delivery line actually uses', () => {
-    expect(shippingCentsFromText(['Frete: R$ 9,90'])).toBe(990);
-    expect(shippingCentsFromText(['+ R$ 12,00'])).toBe(1200);
-    expect(shippingCentsFromText(['Entrega por R$ 12,90'])).toBe(1290);
-    expect(shippingCentsFromText(['Frete: R$ 1.234,56'])).toBe(123456);
+    expect(shippingCentsFromText(['Frete: R$ 9,90'], PT_BR_MARKET_VOCABULARY)).toBe(990);
+    expect(shippingCentsFromText(['+ R$ 12,00'], PT_BR_MARKET_VOCABULARY)).toBe(1200);
+    expect(shippingCentsFromText(['Entrega por R$ 12,90'], PT_BR_MARKET_VOCABULARY)).toBe(1290);
+    expect(shippingCentsFromText(['Frete: R$ 1.234,56'], PT_BR_MARKET_VOCABULARY)).toBe(123456);
   });
 
   it('leaves a delivery-time promise, a pickup line and silence unknown', () => {
     // A date is not a price, an in-store pickup is not a shipping statement,
     // and "consulte" is the merchant declining to say.
-    expect(shippingCentsFromText(['Entrega em 2 dias'])).toBeUndefined();
-    expect(shippingCentsFromText(['Retirada na loja'])).toBeUndefined();
-    expect(shippingCentsFromText(['Consulte o frete'])).toBeUndefined();
-    expect(shippingCentsFromText([])).toBeUndefined();
-    expect(shippingCentsFromText([null, undefined, ''])).toBeUndefined();
+    expect(shippingCentsFromText(['Entrega em 2 dias'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText(['Retirada na loja'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText(['Consulte o frete'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText([], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText([null, undefined, ''], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
   });
 
   it('never reads an installment price as freight', () => {
     // The defect this ticket exists to remove: "R$ 3,79 em 12x" is a financing
     // term. Reporting 379 cents of shipping would invent a cost the merchant
     // never quoted — worse than reporting none.
-    expect(shippingCentsFromText(['R$ 3,79 em 12x'])).toBeUndefined();
-    expect(shippingCentsFromText(['12x de R$ 3,20 sem juros'])).toBeUndefined();
-    expect(shippingCentsFromText(['em 3 parcelas de R$ 10,00'])).toBeUndefined();
+    expect(shippingCentsFromText(['R$ 3,79 em 12x'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText(['12x de R$ 3,20 sem juros'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText(['em 3 parcelas de R$ 10,00'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
   });
 
   it('prefers a free-delivery claim over an amount stated beside it', () => {
     // A merchant showing both is running a promotion over its table price, and
     // the promotion is what the buyer pays today.
-    expect(shippingCentsFromText(['Frete: R$ 19,90', 'Frete grátis nesta compra'])).toBe(0);
+    expect(shippingCentsFromText(['Frete: R$ 19,90', 'Frete grátis nesta compra'], PT_BR_MARKET_VOCABULARY)).toBe(0);
   });
 
   /**
@@ -93,18 +94,18 @@ describe('shippingCentsFromText', () => {
    * surface; a confident zero cannot.
    */
   it('treats free-above-a-minimum as UNKNOWN, never as free', () => {
-    expect(shippingCentsFromText(['Frete GRÁTIS em pedidos acima de R$ 79'])).toBeUndefined();
-    expect(shippingCentsFromText(['Frete grátis a partir de R$ 199'])).toBeUndefined();
-    expect(shippingCentsFromText(['Entrega grátis para compras acima de R$ 100'])).toBeUndefined();
-    expect(shippingCentsFromText(['Frete grátis (pedido mínimo R$ 50)'])).toBeUndefined();
+    expect(shippingCentsFromText(['Frete GRÁTIS em pedidos acima de R$ 79'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText(['Frete grátis a partir de R$ 199'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText(['Entrega grátis para compras acima de R$ 100'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
+    expect(shippingCentsFromText(['Frete grátis (pedido mínimo R$ 50)'], PT_BR_MARKET_VOCABULARY)).toBeUndefined();
     // A conditional claim must not be rescued by an amount stated beside it —
     // that amount is the MINIMUM, not the freight.
     expect(
-      shippingCentsFromText(['Frete grátis acima de R$ 79', 'Frete: R$ 14,90']),
+      shippingCentsFromText(['Frete grátis acima de R$ 79', 'Frete: R$ 14,90'], PT_BR_MARKET_VOCABULARY),
     ).toBeUndefined();
     // ...and the guard must not swallow an UNCONDITIONAL claim that merely
     // names a region.
-    expect(shippingCentsFromText(['Frete grátis para todo o Brasil'])).toBe(0);
+    expect(shippingCentsFromText(['Frete grátis para todo o Brasil'], PT_BR_MARKET_VOCABULARY)).toBe(0);
   });
 });
 
