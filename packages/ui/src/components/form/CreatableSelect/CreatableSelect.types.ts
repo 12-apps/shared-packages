@@ -33,7 +33,8 @@ export interface CreatableSelectProps {
   /** Placeholder shown when empty. */
   placeholder?: string;
   /** Builds the create-row label from the typed text (default: `Criar "<text>"`). */
-  createOptionLabel?: (input: string) => string;
+  /** How a new option is offered, naming what was typed. REQUIRED — no default copy. */
+  createOptionLabel: (input: string) => string;
   /** Text shown when no option matches and creation is disabled. */
   noOptionsText?: string;
   disabled?: boolean;

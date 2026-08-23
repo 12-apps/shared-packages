@@ -11,6 +11,7 @@ import {
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { DataViewsDisplayPanel, type DisplayPanelView } from "./data-views-display-panel";
 import { DataViewsExportMenu, type DataViewExport } from "./data-views-export";
 import { renderBulkActions } from "./data-views-grid-helpers";
@@ -136,6 +137,7 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
  * separators reach the sidebar's vertical line and the window edge.
  */
 export function GridToolbar<T extends Record<string, unknown>>(props: GridToolbarProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const { testIdPrefix, selectedRows } = props;
   return (
     <Box
@@ -150,6 +152,7 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
       }}
     >
       <ContentToolbar
+        selectAllLabel={copy.selection.selectAll}
         hasSelection={selectedRows.length > 0}
         selectedCount={selectedRows.length}
         selectAll={props.selectAll}

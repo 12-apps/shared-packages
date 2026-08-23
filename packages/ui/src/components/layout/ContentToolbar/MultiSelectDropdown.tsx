@@ -61,6 +61,7 @@ export function MultiSelectDropdown<TValue extends string = string>({
   onToggle,
   onClear,
   allLabel = 'All',
+  clearLabel,
   extraOptions,
   searchable,
   searchPlaceholder = 'Search…',
@@ -96,6 +97,7 @@ export function MultiSelectDropdown<TValue extends string = string>({
     if (layout === 'pill')
       return (
         <PillTrigger
+          clearLabel={clearLabel}
           label={label}
           selectedCount={selected.size}
           onClear={onClear}

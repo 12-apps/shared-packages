@@ -60,6 +60,7 @@ function OverflowPill<T extends Record<string, unknown>>({
   if (options.length > INLINE_OPTION_LIMIT) {
     return (
       <MultiSelectDropdown
+          clearLabel={copy.filters.clearRange(field.label)}
         label={field.pill?.label ?? field.label}
         options={options}
         selected={new Set(values)}
@@ -213,6 +214,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
 }: {
   field: OverflowField<T>;
 } & MoreFieldProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const { applied, clear } = fieldClearing({ field, pills, ranges, onTogglePill, onChangeRange });
   return (
     <Box sx={{ mb: 1.5, "&:last-of-type": { mb: 0 } }}>
@@ -245,7 +247,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
               "&:hover": { textDecoration: "underline" },
             }}
           >
-            Limpar
+            {copy.filters.clear}
           </Box>
         )}
       </Box>

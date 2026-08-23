@@ -55,7 +55,7 @@ export interface SearchPaletteProps<T> {
   /** Footer "see all results" action; hidden when omitted. */
   onSubmitAll?: (query: string) => void;
   /** Footer label builder; defaults to `Todos os resultados para "{q}"`. */
-  submitAllLabel?: (query: string) => string;
+  submitAllLabel: (query: string) => string;
 
   /**
    * Content shown when the query is empty (e.g. a "Populares" block). Keeps the
@@ -63,7 +63,7 @@ export interface SearchPaletteProps<T> {
    */
   emptyQueryContent?: React.ReactNode;
   /** Message when a non-empty query yields no items. */
-  noResultsLabel?: string;
+  noResultsLabel: string;
 
   /** Loading spinner in the input while results resolve. */
   isLoading?: boolean;
@@ -71,7 +71,7 @@ export interface SearchPaletteProps<T> {
   showGhostText?: boolean;
   /** Autofocus the input on mount. */
   autoFocus?: boolean;
-  placeholder?: string;
+  placeholder: string;
   inputAriaLabel?: string;
   /** Esc handler (host closes the overlay). */
   onClose?: () => void;

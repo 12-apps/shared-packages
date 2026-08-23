@@ -342,7 +342,7 @@ export function ViewFooter({
         onClick={view.onReset}
         dataTestId={`${testIdPrefix}-display-reset`}
       >
-        Redefinir
+        {copy.nav.reset}
       </Button>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         {/* Only meaningful with a view APPLIED: on {copy.nav.mainView} the single
@@ -358,7 +358,7 @@ export function ViewFooter({
             }}
             dataTestId={`${testIdPrefix}-display-save-as`}
           >
-            Salvar como nova
+            {copy.nav.saveAs}
           </Button>
         )}
         {/* Enabled only when something in Ordenar / Colunas / Exibição (or the

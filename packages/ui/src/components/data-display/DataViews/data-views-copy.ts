@@ -19,6 +19,8 @@ import type { SavedViewsLabels } from "../../layout/ContentToolbar/ContentToolba
 /** What the board's per-page footnote says about counts and sums. */
 export interface DataViewsBoardCopy {
   countOnPage(label: string, count: number): string;
+  /** A board column with no cards in it. */
+  emptyColumn: string;
   onThisPage(count: number): string;
   pageSum(sum: string): string;
   /** Why the figures below are not the whole set. */
@@ -27,16 +29,26 @@ export interface DataViewsBoardCopy {
 
 export interface DeleteViewCopy {
   title: string;
+  /**
+   * WHICH view is about to go, named. The name is quoted rather than
+   * emphasised with markup: a quote delimits it unambiguously in any language
+   * and needs no markup grammar in a design-system package.
+   */
+  target(viewName: string): string;
   /** Shown only when the view is shared with the team. */
   sharedWarning: string;
   /** `entityLabel` is the host's own noun for the rows — never this package's. */
   rowsUnaffected(entityLabel: string): string;
   confirm: string;
+  /** The way out, beside the destructive button. */
+  cancel: string;
 }
 
 export interface ManageViewsCopy {
   title: string;
   empty: string;
+  /** The per-row action that reopens a saved view for editing. */
+  edit: string;
   defaultTag: string;
   otherUserTag: string;
   deleteTitle: string;
@@ -77,6 +89,11 @@ export interface DataViewsColumnsCopy {
   visibleCount(visible: number, total: number): string;
   reset: string;
   showAll: string;
+  /** How the list is reordered, for anyone who cannot see the drag handles. */
+  dragHint: string;
+  /** The keyboard route to the same reordering, named per column. */
+  moveUp(columnLabel: string): string;
+  moveDown(columnLabel: string): string;
 }
 
 export interface DataViewsDisplayCopy {
@@ -119,6 +136,16 @@ export interface DataViewsGridCopy {
   /** The per-row kebab's accessible name. */
   rowActions: string;
   bulkActions(selectedCount: number): string;
+  /**
+   * The FILTERED empty state, which is a different claim from the host's own
+   * "nothing here yet" and must never be worded as one.
+   *
+   * The grid renders this itself because it is the only party that knows a
+   * filter is applied; the way out sits under it, which is the whole point.
+   */
+  emptyFilteredTitle: string;
+  emptyFilteredHint: string;
+  emptyFilteredAction: string;
 }
 
 export interface DataViewsFiltersCopy {
@@ -135,7 +162,13 @@ export interface DataViewsFiltersCopy {
   /** Drop every applied filter. Two spellings: the bar has room for one word. */
   clear: string;
   clearAll: string;
-  /** Drop one range filter, named. */
+  /**
+   * Drop ONE named filter — a range pill or a multi-select chip alike.
+   *
+   * Named for the range because that is where it started; it is the same
+   * sentence and the same job for every named filter control, and the
+   * multi-select pills use it rather than spelling a second copy of it.
+   */
   clearRange(label: string): string;
   /** The multi-select dropdowns this surface mounts. */
   allOption: string;
@@ -163,6 +196,10 @@ export interface DataViewsNavCopy {
   label: string;
   update: string;
   save: string;
+  /** Store the current state as a NEW view rather than over the applied one. */
+  saveAs: string;
+  /** Drop the unsaved changes and return to the applied view. */
+  reset: string;
   /** The inline error when a view could not be refreshed or saved. */
   updateFailed: string;
   saveFailed: string;

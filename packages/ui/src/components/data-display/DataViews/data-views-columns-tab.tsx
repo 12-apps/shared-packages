@@ -84,7 +84,7 @@ export function ColumnsTab({
       </Box>
       <Text variant="caption" as="p">
         <Box component="span" sx={{ px: 1.5, pb: 0.5, display: "block", color: "text.disabled" }}>
-          Arraste para reordenar as colunas.
+          {copy.columns.dragHint}
         </Box>
       </Text>
       <Box sx={{ px: 0.75, pb: 0.75 }}>
@@ -165,6 +165,7 @@ function ColumnRow({
   onMove,
   testIdPrefix,
 }: ColumnRowProps): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box
       draggable
@@ -201,8 +202,8 @@ function ColumnRow({
         </Box>
       </Text>
       <Box className="dv-col-move" sx={{ ml: "auto", display: "flex", opacity: 0, transition: "opacity .15s" }}>
-        <MoveButton label={`Mover ${column.label} para cima`} onClick={() => onMove(-1)} up />
-        <MoveButton label={`Mover ${column.label} para baixo`} onClick={() => onMove(1)} />
+        <MoveButton label={copy.columns.moveUp(column.label)} onClick={() => onMove(-1)} up />
+        <MoveButton label={copy.columns.moveDown(column.label)} onClick={() => onMove(1)} />
       </Box>
     </Box>
   );

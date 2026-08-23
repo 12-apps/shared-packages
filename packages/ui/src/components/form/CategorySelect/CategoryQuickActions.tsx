@@ -3,6 +3,8 @@
 import { Box } from '@mui/material';
 import { useMemo } from 'react';
 
+import type { CategorySelectCopy } from '../../../copy';
+
 import { collectLeafIds } from './category-tree';
 import type { CategorySelectState } from './useCategorySelect';
 
@@ -30,9 +32,12 @@ const linkButtonSx = {
 export function CategoryQuickActions({
   state,
   dataTestId,
+  copy,
 }: {
   state: CategorySelectState;
   dataTestId: string;
+  /** The words this control renders. REQUIRED — no default copy. */
+  copy: CategorySelectCopy;
 }): React.JSX.Element {
   const allLeafIds = useMemo(() => collectLeafIds(state.allGroups), [state.allGroups]);
   const everythingPicked = allLeafIds.length > 0 && state.draft.size >= allLeafIds.length;
@@ -50,7 +55,7 @@ export function CategoryQuickActions({
         sx={linkButtonSx}
         onClick={() => state.setDraft(everythingPicked ? new Set() : new Set(allLeafIds))}
       >
-        {everythingPicked ? 'Desmarcar tudo' : 'Marcar tudo'}
+        {everythingPicked ? copy.deselectAll : copy.selectAll}
       </Box>
       <Box component="span" sx={{ color: 'divider' }}>
         ·
@@ -62,7 +67,7 @@ export function CategoryQuickActions({
         sx={linkButtonSx}
         onClick={() => state.setAllExpanded(!allExpanded)}
       >
-        {allExpanded ? 'Recolher tudo' : 'Expandir tudo'}
+        {allExpanded ? copy.collapseAll : copy.expandAll}
       </Box>
     </>
   );

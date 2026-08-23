@@ -33,6 +33,12 @@ export interface ConfirmActionCopy {
    * never guesses a noun for someone else's rows.
    */
   irreversible: string;
+  /**
+   * The typed-confirmation prompt, naming the exact word that unlocks the
+   * button. A function because where that word sits in the sentence, and how
+   * it is quoted, is the translator's call.
+   */
+  typeToConfirm(expected: string): string;
 }
 
 export interface CategorySelectCopy {
@@ -45,6 +51,22 @@ export interface CategorySelectCopy {
    */
   purpose: string;
   clearSelection: string;
+  /**
+   * The quick actions above the tree. Each toggles as a PAIR, and each label
+   * says what pressing it will do rather than what state the list is in — so a
+   * translator needs both halves, not one plus a negation.
+   */
+  selectAll: string;
+  deselectAll: string;
+  expandAll: string;
+  collapseAll: string;
+  /**
+   * What the closed control invites, and it differs by mode: picking ONE
+   * category is a move, picking several is a filter. Both were pt-BR defaults
+   * behind an optional prop, which is the arrangement this port removes.
+   */
+  placeholderSingle: string;
+  placeholderMulti: string;
   /** The empty state, when the host has no categories at all. */
   emptyTitle: string;
   createCategory: string;
