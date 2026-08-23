@@ -110,6 +110,29 @@ export {
   isTenantScope,
 } from './engine';
 
+// The ceiling's OTHER half. `./guards` already consumes one — it intersects
+// with it and forces `isSuper` off whenever it is present — but computing it
+// was unreachable, so every host wrote the three-row table itself against this
+// package's own `getTenantRolesByName`/`expandRole`/`WILDCARD`.
+export {
+  createImpersonationCeiling,
+  outsideBoundedTenant,
+  type CeilingImpersonation,
+  type ImpersonationCeilingConfig,
+} from './impersonation-ceiling';
+
+// The tenant-ROLE axis, whose order is the escalation fix: the bound is checked
+// before anything can grant, and the platform short-circuit is unreachable
+// while impersonating. A host with two authority resolvers is how that came to
+// be checked in one of them and not the other.
+export {
+  createTenantGuards,
+  type TenantGrant,
+  type TenantGrantOutcome,
+  type TenantGuardActor,
+  type TenantGuardsConfig,
+} from './tenant-guards';
+
 export {
   parseRolePermissions,
   serializeRolePermissions,
