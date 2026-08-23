@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react';
 import type { PlatformHomologationStatus } from '@12-apps/payments-backend';
 
 import { CARD_SX } from './ConnectEnvironmentCard';
+import { usePlatformCopy } from './copy-context';
 
 /**
  * The homologação outcome record (FUT-483, packaged by FUT-573) — the durable
@@ -44,12 +45,6 @@ export interface HomologacaoSaveState {
   success: boolean;
 }
 
-const STATUS_LABEL: Record<PlatformHomologationStatus, string> = {
-  SUBMITTED: 'Submitted',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-};
-
 const STATUS_COLOR: Record<PlatformHomologationStatus, 'warning' | 'success' | 'error'> = {
   SUBMITTED: 'warning',
   APPROVED: 'success',
@@ -57,10 +52,11 @@ const STATUS_COLOR: Record<PlatformHomologationStatus, 'warning' | 'success' | '
 };
 
 function StatusChip({ record }: { record: PlatformHomologationRecordView | null }): ReactNode {
+  const copy = usePlatformCopy().outcome;
   if (record === null) {
     return (
       <Chip
-        label="Not submitted"
+        label={copy.notSubmitted}
         size="small"
         variant="outlined"
         data-testid="homologacao-status-chip"
@@ -69,7 +65,7 @@ function StatusChip({ record }: { record: PlatformHomologationRecordView | null 
   }
   return (
     <Chip
-      label={STATUS_LABEL[record.status]}
+      label={copy.statuses[record.status] ?? record.status}
       size="small"
       color={STATUS_COLOR[record.status]}
       data-testid="homologacao-status-chip"
@@ -88,11 +84,12 @@ function StatusChip({ record }: { record: PlatformHomologationRecordView | null 
 const formatDateTime = (iso: string): string => new Date(iso).toLocaleString();
 
 function RecordTrail({ record }: { record: PlatformHomologationRecordView }): ReactNode {
+  const copy = usePlatformCopy().outcome;
   return (
     <Typography variant="caption" color="text.secondary" component="p">
-      {record.submittedAt ? `Submitted ${formatDateTime(record.submittedAt)}. ` : ''}
-      {record.decidedAt ? `Decided ${formatDateTime(record.decidedAt)}. ` : ''}
-      {record.updatedBy ? `Recorded by ${record.updatedBy}.` : ''}
+      {record.submittedAt ? copy.submittedAt(formatDateTime(record.submittedAt)) : ''}
+      {record.decidedAt ? copy.decidedAt(formatDateTime(record.decidedAt)) : ''}
+      {record.updatedBy ? copy.recordedBy(record.updatedBy) : ''}
     </Typography>
   );
 }
@@ -106,6 +103,7 @@ interface HomologacaoOutcomeCardProps {
 
 export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): ReactNode {
   const { record, onSave, save } = props;
+  const copy = usePlatformCopy().outcome;
   const [status, setStatus] = useState<PlatformHomologationStatus>(record?.status ?? 'SUBMITTED');
   const [protocol, setProtocol] = useState(record?.protocol ?? '');
   const [notes, setNotes] = useState(record?.notes ?? '');
@@ -114,7 +112,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
     <Stack spacing={1.5} data-testid="homologacao-outcome-card" sx={CARD_SX}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Typography variant="body2" fontWeight={600}>
-          Homologation status
+          {copy.heading}
         </Typography>
         <StatusChip record={record} />
       </Box>
@@ -123,7 +121,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
         <TextField
           select
           size="small"
-          label="Status"
+          label={copy.statusLabel}
           value={status}
           onChange={(event) => setStatus(event.target.value as PlatformHomologationStatus)}
           slotProps={{
@@ -131,24 +129,24 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
             htmlInput: { 'data-testid': 'homologacao-status-select' },
           }}
         >
-          {(Object.keys(STATUS_LABEL) as PlatformHomologationStatus[]).map((key) => (
+          {(Object.keys(STATUS_COLOR) as PlatformHomologationStatus[]).map((key) => (
             <option key={key} value={key}>
-              {STATUS_LABEL[key]}
+              {copy.statuses[key] ?? key}
             </option>
           ))}
         </TextField>
         <TextField
           size="small"
-          aria-label="Protocol"
-          placeholder="Protocol (Pipefy card / ticket)"
+          aria-label={copy.protocolLabel}
+          placeholder={copy.protocolPlaceholder}
           value={protocol}
           onChange={(event) => setProtocol(event.target.value)}
           slotProps={{ htmlInput: { 'data-testid': 'homologacao-protocol' } }}
         />
         <TextField
           size="small"
-          aria-label="Notes"
-          placeholder="Notes (PagBank's reply, context…)"
+          aria-label={copy.notesLabel}
+          placeholder={copy.notesPlaceholder}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           slotProps={{ htmlInput: { 'data-testid': 'homologacao-notes' } }}
@@ -160,7 +158,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
           onClick={() => onSave({ status, protocol, notes })}
           data-testid="homologacao-save"
         >
-          Record
+          {copy.save}
         </Button>
       </Box>
       {save.error !== null ? (
@@ -170,7 +168,7 @@ export function HomologacaoOutcomeCard(props: HomologacaoOutcomeCardProps): Reac
       ) : null}
       {save.success ? (
         <Alert severity="success" data-testid="homologacao-save-ok">
-          Record updated.
+          {copy.saved}
         </Alert>
       ) : null}
     </Stack>

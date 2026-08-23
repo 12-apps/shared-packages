@@ -166,6 +166,7 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     defaultConfirmLabel: 'Já habilitei o Checkout Integrado',
     confirmedByYou: 'Confirmado por você',
     reviewAction: 'Revisar',
+    confirmPrompt: 'Confirme quando terminar do lado do provedor.',
     copyValue: (fieldLabel) => `Copiar ${fieldLabel}`,
     copied: 'Copiado',
   },

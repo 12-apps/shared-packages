@@ -25,6 +25,8 @@
  * `textContent` (runs of whitespace collapse to one space), so adjacent
  * elements concatenate exactly as they read.
  */
+import { PT_BR_PLATFORM_HOMOLOGACAO_COPY as PLATFORM } from '../../components/platform/pt-BR';
+
 export interface RenderExpectation {
   /** data-testids that must be present. */
   testIds?: readonly string[];
@@ -273,29 +275,35 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   "ProviderScreens/CapabilityDefaultDirect": { testIds: ["checkout-handoff-pending"] },
 
   // ----------------------------------------------------------- PlatformOps
+  // The platform screens take their words from the pack the stories mount, so
+  // these READ the pack rather than restating it. A copy port would otherwise
+  // fail here as a "wire break" while the wire was fine — which is the one
+  // failure mode this manifest must not produce.
   "PlatformOps/ConnectApplicationAllVerdicts": {
     testIds: ["connect-application-panel", "connect-mismatch-SANDBOX", "connect-match-PRODUCTION"],
-    text: ["Callback this deployment uses"],
+    text: [PLATFORM.connect.expectedRedirectHeading],
   },
   "PlatformOps/ConnectApplicationUnconfigured": {
     testIds: ["connect-application-panel"],
-    text: ["No application configured in this environment."],
+    text: [PLATFORM.connect.noApplication],
   },
   "PlatformOps/ConnectApplicationDegraded": {
     testIds: ["connect-error-SANDBOX", "connect-unknown-PRODUCTION"],
-    text: ["could not be compared with the callback this deployment uses."],
+    text: [PLATFORM.connect.redirectUnreported],
   },
   "PlatformOps/HomologacaoNeverRequested": {
     testIds: ["platform-homologacao", "homologacao-status-chip", "homologacao-anexo-button"],
-    text: ["Not submitted"],
+    text: [PLATFORM.outcome.notSubmitted],
   },
   "PlatformOps/HomologacaoApproved": {
     testIds: ["homologacao-status-chip", "homologacao-save-ok"],
-    text: ["Approved", "Record updated."],
+    text: [PLATFORM.outcome.statuses.APPROVED ?? "", PLATFORM.outcome.saved],
   },
   "PlatformOps/HomologacaoRejected": {
     testIds: ["homologacao-status-chip"],
-    text: ["Rejected", "Decided"],
+    // The trail's own leading word, which is all that proves the clause
+    // rendered — the date beside it is the runtime's, not the pack's.
+    text: [PLATFORM.outcome.statuses.REJECTED ?? "", PLATFORM.outcome.decidedAt("").split(" ")[0] ?? ""],
   },
 
   // -------------------------------------------------------------- Settings

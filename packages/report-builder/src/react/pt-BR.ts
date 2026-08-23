@@ -202,6 +202,8 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
     visualization: "Visualização",
     widthHeading: "Largura",
     filtersHeading: "Filtros",
+    measuresHeading: "Medidas",
+    rangeStartPlaceholder: "De",
     fieldLabel: "Campo",
     axisLabel: "Eixo X",
     grainLabel: "Por",

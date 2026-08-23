@@ -9,6 +9,7 @@ import type {
 import { ConnectApplicationPanel } from "../components/platform/ConnectApplicationPanel";
 import { PlatformHomologacao } from "../components/platform/PlatformHomologacao";
 import type { PlatformHomologationRecordView } from "../components/platform/HomologacaoOutcomeCard";
+import { PT_BR_PLATFORM_HOMOLOGACAO_COPY } from '../components/platform/pt-BR';
 
 /**
  * The PLATFORM operations screens (FUT-479 / FUT-483, packaged by FUT-573):
@@ -64,7 +65,7 @@ const CONFIG_VARS = ["PLATFORM_OAUTH_CLIENT_ID", "PLATFORM_OAUTH_CLIENT_SECRET",
 export const ConnectApplicationAllVerdicts: StoryObj = {
   name: "Aplicação Connect — os três veredictos",
   render: () => (
-    <ConnectApplicationPanel
+    <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
       report={connectReport([
         envStatus({
           environment: "SANDBOX",
@@ -90,7 +91,7 @@ export const ConnectApplicationAllVerdicts: StoryObj = {
 export const ConnectApplicationUnconfigured: StoryObj = {
   name: "Aplicação Connect — nada configurado",
   render: () => (
-    <ConnectApplicationPanel
+    <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
       report={connectReport([
         envStatus({ environment: "SANDBOX" }),
         envStatus({ environment: "PRODUCTION" }),
@@ -103,7 +104,7 @@ export const ConnectApplicationUnconfigured: StoryObj = {
 export const ConnectApplicationDegraded: StoryObj = {
   name: "Aplicação Connect — consulta falhou / sem redirect_uri",
   render: () => (
-    <ConnectApplicationPanel
+    <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
       report={connectReport([
         envStatus({
           environment: "SANDBOX",
@@ -167,7 +168,7 @@ const IDLE = { pending: false, error: null, success: false };
 export const HomologacaoNeverRequested: StoryObj = {
   name: "Homologação — não solicitada",
   render: () => (
-    <PlatformHomologacao
+    <PlatformHomologacao copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
       record={null}
       guide={GUIDE}
       onSaveRecord={() => undefined}
@@ -184,7 +185,7 @@ export const HomologacaoNeverRequested: StoryObj = {
 export const HomologacaoApproved: StoryObj = {
   name: "Homologação — aprovada",
   render: () => (
-    <PlatformHomologacao
+    <PlatformHomologacao copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
       record={APPROVED}
       guide={GUIDE}
       onSaveRecord={() => undefined}
@@ -197,7 +198,7 @@ export const HomologacaoApproved: StoryObj = {
 export const HomologacaoRejected: StoryObj = {
   name: "Homologação — recusada, com o motivo registrado",
   render: () => (
-    <PlatformHomologacao
+    <PlatformHomologacao copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
       record={{
         ...APPROVED,
         status: "REJECTED",
