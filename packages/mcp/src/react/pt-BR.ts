@@ -18,6 +18,8 @@ export const PT_BR_MCP_AI_COPY: McpAiCopy = {
   },
   landing: {
     eyebrow: "Integração com IA",
+    titleLead: "Conecte",
+    titleEmphasis: "assistentes de IA",
     titleTail: "à sua loja",
     lede:
       "Deixe o Claude, o ChatGPT e outros assistentes responderem sobre o seu cardápio, estoque e " +

@@ -174,6 +174,7 @@ function HeaderActions({
   onSave: () => void;
 }): JSX.Element {
   const copy = useReportCopy().screens.editor;
+  const builder = useReportCopy().screens.builder;
   return (
     <Stack
       direction="row"
@@ -205,7 +206,7 @@ function HeaderActions({
         {copy.settings}
       </Button>
       <Button variant="outline" size="sm" onClick={onCancel} dataTestId="report-editor-cancel">
-        Descartar
+        {builder.discard}
       </Button>
       <Button
         variant="solid"

@@ -122,6 +122,11 @@ export interface DataViewsDisplayCopy {
   densityUnavailableNarrow: string;
   /** The control that opens this panel. */
   trigger: string;
+  /** The two column headings inside the panel: which field, and in what shape. */
+  fieldHeading: string;
+  formatHeading: string;
+  /** The card-grid zoom slider, which carries a glyph at each end and no label. */
+  cardZoom: string;
 }
 
 export interface DataViewsExportCopy {
@@ -130,6 +135,12 @@ export interface DataViewsExportCopy {
   visibleColumns(columnCount: number): string;
   /** The control that opens the menu. */
   trigger: string;
+  /**
+   * The word ON that control when the bar has room for it. `trigger` is its
+   * accessible name and its compact tooltip; this is what the eye reads, and
+   * it was a literal — so a host could set one and not the other.
+   */
+  triggerLabel: string;
 }
 
 export interface DataViewsGridCopy {
@@ -151,9 +162,21 @@ export interface DataViewsGridCopy {
 export interface DataViewsFiltersCopy {
   moreFilters(count: number): string;
   moreFiltersApplied(count: number, appliedCount: number): string;
+  /**
+   * The overflow control's own two words: the one ON the button, and the
+   * heading of the sheet it opens. `moreFilters` is the accessible name and
+   * counts; these are what the eye reads.
+   */
+  moreTriggerLabel: string;
+  moreHeading: string;
   overflowNote: string;
   rangeEnd: string;
   rangeInvalid: string;
+  /**
+   * A day range includes BOTH endpoints, which a reader cannot tell from two
+   * dates alone — and getting it wrong silently drops or adds a day's rows.
+   */
+  rangeInclusiveNote: string;
   /** The day-range presets' labels, keyed by preset id. */
   rangePresets: Readonly<Record<string, string>>;
   scopesLabel: string;

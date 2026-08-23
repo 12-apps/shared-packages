@@ -86,7 +86,7 @@ function MoreTrigger({
         <FilterAltRoundedIcon fontSize="small" />
         {!compact && (
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-            Mais
+            {copy.filters.moreTriggerLabel}
           </Box>
         )}
         <Box
@@ -126,7 +126,7 @@ function MoreHeading(): React.JSX.Element {
     >
       <Text variant="caption" as="span">
         <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.5, color: "text.disabled" }}>
-          Mais filtros
+          {copy.filters.moreHeading}
         </Box>
       </Text>
       <Text variant="caption" as="span">

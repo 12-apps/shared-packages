@@ -167,7 +167,7 @@ function StatusBox({
           data-testid={`ai-status-connect-${host.id}`}
         >
           <AddLinkOutlinedIcon sx={{ fontSize: 16, mr: 0.5 }} />
-          Conectar
+          {copy.connect}
         </Button>
       )}
     </Box>
