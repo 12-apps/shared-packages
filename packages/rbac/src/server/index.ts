@@ -110,6 +110,17 @@ export {
   isTenantScope,
 } from './engine';
 
+// The ceiling's OTHER half. `./guards` already consumes one — it intersects
+// with it and forces `isSuper` off whenever it is present — but computing it
+// was unreachable, so every host wrote the three-row table itself against this
+// package's own `getTenantRolesByName`/`expandRole`/`WILDCARD`.
+export {
+  createImpersonationCeiling,
+  outsideBoundedTenant,
+  type CeilingImpersonation,
+  type ImpersonationCeilingConfig,
+} from './impersonation-ceiling';
+
 export {
   parseRolePermissions,
   serializeRolePermissions,
