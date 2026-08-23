@@ -8,6 +8,7 @@ import type {
 } from '@12-apps/payments-backend';
 
 import { ConnectApplicationPanel } from '../components/platform/ConnectApplicationPanel';
+import { PT_BR_PLATFORM_HOMOLOGACAO_COPY } from '../components/platform/pt-BR';
 
 /**
  * The Connect-application panel (FUT-479, packaged by FUT-573). What the
@@ -51,7 +52,7 @@ afterEach(cleanup);
 describe('ConnectApplicationPanel', () => {
   it('shows the expected callback and one card per environment', () => {
     render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([
           status({ environment: 'SANDBOX' }),
           status({ environment: 'PRODUCTION' }),
@@ -61,16 +62,16 @@ describe('ConnectApplicationPanel', () => {
 
     expect(screen.getByTestId('connect-expected-redirect').textContent).toContain(EXPECTED);
     expect(screen.getByTestId('connect-env-SANDBOX').textContent).toContain(
-      'No application configured in this environment.',
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.noApplication,
     );
     expect(screen.getByTestId('connect-env-PRODUCTION').textContent).toContain(
-      'No application configured in this environment.',
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.noApplication,
     );
   });
 
   it('flags a mismatch loudly, with the registered value on display', () => {
     render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([
           status({
             environment: 'SANDBOX',
@@ -84,7 +85,7 @@ describe('ConnectApplicationPanel', () => {
     );
 
     expect(screen.getByTestId('connect-mismatch-SANDBOX').textContent).toContain(
-      'differs from the callback this deployment uses',
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.redirectDiffers,
     );
     expect(screen.getByTestId('connect-env-SANDBOX').textContent).toContain(`${EXPECTED}/`);
     expect(screen.getByTestId('connect-env-SANDBOX').textContent).toContain(
@@ -94,7 +95,7 @@ describe('ConnectApplicationPanel', () => {
 
   it('confirms a byte-identical registration as matching', () => {
     render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([
           status({
             environment: 'PRODUCTION',
@@ -106,12 +107,14 @@ describe('ConnectApplicationPanel', () => {
       />,
     );
 
-    expect(screen.getByTestId('connect-match-PRODUCTION').textContent).toContain('matches');
+    expect(screen.getByTestId('connect-match-PRODUCTION').textContent).toContain(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.redirectMatches,
+    );
   });
 
   it('renders the unknown verdict when the response named no redirect URI', async () => {
     render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([
           status({
             environment: 'SANDBOX',
@@ -125,7 +128,7 @@ describe('ConnectApplicationPanel', () => {
 
     // Never "confere": the schema is undocumented, absence is not a match.
     expect(screen.getByTestId('connect-unknown-SANDBOX').textContent).toContain(
-      'carried no redirect_uri',
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.redirectUnreported,
     );
     await waitFor(() => {
       expect(screen.queryByTestId('connect-match-SANDBOX')).toBeNull();
@@ -134,7 +137,7 @@ describe('ConnectApplicationPanel', () => {
 
   it('surfaces a consult failure on its own environment only', async () => {
     render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([
           status({
             environment: 'SANDBOX',
@@ -160,7 +163,7 @@ describe('ConnectApplicationPanel', () => {
 
   it('shows the undocumented extra fields, when any came back', () => {
     render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([
           status({
             environment: 'SANDBOX',
@@ -177,7 +180,7 @@ describe('ConnectApplicationPanel', () => {
 
   it('renders the host config help behind a toggle, only when supplied', async () => {
     render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([
           status({ environment: 'SANDBOX' }),
           status({ environment: 'PRODUCTION' }),
@@ -205,7 +208,7 @@ describe('ConnectApplicationPanel', () => {
   });
 
   it('omits the toggle entirely when the host supplies no config help', async () => {
-    render(<ConnectApplicationPanel report={report([status({ environment: 'SANDBOX' })])} />);
+    render(<ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY} report={report([status({ environment: 'SANDBOX' })])} />);
 
     await waitFor(() => {
       expect(screen.queryByTestId('connect-config-toggle-SANDBOX')).toBeNull();
@@ -215,7 +218,7 @@ describe('ConnectApplicationPanel', () => {
   it('offers the refresh action only when the host wires one', async () => {
     const refreshed = { count: 0 };
     const { rerender } = render(
-      <ConnectApplicationPanel
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
         report={report([status({ environment: 'SANDBOX' })])}
         onRefresh={() => {
           refreshed.count += 1;
@@ -226,7 +229,7 @@ describe('ConnectApplicationPanel', () => {
     fireEvent.click(screen.getByTestId('connect-refresh'));
     expect(refreshed.count).toBe(1);
 
-    rerender(<ConnectApplicationPanel report={report([status({ environment: 'SANDBOX' })])} />);
+    rerender(<ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY} report={report([status({ environment: 'SANDBOX' })])} />);
     await waitFor(() => {
       expect(screen.queryByTestId('connect-refresh')).toBeNull();
     });

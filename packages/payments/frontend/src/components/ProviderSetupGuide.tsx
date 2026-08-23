@@ -159,9 +159,10 @@ function StepText({ text, link }: { text?: string; link?: SetupStep['link'] }) {
  * button gives them nothing to weigh that against.
  */
 function ConfirmBar({ action }: { action: { label: string; run: () => void } }) {
+  const copy = usePaymentsSettingsCopy().setupGuide;
   return (
     <Box sx={BAR_SX} data-testid="payments-setup-confirm-bar">
-      <Typography sx={BAR_MSG_SX}>Confirme quando terminar do lado do provedor.</Typography>
+      <Typography sx={BAR_MSG_SX}>{copy.confirmPrompt}</Typography>
       <Button variant="contained" disableElevation sx={BTN_PRIMARY_SX} onClick={() => action.run()}>
         {action.label}
       </Button>
