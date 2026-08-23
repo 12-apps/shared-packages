@@ -195,6 +195,7 @@ function BoardColumn<T extends Record<string, unknown>>({
   width,
   testId,
 }: BoardColumnProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const total = sumOf(column.rows, board.sumBy);
   return (
     <Box
@@ -222,7 +223,7 @@ function BoardColumn<T extends Record<string, unknown>>({
       {column.rows.length === 0 ? (
         <Text variant="caption" as="p">
           <Box component="span" data-testid={`${testId}-empty`} sx={{ color: "text.disabled" }}>
-            Nada nesta etapa
+            {copy.board.emptyColumn}
           </Box>
         </Text>
       ) : (

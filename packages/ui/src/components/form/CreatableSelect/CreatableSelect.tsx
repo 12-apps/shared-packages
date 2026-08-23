@@ -185,7 +185,7 @@ export function CreatableSelect({
   label,
   error,
   placeholder,
-  createOptionLabel = (input) => `Criar "${input}"`,
+  createOptionLabel,
   noOptionsText,
   disabled = false,
   loading = false,

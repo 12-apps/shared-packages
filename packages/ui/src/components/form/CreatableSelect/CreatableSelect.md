@@ -21,7 +21,7 @@ Type to filter the options; when the typed text matches nothing, an optional
 - **onCreate** (`(label: string) => void | Promise<void>`): enables create-on-Enter. When the typed text matches no option, a create row appears; choosing it calls `onCreate` with the raw text. The parent persists it and feeds the new option back through `options`/`value`. Omit to make the field a plain searchable select.
 - **label** (`string`): field label.
 - **placeholder** (`string`): placeholder shown when empty.
-- **createOptionLabel** (`(input: string) => string`): builds the create-row label (default: `Criar "<input>"`).
+- **createOptionLabel** (`(input: string) => string`, REQUIRED): builds the create-row label. No default — a pt-BR one used to ship, which is how a host in any other language inherited it silently (FUT-760).
 - **noOptionsText** (`string`): text shown when nothing matches and creation is disabled.
 - **disabled** (`boolean`): disable the field.
 - **loading** (`boolean`): show a spinner in the adornment (e.g. while a create request is in flight).
@@ -71,7 +71,7 @@ Type to filter the options; when the typed text matches nothing, an optional
 1. Keep `options` in sync after `onCreate` resolves — append the created option and
    set `value` to it so the new selection sticks.
 2. Use `loading` while the create request is in flight to signal progress.
-3. Provide a localized `createOptionLabel` when the UI language isn't Portuguese.
+3. `createOptionLabel` is required, so the create-row label is always the host’s own.
 4. Omit `onCreate` entirely when free creation is not allowed — the field then
    behaves as a plain searchable select and shows `noOptionsText`.
 

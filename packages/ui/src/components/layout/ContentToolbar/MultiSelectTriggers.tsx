@@ -102,6 +102,18 @@ export function StackedTrigger({ label, triggerLabel, open, onOpen, testId }: Tr
 }
 
 /** Rounded outlined chip (`Label ▾`, `Label (N) ▾` when selected) for a filter row. */
+/** The pill's own props, above the component so the signature stays short. */
+export type PillTriggerProps = TriggerProps & {
+  selectedCount: number;
+  onClear?: () => void;
+  /**
+   * The clear affordance's accessible name — the pill's own label is already
+   * on screen, so this is the only thing a screen reader gets for the little
+   * cross. REQUIRED: this package ships no default copy.
+   */
+  clearLabel: string;
+};
+
 export function PillTrigger({
   label,
   open,
@@ -109,7 +121,8 @@ export function PillTrigger({
   testId,
   selectedCount,
   onClear,
-}: TriggerProps & { selectedCount: number; onClear?: () => void }): React.JSX.Element {
+  clearLabel,
+}: PillTriggerProps): React.JSX.Element {
   const active = selectedCount > 0;
   return (
     <Button
@@ -129,7 +142,7 @@ export function PillTrigger({
             component="span"
             role="button"
             tabIndex={0}
-            aria-label={`Limpar ${label}`}
+            aria-label={clearLabel}
             data-testid={testId ? `${testId}-clear` : undefined}
             onClick={(event: React.MouseEvent) => {
               // The pill's own click opens the menu; clearing must not.

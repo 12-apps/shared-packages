@@ -153,6 +153,7 @@ function MoreFooter({
   onClearAll: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box sx={{ px: 1.5, py: 1, borderTop: 1, borderColor: "divider" }}>
       <Box
@@ -173,7 +174,7 @@ function MoreFooter({
           "&:hover": { textDecoration: "underline" },
         }}
       >
-        Limpar todos os filtros
+        {copy.filters.clearAll}
       </Box>
     </Box>
   );

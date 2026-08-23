@@ -48,7 +48,7 @@ export function DeleteViewDialog({
       <DialogContent>
         <Stack spacing={1.5}>
           <Text variant="body" as="p" data-testid={`${testIdPrefix}-delete-target`}>
-            Excluir <strong>{view.name}</strong>?
+            {copy.deleteView.target(view.name)}
           </Text>
 
           {view.shared && (
@@ -68,7 +68,7 @@ export function DeleteViewDialog({
               onClick={onClose}
               dataTestId={`${testIdPrefix}-delete-cancel`}
             >
-              Cancelar
+              {copy.deleteView.cancel}
             </Button>
             <Button
               color="danger"

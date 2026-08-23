@@ -19,7 +19,15 @@ const selectionButtonSx = {
 
 type SelectionClusterProps = Pick<
   ContentToolbarProps,
-  'hasSelection' | 'selectedCount' | 'selectAll' | 'clearSelection' | 'actions' | 'selectAllTestId' | 'clearAllTestId' | 'edgeAlign'
+  | 'hasSelection'
+  | 'selectedCount'
+  | 'selectAll'
+  | 'clearSelection'
+  | 'actions'
+  | 'selectAllTestId'
+  | 'clearAllTestId'
+  | 'edgeAlign'
+  | 'selectAllLabel'
 >;
 
 /** The left cluster: Select All + (when selecting) Clear All / count / actions. */
@@ -32,6 +40,7 @@ function SelectionCluster({
   selectAllTestId,
   clearAllTestId,
   edgeAlign = false,
+  selectAllLabel,
 }: SelectionClusterProps): React.JSX.Element {
   const actionsSlot = actions !== undefined && (
     <Box sx={{ ml: 0.5, display: 'flex', flexShrink: 0, alignItems: 'center' }}>{actions}</Box>
@@ -66,7 +75,7 @@ function SelectionCluster({
         checked={hasSelection}
         onChange={(event) => (event.target.checked ? selectAll() : clearSelection())}
         data-testid={`${selectAllTestId}-checkbox`}
-        inputProps={{ 'aria-label': 'Selecionar todos' }}
+        inputProps={{ 'aria-label': selectAllLabel }}
         sx={{ p: 0.5, display: { xs: 'inline-flex', md: 'none' } }}
       />
       {hasSelection ? (
@@ -206,6 +215,7 @@ export function ContentToolbar({
   clearAllTestId,
   edgeAlign = false,
   exclusiveSelection = false,
+  selectAllLabel,
 }: ContentToolbarProps): React.JSX.Element {
   // Under `exclusiveSelection` the two states are alternatives, not neighbours:
   // browsing shows the controls and no checkbox, selecting shows the checkbox
@@ -238,6 +248,7 @@ export function ContentToolbar({
           actions={actions}
           selectAllTestId={selectAllTestId}
           clearAllTestId={clearAllTestId}
+          selectAllLabel={selectAllLabel}
           edgeAlign={edgeAlign}
         />
       )}

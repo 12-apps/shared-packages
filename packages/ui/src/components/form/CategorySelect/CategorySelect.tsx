@@ -51,7 +51,7 @@ function resolveConfig(props: CategorySelectProps): ResolvedConfig {
   const single = props.mode === 'single';
   return {
     single,
-    placeholder: props.placeholder ?? (single ? 'Mover para…' : 'Categoria'),
+    placeholder: props.placeholder ?? (single ? props.copy.placeholderSingle : props.copy.placeholderMulti),
     disabled: props.disabled ?? false,
     loading: props.loading ?? false,
     fullWidth: props.fullWidth ?? false,
