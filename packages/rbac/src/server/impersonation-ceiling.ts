@@ -50,9 +50,9 @@ const NOTHING: ReadonlySet<string> = new Set();
 export interface CeilingImpersonation {
   /**
    * `operator` is the unbounded platform kind; anything else is a preview. A
-   * host that spells it differently (future-pay's trail has always said
-   * `superadmin`) adapts at its own seam — the DISTINCTION is what matters
-   * here, not the word.
+   * host whose audit trail spells that kind differently adapts at its own
+   * seam — the DISTINCTION is what matters here, not the word, and a package
+   * carrying an adopter's vocabulary is one no second adopter can read.
    */
   kind: 'operator' | 'preview';
   /** The one tenant this session is bounded to. */
