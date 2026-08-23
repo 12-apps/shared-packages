@@ -7,8 +7,10 @@ import React from 'react';
 
 import type { PaletteCommand } from './CommandPalette.types';
 import {CommandPalette } from './CommandPalette';
+import { PT_BR_COMMAND_PALETTE_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof CommandPalette> = {
+  args: { copy: PT_BR_COMMAND_PALETTE_COPY },
   title: 'Navigation/CommandPalette',
   component: CommandPalette,
   parameters: {
@@ -73,7 +75,7 @@ const DefaultComponent = () => {
       <Button variant="contained" onClick={() => setOpen(true)}>
         Open Command Palette (⌘K)
       </Button>
-      <CommandPalette
+      <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
         open={open}
         onClose={() => setOpen(false)}
         commands={sampleCommands}
@@ -128,7 +130,7 @@ const WithRecentCommandsComponent = () => {
           </Stack>
         </Paper>
       </Stack>
-      <CommandPalette
+      <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
         open={open}
         onClose={() => setOpen(false)}
         commands={sampleCommands}
@@ -191,7 +193,7 @@ const InteractiveDemoComponent = () => {
         </Paper>
       )}
 
-      <CommandPalette
+      <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
         open={open}
         onClose={() => setOpen(false)}
         commands={customCommands}
@@ -230,7 +232,7 @@ const CustomCategoriesComponent = () => {
           Open Commands
         </Button>
       </Stack>
-      <CommandPalette
+      <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
         open={open}
         onClose={() => setOpen(false)}
         commands={ecommerceCommands}
@@ -271,7 +273,7 @@ const WithKeywordSearchComponent = () => {
         Try Fuzzy Search
       </Button>
 
-      <CommandPalette
+      <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
         open={open}
         onClose={() => setOpen(false)}
         commands={sampleCommands}
@@ -312,7 +314,7 @@ const CustomStylingComponent = () => {
       >
         Open Styled Palette
       </Button>
-      <CommandPalette
+      <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
         open={open}
         onClose={() => setOpen(false)}
         commands={[...favoriteCommands, ...sampleCommands]}
@@ -342,7 +344,7 @@ const EmptyStateComponent = () => {
       <Button variant="contained" onClick={() => setOpen(true)}>
         Open Command Palette
       </Button>
-      <CommandPalette
+      <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
         open={open}
         onClose={() => {
           setOpen(false);

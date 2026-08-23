@@ -4,8 +4,10 @@ import React from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { TutorialOverlay } from './TutorialOverlay';
+import { PT_BR_TUTORIAL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TutorialOverlay> = {
+  args: { copy: PT_BR_TUTORIAL_COPY },
   title: 'Overlays/TutorialOverlay/Tests',
   component: TutorialOverlay,
   parameters: {
@@ -63,7 +65,7 @@ export const BasicInteraction: Story = {
     return (
       <TestEnvironment>
         {showTutorial && (
-          <TutorialOverlay
+          <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
             steps={testSteps}
             onComplete={() => {
               onCompleteMock();
@@ -128,7 +130,7 @@ export const FormInteraction: Story = {
     return (
       <TestEnvironment>
         {showTutorial && (
-          <TutorialOverlay
+          <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
             steps={[
               {
                 id: '1',
@@ -188,7 +190,7 @@ export const KeyboardNavigation: Story = {
     return (
       <TestEnvironment>
         {showTutorial && (
-          <TutorialOverlay
+          <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
             steps={testSteps}
             onComplete={() => setShowTutorial(false)}
             onSkip={() => setShowTutorial(false)}
@@ -229,7 +231,7 @@ export const KeyboardNavigation: Story = {
 export const ScreenReaderTest: Story = {
   render: () => (
     <TestEnvironment>
-      <TutorialOverlay
+      <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
         steps={[
           {
             id: '1',
@@ -275,7 +277,7 @@ export const FocusManagement: Story = {
           Start Tutorial
         </Button>
         {showTutorial && (
-          <TutorialOverlay
+          <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
             steps={testSteps}
             onComplete={() => setShowTutorial(false)}
             onSkip={() => setShowTutorial(false)}
@@ -322,7 +324,7 @@ export const ResponsiveDesign: Story = {
   },
   render: () => (
     <TestEnvironment>
-      <TutorialOverlay
+      <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
         steps={testSteps}
         onComplete={() => {}}
         variant="tooltip"
@@ -351,7 +353,7 @@ export const ResponsiveDesign: Story = {
 export const ThemeVariations: Story = {
   render: () => (
     <TestEnvironment>
-      <TutorialOverlay
+      <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
         steps={[
           {
             id: '1',
@@ -403,7 +405,7 @@ export const VisualStates: Story = {
             </Button>
           ))}
         </Box>
-        <TutorialOverlay
+        <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
           steps={[
             {
               id: '1',
@@ -454,7 +456,7 @@ export const PerformanceTest: Story = {
 
     return (
       <TestEnvironment>
-        <TutorialOverlay
+        <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
           steps={manySteps}
           onComplete={() => {}}
           variant="tooltip"
@@ -521,7 +523,7 @@ export const EdgeCases: Story = {
             </Button>
           ))}
         </Box>
-        <TutorialOverlay
+        <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
           steps={testCases[testCase as keyof typeof testCases]}
           onComplete={() => {}}
           variant="tooltip"
@@ -574,7 +576,7 @@ export const IntegrationTest: Story = {
         </Box>
 
         {tutorials.onboarding && (
-          <TutorialOverlay
+          <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
             steps={[
               {
                 id: '1',
@@ -590,7 +592,7 @@ export const IntegrationTest: Story = {
         )}
 
         {tutorials.features && (
-          <TutorialOverlay
+          <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
             steps={[
               {
                 id: '1',

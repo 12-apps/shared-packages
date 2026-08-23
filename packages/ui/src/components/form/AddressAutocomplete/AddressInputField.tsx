@@ -7,16 +7,17 @@ import React from 'react';
 import type { AddressAutocompleteProps } from './AddressAutocomplete.types';
 import { AddressTextField } from './AddressTextField';
 
-const CurrentLocationButton: FC<{ disabled: boolean; onClick: () => void }> = ({
-  disabled,
-  onClick,
-}) => (
+const CurrentLocationButton: FC<{
+  disabled: boolean;
+  onClick: () => void;
+  currentLocationLabel: string;
+}> = ({ disabled, onClick, currentLocationLabel }) => (
   <InputAdornment position="end">
     <IconButton
       edge="end"
       onClick={onClick}
       size="small"
-      title="Use current location"
+      title={currentLocationLabel}
       disabled={disabled}
       data-testid="address-current-location-button"
     >
@@ -26,6 +27,7 @@ const CurrentLocationButton: FC<{ disabled: boolean; onClick: () => void }> = ({
 );
 
 export interface AddressInputFieldProps {
+  copy: AddressAutocompleteProps['copy'];
   params: AutocompleteRenderInputParams;
   addressVariant: AddressAutocompleteProps['variant'];
   label?: string;
@@ -41,6 +43,7 @@ export interface AddressInputFieldProps {
 }
 
 export const AddressInputField: FC<AddressInputFieldProps> = ({
+  copy,
   params,
   addressVariant,
   label,
@@ -69,7 +72,11 @@ export const AddressInputField: FC<AddressInputFieldProps> = ({
         <>
           {loading && <CircularProgress color="inherit" size={20} data-testid="address-loading" />}
           {showCurrentLocation && (
-            <CurrentLocationButton disabled={disabled} onClick={onGetCurrentLocation} />
+            <CurrentLocationButton
+              disabled={disabled}
+              onClick={onGetCurrentLocation}
+              currentLocationLabel={copy.useCurrentLocation}
+            />
           )}
           {params.InputProps.endAdornment}
         </>

@@ -75,6 +75,8 @@ interface DashboardSettingsBaseProps {
  * dialog rendering `children`. Mutually exclusive with link mode.
  */
 export interface DashboardSettingsDialogProps extends DashboardSettingsBaseProps {
+  /** The dialog's close button — a glyph with no visible label. REQUIRED. */
+  closeLabel: string;
   /** Dialog title. Defaults to `"Settings"`. */
   title?: ReactNode;
   /** Dialog body. */
@@ -89,6 +91,8 @@ export interface DashboardSettingsDialogProps extends DashboardSettingsBaseProps
  * exclusive with dialog mode, so `title`/`children` are not accepted.
  */
 export interface DashboardSettingsLinkProps extends DashboardSettingsBaseProps {
+  /** Link mode opens no dialog, so there is no close button to name. */
+  closeLabel?: never;
   /** Link target settings route. */
   href: string;
   /**

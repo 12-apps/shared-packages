@@ -5,8 +5,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { action } from 'storybook/actions';
 
 import { UploadButton } from './UploadButton';
+import { PT_BR_UPLOAD_BUTTON_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof UploadButton> = {
+  args: { copy: PT_BR_UPLOAD_BUTTON_COPY },
   title: 'Form/UploadButton',
   component: UploadButton,
   parameters: {
@@ -270,12 +272,12 @@ export const AllVariants: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%', maxWidth: 800 }}>
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <UploadButton onSelect={action('default-selected')} />
-        <UploadButton variant="outline" onSelect={action('outline-selected')} />
-        <UploadButton variant="ghost" onSelect={action('ghost-selected')} />
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={action('default-selected')} />
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} variant="outline" onSelect={action('outline-selected')} />
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} variant="ghost" onSelect={action('ghost-selected')} />
       </Box>
       <Box sx={{ width: '100%', maxWidth: 400 }}>
-        <UploadButton 
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
           variant="dropzone" 
           onSelect={action('dropzone-selected')}
         />
@@ -287,16 +289,16 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-      <UploadButton 
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
         label="Small"
         onSelect={action('small-selected')}
         sx={{ fontSize: '0.75rem', padding: '4px 8px' }}
       />
-      <UploadButton 
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
         label="Medium" 
         onSelect={action('medium-selected')}
       />
-      <UploadButton 
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
         label="Large"
         onSelect={action('large-selected')}
         sx={{ fontSize: '1.125rem', padding: '12px 24px' }}
@@ -308,11 +310,11 @@ export const AllSizes: Story = {
 export const AllStates: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-      <UploadButton label="Default" onSelect={action('default-selected')} />
-      <UploadButton label="Disabled" disabled onSelect={action('disabled-selected')} />
-      <UploadButton label="Uploading" uploading progress={50} onSelect={action('uploading-selected')} />
-      <UploadButton label="With Error" errorText="Upload failed" onSelect={action('error-selected')} />
-      <UploadButton label="With Helper" helperText="Select a file to upload" onSelect={action('helper-selected')} />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} label="Default" onSelect={action('default-selected')} />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} label="Disabled" disabled onSelect={action('disabled-selected')} />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} label="Uploading" uploading progress={50} onSelect={action('uploading-selected')} />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} label="With Error" errorText="Upload failed" onSelect={action('error-selected')} />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} label="With Helper" helperText="Select a file to upload" onSelect={action('helper-selected')} />
     </Box>
   )
 };
@@ -320,7 +322,7 @@ export const AllStates: Story = {
 export const InteractiveStates: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-      <UploadButton 
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
         label="Hover Me" 
         onSelect={action('hover-selected')}
         sx={{ 
@@ -330,7 +332,7 @@ export const InteractiveStates: Story = {
           }
         }}
       />
-      <UploadButton 
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
         label="Focus Me" 
         onSelect={action('focus-selected')}
         sx={{
@@ -349,14 +351,14 @@ export const Responsive: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, width: '100%' }}>
       <Box sx={{ flex: 1 }}>
-        <UploadButton 
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
           label="Mobile First"
           onSelect={action('mobile-selected')}
           sx={{ width: '100%' }}
         />
       </Box>
       <Box sx={{ flex: 1 }}>
-        <UploadButton 
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
           variant="dropzone"
           label="Desktop Dropzone"
           onSelect={action('desktop-selected')}

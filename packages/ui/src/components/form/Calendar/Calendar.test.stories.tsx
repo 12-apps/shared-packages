@@ -7,6 +7,7 @@ import { Calendar } from './Calendar';
 import type { DateRange } from './Calendar.types';
 
 const meta: Meta<typeof Calendar> = {
+  args: { ariaLabel: 'Calendário' },
   title: 'Form/Calendar/Tests',
   component: Calendar,
   parameters: {
@@ -55,11 +56,11 @@ const TestWrapper = ({
 
   if (selectionMode === 'range') {
     return (
-      <Calendar {...props} selectionMode="range" range={range} onRangeChange={handleRangeChange} />
+      <Calendar ariaLabel="Calendário" {...props} selectionMode="range" range={range} onRangeChange={handleRangeChange} />
     );
   }
 
-  return <Calendar {...props} selectionMode="single" value={value} onChange={handleChange} />;
+  return <Calendar ariaLabel="Calendário" {...props} selectionMode="single" value={value} onChange={handleChange} />;
 };
 
 export const BasicInteraction: Story = {
@@ -401,13 +402,13 @@ const IntegrationTestComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', gap: 4 }}>
-      <Calendar
+      <Calendar ariaLabel="Calendário"
         selectionMode="single"
         value={singleDate}
         onChange={setSingleDate}
         data-testid="single-calendar"
       />
-      <Calendar
+      <Calendar ariaLabel="Calendário"
         selectionMode="range"
         range={rangeDate}
         onRangeChange={setRangeDate}

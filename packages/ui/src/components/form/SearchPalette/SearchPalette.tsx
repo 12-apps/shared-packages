@@ -50,12 +50,14 @@ function resolveOpts<T>(props: SearchPaletteProps<T>): {
 /** String / label defaults. */
 function resolveText<T>(props: SearchPaletteProps<T>): {
   submitAllLabel: (q: string) => string;
+  submitKeyLabel: string;
   noResultsLabel: string;
   placeholder: string;
   dataTestId: string;
 } {
   return {
     submitAllLabel: props.submitAllLabel,
+    submitKeyLabel: props.submitKeyLabel,
     noResultsLabel: props.noResultsLabel,
     placeholder: props.placeholder,
     dataTestId: props.dataTestId ?? 'search-palette',
@@ -130,7 +132,8 @@ export function SearchPalette<T>(props: SearchPaletteProps<T>): React.JSX.Elemen
           hasQuery={hasQuery} emptyQueryContent={props.emptyQueryContent} visible={visible}
           isLoading={opts.isLoading} noResultsLabel={text.noResultsLabel} showFooter={showFooter}
           footerIndex={footerIndex} activeIndex={activeIndex} trimmed={trimmed}
-          submitAllLabel={text.submitAllLabel} getKey={props.getKey} getPrimary={props.getPrimary}
+          submitAllLabel={text.submitAllLabel} submitKeyLabel={text.submitKeyLabel}
+          getKey={props.getKey} getPrimary={props.getPrimary}
           getSecondary={props.getSecondary} getLead={props.getLead} getTrailing={props.getTrailing}
           onSelect={props.onSelect} onSubmitAll={props.onSubmitAll} setActiveIndex={setActiveIndex}
         />

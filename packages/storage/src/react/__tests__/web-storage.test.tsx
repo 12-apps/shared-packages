@@ -18,13 +18,18 @@ import { createWebStorage } from '../create-web-storage';
 const KEY = 'products/minha-loja/3f2504e0-4f89-41d3-9a0c-0305e82c3301/full.webp';
 
 /**
- * The two labels `ImageField` now requires. Spread into every render below —
- * none of these cases is about the words, and a host that forgot them is a
- * typecheck failure rather than something a test has to catch.
+ * The copy `ImageField` now requires. Spread into every render below — none of
+ * these cases is about the words, and a host that forgot them is a typecheck
+ * failure rather than something a test has to catch.
+ *
+ * Read off the pt-BR pack rather than restated here: the pack is what a host
+ * actually passes, so a suite spelling its own would pass while the wire from
+ * the table to the screen was broken.
  */
 const LABELS = {
   label: PT_BR_WEB_STORAGE_MESSAGES({ limit: '8 MB' }).fieldLabel,
   removeLabel: PT_BR_WEB_STORAGE_MESSAGES({ limit: '8 MB' }).fieldRemove,
+  uploadCopy: PT_BR_WEB_STORAGE_MESSAGES({ limit: '8 MB' }).field,
 } as const;
 
 interface Sent {

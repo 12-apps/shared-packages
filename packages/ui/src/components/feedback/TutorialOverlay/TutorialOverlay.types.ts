@@ -1,3 +1,4 @@
+import type { TutorialCopy } from '../../../copy';
 // Component types
 export interface TutorialStep {
   id: string;
@@ -15,6 +16,8 @@ export interface TutorialStep {
 }
 
 export interface TutorialOverlayProps {
+  /** The tour's four controls. REQUIRED — all four were English literals. */
+  copy: TutorialCopy;
   steps: TutorialStep[];
   onComplete?: () => void;
   onSkip?: () => void;

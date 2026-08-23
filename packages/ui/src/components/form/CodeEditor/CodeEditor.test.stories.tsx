@@ -4,8 +4,10 @@ import React from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { CodeEditor } from './CodeEditor';
+import { PT_BR_CODE_EDITOR_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof CodeEditor> = {
+  args: { copy: PT_BR_CODE_EDITOR_COPY },
   title: 'Form/CodeEditor/Tests',
   component: CodeEditor,
   parameters: {
@@ -377,9 +379,9 @@ export const ThemeVariations: Story = {
 export const VisualStates: Story = {
   render: () => (
     <Stack spacing={3}>
-      <CodeEditor language="javascript" value="// Normal state" height="150px" />
-      <CodeEditor language="javascript" value="// Read-only state" readOnly height="150px" />
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="// Normal state" height="150px" />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="// Read-only state" readOnly height="150px" />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language="javascript"
         value=""
         placeholder="Empty state with placeholder"
@@ -439,14 +441,14 @@ export const Performance: Story = {
 export const EdgeCases: Story = {
   render: () => (
     <Stack spacing={3}>
-      <CodeEditor language="javascript" value="" height="100px" showToolbar={false} />
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} language="javascript" value="" height="100px" showToolbar={false} />
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language="json"
         value='{"test": "very long text that might overflow and cause issues with the editor layout and rendering system"}'
         wordWrap
         height="100px"
       />
-      <CodeEditor
+      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
         language="typescript"
         value="// Special characters: àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
         height="100px"
@@ -537,7 +539,7 @@ export const Integration: Story = {
 
     return (
       <Stack spacing={2}>
-        <CodeEditor
+        <CodeEditor copy={PT_BR_CODE_EDITOR_COPY}
           language="javascript"
           value={code}
           onChange={setCode}

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { FilterTrigger } from '../ContentToolbar/FilterTrigger';
 import { TableFilter } from './TableFilter';
 import type { TableFilterRange } from './TableFilter.types';
+import { PT_BR_TABLE_FILTER_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TableFilter> = {
   title: 'Dashboards/TableFilter',
@@ -44,7 +45,7 @@ export const Default: Story = {
           <Typography variant="h6">Products</Typography>
           <FilterTrigger open={open} onOpenChange={setOpen} hasActiveFilters={active} />
         </Box>
-        <TableFilter open={open} onOpenChange={setOpen} hasActiveFilters={active}>
+        <TableFilter copy={PT_BR_TABLE_FILTER_COPY} open={open} onOpenChange={setOpen} hasActiveFilters={active}>
           <TableFilter.Layout>
             <TableFilter.Main>
               <Box sx={{ p: 2, color: 'text.secondary' }}>Table / grid content…</Box>

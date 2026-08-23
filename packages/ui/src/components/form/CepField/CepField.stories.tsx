@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 
 import { CepField } from './CepField';
 import type { CepAddress } from './CepField.types';
+import { PT_BR_CEP_FIELD_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof CepField> = {
+  args: { copy: PT_BR_CEP_FIELD_COPY },
   title: 'Form/CepField',
   component: CepField,
   parameters: {
@@ -69,7 +71,7 @@ function Demo({
 
   return (
     <Stack spacing={2} sx={{ maxWidth: 420 }}>
-      <CepField
+      <CepField copy={PT_BR_CEP_FIELD_COPY}
         {...props}
         value={cep}
         onChange={setCep}
@@ -116,7 +118,7 @@ export const MaskOnly: Story = {
     const [cep, setCep] = useState('');
     return (
       <Stack sx={{ maxWidth: 420 }}>
-        <CepField value={cep} onChange={setCep} />
+        <CepField copy={PT_BR_CEP_FIELD_COPY} value={cep} onChange={setCep} />
       </Stack>
     );
   },
@@ -127,7 +129,7 @@ export const WithError: Story = {
     const [cep, setCep] = useState('123');
     return (
       <Stack sx={{ maxWidth: 420 }}>
-        <CepField
+        <CepField copy={PT_BR_CEP_FIELD_COPY}
           value={cep}
           onChange={setCep}
           error="CEP inválido — use o formato 00000-000."

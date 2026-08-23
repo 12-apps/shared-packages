@@ -18,8 +18,10 @@ import { useState } from 'react';
 import { Breadcrumbs } from './Breadcrumbs';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
 import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
+import { PT_BR_BREADCRUMB_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Breadcrumbs> = {
+  args: { copy: PT_BR_BREADCRUMB_COPY },
   title: 'Navigation/Breadcrumbs',
   component: Breadcrumbs,
   parameters: {
@@ -219,31 +221,31 @@ export const SeparatorTypes: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Default Separator
         </Typography>
-        <Breadcrumbs items={items} separatorType="arrow" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} separatorType="arrow" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Chevron Separator
         </Typography>
-        <Breadcrumbs items={items} separatorType="chevron" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} separatorType="chevron" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Slash Separator
         </Typography>
-        <Breadcrumbs items={items} separatorType="slash" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} separatorType="slash" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Dot Separator
         </Typography>
-        <Breadcrumbs items={items} separatorType="dot" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} separatorType="dot" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Pipe Separator
         </Typography>
-        <Breadcrumbs items={items} separatorType="pipe" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} separatorType="pipe" />
       </Box>
     </Stack>
   ),
@@ -260,19 +262,19 @@ export const AllSizes: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Small Size
         </Typography>
-        <Breadcrumbs items={items} size="sm" variant="glass" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} size="sm" variant="glass" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Medium Size (Default)
         </Typography>
-        <Breadcrumbs items={items} size="md" variant="glass" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} size="md" variant="glass" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Large Size
         </Typography>
-        <Breadcrumbs items={items} size="lg" variant="glass" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} size="lg" variant="glass" />
       </Box>
     </Stack>
   ),
@@ -289,19 +291,19 @@ export const ColorVariations: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Default Color
         </Typography>
-        <Breadcrumbs items={items} color="default" variant="elevated" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} color="default" variant="elevated" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Primary Color
         </Typography>
-        <Breadcrumbs items={items} color="primary" variant="elevated" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} color="primary" variant="elevated" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Secondary Color
         </Typography>
-        <Breadcrumbs items={items} color="secondary" variant="elevated" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} color="secondary" variant="elevated" />
       </Box>
     </Stack>
   ),
@@ -332,7 +334,7 @@ export const Interactive: Story = {
 
       return (
         <Stack spacing={3}>
-          <Breadcrumbs items={mappedItems} variant="glass" separatorType="chevron" showHomeIcon />
+          <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={mappedItems} variant="glass" separatorType="chevron" showHomeIcon />
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Button
               size="small"
@@ -471,7 +473,7 @@ export const AllVariants: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Default Variant
         </Typography>
-        <Breadcrumbs items={items} variant="default" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} variant="default" />
       </Paper>
 
       <Paper
@@ -483,21 +485,21 @@ export const AllVariants: Story = {
         <Typography variant="subtitle2" gutterBottom sx={{ color: 'white' }}>
           Glass Morphism Variant
         </Typography>
-        <Breadcrumbs items={itemsWithIcons} variant="glass" elevation={2} />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={itemsWithIcons} variant="glass" elevation={2} />
       </Paper>
 
       <Paper sx={{ p: 2 }}>
         <Typography variant="subtitle2" gutterBottom>
           Elevated Variant
         </Typography>
-        <Breadcrumbs items={items} variant="elevated" elevation={3} />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} variant="elevated" elevation={3} />
       </Paper>
 
       <Paper sx={{ p: 2 }}>
         <Typography variant="subtitle2" gutterBottom>
           Outlined Variant
         </Typography>
-        <Breadcrumbs items={items} variant="outlined" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} variant="outlined" />
       </Paper>
     </Stack>
   ),
@@ -514,13 +516,13 @@ export const AllStates: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Default State
         </Typography>
-        <Breadcrumbs items={items} variant="glass" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} variant="glass" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Hover State (simulate)
         </Typography>
-        <Breadcrumbs
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY}
           items={items.map((item) => ({
             ...item,
             sx: { '&:hover': { backgroundColor: 'action.hover' } },
@@ -532,7 +534,7 @@ export const AllStates: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Focus State
         </Typography>
-        <Breadcrumbs
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY}
           items={items}
           variant="elevated"
           sx={{
@@ -544,7 +546,7 @@ export const AllStates: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Collapsed State
         </Typography>
-        <Breadcrumbs
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY}
           items={[
             { label: 'Home', href: '#' },
             { label: 'Products', href: '#' },
@@ -608,7 +610,7 @@ export const InteractiveStates: Story = {
           <Typography variant="body2" color="text.secondary">
             Hover, focus, and click on breadcrumb items to see interactive states
           </Typography>
-          <Breadcrumbs
+          <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY}
             items={interactiveItems}
             variant="glass"
             separatorType="chevron"

@@ -17,6 +17,7 @@ import React from 'react';
 
 import { highlightLabel, type MatchMode } from './Autocomplete.helpers';
 import type { SuggestionItemState, SuggestionType } from './Autocomplete.types';
+import type { AutocompleteCopy } from '../../../copy';
 
 const StyledPopper = styled(Popper)(({ theme }) => ({
   zIndex: theme.zIndex.tooltip,
@@ -213,13 +214,13 @@ export function DefaultSuggestion<T>({
 }
 
 /** A "Loading…" row shown while async suggestions resolve. */
-export function LoadingRow(): React.JSX.Element {
+export function LoadingRow({ label }: { label: string }): React.JSX.Element {
   return (
     <ListItem>
       <Box display="flex" alignItems="center" gap={1}>
         <CircularProgress size={16} />
         <Typography variant="body2" color="text.secondary">
-          Loading...
+          {label}
         </Typography>
       </Box>
     </ListItem>
@@ -227,11 +228,11 @@ export function LoadingRow(): React.JSX.Element {
 }
 
 /** The empty "No results found" row. */
-export function NoResultsRow(): React.JSX.Element {
+export function NoResultsRow({ label }: { label: string }): React.JSX.Element {
   return (
     <ListItem>
       <Typography variant="body2" color="text.secondary">
-        No results found
+        {label}
       </Typography>
     </ListItem>
   );
@@ -251,6 +252,7 @@ const SAME_WIDTH_MODIFIER = {
 };
 
 export interface SuggestionListBoxProps<T> {
+  copy: AutocompleteCopy;
   open: boolean;
   anchorEl: HTMLElement | null;
   portal: boolean | { container?: HTMLElement };
@@ -272,6 +274,7 @@ export interface SuggestionListBoxProps<T> {
 
 /** The suggestions dropdown: a same-width Popper with the option list + loading/empty rows. */
 export function SuggestionListBox<T>({
+  copy,
   open,
   anchorEl,
   portal,
@@ -328,8 +331,8 @@ export function SuggestionListBox<T>({
               {renderItem(item, index === activeIndex)}
             </ListItem>
           ))}
-          {isLoading && <LoadingRow />}
-          {showNoResults && <NoResultsRow />}
+          {isLoading && <LoadingRow label={copy.loading} />}
+          {showNoResults && <NoResultsRow label={copy.noResults} />}
         </List>
       </Paper>
     </StyledPopper>

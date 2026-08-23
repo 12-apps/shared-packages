@@ -76,6 +76,7 @@ const VIEWS: Record<string, FC<TimingViewProps>> = {
 
 // Main component
 export const TimingDiagram: FC<TimingDiagramProps> = ({
+  copy,
   data,
   showLabels = true,
   height = 40,
@@ -88,9 +89,9 @@ export const TimingDiagram: FC<TimingDiagramProps> = ({
   const View = VIEWS[variant];
 
   return (
-    <DiagramContainer elevation={2} role="region" aria-label="Timing diagram" tabIndex={0}>
+    <DiagramContainer elevation={2} role="region" aria-label={copy.regionLabel} tabIndex={0}>
       <Typography variant="h6" fontWeight="bold" gutterBottom>
-        Request Timing
+        {copy.heading}
       </Typography>
 
       {View && (

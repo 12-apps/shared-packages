@@ -57,9 +57,9 @@ function renderInSheets(depth: number): void {
   );
   render(
     <StackedModalProvider>
-      <StackedModal open onClose={() => undefined} modalId="outer" dataTestId="outer-sheet">
+      <StackedModal backLabel="Voltar" open onClose={() => undefined} modalId="outer" dataTestId="outer-sheet">
         {depth > 1 ? (
-          <StackedModal open onClose={() => undefined} modalId="inner" dataTestId="inner-sheet">
+          <StackedModal backLabel="Voltar" open onClose={() => undefined} modalId="inner" dataTestId="inner-sheet">
             {panel}
           </StackedModal>
         ) : (

@@ -202,7 +202,16 @@ const TutorialTooltip: React.FC<{
   showProgress: boolean;
   animated: boolean;
   requiresActionBeforeNext: boolean;
-}> = ({ tutorial, steps, allowSkip, showProgress, animated, requiresActionBeforeNext }) => (
+  copy: TutorialOverlayProps['copy'];
+}> = ({
+  tutorial,
+  steps,
+  allowSkip,
+  showProgress,
+  animated,
+  requiresActionBeforeNext,
+  copy,
+}) => (
         <Fade in={tutorial.isVisible} timeout={300}>
           <TooltipContainer
             ref={tutorial.tooltipRef}
@@ -218,6 +227,7 @@ const TutorialTooltip: React.FC<{
             data-testid={`tutorial-step-${tutorial.currentStep}`}
           >
             <TutorialStepBody
+              copy={copy}
               step={tutorial.currentStepData}
               currentStep={tutorial.currentStep}
               stepCount={steps.length}
@@ -237,6 +247,7 @@ const TutorialTooltip: React.FC<{
 
 export const TutorialOverlay: FC<TutorialOverlayProps> = (componentProps) => {
   const {
+    copy,
     steps,
     onComplete,
     onSkip,
@@ -280,6 +291,7 @@ export const TutorialOverlay: FC<TutorialOverlayProps> = (componentProps) => {
         />
 
         <TutorialTooltip
+          copy={copy}
           tutorial={{ ...tutorial, currentStepData }}
           steps={steps}
           allowSkip={allowSkip}

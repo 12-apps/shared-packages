@@ -11,6 +11,7 @@ import { Menubar } from './Menubar';
 import type { MenubarItem } from './Menubar.types';
 
 const meta: Meta<typeof Menubar> = {
+  args: { ariaLabel: 'Navegação principal' },
   title: 'Navigation/Menubar/Tests',
   component: Menubar,
   parameters: {
@@ -330,7 +331,7 @@ export const ThemeVariations: Story = {
           <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
             Variant: {variant}
           </Typography>
-          <Menubar
+          <Menubar ariaLabel="Navegação principal"
             items={basicMenuItems}
             variant={variant}
             color="primary"
@@ -378,7 +379,7 @@ export const VisualStates: Story = {
       <Typography variant="h6" gutterBottom>
         Loading State
       </Typography>
-      <Menubar
+      <Menubar ariaLabel="Navegação principal"
         items={[]}
         loading
         logo={<Logo />}
@@ -391,7 +392,7 @@ export const VisualStates: Story = {
       <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
         Disabled State
       </Typography>
-      <Menubar
+      <Menubar ariaLabel="Navegação principal"
         items={basicMenuItems}
         disabled
         logo={<Logo />}
@@ -405,7 +406,7 @@ export const VisualStates: Story = {
         Glass Effect
       </Typography>
       <Box sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', p: 2 }}>
-        <Menubar
+        <Menubar ariaLabel="Navegação principal"
           items={basicMenuItems}
           variant="glass"
           glass
@@ -496,12 +497,12 @@ export const EdgeCases: Story = {
       <Typography variant="h6" gutterBottom>
         Empty Menu
       </Typography>
-      <Menubar items={[]} logo={<Logo />} />
+      <Menubar ariaLabel="Navegação principal" items={[]} logo={<Logo />} />
 
       <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
         Mixed Item Types
       </Typography>
-      <Menubar
+      <Menubar ariaLabel="Navegação principal"
         items={[
           { id: 'normal', label: 'Normal Item', action: fn() },
           { id: 'sep1', divider: true, label: '', action: fn() },
@@ -533,7 +534,7 @@ export const Integration: Story = {
   name: '🧪 Integration Test',
   render: () => (
     <Box>
-      <Menubar
+      <Menubar ariaLabel="Navegação principal"
         items={[
           {
             id: 'actions',

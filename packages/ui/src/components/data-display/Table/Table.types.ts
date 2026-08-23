@@ -63,6 +63,11 @@ export type TableStripeColor = ColorValue;
 
 export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   /**
+   * What an empty result reads as. REQUIRED — the fallback was the English
+   * "No data available", on the package every host renders.
+   */
+  emptyText: string;
+  /**
    * The variant of the table
    */
   variant?: 'default' | 'striped' | 'glass' | 'minimal' | 'gradient';

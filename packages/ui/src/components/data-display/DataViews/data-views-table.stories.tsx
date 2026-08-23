@@ -17,6 +17,7 @@ import { DataViewsTableBase } from "./DataViewsTableBase";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
+import { PT_BR_BREADCRUMB_COPY } from "../../../pt-BR";
 import type {
   DataViewCardSelection,
   DataViewColumn,
@@ -353,7 +354,7 @@ function PedidosHeader(): React.JSX.Element {
   return (
     <Box>
       <Box sx={{ px: 3, pt: 2 }}>
-        <Breadcrumbs items={[{ label: "Início", href: "#" }, { label: "Pedidos" }]} />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={[{ label: "Início", href: "#" }, { label: "Pedidos" }]} />
       </Box>
       <Box
         sx={{

@@ -21,6 +21,7 @@ import { useCommandPalette } from './CommandPalette.hooks';
 import { PaletteResults } from './CommandPaletteResults';
 import { ShortcutChip } from './ShortcutChip';
 import type { CommandPaletteProps } from './CommandPalette.types';
+import type { CommandPaletteCopy } from '../../../copy';
 
 // Styled components
 const StyledDialog = styled(Dialog)(() => ({
@@ -98,7 +99,10 @@ const PaletteSearch: React.FC<{
   </SearchContainer>
 );
 
-const PaletteFooter: React.FC<{ commandCount: number }> = ({ commandCount }) => {
+const PaletteFooter: React.FC<{ commandCount: number; copy: CommandPaletteCopy }> = ({
+  commandCount,
+  copy,
+}) => {
   const theme = useTheme();
 
   return (
@@ -112,9 +116,13 @@ const PaletteFooter: React.FC<{ commandCount: number }> = ({ commandCount }) => 
         background: alpha(theme.palette.background.default, 0.4) }}
     >
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <ShortcutChip icon={<EnterIcon sx={{ fontSize: 12 }} />} label="Execute" size="small" />
-        <ShortcutChip label="↑↓ Navigate" size="small" />
-        <ShortcutChip label="ESC Close" size="small" />
+        <ShortcutChip
+          icon={<EnterIcon sx={{ fontSize: 12 }} />}
+          label={copy.execute}
+          size="small"
+        />
+        <ShortcutChip label={copy.navigate} size="small" />
+        <ShortcutChip label={copy.close} size="small" />
       </Box>
       <Typography variant="caption" color="text.secondary">
         {commandCount} commands
@@ -124,6 +132,7 @@ const PaletteFooter: React.FC<{ commandCount: number }> = ({ commandCount }) => 
 };
 
 export const CommandPalette: FC<CommandPaletteProps> = ({
+  copy,
   open,
   onClose,
   commands,
@@ -177,6 +186,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
           />
 
           <PaletteResults
+          copy={copy}
             listRef={listRef}
             dataTestId={dataTestId}
             searchQuery={searchQuery}
@@ -190,7 +200,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
             onExecute={executeCommand}
           />
 
-          <PaletteFooter commandCount={filteredCommands.length} />
+          <PaletteFooter copy={copy} commandCount={filteredCommands.length} />
         </PaletteContainer>
       </DialogContent>
     </StyledDialog>

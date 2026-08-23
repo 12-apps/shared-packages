@@ -105,8 +105,9 @@ const buildTabsSx = ({
 // A tab's label: icon, text, optional close affordance, optionally badged.
 const TabLabel: React.FC<{
   item: TabItem;
+  closeTabLabel: string;
   onClose: (event: React.MouseEvent | React.KeyboardEvent, tabId: string) => void;
-}> = ({ item, onClose }) => {
+}> = ({ item, closeTabLabel, onClose }) => {
   const content = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {item.icon}
@@ -116,7 +117,7 @@ const TabLabel: React.FC<{
           onClick={(e) => onClose(e, item.id)}
           role="button"
           tabIndex={0}
-          aria-label="Close tab"
+          aria-label={closeTabLabel}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             onClose(e, item.id);
@@ -176,7 +177,7 @@ const TabsBar: React.FC<
       <MuiTab
         key={item.id}
         value={item.id}
-        label={<TabLabel item={item} onClose={onCloseTab} />}
+        label={<TabLabel closeTabLabel={p.closeTabLabel} item={item} onClose={onCloseTab} />}
         disabled={item.disabled || p.disabled}
         className={item.className}
         id={`tab-${item.id}`}
@@ -224,6 +225,10 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
   (tabsProps, ref) => {
     const resolved = { ...TABS_DEFAULTS, ...definedProps(tabsProps) } as TabsProps;
     const {
+      // Destructured only to keep it OUT of `rest`, which is spread onto the
+      // DOM node — `{...resolved}` below is what actually carries it to
+      // `TabsBar`. Same reason as `value` on the next line.
+      closeTabLabel: _closeTabLabel,
       value: _value,
       onChange,
       onTabClose,

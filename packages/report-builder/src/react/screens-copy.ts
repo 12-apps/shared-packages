@@ -18,6 +18,8 @@
  * deciding word order on their behalf.
  */
 
+import type { BreadcrumbCopy } from "@12-apps/ui/copy";
+
 /** The relative age a card's footer opens with. */
 export interface ReportRelativeTimeCopy {
   /** Under a minute old. */
@@ -292,6 +294,12 @@ export interface ReportBuilderPanelCopy {
   /** The period control, and the trail above it. */
   period: string;
   breadcrumbAria: string;
+  /**
+   * The trail's own collapse control, which the design system stopped naming
+   * for us. `breadcrumbAria` names the NAV; these name the ellipsis button
+   * that stands in for the levels it hid.
+   */
+  breadcrumb: BreadcrumbCopy;
   /** The default period a report opens on, and its options. */
   defaultRange: string;
   defaultRanges: Readonly<Record<string, string>>;

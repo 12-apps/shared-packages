@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import type { InstallPromptCopy } from '../../../copy';
+
 /**
  * The Chromium-only event that makes a PWA installable from inside the page.
  * It is NOT in TypeScript's DOM lib because it is not a standard: Safari and
@@ -70,16 +72,16 @@ export interface PwaInstallState {
 }
 
 export interface InstallPromptProps {
-  /** Headline text. */
-  title?: string;
+  /**
+   * Every word this prompt renders. REQUIRED: this package ships no default
+   * copy, and the iOS half is a GESTURE instruction — a shopper who cannot
+   * read it cannot install the app at all.
+   */
+  copy: InstallPromptCopy;
   /** Supporting line under the title. */
   description?: string;
-  /** Label for the install button (Chromium only). */
-  installLabel?: string;
-  /** Replaces the built-in iOS Share → Add to Home Screen wording. */
+  /** Replaces the built-in iOS Share → Add to Home Screen wording outright. */
   iosInstructions?: ReactNode;
-  /** Accessible label for the dismiss button. */
-  dismissLabel?: string;
   /** Leading icon. Defaults to an install glyph. */
   icon?: ReactNode;
   /** Called with the outcome after the native prompt resolves. */

@@ -7,8 +7,10 @@ import React from 'react';
 
 import { AddressAutocomplete } from './AddressAutocomplete';
 import type { AddressDetails } from './AddressAutocomplete.types';
+import { PT_BR_ADDRESS_AUTOCOMPLETE_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof AddressAutocomplete> = {
+  args: { copy: PT_BR_ADDRESS_AUTOCOMPLETE_COPY },
   title: 'Form/AddressAutocomplete',
   component: AddressAutocomplete,
   parameters: {
@@ -103,7 +105,7 @@ export const GlassVariant: Story = {
         borderRadius: 2,
       }}
     >
-      <AddressAutocomplete {...args} />
+      <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY} {...args} />
     </Box>
   ),
 };
@@ -136,7 +138,7 @@ const MultipleAddressInputsComponent = () => {
             <Home sx={{ mr: 1, verticalAlign: 'middle' }} />
             Home Address
           </Typography>
-          <AddressAutocomplete
+          <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
             variant="outlined"
             label="Home Address"
             placeholder="Enter your home address"
@@ -161,7 +163,7 @@ const MultipleAddressInputsComponent = () => {
             <Business sx={{ mr: 1, verticalAlign: 'middle' }} />
             Work Address
           </Typography>
-          <AddressAutocomplete
+          <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
             variant="outlined"
             label="Work Address"
             placeholder="Enter your work address"
@@ -185,7 +187,7 @@ const MultipleAddressInputsComponent = () => {
             <LocalShipping sx={{ mr: 1, verticalAlign: 'middle' }} />
             Shipping Address
           </Typography>
-          <AddressAutocomplete
+          <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
             variant="filled"
             label="Shipping Address"
             placeholder="Where should we deliver?"
@@ -232,7 +234,7 @@ const WithValidationComponent = () => {
   return (
     <Stack spacing={3} sx={{ maxWidth: 500 }}>
       <Typography variant="h6">Address Validation Example</Typography>
-      <AddressAutocomplete
+      <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
         variant="outlined"
         label="Delivery Address"
         placeholder="Enter a valid address"
@@ -325,21 +327,21 @@ export const DisabledState: Story = {
 export const CustomIcons: Story = {
   render: () => (
     <Stack spacing={3}>
-      <AddressAutocomplete
+      <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
         variant="outlined"
         label="Home"
         icon={<Home />}
         googleMapsApiKey="demo-key"
         onSelect={handleAddressSelect}
       />
-      <AddressAutocomplete
+      <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
         variant="outlined"
         label="Office"
         icon={<Business />}
         googleMapsApiKey="demo-key"
         onSelect={handleAddressSelect}
       />
-      <AddressAutocomplete
+      <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
         variant="outlined"
         label="Delivery"
         icon={<LocalShipping />}
@@ -369,7 +371,7 @@ export const AllVariants: Story = {
             borderRadius: 2,
           }}
         >
-          <AddressAutocomplete
+          <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
             variant="glass"
             label="Glass Address"
             placeholder="Enter address..."
@@ -383,7 +385,7 @@ export const AllVariants: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Outlined Variant
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Outlined Address"
           placeholder="Enter address..."
@@ -396,7 +398,7 @@ export const AllVariants: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Filled Variant
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="filled"
           label="Filled Address"
           placeholder="Enter address..."
@@ -419,7 +421,7 @@ export const AllSizes: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Default Width
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Default Width"
           placeholder="Enter address..."
@@ -432,7 +434,7 @@ export const AllSizes: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Full Width
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Full Width Address"
           placeholder="Enter address..."
@@ -446,7 +448,7 @@ export const AllSizes: Story = {
         <Typography variant="subtitle2" gutterBottom>
           With Floating Label
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Floating Label"
           placeholder="Enter address..."
@@ -460,7 +462,7 @@ export const AllSizes: Story = {
         <Typography variant="subtitle2" gutterBottom>
           With Icon
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Address with Icon"
           placeholder="Enter address..."
@@ -484,7 +486,7 @@ export const AllStates: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Default State
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Default"
           placeholder="Enter address..."
@@ -497,7 +499,7 @@ export const AllStates: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Error State
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Error"
           placeholder="Enter address..."
@@ -512,7 +514,7 @@ export const AllStates: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Disabled State
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Disabled"
           placeholder="Enter address..."
@@ -527,7 +529,7 @@ export const AllStates: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Required State
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Required"
           placeholder="Enter address..."
@@ -542,7 +544,7 @@ export const AllStates: Story = {
         <Typography variant="subtitle2" gutterBottom>
           With Current Location
         </Typography>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="With Location"
           placeholder="Enter address or use current location..."
@@ -578,7 +580,7 @@ const InteractiveStatesComponent = () => {
           <Typography variant="subtitle2" gutterBottom>
             {state.label} {hoveredIndex === index && '(Hovered)'}
           </Typography>
-          <AddressAutocomplete
+          <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
             variant={state.variant}
             label={state.label}
             placeholder="Interact with this field..."
@@ -626,7 +628,7 @@ export const Responsive: Story = {
       </Alert>
 
       <Box sx={{ width: '100%' }}>
-        <AddressAutocomplete
+        <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
           variant="outlined"
           label="Responsive Address"
           placeholder="Enter your address..."
@@ -640,7 +642,7 @@ export const Responsive: Story = {
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Box sx={{ flex: '1 1 300px' }}>
-          <AddressAutocomplete
+          <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
             variant="outlined"
             label="Home Address"
             icon={<Home />}
@@ -650,7 +652,7 @@ export const Responsive: Story = {
           />
         </Box>
         <Box sx={{ flex: '1 1 300px' }}>
-          <AddressAutocomplete
+          <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY}
             variant="outlined"
             label="Work Address"
             icon={<Business />}

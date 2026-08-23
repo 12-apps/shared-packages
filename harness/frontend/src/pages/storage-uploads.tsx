@@ -37,6 +37,9 @@ const { ImageField, limits } = createWebStorage({
   messages: PT_BR_WEB_STORAGE_MESSAGES,
 });
 
+// The pack this page mounts with, resolved once for the ceiling above.
+const FIELD_COPY = PT_BR_WEB_STORAGE_MESSAGES({ limit: limits.maxBytesLabel });
+
 export function StorageUploadsPage(): JSX.Element {
   const [imageKey, setImageKey] = useState<string | null>(null);
   return (
@@ -47,6 +50,11 @@ export function StorageUploadsPage(): JSX.Element {
         value={imageKey}
         onChange={setImageKey}
         label="Foto do produto"
+        // The two the field itself renders, and the dropzone's own table.
+        // Read off the pack rather than restated: this page is an ADOPTER, and
+        // an adopter that spells its own words proves nothing about the wire.
+        removeLabel={FIELD_COPY.fieldRemove}
+        uploadCopy={FIELD_COPY.field}
         helperText="A imagem é reduzida no navegador antes do envio."
       />
       {/*

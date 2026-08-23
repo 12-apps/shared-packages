@@ -10,8 +10,10 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Breadcrumbs } from './Breadcrumbs';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
+import { PT_BR_BREADCRUMB_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Breadcrumbs> = {
+  args: { copy: PT_BR_BREADCRUMB_COPY },
   title: 'Navigation/Breadcrumbs/Tests',
   component: Breadcrumbs,
   parameters: {
@@ -870,19 +872,19 @@ export const VariantComparison: Story = {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '20px' }}>
       <div>
         <h4>Default Variant</h4>
-        <Breadcrumbs items={basicItems} variant="default" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} variant="default" />
       </div>
       <div>
         <h4>Glass Variant</h4>
-        <Breadcrumbs items={basicItems} variant="glass" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} variant="glass" />
       </div>
       <div>
         <h4>Elevated Variant</h4>
-        <Breadcrumbs items={basicItems} variant="elevated" elevation={3} />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} variant="elevated" elevation={3} />
       </div>
       <div>
         <h4>Outlined Variant</h4>
-        <Breadcrumbs items={basicItems} variant="outlined" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} variant="outlined" />
       </div>
     </div>
   ),
@@ -920,7 +922,7 @@ export const SeparatorTypesTest: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {(['default', 'arrow', 'chevron', 'slash', 'dot', 'pipe'] as const).map((separator) => (
-        <Breadcrumbs
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY}
           key={separator}
           items={basicItems}
           separatorType={separator}
@@ -953,9 +955,9 @@ export const ColorSchemeTest: Story = {
   name: '🎨 Color Scheme Test',
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <Breadcrumbs items={basicItems} color="default" variant="elevated" />
-      <Breadcrumbs items={basicItems} color="primary" variant="elevated" />
-      <Breadcrumbs items={basicItems} color="secondary" variant="elevated" />
+      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} color="default" variant="elevated" />
+      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} color="primary" variant="elevated" />
+      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} color="secondary" variant="elevated" />
     </div>
   ),
   play: async ({ canvasElement, step }) => {
@@ -982,9 +984,9 @@ export const SizeVariationTest: Story = {
     <div
       style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start' }}
     >
-      <Breadcrumbs items={basicItems} size="sm" />
-      <Breadcrumbs items={basicItems} size="md" />
-      <Breadcrumbs items={basicItems} size="lg" />
+      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} size="sm" />
+      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} size="md" />
+      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} size="lg" />
     </div>
   ),
   play: async ({ canvasElement, step }) => {

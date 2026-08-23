@@ -157,6 +157,7 @@ export function FreeUnitsBuilder({
           ids={slot.menuItemIds}
           onChange={(ids) => onChange([{ ...slot, menuItemIds: ids }])}
           copy={copy.categorySelect}
+          autocompleteCopy={copy.autocomplete}
           dataTestId="free-units-items"
         />
         {error !== undefined && (

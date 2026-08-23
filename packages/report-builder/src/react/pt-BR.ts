@@ -8,6 +8,7 @@
  * screen — what changes is that the words are chosen in a diff.
  */
 import type { ReportScreensCopy } from "./screens-copy";
+import { PT_BR_BREADCRUMB_COPY } from "@12-apps/ui/pt-BR";
 
 export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
   list: {
@@ -254,6 +255,7 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
     moved: (label, position, total) => `${label} movido para a posição ${position} de ${total}`,
     period: "Período",
     breadcrumbAria: "Trilha de navegação",
+    breadcrumb: PT_BR_BREADCRUMB_COPY,
     defaultRange: "Período padrão ao abrir",
     defaultRanges: {
       today: "Hoje",

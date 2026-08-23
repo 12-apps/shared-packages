@@ -56,6 +56,12 @@ export interface SearchPaletteProps<T> {
   onSubmitAll?: (query: string) => void;
   /** Footer label builder; defaults to `Todos os resultados para "{q}"`. */
   submitAllLabel: (query: string) => string;
+  /**
+   * The key legend beside the footer's return glyph. A key's printed name is
+   * not universal — an `ABNT2` keyboard says `Enter`, an `ISO` one may not —
+   * so the host names the key its own users are looking at.
+   */
+  submitKeyLabel: string;
 
   /**
    * Content shown when the query is empty (e.g. a "Populares" block). Keeps the

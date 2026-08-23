@@ -153,6 +153,7 @@ export const SonnerToast: React.FC<SonnerItem & { onDismiss: (id: string) => voi
   type = 'default',
   variant = 'default',
   closable = true,
+  dismissLabel,
   action,
   cancel,
   icon,
@@ -198,7 +199,7 @@ export const SonnerToast: React.FC<SonnerItem & { onDismiss: (id: string) => voi
           <IconButton
             size="small"
             onClick={handleDismiss}
-            aria-label="Dismiss notification"
+            aria-label={dismissLabel}
             sx={{
               ml: 'auto',
               color: 'text.secondary',

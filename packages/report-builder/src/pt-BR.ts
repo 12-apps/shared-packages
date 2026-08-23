@@ -89,6 +89,7 @@ export const PT_BR_REPORT_ENGINE_COPY: ReportEngineCopy = {
     qualified: (base, qualifier) => `${base} (${qualifier})`,
     othersBucket: 'Outros',
     emptySplit: '(sem valor)',
+    emptyTable: 'Nenhum dado para este período.',
   },
   presentation: {
     needsGrouping:

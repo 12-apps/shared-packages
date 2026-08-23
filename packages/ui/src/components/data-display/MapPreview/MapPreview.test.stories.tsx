@@ -4,8 +4,10 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { MapPreview } from './MapPreview';
 import type { HeatmapPoint,MapMarker } from './MapPreview.types';
+import { PT_BR_MAP_PREVIEW_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof MapPreview> = {
+  args: { copy: PT_BR_MAP_PREVIEW_COPY },
   title: 'Media/MapPreview/Tests',
   component: MapPreview,
   parameters: {
@@ -37,7 +39,7 @@ const testHeatmapData: HeatmapPoint[] = [{ lat: 37.7749, lng: -122.4194, weight:
 // 1. Basic Interaction Tests
 export const BasicInteraction: Story = {
   render: () => (
-    <MapPreview center={defaultCenter} interactive={true} showControls={true} zoom={15} />
+    <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} interactive={true} showControls={true} zoom={15} />
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -79,7 +81,7 @@ export const BasicInteraction: Story = {
 
 // 2. Marker Interaction Tests
 export const MarkerInteraction: Story = {
-  render: () => <MapPreview center={defaultCenter} markers={testMarkers} interactive={true} />,
+  render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} markers={testMarkers} interactive={true} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -112,7 +114,7 @@ export const MarkerInteraction: Story = {
 
 // 3. Keyboard Navigation Tests
 export const KeyboardNavigation: Story = {
-  render: () => <MapPreview center={defaultCenter} showControls={true} interactive={true} />,
+  render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} showControls={true} interactive={true} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -137,7 +139,7 @@ export const KeyboardNavigation: Story = {
 
 // 4. Screen Reader Tests
 export const ScreenReader: Story = {
-  render: () => <MapPreview center={defaultCenter} showControls={true} />,
+  render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} showControls={true} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -163,7 +165,7 @@ export const ScreenReader: Story = {
 
 // 5. Focus Management Tests
 export const FocusManagement: Story = {
-  render: () => <MapPreview center={defaultCenter} showControls={true} />,
+  render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} showControls={true} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -191,7 +193,7 @@ export const FocusManagement: Story = {
 
 // 6. Responsive Design Tests
 export const ResponsiveDesign: Story = {
-  render: () => <MapPreview center={defaultCenter} height="300px" showControls={true} />,
+  render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} height="300px" showControls={true} />,
   parameters: {
     viewport: {
       defaultViewport: 'mobile1',
@@ -219,7 +221,7 @@ export const ResponsiveDesign: Story = {
 
 // 7. Theme Variation Tests
 export const ThemeVariations: Story = {
-  render: () => <MapPreview center={defaultCenter} variant="glass" showControls={true} />,
+  render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} variant="glass" showControls={true} />,
   parameters: {
     backgrounds: { default: 'dark' },
   },
@@ -245,7 +247,7 @@ export const ThemeVariations: Story = {
 
 // 8. Visual State Tests
 export const VisualStates: Story = {
-  render: () => <MapPreview center={defaultCenter} mapType="satellite" showControls={true} />,
+  render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} mapType="satellite" showControls={true} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -269,7 +271,7 @@ export const VisualStates: Story = {
 // 9. Performance Tests
 export const Performance: Story = {
   render: () => (
-    <MapPreview
+    <MapPreview copy={PT_BR_MAP_PREVIEW_COPY}
       center={defaultCenter}
       // Spread deterministically around the centre. These were random offsets,
       // which meant the marker layout — and any snapshot of it — differed on
@@ -319,7 +321,7 @@ export const Performance: Story = {
 // 10. Edge Cases Tests
 export const EdgeCases: Story = {
   render: () => (
-    <MapPreview
+    <MapPreview copy={PT_BR_MAP_PREVIEW_COPY}
       center={{ lat: 90, lng: 180 }}
       zoom={20}
       height="100px"
@@ -350,7 +352,7 @@ export const EdgeCases: Story = {
 // 11. Integration Tests
 export const Integration: Story = {
   render: () => (
-    <MapPreview
+    <MapPreview copy={PT_BR_MAP_PREVIEW_COPY}
       center={defaultCenter}
       markers={testMarkers}
       showRoute={true}

@@ -127,6 +127,13 @@ export interface RenderLabelCopy {
    * and "no value" is a sentence rather than an absence.
    */
   emptySplit: string;
+  /**
+   * A rendering whose query came back with no rows at all — distinct from
+   * `emptySplit`, which names one missing VALUE inside a result that has rows.
+   * The design system stopped shipping an English default for it, so without
+   * this the table would render a blank body and say nothing about why.
+   */
+  emptyTable: string;
 }
 
 /**

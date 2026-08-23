@@ -20,6 +20,7 @@ import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-
 import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { DataViewExport } from "./data-views-export";
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { DataViewsEmpty } from "./data-views-empty";
 import { DataViewsPagination } from "./data-views-pagination";
 import type { BoardConfig } from "./DataViewsBoard";
@@ -286,6 +287,7 @@ function ShellStack<T extends Record<string, unknown>>({
   props: GridShellProps<T>;
   filters: ReturnType<typeof useGridShellFilters<T>>;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   const { c, testIdPrefix, dataTestId, scopes = [], emptyState, inlineFilters = false } = props;
   const { showInline, useModal, inlineVisible, filterProps, split, onControlOpenChange } = filters;
   // The grid renders the FILTERED empty state itself — it is the only party
@@ -299,7 +301,10 @@ function ShellStack<T extends Record<string, unknown>>({
     />
   );
   return (
-    <TableFilter open={c.filterOpen} onOpenChange={c.setFilterOpen} hasActiveFilters={c.activeFilterCount > 0}>
+    <TableFilter
+      copy={copy.tableFilter} open={c.filterOpen} onOpenChange={c.setFilterOpen}
+      hasActiveFilters={c.activeFilterCount > 0}
+    >
       <Stack spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined}>
         <GridHeaderRow title={props.title} headerActions={props.headerActions} testIdPrefix={testIdPrefix} />
         <ShellToolbar
@@ -311,9 +316,7 @@ function ShellStack<T extends Record<string, unknown>>({
           filterControls={
             inlineVisible ? (
               <InlineFilterControls
-                {...filterProps}
-                split={split}
-                activeFilterCount={c.activeFilterCount}
+                {...filterProps} split={split} activeFilterCount={c.activeFilterCount}
                 onControlOpenChange={onControlOpenChange}
               />
             ) : undefined
@@ -328,12 +331,8 @@ function ShellStack<T extends Record<string, unknown>>({
           showInline={showInline}
         />
         <ScopeTabsSlot
-          scopes={scopes}
-          scopeFieldId={props.scopeFieldId}
-          board={props.board}
-          value={c.scope}
-          onChange={c.setScope}
-          counts={c.scopeCounts}
+          scopes={scopes} scopeFieldId={props.scopeFieldId} board={props.board}
+          value={c.scope} onChange={c.setScope} counts={c.scopeCounts}
           testIdPrefix={testIdPrefix}
         />
         <TableFilter.Layout>

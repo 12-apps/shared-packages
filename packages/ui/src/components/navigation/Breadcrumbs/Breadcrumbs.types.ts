@@ -1,6 +1,7 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { BreadcrumbsProps as MuiBreadcrumbsProps } from '@mui/material';
 import type { ReactNode } from 'react';
+import type { BreadcrumbCopy } from '../../../copy';
 
 export interface BreadcrumbItem {
   /**
@@ -57,6 +58,8 @@ export interface BreadcrumbItem {
 }
 
 export interface BreadcrumbsProps extends Omit<MuiBreadcrumbsProps, 'separator'> {
+  /** The overflow control's tooltip, in its two spellings. REQUIRED. */
+  copy: BreadcrumbCopy;
   /**
    * The visual variant of the breadcrumbs container
    * - default: No special styling

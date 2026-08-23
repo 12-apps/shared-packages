@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { PT_BR_USER_AVATAR_COPY } from "../pt-BR";
 import { UserAvatar, UserMenu } from "../user-avatar";
 
 describe("UserAvatar", () => {
@@ -127,14 +128,14 @@ describe("UserMenu", () => {
   };
 
   it("should render user name and email", () => {
-    render(<UserMenu user={mockUser} onSignOut={vi.fn()} />);
+    render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={mockUser} onSignOut={vi.fn()} />);
 
     expect(screen.getByText("John Doe")).toBeInTheDocument();
     expect(screen.getByText("john@example.com")).toBeInTheDocument();
   });
 
   it("should render user avatar with image", () => {
-    const { container } = render(<UserMenu user={mockUser} onSignOut={vi.fn()} />);
+    const { container } = render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={mockUser} onSignOut={vi.fn()} />);
 
     // Avatar uses Fade animation, so query directly
     const img = container.querySelector('img.MuiAvatar-img');
@@ -142,16 +143,16 @@ describe("UserMenu", () => {
   });
 
   it("should render sign out button", () => {
-    render(<UserMenu user={mockUser} onSignOut={vi.fn()} />);
+    render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={mockUser} onSignOut={vi.fn()} />);
 
-    expect(screen.getByText("Sign out")).toBeInTheDocument();
+    expect(screen.getByText(PT_BR_USER_AVATAR_COPY.signOut)).toBeInTheDocument();
   });
 
   it("should call onSignOut when sign out button is clicked", () => {
     const handleSignOut = vi.fn();
-    render(<UserMenu user={mockUser} onSignOut={handleSignOut} />);
+    render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={mockUser} onSignOut={handleSignOut} />);
 
-    const signOutButton = screen.getByText("Sign out");
+    const signOutButton = screen.getByText(PT_BR_USER_AVATAR_COPY.signOut);
     fireEvent.click(signOutButton);
 
     expect(handleSignOut).toHaveBeenCalledTimes(1);
@@ -163,7 +164,7 @@ describe("UserMenu", () => {
       name: null,
     };
 
-    render(<UserMenu user={userWithoutName} onSignOut={vi.fn()} />);
+    render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={userWithoutName} onSignOut={vi.fn()} />);
 
     expect(screen.getByText("User")).toBeInTheDocument();
   });
@@ -175,7 +176,7 @@ describe("UserMenu", () => {
       image: null,
     };
 
-    render(<UserMenu user={userWithoutImage} onSignOut={vi.fn()} />);
+    render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={userWithoutImage} onSignOut={vi.fn()} />);
 
     expect(screen.getByText("JD")).toBeInTheDocument();
   });
@@ -187,7 +188,7 @@ describe("UserMenu", () => {
       image: null,
     };
 
-    render(<UserMenu user={emptyUser} onSignOut={vi.fn()} />);
+    render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={emptyUser} onSignOut={vi.fn()} />);
 
     expect(screen.getByText("User")).toBeInTheDocument();
     expect(screen.getByText("?")).toBeInTheDocument();

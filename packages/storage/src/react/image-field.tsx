@@ -5,6 +5,7 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 import { Button } from '@12-apps/ui/form/Button';
+import type { UploadButtonCopy } from '@12-apps/ui/copy';
 import { UploadButton } from '@12-apps/ui/form/UploadButton';
 
 import { ACCEPTED_CONTENT_TYPES } from '../content-types';
@@ -38,6 +39,13 @@ export interface ImageFieldProps {
   label: string;
   /** The button that clears a chosen image. REQUIRED, for the same reason. */
   removeLabel: string;
+  /**
+   * What the dropzone itself says — the hint under the label, its accessible
+   * name, and the three announcements only a screen reader receives. REQUIRED:
+   * `@12-apps/ui` ships no default copy, so without this the dropzone has no
+   * name and a silent progress bar.
+   */
+  uploadCopy: UploadButtonCopy;
   helperText?: string;
   /** Passed through per upload — `{ optimize: false }` for a rendered canvas. */
   uploadOptions?: UploadOptions;
@@ -92,6 +100,9 @@ export function ImageField(props: BoundImageFieldProps): JSX.Element {
       ) : null}
       <UploadButton
         variant="dropzone"
+        copy={props.uploadCopy}
+        // The field's own label wins over `uploadCopy.buttonLabel`: a form
+        // already names this field, and naming it twice is how the two drift.
         label={props.label}
         accept={ACCEPT}
         disabled={props.disabled || uploader.uploading}

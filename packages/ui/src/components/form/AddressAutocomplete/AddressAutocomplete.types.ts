@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import type { AddressAutocompleteCopy } from '../../../copy';
 import type { MockPrediction } from './mockPlaces';
 
 /// <reference types="@types/google.maps" />
@@ -27,6 +28,12 @@ export interface AddressDetails {
 }
 
 export interface AddressAutocompleteProps {
+  /**
+   * The field's own three sentences. REQUIRED: this package ships no default
+   * copy, and two of the three are read while the field is unusable because
+   * Google Maps never arrived — the worst moment to speak the wrong language.
+   */
+  copy: AddressAutocompleteCopy;
   variant?: 'glass' | 'outlined' | 'filled';
   label?: string;
   placeholder?: string;

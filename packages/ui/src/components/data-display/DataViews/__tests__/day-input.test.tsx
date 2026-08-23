@@ -20,7 +20,7 @@ function typeSequentially(element: HTMLInputElement, text: string): void {
 
 function renderInput(value?: string) {
   const onChange = vi.fn();
-  render(<DayBoundInput label="De" value={value} onChange={onChange} testId="day" />);
+  render(<DayBoundInput mask="dd/mm/aaaa" label="De" value={value} onChange={onChange} testId="day" />);
   return { onChange, input: screen.getByTestId("day") as HTMLInputElement };
 }
 
@@ -154,10 +154,10 @@ describe("DayBoundInput", () => {
   it("re-syncs when the bound is cleared from outside (a Limpar, a saved view)", () => {
     const onChange = vi.fn();
     const { rerender } = render(
-      <DayBoundInput label="De" value="2026-08-06" onChange={onChange} testId="day" />,
+      <DayBoundInput mask="dd/mm/aaaa" label="De" value="2026-08-06" onChange={onChange} testId="day" />,
     );
     expect(screen.getByTestId("day")).toHaveValue("06/08/2026");
-    rerender(<DayBoundInput label="De" value={undefined} onChange={onChange} testId="day" />);
+    rerender(<DayBoundInput mask="dd/mm/aaaa" label="De" value={undefined} onChange={onChange} testId="day" />);
     expect(screen.getByTestId("day")).toHaveValue("");
   });
 
@@ -167,11 +167,11 @@ describe("DayBoundInput", () => {
     // receiving it back must leave the text exactly as typed.
     const onChange = vi.fn();
     const { rerender } = render(
-      <DayBoundInput label="De" value={undefined} onChange={onChange} testId="day" />,
+      <DayBoundInput mask="dd/mm/aaaa" label="De" value={undefined} onChange={onChange} testId="day" />,
     );
     const input = screen.getByTestId("day") as HTMLInputElement;
     typeSequentially(input, "06082026");
-    rerender(<DayBoundInput label="De" value="2026-08-06" onChange={onChange} testId="day" />);
+    rerender(<DayBoundInput mask="dd/mm/aaaa" label="De" value="2026-08-06" onChange={onChange} testId="day" />);
     await waitFor(() => expect(screen.getByTestId("day")).toHaveValue("06/08/2026"));
   });
 });

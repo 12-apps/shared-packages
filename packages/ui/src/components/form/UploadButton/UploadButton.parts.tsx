@@ -4,10 +4,12 @@ import { Box, Button, LinearProgress, Typography, useTheme } from '@mui/material
 import type React from 'react';
 
 import type { DragHandlers } from './UploadButton.hooks';
+import type { UploadButtonCopy } from '../../../copy';
 import type { UploadButtonProps } from './UploadButton.types';
 
 /** Shared shape for the two trigger variants. */
 export interface TriggerProps {
+  copy: UploadButtonCopy;
   label: string;
   icon?: React.ReactNode;
   disabled: boolean;
@@ -19,6 +21,7 @@ export interface TriggerProps {
 
 /** The drag-and-drop surface. */
 export function UploadDropzone({
+  copy,
   label,
   icon,
   disabled,
@@ -61,7 +64,7 @@ export function UploadDropzone({
         onOpen();
       }}
       aria-describedby={describedBy}
-      aria-label={`Upload file dropzone. ${label}`}
+      aria-label={copy.dropzoneRole(label)}
     >
       <Box sx={{ mb: 2 }}>
         {icon || <CloudUploadOutlined sx={{ fontSize: 48, color: 'text.secondary' }} />}
@@ -70,7 +73,7 @@ export function UploadDropzone({
         {label}
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Drop your file here or click to browse
+        {copy.dropzoneHint}
       </Typography>
     </Box>
   );
@@ -81,6 +84,7 @@ const MUI_VARIANT = { outline: 'outlined', ghost: 'text' } as const;
 
 /** The plain-button trigger. */
 export function UploadTrigger({
+  copy,
   label,
   icon,
   disabled,
@@ -110,18 +114,20 @@ export function UploadTrigger({
         }),
       }}
     >
-      {isUploading ? 'Uploading...' : label}
+      {isUploading ? copy.uploading : label}
     </Button>
   );
 }
 
 /** The screen-reader live region — drag, progress and error announcements. */
 function UploadAnnouncer({
+  copy,
   announceDragOver,
   isUploading,
   progress,
   error,
 }: {
+  copy: UploadButtonCopy;
   announceDragOver: boolean;
   isUploading: boolean;
   progress: number;
@@ -140,15 +146,16 @@ function UploadAnnouncer({
         overflow: 'hidden',
       }}
     >
-      {announceDragOver && 'File ready to drop'}
-      {isUploading && `Upload in progress: ${Math.round(progress)}%`}
-      {error && `Error: ${error}`}
+      {announceDragOver && copy.dropReady}
+      {isUploading && copy.uploadInProgress(Math.round(progress))}
+      {error && copy.errorAnnouncement(error)}
     </div>
   );
 }
 
 /** Progress bar, helper text, error text and the live region. */
 export function UploadFeedback({
+  copy,
   isUploading,
   progress,
   helperText,
@@ -157,6 +164,7 @@ export function UploadFeedback({
   errorId,
   announceDragOver,
 }: {
+  copy: UploadButtonCopy;
   isUploading: boolean;
   progress: number;
   helperText?: string;
@@ -171,7 +179,7 @@ export function UploadFeedback({
         <Box sx={{ mt: 1 }}>
           <LinearProgress variant="determinate" value={progress} sx={{ borderRadius: 1 }} />
           <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
-            {Math.round(progress)}% uploaded
+            {copy.percentUploaded(Math.round(progress))}
           </Typography>
         </Box>
       )}
@@ -200,6 +208,7 @@ export function UploadFeedback({
       )}
 
       <UploadAnnouncer
+        copy={copy}
         announceDragOver={announceDragOver}
         isUploading={isUploading}
         progress={progress}

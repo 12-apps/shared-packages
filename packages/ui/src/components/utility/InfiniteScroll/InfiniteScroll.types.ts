@@ -3,6 +3,12 @@ import type { ReactNode } from 'react';
 export type InfiniteScrollVariant = 'default' | 'reverse' | 'horizontal';
 
 export interface InfiniteScrollProps {
+  /**
+   * The two states the scroller renders on its own: fetching the next page,
+   * and having reached the end. REQUIRED — both were English literals.
+   */
+  loadingText: string;
+  endText: string;
   children: ReactNode;
   variant?: InfiniteScrollVariant;
   hasMore: boolean;

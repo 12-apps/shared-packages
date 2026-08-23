@@ -200,6 +200,10 @@ export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
     ...props
   } = { ...TEXTAREA_DEFAULTS, ...definedProps(textareaProps) };
 
+  // Read off the props rather than the merged object: the spread widens every
+  // key to optional, which would lose what the variant union already proved.
+  const { richEditorCopy } = textareaProps;
+
   const [richTextValue, setRichTextValue] = useState('');
   const hasIcon = Boolean(icon);
   const testId = dataTestId || dataTestIdCamelCase;
@@ -213,10 +217,11 @@ export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
       [iconPosition === 'start' ? 'paddingLeft' : 'paddingRight']: ICON_GUTTER }) };
 
   // If rich text variant, use the rich text editor
-  if (variant === 'rich') {
+  if (variant === 'rich' && richEditorCopy) {
     return (
       <TextareaShell testId={testId} label={label} glassLabel={glassLabel} error={error} helperText={helperText}>
         <TextareaRichEditor
+          copy={richEditorCopy}
           value={richTextValue}
           onChange={setRichTextValue}
           placeholder={props.placeholder}

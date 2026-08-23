@@ -5,8 +5,10 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import React from 'react';
 
 import { UploadButton } from './UploadButton';
+import { PT_BR_UPLOAD_BUTTON_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof UploadButton> = {
+  args: { copy: PT_BR_UPLOAD_BUTTON_COPY },
   title: 'Form/UploadButton/Tests',
   component: UploadButton,
   parameters: {
@@ -74,7 +76,7 @@ export const FormInteraction: Story = {
   render: (args) => (
     <FormControl component="fieldset">
       <FormLabel component="legend">File Upload</FormLabel>
-      <UploadButton {...args} />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} {...args} />
     </FormControl>
   ),
   args: {
@@ -291,13 +293,13 @@ export const ThemeVariations: Story = {
 export const VisualStates: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <UploadButton onSelect={fn()} label="Default" />
-      <UploadButton onSelect={fn()} variant="outline" label="Outline" />
-      <UploadButton onSelect={fn()} variant="ghost" label="Ghost" />
-      <UploadButton onSelect={fn()} variant="dropzone" label="Dropzone" />
-      <UploadButton onSelect={fn()} disabled label="Disabled" />
-      <UploadButton onSelect={fn()} uploading progress={50} label="Uploading" />
-      <UploadButton onSelect={fn()} errorText="Error state" label="Error" />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={fn()} label="Default" />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={fn()} variant="outline" label="Outline" />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={fn()} variant="ghost" label="Ghost" />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={fn()} variant="dropzone" label="Dropzone" />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={fn()} disabled label="Disabled" />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={fn()} uploading progress={50} label="Uploading" />
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} onSelect={fn()} errorText="Error state" label="Error" />
     </Box>
   ),
   play: async ({ canvasElement }) => {
@@ -414,13 +416,13 @@ export const EdgeCases: Story = {
 export const IntegrationTest: Story = {
   render: () => (
     <Box component="form" role="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <UploadButton
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
         onSelect={fn()}
         helperText="Select your profile image"
         accept="image/*"
         maxSizeMB={2}
       />
-      <UploadButton
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
         variant="dropzone"
         onSelect={fn()}
         helperText="Drop your document here"
@@ -466,7 +468,7 @@ export const MultipleFilesGoToOnSelectMany: Story = {
     const [names, setNames] = React.useState<string[]>([]);
     return (
       <Box>
-        <UploadButton
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
           variant="dropzone"
           multiple
           accept=".xml"
@@ -504,7 +506,7 @@ export const RejectedFilesDoNotBlockTheRest: Story = {
     const [names, setNames] = React.useState<string[]>([]);
     return (
       <Box>
-        <UploadButton
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
           variant="dropzone"
           multiple
           onSelect={fn()}
@@ -542,7 +544,7 @@ export const MultipleFilesStillRunOnUpload: Story = {
     const [uploaded, setUploaded] = React.useState<string[]>([]);
     return (
       <Box>
-        <UploadButton
+        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
           variant="dropzone"
           multiple
           onSelect={fn()}

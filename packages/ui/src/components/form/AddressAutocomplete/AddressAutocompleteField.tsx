@@ -17,6 +17,7 @@ export type AddressAutocompleteFieldProps = ResolvedAddressProps & AddressAutoco
 
 // The live field, rendered once Google Maps (or the mock stand-in) is ready.
 export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
+  copy,
   variant,
   label,
   placeholder,
@@ -62,6 +63,7 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
       )}
       renderInput={(params) => (
         <AddressInputField
+          copy={copy}
           params={params}
           addressVariant={variant}
           label={floating ? undefined : label}

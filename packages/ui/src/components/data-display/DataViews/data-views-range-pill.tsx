@@ -52,9 +52,11 @@ function BoundField<T extends Record<string, unknown>>({
   onChange: (bound: number | string | undefined) => void;
   testId: string;
 }): React.JSX.Element {
+  const copy = useDataViewsCopy();
   if (field.kind === 'day') {
     return (
       <DayBoundInput
+        mask={copy.filters.dayMask}
         label={label}
         value={value == null ? undefined : String(value)}
         onChange={onChange}
@@ -102,7 +104,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <BoundField
           field={field}
-          label="De"
+          label={copy.filters.rangeStart}
           value={value.min}
           onChange={(min) => onChange({ ...value, min })}
           testId={`${testId}-min`}

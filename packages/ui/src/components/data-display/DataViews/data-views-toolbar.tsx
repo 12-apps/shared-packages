@@ -153,6 +153,8 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
     >
       <ContentToolbar
         selectAllLabel={copy.selection.selectAll}
+        selectAllText={copy.selection.selectAllOnPage}
+        clearAllText={copy.filters.clearAll}
         hasSelection={selectedRows.length > 0}
         selectedCount={selectedRows.length}
         selectAll={props.selectAll}

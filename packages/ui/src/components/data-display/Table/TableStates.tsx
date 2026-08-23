@@ -2,9 +2,9 @@ import { Box, TableBody, TableCell, TableRow } from '@mui/material';
 import React from 'react';
 
 
-export const NoDataPlaceholder: React.FC = () => (
+export const NoDataPlaceholder: React.FC<{ emptyText: string }> = ({ emptyText }) => (
   <Box py={4} color="text.secondary">
-    No data available
+    {emptyText}
   </Box>
 );
 

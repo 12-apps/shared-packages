@@ -5,8 +5,10 @@ import React from 'react';
 import { Carousel } from './Carousel';
 import type { CarouselItem } from './Carousel.types';
 import { SIZE_VALUES } from '../../../tokens/scales';
+import { PT_BR_CAROUSEL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Carousel> = {
+  args: { copy: PT_BR_CAROUSEL_COPY },
   title: 'Media/Carousel',
   component: Carousel,
   parameters: {
@@ -248,19 +250,19 @@ export const Animations: Story = {
         <Typography variant="h6" gutterBottom>
           Slide Animation
         </Typography>
-        <Carousel items={imageItems} animation="slide" height={250} />
+        <Carousel copy={PT_BR_CAROUSEL_COPY} items={imageItems} animation="slide" height={250} />
       </Box>
       <Box>
         <Typography variant="h6" gutterBottom>
           Fade Animation
         </Typography>
-        <Carousel items={imageItems} animation="fade" height={250} />
+        <Carousel copy={PT_BR_CAROUSEL_COPY} items={imageItems} animation="fade" height={250} />
       </Box>
       <Box>
         <Typography variant="h6" gutterBottom>
           Zoom Animation
         </Typography>
-        <Carousel items={imageItems} animation="zoom" height={250} />
+        <Carousel copy={PT_BR_CAROUSEL_COPY} items={imageItems} animation="zoom" height={250} />
       </Box>
     </Box>
   ),
@@ -274,7 +276,7 @@ export const Sizes: Story = {
           <Typography variant="h6" gutterBottom>
             Size: {size.toUpperCase()}
           </Typography>
-          <Carousel items={imageItems} size={size} />
+          <Carousel copy={PT_BR_CAROUSEL_COPY} items={imageItems} size={size} />
         </Box>
       ))}
     </Box>
@@ -289,7 +291,7 @@ export const Colors: Story = {
           <Typography variant="h6" gutterBottom>
             Color: {color}
           </Typography>
-          <Carousel items={contentItems} color={color} variant="gradient" gradient height={200} />
+          <Carousel copy={PT_BR_CAROUSEL_COPY} items={contentItems} color={color} variant="gradient" gradient height={200} />
         </Box>
       ))}
     </Box>
@@ -304,7 +306,7 @@ export const IndicatorPositions: Story = {
           <Typography variant="h6" gutterBottom>
             Indicator Position: {position}
           </Typography>
-          <Carousel
+          <Carousel copy={PT_BR_CAROUSEL_COPY}
             items={imageItems}
             indicatorPosition={position}
             height={300}
@@ -324,7 +326,7 @@ export const ArrowPositions: Story = {
           <Typography variant="h6" gutterBottom>
             Arrow Position: {position}
           </Typography>
-          <Carousel
+          <Carousel copy={PT_BR_CAROUSEL_COPY}
             items={imageItems}
             arrowPosition={position}
             height={300}
@@ -353,7 +355,7 @@ const InteractiveComponent = () => {
 
   return (
     <Box>
-      <Carousel
+      <Carousel copy={PT_BR_CAROUSEL_COPY}
         items={imageItems}
         onClick={(item, index) => {
           setClickedItem(`Clicked: ${item.title} (index: ${index})`);
@@ -433,7 +435,7 @@ export const CustomContent: Story = {
     ];
 
     return (
-      <Carousel
+      <Carousel copy={PT_BR_CAROUSEL_COPY}
         items={testimonials}
         variant="elevated"
         autoPlay
@@ -455,7 +457,7 @@ export const AllVariants: Story = {
             <Typography variant="h6" gutterBottom>
               Variant: {variant}
             </Typography>
-            <Carousel
+            <Carousel copy={PT_BR_CAROUSEL_COPY}
               items={imageItems.slice(0, 3)}
               variant={variant}
               height={250}
@@ -479,7 +481,7 @@ export const AllSizes: Story = {
           <Typography variant="h6" gutterBottom>
             Size: {size.toUpperCase()}
           </Typography>
-          <Carousel
+          <Carousel copy={PT_BR_CAROUSEL_COPY}
             items={imageItems.slice(0, 3)}
             size={size}
             showArrows={true}
@@ -498,25 +500,25 @@ export const AllStates: Story = {
         <Typography variant="h6" gutterBottom>
           Default State
         </Typography>
-        <Carousel items={imageItems.slice(0, 3)} height={250} />
+        <Carousel copy={PT_BR_CAROUSEL_COPY} items={imageItems.slice(0, 3)} height={250} />
       </Box>
       <Box>
         <Typography variant="h6" gutterBottom>
           Loading State
         </Typography>
-        <Carousel items={[]} loading={true} height={250} />
+        <Carousel copy={PT_BR_CAROUSEL_COPY} items={[]} loading={true} height={250} />
       </Box>
       <Box>
         <Typography variant="h6" gutterBottom>
           Disabled State
         </Typography>
-        <Carousel items={imageItems.slice(0, 3)} disabled={true} height={250} />
+        <Carousel copy={PT_BR_CAROUSEL_COPY} items={imageItems.slice(0, 3)} disabled={true} height={250} />
       </Box>
       <Box>
         <Typography variant="h6" gutterBottom>
           AutoPlay State
         </Typography>
-        <Carousel
+        <Carousel copy={PT_BR_CAROUSEL_COPY}
           items={imageItems.slice(0, 3)}
           autoPlay={true}
           autoPlayInterval={2000}
@@ -536,7 +538,7 @@ const InteractiveStatesComponent = () => {
       <Typography variant="h6" gutterBottom>
         Interactive Carousel with Event Handlers
       </Typography>
-      <Carousel
+      <Carousel copy={PT_BR_CAROUSEL_COPY}
         items={imageItems}
         activeIndex={activeIndex}
         onIndexChange={(index) => setActiveIndex(index)}
@@ -594,7 +596,7 @@ export const Responsive: Story = {
           props are handed maps here too and are just as unsupported; those are
           outside this change and still do not type-check.
         */}
-        <Carousel
+        <Carousel copy={PT_BR_CAROUSEL_COPY}
           items={imageItems}
           height={{ xs: 200, sm: 300, md: 400, lg: 500 }}
           showArrows={{ xs: false, sm: true }}

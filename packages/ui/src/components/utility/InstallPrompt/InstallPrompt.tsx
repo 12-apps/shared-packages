@@ -8,6 +8,7 @@ import React from 'react';
 import { installPromptStyles } from './InstallPrompt.styles';
 import type { InstallPlatform, InstallPromptProps } from './InstallPrompt.types';
 import { usePwaInstall } from './usePwaInstall';
+import type { InstallPromptCopy } from '../../../copy';
 
 const StyledInstallPrompt = styled(Box)(({ theme }) => installPromptStyles(theme));
 
@@ -20,9 +21,10 @@ const testIdFor = (base: string | undefined, suffix: string) =>
  * be a control that does nothing when pressed.
  */
 const IosInstructions: React.FC<{
+  copy: InstallPromptCopy;
   instructions?: React.ReactNode;
   dataTestId?: string;
-}> = ({ instructions, dataTestId }) => (
+}> = ({ copy, instructions, dataTestId }) => (
   <Typography
     className="install-prompt-description"
     variant="body2"
@@ -32,20 +34,22 @@ const IosInstructions: React.FC<{
   >
     {instructions ?? (
       <>
-        Tap <IosShare fontSize="small" aria-label="Share" /> then &quot;Add to Home Screen&quot;
+        {copy.iosTapBefore} <IosShare fontSize="small" aria-label={copy.shareLabel} />{' '}
+        {copy.iosTapAfter}
       </>
     )}
   </Typography>
 );
 
 const InstallPromptBody: React.FC<{
+  copy: InstallPromptCopy;
   icon?: React.ReactNode;
   title: string;
   description?: string;
   iosInstructions?: React.ReactNode;
   platform: InstallPlatform;
   dataTestId?: string;
-}> = ({ icon, title, description, iosInstructions, platform, dataTestId }) => (
+}> = ({ copy, icon, title, description, iosInstructions, platform, dataTestId }) => (
   <>
     <Box className="install-prompt-icon" aria-hidden="true">
       {icon ?? <InstallMobile />}
@@ -73,7 +77,7 @@ const InstallPromptBody: React.FC<{
       )}
 
       {platform === 'ios' && (
-        <IosInstructions instructions={iosInstructions} dataTestId={dataTestId} />
+        <IosInstructions copy={copy} instructions={iosInstructions} dataTestId={dataTestId} />
       )}
     </Box>
   </>
@@ -118,17 +122,17 @@ const InstallPromptActions: React.FC<{
  * browser with no install route at all — so it is safe to mount unconditionally
  * in a layout rather than gating it at the call site.
  *
- * The copy defaults to English and every string is a prop: this package stays
- * locale-neutral and the consuming app supplies its own wording.
+ * Every string is REQUIRED host config (`copy`): this package stays
+ * locale-neutral and the consuming app supplies its own wording. There is no
+ * English default to fall through to, so a missing word is a typecheck failure
+ * rather than an English sentence in a pt-BR store.
  */
 export const InstallPrompt = React.forwardRef<HTMLDivElement, InstallPromptProps>(
   (
     {
-      title = 'Install this app',
+      copy,
       description,
-      installLabel = 'Install',
       iosInstructions,
-      dismissLabel = 'Dismiss install prompt',
       icon,
       onInstall,
       onDismiss,
@@ -163,13 +167,14 @@ export const InstallPrompt = React.forwardRef<HTMLDivElement, InstallPromptProps
         ref={ref}
         className={className}
         role="region"
-        aria-label={title}
+        aria-label={copy.title}
         data-testid={dataTestId}
         {...props}
       >
         <InstallPromptBody
           icon={icon}
-          title={title}
+          copy={copy}
+          title={copy.title}
           description={description}
           iosInstructions={iosInstructions}
           platform={platform}
@@ -178,8 +183,8 @@ export const InstallPrompt = React.forwardRef<HTMLDivElement, InstallPromptProps
 
         <InstallPromptActions
           platform={platform}
-          installLabel={installLabel}
-          dismissLabel={dismissLabel}
+          installLabel={copy.installLabel}
+          dismissLabel={copy.dismissLabel}
           onInstallClick={handleInstall}
           onDismissClick={handleDismiss}
           dataTestId={dataTestId}

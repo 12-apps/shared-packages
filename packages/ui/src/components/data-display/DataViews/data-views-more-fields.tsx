@@ -60,7 +60,9 @@ function OverflowPill<T extends Record<string, unknown>>({
   if (options.length > INLINE_OPTION_LIMIT) {
     return (
       <MultiSelectDropdown
-          clearLabel={copy.filters.clearRange(field.label)}
+        extraOptionsHeading={copy.filters.optionsHeading}
+        clearText={copy.filters.clear}
+        clearLabel={copy.filters.clearRange(field.label)}
         label={field.pill?.label ?? field.label}
         options={options}
         selected={new Set(values)}

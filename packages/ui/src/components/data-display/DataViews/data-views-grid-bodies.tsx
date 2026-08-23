@@ -19,6 +19,7 @@ import { SelectAllStrip } from "./data-views-select-all-strip";
 import { ListCardGroup, type ListGroupConfig } from "./list-card-rails";
 import type { DataViewCardSelection } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
+import { useDataViewsCopy } from "./data-views-copy-context";
 
 /* ── Body (grid) ─────────────────────────────────────────────────────────── */
 
@@ -52,6 +53,7 @@ function GridBody<T extends Record<string, unknown>>({
   dataTestId,
   emptyState,
 }: GridBodyProps<T>): React.JSX.Element {
+  const copy = useDataViewsCopy();
   return (
     <Box
       sx={{
@@ -77,6 +79,7 @@ function GridBody<T extends Record<string, unknown>>({
         sorting={{ mode: sortMode, sortBy, onChangeSortBy }}
         data-testid={dataTestId}
         emptyState={emptyState}
+        emptyText={copy.grid.emptyFilteredTitle}
       />
     </Box>
   );

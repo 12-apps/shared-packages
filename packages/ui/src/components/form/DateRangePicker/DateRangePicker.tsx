@@ -129,6 +129,7 @@ function useMonthCount(requested: number | undefined): number | undefined {
 
 /** The grid, in range mode — `Calendar`, never a second implementation of one. */
 function RangeCalendar({
+  calendarLabel,
   picker,
   value,
   locale,
@@ -142,10 +143,12 @@ function RangeCalendar({
   weekStartsOn: WeekStart;
   months: number | undefined;
   maxRangeDays: number | undefined;
+  calendarLabel: string;
 }): React.JSX.Element {
   return (
     <Calendar
       key={picker.viewNonce}
+      ariaLabel={calendarLabel}
       className={CALENDAR_CLASS}
       selectionMode="range"
       locale={locale}
@@ -223,6 +226,7 @@ export function DateRangePicker({
     <Paper className={className} data-testid={dataTestId} sx={ROOT_SX}>
       <Box sx={BODY_SX}>
         <RangeCalendar
+          calendarLabel={picker.copy.calendarLabel}
           picker={picker}
           value={value}
           locale={locale}

@@ -5,6 +5,7 @@ import React from 'react';
 
 import { ShortcutChip } from './ShortcutChip';
 import type { PaletteCommand } from './CommandPalette.types';
+import type { CommandPaletteCopy } from '../../../copy';
 
 const ResultsList = styled(List)(({ theme }) => ({
   maxHeight: 400,
@@ -90,6 +91,7 @@ const slug = (value: string) => value.toLowerCase().replace(/\s+/g, '-');
 // has to stay consistent across both sections, so it is threaded through here
 // rather than mutated from inside the render as it was before.
 export const PaletteResults: React.FC<{
+  copy: CommandPaletteCopy;
   listRef: React.Ref<globalThis.HTMLUListElement>;
   dataTestId?: string;
   searchQuery: string;
@@ -102,6 +104,7 @@ export const PaletteResults: React.FC<{
   onSelect: (index: number) => void;
   onExecute: (command: PaletteCommand) => void;
 }> = ({
+  copy,
   listRef,
   dataTestId,
   searchQuery,
@@ -121,7 +124,7 @@ export const PaletteResults: React.FC<{
           No commands found for "{searchQuery}"
         </Typography>
         <Typography variant="caption" color="text.disabled" sx={{ mt: 1 }}>
-          Try a different search term
+          {copy.tryAnotherTerm}
         </Typography>
       </NoResults>
     );
@@ -160,7 +163,7 @@ export const PaletteResults: React.FC<{
         <>
           <CategoryLabel data-testid={`${dataTestId}-group-recent`}>
             <RecentIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />
-            Recent
+            {copy.recent}
           </CategoryLabel>
           {recent.map(row)}
           {filteredCommands.length > recentCommandIds.length && <Divider sx={{ my: 1 }} />}

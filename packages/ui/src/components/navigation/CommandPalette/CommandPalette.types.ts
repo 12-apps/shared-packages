@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { CommandPaletteCopy } from '../../../copy';
 
 export interface PaletteCommand {
   id: string;
@@ -12,6 +13,8 @@ export interface PaletteCommand {
 }
 
 export interface CommandPaletteProps {
+  /** The footer's keyboard hints and the empty state's nudge. REQUIRED. */
+  copy: CommandPaletteCopy;
   open: boolean;
   onClose: () => void;
   commands: PaletteCommand[];

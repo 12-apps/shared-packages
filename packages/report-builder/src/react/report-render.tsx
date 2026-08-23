@@ -158,6 +158,7 @@ function ReportTable({
   return (
     <Box sx={REPORT_TABLE_SX}>
       <Table
+        emptyText={copy.labels.emptyTable}
         // The design system's own documented default (`TABLE_DEFAULTS.variant`),
         // and the only variant that paints `background.paper`. That matters:
         // `SystemReportPage` renders a rendering with NO block card around it,

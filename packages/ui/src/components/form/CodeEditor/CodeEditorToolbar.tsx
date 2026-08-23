@@ -7,6 +7,8 @@ import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import { alpha, styled } from '@mui/material';
 import React from 'react';
 
+import type { CodeEditorCopy } from '../../../copy';
+
 // Each button repeated the same conditional test id; this is that ternary once.
 const makeTestId =
   (dataTestId?: string) =>
@@ -37,6 +39,7 @@ const LanguageBadge = styled(Box)(({ theme }) => ({
 }));
 
 const EditorActions: React.FC<{
+  copy: CodeEditorCopy;
   readOnly: boolean;
   isWrapped: boolean;
   isCopied: boolean;
@@ -47,6 +50,7 @@ const EditorActions: React.FC<{
   onWrapToggle: () => void;
   onFullscreenToggle: () => void;
 }> = ({
+  copy,
   readOnly,
   isWrapped,
   isCopied,
@@ -62,7 +66,7 @@ const EditorActions: React.FC<{
   return (
     <Stack direction="row" spacing={1}>
     {!readOnly && (
-      <Tooltip title="Format Code (Ctrl+Shift+F)">
+      <Tooltip title={copy.formatCode}>
         <IconButton
           size="small"
           onClick={onFormat}
@@ -73,7 +77,7 @@ const EditorActions: React.FC<{
       </Tooltip>
     )}
 
-    <Tooltip title={isWrapped ? 'Disable Word Wrap' : 'Enable Word Wrap'}>
+    <Tooltip title={isWrapped ? copy.disableWrap : copy.enableWrap}>
       <IconButton
         size="small"
         onClick={onWrapToggle}
@@ -84,7 +88,7 @@ const EditorActions: React.FC<{
       </IconButton>
     </Tooltip>
 
-    <Tooltip title={isCopied ? 'Copied!' : 'Copy to Clipboard'}>
+    <Tooltip title={isCopied ? copy.copied : copy.copyToClipboard}>
       <IconButton
         size="small"
         onClick={onCopy}
@@ -95,7 +99,7 @@ const EditorActions: React.FC<{
       </IconButton>
     </Tooltip>
 
-    <Tooltip title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
+    <Tooltip title={isFullscreen ? copy.exitFullscreen : copy.enterFullscreen}>
       <IconButton
         size="small"
         onClick={onFullscreenToggle}
@@ -114,6 +118,7 @@ const EditorActions: React.FC<{
 
 // Language badge, read-only marker and the four action buttons.
 export const EditorToolbar: React.FC<{
+  copy: CodeEditorCopy;
   language: string;
   readOnly: boolean;
   isWrapped: boolean;
@@ -125,6 +130,7 @@ export const EditorToolbar: React.FC<{
   onWrapToggle: () => void;
   onFullscreenToggle: () => void;
 }> = ({
+  copy,
   language,
   readOnly,
   isWrapped,
@@ -147,12 +153,13 @@ export const EditorToolbar: React.FC<{
       </LanguageBadge>
       {readOnly && (
         <Typography variant="caption" color="text.secondary">
-          Read Only
+          {copy.readOnly}
         </Typography>
       )}
     </Stack>
 
     <EditorActions
+      copy={copy}
       readOnly={readOnly}
       isWrapped={isWrapped}
       isCopied={isCopied}

@@ -20,6 +20,8 @@ export interface ScrollViewportProps
     | 'loading'
     | 'smoothScroll'
   > {
+  /** The scroll region's accessible name. REQUIRED. */
+  regionLabel: string;
   children: ReactNode;
   shouldShowScrollbar: boolean;
   setScrollRef: (node: HTMLDivElement | null) => void;
@@ -29,6 +31,7 @@ export interface ScrollViewportProps
 // The element that actually scrolls: its own overflow and scrollbar styling,
 // plus the disabled and loading treatments.
 export const ScrollViewport: FC<ScrollViewportProps> = ({
+  regionLabel,
   children,
   height,
   maxHeight,
@@ -52,7 +55,7 @@ export const ScrollViewport: FC<ScrollViewportProps> = ({
       ref={setScrollRef}
       onScroll={onScroll}
       role="region"
-      aria-label="Scrollable content"
+      aria-label={regionLabel}
       aria-busy={loading}
       tabIndex={disabled ? -1 : 0}
       sx={{

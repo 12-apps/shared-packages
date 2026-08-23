@@ -3,8 +3,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { TimingDiagram } from './TimingDiagram';
+import { PT_BR_TIMING_DIAGRAM_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TimingDiagram> = {
+  args: { copy: PT_BR_TIMING_DIAGRAM_COPY },
   title: 'Charts/TimingDiagram',
   component: TimingDiagram,
   parameters: {
@@ -93,7 +95,7 @@ export const AllVariants: Story = {
         <Typography variant="h6" gutterBottom>
           Waterfall Variant
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="waterfall"
           showLabels={true}
@@ -106,7 +108,7 @@ export const AllVariants: Story = {
         <Typography variant="h6" gutterBottom>
           Stacked Variant
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="stacked"
           showLabels={true}
@@ -119,7 +121,7 @@ export const AllVariants: Story = {
         <Typography variant="h6" gutterBottom>
           Horizontal Variant
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="horizontal"
           showLabels={true}
@@ -138,7 +140,7 @@ export const AllSizes: Story = {
         <Typography variant="h6" gutterBottom>
           Small (height: 30px)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="waterfall"
           height={30}
@@ -151,7 +153,7 @@ export const AllSizes: Story = {
         <Typography variant="h6" gutterBottom>
           Medium (height: 40px)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="waterfall"
           height={40}
@@ -164,7 +166,7 @@ export const AllSizes: Story = {
         <Typography variant="h6" gutterBottom>
           Large (height: 60px)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="waterfall"
           height={60}
@@ -183,7 +185,7 @@ export const AllStates: Story = {
         <Typography variant="h6" gutterBottom>
           Fast Request (&lt;300ms)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={fastData}
           variant="stacked"
           showLabels={true}
@@ -196,7 +198,7 @@ export const AllStates: Story = {
         <Typography variant="h6" gutterBottom>
           Normal Request (~750ms)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="stacked"
           showLabels={true}
@@ -209,7 +211,7 @@ export const AllStates: Story = {
         <Typography variant="h6" gutterBottom>
           Slow Request (&gt;2s)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={slowData}
           variant="stacked"
           showLabels={true}
@@ -222,7 +224,7 @@ export const AllStates: Story = {
         <Typography variant="h6" gutterBottom>
           No Animation
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="stacked"
           showLabels={true}
@@ -282,7 +284,7 @@ const InteractiveComponent = () => {
         </Stack>
       </Paper>
 
-      <TimingDiagram
+      <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
         data={currentData}
         variant={variant}
         showLabels={true}
@@ -323,7 +325,7 @@ export const Responsive: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Waterfall (adapts to container width)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="waterfall"
           showLabels={true}
@@ -336,7 +338,7 @@ export const Responsive: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Stacked (full width)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="stacked"
           showLabels={true}
@@ -349,7 +351,7 @@ export const Responsive: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Horizontal (vertical layout)
         </Typography>
-        <TimingDiagram
+        <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
           data={sampleData}
           variant="horizontal"
           showLabels={true}
@@ -386,7 +388,7 @@ export const PerformanceComparison: Story = {
             <Typography variant="body1" gutterBottom>
               {request.name}
             </Typography>
-            <TimingDiagram
+            <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
               data={request.data}
               variant="stacked"
               showLabels={true}
@@ -419,7 +421,7 @@ export const DetailedBreakdown: Story = {
     <Stack spacing={3}>
       <Typography variant="h6">Detailed Request Breakdown</Typography>
 
-      <TimingDiagram
+      <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
         data={{
           dns: 125,
           connect: 250,
@@ -459,7 +461,7 @@ export const MultipleRequests: Story = {
             <Typography variant="body1" gutterBottom>
               {index + 1}. {request.name}
             </Typography>
-            <TimingDiagram
+            <TimingDiagram copy={PT_BR_TIMING_DIAGRAM_COPY}
               data={request.data}
               variant="waterfall"
               showLabels={true}

@@ -23,7 +23,7 @@ const containerSx = (monthsToShow: number): SxProps<Theme> => ({
 
 export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((componentProps, ref) => {
   const props = resolveCalendarProps(componentProps);
-  const { monthsToShow, locale, renderHeader, renderFooter, className } = props;
+  const { monthsToShow, locale, renderHeader, renderFooter, className, ariaLabel } = props;
 
   const calendar = useCalendar(props);
 
@@ -48,7 +48,7 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
       ref={ref}
       className={className}
       role="application"
-      aria-label="Calendar"
+      aria-label={ariaLabel}
       tabIndex={0}
       onKeyDown={calendar.handleKeyDown}
       data-testid="calendar-container"

@@ -1,8 +1,16 @@
 import type { ReactNode } from 'react';
 
+import type { TableFilterCopy } from '../../../copy';
+
 /** Props for the `<TableFilter>` root (provider). */
 export interface TableFilterProps {
   children: ReactNode;
+  /**
+   * Every word this compound renders. REQUIRED: this package ships no default
+   * copy, and the two ends of a range plus the panel's clear link are read by
+   * the store's own customer, in the store's own language.
+   */
+  copy: TableFilterCopy;
   /** Whether the panel is open. */
   open: boolean;
   /** Toggle the panel. */

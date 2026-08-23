@@ -50,7 +50,7 @@ const PlaceholderOverlay = styled(Box)(({ theme }) => ({
   userSelect: 'none' }));
 
 // Monaco editor themes
-const EditorLoading: FC = () => (
+const EditorLoading: FC<{ label: string }> = ({ label }) => (
   <Box
     sx={{
       display: 'flex',
@@ -59,7 +59,7 @@ const EditorLoading: FC = () => (
       height: '100%',
       color: 'text.secondary' }}
   >
-    <Typography variant="body2">Loading editor...</Typography>
+    <Typography variant="body2">{label}</Typography>
   </Box>
 );
 
@@ -116,7 +116,8 @@ export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
     autoFormat,
     placeholder,
     onSave,
-    dataTestId } = resolveCodeEditorProps(componentProps);
+    dataTestId,
+    copy } = resolveCodeEditorProps(componentProps);
 
   const testId = makeTestId(dataTestId);
   const editor = useCodeEditor({ themeProp, wordWrap, autoFormat, readOnly, onSave });
@@ -132,6 +133,7 @@ export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
     <EditorContainer elevation={2} data-testid={dataTestId || 'code-editor'}>
       {showToolbar && (
         <EditorToolbar
+          copy={copy}
           language={language}
           readOnly={readOnly}
           isWrapped={editor.isWrapped}
@@ -158,7 +160,7 @@ export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
           theme={editor.editorTheme}
           options={editorOptions}
           onMount={editor.handleEditorDidMount}
-          loading={<EditorLoading />}
+          loading={<EditorLoading label={copy.loading} />}
         />
       </EditorWrapper>
     </EditorContainer>

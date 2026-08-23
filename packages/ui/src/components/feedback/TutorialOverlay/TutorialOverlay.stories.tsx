@@ -4,8 +4,10 @@ import React from 'react';
 import { action } from 'storybook/actions';
 
 import { TutorialOverlay } from './TutorialOverlay';
+import { PT_BR_TUTORIAL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TutorialOverlay> = {
+  args: { copy: PT_BR_TUTORIAL_COPY },
   title: 'Overlays/TutorialOverlay',
   component: TutorialOverlay,
   parameters: {
@@ -117,7 +119,7 @@ const DefaultComponent = () => {
       </Stack>
 
       {showTutorial && (
-        <TutorialOverlay
+        <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
           steps={tutorialSteps}
           onComplete={() => setShowTutorial(false)}
           onSkip={() => setShowTutorial(false)}
@@ -224,7 +226,7 @@ const OnboardingFlowComponent = () => {
       </Box>
 
       {startOnboarding && (
-        <TutorialOverlay
+        <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
           steps={onboardingSteps}
           onComplete={() => {
             setStartOnboarding(false);
@@ -328,7 +330,7 @@ const FeatureHighlightComponent = () => {
       </Box>
 
       {highlightFeature && (
-        <TutorialOverlay
+        <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
           steps={features[highlightFeature as keyof typeof features]}
           onComplete={() => setHighlightFeature(null)}
           variant="tooltip"
@@ -407,7 +409,7 @@ const InteractiveTourComponent = () => {
       )}
 
       {tourActive && (
-        <TutorialOverlay
+        <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
           steps={interactiveSteps}
           onComplete={() => {
             setTourActive(false);
@@ -476,7 +478,7 @@ const CustomStylingComponent = () => {
         <Typography>This element will be highlighted</Typography>
       </Box>
 
-      <TutorialOverlay
+      <TutorialOverlay copy={PT_BR_TUTORIAL_COPY}
         steps={demoSteps}
         variant={activeVariant}
         onComplete={() => {

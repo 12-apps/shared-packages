@@ -96,6 +96,17 @@ export interface DateRangePickerMessages {
   overMax: (info: { maxRangeDays: number; days: number }) => string;
   /** The chosen window, in words. */
   summary: (window: DayWindow) => string;
+  /**
+   * The month grid's accessible name. The grid is a `role="application"`, so
+   * this is the only thing a screen reader announces for it.
+   */
+  calendarLabel: string;
+  /**
+   * The two fields' mask, which IS their placeholder — the expected ORDER is
+   * on screen before the first keystroke rather than discovered by getting it
+   * wrong. `dd/mm/aaaa` is one locale's order and one locale's letters.
+   */
+  dayMask: string;
 }
 
 /** Which of the three views moved the range, and what it moved it to. */

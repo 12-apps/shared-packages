@@ -37,10 +37,19 @@ export function PwaInstallPromptPage() {
 
       <InstallPrompt
         storageKey="harness-install-dismissed"
-        title="Install this app"
         description="Add it to your home screen to open it faster next time."
-        installLabel="Install"
-        dismissLabel="Not now"
+        // Every word this component renders, as one required object. The
+        // harness is an ADOPTER, so it answers the contract the same way a
+        // storefront does — including the iOS gesture instruction, which is
+        // the half no other page here exercises.
+        copy={{
+          title: 'Install this app',
+          installLabel: 'Install',
+          dismissLabel: 'Not now',
+          iosTapBefore: 'Tap',
+          iosTapAfter: 'then "Add to Home Screen"',
+          shareLabel: 'Share',
+        }}
       />
 
       {/* Read by the spec, so a red test names the precondition that failed. */}

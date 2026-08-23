@@ -25,6 +25,7 @@ import {
   getStrengthLabel,
   SuggestionsList } from './PasswordStrength.helpers';
 import type { PasswordRequirements, PasswordStrengthProps } from './PasswordStrength.types';
+import type { PasswordStrengthCopy } from '../../../copy';
 
 interface RequirementIconProps {
   met: boolean;
@@ -217,18 +218,19 @@ const StrengthIndicator: React.FC<{
 };
 
 const StrengthHeading: React.FC<{
+  copy: PasswordStrengthCopy;
   strength: number;
   hasValue: boolean;
   animated: boolean;
-}> = ({ strength, hasValue, animated }) => (
+}> = ({ copy, strength, hasValue, animated }) => (
   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
     <Typography variant="body2" color="text.secondary">
-      Password Strength
+      {copy.strengthHeading}
     </Typography>
     {hasValue && (
       <Fade in={true}>
         <StrengthLabel
-          label={getStrengthLabel(strength)}
+          label={getStrengthLabel(strength, copy.bands)}
           icon={getStrengthIcon(strength)}
           size="small"
           strength={strength}
@@ -242,22 +244,23 @@ const StrengthHeading: React.FC<{
 // One row per enabled requirement. Previously five near-identical JSX blocks,
 // each with its own `requirements.x &&` guard.
 const RequirementsList: React.FC<{
+  copy: PasswordStrengthCopy;
   requirements: PasswordRequirements;
   checks: RequirementChecks;
   animated: boolean;
-}> = ({ requirements, checks, animated }) => {
+}> = ({ copy, requirements, checks, animated }) => {
   const rows: ReadonlyArray<[unknown, keyof RequirementChecks, React.ReactNode]> = [
-    [requirements.minLength, 'length', `At least ${requirements.minLength} characters`],
-    [requirements.uppercase, 'uppercase', 'One uppercase letter'],
-    [requirements.lowercase, 'lowercase', 'One lowercase letter'],
-    [requirements.numbers, 'numbers', 'One number'],
-    [requirements.special, 'special', 'One special character'],
+    [requirements.minLength, 'length', copy.requirements.minLength(requirements.minLength ?? 0)],
+    [requirements.uppercase, 'uppercase', copy.requirements.uppercase],
+    [requirements.lowercase, 'lowercase', copy.requirements.lowercase],
+    [requirements.numbers, 'numbers', copy.requirements.numbers],
+    [requirements.special, 'special', copy.requirements.special],
   ];
 
   return (
     <Stack spacing={1}>
       <Typography variant="caption" color="text.secondary" fontWeight="medium">
-        Requirements:
+        {copy.requirementsHeading}
       </Typography>
       {rows
         .filter(([enabled]) => Boolean(enabled))
@@ -277,6 +280,7 @@ const RequirementsList: React.FC<{
 const PasswordStrengthBody: React.FC<{
   value: string;
   strength: number;
+  copy: PasswordStrengthCopy;
   requirements: PasswordRequirements;
   requirementChecks: RequirementChecks;
   suggestions: string[];
@@ -286,6 +290,7 @@ const PasswordStrengthBody: React.FC<{
   variant: PasswordStrengthProps['variant'];
   animated: boolean;
 }> = ({
+  copy,
   value,
   strength,
   requirements,
@@ -298,7 +303,12 @@ const PasswordStrengthBody: React.FC<{
   animated }) => (
     <Stack spacing={2}>
       {showStrengthLabel && (
-        <StrengthHeading strength={strength} hasValue={value.length > 0} animated={animated} />
+        <StrengthHeading
+          copy={copy}
+          strength={strength}
+          hasValue={value.length > 0}
+          animated={animated}
+        />
       )}
 
       <StrengthIndicator variant={variant} strength={strength} animated={animated} />
@@ -306,6 +316,7 @@ const PasswordStrengthBody: React.FC<{
       {showRequirements && (
         <Fade in={value.length > 0}>
           <RequirementsList
+            copy={copy}
             requirements={requirements}
             checks={requirementChecks}
             animated={animated}
@@ -315,7 +326,7 @@ const PasswordStrengthBody: React.FC<{
 
       {showSuggestions && suggestions.length > 0 && value.length > 0 && (
         <Fade in={true}>
-          <SuggestionsList suggestions={suggestions} />
+          <SuggestionsList suggestions={suggestions} heading={copy.suggestionsHeading} />
         </Fade>
       )}
     </Stack>
@@ -323,6 +334,7 @@ const PasswordStrengthBody: React.FC<{
 
 // Main component
 export const PasswordStrength: FC<PasswordStrengthProps> = ({
+  copy,
   value = '',
   showRequirements = true,
   requirements = defaultRequirements,
@@ -342,11 +354,15 @@ export const PasswordStrength: FC<PasswordStrengthProps> = ({
     [value, requirements],
   );
 
-  const suggestions = useMemo(() => buildSuggestions(requirementChecks), [requirementChecks]);
+  const suggestions = useMemo(
+    () => buildSuggestions(requirementChecks, copy.suggestions, requirements.minLength ?? 0),
+    [requirementChecks, copy.suggestions, requirements.minLength],
+  );
 
   return (
     <StrengthContainer animated={animated} data-testid={dataTestId}>
       <PasswordStrengthBody
+        copy={copy}
         value={value}
         strength={strength}
         requirements={requirements}

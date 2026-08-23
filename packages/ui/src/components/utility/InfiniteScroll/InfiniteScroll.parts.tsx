@@ -12,19 +12,19 @@ const CENTERED = {
   p: 2,
 } as const;
 
-export const DefaultLoader: React.FC = () => (
+export const DefaultLoader: React.FC<{ loadingText: string }> = ({ loadingText }) => (
   <Box sx={CENTERED}>
     <CircularProgress size={24} />
     <Typography variant="body2" sx={{ ml: 1 }}>
-      Loading...
+      {loadingText}
     </Typography>
   </Box>
 );
 
-export const DefaultEndMessage: React.FC = () => (
+export const DefaultEndMessage: React.FC<{ endText: string }> = ({ endText }) => (
   <Box sx={CENTERED}>
     <Typography variant="body2" color="text.secondary">
-      No more items to load
+      {endText}
     </Typography>
   </Box>
 );

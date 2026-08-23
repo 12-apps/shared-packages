@@ -101,6 +101,15 @@ const DEV_SURFACES = new Map([
       "is mounted at a fixed runbook URL, and exists to be opened by whoever is debugging " +
       "that deployment — never by its users.",
   ],
+  [
+    "packages/ui/src/components/utility/Portal/Portal.button-container.example.tsx",
+    "A worked example of mounting a Portal into an HTMLButtonElement. Nothing " +
+      "imports it and it is not in the package's exports — it exists to be READ, " +
+      "by someone deciding whether Portal does what they need. Its sentences are " +
+      "the demonstration itself ('This portal is rendered inside the button " +
+      "element!'), so porting them to a copy table would ask every host to " +
+      "supply words for a screen no host mounts.",
+  ],
 ]);
 
 /**

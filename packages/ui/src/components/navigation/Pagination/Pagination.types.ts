@@ -3,6 +3,8 @@ import type { PaginationProps as MuiPaginationProps } from '@mui/material';
 import type { ReactNode } from 'react';
 
 export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 'size' | 'color'> {
+  /** The label in front of the page-size select. REQUIRED. */
+  pageSizeLabel: string;
   /**
    * The variant of the pagination
    */

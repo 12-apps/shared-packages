@@ -10,6 +10,7 @@ import type { MenubarItem } from './Menubar.types';
 import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Menubar> = {
+  args: { ariaLabel: 'Navegação principal' },
   title: 'Navigation/Menubar',
   component: Menubar,
   parameters: {
@@ -149,7 +150,7 @@ export const Sizes: Story = {
           <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
             Size: {size}
           </Typography>
-          <Menubar items={sampleMenuItems} size={size} variant="bordered" logo={<Logo />} />
+          <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} size={size} variant="bordered" logo={<Logo />} />
         </Box>
       ))}
     </Box>
@@ -165,7 +166,7 @@ export const Colors: Story = {
             <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
               Color: {color}
             </Typography>
-            <Menubar items={sampleMenuItems} color={color} variant="elevated" logo={<Logo />} />
+            <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} color={color} variant="elevated" logo={<Logo />} />
           </Box>
         ),
       )}
@@ -177,7 +178,7 @@ export const Vertical: Story = {
   render: () => (
     <Box sx={{ display: 'flex', height: '100vh' }}>
       <Box sx={{ width: 250, borderRight: 1, borderColor: 'divider' }}>
-        <Menubar items={sampleMenuItems} orientation="vertical" variant="minimal" logo={<Logo />} />
+        <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} orientation="vertical" variant="minimal" logo={<Logo />} />
       </Box>
       <Box sx={{ flex: 1, p: 3 }}>
         <Typography variant="h6">Content Area</Typography>
@@ -192,7 +193,7 @@ export const Vertical: Story = {
 export const Sticky: Story = {
   render: () => (
     <Box>
-      <Menubar
+      <Menubar ariaLabel="Navegação principal"
         items={sampleMenuItems}
         sticky
         variant="glass"
@@ -227,7 +228,7 @@ export const Transparent: Story = {
         minHeight: '100vh',
       }}
     >
-      <Menubar
+      <Menubar ariaLabel="Navegação principal"
         items={sampleMenuItems}
         transparent
         variant="glass"
@@ -287,7 +288,7 @@ export const CustomContent: Story = {
     ];
 
     return (
-      <Menubar
+      <Menubar ariaLabel="Navegação principal"
         items={customItems}
         variant="gradient"
         gradient
@@ -326,7 +327,7 @@ export const AllVariants: Story = {
             <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
               Variant: {variant}
             </Typography>
-            <Menubar
+            <Menubar ariaLabel="Navegação principal"
               items={sampleMenuItems}
               variant={variant}
               logo={<Logo />}
@@ -348,7 +349,7 @@ export const AllSizes: Story = {
           <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
             Size: {size}
           </Typography>
-          <Menubar items={sampleMenuItems} size={size} variant="bordered" logo={<Logo />} />
+          <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} size={size} variant="bordered" logo={<Logo />} />
         </Box>
       ))}
     </Box>
@@ -362,25 +363,25 @@ export const AllStates: Story = {
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           State: Default
         </Typography>
-        <Menubar items={sampleMenuItems} variant="default" logo={<Logo />} />
+        <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} variant="default" logo={<Logo />} />
       </Box>
       <Box sx={{ mb: 2 }}>
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           State: Loading
         </Typography>
-        <Menubar items={[]} loading variant="default" logo={<Logo />} />
+        <Menubar ariaLabel="Navegação principal" items={[]} loading variant="default" logo={<Logo />} />
       </Box>
       <Box sx={{ mb: 2 }}>
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           State: Disabled
         </Typography>
-        <Menubar items={sampleMenuItems} disabled variant="default" logo={<Logo />} />
+        <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} disabled variant="default" logo={<Logo />} />
       </Box>
       <Box sx={{ mb: 2 }}>
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           State: With Effects (glow, pulse)
         </Typography>
-        <Menubar items={sampleMenuItems} variant="glass" glow pulse glass logo={<Logo />} />
+        <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} variant="glass" glow pulse glass logo={<Logo />} />
       </Box>
     </Box>
   ),
@@ -393,7 +394,7 @@ export const InteractiveStates: Story = {
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           Interactive: Clickable with callbacks
         </Typography>
-        <Menubar
+        <Menubar ariaLabel="Navegação principal"
           items={[
             {
               id: 'interactive',
@@ -410,7 +411,7 @@ export const InteractiveStates: Story = {
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           Interactive: With focus management
         </Typography>
-        <Menubar
+        <Menubar ariaLabel="Navegação principal"
           items={sampleMenuItems}
           variant="bordered"
           logo={<Logo />}
@@ -422,7 +423,7 @@ export const InteractiveStates: Story = {
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           Interactive: With ripple effects
         </Typography>
-        <Menubar items={sampleMenuItems} variant="default" ripple logo={<Logo />} />
+        <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} variant="default" ripple logo={<Logo />} />
       </Box>
     </Box>
   ),
@@ -439,7 +440,7 @@ export const Responsive: Story = {
           Mobile View (full width, minimal)
         </Typography>
         <Box sx={{ maxWidth: '375px', border: 1, borderColor: 'divider' }}>
-          <Menubar items={sampleMenuItems} variant="minimal" fullWidth logo={<Logo />} />
+          <Menubar ariaLabel="Navegação principal" items={sampleMenuItems} variant="minimal" fullWidth logo={<Logo />} />
         </Box>
       </Box>
       <Box sx={{ mb: 2 }}>
@@ -447,7 +448,7 @@ export const Responsive: Story = {
           Tablet View (with end content)
         </Typography>
         <Box sx={{ maxWidth: '768px', border: 1, borderColor: 'divider' }}>
-          <Menubar
+          <Menubar ariaLabel="Navegação principal"
             items={sampleMenuItems}
             variant="elevated"
             logo={<Logo />}
@@ -459,7 +460,7 @@ export const Responsive: Story = {
         <Typography variant="caption" sx={{ mb: 1, display: 'block' }}>
           Desktop View (full features)
         </Typography>
-        <Menubar
+        <Menubar ariaLabel="Navegação principal"
           items={sampleMenuItems}
           variant="glass"
           glass

@@ -57,6 +57,7 @@ export function DateRangeFields({
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
         <DayBoundInput
+          mask={messages.dayMask}
           label={messages.from}
           value={value.from ?? undefined}
           onChange={(bound) => onEdit('from', bound ?? null)}
@@ -65,6 +66,7 @@ export function DateRangeFields({
           describedBy={statusId}
         />
         <DayBoundInput
+          mask={messages.dayMask}
           label={messages.to}
           value={value.to ?? undefined}
           onChange={(bound) => onEdit('to', bound ?? null)}

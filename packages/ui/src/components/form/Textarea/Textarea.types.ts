@@ -1,8 +1,21 @@
+import type { RichEditorToolbarCopy } from '../../../copy';
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { TextareaAutosizeProps } from '@mui/material';
 import type React from 'react';
 
-export interface TextareaProps extends Omit<TextareaAutosizeProps, 'variant' | 'color' | 'size'> {
+/**
+ * The rich variant mounts a formatting toolbar of ten glyph buttons; the other
+ * three variants mount no toolbar at all. So only that variant owes the words
+ * — a plain textarea is not asked for tooltips it has nowhere to put.
+ */
+type TextareaRichCopy =
+  | { variant?: 'default' | 'autosize' | 'resizable'; richEditorCopy?: never }
+  | { variant: 'rich'; richEditorCopy: RichEditorToolbarCopy };
+
+export type TextareaProps = TextareaBaseProps & TextareaRichCopy;
+
+export interface TextareaBaseProps
+  extends Omit<TextareaAutosizeProps, 'variant' | 'color' | 'size'> {
   /**
    * The variant of the textarea
    */

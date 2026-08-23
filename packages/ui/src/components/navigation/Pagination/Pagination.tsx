@@ -152,6 +152,7 @@ export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
   (componentProps, ref) => {
     const resolved = resolvePaginationProps(componentProps);
     const {
+      pageSizeLabel,
       variant,
       size,
       page,
@@ -194,6 +195,7 @@ export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(
       <PaginationContainer className={className} data-testid={dataTestId || 'pagination'}>
         {showItemsPerPage && onItemsPerPageChange && (
           <ItemsPerPageSelect
+            pageSizeLabel={pageSizeLabel}
             value={itemsPerPage}
             options={itemsPerPageOptions}
             size={size}

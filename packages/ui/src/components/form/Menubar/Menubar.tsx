@@ -47,7 +47,7 @@ type ResolvedProps = MenubarProps & Required<Pick<MenubarProps, keyof typeof DEF
 
 export const Menubar: React.FC<MenubarProps> = (props) => {
   const {
-    items, variant, size, color, orientation, glow, pulse, glass, gradient,
+    ariaLabel, items, variant, size, color, orientation, glow, pulse, glass, gradient,
     loading, disabled, className, style, logo, endContent, sticky, transparent,
     blur, elevation, fullWidth, onClick, onFocus, onBlur,
     'data-testid': dataTestId,
@@ -65,6 +65,7 @@ export const Menubar: React.FC<MenubarProps> = (props) => {
 
   const content = (
     <MenubarToolbar
+      ariaLabel={ariaLabel}
       barSx={barSx}
       items={items}
       size={size}

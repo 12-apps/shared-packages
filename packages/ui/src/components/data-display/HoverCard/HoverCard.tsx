@@ -62,7 +62,7 @@ const offsetMargin = (placement: HoverCardPlacement, offset: number) => {
 export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props, ref) => {
   const {
     variant, glow, pulse, title, description, avatar, trigger, placement, showArrow,
-    animation, enterDelay, exitDelay, maxWidth, loading, loadingComponent, touchEnabled,
+    animation, enterDelay, exitDelay, maxWidth, loading, loadingComponent, loadingText, touchEnabled,
     offset, disabled, onOpen, onClose, children, dataTestId,
     ...rest
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
@@ -122,8 +122,7 @@ export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props
           >
             <CardContent sx={{ p: padding, '&:last-child': { pb: padding } }}>
               <HoverCardContent
-                variant={variant}
-                title={title}
+                loadingText={loadingText} variant={variant} title={title}
                 description={description}
                 avatar={avatar}
                 loading={loading}

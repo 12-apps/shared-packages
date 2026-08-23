@@ -3,8 +3,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { PasswordStrength } from './PasswordStrength';
+import { PT_BR_PASSWORD_STRENGTH_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof PasswordStrength> = {
+  args: { copy: PT_BR_PASSWORD_STRENGTH_COPY },
   title: 'Form/PasswordStrength',
   component: PasswordStrength,
   parameters: {
@@ -58,7 +60,7 @@ const DefaultComponent = () => {
         fullWidth
         placeholder="Enter your password"
       />
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         value={password}
         variant="linear"
         showRequirements={true}
@@ -91,28 +93,28 @@ const AllVariantsComponent = () => {
           <Typography variant="subtitle2" gutterBottom>
             Linear Progress
           </Typography>
-          <PasswordStrength value={password} variant="linear" showStrengthLabel={true} />
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value={password} variant="linear" showStrengthLabel={true} />
         </Paper>
 
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
             Circular Progress
           </Typography>
-          <PasswordStrength value={password} variant="circular" showStrengthLabel={true} />
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value={password} variant="circular" showStrengthLabel={true} />
         </Paper>
 
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
             Steps Indicator
           </Typography>
-          <PasswordStrength value={password} variant="steps" showStrengthLabel={true} />
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value={password} variant="steps" showStrengthLabel={true} />
         </Paper>
 
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
             Detailed View
           </Typography>
-          <PasswordStrength value={password} variant="detailed" showStrengthLabel={true} />
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value={password} variant="detailed" showStrengthLabel={true} />
         </Paper>
       </Box>
     </Stack>
@@ -139,7 +141,7 @@ const WithRequirementsComponent = () => {
         placeholder="Enter a strong password"
       />
 
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         value={password}
         variant="linear"
         showRequirements={true}
@@ -180,7 +182,7 @@ export const PasswordComparison: Story = {
             <Typography variant="subtitle2" gutterBottom sx={{ textTransform: 'capitalize' }}>
               {level}: "{pwd}"
             </Typography>
-            <PasswordStrength value={pwd} variant="linear" showStrengthLabel={true} />
+            <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value={pwd} variant="linear" showStrengthLabel={true} />
           </Paper>
         ))}
       </Stack>
@@ -217,7 +219,7 @@ const RegistrationFormComponent = () => {
         fullWidth
       />
 
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         value={password}
         variant="linear"
         showRequirements={true}
@@ -264,7 +266,7 @@ const WithCustomRequirementsComponent = () => {
         fullWidth
       />
 
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         value={password}
         variant="linear"
         showRequirements={true}
@@ -306,7 +308,7 @@ const RealTimeValidationComponent = () => {
       />
 
       {(focused || password) && (
-        <PasswordStrength
+        <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
           value={password}
           variant="linear"
           showRequirements={true}
@@ -344,7 +346,7 @@ const MinimalIndicatorComponent = () => {
         fullWidth
         size="small"
       />
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         value={password}
         variant="linear"
         showRequirements={false}
@@ -370,7 +372,7 @@ export const AllSizes: Story = {
           Small Indicator
         </Typography>
         <Box sx={{ transform: 'scale(0.8)', transformOrigin: 'left center' }}>
-          <PasswordStrength
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
             value="MyP@ssw0rd123!"
             variant="linear"
             showRequirements={false}
@@ -383,7 +385,7 @@ export const AllSizes: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Medium Indicator (Default)
         </Typography>
-        <PasswordStrength
+        <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
           value="MyP@ssw0rd123!"
           variant="linear"
           showRequirements={false}
@@ -396,7 +398,7 @@ export const AllSizes: Story = {
           Large Indicator
         </Typography>
         <Box sx={{ transform: 'scale(1.2)', transformOrigin: 'left center' }}>
-          <PasswordStrength
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
             value="MyP@ssw0rd123!"
             variant="linear"
             showRequirements={false}
@@ -417,35 +419,35 @@ export const AllStates: Story = {
         <Typography variant="subtitle2" color="error.main">
           Very Weak
         </Typography>
-        <PasswordStrength value="123" variant="linear" showStrengthLabel={true} />
+        <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value="123" variant="linear" showStrengthLabel={true} />
       </Paper>
 
       <Paper sx={{ p: 2 }}>
         <Typography variant="subtitle2" color="warning.main">
           Weak
         </Typography>
-        <PasswordStrength value="password" variant="linear" showStrengthLabel={true} />
+        <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value="password" variant="linear" showStrengthLabel={true} />
       </Paper>
 
       <Paper sx={{ p: 2 }}>
         <Typography variant="subtitle2" color="info.main">
           Fair
         </Typography>
-        <PasswordStrength value="Password123" variant="linear" showStrengthLabel={true} />
+        <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value="Password123" variant="linear" showStrengthLabel={true} />
       </Paper>
 
       <Paper sx={{ p: 2 }}>
         <Typography variant="subtitle2" color="success.main">
           Good
         </Typography>
-        <PasswordStrength value="MyPassword123!" variant="linear" showStrengthLabel={true} />
+        <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value="MyPassword123!" variant="linear" showStrengthLabel={true} />
       </Paper>
 
       <Paper sx={{ p: 2 }}>
         <Typography variant="subtitle2" color="success.dark">
           Very Strong
         </Typography>
-        <PasswordStrength value="MyS3cur3P@ssw0rd!2024" variant="linear" showStrengthLabel={true} />
+        <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value="MyS3cur3P@ssw0rd!2024" variant="linear" showStrengthLabel={true} />
       </Paper>
     </Stack>
   ),
@@ -487,7 +489,7 @@ export const InteractiveStates: Story = {
             fullWidth
           />
 
-          <PasswordStrength
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
             value={password}
             variant={variant}
             showRequirements={showRequirements}
@@ -522,7 +524,7 @@ export const Responsive: Story = {
             Mobile View (Stacked)
           </Typography>
           <Box sx={{ maxWidth: 300 }}>
-            <PasswordStrength
+            <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
               value="MyPassword123!"
               variant="linear"
               showRequirements={true}
@@ -535,7 +537,7 @@ export const Responsive: Story = {
           <Typography variant="subtitle2" gutterBottom>
             Desktop View (Full Width)
           </Typography>
-          <PasswordStrength
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
             value="MyPassword123!"
             variant="linear"
             showRequirements={true}
@@ -549,7 +551,7 @@ export const Responsive: Story = {
           Compact Mobile
         </Typography>
         <Box sx={{ maxWidth: 250 }}>
-          <PasswordStrength
+          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
             value="MyPassword123!"
             variant="steps"
             showRequirements={false}

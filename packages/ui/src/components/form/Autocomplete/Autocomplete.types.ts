@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { AutocompleteCopy } from '../../../copy';
 
 /**
  * A suggestion's behavior on select:
@@ -24,6 +25,12 @@ export interface AutocompleteOption<T = unknown> {
 }
 
 export interface AutocompleteProps<T = AutocompleteOption> {
+  /**
+   * The two rows the dropdown shows in place of options — while an async
+   * fetch is in flight, and when it came back empty. REQUIRED: this package
+   * ships no default copy.
+   */
+  copy: AutocompleteCopy;
   /** Controlled input value */
   value: string;
   /** Input value change */

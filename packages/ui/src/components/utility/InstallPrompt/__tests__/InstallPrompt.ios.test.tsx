@@ -13,6 +13,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { InstallPrompt } from '../index';
+import { PT_BR_INSTALL_PROMPT_COPY } from '../../../../pt-BR';
 
 vi.mock('../InstallPrompt.helpers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../InstallPrompt.helpers')>();
@@ -26,7 +27,7 @@ describe('InstallPrompt on iOS Safari', () => {
   });
 
   it('shows without waiting for an event that iOS never fires', async () => {
-    render(<InstallPrompt title="Instalar FutureDrink" />);
+    render(<InstallPrompt copy={{ ...PT_BR_INSTALL_PROMPT_COPY, title: 'Instalar FutureDrink' }} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('install-prompt')).toBeInTheDocument();
@@ -35,7 +36,7 @@ describe('InstallPrompt on iOS Safari', () => {
   });
 
   it('offers instructions instead of an install button', async () => {
-    render(<InstallPrompt />);
+    render(<InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('install-prompt-ios-instructions')).toBeInTheDocument();
@@ -46,7 +47,7 @@ describe('InstallPrompt on iOS Safari', () => {
   });
 
   it('accepts host-supplied instruction copy', async () => {
-    render(<InstallPrompt iosInstructions={<span>Toque em Compartilhar</span>} />);
+    render(<InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} iosInstructions={<span>Toque em Compartilhar</span>} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('install-prompt-ios-instructions')).toHaveTextContent(
@@ -56,7 +57,7 @@ describe('InstallPrompt on iOS Safari', () => {
   });
 
   it('can still be dismissed', async () => {
-    render(<InstallPrompt />);
+    render(<InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('install-prompt-dismiss')).toBeInTheDocument();

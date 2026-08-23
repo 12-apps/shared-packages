@@ -54,9 +54,10 @@ export function TableFilter({
   open,
   onOpenChange,
   hasActiveFilters = false,
+  copy,
 }: TableFilterProps): React.JSX.Element {
   return (
-    <TableFilterContext.Provider value={{ open, onOpenChange, hasActiveFilters }}>
+    <TableFilterContext.Provider value={{ open, onOpenChange, hasActiveFilters, copy }}>
       {children}
     </TableFilterContext.Provider>
   );
@@ -97,7 +98,7 @@ const TableFilterPanel = ({
   ariaLabel = 'Filters',
   clearTestId,
 }: TableFilterPanelProps): React.JSX.Element => {
-  const { open } = useTableFilterContext();
+  const { open, copy } = useTableFilterContext();
   return (
     <Box
       component="aside"
@@ -142,7 +143,7 @@ const TableFilterPanel = ({
               onClick={onClearAll}
               sx={{ fontSize: '0.75rem', color: 'text.secondary' }}
             >
-              Clear All Filters
+              {copy.clearAllFilters}
             </Link>
           </Box>
           {children}
@@ -160,6 +161,7 @@ const TableFilterKeyword = ({
   label = 'Filter by keyword',
   testId,
 }: TableFilterKeywordProps): React.JSX.Element => {
+  const { copy } = useTableFilterContext();
   const [draft, setDraft] = useState(value);
   const prevValue = useRef(value);
   if (prevValue.current !== value) {
@@ -204,7 +206,7 @@ const TableFilterKeyword = ({
               <InputAdornment position="end">
                 <IconButton
                   size="small"
-                  aria-label="Clear keyword filter"
+                  aria-label={copy.clearKeyword}
                   data-testid={testId ? `${testId}-clear` : undefined}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={clearKeyword}
@@ -326,12 +328,18 @@ const TableFilterRangeField = ({
   onChange,
   unit,
   step,
-  minPlaceholder = 'min',
-  maxPlaceholder = 'max',
+  minPlaceholder,
+  maxPlaceholder,
   invalidLabel,
   testId,
 }: TableFilterRangeFieldProps): React.JSX.Element => {
+  const { copy } = useTableFilterContext();
   const invalid = isRangeInverted(value);
+  // A field may override any of the three; unset, they come from the root's
+  // table. Neither path reaches an English literal in this package.
+  const minText = minPlaceholder ?? copy.rangeMin;
+  const maxText = maxPlaceholder ?? copy.rangeMax;
+  const invalidText = invalidLabel ?? copy.invalidRange;
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }} data-testid={testId}>
       <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: 'text.secondary' }}>
@@ -342,9 +350,9 @@ const TableFilterRangeField = ({
         <RangeBound
           bound={value.min}
           error={invalid}
-          placeholder={minPlaceholder}
+          placeholder={minText}
           step={step}
-          ariaLabel={`${label} ${minPlaceholder}`}
+          ariaLabel={`${label} ${minText}`}
           testId={testId ? `${testId}-min` : undefined}
           onChange={(min) => onChange({ ...value, min })}
         />
@@ -354,9 +362,9 @@ const TableFilterRangeField = ({
         <RangeBound
           bound={value.max}
           error={invalid}
-          placeholder={maxPlaceholder}
+          placeholder={maxText}
           step={step}
-          ariaLabel={`${label} ${maxPlaceholder}`}
+          ariaLabel={`${label} ${maxText}`}
           testId={testId ? `${testId}-max` : undefined}
           onChange={(max) => onChange({ ...value, max })}
         />
@@ -367,7 +375,7 @@ const TableFilterRangeField = ({
           data-testid={testId ? `${testId}-error` : undefined}
           sx={{ fontSize: '0.7rem', color: 'error.main' }}
         >
-          {invalidLabel}
+          {invalidText}
         </Typography>
       )}
     </Box>

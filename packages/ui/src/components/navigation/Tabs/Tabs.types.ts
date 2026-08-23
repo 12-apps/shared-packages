@@ -50,6 +50,8 @@ export interface TabItem {
 }
 
 export interface TabsProps extends Omit<MuiTabsProps, 'variant' | 'children' | 'indicatorColor' | 'scrollButtons'> {
+  /** A closable tab's dismiss — a glyph with no visible label. REQUIRED. */
+  closeTabLabel: string;
   /**
    * The visual variant of the tabs
    */

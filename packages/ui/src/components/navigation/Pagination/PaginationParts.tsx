@@ -20,6 +20,8 @@ const PageInfoContainer = styled(Box)(({ theme }) => ({
 }));
 
 export interface ItemsPerPageSelectProps {
+  /** The label in front of the select. REQUIRED — it was `"Show:"`. */
+  pageSizeLabel: string;
   value: number;
   options: number[];
   size: string;
@@ -29,6 +31,7 @@ export interface ItemsPerPageSelectProps {
 }
 
 export const ItemsPerPageSelect: FC<ItemsPerPageSelectProps> = ({
+  pageSizeLabel,
   value,
   options,
   size,
@@ -38,7 +41,7 @@ export const ItemsPerPageSelect: FC<ItemsPerPageSelectProps> = ({
 }) => (
   <ItemsPerPageContainer>
     <Typography variant="body2" color="text.secondary">
-      Show:
+      {pageSizeLabel}
     </Typography>
     <FormControl size="small" sx={{ minWidth: 80 }}>
       <Select

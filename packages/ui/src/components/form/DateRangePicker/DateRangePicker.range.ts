@@ -61,6 +61,8 @@ export function defaultMessages(): DateRangePickerMessages {
     reversed: 'The end date must be on or after the start date.',
     overMax: ({ maxRangeDays }) => `Choose a range of at most ${maxRangeDays} days.`,
     summary: ({ from, to }) => `${isoToBr(from)} – ${isoToBr(to)}`,
+    calendarLabel: 'Calendar',
+    dayMask: 'dd/mm/yyyy',
   };
 }
 

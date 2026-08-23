@@ -3,8 +3,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { PhoneInput } from './PhoneInput';
+import { PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof PhoneInput> = {
+  args: { copy: PT_BR_PHONE_INPUT_COPY },
   title: 'Form/PhoneInput',
   component: PhoneInput,
   parameters: {
@@ -66,7 +68,7 @@ const DefaultComponent = () => {
 
   return (
     <Box sx={{ maxWidth: 400 }}>
-      <PhoneInput value={value} onChange={setValue} label="Phone Number" defaultCountry="US" />
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} value={value} onChange={setValue} label="Phone Number" defaultCountry="US" />
       {value && (
         <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
           Value: {value}
@@ -101,7 +103,7 @@ export const InternationalNumbers: Story = {
               <Typography variant="subtitle2" gutterBottom>
                 {country.name}
               </Typography>
-              <PhoneInput
+              <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
                 defaultCountry={country.code}
                 placeholder={country.example}
                 label="Phone"
@@ -145,7 +147,7 @@ const WithValidationComponent = () => {
     <Stack spacing={3} sx={{ maxWidth: 400 }}>
       <Typography variant="h6">Phone Validation Example</Typography>
 
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         value={phone}
         onChange={(value) => {
           setPhone(value);
@@ -198,7 +200,7 @@ const ContactFormComponent = () => {
             style={{ padding: '10px' }}
           />
 
-          <PhoneInput
+          <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             value={formData.phone}
             onChange={(value) => setFormData({ ...formData, phone: value })}
             label="Primary Phone"
@@ -206,7 +208,7 @@ const ContactFormComponent = () => {
             defaultCountry="US"
           />
 
-          <PhoneInput
+          <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             value={formData.alternatePhone}
             onChange={(value) => setFormData({ ...formData, alternatePhone: value })}
             label="Alternate Phone (Optional)"
@@ -235,21 +237,21 @@ export const DifferentVariants: Story = {
       <Stack spacing={3}>
         <Typography variant="h6">Input Variants</Typography>
 
-        <PhoneInput
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
           label="Outlined"
           variant="outlined"
           defaultCountry="US"
           placeholder="+1 (555) 000-0000"
         />
 
-        <PhoneInput
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
           label="Filled"
           variant="filled"
           defaultCountry="US"
           placeholder="+1 (555) 000-0000"
         />
 
-        <PhoneInput
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
           label="Standard"
           variant="standard"
           defaultCountry="US"
@@ -268,7 +270,7 @@ export const WithCountryRestrictions: Story = {
           <Typography variant="subtitle2" gutterBottom>
             North America Only
           </Typography>
-          <PhoneInput
+          <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             label="Phone"
             defaultCountry="US"
             onlyCountries={['US', 'CA', 'MX']}
@@ -280,7 +282,7 @@ export const WithCountryRestrictions: Story = {
           <Typography variant="subtitle2" gutterBottom>
             European Union
           </Typography>
-          <PhoneInput
+          <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             label="Phone"
             defaultCountry="FR"
             onlyCountries={['FR', 'DE', 'IT', 'ES', 'NL', 'BE']}
@@ -292,7 +294,7 @@ export const WithCountryRestrictions: Story = {
           <Typography variant="subtitle2" gutterBottom>
             Asia Pacific
           </Typography>
-          <PhoneInput
+          <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             label="Phone"
             defaultCountry="JP"
             onlyCountries={['JP', 'CN', 'KR', 'SG', 'AU', 'NZ']}
@@ -306,9 +308,9 @@ export const WithCountryRestrictions: Story = {
 export const DisabledAndReadOnly: Story = {
   render: () => (
       <Stack spacing={3}>
-        <PhoneInput label="Disabled" defaultCountry="US" value="+1 (555) 123-4567" disabled />
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Disabled" defaultCountry="US" value="+1 (555) 123-4567" disabled />
 
-        <PhoneInput label="Read Only" defaultCountry="GB" value="+44 20 7123 4567" readOnly />
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Read Only" defaultCountry="GB" value="+44 20 7123 4567" readOnly />
       </Stack>
     ),
 };
@@ -333,7 +335,7 @@ const EmergencyContactsComponent = () => {
           <Typography variant="subtitle2" gutterBottom>
             {contact.name}
           </Typography>
-          <PhoneInput
+          <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             value={contact.phone}
             onChange={(value) => updateContact(contact.id, value)}
             label="Phone Number"
@@ -359,19 +361,19 @@ export const EmergencyContacts: Story = {
 export const AllVariants: Story = {
   render: () => (
     <Stack spacing={3} sx={{ width: 400 }}>
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="Outlined Variant"
         variant="outlined"
         countryCode="US"
         placeholder="+1 (555) 000-0000"
       />
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="Filled Variant"
         variant="filled"
         countryCode="US"
         placeholder="+1 (555) 000-0000"
       />
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="Glass Variant"
         variant="glass"
         countryCode="US"
@@ -387,9 +389,9 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Stack spacing={3} sx={{ width: 400 }}>
-      <PhoneInput label="Default Size" countryCode="US" placeholder="+1 (555) 000-0000" />
-      <PhoneInput label="Full Width" countryCode="US" placeholder="+1 (555) 000-0000" fullWidth />
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Default Size" countryCode="US" placeholder="+1 (555) 000-0000" />
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Full Width" countryCode="US" placeholder="+1 (555) 000-0000" fullWidth />
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="Not Full Width"
         countryCode="US"
         placeholder="+1 (555) 000-0000"
@@ -405,22 +407,22 @@ export const AllSizes: Story = {
 export const AllStates: Story = {
   render: () => (
     <Stack spacing={3} sx={{ width: 400 }}>
-      <PhoneInput label="Default State" countryCode="US" placeholder="Enter phone number" />
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Default State" countryCode="US" placeholder="Enter phone number" />
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="Disabled State"
         countryCode="US"
         defaultValue="+1 (555) 123-4567"
         disabled
       />
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="Error State"
         countryCode="US"
         defaultValue="invalid"
         error
         errorMessage="Invalid phone number format"
       />
-      <PhoneInput label="Required State" countryCode="US" placeholder="Required field" required />
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Required State" countryCode="US" placeholder="Required field" required />
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="With Helper Text"
         countryCode="US"
         placeholder="Enter your phone"
@@ -444,7 +446,7 @@ const InteractiveStatesComponent = () => {
 
   return (
     <Stack spacing={3} sx={{ width: 400 }}>
-      <PhoneInput
+      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
         label="Interactive Phone Input"
         countryCode="US"
         placeholder="Try typing a phone number"
@@ -478,9 +480,9 @@ export const Responsive: Story = {
           gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
         }}
       >
-        <PhoneInput label="US Phone" countryCode="US" placeholder="+1 (555) 000-0000" fullWidth />
-        <PhoneInput label="UK Phone" countryCode="GB" placeholder="+44 20 0000 0000" fullWidth />
-        <PhoneInput
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="US Phone" countryCode="US" placeholder="+1 (555) 000-0000" fullWidth />
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="UK Phone" countryCode="GB" placeholder="+44 20 0000 0000" fullWidth />
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
           label="France Phone"
           countryCode="FR"
           placeholder="+33 1 00 00 00 00"

@@ -145,6 +145,7 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
       collapseBehavior,
       mobileMaxItems,
       ariaLabel,
+      copy,
       dataTestId,
       ...props
     } = resolveProps(componentProps);
@@ -181,6 +182,7 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
       >
         {displayItems.map((item, index) => (
           <BreadcrumbEntry
+            copy={copy}
             key={index}
             item={item}
             index={index}

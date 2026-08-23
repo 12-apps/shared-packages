@@ -159,6 +159,7 @@ export function FilterDialog<T extends Record<string, unknown>>({
       open={open}
       onClose={onClose}
       navigationTitle={copy.filters.panelTitle}
+      backLabel={copy.nav.goBack}
       modalId={`${props.testIdPrefix}-filters`}
       maxWidth="xs"
       dataTestId={`${props.testIdPrefix}-filter-dialog`}
@@ -174,7 +175,7 @@ export function FilterDialog<T extends Record<string, unknown>>({
               data-testid={`${props.testIdPrefix}-clear-filters`}
               sx={{ fontSize: "0.75rem", color: "text.secondary" }}
             >
-              Clear All Filters
+              {copy.filters.clearAllFilters}
             </Link>
           </Box>
           <FilterControls {...props} />
