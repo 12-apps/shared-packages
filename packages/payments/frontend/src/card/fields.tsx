@@ -41,7 +41,7 @@ export function SavedCardsPicker({
         ...savedCards.map((saved) => ({
           value: saved.id,
           label: `${saved.brand} •••• ${saved.last4}`,
-          description: `Validade ${String(saved.expMonth).padStart(2, "0")}/${saved.expYear}`,
+          description: copy.savedCardExpiry(String(saved.expMonth).padStart(2, "0"), saved.expYear),
         })),
         { value: NEW_CARD, label: copy.newCard, description: copy.newCardDescription },
       ]}

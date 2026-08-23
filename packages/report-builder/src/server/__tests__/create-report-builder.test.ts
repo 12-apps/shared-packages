@@ -189,10 +189,15 @@ function setup(
     // that never saw the window would silently report on all of history.
     adapter: ({ window }) => {
       seen.push(window);
-      return createMemoryDataSource({
-        orders: [{ createdAt: new Date('2026-07-14T12:00:00Z'), method: 'PIX', totalCents: 1000 }],
-        losses: [{ reason: 'quebra', units: 3 }],
-      });
+      return createMemoryDataSource(
+        {
+          orders: [
+            { createdAt: new Date('2026-07-14T12:00:00Z'), method: 'PIX', totalCents: 1000 },
+          ],
+          losses: [{ reason: 'quebra', units: 3 }],
+        },
+        PT_BR_REPORT_ENGINE_COPY.labels.othersBucket,
+      );
     },
     db: () => Promise.resolve(db),
     timeZone: 'America/Sao_Paulo',

@@ -122,7 +122,7 @@ function useSelectedBlock(
     if (spec === null) return null;
     return {
       spec,
-      parts: sentenceParts(blockSentence(spec, catalog, copy.spec)),
+      parts: sentenceParts(blockSentence(spec, catalog, copy.spec), copy.spec),
       autoTitle: blockAutoTitle(spec, catalog, copy.spec),
     };
   }, [spec, catalog, copy]);

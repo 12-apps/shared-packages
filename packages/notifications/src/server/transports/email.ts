@@ -46,8 +46,13 @@ export interface EmailDriverDeclaration extends DriverDeclarationBase {
   from?: string;
   /** Where the CTA link points; without it a link is dropped. */
   appUrl?: string;
-  /** CTA label. pt-BR product copy by default. */
-  linkLabel?: string;
+  /**
+   * The CTA link's label. REQUIRED — this used to default to `'Ver detalhes'`,
+   * so a host that declared EMAIL and nothing else mailed this product's
+   * Portuguese to its own users, in their inbox, signed with the host's own
+   * `from` address.
+   */
+  linkLabel: string;
   logger?: NotificationLogger;
 }
 
@@ -109,7 +114,7 @@ export function formatEmail(
   declaration: EmailDriverDeclaration,
 ): EmailMessage {
   const href = absoluteLink(content.link, declaration.appUrl);
-  const label = declaration.linkLabel ?? 'Ver detalhes';
+  const label = declaration.linkLabel;
   return {
     subject: content.title,
     text: href ? `${content.body}\n\n${href}` : content.body,

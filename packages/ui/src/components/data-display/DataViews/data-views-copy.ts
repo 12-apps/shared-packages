@@ -183,6 +183,12 @@ export interface DataViewsSelectionCopy {
   onThisPage(count: number): string;
   /** One row's checkbox, which carries no visible label of its own. */
   selectRow: string;
+  /**
+   * The row's disclosure button, in its two states. It carries a glyph and no
+   * text, so this pair IS the only name a screen reader ever reads for it.
+   */
+  expandRow: string;
+  collapseRow: string;
 }
 
 export interface DataViewsNavCopy {

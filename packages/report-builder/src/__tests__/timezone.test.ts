@@ -5,6 +5,7 @@ import { executeCompiledQuery } from '../memory';
 import { reportSpecSchema, type ReportSpecInput } from '../spec';
 import { truncateDateToGrain } from '../time';
 import { salesCatalog } from './fixtures';
+import { PT_BR_REPORT_ENGINE_COPY } from '../pt-BR';
 
 /**
  * A tenant zone, NAMED BY THE TEST rather than imported.
@@ -19,7 +20,7 @@ const SAO_PAULO = 'America/Sao_Paulo';
 type SourceRow = Record<string, unknown>;
 
 function run(input: ReportSpecInput, rows: SourceRow[]) {
-  return executeCompiledQuery(rows, compileReport(reportSpecSchema.parse(input), salesCatalog));
+  return executeCompiledQuery(rows, compileReport(reportSpecSchema.parse(input), salesCatalog), PT_BR_REPORT_ENGINE_COPY.labels.othersBucket);
 }
 
 /** 02:00Z on the 31st is still the 30th at 23:00 in São Paulo (UTC-3). */

@@ -315,6 +315,32 @@ function harnessControls(
   return routes;
 }
 
+/**
+ * The four channels this harness declares, and what each one has to STATE.
+ *
+ * Lifted out of `notificationsHost` so the wiring reads as the fixed
+ * declaration it is — and so the function stays inside the size gate, which
+ * the `linkLabel` line was what finally pushed it past.
+ *
+ * `linkLabel` (EMAIL), `defaultCountryCode` (both phone channels) and
+ * `templateLanguage` (WhatsApp) are all REQUIRED for one reason: a package
+ * default would be this product's answer landing in a stranger's inbox, on a
+ * foreign number, or under a template registered in the wrong language.
+ */
+const TRANSPORTS = [
+  { channel: 'EMAIL', driver: 'harness', appUrl: 'https://harness.test', linkLabel: 'Ver detalhes' },
+  { channel: 'SMS', driver: 'harness', appUrl: 'https://harness.test', defaultCountryCode: '55' },
+  {
+    channel: 'WHATSAPP',
+    driver: 'harness',
+    appUrl: 'https://harness.test',
+    templateName: 'harness_alert',
+    templateLanguage: 'pt_BR',
+    defaultCountryCode: '55',
+  },
+  { channel: 'WEB_PUSH', driver: 'harness', publicKey: 'BHarnessVapidPublicKey' },
+] as const;
+
 /** The mounted surface: the package's router behind this host's seams. */
 export function notificationsHost(pg: PGlite) {
   const outbox: OutboxEntry[] = [];
@@ -349,30 +375,7 @@ export function notificationsHost(pg: PGlite) {
         return Promise.resolve(person ? { email: person.email, phone: person.phone } : null);
       },
     },
-    transports: [
-      { channel: 'EMAIL', driver: 'harness', appUrl: 'https://harness.test' },
-      // `defaultCountryCode` is REQUIRED on both phone channels, and this is what
-      // that requirement looks like from a host: one line, stated once, instead
-      // of a package-level guess that turns a foreign number into a local one.
-      {
-        channel: 'SMS',
-        driver: 'harness',
-        appUrl: 'https://harness.test',
-        defaultCountryCode: '55',
-      },
-      {
-        channel: 'WHATSAPP',
-        driver: 'harness',
-        appUrl: 'https://harness.test',
-        templateName: 'harness_alert',
-        // Stated even though this harness driver never sends to Meta: a
-        // template is registered under exactly one language, so the channel
-        // declaration is where that belongs regardless of who delivers it.
-        templateLanguage: 'pt_BR',
-        defaultCountryCode: '55',
-      },
-      { channel: 'WEB_PUSH', driver: 'harness', publicKey: 'BHarnessVapidPublicKey' },
-    ],
+    transports: TRANSPORTS,
     drivers: recorder(outbox, latch),
     // The plan gate: the free tenant pays for the inbox and nothing else, so a
     // tenant-scoped emit there DEGRADES to zero channels rather than vanishing.

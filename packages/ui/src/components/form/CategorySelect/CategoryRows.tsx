@@ -2,6 +2,7 @@
 
 import { Box } from '@mui/material';
 
+import type { CategorySelectCopy } from '../../../copy';
 import { CheckGlyph, DisclosureGlyph } from './CategoryIcons';
 import { highlightSegments, type CategoryCheckState } from './category-tree';
 import {
@@ -69,6 +70,7 @@ interface CategoryHeadRowProps {
   onToggleExpanded: () => void;
   onActivate: () => void;
   dataTestId: string;
+  copy: CategorySelectCopy;
 }
 
 /** The trailing number: how many children are picked, else the item count. */
@@ -101,6 +103,7 @@ export function CategoryHeadRow({
   onToggleExpanded,
   onActivate,
   dataTestId,
+  copy,
 }: CategoryHeadRowProps): React.JSX.Element {
   const meta = rowMeta(selectedCount, showCounts, option.count);
   return (
@@ -117,7 +120,9 @@ export function CategoryHeadRow({
         component="button"
         type="button"
         tabIndex={-1}
-        aria-label={`${expanded ? 'Recolher' : 'Expandir'} ${option.name}`}
+        aria-label={
+          expanded ? copy.collapseCategory(option.name) : copy.expandCategory(option.name)
+        }
         data-testid={`${dataTestId}-expand-${option.id}`}
         sx={(theme) => chevronButtonSx(theme, expanded)}
         onClick={(event: React.MouseEvent) => {

@@ -9,7 +9,7 @@ import { orderRows, salesCatalog } from './fixtures';
 
 const options = {
   catalog: salesCatalog,
-  adapter: createMemoryDataSource({ orders: orderRows }),
+  adapter: createMemoryDataSource({ orders: orderRows }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket),
   copy: PT_BR_REPORT_ENGINE_COPY,
 };
 

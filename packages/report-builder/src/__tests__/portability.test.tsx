@@ -178,7 +178,7 @@ function savedReportDb(): SavedReportDb {
 function config(overrides: Partial<ReportBuilderServerConfig> = {}): ReportBuilderServerConfig {
   return {
     catalog: CATALOG,
-    adapter: () => createMemoryDataSource(ROWS),
+    adapter: () => createMemoryDataSource(ROWS, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket),
     copy: PT_BR_REPORT_ENGINE_COPY,
     messages: PT_BR_REPORT_SERVER_MESSAGES,
     db: () => Promise.resolve(savedReportDb()),

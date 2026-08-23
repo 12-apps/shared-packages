@@ -128,7 +128,7 @@ function setup(seed: SavedReportRecord = record()): Harness {
 
   const { routes } = createApiReportBuilder({
     catalog: CATALOG,
-    adapter: () => createMemoryDataSource({ orders: [] }),
+    adapter: () => createMemoryDataSource({ orders: [] }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket),
     copy: PT_BR_REPORT_ENGINE_COPY,
     messages: PT_BR_REPORT_SERVER_MESSAGES,
     db: () => Promise.resolve(db),

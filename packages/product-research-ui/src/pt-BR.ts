@@ -20,6 +20,7 @@ export const PT_BR_RESEARCH_MESSAGES: ResearchMessages = {
   formSubmitBusy: 'Iniciando…',
   formTermRequired: 'Diga o que pesquisar (mínimo 2 letras).',
   formStartFailed: 'Não foi possível iniciar a pesquisa.',
+  runLoadFailed: 'Não foi possível carregar a pesquisa.',
 
   statusTitle: 'Fontes consultadas',
   statusQuerying: 'consultando…',

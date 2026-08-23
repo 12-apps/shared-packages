@@ -42,6 +42,12 @@ export interface CardFieldCopy {
    */
   expiryLabel: string;
   cvvLabel: string;
+  /**
+   * The expiry field holds something that is not yet `MM/AA` at all — too few
+   * digits, or the wrong shape. Distinct from {@link monthInvalid}, which is a
+   * well-formed date with an impossible month.
+   */
+  expiryIncomplete: string;
   /** A month outside 1–12 — a typo, not an expiry. */
   monthInvalid: string;
   /** A well-formed date that has already passed. */
@@ -66,6 +72,12 @@ export interface CardFieldCopy {
   cpfInvalid: string;
   /** The saved-cards radio group's own label. */
   savedCardsLabel: string;
+  /**
+   * A saved card's second line — the expiry, already zero-padded and split
+   * into month and year. The WORD in front of it is this host's; the order it
+   * reads in is the same order {@link expiryLabel} promised.
+   */
+  savedCardExpiry(month: string, year: number): string;
   /** The trailing option that opens the new-card form. */
   newCard: string;
   newCardDescription: string;

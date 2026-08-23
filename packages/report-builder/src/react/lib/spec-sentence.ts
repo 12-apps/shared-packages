@@ -145,34 +145,22 @@ export function blockAutoTitle(
 /** One run of the sentence: `strong` marks the terms the author chose. */
 export interface SentencePart {
   text: string;
-  /** False for the words `specSentence` joins clauses with, true for the rest. */
+  /** False for the phrases the pack joins clauses with, true for the rest. */
   strong: boolean;
 }
 
 /**
- * The words `specSentence` uses to JOIN clauses, longest first.
- *
- * Longest first is load-bearing: a regex alternation takes the first branch
- * that matches at a position, so `", "` listed before `", onde "` would cut
- * every clause boundary short and leave `onde ` emphasised as if it were a
- * field label.
+ * The splitter for ONE pack's joining phrases, in the order the pack listed
+ * them. Longest first is load-bearing and is the PACK's responsibility: a
+ * regex alternation takes the first branch that matches at a position, so
+ * `", "` listed before `", onde "` would cut every clause boundary short and
+ * leave `onde ` emphasised as if it were a field label.
  */
-const CONNECTIVES: readonly string[] = [
-  ", separado por ",
-  ", dividido por ",
-  ", onde ",
-  ", top ",
-  " por ",
-  " em ",
-  " e ",
-  ", ",
-];
-
-const CONNECTIVE_SET: ReadonlySet<string> = new Set(CONNECTIVES);
-
-const SPLITTER = new RegExp(
-  `(${CONNECTIVES.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
-);
+function splitterFor(connectives: readonly string[]): RegExp {
+  return new RegExp(
+    `(${connectives.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+  );
+}
 
 /**
  * The sentence split into emphasised and un-emphasised runs, so the panel can
@@ -181,15 +169,19 @@ const SPLITTER = new RegExp(
  *
  * A PRESENTATION pass over {@link specSentence}'s output, never a second
  * sentence: the parts concatenate back to exactly the string that went in (a
- * test pins that), so this can lose or invent no word. If `describe.ts` ever
- * joins with a phrase not listed above, the clause simply stops being bold —
+ * test pins that), so this can lose or invent no word. The phrases it splits
+ * on are the PACK's own {@link SpecSentenceCopy.connectives} — the same pack
+ * that wrote the sentence — so a host in another language bolds correctly
+ * rather than not at all. If a pack joins with a phrase it did not list, the
+ * clause simply stops being bold —
  * the text stays right, which is the failure mode worth having. Bolding is also
  * approximate INSIDE a clause: a field whose label contains "e" or a comma has
  * its emphasis broken there, which costs a weight change and nothing else.
  */
-export function sentenceParts(sentence: string): SentencePart[] {
+export function sentenceParts(sentence: string, copy: SpecSentenceCopy): SentencePart[] {
+  const joins = new Set(copy.connectives);
   return sentence
-    .split(SPLITTER)
+    .split(splitterFor(copy.connectives))
     .filter((part) => part !== "")
-    .map((part) => ({ text: part, strong: !CONNECTIVE_SET.has(part) }));
+    .map((part) => ({ text: part, strong: !joins.has(part) }));
 }

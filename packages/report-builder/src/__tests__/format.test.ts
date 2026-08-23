@@ -121,7 +121,7 @@ describe('compiled measure formats', () => {
 describe('render model format metadata', () => {
   const options = {
     catalog: salesCatalog,
-    adapter: createMemoryDataSource({ orders: [] }),
+    adapter: createMemoryDataSource({ orders: [] }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket),
     copy: PT_BR_REPORT_ENGINE_COPY,
   };
 
@@ -154,7 +154,7 @@ describe('render model format metadata', () => {
       },
       {
         catalog: salesCatalog,
-        adapter: createMemoryDataSource({ orders: [{ prepSeconds: 42 }] }),
+        adapter: createMemoryDataSource({ orders: [{ prepSeconds: 42 }] }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket),
         copy: PT_BR_REPORT_ENGINE_COPY,
       },
     );
@@ -171,7 +171,7 @@ describe('render model format metadata', () => {
       },
       {
         catalog: salesCatalog,
-        adapter: createMemoryDataSource({ orders: [{ prepSeconds: 42 }] }),
+        adapter: createMemoryDataSource({ orders: [{ prepSeconds: 42 }] }, PT_BR_REPORT_ENGINE_COPY.labels.othersBucket),
         copy: PT_BR_REPORT_ENGINE_COPY,
       },
     );
