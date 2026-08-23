@@ -17,6 +17,7 @@ import type { ReactNode } from 'react';
 import type { ConnectedOAuthAccount, PaymentEnvironment } from '@12-apps/payments-backend';
 
 import { BTN_PRIMARY_SX, BTN_SECONDARY_SX, LINKISH_SX, T } from './panel-tokens';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * The connect card's own pieces: what a connection IS, what authorizing
@@ -46,23 +47,25 @@ export function ConnectionFacts({
   account: ConnectedOAuthAccount | null;
   displayName: string;
 }) {
+  const copy = usePaymentsSettingsCopy().card;
+  const env = usePaymentsSettingsCopy().environment;
   // A fact's testid names its VALUE, not its row: the environment is asserted
   // with an exact `toHaveText`, so hanging the id on the grid — or even on the
   // row, which also carries the "AMBIENTE" label — makes that assertion read
   // the whole card. Every consumer of this id wants the one string.
   const facts: { key: string; value: string; testId?: string }[] = [
-    { key: 'Conta', value: account?.accountLabel ?? account?.accountId ?? `Conta ${displayName}` },
-    { key: 'Conexão', value: `Autorizada no ${displayName}` },
+    { key: copy.accountLabel, value: account?.accountLabel ?? account?.accountId ?? copy.accountHeading(displayName) },
+    { key: copy.connectionLabel, value: copy.authorizedAt(displayName) },
     {
-      key: 'Ambiente',
-      value: environment === 'PRODUCTION' ? 'Produção' : 'Sandbox (testes)',
+      key: copy.environmentLabel,
+      value: environment === 'PRODUCTION' ? env.production : copy.sandboxWithNote,
       testId: 'payments-connected-environment',
     },
   ];
   if (account?.connectedAt) {
     facts.push({
-      key: 'Conectada em',
-      value: new Date(account.connectedAt).toLocaleString('pt-BR'),
+      key: copy.connectedAtLabel,
+      value: new Date(account.connectedAt).toLocaleString(),
     });
   }
   return (
@@ -108,10 +111,11 @@ export function ConnectionFacts({
  * you end up back here.
  */
 export function ConnectSteps({ displayName }: { displayName: string }) {
+  const copy = usePaymentsSettingsCopy().card;
   const steps = [
-    `Entre na sua conta ${displayName} — dá para criar uma na hora, se ainda não tiver.`,
-    'Autorize o acesso na tela do provedor.',
-    'Você volta para cá com a conta conectada.',
+    copy.steps.signIn(displayName),
+    copy.steps.authorize,
+    copy.steps.comeBack,
   ];
   return (
     <Stack component="ol" spacing={1.1} sx={{ listStyle: 'none', m: 0, p: 0 }}>
@@ -159,17 +163,18 @@ export function DisconnectDialog(props: {
   /** The softer path: keep the connection, stop taking orders through it. */
   onPauseInstead?: () => void;
 }) {
+  const copy = usePaymentsSettingsCopy().card;
   const { displayName, receiving } = props;
   return (
     <Dialog open={props.open} onClose={props.onCancel} data-testid="payments-disconnect-confirm">
       <DialogTitle sx={{ fontSize: '16.5px', fontWeight: 700, letterSpacing: '-.01em', pb: '8px' }}>
-        Remover a conexão com {displayName}?
+        {copy.removeQuestion(displayName)}
       </DialogTitle>
       <DialogContent sx={{ pb: '4px' }}>
         <DialogContentText sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.55 }}>
           {receiving
-            ? 'A loja para de receber na hora e fica sem provedor ativo — pedidos novos não conseguem ser pagos até você conectar outro.'
-            : 'Esta conexão sai da loja. Você pode conectar de novo depois.'}
+            ? copy.removeConsequenceLive
+            : copy.removeConsequenceIdle}
         </DialogContentText>
         {/* The consequences, itemised. A single paragraph makes the reversible
             facts and the irreversible one weigh the same, and the one that
@@ -179,12 +184,12 @@ export function DisconnectDialog(props: {
             <Consequence tone="bad">Pedidos novos deixam de ser cobrados imediatamente.</Consequence>
           ) : null}
           <Consequence>
-            {`A autorização é revogada no ${displayName}. Sua conta e seu histórico continuam lá, intactos.`}
+            {copy.removeRevokes(displayName)}
           </Consequence>
           <Consequence>
-            {`Pagamentos já aprovados e estornos em andamento seguem normalmente pelo ${displayName}.`}
+            {copy.removeKeepsSettled(displayName)}
           </Consequence>
-          <Consequence>Para reconectar, os passos recomeçam do zero.</Consequence>
+          <Consequence>{copy.removeRestartsSetup}</Consequence>
         </Stack>
       </DialogContent>
       <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: '8px', p: '18px 22px 20px' }}>
@@ -199,7 +204,7 @@ export function DisconnectDialog(props: {
             sx={BTN_SECONDARY_SX}
             data-testid="payments-pause-instead"
           >
-            Só pausar o recebimento
+            {copy.pauseInstead}
           </Button>
         ) : null}
         <Button
@@ -211,7 +216,7 @@ export function DisconnectDialog(props: {
           data-testid="payments-disconnect-confirm-action"
           sx={{ ...BTN_PRIMARY_SX, background: T.bad, '&:hover': { background: '#a51f1f' } }}
         >
-          {props.busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Remover conexão'}
+          {props.busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : copy.removeAction}
         </Button>
         <Button fullWidth onClick={props.onCancel} disabled={props.busy} sx={LINKISH_SX}>
           Cancelar

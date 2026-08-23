@@ -10,6 +10,7 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { PT_BR_INFINITEPAY_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * Can a connected store actually REACH the step that switches it on?
@@ -122,6 +123,7 @@ function renderSettings(testCase: Case, { proven = false } = {}) {
 
   render(
     <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
       client={client}
       initialProvider={adapter.name}
       // The OAuth providers' real screen has a working connect button, which is

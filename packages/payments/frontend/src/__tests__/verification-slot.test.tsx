@@ -6,6 +6,7 @@ import type { MerchantSettingsView } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * The activation step's slot.
@@ -45,6 +46,7 @@ describe('PaymentProviderSettings — the verification slot', () => {
     const renderVerification = vi.fn(() => <div data-testid="slot" />);
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient(viewWith(null))}
         renderVerification={renderVerification}
       />,
@@ -58,6 +60,7 @@ describe('PaymentProviderSettings — the verification slot', () => {
     const renderVerification = vi.fn(() => <div data-testid="slot" />);
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient(
           viewWith({ provider: 'pagbank', status: 'VERIFIED', enabled: true, environments: {} }),
         )}
@@ -89,6 +92,7 @@ describe('PaymentProviderSettings — the verification slot', () => {
     const renderVerification = vi.fn(() => <div data-testid="slot" />);
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient(viewWith(null))}
         initialProvider="pagbank"
         renderVerification={renderVerification}
@@ -110,6 +114,7 @@ describe('PaymentProviderSettings — the verification slot', () => {
   it('places the step outside the manual-credentials disclosure', async () => {
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient(
           viewWith({ provider: 'pagbank', status: 'VERIFIED', enabled: false, environments: {} }),
         )}

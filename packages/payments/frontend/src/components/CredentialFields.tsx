@@ -5,6 +5,8 @@ import { Box, Button, Stack, TextField, Typography } from '@mui/material';
 import type { CredentialFieldSpec, MaskedFieldState } from '@12-apps/payments-backend';
 
 import { LINKISH_SX, T } from './panel-tokens';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
+import type { CredentialFormCopy } from './settings-copy';
 
 /**
  * The schema-driven credential inputs, and the one-line summary a finished
@@ -27,6 +29,7 @@ function secretPresentation(
   state: MaskedFieldState | undefined,
   value: string | undefined,
   required: boolean,
+  copy: CredentialFormCopy,
 ): FieldPresentation {
   const configured = state?.configured ?? false;
   return {
@@ -34,7 +37,7 @@ function secretPresentation(
     value: value ?? '',
     required: required && !configured,
     placeholder: configured ? (state?.hint ?? '') : undefined,
-    helperText: configured ? 'Configurado — deixe em branco para manter o valor atual.' : undefined,
+    helperText: configured ? copy.configuredKeepBlank : undefined,
   };
 }
 
@@ -42,8 +45,9 @@ function fieldPresentation(
   spec: CredentialFieldSpec,
   state: MaskedFieldState | undefined,
   value: string | undefined,
+  copy: CredentialFormCopy,
 ): FieldPresentation {
-  if (spec.secret) return secretPresentation(state, value, spec.required);
+  if (spec.secret) return secretPresentation(state, value, spec.required, copy);
   const configured = state?.configured ?? false;
   return {
     type: 'text',
@@ -83,7 +87,8 @@ interface CredentialFieldProps {
 
 /** One schema-driven form field. Secrets are write-only: hint, never value. */
 export function CredentialField({ spec, state, value, onChange, check }: CredentialFieldProps) {
-  const presentation = fieldPresentation(spec, state, value);
+  const copy = usePaymentsSettingsCopy().credentials;
+  const presentation = fieldPresentation(spec, state, value, copy);
   // Label ABOVE the box, not floating in it. Four credentials whose names are
   // the only thing distinguishing them (`sk_`, `pk_`, `whsec_`, `acct_`) are
   // read as a column, and a floating label disappears the moment a value is
@@ -103,7 +108,7 @@ export function CredentialField({ spec, state, value, onChange, check }: Credent
         {spec.label}
         {spec.advanced ? (
           <Box component="span" sx={{ fontWeight: 500, color: T.ink4 }}>
-            {' · só para plataformas Connect'}
+            {copy.advancedSuffix}
           </Box>
         ) : null}
       </Typography>
@@ -222,16 +227,18 @@ export function DoneRow({
   value,
   mono,
   onEdit,
-  editLabel = 'Alterar',
+  editLabel,
   testId,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   onEdit: () => void;
+  /** Defaults to the host's `changeAction` when the caller names none. */
   editLabel?: string;
   testId: string;
 }) {
+  const copy = usePaymentsSettingsCopy().credentials;
   return (
     // Green, not grey: a finished step reads as an achievement at a glance, and
     // the whole point of collapsing it is that the eye can skip it on the way to
@@ -263,7 +270,7 @@ export function DoneRow({
       </Typography>
       <Box sx={{ flexGrow: 1 }} />
       <Button size="small" onClick={onEdit} data-testid={`${testId}-edit`} sx={LINKISH_SX}>
-        {editLabel}
+        {editLabel ?? copy.changeAction}
       </Button>
     </Stack>
   );

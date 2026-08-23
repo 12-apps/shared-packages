@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from './settings-test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -12,6 +12,7 @@ import type { PaymentsSettingsClient } from '../client';
 import { connectionBadge, expiryProximity, isConnected } from '../components/connection-state';
 import { ProviderConnection } from '../components/ProviderConnection';
 import { ProviderList } from '../components/ProviderList';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * What "connected" means, in exactly one place.
@@ -26,6 +27,9 @@ import { ProviderList } from '../components/ProviderList';
 function config(over: Partial<MaskedProviderConfig>): MaskedProviderConfig {
   return { provider: 'pagbank', status: 'UNVERIFIED', enabled: false, ...over } as MaskedProviderConfig;
 }
+
+/** The pack a host passes; these assertions read the words it chose. */
+const BADGE_COPY = PT_BR_PAYMENTS_SETTINGS_COPY.listBadge;
 
 describe('isConnected', () => {
   /** The reported bug: the row survives a disconnect, emptied. */
@@ -49,11 +53,11 @@ describe('isConnected', () => {
 
 describe('connectionBadge', () => {
   it('names a disconnected store as not connected', () => {
-    expect(connectionBadge(config({ status: 'UNVERIFIED' })).label).toBe('Não conectado');
+    expect(connectionBadge(BADGE_COPY, config({ status: 'UNVERIFIED' })).label).toBe('Não conectado');
   });
 
   it('leads with Ativo, the only state where money can move', () => {
-    expect(connectionBadge(config({ status: 'VERIFIED', enabled: true })).label).toBe('Ativo');
+    expect(connectionBadge(BADGE_COPY, config({ status: 'VERIFIED', enabled: true })).label).toBe('Ativo');
   });
 
   /**
@@ -61,7 +65,7 @@ describe('connectionBadge', () => {
    * card an owner needs to open.
    */
   it('calls out a lapsed authorization instead of calling it connected', () => {
-    expect(connectionBadge(config({ status: 'RECONNECT_REQUIRED' })).label).toBe('Reconectar');
+    expect(connectionBadge(BADGE_COPY, config({ status: 'RECONNECT_REQUIRED' })).label).toBe('Reconectar');
   });
 });
 

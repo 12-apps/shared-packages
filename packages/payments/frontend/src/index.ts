@@ -221,6 +221,25 @@ export {
   type CardTokenizer,
   type SavedCard,
 } from './card';
+// The settings surface's words. `PaymentProviderSettings` takes the pack as a
+// required prop and mounts the provider; the provider is exported for a host
+// that composes the pieces itself (FUT-760).
+export {
+  PaymentsSettingsCopyProvider,
+  usePaymentsSettingsCopy,
+} from './components/settings-copy-context';
+export { PT_BR_PAYMENTS_SETTINGS_COPY } from './components/settings-pt-BR';
+export type {
+  ConnectionBadgeCopy,
+  ConnectionCardCopy,
+  ConnectionStatusCopy,
+  CredentialFormCopy,
+  EnvironmentCopy,
+  OAuthConnectionCopy,
+  PaymentsSettingsCopy,
+  ProviderPriorityCopy,
+  SetupGuideCopy,
+} from './components/settings-copy';
 export {
   ProviderConnection,
   type ProviderConnectionProps,

@@ -7,6 +7,7 @@ import type { ProviderSetupGuide as Guide, SetupSection } from '@12-apps/payment
 
 import { DoneRow } from './CredentialFields';
 import { ProviderSetupGuide } from './ProviderSetupGuide';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * The walkthrough, plus the one step whose completion only the OWNER can
@@ -34,9 +35,10 @@ export const CHECKOUT_CONFIRM_ACTION = 'checkout-integrado-confirmado';
  * and Stone both own a step no API can report, and neither of them has a
  * "Checkout Integrado" to have enabled. Sections say what they are asking about
  * via `SetupSection.confirmLabel`; this fallback keeps InfinitePay's rendered
- * guide identical.
+ * guide identical. It is `setupGuide.defaultConfirmLabel` on the host's pack
+ * now, so the vendor's product name is at least chosen rather than compiled in.
  */
-const CONFIRM_LABEL_FALLBACK = 'Já habilitei o Checkout Integrado';
+
 
 /** Does this section end in a question only the owner can answer? */
 function isConfirmable(section: SetupSection): boolean {
@@ -134,12 +136,13 @@ export interface SetupGuideSectionProps {
  * still there to press Revisar on.
  */
 function ConfirmedRow({ section, onReopen }: { section: SetupSection; onReopen: () => void }) {
+  const copy = usePaymentsSettingsCopy().setupGuide;
   return (
     <DoneRow
       testId="payments-setup-confirmed"
       label={section.doneSummary?.label ?? section.title}
-      value={section.doneSummary?.value ?? 'Confirmado por você'}
-      editLabel="Revisar"
+      value={section.doneSummary?.value ?? copy.confirmedByYou}
+      editLabel={copy.reviewAction}
       onEdit={onReopen}
     />
   );
@@ -157,12 +160,13 @@ function ConfirmedRow({ section, onReopen }: { section: SetupSection; onReopen: 
 function confirmationOf(
   guide: Guide,
   { stage, confirmed, editing }: { stage: number; confirmed: boolean; editing: boolean },
+  fallbackLabel: string,
 ): { label: string; settledSection: SetupSection | null } {
   const asking = confirmableStage(guide);
   const section = asking >= 0 ? sectionAt(guide, asking) : null;
   const settled = confirmed && !editing && asking >= 0 && stage > asking;
   return {
-    label: section?.confirmLabel ?? CONFIRM_LABEL_FALLBACK,
+    label: section?.confirmLabel ?? fallbackLabel,
     settledSection: settled ? section : null,
   };
 }
@@ -193,7 +197,12 @@ export function SetupGuideSection({
 
   const stage = effectiveStage(guide, confirmed, editing, stored);
   const open = sectionAt(guide, stage);
-  const { label, settledSection } = confirmationOf(guide, { stage, confirmed, editing });
+  const guideCopy = usePaymentsSettingsCopy().setupGuide;
+  const { label, settledSection } = confirmationOf(
+    guide,
+    { stage, confirmed, editing },
+    guideCopy.defaultConfirmLabel,
+  );
 
   return (
     <Box data-testid="payments-setup">

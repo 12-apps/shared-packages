@@ -8,6 +8,7 @@ import { CredentialField } from './CredentialFields';
 import { saveLabel } from './credential-rules';
 import { FormActions, ReverifyWarning } from './CredentialFormAlerts';
 import type { CredentialFormState } from './ProviderCredentialForm';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * The live inputs for the step still owed, plus the one button that commits
@@ -27,9 +28,10 @@ export function CredentialFields({
   /** A real charge has landed through this connection — see `ReverifyWarning`. */
   proven: boolean;
 }) {
+  const copy = usePaymentsSettingsCopy().credentials;
   return (
     <Stack spacing={2}>
-      {proven ? <ReverifyWarning /> : null}
+      {proven ? <ReverifyWarning displayName={descriptor.displayName} /> : null}
       {descriptor.credentialSchema.map((spec) => (
         <CredentialField
           key={spec.key}
@@ -46,7 +48,11 @@ export function CredentialFields({
       ))}
       <FormActions
         busy={form.busy}
-        label={saveLabel(descriptor, form.complete)}
+        label={saveLabel(copy, descriptor, form.complete)}
+        // The FACT, not the words. This bar used to read `label.includes(
+        // 'testar')` to decide which promise to print — which quietly made the
+        // sentence depend on how a host spelled its button (FUT-760).
+        willTest={form.complete}
         disabled={form.nothingEdited || !form.valid}
         onSave={form.requestSave}
       />

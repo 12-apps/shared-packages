@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from './settings-test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments-backend';

@@ -6,6 +6,8 @@ import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments
 
 import { isConnected } from './connection-state';
 import { T } from './panel-tokens';
+import type { ConnectionStatusCopy } from './settings-copy';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * The provider's headline: what state it is in, and the switch that decides
@@ -37,19 +39,22 @@ interface StatusBadge {
  * — a real payment that actually landed — and is the only one painted green.
  */
 export function statusBadge(
+  copy: ConnectionStatusCopy,
   config: MaskedProviderConfig | null,
   descriptor?: ProviderDescriptor,
 ): StatusBadge {
-  if (config?.chargeVerifiedAt) return { label: 'VERIFICADO', color: 'success' };
+  if (config?.chargeVerifiedAt) return { label: copy.verified, color: 'success' };
   // A store that has entered nothing has not FAILED at anything. The stored
   // status outlives the credential it described — clearing the field leaves the
   // last verdict behind — so a red FALHOU sat above an empty form, accusing the
   // owner of a mistake they had not yet had the chance to make.
   if (descriptor && !anyCredentialStored(config, descriptor)) {
-    return { label: 'NÃO VERIFICADO', color: 'default' };
+    return { label: copy.unverified, color: 'default' };
   }
-  if (config?.status === 'RECONNECT_REQUIRED') return { label: 'RECONECTAR', color: 'error' };
-  if (isConnected(config)) return { label: 'CONEXÃO OK', color: 'info' };
+  if (config?.status === 'RECONNECT_REQUIRED') {
+    return { label: copy.reconnectRequired, color: 'error' };
+  }
+  if (isConnected(config)) return { label: copy.connectionOk, color: 'info' };
   // A FAILED probe lands here, and it says NÃO VERIFICADO like every other
   // not-yet-connected state. `FALHOU` was a third word for the same fact — the
   // store cannot take money through this provider yet — and it was the only
@@ -59,7 +64,7 @@ export function statusBadge(
   //
   // `RECONNECT_REQUIRED` stays red on purpose: that one is a connection that
   // WAS working and stopped, which is news rather than a step.
-  return { label: 'NÃO VERIFICADO', color: 'default' };
+  return { label: copy.unverified, color: 'default' };
 }
 
 /**
@@ -107,6 +112,7 @@ function anyCredentialStored(
  * does not have, and quoting it from here could only ever be a guess.
  */
 function toggleGate(
+  copy: ConnectionStatusCopy,
   descriptor: ProviderDescriptor,
   config: MaskedProviderConfig | null,
   enabled: boolean,
@@ -119,9 +125,7 @@ function toggleGate(
   if (!lockedOff) return { lockedOff, hint: '' };
   return {
     lockedOff,
-    hint: provable
-      ? 'Este provedor só passa a receber vendas depois dos 3 passos abaixo.'
-      : 'Conecte e verifique o provedor antes de ativar as vendas.',
+    hint: provable ? copy.threeStepsAhead : copy.connectAndVerifyFirst,
   };
 }
 
@@ -133,24 +137,19 @@ function toggleGate(
  * opposite situations: the first is a step outstanding, the second a decision
  * the owner made and can undo in one click.
  */
-function headline(io: { enabled: boolean; paused: boolean; lockedOff: boolean; hint: string }) {
+function headline(
+  copy: ConnectionStatusCopy,
+  io: { enabled: boolean; paused: boolean; lockedOff: boolean; hint: string },
+) {
   if (io.enabled) {
-    return {
-      state: 'Recebendo vendas',
-      sub: 'Sua loja está recebendo por este provedor.',
-      tone: T.ok,
-    };
+    return { ...copy.receiving, tone: T.ok };
   }
   if (io.paused) {
-    return {
-      state: 'Pausado',
-      sub: 'Conexão pronta e pausada por você — nenhum pedido novo é cobrado aqui.',
-      tone: T.warn,
-    };
+    return { ...copy.pausedByOwner, tone: T.warn };
   }
   return {
-    state: 'Ainda não está recebendo',
-    sub: io.lockedOff ? io.hint : 'Tudo pronto — ligue a chave para começar a receber.',
+    state: copy.readyNotReceiving.state,
+    sub: io.lockedOff ? io.hint : copy.readyNotReceiving.sub,
     tone: T.ink3,
   };
 }
@@ -231,12 +230,13 @@ export function ProviderStatusBar({
   onToggle: (enabled: boolean) => void;
 }) {
   const enabled = config?.enabled ?? false;
-  const { lockedOff, hint } = toggleGate(descriptor, config, enabled);
-  const badge = statusBadge(config, descriptor);
+  const copy = usePaymentsSettingsCopy().status;
+  const { lockedOff, hint } = toggleGate(copy, descriptor, config, enabled);
+  const badge = statusBadge(copy, config, descriptor);
 
   const proven = Boolean(config?.chargeVerifiedAt);
   const paused = proven && !enabled;
-  const { state, sub, tone } = headline({ enabled, paused, lockedOff, hint });
+  const { state, sub, tone } = headline(copy, { enabled, paused, lockedOff, hint });
 
   return (
     <Stack direction="row" alignItems="flex-start" gap="14px" flexWrap="wrap">
