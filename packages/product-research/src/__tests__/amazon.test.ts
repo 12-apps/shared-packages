@@ -8,6 +8,7 @@ import { FixedBudget, InMemoryCache, InMemoryResearchStore, silentLogger } from 
 import { runResearch } from '../pipeline/run-research';
 import type { BudgetPort, ResearchDeps } from '../ports';
 import type { SourceRecord } from '../types';
+import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
 // Shape mirrors a SearchApi.io `amazon_search` response for
 // amazon_domain=amazon.com.br (documented response reference, 2026-07),
@@ -94,7 +95,7 @@ const ctxWith = (
   },
 });
 
-const amazonConnector = () => createAmazonConnector({ getApiKey: () => 'test-key' });
+const amazonConnector = () => createAmazonConnector({ getApiKey: () => 'test-key', vocabulary: PT_BR_MARKET_VOCABULARY });
 
 describe('parseAmazonResponse', () => {
   // The shippingCents assertions below pin FUT-518's extraction: this
@@ -108,7 +109,7 @@ describe('parseAmazonResponse', () => {
   // understated the total and won cheapest-first on freight the buyer would
   // actually pay at checkout — the exact defect FUT-518 exists to remove.
   it('extracts BRL offers with ASIN identity, prime/shipping hints and availability', () => {
-    const offers = parseAmazonResponse(AMAZON_FIXTURE);
+    const offers = parseAmazonResponse(AMAZON_FIXTURE, PT_BR_MARKET_VOCABULARY);
     expect(offers).toHaveLength(3);
     // extracted_price wins; Prime badge → free shipping; "amanhã" → 1 day.
     expect(offers[0]).toMatchObject({
@@ -141,8 +142,9 @@ describe('parseAmazonResponse', () => {
   });
 
   it('reads a quoted freight amount, keeps Prime as an override, leaves silence unknown', () => {
-    const offers = parseAmazonResponse({
-      organic_results: [
+    const offers = parseAmazonResponse(
+      {
+        organic_results: [
         {
           asin: 'B0FRETE001',
           title: 'Energético com frete cobrado',
@@ -166,28 +168,30 @@ describe('parseAmazonResponse', () => {
           extracted_price: 10,
           delivery: ['Chega em 3 dias'],
         },
-      ],
-    });
+        ],
+      },
+      PT_BR_MARKET_VOCABULARY,
+    );
     expect(offers.map((offer) => offer.shippingCents)).toEqual([1490, 0, undefined]);
   });
 
   it('drops non-BRL results and results with neither price nor availability', () => {
-    const titles = parseAmazonResponse(AMAZON_FIXTURE).map((offer) => offer.title);
+    const titles = parseAmazonResponse(AMAZON_FIXTURE, PT_BR_MARKET_VOCABULARY).map((offer) => offer.title);
     expect(titles).not.toContain('Monster Energy Ultra imported 16oz');
     expect(titles).not.toContain('Monster Energy sem oferta');
   });
 
   it('keeps the verbatim result (ASIN included) in raw for offline replay', () => {
-    const raw = parseAmazonResponse(AMAZON_FIXTURE)[0]?.raw as Record<string, unknown>;
+    const raw = parseAmazonResponse(AMAZON_FIXTURE, PT_BR_MARKET_VOCABULARY)[0]?.raw as Record<string, unknown>;
     expect(raw.asin).toBe('B0MONSTER1');
     expect(raw.position).toBe(1);
     expect(raw.rating).toBe(4.8);
   });
 
   it('tolerates unexpected payload shapes by returning no offers', () => {
-    expect(parseAmazonResponse(null)).toEqual([]);
-    expect(parseAmazonResponse([])).toEqual([]);
-    expect(parseAmazonResponse({ error: 'weird' })).toEqual([]);
+    expect(parseAmazonResponse(null, PT_BR_MARKET_VOCABULARY)).toEqual([]);
+    expect(parseAmazonResponse([], PT_BR_MARKET_VOCABULARY)).toEqual([]);
+    expect(parseAmazonResponse({ error: 'weird' }, PT_BR_MARKET_VOCABULARY)).toEqual([]);
   });
 });
 
@@ -225,7 +229,7 @@ describe('createAmazonConnector', () => {
   });
 
   it('reports a missing API key as a connector error, never throws', async () => {
-    const keyless = createAmazonConnector({ getApiKey: () => undefined });
+    const keyless = createAmazonConnector({ getApiKey: () => undefined, vocabulary: PT_BR_MARKET_VOCABULARY });
     const seen: { url: string }[] = [];
     const result = await keyless.search(
       { term: 'Monster Energy 473ml', quantity: 1 },
@@ -245,7 +249,7 @@ describe('createAmazonConnector', () => {
   });
 
   it('runs on the tenant credential from source.config even without a host env key', async () => {
-    const keyless = createAmazonConnector({ getApiKey: () => undefined });
+    const keyless = createAmazonConnector({ getApiKey: () => undefined, vocabulary: PT_BR_MARKET_VOCABULARY });
     const seen: { url: string; headers?: Record<string, string> }[] = [];
     const result = await keyless.search(
       { term: 'Monster Energy 473ml', quantity: 1 },

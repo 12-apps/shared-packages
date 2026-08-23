@@ -18,6 +18,7 @@ import { DoneRow } from "../components/CredentialFields";
 import { ProviderSetupGuide, SetupGuideSection } from "../index";
 
 import { settingsAdapter, TAG_FIELD, type SettingsStoryProvider } from "./settings-store-adapter";
+import { SettingsStoryHost } from "./settings-story-host";
 
 /**
  * THE ONBOARDING WALKTHROUGH, component by component: `ProviderSetupGuide`
@@ -283,16 +284,18 @@ function GuideScene({
 }: GuideSceneProps): JSX.Element {
   const [confirmed, setConfirmed] = useState(confirmedAtStart);
   return (
-    <SetupGuideSection
-      guide={guide}
-      confirmed={confirmed}
-      onConfirm={() => setConfirmed(true)}
-      onReopen={() => setConfirmed(false)}
-      rows={savedTag ? <SavedTagRow /> : undefined}
-      sectionFooter={<HostFormSlot />}
-      editing={editing}
-      stored={stored}
-    />
+    <SettingsStoryHost>
+      <SetupGuideSection
+        guide={guide}
+        confirmed={confirmed}
+        onConfirm={() => setConfirmed(true)}
+        onReopen={() => setConfirmed(false)}
+        rows={savedTag ? <SavedTagRow /> : undefined}
+        sectionFooter={<HostFormSlot />}
+        editing={editing}
+        stored={stored}
+      />
+    </SettingsStoryHost>
   );
 }
 

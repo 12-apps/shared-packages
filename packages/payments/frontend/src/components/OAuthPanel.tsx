@@ -8,6 +8,7 @@ import { LINKISH_SX } from './panel-tokens';
 import { ProviderConnection } from './ProviderConnection';
 import type { ActivePanelProps } from './ProviderPanel';
 import { ProviderCard } from './ProviderPanel';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * The OAuth branch of a provider's screen, and the switch between its two
@@ -108,6 +109,7 @@ export function OAuthPanel({
   walkthrough: (path: 'oauth' | 'credentials') => ReactNode;
   form: ReactNode;
 }) {
+  const copy = usePaymentsSettingsCopy().oauth;
   // Which path the owner is on. The disclosure is no longer just a container —
   // opening it CHOOSES the credentials path, so the panel has to know.
   const [manual, setManual] = useState(false);
@@ -119,10 +121,7 @@ export function OAuthPanel({
   if (!prepareConnect) {
     return (
       <ProviderCard header={statusBar}>
-        <Alert severity="info">
-          Este provedor conecta por autorização, mas o botão de conexão não está disponível nesta
-          instalação. Você ainda pode conectar informando as credenciais manualmente.
-        </Alert>
+        <Alert severity="info">{copy.connectUnavailable}</Alert>
         {form}
         {probe}
         {verification}
@@ -134,7 +133,7 @@ export function OAuthPanel({
     <ProviderCard header={statusBar}>
       {manual ? (
         <PathSwitch
-          label="Prefiro conectar por autorização"
+          label={copy.preferOAuth}
           expanded={false}
           onChange={() => setManual(false)}
           testId="payments-oauth-fallback"
@@ -153,7 +152,7 @@ export function OAuthPanel({
       {probe}
       {descriptor.credentialSchema.length > 0 ? (
         <PathSwitch
-          label="Prefiro informar as credenciais manualmente"
+          label={copy.preferCredentials}
           expanded={manual}
           onChange={setManual}
           testId="payments-manual-fallback"

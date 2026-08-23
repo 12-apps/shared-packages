@@ -6,6 +6,7 @@ import type { MerchantSettingsView } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * Landing after an OAuth connect.
@@ -38,7 +39,7 @@ function fakeClient(): PaymentsSettingsClient {
 
 describe('PaymentProviderSettings — landing after a connect', () => {
   it('lands on the provider list when nothing was just connected', async () => {
-    render(<PaymentProviderSettings client={fakeClient()} />);
+    render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={fakeClient()} />);
     expect(await screen.findByTestId('payments-provider-picker')).toBeDefined();
   });
 
@@ -49,10 +50,10 @@ describe('PaymentProviderSettings — landing after a connect', () => {
    */
   it('opens the provider when the host supplies it AFTER mount', async () => {
     const client = fakeClient();
-    const { rerender } = render(<PaymentProviderSettings client={client} initialProvider={null} />);
+    const { rerender } = render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} initialProvider={null} />);
     await screen.findByTestId('payments-provider-picker');
 
-    rerender(<PaymentProviderSettings client={client} initialProvider="pagbank" />);
+    rerender(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} initialProvider="pagbank" />);
 
     // The picker is replaced by that provider's own panel.
     await waitFor(() => expect(screen.queryByTestId('payments-provider-picker')).toBeNull());
@@ -66,16 +67,16 @@ describe('PaymentProviderSettings — landing after a connect', () => {
    */
   it('does not re-open the provider after the owner goes back', async () => {
     const client = fakeClient();
-    const { rerender } = render(<PaymentProviderSettings client={client} initialProvider={null} />);
+    const { rerender } = render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} initialProvider={null} />);
     await screen.findByTestId('payments-provider-picker');
 
-    rerender(<PaymentProviderSettings client={client} initialProvider="pagbank" />);
+    rerender(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} initialProvider="pagbank" />);
     const back = await screen.findByTestId('payments-provider-back');
 
     back.click();
 
     // A rerender with the SAME still-set prop must not drag them back in.
-    rerender(<PaymentProviderSettings client={client} initialProvider="pagbank" />);
+    rerender(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} initialProvider="pagbank" />);
     expect(await screen.findByTestId('payments-provider-picker')).toBeDefined();
   });
 });

@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import type { JSX } from "react";
 
+import { useCheckoutCopy } from "../components/checkout/copy-context";
 import { useCheckoutComponents } from "../components/checkout/ui";
 
 import {
@@ -30,9 +31,10 @@ export function SavedCardsPicker({
   onSelect: (id: string) => void;
 }): JSX.Element {
   const { RadioGroup } = useCheckoutComponents();
+  const copy = useCheckoutCopy().card.fields;
   return (
     <RadioGroup
-      label="Cartão"
+      label={copy.savedCardsLabel}
       value={selection}
       onChange={(_event, next) => onSelect(next)}
       options={[
@@ -41,7 +43,7 @@ export function SavedCardsPicker({
           label: `${saved.brand} •••• ${saved.last4}`,
           description: `Validade ${String(saved.expMonth).padStart(2, "0")}/${saved.expYear}`,
         })),
-        { value: NEW_CARD, label: "Novo cartão", description: "Inserir outro cartão" },
+        { value: NEW_CARD, label: copy.newCard, description: copy.newCardDescription },
       ]}
       dataTestId="saved-cards"
     />
@@ -63,9 +65,10 @@ function CardNumberInput({
   setFieldErrors: SetErrors;
 }): JSX.Element {
   const { Input, Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().card.fields;
   return (
     <Input
-      label="Número do cartão"
+      label={copy.numberLabel}
       type="text"
       inputMode="numeric"
       variant="outlined"
@@ -77,14 +80,14 @@ function CardNumberInput({
       error={Boolean(fieldErrors.number)}
       helperText={fieldErrors.number}
       endAdornment={
-        brand !== "Cartão" ? (
+        brand !== "Unknown" ? (
           <Text variant="caption" size="xs" color="secondary" as="span">
             {brand}
           </Text>
         ) : undefined
       }
       onChange={(event) => setCard((prev) => ({ ...prev, number: formatCardNumber(event.target.value) }))}
-      onBlur={() => setFieldErrors((prev) => ({ ...prev, number: validateCardNumber(card.number) }))}
+      onBlur={() => setFieldErrors((prev) => ({ ...prev, number: validateCardNumber(card.number, copy) }))}
       data-testid="card-number"
     />
   );
@@ -105,10 +108,11 @@ function ExpiryCvvFields({
   setFieldErrors: SetErrors;
 }): JSX.Element {
   const { Input } = useCheckoutComponents();
+  const copy = useCheckoutCopy().card.fields;
   return (
     <Box sx={{ display: "flex", gap: 2 }}>
       <Input
-        label="Validade (MM/AA)"
+        label={copy.expiryLabel}
         type="text"
         inputMode="numeric"
         placeholder="MM/AA"
@@ -120,11 +124,11 @@ function ExpiryCvvFields({
         error={Boolean(fieldErrors.expiry)}
         helperText={fieldErrors.expiry}
         onChange={(event) => setCard((prev) => ({ ...prev, expiry: formatExpiry(event.target.value) }))}
-        onBlur={() => setFieldErrors((prev) => ({ ...prev, expiry: validateExpiry(card.expiry) }))}
+        onBlur={() => setFieldErrors((prev) => ({ ...prev, expiry: validateExpiry(card.expiry, copy) }))}
         data-testid="card-expiry"
       />
       <Input
-        label="CVV"
+        label={copy.cvvLabel}
         type="text"
         inputMode="numeric"
         variant="outlined"
@@ -136,7 +140,7 @@ function ExpiryCvvFields({
         error={Boolean(fieldErrors.cvv)}
         helperText={fieldErrors.cvv}
         onChange={(event) => setCard((prev) => ({ ...prev, cvv: formatCvv(event.target.value) }))}
-        onBlur={() => setFieldErrors((prev) => ({ ...prev, cvv: validateCvv(card.cvv, brand) }))}
+        onBlur={() => setFieldErrors((prev) => ({ ...prev, cvv: validateCvv(card.cvv, copy, brand) }))}
         data-testid="card-cvv"
       />
     </Box>
@@ -169,6 +173,7 @@ export function NewCardForm({
   onSaveCardChange?: (checked: boolean) => void;
 }): JSX.Element {
   const { Input, Checkbox } = useCheckoutComponents();
+  const copy = useCheckoutCopy().card.fields;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <CardNumberInput
@@ -179,7 +184,7 @@ export function NewCardForm({
         setFieldErrors={setFieldErrors}
       />
       <Input
-        label="Nome impresso no cartão"
+        label={copy.holderLabel}
         type="text"
         variant="outlined"
         size="md"
@@ -189,7 +194,7 @@ export function NewCardForm({
         error={Boolean(fieldErrors.holder)}
         helperText={fieldErrors.holder}
         onChange={(event) => setCard((prev) => ({ ...prev, holder: event.target.value }))}
-        onBlur={() => setFieldErrors((prev) => ({ ...prev, holder: validateHolder(card.holder) }))}
+        onBlur={() => setFieldErrors((prev) => ({ ...prev, holder: validateHolder(card.holder, copy) }))}
         data-testid="card-holder"
       />
       <ExpiryCvvFields
@@ -201,7 +206,7 @@ export function NewCardForm({
       />
       {onSaveCardChange ? (
         <Checkbox
-          label="Salvar cartão para próximas compras"
+          label={copy.saveCard}
           checked={saveCard}
           onChange={(_event, checked) => onSaveCardChange(checked)}
           data-testid="save-card"

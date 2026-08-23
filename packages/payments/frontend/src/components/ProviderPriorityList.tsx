@@ -15,6 +15,8 @@ import { useCallback, useState } from 'react';
 import type { MerchantSettingsView, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
+import { richText } from './rich-text';
 
 /**
  * The store's failover chain, ordered.
@@ -92,6 +94,7 @@ function PriorityRow({
   onDragEnd,
   onMove,
 }: PriorityRowProps) {
+  const copy = usePaymentsSettingsCopy().priority;
   return (
     <Paper
       component="li"
@@ -120,12 +123,12 @@ function PriorityRow({
       <Typography sx={{ flexGrow: 1 }}>{label}</Typography>
       {index === 0 ? (
         <Typography variant="caption" color="primary" data-testid="payments-priority-first">
-          primeiro
+          {copy.firstInChain}
         </Typography>
       ) : null}
       <IconButton
         size="small"
-        aria-label={`Mover ${label} para cima`}
+        aria-label={copy.moveUp(label)}
         disabled={index === 0 || saving}
         onClick={() => onMove(index, index - 1)}
       >
@@ -133,7 +136,7 @@ function PriorityRow({
       </IconButton>
       <IconButton
         size="small"
-        aria-label={`Mover ${label} para baixo`}
+        aria-label={copy.moveDown(label)}
         disabled={index === total - 1 || saving}
         onClick={() => onMove(index, index + 1)}
       >
@@ -154,6 +157,7 @@ function useChainReorder(
   client: PaymentsSettingsClient,
   onReordered?: (next: MerchantSettingsView) => void,
 ) {
+  const copy = usePaymentsSettingsCopy().priority;
   const [chain, setChain] = useState<string[]>(() => chainOf(view));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -174,7 +178,7 @@ function useChainReorder(
         })
         .catch((err: unknown) => {
           setChain(previous);
-          setError(err instanceof Error ? err.message : 'Não foi possível salvar a ordem.');
+          setError(err instanceof Error ? err.message : copy.saveFailed);
         })
         .finally(() => setSaving(false));
     },
@@ -201,6 +205,7 @@ function DeclinePolicyControl({
   client: PaymentsSettingsClient;
   onChanged?: (next: MerchantSettingsView) => void;
 }) {
+  const copy = usePaymentsSettingsCopy().priority;
   const [saving, setSaving] = useState(false);
   const cascades = view.failoverPolicy === 'TECHNICAL_AND_DECLINE';
 
@@ -212,7 +217,9 @@ function DeclinePolicyControl({
             size="small"
             checked={cascades}
             disabled={saving}
-            inputProps={{ 'aria-label': 'Tentar cartão recusado no próximo provedor' }}
+            // The accessible name is the same sentence with its emphasis
+            // markers stripped: a screen reader must not spell out asterisks.
+            inputProps={{ 'aria-label': copy.retryDeclinedLabel.replace(/\*\*/g, '') }}
             onChange={(e) => {
               setSaving(true);
               void client
@@ -223,28 +230,25 @@ function DeclinePolicyControl({
           />
         }
         label={
-          <Typography variant="body2">
-            Tentar cartão <strong>recusado</strong> no próximo provedor
-          </Typography>
+          <Typography variant="body2">{richText(copy.retryDeclinedLabel)}</Typography>
         }
       />
       <Typography variant="caption" color="text.secondary" display="block">
-        {cascades
-          ? 'Uma recusa passa para o próximo da lista. Isso pode aumentar custos de transação e sinais de fraude.'
-          : 'Padrão: uma recusa encerra a cobrança. Só falhas técnicas passam para o próximo.'}
+        {cascades ? copy.retryDeclinedOn : copy.retryDeclinedOff}
       </Typography>
     </Box>
   );
 }
 
 export function ProviderPriorityList({ view, client, onReordered }: ProviderPriorityListProps) {
+  const copy = usePaymentsSettingsCopy().priority;
   const { chain, error, saving, move } = useChainReorder(view, client, onReordered);
   const [dragging, setDragging] = useState<number | null>(null);
 
   if (chain.length === 0) {
     return (
       <Alert severity="warning" data-testid="payments-priority-empty">
-        Nenhum provedor está ativo. O checkout não conseguirá cobrar até que você ative ao menos um.
+        {copy.noneActive}
       </Alert>
     );
   }
@@ -252,12 +256,10 @@ export function ProviderPriorityList({ view, client, onReordered }: ProviderPrio
   return (
     <Box data-testid="payments-priority-list">
       <Typography variant="subtitle2" gutterBottom>
-        Ordem de tentativa
+        {copy.orderHeading}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        O checkout tenta <strong>{labelOf(view.providers, chain[0] ?? '')}</strong> primeiro. Se uma
-        cobrança falhar por motivo técnico, ele tenta o próximo da lista — mas só quando é possível
-        comprovar que a tentativa anterior não gerou cobrança.
+        {richText(copy.chainExplainer(labelOf(view.providers, chain[0] ?? '')))}
       </Typography>
 
       {error ? (

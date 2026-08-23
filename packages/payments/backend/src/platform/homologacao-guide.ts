@@ -99,6 +99,27 @@ export interface HomologacaoGuide {
   demoStoreUrl: string;
   productsDescription: string;
   slaText: string;
+  /**
+   * The form's own FIELD NAMES, exactly as PagBank prints them.
+   *
+   * Here rather than in the screen that renders them, for the same reason
+   * `integrationType` and `services` are here: they are quotes, not copy. The
+   * whole use of that screen is matching each paste-ready value to the box it
+   * goes in, and a box named anything other than what PagBank named it sends
+   * an operator hunting for a field that does not exist (FUT-760). The screen
+   * around them is English, because the person reading it is the platform's
+   * own integrator.
+   */
+  fieldLabels: HomologacaoFieldLabels;
+}
+
+/** PagBank's Pipefy field names, verbatim. See {@link HomologacaoGuide.fieldLabels}. */
+export interface HomologacaoFieldLabels {
+  integrationType: string;
+  services: string;
+  accessInstructions: string;
+  siteUrl: string;
+  productsDescription: string;
 }
 
 /** The platform's answers, built from the deployment's real URLs. */
@@ -116,5 +137,12 @@ export function platformHomologacaoGuide(facts: PlatformHomologacaoGuideFacts): 
     demoStoreUrl: facts.demoStoreUrl,
     productsDescription: facts.productsDescription,
     slaText: facts.slaText,
+    fieldLabels: {
+      integrationType: 'Selecione o tipo de integração',
+      services: 'Selecione qual serviço você integrou (marque OS DOIS)',
+      accessInstructions: 'Instruções de acesso ao seu ambiente (limite de 255 caracteres)',
+      siteUrl: 'URL do site',
+      productsDescription: 'Detalhe quais produtos/serviços serão comercializados',
+    },
   };
 }

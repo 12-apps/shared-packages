@@ -24,6 +24,10 @@ import { CARD_SX, ConnectEnvironmentCard } from './ConnectEnvironmentCard';
  * (`consultConnectApplications` in `@12-apps/payments-backend`) and passes it
  * here, so the host page is a thin mount — page chrome, auth and loading
  * belong to the host; the screen itself lives in this package.
+ *
+ * English, like the rest of this platform surface (FUT-760): the reader is the
+ * deployment's own integrator, reading redirect URIs and environment variable
+ * names, and everything a developer reads in this repo is English.
  */
 export interface ConnectApplicationPanelProps {
   /** The consult report, as the backend's `consultConnectApplications` answers. */
@@ -44,7 +48,7 @@ export function ConnectApplicationPanel(props: ConnectApplicationPanelProps): Re
     <Stack spacing={2} data-testid="connect-application-panel">
       <Stack spacing={0.5} data-testid="connect-expected-redirect" sx={CARD_SX}>
         <Typography variant="caption" color="text.secondary" fontWeight={600}>
-          Callback desta instalação (o valor que precisa estar registrado)
+          Callback this deployment uses (the value that must be registered)
         </Typography>
         <Box
           component="code"
@@ -68,7 +72,7 @@ export function ConnectApplicationPanel(props: ConnectApplicationPanelProps): Re
             onClick={() => onRefresh()}
             data-testid="connect-refresh"
           >
-            Consultar novamente
+            Consult again
           </Button>
         </Box>
       ) : null}

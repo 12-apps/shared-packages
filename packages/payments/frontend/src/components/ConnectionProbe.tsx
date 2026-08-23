@@ -8,6 +8,7 @@ import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments
 import type { PaymentsSettingsClient } from '../client';
 import { isConnected } from './connection-state';
 import { ProbeAlert, ProbeChecklist, type VerifyProbe } from './CredentialFormAlerts';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * "Testar conexão" for a store whose connection is a GRANT, not a form.
@@ -41,6 +42,7 @@ export function ConnectionProbe({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [probe, setProbe] = useState<VerifyProbe | null>(null);
+  const copy = usePaymentsSettingsCopy().credentials;
   if (!isConnected(config)) return null;
 
   const verify = async () => {
@@ -69,7 +71,7 @@ export function ConnectionProbe({
         onClick={() => void verify()}
         sx={{ textTransform: 'none' }}
       >
-        {busy ? <CircularProgress size={18} /> : 'Testar conexão'}
+        {busy ? <CircularProgress size={18} /> : copy.probeAction}
       </Button>
       {error ? <Alert severity="error">{error}</Alert> : null}
       {probe ? <ProbeAlert probe={probe} busy={busy} onRetry={() => void verify()} /> : null}

@@ -27,8 +27,25 @@ import type {
   PaymentFlows,
 } from "../index";
 
+import { CheckoutCopyProvider } from "../components/checkout/copy-context";
+
+import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { raisePayable, StoryFlow } from "./host";
 import type { StoryWorld } from "./store";
+
+/**
+ * The words these two buttons render, from the story host's own pack
+ * (FUT-760).
+ *
+ * `StoryFlow` mounts this for every other story here; the wallet demos mount
+ * the buttons by hand, so they answer the same question the same way — a
+ * story is a HOST, and a host states its copy.
+ */
+function WithWalletCopy({ children }: { children: ReactNode }): JSX.Element {
+  return (
+    <CheckoutCopyProvider copy={STORY_CHECKOUT_COPY.views.screens}>{children}</CheckoutCopyProvider>
+  );
+}
 
 /**
  * The WALLET buttons on their own (FUT-471/472).
@@ -214,7 +231,7 @@ function WithGooglePayApi({
       else delete googleScope().google;
     };
   }, [api]);
-  return <>{children}</>;
+  return <WithWalletCopy>{children}</WithWalletCopy>;
 }
 
 /**
@@ -421,7 +438,7 @@ function WithApplePaySession({
     setApplePaySession(Session);
     return () => setApplePaySession(saved.current?.previous ?? null);
   }, [Session]);
-  return <>{children}</>;
+  return <WithWalletCopy>{children}</WithWalletCopy>;
 }
 
 /** Rendered INSIDE the scoped global, so the verdict reads the story's fake. */

@@ -5,12 +5,19 @@ import { Alert, Box, Tab, Tabs, Typography } from '@mui/material';
 import type { PaymentEnvironment } from '@12-apps/payments-backend';
 
 import { T } from './panel-tokens';
+import type { EnvironmentCopy } from './settings-copy';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
-/** One environment's human name — the tabs and the probe result share it. */
-export const ENVIRONMENT_LABELS: Record<PaymentEnvironment, string> = {
-  SANDBOX: 'Sandbox',
-  PRODUCTION: 'Produção',
-};
+/**
+ * One environment's human name — the tabs and the probe result share it.
+ *
+ * Built from the host's pack rather than declared here (FUT-760): the names
+ * appear inside the probe's own failure sentence too, so one spelling has to
+ * serve both or the screen contradicts itself.
+ */
+export function environmentLabels(copy: EnvironmentCopy): Record<PaymentEnvironment, string> {
+  return { SANDBOX: copy.sandbox, PRODUCTION: copy.production };
+}
 
 /**
  * Sentence case, because these are place names rather than shouted commands —
@@ -47,6 +54,7 @@ export function EnvironmentSelector({
   environment: PaymentEnvironment;
   onChange: (next: PaymentEnvironment) => void;
 }) {
+  const copy = usePaymentsSettingsCopy().environment;
   // A segmented control, not underlined tabs. Two options that CHANGE WHAT
   // EVERY FIELD BELOW MEANS should look like a switch being thrown, and the
   // label above says which switch — "Ambiente" alone reads as a page section.
@@ -55,12 +63,12 @@ export function EnvironmentSelector({
       <Typography
         sx={{ display: 'block', fontSize: '12px', fontWeight: 650, color: T.ink2, mb: '5px' }}
       >
-        Ambiente desta conexão
+        {copy.groupLabel}
       </Typography>
       <Tabs
         value={environment}
         onChange={(_, next: PaymentEnvironment) => onChange(next)}
-        aria-label="Ambiente desta conexão"
+        aria-label={copy.groupLabel}
         data-testid="payments-environment-tabs"
         slotProps={{ indicator: { sx: { display: 'none' } } }}
         sx={{
@@ -73,13 +81,13 @@ export function EnvironmentSelector({
         }}
       >
         <Tab
-          label="Sandbox"
+          label={copy.sandbox}
           value="SANDBOX"
           data-testid="payments-environment-SANDBOX"
           sx={TAB_SX}
         />
         <Tab
-          label="Produção"
+          label={copy.production}
           value="PRODUCTION"
           data-testid="payments-environment-PRODUCTION"
           sx={TAB_SX}
@@ -126,7 +134,9 @@ export function EnvironmentNotice({
    */
   band?: boolean;
 }) {
-  const elsewhere = active !== null && active !== environment ? ENVIRONMENT_LABELS[active] : null;
+  const copy = usePaymentsSettingsCopy().environment;
+  const elsewhere =
+    active !== null && active !== environment ? environmentLabels(copy)[active] : null;
   const production = environment === 'PRODUCTION';
   return (
     <Alert
@@ -137,12 +147,10 @@ export function EnvironmentNotice({
       sx={band ? { borderRadius: 0, py: 0.5, px: 3 } : { py: 0.5 }}
     >
       <strong>
-        {production ? 'Produção — dinheiro real.' : 'Sandbox — ambiente de teste.'}
+        {production ? copy.productionMeaning : copy.sandboxMeaning}
       </strong>{' '}
-      {production
-        ? 'Tudo o que você fizer aqui vale para as vendas da loja.'
-        : 'Nenhum valor sai ou entra de verdade.'}
-      {elsewhere ? ` Hoje a loja está usando ${elsewhere}.` : ''}
+      {production ? copy.productionConsequence : copy.sandboxConsequence}
+      {elsewhere ? copy.storeIsUsing(elsewhere) : ''}
     </Alert>
   );
 }

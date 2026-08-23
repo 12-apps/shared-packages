@@ -1,4 +1,5 @@
 import type { ResearchDiagnosticsCopy } from '../connectors/diagnostics-copy';
+import type { MarketVocabulary } from '../normalize/vocabulary';
 import type { NormalizedManualRow } from '../import/manual';
 
 /**
@@ -196,6 +197,16 @@ export interface ResearchApiConfig {
    * origin host's Portuguese the silent default for every adopter.
    */
   diagnostics: ResearchDiagnosticsCopy;
+  /**
+   * The words this API READS in somebody else's data — a spreadsheet's column
+   * headers, a merchant's stock and delivery lines (FUT-760).
+   *
+   * REQUIRED for the same reason `diagnostics` is, and with a worse failure
+   * mode: an unstated vocabulary does not render another product's language,
+   * it silently recognises NOTHING. A supplier sheet whose headers this host
+   * cannot match yields zero rows and one problem at line 0.
+   */
+  vocabulary: MarketVocabulary;
   store: ResearchHttpStore;
   checks: ResearchHttpChecks;
   credentials: ResearchCredentialCodec;

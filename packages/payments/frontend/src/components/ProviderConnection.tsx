@@ -22,6 +22,8 @@ import type { PaymentsSettingsClient } from '../client';
 import { ConnectionFacts, ConnectSteps, DisconnectDialog } from './ConnectionCard';
 import { expiryProximity, isConnected } from './connection-state';
 import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, BTN_QUIET_DANGER_SX, T } from './panel-tokens';
+import type { OAuthConnectionCopy } from './settings-copy';
+import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * The `authMode: 'oauth'` half of the settings page: a provider whose
@@ -56,12 +58,13 @@ export interface ProviderConnectionProps {
  * gray line read the same on the eve of an outage as a year out.
  */
 function ExpiryNote(props: { expiresAt: string }) {
+  const copy = usePaymentsSettingsCopy().oauth;
   const when = new Date(props.expiresAt).toLocaleString('pt-BR');
   const proximity = expiryProximity(props.expiresAt);
   if (proximity === 'SAFE' || proximity === null) {
     return (
       <Typography variant="caption" color="text.secondary">
-        {`Autorização válida até ${when}`}
+        {copy.validUntil(when)}
       </Typography>
     );
   }
@@ -73,8 +76,8 @@ function ExpiryNote(props: { expiresAt: string }) {
       data-testid="payments-expiry-warning"
     >
       {proximity === 'PAST'
-        ? `A autorização expirou em ${when}. Reconecte para voltar a receber pagamentos.`
-        : `A autorização expira em ${when}. Se o aviso continuar, reconecte a conta.`}
+        ? copy.expiredAt(when)
+        : copy.expiresAt(when)}
     </Typography>
   );
 }
@@ -96,23 +99,19 @@ function ExpiryNote(props: { expiresAt: string }) {
  * up confidently misdescribing an outage.
  */
 function connectFailure(
+  copy: OAuthConnectionCopy,
   message: string,
   displayName: string,
 ): { severity: 'error' | 'warning'; text: string } {
   if (/no platform oauth application credentials/i.test(message)) {
-    return {
-      severity: 'warning',
-      text:
-        `A conexão automática com ${displayName} não está disponível nesta instalação — ` +
-        'o aplicativo de autorização não foi cadastrado. Para conectar agora, abra ' +
-        '“Prefiro informar as credenciais manualmente” abaixo e cole as suas próprias chaves.',
-    };
+    return { severity: 'warning', text: copy.notAvailableHere(displayName) };
   }
   return { severity: 'error', text: message };
 }
 
 function ConnectError({ message, displayName }: { message: string; displayName: string }) {
-  const { severity, text } = connectFailure(message, displayName);
+  const copy = usePaymentsSettingsCopy().oauth;
+  const { severity, text } = connectFailure(copy, message, displayName);
   return (
     <Alert severity={severity} data-testid="payments-connect-failure">
       {text}
@@ -120,21 +119,28 @@ function ConnectError({ message, displayName }: { message: string; displayName: 
   );
 }
 
-function connectLabel(displayName: string, connected: boolean, busy: string | null) {
+function connectLabel(
+  copy: OAuthConnectionCopy,
+  displayName: string,
+  connected: boolean,
+  busy: string | null,
+) {
   if (busy === 'connect') return <CircularProgress size={18} />;
-  return connected ? 'Reconectar' : `Conectar com ${displayName}`;
+  return connected ? copy.reconnectAction : copy.connectAction(displayName);
 }
 
 /**
  * pt-BR labels for the scopes a store owner actually sees. Unknown scopes fall
  * back to the provider's own spelling — wrong words are worse than raw ones.
  */
-const SCOPE_LABELS: Record<string, string> = {
-  'payments.read': 'Consultar pagamentos',
-  'payments.create': 'Criar cobranças',
-  'payments.refund': 'Estornar pagamentos',
-  'accounts.read': 'Consultar dados da conta',
-};
+function scopeLabels(copy: OAuthConnectionCopy): Record<string, string> {
+  return {
+    'payments.read': copy.scopes.read,
+    'payments.create': copy.scopes.create,
+    'payments.refund': copy.scopes.refund,
+    'accounts.read': copy.scopes.account,
+  };
+}
 
 /**
  * WHICH account is connected (FUT-300): identity, granted scopes and the
@@ -143,6 +149,7 @@ const SCOPE_LABELS: Record<string, string> = {
  * charges into was to disconnect and connect again.
  */
 function ConnectedAccountDetails(props: { account: ConnectedOAuthAccount }) {
+  const copy = usePaymentsSettingsCopy().oauth;
   const { account } = props;
   const identity = account.accountLabel ?? account.accountId;
   return (
@@ -154,7 +161,7 @@ function ConnectedAccountDetails(props: { account: ConnectedOAuthAccount }) {
       ) : null}
       {account.connectedAt ? (
         <Typography variant="caption" color="text.secondary">
-          {`Conectada em ${new Date(account.connectedAt).toLocaleString('pt-BR')}`}
+          {copy.connectedAt(new Date(account.connectedAt).toLocaleString())}
         </Typography>
       ) : null}
       {account.grantedScopes.length > 0 ? (
@@ -164,7 +171,7 @@ function ConnectedAccountDetails(props: { account: ConnectedOAuthAccount }) {
               key={scope}
               size="small"
               variant="outlined"
-              label={SCOPE_LABELS[scope] ?? scope}
+              label={scopeLabels(copy)[scope] ?? scope}
             />
           ))}
         </Stack>
@@ -184,6 +191,7 @@ function ConnectionSummary(props: {
   environment: PaymentEnvironment;
   connectedAccount: ConnectedOAuthAccount | null;
 }) {
+  const copy = usePaymentsSettingsCopy().oauth;
   return (
     <>
       {/*
@@ -215,8 +223,8 @@ function ConnectionSummary(props: {
       */}
       <Typography sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.6 }}>
         {props.connected
-          ? 'Sua conta está conectada. As cobranças são criadas em seu nome — nenhuma chave precisa ser copiada.'
-          : `Conecte sua conta ${props.displayName} autorizando o acesso no site do provedor. Nenhuma chave precisa ser copiada.`}
+          ? copy.connectedExplainer
+          : copy.invitation(props.displayName)}
       </Typography>
       {props.connected ? null : <ConnectSteps displayName={props.displayName} />}
       {props.connected && props.connectedAccount ? (
@@ -224,7 +232,7 @@ function ConnectionSummary(props: {
       ) : null}
       {props.status === 'RECONNECT_REQUIRED' ? (
         <Alert severity="warning">
-          A autorização expirou ou foi revogada. Reconecte para voltar a receber pagamentos.
+          {copy.revoked}
         </Alert>
       ) : null}
       {props.expiresAt ? <ExpiryNote expiresAt={props.expiresAt} /> : null}
@@ -249,13 +257,14 @@ function ConnectionActions(props: {
   onConnect: () => void;
   onDisconnect: () => void;
 }) {
+  const copy = usePaymentsSettingsCopy().oauth;
   const { displayName, connected, busy, onConnect, onDisconnect } = props;
   return (
     <Box sx={BAR_SX} data-testid="payments-connection-bar">
       <Typography sx={BAR_MSG_SX}>
         {connected
-          ? `Conta ${displayName} conectada. Revogue quando quiser, aqui ou no painel do provedor.`
-          : 'Você sai para o provedor e volta para cá — leva menos de um minuto.'}
+          ? copy.connectedNote(displayName)
+          : copy.roundTripNote}
       </Typography>
       {connected ? (
         <Button
@@ -264,7 +273,7 @@ function ConnectionActions(props: {
           sx={BTN_QUIET_DANGER_SX}
           data-testid="payments-disconnect"
         >
-          {busy === 'disconnect' ? <CircularProgress size={18} /> : 'Remover conexão'}
+          {busy === 'disconnect' ? <CircularProgress size={18} /> : copy.removeAction}
         </Button>
       ) : null}
       <Button
@@ -274,7 +283,7 @@ function ConnectionActions(props: {
         onClick={onConnect}
         sx={BTN_PRIMARY_SX}
       >
-        {connectLabel(displayName, connected, busy)}
+        {connectLabel(copy, displayName, connected, busy)}
       </Button>
     </Box>
   );

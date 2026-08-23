@@ -1,4 +1,5 @@
 import type { ManualImportCopy } from '../connectors/diagnostics-copy';
+import type { MappableField, MarketVocabulary } from '../normalize/vocabulary';
 import { z } from 'zod';
 import { parseMoneyToCents } from '../normalize/money';
 
@@ -125,25 +126,7 @@ export const normalizeManualRows = (
   return { entries, problems };
 };
 
-export type MappableField =
-  | 'title'
-  | 'price'
-  | 'supplierName'
-  | 'brand'
-  | 'ean'
-  | 'packQuantity'
-  | 'validUntil';
-
-/** PT-BR/EN header spellings recognized without an explicit mapping. */
-const HEADER_ALIASES: Record<MappableField, readonly string[]> = {
-  title: ['produto', 'descricao', 'descrição', 'item', 'nome', 'product', 'title'],
-  price: ['preco', 'preço', 'valor', 'price', 'r$', 'preco unitario', 'preço unitário'],
-  supplierName: ['fornecedor', 'distribuidor', 'supplier'],
-  brand: ['marca', 'brand'],
-  ean: ['ean', 'gtin', 'codigo de barras', 'código de barras', 'barcode'],
-  packQuantity: ['embalagem', 'pack', 'qtd por caixa', 'unidades por caixa', 'fardo'],
-  validUntil: ['validade', 'valido ate', 'válido até', 'valid until'],
-};
+export type { MappableField };
 
 const normalizeHeader = (header: string): string =>
   header
@@ -190,12 +173,13 @@ const normalizeDateCell = (value: string | undefined): string | undefined => {
 const resolveColumns = (
   headers: string[],
   mapping: Partial<Record<MappableField, string>>,
+  headerAliases: MarketVocabulary['headerAliases'],
 ): Partial<Record<MappableField, number>> => {
   const normalized = headers.map(normalizeHeader);
   const columns: Partial<Record<MappableField, number>> = {};
-  for (const field of Object.keys(HEADER_ALIASES) as MappableField[]) {
+  for (const field of Object.keys(headerAliases) as MappableField[]) {
     const mapped = mapping[field];
-    const aliases = HEADER_ALIASES[field].map(normalizeHeader);
+    const aliases = headerAliases[field].map(normalizeHeader);
     const index =
       mapped !== undefined
         ? normalized.indexOf(normalizeHeader(mapped))
@@ -225,8 +209,9 @@ export const readCsvHeaders = (
  */
 export const guessHeaderMapping = (
   headers: string[],
+  headerAliases: MarketVocabulary['headerAliases'],
 ): Partial<Record<MappableField, string>> => {
-  const columns = resolveColumns(headers, {});
+  const columns = resolveColumns(headers, {}, headerAliases);
   const mapping: Partial<Record<MappableField, string>> = {};
   for (const [field, index] of Object.entries(columns) as [MappableField, number][]) {
     const header = headers[index];
@@ -237,6 +222,15 @@ export const guessHeaderMapping = (
 
 export interface CsvParseInput {
   content: string;
+  /**
+   * The header spellings to recognise — the MARKET's, required (FUT-760).
+   *
+   * It used to be a private table of Portuguese and English column names, so
+   * a host importing a supplier sheet in any other language found no title
+   * and no price column and got one problem at line 0, with nothing saying
+   * why. An explicit `mapping` still wins over it, field by field.
+   */
+  headerAliases: MarketVocabulary['headerAliases'];
   /** Field → header name, for sheets whose headers the aliases don't cover. */
   mapping?: Partial<Record<MappableField, string>>;
   /** Auto-detected from the header line (";" vs ",") when omitted. */
@@ -259,7 +253,11 @@ export const parseCsvPriceList = (
 
   const headerLine = lines[0] ?? '';
   const delimiter = input.delimiter ?? detectDelimiter(headerLine);
-  const columns = resolveColumns(splitCsvLine(headerLine, delimiter), input.mapping ?? {});
+  const columns = resolveColumns(
+    splitCsvLine(headerLine, delimiter),
+    input.mapping ?? {},
+    input.headerAliases,
+  );
   if (columns.title === undefined || columns.price === undefined) {
     return {
       rows: [],

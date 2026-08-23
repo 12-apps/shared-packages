@@ -13,6 +13,7 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * One connection path on screen at a time — and its OWN steps.
@@ -87,6 +88,7 @@ function renderPanel(connected: boolean) {
 
   render(
     <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
       client={client}
       initialProvider="stripe"
       prepareConnect={async () => ({ state: 'st_1', redirectUri: 'https://host.test/cb' })}

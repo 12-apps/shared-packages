@@ -6,6 +6,7 @@ import type { MerchantSettingsView } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
+import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 
 /**
  * How a provider is spelled in a URL is the ADAPTER's declaration (FUT-557),
@@ -41,14 +42,14 @@ function fakeClient(): PaymentsSettingsClient {
 
 describe('PaymentProviderSettings — adapter-declared URL slugs', () => {
   it('opens the provider a slug segment names', async () => {
-    render(<PaymentProviderSettings client={fakeClient()} selectedProvider="infinite-pay" />);
+    render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={fakeClient()} selectedProvider="infinite-pay" />);
 
     expect(await screen.findByTestId('payments-provider-back')).toBeDefined();
     await waitFor(() => expect(screen.queryByTestId('payments-provider-picker')).toBeNull());
   });
 
   it('still resolves the raw name, so a link minted before the slug existed lands', async () => {
-    render(<PaymentProviderSettings client={fakeClient()} selectedProvider="infinitepay" />);
+    render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={fakeClient()} selectedProvider="infinitepay" />);
 
     expect(await screen.findByTestId('payments-provider-back')).toBeDefined();
   });
@@ -57,6 +58,7 @@ describe('PaymentProviderSettings — adapter-declared URL slugs', () => {
     const onProviderChange = vi.fn();
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient()}
         selectedProvider={null}
         onProviderChange={onProviderChange}
@@ -81,6 +83,7 @@ describe('PaymentProviderSettings — adapter-declared URL slugs', () => {
     const onProviderChange = vi.fn();
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient()}
         selectedProvider="infinitepay"
         onProviderChange={onProviderChange}
@@ -96,6 +99,7 @@ describe('PaymentProviderSettings — adapter-declared URL slugs', () => {
     const onProviderChange = vi.fn();
     render(
       <PaymentProviderSettings
+      copy={PT_BR_PAYMENTS_SETTINGS_COPY}
         client={fakeClient()}
         selectedProvider="infinite-pay"
         onProviderChange={onProviderChange}

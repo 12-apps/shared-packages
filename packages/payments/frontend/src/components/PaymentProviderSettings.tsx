@@ -21,6 +21,8 @@ import {
   type ProviderChangeHandler,
 } from './settings-state';
 import { openSection, SetupGuideSection } from './SetupGuideSection';
+import type { PaymentsSettingsCopy } from './settings-copy';
+import { PaymentsSettingsCopyProvider } from './settings-copy-context';
 
 /**
  * Plug-and-play settings page for payment providers — the reusable
@@ -40,6 +42,15 @@ import { openSection, SetupGuideSection } from './SetupGuideSection';
  */
 export interface PaymentProviderSettingsProps {
   client: PaymentsSettingsClient;
+  /**
+   * Every sentence this surface renders (FUT-760).
+   *
+   * REQUIRED, with no default in the package: a default would be one product's
+   * Portuguese compiled into every other product's settings screen. Passed
+   * once, here, and read from context by the fifteen components below —
+   * `PT_BR_PAYMENTS_SETTINGS_COPY` reproduces today's wording verbatim.
+   */
+  copy: PaymentsSettingsCopy;
   /** Called after any state-changing action, e.g. to refresh host UI. */
   onChanged?: (config: MaskedProviderConfig) => void;
   /**
@@ -233,8 +244,34 @@ function ProviderScreen({ onBack, ...panel }: ProviderScreenProps) {
   );
 }
 
+/**
+ * The walkthrough slot the panel renders, per the connection path it has open.
+ *
+ * Extracted for the size gate, and it reads better here anyway: the mount above
+ * is about resolving WHICH provider is open, and this is about what its
+ * walkthrough shows once one is.
+ */
+function guideSlot(
+  guide: ProviderSetupGuide | null,
+  ack: { confirmed: boolean; confirm: () => void; withdraw: () => void },
+) {
+  return ({ path, ...slots }: Parameters<NonNullable<ProviderScreenProps['guide']>>[0]) => (
+    <SetupGuideSection
+      // Which walkthrough, per the path the panel has open. Only the SECTIONS
+      // differ; `blocked`/`hidden` at the call site stay computed from the base
+      // guide, which `credentialsPath` is required to mirror.
+      guide={guideForPath(guide, path)}
+      confirmed={ack.confirmed}
+      onConfirm={ack.confirm}
+      onReopen={ack.withdraw}
+      {...slots}
+    />
+  );
+}
+
 export function PaymentProviderSettings({
   client,
+  copy,
   onChanged,
   prepareConnect,
   initialProvider = null,
@@ -268,10 +305,15 @@ export function PaymentProviderSettings({
   if (!view) return <CircularProgress data-testid="payments-settings-loading" />;
 
   if (!active) {
-    return <ProviderList view={view} client={client} reload={reload} onSelect={openProvider} />;
+    return (
+      <PaymentsSettingsCopyProvider copy={copy}>
+        <ProviderList view={view} client={client} reload={reload} onSelect={openProvider} />
+      </PaymentsSettingsCopyProvider>
+    );
   }
 
   return (
+    <PaymentsSettingsCopyProvider copy={copy}>
     <ProviderScreen
       descriptor={active}
       config={activeConfig}
@@ -296,18 +338,8 @@ export function PaymentProviderSettings({
         onVerified: () => void reload(),
         onSetupIncomplete: ack.withdraw,
       })}
-      guide={({ path, ...slots }) => (
-        <SetupGuideSection
-          // Which walkthrough, per the path the panel has open. Only the
-          // SECTIONS differ; `blocked`/`hidden` above stay computed from the
-          // base guide, which `credentialsPath` is required to mirror.
-          guide={guideForPath(guide, path)}
-          confirmed={ack.confirmed}
-          onConfirm={ack.confirm}
-          onReopen={ack.withdraw}
-          {...slots}
-        />
-      )}
+      guide={guideSlot(guide, ack)}
     />
+    </PaymentsSettingsCopyProvider>
   );
 }

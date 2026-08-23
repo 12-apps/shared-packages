@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PT_BR_CARD_COPY } from "./pt-BR";
 import { tokenizeForCheckout, tokenizerFor } from "./tokenize";
 import type { CardDetails } from "./types";
 
@@ -21,41 +22,57 @@ describe("tokenizeForCheckout — the mock gate (FUT-697)", () => {
     // a null PagBank key, and the old fallback minted a fake `tok_…` that
     // entered a real charge. With no `mockTokenization` grant, the answer is
     // a clear bail BEFORE any money moves.
-    const result = await tokenizeForCheckout(VALID_CARD, {
-      provider: "stripe",
-      publicKey: null,
-      mockTokenization: false,
-    });
+    const result = await tokenizeForCheckout(
+      VALID_CARD,
+      {
+        provider: "stripe",
+        publicKey: null,
+        mockTokenization: false,
+      },
+      PT_BR_CARD_COPY,
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("indisponível");
   });
 
   it("bails clearly for a provider with no browser scheme, even WITH a key", async () => {
-    const result = await tokenizeForCheckout(VALID_CARD, {
-      provider: "infinitepay",
-      publicKey: "pk_live_123",
-      mockTokenization: false,
-    });
+    const result = await tokenizeForCheckout(
+      VALID_CARD,
+      {
+        provider: "infinitepay",
+        publicKey: "pk_live_123",
+        mockTokenization: false,
+      },
+      PT_BR_CARD_COPY,
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("indisponível");
   });
 
   it("bails clearly when the store has no provider at all", async () => {
-    const result = await tokenizeForCheckout(VALID_CARD, {
-      provider: null,
-      publicKey: null,
-      mockTokenization: false,
-    });
+    const result = await tokenizeForCheckout(
+      VALID_CARD,
+      {
+        provider: null,
+        publicKey: null,
+        mockTokenization: false,
+      },
+      PT_BR_CARD_COPY,
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("indisponível");
   });
 
   it("mints the mock token under stub permission (dev / e2e path)", async () => {
-    const result = await tokenizeForCheckout(VALID_CARD, {
-      provider: "pagbank",
-      publicKey: null,
-      mockTokenization: true,
-    });
+    const result = await tokenizeForCheckout(
+      VALID_CARD,
+      {
+        provider: "pagbank",
+        publicKey: null,
+        mockTokenization: true,
+      },
+      PT_BR_CARD_COPY,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.token).toMatch(/^tok/);
@@ -65,11 +82,15 @@ describe("tokenizeForCheckout — the mock gate (FUT-697)", () => {
   });
 
   it("encodes the decline scenario in the mock token", async () => {
-    const result = await tokenizeForCheckout(DECLINE_CARD, {
-      provider: "pagbank",
-      publicKey: null,
-      mockTokenization: true,
-    });
+    const result = await tokenizeForCheckout(
+      DECLINE_CARD,
+      {
+        provider: "pagbank",
+        publicKey: null,
+        mockTokenization: true,
+      },
+      PT_BR_CARD_COPY,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.token).toMatch(/^tok_declined/);
   });
@@ -78,6 +99,7 @@ describe("tokenizeForCheckout — the mock gate (FUT-697)", () => {
     const result = await tokenizeForCheckout(
       { ...VALID_CARD, number: "1234" },
       { provider: "pagbank", publicKey: null, mockTokenization: true },
+      PT_BR_CARD_COPY,
     );
     expect(result.ok).toBe(false);
   });
@@ -96,7 +118,7 @@ describe("tokenizeForCheckout — the mock gate (FUT-697)", () => {
         provider: "pagbank",
         publicKey: "PUB-KEY",
         mockTokenization: true, // even with stub permission, a key means REAL tokenization
-      });
+      }, PT_BR_CARD_COPY);
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.token).toBe("enc-blob-123");
@@ -142,11 +164,15 @@ describe("tokenizeForCheckout — the stripe-pm scheme (FUT-698)", () => {
   it("mints a PaymentMethod at Stripe with the publishable key — the PAN never reaches us", async () => {
     const calls = stubStripe(200, { id: "pm_123", card: { brand: "visa", last4: "1111" } });
 
-    const result = await tokenizeForCheckout(VALID_CARD, {
-      provider: "stripe",
-      publicKey: "pk_test_1",
-      mockTokenization: false,
-    });
+    const result = await tokenizeForCheckout(
+      VALID_CARD,
+      {
+        provider: "stripe",
+        publicKey: "pk_test_1",
+        mockTokenization: false,
+      },
+      PT_BR_CARD_COPY,
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -166,11 +192,15 @@ describe("tokenizeForCheckout — the stripe-pm scheme (FUT-698)", () => {
   it("carries Stripe's refusal verbatim — the provider's answer must reach a human", async () => {
     stubStripe(402, { error: { message: "Your card number is incorrect." } });
 
-    const result = await tokenizeForCheckout(VALID_CARD, {
-      provider: "stripe",
-      publicKey: "pk_test_1",
-      mockTokenization: false,
-    });
+    const result = await tokenizeForCheckout(
+      VALID_CARD,
+      {
+        provider: "stripe",
+        publicKey: "pk_test_1",
+        mockTokenization: false,
+      },
+      PT_BR_CARD_COPY,
+    );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -182,11 +212,15 @@ describe("tokenizeForCheckout — the stripe-pm scheme (FUT-698)", () => {
   it("a keyed Stripe store routes to the REAL tokenizer — a key beats stub permission", async () => {
     stubStripe(200, { id: "pm_real" });
 
-    const result = await tokenizeForCheckout(VALID_CARD, {
-      provider: "stripe",
-      publicKey: "pk_test_1",
-      mockTokenization: true, // even with stub permission, a key means REAL tokenization
-    });
+    const result = await tokenizeForCheckout(
+      VALID_CARD,
+      {
+        provider: "stripe",
+        publicKey: "pk_test_1",
+        mockTokenization: true, // even with stub permission, a key means REAL tokenization
+      },
+      PT_BR_CARD_COPY,
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.token).toBe("pm_real");

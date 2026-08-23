@@ -10,7 +10,7 @@
  * `CheckoutClient`, which is the seam the wire contract suite pins from both
  * ends.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { err, ok } from "../../../result";

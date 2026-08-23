@@ -275,27 +275,27 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // ----------------------------------------------------------- PlatformOps
   "PlatformOps/ConnectApplicationAllVerdicts": {
     testIds: ["connect-application-panel", "connect-mismatch-SANDBOX", "connect-match-PRODUCTION"],
-    text: ["Callback desta instalação"],
+    text: ["Callback this deployment uses"],
   },
   "PlatformOps/ConnectApplicationUnconfigured": {
     testIds: ["connect-application-panel"],
-    text: ["Nenhuma aplicação configurada neste ambiente."],
+    text: ["No application configured in this environment."],
   },
   "PlatformOps/ConnectApplicationDegraded": {
     testIds: ["connect-error-SANDBOX", "connect-unknown-PRODUCTION"],
-    text: ["não foi possível comparar com o callback desta instalação."],
+    text: ["could not be compared with the callback this deployment uses."],
   },
   "PlatformOps/HomologacaoNeverRequested": {
     testIds: ["platform-homologacao", "homologacao-status-chip", "homologacao-anexo-button"],
-    text: ["Não solicitada"],
+    text: ["Not submitted"],
   },
   "PlatformOps/HomologacaoApproved": {
     testIds: ["homologacao-status-chip", "homologacao-save-ok"],
-    text: ["Aprovada", "Registro atualizado."],
+    text: ["Approved", "Record updated."],
   },
   "PlatformOps/HomologacaoRejected": {
     testIds: ["homologacao-status-chip"],
-    text: ["Recusada", "Decidida em"],
+    text: ["Rejected", "Decided"],
   },
 
   // -------------------------------------------------------------- Settings

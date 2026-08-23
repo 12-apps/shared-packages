@@ -14,7 +14,7 @@
  * tail provider whose tokenization fails while the head's works, and a store
  * whose host published no chain at all.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JSX } from "react";

@@ -61,10 +61,10 @@ describe('ConnectApplicationPanel', () => {
 
     expect(screen.getByTestId('connect-expected-redirect').textContent).toContain(EXPECTED);
     expect(screen.getByTestId('connect-env-SANDBOX').textContent).toContain(
-      'Nenhuma aplicação configurada neste ambiente.',
+      'No application configured in this environment.',
     );
     expect(screen.getByTestId('connect-env-PRODUCTION').textContent).toContain(
-      'Nenhuma aplicação configurada neste ambiente.',
+      'No application configured in this environment.',
     );
   });
 
@@ -84,7 +84,7 @@ describe('ConnectApplicationPanel', () => {
     );
 
     expect(screen.getByTestId('connect-mismatch-SANDBOX').textContent).toContain(
-      'diferente do callback desta instalação',
+      'differs from the callback this deployment uses',
     );
     expect(screen.getByTestId('connect-env-SANDBOX').textContent).toContain(`${EXPECTED}/`);
     expect(screen.getByTestId('connect-env-SANDBOX').textContent).toContain(
@@ -106,7 +106,7 @@ describe('ConnectApplicationPanel', () => {
       />,
     );
 
-    expect(screen.getByTestId('connect-match-PRODUCTION').textContent).toContain('confere');
+    expect(screen.getByTestId('connect-match-PRODUCTION').textContent).toContain('matches');
   });
 
   it('renders the unknown verdict when the response named no redirect URI', async () => {
@@ -125,7 +125,7 @@ describe('ConnectApplicationPanel', () => {
 
     // Never "confere": the schema is undocumented, absence is not a match.
     expect(screen.getByTestId('connect-unknown-SANDBOX').textContent).toContain(
-      'não informou a redirect_uri',
+      'carried no redirect_uri',
     );
     await waitFor(() => {
       expect(screen.queryByTestId('connect-match-SANDBOX')).toBeNull();
