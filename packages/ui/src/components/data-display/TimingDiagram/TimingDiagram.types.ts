@@ -1,3 +1,4 @@
+import type { TimingDiagramCopy } from '../../../copy';
 // Types
 export interface TimingData {
   dns?: number;
@@ -9,6 +10,8 @@ export interface TimingData {
 }
 
 export interface TimingDiagramProps {
+  /** The region's accessible name and its visible heading. REQUIRED. */
+  copy: TimingDiagramCopy;
   data: TimingData;
   showLabels?: boolean;
   color?: string;

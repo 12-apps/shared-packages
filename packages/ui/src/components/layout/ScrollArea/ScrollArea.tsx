@@ -148,9 +148,18 @@ const LoadingOverlay: FC = () => (
   </Box>
 );
 
-const ScrollToTopFab: FC<{ visible: boolean; glass: boolean; onClick: () => void }> = ({
+// The label is guarded at the call site rather than defaulted: the props union
+// already makes it required alongside `scrollToTopButton`, and a fab with an
+// empty accessible name is the exact failure this port exists to remove.
+const ScrollToTopFab: FC<{
+  visible: boolean;
+  glass: boolean;
+  scrollToTopLabel: string;
+  onClick: () => void;
+}> = ({
   visible,
   glass,
+  scrollToTopLabel,
   onClick }) => {
   const theme = useTheme();
 
@@ -158,7 +167,7 @@ const ScrollToTopFab: FC<{ visible: boolean; glass: boolean; onClick: () => void
     <Zoom in={visible}>
       <Fab
         size="small"
-        aria-label="Scroll to top"
+        aria-label={scrollToTopLabel}
         onClick={onClick}
         sx={{
           position: 'absolute',
@@ -183,6 +192,8 @@ const ScrollToTopFab: FC<{ visible: boolean; glass: boolean; onClick: () => void
 export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
   const resolved = resolveScrollAreaProps(componentProps);
   const {
+    regionLabel,
+    scrollToTopLabel,
     children,
     width,
     height,
@@ -231,6 +242,7 @@ export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
     >
       <ScrollViewport
         {...resolved}
+        regionLabel={regionLabel}
         shouldShowScrollbar={shouldShowScrollbar}
         setScrollRef={setScrollRef}
         onScroll={handleScroll}
@@ -246,8 +258,9 @@ export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
 
       {loading && <LoadingOverlay />}
 
-      {scrollToTopButton && !disabled && !loading && (
+      {scrollToTopButton && scrollToTopLabel && !disabled && !loading && (
         <ScrollToTopFab
+          scrollToTopLabel={scrollToTopLabel}
           visible={showScrollToTop}
           glass={variant === 'glass'}
           onClick={scrollToTop}

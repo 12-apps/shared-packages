@@ -101,6 +101,7 @@ DashboardFilterToggle.displayName = 'Dashboard.FilterToggle';
 
 export const DashboardSettings = ({
   title = 'Settings',
+  closeLabel,
   children,
   ariaLabel = 'Settings',
   href,
@@ -146,7 +147,7 @@ export const DashboardSettings = ({
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth data-testid={`${testIdPrefix}-settings-dialog`}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {title}
-          <IconButton aria-label="Close" size="small" onClick={() => setOpen(false)}>
+          <IconButton aria-label={closeLabel} size="small" onClick={() => setOpen(false)}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>

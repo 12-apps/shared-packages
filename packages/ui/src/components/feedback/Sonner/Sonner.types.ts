@@ -4,6 +4,8 @@ export type SonnerVariant = 'default' | 'glass' | 'minimal';
 export type SonnerType = 'default' | 'success' | 'error' | 'warning' | 'info' | 'loading';
 
 export interface SonnerProps {
+  /** The dismiss button's accessible name — it carries a glyph only. REQUIRED. */
+  dismissLabel: string;
   id?: string;
   title?: ReactNode;
   description?: ReactNode;

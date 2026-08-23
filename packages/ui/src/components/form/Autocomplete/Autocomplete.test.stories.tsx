@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor,within } from 'storybook/test';
 
 import { Autocomplete } from './Autocomplete';
 import type { AutocompleteProps } from './Autocomplete.types';
+import { PT_BR_AUTOCOMPLETE_COPY } from '../../../pt-BR';
 
 interface Person {
   id: string;
@@ -23,6 +24,7 @@ const samplePeople: Person[] = [
 const stringSuggestions = ['Apple', 'Banana', 'Cherry', 'Date', 'Elderberry', 'Fig', 'Grape'];
 
 const meta: Meta<typeof Autocomplete> = {
+  args: { copy: PT_BR_AUTOCOMPLETE_COPY },
   title: 'Form/Autocomplete/Tests',
   component: Autocomplete,
   tags: ['autodocs', 'test', 'component:Autocomplete'],

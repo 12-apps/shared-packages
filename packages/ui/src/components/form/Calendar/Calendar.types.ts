@@ -23,6 +23,13 @@ export interface HeaderRenderContext {
 }
 
 export interface CalendarProps {
+  /**
+   * The grid's accessible name. REQUIRED: the container is a
+   * `role="application"`, so a screen reader announces this and nothing else —
+   * and the package cannot know whether it picks a delivery day or a birthday.
+   */
+  ariaLabel: string;
+
   // Mode
   selectionMode?: SelectionMode; // default: 'single'
 

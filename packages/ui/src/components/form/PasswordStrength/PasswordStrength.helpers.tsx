@@ -4,6 +4,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import { Box, Typography } from '@mui/material';
 import React from 'react';
 
+import type { PasswordRequirementCopy, PasswordStrengthCopy } from '../../../copy';
 import type { PasswordRequirements } from './PasswordStrength.types';
 
 export const defaultRequirements: PasswordRequirements = {
@@ -72,15 +73,19 @@ export const calculatePasswordStrength = (
   return Math.min(earned + lengthBonus(password.length), 100);
 };
 
-const STRENGTH_LABELS: ReadonlyArray<[number, string]> = [
-  [20, 'Very Weak'],
-  [40, 'Weak'],
-  [60, 'Fair'],
-  [80, 'Good'],
+// The four ceilings, and which band each one names. The band NAMES come from
+// the host's table — only the thresholds are ours.
+const STRENGTH_BANDS: ReadonlyArray<[number, keyof PasswordStrengthCopy['bands']]> = [
+  [20, 'veryWeak'],
+  [40, 'weak'],
+  [60, 'fair'],
+  [80, 'good'],
 ];
 
-export const getStrengthLabel = (strength: number): string =>
-  STRENGTH_LABELS.find(([ceiling]) => strength <= ceiling)?.[1] ?? 'Strong';
+export const getStrengthLabel = (
+  strength: number,
+  bands: PasswordStrengthCopy['bands'],
+): string => bands[STRENGTH_BANDS.find(([ceiling]) => strength <= ceiling)?.[1] ?? 'strong'];
 
 export const getStrengthIcon = (strength: number) => {
   if (strength <= 40) return <WarningIcon />;
@@ -88,23 +93,34 @@ export const getStrengthIcon = (strength: number) => {
   return <SuccessIcon />;
 };
 
-const SUGGESTIONS: ReadonlyArray<[keyof RequirementChecks, string]> = [
-  ['length', 'Use at least 8 characters'],
-  ['uppercase', 'Add uppercase letters'],
-  ['lowercase', 'Add lowercase letters'],
-  ['numbers', 'Include numbers'],
-  ['special', 'Add special characters'],
+// One tip per unmet requirement, in checklist order. The `length` tip carries
+// the configured minimum, so the number in the sentence is the one enforced.
+const SUGGESTION_KEYS: ReadonlyArray<[keyof RequirementChecks, keyof PasswordRequirementCopy]> = [
+  ['length', 'minLength'],
+  ['uppercase', 'uppercase'],
+  ['lowercase', 'lowercase'],
+  ['numbers', 'numbers'],
+  ['special', 'special'],
 ];
 
-export const buildSuggestions = (checks: RequirementChecks): string[] =>
-  SUGGESTIONS.filter(([key]) => !checks[key]).map(([, tip]) => tip);
+export const buildSuggestions = (
+  checks: RequirementChecks,
+  copy: PasswordRequirementCopy,
+  minLength: number,
+): string[] =>
+  SUGGESTION_KEYS.filter(([check]) => !checks[check]).map(([, key]) =>
+    key === 'minLength' ? copy.minLength(minLength) : copy[key],
+  );
 
 // Rendered by PasswordStrength; depends on nothing styled, so it lives beside
 // the pure helpers rather than in the component file.
-export const SuggestionsList: React.FC<{ suggestions: string[] }> = ({ suggestions }) => (
+export const SuggestionsList: React.FC<{ suggestions: string[]; heading: string }> = ({
+  suggestions,
+  heading,
+}) => (
   <Box>
     <Typography variant="caption" color="text.secondary" fontWeight="medium">
-      Suggestions:
+      {heading}
     </Typography>
     <Box sx={{ mt: 1 }}>
       {suggestions.map((tip) => (

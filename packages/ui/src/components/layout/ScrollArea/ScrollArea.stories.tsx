@@ -310,7 +310,7 @@ export const NestedScrollAreas: Story = {
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
           <Paper sx={{ flex: 1 }}>
-            <ScrollArea height={200} variant="overlay">
+            <ScrollArea regionLabel="Área rolável" height={200} variant="overlay">
               <Box sx={{ p: 2 }}>
                 <Typography variant="subtitle1" gutterBottom>
                   Nested Area 1
@@ -320,7 +320,7 @@ export const NestedScrollAreas: Story = {
             </ScrollArea>
           </Paper>
           <Paper sx={{ flex: 1 }}>
-            <ScrollArea height={200} variant="overlay">
+            <ScrollArea regionLabel="Área rolável" height={200} variant="overlay">
               <Box sx={{ p: 2 }}>
                 <Typography variant="subtitle1" gutterBottom>
                   Nested Area 2
@@ -363,14 +363,14 @@ export const AllVariants: Story = {
       <Box sx={{ display: 'flex', gap: 2 }}>
         <Box>
           <Typography variant="caption" color="text.secondary">Default</Typography>
-          <ScrollArea width={300} height={200} variant="default">
+          <ScrollArea regionLabel="Área rolável" width={300} height={200} variant="default">
             <ScrollableContent lines={20} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">Overlay</Typography>
-          <ScrollArea width={300} height={200} variant="overlay">
+          <ScrollArea regionLabel="Área rolável" width={300} height={200} variant="overlay">
             <ScrollableContent lines={20} />
           </ScrollArea>
         </Box>
@@ -378,7 +378,7 @@ export const AllVariants: Story = {
         <Box>
           <Typography variant="caption" color="text.secondary">Glass</Typography>
           <Box sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', p: 2, borderRadius: 1 }}>
-            <ScrollArea width={300} height={200} variant="glass">
+            <ScrollArea regionLabel="Área rolável" width={300} height={200} variant="glass">
               <ScrollableContent lines={20} />
             </ScrollArea>
           </Box>
@@ -396,21 +396,21 @@ export const AllSizes: Story = {
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
         <Box>
           <Typography variant="caption" color="text.secondary">Small (200x150)</Typography>
-          <ScrollArea width={200} height={150}>
+          <ScrollArea regionLabel="Área rolável" width={200} height={150}>
             <ScrollableContent lines={15} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">Medium (400x300)</Typography>
-          <ScrollArea width={400} height={300}>
+          <ScrollArea regionLabel="Área rolável" width={400} height={300}>
             <ScrollableContent lines={25} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">Large (600x400)</Typography>
-          <ScrollArea width={600} height={400}>
+          <ScrollArea regionLabel="Área rolável" width={600} height={400}>
             <ScrollableContent lines={35} />
           </ScrollArea>
         </Box>
@@ -427,28 +427,28 @@ export const AllStates: Story = {
       <Box sx={{ display: 'flex', gap: 2 }}>
         <Box>
           <Typography variant="caption" color="text.secondary">Normal</Typography>
-          <ScrollArea width={300} height={200}>
+          <ScrollArea regionLabel="Área rolável" width={300} height={200}>
             <ScrollableContent lines={20} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">Disabled</Typography>
-          <ScrollArea width={300} height={200} disabled>
+          <ScrollArea regionLabel="Área rolável" width={300} height={200} disabled>
             <ScrollableContent lines={20} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">Loading</Typography>
-          <ScrollArea width={300} height={200} loading>
+          <ScrollArea regionLabel="Área rolável" width={300} height={200} loading>
             <ScrollableContent lines={20} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">Empty</Typography>
-          <ScrollArea 
+          <ScrollArea regionLabel="Área rolável" 
             width={300} 
             height={200}
             emptyContent={
@@ -471,21 +471,21 @@ export const InteractiveStates: Story = {
       <Box sx={{ display: 'flex', gap: 2 }}>
         <Box>
           <Typography variant="caption" color="text.secondary">Hover (Auto-hide scrollbar)</Typography>
-          <ScrollArea width={300} height={200} autoHide>
+          <ScrollArea regionLabel="Área rolável" width={300} height={200} autoHide>
             <ScrollableContent lines={20} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">Active (Scrolling)</Typography>
-          <ScrollArea width={300} height={200} smoothScroll>
+          <ScrollArea regionLabel="Área rolável" width={300} height={200} smoothScroll>
             <ScrollableContent lines={20} />
           </ScrollArea>
         </Box>
         
         <Box>
           <Typography variant="caption" color="text.secondary">With Scroll-to-Top</Typography>
-          <ScrollArea width={300} height={200} scrollToTopButton scrollToTopThreshold={50}>
+          <ScrollArea regionLabel="Área rolável" width={300} height={200} scrollToTopButton scrollToTopThreshold={50}>
             <ScrollableContent lines={30} />
           </ScrollArea>
         </Box>
@@ -505,14 +505,14 @@ export const Responsive: Story = {
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
         <Box sx={{ flex: 1 }}>
           <Typography variant="caption" color="text.secondary">100% width, max 500px</Typography>
-          <ScrollArea width="100%" maxWidth={500} height={300}>
+          <ScrollArea regionLabel="Área rolável" width="100%" maxWidth={500} height={300}>
             <ScrollableContent lines={25} />
           </ScrollArea>
         </Box>
 
         <Box sx={{ flex: 1 }}>
           <Typography variant="caption" color="text.secondary">Responsive height</Typography>
-          <ScrollArea
+          <ScrollArea regionLabel="Área rolável"
             width="100%"
             height={{ xs: 200, sm: 300, md: 400 }}
             sx={{ bgcolor: 'background.paper' }}
@@ -571,7 +571,7 @@ const VirtualizedGridInScrollArea: React.FC<VirtualizedGridInScrollAreaProps> = 
   }, []);
 
   return (
-    <ScrollArea
+    <ScrollArea regionLabel="Área rolável"
       width={containerWidth + 20}
       height={visibleHeight}
       autoHide

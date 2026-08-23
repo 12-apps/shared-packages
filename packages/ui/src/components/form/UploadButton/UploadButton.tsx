@@ -19,8 +19,9 @@ import type { UploadButtonProps, UploadButtonState } from './UploadButton.types'
  */
 const UploadButton = React.forwardRef<HTMLInputElement, UploadButtonProps>((props, ref) => {
   const {
+    copy,
     variant = 'default',
-    label = 'Upload File',
+    label = props.copy.buttonLabel,
     disabled = false,
     multiple = false,
     accept,
@@ -34,6 +35,7 @@ const UploadButton = React.forwardRef<HTMLInputElement, UploadButtonProps>((prop
     useUploadButton(props);
 
   const trigger: TriggerProps = {
+    copy,
     label,
     icon,
     disabled,
@@ -65,6 +67,7 @@ const UploadButton = React.forwardRef<HTMLInputElement, UploadButtonProps>((prop
       )}
 
       <UploadFeedback
+        copy={copy}
         isUploading={derived.isUploading}
         progress={derived.progress}
         helperText={helperText}

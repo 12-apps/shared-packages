@@ -14,6 +14,7 @@ import {
 import React, {  } from 'react';
 
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
+import type { TutorialCopy } from '../../../copy';
 
 // Animation keyframes
 
@@ -42,6 +43,7 @@ const StepDot = styled(Box, {
 
 // The step's controls: skip/restart on the left, previous/next on the right.
 const TutorialStepNav: React.FC<{
+  copy: TutorialCopy;
   currentStep: number;
   stepCount: number;
   isLastStep: boolean;
@@ -52,6 +54,7 @@ const TutorialStepNav: React.FC<{
   onSkip: () => void;
   onRestart: () => void;
 }> = ({
+  copy,
   currentStep,
   stepCount,
   isLastStep,
@@ -70,7 +73,7 @@ const TutorialStepNav: React.FC<{
           <Stack direction="row" spacing={1}>
             {allowSkip && (
               <Button size="small" onClick={onSkip} variant="text">
-                Skip
+                {copy.skip}
               </Button>
             )}
             {stepCount > 1 && (
@@ -78,7 +81,7 @@ const TutorialStepNav: React.FC<{
                 size="small"
                 onClick={onRestart}
                 disabled={currentStep === 0}
-                title="Restart"
+                title={copy.restart}
               >
                 <RestartIcon fontSize="small" />
               </IconButton>
@@ -94,7 +97,7 @@ const TutorialStepNav: React.FC<{
                 disabled={currentStep === 0}
                 data-testid="tutorial-prev-button"
               >
-                Previous
+                {copy.previous}
               </Button>
             )}
 
@@ -108,7 +111,7 @@ const TutorialStepNav: React.FC<{
                 title={requiresActionBeforeNext ? 'Complete the required action first' : ''}
                 data-testid="tutorial-next-button"
               >
-                Next
+                {copy.next}
               </Button>
             ) : (
               <Button
@@ -175,6 +178,7 @@ const TutorialStepHeader: React.FC<{
 );
 
 export const TutorialStepBody: React.FC<{
+  copy: TutorialCopy;
   step: TutorialOverlayProps['steps'][number];
   currentStep: number;
   stepCount: number;
@@ -188,6 +192,7 @@ export const TutorialStepBody: React.FC<{
   onSkip: () => void;
   onRestart: () => void;
 }> = ({
+  copy,
   step,
   currentStep,
   stepCount,
@@ -239,6 +244,7 @@ export const TutorialStepBody: React.FC<{
         <StepDots currentStep={currentStep} stepCount={stepCount} />
 
         <TutorialStepNav
+          copy={copy}
           currentStep={currentStep}
           stepCount={stepCount}
           isLastStep={isLastStep}

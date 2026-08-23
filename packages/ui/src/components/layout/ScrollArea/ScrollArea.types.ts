@@ -5,7 +5,25 @@ export type ScrollOrientation = 'vertical' | 'horizontal' | 'both';
 export type ScrollbarSize = 'thin' | 'medium' | 'thick';
 export type ScrollAreaVariant = 'default' | 'overlay' | 'glass';
 
-export interface ScrollAreaProps extends Omit<BoxProps, 'ref'> {
+/**
+ * Conditionally-required copy for the scroll-to-top control. The fab only exists
+ * when `scrollToTopButton` is set, so only that side of the union owes a name —
+ * a host that never shows the button is not asked for a word it cannot place.
+ */
+type ScrollAreaScrollToTop =
+  | { scrollToTopButton?: false; scrollToTopLabel?: never }
+  | { scrollToTopButton: true; scrollToTopLabel: string };
+
+export type ScrollAreaProps = ScrollAreaBase & ScrollAreaScrollToTop;
+
+export interface ScrollAreaBase extends Omit<BoxProps, 'ref'> {
+  /**
+   * The scroll region's accessible name. REQUIRED: the viewport is a
+   * `role="region"`, so a screen reader announces this word and no other. The
+   * package cannot know whether it wraps a menu, a chat log or a table.
+   */
+  regionLabel: string;
+
   /** Content to be rendered inside the scrollable area */
   children: ReactNode;
 
@@ -44,9 +62,6 @@ export interface ScrollAreaProps extends Omit<BoxProps, 'ref'> {
 
   /** Scroll event handler */
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
-
-  /** Show scroll-to-top button */
-  scrollToTopButton?: boolean;
 
   /** Threshold for showing scroll-to-top button (in pixels) */
   scrollToTopThreshold?: number;

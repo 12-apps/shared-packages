@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { Autocomplete } from './Autocomplete';
 import type { AutocompleteProps } from './Autocomplete.types';
+import { PT_BR_AUTOCOMPLETE_COPY } from '../../../pt-BR';
 
 interface Person {
   id: string;
@@ -50,6 +51,7 @@ const countries = [
 ];
 
 const meta: Meta<typeof Autocomplete> = {
+  args: { copy: PT_BR_AUTOCOMPLETE_COPY },
   title: 'Form/Autocomplete',
   component: Autocomplete,
   tags: ['autodocs', 'component:Autocomplete'],

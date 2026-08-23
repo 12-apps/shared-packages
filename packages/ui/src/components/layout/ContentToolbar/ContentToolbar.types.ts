@@ -4,6 +4,9 @@ import type { ReactNode } from 'react';
 
 /** Props for {@link ContentToolbar} — the shared content-page toolbar. */
 export interface ContentToolbarProps {
+  /** The two bulk-selection buttons, spelled out where the bar has room. */
+  selectAllText: string;
+  clearAllText: string;
   /**
    * The select-all checkbox's accessible name. It carries no visible label of
    * its own, so this is the only thing a screen reader gets for it. REQUIRED:
@@ -61,6 +64,8 @@ export type ViewMode = 'grid' | 'list';
 
 /** Props for {@link ViewSelector}. */
 export interface ViewSelectorProps {
+  /** The card-size control's accessible name — it renders icons only. */
+  cardSizeLabel: string;
   /** Current view mode. */
   viewMode: ViewMode;
   /** Called when the view mode changes. */
@@ -99,6 +104,10 @@ export interface SortFieldDefinition<TField extends string = string> {
 
 /** Props for {@link SortByDropdown}. */
 export interface SortByDropdownProps<TField extends string = string> {
+  /** The menu's two section headings, and the trigger's own prefix. */
+  orderHeading: string;
+  sortHeading: string;
+  triggerPrefix: string;
   fields: SortFieldDefinition<TField>[];
   activeField: TField;
   activeOrder?: string;
@@ -126,6 +135,9 @@ export interface MultiSelectExtraOption {
 
 /** Props for {@link MultiSelectDropdown}. */
 export interface MultiSelectDropdownProps<TValue extends string = string> {
+  /** The extra-options section heading, and the clear-selection action. */
+  extraOptionsHeading: string;
+  clearText: string;
   /** Label before the trigger (e.g. "Content Type"). */
   label: string;
   options: MultiSelectOption<TValue>[];

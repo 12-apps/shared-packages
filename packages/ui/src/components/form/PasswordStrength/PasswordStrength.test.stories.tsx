@@ -4,8 +4,10 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import React, { useState } from 'react';
 
 import { PasswordStrength } from './PasswordStrength';
+import { PT_BR_PASSWORD_STRENGTH_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof PasswordStrength> = {
+  args: { copy: PT_BR_PASSWORD_STRENGTH_COPY },
   title: 'Form/PasswordStrength/Tests',
   component: PasswordStrength,
   parameters: {
@@ -22,7 +24,7 @@ export const BasicInteraction: Story = {
   name: '🧪 Basic Interaction Test',
   render: () => (
     <Stack spacing={2} sx={{ width: 400 }}>
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="password-strength"
         value="weak"
         variant="linear"
@@ -64,7 +66,7 @@ const InteractivePasswordStrength = () => {
         inputProps={{ 'data-testid': 'password-input' }}
         variant="outlined"
       />
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="password-strength-indicator"
         value={password}
         showRequirements={true}
@@ -108,7 +110,7 @@ export const ScreenReader: Story = {
   name: '🧪 Screen Reader Test',
   render: () => (
     <Stack spacing={2} sx={{ width: 400 }}>
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="password-strength"
         value="MyStrongP@ssw0rd123!"
         variant="linear"
@@ -145,7 +147,7 @@ export const ResponsiveDesign: Story = {
   name: '🧪 Responsive Design Test',
   render: () => (
     <Stack spacing={2} sx={{ width: '90vw' }}>
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="password-strength-responsive"
         value="MyStrongP@ssw0rd123!"
         variant="linear"
@@ -176,11 +178,11 @@ export const VisualStates: Story = {
   name: '🧪 Visual States Test',
   render: () => (
     <Stack spacing={3}>
-      <PasswordStrength data-testid="very-weak-password" value="1" showStrengthLabel={true} />
-      <PasswordStrength data-testid="weak-password" value="pass" showStrengthLabel={true} />
-      <PasswordStrength data-testid="fair-password" value="password" showStrengthLabel={true} />
-      <PasswordStrength data-testid="good-password" value="password123" showStrengthLabel={true} />
-      <PasswordStrength data-testid="strong-password" value="MyStrongP@ssw0rd123!" showStrengthLabel={true} />
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} data-testid="very-weak-password" value="1" showStrengthLabel={true} />
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} data-testid="weak-password" value="pass" showStrengthLabel={true} />
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} data-testid="fair-password" value="password" showStrengthLabel={true} />
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} data-testid="good-password" value="password123" showStrengthLabel={true} />
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} data-testid="strong-password" value="MyStrongP@ssw0rd123!" showStrengthLabel={true} />
     </Stack>
   ),
   play: async ({ canvasElement, step }) => {
@@ -227,7 +229,7 @@ export const Performance: Story = {
   name: '🧪 Performance Test',
   render: () => (
     <Stack spacing={2} sx={{ width: 400 }}>
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="performance-strength"
         value="MyPassword123!"
         animated={true}
@@ -254,13 +256,13 @@ export const EdgeCases: Story = {
   name: '🧪 Edge Cases Test',
   render: () => (
     <Stack spacing={3}>
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="empty-password"
         value=""
         showRequirements={true}
         showStrengthLabel={true}
       />
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="very-long-password"
         value="ThisIsAnExtremelyLongPasswordThatExceedsTypicalLengthRequirementsAndShouldStillWork123!@#"
         showStrengthLabel={true}
@@ -290,7 +292,7 @@ export const Integration: Story = {
   name: '🧪 Integration Test',
   render: () => (
     <Stack spacing={2} sx={{ width: 500 }}>
-      <PasswordStrength
+      <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY}
         data-testid="integration-strength"
         value="Pass123"
         variant="linear"

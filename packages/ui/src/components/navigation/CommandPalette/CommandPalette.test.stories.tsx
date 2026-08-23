@@ -8,8 +8,10 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { PaletteCommand } from './CommandPalette.types';
 import {CommandPalette } from './CommandPalette';
+import { PT_BR_COMMAND_PALETTE_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof CommandPalette> = {
+  args: { copy: PT_BR_COMMAND_PALETTE_COPY },
   title: 'Navigation/CommandPalette/Tests',
   component: CommandPalette,
   parameters: {
@@ -73,7 +75,7 @@ export const BasicInteraction: Story = {
         <Button variant="contained" onClick={() => setOpen(true)} data-testid="open-palette">
           Open Command Palette
         </Button>
-        <CommandPalette
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
           open={open}
           onClose={() => setOpen(false)}
           commands={testCommands}
@@ -117,7 +119,7 @@ export const KeyboardNavigation: Story = {
         <Button variant="contained" onClick={() => setOpen(true)} data-testid="open-palette">
           Open Command Palette
         </Button>
-        <CommandPalette
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY}
           open={open}
           onClose={() => setOpen(false)}
           commands={testCommands}
@@ -169,7 +171,7 @@ export const ScreenReader: Story = {
         <div id="palette-help" style={{ display: 'none' }}>
           Press Ctrl+K or Cmd+K to open command palette
         </div>
-        <CommandPalette open={open} onClose={() => setOpen(false)} commands={testCommands} />
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY} open={open} onClose={() => setOpen(false)} commands={testCommands} />
       </>
     );
   },
@@ -214,7 +216,7 @@ export const FocusManagement: Story = {
         <Button data-testid="after-button" variant="outlined">
           Button After
         </Button>
-        <CommandPalette open={open} onClose={() => setOpen(false)} commands={testCommands} />
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY} open={open} onClose={() => setOpen(false)} commands={testCommands} />
       </>
     );
   },
@@ -266,7 +268,7 @@ export const ResponsiveDesign: Story = {
         <Button variant="contained" onClick={() => setOpen(true)} data-testid="open-palette">
           Open Responsive Palette
         </Button>
-        <CommandPalette open={open} onClose={() => setOpen(false)} commands={testCommands} />
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY} open={open} onClose={() => setOpen(false)} commands={testCommands} />
       </>
     );
   },
@@ -299,7 +301,7 @@ export const ThemeVariations: Story = {
         <Button variant="contained" onClick={() => setOpen(true)} data-testid="open-palette">
           Open Themed Palette
         </Button>
-        <CommandPalette open={open} onClose={() => setOpen(false)} commands={testCommands} />
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY} open={open} onClose={() => setOpen(false)} commands={testCommands} />
       </>
     );
   },
@@ -328,7 +330,7 @@ export const VisualStates: Story = {
         <Button variant="contained" onClick={() => setOpen(true)} data-testid="open-palette">
           Open for Visual States
         </Button>
-        <CommandPalette open={open} onClose={() => setOpen(false)} commands={testCommands} />
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY} open={open} onClose={() => setOpen(false)} commands={testCommands} />
       </>
     );
   },
@@ -395,7 +397,7 @@ export const EdgeCases: Story = {
         <Button variant="contained" onClick={() => setOpen(true)} data-testid="open-palette">
           Open Edge Cases Test
         </Button>
-        <CommandPalette open={open} onClose={() => setOpen(false)} commands={edgeCaseCommands} />
+        <CommandPalette copy={PT_BR_COMMAND_PALETTE_COPY} open={open} onClose={() => setOpen(false)} commands={edgeCaseCommands} />
       </>
     );
   },

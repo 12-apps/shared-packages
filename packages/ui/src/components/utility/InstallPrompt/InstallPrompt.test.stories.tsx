@@ -4,8 +4,10 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { InstallPrompt } from './InstallPrompt';
 import type { BeforeInstallPromptEvent } from './InstallPrompt.types';
+import { PT_BR_INSTALL_PROMPT_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof InstallPrompt> = {
+  args: { copy: PT_BR_INSTALL_PROMPT_COPY },
   title: 'Utility/InstallPrompt/Tests',
   component: InstallPrompt,
   parameters: {
@@ -36,7 +38,7 @@ const Installable = ({ storageKey }: { storageKey: string }) => {
     dispatchInstallEvent();
   }, [storageKey]);
 
-  return <InstallPrompt storageKey={storageKey} title="Install this app" />;
+  return <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} storageKey={storageKey} title="Install this app" />;
 };
 
 // ================================
@@ -72,7 +74,7 @@ export const DismissHidesPrompt: Story = {
 };
 
 export const HiddenWithoutInstallEvent: Story = {
-  render: () => <InstallPrompt storageKey="sb-test-hidden" />,
+  render: () => <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} storageKey="sb-test-hidden" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 

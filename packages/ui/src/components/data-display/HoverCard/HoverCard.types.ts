@@ -9,6 +9,8 @@ export type HoverCardPlacement =
 export type HoverCardAnimation = 'fade' | 'scale' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right';
 
 export interface HoverCardProps extends Omit<MuiPopoverProps, 'variant' | 'open' | 'anchorEl'> {
+  /** What the card says while its content is in flight. REQUIRED. */
+  loadingText: string;
   /**
    * The variant of the hover card
    */

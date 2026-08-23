@@ -14,6 +14,7 @@ import { styled } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { floatAnimation, getColorFromTheme } from './Textarea.styles';
+import type { RichEditorToolbarCopy } from '../../../copy';
 
 const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   display: 'flex',
@@ -206,11 +207,12 @@ const useRichEditorState = ({
 };
 
 const InlineFormatButtons: React.FC<{
+  copy: RichEditorToolbarCopy;
   activeFormats: Record<string, boolean>;
   onCommand: (command: string, value?: string) => void;
-}> = ({ activeFormats, onCommand }) => (
+}> = ({ copy, activeFormats, onCommand }) => (
   <>
-    <Tooltip title="Bold" arrow>
+    <Tooltip title={copy.bold} arrow>
       <ToolbarButton
         size="small"
         active={activeFormats.bold}
@@ -220,7 +222,7 @@ const InlineFormatButtons: React.FC<{
       </ToolbarButton>
     </Tooltip>
 
-    <Tooltip title="Italic" arrow>
+    <Tooltip title={copy.italic} arrow>
       <ToolbarButton
         size="small"
         active={activeFormats.italic}
@@ -230,7 +232,7 @@ const InlineFormatButtons: React.FC<{
       </ToolbarButton>
     </Tooltip>
 
-    <Tooltip title="Underline" arrow>
+    <Tooltip title={copy.underline} arrow>
       <ToolbarButton
         size="small"
         active={activeFormats.underline}
@@ -244,13 +246,14 @@ const InlineFormatButtons: React.FC<{
 );
 
 const BlockFormatButtons: React.FC<{
+  copy: RichEditorToolbarCopy;
   activeFormats: Record<string, boolean>;
   onCommand: (command: string, value?: string) => void;
-}> = ({ activeFormats, onCommand }) => (
+}> = ({ copy, activeFormats, onCommand }) => (
   <>
     <Divider orientation="vertical" flexItem />
 
-    <Tooltip title="Bullet List" arrow>
+    <Tooltip title={copy.bulletList} arrow>
       <ToolbarButton
         size="small"
         active={activeFormats.list}
@@ -260,7 +263,7 @@ const BlockFormatButtons: React.FC<{
       </ToolbarButton>
     </Tooltip>
 
-    <Tooltip title="Numbered List" arrow>
+    <Tooltip title={copy.numberedList} arrow>
       <ToolbarButton
         size="small"
         active={activeFormats.orderedList}
@@ -272,13 +275,13 @@ const BlockFormatButtons: React.FC<{
 
     <Divider orientation="vertical" flexItem />
 
-    <Tooltip title="Quote" arrow>
+    <Tooltip title={copy.quote} arrow>
       <ToolbarButton size="small" onClick={() => onCommand('formatBlock', 'blockquote')}>
         <FormatQuote fontSize="small" />
       </ToolbarButton>
     </Tooltip>
 
-    <Tooltip title="Code" arrow>
+    <Tooltip title={copy.code} arrow>
       <ToolbarButton size="small" onClick={() => onCommand('formatBlock', 'pre')}>
         <Code fontSize="small" />
       </ToolbarButton>
@@ -286,11 +289,11 @@ const BlockFormatButtons: React.FC<{
 
     <Divider orientation="vertical" flexItem />
 
-    <Tooltip title="Insert Link" arrow>
+    <Tooltip title={copy.insertLink} arrow>
       <ToolbarButton
         size="small"
         onClick={() => {
-          const url = window.prompt('Enter URL:');
+          const url = window.prompt(copy.linkPrompt);
           if (url) onCommand('createLink', url);
         }}
       >
@@ -298,13 +301,13 @@ const BlockFormatButtons: React.FC<{
       </ToolbarButton>
     </Tooltip>
 
-    <Tooltip title="Text Color" arrow>
+    <Tooltip title={copy.textColor} arrow>
       <ToolbarButton size="small">
         <FormatColorText fontSize="small" />
       </ToolbarButton>
     </Tooltip>
 
-    <Tooltip title="Background Color" arrow>
+    <Tooltip title={copy.backgroundColor} arrow>
       <ToolbarButton size="small">
         <FormatColorFill fontSize="small" />
       </ToolbarButton>
@@ -315,17 +318,24 @@ const BlockFormatButtons: React.FC<{
 // The formatting buttons. Split out so the editor body is state, handlers and
 // the editable region.
 const EditorToolbar: React.FC<{
+  copy: RichEditorToolbarCopy;
   glass?: boolean;
   activeFormats: Record<string, boolean>;
   onCommand: (command: string, value?: string) => void;
-}> = ({ glass, activeFormats, onCommand }) => (
+}> = ({ copy, glass, activeFormats, onCommand }) => (
   <RichToolbar glass={glass}>
-    <InlineFormatButtons activeFormats={activeFormats} onCommand={onCommand} />
-    <BlockFormatButtons activeFormats={activeFormats} onCommand={onCommand} />
+    <InlineFormatButtons copy={copy} activeFormats={activeFormats} onCommand={onCommand} />
+    <BlockFormatButtons copy={copy} activeFormats={activeFormats} onCommand={onCommand} />
   </RichToolbar>
 );
 
 export const TextareaRichEditor: React.FC<{
+  /**
+   * The ten toolbar buttons' tooltips — which are also their accessible names,
+   * since every one of them is a glyph — plus the link prompt. REQUIRED: this
+   * package ships no default copy.
+   */
+  copy: RichEditorToolbarCopy;
   value?: string;
   onChange?: (html: string) => void;
   placeholder?: string;
@@ -333,7 +343,7 @@ export const TextareaRichEditor: React.FC<{
   glass?: boolean;
   color?: string;
   characterLimit?: number;
-}> = ({ value, onChange, placeholder, error, glass, color, characterLimit }) => {
+}> = ({ copy, value, onChange, placeholder, error, glass, color, characterLimit }) => {
   const {
     focused,
     setFocused,
@@ -346,7 +356,7 @@ export const TextareaRichEditor: React.FC<{
 
   return (
     <Box sx={{ position: 'relative' }}>
-      <EditorToolbar glass={glass} activeFormats={activeFormats} onCommand={handleFormat} />
+      <EditorToolbar copy={copy} glass={glass} activeFormats={activeFormats} onCommand={handleFormat} />
 
       <ContentEditableDiv
         ref={contentRef}

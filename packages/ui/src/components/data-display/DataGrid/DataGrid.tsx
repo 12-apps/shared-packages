@@ -68,7 +68,7 @@ export const DataGrid = <T extends Record<string, unknown> = Record<string, unkn
   if (props.loading) return <DataGridLoading {...placeholder} />;
   if (props.error) return <DataGridError {...placeholder} error={props.error} />;
   if (model.processedRows.length === 0) {
-    return <DataGridEmpty {...placeholder} emptyState={props.emptyState} />;
+    return <DataGridEmpty {...placeholder} emptyState={props.emptyState} emptyText={props.emptyText} />;
   }
 
   const leadingColumns = (props.selection?.mode ?? 'none') !== 'none' ? 1 : 0;

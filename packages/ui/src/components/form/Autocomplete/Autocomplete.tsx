@@ -54,7 +54,7 @@ function resolveRenderConfig<T>(p: AutocompleteProps<T>): RenderConfig<T> {
     selectedItems: p.selectedItems ?? [],
     isLoading: Boolean(p.isLoading),
     showGhostText: p.showGhostText ?? true,
-    placeholder: p.placeholder ?? 'Type to search...',
+    placeholder: p.placeholder ?? p.copy.placeholder,
     autoFocus: Boolean(p.autoFocus),
     disabled: Boolean(p.disabled),
     portal: p.portal ?? false,
@@ -137,6 +137,7 @@ export const Autocomplete = <T = AutocompleteOption>(props: AutocompleteProps<T>
 
         {s.open && (
           <SuggestionListBox
+            copy={props.copy}
             open={s.open}
             anchorEl={s.inputRef.current}
             portal={cfg.portal}

@@ -28,6 +28,8 @@ type SelectionClusterProps = Pick<
   | 'clearAllTestId'
   | 'edgeAlign'
   | 'selectAllLabel'
+  | 'selectAllText'
+  | 'clearAllText'
 >;
 
 /** The left cluster: Select All + (when selecting) Clear All / count / actions. */
@@ -41,6 +43,8 @@ function SelectionCluster({
   clearAllTestId,
   edgeAlign = false,
   selectAllLabel,
+  selectAllText,
+  clearAllText,
 }: SelectionClusterProps): React.JSX.Element {
   const actionsSlot = actions !== undefined && (
     <Box sx={{ ml: 0.5, display: 'flex', flexShrink: 0, alignItems: 'center' }}>{actions}</Box>
@@ -68,7 +72,7 @@ function SelectionCluster({
         data-testid={selectAllTestId}
         sx={{ ...selectionButtonSx, display: { xs: 'none', md: 'inline-flex' } }}
       >
-        Select All
+        {selectAllText}
       </Button>
       <Checkbox
         size="small"
@@ -88,7 +92,7 @@ function SelectionCluster({
             data-testid={clearAllTestId}
             sx={selectionButtonSx}
           >
-            Clear All
+            {clearAllText}
           </Button>
           <Divider orientation="vertical" flexItem sx={{ height: 16, alignSelf: 'center' }} />
           <Typography
@@ -216,6 +220,8 @@ export function ContentToolbar({
   edgeAlign = false,
   exclusiveSelection = false,
   selectAllLabel,
+  selectAllText,
+  clearAllText,
 }: ContentToolbarProps): React.JSX.Element {
   // Under `exclusiveSelection` the two states are alternatives, not neighbours:
   // browsing shows the controls and no checkbox, selecting shows the checkbox
@@ -241,6 +247,8 @@ export function ContentToolbar({
     >
       {showSelection && (
         <SelectionCluster
+          selectAllText={selectAllText}
+          clearAllText={clearAllText}
           hasSelection={hasSelection}
           selectedCount={selectedCount}
           selectAll={selectAll}

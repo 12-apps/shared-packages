@@ -121,6 +121,8 @@ interface ModalHeaderProps {
   /** Deeper than the first panel, so the leading button goes back instead of closing. */
   canGoBack: boolean;
   onBack: () => void;
+  /** The back arrow's accessible name — it carries a glyph only. REQUIRED. */
+  backLabel: string;
   onClose: () => void;
   /** Renders the bar without its ✕ — the panel's content owns the dismiss. */
   hideClose?: boolean;
@@ -135,15 +137,18 @@ interface ModalHeaderProps {
  * all when the panel's content carries its own ✕ (`hideClose`).
  */
 const HeaderLeadingButton: FC<
-  Pick<ModalHeaderProps, 'canGoBack' | 'onBack' | 'onClose' | 'hideClose' | 'rtl' | 'dataTestId'>
-> = ({ canGoBack, onBack, onClose, hideClose, rtl, dataTestId }) => {
+  Pick<
+    ModalHeaderProps,
+    'canGoBack' | 'onBack' | 'backLabel' | 'onClose' | 'hideClose' | 'rtl' | 'dataTestId'
+  >
+> = ({ canGoBack, onBack, backLabel, onClose, hideClose, rtl, dataTestId }) => {
   if (canGoBack) {
     return (
       <IconButton
         edge="start"
         color="inherit"
         onClick={onBack}
-        aria-label="go back"
+        aria-label={backLabel}
         size="small"
         sx={{ transform: rtl ? 'rotate(180deg)' : 'none' }}
         data-testid={testId(dataTestId, 'back-button')}
@@ -174,6 +179,7 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
   onBack,
   onClose,
   hideClose,
+  backLabel,
   headerActions,
   rtl,
   dataTestId,
@@ -183,6 +189,7 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
       <HeaderLeadingButton
         canGoBack={canGoBack}
         onBack={onBack}
+        backLabel={backLabel}
         onClose={onClose}
         hideClose={hideClose}
         rtl={rtl}

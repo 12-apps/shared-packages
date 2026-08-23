@@ -6,6 +6,7 @@ import { Calendar } from './Calendar';
 import type { DateRange } from './Calendar.types';
 
 const meta: Meta<typeof Calendar> = {
+  args: { ariaLabel: 'Calendário' },
   title: 'Form/Calendar',
   component: Calendar,
   parameters: {
@@ -72,7 +73,7 @@ const SingleDateControlledComponent = () => {
       <Typography variant="h6">
         Selected: {selectedDate ? selectedDate.toLocaleDateString() : 'None'}
       </Typography>
-      <Calendar
+      <Calendar ariaLabel="Calendário"
         selectionMode="single"
         value={selectedDate}
         onChange={setSelectedDate}
@@ -96,7 +97,7 @@ const RangeSelectionComponent = () => {
       <Typography variant="h6">
         Range: {selectedRange.start ? selectedRange.start.toLocaleDateString() : 'None'} - {selectedRange.end ? selectedRange.end.toLocaleDateString() : 'None'}
       </Typography>
-      <Calendar
+      <Calendar ariaLabel="Calendário"
         selectionMode="range"
         range={selectedRange}
         onRangeChange={(range) => setSelectedRange(range)}
@@ -205,7 +206,7 @@ const WithFooterComponent = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
   return (
-    <Calendar
+    <Calendar ariaLabel="Calendário"
       selectionMode="single"
       value={selectedDate}
       onChange={setSelectedDate}
@@ -265,13 +266,13 @@ export const AllVariants: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <Typography variant="h6">Single Date Selection</Typography>
-      <Calendar selectionMode="single" />
+      <Calendar ariaLabel="Calendário" selectionMode="single" />
       
       <Typography variant="h6">Range Selection</Typography>
-      <Calendar selectionMode="range" />
+      <Calendar ariaLabel="Calendário" selectionMode="range" />
       
       <Typography variant="h6">Dual Month</Typography>
-      <Calendar selectionMode="range" numberOfMonths={2} />
+      <Calendar ariaLabel="Calendário" selectionMode="range" numberOfMonths={2} />
     </Box>
   ),
 };
@@ -280,13 +281,13 @@ export const AllSizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <Typography variant="h6">Single Month</Typography>
-      <Calendar numberOfMonths={1} />
+      <Calendar ariaLabel="Calendário" numberOfMonths={1} />
       
       <Typography variant="h6">Dual Month</Typography>
-      <Calendar numberOfMonths={2} />
+      <Calendar ariaLabel="Calendário" numberOfMonths={2} />
       
       <Typography variant="h6">Triple Month</Typography>
-      <Calendar numberOfMonths={3} />
+      <Calendar ariaLabel="Calendário" numberOfMonths={3} />
     </Box>
   ),
 };
@@ -295,16 +296,16 @@ export const AllStates: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <Typography variant="h6">Default State</Typography>
-      <Calendar />
+      <Calendar ariaLabel="Calendário" />
       
       <Typography variant="h6">With Disabled Dates</Typography>
-      <Calendar
+      <Calendar ariaLabel="Calendário"
         minDate={new Date()}
         isDateDisabled={(date) => date.getDay() === 0}
       />
       
       <Typography variant="h6">Without Outside Days</Typography>
-      <Calendar showOutsideDays={false} />
+      <Calendar ariaLabel="Calendário" showOutsideDays={false} />
     </Box>
   ),
 };
@@ -316,7 +317,7 @@ const InteractiveStatesComponent = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <Typography variant="h6">Interactive Single Selection</Typography>
-      <Calendar
+      <Calendar ariaLabel="Calendário"
         selectionMode="single"
         value={singleValue}
         onChange={setSingleValue}
@@ -324,7 +325,7 @@ const InteractiveStatesComponent = () => {
       />
       
       <Typography variant="h6">Interactive Range Selection</Typography>
-      <Calendar
+      <Calendar ariaLabel="Calendário"
         selectionMode="range"
         range={rangeValue}
         onRangeChange={setRangeValue}
@@ -343,7 +344,7 @@ export const Responsive: Story = {
   },
   render: () => (
     <Box sx={{ width: '100%', maxWidth: 400 }}>
-      <Calendar selectionMode="single" />
+      <Calendar ariaLabel="Calendário" selectionMode="single" />
     </Box>
   ),
 };

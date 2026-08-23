@@ -346,9 +346,9 @@ export const ThemeVariations: Story = {
   },
   render: (args) => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <ScrollArea {...args} variant="default" data-testid="scroll-area" />
-      <ScrollArea {...args} variant="overlay" data-testid="scroll-area-overlay" />
-      <ScrollArea {...args} variant="glass" data-testid="scroll-area-glass" />
+      <ScrollArea regionLabel="Área rolável" {...args} variant="default" data-testid="scroll-area" />
+      <ScrollArea regionLabel="Área rolável" {...args} variant="overlay" data-testid="scroll-area-overlay" />
+      <ScrollArea regionLabel="Área rolável" {...args} variant="glass" data-testid="scroll-area-glass" />
     </Box>
   ),
   play: async ({ canvasElement }) => {
@@ -387,16 +387,16 @@ export const VisualStates: Story = {
   },
   render: (args) => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <ScrollArea {...args} data-testid="scroll-area-normal">
+      <ScrollArea regionLabel="Área rolável" {...args} data-testid="scroll-area-normal">
         {generateContent(10)}
       </ScrollArea>
-      <ScrollArea {...args} disabled data-testid="scroll-area-disabled">
+      <ScrollArea regionLabel="Área rolável" {...args} disabled data-testid="scroll-area-disabled">
         {generateContent(10)}
       </ScrollArea>
-      <ScrollArea {...args} loading data-testid="scroll-area-loading">
+      <ScrollArea regionLabel="Área rolável" {...args} loading data-testid="scroll-area-loading">
         {generateContent(10)}
       </ScrollArea>
-      <ScrollArea {...args} emptyContent="No content" data-testid="scroll-area-empty" />
+      <ScrollArea regionLabel="Área rolável" {...args} emptyContent="No content" data-testid="scroll-area-empty" />
     </Box>
   ),
   play: async ({ canvasElement }) => {
@@ -504,24 +504,24 @@ export const EdgeCases: Story = {
   render: (args) => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {/* Empty content */}
-      <ScrollArea {...args} data-testid="scroll-area-empty">
+      <ScrollArea regionLabel="Área rolável" {...args} data-testid="scroll-area-empty">
         {null}
       </ScrollArea>
 
       {/* Very long content */}
-      <ScrollArea {...args} height={100} data-testid="scroll-area-long">
+      <ScrollArea regionLabel="Área rolável" {...args} height={100} data-testid="scroll-area-long">
         {generateContent(100)}
       </ScrollArea>
 
       {/* Wide content */}
-      <ScrollArea {...args} width={200} orientation="horizontal" data-testid="scroll-area-wide">
+      <ScrollArea regionLabel="Área rolável" {...args} width={200} orientation="horizontal" data-testid="scroll-area-wide">
         <Box sx={{ width: 1000, p: 2 }}>
           <Typography>Very wide content that requires horizontal scrolling</Typography>
         </Box>
       </ScrollArea>
 
       {/* No scrollable content */}
-      <ScrollArea {...args} height={300} data-testid="scroll-area-no-scroll">
+      <ScrollArea regionLabel="Área rolável" {...args} height={300} data-testid="scroll-area-no-scroll">
         <Typography>Short content</Typography>
       </ScrollArea>
     </Box>
@@ -567,7 +567,7 @@ export const Integration: Story = {
         <Typography variant="h6" gutterBottom>
           Scroll Position: {scrollPosition}px
         </Typography>
-        <ScrollArea
+        <ScrollArea regionLabel="Área rolável"
           {...args}
           data-testid="scroll-area"
           onScroll={(e) => {

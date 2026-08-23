@@ -103,6 +103,8 @@ interface SortMenuProps<TField extends string> {
   fields: SortFieldDefinition<TField>[];
   activeField: TField;
   onFieldSelect: (field: TField) => void;
+  orderHeading: string;
+  sortHeading: string;
 }
 
 /** The Order + Sort sections of the dropdown menu. */
@@ -116,6 +118,8 @@ function SortMenu<TField extends string>({
   fields,
   activeField,
   onFieldSelect,
+  orderHeading,
+  sortHeading,
 }: SortMenuProps<TField>): React.JSX.Element {
   return (
     <Menu
@@ -128,7 +132,7 @@ function SortMenu<TField extends string>({
     >
       {orderOptions.length > 0 && [
         <ListSubheader key="order-label" sx={sectionLabelSx}>
-          Order
+          {orderHeading}
         </ListSubheader>,
         ...orderOptions.map((option) => (
           <SortRow
@@ -141,7 +145,7 @@ function SortMenu<TField extends string>({
         )),
         <Divider key="order-divider" />,
       ]}
-      <ListSubheader sx={sectionLabelSx}>Sort</ListSubheader>
+      <ListSubheader sx={sectionLabelSx}>{sortHeading}</ListSubheader>
       {fields.map((field) => (
         <SortRow
           key={field.value}
@@ -167,6 +171,9 @@ export function SortByDropdown<TField extends string = string>({
   activeOrder,
   onFieldChange,
   onOrderChange,
+  orderHeading,
+  sortHeading,
+  triggerPrefix,
   'data-testid': testId,
 }: SortByDropdownProps<TField>): React.JSX.Element {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -195,7 +202,7 @@ export function SortByDropdown<TField extends string = string>({
         component="span"
         sx={{ display: { xs: 'none', md: 'inline' }, color: 'text.secondary', fontSize: '0.875rem' }}
       >
-        Sort By:
+        {triggerPrefix}
       </Typography>
       <Button
         variant="text"
@@ -219,6 +226,8 @@ export function SortByDropdown<TField extends string = string>({
         <ChevronDownIcon sx={{ fontSize: 14 }} />
       </Button>
       <SortMenu
+        orderHeading={orderHeading}
+        sortHeading={sortHeading}
         anchorEl={anchorEl}
         open={open}
         close={close}

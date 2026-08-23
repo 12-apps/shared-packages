@@ -6,6 +6,7 @@ import React from 'react';
 
 import { breadcrumbLinkStyles } from './Breadcrumbs.styles';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
+import type { BreadcrumbCopy } from '../../../copy';
 
 const BreadcrumbLink = styled(Link, {
   shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle' })<{ size?: string; active?: boolean; visualStyle?: string }>(
@@ -96,10 +97,12 @@ const CollapsedMenu = ({
   items,
   size,
   visualStyle,
+  copy,
   dataTestId }: {
   items: BreadcrumbItem[];
   size: string;
   visualStyle?: string;
+  copy: BreadcrumbCopy;
   dataTestId?: string;
 }) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -115,7 +118,7 @@ const CollapsedMenu = ({
 
   return (
     <>
-      <Tooltip title="Show more" arrow>
+      <Tooltip title={copy.showMore} arrow>
         <BreadcrumbLink
           onClick={handleClick}
           size={size}
@@ -174,10 +177,11 @@ const crumbIcon = ({
   );
 };
 
-const EllipsisCrumb: React.FC<{ label: string; dataTestId?: string }> = ({
+const EllipsisCrumb: React.FC<{ label: string; copy: BreadcrumbCopy; dataTestId?: string }> = ({
   label,
+  copy,
   dataTestId }) => (
-  <Tooltip title="More items" arrow>
+  <Tooltip title={copy.moreItems} arrow>
             <Box
               sx={{
                 px: 1,
@@ -237,6 +241,7 @@ export const BreadcrumbEntry: React.FC<{
   iconSize: 'small' | 'medium';
   size: string;
   variant: string;
+  copy: BreadcrumbCopy;
   dataTestId?: string;
 }> = ({
   item,
@@ -249,6 +254,7 @@ export const BreadcrumbEntry: React.FC<{
   iconSize,
   size,
   variant,
+  copy,
   dataTestId }) => {
   const testId = makeTestId(dataTestId);
   const isLast = index === itemCount - 1;
@@ -262,6 +268,7 @@ export const BreadcrumbEntry: React.FC<{
     return (
       <>
         <CollapsedMenu
+          copy={copy}
           items={collapsedItems}
           size={size}
           visualStyle={variant}
@@ -273,7 +280,7 @@ export const BreadcrumbEntry: React.FC<{
   }
 
   if (item.isEllipsis) {
-    return <EllipsisCrumb label={item.label} dataTestId={dataTestId} />;
+    return <EllipsisCrumb copy={copy} label={item.label} dataTestId={dataTestId} />;
   }
 
   const icon = crumbIcon({ item, isFirst: index === 0, showHomeIcon, iconSize });
