@@ -2,6 +2,12 @@ import type React from 'react';
 
 export interface AsyncStateContainerProps {
   /**
+   * What an EMPTY result reads as, when the caller supplies no
+   * `emptyComponent` of its own. REQUIRED — the fallback was the English
+   * "No data available", on the package every host renders.
+   */
+  emptyTitle: string;
+  /**
    * Whether the container is in a loading state
    * @default false
    */

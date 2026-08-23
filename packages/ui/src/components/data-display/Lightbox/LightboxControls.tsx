@@ -11,22 +11,26 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { navButtonSx, OVERLAY_Z_INDEX, overlayButtonSx } from './Lightbox.constants';
+import { useLightboxCopy } from './lightbox-copy-context';
 
 type TestId = (suffix: string) => string;
 
 export const LightboxCloseButton: FC<{ testId: TestId; onClose: () => void }> = ({
   testId,
   onClose,
-}) => (
+}) => {
+  const copy = useLightboxCopy();
+  return (
   <IconButton
     onClick={onClose}
     sx={{ ...overlayButtonSx, position: 'absolute', top: 16, right: 16, zIndex: OVERLAY_Z_INDEX }}
-    aria-label="Close lightbox"
+    aria-label={copy.close}
     data-testid={testId('close')}
   >
     <CloseIcon />
   </IconButton>
-);
+  );
+};
 
 const arrowSx = (side: 'left' | 'right') =>
   ({
@@ -52,13 +56,15 @@ export const LightboxNavButtons: FC<LightboxNavButtonsProps> = ({
   atEnd,
   onPrev,
   onNext,
-}) => (
+}) => {
+  const copy = useLightboxCopy();
+  return (
   <>
     <IconButton
       onClick={onPrev}
       disabled={atStart}
       sx={arrowSx('left')}
-      aria-label="Previous item"
+      aria-label={copy.previous}
       data-testid={testId('prev')}
     >
       <PrevIcon />
@@ -68,13 +74,14 @@ export const LightboxNavButtons: FC<LightboxNavButtonsProps> = ({
       onClick={onNext}
       disabled={atEnd}
       sx={arrowSx('right')}
-      aria-label="Next item"
+      aria-label={copy.next}
       data-testid={testId('next')}
     >
       <NextIcon />
     </IconButton>
   </>
-);
+  );
+};
 
 export interface LightboxZoomControlsProps {
   testId: TestId;
@@ -88,7 +95,9 @@ export const LightboxZoomControls: FC<LightboxZoomControlsProps> = ({
   onZoomIn,
   onZoomOut,
   onResetZoom,
-}) => (
+}) => {
+  const copy = useLightboxCopy();
+  return (
   <Box
     sx={{
       position: 'absolute',
@@ -101,13 +110,13 @@ export const LightboxZoomControls: FC<LightboxZoomControlsProps> = ({
     }}
     data-testid={testId('zoom-controls')}
   >
-    <IconButton onClick={onZoomIn} sx={overlayButtonSx} aria-label="Zoom in" data-testid={testId('zoom-in')}>
+    <IconButton onClick={onZoomIn} sx={overlayButtonSx} aria-label={copy.zoomIn} data-testid={testId('zoom-in')}>
       <ZoomInIcon />
     </IconButton>
     <IconButton
       onClick={onZoomOut}
       sx={overlayButtonSx}
-      aria-label="Zoom out"
+      aria-label={copy.zoomOut}
       data-testid={testId('zoom-out')}
     >
       <ZoomOutIcon />
@@ -115,13 +124,14 @@ export const LightboxZoomControls: FC<LightboxZoomControlsProps> = ({
     <IconButton
       onClick={onResetZoom}
       sx={overlayButtonSx}
-      aria-label="Reset zoom"
+      aria-label={copy.resetZoom}
       data-testid={testId('zoom-reset')}
     >
       <ResetZoomIcon />
     </IconButton>
   </Box>
-);
+  );
+};
 
 export interface LightboxAutoplayButtonProps {
   testId: TestId;
@@ -133,7 +143,9 @@ export const LightboxAutoplayButton: FC<LightboxAutoplayButtonProps> = ({
   testId,
   isAutoPlaying,
   onToggle,
-}) => (
+}) => {
+  const copy = useLightboxCopy();
+  return (
   <IconButton
     onClick={onToggle}
     sx={{
@@ -144,9 +156,10 @@ export const LightboxAutoplayButton: FC<LightboxAutoplayButtonProps> = ({
       transform: 'translateX(-50%)',
       zIndex: OVERLAY_Z_INDEX,
     }}
-    aria-label={isAutoPlaying ? 'Pause slideshow' : 'Start slideshow'}
+    aria-label={isAutoPlaying ? copy.pause : copy.play}
     data-testid={testId('autoplay')}
   >
     {isAutoPlaying ? <PauseIcon /> : <PlayIcon />}
   </IconButton>
-);
+  );
+};

@@ -28,6 +28,8 @@ const SearchField = styled(TextField)(({ theme }) => ({
 }));
 
 export interface MapSearchBarProps {
+  /** The field's accessible name — it renders no visible label. REQUIRED. */
+  label: string;
   value: string;
   placeholder: string;
   isSearching: boolean;
@@ -36,6 +38,7 @@ export interface MapSearchBarProps {
 }
 
 export const MapSearchBar: FC<MapSearchBarProps> = ({
+  label,
   value,
   placeholder,
   isSearching,
@@ -58,7 +61,7 @@ export const MapSearchBar: FC<MapSearchBarProps> = ({
         ),
       }}
       disabled={isSearching}
-      aria-label="Search location"
+      aria-label={label}
     />
   </SearchBar>
 );

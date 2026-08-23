@@ -163,6 +163,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     deleteManyDescription: "Deixam de valer na vitrine e não podem ser restaurados.",
     deleteFailed: "Não foi possível excluir o desconto.",
     actionFailed: "Não foi possível concluir a ação",
+    actionFailedDismiss: "Fechar o aviso",
   },
   card: {
     paused: "Pausado",

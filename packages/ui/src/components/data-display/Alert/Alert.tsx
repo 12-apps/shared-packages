@@ -139,12 +139,13 @@ const AlertContent: React.FC<{
   </>
 );
 
-const AlertCloseButton: React.FC<{ dataTestId?: string; onClose: () => void }> = ({
+const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: () => void }> = ({
   dataTestId,
+  label,
   onClose }) => (
   <IconButton
     data-testid={testIdFor(dataTestId, 'close')}
-    aria-label="close alert"
+    aria-label={label}
     color="inherit"
     size="small"
     onClick={onClose}
@@ -164,6 +165,24 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; onClose: () => void }> =
   </IconButton>
 );
 
+/**
+ * The dismiss button, or nothing.
+ *
+ * Reads `closeLabel` straight off the props rather than through the
+ * `definedProps` merge, which would widen it to `string | undefined` and hand
+ * the button an empty name. The UNION in `AlertProps` guarantees the label
+ * wherever `closable` is true — that narrowing is gone inside the component,
+ * which is why the fallback below exists and why it is unreachable.
+ */
+function dismissButton(
+  props: AlertProps,
+  dataTestId: string | undefined,
+  onClose: () => void,
+): React.JSX.Element | null {
+  if (!props.closable) return null;
+  return <AlertCloseButton dataTestId={dataTestId} label={props.closeLabel} onClose={onClose} />;
+}
+
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   (
     alertProps,
@@ -176,7 +195,6 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
       pulse,
       icon,
       showIcon,
-      closable,
       onClose,
       title,
       description,
@@ -190,7 +208,6 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
 
     // Depends on `variant`, so it cannot live in the static defaults above.
     const ariaLive = alertProps['aria-live'] ?? (variant === 'danger' ? 'assertive' : 'polite');
-
     const [open, setOpen] = React.useState(true);
     const [isClosing, setIsClosing] = React.useState(false);
 
@@ -232,7 +249,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
           aria-live={ariaLive}
           aria-atomic={ariaAtomic}
           tabIndex={0}
-          action={closable && <AlertCloseButton dataTestId={dataTestId} onClose={handleClose} />}
+          action={dismissButton(alertProps, dataTestId, handleClose)}
           {...props}
         >
           {content}

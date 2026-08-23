@@ -37,6 +37,12 @@ export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
  */
 export type AuthErrorCopy = Record<AuthErrorCode, string> & {
   fallback: string;
+  /**
+   * The notice's dismiss, which carries a glyph and no visible text. Required
+   * because the notice is closable BY DESIGN — the code lives in the URL, so
+   * without a way out it never leaves the screen.
+   */
+  dismiss: string;
   titles?: Partial<Record<AuthErrorCode, string>>;
   titleFallback?: string;
 };
@@ -94,6 +100,7 @@ export function FailureNotice({
         {...(title === undefined ? {} : { title })}
         description={authErrorMessage(failure, errors)}
         closable
+        closeLabel={errors.dismiss}
         onClose={() => setDismissed(failure)}
       />
     </div>

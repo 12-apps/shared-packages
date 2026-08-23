@@ -1,3 +1,5 @@
+import type { MapPreviewCopy } from '../../../copy';
+
 export type MapType = 'roadmap' | 'satellite' | 'hybrid' | 'terrain';
 
 export interface LatLng {
@@ -20,6 +22,14 @@ export interface HeatmapPoint {
 }
 
 export interface MapPreviewProps {
+  /**
+   * The control bar's six names and the search field's own. Every control is a
+   * glyph carrying a `title` and an `aria-label`, so this is both the tooltip
+   * and what a screen reader reads. REQUIRED — `searchPlaceholder` beside it
+   * shows the shape this replaces: an English default that read as
+   * configurable right up until nobody configured it.
+   */
+  copy: MapPreviewCopy;
   /** Map center coordinates */
   center?: { lat: number; lng: number };
   /** Legacy coordinates prop (use center instead) */

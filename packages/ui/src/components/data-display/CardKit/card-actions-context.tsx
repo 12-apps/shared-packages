@@ -37,6 +37,7 @@ export function CardActionsProvider({
   tenantSlug,
   onRefresh,
   errorTitle,
+  errorDismissLabel,
   autoHideMs = 6_000,
   children,
 }: {
@@ -50,6 +51,8 @@ export function CardActionsProvider({
    * MESSAGE beside it comes from whatever failed, which is already the host's.
    */
   errorTitle: string;
+  /** The dismiss on that alert, which carries a glyph only. REQUIRED. */
+  errorDismissLabel: string;
   /** How long the snackbar stays up. */
   autoHideMs?: number;
   children: ReactNode;
@@ -72,6 +75,7 @@ export function CardActionsProvider({
             title={errorTitle}
             description={error ?? ''}
             closable
+            closeLabel={errorDismissLabel}
             onClose={() => setError(null)}
             data-testid="card-action-error"
           />

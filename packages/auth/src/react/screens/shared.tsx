@@ -49,6 +49,7 @@ export function FailureBanner({
         title={title}
         description={failureMessage(copy, reason, violations)}
         closable
+        closeLabel={copy.dismissFailure}
         onClose={onDismiss}
         data-testid="auth-failure"
         data-reason={reason}

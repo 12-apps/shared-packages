@@ -240,6 +240,7 @@ function ApprovalsBody({
           title={copy.decisionFailedTitle}
           description={actions.error}
           closable
+          closeLabel={copy.dismissNotice}
           onClose={actions.clearError}
           data-testid="approvals-error"
         />

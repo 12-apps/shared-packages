@@ -63,6 +63,7 @@ const meta: Meta = {
         tenantSlug="minha-loja"
         onRefresh={() => {}}
         errorTitle={copy.actions.actionFailed}
+        errorDismissLabel={copy.actions.actionFailedDismiss}
       >
         <Story />
       </CardActionsProvider>

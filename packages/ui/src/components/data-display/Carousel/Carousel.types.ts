@@ -1,5 +1,6 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { CSSProperties, ReactNode } from 'react';
+import type { CarouselCopy } from '../../../copy';
 
 export interface CarouselItem {
   id: string;
@@ -11,6 +12,11 @@ export interface CarouselItem {
 }
 
 export interface CarouselProps {
+  /**
+   * The two arrows' accessible names. They render a glyph and nothing else,
+   * so this pair IS what a screen reader announces for them. REQUIRED.
+   */
+  copy: CarouselCopy;
   items: CarouselItem[];
   variant?: 'default' | 'glass' | 'gradient' | 'elevated' | 'minimal' | 'cards';
   size?: SizeValue;
@@ -58,6 +64,7 @@ export interface CarouselIndicatorsProps {
 }
 
 export interface CarouselArrowsProps {
+  copy: CarouselCopy;
   onPrev: () => void;
   onNext: () => void;
   position?: 'inside' | 'outside' | 'overlay';

@@ -112,6 +112,7 @@ export function AccessGate({
         error={error ?? null}
         isEmpty={empty ?? false}
         dataTestId="access-async"
+        emptyTitle={emptyTitle ?? ""}
         renderError={(message) => (
           <ErrorState
             title={errorTitle}

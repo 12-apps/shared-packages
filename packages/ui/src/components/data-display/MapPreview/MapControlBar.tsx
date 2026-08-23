@@ -9,6 +9,7 @@ import React from 'react';
 
 import { MAX_ZOOM, MIN_ZOOM } from './MapPreview.constants';
 import type { MapType } from './MapPreview.types';
+import type { MapPreviewCopy } from '../../../copy';
 
 // Kept module-local: the inferred type of a styled() component cannot be named
 // across a module boundary here (TS2742).
@@ -41,6 +42,12 @@ const ControlButton = styled(IconButton)(({ theme }) => ({
 }));
 
 export interface MapControlBarProps {
+  /**
+   * The six controls' names. Every one is a glyph with a `title` AND an
+   * `aria-label`, so this object is both the tooltip and what a screen reader
+   * reads — REQUIRED, because a default is one language for every adopter.
+   */
+  copy: MapPreviewCopy;
   zoom: number;
   mapType: MapType;
   onZoomIn: () => void;
@@ -51,6 +58,7 @@ export interface MapControlBarProps {
 }
 
 export const MapControlBar: FC<MapControlBarProps> = ({
+  copy,
   zoom,
   mapType,
   onZoomIn,
@@ -60,33 +68,33 @@ export const MapControlBar: FC<MapControlBarProps> = ({
   onToggleFullscreen,
 }) => (
   <MapControls data-testid="map-controls">
-    <Tooltip title="Zoom in" placement="left">
+    <Tooltip title={copy.zoomIn} placement="left">
       <ControlButton
         size="small"
         onClick={onZoomIn}
-        aria-label="Zoom in"
+        aria-label={copy.zoomIn}
         data-testid="zoom-in-button"
         disabled={zoom >= MAX_ZOOM}
       >
         <ZoomInIcon fontSize="small" />
       </ControlButton>
     </Tooltip>
-    <Tooltip title="Zoom out" placement="left">
+    <Tooltip title={copy.zoomOut} placement="left">
       <ControlButton
         size="small"
         onClick={onZoomOut}
-        aria-label="Zoom out"
+        aria-label={copy.zoomOut}
         data-testid="zoom-out-button"
         disabled={zoom <= MIN_ZOOM}
       >
         <ZoomOutIcon fontSize="small" />
       </ControlButton>
     </Tooltip>
-    <Tooltip title="Center map" placement="left">
+    <Tooltip title={copy.center} placement="left">
       <ControlButton
         size="small"
         onClick={onCenter}
-        aria-label="Center map"
+        aria-label={copy.center}
         data-testid="center-button"
       >
         <CenterIcon fontSize="small" />
@@ -96,17 +104,17 @@ export const MapControlBar: FC<MapControlBarProps> = ({
       <ControlButton
         size="small"
         onClick={onToggleMapType}
-        aria-label="Change map type"
+        aria-label={copy.mapType}
         data-testid="map-type-button"
       >
         <LayersIcon fontSize="small" />
       </ControlButton>
     </Tooltip>
-    <Tooltip title="Toggle fullscreen" placement="left">
+    <Tooltip title={copy.fullscreen} placement="left">
       <ControlButton
         size="small"
         onClick={onToggleFullscreen}
-        aria-label="Toggle fullscreen"
+        aria-label={copy.fullscreen}
         data-testid="fullscreen-button"
       >
         <FullscreenIcon fontSize="small" />

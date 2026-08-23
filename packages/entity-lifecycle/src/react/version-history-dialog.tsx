@@ -271,6 +271,7 @@ export function VersionHistoryDialog({
               variant={restore.notice.variant}
               description={restore.notice.message}
               closable
+              closeLabel={copy.dismissNotice}
               onClose={restore.clearNotice}
               data-testid="version-history-notice"
             />

@@ -36,6 +36,7 @@ export function ViewMutationErrorAlert({
       title={copy.nav.updateFailed}
       description={error}
       closable
+      closeLabel={copy.nav.dismissError}
       onClose={onClose}
       data-testid={`${testIdPrefix}-views-mutation-error`}
     />

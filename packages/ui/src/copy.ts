@@ -129,4 +129,61 @@ export interface CepFieldCopy {
 export interface TableFilterCopy {
   /** A numeric range whose maximum is below its minimum. */
   invalidRange: string;
+  /** The two free-text bounds, which carry no visible label of their own. */
+  rangeMin: string;
+  rangeMax: string;
+}
+
+/**
+ * The lightbox's controls, every one of them a glyph with no text.
+ *
+ * So this object IS what a screen-reader user hears for the whole viewer —
+ * which is why it shipped as English literals for so long without anyone
+ * noticing: the sighted path renders identically either way.
+ */
+export interface LightboxCopy {
+  close: string;
+  previous: string;
+  next: string;
+  zoomIn: string;
+  zoomOut: string;
+  resetZoom: string;
+  /** The slideshow toggle, in its two states. */
+  play: string;
+  pause: string;
+}
+
+/** The map preview's control bar — same shape, same reason, as the lightbox. */
+export interface MapPreviewCopy {
+  zoomIn: string;
+  zoomOut: string;
+  center: string;
+  mapType: string;
+  fullscreen: string;
+  search: string;
+}
+
+/** The carousel's two arrows, which carry a glyph and nothing else. */
+export interface CarouselCopy {
+  previous: string;
+  next: string;
+}
+
+/**
+ * The states a data surface can be in with nothing to draw, and the dismiss
+ * every banner-like surface carries.
+ *
+ * One object rather than six, because these are the same four sentences the
+ * table, the grid, the async container, the hover card and the infinite
+ * scroller each rendered their own copy of.
+ */
+export interface DataStateCopy {
+  /** No rows at all — distinct from "no rows for these filters". */
+  empty: string;
+  loading: string;
+  /** The infinite scroller reached the end. */
+  endOfList: string;
+  /** An alert's and a banner's dismiss, neither of which has a visible label. */
+  dismissAlert: string;
+  dismissBanner: string;
 }
