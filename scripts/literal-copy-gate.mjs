@@ -79,6 +79,31 @@ const LABEL = "[literal-copy]";
 const EXCEPTIONS_PATH = ".literal-copy-exceptions.json";
 
 /**
+ * Surfaces whose reader is a DEVELOPER, exempted as whole files.
+ *
+ * A file-level rule, not a per-line grandfather, because the claim is about
+ * what the surface IS rather than about which words it currently holds — so it
+ * does not go stale when a line moves, and it cannot quietly cover a product
+ * string that drifts into the same file later without someone reading this
+ * list again.
+ *
+ * The test is not "is it technical", it is "would a host ever write different
+ * words here?". CLAUDE.md puts everything a developer reads in English
+ * deliberately; a pack for one of these would be every adopter copying the
+ * same English sentence to satisfy a type, which is ceremony rather than
+ * portability — and ceremony is how a gate loses the argument the next time
+ * someone wants an exemption.
+ */
+const DEV_SURFACES = new Map([
+  [
+    "packages/observability-frontend/src/react/self-check.tsx",
+    "The Sentry diagnostics page. It names window.onerror, source maps and the DSN, " +
+      "is mounted at a fixed runbook URL, and exists to be opened by whoever is debugging " +
+      "that deployment — never by its users.",
+  ],
+]);
+
+/**
  * The props whose value a PERSON reads.
  *
  * Built fresh per call so no caller can mutate what a later one checks
@@ -173,7 +198,7 @@ function scanRepo() {
   // `.tsx` only: see the header on why a plain module's strings are not this
   // gate's business.
   const keyed = tracked
-    .filter((path) => path.endsWith(".tsx") && inScope(path))
+    .filter((path) => path.endsWith(".tsx") && inScope(path) && !DEV_SURFACES.has(path))
     .flatMap((path) =>
       findLiterals(readFileSync(path, "utf8")).map(([line, snippet]) => describe(path, line, snippet)),
     );
@@ -204,6 +229,7 @@ function selftest() {
     [!isProse("dataTestId") && !isProse("publish-button") && !isProse("MAX_ROWS"), "tokens are not prose"],
     [!isProse("https://x.test") && !isProse("./a/b") && !isProse("x"), "paths and single letters are not prose"],
     [inScope("packages/ui/src/components/form/Button.tsx"), "shipped src is in scope"],
+    [[...DEV_SURFACES.values()].every((why) => why.length > 40), "every dev surface states why"],
     [!inScope("packages/ui/src/components/form/__tests__/Button.test.tsx"), "tests are out of scope"],
   ];
   const failed = cases.filter(([ok]) => !ok);

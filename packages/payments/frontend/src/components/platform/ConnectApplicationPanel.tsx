@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 import type { ConnectApplicationReport, PaymentEnvironment } from '@12-apps/payments-backend';
 
 import { CARD_SX, ConnectEnvironmentCard } from './ConnectEnvironmentCard';
+import type { PlatformHomologacaoCopy } from './copy';
+import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
 
 /**
  * The platform's PagBank Connect application, per environment (FUT-479,
@@ -25,9 +27,11 @@ import { CARD_SX, ConnectEnvironmentCard } from './ConnectEnvironmentCard';
  * here, so the host page is a thin mount — page chrome, auth and loading
  * belong to the host; the screen itself lives in this package.
  *
- * English, like the rest of this platform surface (FUT-760): the reader is the
- * deployment's own integrator, reading redirect URIs and environment variable
- * names, and everything a developer reads in this repo is English.
+ * Its words are the HOST's (FUT-760), passed as one required `copy` object.
+ * The reader is whoever operates the platform — and a second platform adopting
+ * this package has its own operator, who reads whatever it was handed. The
+ * literals this screen used to carry were English because they were written
+ * for whoever was reading the code, which is a different person.
  */
 export interface ConnectApplicationPanelProps {
   /** The consult report, as the backend's `consultConnectApplications` answers. */
@@ -40,15 +44,26 @@ export interface ConnectApplicationPanelProps {
    * when provided.
    */
   configVarsFor?: (environment: PaymentEnvironment) => string[];
+  /** Every word this panel and its environment cards render. REQUIRED. */
+  copy: PlatformHomologacaoCopy;
 }
 
 export function ConnectApplicationPanel(props: ConnectApplicationPanelProps): ReactNode {
+  return (
+    <PlatformCopyProvider copy={props.copy}>
+      <ConnectApplicationBody {...props} />
+    </PlatformCopyProvider>
+  );
+}
+
+function ConnectApplicationBody(props: ConnectApplicationPanelProps): ReactNode {
   const { report, onRefresh, configVarsFor } = props;
+  const copy = usePlatformCopy().connect;
   return (
     <Stack spacing={2} data-testid="connect-application-panel">
       <Stack spacing={0.5} data-testid="connect-expected-redirect" sx={CARD_SX}>
         <Typography variant="caption" color="text.secondary" fontWeight={600}>
-          Callback this deployment uses (the value that must be registered)
+          {copy.expectedRedirectHeading}
         </Typography>
         <Box
           component="code"
@@ -72,7 +87,7 @@ export function ConnectApplicationPanel(props: ConnectApplicationPanelProps): Re
             onClick={() => onRefresh()}
             data-testid="connect-refresh"
           >
-            Consult again
+            {copy.consultAgain}
           </Button>
         </Box>
       ) : null}

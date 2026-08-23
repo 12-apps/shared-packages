@@ -41,6 +41,12 @@ export interface CardFieldCopy {
    * flagged it, and getting it wrong makes a buyer type the year first.
    */
   expiryLabel: string;
+  /**
+   * The same order, inside the box. It sat here as `"MM/AA"` while the LABEL
+   * beside it was already required config — so a host could translate the
+   * label and be contradicted by the field one line down.
+   */
+  expiryPlaceholder: string;
   cvvLabel: string;
   /**
    * The expiry field holds something that is not yet `MM/AA` at all — too few

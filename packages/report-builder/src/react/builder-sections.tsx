@@ -117,7 +117,7 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
   };
   return (
     <Stack spacing={1}>
-      <SectionHeading>Medidas</SectionHeading>
+      <SectionHeading>{copy.measuresHeading}</SectionHeading>
       {draft.measures.map((measure, index) => (
         <Stack key={index} direction="row" spacing={1} sx={{ alignItems: "center" }}>
           {/* Both a visible `label` and an `aria-label` (FUT-755). The visible

@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import type { HomologacaoGuide } from '@12-apps/payments-backend';
 
 import { CARD_SX } from './ConnectEnvironmentCard';
+import { usePlatformCopy } from './copy-context';
 
 /**
  * The paste-ready homologação answers (FUT-483, packaged by FUT-573) — the
@@ -49,31 +50,31 @@ function Answer({ label, children }: { label: string; children: ReactNode }): Re
 }
 
 export function HomologacaoGuideCard({ guide }: { guide: HomologacaoGuide }): ReactNode {
+  const copy = usePlatformCopy().guide;
   return (
     <Stack spacing={1.5} data-testid="homologacao-guide-card" sx={CARD_SX}>
       <Typography variant="body2" fontWeight={600}>
-        Homologation form — answers ready to paste
+        {copy.heading}
       </Typography>
       <Typography variant="body2" color="text.secondary" component="p">
-        Open the{' '}
+        {copy.ledeBeforeForm}
         <Link
           href={guide.formUrl}
           target="_blank"
           rel="noreferrer"
           data-testid="homologacao-form-link"
         >
-          official homologation form
-        </Link>{' '}
-        and fill it in with the values below. In parallel, open a ticket with{' '}
-        <Link href={guide.supportFormUrl} target="_blank" rel="noreferrer">
-          SIP — PagBank integration support
-        </Link>{' '}
-        quoting the 403 ACCESS_DENIED: whichever answers first settles whether the form
-        covers Connect. Documentation:{' '}
-        <Link href={guide.docsUrl} target="_blank" rel="noreferrer">
-          requesting homologation
+          {copy.formLink}
         </Link>
-        .
+        {copy.ledeBeforeSupport}
+        <Link href={guide.supportFormUrl} target="_blank" rel="noreferrer">
+          {copy.supportLink}
+        </Link>
+        {copy.ledeBeforeDocs}
+        <Link href={guide.docsUrl} target="_blank" rel="noreferrer">
+          {copy.docsLink}
+        </Link>
+        {copy.ledeAfterDocs}
       </Typography>
       <Answer label={guide.fieldLabels.integrationType}>{guide.integrationType}</Answer>
       <Box data-testid="homologacao-services">

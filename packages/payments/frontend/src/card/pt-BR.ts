@@ -19,6 +19,7 @@ export const PT_BR_CARD_COPY: CardCopy = {
     holderLabel: 'Nome impresso no cartão',
     holderRequired: 'Informe o nome impresso no cartão.',
     expiryLabel: 'Validade (MM/AA)',
+    expiryPlaceholder: 'MM/AA',
     cvvLabel: 'CVV',
     expiryIncomplete: 'Validade incompleta (MM/AA).',
     monthInvalid: 'Mês inválido.',

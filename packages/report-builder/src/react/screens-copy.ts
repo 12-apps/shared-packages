@@ -263,6 +263,9 @@ export interface ReportBuilderPanelCopy {
    */
   widthHeading: string;
   filtersHeading: string;
+  measuresHeading: string;
+  /** The FROM half of a range filter, in the box itself. */
+  rangeStartPlaceholder: string;
   fieldLabel: string;
   axisLabel: string;
   grainLabel: string;

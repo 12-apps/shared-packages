@@ -4,6 +4,7 @@ import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import type { ConnectApplicationStatus, PaymentEnvironment } from '@12-apps/payments-backend';
+import { usePlatformCopy } from './copy-context';
 
 /**
  * One environment's Connect application (FUT-479, packaged by FUT-573).
@@ -46,49 +47,50 @@ function Field({ label, children }: { label: string; children: ReactNode }): Rea
 
 /** The verdict the screen exists for: does the registered callback match ours? */
 function MismatchAlert({ status }: { status: ConnectApplicationStatus }): ReactNode {
+  const copy = usePlatformCopy().connect;
   if (status.application === null) return null;
   if (status.redirectUriMismatch === true) {
     return (
       <Alert severity="error" data-testid={`connect-mismatch-${status.environment}`}>
-        The redirect_uri registered with PagBank differs from the callback this deployment
-        uses. The OAuth authorization flow fails silently until the registration is corrected
-        at PagBank.
+        {copy.redirectDiffers}
       </Alert>
     );
   }
   if (status.redirectUriMismatch === false) {
     return (
       <Alert severity="success" data-testid={`connect-match-${status.environment}`}>
-        The registered redirect_uri matches the callback this deployment uses.
+        {copy.redirectMatches}
       </Alert>
     );
   }
   return (
     <Alert severity="warning" data-testid={`connect-unknown-${status.environment}`}>
-      The PagBank response carried no redirect_uri, so it could not be compared with the
-      callback this deployment uses.
+      {copy.redirectUnreported}
     </Alert>
   );
 }
 
 /** What PagBank reports as registered, plus whatever extra keys came back. */
 function ApplicationFields({ status }: { status: ConnectApplicationStatus }): ReactNode {
+  const copy = usePlatformCopy().connect;
   const app = status.application;
   if (app === null) return null;
   const extraKeys = Object.keys(app.extra);
   return (
     <Stack spacing={1.5}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5 }}>
-        <Field label="Name (shown to the merchant)">{app.name ?? '—'}</Field>
-        <Field label="Site">{app.site ?? '—'}</Field>
-        <Field label="Description">{app.description ?? '—'}</Field>
-        <Field label="Logo">{app.logo ?? '—'}</Field>
-        <Field label="Registered redirect_uri">{app.redirectUri ?? 'not reported'}</Field>
+        <Field label={copy.fields.name}>{app.name ?? copy.fieldEmpty}</Field>
+        <Field label={copy.fields.site}>{app.site ?? copy.fieldEmpty}</Field>
+        <Field label={copy.fields.description}>{app.description ?? copy.fieldEmpty}</Field>
+        <Field label={copy.fields.logo}>{app.logo ?? copy.fieldEmpty}</Field>
+        <Field label={copy.fields.redirectUri}>
+          {app.redirectUri ?? copy.redirectNotReported}
+        </Field>
       </Box>
       {extraKeys.length > 0 ? (
         <Box data-testid={`connect-extra-${status.environment}`}>
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            Other fields returned (undocumented schema)
+            {copy.extraKeys}
           </Typography>
           <Box component="pre" sx={{ m: 0, fontSize: 12, overflowX: 'auto' }}>
             {JSON.stringify(app.extra, null, 2)}
@@ -111,6 +113,7 @@ function ConfigHelp({
   environment: PaymentEnvironment;
   configVars?: string[];
 }): ReactNode {
+  const copy = usePlatformCopy().connect;
   const [open, setOpen] = useState(false);
   if (!configVars || configVars.length === 0) return null;
   return (
@@ -121,13 +124,12 @@ function ConfigHelp({
         onClick={() => setOpen((value) => !value)}
         data-testid={`connect-config-toggle-${environment}`}
       >
-        {open ? 'Hide environment variables' : 'Show environment variables'}
+        {open ? copy.hideConfig : copy.showConfig}
       </Button>
       {open ? (
         <Box data-testid={`connect-config-details-${environment}`}>
           <Typography variant="caption" color="text.secondary" component="p">
-            This environment's application is resolved strictly from these variables, with no
-            fallback between environments:
+            {copy.resolvedFrom}
           </Typography>
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
             {configVars.map((name) => (
@@ -151,6 +153,7 @@ export function ConnectEnvironmentCard({
   status: ConnectApplicationStatus;
   configVars?: string[];
 }): ReactNode {
+  const copy = usePlatformCopy().connect;
   return (
     <Stack spacing={1.5} data-testid={`connect-env-${status.environment}`} sx={CARD_SX}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, wordBreak: 'break-all' }}>
@@ -162,9 +165,7 @@ export function ConnectEnvironmentCard({
         </Typography>
       </Box>
       {!status.configured ? (
-        <Typography variant="body2" color="text.secondary">
-          No application configured in this environment.
-        </Typography>
+        <Typography variant="body2" color="text.secondary">{copy.noApplication}</Typography>
       ) : null}
       {status.error !== null ? (
         <Alert severity="warning" data-testid={`connect-error-${status.environment}`}>

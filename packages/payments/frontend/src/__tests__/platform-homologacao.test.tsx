@@ -10,6 +10,7 @@ import type {
   HomologacaoSaveState,
   PlatformHomologationRecordView,
 } from '../components/platform/HomologacaoOutcomeCard';
+import { PT_BR_PLATFORM_HOMOLOGACAO_COPY } from '../components/platform/pt-BR';
 
 /**
  * The platform homologação screen (FUT-483, packaged by FUT-573). Pinned: the
@@ -61,7 +62,7 @@ function record(over: Partial<PlatformHomologationRecordView>): PlatformHomologa
 function renderScreen(over: Partial<Parameters<typeof PlatformHomologacao>[0]> = {}) {
   const saved: HomologacaoSaveInput[] = [];
   render(
-    <PlatformHomologacao
+    <PlatformHomologacao copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
       record={null}
       guide={GUIDE}
       onSaveRecord={(input) => saved.push(input)}
@@ -79,7 +80,7 @@ describe('PlatformHomologacao', () => {
   it('renders the absent record as "não solicitada" — displayed, never a choice', () => {
     renderScreen();
 
-    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Not submitted');
+    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe(PT_BR_PLATFORM_HOMOLOGACAO_COPY.outcome.notSubmitted);
     const select = screen.getByTestId<HTMLSelectElement>('homologacao-status-select');
     const offered = Array.from(select.options).map((option) => option.value);
     expect(offered).toEqual(['SUBMITTED', 'APPROVED', 'REJECTED']);
@@ -90,16 +91,16 @@ describe('PlatformHomologacao', () => {
       record: record({ status: 'APPROVED', decidedAt: '2026-08-05T09:00:00.000Z' }),
     });
 
-    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Approved');
+    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe(PT_BR_PLATFORM_HOMOLOGACAO_COPY.outcome.statuses.APPROVED);
     expect(screen.getByTestId('homologacao-outcome-card').textContent).toContain(
-      'Recorded by ops@example.com.',
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.outcome.recordedBy('ops@example.com'),
     );
   });
 
   it('shows the rejected outcome too — a refusal is a first-class answer', () => {
     renderScreen({ record: record({ status: 'REJECTED' }) });
 
-    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe('Rejected');
+    expect(screen.getByTestId('homologacao-status-chip').textContent).toBe(PT_BR_PLATFORM_HOMOLOGACAO_COPY.outcome.statuses.REJECTED);
   });
 
   it('names BOTH services and links the official form', () => {
@@ -143,7 +144,7 @@ describe('PlatformHomologacao', () => {
 
     renderScreen({ save: { pending: false, error: null, success: true } });
     expect(screen.getByTestId('homologacao-save-ok').textContent).toContain(
-      'Record updated.',
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.outcome.saved,
     );
   });
 

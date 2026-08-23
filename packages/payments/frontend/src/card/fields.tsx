@@ -115,7 +115,7 @@ function ExpiryCvvFields({
         label={copy.expiryLabel}
         type="text"
         inputMode="numeric"
-        placeholder="MM/AA"
+        placeholder={copy.expiryPlaceholder}
         variant="outlined"
         size="md"
         fullWidth

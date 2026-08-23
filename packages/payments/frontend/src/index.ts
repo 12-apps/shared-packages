@@ -306,23 +306,23 @@ export {
 // The PLATFORM operations screens (FUT-479 / FUT-483, packaged by FUT-573) —
 // the Connect-application consult and the homologação, as dumb components a
 // host page mounts with data + callbacks from its own routes. Their backend
-// halves live in `@12-apps/payments-backend` (`consultConnectApplications`,
-// `platformHomologacaoGuide`, `createHomologationRecordService`,
-// `buildPlatformHomologacaoAnexo`).
+// halves are `consultConnectApplications`, `platformHomologacaoGuide`,
+// `createHomologationRecordService` and `buildPlatformHomologacaoAnexo`.
 // ---------------------------------------------------------------------------
 export {
   ConnectApplicationPanel,
   type ConnectApplicationPanelProps,
 } from './components/platform/ConnectApplicationPanel';
-export {
-  PlatformHomologacao,
-  type PlatformHomologacaoProps,
-} from './components/platform/PlatformHomologacao';
+export { PlatformHomologacao, type PlatformHomologacaoProps } from './components/platform/PlatformHomologacao';
 export {
   type HomologacaoSaveInput,
   type HomologacaoSaveState,
   type PlatformHomologationRecordView,
 } from './components/platform/HomologacaoOutcomeCard';
+// Both mounts require `copy`, so the contract and its pt-BR pack are part of
+// the port — a required port a host cannot import is not one.
+export type * from './components/platform/copy';
+export { PT_BR_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/pt-BR';
 
 /**
  * Re-exported because it appears in the `prepareConnect` prop a host must

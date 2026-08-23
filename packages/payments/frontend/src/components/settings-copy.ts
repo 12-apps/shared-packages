@@ -290,6 +290,12 @@ export interface SetupGuideCopy {
   /** Reopen a section the owner already confirmed. */
   reviewAction: string;
   /**
+   * The sentence beside the confirm button. It exists because the owner is
+   * vouching for work done in the PROVIDER's dashboard, not here — a bare
+   * button gives them nothing to weigh that against.
+   */
+  confirmPrompt: string;
+  /**
    * The copy-to-clipboard button beside a reference value, and what it says
    * for the two seconds after a successful copy.
    */

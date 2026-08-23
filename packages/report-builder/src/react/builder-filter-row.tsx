@@ -186,7 +186,7 @@ function FilterWideValue({
           testId={`${testId}-from`}
           options={options}
           value={filter.from ?? ""}
-          placeholder="De"
+          placeholder={copy.rangeStartPlaceholder}
           onChange={(from) => onPatch({ from })}
         />
       </Box>

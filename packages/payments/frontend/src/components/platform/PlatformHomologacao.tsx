@@ -13,6 +13,8 @@ import {
   type HomologacaoSaveState,
   type PlatformHomologationRecordView,
 } from './HomologacaoOutcomeCard';
+import type { PlatformHomologacaoCopy } from './copy';
+import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
 
 /**
  * The PLATFORM's PagBank homologação screen (FUT-483, packaged by FUT-573).
@@ -49,10 +51,13 @@ export interface PlatformHomologacaoProps {
    * card shows it verbatim.
    */
   onGenerateAnexo: () => Promise<void>;
+  /** Every word these three cards render. REQUIRED — no default copy. */
+  copy: PlatformHomologacaoCopy;
 }
 
 /** The evidence-file half: real sandbox calls, downloaded as a text file. */
 function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNode {
+  const copy = usePlatformCopy().anexo;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -62,7 +67,7 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
     try {
       await onGenerate();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not generate the attachment.');
+      setError(cause instanceof Error ? cause.message : copy.generateFailed);
     } finally {
       setBusy(false);
     }
@@ -71,13 +76,10 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
   return (
     <Stack spacing={1.5} data-testid="homologacao-anexo-card" sx={CARD_SX}>
       <Typography variant="body2" fontWeight={600}>
-        Evidence attachment
+        {copy.heading}
       </Typography>
       <Typography variant="body2" color="text.secondary" component="p">
-        The form demands the requests and responses of the calls sent to PagBank's APIs. The
-        button below makes those calls for real against the test environment (Sandbox), on the
-        platform's own token — nothing is actually charged — and downloads the file ready to
-        attach, with the token redacted.
+        {copy.body}
       </Typography>
       <Box>
         <Button
@@ -87,7 +89,7 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
           onClick={() => void generate()}
           data-testid="homologacao-anexo-button"
         >
-          Generate attachment
+          {copy.generate}
         </Button>
       </Box>
       {error !== null ? (
@@ -102,10 +104,12 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
 export function PlatformHomologacao(props: PlatformHomologacaoProps): ReactNode {
   const { record, guide, onSaveRecord, save, onGenerateAnexo } = props;
   return (
-    <Stack spacing={2} data-testid="platform-homologacao">
-      <HomologacaoOutcomeCard record={record} onSave={onSaveRecord} save={save} />
-      <HomologacaoGuideCard guide={guide} />
-      <AnexoCard onGenerate={onGenerateAnexo} />
-    </Stack>
+    <PlatformCopyProvider copy={props.copy}>
+      <Stack spacing={2} data-testid="platform-homologacao">
+        <HomologacaoOutcomeCard record={record} onSave={onSaveRecord} save={save} />
+        <HomologacaoGuideCard guide={guide} />
+        <AnexoCard onGenerate={onGenerateAnexo} />
+      </Stack>
+    </PlatformCopyProvider>
   );
 }
