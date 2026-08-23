@@ -11,6 +11,16 @@ import { CARD_SX } from './ConnectEnvironmentCard';
  * The paste-ready homologação answers (FUT-483, packaged by FUT-573) — the
  * Pipefy form with every deployment-specific value already computed, and the
  * services list naming BOTH Order and Connect.
+ *
+ * ## Why this screen is English and its field labels are not (FUT-760)
+ *
+ * The reader is the PLATFORM's own integrator — the person registering a
+ * Connect application and chasing a `403 ACCESS_DENIED` — so the prose here
+ * follows the same rule as every other developer-facing sentence in this
+ * repo. The field names beside each value are quotes of PagBank's Pipefy
+ * form, and they arrive on `guide.fieldLabels` rather than being written
+ * here: this card is USED by matching each block to the box it goes in, and a
+ * translated box name has nothing to match.
  */
 
 /** One paste-ready value, in a copyable code block. */
@@ -42,42 +52,36 @@ export function HomologacaoGuideCard({ guide }: { guide: HomologacaoGuide }): Re
   return (
     <Stack spacing={1.5} data-testid="homologacao-guide-card" sx={CARD_SX}>
       <Typography variant="body2" fontWeight={600}>
-        Formulário de homologação — respostas prontas
+        Homologation form — answers ready to paste
       </Typography>
       <Typography variant="body2" color="text.secondary" component="p">
-        Abra o{' '}
+        Open the{' '}
         <Link
           href={guide.formUrl}
           target="_blank"
           rel="noreferrer"
           data-testid="homologacao-form-link"
         >
-          formulário oficial de homologação
+          official homologation form
         </Link>{' '}
-        e preencha com os valores abaixo. Em paralelo, abra um chamado no{' '}
+        and fill it in with the values below. In parallel, open a ticket with{' '}
         <Link href={guide.supportFormUrl} target="_blank" rel="noreferrer">
-          SIP — Suporte Integração PagBank
+          SIP — PagBank integration support
         </Link>{' '}
-        citando o 403 ACCESS_DENIED — o que responder primeiro resolve a dúvida de o
-        formulário cobrir ou não o Connect. Documentação:{' '}
+        quoting the 403 ACCESS_DENIED: whichever answers first settles whether the form
+        covers Connect. Documentation:{' '}
         <Link href={guide.docsUrl} target="_blank" rel="noreferrer">
-          solicitar homologação
+          requesting homologation
         </Link>
         .
       </Typography>
-      <Answer label="Selecione o tipo de integração">{guide.integrationType}</Answer>
+      <Answer label={guide.fieldLabels.integrationType}>{guide.integrationType}</Answer>
       <Box data-testid="homologacao-services">
-        <Answer label="Selecione qual serviço você integrou (marque OS DOIS)">
-          {guide.services.join('\n')}
-        </Answer>
+        <Answer label={guide.fieldLabels.services}>{guide.services.join('\n')}</Answer>
       </Box>
-      <Answer label="Instruções de acesso ao seu ambiente (limite de 255 caracteres)">
-        {guide.accessInstructions}
-      </Answer>
-      <Answer label="URL do site">{guide.siteUrl}</Answer>
-      <Answer label="Detalhe quais produtos/serviços serão comercializados">
-        {guide.productsDescription}
-      </Answer>
+      <Answer label={guide.fieldLabels.accessInstructions}>{guide.accessInstructions}</Answer>
+      <Answer label={guide.fieldLabels.siteUrl}>{guide.siteUrl}</Answer>
+      <Answer label={guide.fieldLabels.productsDescription}>{guide.productsDescription}</Answer>
       <Typography variant="caption" color="text.secondary" component="p">
         {guide.slaText}
       </Typography>

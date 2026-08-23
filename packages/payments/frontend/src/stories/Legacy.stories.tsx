@@ -27,6 +27,7 @@ import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { raisePayable, StoryFlow, withConfigRead, type StoryHost } from "./host";
 import type { StoryWorld } from "./store";
 import { CheckoutCopyProvider } from "../components/checkout/copy-context";
+import { PT_BR_CHECKOUT_PAYMENT_COPY } from "../components/checkout-payment-pt-BR";
 
 /**
  * THE FLAT SURFACE THAT PREDATES THE FACTORY, still exported and still real.
@@ -185,6 +186,7 @@ function CheckoutPaymentScene({
           savedCards={savedCards}
           onPaid={setOutcome}
           onFailed={setOutcome}
+          copy={PT_BR_CHECKOUT_PAYMENT_COPY}
         />
       </div>
     </PaymentsProvider>

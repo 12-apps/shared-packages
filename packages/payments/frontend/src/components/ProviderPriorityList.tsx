@@ -241,13 +241,14 @@ function DeclinePolicyControl({
 }
 
 export function ProviderPriorityList({ view, client, onReordered }: ProviderPriorityListProps) {
+  const copy = usePaymentsSettingsCopy().priority;
   const { chain, error, saving, move } = useChainReorder(view, client, onReordered);
   const [dragging, setDragging] = useState<number | null>(null);
 
   if (chain.length === 0) {
     return (
       <Alert severity="warning" data-testid="payments-priority-empty">
-        Nenhum provedor está ativo. O checkout não conseguirá cobrar até que você ative ao menos um.
+        {copy.noneActive}
       </Alert>
     );
   }
@@ -255,12 +256,10 @@ export function ProviderPriorityList({ view, client, onReordered }: ProviderPrio
   return (
     <Box data-testid="payments-priority-list">
       <Typography variant="subtitle2" gutterBottom>
-        Ordem de tentativa
+        {copy.orderHeading}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        O checkout tenta <strong>{labelOf(view.providers, chain[0] ?? '')}</strong> primeiro. Se uma
-        cobrança falhar por motivo técnico, ele tenta o próximo da lista — mas só quando é possível
-        comprovar que a tentativa anterior não gerou cobrança.
+        {richText(copy.chainExplainer(labelOf(view.providers, chain[0] ?? '')))}
       </Typography>
 
       {error ? (

@@ -189,12 +189,14 @@ export const ReverifyWarningAtRest: StoryObj = scene(
 export const ConfirmMoneyDestination: StoryObj = {
   name: "Confirmação — o campo que decide quem recebe",
   render: () => (
-    <ConfirmCredentialSave
-      pending={{ spec: TAG_FIELD, value: "$loja-da-ana" }}
-      busy={false}
-      onCancel={() => undefined}
-      onConfirm={() => undefined}
-    />
+    <SettingsStoryHost>
+      <ConfirmCredentialSave
+        pending={{ spec: TAG_FIELD, value: "$loja-da-ana" }}
+        busy={false}
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+      />
+    </SettingsStoryHost>
   ),
 };
 

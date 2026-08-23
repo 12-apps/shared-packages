@@ -37,6 +37,17 @@ export {
   type CheckoutPaymentProps,
   type SavedCardOption,
 } from './components/CheckoutPayment';
+// The words that step renders — required on the prop above, so a host wiring
+// the legacy surface has to answer them (FUT-760).
+export type {
+  CheckoutPaymentCopy,
+  LegacyCardCopy,
+  LegacyMethodCopy,
+  LegacyMoneyCopy,
+  LegacyPixCopy,
+  LegacyRefusalCopy,
+} from './components/checkout-payment-copy';
+export { PT_BR_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-pt-BR';
 
 // ---------------------------------------------------------------------------
 // The buyer checkout surface (FUT-564) — the storefront's three-step flow,

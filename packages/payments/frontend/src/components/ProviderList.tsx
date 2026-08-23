@@ -95,6 +95,7 @@ export function ProviderList({
   reload: () => Promise<void>;
   onSelect: (name: string) => void;
 }) {
+  const copy = usePaymentsSettingsCopy().providerList;
   return (
     <Box data-testid="payments-provider-settings">
       {/*
@@ -113,9 +114,9 @@ export function ProviderList({
           />
         </Box>
       ) : null}
-      <Typography variant="subtitle1">Escolha o provedor de pagamento</Typography>
+      <Typography variant="subtitle1">{copy.heading}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Selecione onde sua loja recebe — a configuração é feita sob medida para ele.
+        {copy.subheading}
       </Typography>
       <ProviderPicker
         providers={view.providers}

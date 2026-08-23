@@ -142,6 +142,13 @@ const GUIDE: HomologacaoGuide = {
   slaText:
     "Prazo (SLA): até 4 dias úteis quando os registros são enviados corretamente; " +
     "estendido caso contrário.",
+  fieldLabels: {
+    integrationType: "Selecione o tipo de integração",
+    services: "Selecione qual serviço você integrou (marque OS DOIS)",
+    accessInstructions: "Instruções de acesso ao seu ambiente (limite de 255 caracteres)",
+    siteUrl: "URL do site",
+    productsDescription: "Detalhe quais produtos/serviços serão comercializados",
+  },
 };
 
 const APPROVED: PlatformHomologationRecordView = {

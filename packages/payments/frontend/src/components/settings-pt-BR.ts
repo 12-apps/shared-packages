@@ -70,6 +70,9 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
       `A conexão automática com ${displayName} não está disponível nesta instalação — ` +
       'o aplicativo de autorização não foi cadastrado. Para conectar agora, abra ' +
       '“Prefiro informar as credenciais manualmente” abaixo e cole as suas próprias chaves.',
+    connectUnavailable:
+      'Este provedor conecta por autorização, mas o botão de conexão não está disponível nesta ' +
+      'instalação. Você ainda pode conectar informando as credenciais manualmente.',
     preferOAuth: 'Prefiro conectar por autorização',
     preferCredentials: 'Prefiro informar as credenciais manualmente',
     scopes: {
@@ -98,6 +101,7 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     removeConsequenceLive:
       'A loja para de receber na hora e fica sem provedor ativo — pedidos novos não conseguem ser pagos até você conectar outro.',
     removeConsequenceIdle: 'Esta conexão sai da loja. Você pode conectar de novo depois.',
+    removeStopsChargingNow: 'Pedidos novos deixam de ser cobrados imediatamente.',
     removeRevokes: (displayName) =>
       `A autorização é revogada no ${displayName}. Sua conta e seu histórico continuam lá, intactos.`,
     removeKeepsSettled: (displayName) =>
@@ -130,11 +134,32 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     moveDown: (label) => `Mover ${label} para baixo`,
     saveFailed: 'Não foi possível salvar a ordem.',
     firstInChain: 'primeiro',
+    orderHeading: 'Ordem de tentativa',
+    chainExplainer: (firstProviderLabel) =>
+      `O checkout tenta **${firstProviderLabel}** primeiro. Se uma cobrança falhar por motivo ` +
+      'técnico, ele tenta o próximo da lista — mas só quando é possível comprovar que a ' +
+      'tentativa anterior não gerou cobrança.',
+    noneActive:
+      'Nenhum provedor está ativo. O checkout não conseguirá cobrar até que você ative ao menos um.',
     retryDeclinedLabel: 'Tentar cartão **recusado** no próximo provedor',
     retryDeclinedOn:
       'Uma recusa passa para o próximo da lista. Isso pode aumentar custos de transação e sinais de fraude.',
     retryDeclinedOff:
       'Padrão: uma recusa encerra a cobrança. Só falhas técnicas passam para o próximo.',
+  },
+  providerList: {
+    heading: 'Escolha o provedor de pagamento',
+    subheading: 'Selecione onde sua loja recebe — a configuração é feita sob medida para ele.',
+  },
+  confirmSave: {
+    title: 'Confirme para onde vai o dinheiro',
+    body: (fieldLabel) =>
+      `Todo pagamento recebido por esta loja será depositado na conta desta ${fieldLabel}:`,
+    fieldFallback: 'credencial',
+    warning:
+      'Um valor errado envia os pagamentos desta loja para outra pessoa, e não há como reverter.',
+    cancelAction: 'Voltar e revisar',
+    confirmAction: 'É essa, salvar',
   },
   setupGuide: {
     defaultConfirmLabel: 'Já habilitei o Checkout Integrado',

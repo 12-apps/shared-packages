@@ -181,7 +181,7 @@ export function DisconnectDialog(props: {
             costs money is the one an owner skims past. */}
         <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, mt: '14px', p: 0 }}>
           {receiving ? (
-            <Consequence tone="bad">Pedidos novos deixam de ser cobrados imediatamente.</Consequence>
+            <Consequence tone="bad">{copy.removeStopsChargingNow}</Consequence>
           ) : null}
           <Consequence>
             {copy.removeRevokes(displayName)}

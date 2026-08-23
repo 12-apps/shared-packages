@@ -121,10 +121,7 @@ export function OAuthPanel({
   if (!prepareConnect) {
     return (
       <ProviderCard header={statusBar}>
-        <Alert severity="info">
-          Este provedor conecta por autorização, mas o botão de conexão não está disponível nesta
-          instalação. Você ainda pode conectar informando as credenciais manualmente.
-        </Alert>
+        <Alert severity="info">{copy.connectUnavailable}</Alert>
         {form}
         {probe}
         {verification}

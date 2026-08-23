@@ -113,6 +113,15 @@ export interface OAuthConnectionCopy {
    * work — the one sentence here about the installation rather than the store.
    */
   notAvailableHere(displayName: string): string;
+  /**
+   * The whole PANEL's refusal, for a deployment with no registered provider
+   * application at all.
+   *
+   * Not the same sentence as {@link notAvailableHere}: that one sits beside a
+   * working credential form and points at it, this one replaces the connect
+   * card because there is no button to render.
+   */
+  connectUnavailable: string;
   /** The two links that swap between the grant and the credential form. */
   preferOAuth: string;
   preferCredentials: string;
@@ -150,6 +159,15 @@ export interface ConnectionCardCopy {
    */
   removeConsequenceLive: string;
   removeConsequenceIdle: string;
+  /**
+   * The first itemised consequence, shown only for a LIVE connection: the
+   * store stops taking money the moment this is confirmed.
+   *
+   * Its own field rather than a clause of `removeConsequenceLive`, because
+   * the list beside it is what makes the irreversible item weigh more than
+   * the reversible ones — a single paragraph is what an owner skims.
+   */
+  removeStopsChargingNow: string;
   removeRevokes(displayName: string): string;
   removeKeepsSettled(displayName: string): string;
   removeRestartsSetup: string;
@@ -204,6 +222,17 @@ export interface ProviderPriorityCopy {
   saveFailed: string;
   /** The head of the chain, captioned so the order is unmistakable. */
   firstInChain: string;
+  /** The reorderable list's own heading. */
+  orderHeading: string;
+  /**
+   * What the order MEANS, naming the provider at the head of it.
+   *
+   * Rendered through `richText`, so `**…**` marks that name — the sentence is
+   * about which provider is tried first, and the name is the answer.
+   */
+  chainExplainer(firstProviderLabel: string): string;
+  /** No provider is switched on, so nothing can be charged at all. */
+  noneActive: string;
   /**
    * The switch's label. Rendered through `richText`, so `**…**` emphasises the
    * word the sentence is about — the same two-asterisk grammar the setup-guide
@@ -212,6 +241,37 @@ export interface ProviderPriorityCopy {
   retryDeclinedLabel: string;
   retryDeclinedOn: string;
   retryDeclinedOff: string;
+}
+
+/** Choosing which provider to set up, before there is a connection at all. */
+export interface ProviderListCopy {
+  heading: string;
+  /** What choosing one means — the setup that follows is shaped by it. */
+  subheading: string;
+}
+
+/**
+ * The last look at the value that decides who gets paid.
+ *
+ * A mistyped account handle is the one failure on this screen with no
+ * recourse: the charge succeeds, the buyer is happy, and the money is in a
+ * stranger's account. So these sentences are not decoration, and a host that
+ * softens them has removed the only intervention available.
+ */
+export interface ConfirmCredentialSaveCopy {
+  title: string;
+  /**
+   * What saving this value means, naming the field it will be saved as — the
+   * provider's own name for it, as the credential schema spells it.
+   */
+  body(fieldLabel: string): string;
+  /** What to call the field when the schema shipped no label for it. */
+  fieldFallback: string;
+  /** The irreversibility, said plainly and last. */
+  warning: string;
+  /** Cancel is the plain, first-reached option; confirm carries the verb. */
+  cancelAction: string;
+  confirmAction: string;
 }
 
 /** The walkthrough's own controls — the confirmation only an owner can give. */
@@ -238,5 +298,7 @@ export interface PaymentsSettingsCopy {
   card: ConnectionCardCopy;
   credentials: CredentialFormCopy;
   priority: ProviderPriorityCopy;
+  providerList: ProviderListCopy;
+  confirmSave: ConfirmCredentialSaveCopy;
   setupGuide: SetupGuideCopy;
 }

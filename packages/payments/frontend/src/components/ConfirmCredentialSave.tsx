@@ -12,6 +12,8 @@ import {
 
 import type { CredentialFieldSpec } from '@12-apps/payments-backend';
 
+import { usePaymentsSettingsCopy } from './settings-copy-context';
+
 /**
  * The last look at the value that decides who gets paid.
  *
@@ -45,6 +47,7 @@ export function ConfirmCredentialSave({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const copy = usePaymentsSettingsCopy().confirmSave;
   return (
     <Dialog
       open={pending !== null}
@@ -54,13 +57,10 @@ export function ConfirmCredentialSave({
       data-testid="payments-confirm-credential"
       aria-labelledby="payments-confirm-credential-title"
     >
-      <DialogTitle id="payments-confirm-credential-title">
-        Confirme para onde vai o dinheiro
-      </DialogTitle>
+      <DialogTitle id="payments-confirm-credential-title">{copy.title}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary">
-          Todo pagamento recebido por esta loja será depositado na conta desta{' '}
-          {pending?.spec.label ?? 'credencial'}:
+          {copy.body(pending?.spec.label ?? copy.fieldFallback)}
         </Typography>
         <Box
           data-testid="payments-confirm-credential-value"
@@ -79,9 +79,7 @@ export function ConfirmCredentialSave({
         >
           {pending?.value}
         </Box>
-        <Typography variant="caption" color="text.secondary">
-          Um valor errado envia os pagamentos desta loja para outra pessoa, e não há como reverter.
-        </Typography>
+        <Typography variant="caption" color="text.secondary">{copy.warning}</Typography>
       </DialogContent>
       <DialogActions>
         {/*
@@ -90,7 +88,7 @@ export function ConfirmCredentialSave({
           go back and check than to press on.
         */}
         <Button onClick={onCancel} disabled={busy} data-testid="payments-confirm-credential-cancel">
-          Voltar e revisar
+          {copy.cancelAction}
         </Button>
         <Button
           variant="contained"
@@ -98,7 +96,7 @@ export function ConfirmCredentialSave({
           disabled={busy}
           data-testid="payments-confirm-credential-confirm"
         >
-          É essa, salvar
+          {copy.confirmAction}
         </Button>
       </DialogActions>
     </Dialog>

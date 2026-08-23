@@ -16,6 +16,7 @@ export {
 export {
   ACCESS_INSTRUCTIONS_MAX,
   platformHomologacaoGuide,
+  type HomologacaoFieldLabels,
   type HomologacaoGuide,
   type PlatformHomologacaoGuideFacts,
 } from './homologacao-guide';
