@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { CarouselArrows, CarouselIndicators, CarouselThumbnails } from './Carousel.parts';
+import type { CarouselCopy } from '../../../copy';
 import type {
   CarouselArrowsProps,
   CarouselIndicatorsProps,
@@ -12,6 +13,8 @@ type IndicatorPosition = NonNullable<CarouselIndicatorsProps['position']>;
 type Color = NonNullable<CarouselIndicatorsProps['color']>;
 
 export interface CarouselChromeProps {
+  /** The two arrows' accessible names, from the mount. */
+  copy: CarouselCopy;
   items: CarouselItem[];
   activeIndex: number;
   loop: boolean;
@@ -34,6 +37,7 @@ export interface CarouselChromeProps {
  * as three conditional blocks inside the carousel's own render.
  */
 export const CarouselChrome: React.FC<CarouselChromeProps> = ({
+  copy,
   items,
   activeIndex,
   loop,
@@ -52,6 +56,7 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
   <>
     {showArrows && !disabled && (
       <CarouselArrows
+        copy={copy}
         onPrev={onPrev}
         onNext={onNext}
         position={arrowPosition}

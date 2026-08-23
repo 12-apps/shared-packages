@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 
 import { Lightbox } from './Lightbox';
 import type { LightboxItem } from './Lightbox.types';
+import { PT_BR_LIGHTBOX_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Lightbox> = {
   title: 'Overlays/Lightbox',
@@ -96,7 +97,7 @@ const LightboxWrapper = ({
       <Typography variant="body2" color="text.secondary">
         Click the button to open the lightbox
       </Typography>
-      <Lightbox isOpen={isOpen} onClose={() => setIsOpen(false)} items={items} {...props} />
+      <Lightbox copy={PT_BR_LIGHTBOX_COPY} isOpen={isOpen} onClose={() => setIsOpen(false)} items={items} {...props} />
     </Box>
   );
 };

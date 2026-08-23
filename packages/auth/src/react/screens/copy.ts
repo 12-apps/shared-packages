@@ -38,6 +38,11 @@ export interface EmailAuthCopy {
    * `undefined` on somebody's screen.
    */
   failures: Record<EmailAuthScreenReason, string>;
+  /**
+   * The dismiss on the refusal alert, which carries a glyph and no visible
+   * text — so this is the whole of what a screen reader announces for it.
+   */
+  dismissFailure: string;
   passwordField: {
     show: string;
     hide: string;

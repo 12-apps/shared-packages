@@ -159,6 +159,7 @@ function SettingsBody({
           title={copy.saveFailedTitle}
           description={copy.saveFailedDescription}
           closable
+          closeLabel={copy.saveFailedDismiss}
           onClose={state.dismissSaveFailure}
           data-testid="auth-settings-error"
         />

@@ -46,6 +46,7 @@ export const MapLayers: FC<MapLayersProps> = ({ settings, zoom, mapType, search,
 
       {settings.showSearch && (
         <MapSearchBar
+          label={settings.copy.search}
           value={search.searchValue}
           placeholder={settings.searchPlaceholder}
           isSearching={search.isSearching}
@@ -56,6 +57,7 @@ export const MapLayers: FC<MapLayersProps> = ({ settings, zoom, mapType, search,
 
       {settings.showControls && (
         <MapControlBar
+          copy={settings.copy}
           zoom={zoom}
           mapType={mapType}
           onZoomIn={controls.handleZoomIn}

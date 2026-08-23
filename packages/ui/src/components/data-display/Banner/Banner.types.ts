@@ -14,6 +14,8 @@ export interface BannerAction {
 }
 
 export interface BannerProps {
+  /** The dismiss button's accessible name — it carries a glyph only. REQUIRED. */
+  dismissLabel: string;
   /** Message severity type */
   variant?: BannerVariant;
   /** Main message title text */

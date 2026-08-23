@@ -11,6 +11,7 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
   systemActor: 'Sistema',
   tabs: { recycleBin: 'Lixeira', approvals: 'Aprovações' },
   approvals: {
+    dismissNotice: 'Fechar o aviso',
     statusFilters: { pending: 'Pendentes', approved: 'Aprovadas', rejected: 'Rejeitadas' },
     actions: { create: 'Criação', update: 'Alteração', delete: 'Exclusão' },
     emptyByStatus: {
@@ -31,6 +32,7 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
     retryAction: 'Tentar novamente',
   },
   recycleBin: {
+    dismissNotice: 'Fechar o aviso',
     restoreAction: 'Restaurar',
     purgeAction: 'Excluir definitivamente',
     purgeDialogTitle: 'Excluir definitivamente',
@@ -49,6 +51,7 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
     retryAction: 'Tentar novamente',
   },
   versionHistory: {
+    dismissNotice: 'Fechar o aviso',
     title: (itemLabel) => `Histórico de versões — ${itemLabel}`,
     actions: { create: 'Criação', update: 'Alteração', restore: 'Restauração' },
     currentBadge: 'Versão atual',
@@ -77,6 +80,7 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
     loadFailedBody: 'Não foi possível carregar a comparação desta versão.',
   },
   draftBanner: {
+    dismissNotice: 'Fechar o aviso',
     title: 'Este item tem um rascunho não publicado.',
     updatedAtPrefix: 'Atualizado em',
     load: 'Carregar rascunho',

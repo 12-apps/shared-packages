@@ -243,6 +243,8 @@ export interface DiscountsActionsCopy {
   readonly deleteFailed: string;
   /** The shared snackbar's heading, over whatever an action reported. */
   readonly actionFailed: string;
+  /** The dismiss on that failure's toast — a glyph with no visible label. */
+  readonly actionFailedDismiss: string;
 }
 
 /** The two card layouts. */

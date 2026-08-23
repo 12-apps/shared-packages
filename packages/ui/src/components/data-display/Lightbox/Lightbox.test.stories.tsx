@@ -5,6 +5,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Lightbox } from './Lightbox';
 import type { LightboxItem, LightboxRef } from './Lightbox.types';
+import { PT_BR_LIGHTBOX_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Lightbox> = {
   title: 'Overlays/Lightbox/Tests',
@@ -80,7 +81,7 @@ const LightboxTestWrapper = ({
         Open Lightbox
       </Button>
       {children}
-      <Lightbox
+      <Lightbox copy={PT_BR_LIGHTBOX_COPY}
         ref={lightboxRef}
         isOpen={isOpen}
         onClose={handleClose}
