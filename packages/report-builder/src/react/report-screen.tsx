@@ -108,7 +108,7 @@ function ReportHeaderActions({
         onClick={onEdit}
         dataTestId="report-edit"
       >
-        Editar
+        {copy.edit}
       </Button>
       <ReportActionsMenu tenantSlug={tenantSlug} view={view} onChanged={onChanged} />
     </Box>
@@ -328,7 +328,7 @@ export function ReportScreen({
       <ErrorState
         title={copy.view.loadFailedTitle}
         message={copy.view.loadFailedBody}
-        retryLabel="Tentar novamente"
+        retryLabel={copy.view.retry}
         onRetry={() => {
           void query.refetch();
         }}

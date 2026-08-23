@@ -70,7 +70,8 @@ export function ArchiveFromListDialog({
   onDone: () => void;
 }): JSX.Element | null {
   const transport = useTransport();
-  const words = useReportCopy().screens.archive;
+  const screens = useReportCopy().screens;
+  const words = screens.archive;
   const [busy, setBusy] = useState(false);
 
   if (report === null) return null;
@@ -107,6 +108,7 @@ export function ArchiveFromListDialog({
       title={copy.title}
       description={copy.description}
       confirmText={busy ? words.busy : copy.action}
+      cancelText={screens.editor.confirmCancel}
       onConfirm={() => void run(report)}
       onCancel={onClose}
       dataTestId="reports-card-archive-confirm"

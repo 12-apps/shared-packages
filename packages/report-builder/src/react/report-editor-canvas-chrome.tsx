@@ -41,7 +41,7 @@ export function AddBlockRow({
           type="button"
           onClick={onAdd}
           disabled={disabled}
-          aria-label="Adicionar bloco"
+          aria-label={copy.addBlock}
           data-testid="report-editor-add-block"
           sx={{
             width: "100%",
@@ -125,6 +125,7 @@ export function RemoveBlockConfirm({
       title={copy.removeBlockTitle}
       description={copy.removeBlockBody}
       confirmText={copy.removeBlockConfirm}
+      cancelText={copy.confirmCancel}
       onConfirm={onConfirm}
       onCancel={onCancel}
       dataTestId={`report-block-${targetId ?? "sem-selecao"}-remove-confirm`}

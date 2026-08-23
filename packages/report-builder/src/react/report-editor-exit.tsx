@@ -50,6 +50,7 @@ export function ExitConfirmDialog({
       title={copy.exitTitle}
       description={published ? copy.exitPublishedBody : copy.exitDraftBody}
       confirmText={copy.exitConfirm}
+      cancelText={copy.confirmCancel}
       onConfirm={onLeave}
       onCancel={onStay}
       dataTestId="report-editor-exit-confirm"

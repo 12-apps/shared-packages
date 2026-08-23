@@ -35,7 +35,6 @@ import type { SentencePart } from "./spec-sentence";
 import { useReportCopy } from "../transport-context";
 
 /** What the panel says when nothing is selected — the spec's exact wording. */
-const EMPTY_TEXT = "Selecione um bloco para editar";
 
 const EMPTY_SX = {
   display: "flex",
@@ -53,10 +52,11 @@ const EMPTY_SX = {
  * the moment the author clicks the next block.
  */
 export function BlockPanelEmptyState({ testId }: { testId: string }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   return (
     <Box data-testid={`${testId}-empty`} sx={EMPTY_SX}>
       <Text variant="body" size="sm" color="secondary">
-        {EMPTY_TEXT}
+        {copy.emptySelection}
       </Text>
     </Box>
   );
@@ -225,6 +225,7 @@ export function BlockPanelFooter({
   onRemove: () => void;
   testId: string;
 }): JSX.Element {
+  const copy = useReportCopy().screens.builder;
   const reasonId = `${testId}-duplicate-reason`;
   return (
     <Box sx={FOOTER_SX} data-testid={`${testId}-footer`}>
@@ -268,7 +269,7 @@ export function BlockPanelFooter({
           onClick={onRemove}
           dataTestId={`${testId}-remove`}
         >
-          Remover
+          {copy.remove}
         </Button>
       </Box>
     </Box>

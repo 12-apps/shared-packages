@@ -10,6 +10,7 @@ import { AlertDialog } from "@12-apps/ui/data-display/AlertDialog";
 
 import { CONTAINER_RADIUS_PX, CONTROL_RADIUS_PX } from "./report-surface";
 
+
 /**
  * What the reports area restates about MUI's dialog, and why each line is here.
  *
@@ -54,6 +55,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmText,
+  cancelText,
   onConfirm,
   onCancel,
   dataTestId,
@@ -63,6 +65,12 @@ export function ConfirmDialog({
   title: string;
   description: string;
   confirmText: string;
+  /**
+   * The dismiss label, beside {@link confirmText}. REQUIRED and symmetric with
+   * it: this is a leaf a host can mount standalone, and a default in one
+   * language is how the next adopter inherits ours (FUT-760).
+   */
+  cancelText: string;
   onConfirm: () => void;
   onCancel: () => void;
   dataTestId: string;
@@ -76,7 +84,7 @@ export function ConfirmDialog({
       title={title}
       description={description}
       confirmText={confirmText}
-      cancelText="Cancelar"
+      cancelText={cancelText}
       onConfirm={onConfirm}
       onCancel={onCancel}
       onClose={onCancel}
