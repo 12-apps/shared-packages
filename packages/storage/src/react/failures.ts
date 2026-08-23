@@ -1,3 +1,5 @@
+import type { UploadButtonCopy } from '@12-apps/ui/copy';
+
 import { ACCEPTED_CONTENT_TYPES } from '../content-types';
 import { megabytes } from '../limits';
 
@@ -109,6 +111,15 @@ export interface WebStorageMessages {
   fieldLabel: string;
   fieldHelper: string;
   fieldRemove: string;
+  /**
+   * What the dropzone ITSELF says — its hint line, its accessible name, and
+   * the three announcements only a screen reader receives. `@12-apps/ui` stopped
+   * shipping English defaults for these, so a host that answers `fieldLabel`
+   * and nothing else would have a dropzone with no name and a silent progress
+   * bar. `buttonLabel` is unused here: `ImageField` passes `fieldLabel` as the
+   * override, because the field's own label is the one a form already names.
+   */
+  field: UploadButtonCopy;
 }
 
 /** Copy that only makes sense with the configured ceiling in it. */

@@ -126,6 +126,7 @@ export function DiscountTargetPicker({
       ids={ids}
       onChange={onChange}
       copy={copy.categorySelect}
+          autocompleteCopy={copy.autocomplete}
       dataTestId={`discount-${group.slug}-targets`}
     />
   );

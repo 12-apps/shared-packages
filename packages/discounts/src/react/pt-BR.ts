@@ -1,4 +1,5 @@
 import {
+  PT_BR_AUTOCOMPLETE_COPY,
   PT_BR_CATEGORY_SELECT_COPY,
   PT_BR_CONFIRM_ACTION_COPY,
   PT_BR_DATA_VIEWS_COPY,
@@ -182,4 +183,5 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
   confirmAction: PT_BR_CONFIRM_ACTION_COPY,
   dataViews: PT_BR_DATA_VIEWS_COPY,
   categorySelect: PT_BR_CATEGORY_SELECT_COPY,
+  autocomplete: PT_BR_AUTOCOMPLETE_COPY,
 };

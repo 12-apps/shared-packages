@@ -35,5 +35,18 @@ export function PT_BR_WEB_STORAGE_MESSAGES(
     fieldLabel: 'Foto do produto',
     fieldHelper: 'A imagem é reduzida no navegador antes do envio.',
     fieldRemove: 'Remover imagem',
+    field: {
+      // `buttonLabel` is never read here — `ImageField` overrides it with
+      // `fieldLabel`. It is still answered, because the type is the whole of
+      // what `UploadButton` may render and a partial answer is not a pack.
+      buttonLabel: 'Foto do produto',
+      dropzoneHint: 'Solte a imagem aqui ou clique para escolher',
+      dropzoneRole: (label) => `Área de upload de imagem. ${label}`,
+      uploading: 'Enviando…',
+      dropReady: 'Imagem pronta para soltar',
+      percentUploaded: (percent) => `${percent}% enviado`,
+      uploadInProgress: (percent) => `Envio em andamento: ${percent}%`,
+      errorAnnouncement: (message) => `Erro: ${message}`,
+    },
   };
 }
