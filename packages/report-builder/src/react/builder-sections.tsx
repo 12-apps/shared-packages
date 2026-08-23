@@ -151,9 +151,9 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
               variant="ghost"
               size="sm"
               onClick={() => update({ measures: draft.measures.filter((_, i) => i !== index) })}
-              aria-label={`Remover medida ${index + 1}`}
+              aria-label={copy.removeMeasure(index + 1)}
             >
-              Remover
+              {copy.remove}
             </Button>
           ) : null}
         </Stack>

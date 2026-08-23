@@ -87,6 +87,7 @@ export function UnpublishedChangesBar({
         title={copy.discardTitle}
         description={copy.discardBody}
         confirmText={copy.discardConfirm}
+        cancelText={copy.confirmCancel}
         onConfirm={() => {
           setConfirming(false);
           unpublished.discard();
