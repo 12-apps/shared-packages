@@ -219,7 +219,7 @@ export function DisconnectDialog(props: {
           {props.busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : copy.removeAction}
         </Button>
         <Button fullWidth onClick={props.onCancel} disabled={props.busy} sx={LINKISH_SX}>
-          Cancelar
+          {copy.cancel}
         </Button>
       </DialogActions>
     </Dialog>

@@ -86,7 +86,7 @@ function readSdkStatus(): SdkStatus {
 
 /** A distinctive, self-describing message — whoever finds it in Sentry should not have to ask. */
 function syntheticMessage(kind: string): string {
-  return `[self-check] ${kind} — evento sintetico, pode apagar (${new Date().toISOString()})`;
+  return `[self-check] ${kind} — synthetic event, safe to delete (${new Date().toISOString()})`;
 }
 
 /**
@@ -130,22 +130,23 @@ function StatusPanel({ status }: { status: SdkStatus }): JSX.Element {
       >
         <StatusRow
           label="SDK"
-          value={status.initialised ? "inicializado" : "NAO inicializado"}
+          value={status.initialised ? "initialised" : "NOT initialised"}
           ok={status.initialised}
         />
-        <StatusRow label="DSN" value={status.dsn ?? "vazio — reporting desligado"} ok={dsnOk} />
+        <StatusRow label="DSN" value={status.dsn ?? "empty — reporting is off"} ok={dsnOk} />
         <StatusRow
           label="environment"
-          value={status.environment ?? "(nao definido)"}
+          value={status.environment ?? "(not set)"}
           ok={Boolean(status.environment)}
         />
-        <StatusRow label="release" value={status.release ?? "(nao definido)"} ok={Boolean(status.release)} />
+        <StatusRow label="release" value={status.release ?? "(not set)"} ok={Boolean(status.release)} />
       </section>
 
       {!dsnOk && (
-        <Alert variant="warning" title="Reporting desligado nesta build" data-testid="self-check-off">
-          Sem DSN o SDK nao abre conexao e nenhum botao abaixo envia nada. E o estado normal em dev,
-          CI e builds de PR; em producao significa que a variavel nao chegou ao processo.
+        <Alert variant="warning" title="Reporting is off in this build" data-testid="self-check-off">
+          With no DSN the SDK opens no connection and no button below sends anything. That is
+          normal in dev, CI and PR builds; in production it means the variable never reached the
+          process.
         </Alert>
       )}
     </>
@@ -168,10 +169,10 @@ function TriggerRow({
         Quebrar no render (error boundary)
       </Button>
       <Button variant="outline" color="danger" onClick={onHandlerError} data-testid="self-check-handler">
-        Erro no handler (window.onerror)
+        Handler error (window.onerror)
       </Button>
       <Button variant="outline" color="warning" onClick={onWarning} data-testid="self-check-warning">
-        Enviar warning
+        Send a warning
       </Button>
     </div>
   );
@@ -196,7 +197,7 @@ const INIT_POLL_MS = 250;
  * it can call `Sentry.init`, deliberately, so that reporting never gates first
  * paint. This page renders long before that returns, so a lazy `useState`
  * initialiser snapshots `getClient() === undefined` and shows a confident
- * "NAO inicializado" forever, on a perfectly healthy build.
+ * "NOT initialised" forever, on a perfectly healthy build.
  *
  * That is precisely the failure this page exists to expose, produced by the
  * page itself. So poll until the client shows up, and stop as soon as it does.
@@ -244,7 +245,7 @@ export function ObservabilitySelfCheck(): JSX.Element {
   const throttled = useCallback((): boolean => {
     const now = Date.now();
     if (now - lastFiredAt.current < THROTTLE_MS) {
-      setNote(`Aguarde ${Math.ceil(THROTTLE_MS / 1000)}s entre disparos.`);
+      setNote(`Wait ${Math.ceil(THROTTLE_MS / 1000)}s between triggers.`);
       return true;
     }
     lastFiredAt.current = now;
@@ -277,10 +278,10 @@ export function ObservabilitySelfCheck(): JSX.Element {
   return (
     <main style={{ padding: 24, maxWidth: 760, margin: "0 auto" }} data-testid="observability-self-check">
       <Heading level="h1">
-        Diagnostico de observabilidade
+        Observability diagnostics
       </Heading>
       <Text size="sm" color="neutral">
-        Dispara um evento sintetico para conferir se o Sentry esta integrado nesta build.
+        Fires a synthetic event to confirm Sentry is wired into this build.
       </Text>
 
       <StatusPanel status={status} />
@@ -294,9 +295,9 @@ export function ObservabilitySelfCheck(): JSX.Element {
       )}
 
       <Text size="xs" color="neutral" style={{ display: "block", marginTop: 24 }}>
-        O evento leva alguns segundos para aparecer. A stack precisa nomear um arquivo .tsx/.ts com
-        linha — se vier minificada, os source maps nao estao pareados com este release. Todos os
-        eventos daqui levam a marca &quot;{SYNTHETIC_TAG}&quot; e podem ser apagados em lote.
+        The event takes a few seconds to show up. The stack must name a .tsx/.ts file and a line
+        — if it comes back minified, the source maps are not paired with this release. Every event
+        from here carries the &quot;{SYNTHETIC_TAG}&quot; tag and can be deleted in bulk.
       </Text>
     </main>
   );

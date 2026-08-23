@@ -176,6 +176,8 @@ export interface ConnectionCardCopy {
    * taking orders — the offer that makes the destructive button safe to show.
    */
   pauseInstead: string;
+  /** The dialog's plain dismiss, under the two offers above. */
+  cancel: string;
 }
 
 /** The credential form: its fields, its probe, and what it says while testing. */
@@ -287,6 +289,12 @@ export interface SetupGuideCopy {
   confirmedByYou: string;
   /** Reopen a section the owner already confirmed. */
   reviewAction: string;
+  /**
+   * The copy-to-clipboard button beside a reference value, and what it says
+   * for the two seconds after a successful copy.
+   */
+  copyValue(fieldLabel: string): string;
+  copied: string;
 }
 
 /** The whole settings surface, in one object a host passes at the mount. */

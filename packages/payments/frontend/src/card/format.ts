@@ -113,7 +113,7 @@ export function validateCvv(
   brand: CardBrand = "Unknown",
 ): string | undefined {
   const digits = onlyDigits(value);
-  if (!digits) return "Informe o CVV.";
+  if (!digits) return copy.cvvRequired;
   const len = cvvLength(brand);
   return digits.length === len ? undefined : copy.cvvDigits(len);
 }
