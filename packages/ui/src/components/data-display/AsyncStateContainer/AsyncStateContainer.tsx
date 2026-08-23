@@ -80,6 +80,7 @@ export const AsyncStateContainer: React.FC<AsyncStateContainerProps> = React.mem
     errorComponent,
     renderError,
     emptyComponent,
+    emptyTitle,
     renderEmpty,
     className,
     dataTestId,
@@ -107,7 +108,7 @@ export const AsyncStateContainer: React.FC<AsyncStateContainerProps> = React.mem
     if (isEmpty) {
       return (
         <StateBox state="empty" {...box}>
-          {pickNode(emptyComponent, renderEmpty, <EmptyState title="No data available" />)}
+          {pickNode(emptyComponent, renderEmpty, <EmptyState title={emptyTitle} />)}
         </StateBox>
       );
     }

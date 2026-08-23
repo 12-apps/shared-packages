@@ -44,6 +44,7 @@ export const STORY_COPY: EmailAuthCopy = {
     "verification-unavailable": "Sign-up could not be completed. Try later or contact support.",
     unknown: "That did not go through. Try again.",
   },
+  dismissFailure: "Fechar o aviso",
   passwordField: {
     show: "Show",
     hide: "Hide",

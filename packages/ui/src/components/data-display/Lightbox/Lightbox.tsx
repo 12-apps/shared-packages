@@ -3,6 +3,7 @@ import React from 'react';
 
 import { makeTestId } from './Lightbox.constants';
 import { resolveLightboxProps } from './Lightbox.helpers';
+import { LightboxCopyProvider } from './lightbox-copy-context';
 import type { LightboxProps, LightboxRef } from './Lightbox.types';
 import { LightboxCurrentMedia } from './LightboxCurrentMedia';
 import { LightboxOverlay } from './LightboxOverlay';
@@ -32,6 +33,7 @@ export const Lightbox = React.forwardRef<LightboxRef, LightboxProps>((componentP
   const { currentIndex, currentItem, zoom } = lightbox;
 
   return (
+    <LightboxCopyProvider copy={props.copy}>
     <Dialog
       open={isOpen}
       onClose={lightbox.close}
@@ -98,6 +100,7 @@ export const Lightbox = React.forwardRef<LightboxRef, LightboxProps>((componentP
         }
       />
     </Dialog>
+    </LightboxCopyProvider>
   );
 });
 

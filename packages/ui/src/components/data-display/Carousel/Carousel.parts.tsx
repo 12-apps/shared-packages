@@ -212,7 +212,8 @@ const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => (
 
 export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
   const {
-    onPrev, onNext, position, disabled, disablePrev, disableNext, color, size, className, style,
+    copy, onPrev, onNext, position, disabled, disablePrev, disableNext, color, size, className,
+    style,
   } = withDefaults(props, ARROWS_DEFAULTS) as CarouselArrowsProps &
     Required<Pick<CarouselArrowsProps, keyof typeof ARROWS_DEFAULTS>>;
 
@@ -227,7 +228,7 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
         disabled={disabled || disablePrev}
         size={muiSize(size)}
         className={className}
-        aria-label="Previous slide"
+        aria-label={copy.previous}
         data-testid="carousel-prev-button"
         sx={{ ...sx, left: offset, ...style }}
       >
@@ -237,7 +238,7 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
       <IconButton
         onClick={onNext}
         disabled={disabled || disableNext}
-        aria-label="Next slide"
+        aria-label={copy.next}
         size={muiSize(size)}
         className={className}
         data-testid="carousel-next-button"

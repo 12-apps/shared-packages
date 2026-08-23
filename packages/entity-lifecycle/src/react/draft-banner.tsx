@@ -135,6 +135,7 @@ export function DraftBanner({
           variant="danger"
           description={actions.error}
           closable
+          closeLabel={copy.dismissNotice}
           onClose={actions.clearError}
           data-testid={`${testIdPrefix}-error`}
         />

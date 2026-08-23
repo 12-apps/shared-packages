@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { LightboxCopy } from '../../../copy';
 
 export interface LightboxItem {
   src: string;
@@ -12,6 +13,14 @@ export interface AutoplayConfig {
 }
 
 export interface LightboxProps {
+  /**
+   * Every word this viewer renders — all of them aria-labels on glyph-only
+   * controls, so this object IS what a screen-reader user hears for the whole
+   * component. REQUIRED: a default could only be one language read aloud to
+   * everybody else's users, and the sighted path looks identical either way,
+   * which is why the English literals survived so long.
+   */
+  copy: LightboxCopy;
   /** Controls visibility; must lock body scroll when true */
   isOpen: boolean;
   /** Fired on close button, backdrop click, Esc, and swipe-down (mobile) */

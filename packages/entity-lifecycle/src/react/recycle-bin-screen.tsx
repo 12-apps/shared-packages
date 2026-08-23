@@ -189,6 +189,7 @@ function BinBody({
           title={copy.actionFailedTitle}
           description={actions.error}
           closable
+          closeLabel={copy.dismissNotice}
           onClose={actions.clearError}
           data-testid="recycle-bin-error"
         />

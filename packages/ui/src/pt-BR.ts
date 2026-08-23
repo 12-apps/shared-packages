@@ -1,12 +1,16 @@
 import type { DataViewsCopy } from "./components/data-display/DataViews/data-views-copy";
 import type { SavedViewsLabels } from "./components/layout/ContentToolbar/ContentToolbar.types";
 import type {
+  CarouselCopy,
   CategorySelectCopy,
   CepFieldCopy,
   ConfirmActionCopy,
+  DataStateCopy,
+  LightboxCopy,
+  MapPreviewCopy,
   SectionOnboardingCopy,
   TableFilterCopy,
-} from "./copy";
+} from './copy';
 
 /**
  * The pt-BR packs — NAMED constants a host passes by hand, never defaults.
@@ -101,6 +105,41 @@ export const PT_BR_SAVED_VIEWS_LABELS: SavedViewsLabels = {
 
 export const PT_BR_TABLE_FILTER_COPY: TableFilterCopy = {
   invalidRange: "O máximo deve ser maior ou igual ao mínimo.",
+  rangeMin: "Mínimo",
+  rangeMax: "Máximo",
+};
+
+export const PT_BR_LIGHTBOX_COPY: LightboxCopy = {
+  close: "Fechar",
+  previous: "Anterior",
+  next: "Próximo",
+  zoomIn: "Aproximar",
+  zoomOut: "Afastar",
+  resetZoom: "Restaurar o zoom",
+  play: "Iniciar a apresentação",
+  pause: "Pausar a apresentação",
+};
+
+export const PT_BR_MAP_PREVIEW_COPY: MapPreviewCopy = {
+  zoomIn: "Aproximar",
+  zoomOut: "Afastar",
+  center: "Centralizar o mapa",
+  mapType: "Trocar o tipo de mapa",
+  fullscreen: "Tela cheia",
+  search: "Buscar endereço",
+};
+
+export const PT_BR_CAROUSEL_COPY: CarouselCopy = {
+  previous: "Anterior",
+  next: "Próximo",
+};
+
+export const PT_BR_DATA_STATE_COPY: DataStateCopy = {
+  empty: "Nenhum dado por aqui",
+  loading: "Carregando…",
+  endOfList: "Não há mais itens para carregar",
+  dismissAlert: "Fechar o aviso",
+  dismissBanner: "Fechar a faixa",
 };
 
 export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
@@ -260,6 +299,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     saveAs: "Salvar como nova",
     reset: "Redefinir",
     updateFailed: "Não foi possível atualizar a visão",
+    dismissError: "Fechar o aviso",
     saveFailed: "Não foi possível salvar a alteração da visão.",
     editView: "Renomear e editar",
     pinToSidebar: "Fixar na barra lateral",

@@ -88,7 +88,8 @@ describe('the ambient wiring', () => {
 
   it('K7: hands a menu the tenant it is acting inside', () => {
     render(
-      <CardActionsProvider tenantSlug="acme" onRefresh={vi.fn()} errorTitle="Action failed">
+      <CardActionsProvider tenantSlug="acme" onRefresh={vi.fn()} errorTitle="Action failed"
+      errorDismissLabel="Fechar o aviso">
         <Consumer />
       </CardActionsProvider>,
     );
@@ -130,7 +131,8 @@ describe('confirm before removing, from a menu', () => {
   it('K9: writes NOTHING until the operator confirms', async () => {
     const onRefresh = vi.fn();
     render(
-      <CardActionsProvider tenantSlug="acme" onRefresh={onRefresh} errorTitle="Action failed">
+      <CardActionsProvider tenantSlug="acme" onRefresh={onRefresh} errorTitle="Action failed"
+      errorDismissLabel="Fechar o aviso">
         <RemoveMenu result={{ ok: true }} />
       </CardActionsProvider>,
     );
@@ -142,7 +144,8 @@ describe('confirm before removing, from a menu', () => {
 
   it('K10: keeps the popup OPEN on a refusal, carrying the server’s sentence', async () => {
     render(
-      <CardActionsProvider tenantSlug="acme" onRefresh={vi.fn()} errorTitle="Action failed">
+      <CardActionsProvider tenantSlug="acme" onRefresh={vi.fn()} errorTitle="Action failed"
+      errorDismissLabel="Fechar o aviso">
         <RemoveMenu result={{ ok: false, error: 'Still in use.' }} />
       </CardActionsProvider>,
     );
@@ -158,7 +161,8 @@ describe('confirm before removing, from a menu', () => {
 
   it('K11: also reports the refusal in the provider’s shared snackbar', async () => {
     render(
-      <CardActionsProvider tenantSlug="acme" onRefresh={vi.fn()} errorTitle="Action failed">
+      <CardActionsProvider tenantSlug="acme" onRefresh={vi.fn()} errorTitle="Action failed"
+      errorDismissLabel="Fechar o aviso">
         <RemoveMenu result={{ ok: false, error: 'Still in use.' }} />
       </CardActionsProvider>,
     );

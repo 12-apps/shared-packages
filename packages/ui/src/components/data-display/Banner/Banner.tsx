@@ -202,8 +202,9 @@ const BannerTrailing: React.FC<{
   variant: BannerVariant;
   dismissible: boolean;
   onDismissClick: () => void;
+  dismissLabel: string;
   dataTestId?: string;
-}> = ({ actions, variant, dismissible, onDismissClick, dataTestId }) => (
+}> = ({ actions, variant, dismissible, onDismissClick, dismissLabel, dataTestId }) => (
   <Box display="flex" alignItems="center" gap={1}>
     {actions && actions.length > 0 && (
       <Box className="banner-actions">
@@ -223,7 +224,7 @@ const BannerTrailing: React.FC<{
         className="banner-dismiss"
         size="small"
         onClick={onDismissClick}
-        aria-label="Dismiss banner"
+        aria-label={dismissLabel}
         data-testid={testIdFor(dataTestId, 'close')}
         sx={{ transition: 'all 0.2s ease' }}
       >
@@ -241,6 +242,7 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
       description,
       icon,
       dismissible = false,
+      dismissLabel,
       onDismiss,
       actions,
       sticky = false,
@@ -295,6 +297,7 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
           variant={variant}
           dismissible={dismissible}
           onDismissClick={handleDismiss}
+          dismissLabel={dismissLabel}
           dataTestId={dataTestId}
         />
       </StyledBanner>

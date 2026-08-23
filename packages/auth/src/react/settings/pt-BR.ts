@@ -40,6 +40,7 @@ export const PT_BR_SETTINGS: EmailAuthSettingsCopy = {
 
   saveFailedTitle: "Não foi possível salvar",
   saveFailedDescription: "A alteração não foi aplicada. Tente novamente.",
+  saveFailedDismiss: "Fechar o aviso",
 
   loadFailedTitle: "Não foi possível carregar as configurações de login",
   retry: "Tentar novamente",

@@ -2,7 +2,26 @@ import type { ColorValue } from '../../../tokens/scales';
 import type { AlertProps as MuiAlertProps } from '@mui/material';
 import type React from 'react';
 
-export interface AlertProps extends Omit<MuiAlertProps, 'variant' | 'color' | 'role'> {
+/**
+ * The dismissible half, as a UNION rather than one more optional field.
+ *
+ * `closeLabel` is the dismiss button's only accessible name — it renders a
+ * glyph and nothing else — so it must be REQUIRED wherever that button exists.
+ * But most alerts are not closable, and making it required on all of them
+ * would ask a dozen call sites across five packages to name a control they
+ * never render. A word invented to satisfy a type is worse than no word: the
+ * next reader cannot tell which button it belongs to.
+ *
+ * So the type says what is actually true — the label is required exactly when
+ * the button is.
+ */
+type AlertDismiss =
+  | { closable?: false; onClose?: () => void; closeLabel?: never }
+  | { closable: true; onClose?: () => void; closeLabel: string };
+
+export type AlertProps = AlertBase & AlertDismiss;
+
+export interface AlertBase extends Omit<MuiAlertProps, 'variant' | 'color' | 'role'> {
   /**
    * The variant of the alert
    */
@@ -33,15 +52,6 @@ export interface AlertProps extends Omit<MuiAlertProps, 'variant' | 'color' | 'r
    */
   showIcon?: boolean;
   
-  /**
-   * Whether the alert can be closed
-   */
-  closable?: boolean;
-  
-  /**
-   * Callback when alert is closed
-   */
-  onClose?: () => void;
   
   /**
    * Title for the alert

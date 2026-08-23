@@ -291,6 +291,7 @@ function ScreenBody({
         tenantSlug=""
         onRefresh={refresh}
         errorTitle={copy.actions.actionFailed}
+        errorDismissLabel={copy.actions.actionFailedDismiss}
       >
         <DiscountsGrid
           rows={rows}

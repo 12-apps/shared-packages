@@ -13,6 +13,11 @@ import type { ConfirmActionCopy } from '@12-apps/ui/copy';
  */
 
 export interface ApprovalsCopy {
+  /**
+   * The dismiss on this screen's closable notice — a glyph-only button, so
+   * this is the whole of what a screen reader announces for it.
+   */
+  dismissNotice: string;
   /** The status filter's three options. */
   statusFilters: { pending: string; approved: string; rejected: string };
   /** The chip naming what a request wants to do. */
@@ -34,6 +39,11 @@ export interface ApprovalsCopy {
 }
 
 export interface RecycleBinCopy {
+  /**
+   * The dismiss on this screen's closable notice — a glyph-only button, so
+   * this is the whole of what a screen reader announces for it.
+   */
+  dismissNotice: string;
   restoreAction: string;
   purgeAction: string;
   purgeDialogTitle: string;
@@ -59,6 +69,11 @@ export interface RecycleBinCopy {
 }
 
 export interface VersionHistoryCopy {
+  /**
+   * The dismiss on this screen's closable notice — a glyph-only button, so
+   * this is the whole of what a screen reader announces for it.
+   */
+  dismissNotice: string;
   title: (itemLabel: string) => string;
   actions: { create: string; update: string; restore: string };
   currentBadge: string;
@@ -89,6 +104,11 @@ export interface VersionComparisonCopy {
 }
 
 export interface DraftBannerCopy {
+  /**
+   * The dismiss on this screen's closable notice — a glyph-only button, so
+   * this is the whole of what a screen reader announces for it.
+   */
+  dismissNotice: string;
   title: string;
   /** "Atualizado em" — the date renders right after it. */
   updatedAtPrefix: string;

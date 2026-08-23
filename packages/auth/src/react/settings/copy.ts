@@ -40,6 +40,8 @@ export interface EmailAuthSettingsCopy {
   /** The save failed. */
   saveFailedTitle: string;
   saveFailedDescription: string;
+  /** The dismiss on that alert — a glyph with no visible label. */
+  saveFailedDismiss: string;
 
   /** The settings could not be read at all. */
   loadFailedTitle: string;

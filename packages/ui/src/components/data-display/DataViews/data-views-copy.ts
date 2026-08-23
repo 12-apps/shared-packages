@@ -231,6 +231,8 @@ export interface DataViewsNavCopy {
   reset: string;
   /** The inline error when a view could not be refreshed or saved. */
   updateFailed: string;
+  /** The dismiss on that failure's alert — a glyph with no visible label. */
+  dismissError: string;
   saveFailed: string;
   /** Reopen the save dialog over an existing view. */
   editView: string;

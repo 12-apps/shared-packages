@@ -52,6 +52,7 @@ export const PT_BR: EmailAuthCopy = {
       "Não foi possível concluir o cadastro agora. Tente novamente mais tarde ou fale com o suporte.",
     unknown: "Não foi possível concluir. Tente novamente.",
   },
+  dismissFailure: "Fechar o aviso",
   passwordField: {
     show: "Mostrar",
     hide: "Ocultar",
