@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { EmailCredentials } from "../../email-credentials";
 import { emailAuthRoutes, type EmailAuthRoute } from "../email-routes";
+import { EN_US_MESSAGES } from "../en-US";
 import { PT_BR_MESSAGES } from "../pt-BR";
 
 /**
@@ -227,5 +228,66 @@ describe("emailAuthRoutes", () => {
         routes.filter((entry) => entry.session).map((entry) => `${entry.method} ${entry.path}`).sort(),
       ).toEqual(["GET /password", "PUT /password"]);
     });
+  });
+});
+
+describe("one mount, two languages", () => {
+  /**
+   * The property the resolver form of the copy port exists for: these
+   * descriptors are built ONCE and the language changes per caller. A
+   * `messages` field read where the routes are assembled would answer every
+   * reader in whichever language the process started with — and would pass
+   * every case above, which is exactly why this one is here.
+   */
+  function bilingualForgot(): EmailAuthRoute {
+    return route(
+      emailAuthRoutes({
+        credentials: credentialsStub({
+          requestPasswordReset: vi.fn().mockResolvedValue({ ok: false, reason: "invalid-email" }),
+        }),
+        // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out
+        // here so this package keeps no dependency on it.
+        messages: ({ locale }) => (locale === "en-US" ? EN_US_MESSAGES : PT_BR_MESSAGES),
+      }),
+      "POST",
+      "/forgot-password",
+    );
+  }
+
+  const errorOf = (body: unknown): string => (body as { error: string }).error;
+
+  it("answers the same descriptor in each caller's language", async () => {
+    const forgot = bilingualForgot();
+    const inPortuguese = await forgot.handle({ body: { email: "x" }, userId: null, locale: "pt-BR" });
+    const inEnglish = await forgot.handle({ body: { email: "x" }, userId: null, locale: "en-US" });
+    expect(errorOf(inPortuguese.body)).toBe(PT_BR_MESSAGES["invalid-email"]);
+    expect(errorOf(inEnglish.body)).toBe(EN_US_MESSAGES["invalid-email"]);
+    // The `reason` is a CODE the screens branch on, and must not move with the
+    // language — a sentence cannot be branched on.
+    expect((inEnglish.body as { reason: string }).reason).toBe("invalid-email");
+  });
+
+  it("hands an absent locale to the resolver rather than refusing", async () => {
+    // A host with one audience populates nothing. Not a misconfiguration — the
+    // resolver decides what no answer means, and here it means the default.
+    const response = await bilingualForgot().handle({ body: { email: "x" }, userId: null });
+    expect(errorOf(response.body)).toBe(PT_BR_MESSAGES["invalid-email"]);
+  });
+
+  it("leaves a plain-value host byte-identical", async () => {
+    // The whole compatibility claim: a host that passes words, not a resolver,
+    // behaves exactly as it did before the field widened.
+    const forgot = route(
+      emailAuthRoutes({
+        credentials: credentialsStub({
+          requestPasswordReset: vi.fn().mockResolvedValue({ ok: false, reason: "invalid-email" }),
+        }),
+        messages: PT_BR_MESSAGES,
+      }),
+      "POST",
+      "/forgot-password",
+    );
+    const response = await forgot.handle({ body: { email: "x" }, userId: null, locale: "en-US" });
+    expect(errorOf(response.body)).toBe(PT_BR_MESSAGES["invalid-email"]);
   });
 });
