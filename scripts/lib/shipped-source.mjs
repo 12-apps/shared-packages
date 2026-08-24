@@ -43,29 +43,33 @@
 // `files` field publishes everything, so it simply gets the regex.
 import { existsSync, readFileSync } from "node:fs";
 
+import { localeTagIn } from "./locale-tag.mjs";
+
 const SHIPPED_SOURCE = /^packages\/[^/]+(?:\/[^/]+)?\/src\/.+\.(?:ts|tsx|js|jsx|mjs)$/;
 const CATEGORY_EXCLUDED =
   /(?:__tests__|__stories__|\.test\.|\.spec\.|\.stories\.|\.test-story\.|(?:^|\/)e2e\/|(?:^|\/)features\/|test-helpers)/;
-// A file naming a BCP-47 `language-REGION` tag as a DELIMITED SEGMENT of its
-// basename, or anything under `locales/`. All four spellings this repo already
-// uses are covered — `pt-BR.ts`, `pt-BR.form.ts`, `mail-templates.pt-BR.ts`,
-// `setup-guide-pt-BR.ts` — and each keeps its meaning: the file says which
-// language it is.
-//
-// It was `pt-?br…` until a second language existed. That spelling exempted
-// exactly the one language this repo happened to ship, so `en-US.ts` — the
-// TRANSLATION of an already-exempt file — came back into scope, where the
-// vocabulary gate fails it for saying "restaurants" in the English rendering of
-// a sentence whose Portuguese was fine next door. The rule was always "a file
-// that says which language it is"; only the pattern was narrower than the rule.
-//
-// Two things keep the widening honest. The region subtag is REQUIRED, so
-// `packages/forms-core/src/br.ts` — CPF/CNPJ validation, not a language pack —
-// cannot exempt itself by its name; and the tag must sit on a `.`/`-` boundary
-// rather than anywhere in the name. Checked against the whole tree when it
-// landed: it reclassifies nothing and exempts no file that is not a pack.
-const NAMED_PACK =
-  /(?:(?:^|\/)locales\/|(?:^|[./-])[a-z]{2}-[A-Z]{2}(?:\.[^/]*)?\.(?:ts|tsx|js|jsx|mjs)$)/;
+/**
+ * Whether a path is a NAMED PACK — a file that says which language it is.
+ *
+ * The rule and every spelling it admits live in `./locale-tag.mjs`, shared with
+ * `scripts/locale-coverage-gate.mjs`: two gates asking one question from two
+ * hand-kept patterns is the drift this folder exists to prevent.
+ *
+ * It was `pt-?br…` until a second language existed. That spelling exempted
+ * exactly the one language this repo happened to ship, so `en-US.ts` — the
+ * TRANSLATION of an already-exempt file — came back into scope, where the
+ * vocabulary gate fails it for saying "restaurants" in the English rendering of
+ * a sentence whose Portuguese was fine next door. The rule was always "a file
+ * that says which language it is"; only the pattern was narrower than the rule.
+ *
+ * Measured against the whole tree when it widened: it reclassifies nothing and
+ * exempts no file that is not a pack.
+ */
+function isNamedPack(path) {
+  if (path.includes("/locales/")) return true;
+  const basename = path.slice(path.lastIndexOf("/") + 1);
+  return localeTagIn(basename) !== null;
+}
 
 /**
  * One `files` glob as a regex over the package-relative path.
@@ -134,7 +138,7 @@ export function inScope(path, readManifest) {
   return (
     SHIPPED_SOURCE.test(path) &&
     !CATEGORY_EXCLUDED.test(path) &&
-    !NAMED_PACK.test(path) &&
+    !isNamedPack(path) &&
     !isUnpublished(path, readManifest)
   );
 }

@@ -38,6 +38,8 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
+import { familyOf, localeTagIn } from "./lib/locale-tag.mjs";
+
 const LABEL = "[locale-coverage]";
 const EXCEPTIONS_PATH = ".locale-coverage.json";
 const CANONICAL_SOURCE = "packages/i18n/src/core/locale.ts";
@@ -82,27 +84,16 @@ function packageOf(path) {
 export function localeFileOf(path, locales) {
   if (!/^packages\/[^/]+(?:\/[^/]+)?\/src\//.test(path)) return null;
   const basename = path.slice(path.lastIndexOf("/") + 1);
-  const stem = basename.replace(/\.(?:ts|tsx|js|jsx|mjs)$/, "");
-  if (stem === basename) return null;
 
-  // The tag must be a DELIMITED segment, matching `lib/shipped-source.mjs`'s
-  // exemption rule: all four spellings this repo uses are legal (`pt-BR`,
+  // The tag rule lives in `lib/locale-tag.mjs`, shared with the portability
+  // gates' `inScope`: all four spellings this repo uses are legal (`pt-BR`,
   // `pt-BR.form`, `mail-templates.pt-BR`, `setup-guide-pt-BR`), and `br` on its
   // own is not a language.
-  const tag = locales.find((locale) =>
-    new RegExp(`(?:^|[.-])${locale}(?:\\.|$)`).test(stem),
-  );
-  if (!tag) return null;
+  const found = localeTagIn(basename);
+  if (!found || !locales.includes(found.tag)) return null;
 
-  // The family is the name with the tag and ONE adjacent delimiter removed, so
-  // `setup-guide-pt-BR` pairs with `setup-guide-en-US` and not merely with some
-  // other English file in the same folder.
-  const at = stem.indexOf(tag);
-  const before = stem.slice(0, at).replace(/[.-]$/, "");
-  const after = stem.slice(at + tag.length).replace(/^[.-]/, "");
-  const family = [before, after].filter(Boolean).join(".");
   const folder = path.slice(0, path.lastIndexOf("/"));
-  return { tag, family, folder, package: packageOf(path) };
+  return { tag: found.tag, family: familyOf(found), folder, package: packageOf(path) };
 }
 
 function readExceptions() {
