@@ -10,6 +10,7 @@ import { FEATURE_FLAGS_MOUNT_PATH, wireFeatureFlags } from './feature-flags-host
 import { IMPERSONATION_PLATFORM_PATH, IMPERSONATION_TENANT_MOUNT } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { observabilityHarnessRoutes, observabilityRoutes } from './observability-host';
+import { mountPaymentsControls, PAYMENTS_MOUNT_PATH } from './payments-host';
 import { REALTIME_MOUNT_PATH } from './realtime-host';
 import { reportsRouter } from './reports-host';
 import { savedReportDb } from './saved-report-db';
@@ -69,6 +70,12 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // package's. Sharing a path and splitting the verbs is the arrangement a real
   // adopter has, so the harness has it too.
   app.route(RESEARCH_MOUNT_PATH, researchListingRoutes(pg));
+  // @12-apps/payments-backend's merchant-admin surface (the buyer half runs in
+  // the frontend harness — see `payments-host.ts` for why that split is the
+  // package's own).
+  app.route(PAYMENTS_MOUNT_PATH, hosts.payments.router);
+  mountPaymentsControls(app, pg);
+
 }
 
 /**
