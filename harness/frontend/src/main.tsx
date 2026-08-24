@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { setErrorClassifiers, startObservability } from '@12-apps/observability-frontend';
+
 import { CssBaseline } from '@12-apps/ui/mui/CssBaseline';
 import { ThemeProvider } from '@12-apps/ui/mui/styles';
 
@@ -69,5 +71,34 @@ function Shell() {
     </ThemeProvider>
   );
 }
+
+/**
+ * `@12-apps/observability-frontend`, wired the ONE way it can be: first, before
+ * `createRoot`, for the whole bundle.
+ *
+ * It cannot be a page's mount. The package installs `window.onerror` and
+ * `unhandledrejection` SYNCHRONOUSLY, before the config it needs has arrived,
+ * precisely so an error thrown in that window is still caught — and a hook that
+ * ran when a route mounted would have missed exactly the errors it exists for.
+ * So this is where a host puts it and where the harness puts it, and the
+ * `observability` page below drives it rather than owning it.
+ *
+ * It is OFF here, and stays off, unless a suite serves a DSN: the backend's
+ * `/api/observability-config` answers an empty one by default, which is no SDK
+ * and no network for every other page in this app. That default is the
+ * package's own contract, not a harness convenience.
+ *
+ * The two classifiers are the host seam the package refuses to guess at — what
+ * counts as a routine non-5xx answer depends on this app's HTTP client, and
+ * what a dead chunk looks like depends on its lazy-route strategy. Both are
+ * spelled here, in this app's own terms, because a package that shipped either
+ * would be filtering another product's errors.
+ */
+setErrorClassifiers({
+  isIgnorableResponse: (error) =>
+    error instanceof Error && /^harness-4\d\d\b/.test(error.message),
+  isStaleChunk: (error) => error instanceof Error && error.name === 'HarnessChunkError',
+});
+void startObservability('harness');
 
 createRoot(document.getElementById('root')!).render(<Shell />);

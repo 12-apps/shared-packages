@@ -88,6 +88,39 @@ AES-GCM codec, the four path tables in this app's URLs, the roster, the trail
 (an array, where a real adopter has an append-only table) and the branch switch a
 spec flips to prove a live revocation.
 
+## The error-reporting page (`observability`)
+
+The one page whose package the page does not mount. `startObservability` runs in
+`main.tsx`, before `createRoot`, for the whole bundle — because it installs
+`window.onerror` and `unhandledrejection` **synchronously**, before the config it
+needs has arrived, exactly so an error thrown in that window is still caught. A
+hook that ran when a route mounted would miss the errors it exists for. So this
+is where a host puts it, and the page drives what is already installed.
+
+It is OFF here and stays off: the backend answers `/api/observability-config`
+with an empty DSN by default, which is no SDK and no network for every other
+page in this app. That default is the package's own contract, not a harness
+convenience, and `/__harness/reset` restores it.
+
+**The ingest is real.** A DSN is a URL — `<protocol>://<key>@<host>/<projectId>`
+— and the SDK POSTs to `<host>/api/<projectId>/envelope/`. Point the host at the
+harness's own origin and the SDK's real transport, its real serialisation and its
+real `beforeSend` pipeline all run, over Vite's proxy into
+`observability-host.ts`, which parses the envelope and records what arrived.
+Nothing about the package is stubbed; only the far end of the wire is ours.
+
+That matters because of what `beforeSend` is for: **some events must NOT leave**,
+and an event that was dropped and an event that was never produced are
+indistinguishable from inside the page. So every noise case in
+`tests/observability.spec.ts` fires a reportable error beside the dropped one —
+otherwise "the ingest is empty" would also be satisfied by an SDK that never
+started.
+
+The two `setErrorClassifiers` entries in `main.tsx` are the host seam the package
+refuses to guess at: what counts as a routine non-5xx answer depends on this
+app's HTTP client, and what a dead chunk looks like depends on its lazy-route
+strategy. A package shipping either would be filtering another product's errors.
+
 ## The price-research page (`product-research`)
 
 Two published tarballs meeting over a socket, which is the only reason this page

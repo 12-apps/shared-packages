@@ -107,6 +107,7 @@ import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './d
 import { provisionShift, reseedShifts, shiftHost } from './shift-host';
 import { mountRequestScope, requestScopeProbes } from './request-scope-host';
 import { provisionResearch, researchHost, reseedResearch } from './research-host';
+import { observability } from './observability-host';
 import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
@@ -279,6 +280,9 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     hosts.entitlements.reset();
     hosts.appShell.reset();
     hosts.impersonation.reset();
+    // Back to NO DSN — the default, and the state every other page in this app
+    // needs, since `startObservability` runs once for the whole bundle.
+    observability.reset();
     return c.body(null, 204);
   });
 }
