@@ -20,12 +20,16 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import {
   SHIFT_COPY,
+  SHIFT_MOUNT_PATH,
   SHIFT_TENANT_B_ID,
   SHIFT_TENANT_ID,
   SHIFT_USER_HEADER,
+  shiftSweep,
 } from '../src/shift-host';
 
 let backend: HarnessBackend;
@@ -400,5 +404,73 @@ describe('the overdue sweep', () => {
     // own CHECK constraint is what allows the NULL only for it.
     expect(closed.rows[0]?.ended_reason).toBe('auto');
     expect(closed.rows[0]?.ended_by_user_id).toBeNull();
+  });
+});
+
+describe('adopted through @12-apps/wiring, not by calling the factory', () => {
+  it("binds the package's OWN sweep blueprint — cadence, lease and all", () => {
+    // The package moved these numbers into the blueprint on purpose: "every one
+    // of those numbers is a claim about THIS package's domain — how often
+    // overdue shifts should be swept, how long one sweep may hold the
+    // single-flight name — so they belong here, declared once." The origin host
+    // had been restating them in its own `defineJob`, and a harness that drives
+    // `service.autoCloseOverdue` by hand repeats that in the one place that
+    // exists to catch it.
+    const sweep = backend.shift.jobs.find((job) => job.name === 'shift.auto-close');
+
+    expect(sweep).toBeDefined();
+    expect(sweep?.schedule).toEqual({ pattern: '*/15 * * * *' });
+    // The first `lease` the contract shipped. The package's instruction for a
+    // host that cannot honour one is explicit — decline the jobs binding rather
+    // than run the sweep unfenced — so binding it is a claim this host makes.
+    expect(sweep?.lease).toEqual({ ttlMs: 30 * 60 * 1000 });
+    // A missed sweep is retried by the next tick, not by the queue.
+    expect(sweep?.attempts).toBe(1);
+  });
+
+  it('runs the bound handler, not merely its metadata', async () => {
+    // A harness could carry every number above in a report and never execute a
+    // line of the blueprint. This drives the sweep THROUGH it: the host's own
+    // duration policy is closed over the dep, and what runs is the package's
+    // `handle`.
+    const north = await shiftFrom(await as('ana').open({ kind: 'desk' }));
+    shiftSweep.detectedAt = new Date(new Date(north.startedAt).getTime() + 1000);
+    shiftSweep.maxDurationMsForTenant = async (clientId) =>
+      clientId === SHIFT_TENANT_ID ? 1 : 16 * 60 * 60 * 1000;
+
+    const sweep = backend.shift.jobs.find((job) => job.name === 'shift.auto-close');
+    await sweep?.handle(undefined as never, { logger: console } as never);
+
+    expect(await pageFrom(await as('ana').list('?open=true'))).toMatchObject({ items: [] });
+  });
+
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.shift.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    expect(statuses.get('jobs')).toBe('bound');
+    // Mandatory, and the manifest gives the reason in one line: "a sweep that
+    // fails files under `shift`, not nowhere." `createApiShift` takes no logger
+    // argument, so the BINDER is the only thing that can supply one.
+    expect(statuses.get('observability')).toBe('bound');
+    expect(statuses.get('db')).toBe('collected');
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.shift;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} ${SHIFT_MOUNT_PATH}${mounted.route.path}`);
+
+    const missing = unclaimedRoutes(routes, allButOne);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.route.path).toBe(routes[0]?.route.path);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.shift.report)).toContain(SHIFT_MOUNT_PATH);
   });
 });

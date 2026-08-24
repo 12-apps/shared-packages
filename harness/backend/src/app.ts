@@ -150,6 +150,8 @@ export interface HarnessBackend {
    * the vault sessions live in.
    */
   billing: Hosts['billing'];
+  /** Its wiring report and its BOUND job blueprints — neither has an endpoint. */
+  research: Hosts['research'];
   /** Its wiring report — an aggregate, not a route. */
   entitlements: Hosts['entitlements'];
   /** Closing it is the caller's job; the server itself never does. */
@@ -289,6 +291,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     realtimeDriver: hosts.realtimeDriver,
     shift: hosts.shift,
     billing: hosts.billing,
+    research: hosts.research,
     entitlements: hosts.entitlements,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream

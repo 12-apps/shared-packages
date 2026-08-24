@@ -28,6 +28,14 @@
       "types": "./dist/generate/index.d.ts",
       "default": "./dist/generate/index.js"
     },
+    "./manifest": {
+      "types": "./dist/manifest/index.d.ts",
+      "default": "./dist/manifest/index.js"
+    },
+    "./manifest/server": {
+      "types": "./dist/manifest/server.d.ts",
+      "default": "./dist/manifest/server.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -50,14 +58,27 @@
     "react": "^19.2.0"
   },
   "peerDependencies": {
-    "react": ">=19.0.0",
+    "@12-apps/wiring": ">=1.9.0",
     "hono": ">=4.0.0",
+    "react": ">=19.0.0",
     "zod": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/i18n": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@mui/material": "^6.5.0",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^22.15.3",
@@ -71,6 +92,12 @@
     "typescript": "^5.8.2",
     "vitest": "^3.2.4",
     "zod": "^4.3.5"
+  },
+  "wiring": {
+    "db": {
+      "partial": "prisma/mcp.prisma",
+      "migrations": "prisma/migrations"
+    }
   },
   "engines": {
     "node": ">=22.0.0"
@@ -102,13 +129,5 @@
     "!**/*.stories.*",
     "!**/*.test-story.*",
     "!**/test-helpers.*"
-  ],
-  "peerDependenciesMeta": {
-    "hono": {
-      "optional": true
-    },
-    "zod": {
-      "optional": true
-    }
-  }
+  ]
 }
