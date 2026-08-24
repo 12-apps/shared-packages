@@ -47,3 +47,31 @@ export function missingServerCopy(copy: FeatureFlagsServerCopy | undefined): str
   if (copy === undefined) return [...COPY_KEYS];
   return COPY_KEYS.filter((key) => typeof copy[key] !== "string" || copy[key].trim() === "");
 }
+
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type FeatureFlagsCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type FeatureFlagsCopySource<T> = T | FeatureFlagsCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED, never where the surface is built: a
+ * factory that resolves once and stores the result has re-frozen the language
+ * into its mount, and a single-locale host cannot tell the difference.
+ */
+export function resolveServerCopy(
+  source: FeatureFlagsCopySource<FeatureFlagsServerCopy>,
+  locale: string | undefined,
+): FeatureFlagsServerCopy {
+  return typeof source === "function"
+    ? (source as FeatureFlagsCopyResolver<FeatureFlagsServerCopy>)({ locale })
+    : source;
+}

@@ -28,6 +28,8 @@ export {
   messagesOf,
   OnboardingApiError,
   type OnboardingActor,
+  type OnboardingCopyResolver,
+  type OnboardingCopySource,
   type OnboardingMessages,
   type OnboardingRequest,
   type OnboardingResponse,

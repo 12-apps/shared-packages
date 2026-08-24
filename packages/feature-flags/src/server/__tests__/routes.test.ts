@@ -9,6 +9,7 @@ import type {
   FeatureFlagsRoute,
   FeatureFlagsServerConfig,
 } from "../index";
+import { EN_US_FEATURE_FLAGS_SERVER_COPY } from "../en-US";
 import { PT_BR_FEATURE_FLAGS_SERVER_COPY } from "../pt-BR";
 
 const CATALOG = [
@@ -289,5 +290,60 @@ describe("GET /users/:userId", () => {
     const byKey = new Map(body.grants.map((grant) => [grant.flagKey, grant.label]));
     expect(byKey.get("delivery-beta")).toBe("Delivery (beta)");
     expect(byKey.get("retired-flag")).toBeNull();
+  });
+});
+
+describe("one mount, two languages", () => {
+  /**
+   * The property the resolver form of the copy port exists for: this surface is
+   * a lazy singleton in every host that has one, so a `copy` chosen when it was
+   * BUILT answers in the same language for the life of the process. Every case
+   * above would pass either way — which is exactly why this one is here.
+   */
+  function bilingual(): Harness {
+    return harness([], {
+      // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out
+      // here so this package keeps no dependency on it.
+      copy: ({ locale }) =>
+        locale === "en-US" ? EN_US_FEATURE_FLAGS_SERVER_COPY : PT_BR_FEATURE_FLAGS_SERVER_COPY,
+    });
+  }
+
+  const errorOf = async (
+    routes: FeatureFlagsRoute[],
+    locale: string | undefined,
+  ): Promise<string> => {
+    const response = await routeOf(routes, "GET", "/:key/grants").handle(
+      request({ params: { key: "nao-existe" }, ...(locale === undefined ? {} : { locale }) }),
+    );
+    return (response.body as { message: string }).message;
+  };
+
+  it("answers the same mount in each caller's language", async () => {
+    const { routes } = bilingual();
+    expect(await errorOf(routes, "pt-BR")).toBe(PT_BR_FEATURE_FLAGS_SERVER_COPY.unknownFlag);
+    expect(await errorOf(routes, "en-US")).toBe(EN_US_FEATURE_FLAGS_SERVER_COPY.unknownFlag);
+  });
+
+  it("hands an absent locale to the resolver rather than refusing", async () => {
+    // A host with one audience populates nothing. Not a misconfiguration — the
+    // resolver decides what no answer means, and here it means the default.
+    const { routes } = bilingual();
+    expect(await errorOf(routes, undefined)).toBe(PT_BR_FEATURE_FLAGS_SERVER_COPY.unknownFlag);
+  });
+
+  it("leaves a plain-value host byte-identical", async () => {
+    // The whole compatibility claim: a host that passes words, not a resolver,
+    // behaves exactly as it did before the field widened.
+    const { routes } = harness();
+    expect(await errorOf(routes, "en-US")).toBe(PT_BR_FEATURE_FLAGS_SERVER_COPY.unknownFlag);
+  });
+
+  it("still refuses an incomplete resolver at ASSEMBLY, not at the first request", () => {
+    // The property a resolver could most easily have cost. Construction
+    // validation renders the resolver with no locale and checks THAT.
+    expect(() =>
+      harness([], { copy: () => ({ ...PT_BR_FEATURE_FLAGS_SERVER_COPY, unknownFlag: "  " }) }),
+    ).toThrow(/unknownFlag/);
   });
 });
