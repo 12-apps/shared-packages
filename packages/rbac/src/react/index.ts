@@ -22,6 +22,8 @@ export type {
   TeamTableCopy,
 } from './copy';
 export { PT_BR_RBAC_WEB_COPY } from './pt-BR';
+export { EN_US_RBAC_WEB_COPY } from './en-US';
+export { RBAC_WEB_COPY } from './locales';
 export {
   createRbacApiClient,
   type PaginationWire,

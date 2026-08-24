@@ -30,6 +30,8 @@ export {
   type RbacUserIdentity,
 } from './context';
 export { PT_BR_RBAC_MESSAGES } from './pt-BR';
+export { EN_US_RBAC_MESSAGES } from './en-US';
+export { RBAC_MESSAGES } from './locales';
 
 export {
   isUniqueViolation,
