@@ -44,6 +44,11 @@ export {
   PT_BR_ENTITLEMENTS_PERMISSION_LABELS,
 } from './pt-BR';
 export {
+  EN_US_ENTITLEMENTS_MESSAGES,
+  EN_US_ENTITLEMENTS_PERMISSION_LABELS,
+} from './en-US';
+export { ENTITLEMENTS_MESSAGES, ENTITLEMENTS_PERMISSION_LABELS } from './locales';
+export {
   entitlementDenialResponse,
   isEntitlementDenial,
   type WireResponse,
