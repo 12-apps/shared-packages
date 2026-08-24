@@ -151,6 +151,8 @@ export interface HarnessBackend {
    */
   billing: Hosts['billing'];
   /** Its wiring report — an aggregate, not a route. */
+  audit: Hosts['audit'];
+  /** Its wiring report — an aggregate, not a route. */
   onboarding: Hosts['onboarding'];
   /** Its wiring report and its BOUND job blueprints — neither has an endpoint. */
   research: Hosts['research'];
@@ -293,6 +295,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     realtimeDriver: hosts.realtimeDriver,
     shift: hosts.shift,
     billing: hosts.billing,
+    audit: hosts.audit,
     onboarding: hosts.onboarding,
     research: hosts.research,
     entitlements: hosts.entitlements,
