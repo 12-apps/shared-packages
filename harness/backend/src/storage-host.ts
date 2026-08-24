@@ -31,7 +31,7 @@
  * srcset the server builds from the key.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
-import { PT_BR_STORAGE_MESSAGES, PT_BR_STORAGE_UNAUTHENTICATED } from '@12-apps/storage';
+import { PT_BR_STORAGE_MESSAGES } from '@12-apps/storage';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -40,7 +40,15 @@ import type { PGlite } from '@electric-sql/pglite';
 import { STORAGE_PATHS } from '@12-apps/storage';
 import type { ImagePipeline, StorageReferenceProbe } from '@12-apps/storage/server';
 import { createLocalDiskDriver } from '@12-apps/storage/server';
-import { storageRouter } from '@12-apps/storage/hono';
+import { storageManifest } from '@12-apps/storage/manifest';
+import {
+  storageServerManifest,
+  type createWireApiStorage,
+} from '@12-apps/storage/manifest/server';
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /** The tenant the SPA page and most suites drive. */
 export const STORAGE_TENANT = 'harness-store';
@@ -64,6 +72,8 @@ export interface StorageHost {
   router: Hono;
   /** Where objects land, so a suite can assert files rather than responses. */
   root: string;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
   reset(): Promise<void>;
   close(): void;
 }
@@ -145,42 +155,98 @@ export function harnessImagePipeline(): ImagePipeline {
   };
 }
 
+/** Where `mount-surfaces.ts` hangs the package — the adoption's claim. */
+export const STORAGE_MOUNT_PATH = '/api';
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer`.
+ *
+ * This package is the reason the contract carries `wildcardParam` at all: the
+ * serve route's key is FOUR segments (`products/<scope>/<uuid>/card-320.webp`),
+ * so an adapter registering only `path` answers the prefix and 404s every real
+ * object. The manifest forwards the NAME, this host's bridge spells Hono's
+ * `:key{.+}` from it, and the pair is what made the package mountable through a
+ * consumer at all.
+ *
+ * It is also the first surface here with a `public` route, and the bridge
+ * learned `kind` for it: an object read is anonymous by design — the `<img>`
+ * that loads a store's photo carries no session — so a bridge that 401s on a
+ * null actor would have served the whole package correctly except for the one
+ * route a shopper actually hits.
+ *
+ * `unauthenticatedMessage` is gone from the config: that sentence belonged to
+ * the per-package adapter's own 401, and under the contract the refusal is the
+ * bridge's. The package's `messages` — every refusal it makes itself — stay
+ * exactly where they were.
+ */
 export async function createStorageHost(pg: PGlite): Promise<StorageHost> {
   await createHostTables(pg);
   const root = mkdtempSync(join(tmpdir(), 'harness-storage-'));
-  const api = storageRouter({
-    // Required host copy: the refusal sentences and the router's 401.
-    messages: PT_BR_STORAGE_MESSAGES,
-    unauthenticatedMessage: PT_BR_STORAGE_UNAUTHENTICATED,
-    driver: createLocalDiskDriver({
-      root,
-      // Composed, never retyped: the driver builds display URLs from this and the
-      // serve route answers them, so a literal here is how a deployment writes
-      // objects at one path and serves them from another.
-      publicPathPrefix: `/api${STORAGE_PATHS.serve}`,
-    }),
-    maxBytes: 1024 * 1024,
-    imagePipeline: harnessImagePipeline(),
-    // A fresh host: every key it will ever mint carries a scope, so a key without
-    // one can only be somebody else's or nobody's.
-    unscopedKeys: 'reject',
-    references: probesOver(pg),
-    logger: { error: (message) => process.stderr.write(`${message}\n`) },
-    resolveActor: (c) => {
+
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The port behind the manifest's mandatory namespace: "a refused upload or
+    // a driver that could not be reached files under `storage` rather than
+    // under whichever host happened to mount it."
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  host.adoptServer({
+    manifest: storageManifest,
+    server: storageServerManifest,
+    bindings: {
+      http: {
+        mountPath: STORAGE_MOUNT_PATH,
+        config: {
+          // Required host copy: the sentences this surface refuses in.
+          messages: PT_BR_STORAGE_MESSAGES,
+          driver: createLocalDiskDriver({
+            root,
+            // Composed, never retyped: the driver builds display URLs from this
+            // and the serve route answers them, so a literal here is how a
+            // deployment writes objects at one path and serves them from
+            // another.
+            publicPathPrefix: `${STORAGE_MOUNT_PATH}${STORAGE_PATHS.serve}`,
+          }),
+          maxBytes: 1024 * 1024,
+          imagePipeline: harnessImagePipeline(),
+          // A fresh host: every key it will ever mint carries a scope, so a key
+          // without one can only be somebody else's or nobody's.
+          unscopedKeys: 'reject',
+          references: probesOver(pg),
+          // A plain sink, deliberately, even though `observability` is bound:
+          // this package writes its own `[storage]` into the message text
+          // (`reclaim.ts`), so handing it the binder's namespaced logger would
+          // print the namespace twice. The binder's logger is still built and
+          // reported — `wired.loggers['@12-apps/storage']` — it is just not the
+          // seam this factory's own `logger` argument fills.
+          logger: { error: (message: string) => process.stderr.write(`${message}\n`) },
+        },
+      },
+    },
+  });
+
+  const wired = host.assemble();
+  const api = wired.http[storageManifest.name] as ReturnType<typeof createWireApiStorage>;
+
+  const router = new Hono();
+  router.route(
+    STORAGE_MOUNT_PATH,
+    honoRouterFor(wired.routes, (c) => {
       const scope = c.req.header(ACTOR_HEADER) ?? STORAGE_TENANT;
       // Both halves of "may this upload happen" are the host's: whose rights
       // decide, and whether this session may change anything at all.
       return { scope, mayUpload: c.req.header(GATE_HEADER) !== 'deny' };
-    },
-  });
-
-  const router = new Hono();
-  router.route('/api', api.router);
+    }),
+  );
   router.route('/__harness/storage', controlRouter(pg, api));
 
   return {
     router,
     root,
+    report: wired.report,
+    routes: wired.routes,
     reset: async () => {
       await pg.exec(
         'TRUNCATE TABLE harness_photos, harness_pending_edits, harness_photo_versions',
@@ -205,7 +271,7 @@ interface HostRow {
  * the three tables the probes read, which is how a suite states "a live row still
  * points at this" without reaching around the mount into the database.
  */
-function controlRouter(pg: PGlite, api: ReturnType<typeof storageRouter>): Hono {
+function controlRouter(pg: PGlite, api: ReturnType<typeof createWireApiStorage>): Hono {
   const control = new Hono();
 
   control.post('/rows', async (c) => {

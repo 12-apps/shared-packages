@@ -11,8 +11,10 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
-import { STORAGE_TENANT, STORAGE_TENANT_B } from '../src/storage-host';
+import { STORAGE_MOUNT_PATH, STORAGE_TENANT, STORAGE_TENANT_B } from '../src/storage-host';
 
 /**
  * `@12-apps/storage` end to end (12-20): the port of the origin host's
@@ -402,6 +404,52 @@ describe('the objects on disk', () => {
     expect(theirs.startsWith(`products/${STORAGE_TENANT_B}/`)).toBe(true);
     expect((await readdir(join(root, 'products'))).sort()).toEqual(
       [STORAGE_TENANT, STORAGE_TENANT_B].sort(),
+    );
+  });
+});
+
+describe('adopted through @12-apps/wiring, not by calling the factory', () => {
+  it('carries the wildcard the serve route cannot work without', () => {
+    // This package is the reason the contract has `wildcardParam` at all. An
+    // object key is FOUR segments (`products/<scope>/<uuid>/card-320.webp`), so
+    // an adapter registering only `path` answers the prefix and 404s every real
+    // object — while the upload route, and every other route, keeps working.
+    // That is how it hid.
+    const { hosts } = backend;
+    const serve = hosts.storage.routes.find(
+      (mounted) => (mounted.route as { wildcardParam?: string }).wildcardParam !== undefined,
+    );
+
+    expect(serve?.route.method).toBe('GET');
+    expect((serve?.route as { wildcardParam?: string }).wildcardParam).toBeDefined();
+    // …and it is `public`, which is the other half: an `<img>` carries no
+    // session, so the bridge must not gate it.
+    expect((serve?.route as { kind?: string }).kind).toBe('public');
+  });
+
+  it('accounts for every capability, with none unanswered', () => {
+    const { hosts } = backend;
+    const statuses = new Map(
+      hosts.storage.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    // Mandatory because `http` is: "a refused upload or a driver that could not
+    // be reached files under `storage` rather than under whichever host
+    // happened to mount it."
+    expect(statuses.get('observability')).toBe('bound');
+    // No `db` and no `env` — both deliberate absences the manifest argues for:
+    // this package owns no table, and every deployment-shaped decision is an
+    // argument rather than a `process.env` read.
+    expect(statuses.get('db')).toBeUndefined();
+    expect(statuses.get('env')).toBeUndefined();
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('renders a report naming the mount', () => {
+    const { hosts } = backend;
+    expect(renderWiringReport(hosts.storage.report)).toContain(
+      `http: bound — ${hosts.storage.routes.length} routes at ${STORAGE_MOUNT_PATH}`,
     );
   });
 });

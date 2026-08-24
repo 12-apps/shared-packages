@@ -136,7 +136,13 @@ export function honoRouterFor(
   const app = new Hono();
   routes.forEach((mounted) => {
     app.on(mounted.route.method, honoPath(mounted.route), async (c) => {
-      const actor = await resolveActor(c);
+      // A route with no caller is not asked for one. The package's own adapter
+      // does the same (`route.auth === 'public' ? null : await resolveActor(c)`)
+      // and the reason is more than tidiness: resolving is a session lookup, and
+      // an `<img>` loading a store's photo would pay for one it can never
+      // satisfy. Handing such a route a resolved actor also invites a handler to
+      // read one the contract says is not there.
+      const actor = needsActor(mounted.route) ? await resolveActor(c) : null;
       if (!actor && needsActor(mounted.route)) {
         return c.json({ error: 'Não autenticado.' }, 401);
       }
