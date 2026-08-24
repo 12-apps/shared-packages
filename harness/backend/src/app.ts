@@ -106,6 +106,7 @@ import { applyDiscountMigrations } from './discounts-db';
 import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
 import { provisionShift, reseedShifts, shiftHost } from './shift-host';
 import { mountRequestScope, requestScopeProbes } from './request-scope-host';
+import { provisionResearch, researchHost, reseedResearch } from './research-host';
 import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
@@ -198,6 +199,8 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   // FUT-146: the shift tables plus the ledger the package does NOT ship — see
   // `provisionShift`, and `shift-db.ts` for why that split is the adoption.
   const shift = await provisionShift(pg);
+  // FUT-430: five tables, eight migrations, seventeen routes — see research-host.ts.
+  const research = await provisionResearch(pg);
   // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
   // host is the two tables its reference probes read (storage-host.ts) and a
   // directory to keep objects in.
@@ -214,6 +217,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     onboarding: onboardingHost(pg),
     discounts: discountsHost(pg),
     shift,
+    research,
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
     entitlements: createEntitlementsHost(),
@@ -239,6 +243,7 @@ export interface Hosts {
   onboarding: ReturnType<typeof onboardingHost>;
   discounts: ReturnType<typeof discountsHost>;
   shift: ReturnType<typeof shiftHost>;
+  research: ReturnType<typeof researchHost>;
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
@@ -269,6 +274,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedNotifications(pg, hosts.notifications);
     await reseedDiscounts(pg);
     await reseedShifts(pg);
+    await reseedResearch(pg);
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();

@@ -88,6 +88,39 @@ AES-GCM codec, the four path tables in this app's URLs, the roster, the trail
 (an array, where a real adopter has an append-only table) and the branch switch a
 spec flips to prove a live revocation.
 
+## The price-research page (`product-research`)
+
+Two published tarballs meeting over a socket, which is the only reason this page
+exists. `@12-apps/product-research` declares the routes; `@12-apps/product-research-ui`
+renders their answers; and the shapes between them travel through a store seam
+typed `Promise<unknown>` so a host can answer anything at all. **There is no type
+error when a host's client answers a smaller shape** — only a screen rendering
+`undefined`, in production. Both packages' own suites fake the other side, so
+neither can see it.
+
+Three parts of this adoption are the HOST's and could not be otherwise:
+
+- **the worker** (`harness/backend/src/research-worker.ts`). The start route
+  persists a request, calls `enqueueRun` and answers 202 — and says why the
+  accepted answer cannot carry a run id: the run is created by the background
+  job, later. So every screen past the form renders rows a host produced, and a
+  harness with no worker can render none of them. This one settles inline, the
+  same choice the harness makes for realtime, and deliberately produces a FAILED
+  source beside the OK ones (degradation is a banner, never a shorter list) and
+  one offer with a NULL shipping cost (FUT-518: unstated, so the total is a
+  lower bound). `researchProbes.queue = 'unavailable'` drives the other branch
+  the package documents — a durable request, a 202, and no run.
+- **the history listing.** `GET /research` is the one route of the seventeen the
+  engine deliberately does not declare, because its query grammar is a host's own
+  search-grid config. It is mounted BESIDE the package's own POST on the same
+  path, sharing a path and splitting the verbs, which is the arrangement a real
+  adopter has. Both go through one mapping (`research-views.ts`) — a host that
+  spelled the wire shape twice is exactly what these specs make red.
+- **`term_normalized`.** The package's migration backfills it once and leaves it
+  "kept in sync by the host on write", using the package's exported
+  `normalizeText`. The column is nullable and no write fails without it, so a
+  host that forgets simply searches and matches nothing.
+
 ## Running it
 
 ```bash
