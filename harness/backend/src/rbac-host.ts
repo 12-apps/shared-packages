@@ -11,8 +11,13 @@
  * the package's, which is the entire claim under test.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { rbacRouter } from '@12-apps/rbac/hono';
-import { PT_BR_RBAC_MESSAGES, type RbacUserIdentity } from '@12-apps/rbac/server';
+import { rbacManifest } from '@12-apps/rbac/manifest';
+import { rbacServerManifest } from '@12-apps/rbac/manifest/server';
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
+import { PT_BR_RBAC_MESSAGES, type createApiRbac, type RbacUserIdentity } from '@12-apps/rbac/server';
 
 import { HARNESS_CATALOG } from './rbac-catalog';
 import { rbacDb } from './rbac-db';
@@ -98,52 +103,101 @@ export async function reseedRbac(pg: PGlite, rbac: HarnessRbac): Promise<void> {
 }
 
 /** The mounted surface: the package's router behind this host's actor seam. */
-export function rbacHost(pg: PGlite) {
-  return rbacRouter({
-    db: async () => rbacDb(pg),
-    // The whole catalog, assembled by this host from three owners'
-    // contributions (see `rbac-catalog.ts`) — one field, not four.
-    catalog: HARNESS_CATALOG,
-    // The roster's own vocabulary, stated because this host's words are
-    // nobody else's. `ownerRoles` is deliberately NOT passed: it derives from
-    // `catalog.governance.ownerRoles` (DIRECTOR + NETWORK_OPS), so the
-    // disable/removal invariants run on exactly the set this host's composed
-    // governance already names, rather than on a package default that used to
-    // read `['OWNER']` and protected nothing here.
-    adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
-    customerRole: 'PATRON',
-    // The refusal sentences are required host config; this host is pt-BR.
-    messages: PT_BR_RBAC_MESSAGES,
-    directory: {
-      getUsers: async (ids) =>
-        ids.flatMap((id) => {
-          const user = DIRECTORY.get(id);
-          return user ? [user] : [];
-        }),
-      searchUsers: async (q) =>
-        [...DIRECTORY.values()]
-          .filter(
-            (user) =>
-              user.email.toLowerCase().includes(q.toLowerCase()) ||
-              (user.name ?? '').toLowerCase().includes(q.toLowerCase()),
-          )
-          .map((user) => user.id),
+/** Where `mount-surfaces.ts` hangs it — the adoption's claim. */
+export const RBAC_MOUNT_PATH = '/api/admin/:tenantSlug';
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer`.
+ *
+ * `permissions` is a CONTRIBUTION here, which makes this the first adoption
+ * where a collected capability is something the host actually consumes: the
+ * package contributes ids, and `rbac-catalog.ts` composes them with two other
+ * owners' into the one catalog this host passes back as config. The report is
+ * what lets a host be asked whether it did that, rather than quietly shipping a
+ * catalog missing a package's own ids.
+ *
+ * What does NOT come off the routes, and the manifest says so: `engine`,
+ * `governance`, the two stores and `seedTenantRoles` are "the rest of
+ * `ApiRbac`, and a host still reaches for it directly: this surface is the one
+ * every OTHER host surface asks permission from, so the capability being
+ * mounted does not make the guards stop being a library." `wired.http[name]`
+ * is how the host keeps them beside the routes without building the surface
+ * twice — two engines over one database is two answers to "may they".
+ */
+export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
+  router: ReturnType<typeof honoRouterFor>;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+} {
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  host.adoptServer({
+    manifest: rbacManifest,
+    server: rbacServerManifest,
+    bindings: {
+      http: {
+        mountPath: RBAC_MOUNT_PATH,
+        config: {
+          db: async () => rbacDb(pg),
+          // The whole catalog, assembled by this host from three owners'
+          // contributions (see `rbac-catalog.ts`) — one field, not four.
+          catalog: HARNESS_CATALOG,
+          // The roster's own vocabulary, stated because this host's words are
+          // nobody else's. `ownerRoles` is deliberately NOT passed: it derives
+          // from `catalog.governance.ownerRoles` (DIRECTOR + NETWORK_OPS), so
+          // the disable/removal invariants run on exactly the set this host's
+          // composed governance already names, rather than on a package default
+          // that used to read `['OWNER']` and protected nothing here.
+          adminRoles: ['DIRECTOR', 'HEAD_LIBRARIAN'],
+          customerRole: 'PATRON',
+          // The refusal sentences are required host config; this host is pt-BR.
+          messages: PT_BR_RBAC_MESSAGES,
+          directory: {
+            getUsers: async (ids: readonly string[]) =>
+              ids.flatMap((id) => {
+                const user = DIRECTORY.get(id);
+                return user ? [user] : [];
+              }),
+            searchUsers: async (q: string) =>
+              [...DIRECTORY.values()]
+                .filter(
+                  (user) =>
+                    user.email.toLowerCase().includes(q.toLowerCase()) ||
+                    (user.name ?? '').toLowerCase().includes(q.toLowerCase()),
+                )
+                .map((user) => user.id),
+          },
+        },
+      },
     },
-    resolveActor: (c) => {
-      // Which tenant: resolved from the mounted path's own slug, the way a
-      // real host resolves it — an unknown slug is an unauthenticated 401
-      // here (a real host would 404 first).
+  });
+
+  const wired = host.assemble();
+  const api = wired.http[rbacManifest.name] as ReturnType<typeof createApiRbac>;
+
+  return {
+    ...api,
+    report: wired.report,
+    routes: wired.routes,
+    router: honoRouterFor(wired.routes, (c) => {
+      // Which tenant: resolved from the mounted path's own slug, the way a real
+      // host resolves it — an unknown slug is an unauthenticated 401 here (a
+      // real host would 404 first).
       const tenantId = c.req.param('tenantSlug');
       if (tenantId !== RBAC_TENANT_ID && tenantId !== RBAC_TENANT_B_ID) return null;
       // Who: the SPA sends no header and acts as the seeded DIRECTOR — the
-      // arrangement the admin screens assume. A spec that needs another
-      // vantage sets the header; `anonymous` exercises the 401 path.
+      // arrangement the admin screens assume. A spec that needs another vantage
+      // sets the header; `anonymous` exercises the 401 path.
       const userId = c.req.header(ACTOR_HEADER) ?? 'owner-1';
       if (userId === 'anonymous') return null;
       if (userId === 'superadmin') {
         return { tenantId, userId: null, isSuper: true };
       }
       return { tenantId, userId, isSuper: false };
-    },
-  });
+    }),
+  };
 }

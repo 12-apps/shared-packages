@@ -8,8 +8,10 @@
  * consumer path answers byte-for-byte what the per-package adapter answers:
  *
  *  - a `null` actor is 401 before any handler runs;
- *  - GET/DELETE carry no body; a malformed JSON body is `undefined` (the
- *    handler's own validation reports it better than a parse failure would);
+ *  - GET/HEAD carry no body; every other method may, DELETE included — an
+ *    endpoint URL is not a path segment, so a delete-by-endpoint has nowhere
+ *    else to put it. A malformed JSON body is `undefined` (the handler's own
+ *    validation reports it better than a parse failure would);
  *  - a handler that chose NO body means exactly that (204) — serializing
  *    `undefined` would put four bytes of `null` in a response whose status
  *    promises no content;
@@ -61,7 +63,14 @@ export type ResolveWireActor = (c: Context) => Promise<unknown> | unknown;
  * handler without asking a route to declare which it is.
  */
 async function readBody(c: Context): Promise<unknown> {
-  if (c.req.method === 'GET' || c.req.method === 'DELETE') return undefined;
+  // GET and HEAD only. This used to skip DELETE too — inherited from the
+  // per-package adapter this bridge was modelled on, where it happened to be
+  // true — and it is not a rule of HTTP: `@12-apps/notifications` deletes a
+  // push subscription BY ITS ENDPOINT, which travels in the body because an
+  // endpoint URL is not a path segment. Skipping it handed that handler
+  // `undefined` and the row survived, which a suite reading the response
+  // envelope catches and a suite reading only the status does not.
+  if (c.req.method === 'GET' || c.req.method === 'HEAD') return undefined;
   try {
     return await c.req.raw.clone().json();
   } catch {

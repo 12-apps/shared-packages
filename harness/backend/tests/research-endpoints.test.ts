@@ -464,7 +464,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
   // directly, which does not decline the other four — it does not see them.
 
   it('binds the package\'s OWN job blueprint, retry policy and all', () => {
-    const { jobs } = backend.research;
+    const { jobs } = backend.hosts.research;
 
     // The numbers are the PACKAGE's, and it argues for them: "three attempts,
     // exponentially spaced from five seconds, cheap because the pipeline is
@@ -482,7 +482,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
 
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.research.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
+      backend.hosts.research.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -498,7 +498,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.research;
+    const { routes } = backend.hosts.research;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} ${RESEARCH_MOUNT_PATH}${mounted.route.path}`);
@@ -509,6 +509,6 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.research.report)).toContain(RESEARCH_MOUNT_PATH);
+    expect(renderWiringReport(backend.hosts.research.report)).toContain(RESEARCH_MOUNT_PATH);
   });
 });

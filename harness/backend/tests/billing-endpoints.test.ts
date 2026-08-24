@@ -56,7 +56,7 @@ beforeEach(async () => {
   const reset = await backend.app.request('/__harness/reset', { method: 'POST' });
   expect(reset.status).toBe(204);
   billingProviders.reset();
-  backend.billing.payments.credentials.setChain(PLATFORM_MERCHANT, [
+  backend.hosts.billing.payments.credentials.setChain(PLATFORM_MERCHANT, [
     VAULTING_PROVIDER,
     CHARGE_ONLY_PROVIDER,
   ]);
@@ -254,7 +254,7 @@ describe('what this deployment cannot do', () => {
     // Not an error state: an operator fixes it by switching acquirer, which is
     // exactly why the package answers a rejection rather than throwing. A
     // harness with only vaulting providers could never reach this branch.
-    backend.billing.payments.credentials.setChain(PLATFORM_MERCHANT, [CHARGE_ONLY_PROVIDER]);
+    backend.hosts.billing.payments.credentials.setChain(PLATFORM_MERCHANT, [CHARGE_ONLY_PROVIDER]);
 
     const response = await as().beginSession();
 
@@ -337,7 +337,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
   // and nothing is red."
 
   it('accounts for every capability the package declares', () => {
-    const { report } = backend.billing;
+    const { report } = backend.hosts.billing;
     const statuses = new Map(
       report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
     );
@@ -363,7 +363,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
     // which stays behind a human). A capability that is absent from the
     // manifest is absent from the report — which is how a host reading this
     // knows those four are decisions rather than omissions.
-    const kinds = backend.billing.report.packages[0]?.capabilities.map((entry) => entry.kind);
+    const kinds = backend.hosts.billing.report.packages[0]?.capabilities.map((entry) => entry.kind);
 
     expect(kinds).not.toContain('db');
     expect(kinds).not.toContain('permissions');
@@ -374,7 +374,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
     // The pin the contract prescribes for a host that mounts by hand. All four
     // routes go through one router here, so the real list is complete; dropping
     // one is what proves the check would speak up.
-    const { routes } = backend.billing;
+    const { routes } = backend.hosts.billing;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} ${'/api/account/billing'}${mounted.route.path}`);
@@ -385,6 +385,6 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.billing.report)).toContain('/api/account/billing');
+    expect(renderWiringReport(backend.hosts.billing.report)).toContain('/api/account/billing');
   });
 });
