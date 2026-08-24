@@ -139,13 +139,13 @@ function cartOf(amountCents: number, overrides?: Partial<CheckoutCartView>): Che
  * Build a factory for one page: a real mount behind the transport, and a real
  * host in front of it.
  */
-export function harnessFlows(
+export function harnessFlowsConfig(
   spec: HarnessStoreSpec = {},
   host: HarnessHost = {},
-): { flows: PaymentFlows; world: HarnessWorld } {
+): { config: Parameters<typeof createPaymentFlows>[0]; world: HarnessWorld } {
   const world = createHarnessStore(spec);
   const amountCents = spec.amountCents ?? 7500;
-  const flows = createPaymentFlows({
+  const config: Parameters<typeof createPaymentFlows>[0] = {
     // The DEFAULT base url is left in place on purpose: `/api/checkout`,
     // verbatim, is what the shipped client posts and what the mount's shim
     // answers. A page that re-prefixed it would stop testing that.
@@ -173,8 +173,24 @@ export function harnessFlows(
       validateApplePayMerchant: host.validateApplePayMerchant,
       useAvailability: () => host.availability ?? { payable: true },
     },
-  });
-  return { flows, world };
+  };
+  return { config, world };
+}
+
+/**
+ * The same thing, BUILT — what twenty-two scenario pages call.
+ *
+ * Split from the config above so the one canonical adoption
+ * (`./wiring.ts`) and these many worlds state the host's answers ONCE. A
+ * second copy of this config for the adoption would be a second definition of
+ * what this host's checkout is, drifting from the one under test.
+ */
+export function harnessFlows(
+  spec: HarnessStoreSpec = {},
+  host: HarnessHost = {},
+): { flows: PaymentFlows; world: HarnessWorld } {
+  const { config, world } = harnessFlowsConfig(spec, host);
+  return { flows: createPaymentFlows(config), world };
 }
 
 /**
