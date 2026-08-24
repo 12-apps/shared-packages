@@ -15,6 +15,23 @@ import type { PackageManifest } from '@12-apps/wiring';
 import packageJson from '../../../package.json';
 import { storageManifest } from '../index';
 import { asWireAnswer, storageServerManifest } from '../server';
+import { createLocalDiskDriver, passthroughImagePipeline } from '../../server';
+import { PT_BR_STORAGE_MESSAGES } from '../../index';
+
+/**
+ * The smallest config the factory accepts — nothing here is exercised, because
+ * these cases read the DESCRIPTORS rather than call a handler.
+ */
+function configForTest(): Parameters<typeof storageServerManifest.http.create>[0] {
+  return {
+    driver: createLocalDiskDriver({ root: '/tmp/storage-manifest-test', publicPathPrefix: '/x' }),
+    maxBytes: 1024,
+    imagePipeline: passthroughImagePipeline(),
+    unscopedKeys: 'reject',
+    references: [],
+    messages: PT_BR_STORAGE_MESSAGES,
+  };
+}
 
 /**
  * The manifest as an ADOPTER's type sees it. `as const satisfies` narrows the
@@ -50,6 +67,32 @@ describe('the storage manifest', () => {
 
   it('mirrors the manifest subpaths into package.json', () => {
     assertExportsMirror(storageManifest, packageJson);
+  });
+});
+
+describe('the wire view of a descriptor', () => {
+  it('carries the serve route\'s wildcard through to the aggregate', () => {
+    // The gap this closes. The serve route's key is FOUR segments —
+    // `products/<scope>/<uuid>/card-320.webp` — so an adapter that registers
+    // only `path` answers the prefix and 404s every real object, while the
+    // upload route beside it keeps working. That is why it hid: the surface
+    // looked mounted.
+    //
+    // The NAME travels, not the syntax: `:key{.+}` is Hono's spelling and
+    // `*key` is Express's, so a package writing either would have chosen its
+    // host's framework. `./hono` composes the Hono form from this name, and so
+    // must any other adapter.
+    const routes = storageServerManifest.http.create(configForTest()).routes;
+    const serve = routes.find((route) => route.method === 'GET');
+
+    expect(serve?.wildcardParam).toBe('key');
+  });
+
+  it('leaves the upload route without one, because its path is fixed', () => {
+    const routes = storageServerManifest.http.create(configForTest()).routes;
+    const upload = routes.find((route) => route.method === 'POST');
+
+    expect(upload?.wildcardParam).toBeUndefined();
   });
 });
 
