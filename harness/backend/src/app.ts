@@ -105,6 +105,8 @@ import { rbacHost, reseedRbac } from './rbac-host';
 import { applyRealtimeMigrations, realtimeOutboxWriteDb } from './realtime-db';
 import { realtimeHost } from './realtime-host';
 import { mountSurfaces } from './mount-surfaces';
+import { applyDiscountMigrations } from './discounts-db';
+import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
 import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
@@ -179,6 +181,15 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   // an account is the host's row. See auth-db.ts for why that is the design.
   await applyAuthMigrations(pg);
   await reseedAuth(pg);
+  // FUT-244: the promotions tables, again out of the package's own tarball. Its
+  // migration is REPLAY-SAFE by construction (it adopts an existing `discounts`
+  // table rather than demanding a baseline), so applying it here is a no-op on a
+  // database that already has one. `harness_categories` / `harness_menu_items`
+  // are the HOST's — a discount targets a host's catalog, which is exactly the
+  // separation `ForeignTargetError` protects.
+  await applyDiscountMigrations(pg);
+  await createDiscountCatalogTables(pg);
+  await reseedDiscounts(pg);
   // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
   // host is the two tables its reference probes read (storage-host.ts) and a
   // directory to keep objects in.
@@ -193,6 +204,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     realtimeDriver,
     realtime: realtimeHost(pg, realtimeDriver),
     onboarding: onboardingHost(pg),
+    discounts: discountsHost(pg),
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
     entitlements: createEntitlementsHost(),
@@ -216,6 +228,7 @@ export interface Hosts {
   realtime: ReturnType<typeof realtimeHost>;
   realtimeDriver: RealtimeDriver;
   onboarding: ReturnType<typeof onboardingHost>;
+  discounts: ReturnType<typeof discountsHost>;
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
@@ -244,6 +257,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedMcpOauth(pg);
     await reseedLifecycle(pg);
     await reseedNotifications(pg, hosts.notifications);
+    await reseedDiscounts(pg);
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();
