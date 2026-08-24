@@ -11,6 +11,8 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
 
 let backend: HarnessBackend;
@@ -155,5 +157,52 @@ describe('the snapshot bootstrap', () => {
     }).data;
     expect(snapshot.planKey).toBe('shorts');
     expect(snapshot.features['submissions.notes']?.reason).toBe('disabled-by-tenant');
+  });
+});
+
+describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
+  // `@12-apps/entitlements/hono` still works and is not deprecated. What it
+  // cannot do is COUNT — and this package's manifest declares more than routes.
+
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.entitlements.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    // Mandatory, with the reason in one line: "a refused plan change or a
+    // failed retention sweep files under `entitlements`, not nowhere."
+    // `entitlementsRouter` takes no logger argument, so the BINDER is the only
+    // thing that can supply one.
+    expect(statuses.get('observability')).toBe('bound');
+    expect(statuses.get('db')).toBe('collected');
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('does not oblige this server host to answer for a React surface', () => {
+    // The clearest statement in the repo of why an inventory must not
+    // overstate: the manifest deliberately omits `web` even though `./react`
+    // ships the plan screens, "because listing it would oblige every SERVER
+    // host adopting this manifest to answer for a React surface it never
+    // mounts." So answering it here is a COMPLETE answer, not a partial one.
+    const kinds = backend.entitlements.report.packages[0]?.capabilities.map((e) => e.kind);
+
+    expect(kinds).not.toContain('surface');
+    expect(kinds).not.toContain('areas');
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.entitlements;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} /api/admin/:tenantSlug${mounted.route.path}`);
+
+    const missing = unclaimedRoutes(routes, allButOne);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.route.path).toBe(routes[0]?.route.path);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.entitlements.report)).toContain('/api/admin/:tenantSlug');
   });
 });
