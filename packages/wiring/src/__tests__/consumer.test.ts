@@ -9,7 +9,7 @@ import {
   notesManifest,
   notesServerManifest,
   PT_BR_NOTES_COPY,
-  EN_US_NOTES_COPY,
+  NOTES_COPY,
   type NotesCopy,
   type NotesCopySource,
   notesWebManifest,
@@ -192,9 +192,12 @@ describe("a server host adopting the fixture package", () => {
  * request, and the package resolves at the moment it needs a sentence.
  */
 describe("one mount, two languages", () => {
-  /** What a bilingual host writes: `localeCopy(PACK)`, spelled out. */
+  /**
+   * What a bilingual host writes, spelled out: `localeCopy(NOTES_COPY)` reads
+   * the same pack and falls back the same way for a tag it does not know.
+   */
   const resolver = ({ locale }: { readonly locale?: string | null }) =>
-    locale === "en-US" ? EN_US_NOTES_COPY : PT_BR_NOTES_COPY;
+    NOTES_COPY[locale === "en-US" ? "en-US" : "pt-BR"];
 
   function mountWith(copy: NotesCopySource<NotesCopy>) {
     // Named apart from the `host` every `it` below declares: the flakiness gate

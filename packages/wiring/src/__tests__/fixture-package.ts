@@ -47,7 +47,8 @@ export interface NotesCopy {
 
 /** What a single-audience host passes: the words themselves. */
 export const PT_BR_NOTES_COPY: NotesCopy = { empty: "Nenhuma nota." };
-export const EN_US_NOTES_COPY: NotesCopy = { empty: "No notes." };
+/** Not exported: reached through {@link NOTES_COPY}, the way a host reaches it. */
+const EN_US_NOTES_COPY: NotesCopy = { empty: "No notes." };
 
 /** The pack a bilingual host turns into a resolver. */
 export const NOTES_COPY = {
