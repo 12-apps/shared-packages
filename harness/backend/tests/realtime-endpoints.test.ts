@@ -4,8 +4,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { verifyRealtimeTicket } from '@12-apps/realtime/ticket';
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
 
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
+import { REALTIME_MOUNT_PATH } from '../src/realtime-host';
 
 /**
  * The subscribe surface over the REAL mount the SPA drives, out of the packed tarball.
@@ -293,5 +295,119 @@ describe('the outbox, through the host mount', () => {
     const frame = new TextDecoder().decode((await reader.read()).value);
     expect(frame).toContain('kitchen.changed');
     await reader.cancel();
+  });
+});
+
+describe('adopted through @12-apps/wiring, not by calling the factory', () => {
+  it('serves the SAME mount through the consumer, streams included', async () => {
+    // Every case above already runs on the adopted path — this one states what
+    // that means. The manifest's `createWireApiEvents` renames the descriptors'
+    // `kind` to the contract's `transport` and changes nothing else, so the
+    // subscribe route arrives marked `stream` and the ticket route `json`.
+    //
+    // The mark is not decoration: the contract obliges an adapter that cannot
+    // stream to refuse such a route LOUDLY rather than buffer it, because a
+    // buffered stream is a request that never completes. This host's bridge
+    // answers the raw arm untouched, which is what the first case in this file
+    // reads a `: connected` frame out of.
+    const { hosts } = await backend();
+    const marks = new Map(
+      hosts.realtime.routes.map((mounted) => [
+        `${mounted.route.method} ${mounted.route.path}`,
+        (mounted.route as { transport?: string }).transport,
+      ]),
+    );
+
+    expect(marks.get('GET /admin/:tenantSlug/realtime')).toBe('stream');
+    expect(marks.get('POST /admin/:tenantSlug/realtime/ticket')).toBe('json');
+    expect(marks.get('GET /account/realtime')).toBe('stream');
+  });
+
+  it("binds the package's OWN blueprints — the cadence cron cannot say", async () => {
+    // The drain's ten seconds and the purge's daily pattern are claims about
+    // THIS package's domain, which is why they moved into the blueprints: how
+    // quickly a committed row should reach the bus, how often published rows
+    // are swept. A host that restated them in its own `defineJob` — as the
+    // origin host did — owns numbers it cannot answer questions about.
+    const { hosts } = await backend();
+    const drain = hosts.realtime.jobs.find((job) => job.name === 'realtime.outbox-drain');
+    const purge = hosts.realtime.jobs.find((job) => job.name === 'realtime.outbox-purge');
+
+    // The contract's sub-minute case in the flesh: a 5-field cron bottoms out
+    // at one minute, so the blueprint declares an `interval` instead — and a
+    // host whose runtime cannot repeat sub-minute must DECLINE the binding
+    // rather than silently round the cadence up.
+    expect(drain?.interval).toEqual({ everyMs: 10_000 });
+    expect(drain?.schedule).toBeUndefined();
+    expect(purge?.schedule).toEqual({ pattern: '0 4 * * *' });
+    // A missed pass is retried by the next tick, not by the queue.
+    expect(drain?.attempts).toBe(1);
+  });
+
+  it('runs the bound drain handler, not merely its metadata', async () => {
+    // The `/__harness/realtime/drain` control calls the outbox directly, which
+    // is the right shape for a control that reports a pass's metrics — and it
+    // means no case here had ever executed a line of the blueprint. This one
+    // does: what runs is the package's own drain loop, over the outbox the
+    // ASSEMBLED api built, reached through the deps this host bound.
+    const { app, hosts } = await backend();
+    await app.request('/__harness/realtime/outbox', {
+      method: 'POST',
+      body: JSON.stringify({ domain: 'kitchen' }),
+    });
+
+    const drain = hosts.realtime.jobs.find((job) => job.name === 'realtime.outbox-drain');
+    await drain?.handle(undefined as never, { logger: console } as never);
+
+    expect(await (await app.request('/__harness/realtime/outbox')).json()).toEqual({
+      pending: 0,
+    });
+  });
+
+  it('accounts for every capability, and DECLINES env in writing', async () => {
+    const { hosts } = await backend();
+    const entries = new Map(
+      hosts.realtime.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry]),
+    );
+
+    expect(entries.get('http')?.status).toBe('bound');
+    expect(entries.get('jobs')?.status).toBe('bound');
+    // Mandatory since wiring 1.3.0, and the manifest gives its reason in one
+    // line: "a refused ticket or a failed drain files under `realtime`, not
+    // nowhere." `createApiEvents` takes an OPTIONAL logger and defaults to a
+    // silent one, so a host calling the factory by hand is one omission away
+    // from a bus that fails quietly.
+    expect(entries.get('observability')?.status).toBe('bound');
+    expect(entries.get('db')?.status).toBe('collected');
+    // The first `env` answer in this host. Declining is the honest one: every
+    // declared var is supplied here as CONFIGURATION — the driver object, the
+    // ticket-secret literal, the gateway port — and handing `process.env` over
+    // instead would report `0/6 vars set`, which reads as a host that has not
+    // configured realtime at all.
+    expect(entries.get('env')?.status).toBe('declined');
+    expect(entries.get('env')?.detail).toContain('supplied as configuration');
+    // The browser half is the frontend harness's to answer, and the report
+    // says so rather than going quiet.
+    expect(entries.get('surface')?.status).toBe('out-of-scope');
+    expect([...entries.values()].map((entry) => entry.status)).not.toContain('unanswered');
+  });
+
+  it('names a descriptor this host forgot to claim', async () => {
+    const { hosts } = await backend();
+    const { routes } = hosts.realtime;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} ${REALTIME_MOUNT_PATH}${mounted.route.path}`);
+
+    const missing = unclaimedRoutes(routes, allButOne);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.route.path).toBe(routes[0]?.route.path);
+  });
+
+  it('renders a report naming the mount', async () => {
+    const { hosts } = await backend();
+    expect(renderWiringReport(hosts.realtime.report)).toContain(
+      `http: bound — ${hosts.realtime.routes.length} routes at ${REALTIME_MOUNT_PATH}`,
+    );
   });
 });

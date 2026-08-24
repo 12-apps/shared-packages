@@ -14,12 +14,26 @@
  * request, per-domain read tiers, and a kitchen qualifier the caller must have reach for.
  */
 import type { PGlite } from '@electric-sql/pglite';
+import type { Hono } from 'hono';
 import { tenantTopic, userTopic, type RealtimeDriver } from '@12-apps/realtime';
-import { eventsRouter, type EventsHono } from '@12-apps/realtime/hono';
-import { EventsDenial, PT_BR_EVENTS_MESSAGES, type EventsTopicSpec } from '@12-apps/realtime/server';
+import { realtimeManifest } from '@12-apps/realtime/manifest';
+import {
+  realtimeServerManifest,
+  type createWireApiEvents,
+} from '@12-apps/realtime/manifest/server';
+import {
+  EventsDenial,
+  PT_BR_EVENTS_MESSAGES,
+  type EventsServerConfig,
+  type EventsTopicSpec,
+  type RealtimeOutbox,
+} from '@12-apps/realtime/server';
+import type { BoundJob, MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 
 import { realtimeOutboxDrainDb } from './realtime-db';
 import type { SqlRunner } from './rbac-db-shared';
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /**
  * The ticket secret BOTH halves use.
@@ -30,6 +44,15 @@ import type { SqlRunner } from './rbac-db-shared';
  * processes; the harness runs them in one, so one constant is the honest equivalent.
  */
 export const HARNESS_TICKET_SECRET = 'harness-realtime-secret';
+
+/**
+ * Where `mount-surfaces.ts` hangs the surface — the adoption's claim, and the
+ * prefix the report names. The descriptors' own paths already carry the rest
+ * (`/admin/:tenantSlug/realtime`, `/account/realtime`), because a realtime
+ * surface's path is the HOST's configuration rather than the package's
+ * convention.
+ */
+export const REALTIME_MOUNT_PATH = '/api';
 
 /** The harness's two tenants, by slug — a real host reads its own table. */
 const TENANTS: Record<string, string> = {
@@ -124,23 +147,22 @@ function assertMayWatch(actor: HarnessActor, spec: EventsTopicSpec): void {
   }
 }
 
-export interface RealtimeHost {
-  events: EventsHono;
-  /** The db the enqueue side writes through, for the suite's own transactions. */
-  drainDb: ReturnType<typeof realtimeOutboxDrainDb>;
-}
-
 /**
+ * Everything the package's factory takes: the host's own half of the surface,
+ * unchanged by the adoption. Extracted so the binder below reads as the wiring
+ * it is — and so both stay inside the size gate.
+ *
  * `driver` is passed IN rather than resolved from the environment, and that is what lets the
  * gateway share this bus: `configureRealtime` installs one driver per process, so handing the
  * same object to both halves means a publish on the API side is observed by a subscription the
  * gateway made. Two separately-resolved inline drivers would each be their own bus, and the
  * socket would sit open and silent — the failure the liveness watch exists to catch.
  */
-export function realtimeHost(pg: PGlite, driver: RealtimeDriver): RealtimeHost {
-  const drainDb = realtimeOutboxDrainDb(pg as unknown as SqlRunner);
-
-  const events = eventsRouter({
+function eventsConfig(
+  driver: RealtimeDriver,
+  drainDb: ReturnType<typeof realtimeOutboxDrainDb>,
+): EventsServerConfig {
+  return {
     // The wire sentences are the HOST's now (realtime requires them); this
     // harness host already speaks pt-BR in its own authorize refusals below,
     // so it passes the pack — the same one line a real host writes.
@@ -192,7 +214,137 @@ export function realtimeHost(pg: PGlite, driver: RealtimeDriver): RealtimeHost {
         },
       },
     ],
+  };
+}
+
+/**
+ * How long a PUBLISHED outbox row survives before the purge blueprint removes
+ * it. The HOST's number — retention is storage policy, and the package says so
+ * where it leaves the field open. A week, which is ADOPTING.md's own example.
+ */
+const OUTBOX_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The package's whole server surface, plus the router this host mounts. */
+export type HarnessEvents = Omit<ReturnType<typeof createWireApiEvents>, 'routes'> & {
+  router: Hono;
+};
+
+export interface RealtimeHost {
+  events: HarnessEvents;
+  /** The db the enqueue side writes through, for the suite's own transactions. */
+  drainDb: ReturnType<typeof realtimeOutboxDrainDb>;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+  /** The package's OWN blueprints — the drain and the purge — bound to this host. */
+  jobs: readonly BoundJob[];
+}
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer`.
+ *
+ * The package anticipated this: `manifest/server` ships `createWireApiEvents`,
+ * a WIRE VIEW that renames the descriptors' `kind` to the contract's
+ * `transport` and forwards the raw request, "changing nothing else". So the
+ * host's ONE bridge serves these routes the way it serves every other adopted
+ * surface, and `@12-apps/realtime/hono` — a whole adapter this host no longer
+ * needs — stops being on the import list.
+ *
+ * Two things about this surface the earlier adoptions never exercised, and both
+ * are the reason the bridge was fixed BEFORE this file was touched:
+ *
+ * - a subscribe route answers the RAW arm of `WireRouteAnswer` — a live SSE
+ *   body — and an adapter that runs that through `c.json` produces a request
+ *   that never completes;
+ * - a POST `…/ticket` carries no body the bridge must invent, but it does need
+ *   the raw `Request`: the authorize seam above reads the caller out of a
+ *   COOKIE, which is the only identity `EventSource` can present.
+ *
+ * The `jobs` half is bound rather than declined. The package moved the drain's
+ * ten-second cadence and the purge's daily pattern into the blueprints because
+ * both are claims about ITS domain, and it states what a host that cannot
+ * repeat sub-minute must do instead: decline in writing. Vitest can repeat at
+ * any cadence — the harness runs a pass on demand — so declining here would be
+ * a fiction, and binding is what puts the blueprints under test at all.
+ */
+export function realtimeHost(pg: PGlite, driver: RealtimeDriver): RealtimeHost {
+  const drainDb = realtimeOutboxDrainDb(pg as unknown as SqlRunner);
+  // The outbox instance belongs to the ASSEMBLED api, and the jobs binding is
+  // written before assemble — so the deps reach for it late. A second
+  // `createRealtimeOutbox` over the same rows would be a second drain claiming
+  // the same events, which is the one thing the claim-by-UPDATE design exists
+  // to make impossible to need.
+  const outbox: { current: RealtimeOutbox | null } = { current: null };
+  const requireOutbox = (): RealtimeOutbox => {
+    if (!outbox.current) throw new Error('realtime outbox is not configured');
+    return outbox.current;
+  };
+
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The port behind the manifest's mandatory namespace: "a refused ticket or
+    // a failed drain files under `realtime`, not nowhere."
+    ports: { loggerFor: harnessLoggerFor },
   });
 
-  return { events, drainDb };
+  host.adoptServer({
+    manifest: realtimeManifest,
+    server: realtimeServerManifest,
+    // The first `env` answer in this host, and a DECLINE with the reason
+    // written out — because every one of the six vars is answered by CONFIG
+    // here instead. The driver is passed in as an object (`REALTIME_DRIVER`,
+    // `REDIS_URL`), the ticket secret is the literal both halves share
+    // (`REALTIME_TICKET_SECRET`), the cap is left at the package's default,
+    // and the two `worker`-scoped gateway vars are `server.ts`'s constants:
+    // this harness runs the API and the gateway in ONE process, and a
+    // process that read them from the ambient environment would be a
+    // harness whose result depends on the shell that started it.
+    //
+    // Handing `process.env` over instead would report `0/6 vars set` and
+    // read as a host that simply has not configured realtime yet. It has —
+    // in the line above.
+    env: {
+      declined:
+        'every declared var is supplied as configuration by this host: the driver object and ticket secret in eventsConfig, the gateway port in server.ts. The harness runs both processes in one and must not read the ambient environment.',
+    },
+    bindings: {
+      http: { mountPath: REALTIME_MOUNT_PATH, config: eventsConfig(driver, drainDb) },
+      jobs: {
+        deps: {
+          outbox: {
+            drain: () => requireOutbox().drain(),
+            purgePublished: (olderThanMs: number) => requireOutbox().purgePublished(olderThanMs),
+          },
+          purgeRetentionMs: OUTBOX_RETENTION_MS,
+        },
+      },
+    },
+  });
+
+  const wired = host.assemble();
+  const api = wired.http[realtimeManifest.name] as ReturnType<typeof createWireApiEvents>;
+  outbox.current = api.outbox;
+
+  return {
+    drainDb,
+    report: wired.report,
+    routes: wired.routes,
+    jobs: wired.jobs,
+    events: {
+      ...api,
+      // No actor: this surface authorizes ITSELF, per topic, inside the
+      // package's `authorize` seam — which is the property the whole design
+      // turns on. A bridge-level 401 would answer before that seam ran, so an
+      // unauthenticated request would get the bridge's refusal instead of the
+      // surface's, and every per-topic denial above would become unreachable.
+      router: honoRouterFor(wired.routes, () => REALTIME_CALLER),
+    },
+  };
 }
+
+/**
+ * The sentinel the bridge treats as "there is a caller". Frozen and shared: it
+ * carries nothing, because nothing downstream reads it — the wire view drops
+ * the contract's `actor` field on the way to `EventsRoute.handle`.
+ */
+const REALTIME_CALLER = Object.freeze({});
