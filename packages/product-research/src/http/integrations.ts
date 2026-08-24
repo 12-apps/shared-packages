@@ -1,4 +1,5 @@
 import type { ResearchApiConfig, ResearchRoute } from './types';
+import { resolveResearchCopy } from './types';
 import { ok, recordOf, refuse, credentialsOf } from './shared';
 
 /**
@@ -9,7 +10,7 @@ import { ok, recordOf, refuse, credentialsOf } from './shared';
  * connector lands.
  */
 export function integrationRoutes(config: ResearchApiConfig): ResearchRoute[] {
-  const { store, checks, credentials: codec, messages, connectors } = config;
+  const { store, checks, credentials: codec, connectors } = config;
   const now = config.now ?? ((): Date => new Date());
   const withMounted = (integration: Record<string, unknown>): Record<string, unknown> => ({
     ...integration,
@@ -33,7 +34,10 @@ export function integrationRoutes(config: ResearchApiConfig): ResearchRoute[] {
       // the key, never adds a row. The key is verified through the probe
       // seam; no probe (or an unreachable provider) stores it visibly
       // UNVERIFIED — never a blocked save.
-      async handle({ actor, params, body }) {
+      async handle({ actor, params, body, locale }) {
+        // Resolved per request, never at mount: these routes are built once
+        // and the language changes per caller.
+        const messages = resolveResearchCopy(config.messages, locale);
         const record = recordOf(body);
         const submitted = credentialsOf(record);
         const type = params['type'] ?? '';
