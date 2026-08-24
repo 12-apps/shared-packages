@@ -154,6 +154,44 @@ describe('the host bridge, on the two halves a JSON handler never needs', () => 
     expect(await seen.request?.json()).toEqual({ term: 'café' });
   });
 
+  /** A bridge over one route that answers the RAW arm. Built per case. */
+  function rawAnswerBridge(): Hono {
+    const app = new Hono();
+    app.route(
+      '/probe',
+      honoRouterFor(
+        [
+          {
+            route: {
+              method: 'GET',
+              path: '/raw',
+              handle: async () => ({
+                response: new Response('data: hello\n\n', {
+                  status: 200,
+                  headers: { 'content-type': 'text/event-stream' },
+                }),
+              }),
+            },
+          } as never,
+        ],
+        () => ({ userId: 'probe' }),
+      ),
+    );
+    return app;
+  }
+
+  it('returns a raw answer UNTOUCHED, so a stream is not serialized', async () => {
+    // The other arm of `WireRouteAnswer`: "an answer the adapter must return
+    // UNTOUCHED: a live SSE stream, a redirect whose headers are the payload, a
+    // provider-shaped webhook body." The contract states the failure too — "a
+    // serialized stream is a hung request and a redirect with no `Location` is
+    // a dead end" — which is what this bridge did to any of them until now.
+    const response = await rawAnswerBridge().request('/probe/raw');
+
+    expect(response.headers.get('content-type')).toBe('text/event-stream');
+    expect(await response.text()).toBe('data: hello\n\n');
+  });
+
   it('leaves a body that is not JSON to the handler, unread', async () => {
     // A multipart upload is the case: it was never JSON, so the parsed body is
     // undefined and the handler streams the raw request to its driver.

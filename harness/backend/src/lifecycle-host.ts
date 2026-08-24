@@ -24,8 +24,17 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { Context } from 'hono';
 import type { EntityOps, FeatureFlagMap, Snapshot } from '@12-apps/entity-lifecycle';
-import { PT_BR_LIFECYCLE_MESSAGES, type LifecycleActor } from '@12-apps/entity-lifecycle/server';
-import { entityLifecycleRouter } from '@12-apps/entity-lifecycle/hono';
+import {
+  PT_BR_LIFECYCLE_MESSAGES,
+  type createApiEntityLifecycle,
+  type LifecycleActor,
+} from '@12-apps/entity-lifecycle/server';
+import { entityLifecycleManifest } from '@12-apps/entity-lifecycle/manifest';
+import { entityLifecycleServerManifest } from '@12-apps/entity-lifecycle/manifest/server';
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 import { lifecycleDb } from './lifecycle-db';
 
@@ -254,57 +263,115 @@ export function resolveLifecycleActor(c: Context): LifecycleActor | null {
   };
 }
 
-/** The mounted surface: the package's router behind this host's actor seam. */
-export function lifecycleHost(pg: PGlite) {
-  return entityLifecycleRouter({
-    db: async () => lifecycleDb(pg),
-    entities: [
-      {
-        entityType: 'product',
-        slug: 'catalog-items',
-        features: { versioning: true, drafts: true, approvals: true },
-        label: (snapshot: Snapshot) =>
-          typeof snapshot.name === 'string' && snapshot.name.length > 0
-            ? snapshot.name
-            : 'Produto',
-        retention: { maxVersions: 50, maxAgeDays: 365 },
-        approvePermission: 'products:approve',
-        ops: productOps(pg),
-        // Soft-delete visibility is the HOST's job on every read it owns
-        // (ADOPTING rule 3), this one included: the origin host's twin reads the
-        // mirror column through its soft-delete-filtered client, so an
-        // ARCHIVED entity answers nothing and the dialog offers Restaurar on
-        // every row. `null` is that answer, and the package renders it as 0.
-        publishedVersion: async (tenantId, entityId) => {
-          const { rows } = await pg.query<{ published_version: number }>(
-            `SELECT published_version FROM demo_products
-             WHERE id = $1 AND client_id = $2 AND archived_at IS NULL`,
-            [entityId, tenantId],
-          );
-          return rows[0]?.published_version ?? null;
-        },
+/**
+ * Everything `createApiEntityLifecycle` requires, as one value.
+ *
+ * Its own function because the entity table is the interesting half — two
+ * registrations, each naming its slug, its features, its label and its ops —
+ * and a reader comparing this host against the package's own list of required
+ * config should not have to scroll past the contract mechanics to find it.
+ */
+function apiConfig(pg: PGlite) {
+  return {
+  db: async () => lifecycleDb(pg),
+  entities: [
+    {
+      entityType: 'product',
+      slug: 'catalog-items',
+      features: { versioning: true, drafts: true, approvals: true },
+      label: (snapshot: Snapshot) =>
+        typeof snapshot.name === 'string' && snapshot.name.length > 0
+          ? snapshot.name
+          : 'Produto',
+      retention: { maxVersions: 50, maxAgeDays: 365 },
+      approvePermission: 'products:approve',
+      ops: productOps(pg),
+      // Soft-delete visibility is the HOST's job on every read it owns
+      // (ADOPTING rule 3), this one included: the origin host's twin reads the
+      // mirror column through its soft-delete-filtered client, so an
+      // ARCHIVED entity answers nothing and the dialog offers Restaurar on
+      // every row. `null` is that answer, and the package renders it as 0.
+      publishedVersion: async (tenantId, entityId) => {
+        const { rows } = await pg.query<{ published_version: number }>(
+          `SELECT published_version FROM demo_products
+           WHERE id = $1 AND client_id = $2 AND archived_at IS NULL`,
+          [entityId, tenantId],
+        );
+        return rows[0]?.published_version ?? null;
       },
-      {
-        entityType: 'supplier',
-        slug: 'demo-suppliers',
-        features: { versioning: true, drafts: true, approvals: true },
-        label: (snapshot: Snapshot) =>
-          typeof snapshot.name === 'string' && snapshot.name.length > 0
-            ? snapshot.name
-            : 'Fornecedor',
-        approvePermission: 'suppliers:approve',
-        ops: supplierOps(pg),
-      },
-    ],
-    directory: {
-      getUsers: async (ids) =>
-        ids.flatMap((id) => {
-          const user = DIRECTORY.get(id);
-          return user ? [{ id: user.id, name: user.name }] : [];
-        }),
     },
-    // The refusal sentences are required host config; this host is pt-BR.
-    messages: PT_BR_LIFECYCLE_MESSAGES,
-    resolveActor: resolveLifecycleActor,
+    {
+      entityType: 'supplier',
+      slug: 'demo-suppliers',
+      features: { versioning: true, drafts: true, approvals: true },
+      label: (snapshot: Snapshot) =>
+        typeof snapshot.name === 'string' && snapshot.name.length > 0
+          ? snapshot.name
+          : 'Fornecedor',
+      approvePermission: 'suppliers:approve',
+      ops: supplierOps(pg),
+    },
+  ],
+  directory: {
+    getUsers: async (ids) =>
+      ids.flatMap((id) => {
+        const user = DIRECTORY.get(id);
+        return user ? [{ id: user.id, name: user.name }] : [];
+      }),
+  },
+  // The refusal sentences are required host config; this host is pt-BR.
+  messages: PT_BR_LIFECYCLE_MESSAGES,
+  };
+}
+
+/** Where `mount-surfaces.ts` hangs it — the adoption's claim. */
+export const LIFECYCLE_MOUNT_PATH = '/api/admin/:tenantSlug';
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer`.
+ *
+ * MOUNT ORDER is load-bearing here and nowhere else in this harness (`app.ts`'s
+ * header, ADOPTING rule 7): a host route shaped `/:slug/:id` is two segments,
+ * exactly like the package's literal `GET /:slug/drafts`, so registering the
+ * host's demo CRUD first captures the drafts endpoint and it starts answering
+ * the host's "not found" while every other lifecycle endpoint keeps working.
+ *
+ * The consumer hands routes back ALREADY specificity-ordered and the bridge
+ * registers in the order it is given, so the property the adoption depended on
+ * is now the contract's rather than this file's — which is the better place for
+ * it, since the rule was never about this host.
+ */
+export function lifecycleHost(pg: PGlite): ReturnType<typeof createApiEntityLifecycle> & {
+  router: ReturnType<typeof honoRouterFor>;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+} {
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
   });
+
+  host.adoptServer({
+    manifest: entityLifecycleManifest,
+    server: entityLifecycleServerManifest,
+    bindings: {
+      http: {
+        mountPath: LIFECYCLE_MOUNT_PATH,
+        config: apiConfig(pg),
+      },
+    },
+  });
+
+  const wired = host.assemble();
+  const api = wired.http[entityLifecycleManifest.name] as ReturnType<
+    typeof createApiEntityLifecycle
+  >;
+
+  return {
+    ...api,
+    report: wired.report,
+    routes: wired.routes,
+    router: honoRouterFor(wired.routes, resolveLifecycleActor),
+  };
 }
