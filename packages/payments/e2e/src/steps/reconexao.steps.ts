@@ -87,3 +87,34 @@ Then('o aviso de autorização expirada some', async ({ page }) => {
   await expect(page.getByText('A autorização expirou ou foi revogada.')).toBeHidden();
   await expect(page.getByTestId('payments-expiry-warning')).toBeHidden();
 });
+
+/**
+ * THE CONTRAST, and the reason it is a scenario rather than an assumption.
+ *
+ * Every warning on this screen is conditional, so a panel that rendered the
+ * reconnect banner unconditionally would satisfy all three scenarios above —
+ * they only ever look at a store whose grant is already dead. This is the one
+ * that fails if the condition is dropped.
+ *
+ * It reuses the `activation` surface rather than asking hosts for a fourth
+ * case: that store's provider is connected in stub mode and simply never
+ * charged, which is a healthy grant by every measure this feature cares about.
+ */
+Given('a loja tem uma conexão saudável com o provedor', async ({ page }) => {
+  await paymentsWorld().open(page, 'activation');
+});
+
+When('o lojista abre a tela dessa conexão', async ({ page }) => {
+  // The activation surface lands the owner on the provider's own panel, so
+  // there is nothing to click — what this step asserts is that we are on it.
+  await expect(page.getByTestId('payments-enabled-toggle')).toBeVisible();
+});
+
+Then('não há aviso de autorização expirada', async ({ page }) => {
+  await expect(page.getByText('A autorização expirou ou foi revogada.')).toBeHidden();
+  await expect(page.getByTestId('payments-expiry-warning')).toBeHidden();
+});
+
+Then('não há nada para reconectar', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Reconectar' })).toBeHidden();
+});
