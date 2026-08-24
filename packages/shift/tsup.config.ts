@@ -25,7 +25,30 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: { index: 'src/index.ts', types: 'src/types.ts' },
+  // EVERY published subpath, not just the two that had one. `./http`, `./jobs`
+  // and the two manifest entries pointed straight at `src/*.ts` until FUT-446,
+  // which this file's own header had already named as the defect: Node refuses
+  // to strip types below `node_modules`, so a plain host importing
+  // `@12-apps/shift/http` got `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` and
+  // could not adopt the surface at all.
+  //
+  // The quieter half is why it survived a repo full of tests. Where TypeScript
+  // IS transformed — vitest, tsx, a bundler — the source entry loads its own
+  // copy of `src/errors.ts` while `.` hands out `dist`'s, so a consumer holds
+  // TWO `ShiftError` classes and `error instanceof ShiftError` inside
+  // `answering()` is false. Every documented refusal then answers 500 instead
+  // of the 400/403/404/409 its code earns. The backend harness found it on the
+  // first request it made. `splitting: true` below is what makes the fix
+  // structural rather than a convention: rollup emits `errors`/`types` once and
+  // every entry imports the same chunk.
+  entry: {
+    index: 'src/index.ts',
+    types: 'src/types.ts',
+    http: 'src/http.ts',
+    jobs: 'src/jobs.ts',
+    'manifest/index': 'src/manifest/index.ts',
+    'manifest/server': 'src/manifest/server.ts',
+  },
   format: ['esm'],
   dts: true,
   splitting: true,
