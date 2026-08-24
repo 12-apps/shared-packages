@@ -15,6 +15,7 @@ import {
   assertExportsMirror,
   defineManifest,
   defineServerManifest,
+  defineWebManifest,
 } from '@12-apps/wiring/producer';
 import type { PackageManifest } from '@12-apps/wiring';
 import type { WireRequest } from '@12-apps/wiring';
@@ -24,6 +25,8 @@ import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
 import { createMemoryDb, memoryContacts, type MemoryDb } from '../../server/__tests__/memory-db';
 import { notificationsManifest } from '../index';
 import { createWireApiNotifications, notificationsServerManifest } from '../server';
+import { notificationsWebManifest } from '../web';
+import { createWebNotifications } from '../../react/create-web-notifications';
 
 /**
  * The manifest as an ADOPTER's type sees it. `as const satisfies` narrows the
@@ -42,12 +45,15 @@ describe('the notifications manifest', () => {
     expect(defineServerManifest(notificationsManifest, notificationsServerManifest)).toBe(
       notificationsServerManifest,
     );
+    expect(defineWebManifest(notificationsManifest, notificationsWebManifest)).toBe(
+      notificationsWebManifest,
+    );
   });
 
   it('declares the account surface, the four-model partial and the namespace', () => {
     expect(notificationsManifest.name).toBe('@12-apps/notifications');
     expect(notificationsManifest.contract).toBe(1);
-    expect(notificationsManifest.server).toEqual(['http']);
+    expect(notificationsManifest.server).toEqual(['http', 'jobs']);
     expect(notificationsManifest.db).toEqual({
       partial: 'prisma/notifications.prisma',
       migrations: 'prisma/migrations',
@@ -62,8 +68,36 @@ describe('the notifications manifest', () => {
     expect(notificationsServerManifest).not.toHaveProperty('email');
   });
 
-  it('declares no web inventory — a server host must not owe an answer for the React half', () => {
-    expect(declared().web).toBeUndefined();
+  it('declares the web surface — a server host reports it out-of-scope, it is not owed an answer', () => {
+    // The narrowing this replaces claimed a server host would be obliged to
+    // answer for the React half. It is not: the consumer reports a capability
+    // declared for the OTHER runtime as `out-of-scope`, and only an applicable
+    // unanswered one is `unbound`. Declaring is what makes Bell, Panel and
+    // Preferences discoverable instead of hand-duplicated per host.
+    expect(notificationsManifest.web).toEqual(['surface']);
+    expect(notificationsWebManifest.surface.create).toBe(createWebNotifications);
+    // No areas: the bell is header chrome with no route to suggest, and where
+    // preferences belongs differs per host.
+    expect(notificationsWebManifest).not.toHaveProperty('areas');
+  });
+
+  it('declares the dispatch and drain cadence, so a host stops restating it', () => {
+    // The wire names a bound host sees — `namespace` is prepended once at bind
+    // time, and these are the two the origin host already hand-rolled, so
+    // adopting is a deletion rather than a rename.
+    expect(notificationsServerManifest.jobs.namespace).toBe('notifications');
+    expect(Object.values(notificationsServerManifest.jobs.blueprints).map((job) => job.name)).toEqual(
+      ['dispatch', 'drain'],
+    );
+    // The numbers that were host code: the sweep's cadence, its single-flight
+    // lease, and the fast path retrying infrastructure faults only.
+    const { dispatch, drain } = notificationsServerManifest.jobs.blueprints;
+    expect(dispatch.attempts).toBe(3);
+    expect(dispatch.backoff).toEqual({ type: 'exponential', delayMs: 10_000 });
+    expect(drain.schedule).toEqual({ pattern: '*/5 * * * *' });
+    expect(drain.concurrency).toBe(1);
+    expect(drain.attempts).toBe(1);
+    expect(drain.lease).toEqual({ ttlMs: 4 * 60_000 });
   });
 
   it('mirrors the db declaration and the manifest subpaths into package.json', () => {

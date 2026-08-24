@@ -14,11 +14,24 @@
  *   (`config.transports`, `config.drivers`), so what would be declared here
  *   is a seam the host already fills — and declaring it would oblige an
  *   adopter to bind a mailer this package never owns.
- * - **No `web` inventory**, though `./react` ships the bell and the
- *   preference screens. Listing it would oblige every SERVER host adopting
- *   this manifest to answer for a React surface it never mounts —
- *   `assemble()` refuses a declared-but-unanswered capability, so the
- *   inventory must not overstate.
+ *
+ * ON THE `jobs` DECLARATION. The dispatch fast path and the retry sweep are
+ * this package's own cadence decisions — attempts, backoff, the five-minute
+ * tick, the single-flight lease — and they were host code in every adopting
+ * host, restated by hand from this package's docstrings. That is the
+ * `paymentsJobBlueprints()` incident's shape exactly: a mechanism a host must
+ * remember to schedule is a mechanism most hosts silently do not have, and the
+ * one host that DID write them wrote them correctly only because someone read
+ * the source. `./server`'s `NOTIFICATIONS_JOBS` declares both; a host with no
+ * worker declines the capability in writing and the report says so.
+ *
+ * ON THE `web` INVENTORY, which this manifest used to narrow away. The reason
+ * given — that listing it would oblige every SERVER host to answer for a React
+ * surface it never mounts — is not how the consumer behaves: a capability
+ * declared for the OTHER runtime is reported `out-of-scope`, and only an
+ * applicable, unanswered one is `unbound`. So the narrowing protected nothing
+ * and hid Bell, Panel and Preferences from every adopting host, which is why
+ * the origin host hand-duplicated two of the three.
  *
  * ON THE `db` DECLARATION. The origin host already composes
  * `prisma/notifications.prisma` into its schema — but by STRUCTURAL
@@ -45,5 +58,6 @@ export const notificationsManifest = {
    * exhausts its attempts files under `notifications`, not nowhere.
    */
   observability: { namespace: 'notifications' },
-  server: ['http'],
+  server: ['http', 'jobs'],
+  web: ['surface'],
 } as const satisfies PackageManifest;
