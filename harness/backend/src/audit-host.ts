@@ -19,6 +19,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { defineAuditVocabulary } from '@12-apps/audit';
 import { auditManifest } from '@12-apps/audit/manifest';
 import { auditServerManifest, type createWireApiAudit } from '@12-apps/audit/manifest/server';
+import type { AuditJobDeps } from '@12-apps/audit/server';
 import type { BoundJob, MountedRoute } from '@12-apps/wiring';
 import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 import type { Context, MiddlewareHandler } from 'hono';
@@ -111,6 +112,37 @@ function actorFrom(c: Context) {
   };
 }
 
+
+/**
+ * The retention sweep's binding, bound rather than declined.
+ *
+ * The package moved the cadence, the single-flight lease and the pass structure
+ * into the blueprint because every one of those numbers is a claim about its
+ * own delete path — and this harness had the sweep available and no schedule
+ * for it, which is exactly the shape the declaration exists to expose.
+ *
+ * `mount` is a GETTER, not the api: `adoptServer` takes the bindings and the
+ * api comes out the other side, so the deps reach for it when the sweep runs
+ * rather than when the binding is written.
+ *
+ * No `tenantWindows`: who decides a TENANT's window is a billing question and
+ * this host has no plan resolver, so the pass sweeps the global floor and
+ * nothing more — the fail-safe direction.
+ */
+function retentionJobBinding(mount: () => ReturnType<typeof createWireApiAudit>): {
+  deps: AuditJobDeps;
+} {
+  return {
+    deps: {
+      retention: {
+        purgeExpired: (days) => mount().retention.purgeExpired(days),
+        purgeTenantWindow: (clientId, since, cutoff) =>
+          mount().retention.purgeTenantWindow(clientId, since, cutoff),
+      },
+    },
+  };
+}
+
 /**
  * The surface, adopted through `@12-apps/wiring/consumer`.
  *
@@ -168,32 +200,7 @@ export function auditHost(pg: PGlite): {
           resolveActor: (request: { raw?: unknown }) => request.raw ?? null,
         },
       },
-      /**
-       * The retention sweep, bound rather than declined.
-       *
-       * The package moved the cadence, the single-flight lease and the pass
-       * structure into the blueprint because every one of those numbers is a
-       * claim about its own delete path — and this harness had the sweep
-       * available and no schedule for it, which is exactly the shape the
-       * declaration exists to expose.
-       *
-       * `retention` comes off the mounted api, so the sweep deletes through
-       * the same object `audit-retention.test.ts` drives directly. There is no
-       * `tenantWindows`: who decides a TENANT's window is a billing question,
-       * and this host has no plan resolver — omitting it is the fail-safe
-       * direction, sweeping the global floor and nothing more.
-       */
-      jobs: {
-        deps: {
-          // Deferred: `api` is what `adoptServer` returns, so the arrows reach
-          // for it when the sweep runs rather than when the binding is written.
-          retention: {
-            purgeExpired: (days) => api.retention.purgeExpired(days),
-            purgeTenantWindow: (clientId, since, cutoff) =>
-              api.retention.purgeTenantWindow(clientId, since, cutoff),
-          },
-        },
-      },
+      jobs: retentionJobBinding(() => api),
     },
   });
 

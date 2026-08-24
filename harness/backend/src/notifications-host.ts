@@ -362,17 +362,10 @@ export function notificationsHost(pg: PGlite): ReturnType<typeof createWireApiNo
         },
       },
       /**
-       * The dispatch fast path and the retry sweep, bound rather than declined.
-       *
-       * The package moved their cadence into the blueprints — the attempts, the
-       * backoff, the five-minute tick and the single-flight lease — because
-       * every one of those is a claim about ITS pipeline, and every host had
-       * been restating them by hand. A harness that exists to be the living
-       * consumer example should take the declaration rather than repeat that.
-       *
-       * Deferred through arrows: `surface` is what `adoptServer` returns, so
-       * the deps reach for it when a job runs rather than when the binding is
-       * written.
+       * The dispatch fast path and the retry sweep, bound rather than declined:
+       * the attempts, the backoff, the tick and the lease are the package's
+       * claims about its own pipeline, and every host had been restating them.
+       * Deferred through arrows — `surface` is what `adoptServer` returns.
        */
       jobs: {
         deps: {
