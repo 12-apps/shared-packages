@@ -1,4 +1,4 @@
-import { defineManifest } from "@12-apps/wiring/producer";
+import type { PackageManifest } from "@12-apps/wiring";
 
 /**
  * `@12-apps/auth`'s producer half of the wiring contract.
@@ -30,10 +30,28 @@ import { defineManifest } from "@12-apps/wiring/producer";
  * The manifest NAME is a wiring identity, not an npm package name — the
  * consumer keys adoption and the report on it, so it only has to be unique and
  * legible in `report`.
+ *
+ * ## Why `@12-apps/wiring` is a TYPE-ONLY devDependency here
+ *
+ * This file used to `import { defineManifest } from '@12-apps/wiring/producer'`
+ * and call it, with `@12-apps/wiring` in `dependencies` as `workspace:*` — which
+ * publishes as a pinned RUNTIME dependency. That made the contract package
+ * something every auth installer downloads and, worse, put auth's release behind
+ * wiring's: a package cannot ship a fix until the contract it merely describes
+ * itself with has shipped first. Auth is the estate's most-installed package, so
+ * it was the worst possible place for that edge.
+ *
+ * The report-builder move fixes it without losing a single check. The manifests
+ * are plain values `satisfies`-checked against the contract's TYPES, and the
+ * producer factories' RUNTIME assertions — identity, contribution validation,
+ * and the inventory drift check in both directions — run in this package's own
+ * test suite (`__tests__/manifest.test.ts`). Same "a malformed manifest fails in
+ * the package's own test run, before any host sees it" guarantee; zero runtime
+ * dependencies added; a host that never adopts the contract never installs it.
  */
 
 /** The sign-in surface, and the owner of every auth table. */
-export const authManifest = defineManifest({
+export const authManifest = {
   name: "@12-apps/auth",
   contract: 1,
   // Declared HERE and not on the platform manifest: one package owns the
@@ -76,13 +94,13 @@ export const authManifest = defineManifest({
   ],
   server: ["http", "email"],
   web: ["surface", "areas"],
-});
+} as const satisfies PackageManifest;
 
 /** The operator console: the two platform switches. */
-export const authPlatformManifest = defineManifest({
+export const authPlatformManifest = {
   name: "@12-apps/auth-platform",
   contract: 1,
   observability: { namespace: "auth-platform" },
   server: ["http"],
   web: ["surface", "areas"],
-});
+} as const satisfies PackageManifest;

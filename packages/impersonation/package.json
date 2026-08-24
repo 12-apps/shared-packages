@@ -12,6 +12,7 @@
     "./hono": "./src/hono/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",
+    "./manifest/web": "./src/manifest/web.ts",
     "./package.json": "./package.json",
     "./react": "./src/react/index.ts",
     "./server": "./src/server/index.ts"
@@ -47,6 +48,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "@12-apps/wiring": {
       "optional": true
     }
   },

@@ -10,23 +10,16 @@ import {
   assertExportsMirror,
   defineManifest,
   defineServerManifest,
+  defineWebManifest,
 } from '@12-apps/wiring/producer';
-import type { PackageManifest } from '@12-apps/wiring';
 
 import packageJson from '../../../package.json';
 import { auditManifest } from '../index';
 import { auditServerManifest } from '../server';
+import { auditWebManifest } from '../web';
+import { AUDIT_READ_PERMISSION } from '../../core/permissions';
+import { createWebAudit } from '../../react/create-web-audit';
 
-/**
- * The manifest as an ADOPTER's type sees it. `as const satisfies` narrows the
- * value to its literal, on which an absent optional key is a compile error
- * rather than `undefined` — so the widened view is what a claim about absence
- * has to be made against. Built per case: the flakiness lane refuses shared
- * test-scope bindings.
- */
-function declared(): PackageManifest {
-  return auditManifest;
-}
 
 describe('the audit manifest', () => {
   it('passes the producer assertions — the contract is a devDependency, so the check lives here', () => {
@@ -42,11 +35,45 @@ describe('the audit manifest', () => {
     });
   });
 
-  it('inventories the http capability, and nothing this package does not ship', () => {
-    // The inventory is what `assemble()` holds a host to. `web` stays absent:
-    // the React viewer is a component, not a mountable web surface.
-    expect(auditManifest.server).toEqual(['http']);
-    expect(declared().web).toBeUndefined();
+  it('inventories every capability this package ships, and nothing it does not', () => {
+    // The inventory is what `assemble()` holds a host to. `jobs` and `web`
+    // both used to be absent while the code for them shipped — the retention
+    // sweep with no schedule, and a real `createWeb*` factory with no
+    // declaration and no written narrowing, in the package whose own docblock
+    // argues that structural discovery is the drift the contract prevents.
+    expect(auditManifest.server).toEqual(['http', 'jobs']);
+    expect(auditManifest.web).toEqual(['surface', 'areas']);
+  });
+
+  it('declares the retention sweep with the cadence a host used to restate', () => {
+    // The wire name a bound host sees is `audit.retention` — namespace
+    // prepended once at bind time.
+    expect(auditServerManifest.jobs.namespace).toBe('audit');
+    const { retention } = auditServerManifest.jobs.blueprints;
+    expect(retention.name).toBe('retention');
+    // Single-flight and idempotent: two passes deleting from the same table
+    // would race each other's cutoffs, and the next tick is the only recovery
+    // an idempotent pass needs.
+    expect(retention.queue).toBe('sweeps');
+    expect(retention.concurrency).toBe(1);
+    expect(retention.attempts).toBe(1);
+    expect(retention.schedule).toEqual({ pattern: '30 4 * * *' });
+    expect(retention.lease).toEqual({ ttlMs: 30 * 60_000 });
+    // No timezone, deliberately: a package cannot know a host's business
+    // hours, and UTC is the honest default rather than a guess at one.
+    expect(retention.schedule).not.toHaveProperty('timezone');
+  });
+
+  it('declares the trail surface, gated on the id this package itself owns', () => {
+    expect(auditWebManifest.surface.create).toBe(createWebAudit);
+    const [area] = auditWebManifest.areas;
+    expect(area.area).toBe('admin');
+    // Referenced, not retyped — the manifest cannot drift from the gate the
+    // server half enforces.
+    expect(area.routes[0]?.permission).toBe(AUDIT_READ_PERMISSION);
+    expect(area.nav[0]?.permission).toBe(AUDIT_READ_PERMISSION);
+    // The trail names who did what; it is not a screen to leave ungated.
+    expect(AUDIT_READ_PERMISSION).toBe('audit:read');
   });
 
   it('files its telemetry under `audit` — mandatory now a runtime half exists', () => {
@@ -61,6 +88,7 @@ describe('the audit manifest', () => {
     // manifest's keys are exactly what `./index` inventoried. A capability
     // added to one and not the other is a boot failure, not a silent 404.
     expect(defineServerManifest(auditManifest, auditServerManifest)).toBe(auditServerManifest);
+    expect(defineWebManifest(auditManifest, auditWebManifest)).toBe(auditWebManifest);
   });
 
   it('mirrors the db declaration and the manifest subpath into package.json', () => {

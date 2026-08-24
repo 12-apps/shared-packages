@@ -133,3 +133,52 @@ describe('lifecycleMcpEndpoints', () => {
     expect(a[0]?.tags).not.toBe(b[0]?.tags);
   });
 });
+
+/**
+ * The behaviour defaults — Phase 3's producer half.
+ *
+ * These are what let a host's policy-hint table become OVERRIDES: 48
+ * hand-written lines for one factory's eight endpoints, times every collection
+ * plugged in, restating what this file already knows. Written out by hand for
+ * the same reason as the operation ids above — deriving the expectation from
+ * the same constants the code uses would agree with any mistake in them.
+ */
+describe('the behaviour a host no longer has to restate', () => {
+  it('classifies every one of the eight, and never reaches outside the host', () => {
+    const byId = Object.fromEntries(
+      suppliers().map((endpoint) => [endpoint.operationId, endpoint.annotations]),
+    );
+    expect(byId).toEqual({
+      getSupplierVersions: { readOnly: true, destructive: false, openWorld: false },
+      restoreSupplierVersion: { readOnly: false, destructive: false, openWorld: false },
+      getSupplierDraft: { readOnly: true, destructive: false, openWorld: false },
+      saveSupplierDraft: { readOnly: false, destructive: false, openWorld: false },
+      publishSupplierDraft: { readOnly: false, destructive: false, openWorld: false },
+      // The one destructive tool of the eight: a discarded draft was never
+      // published, so no version history covers it and nothing restores it.
+      discardSupplierDraft: { readOnly: false, destructive: true, openWorld: false },
+      listSupplierDrafts: { readOnly: true, destructive: false, openWorld: false },
+      createSupplierDraft: { readOnly: false, destructive: false, openWorld: false },
+    });
+  });
+
+  it('asserts behaviour and NOT the label — the title stays host copy', () => {
+    // Behaviour is this package's knowledge; the words an agent reads are the
+    // host's, in the host's language, from the same vocabulary that supplies
+    // `noun` and `summaries`. A title here would be a silent default.
+    suppliers().forEach((endpoint) => {
+      expect(endpoint.annotations).not.toHaveProperty('title');
+    });
+  });
+
+  it('hands every collection the same classification — it is about the verb, not the noun', () => {
+    const products = lifecycleMcpEndpoints({
+      collectionPath: '/api/admin/{tenantSlug}/products',
+      noun: 'Product',
+      summaries,
+    });
+    expect(products.map((endpoint) => endpoint.annotations)).toEqual(
+      suppliers().map((endpoint) => endpoint.annotations),
+    );
+  });
+});

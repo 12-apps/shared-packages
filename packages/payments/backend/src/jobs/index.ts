@@ -44,17 +44,70 @@
 
 import { reconcilePendingCharges, type PendingSweepDeps } from '../core/payable-sweep';
 
+import { PAYMENTS_SWEEP_QUEUE, RECONCILE_CRON } from './cadence';
+
+export {
+  ACTIVATION_RECONCILE_CRON,
+  OAUTH_RENEWAL_BATCH,
+  OAUTH_RENEWAL_CRON,
+  OAUTH_RENEW_WITHIN_MS,
+  PAYMENTS_SWEEP_QUEUE,
+  RECONCILE_CRON,
+  WEBHOOK_DRAIN_CRON,
+} from './cadence';
+
+import type { WebhookReplayOptions, WebhookReplayReport } from '../core/webhook-replay';
+import type { ExpiringConnection, ProviderConfigStore, StoredProviderConfig } from '../config/types';
+import type { MerchantRef, ProviderName } from '../core/types';
+import type { ActivationReconcileContext } from '../activation/reconcile';
+
+/**
+ * Why a grant could not be renewed — the two outcomes a host must be able to
+ * tell apart, because only one of them means the tokens are GONE.
+ */
+export type ReconnectReason = 'refused' | 'lost';
+
+/** The OAuth seam the renewal sweep needs, and nothing more. */
+export interface PaymentsOAuthJobDeps {
+  /** The connections whose grants lapse before a given instant. */
+  listExpiring: ProviderConfigStore['listExpiring'];
+  /**
+   * Renew one grant. Records `RECONNECT_REQUIRED` rather than throwing when
+   * the provider refuses, so a resolved promise is NOT automatically a
+   * success — the sweep reads the status back.
+   */
+  refresh(merchant: MerchantRef, provider: ProviderName): Promise<StoredProviderConfig>;
+  /**
+   * Tell the merchant they must reauthorize. Optional, and fire-and-forget by
+   * contract: an alert must not cost the rest of the batch. Absent, the
+   * failure still reaches the logger — it just reaches nobody who can fix it.
+   */
+  onReconnectRequired?: (connection: ExpiringConnection, reason: ReconnectReason) => void;
+}
+
 /**
  * What the host supplies once, when it binds these blueprints.
  *
- * Deliberately the SAME shape `reconcilePendingCharges` already takes: the
- * store, a gateway that can re-read a charge, and the host's own idempotent
- * settle path. Nothing new to implement for a host that had already wired the
- * sweep by hand — it deletes its scheduling and passes the same object.
+ * Every field is REQUIRED, and that is the contract's doctrine rather than an
+ * oversight: a partially-supplied deps object would make a declared sweep a
+ * silent no-op, which is the exact incident this whole seam exists to end. A
+ * host with no OAuth providers writes `listExpiring: () => Promise.resolve([])`
+ * — one line at the bind site that says so in code, which is a written decline
+ * and not a gap.
  */
 export interface PaymentsJobDeps extends PendingSweepDeps {
   /** Overridable clock, for a suite that drives the window deterministically. */
   now?: () => Date;
+  /**
+   * The webhook inbox drain. `gateway` already carries it — a host passing its
+   * whole gateway (the wiring in practice) needs no change beyond widening the
+   * `Pick`.
+   */
+  replayWebhooks(options?: WebhookReplayOptions): Promise<WebhookReplayReport>;
+  /** The stranded-activation reconcile's context, over the host's tables. */
+  activation: ActivationReconcileContext;
+  /** The OAuth renewal seam. */
+  oauth: PaymentsOAuthJobDeps;
 }
 
 /** What a handler is told about the attempt it is running in. */
@@ -91,14 +144,46 @@ export interface PaymentsJobBlueprint<TPayload = void> {
 }
 
 /**
- * The single-flight queue name. Stated as a literal rather than imported for
- * the reason in the header; it is the same string `@12-apps/jobs` exports as
- * `SWEEP_QUEUE`, and `paymentsJobBlueprints.test.ts` pins the pair.
+ * What the host supplies once, when it binds these blueprints.
+ *
+ * Deliberately the SAME shape `reconcilePendingCharges` already takes: the
+ * store, a gateway that can re-read a charge, and the host's own idempotent
+ * settle path. Nothing new to implement for a host that had already wired the
+ * sweep by hand — it deletes its scheduling and passes the same object.
  */
-export const PAYMENTS_SWEEP_QUEUE = 'sweeps';
+/** What a handler is told about the attempt it is running in. */
+export interface PaymentsJobContext {
+  logger: { info(message: string): void; warn(message: string): void; error(message: string): void };
+}
 
-/** Five minutes — the resolution at which "paid but still pending" is a delay. */
-export const RECONCILE_CRON = '*/5 * * * *';
+/**
+ * One unit of deferred work this package needs, with the host's deps left open.
+ *
+ * Structurally identical to `@12-apps/jobs`'s `JobBlueprint` on purpose — see
+ * the file header. Everything here is inert data until a host binds it.
+ */
+export interface PaymentsJobBlueprint<TPayload = void> {
+  /** Short name; the host's module namespaces it (`payments.reconcile-pending`). */
+  name: string;
+  /** Queue hint. `sweeps` is the single-flight queue the scheduled passes share. */
+  queue?: string;
+  concurrency?: number;
+  schedule?: { pattern: string; timezone?: string };
+  /** Total tries. `1` means the next scheduled tick IS the retry. */
+  attempts?: number;
+  /**
+   * Single-flight fence: a runner that can hold leases takes the name for
+   * `ttlMs` before running, and a tick that finds it held skips silently.
+   * Concurrency alone bounds one process; the lease bounds ALL of them.
+   */
+  lease?: { ttlMs: number };
+  handle: (
+    payload: TPayload,
+    deps: PaymentsJobDeps,
+    context: PaymentsJobContext,
+  ) => Promise<void>;
+}
+
 
 /**
  * Ask the provider about charges still waiting.
@@ -137,6 +222,8 @@ const reconcilePending: PaymentsJobBlueprint = {
   },
 };
 
+import { oauthRenewal, reconcileActivations, webhookDrain } from './sweeps';
+
 /**
  * Every job this package needs a host to run, keyed as a job module expects.
  *
@@ -146,8 +233,11 @@ const reconcilePending: PaymentsJobBlueprint = {
  */
 export function paymentsJobBlueprints(): {
   readonly reconcilePending: PaymentsJobBlueprint;
+  readonly webhookDrain: PaymentsJobBlueprint;
+  readonly reconcileActivations: PaymentsJobBlueprint;
+  readonly oauthRenewal: PaymentsJobBlueprint;
 } {
-  return { reconcilePending };
+  return { reconcilePending, webhookDrain, reconcileActivations, oauthRenewal };
 }
 
 /**
@@ -165,5 +255,5 @@ export function paymentsJobBlueprints(): {
  */
 export const PAYMENTS_JOBS = {
   namespace: 'payments',
-  blueprints: { reconcilePending },
+  blueprints: { reconcilePending, webhookDrain, reconcileActivations, oauthRenewal },
 } as const;

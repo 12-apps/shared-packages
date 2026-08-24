@@ -181,9 +181,6 @@ importers:
 
   packages/auth:
     dependencies:
-      '@12-apps/wiring':
-        specifier: workspace:*
-        version: link:../wiring
       '@auth/core':
         specifier: 0.41.0
         version: 0.41.0
@@ -206,6 +203,9 @@ importers:
       '@12-apps/ui':
         specifier: workspace:*
         version: link:../ui
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       '@playwright/test':
         specifier: ^1.56.1
         version: 1.61.1
@@ -1910,6 +1910,9 @@ importers:
       '@12-apps/payments-backend':
         specifier: workspace:*
         version: link:../payments/backend
+      '@12-apps/payments-e2e':
+        specifier: workspace:*
+        version: link:../payments/e2e
       '@12-apps/payments-frontend':
         specifier: workspace:*
         version: link:../payments/frontend

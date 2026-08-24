@@ -2,6 +2,8 @@ import type { RbacCatalog } from '../core/compose';
 import type { AuthzContext, OwnershipPredicate } from '../core/types';
 
 import type { RbacDbProvider } from './db';
+import type { RbacInvitesPort } from './invites';
+import type { RbacNotifyPort } from './notifications';
 
 /**
  * What every route in this surface shares (12-13): the actor, the request, the
@@ -141,26 +143,8 @@ export interface RbacUserDirectory {
   searchUsers?(q: string): Promise<string[]>;
 }
 
-/** A pending accountless invite, when the host wires the invites seam. */
-export interface RbacPendingInvite {
-  id: string;
-  email: string;
-  role: string;
-}
-
-/**
- * OPTIONAL invite seam. Accountless invites need a table and a signup hook
- * this package does not own, so a host that wants the roster's invite surface
- * plugs its own storage in; without it the two invite routes answer 501 and
- * the packaged screen hides the affordance.
- */
-export interface RbacInvitesPort {
-  /** Grant-or-invite by e-mail; the host decides which happened. */
-  invite(tenantId: string, email: string): Promise<{ status: 'added' | 'invited' }>;
-  listPending(tenantId: string): Promise<RbacPendingInvite[]>;
-  /** Cancel a pending invite by id. Idempotent. */
-  cancel(tenantId: string, inviteId: string): Promise<void>;
-}
+/** The invites seam lives in `./invites`; re-exported so its import path is unchanged. */
+export type { RbacInvitesPort, RbacPendingInvite } from './invites';
 
 /** Every user-facing string this surface emits — REQUIRED host config; pt-BR ships as `./pt-BR`. */
 export interface RbacMessages {
@@ -275,6 +259,15 @@ export interface RbacServerConfig<
   audit?: RbacAuditSink;
   /** Optional invites seam — see {@link RbacInvitesPort}. */
   invites?: RbacInvitesPort;
+  /**
+   * OPTIONAL notification port — how this package tells an invitee they were
+   * invited. Bound, `POST /team` emits `rbac.team.invited` after the write
+   * commits and the host's pipeline delivers it with no new host code.
+   * Unbound, nothing is emitted, which is the behaviour every host has today —
+   * the difference is that the silence is now a capability a host declines
+   * rather than a hole nobody can see. See `./notifications`.
+   */
+  notify?: RbacNotifyPort;
   /** Walk a scope to its parent (`org:` chains). Default: flat scopes. */
   scopeParent?: (scope: string) => string | null;
   /**

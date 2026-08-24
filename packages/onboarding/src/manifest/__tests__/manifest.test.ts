@@ -10,12 +10,15 @@ import {
   assertExportsMirror,
   defineManifest,
   defineServerManifest,
+  defineWebManifest,
 } from "@12-apps/wiring/producer";
 import type { PackageManifest } from "@12-apps/wiring";
 
 import packageJson from "../../../package.json";
 import { onboardingManifest } from "../index";
 import { onboardingServerManifest } from "../server";
+import { onboardingWebManifest } from "../web";
+import { createWebOnboarding } from "../../create-web-onboarding";
 
 /**
  * The manifest as an ADOPTER's type sees it. `as const satisfies` narrows the
@@ -31,6 +34,9 @@ function declared(): PackageManifest {
 describe("the onboarding manifest", () => {
   it("passes the producer assertions — the contract is a devDependency, so the check lives here", () => {
     expect(defineManifest(onboardingManifest)).toBe(onboardingManifest);
+    expect(defineWebManifest(onboardingManifest, onboardingWebManifest)).toBe(
+      onboardingWebManifest,
+    );
     expect(defineServerManifest(onboardingManifest, onboardingServerManifest)).toBe(
       onboardingServerManifest,
     );
@@ -40,6 +46,7 @@ describe("the onboarding manifest", () => {
     expect(onboardingManifest.name).toBe("@12-apps/onboarding");
     expect(onboardingManifest.contract).toBe(1);
     expect(onboardingManifest.server).toEqual(["http"]);
+    expect(onboardingManifest.web).toEqual(["surface"]);
     expect(onboardingManifest.db).toEqual({
       partial: "prisma/onboarding.prisma",
       migrations: "prisma/migrations",
@@ -47,11 +54,16 @@ describe("the onboarding manifest", () => {
     expect(onboardingManifest.observability).toEqual({ namespace: "onboarding" });
   });
 
-  it("declares no web inventory — a server host must not owe an answer for the React half", () => {
-    // `./` ships OnboardingProvider and GuidedSection, and `assemble()`
-    // refuses a declared-but-unanswered capability: listing `web` here would
-    // make every backend adoption red until it bound a surface it never mounts.
-    expect(declared().web).toBeUndefined();
+  it("declares the web surface — a server host reports it out-of-scope, it is not owed an answer", () => {
+    // The narrowing this replaces said listing `web` would make every backend
+    // adoption red until it bound a surface it never mounts. It would not: a
+    // capability declared for the OTHER runtime is reported `out-of-scope`,
+    // and only an applicable unanswered one is `unbound`.
+    expect(onboardingManifest.web).toEqual(["surface"]);
+    expect(onboardingWebManifest.surface.create).toBe(createWebOnboarding);
+    // No areas: a guided flow is a section inside the host screen that owns
+    // the feature, so there is no route for the package to suggest.
+    expect(onboardingWebManifest).not.toHaveProperty("areas");
   });
 
   it("declares no env — NODE_ENV is platform vocabulary and reset-ness is a config seam", () => {

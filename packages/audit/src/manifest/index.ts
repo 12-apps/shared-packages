@@ -30,6 +30,23 @@
  * a refused read or a failed retention sweep now files under `audit` rather
  * than under the host app, or nowhere.
  *
+ * TWO MORE CAPABILITIES LAND WITH THIS RELEASE, and both were absences this
+ * package's own docblock argued against while carrying them:
+ *
+ * - **`jobs`** — the retention sweep. `createAuditRetention` is the only
+ *   sanctioned delete path for entries and has shipped for as long as the
+ *   append-only guard has; what never shipped was the CADENCE, so every host
+ *   had to notice the export and schedule it. The origin host did, restating
+ *   the queue, the concurrency, the lease and the pass structure by hand —
+ *   the `paymentsJobBlueprints()` incident's shape, with `audit_logs` growing
+ *   without bound in any host that never noticed. `./server`'s `AUDIT_JOBS`
+ *   declares it; the per-tenant windows stay a host-supplied dep, because who
+ *   decides a tenant's window is a billing question this package cannot answer.
+ * - **`web`** — `./react` ships `create-web-audit.tsx`, a real `createWeb*`
+ *   factory, and this manifest neither declared nor narrowed it. Structural
+ *   discovery is the drift the paragraph above objects to; an undeclared
+ *   React surface is the same drift with no fallback to find it at all.
+ *
  * `@12-apps/wiring` is a TYPE-ONLY devDependency, with the peer that entitles
  * a consumer to it (the report-builder move): the manifest is a plain
  * `satisfies`-checked value, and the producer factories' runtime assertions
@@ -43,5 +60,6 @@ export const auditManifest = {
   contract: 1,
   db: { partial: 'prisma/audit.prisma', migrations: 'prisma/migrations' },
   observability: { namespace: 'audit' },
-  server: ['http'],
+  server: ['http', 'jobs'],
+  web: ['surface', 'areas'],
 } as const satisfies PackageManifest;

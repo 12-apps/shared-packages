@@ -27,6 +27,7 @@ export default defineConfig({
     'coverage-gate/index': 'src/coverage-gate/index.ts',
     'manifest/index': 'src/manifest/index.ts',
     'manifest/server': 'src/manifest/server.ts',
+    'manifest/web': 'src/manifest/web.ts',
 },
   format: ['esm'],
   dts: true,

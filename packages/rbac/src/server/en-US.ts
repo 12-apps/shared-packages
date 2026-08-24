@@ -1,4 +1,5 @@
 import type { RbacMessages } from './context';
+import type { TeamInvitedCopy } from './notifications';
 
 /**
  * The en-US pack — a NAMED export a host passes by hand
@@ -35,4 +36,16 @@ export const EN_US_RBAC_MESSAGES: RbacMessages = {
     unknownRole: 'Unknown role.',
     fallback: 'This role could not be assigned.',
   },
+};
+
+/** The invite notice's phrasing and CTA — pass to `createTeamInvitedBlueprint`. */
+export const EN_US_TEAM_INVITED_COPY: TeamInvitedCopy = {
+  title: (payload) =>
+    payload.status === 'added' ? 'You were added to the team' : 'Team invitation',
+  body: (payload) =>
+    payload.status === 'added'
+      // No noun for the tenant — see the pt-BR pack.
+      ? 'Your account now has access. Open the dashboard to get started.'
+      : `We sent an invitation to ${payload.email}. Finish signing up to get access.`,
+  link: () => '/admin',
 };

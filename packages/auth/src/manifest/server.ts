@@ -1,5 +1,4 @@
-import { defineServerManifest } from "@12-apps/wiring/producer";
-import type { EmailPort } from "@12-apps/wiring";
+import type { AnyServerManifest, EmailPort } from "@12-apps/wiring";
 
 import type { EmailCredentialsMailer } from "../email-credentials/types";
 import { createAuthMailer } from "../notifications/mailer";
@@ -8,7 +7,6 @@ import {
   createApiEmailAuth,
   createApiEmailAuthSettings,
 } from "../server/create-api-email-auth";
-import { authManifest, authPlatformManifest } from "./index";
 
 /**
  * The SERVER runtime manifest — the factories, which only a server holds.
@@ -24,6 +22,11 @@ import { authManifest, authPlatformManifest } from "./index";
  *
  * So the mail choices are made where every other choice in this package is
  * made — at the call, by name.
+ *
+ * Behind its own subpath so a web bundle importing `./manifest/web` never
+ * resolves the server half. Plain `satisfies`-checked values — see `./index`
+ * for why the contract package stays a type-only devDependency; the inventory
+ * check against the shared manifest runs in the test suite.
  */
 export interface AuthServerManifestOptions {
   /** Which words the four mails use — REQUIRED, the host's choice by name. */
@@ -38,10 +41,8 @@ export interface AuthServerManifestOptions {
   loginUrl?: string;
 }
 
-export function authServerManifest(options: AuthServerManifestOptions): ReturnType<
-  typeof defineServerManifest
-> {
-  return defineServerManifest(authManifest, {
+export function authServerManifest(options: AuthServerManifestOptions) {
+  return {
     name: "@12-apps/auth",
     http: { create: createApiEmailAuth },
     email: {
@@ -57,11 +58,11 @@ export function authServerManifest(options: AuthServerManifestOptions): ReturnTy
       createMailer: (port: EmailPort): EmailCredentialsMailer =>
         createAuthMailer({ driver: port, pack: options.pack, loginUrl: options.loginUrl }),
     },
-  });
+  } as const satisfies AnyServerManifest;
 }
 
 /** The operator console's server half. No mail; it only reads and writes rows. */
-export const authPlatformServerManifest = defineServerManifest(authPlatformManifest, {
+export const authPlatformServerManifest = {
   name: "@12-apps/auth-platform",
   http: { create: createApiEmailAuthSettings },
-});
+} as const satisfies AnyServerManifest;

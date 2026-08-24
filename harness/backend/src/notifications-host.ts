@@ -27,7 +27,7 @@ import {
   notificationsServerManifest,
   type createWireApiNotifications,
 } from '@12-apps/notifications/manifest/server';
-import type { MountedRoute } from '@12-apps/wiring';
+import type { BoundJob, MountedRoute } from '@12-apps/wiring';
 import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 
 import { harnessLoggerFor, honoRouterFor } from './wire-hono';
@@ -340,6 +340,7 @@ export function notificationsHost(pg: PGlite): ReturnType<typeof createWireApiNo
   latch: OutboxLatch;
   report: WiringReport;
   routes: readonly MountedRoute[];
+  jobs: readonly BoundJob[];
 } {
   const outbox: OutboxEntry[] = [];
   const latch = createOutboxLatch();
@@ -360,6 +361,18 @@ export function notificationsHost(pg: PGlite): ReturnType<typeof createWireApiNo
           ...apiConfig(pg, outbox, latch),
         },
       },
+      /**
+       * The dispatch fast path and the retry sweep, bound rather than declined:
+       * the attempts, the backoff, the tick and the lease are the package's
+       * claims about its own pipeline, and every host had been restating them.
+       * Deferred through arrows — `surface` is what `adoptServer` returns.
+       */
+      jobs: {
+        deps: {
+          dispatchDeliveries: (notificationId) => surface.dispatchDeliveries(notificationId),
+          drainPending: (olderThanMs, take) => surface.drainPending(olderThanMs, take),
+        },
+      },
     },
   });
 
@@ -372,6 +385,7 @@ export function notificationsHost(pg: PGlite): ReturnType<typeof createWireApiNo
     ...surface,
     report: wired.report,
     routes: wired.routes,
+    jobs: wired.jobs,
     router: honoRouterFor(wired.routes, (c) => {
       // The SPA sends no header and acts as the seeded owner; a spec that needs
       // another vantage sets one, and `anonymous` exercises the 401 path.
