@@ -137,6 +137,8 @@ export interface HarnessBackend {
    * other people's shifts on request is a very different thing.
    */
   shift: Hosts['shift'];
+  /** Its wiring report and its BOUND job blueprints — neither has an endpoint. */
+  research: Hosts['research'];
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -384,6 +386,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     pg,
     realtimeDriver: hosts.realtimeDriver,
     shift: hosts.shift,
+    research: hosts.research,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream
       // severed after its driver is gone throws into the sink rather than closing cleanly.
