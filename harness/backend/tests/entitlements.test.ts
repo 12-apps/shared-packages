@@ -176,19 +176,34 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     // thing that can supply one.
     expect(statuses.get('observability')).toBe('bound');
     expect(statuses.get('db')).toBe('collected');
-    expect([...statuses.values()]).not.toContain('unanswered');
+    // `unbound` is the status, and this line asserted `'unanswered'` — a string
+    // no capability is ever given, so the check every one of these cases is
+    // named for could not fail. The same shape of defect the contract exists to
+    // catch, in the suite that checks the contract.
+    expect([...statuses.values()]).not.toContain('unbound');
   });
 
   it('does not oblige this server host to answer for a React surface', () => {
-    // The clearest statement in the repo of why an inventory must not
-    // overstate: the manifest deliberately omits `web` even though `./react`
-    // ships the plan screens, "because listing it would oblige every SERVER
-    // host adopting this manifest to answer for a React surface it never
-    // mounts." So answering it here is a COMPLETE answer, not a partial one.
-    const kinds = backend.entitlements.report.packages[0]?.capabilities.map((e) => e.kind);
+    // The obligation this case guards is unchanged; what it asserts is now one
+    // level more precise, because the manifest changed underneath it.
+    //
+    // It used to demand the capability be ABSENT, quoting the manifest's reason
+    // for omitting `web`: "listing it would oblige every SERVER host adopting
+    // this manifest to answer for a React surface it never mounts." That reason
+    // was false. A capability declared for the OTHER runtime is answered
+    // `out-of-scope` — the sibling web host answers for it — and `assemble()`
+    // returns; only an APPLICABLE, unanswered capability is `unbound`. So the
+    // omission bought nothing and cost the plan screens their only route to a
+    // web host, which is why the manifest now declares them.
+    //
+    // The property that actually matters is the last line: nothing the web half
+    // declares can leave this server host's assembly incomplete.
+    const entries = backend.entitlements.report.packages[0]?.capabilities ?? [];
+    const statuses = new Map(entries.map((entry) => [entry.kind, entry.status]));
 
-    expect(kinds).not.toContain('surface');
-    expect(kinds).not.toContain('areas');
+    expect(statuses.get('surface')).toBe('out-of-scope');
+    expect(statuses.get('areas')).toBe('out-of-scope');
+    expect([...statuses.values()]).not.toContain('unbound');
   });
 
   it('names a descriptor this host forgot to claim', () => {

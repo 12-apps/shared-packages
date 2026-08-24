@@ -263,7 +263,11 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     // Collected still means COUNTED: the partial and its migrations appear in
     // the report, so a host can be asked what it did with them.
     expect(statuses.get('db')).toBe('collected');
-    expect([...statuses.values()]).not.toContain('unanswered');
+    // `unbound` is the status, and this line asserted `'unanswered'` — a string
+    // no capability is ever given, so the check every one of these cases is
+    // named for could not fail. The same shape of defect the contract exists to
+    // catch, in the suite that checks the contract.
+    expect([...statuses.values()]).not.toContain('unbound');
   });
 
   it('names a descriptor this host forgot to claim', () => {

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type JSX } from 'react';
 
-import { createWebNotifications } from '@12-apps/notifications/react';
+import { notificationsManifest } from '@12-apps/notifications/manifest';
+import { notificationsWebManifest } from '@12-apps/notifications/manifest/web';
+import { createWiringHost } from '@12-apps/wiring/consumer';
 
 import { HARNESS_NOTIFICATION_MESSAGES } from '../notifications/notification-copy';
 
@@ -30,14 +32,52 @@ import { HARNESS_NOTIFICATION_MESSAGES } from '../notifications/notification-cop
  *    wire probe, applied to notifications: an assertion becomes a string
  *    comparison against what crossed, instead of a screenshot of a screen.
  */
-const notifications = createWebNotifications({
-  apiBase: '/api/account',
-  // Required now, and stated by THIS host in its own words. It used to be
-  // omitted, which meant rendering the package's ~40-sentence pt-BR default —
-  // the extraction origin's copy — while claiming to be an independent
-  // consumer. See `../notifications/notification-copy`.
-  messages: HARNESS_NOTIFICATION_MESSAGES,
+/**
+ * Built through the WIRING CONSUMER rather than by calling
+ * `createWebNotifications` directly — the package declares a `web` capability
+ * as of this release, and a harness whose job is to be the living consumer
+ * example should adopt it the way a host does.
+ *
+ * Module scope IS the memoisation the binder documents: surface members are
+ * component TYPES, so rebuilding per render would unmount the panel
+ * mid-interaction. The server capabilities (`http`, `jobs`) answer
+ * `out-of-scope` here and the sibling backend harness answers for them, which
+ * is the property the declaration exists to make checkable.
+ */
+const host = createWiringHost({
+  name: 'frontend-harness',
+  kind: 'web',
+  // Mandatory since wiring 1.3.0. This SPA has no error channel of its own, so
+  // warn/error reach the console deliberately — a harness IS the place a
+  // package's complaint should be visible.
+  ports: {
+    loggerFor: (namespace) => ({
+      info: () => undefined,
+      warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
+      error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
+    }),
+  },
 });
+host.adoptWeb({
+  manifest: notificationsManifest,
+  web: notificationsWebManifest,
+  bindings: {
+    surface: {
+      config: {
+        apiBase: '/api/account',
+        // Required now, and stated by THIS host in its own words. It used to be
+        // omitted, which meant rendering the package's ~40-sentence pt-BR default —
+        // the extraction origin's copy — while claiming to be an independent
+        // consumer. See `../notifications/notification-copy`.
+        messages: HARNESS_NOTIFICATION_MESSAGES,
+      },
+    },
+  },
+});
+
+const notifications = host.assemble().surfaces[notificationsManifest.name] as ReturnType<
+  typeof notificationsWebManifest.surface.create
+>;
 const { BellButton, Panel, page: PreferencesSurface, store } = notifications;
 
 interface OutboxEntry {
