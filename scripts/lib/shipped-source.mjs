@@ -18,10 +18,10 @@
 //    exercise product copy rather than shipping it — a spec that clicks
 //    "Continuar com Google" is a spec, not a leak.
 //
-// 3. A NAMED PACK. A file whose name says what it is (`pt-BR.ts`, anything
-//    under `locales/`) is the sanctioned way to ship another language: a
-//    host imports it and passes it BY HAND, so choosing Portuguese is a line
-//    in the host's diff rather than a silence.
+// 3. A NAMED PACK. A file whose name says what it is (`pt-BR.ts`, `en-US.ts`,
+//    anything under `locales/`) is the sanctioned way to ship a language: a
+//    host imports it and passes it BY HAND, so choosing Portuguese — or
+//    English — is a line in the host's diff rather than a silence.
 //
 // ## Category 2 is read from the MANIFEST, not only from a regex
 //
@@ -46,7 +46,26 @@ import { existsSync, readFileSync } from "node:fs";
 const SHIPPED_SOURCE = /^packages\/[^/]+(?:\/[^/]+)?\/src\/.+\.(?:ts|tsx|js|jsx|mjs)$/;
 const CATEGORY_EXCLUDED =
   /(?:__tests__|__stories__|\.test\.|\.spec\.|\.stories\.|\.test-story\.|(?:^|\/)e2e\/|(?:^|\/)features\/|test-helpers)/;
-const NAMED_PACK = /(?:pt-?br[^/]*\.(?:ts|tsx|js|jsx|mjs)$|(?:^|\/)locales\/)/i;
+// A file naming a BCP-47 `language-REGION` tag as a DELIMITED SEGMENT of its
+// basename, or anything under `locales/`. All four spellings this repo already
+// uses are covered — `pt-BR.ts`, `pt-BR.form.ts`, `mail-templates.pt-BR.ts`,
+// `setup-guide-pt-BR.ts` — and each keeps its meaning: the file says which
+// language it is.
+//
+// It was `pt-?br…` until a second language existed. That spelling exempted
+// exactly the one language this repo happened to ship, so `en-US.ts` — the
+// TRANSLATION of an already-exempt file — came back into scope, where the
+// vocabulary gate fails it for saying "restaurants" in the English rendering of
+// a sentence whose Portuguese was fine next door. The rule was always "a file
+// that says which language it is"; only the pattern was narrower than the rule.
+//
+// Two things keep the widening honest. The region subtag is REQUIRED, so
+// `packages/forms-core/src/br.ts` — CPF/CNPJ validation, not a language pack —
+// cannot exempt itself by its name; and the tag must sit on a `.`/`-` boundary
+// rather than anywhere in the name. Checked against the whole tree when it
+// landed: it reclassifies nothing and exempts no file that is not a pack.
+const NAMED_PACK =
+  /(?:(?:^|\/)locales\/|(?:^|[./-])[a-z]{2}-[A-Z]{2}(?:\.[^/]*)?\.(?:ts|tsx|js|jsx|mjs)$)/;
 
 /**
  * One `files` glob as a regex over the package-relative path.
