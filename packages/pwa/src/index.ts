@@ -19,6 +19,8 @@ export {
 } from "./install-prompt";
 export { type PwaMessages } from "./messages";
 export { PT_BR_PWA_MESSAGES } from "./pt-BR";
+export { EN_US_PWA_MESSAGES } from "./en-US";
+export { PWA_MESSAGES } from "./locales";
 // Boot registration (12-23): a registered worker is a PRECONDITION for
 // installability, so it belongs on every visit rather than behind a settings
 // screen. Browser-side but React-free, hence the root rather than `./react`.
