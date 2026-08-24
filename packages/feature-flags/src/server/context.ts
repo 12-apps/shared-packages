@@ -15,8 +15,8 @@ import {
   type FeatureFlagsDb,
   type FlagDefinition,
 } from "../index";
-import { missingServerCopy } from "./copy";
-import type { FeatureFlagsServerCopy } from "./copy";
+import { missingServerCopy, resolveServerCopy } from "./copy";
+import type { FeatureFlagsCopySource, FeatureFlagsServerCopy } from "./copy";
 
 /**
  * Whoever the host resolved. Authorization is the HOST's, done before a
@@ -62,8 +62,17 @@ export interface FeatureFlagsServerConfig {
   /** The host's flag catalog. `[]` is valid: "no beta running". */
   catalog: readonly FlagDefinition[];
   directory: FeatureFlagsDirectory;
-  /** Every human-readable sentence the API answers with — host vocabulary, no defaults. */
-  copy: FeatureFlagsServerCopy;
+  /**
+   * Every human-readable sentence the API answers with — host vocabulary, no
+   * defaults.
+   *
+   * A host serving more than one language passes a RESOLVER instead of the
+   * words — the shape `@12-apps/i18n`'s `localeCopy(PACK)` returns — and the
+   * sentence is then chosen per request from {@link FeatureFlagsRequest.locale}.
+   * Passing a plain value is unchanged in every respect, which is what keeps a
+   * single-audience host from paying for a choice it never makes.
+   */
+  copy: FeatureFlagsCopySource<FeatureFlagsServerCopy>;
   /** Optional sink for the host's audit trail; awaited when it returns one. */
   audit?: (event: FeatureFlagsAuditEvent) => void | Promise<void>;
 }
@@ -75,6 +84,16 @@ export interface FeatureFlagsRequest {
   params: Record<string, string | undefined>;
   query: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 export interface FeatureFlagsResponse {
@@ -102,7 +121,11 @@ export function assertFeatureFlagsConfig(config: FeatureFlagsServerConfig): void
   if (typeof config.directory.findUserByEmail !== "function") {
     throw new FeatureFlagsError("invalid_config", "directory.findUserByEmail is required.");
   }
-  const missing = missingServerCopy(config.copy);
+  // Validated against the DEFAULT rendering — a resolver called with no
+  // locale. A host that forgot a sentence still fails when it ASSEMBLES its
+  // surface, exactly as before, rather than at whichever request first needs
+  // the missing one. That is the property a resolver could most easily cost.
+  const missing = missingServerCopy(resolveServerCopy(config.copy, undefined));
   if (missing.length > 0) {
     throw new FeatureFlagsError(
       "invalid_config",

@@ -5,7 +5,10 @@
    over a real Postgres. Each case resets to the seeded fixture first. */
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
+import { AUDIT_MOUNT_PATH } from '../src/audit-host';
 import type { AuditLogPageWire } from '@12-apps/audit';
 
 /**
@@ -254,5 +257,47 @@ describe('the actor options', () => {
     const neighbour = await backend.app.request('/api/admin/tenant-b/audit-logs/actors');
     const neighbourBody = (await neighbour.json()) as { data: { id: string }[] };
     expect(neighbourBody.data.map((option) => option.id)).toEqual(['owner-b']);
+  });
+});
+
+describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.hosts.audit.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    expect(statuses.get('observability')).toBe('bound');
+    expect(statuses.get('db')).toBe('collected');
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('keeps the routes in DESCRIPTOR order, which is a rule of the surface', () => {
+    // `/audit-logs/actors` before `/audit-logs` — the package's own adapter
+    // says this is "a rule of the surface, not of the host". The consumer
+    // orders by specificity and the bridge registers in the order it is given,
+    // so the property survives the move; reversed, the actors endpoint would
+    // be swallowed by the list route and answer a page of rows.
+    const paths = backend.hosts.audit.routes.map((mounted) => mounted.route.path);
+    const actors = paths.indexOf('/audit-logs/actors');
+    const list = paths.indexOf('/audit-logs');
+
+    expect(actors).toBeGreaterThanOrEqual(0);
+    expect(list).toBeGreaterThanOrEqual(0);
+    expect(actors).toBeLessThan(list);
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.hosts.audit;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} ${AUDIT_MOUNT_PATH}${mounted.route.path}`);
+
+    const missing = unclaimedRoutes(routes, allButOne);
+    expect(missing).toHaveLength(1);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.hosts.audit.report)).toContain(AUDIT_MOUNT_PATH);
   });
 });

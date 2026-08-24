@@ -378,7 +378,7 @@ describe('team — the roster over the directory seam', () => {
 describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.rbac.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+      backend.hosts.rbac.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -393,7 +393,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     // composes them with two other owners' into the one catalog passed back as
     // config. Without the report a host could ship a catalog missing the
     // package's own ids and nothing would ask.
-    const contributed = backend.rbac.report.packages[0]?.capabilities.find(
+    const contributed = backend.hosts.rbac.report.packages[0]?.capabilities.find(
       (e) => e.kind === 'permissions',
     );
 
@@ -406,12 +406,12 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     // host surface asks permission from, so the capability being mounted does
     // not make the guards stop being a library." Two engines over one database
     // is two answers to "may they".
-    expect(typeof backend.rbac.engine).toBe('object');
-    expect(typeof backend.rbac.seedTenantRoles).toBe('function');
+    expect(typeof backend.hosts.rbac.engine).toBe('object');
+    expect(typeof backend.hosts.rbac.seedTenantRoles).toBe('function');
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.rbac;
+    const { routes } = backend.hosts.rbac;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} ${RBAC_MOUNT_PATH}${mounted.route.path}`);
@@ -420,6 +420,6 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.rbac.report)).toContain(RBAC_MOUNT_PATH);
+    expect(renderWiringReport(backend.hosts.rbac.report)).toContain(RBAC_MOUNT_PATH);
   });
 });

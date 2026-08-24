@@ -54,13 +54,14 @@ function emptySnapshot(featureKey: string): OnboardingStateSnapshot {
 function requireFeatureKey(
   config: OnboardingServerConfig,
   params: Record<string, string | undefined>,
+  locale: string | undefined,
 ): string {
   const featureKey = params.featureKey;
   if (!featureKey) {
-    throw new OnboardingApiError(404, messagesOf(config).unknownFeature);
+    throw new OnboardingApiError(404, messagesOf(config, locale).unknownFeature);
   }
   if (config.featureKeys && !config.featureKeys.includes(featureKey)) {
-    throw new OnboardingApiError(404, messagesOf(config).unknownFeature);
+    throw new OnboardingApiError(404, messagesOf(config, locale).unknownFeature);
   }
   return featureKey;
 }
@@ -110,10 +111,14 @@ function parseSavePatch(
 }
 
 /** Parse + validate the PATCH body into one of the three operations. */
-function parseOperation(config: OnboardingServerConfig, body: unknown): Operation {
+function parseOperation(
+  config: OnboardingServerConfig,
+  body: unknown,
+  locale: string | undefined,
+): Operation {
   const record = asRecord(body);
   const invalid = (): never => {
-    throw new OnboardingApiError(400, messagesOf(config).invalidOperation);
+    throw new OnboardingApiError(400, messagesOf(config, locale).invalidOperation);
   };
   if (!record) return invalid();
 
@@ -140,6 +145,7 @@ async function applyOperation(
   actor: OnboardingActor,
   featureKey: string,
   operation: Operation,
+  locale: string | undefined,
 ): Promise<OnboardingStateSnapshot> {
   const { userId, clientId } = actor;
   if (operation.op === "save") {
@@ -158,7 +164,7 @@ async function applyOperation(
   // this here", and no caller branches on it (the affordance is compiled out), but
   // it IS a changed status rather than a pure move.
   if (!resetAllowed(deps.config)) {
-    throw new OnboardingApiError(403, messagesOf(deps.config).resetUnavailable);
+    throw new OnboardingApiError(403, messagesOf(deps.config, locale).resetUnavailable);
   }
   await deps.repository.deleteOnboardingState(userId, clientId, featureKey);
   return emptySnapshot(featureKey);
@@ -169,9 +175,9 @@ export function onboardingRoutes(deps: RouteDeps): OnboardingRoute[] {
     {
       method: "GET",
       path: "/onboarding/:featureKey",
-      async handle({ actor, params }) {
+      async handle({ actor, params, locale }) {
         try {
-          const featureKey = requireFeatureKey(deps.config, params);
+          const featureKey = requireFeatureKey(deps.config, params, locale);
           // `null` is a legitimate answer, not a 404: "this user has not
           // started" is exactly what the provider's `initialState` wants.
           return ok(
@@ -185,11 +191,11 @@ export function onboardingRoutes(deps: RouteDeps): OnboardingRoute[] {
     {
       method: "PATCH",
       path: "/onboarding/:featureKey",
-      async handle({ actor, params, body }) {
+      async handle({ actor, params, body, locale }) {
         try {
-          const featureKey = requireFeatureKey(deps.config, params);
-          const operation = parseOperation(deps.config, body);
-          return ok(await applyOperation(deps, actor, featureKey, operation));
+          const featureKey = requireFeatureKey(deps.config, params, locale);
+          const operation = parseOperation(deps.config, body, locale);
+          return ok(await applyOperation(deps, actor, featureKey, operation, locale));
         } catch (error) {
           return foldApiError(error);
         }

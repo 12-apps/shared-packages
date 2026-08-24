@@ -772,7 +772,7 @@ describe('the permission fan-out against a real grant table', () => {
 describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.notifications.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+      backend.hosts.notifications.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -787,7 +787,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.notifications;
+    const { routes } = backend.hosts.notifications;
     const allButOne = routes
       .slice(1)
       .map((m) => `${m.route.method} ${NOTIFICATIONS_MOUNT_PATH}${m.route.path}`);
@@ -796,6 +796,6 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.notifications.report)).toContain(NOTIFICATIONS_MOUNT_PATH);
+    expect(renderWiringReport(backend.hosts.notifications.report)).toContain(NOTIFICATIONS_MOUNT_PATH);
   });
 });

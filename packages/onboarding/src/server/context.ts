@@ -26,6 +26,17 @@ export interface OnboardingRequest {
   params: Record<string, string | undefined>;
   query: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries, mirrored here because this
+   * surface builds its own request shape.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** What a handler answers with; the adapter maps this onto its response type. */
@@ -63,8 +74,35 @@ export interface OnboardingMessages {
   unknownFeature: string;
 }
 
-export function messagesOf(config: OnboardingServerConfig): OnboardingMessages {
-  return config.messages;
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type OnboardingCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type OnboardingCopySource<T> = T | OnboardingCopyResolver<T>;
+
+/**
+ * The messages in force, for the caller being answered right now.
+ *
+ * Call this where the sentence is USED, never once when the surface is built:
+ * a factory that resolves and stores the result has re-frozen the language into
+ * its mount, and a single-locale host cannot tell the difference. Every call
+ * site here already had this shape, which is why adopting a resolver costs the
+ * package one argument rather than a refactor.
+ */
+export function messagesOf(
+  config: OnboardingServerConfig,
+  locale?: string,
+): OnboardingMessages {
+  const source = config.messages;
+  return typeof source === "function"
+    ? (source as OnboardingCopyResolver<OnboardingMessages>)({ locale })
+    : source;
 }
 
 export interface OnboardingServerConfig {
@@ -87,14 +125,19 @@ export interface OnboardingServerConfig {
    * route makes, kept as config so a host decides what "development" means.
    */
   resetEnabled?: () => boolean;
-  /** Override any user-facing string (pt-BR defaults). */
   /**
    * The refusal sentences this surface answers with — REQUIRED, the host's
    * words. A pt-BR host passes `PT_BR_ONBOARDING_MESSAGES` from `./pt-BR`,
    * which is verbatim what the origin host's route said; requiring it turns
    * that choice into a line in the host's diff instead of a silence.
+   *
+   * A host serving more than one language passes a RESOLVER instead — the
+   * shape `@12-apps/i18n`'s `localeCopy(PACK)` returns — and the words are
+   * then chosen per request from {@link OnboardingRequest.locale}. Passing a
+   * plain value is unchanged in every respect, which is what keeps a
+   * single-audience host from paying for a choice it never makes.
    */
-  messages: OnboardingMessages;
+  messages: OnboardingCopySource<OnboardingMessages>;
 }
 
 /** The `{ data }` success envelope (the report-builder / rbac house shape). */

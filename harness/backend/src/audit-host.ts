@@ -17,7 +17,13 @@
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { defineAuditVocabulary } from '@12-apps/audit';
-import { auditRouter } from '@12-apps/audit/hono';
+import { auditManifest } from '@12-apps/audit/manifest';
+import { auditServerManifest, type createWireApiAudit } from '@12-apps/audit/manifest/server';
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+import type { Context, MiddlewareHandler } from 'hono';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 import type { AuditUserIdentity } from '@12-apps/audit/server';
 
 import { auditDb } from './audit-db';
@@ -74,37 +80,115 @@ const PERMISSIONS_HEADER = 'x-audit-permissions';
 const tenantFor = (slug: string | undefined): string =>
   slug === 'tenant-b' ? AUDIT_TENANT_B_ID : AUDIT_TENANT_ID;
 
-export function auditHost(pg: PGlite) {
-  return auditRouter({
-    db: () => Promise.resolve(auditDb(pg)),
-    vocabulary: AUDIT_VOCABULARY,
-    trackedModels: ['Product'],
-    retention: { floorDays: 365 },
-    directory: {
-      getUsers: (ids) =>
-        Promise.resolve(ids.map((id) => DIRECTORY.get(id)).filter((user) => user !== undefined)),
-      listActors: (tenantId) =>
-        Promise.resolve(AUDIT_USERS.filter((user) => user.tenantId === tenantId)),
-    },
-    /**
-     * WHO is calling. A real host reads a session; this reads headers, which is
-     * the one thing a browser genuinely cannot have — and it is the host's own
-     * code either way, which is the point: the PACKAGE never reads a header.
-     */
-    resolveActor: (request) => {
-      const userId = request.header(ACTOR_HEADER) ?? 'owner-1';
-      if (userId === 'anonymous') return null;
-      const permissions = request.header(PERMISSIONS_HEADER)?.split(',') ?? ['audit:read'];
-      return {
-        tenantId: tenantFor(request.params.tenantSlug),
-        userId,
-        permissions,
-        role: userId === 'support-1' ? 'SUPERADMIN' : 'OWNER',
-        scope: tenantFor(request.params.tenantSlug),
-        onBehalfOfUserId: request.header(SUBJECT_HEADER) ?? null,
-      };
+/** Where `mount-surfaces.ts` hangs it — the adoption's claim. */
+export const AUDIT_MOUNT_PATH = '/api/admin/:tenantSlug';
+
+/**
+ * WHO is calling, from Hono's own context.
+ *
+ * Under the per-package adapter this lived in `resolveActor` and read an
+ * `AuditRequest`; under the contract it is the BRIDGE's job, because the actor
+ * is what a host resolved and the contract carries it as `actor`. The
+ * package's wire view then hands it back to the surface as `raw` — "the field
+ * `AuditRequest` documents as existing for `resolveActor` alone", in its own
+ * words, so the translation is one hop and the package never reads a header.
+ *
+ * A real host reads a session; this reads headers, which is the one thing a
+ * browser genuinely cannot have — and it is the host's own code either way.
+ */
+function actorFrom(c: Context) {
+  const userId = c.req.header(ACTOR_HEADER) ?? 'owner-1';
+  if (userId === 'anonymous') return null;
+  const permissions = c.req.header(PERMISSIONS_HEADER)?.split(',') ?? ['audit:read'];
+  const tenantId = tenantFor(c.req.param('tenantSlug'));
+  return {
+    tenantId,
+    userId,
+    permissions,
+    role: userId === 'support-1' ? 'SUPERADMIN' : 'OWNER',
+    scope: tenantId,
+    onBehalfOfUserId: c.req.header(SUBJECT_HEADER) ?? null,
+  };
+}
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer`.
+ *
+ * The package anticipated this: its manifest ships `createWireApiAudit`, a WIRE
+ * VIEW that reconciles the two request shapes "in exactly two places and both
+ * are the adapter's business rather than a host's" — `header(name)` closed over
+ * the contract's raw `Request`, and `raw` carrying the actor the host resolved.
+ * The first of those is why this adoption needed the bridge to forward the raw
+ * request at all.
+ *
+ * `actorContext` does NOT come off the aggregate, and cannot: it is a Hono
+ * middleware, and the contract is framework-neutral by construction. What the
+ * aggregate hands back is `withActorContext`, and composing a middleware from
+ * it is this host's work — the same shape of work the per-package adapter was
+ * doing on every adopter's behalf. It is wrapped around EVERY route in the app
+ * (`app.ts`), because the stamp is what attributes the writes of every other
+ * surface too.
+ */
+export function auditHost(pg: PGlite): {
+  router: ReturnType<typeof honoRouterFor>;
+  actorContext: MiddlewareHandler;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+} & Omit<ReturnType<typeof createWireApiAudit>, 'routes'> {
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  host.adoptServer({
+    manifest: auditManifest,
+    server: auditServerManifest,
+    bindings: {
+      http: {
+        mountPath: AUDIT_MOUNT_PATH,
+        config: {
+          db: () => Promise.resolve(auditDb(pg)),
+          vocabulary: AUDIT_VOCABULARY,
+          trackedModels: ['Product'],
+          retention: { floorDays: 365 },
+          directory: {
+            getUsers: (ids: readonly string[]) =>
+              Promise.resolve(
+                ids.map((id) => DIRECTORY.get(id)).filter((user) => user !== undefined),
+              ),
+            listActors: (tenantId: string) =>
+              Promise.resolve(AUDIT_USERS.filter((user) => user.tenantId === tenantId)),
+          },
+          // The actor arrives as `raw`, already resolved by the bridge — so
+          // this is an unwrap rather than a second resolution. Two resolutions
+          // is how a surface and its middleware come to disagree about who is
+          // calling.
+          resolveActor: (request: { raw?: unknown }) => request.raw ?? null,
+        },
+      },
     },
   });
+
+  const wired = host.assemble();
+  const api = wired.http[auditManifest.name] as ReturnType<typeof createWireApiAudit>;
+
+  return {
+    ...api,
+    report: wired.report,
+    routes: wired.routes,
+    router: honoRouterFor(wired.routes, actorFrom),
+    actorContext: (c, next) =>
+      api.withActorContext(
+        {
+          params: c.req.param() as Record<string, string | undefined>,
+          query: c.req.query() as Record<string, string | undefined>,
+          header: (name: string) => c.req.header(name),
+          raw: actorFrom(c),
+        } as never,
+        () => next(),
+      ),
+  };
 }
 
 /** Wipe + reseed the trail — the `/__harness/reset` contract. */
@@ -220,6 +304,19 @@ function stampedAs(userId: string, subject?: string) {
     params: {},
     query: {},
     header: (name: string) => headers[name],
+    // The ACTOR, resolved. Under the per-package adapter this object carried
+    // only headers and the package's `resolveActor` read them; under the
+    // contract the actor is what the HOST resolved and travels as `raw`, so a
+    // seed that passed headers alone would stamp every seeded row `null` —
+    // which is what it did, until these three cases said so.
+    raw: {
+      tenantId: AUDIT_TENANT_ID,
+      userId,
+      permissions: ['audit:read'],
+      role: userId === 'support-1' ? 'SUPERADMIN' : 'OWNER',
+      scope: AUDIT_TENANT_ID,
+      onBehalfOfUserId: subject ?? null,
+    },
   };
 }
 

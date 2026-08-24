@@ -73,3 +73,31 @@ export const EMAIL_AUTH_STATUS: Record<EmailAuthFailure, number> = {
   // like users typing badly.
   "verification-unavailable": 503,
 };
+
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type EmailAuthCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type EmailAuthCopySource<T> = T | EmailAuthCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED, never where the routes are built: a
+ * builder that resolves once and closes over the result has re-frozen the
+ * language into its mount, and a single-locale host cannot tell the difference.
+ */
+export function resolveEmailAuthCopy<T>(
+  source: EmailAuthCopySource<T>,
+  locale: string | undefined,
+): T {
+  return typeof source === "function"
+    ? (source as EmailAuthCopyResolver<T>)({ locale })
+    : source;
+}
