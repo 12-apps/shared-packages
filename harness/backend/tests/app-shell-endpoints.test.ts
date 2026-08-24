@@ -181,6 +181,42 @@ describe(`POST /api${CONSENT_ACCEPT_PATH}`, () => {
   });
 });
 
+describe('the ADOPTION, not just the mount', () => {
+  it('accounts for every capability @12-apps/app-shell declares', () => {
+    // The claim the direct `appShellRouter(config)` call could not make. A
+    // package this host mounts but never ADOPTS is not an unanswered
+    // capability — it is a package the report never hears about, so nothing is
+    // red while a declared surface goes unbound. That is precisely how three
+    // WEB manifests sat unbound in the sibling harness.
+    const entry = backend.hosts.appShell.report.packages.find(
+      (pkg) => pkg.packageName === '@12-apps/app-shell',
+    );
+
+    expect(entry, 'the shell must appear in its own host report').toBeDefined();
+    const statuses = entry?.capabilities.map((capability) => capability.status) ?? [];
+    expect(statuses).not.toHaveLength(0);
+    expect(statuses).not.toContain('unanswered');
+    expect(statuses).not.toContain('unbound');
+  });
+
+  it('mounts exactly the routes the manifest declares, and no more', () => {
+    // The route TABLE is what the adoption buys over a package-owned router:
+    // the surface becomes data this host can assert on, rather than handlers
+    // hidden inside someone else's Hono instance.
+    const declared = backend.hosts.appShell.routes.map(
+      (mounted) => `${mounted.route.method} ${mounted.route.path}`,
+    );
+
+    expect(declared).toHaveLength(2);
+    // Both are `public` — consent precedes having an account, so a caller with
+    // no session is exactly who they are for, and the bridge must not gate them.
+    const kinds = backend.hosts.appShell.routes.map(
+      (mounted) => (mounted.route as { kind?: string }).kind ?? 'authenticated',
+    );
+    expect(kinds).toEqual(['public', 'public']);
+  });
+});
+
 describe('the mount itself', () => {
   it('does not answer the tenant-scoped prefix the other surfaces use', async () => {
     // Consent is a fact about the CALLER; a tenant-prefixed copy would be a second
