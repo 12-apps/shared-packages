@@ -64,5 +64,16 @@ harness/*/package-lock.json
 # committing it would let a scenario and its compiled spec drift apart.
 harness/*/.features-gen/
 
+# The harness's Prisma schema folder is ASSEMBLED from the installed tarballs by
+# harness/backend/prisma/sync-partials.ts, so every file in it except the host's
+# own `schema.prisma` is a copy of a package's partial at whatever version is
+# installed. Committing those copies would create a second source of truth that
+# drifts from the tarball the tests actually run against — and drifts in the
+# direction that matters, since Prisma would then generate a client for models
+# the database does not have.
+harness/backend/prisma/schema/*.prisma
+!harness/backend/prisma/schema/schema.prisma
+harness/backend/prisma/assembled.json
+
 # Storybook build output
 storybook-static/
