@@ -107,3 +107,32 @@ export type PlanImpactMessages = Pick<
   EntitlementsMessages,
   'offLadderNote' | 'unscorableNote' | 'tierBreakdownAboveTop' | 'tierBreakdownOffLadder'
 >;
+
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type EntitlementsCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type EntitlementsCopySource<T> = T | EntitlementsCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED, never where the surface is built: this
+ * package's surface and its `PlanService` are both assembled once per process,
+ * so a value resolved there answers every reader in the language the process
+ * started with — and a single-locale host cannot tell the difference.
+ */
+export function resolveEntitlementsCopy<T>(
+  source: EntitlementsCopySource<T>,
+  locale: string | undefined,
+): T {
+  return typeof source === 'function'
+    ? (source as EntitlementsCopyResolver<T>)({ locale })
+    : source;
+}

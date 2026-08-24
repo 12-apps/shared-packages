@@ -20,6 +20,7 @@ import {
   type EntitlementsRoute,
   type PlanChangeRequestPort,
 } from '../create-api-entitlements';
+import { EN_US_ENTITLEMENTS_MESSAGES } from '../en-US';
 import { PT_BR_ENTITLEMENTS_MESSAGES } from '../pt-BR';
 import { entitlementDenialResponse, isEntitlementDenial } from '../wire';
 
@@ -358,5 +359,79 @@ describe('the usage-registry audit at build time', () => {
         },
       }),
     ).toThrow(/unregistered: stations.online/);
+  });
+});
+
+describe('one mount, two languages', () => {
+  /**
+   * The property the resolver form of the copy port exists for. This surface is
+   * assembled once per process — and so is the `PlanService` behind it, which is
+   * the half that would have been missed: the plan screen's situation notes are
+   * built by a service constructed at boot, not by a handler.
+   *
+   * So there are two cases, one per layer. A resolver wired into the routes but
+   * not the service answers a refusal in the reader's language and the plan
+   * screen beside it in the deployment's.
+   */
+  const bilingual = () =>
+    build({
+      planChangeRequests: memoryLeads(),
+      // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out so
+      // this package keeps no dependency on it.
+      messages: ({ locale }) =>
+        locale === 'en-US' ? EN_US_ENTITLEMENTS_MESSAGES : PT_BR_ENTITLEMENTS_MESSAGES,
+    });
+
+  const errorOf = (body: unknown): string => (body as { error: string }).error;
+
+  it('answers a ROUTE refusal in each caller’s language', async () => {
+    // `POST /plan/request` without the permission — the routes layer.
+    const api = bilingual();
+    const ask = route(api, 'POST', '/plan/request');
+    const actor = { tenantId: 't1', userId: 'u1', permissions: [] };
+
+    expect(errorOf((await ask.handle({ actor, body: {}, locale: 'pt-BR' })).body)).toBe(
+      PT_BR_ENTITLEMENTS_MESSAGES.planRequestForbidden,
+    );
+    expect(errorOf((await ask.handle({ actor, body: {}, locale: 'en-US' })).body)).toBe(
+      EN_US_ENTITLEMENTS_MESSAGES.planRequestForbidden,
+    );
+  });
+
+  it('carries the locale into the PLAN SERVICE, not just the routes', async () => {
+    // The layer a routes-only adoption would leave behind: `getPlanPayload`
+    // builds the situation notes from a service constructed at boot.
+    const api = bilingual();
+    const plan = route(api, 'GET', '/plan');
+    const actor = { tenantId: 't1', userId: 'u1', permissions: [] };
+
+    const pt = await plan.handle({ actor, locale: 'pt-BR' });
+    const en = await plan.handle({ actor, locale: 'en-US' });
+    expect(pt.status).toBe(200);
+    expect(en.status).toBe(200);
+    expect(JSON.stringify(en.body)).not.toBe(JSON.stringify(pt.body));
+  });
+
+  it('hands an absent locale to the resolver rather than refusing', async () => {
+    // A host with one audience populates nothing. Not a misconfiguration — the
+    // resolver decides what no answer means, and here it means the default.
+    const ask = route(bilingual(), 'POST', '/plan/request');
+    const response = await ask.handle({
+      actor: { tenantId: 't1', userId: 'u1', permissions: [] },
+      body: {},
+    });
+    expect(errorOf(response.body)).toBe(PT_BR_ENTITLEMENTS_MESSAGES.planRequestForbidden);
+  });
+
+  it('leaves a plain-value host byte-identical', async () => {
+    // The whole compatibility claim: a host that passes words, not a resolver,
+    // behaves exactly as it did before the field widened.
+    const ask = route(build({ planChangeRequests: memoryLeads() }), 'POST', '/plan/request');
+    const response = await ask.handle({
+      actor: { tenantId: 't1', userId: 'u1', permissions: [] },
+      body: {},
+      locale: 'en-US',
+    });
+    expect(errorOf(response.body)).toBe(PT_BR_ENTITLEMENTS_MESSAGES.planRequestForbidden);
   });
 });
