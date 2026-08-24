@@ -29,6 +29,8 @@ export {
   type LifecycleUserDirectory,
 } from './context';
 export { PT_BR_LIFECYCLE_MESSAGES } from './pt-BR';
+export { EN_US_LIFECYCLE_MESSAGES } from './en-US';
+export { LIFECYCLE_MESSAGES } from './locales';
 export { createDbLifecycleStores } from './stores';
 export type {
   ChangeRequestCreateData,

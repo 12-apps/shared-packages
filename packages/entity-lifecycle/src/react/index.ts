@@ -21,6 +21,8 @@ export type {
   VersionHistoryCopy,
 } from './copy';
 export { PT_BR_LIFECYCLE_WEB_COPY } from './pt-BR';
+export { EN_US_LIFECYCLE_WEB_COPY } from './en-US';
+export { LIFECYCLE_WEB_COPY } from './locales';
 export {
   createLifecycleApiClient,
   type ApprovalRequestWire,
