@@ -173,12 +173,103 @@ describe('the plan screen', () => {
   it('offers the upgrade only where it is the remedy, with the COMMERCIAL name', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
-    expect(screen.getByTestId('plan-upsell-forecast.history').textContent).toContain('Network');
-    // The tenant's own switch gets the way back to it, never a sale.
-    await waitFor(() => expect(screen.queryByTestId('plan-upsell-alerts.digest')).toBeNull());
+    // The sentence lives on the GROUP now — said once for every row that tier
+    // would lift, rather than once per row. The claim is unchanged: a
+    // customer reads the commercial name, never the key.
+    const upsell = screen.getByTestId('plan-upsell-plan-network');
+    expect(upsell.textContent).toContain('Network');
+    expect(screen.getByTestId('plan-blocked-network').textContent).toContain(
+      'Histórico de previsões',
+    );
+
+    // The tenant's own switch is in the UNGROUPED bucket and gets the way back
+    // to it, never a sale — no plan heading may claim that row.
+    const other = screen.getByTestId('plan-blocked-other');
+    expect(other.textContent).toContain('Resumo de alertas');
+    expect(other.textContent).not.toContain('Disponível no plano');
     const link = screen.getByTestId('plan-switch-alerts.digest');
     expect(link.textContent).toContain('Ajustes › Alertas');
     expect(link.querySelector('a')?.getAttribute('href')).toBe('/acme/alertas');
+  });
+
+  it('keeps the upsell on an OVER-QUOTA row, which is enabled', async () => {
+    // The trap: an over-quota row is `enabled: true` — the plan includes the
+    // feature and the tenant outgrew the ceiling — and it carries the one
+    // upsell that hangs off a working row. Keying the explanation off
+    // `enabled` drops it silently, and the row then reads as simply fine.
+    const host = fakeHost();
+    const overQuota: typeof host.fetchImpl = async (input, init) => {
+      if (String(input).endsWith('/plan') && (init?.method ?? 'GET') === 'GET') {
+        const base = payload();
+        return Response.json({
+          data: {
+            plan: {
+              ...base,
+              features: [
+                {
+                  feature: 'scores.library',
+                  description: 'Partituras arquivadas',
+                  enabled: true,
+                  note: 'Você usou 30 de 25. O plano Network amplia o limite.',
+                  reason: 'enabled' as const,
+                  limit: 25,
+                  used: 30,
+                  requiredPlan: 'network',
+                  requiredPlanLabel: 'Network',
+                },
+              ],
+            },
+          },
+        });
+      }
+      return host.fetchImpl(input, init);
+    };
+    renderPage({}, { state: host.state, fetchImpl: overQuota });
+    await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
+
+    const row = screen.getByTestId('plan-feature-scores.library');
+    expect(row.textContent).toContain('Você usou 30 de 25');
+    expect(row.textContent).toContain('Network');
+    // It is not a denial, so it is not under a plan group and the chip is on.
+    await waitFor(() => expect(screen.queryByTestId('plan-blocked-network')).toBeNull());
+    expect(screen.getByTestId('plan-status-scores.library').textContent).toBe('Ativo');
+  });
+
+  it('says the upgrade sentence ONCE for a tier, however many rows it lifts', async () => {
+    // The wall this grouping removes: a store on a low tier read "Disponível
+    // no plano X." once per row, twenty-one rows deep on a real fixture.
+    const host = fakeHost();
+    const manyDenials: typeof host.fetchImpl = async (input, init) => {
+      if (String(input).endsWith('/plan') && (init?.method ?? 'GET') === 'GET') {
+        const base = payload();
+        const denied = base.features[0];
+        if (denied === undefined) throw new Error('fixture lost its denial');
+        return Response.json({
+          data: {
+            plan: {
+              ...base,
+              features: [
+                denied,
+                { ...denied, feature: 'forecast.export', description: 'Exportar previsões' },
+                { ...denied, feature: 'forecast.share', description: 'Compartilhar previsões' },
+              ],
+            },
+          },
+        });
+      }
+      return host.fetchImpl(input, init);
+    };
+    renderPage({}, { state: host.state, fetchImpl: manyDenials });
+    await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
+
+    const group = screen.getByTestId('plan-blocked-network');
+    expect(group.querySelectorAll('[data-testid^="plan-feature-"]')).toHaveLength(3);
+    // Three rows, ONE sentence…
+    expect(screen.getAllByTestId('plan-upsell-plan-network')).toHaveLength(1);
+    // …and the NOTE folds into it too. Under this heading every row is "not
+    // included in your plan" by construction, so printing it per row is the
+    // heading said three more times.
+    expect(group.textContent).not.toContain('Não incluído no seu plano');
   });
 
   it('separates the note from the upsell, and marks the row with a chip', async () => {
@@ -186,8 +277,11 @@ describe('the plan screen', () => {
     await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
     // Two SENTENCES from two sources. Run together they read as one broken
     // one, and the note's own language decides whether it ends in punctuation.
+    // A grouped denial is ONE line: its label and its chip. Everything it
+    // would otherwise say is on the heading above it.
     const row = screen.getByTestId('plan-feature-forecast.history');
-    expect(row.textContent).toContain('Não incluído no seu plano ·');
+    expect(row.textContent).not.toContain('Não incluído no seu plano');
+    expect(row.textContent).not.toContain('Disponível no plano');
     // The marker is a chip rather than MUI's notification-DOT Badge, whose
     // children render as unstyled text — the one thing distinguishing an
     // available row from a withheld one has to be visible.
@@ -274,7 +368,15 @@ describe('the plan screen', () => {
           data: {
             plan: {
               ...base,
-              features: base.features.map((feature) => ({ ...feature, enabled: true })),
+              // Enabled AND inside its ceiling: `requiredPlan` has to clear
+              // too, because an enabled row that still names a tier is an
+              // OVER-QUOTA row, which very much has something to say.
+              features: base.features.map((feature) => ({
+                ...feature,
+                enabled: true,
+                requiredPlan: null,
+                requiredPlanLabel: null,
+              })),
             },
           },
         });

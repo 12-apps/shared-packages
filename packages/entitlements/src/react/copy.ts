@@ -40,13 +40,13 @@ export interface PlanPageCopy {
   statusIntro: string;
   statusEmpty: string;
   /**
-   * The status list opens on what is BLOCKED, because that is the half a
-   * tenant can act on; the rest is one press away. `count` is how many rows
-   * the press would add.
+   * The status list opens on the rows that NEED ATTENTION — denied, switched
+   * off, or over a ceiling — because that is the half a tenant can act on; the
+   * rest is one press away. `count` is how many rows the press would add.
    */
   statusShowAll: (context: { count: number }) => string;
   statusShowBlocked: string;
-  /** The list's own empty state when the plan withholds nothing at all. */
+  /** The list's own empty state when nothing needs attention at all. */
   statusNothingBlocked: string;
   /**
    * A quota ceiling beside a row's note. A ZERO ceiling renders neither —

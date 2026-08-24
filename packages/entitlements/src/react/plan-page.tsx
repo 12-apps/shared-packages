@@ -28,174 +28,20 @@
 import { useState, type JSX } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
-import { Chip } from '@12-apps/ui/data-display/Chip';
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
-import { Button } from '@12-apps/ui/form/Button';
 import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Heading } from '@12-apps/ui/typography/Heading';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { ComparisonTier, OpenPlanRequest, TenantFeatureView } from '../plan-wire';
+import type { ComparisonTier, OpenPlanRequest } from '../plan-wire';
 import { ComparisonTable } from './comparison-table';
 import type { PlanPageCopy } from './copy';
 import { createPlanApi, useRead } from './plan-api';
+import { CurrentStatus } from './plan-status';
 import { TierCards } from './tier-cards';
 import type { ResolvedWebConfig } from './web-config';
-
-/**
- * A quota ceiling, or nothing at all for an on/off capability.
- *
- * A ZERO ceiling returns null rather than the "up to 0" wording — that is
- * not a limit a customer can act on, it is a denial pretending to be one,
- * and the row's own note already says the feature is not included.
- */
-function ceilingLabel(limit: TenantFeatureView['limit'], copy: PlanPageCopy): string | null {
-  if (limit === null) return null;
-  if (limit === 'unlimited') return copy.ceilingUnlimited;
-  if (limit === 0) return null;
-  return copy.ceilingUpTo({ limit });
-}
-
-/**
- * The way back to their own switch, named by the host (`copy.openSwitch`).
- *
- * Rendered ONLY for `disabled-by-tenant`, and keyed off that code rather than
- * off `enabled === false`: a tenant-switched feature can equally be dark
- * because the plan never granted it, and offering the toggle there would send
- * them to flip something that cannot help.
- */
-function TenantSwitchLink({
-  feature,
-  config,
-}: {
-  feature: TenantFeatureView;
-  config: ResolvedWebConfig;
-}): JSX.Element | null {
-  if (feature.reason !== 'disabled-by-tenant') return null;
-  const location = config.switchLocation(feature.feature);
-  if (location === null) return null;
-  const Link = config.LinkComponent;
-  return (
-    <Text as="div" size="sm" data-testid={`plan-switch-${feature.feature}`}>
-      <Link to={location.path}>{config.copy.planPage.openSwitch({ label: location.label })}</Link>
-    </Text>
-  );
-}
-
-/**
- * Why a row is off, and what to do about it — the second line, rendered only
- * for a row that HAS something to explain.
- *
- * Its own component because a row that is simply ON has nothing to say: the
- * chip is the whole message, and every one of the ~40 rows used to carry this
- * block whether or not it applied.
- */
-function FeatureDenial({
-  feature,
-  config,
-}: {
-  feature: TenantFeatureView;
-  config: ResolvedWebConfig;
-}): JSX.Element {
-  const copy = config.copy.planPage;
-  return (
-    <Box sx={{ mt: 0.25 }}>
-      <Text as="div" size="sm" color="secondary">
-        {feature.note}
-        {/* Only where upgrading is actually the remedy — the payload already
-            withholds this for a feature the store switched off itself. The
-            BUTTON lives on the tier's card instead of here: one press per tier
-            reads better than the same offer repeated on every denied row.
-
-            SEPARATED rather than merely spaced: these are two sentences from
-            two sources, and the note's own language decides whether it ends in
-            punctuation. Run together they read as one broken sentence —
-            "Não incluído no seu plano Disponível no plano Max." */}
-        {feature.requiredPlan === null ? null : (
-          <Text
-            as="span"
-            size="sm"
-            color="secondary"
-            data-testid={`plan-upsell-${feature.feature}`}
-          >
-            {' · '}
-            {copy.availableOn({
-              planLabel: feature.requiredPlanLabel ?? feature.requiredPlan,
-            })}
-          </Text>
-        )}
-      </Text>
-      {/* The mirror image of the upsell line: this row is off because of a
-          switch the tenant owns, so the useful thing to hand them is the way
-          back to it. */}
-      <TenantSwitchLink feature={feature} config={config} />
-    </Box>
-  );
-}
-
-/**
- * One capability, as one line — with a second line ONLY where something is
- * wrong.
- *
- * Every row used to carry a label, a note, an upsell sentence and a link as
- * four stacked blocks, on all ~40 features, enabled ones included. A row that
- * is simply on has nothing to explain: the chip is the whole message, and the
- * ceiling ("até 100") rides beside it because that is the only other fact a
- * working feature has. The prose is kept for the rows that are OFF, which is
- * where the screen actually has something to say.
- */
-function FeatureRow({
-  feature,
-  config,
-}: {
-  feature: TenantFeatureView;
-  config: ResolvedWebConfig;
-}): JSX.Element {
-  const copy = config.copy.planPage;
-  const ceiling = ceilingLabel(feature.limit, copy);
-  return (
-    <Box
-      data-testid={`plan-feature-${feature.feature}`}
-      sx={{ py: 1, borderBottom: '1px solid', borderColor: 'divider' }}
-    >
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1.5,
-        }}
-      >
-        <Text as="span" size="sm" weight="medium">
-          {feature.description ?? feature.feature}
-        </Text>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
-          {ceiling === null ? null : (
-            <Text as="span" size="sm" color="secondary">
-              {ceiling}
-            </Text>
-          )}
-          {/* A CHIP, not a Badge. `@12-apps/ui`'s Badge wraps MUI's, which is
-              the notification-DOT primitive: it renders its children as bare
-              text with an invisible dot anchored to them, so the one marker
-              distinguishing an available row from a withheld one arrived as
-              unstyled grey text at the far right of the row. A chip is the
-              pill this always meant to be, and it is what the tier badges
-              above already use. */}
-          <Chip
-            label={feature.enabled ? copy.statusBadge.enabled : copy.statusBadge.disabled}
-            size="sm"
-            color={feature.enabled ? 'success' : 'neutral'}
-            data-testid={`plan-status-${feature.feature}`}
-          />
-        </Stack>
-      </Box>
-      {feature.enabled ? null : <FeatureDenial feature={feature} config={config} />}
-    </Box>
-  );
-}
 
 /**
  * The two things that can be true about an ask: one is open, or the last one
@@ -226,73 +72,6 @@ function RequestBanners({
     );
   }
   return null;
-}
-
-/**
- * What is on for THIS tenant right now, and why it is off if it is.
- *
- * Kept separate from the cards because it is the only place that
- * distinguishes "your plan does not include this" from "you switched this off
- * yourself" — collapsing those two sells an upgrade that changes nothing.
- *
- * Opens on the BLOCKED rows alone. A registry of forty-odd capabilities
- * printed in full is a wall a customer scrolls past, and all but a handful of
- * it says "on" — which is the half nobody came to read. What is withheld, and
- * why, is the actionable half and the reason this section exists; the rest is
- * one press away and stays exactly one press away, because a store that wants
- * the whole inventory should not have to hunt for it either.
- */
-function CurrentStatus({
-  features,
-  config,
-}: {
-  features: TenantFeatureView[];
-  config: ResolvedWebConfig;
-}): JSX.Element {
-  const copy = config.copy.planPage;
-  const [showAll, setShowAll] = useState(false);
-  const blocked = features.filter((feature) => !feature.enabled);
-  const hidden = features.length - blocked.length;
-  const shown = showAll ? features : blocked;
-
-  return (
-    <Box>
-      <Heading level="h3">{copy.statusHeading}</Heading>
-      <Box sx={{ mb: 1 }}>
-        <Text as="div" color="secondary" size="sm">
-          {copy.statusIntro}
-        </Text>
-      </Box>
-      {features.length === 0 ? (
-        <Text color="secondary">{copy.statusEmpty}</Text>
-      ) : (
-        <>
-          {shown.length === 0 ? (
-            <Text as="div" color="secondary" size="sm" data-testid="plan-status-none-blocked">
-              {copy.statusNothingBlocked}
-            </Text>
-          ) : (
-            shown.map((feature) => (
-              <FeatureRow key={feature.feature} feature={feature} config={config} />
-            ))
-          )}
-          {hidden === 0 ? null : (
-            <Box sx={{ mt: 1 }}>
-              <Button
-                variant="text"
-                size="sm"
-                onClick={() => setShowAll((was) => !was)}
-                aria-expanded={showAll}
-                data-testid="plan-status-toggle"
-              >
-                {showAll ? copy.statusShowBlocked : copy.statusShowAll({ count: hidden })}
-              </Button>
-            </Box>
-          )}
-        </>
-      )}
-    </Box>
-  );
 }
 
 /** The press-to-ask flow: one pending flag, one error, reload on success. */
@@ -390,7 +169,11 @@ export function PlanScreen({ config }: { config: ResolvedWebConfig }): JSX.Eleme
           per card, and closed until somebody is actually comparing. */}
       <ComparisonTable tiers={plan.comparison} copy={config.copy.comparisonTable} />
 
-      <CurrentStatus features={plan.features} config={config} />
+      <CurrentStatus
+        features={plan.features}
+        planOrder={plan.comparison.map((tier) => tier.key)}
+        config={config}
+      />
     </Stack>
   );
 }
