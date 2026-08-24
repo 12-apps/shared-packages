@@ -107,7 +107,7 @@ import { realtimeHost } from './realtime-host';
 import { mountSurfaces } from './mount-surfaces';
 import { applyDiscountMigrations } from './discounts-db';
 import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
-import { createShiftHostSchema, reseedShifts, shiftHost } from './shift-host';
+import { provisionShift, reseedShifts, shiftHost } from './shift-host';
 import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
@@ -132,12 +132,9 @@ export interface HarnessBackend {
    */
   realtimeDriver: RealtimeDriver;
   /**
-   * `@12-apps/shift`'s service, for the overdue sweep.
-   *
-   * Exposed because the sweep has NO route and deliberately so: it is a
-   * scheduled cross-tenant job, and an endpoint that closed other people's
-   * shifts on request would be a very different thing from one that closes
-   * them because their window ran out.
+   * `@12-apps/shift`'s service, for the overdue sweep — which has NO route,
+   * deliberately: it is a scheduled cross-tenant job, and an endpoint closing
+   * other people's shifts on request is a very different thing.
    */
   shift: Hosts['shift'];
   /** Closing it is the caller's job; the server itself never does. */
@@ -200,14 +197,9 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   await applyDiscountMigrations(pg);
   await createDiscountCatalogTables(pg);
   await reseedDiscounts(pg);
-  // FUT-146: the two shift tables, out of the package's own tarball. What is
-  // NOT in that tarball is `resource_assignments` — the package asks a host to
-  // create, check and end the claims, and names the index it must carry, while
-  // owning no model for it. WHAT a shift claims is host domain, so the ledger
-  // is the host's and the package keeps only the snapshot it copied. See
-  // shift-db.ts; `harness_desks` is the catalog that makes the claim real.
-  await createShiftHostSchema(pg);
-  await reseedShifts(pg);
+  // FUT-146: the shift tables plus the ledger the package does NOT ship — see
+  // `provisionShift`, and `shift-db.ts` for why that split is the adoption.
+  const shift = await provisionShift(pg);
   // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
   // host is the two tables its reference probes read (storage-host.ts) and a
   // directory to keep objects in.
@@ -223,7 +215,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     realtime: realtimeHost(pg, realtimeDriver),
     onboarding: onboardingHost(pg),
     discounts: discountsHost(pg),
-    shift: shiftHost(pg),
+    shift,
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
     entitlements: createEntitlementsHost(),

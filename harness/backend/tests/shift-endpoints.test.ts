@@ -362,33 +362,39 @@ describe('the audit seam', () => {
 });
 
 describe('the overdue sweep', () => {
-  it('closes a shift past its library window and leaves a fresh one alone', async () => {
-    // Opened THROUGH the service with an explicit `startedAt`, not backdated
-    // afterwards: `started_at` is one of the identity columns the package's
-    // trigger freezes, so an UPDATE here is refused — which is the guard doing
-    // its job, and a reminder that a shift's start is settled when it opens.
-    const stale = await backend.shift.service.openShift({
-      clientId: SHIFT_TENANT_ID,
-      userId: 'ana',
-      actorUserId: 'ana',
-      kind: 'desk',
-      startedAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
-    });
-    const fresh = await shiftFrom(await as('bruno').open({ kind: 'stacks' }));
+  it('closes what is past ITS tenant window and leaves the other alone', async () => {
+    const north = await shiftFrom(await as('ana').open({ kind: 'desk' }));
+    const river = await shiftFrom(
+      await as('beatriz', SHIFT_TENANT_B_ID).open({ kind: 'desk' }),
+    );
 
+    // The window is per TENANT, and that is the whole point of the seam: the
+    // sweep is cross-tenant, so it has to ask each branch how long a shift of
+    // its own may run. Driving the case through the two windows rather than
+    // through a backdated clock also makes it deterministic — nothing here
+    // depends on when the test ran, and the package refuses a `startedAt` more
+    // than 24 hours old anyway.
     const result = await backend.shift.service.autoCloseOverdue({
-      maxDurationMsForTenant: async () => 16 * 60 * 60 * 1000,
+      // Derived from the row rather than from a clock, so the case is decided
+      // entirely by data. A second past the north shift's own start is past a
+      // one-millisecond window and nowhere near a sixteen-hour one.
+      detectedAt: new Date(new Date(north.startedAt).getTime() + 1000),
+      maxDurationMsForTenant: async (clientId) =>
+        clientId === SHIFT_TENANT_ID ? 1 : 16 * 60 * 60 * 1000,
     });
 
-    expect(result.closed.map((shift) => shift.id)).toEqual([stale.id]);
+    expect(result.closed.map((shift) => shift.id)).toEqual([north.id]);
     expect(result.failures).toEqual([]);
 
-    const after = await pageFrom(await as('ana').list('?open=true'));
-    expect(after.items.map((item) => item.id)).toEqual([fresh.id]);
+    // The neighbour's shift is untouched, which is the half a single-tenant
+    // sweep could not tell apart from "nothing was overdue".
+    const neighbour = await pageFrom(await as('beatriz', SHIFT_TENANT_B_ID).list('?open=true'));
+    expect(neighbour.items.map((item) => item.id)).toEqual([river.id]);
+    expect(await pageFrom(await as('ana').list('?open=true'))).toMatchObject({ items: [] });
 
     const closed = await backend.pg.query<{ ended_reason: string; ended_by_user_id: string | null }>(
       'SELECT ended_reason, ended_by_user_id FROM shifts WHERE id = $1',
-      [stale.id],
+      [north.id],
     );
     // `auto` is the one end reason that carries no closer, and the package's
     // own CHECK constraint is what allows the NULL only for it.

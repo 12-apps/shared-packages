@@ -158,6 +158,34 @@ export function serializeShift(shift: Shift): unknown {
   };
 }
 
+/**
+ * `deskId` is this host's field name, and the desk must be one of ITS rows.
+ *
+ * `exclusive` comes off the catalog rather than off the request — a caller that
+ * could declare its own claim non-exclusive would opt out of the very rule the
+ * assignment ledger exists to enforce.
+ */
+async function deskFromBody(
+  pg: PGlite,
+  body: Record<string, unknown>,
+  actor: { clientId: string },
+): Promise<{ resource?: ShiftResource }> {
+  const deskId = typeof body['deskId'] === 'string' ? body['deskId'] : undefined;
+  if (deskId === undefined || deskId === '') return {};
+  const params = new Params();
+  const { rows } = await (pg as unknown as SqlRunner).query<{ exclusive: boolean }>(
+    `SELECT exclusive FROM harness_desks
+     WHERE client_id = ${params.add(actor.clientId)} AND id = ${params.add(deskId)}`,
+    params.values,
+  );
+  const desk = rows[0];
+  // The host's own error language, thrown from the host's own resolver — the
+  // package documents that a throw here flows out of the handler untouched,
+  // exactly like a guard's refusal.
+  if (!desk) throw new ShiftError('INVALID_SHIFT', SHIFT_COPY.unknownDesk);
+  return { resource: { type: DESK_RESOURCE_TYPE, id: deskId, exclusive: desk.exclusive } };
+}
+
 export type HarnessShift = ReturnType<typeof shiftHost>;
 
 export function shiftHost(pg: PGlite): ShiftApi & {
@@ -195,32 +223,7 @@ export function shiftHost(pg: PGlite): ShiftApi & {
   const api = createApiShift({
     shifts: port,
     serialize: serializeShift,
-    resources: {
-      /**
-       * `deskId` is this host's field name, and the desk must be one of ITS
-       * rows. `exclusive` comes off the catalog rather than off the request —
-       * a caller that could declare its own claim non-exclusive would opt out
-       * of the rule the ledger exists to enforce.
-       */
-      async fromBody(body, actor): Promise<{ resource?: ShiftResource }> {
-        const deskId = typeof body['deskId'] === 'string' ? body['deskId'] : undefined;
-        if (deskId === undefined || deskId === '') return {};
-        const params = new Params();
-        const { rows } = await (pg as unknown as SqlRunner).query<{ exclusive: boolean }>(
-          `SELECT exclusive FROM harness_desks
-           WHERE client_id = ${params.add(actor.clientId)} AND id = ${params.add(deskId)}`,
-          params.values,
-        );
-        const desk = rows[0];
-        // The host's own error language, thrown from the host's own resolver —
-        // the package documents that a throw here flows out of the handler
-        // untouched, exactly like a guard's refusal.
-        if (!desk) throw new ShiftError('INVALID_SHIFT', SHIFT_COPY.unknownDesk);
-        return {
-          resource: { type: DESK_RESOURCE_TYPE, id: deskId, exclusive: desk.exclusive },
-        };
-      },
-    },
+    resources: { fromBody: (body, actor) => deskFromBody(pg, body, actor) },
   });
 
   return {
@@ -245,6 +248,26 @@ export function shiftHost(pg: PGlite): ShiftApi & {
       },
     ),
   };
+}
+
+/**
+ * Everything this surface needs before it can answer, in one call.
+ *
+ * The package's own migrations out of the installed tarball, then the tables it
+ * does NOT ship. `resource_assignments` is the interesting one: the package
+ * asks a host to create, check and end resource claims, and names the unique
+ * index they must carry, while owning no model for any of it — because WHAT a
+ * shift claims is host domain. The package keeps only the three-column snapshot
+ * it copied onto the shift. `harness_desks` is the catalog that makes a claim
+ * refusable rather than a free-form string.
+ *
+ * Bundled here rather than spelled out in `app.ts` so the adoption reads as one
+ * line there, the way the other surfaces do.
+ */
+export async function provisionShift(pg: PGlite): Promise<HarnessShift> {
+  await createShiftHostSchema(pg);
+  await reseedShifts(pg);
+  return shiftHost(pg);
 }
 
 /** The host's own vocabulary check, in the host's own words. */
