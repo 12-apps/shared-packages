@@ -65,6 +65,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+import { checkLedger, readLedger, summarize } from "./lib/exception-ledger.mjs";
 import { globToRegExp, inScope } from "./lib/shipped-source.mjs";
 import { stripComments } from "./copy-portability-gate.mjs";
 
@@ -134,11 +135,6 @@ function scanRepo() {
   return findings;
 }
 
-function readExceptions() {
-  if (!existsSync(EXCEPTIONS_PATH)) return {};
-  return JSON.parse(readFileSync(EXCEPTIONS_PATH, "utf8"));
-}
-
 /** How a finding reads in the failure list: `path:line — label, label`. */
 export function describe(path, leaks) {
   const parts = [...leaks.entries()].sort((a, b) => a[1] - b[1]);
@@ -176,32 +172,29 @@ function selftest() {
 function main() {
   if (!selftest()) process.exit(1);
   const findings = scanRepo();
-  const exceptions = readExceptions();
-  const failures = [];
-  for (const [path, leaks] of findings) {
-    if (!(path in exceptions)) {
-      failures.push(
-        `origin-host vocabulary in shipped source: ${describe(path, leaks)} — a domain noun in a ` +
-          `published type, value or string becomes every adopter's wire contract. Take it from host ` +
-          `config, or name it for the shape rather than for the application.`,
-      );
-    }
-  }
-  for (const path of Object.keys(exceptions)) {
-    if (!findings.has(path)) {
-      failures.push(
-        `stale exception: ${path} no longer leaks (or no longer exists) — delete its line from ${EXCEPTIONS_PATH}`,
-      );
-    }
-  }
+  const ledger = readLedger(EXCEPTIONS_PATH, { existsSync, readFileSync });
+  const { failures, counts } = checkLedger({
+    findings: new Set(findings.keys()),
+    ledger,
+    ledgerPath: EXCEPTIONS_PATH,
+    unlisted: (path) =>
+      `origin-host vocabulary in shipped source: ${describe(path, findings.get(path))} — a domain ` +
+      `noun in a published type, value or string becomes every adopter's wire contract. Take it ` +
+      `from host config, or name it for the shape rather than for the application.`,
+  });
   if (failures.length > 0) {
     console.error(`${LABEL} ${failures.length} violation(s):`);
     for (const failure of failures) console.error(`  ✗ ${failure}`);
     process.exit(1);
   }
   console.log(
-    `${LABEL} clean — ${findings.size} file(s) naming the origin host's domain, all ` +
-      `${Object.keys(exceptions).length} grandfathered (shrink-only).`,
+    summarize({
+      label: LABEL,
+      total: findings.size,
+      noun: "file(s) naming the origin host's domain",
+      counts,
+      burndown: "the burn-down is each package's adoption wave",
+    }),
   );
 }
 
