@@ -29,7 +29,16 @@ export { inlineSchemaRefs, UnsupportedSchemaError } from "./openapi/refs";
 // here so that packages which own a domain can ship that domain's endpoints and
 // a host can concatenate them — which requires all of them to mean the same
 // thing by "an endpoint". See `openapi/endpoint.ts`.
-export type { McpEndpoint, HttpMethod } from "./openapi/endpoint";
+export type { McpEndpoint, HttpMethod, McpAnnotationDefaults } from "./openapi/endpoint";
+/**
+ * Composing a tool's classification from a package's declared defaults and the
+ * host's own table — the host still wins every field it states, and a field
+ * neither side supplies is a refusal. See `./openapi/annotations`.
+ */
+export {
+  resolveToolAnnotations,
+  type ToolAnnotationOverrides,
+} from "./openapi/annotations";
 export type {
   OpenApiDocument,
   OpenApiOperation,

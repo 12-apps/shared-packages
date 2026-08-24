@@ -28,6 +28,37 @@ import type { z } from "zod";
 /** The methods an MCP-exposed route may use. */
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
+/**
+ * What a PACKAGE can say about how its own tool behaves.
+ *
+ * The host still owns the final `ToolAnnotations` — every field required, and
+ * `mcp:lint` unchanged in demanding that each tool ends classified. What
+ * changes is who supplies the DEFAULT. A package declaring
+ * `getSupplierVersions` knows perfectly well that it reads and does not
+ * destroy; a host cannot know that without reading the package's source, so
+ * today it restates the classification by hand — 48 lines of policy hints for
+ * one package's eight-endpoint factory, growing with every collection plugged
+ * in, and wrong the moment the package changes a verb.
+ *
+ * Every field is OPTIONAL here, which is the whole difference from
+ * `ToolAnnotations`: this is a suggestion the host merges under its own table,
+ * so a package that knows two of the four says two and stays silent on the
+ * rest. Deliberately spelled without the `Hint` suffix and as a structural
+ * twin of `@12-apps/wiring`'s `WireMcpAnnotations`, so an `McpEndpoint` still
+ * satisfies `WireMcpTool` — restated rather than imported because this package
+ * takes no dependency on the wiring contract.
+ */
+export interface McpAnnotationDefaults {
+  /** Human title override; hosts may re-derive from the operation id. */
+  title?: string;
+  /** The tool only reads — never mutates host state. */
+  readOnly?: boolean;
+  /** A destructive write (delete/purge), as opposed to an additive one. */
+  destructive?: boolean;
+  /** The tool reaches beyond the host's own data (external services). */
+  openWorld?: boolean;
+}
+
 interface McpEndpointBase {
   /** Stable tool id — this becomes the MCP tool name, so renaming it is a
    *  breaking change for every agent that has learned the old one. */
@@ -44,6 +75,11 @@ interface McpEndpointBase {
   params?: z.ZodType;
   /** Request body schema (writes only). */
   body?: z.ZodType;
+  /**
+   * Behavior the package can assert about its own tool. Optional, and merged
+   * UNDER the host's table — see {@link McpAnnotationDefaults}.
+   */
+  annotations?: McpAnnotationDefaults;
 }
 
 /**
