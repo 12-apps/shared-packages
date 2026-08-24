@@ -1,6 +1,12 @@
 /**
- * The six framework-neutral endpoints, mount-relative. Error copy is pt-BR
+ * The six framework-neutral endpoints, mount-relative. Error copy is the host's
  * (a user-facing management screen reads it) beside stable machine codes.
+ *
+ * Every handler opens by resolving `config.copy` against `request.locale`, and
+ * none may hoist that: this surface is a lazy singleton in every host that has
+ * one, so a copy resolved where the routes are BUILT answers in the same
+ * language for the life of the process — and a single-locale host cannot tell
+ * the difference.
  *
  * Grant lookups run `findUnique` first and never rely on the client throwing
  * a known error code for a missing row — the seam is structural, and a fake
@@ -111,9 +117,6 @@ export function flagsIndexRoute(config: FeatureFlagsServerConfig): FeatureFlagsR
     method: "GET",
     path: "/",
     async handle(request) {
-      // Resolved per request, never at mount: this surface is a lazy singleton
-      // in every host that has one, and a copy chosen when it was built answers
-      // in the same language for the life of the process.
       const copy = resolveServerCopy(config.copy, request.locale);
       const denied = unauthenticated(request, copy);
       if (denied) return denied;
@@ -152,9 +155,6 @@ export function userFlagsRoute(config: FeatureFlagsServerConfig): FeatureFlagsRo
     method: "GET",
     path: "/users/:userId",
     async handle(request) {
-      // Resolved per request, never at mount: this surface is a lazy singleton
-      // in every host that has one, and a copy chosen when it was built answers
-      // in the same language for the life of the process.
       const copy = resolveServerCopy(config.copy, request.locale);
       const denied = unauthenticated(request, copy);
       if (denied) return denied;
@@ -187,9 +187,6 @@ export function grantsListRoute(config: FeatureFlagsServerConfig): FeatureFlagsR
     method: "GET",
     path: "/:key/grants",
     async handle(request) {
-      // Resolved per request, never at mount: this surface is a lazy singleton
-      // in every host that has one, and a copy chosen when it was built answers
-      // in the same language for the life of the process.
       const copy = resolveServerCopy(config.copy, request.locale);
       const denied = unauthenticated(request, copy);
       if (denied) return denied;
@@ -268,9 +265,6 @@ export function grantByEmailRoute(config: FeatureFlagsServerConfig): FeatureFlag
     method: "POST",
     path: "/:key/grants",
     async handle(request) {
-      // Resolved per request, never at mount: this surface is a lazy singleton
-      // in every host that has one, and a copy chosen when it was built answers
-      // in the same language for the life of the process.
       const copy = resolveServerCopy(config.copy, request.locale);
       const denied = unauthenticated(request, copy);
       if (denied) return denied;
@@ -350,9 +344,6 @@ export function grantUpdateRoute(config: FeatureFlagsServerConfig): FeatureFlags
     method: "PUT",
     path: "/:key/grants/:userId",
     async handle(request) {
-      // Resolved per request, never at mount: this surface is a lazy singleton
-      // in every host that has one, and a copy chosen when it was built answers
-      // in the same language for the life of the process.
       const copy = resolveServerCopy(config.copy, request.locale);
       const denied = unauthenticated(request, copy);
       if (denied) return denied;
@@ -384,9 +375,6 @@ export function grantRevokeRoute(config: FeatureFlagsServerConfig): FeatureFlags
     method: "DELETE",
     path: "/:key/grants/:userId",
     async handle(request) {
-      // Resolved per request, never at mount: this surface is a lazy singleton
-      // in every host that has one, and a copy chosen when it was built answers
-      // in the same language for the life of the process.
       const copy = resolveServerCopy(config.copy, request.locale);
       const denied = unauthenticated(request, copy);
       if (denied) return denied;

@@ -120,6 +120,22 @@ function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): 
   };
 }
 
+/**
+ * A refusal in the CALLER's language, bound to one mount's copy.
+ *
+ * Resolved per refusal rather than where the routes are built: these eight
+ * descriptors are assembled once and the language changes per caller, so a
+ * `messages` read at assembly would answer every reader in whichever language
+ * the process started with — and a single-locale host cannot tell the
+ * difference.
+ */
+function refuserFor(
+  messages: EmailAuthCopySource<EmailAuthMessages>,
+): (refusalResult: EmailAuthRefusal, locale: string | undefined) => EmailAuthResponse {
+  return (refusalResult, locale) =>
+    refusal(refusalResult, resolveEmailAuthCopy(messages, locale));
+}
+
 /** A success, in the envelope the packaged client parses. */
 function ok(data: unknown): EmailAuthResponse {
   return { status: 200, body: { data } };
@@ -163,12 +179,8 @@ function optionalStr(body: unknown, key: string): string | undefined {
  * vocabulary and the two would drift.
  */
 export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[] {
-  const { credentials, messages, onSignedUp } = config;
-  // Resolved per REFUSAL, not per mount: these routes are built once and the
-  // language changes per caller, so a `messages` read here would answer every
-  // reader in whichever language the process was started with.
-  const refuse = (r: EmailAuthRefusal, locale: string | undefined): EmailAuthResponse =>
-    refusal(r, resolveEmailAuthCopy(messages, locale));
+  const { credentials, onSignedUp } = config;
+  const refuse = refuserFor(config.messages);
 
   return [
     {
