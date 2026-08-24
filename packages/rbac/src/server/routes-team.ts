@@ -14,6 +14,7 @@ import type { RbacActorTier } from './roster-policy';
 import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
 import type { MemberDetailPayload } from './payloads';
+import { announceInvite } from './invite-announce';
 import type { RolesStore } from './roles-store';
 import type { TeamStore } from './team-store';
 import { parseBody, parseTeamListQuery, requireParam, type RoleWireSchemas } from './wire';
@@ -125,6 +126,7 @@ function inviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
           resourceId: email,
           after: { status: result.status },
         });
+        await announceInvite(deps, actor, email, result);
         return ok({ status: result.status });
       } catch (error) {
         return foldApiError(error);

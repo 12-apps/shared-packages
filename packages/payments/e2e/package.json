@@ -19,6 +19,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./manifest": {
+      "types": "./dist/manifest/index.d.ts",
+      "default": "./dist/manifest/index.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

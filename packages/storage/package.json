@@ -40,6 +40,9 @@
     },
     "react-dom": {
       "optional": true
+    },
+    "@12-apps/wiring": {
+      "optional": true
     }
   },
   "dependencies": {

@@ -30,6 +30,7 @@ export default defineConfig({
     'hono/index': 'src/hono/index.ts',
     'manifest/index': 'src/manifest/index.ts',
     'manifest/server': 'src/manifest/server.ts',
+    'manifest/web': 'src/manifest/web.tsx',
 },
   format: ['esm'],
   dts: true,

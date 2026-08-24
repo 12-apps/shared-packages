@@ -76,6 +76,52 @@ export interface LifecycleEndpointVocabulary {
   tags?: readonly string[];
 }
 
+
+/**
+ * The behaviour every one of these eight tools has, asserted by the package
+ * that wrote them.
+ *
+ * The host still owns the final classification and `mcp:lint` still demands
+ * that every served tool ends complete — what changes is who supplies the
+ * DEFAULT. A host cannot know that `get<Noun>Versions` reads and does not
+ * destroy without reading this file, so it restated the answer by hand: one
+ * line per tool, times eight, times every collection plugged in, and wrong the
+ * moment this factory changed a verb. These defaults make the host's table
+ * OVERRIDES plus the tools the host itself owns.
+ *
+ * `openWorld` is false on all eight and that is a claim, not a formality: every
+ * one of them reads or writes the host's own lifecycle tables through the
+ * host's own ports, and none reaches a vendor.
+ *
+ * `title` is deliberately NOT set. Behaviour is this package's knowledge;
+ * the label an agent reads is host copy, in the host's language, keyed off the
+ * same vocabulary that already supplies `noun` and `summaries`. Asserting one
+ * here would be the silent-pt-BR-default failure one capability over.
+ */
+const READS: McpEndpoint['annotations'] = {
+  readOnly: true,
+  destructive: false,
+  openWorld: false,
+};
+
+/** An additive or replacing write — nothing is lost that cannot be restored. */
+const WRITES: McpEndpoint['annotations'] = {
+  readOnly: false,
+  destructive: false,
+  openWorld: false,
+};
+
+/**
+ * The one destructive tool of the eight: discarding a draft throws away the
+ * unpublished working copy, and no version history covers it — the draft was
+ * never published, so there is nothing to restore it from.
+ */
+const DESTROYS: McpEndpoint['annotations'] = {
+  readOnly: false,
+  destructive: true,
+  openWorld: false,
+};
+
 /**
  * The eight endpoints for one plugged collection, in a fixed order.
  *
@@ -105,6 +151,7 @@ function versioningEndpoints(
   return [
     {
       operationId: `get${noun}Versions`,
+      annotations: READS,
       method: 'get',
       path: `${collectionPath}/{id}/versions`,
       summary: summaries.getVersions,
@@ -115,6 +162,7 @@ function versioningEndpoints(
     },
     {
       operationId: `restore${noun}Version`,
+      annotations: WRITES,
       method: 'post',
       path: `${collectionPath}/{id}/versions/{version}/restore`,
       summary: summaries.restoreVersion,
@@ -133,6 +181,7 @@ function draftEndpoints(
   return [
     {
       operationId: `get${noun}Draft`,
+      annotations: READS,
       method: 'get',
       path: `${collectionPath}/{id}/draft`,
       summary: summaries.getDraft,
@@ -142,6 +191,7 @@ function draftEndpoints(
     },
     {
       operationId: `save${noun}Draft`,
+      annotations: WRITES,
       method: 'put',
       path: `${collectionPath}/{id}/draft`,
       summary: summaries.saveDraft,
@@ -152,6 +202,7 @@ function draftEndpoints(
     },
     {
       operationId: `publish${noun}Draft`,
+      annotations: WRITES,
       method: 'post',
       path: `${collectionPath}/drafts/{draftId}/publish`,
       summary: summaries.publishDraft,
@@ -163,6 +214,7 @@ function draftEndpoints(
       // The one 204 of the eight, so it carries no response schema at all —
       // see `McpEndpoint`, where the two are mutually exclusive by construction.
       operationId: `discard${noun}Draft`,
+      annotations: DESTROYS,
       method: 'delete',
       path: `${collectionPath}/drafts/{draftId}`,
       summary: summaries.discardDraft,
@@ -172,6 +224,7 @@ function draftEndpoints(
     },
     {
       operationId: `list${noun}Drafts`,
+      annotations: READS,
       method: 'get',
       path: `${collectionPath}/drafts`,
       summary: summaries.listDrafts,
@@ -181,6 +234,7 @@ function draftEndpoints(
     },
     {
       operationId: `create${noun}Draft`,
+      annotations: WRITES,
       method: 'post',
       path: `${collectionPath}/drafts`,
       summary: summaries.createDraft,

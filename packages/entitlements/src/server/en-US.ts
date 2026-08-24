@@ -1,5 +1,6 @@
 import type { EntitlementsMessages } from './copy';
 import type { EntitlementPermissionLabels } from './contribution';
+import type { PlanChangedCopy, PlanLabelLookup } from './notifications';
 
 /**
  * The en-US pack — a NAMED export a host passes by hand
@@ -76,3 +77,25 @@ export const EN_US_ENTITLEMENTS_PERMISSION_LABELS: EntitlementPermissionLabels =
   domains: { plan: 'Plan' },
   actions: { request: 'Request a change' },
 };
+
+/**
+ * The plan-change notice's phrasing and CTA — pass to
+ * `createPlanChangedBlueprint`. A factory over the host's plan-label lookup;
+ * see the pt-BR pack for why.
+ */
+export const enUsPlanChangedCopy = (label: PlanLabelLookup): PlanChangedCopy => ({
+  title: (payload) =>
+    payload.direction === 'downgrade' ? 'Your plan changed' : 'Your plan was upgraded',
+  body: (payload) => {
+    const to = label(payload.toPlanKey);
+    // No noun for the tenant — see the pt-BR pack.
+    if (payload.direction === 'upgrade') {
+      return `You are now on the ${to} plan. The new features are already available.`;
+    }
+    if (payload.direction === 'downgrade') {
+      return `You moved to the ${to} plan. Some features may no longer be available.`;
+    }
+    return `You are now on the ${to} plan.`;
+  },
+  link: () => '/admin/plano',
+});

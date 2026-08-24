@@ -139,6 +139,29 @@ describe("assertDbMirror", () => {
     expect(() => assertDbMirror(defineManifest(base), { name: base.name })).not.toThrow();
   });
 
+  it("accepts the ROOT as an e2e entry — a package that IS the journeys", () => {
+    // `@12-apps/report-builder/e2e` ships journeys BESIDE an API, so the entry
+    // is a subpath. `@12-apps/payments-e2e` ships nothing else, so its root IS
+    // the entry — just as much this package's own. Refusing the root form
+    // would force a redundant `./e2e` subpath onto a package whose whole
+    // surface is already the world and the globs.
+    const atRoot = defineManifest({ ...base, e2e: { entry: base.name } });
+    expect(() =>
+      assertExportsMirror(atRoot, {
+        name: base.name,
+        exports: { ".": "./dist/index.js", "./manifest": "./dist/manifest/index.js" },
+      }),
+    ).not.toThrow();
+    // And the root entry still has to RESOLVE: a manifest naming it while the
+    // package exports no ".", points adopters at nothing.
+    expect(() =>
+      assertExportsMirror(atRoot, {
+        name: base.name,
+        exports: { "./manifest": "./dist/manifest/index.js" },
+      }),
+    ).toThrow(/does not export it/);
+  });
+
   it("refuses a package.json named for another package", () => {
     expect(() => assertDbMirror(withDb, { name: "@12-apps/other", wiring: { db: composed } })).toThrow(
       /must match/,
@@ -219,7 +242,7 @@ describe("assertExportsMirror", () => {
         name: base.name,
         exports: { "./manifest": "./dist/manifest/index.js", "./e2e": "./dist/e2e/index.js" },
       }),
-    ).toThrow(/does not start with/);
+    ).toThrow(/is neither/);
     const dangling = defineManifest({ ...base, e2e: { entry: "@12-apps/example/journeys" } });
     expect(() =>
       assertExportsMirror(dangling, {

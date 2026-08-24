@@ -494,7 +494,11 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
     expect(statuses.get('mcp')).toBe('collected');
     // The day this package declares a sixth, `assemble()` throws naming it
     // instead of the harness quietly not running it.
-    expect([...statuses.values()]).not.toContain('unanswered');
+    // `unbound` is the status, and this line asserted `'unanswered'` — a string
+    // no capability is ever given, so the check every one of these cases is
+    // named for could not fail. The same shape of defect the contract exists to
+    // catch, in the suite that checks the contract.
+    expect([...statuses.values()]).not.toContain('unbound');
   });
 
   it('names a descriptor this host forgot to claim', () => {

@@ -36,6 +36,10 @@
       "types": "./dist/manifest/server.d.ts",
       "default": "./dist/manifest/server.js"
     },
+    "./manifest/web": {
+      "types": "./dist/manifest/web.d.ts",
+      "default": "./dist/manifest/web.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -63,6 +67,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "@12-apps/wiring": {
       "optional": true
     }
   },

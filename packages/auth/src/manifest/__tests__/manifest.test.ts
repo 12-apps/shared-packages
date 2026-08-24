@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { PT_BR_MAIL } from "../../server/mail-templates.pt-BR";
-import { assertDbMirror, assertEnvMirror, assertExportsMirror } from "@12-apps/wiring/producer";
+import type { AnyWebManifest, PackageManifest } from "@12-apps/wiring";
+import {
+  assertDbMirror,
+  assertEnvMirror,
+  assertExportsMirror,
+  defineManifest,
+  defineServerManifest,
+  defineWebManifest,
+} from "@12-apps/wiring/producer";
 
 import packageJson from "../../../package.json";
 import { emailAuthRoutes } from "../../server/email-routes";
@@ -14,15 +22,55 @@ import { authPlatformServerManifest, authServerManifest } from "../server";
 import { authPlatformWebManifest, authWebManifest } from "../web";
 
 /**
+ * The manifests are `as const` literals now that the contract is a type-only
+ * devDependency, so a key the object does not carry is a compile error rather
+ * than `undefined` — right for source, useless for the cases below whose whole
+ * point is to pin an ABSENCE (`db` on the platform half, `env` on it too). The
+ * aliases widen them back to the shape a host adopting the manifest actually
+ * holds, which is also the shape the assertions are about.
+ */
+const shared: PackageManifest = authManifest;
+const sharedPlatform: PackageManifest = authPlatformManifest;
+const web: AnyWebManifest = authWebManifest;
+const webPlatform: AnyWebManifest = authPlatformWebManifest;
+
+/**
  * The producer half, asserted against what this package actually ships.
  *
- * The inventory checks run at MODULE LOAD — `defineServerManifest` and
- * `defineWebManifest` refuse a runtime manifest that drifts from the shared
- * one — so importing the three files is already half the test. What follows
- * asserts the half a type cannot: that the names in `areas` resolve to real
- * screens, that the routes are the ones a host would otherwise mount by hand,
- * and that the email contribution really does bind a port.
+ * The manifests are plain `satisfies`-checked values — `@12-apps/wiring` is a
+ * type-only devDependency, so this package's release never waits on the
+ * contract package's and no auth installer downloads it. That moves the
+ * producer factories' RUNTIME assertions here: the first case below runs all
+ * three, so a malformed manifest or an inventory that drifts in either
+ * direction still fails in this package's own test run, before any host sees
+ * it. What the remaining cases assert is the half a type cannot: that the
+ * names in `areas` resolve to real screens, that the routes are the ones a
+ * host would otherwise mount by hand, and that the email contribution really
+ * does bind a port.
  */
+
+describe("the producer assertions", () => {
+  it("validates all six manifests — the check a type-only import cannot run", () => {
+    // Identity, contribution validation and the inventory cross-check between
+    // the shared manifest and each runtime half, in BOTH directions: a
+    // capability cannot ship undeclared, nor stay declared after it is gone.
+    // This ran at import while the factories were called at module load; it
+    // runs here now, and dropping it would be the whole cost of the move.
+    expect(defineManifest(authManifest)).toBe(authManifest);
+    expect(defineManifest(authPlatformManifest)).toBe(authPlatformManifest);
+
+    const server = authServerManifest({ pack: PT_BR_MAIL });
+    expect(defineServerManifest(authManifest, server)).toBe(server);
+    expect(defineServerManifest(authPlatformManifest, authPlatformServerManifest)).toBe(
+      authPlatformServerManifest,
+    );
+
+    expect(defineWebManifest(authManifest, authWebManifest)).toBe(authWebManifest);
+    expect(defineWebManifest(authPlatformManifest, authPlatformWebManifest)).toBe(
+      authPlatformWebManifest,
+    );
+  });
+});
 
 describe("authManifest", () => {
   it("declares the package identity and the runtime inventory", () => {
@@ -36,7 +84,7 @@ describe("authManifest", () => {
     // Both halves: the partial a host syncs in, and the migrations directory
     // beside it. A partial with no migrations is a schema a host can generate
     // a client from and never create the tables for.
-    expect(authManifest.db).toEqual({
+    expect(shared.db).toEqual({
       partial: "prisma/auth.prisma",
       migrations: "prisma/migrations",
     });
@@ -45,7 +93,7 @@ describe("authManifest", () => {
   it("owns the tables from ONE manifest, so the platform half declares no db", () => {
     // The settings rows the operator surface writes live in the same partial.
     // Declaring `db` twice would have a host sync one schema under two names.
-    expect(authPlatformManifest.db).toBeUndefined();
+    expect(sharedPlatform.db).toBeUndefined();
   });
 
   it("splits the platform surface into its own manifest", () => {
@@ -56,19 +104,19 @@ describe("authManifest", () => {
   });
 
   it("declares the env surface — the exact keys build-config reads", () => {
-    const names = (authManifest.env ?? []).map((declared) => declared.name);
+    const names = (shared.env ?? []).map((declared) => declared.name);
     expect(names).toHaveLength(13);
     expect(names).toContain("AUTH_SECRET");
     // Only the signing secret is REQUIRED — every provider pair, the
     // allowlist and the toggles degrade by design when unset.
-    const required = (authManifest.env ?? []).filter((declared) => declared.required);
+    const required = (shared.env ?? []).filter((declared) => declared.required);
     expect(required.map((declared) => declared.name)).toEqual(["AUTH_SECRET"]);
     // Everything that is a credential never has its value reported.
     for (const name of ["AUTH_SECRET", "GOOGLE_CLIENT_SECRET", "FACEBOOK_CLIENT_SECRET", "APPLE_CLIENT_SECRET"]) {
-      expect((authManifest.env ?? []).find((declared) => declared.name === name)?.secret).toBe(true);
+      expect((shared.env ?? []).find((declared) => declared.name === name)?.secret).toBe(true);
     }
     // The platform surface reads no env of its own.
-    expect(authPlatformManifest.env).toBeUndefined();
+    expect(sharedPlatform.env).toBeUndefined();
   });
 
   it("mirrors db and env into package.json, and the exports map matches the declarations", () => {
@@ -147,7 +195,7 @@ describe("authWebManifest", () => {
    * it would be shared across files that never asked for it.
    */
   const suggestedScreens = (): string[] =>
-    [...(authWebManifest.areas ?? []), ...(authPlatformWebManifest.areas ?? [])]
+    [...(web.areas ?? []), ...(webPlatform.areas ?? [])]
       .flatMap((area) => area.routes ?? [])
       .map((route) => route.screen);
 
@@ -174,7 +222,7 @@ describe("authWebManifest", () => {
     // An operator account is granted, never self-served — so the admin area
     // suggests login and the two reset screens, and no signup.
     const areaScreens = (area: string): string[] =>
-      (authWebManifest.areas ?? [])
+      (web.areas ?? [])
         .filter((entry) => entry.area === area)
         .flatMap((entry) => entry.routes ?? [])
         .map((route) => route.screen);
@@ -190,7 +238,7 @@ describe("authWebManifest", () => {
   it("suggests the platform console with a matching nav anchor", () => {
     // The route and the nav entry must agree on the path, or the sidebar links
     // somewhere the router does not answer.
-    const [area] = authPlatformWebManifest.areas ?? [];
+    const [area] = webPlatform.areas ?? [];
     expect(area?.area).toBe("super-admin");
     expect(area?.routes?.[0]?.path).toBe("auth-settings");
     expect(area?.nav?.[0]?.path).toBe("auth-settings");

@@ -1,4 +1,5 @@
 import type { RbacMessages } from './context';
+import type { TeamInvitedCopy } from './notifications';
 
 /**
  * The pt-BR pack — the origin host's exact copy, now a NAMED export a host
@@ -32,4 +33,27 @@ export const PT_BR_RBAC_MESSAGES: RbacMessages = {
     unknownRole: 'Papel desconhecido.',
     fallback: 'Não foi possível atribuir este papel.',
   },
+};
+
+/**
+ * The invite notice's phrasing and CTA — pass to `createTeamInvitedBlueprint`.
+ *
+ * Two sentences because there are two facts: an existing account gains access
+ * immediately, while an accountless address is waiting on signup and must be
+ * told to finish it. Sending the first sentence to the second reader is the
+ * failure worth avoiding — "you now have access" to somebody who cannot sign
+ * in yet.
+ */
+export const PT_BR_TEAM_INVITED_COPY: TeamInvitedCopy = {
+  title: (payload) =>
+    payload.status === 'added' ? 'Você foi adicionado à equipe' : 'Convite para a equipe',
+  body: (payload) =>
+    payload.status === 'added'
+      // No noun for the tenant: every candidate ("loja", "empresa", "conta")
+      // is one application's word for it, and a shared package that picks one
+      // hands that vocabulary to every adopter. The second person carries both
+      // sentences without naming what the reader is joining.
+      ? 'Sua conta agora tem acesso. Abra o painel para começar.'
+      : `Enviamos um convite para ${payload.email}. Conclua o cadastro para ter acesso.`,
+  link: () => '/admin',
 };

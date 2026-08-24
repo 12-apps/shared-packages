@@ -14,12 +14,15 @@
  *   `NODE_ENV`; the host decides what "development" means by passing its own
  *   predicate. `NODE_ENV` itself is platform vocabulary, not a contribution
  *   — the same call `@12-apps/realtime`'s manifest makes.
- * - **No `web` inventory**, though `./` ships `OnboardingProvider` and
- *   `GuidedSection`. The web capability is a separate adoption with its own
- *   binding, and listing it here would oblige every SERVER host adopting
- *   this manifest to answer for a React surface it never mounts —
- *   `assemble()` refuses a declared-but-unanswered capability, which is the
- *   point of the inventory and also why it must not overstate.
+ *
+ * The `web` inventory used to be a third narrowing here, on a false premise:
+ * that listing it would oblige every SERVER host to answer for a React surface
+ * it never mounts. The consumer reports a capability declared for the OTHER
+ * runtime as `out-of-scope` and returns; only an applicable, unanswered one is
+ * `unbound`. What the narrowing actually cost was the declaration of
+ * `OnboardingProvider` and `GuidedSection` — and, until now, the `createWeb*`
+ * factory the contract's `surface` capability names, which this package had
+ * never grown. `./manifest/web` declares it.
  *
  * `@12-apps/wiring` is a TYPE-ONLY devDependency (the report-builder move):
  * the manifest is a plain `satisfies`-checked value, and the producer
@@ -38,4 +41,5 @@ export const onboardingManifest = {
    */
   observability: { namespace: "onboarding" },
   server: ["http"],
+  web: ["surface"],
 } as const satisfies PackageManifest;

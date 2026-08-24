@@ -9,6 +9,7 @@ import {
   assertExportsMirror,
   defineManifest,
   defineServerManifest,
+  defineWebManifest,
 } from '@12-apps/wiring/producer';
 import type { PackageManifest } from '@12-apps/wiring';
 
@@ -21,6 +22,8 @@ import {
   readCookie,
   serializeCookie,
 } from '../server';
+import { impersonationPreviewWebManifest, impersonationWebManifest } from '../web';
+import { createWebImpersonation } from '../../react/create-web-impersonation';
 
 /** The manifest as an ADOPTER's type sees it — see the audit suite for why. */
 function declared(manifest: PackageManifest): PackageManifest {
@@ -37,6 +40,12 @@ describe('the impersonation manifests', () => {
     expect(
       defineServerManifest(impersonationPreviewManifest, impersonationPreviewServerManifest),
     ).toBe(impersonationPreviewServerManifest);
+    expect(defineWebManifest(impersonationManifest, impersonationWebManifest)).toBe(
+      impersonationWebManifest,
+    );
+    expect(
+      defineWebManifest(impersonationPreviewManifest, impersonationPreviewWebManifest),
+    ).toBe(impersonationPreviewWebManifest);
   });
 
   it('are NAMED apart, which is what keeps the two mounts from merging', () => {
@@ -45,6 +54,27 @@ describe('the impersonation manifests', () => {
     // tenant mount with a platform row. Distinct names make that unsayable.
     expect(impersonationManifest.name).toBe('@12-apps/impersonation');
     expect(impersonationPreviewManifest.name).toBe('@12-apps/impersonation-preview');
+  });
+
+  it('declare the banner surface — the one this package refuses to start without', () => {
+    // `web` was not narrowed here, it was simply MISSING, which is how a host
+    // could adopt the server half, never learn the banner exists, and get a
+    // mount whose every start fails the handshake.
+    expect(impersonationManifest.web).toEqual(['surface', 'areas']);
+    expect(impersonationPreviewManifest.web).toEqual(['surface']);
+    expect(impersonationWebManifest.surface.create).toBe(createWebImpersonation);
+    expect(impersonationPreviewWebManifest.surface.create).toBe(createWebImpersonation);
+  });
+
+  it('routes only the operator start dialog, and only in the platform area', () => {
+    // The banner is per-DOCUMENT and cannot be an area row — areas are routed
+    // screens, and unmounting the banner is exactly what makes the next start
+    // refuse. A previewing tenant app mounts the banner and no picker, so the
+    // preview manifest declares no areas at all.
+    const [area] = impersonationWebManifest.areas;
+    expect(area.area).toBe('super-admin');
+    expect(area.routes).toEqual([{ path: 'impersonate', screen: 'dialog' }]);
+    expect(impersonationPreviewWebManifest).not.toHaveProperty('areas');
   });
 
   it('declare the e2e world on the operator half, and no db or env anywhere', () => {

@@ -27,6 +27,7 @@ import type { AnyServerManifest, WireRequest } from '@12-apps/wiring';
 
 import {
   createApiNotifications,
+  NOTIFICATIONS_JOBS,
   type ApiNotifications,
   type NotificationsRoute,
   type NotificationsServerConfig,
@@ -75,4 +76,11 @@ export function createWireApiNotifications(
 export const notificationsServerManifest = {
   name: '@12-apps/notifications',
   http: { create: createWireApiNotifications },
+  /**
+   * The dispatch fast path and the retry sweep, with their cadence. The host
+   * binds `{ dispatchDeliveries, drainPending }` off its own mount — the two
+   * methods the aggregate already hands it — and deletes the hand-rolled
+   * copies. See `../server/jobs` for why the numbers are the package's.
+   */
+  jobs: NOTIFICATIONS_JOBS,
 } as const satisfies AnyServerManifest;

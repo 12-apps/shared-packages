@@ -82,3 +82,16 @@ export {
   type AuditEntryInput,
   type AuditWriter,
 } from './writer';
+
+/**
+ * The retention sweep as a declared job — the cadence this package shipped a
+ * delete path for and never a schedule. See `./jobs`.
+ */
+export {
+  AUDIT_JOBS,
+  AUDIT_RETENTION_CRON,
+  AUDIT_RETENTION_LEASE_MS,
+  AUDIT_SWEEP_QUEUE,
+  type AuditJobDeps,
+  type AuditRetentionRange,
+} from './jobs';

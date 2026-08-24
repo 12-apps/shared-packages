@@ -40,6 +40,11 @@ const manifestPath = fileURLToPath(
 /** Subpaths proven elsewhere, with where. */
 const COVERED_ELSEWHERE: Record<string, string> = {
   './react': 'harness/frontend — pages/notifications-center.tsx',
+  // The web manifest is React-bearing (`surface.create` IS the React factory),
+  // so importing it here would drag React into a backend suite. It is proven
+  // where a web host would use it: the frontend harness adopts it through
+  // `createWiringHost({ kind: "web" })` and renders the surface it hands back.
+  './manifest/web': 'harness/frontend — pages/notifications-center.tsx',
   './package.json': 'read by this very test',
 };
 
@@ -86,7 +91,11 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     // the `exports` keys and `.gitignore` are made to agree.
     expect(manifest.notificationsManifest.name).toBe('@12-apps/notifications');
     expect(manifest.notificationsManifest.contract).toBe(1);
-    expect(manifest.notificationsManifest.server).toEqual(['http']);
+    // `jobs` joins `http` as of this release: the dispatch fast path and the
+    // retry sweep carry their own cadence now, rather than every host restating
+    // the attempts, the five-minute tick and the single-flight lease by hand.
+    expect(manifest.notificationsManifest.server).toEqual(['http', 'jobs']);
+    expect(manifest.notificationsManifest.web).toEqual(['surface']);
 
     // The runtime half, and its wire view: a factory, not data.
     expect(manifestServer.notificationsServerManifest.name).toBe('@12-apps/notifications');

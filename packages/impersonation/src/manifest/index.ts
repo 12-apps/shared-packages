@@ -6,7 +6,11 @@
  * why they must never merge). payments-backend's merchant/buyer pair is the
  * same shape and the precedent for it.
  *
- * Three absences are deliberate:
+ * Three absences are deliberate — and `web` is deliberately NOT among them:
+ * the banner is the one surface this package's README calls mandatory (the
+ * start handshake refuses a document with no banner host), so it is declared
+ * in `./manifest/web` rather than narrowed. Leaving it out was how a host
+ * could adopt the server half and get a mount whose every start fails.
  *
  * - **No `db`.** The session lives in a signed COOKIE, not a table — which is
  *   the design decision that makes an impersonation end when the browser says
@@ -36,6 +40,7 @@ export const impersonationManifest = {
   observability: { namespace: 'impersonation' },
   e2e: { entry: '@12-apps/impersonation/e2e', world: { factory: 'defineImpersonationWorld' } },
   server: ['http'],
+  web: ['surface', 'areas'],
 } as const satisfies PackageManifest;
 
 /** The tenant PREVIEW mount: slug-scoped, gated in that tenant. */
@@ -44,4 +49,5 @@ export const impersonationPreviewManifest = {
   contract: 1,
   observability: { namespace: 'impersonation' },
   server: ['http'],
+  web: ['surface'],
 } as const satisfies PackageManifest;

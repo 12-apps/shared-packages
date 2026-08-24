@@ -13,10 +13,18 @@
  *   which is the copy-portability doctrine's named failure. A pt-BR host
  *   passes `PT_BR_ENTITLEMENTS_PERMISSION_LABELS` at the same seam it
  *   assembles the rest of its catalog at, and that stays a line in its diff.
- * - **No `web` inventory**, though `./react` ships the plan screens. Listing
- *   it would oblige every SERVER host adopting this manifest to answer for a
- *   React surface it never mounts — `assemble()` refuses a declared-but-
- *   unanswered capability, so the inventory must not overstate.
+ * - **No static `notifications` capability**, though this package owns the
+ *   `plan.changed` event. Its words are host copy — a tenant reads what its
+ *   plan moved to in its own language — so it ships as the factory
+ *   `createPlanChangedBlueprint(copy)` (`../server/notifications`), the same
+ *   carve-out the permission contribution above makes for the same reason.
+ *
+ * The `web` inventory used to be a third narrowing, claiming a SERVER host
+ * would be obliged to answer for a React surface it never mounts. It would
+ * not: the consumer reports the other runtime's capabilities as `out-of-scope`
+ * and only an applicable, unanswered one is `unbound`. The narrowing protected
+ * nothing and made the plan screens undeclarable; `./manifest/web` declares
+ * them now.
  *
  * `@12-apps/wiring` is a TYPE-ONLY devDependency (the report-builder move):
  * the manifest is a plain `satisfies`-checked value, and the producer
@@ -35,4 +43,5 @@ export const entitlementsManifest = {
    */
   observability: { namespace: 'entitlements' },
   server: ['http'],
+  web: ['surface', 'areas'],
 } as const satisfies PackageManifest;

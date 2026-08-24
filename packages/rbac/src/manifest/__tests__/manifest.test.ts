@@ -10,6 +10,7 @@ import {
   assertExportsMirror,
   defineManifest,
   defineServerManifest,
+  defineWebManifest,
 } from '@12-apps/wiring/producer';
 import type { PackageManifest } from '@12-apps/wiring';
 
@@ -17,6 +18,10 @@ import packageJson from '../../../package.json';
 import { RBAC_PERMISSIONS } from '../../permissions';
 import { rbacManifest } from '../index';
 import { rbacServerManifest } from '../server';
+import { rbacWebManifest } from '../web';
+import { createWebRbac } from '../../react/create-web-rbac';
+import { createTeamInvitedBlueprint } from '../../server/notifications';
+import { PT_BR_TEAM_INVITED_COPY } from '../../server/pt-BR';
 
 /**
  * The manifest as an ADOPTER's type sees it. `as const satisfies` narrows the
@@ -33,6 +38,7 @@ describe('the rbac manifest', () => {
   it('passes the producer assertions — the contract is a devDependency, so the check lives here', () => {
     expect(defineManifest(rbacManifest)).toBe(rbacManifest);
     expect(defineServerManifest(rbacManifest, rbacServerManifest)).toBe(rbacServerManifest);
+    expect(defineWebManifest(rbacManifest, rbacWebManifest)).toBe(rbacWebManifest);
   });
 
   it('declares the admin surface, the five-model partial and the namespace', () => {
@@ -64,8 +70,42 @@ describe('the rbac manifest', () => {
     )).toEqual([]);
   });
 
-  it('declares no web inventory — a server host must not owe an answer for the React half', () => {
-    expect(declared().web).toBeUndefined();
+  it('declares the web surface — a server host reports it out-of-scope, it is not owed an answer', () => {
+    // The narrowing this replaces claimed a server host would be obliged to
+    // answer for the React half. It is not: a capability declared for the
+    // OTHER runtime is reported `out-of-scope`, and only an applicable
+    // unanswered one is `unbound`. Declaring is what makes the role editor and
+    // the team screens adoptable at all.
+    expect(rbacManifest.web).toEqual(['surface', 'areas']);
+    expect(rbacWebManifest.surface.create).toBe(createWebRbac);
+  });
+
+  it('gates the suggested rows with ids THIS package contributes, never host vocabulary', () => {
+    // A package guessing at a host's permission spelling would be wrong for
+    // every host but the first; these two are ids the host already received in
+    // the contribution, and `gatePermissions` remaps them if it spells them
+    // otherwise. The pin is what stops a rename desyncing the two.
+    const area = rbacWebManifest.areas[0];
+    expect(area.area).toBe('admin');
+    const gates = area.routes.map((route) => route.permission);
+    expect(gates).toEqual(['team:read', 'roles:manage']);
+    gates.forEach((gate) => {
+      expect(RBAC_PERMISSIONS.ids).toContain(gate);
+    });
+    // Every nav row opens a route this area actually declares.
+    const paths = new Set(area.routes.map((route) => route.path));
+    area.nav.forEach((row) => {
+      expect(paths.has(row.path)).toBe(true);
+    });
+  });
+
+  it('declares no STATIC notifications capability — the invite copy is the host\'s', () => {
+    // A blueprint pre-worded here would be a silent pt-BR default inside a
+    // library. The capability ships as a factory instead, and this pins that
+    // the manifest does not quietly grow a worded one.
+    expect(declared().notifications).toBeUndefined();
+    const blueprint = createTeamInvitedBlueprint(PT_BR_TEAM_INVITED_COPY);
+    expect(blueprint.type).toBe('rbac.team.invited');
   });
 
   it('mirrors the db declaration and the manifest subpaths into package.json', () => {

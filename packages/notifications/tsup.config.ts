@@ -32,6 +32,7 @@ export default defineConfig({
     'web-push/index': 'src/web-push/index.ts',
     'manifest/index': 'src/manifest/index.ts',
     'manifest/server': 'src/manifest/server.ts',
+    'manifest/web': 'src/manifest/web.ts',
 },
   format: ['esm'],
   dts: true,

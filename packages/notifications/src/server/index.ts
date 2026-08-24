@@ -113,3 +113,23 @@ export {
   type WebPushSubscription,
   type WebPushSubscriptionSource,
 } from './transports/web-push';
+
+/**
+ * The `NotifyPort` adapter — this package as a host's ONE notification
+ * channel, for every package that has something to say and no dependency on
+ * this one. See `./wire-notify-port` for why an emit never throws.
+ */
+export { wireNotifyPort, type NotifyPortSource } from './wire-notify-port';
+
+/**
+ * The two background jobs, declared with their cadence — see `./jobs` for why
+ * the attempts, the tick and the lease are this package's numbers rather than
+ * a host's.
+ */
+export {
+  NOTIFICATIONS_JOBS,
+  NOTIFICATIONS_DRAIN_CRON,
+  NOTIFICATIONS_DRAIN_LEASE_MS,
+  NOTIFICATIONS_SWEEP_QUEUE,
+  type NotificationsJobDeps,
+} from './jobs';
