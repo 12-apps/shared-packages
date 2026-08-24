@@ -1,0 +1,17 @@
+// The harness host's schema ROOT: datasource + generator, and nothing else.
+//
+// Every model in this folder beside this file is a PARTIAL copied out of an
+// installed `@12-apps/*` tarball by `prisma/sync-partials.ts`. None of them is
+// committed — see that script's header for why, and `prisma/README.md` for what
+// this folder is for.
+//
+// A host owns exactly this much of a plug-and-play schema: where the database
+// is and which client to generate. The models are the packages'.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

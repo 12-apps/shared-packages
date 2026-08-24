@@ -1,0 +1,44 @@
+-- @12-apps/payments-backend owned migration: remember the activation charge
+-- that is currently OUTSTANDING, so a refresh does not charge the owner twice
+-- (FUT-463).
+--
+-- The attempt lived in React state. Refreshing the settings page — or simply
+-- coming back to the tab after paying on the provider's own site, which is
+-- what the flow ASKS the owner to do — erased it and offered to generate a
+-- charge again. That mints a SECOND real charge on their card, while the
+-- first, already paid, is never looked at again.
+--
+-- It also has to carry what confirmation needs and creation is the only chance
+-- to learn. InfinitePay's `payment_check` takes `handle`, `order_nsu`,
+-- `transaction_nsu` and `slug`; `slug` (the invoice code) comes back only in
+-- the response that mints the link. Asking with the reference alone answers
+-- "not paid" indefinitely — which is what happened to a genuinely paid
+-- R$ 1,01, right up to the ten-minute timeout that then told the owner they
+-- had not paid in time.
+--
+-- Nullable, no backfill, no row touched: a connection with nothing in flight
+-- is exactly the null case, and any attempt predating this column is one
+-- nobody can confirm anyway.
+--
+-- ## Why this migration is dated a month after the column it adds
+--
+-- `pending_verification` has been in `payments.prisma` since FUT-463 while the
+-- migration that creates it stayed behind in the host that first needed it.
+-- Every other adopter has therefore been generating a client that selects a
+-- column their database does not have — which is every read of
+-- `PaymentProviderConfig`, not merely the ones that touch this field.
+--
+-- The two properties below are what make it safe to ship late, and both are
+-- load-bearing:
+--
+--   * The name is NEW rather than the origin host's. That host applied
+--     `20260731160000_payments_pending_verification` long ago and syncs this
+--     package's migrations into its own folder; reusing the name would replace
+--     an applied migration's body, and Prisma refuses a migration whose
+--     checksum moved after it was applied.
+--   * `IF NOT EXISTS`, because that same host will now apply THIS file too and
+--     already has the column. Applying a plugin's migrations over a database
+--     that already satisfies them is the ordinary case a host's `migrate
+--     deploy` must survive, not an error.
+ALTER TABLE "payment_provider_configs"
+    ADD COLUMN IF NOT EXISTS "pending_verification" JSONB;
