@@ -2,6 +2,7 @@ import { invalidSpecError } from '../errors';
 import { runReport } from '../run';
 
 import {
+  messagesOf,
   foldSpecError,
   forbidden,
   mayQueryEntity,
@@ -24,13 +25,13 @@ export function runRoute(config: ReportBuilderServerConfig): ReportRoute {
   return {
     method: 'POST',
     path: '/reports/run',
-    async handle({ actor, body }) {
+    async handle({ actor, body, locale }) {
       try {
-        const parsed = runReportBody(config.messages.range).safeParse(body);
+        const parsed = runReportBody(messagesOf(config, locale).range).safeParse(body);
         if (!parsed.success) {
           const first = parsed.error.issues[0];
           throw invalidSpecError(
-            first ? `${first.path.join('.') || 'body'}: ${first.message}` : config.messages.invalidBody,
+            first ? `${first.path.join('.') || 'body'}: ${first.message}` : messagesOf(config, locale).invalidBody,
           );
         }
         // The entity gate runs BEFORE the spec reaches the adapter: a spec is

@@ -2,6 +2,7 @@ import { runReport } from '../run';
 import type { TimeGrain } from '../types';
 
 import {
+  messagesOf,
   fail,
   foldSpecError,
   forbidden,
@@ -74,12 +75,12 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
     method: 'GET',
     path: '/reports/system/:key',
     entitlement: REPORT_BUILDER_FEATURES.system,
-    async handle({ actor, params, query }) {
+    async handle({ actor, params, query, locale }) {
       const report = config.systemReports.find((candidate) => candidate.key === params.key);
       // An unknown key is 404 before the permission check: there is no id to
       // disclose here, and a 403 on a key that does not exist reads as "you
       // nearly had it".
-      if (!report) return fail(404, config.messages.notFound);
+      if (!report) return fail(404, messagesOf(config, locale).notFound);
       if (!actor.permissions.includes(report.permission)) return forbidden(config);
 
       const grain = grainOf(query);

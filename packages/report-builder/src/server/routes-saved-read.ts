@@ -2,6 +2,7 @@ import { runDashboard, runReport, parseReportDocument, type DashboardRunResult }
 import { documentEntities, isDashboardSpec, type ReportDocument } from '../spec';
 
 import {
+  messagesOf,
   fail,
   foldSpecError,
   forbidden,
@@ -147,9 +148,9 @@ function getRoute(config: ReportBuilderServerConfig, store: SavedReportStore): R
   return {
     method: 'GET',
     path: '/reports/custom/:id',
-    async handle({ actor, params, query }) {
+    async handle({ actor, params, query, locale }) {
       const record = await store.get(actor.clientId, params.id ?? '');
-      if (!record || !canViewSavedReport(record, actor)) return fail(404, config.messages.notFound);
+      if (!record || !canViewSavedReport(record, actor)) return fail(404, messagesOf(config, locale).notFound);
       // The entity gate reads the STORED shape rather than the parsed
       // document, so a document that no longer compiles is still refused to an
       // actor who may not read its entities — authorization before validation.

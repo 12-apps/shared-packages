@@ -4,6 +4,7 @@ import { parseReportDocument } from '../run';
 import { compileDocument } from './compile-document';
 import type { ReportServerMessages } from './messages';
 import {
+  messagesOf,
   fail,
   foldSpecError,
   isDuplicateName,
@@ -84,17 +85,17 @@ function saveRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
     permission: DEFAULT_AUTHOR_PERMISSION,
     entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
-    async handle({ actor, params, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
+    async handle({ actor, params, body, locale }) {
+      if (!mayAuthor(config, actor)) return fail(403, messagesOf(config, locale).forbiddenEdit);
       const parsed = reportWorkingCopySchema.safeParse(body);
       if (!parsed.success) {
         const first = parsed.error.issues[0];
-        return fail(400, first ? `${first.path.join('.') || 'body'}: ${first.message}` : config.messages.invalidBody);
+        return fail(400, first ? `${first.path.join('.') || 'body'}: ${first.message}` : messagesOf(config, locale).invalidBody);
       }
-      const record = await loadPublished(store, actor, params.id ?? '', config.messages);
+      const record = await loadPublished(store, actor, params.id ?? '', messagesOf(config, locale));
       if (isFailure(record)) return record.error;
       const saved = await store.saveWorkingCopy(actor.clientId, record.id, parsed.data);
-      return saved ? ok({ saved: true }) : fail(404, config.messages.notFound);
+      return saved ? ok({ saved: true }) : fail(404, messagesOf(config, locale).notFound);
     },
   };
 }
@@ -115,17 +116,17 @@ function publishRoute(config: ReportBuilderServerConfig, store: SavedReportStore
     permission: DEFAULT_AUTHOR_PERMISSION,
     entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
-    async handle({ actor, params, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
-      const record = await loadPublished(store, actor, params.id ?? '', config.messages);
+    async handle({ actor, params, body, locale }) {
+      if (!mayAuthor(config, actor)) return fail(403, messagesOf(config, locale).forbiddenEdit);
+      const record = await loadPublished(store, actor, params.id ?? '', messagesOf(config, locale));
       if (isFailure(record)) return record.error;
       try {
-        const input = parsePublishBody(body, record, config.messages);
+        const input = parsePublishBody(body, record, messagesOf(config, locale));
         compileDocument(parseReportDocument(input.spec), config.catalog);
         const saved = await store.publishWorkingCopy(actor.clientId, record.id, input);
-        return saved ? ok(toSummary(saved, actor.userId)) : fail(404, config.messages.notFound);
+        return saved ? ok(toSummary(saved, actor.userId)) : fail(404, messagesOf(config, locale).notFound);
       } catch (error) {
-        if (isDuplicateName(error)) return fail(409, config.messages.duplicateName);
+        if (isDuplicateName(error)) return fail(409, messagesOf(config, locale).duplicateName);
         return foldSpecError(error);
       }
     },
@@ -139,18 +140,18 @@ function discardRoute(config: ReportBuilderServerConfig, store: SavedReportStore
     path: '/reports/custom/:id/working-copy',
     permission: DEFAULT_AUTHOR_PERMISSION,
     authoring: true,
-    async handle({ actor, params }) {
-      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
-      const record = await loadPublished(store, actor, params.id ?? '', config.messages);
+    async handle({ actor, params, locale }) {
+      if (!mayAuthor(config, actor)) return fail(403, messagesOf(config, locale).forbiddenEdit);
+      const record = await loadPublished(store, actor, params.id ?? '', messagesOf(config, locale));
       if (isFailure(record)) return record.error;
       // A 404 rather than a silent 200: "discard" that discarded nothing would
       // tell the editor to reset to a published version it is already showing,
       // hiding the fact that the parked edit is still on the server.
       if (record.workingCopy === null || record.workingCopy === undefined) {
-        return fail(404, config.messages.noWorkingCopy);
+        return fail(404, messagesOf(config, locale).noWorkingCopy);
       }
       const discarded = await store.discardWorkingCopy(actor.clientId, record.id);
-      return discarded ? ok({ discarded: true }) : fail(404, config.messages.notFound);
+      return discarded ? ok({ discarded: true }) : fail(404, messagesOf(config, locale).notFound);
     },
   };
 }

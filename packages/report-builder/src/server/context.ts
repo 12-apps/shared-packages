@@ -61,6 +61,16 @@ export interface ReportRequest {
   query: Record<string, string | undefined>;
   /** Parsed JSON body, for writes. */
   body?: unknown;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** What a handler answers with; the host maps this onto its own response type. */
@@ -117,7 +127,7 @@ export interface ReportBuilderServerConfig {
    * their own pt-BR, which made the origin host's Portuguese the silent default
    * for every adopter. `PT_BR_REPORT_SERVER_MESSAGES` is that exact wording.
    */
-  messages: ReportServerMessages;
+  messages: ReportCopySource<ReportServerMessages>;
   /**
    * The sentences and headings a RUN renders — the spec sentence a dashboard
    * block carries, and the column, axis and series labels. Separate from
@@ -195,6 +205,36 @@ export interface ReportBuilderServerConfig {
   now?: () => Date;
 }
 
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type ReportCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type ReportCopySource<T> = T | ReportCopyResolver<T>;
+
+/**
+ * The sentences in force, for the caller being answered right now.
+ *
+ * Every use site below calls this rather than reading `config.messages`, and
+ * that is the whole adoption: these routes are built once per process, so a
+ * value read where they are assembled answers every reader in the language the
+ * process started with — and a single-locale host cannot tell the difference.
+ */
+export function messagesOf(
+  config: ReportBuilderServerConfig,
+  locale?: string,
+): ReportServerMessages {
+  const source = config.messages;
+  return typeof source === 'function'
+    ? (source as ReportCopyResolver<ReportServerMessages>)({ locale })
+    : source;
+}
+
 export const ok = (data: unknown, status = 200): ReportResponse => ({ status, body: { data } });
 export const fail = (status: number, error: string): ReportResponse => ({
   status,
@@ -202,8 +242,10 @@ export const fail = (status: number, error: string): ReportResponse => ({
 });
 
 /** 403, in the host's own words. */
-export const forbidden = (config: ReportBuilderServerConfig): ReportResponse =>
-  fail(403, config.messages.forbidden);
+export const forbidden = (
+  config: ReportBuilderServerConfig,
+  locale?: string,
+): ReportResponse => fail(403, messagesOf(config, locale).forbidden);
 
 /**
  * A spec (or period) error is the CALLER's mistake, not a server fault: it
@@ -278,10 +320,15 @@ export function mayQueryAll(
 /** The window this request runs over, on the tenant's clock. */
 export function windowOf(
   config: ReportBuilderServerConfig,
-  request: Pick<ReportRequest, 'query'>,
+  request: Pick<ReportRequest, 'query' | 'locale'>,
 ): ResolvedReportRange {
   const now = config.now ? config.now() : new Date();
-  return resolveReportRange(rangeFromQuery(request.query), now, config.messages.range, config.timeZone);
+  return resolveReportRange(
+    rangeFromQuery(request.query),
+    now,
+    messagesOf(config, request.locale).range,
+    config.timeZone,
+  );
 }
 
 /** A period named in a REQUEST BODY (the dry run) rather than in the query. */
