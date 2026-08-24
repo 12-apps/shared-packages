@@ -34,8 +34,9 @@
  *    a path segment a caller can choose, and the serve route answers a public
  *    `<img>` that carries no tenant at all;
  *  - `/api/admin/:tenantSlug/realtime` and `/api/account/realtime` are
- *    @12-apps/realtime's (12-16), mounted whole; the host keeps only its seams
- *    (realtime-host.ts) and the outbox's db adapter (realtime-db.ts). The
+ *    @12-apps/realtime's (12-16), adopted through the wiring consumer; the host
+ *    keeps only its seams (realtime-host.ts) and the outbox's db adapter
+ *    (realtime-db.ts), and its jobs run the package's OWN blueprints. The
  *    matching WebSocket gateway is a THIRD process shape and lives in
  *    `server.ts`, on its own port, because that is where a port is bound;
  *  - `/api/consent/{status,terms}` is @12-apps/app-shell's (12-18), mounted whole;
@@ -230,6 +231,24 @@ function mountRealtimeControls(app: Hono, pg: PGlite, hosts: Hosts): void {
       if (body.fail) throw new Error('the host write failed');
     };
     await pg.transaction(write).catch(() => undefined);
+    const { rows } = await pg.query<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM realtime_outbox_events WHERE published_at IS NULL',
+    );
+    return c.json({ pending: Number(rows[0]?.count ?? '0') });
+  });
+
+  /**
+   * What is still pending — the same count the enqueue control answers with,
+   * asked on its own.
+   *
+   * A spec that drains through the package's BOUND job blueprint gets no
+   * metrics back (a blueprint returns void, by design: the runtime reports the
+   * pass, the caller does not), so the only honest way to see it happened is to
+   * ask afterwards. Through a control rather than a raw query in the spec: a
+   * test reaching into the schema is a test that breaks when a migration
+   * renames a column it never meant to depend on.
+   */
+  app.get('/__harness/realtime/outbox', async (c) => {
     const { rows } = await pg.query<{ count: string }>(
       'SELECT COUNT(*)::text AS count FROM realtime_outbox_events WHERE published_at IS NULL',
     );

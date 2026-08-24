@@ -10,6 +10,7 @@ import { FEATURE_FLAGS_MOUNT_PATH, wireFeatureFlags } from './feature-flags-host
 import { IMPERSONATION_PLATFORM_PATH } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { observabilityHarnessRoutes, observabilityRoutes } from './observability-host';
+import { REALTIME_MOUNT_PATH } from './realtime-host';
 import { reportsRouter } from './reports-host';
 import { savedReportDb } from './saved-report-db';
 
@@ -95,7 +96,7 @@ function mountAccountSurfaces(app: Hono, hosts: Hosts): void {
   // paths, and the account one takes no tenant slug at all. AFTER the notification
   // mount above, deliberately: `/api` is the broader prefix of the two, and this file's
   // header rule is that the more specific mount goes on first.
-  app.route('/api', hosts.realtime.events.router);
+  app.route(REALTIME_MOUNT_PATH, hosts.realtime.events.router);
   // 12-18, also at the API root and for the same reason: consent is a fact about the
   // CALLER, so neither of its two paths carries a tenant slug.
   app.route('/api', hosts.appShell.router);
