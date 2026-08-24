@@ -38,6 +38,7 @@ export {
 } from "./copy";
 
 export { PT_BR_DISCOUNTS_WEB_COPY } from "./pt-BR";
+export { EN_US_DISCOUNTS_WEB_COPY } from "./en-US";
 
 export {
   createFormatters,
