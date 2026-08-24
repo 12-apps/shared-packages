@@ -82,19 +82,20 @@ function sourceFiles(dir, out = []) {
   return out;
 }
 
+/** The names a top-level statement introduces into this module's scope. */
+function declaredBy(statement, src) {
+  if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+    return [statement.name.getText(src)];
+  }
+  if (!ts.isVariableStatement(statement)) return [];
+  return statement.declarationList.declarations
+    .filter((d) => ts.isIdentifier(d.name))
+    .map((d) => d.name.getText(src));
+}
+
 /** Top-level `const`/`function`/`class` names — the bindings this module owns. */
 function localBindings(src) {
-  const names = new Set();
-  for (const st of src.statements) {
-    if ((ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st)) && st.name) {
-      names.add(st.name.getText(src));
-    } else if (ts.isVariableStatement(st)) {
-      for (const d of st.declarationList.declarations) {
-        if (ts.isIdentifier(d.name)) names.add(d.name.getText(src));
-      }
-    }
-  }
-  return names;
+  return new Set(src.statements.flatMap((statement) => declaredBy(statement, src)));
 }
 
 /** `(X as T).y.z` -> `X`, so a cast or a parenthesis cannot hide the target. */
@@ -109,6 +110,32 @@ function baseIdentifier(node, src) {
   return ts.isIdentifier(n) ? n.getText(src) : null;
 }
 
+/** A write onto a binding this module declares — invisible if the module goes. */
+function writesOnlyToOwnBinding(expression, src, locals) {
+  return (
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    ts.isPropertyAccessExpression(expression.left) &&
+    locals.has(baseIdentifier(expression.left, src))
+  );
+}
+
+/** Why this ONE statement would have to survive elision, or `null`. */
+function statementEffect(statement, src, locals) {
+  if (ts.isImportDeclaration(statement)) {
+    return statement.importClause ? null : 'bare import';
+  }
+  if (!ts.isExpressionStatement(statement)) return null;
+  const expression = statement.expression;
+  if (writesOnlyToOwnBinding(expression, src, locals)) return null;
+  if (ts.isCallExpression(expression)) {
+    return `top-level call: ${expression.getText(src).split('\n')[0].slice(0, 60)}`;
+  }
+  if (ts.isAwaitExpression(expression)) return 'top-level await';
+  if (ts.isBinaryExpression(expression)) return 'top-level write to a non-local binding';
+  return null;
+}
+
 /** The reason this file must survive elision, or `null` if it need not. */
 export function sideEffectReason(file, text = readFileSync(file, 'utf8')) {
   const src = ts.createSourceFile(
@@ -116,22 +143,11 @@ export function sideEffectReason(file, text = readFileSync(file, 'utf8')) {
     /\.tsx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const locals = localBindings(src);
-  for (const st of src.statements) {
-    const line = src.getLineAndCharacterOfPosition(st.getStart(src)).line + 1;
-    if (ts.isImportDeclaration(st) && !st.importClause) return { line, why: 'bare import' };
-    if (!ts.isExpressionStatement(st)) continue;
-    const e = st.expression;
-    if (
-      ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      ts.isPropertyAccessExpression(e.left) && locals.has(baseIdentifier(e.left, src))
-    ) {
-      continue; // a write onto this module's own binding — see the header
+  for (const statement of src.statements) {
+    const why = statementEffect(statement, src, locals);
+    if (why !== null) {
+      return { line: src.getLineAndCharacterOfPosition(statement.getStart(src)).line + 1, why };
     }
-    if (ts.isCallExpression(e)) {
-      return { line, why: `top-level call: ${e.getText(src).split('\n')[0].slice(0, 60)}` };
-    }
-    if (ts.isAwaitExpression(e)) return { line, why: 'top-level await' };
-    if (ts.isBinaryExpression(e)) return { line, why: 'top-level write to a non-local binding' };
   }
   return null;
 }
@@ -149,44 +165,57 @@ export function matchesGlob(glob, relPath) {
   return new RegExp(`^(?:\\./)?${pattern}$`).test(relPath);
 }
 
+/** Every shipped file that runs something at import time, with its reason. */
+function importTimeStatements(pkgDir) {
+  return sourceFiles(path.join(pkgDir, 'src'))
+    .map((file) => ({ file, reason: sideEffectReason(file) }))
+    .filter(({ reason }) => reason !== null)
+    .map(({ file, reason }) => ({ rel: path.relative(pkgDir, file), ...reason }));
+}
+
+/** The dangerous direction: a bundler is licensed to drop this. */
+function uncoveredProblems(effectful, globs) {
+  return effectful
+    .filter((hit) => !globs.some((glob) => matchesGlob(glob, hit.rel)))
+    .map(
+      (hit) =>
+        `${hit.rel}:${hit.line} runs at import time (${hit.why}) but no \`sideEffects\` entry covers it, ` +
+        'so a bundler is licensed to drop it. Add a glob for this file, or move the statement into a function.',
+    );
+}
+
+/** The quiet direction: an allowlist that has outlived its reason. */
+function staleProblems(effectful, globs) {
+  return globs
+    .filter((glob) => !effectful.some((hit) => matchesGlob(glob, hit.rel)))
+    .map(
+      (glob) =>
+        `\`sideEffects\` lists "${glob}", but no shipped file under it runs anything at import time. ` +
+        'Remove the entry — a stale allowlist re-pins a module for ever.',
+    );
+}
+
+function undeclaredProblem(effectful) {
+  return (
+    'declares no `sideEffects`. Every published package must state whether it is tree-shakeable. ' +
+    (effectful.length
+      ? `This one is not entirely — declare an allowlist covering its ${effectful.length} import-time statement(s).`
+      : 'This one is: add "sideEffects": false.')
+  );
+}
+
 export function auditPackage(pkgDir) {
   const manifest = JSON.parse(readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
   const declared = manifest.sideEffects;
-  const effectful = [];
-  for (const file of sourceFiles(path.join(pkgDir, 'src'))) {
-    const reason = sideEffectReason(file);
-    if (reason) effectful.push({ rel: path.relative(pkgDir, file), ...reason });
-  }
-  const problems = [];
+  const effectful = importTimeStatements(pkgDir);
 
   if (declared === undefined) {
-    problems.push(
-      'declares no `sideEffects`. Every published package must state whether it is tree-shakeable. ' +
-      (effectful.length
-        ? `This one is not entirely — declare an allowlist covering its ${effectful.length} import-time statement(s).`
-        : 'This one is: add "sideEffects": false.'),
-    );
+    return { name: manifest.name, effectful, problems: [undeclaredProblem(effectful)] };
   }
-
   const globs = declared === false ? [] : Array.isArray(declared) ? declared : null;
-  if (globs) {
-    for (const hit of effectful) {
-      if (!globs.some((g) => matchesGlob(g, hit.rel))) {
-        problems.push(
-          `${hit.rel}:${hit.line} runs at import time (${hit.why}) but no \`sideEffects\` entry covers it, ` +
-          'so a bundler is licensed to drop it. Add a glob for this file, or move the statement into a function.',
-        );
-      }
-    }
-    for (const g of globs) {
-      if (!effectful.some((hit) => matchesGlob(g, hit.rel))) {
-        problems.push(
-          `\`sideEffects\` lists "${g}", but no shipped file under it runs anything at import time. ` +
-          'Remove the entry — a stale allowlist re-pins a module for ever.',
-        );
-      }
-    }
-  }
+  const problems = globs === null
+    ? []
+    : [...uncoveredProblems(effectful, globs), ...staleProblems(effectful, globs)];
   return { name: manifest.name, effectful, problems };
 }
 
@@ -207,8 +236,7 @@ function main() {
     const { name, problems } = auditPackage(abs);
     if (!problems.length) continue;
     failed += 1;
-    console.error(`\n${name} (${dir})`);
-    for (const problem of problems) console.error(`  - ${problem}`);
+    console.error(`\n${name} (${dir})\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
   }
   if (failed) {
     console.error(`\n${failed} package(s) whose \`sideEffects\` does not match their code.`);
