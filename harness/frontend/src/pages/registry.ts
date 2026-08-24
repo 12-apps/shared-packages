@@ -8,6 +8,7 @@ import { FeatureFlagsPage } from './feature-flags';
 import { ImpersonationPage } from './impersonation';
 import { LifecycleAdminPage } from './lifecycle-admin';
 import { NotificationsCenterPage } from './notifications-center';
+import { ObservabilityPage } from './observability';
 import { OnboardingGuidedPage } from './onboarding-guided';
 import { PAYMENTS_ADMIN_PAGES, PAYMENTS_STOREFRONT_PAGES } from './payments-pages';
 import { ProductResearchPage } from './product-research';
@@ -240,6 +241,17 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/feature-flags',
     group: 'backoffice',
     Component: FeatureFlagsPage,
+  },
+  // The one page whose package is NOT mounted by the page: `startObservability`
+  // runs in `main.tsx`, for the whole bundle, because it installs its global
+  // handlers before its own config arrives. This entry drives what is already
+  // there — which is exactly the shape a host's adoption has.
+  {
+    slug: 'observability',
+    title: 'Error reporting',
+    pkg: '@12-apps/observability-frontend',
+    group: 'backoffice',
+    Component: ObservabilityPage,
   },
   // ONE entry, and the `pkg` is the UI half deliberately: the page is ABOUT
   // whether the published screens work for a host, and the engine underneath
