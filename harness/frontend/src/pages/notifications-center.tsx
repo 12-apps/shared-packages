@@ -58,7 +58,7 @@ const host = createWiringHost({
     }),
   },
 });
-host.adoptWeb({
+const { surface: notifications } = host.adoptWeb({
   manifest: notificationsManifest,
   web: notificationsWebManifest,
   bindings: {
@@ -75,9 +75,12 @@ host.adoptWeb({
   },
 });
 
-const notifications = host.assemble().surfaces[notificationsManifest.name] as ReturnType<
-  typeof notificationsWebManifest.surface.create
->;
+// Called for its REFUSAL, not its return: `assemble()` is what rejects a
+// capability this host neither bound nor declined, so running it here is what
+// makes the declaration mean something. A release that adds a web capability
+// turns this page into a boot failure rather than a screen quietly missing a
+// feature.
+host.assemble();
 const { BellButton, Panel, page: PreferencesSurface, store } = notifications;
 
 interface OutboxEntry {
