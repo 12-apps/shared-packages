@@ -16,6 +16,22 @@
  * adopter's answer is a column on `users`; the harness's is a Map; the package
  * cannot tell and must not care.
  *
+ * ## ADOPTED, not routed
+ *
+ * This host used to call `appShellRouter(config)` — the package's own Hono
+ * mount — which works and binds nothing. `@12-apps/app-shell` declares
+ * `server: ['http']`, and a manifest no host adopts is not an unanswered
+ * capability: it is a package the wiring report never hears about, which is
+ * exactly how three WEB manifests sat unbound here without a single red test.
+ * Same blind spot, other runtime.
+ *
+ * What the adoption buys beyond the report is the route TABLE — `wired.routes`
+ * is the declared surface, mounted through this harness's ONE framework bridge
+ * (`honoRouterFor`) rather than through a second per-package adapter. Both
+ * routes are `public`, and the bridge is what makes that mean something: it
+ * does not resolve a caller for them, so the descriptors are reached by exactly
+ * the anonymous callers they exist for.
+ *
  * ## Why the version is MOVABLE
  *
  * The failure this surface exists for is a version BUMP, which in production ships
@@ -27,8 +43,15 @@
  */
 import type { Hono } from 'hono';
 
-import { appShellRouter } from '@12-apps/app-shell/hono';
+import { appShellManifest } from '@12-apps/app-shell/manifest';
+import { appShellServerManifest } from '@12-apps/app-shell/manifest/server';
 import type { AppShellServerConfig, ConsentActor } from '@12-apps/app-shell/server';
+import { createWiringHost } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
+
+/** Where `mount-surfaces.ts` hangs the router — the adoption's claim. */
+export const APP_SHELL_MOUNT_PATH = '/api';
 
 /** The version this deployment starts on. */
 const INITIAL_VERSION = '2026-07-27';
@@ -82,15 +105,18 @@ function resolveActor(request: { header(name: string): string | undefined }): Co
   return { userId };
 }
 
-export function appShellHost() {
-  const state: ConsentState = {
-    version: INITIAL_VERSION,
-    accepted: new Map(SEEDED),
-    published: [],
-    recordFails: false,
-  };
-
-  const config: AppShellServerConfig = {
+/**
+ * The host's ANSWERS, over one piece of host state.
+ *
+ * Split from the adoption below so each reads as one thing: this is everything
+ * `@12-apps/app-shell` asks a host for, and `appShellHost` is the wiring that
+ * hands it over. They were one function until the adoption pushed it past the
+ * size gate — which is the gate doing its job, because "what the host knows"
+ * and "how the package is mounted" are the two halves this harness exists to
+ * keep separable.
+ */
+function shellConfig(state: ConsentState): AppShellServerConfig {
+  return {
     // A getter, not a value — see the module docstring.
     get termsVersion() {
       return state.version;
@@ -130,11 +156,39 @@ export function appShellHost() {
       recordFailed: 'Não foi possível registrar seu aceite. Tente de novo em instantes.',
     },
   };
+}
 
-  const shell = appShellRouter(config);
+export function appShellHost() {
+  const state: ConsentState = {
+    version: INITIAL_VERSION,
+    accepted: new Map(SEEDED),
+    published: [],
+    recordFails: false,
+  };
+  const config = shellConfig(state);
+
+  const wiring = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The mandatory observability capability: a shell failure files under
+    // `app-shell` rather than nowhere.
+    ports: { loggerFor: harnessLoggerFor },
+  });
+  wiring.adoptServer({
+    manifest: appShellManifest,
+    server: appShellServerManifest,
+    bindings: { http: { mountPath: APP_SHELL_MOUNT_PATH, config } },
+  });
+  const wired = wiring.assemble();
 
   return {
-    router: shell.router,
+    // Both routes are `public`, so the bridge never asks who is calling. The
+    // consent actor is resolved INSIDE the package's config instead
+    // (`consent.resolveActor` above), off the raw request — which is the seam
+    // the manifest's wire view keeps `header` and `raw` reaching.
+    router: honoRouterFor(wired.routes, () => null),
+    report: wired.report,
+    routes: wired.routes,
     /** Back to the seeded fixture — the `/__harness/reset` contract. */
     reset: (): void => {
       state.version = INITIAL_VERSION;
