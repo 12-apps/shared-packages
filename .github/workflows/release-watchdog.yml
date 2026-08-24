@@ -30,6 +30,21 @@ on:
 permissions:
   contents: read
   issues: write # the alert issue this raises, updates and closes
+  # release-alert's fallback when the issue channel is unavailable — the same
+  # grant cd.yml's release job carries, and for the same reason.
+  #
+  # Issues are DISABLED on this repository, so the issue channel does not exist
+  # at all here and the fallback is not a fallback but the primary. Without this
+  # the status write 403s, and run 32776704990 is what that costs: a genuinely
+  # stuck package (@12-apps/i18n, tagged i18n-v1.1.0, never published) reported
+  # through none of the three channels, the script itself printing "THIS ALERT
+  # REACHED NOBODY".
+  #
+  # Worth having even now the webhook works, because the two survive differently
+  # — release-alert.mjs ranks them that way itself. A commit status stays on the
+  # commit for anyone who looks later; a webhook only reaches whoever was
+  # watching the channel at the time.
+  statuses: write
 
 concurrency:
   group: release-watchdog
