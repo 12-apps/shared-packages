@@ -18,7 +18,15 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
 
-import { impersonationRouter } from '@12-apps/impersonation/hono';
+import {
+  impersonationManifest,
+  impersonationPreviewManifest,
+} from '@12-apps/impersonation/manifest';
+import {
+  impersonationPreviewServerManifest,
+  impersonationServerManifest,
+  type createWireApiImpersonation,
+} from '@12-apps/impersonation/manifest/server';
 import {
   IMPERSONATION_PERMISSIONS,
   type ImpersonationCodec,
@@ -31,10 +39,21 @@ import {
   type ImpersonationAuditPort,
   type ImpersonationDirectory,
   type ImpersonationMessages,
+  type ImpersonationServerConfig,
   type ImpersonationStartEntry,
 } from '@12-apps/impersonation/server';
 
-import { RBAC_TENANT_B_ID, RBAC_TENANT_ID, RBAC_USERS } from './rbac-host';
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
+import {
+  DIRECTORY_PORT,
+  IMPERSONATION_TENANTS,
+  resolveActor,
+  revoked,
+  stillAuthorized,
+} from './impersonation-directory';
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /** Where the shared session surface is mounted. Read by the SPA too. */
 export const IMPERSONATION_PLATFORM_PATH = '/api/desk-session';
@@ -42,54 +61,6 @@ export const IMPERSONATION_PLATFORM_PATH = '/api/desk-session';
 /** The tenant preview mount, as a template the SPA rebuilds per branch. */
 export const impersonationTenantPath = (slug: string): string =>
   `/api/admin/${slug}/desk-session`;
-
-/** The branches a session may be bounded to. */
-export const IMPERSONATION_TENANTS: readonly ImpersonationTenant[] = [
-  { id: RBAC_TENANT_ID, slug: RBAC_TENANT_ID, name: 'North Branch' },
-  { id: RBAC_TENANT_B_ID, slug: RBAC_TENANT_B_ID, name: 'Riverside Branch' },
-];
-
-/**
- * The two accounts that hold PLATFORM authority.
- *
- * Two, not one, because the refusal this whole mechanism is built around is a
- * start aimed at the second: a lateral move between full-privilege accounts
- * defeats attribution.
- */
-export const SYSTEM_LIBRARIAN = {
-  id: 'system-1',
-  email: 'system@harness.dev',
-  name: 'Sam Sistema',
-};
-export const SECOND_SYSTEM_LIBRARIAN = {
-  id: 'system-2',
-  email: 'system2@harness.dev',
-  name: 'Robin Sistema',
-};
-
-const PLATFORM_IDS = new Set([SYSTEM_LIBRARIAN.id, SECOND_SYSTEM_LIBRARIAN.id]);
-
-/** Everyone the directory can resolve: the roster, plus the two operators. */
-const PEOPLE: readonly (ImpersonationTarget & { tenantId: string | null })[] = [
-  ...RBAC_USERS.map((user) => ({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    isPlatformAdmin: false,
-    tenantId: user.tenantId,
-  })),
-  { ...SYSTEM_LIBRARIAN, isPlatformAdmin: true, tenantId: null },
-  { ...SECOND_SYSTEM_LIBRARIAN, isPlatformAdmin: true, tenantId: null },
-];
-
-const DIRECTORY = new Map(PEOPLE.map((person) => [person.id, person]));
-
-/** The header a spec sets to act as someone else — the rbac host's convention. */
-const ACTOR_HEADER = 'x-rbac-user';
-/** Who the SPA is when it sets no header: a system librarian, who may start
- * operator sessions AND (through the platform short-circuit) previews. */
-/** The header a spec sets to arrive as an integration key rather than a person. */
-const MACHINE_HEADER = 'x-machine-token';
 
 /**
  * An authenticated cipher, which is what the package asks a host for.
@@ -156,66 +127,6 @@ export interface ImpersonationTrail {
 /** A denial the harness's own entitlement toggle raises. */
 class BranchDeskSessionsOff extends Error {}
 
-/** WHERE THE DATA LIVES — the roster, the branches, and the membership test. */
-const DIRECTORY_PORT: ImpersonationDirectory = {
-  findUser: async (id) => {
-    const person = DIRECTORY.get(id);
-    return person ? { id: person.id, email: person.email, name: person.name } : null;
-  },
-  resolveTarget: async (id) => {
-    const person = DIRECTORY.get(id);
-    if (!person) return null;
-    return {
-      id: person.id,
-      email: person.email,
-      name: person.name,
-      isPlatformAdmin: PLATFORM_IDS.has(person.id),
-    };
-  },
-  findTenant: async (id) => IMPERSONATION_TENANTS.find((tenant) => tenant.id === id) ?? null,
-  findTenantBySlug: async (slug) =>
-    IMPERSONATION_TENANTS.find((tenant) => tenant.slug === slug) ?? null,
-  isActiveMember: async (userId, tenantId) => DIRECTORY.get(userId)?.tenantId === tenantId,
-};
-
-/**
- * WHO is calling — the one thing a host can never delegate.
- *
- * A header stand-in for a real session, the same shape the rbac host uses. The
- * package is handed a resolved actor and narrows against it; it never computes
- * one.
- */
-function resolveActor(c: Context): ImpersonationActor {
-  const id = c.req.header(ACTOR_HEADER) ?? SYSTEM_LIBRARIAN.id;
-  const person = DIRECTORY.get(id);
-  return {
-    userId: person ? person.id : null,
-    email: person?.email ?? `${id}@harness.dev`,
-    isPlatformAdmin: PLATFORM_IDS.has(id),
-    // Every staff row may open a preview here. A real host reads this off its
-    // own RBAC engine.
-    permissions: person && !PLATFORM_IDS.has(id) ? [IMPERSONATION_PERMISSIONS.preview] : [],
-    isMachineToken: c.req.header(MACHINE_HEADER) === '1',
-  };
-}
-
-/**
- * Is the real human behind an OPERATOR session still a system librarian?
- *
- * The revocation path. A real host re-reads its own allowlist; the harness reads
- * the same in-memory set, and `/__harness/impersonation/revoke` takes an id out
- * of it so a spec can watch a live session stop being one.
- */
-const revoked = new Set<string>();
-
-function stillAuthorized(
-  state: { kind: string; realUserId: string },
-  actor: ImpersonationActor,
-): boolean {
-  if (state.kind !== 'operator') return true;
-  return !revoked.has(state.realUserId) && actor.isPlatformAdmin;
-}
-
 /**
  * WHERE THIS APP'S OWN SURFACES ARE — the four tables the write gate consults.
  *
@@ -235,6 +146,77 @@ const PATHS = {
 
 export type HarnessImpersonation = ReturnType<typeof impersonationHost>;
 
+/** The tenant PREVIEW mount, as the adoption names it. */
+export const IMPERSONATION_TENANT_MOUNT = '/api/admin/:tenantSlug/desk-session';
+
+/**
+ * The config both mounts take — the host's whole half, unchanged by the
+ * adoption. Extracted so the binder below reads as the wiring it is.
+ *
+ * `resolveActor` is NOT in here any more. Under the contract, who is calling is
+ * the BRIDGE's answer (the same seam every other adopted surface uses), and the
+ * package reads it off `request.actor`. That is one resolution rather than two,
+ * which matters on this surface more than on most: a mount and a write gate
+ * that disagreed about the caller would gate one identity's writes while
+ * minting for another.
+ */
+function impersonationConfig(deps: {
+  audit: ImpersonationAuditPort;
+  entitled: Set<string>;
+}): ImpersonationServerConfig {
+  return {
+    cookieName: 'harness_desk_session',
+    // The harness is served over plain HTTP; a real deploy answers `true`.
+    secure: false,
+    codec: harnessCodec(),
+    // The library closes the desk after a shift, and a look is much shorter.
+    timeBox: { operator: 30 * 60 * 1000, preview: 10 * 60 * 1000 },
+    paths: PATHS,
+    directory: DIRECTORY_PORT,
+    audit: deps.audit,
+    mintPolicy: {
+      targetApps: ['counter', 'catalogue'],
+      reasonLength: { min: 15, max: 280 },
+    },
+    previewPermission: IMPERSONATION_PERMISSIONS.preview,
+    previewEntitlement: {
+      require: async (tenantId) => {
+        if (!deps.entitled.has(tenantId)) throw new BranchDeskSessionsOff();
+      },
+      isDenial: (error) => error instanceof BranchDeskSessionsOff,
+      denialResponse: () => ({
+        status: 409,
+        message: 'Desk sessions are switched off for this branch.',
+      }),
+    },
+    messages: MESSAGES,
+    stillAuthorized,
+  };
+}
+
+/** One package's mounted routes, out of an aggregate carrying two. */
+const routesOf = (routes: readonly MountedRoute[], name: string): readonly MountedRoute[] =>
+  routes.filter((mounted) => mounted.packageName === name);
+
+/**
+ * The two mounts, adopted through `@12-apps/wiring/consumer`.
+ *
+ * TWO adoptions, because the package ships two manifests — and that is a
+ * PRIVILEGE SPLIT rather than bookkeeping. The operator mount answers to
+ * platform authority and carries no slug; the preview mount is slug-scoped and
+ * gated on the caller's permissions in that tenant. One binding would hand this
+ * host a single `mountPath` for two mounts that must sit behind different
+ * gates, and a version bump could then widen the tenant mount with a platform
+ * row nobody re-reviewed. Two manifests make that impossible to express, and
+ * the aggregate still reports both.
+ *
+ * The `e2e` world is DECLINED here and answered by the web harness, whose
+ * `playwright.config.ts` already reads `impersonationFeatures`,
+ * `impersonationFeaturesRoot` and `impersonationSteps` off the package. The
+ * declaration is the point of that capability rather than a formality: a
+ * shipped world nobody adopts is a few hundred lines of journeys re-derived by
+ * hand in a host, undiscovered.
+ */
 export function impersonationHost() {
   const trail: ImpersonationTrail = { started: [], ended: [], refused: [] };
   /** Which branches currently allow desk sessions — the harness's own switch. */
@@ -246,39 +228,43 @@ export function impersonationHost() {
     refused: async (entry) => void trail.refused.push(entry),
   };
 
-  const surface = impersonationRouter({
-    cookieName: 'harness_desk_session',
-    // The harness is served over plain HTTP; a real deploy answers `true`.
-    secure: false,
-    codec: harnessCodec(),
-    // The library closes the desk after a shift, and a look is much shorter.
-    timeBox: { operator: 30 * 60 * 1000, preview: 10 * 60 * 1000 },
-    paths: PATHS,
-    directory: DIRECTORY_PORT,
-    audit,
-    mintPolicy: {
-      targetApps: ['counter', 'catalogue'],
-      reasonLength: { min: 15, max: 280 },
-    },
-    previewPermission: IMPERSONATION_PERMISSIONS.preview,
-    previewEntitlement: {
-      require: async (tenantId) => {
-        if (!entitled.has(tenantId)) throw new BranchDeskSessionsOff();
-      },
-      isDenial: (error) => error instanceof BranchDeskSessionsOff,
-      denialResponse: () => ({
-        status: 409,
-        message: 'Desk sessions are switched off for this branch.',
-      }),
-    },
-    messages: MESSAGES,
-    stillAuthorized,
-    resolveActor,
+  const config = impersonationConfig({ audit, entitled });
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The port behind both manifests' mandatory namespace — they share it
+    // (`impersonation`), because a refusal on either mount is one story.
+    ports: { loggerFor: harnessLoggerFor },
   });
 
+  host.adoptServer({
+    manifest: impersonationManifest,
+    server: impersonationServerManifest,
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
+    bindings: { http: { mountPath: IMPERSONATION_PLATFORM_PATH, config } },
+  });
+  host.adoptServer({
+    manifest: impersonationPreviewManifest,
+    server: impersonationPreviewServerManifest,
+    bindings: { http: { mountPath: IMPERSONATION_TENANT_MOUNT, config } },
+  });
+
+  const wired = host.assemble();
+  // The gate, the codec and `readState` are the rest of the api and stay a
+  // LIBRARY: the write gate runs in front of every route in this app, most of
+  // which have nothing to do with this package, so it could never have come off
+  // a mount. `wired.http[name]` keeps them beside the routes instead of
+  // rebuilding the surface — two codecs over one cookie is two answers to
+  // "whose session is this".
+  const surface = wired.http[impersonationManifest.name] as ReturnType<
+    typeof createWireApiImpersonation
+  >;
+
   return {
-    platform: surface.platform,
-    tenant: surface.tenant,
+    report: wired.report,
+    routes: wired.routes,
+    platform: honoRouterFor(routesOf(wired.routes, impersonationManifest.name), resolveActor),
+    tenant: honoRouterFor(routesOf(wired.routes, impersonationPreviewManifest.name), resolveActor),
     writeGate: writeGate(surface),
     trail,
     revoke(userId: string, value: boolean): void {
@@ -308,7 +294,7 @@ export function impersonationHost() {
  * effect can precede the check. It short-circuits on the cookie header, so
  * traffic that is not impersonated pays a substring test and nothing else.
  */
-function writeGate(surface: ReturnType<typeof impersonationRouter>): MiddlewareHandler {
+function writeGate(surface: ReturnType<typeof createWireApiImpersonation>): MiddlewareHandler {
   return async (c, next) => {
     const cookie = readCookie(c, 'harness_desk_session');
     if (!cookie) return next();
@@ -337,42 +323,4 @@ function readCookie(c: Context, name: string): string | undefined {
     if (eq > 0 && entry.slice(0, eq) === name) return entry.slice(eq + 1);
   }
   return undefined;
-}
-
-/**
- * The HOST endpoints that stand behind the gate — the arrangement every guarded
- * route in a real app has, and the only way to see the refusals from a browser.
- *
- * Four shapes, deliberately: a money WRITE, an allowlisted money READ, an
- * unlisted money GET (the one where the verb lies), and an account write.
- */
-export function mountImpersonationDemo(app: Hono, harness: HarnessImpersonation): void {
-  app.get('/api/loans', (c) => c.json({ loans: [{ id: 'l-1', title: 'Dune' }] }));
-  app.get('/api/loans/:id/receipt', (c) => c.json({ receipt: c.req.param('id') }));
-  app.post('/api/loans/:id/renew', (c) => c.json({ renewed: c.req.param('id') }));
-  app.post('/api/borrower-profile', (c) => c.json({ saved: true }));
-  app.post('/api/catalog-notes', (c) => c.json({ saved: true }));
-
-  // The host's OWN catalogs, which the dialog takes as config: the branches a
-  // session may be bounded to, and who works at one.
-  app.get('/__harness/impersonation/branches', (c) => c.json(IMPERSONATION_TENANTS));
-  app.get('/__harness/impersonation/staff/:slug', (c) => {
-    const slug = c.req.param('slug');
-    const branch = IMPERSONATION_TENANTS.find((tenant) => tenant.slug === slug);
-    return c.json(
-      PEOPLE.filter((person) => person.tenantId === branch?.id).map((person) => person.id),
-    );
-  });
-
-  app.get('/__harness/impersonation/trail', (c) => c.json(harness.trail));
-  app.post('/__harness/impersonation/revoke', async (c) => {
-    const body = (await c.req.json()) as { userId?: string; revoked?: boolean };
-    harness.revoke(body.userId ?? SYSTEM_LIBRARIAN.id, body.revoked !== false);
-    return c.body(null, 204);
-  });
-  app.post('/__harness/impersonation/entitlement', async (c) => {
-    const body = (await c.req.json()) as { tenantId?: string; enabled?: boolean };
-    harness.setEntitled(body.tenantId ?? RBAC_TENANT_ID, body.enabled !== false);
-    return c.body(null, 204);
-  });
 }
