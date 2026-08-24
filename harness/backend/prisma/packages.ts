@@ -163,45 +163,55 @@ export interface DeclaredModel {
   table: string;
 }
 
+/** The three lines the parse recognises; hoisted so they compile once. */
+const MODEL_OPENING = /^\s*model\s+([A-Za-z][A-Za-z0-9_]*)\s*\{/;
+const TABLE_MAP = /^\s*@@map\("([^"]+)"\)/;
+const BLOCK_CLOSE = /^\s*\}\s*$/;
+
+/**
+ * The models one partial declares, with the table each claims.
+ *
+ * Split out of {@link declaredModels} so the line-level parse is one function
+ * with one job — the enclosing walk over packages and their partials says
+ * nothing about Prisma syntax, and this says nothing about where files are.
+ */
+function modelsInPartial(packageName: string, partial: string): DeclaredModel[] {
+  const found: DeclaredModel[] = [];
+  let model: string | null = null;
+  let table: string | null = null;
+  for (const line of readFileSync(partial, 'utf8').split('\n')) {
+    const opening = MODEL_OPENING.exec(line);
+    if (opening?.[1]) {
+      model = opening[1];
+      table = null;
+    } else if (model === null) {
+      continue;
+    } else if (BLOCK_CLOSE.test(line)) {
+      found.push({ package: packageName, model, table: table ?? model });
+      model = null;
+      table = null;
+    } else {
+      table = TABLE_MAP.exec(line)?.[1] ?? table;
+    }
+  }
+  return found;
+}
+
 /**
  * Every model declared by every installed partial, with the table it claims.
  *
  * Parsed out of the `.prisma` text rather than read off the generated client's
- * DMMF, for two reasons. The partial IS the artifact under test here, so reading
- * it directly keeps the assertion pointed at the file a package ships; and
- * `Prisma.dmmf` is an internal whose shape has moved between major versions,
- * which would make a Prisma bump look like a schema failure.
+ * DMMF, for two reasons. The partial IS the artifact under test here, so
+ * reading it directly keeps the assertion pointed at the file a package ships;
+ * and `Prisma.dmmf` is an internal whose shape has moved between major
+ * versions, which would make a Prisma bump look like a schema failure.
  *
  * The parse is deliberately shallow — block headers and `@@map`, nothing else.
  * `enum` and `type` blocks are not models and carry no table, so only `model`
  * opens a block here.
  */
 export function declaredModels(): DeclaredModel[] {
-  const models: DeclaredModel[] = [];
-  for (const pkg of schemaPackages()) {
-    for (const partial of pkg.partials) {
-      let current: string | null = null;
-      let table: string | null = null;
-      for (const line of readFileSync(partial, 'utf8').split('\n')) {
-        const opening = /^\s*model\s+([A-Za-z][A-Za-z0-9_]*)\s*\{/.exec(line);
-        if (opening?.[1]) {
-          current = opening[1];
-          table = null;
-          continue;
-        }
-        if (current === null) continue;
-        const mapped = /^\s*@@map\("([^"]+)"\)/.exec(line);
-        if (mapped?.[1]) {
-          table = mapped[1];
-          continue;
-        }
-        if (/^\s*\}\s*$/.test(line)) {
-          models.push({ package: pkg.packageName, model: current, table: table ?? current });
-          current = null;
-          table = null;
-        }
-      }
-    }
-  }
-  return models;
+  return schemaPackages().flatMap((pkg) =>
+    pkg.partials.flatMap((partial) => modelsInPartial(pkg.packageName, partial)),
+  );
 }

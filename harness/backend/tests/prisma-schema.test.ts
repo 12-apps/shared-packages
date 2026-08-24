@@ -116,13 +116,12 @@ describe('each partial against its own migration', () => {
     const models = declaredModels();
     expect(models.length).toBeGreaterThanOrEqual(30);
 
-    const missing = models.filter((model) => !tables.has(model.table));
-    expect(
-      missing,
-      `models whose table no migration creates:\n${missing
-        .map((m) => `  ${m.package}  ${m.model} -> ${m.table}`)
-        .join('\n')}`,
-    ).toEqual([]);
+    // Reported as `package model -> table`, so a failure names the tarball to
+    // open rather than only the model that is missing one.
+    const missing = models
+      .filter((model) => !tables.has(model.table))
+      .map((model) => `${model.package} ${model.model} -> ${model.table}`);
+    expect(missing).toEqual([]);
   });
 
   /**

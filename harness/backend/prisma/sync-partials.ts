@@ -108,14 +108,13 @@ function main(): void {
   // folder, or Prisma keeps generating delegates for tables no migration builds.
   for (const stale of generatedFiles()) rmSync(join(SCHEMA_DIR, stale));
 
-  const manifest: { package: string; file: string; migrations: number }[] = [];
-  for (const pkg of packages) {
-    for (const partial of pkg.partials) {
+  const manifest = packages.flatMap((pkg) =>
+    pkg.partials.map((partial) => {
       const target = targetFor(pkg, partial);
       copyFileSync(partial, join(SCHEMA_DIR, target));
-      manifest.push({ package: pkg.packageName, file: target, migrations: pkg.migrations.length });
-    }
-  }
+      return { package: pkg.packageName, file: target, migrations: pkg.migrations.length };
+    }),
+  );
 
   // A machine-readable record of what this run assembled: what
   // `tests/prisma-schema.test.ts` asserts against, and what tells a human
