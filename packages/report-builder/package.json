@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/i18n": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/wiring": "workspace:*",
     "@playwright/test": "^1.56.1",

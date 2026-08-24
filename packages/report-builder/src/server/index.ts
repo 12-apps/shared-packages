@@ -141,3 +141,4 @@ export {
 export type { ReportRangeMessages, ReportServerMessages } from './messages';
 export type { BlankBlockTemplateCopy } from './block-templates';
 export { PT_BR_BLANK_BLOCK_TEMPLATE_COPY, PT_BR_REPORT_SERVER_MESSAGES } from './pt-BR';
+export { EN_US_BLANK_BLOCK_TEMPLATE_COPY, EN_US_REPORT_SERVER_MESSAGES } from './en-US';
