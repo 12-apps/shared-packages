@@ -1,12 +1,19 @@
 /**
  * The plan screen — what this tenant is on, and what every tier gives.
  *
- * The page leads with the pricing cards and keeps the tenant's live status
- * BELOW them, because the two answer different questions and only one of them
- * is why somebody opens this screen:
+ * Three bands, in the order the questions get asked:
  *
- *   cards   what each tier includes — the catalog, identical for everyone
+ *   cards   what each tier is FOR, what it costs, and what it adds over the
+ *           one below it — four short cards, not four catalogs
+ *   table   the full matrix, closed, for the visit that is actually comparing
  *   status  what is on for THIS tenant right now, and why it is off if it is
+ *
+ * The middle band is the whole shape of this screen and it is a subtraction.
+ * Every card printed every line of every section, so the four of them stood
+ * ~35 rows tall, repeated the same thirty labels four times, and pushed the
+ * price and the button below the fold — a comparison layout in which no two
+ * cards could be seen at once. The rows moved into one table where a label is
+ * stated once; the cards kept the delta.
  *
  * The status half is not decoration and is deliberately not merged into the
  * cards: it is the only place that distinguishes "your plan does not include
@@ -21,7 +28,6 @@
 import { useState, type JSX } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
-import { Badge } from '@12-apps/ui/data-display/Badge';
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
 import { Box } from '@12-apps/ui/mui/Box';
@@ -29,112 +35,13 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Heading } from '@12-apps/ui/typography/Heading';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { ComparisonTier, OpenPlanRequest, TenantFeatureView } from '../plan-wire';
+import type { ComparisonTier, OpenPlanRequest } from '../plan-wire';
+import { ComparisonTable } from './comparison-table';
 import type { PlanPageCopy } from './copy';
 import { createPlanApi, useRead } from './plan-api';
+import { CurrentStatus } from './plan-status';
 import { TierCards } from './tier-cards';
 import type { ResolvedWebConfig } from './web-config';
-
-/**
- * A quota ceiling, or nothing at all for an on/off capability.
- *
- * A ZERO ceiling returns null rather than the "up to 0" wording — that is
- * not a limit a customer can act on, it is a denial pretending to be one,
- * and the row's own note already says the feature is not included.
- */
-function ceilingLabel(limit: TenantFeatureView['limit'], copy: PlanPageCopy): string | null {
-  if (limit === null) return null;
-  if (limit === 'unlimited') return copy.ceilingUnlimited;
-  if (limit === 0) return null;
-  return copy.ceilingUpTo({ limit });
-}
-
-/**
- * The way back to their own switch, named by the host (`copy.openSwitch`).
- *
- * Rendered ONLY for `disabled-by-tenant`, and keyed off that code rather than
- * off `enabled === false`: a tenant-switched feature can equally be dark
- * because the plan never granted it, and offering the toggle there would send
- * them to flip something that cannot help.
- */
-function TenantSwitchLink({
-  feature,
-  config,
-}: {
-  feature: TenantFeatureView;
-  config: ResolvedWebConfig;
-}): JSX.Element | null {
-  if (feature.reason !== 'disabled-by-tenant') return null;
-  const location = config.switchLocation(feature.feature);
-  if (location === null) return null;
-  const Link = config.LinkComponent;
-  return (
-    <Text as="div" size="sm" data-testid={`plan-switch-${feature.feature}`}>
-      <Link to={location.path}>{config.copy.planPage.openSwitch({ label: location.label })}</Link>
-    </Text>
-  );
-}
-
-function FeatureRow({
-  feature,
-  config,
-}: {
-  feature: TenantFeatureView;
-  config: ResolvedWebConfig;
-}): JSX.Element {
-  const copy = config.copy.planPage;
-  const ceiling = ceilingLabel(feature.limit, copy);
-  return (
-    <Box
-      data-testid={`plan-feature-${feature.feature}`}
-      sx={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 2,
-        py: 1.25,
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
-      <Box sx={{ minWidth: 0 }}>
-        {/* `as="div"` on both: an inline default would render the label and
-            the note as one run-on string. */}
-        <Text as="div" weight="medium">
-          {feature.description ?? feature.feature}
-        </Text>
-        <Text as="div" size="sm" color="secondary">
-          {feature.note}
-          {ceiling === null ? '' : ` · ${ceiling}`}
-        </Text>
-        {/* Only where upgrading is actually the remedy — the payload already
-            withholds this for a feature the store switched off itself. The
-            BUTTON lives on the tier's card instead of here: one press per
-            tier reads better than the same offer repeated on every denied
-            row. */}
-        {feature.requiredPlan === null ? null : (
-          <Text
-            as="div"
-            size="sm"
-            color="secondary"
-            data-testid={`plan-upsell-${feature.feature}`}
-          >
-            {copy.availableOn({
-              planLabel: feature.requiredPlanLabel ?? feature.requiredPlan,
-            })}
-          </Text>
-        )}
-        {/* The mirror image of the upsell line: this row is off because of a
-            switch the tenant owns, so the useful thing to hand them is the
-            way back to it. */}
-        <TenantSwitchLink feature={feature} config={config} />
-      </Box>
-      <Badge color={feature.enabled ? 'success' : 'neutral'}>
-        {feature.enabled ? copy.statusBadge.enabled : copy.statusBadge.disabled}
-      </Badge>
-    </Box>
-  );
-}
 
 /**
  * The two things that can be true about an ask: one is open, or the last one
@@ -165,40 +72,6 @@ function RequestBanners({
     );
   }
   return null;
-}
-
-/**
- * What is on for THIS tenant right now, and why it is off if it is.
- *
- * Kept separate from the cards because it is the only place that
- * distinguishes "your plan does not include this" from "you switched this off
- * yourself" — collapsing those two sells an upgrade that changes nothing.
- */
-function CurrentStatus({
-  features,
-  config,
-}: {
-  features: TenantFeatureView[];
-  config: ResolvedWebConfig;
-}): JSX.Element {
-  const copy = config.copy.planPage;
-  return (
-    <Box>
-      <Heading level="h3">{copy.statusHeading}</Heading>
-      <Box sx={{ mb: 1 }}>
-        <Text as="div" color="secondary" size="sm">
-          {copy.statusIntro}
-        </Text>
-      </Box>
-      {features.length === 0 ? (
-        <Text color="secondary">{copy.statusEmpty}</Text>
-      ) : (
-        features.map((feature) => (
-          <FeatureRow key={feature.feature} feature={feature} config={config} />
-        ))
-      )}
-    </Box>
-  );
 }
 
 /** The press-to-ask flow: one pending flag, one error, reload on success. */
@@ -292,7 +165,15 @@ export function PlanScreen({ config }: { config: ResolvedWebConfig }): JSX.Eleme
         copy={config.copy.tierCards}
       />
 
-      <CurrentStatus features={plan.features} config={config} />
+      {/* The rows the cards no longer print, stated once each instead of once
+          per card, and closed until somebody is actually comparing. */}
+      <ComparisonTable tiers={plan.comparison} copy={config.copy.comparisonTable} />
+
+      <CurrentStatus
+        features={plan.features}
+        planOrder={plan.comparison.map((tier) => tier.key)}
+        config={config}
+      />
     </Stack>
   );
 }

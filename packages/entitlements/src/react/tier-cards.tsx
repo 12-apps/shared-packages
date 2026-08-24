@@ -1,16 +1,28 @@
 /**
  * The pricing cards.
  *
- * The tiers side by side, the tenant's own marked and every tier's contents
- * spelled out. The columns are the comparison: every card renders the same
- * sections in the same order, so a row means the same thing across all cards
- * and the eye can travel sideways — the host's `comparison` builder
- * guarantees that shape.
+ * ## What a card is for, and what it stopped being
  *
- * Every tier's wording and every number arrive PRE-FORMATTED from the server;
- * the card chrome's own words (badges, CTAs, the unpriced slot) are required
- * host copy. Nothing here decides how a zero quota reads, because that is a
- * product statement and it belongs somewhere a test can reach it.
+ * A card answers two questions and nothing else: **is this me** (the pitch,
+ * the headline number) and **what does it cost**. The reason to move up is
+ * the DIFFERENCE from the tier before it, so that is the list a card carries
+ * — four lines of it — and the full matrix lives in the comparison table
+ * below, where each label is stated once across all tiers instead of once per
+ * card.
+ *
+ * It used to print every section of every line on every card. Four cards
+ * ~35 rows tall each: the same thirty labels four times over, the price and
+ * the button pushed under all of them, and the side-by-side comparison the
+ * layout was built for impossible to actually perform because no two cards
+ * fit on a screen together. Order follows from that — price and CTA sit ABOVE
+ * the list now, because they are the reason the customer is on this screen and
+ * a list is no reason to scroll past them.
+ *
+ * Every tier's wording and every number still arrive PRE-FORMATTED from the
+ * server; the card chrome's own words (badges, CTAs, the unpriced slot, the
+ * "everything in X, plus" line) are required host copy. Nothing here decides
+ * how a zero quota reads, because that is a product statement and it belongs
+ * somewhere a test can reach it.
  */
 import type { JSX } from 'react';
 
@@ -23,6 +35,17 @@ import { Text } from '@12-apps/ui/typography/Text';
 
 import type { ComparisonLine, ComparisonTier } from '../plan-wire';
 import type { TierCardsCopy } from './copy';
+import { IncludedMark } from './marks';
+import { tierHighlights } from './tier-highlights';
+
+/**
+ * How many differences a card shows before it starts counting.
+ *
+ * Four, because that is what fits above the fold beside three sibling cards
+ * on a laptop — and because a list long enough to need scanning is the full
+ * matrix, which is one press away.
+ */
+const HIGHLIGHT_LIMIT = 4;
 
 interface TierCardsProps {
   tiers: ComparisonTier[];
@@ -34,57 +57,25 @@ interface TierCardsProps {
 }
 
 /**
- * The ✓ / − marks, as plain SVG: this package takes no icon-font dependency
- * for two glyphs, and both are decoration (`aria-hidden`) — the line's
- * `included` state is what carries the meaning. Drawn with `currentColor`
- * under an `sx` palette color, so the marks follow the host THEME (including
- * dark mode) exactly as the original `color="success"` icons did.
+ * One difference. The mark is decoration here (`label: null`) — the line's
+ * own text carries the meaning, and a screen reader announcing "included"
+ * before every one of them would read the list twice.
  */
-function IncludedMark({ included }: { included: boolean }): JSX.Element {
+function HighlightRow({ line }: { line: ComparisonLine }): JSX.Element {
   return (
-    <Box
-      component="svg"
-      aria-hidden
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      sx={{
-        flexShrink: 0,
-        mt: '2px',
-        color: included ? 'success.main' : 'text.disabled',
-      }}
-    >
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-      {included ? (
-        <path
-          d="M8 12.5l2.5 2.5L16 9.5"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      ) : (
-        <path d="M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      )}
-    </Box>
-  );
-}
-
-function LineRow({ line }: { line: ComparisonLine }): JSX.Element {
-  return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', py: 0.5 }}>
-      <IncludedMark included={line.included} />
-      {/* The LABEL and the detail must not run together the way two inline
-          spans would — hence the explicit block and the separated detail
-          line. */}
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', py: 0.375 }}>
+      <Box sx={{ mt: '1px' }}>
+        <IncludedMark included label={null} />
+      </Box>
       <Box sx={{ minWidth: 0 }}>
         {/* `neutral` is body text; `primary` is the BRAND colour and would
-            render every included line as if it were a link. */}
-        <Text as="div" size="sm" color={line.included ? 'neutral' : 'secondary'}>
+            render every line as if it were a link. */}
+        <Text as="span" size="sm">
           {line.label}
         </Text>
         {line.detail === null ? null : (
-          <Text as="div" size="xs" color="secondary">
+          <Text as="span" size="sm" color="secondary">
+            {' · '}
             {line.detail}
           </Text>
         )}
@@ -94,7 +85,13 @@ function LineRow({ line }: { line: ComparisonLine }): JSX.Element {
 }
 
 /** The badge strip: at most one of the current / recommended badges. */
-function TierBadge({ tier, copy }: { tier: ComparisonTier; copy: TierCardsCopy }): JSX.Element | null {
+function TierBadge({
+  tier,
+  copy,
+}: {
+  tier: ComparisonTier;
+  copy: TierCardsCopy;
+}): JSX.Element | null {
   // The tenant's own badge wins over the recommendation when both apply —
   // telling a tenant that the tier they already pay for is a great offer is
   // noise, and knowing which card is theirs is the thing they came for.
@@ -132,17 +129,16 @@ function TierBadge({ tier, copy }: { tier: ComparisonTier; copy: TierCardsCopy }
  */
 function TierPrice({ tier, copy }: { tier: ComparisonTier; copy: TierCardsCopy }): JSX.Element {
   return (
-    <Box sx={{ mt: 2 }}>
-      <Text size="lg" weight="bold" data-testid={`tier-price-${tier.key}`}>
+    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'baseline', mt: 1.5 }}>
+      <Text size="xl" weight="bold" data-testid={`tier-price-${tier.key}`}>
         {tier.price ?? copy.priceUnpriced}
       </Text>
       {tier.priceNote === null ? null : (
         <Text size="sm" color="secondary" data-testid={`tier-price-note-${tier.key}`}>
-          {' '}
           {tier.priceNote}
         </Text>
       )}
-    </Box>
+    </Stack>
   );
 }
 
@@ -187,17 +183,58 @@ function TierCta({
   );
 }
 
+/** The delta list, headed by the tier it builds on. */
+function TierDelta({
+  tiers,
+  index,
+  copy,
+}: {
+  tiers: ComparisonTier[];
+  index: number;
+  copy: TierCardsCopy;
+}): JSX.Element | null {
+  const tier = tiers[index];
+  if (tier === undefined) return null;
+  const { lines, more, inheritsFrom } = tierHighlights(tiers, index, HIGHLIGHT_LIMIT);
+  if (lines.length === 0) return null;
+  return (
+    <Box sx={{ mt: 2 }} data-testid={`tier-highlights-${tier.key}`}>
+      <Box sx={{ mb: 0.5 }}>
+        <Text as="div" size="xs" weight="bold" color="secondary">
+          {inheritsFrom === null
+            ? copy.highlightsHeading
+            : copy.inheritsFrom({ planName: inheritsFrom })}
+        </Text>
+      </Box>
+      {lines.map((line) => (
+        <HighlightRow key={line.label} line={line} />
+      ))}
+      {more === 0 ? null : (
+        <Box sx={{ mt: 0.5 }}>
+          <Text as="div" size="xs" color="secondary" data-testid={`tier-more-${tier.key}`}>
+            {copy.moreIncluded({ count: more })}
+          </Text>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 function TierCard({
-  tier,
+  tiers,
+  index,
   onRequest,
   pending,
   copy,
 }: {
-  tier: ComparisonTier;
+  tiers: ComparisonTier[];
+  index: number;
   onRequest: ((tier: ComparisonTier) => void) | null;
   pending: boolean;
   copy: TierCardsCopy;
-}): JSX.Element {
+}): JSX.Element | null {
+  const tier = tiers[index];
+  if (tier === undefined) return null;
   return (
     <Box
       data-testid={`tier-card-${tier.key}`}
@@ -219,8 +256,8 @@ function TierCard({
 
       <Heading level="h3">{tier.name}</Heading>
 
-      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'baseline', mt: 1 }}>
-        <Text size="xl" weight="bold" data-testid={`tier-headline-${tier.key}`}>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'baseline', mt: 0.5 }}>
+        <Text size="md" weight="bold" data-testid={`tier-headline-${tier.key}`}>
           {tier.headline}
         </Text>
         <Text size="sm" color="secondary">
@@ -228,31 +265,20 @@ function TierCard({
         </Text>
       </Stack>
 
-      <Box sx={{ mt: 1, minHeight: 40 }}>
+      {/* Price and action ABOVE the list: they are why the customer opened
+          this screen, and a feature list is no reason to scroll past them. */}
+      <TierPrice tier={tier} copy={copy} />
+      <Box sx={{ mt: 1.5 }}>
+        <TierCta tier={tier} onRequest={onRequest} pending={pending} copy={copy} />
+      </Box>
+
+      <Box sx={{ mt: 1.5, minHeight: 40 }}>
         <Text as="div" size="sm" color="secondary">
           {tier.pitch}
         </Text>
       </Box>
 
-      <Box sx={{ mt: 2, flex: 1 }}>
-        {tier.sections.map((section) => (
-          <Box key={section.title} sx={{ mb: 1.5 }}>
-            <Box sx={{ mb: 0.5 }}>
-              <Text as="div" size="xs" weight="bold" color="secondary">
-                {section.title.toUpperCase()}
-              </Text>
-            </Box>
-            {section.lines.map((line) => (
-              <LineRow key={line.label} line={line} />
-            ))}
-          </Box>
-        ))}
-      </Box>
-
-      <TierPrice tier={tier} copy={copy} />
-      <Box sx={{ mt: 1.5 }}>
-        <TierCta tier={tier} onRequest={onRequest} pending={pending} copy={copy} />
-      </Box>
+      <TierDelta tiers={tiers} index={index} copy={copy} />
     </Box>
   );
 }
@@ -275,8 +301,15 @@ export function TierCards({ tiers, onRequest, pending, copy }: TierCardsProps): 
         alignItems: 'stretch',
       }}
     >
-      {tiers.map((tier) => (
-        <TierCard key={tier.key} tier={tier} onRequest={onRequest} pending={pending} copy={copy} />
+      {tiers.map((tier, index) => (
+        <TierCard
+          key={tier.key}
+          tiers={tiers}
+          index={index}
+          onRequest={onRequest}
+          pending={pending}
+          copy={copy}
+        />
       ))}
     </Box>
   );

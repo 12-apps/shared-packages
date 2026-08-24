@@ -31,10 +31,19 @@ test('the whole surface mounts from one factory call and names the plan commerci
   await expect(page.getByTestId('tier-badge-shorts')).toHaveText('SEU PLANO');
   await expect(page.getByTestId('plan-name')).toHaveText('Shorts');
 
-  // The printed catalogue is the cheapest tier's canonical denial, and this
-  // line is the load-bearing one: it must name "Feature", the tier's
-  // COMMERCIAL name from the pricing catalog — never the raw key.
-  await expect(page.getByTestId('plan-upsell-catalogue.print')).toContainText('Feature');
+  // The printed catalogue is the cheapest tier's canonical denial, and this is
+  // the load-bearing claim: the screen names "Feature", the tier's COMMERCIAL
+  // name from the pricing catalog — never the raw key.
+  //
+  // The sentence hangs off the GROUP rather than the row: the status band says
+  // it once per tier, over every row that tier would lift, because a store on
+  // a low tier was reading the same sentence on twenty-odd consecutive rows.
+  // So the row assertion is MEMBERSHIP — this denial is under that tier — and
+  // the wording assertion is on the heading that carries it.
+  await expect(page.getByTestId('plan-upsell-plan-feature')).toContainText('Feature');
+  await expect(
+    page.getByTestId('plan-blocked-feature').getByTestId('plan-feature-catalogue.print'),
+  ).toBeVisible();
 
   // And the endpoint itself, so a narrowing of the read guard fails here
   // rather than only in whatever the SPA happens to render.
@@ -52,8 +61,15 @@ test("the tenant's own switch earns the way back to it — never a sale", async 
   await expect(page.getByTestId('plan-switch-submissions.notes')).toContainText(
     'Ajustes › Curadoria',
   );
-  // …not an upgrade that would change nothing.
-  await expect(page.getByTestId('plan-upsell-submissions.notes')).toHaveCount(0);
+  // …not an upgrade that would change nothing. Asserted as membership of the
+  // UNGROUPED bucket rather than as the absence of a per-row test id: no tier
+  // fixes this row, so no tier's heading may gather it. The absence check went
+  // vacuous the moment the sentence moved off the row, and a test that cannot
+  // fail is worse than none.
+  await expect(
+    page.getByTestId('plan-blocked-other').getByTestId('plan-feature-submissions.notes'),
+  ).toBeVisible();
+  await expect(page.getByTestId('plan-blocked-other')).not.toContainText('Disponível no plano');
 });
 
 test('an outgrown quota says everything keeps working', async ({ page }) => {
