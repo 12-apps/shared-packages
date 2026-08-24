@@ -46,6 +46,21 @@ function toWireRoute(route: EmailAuthRoute): WireRoute<AuthActor> {
   return {
     method: route.method,
     path: route.path,
+    /**
+     * The route's own `session` flag, said in the contract's vocabulary.
+     *
+     * Six of the eight endpoints here are anonymous BY DEFINITION — sign up,
+     * verify, sign in, forget a password, reset it — and `kind` defaults to
+     * `authenticated`, which is what a host's gate reads. So a consumer that
+     * honours the contract (as it must: `public` is "anonymous by design", a
+     * `webhook` "must NOT sit behind tenant guards") would refuse the whole
+     * sign-in surface with 401 before a handler ran, while the two account
+     * routes worked — a package nobody could sign in to, mounting cleanly.
+     *
+     * The Hono adapter never noticed because it asks `route.session` itself.
+     * Only the wire view has to SAY it, and this is the line that does.
+     */
+    kind: route.session === true ? "authenticated" : "public",
     handle: async (request: WireRequest<AuthActor>): Promise<WireResponse> => {
       // Still refused HERE rather than left to the host, because `session` is a
       // property of the ROUTE — which endpoints need a caller is this package's

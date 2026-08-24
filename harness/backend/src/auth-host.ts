@@ -6,16 +6,23 @@ import { getCookie, setCookie } from 'hono/cookie';
 import type { PGlite } from '@electric-sql/pglite';
 
 import { createApiAuth } from '@12-apps/auth/server';
-import type { EmailCredentials } from '@12-apps/auth';
+import type { EmailCredentials, EmailCredentialsMailer } from '@12-apps/auth';
 import { createEmailCredentials } from '@12-apps/auth/server';
-import { emailAuthRouter, emailAuthSettingsRouter } from '@12-apps/auth/hono';
-import { createAuthMailer } from '@12-apps/auth/notifications';
+import { authManifest, authPlatformManifest } from '@12-apps/auth/manifest';
+import {
+  authPlatformServerManifest,
+  authServerManifest,
+} from '@12-apps/auth/manifest/server';
 import { PT_BR_MAIL } from '@12-apps/auth/server';
 import { PT_BR_MESSAGES } from '@12-apps/auth/server';
 import type { EmailDriver } from '@12-apps/notifications/server';
 
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
 import { authSettingsStore, authStore } from './auth-store';
 import { HARNESS_SPA_ORIGIN } from './port';
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /**
  * `@12-apps/auth`'s e-mail + password surface, mounted the way an adopter
@@ -105,8 +112,17 @@ function recordingDriver(pg: PGlite): EmailDriver {
   };
 }
 
+/** Where the two mounts hang — the adoption's claims. */
+export const AUTH_MOUNT_PATH = '/api/auth/email';
+export const AUTH_PLATFORM_MOUNT_PATH = '/api/platform/auth-settings';
+
+/** The secret this host actually runs on — see the `env` answer below. */
+const AUTH_SECRET = process.env.AUTH_SECRET ?? 'harness-auth-secret-not-a-real-one';
+
 export interface AuthHost {
   credentials: EmailCredentials;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
   /** Real Auth.js — `/api/auth/**`, credentials provider included. */
   apiAuth: ReturnType<typeof createApiAuth>;
   /** The eight shopper endpoints, for `/api/auth/email`. */
@@ -197,28 +213,47 @@ function harnessRouter(pg: PGlite): Hono {
   return app;
 }
 
+/**
+ * The two surfaces, adopted through `@12-apps/wiring/consumer`.
+ *
+ * TWO manifests, and the package argues the split in its own words: an `http`
+ * capability binds ONE mount path, and the sign-in surface (anybody) and the
+ * platform switches (a superadmin, behind the host's own gate) differ in
+ * audience, in mount path and in the gate in front of them. Folding them into
+ * one would mean the aggregate could not express that difference — and these
+ * are the two endpoints that can turn a sign-in method off for everybody.
+ *
+ * Three things this adoption moves out of this file:
+ *
+ * - **`resolveUserId` is gone from both configs.** The package's own docblock
+ *   calls this inversion the point: `resolveUserId` returned `string | null`,
+ *   so `null` became 401 for every refusal and a host whose gate has a second
+ *   one (signed in, but not permitted — a 403) had nowhere to put it. Under the
+ *   contract the host answers before the route runs and `actor` arrives already
+ *   proven. The bridge resolves it exactly once, here.
+ * - **The mailer comes from the BINDER.** `ports.email` is this host's one
+ *   delivery port, and `email.createMailer` turns it into the package's four
+ *   semantic sends — so the host supplies a vendor and nothing else. It is
+ *   late-bound below for an ordering reason, not a design one.
+ * - **The `e2e` world is declined in writing**, and the web harness binds it.
+ *   The manifest says why the declaration exists at all: "the first host
+ *   adoption re-derived the whole mail-sink world by hand without discovering
+ *   `./e2e` existed."
+ */
 export function authHost(pg: PGlite): AuthHost {
   const settings = authSettingsStore(pg);
+  // The mailer belongs to the ADOPTION and the http config is written before
+  // it exists — `createEmailCredentials` needs one at construction. So the
+  // credentials hold a forwarder and the real mailer lands in it a few lines
+  // later. Building a second one with `createAuthMailer` would work and is the
+  // wrong answer: it is the binder's job to compose the host's port with the
+  // package's own sentences, and two mailers is two answers to "which words".
+  const mail: { current: EmailCredentialsMailer | null } = { current: null };
+  const mailer = forwardingMailer(mail);
 
   const credentials = createEmailCredentials({
     store: authStore(pg),
-    /**
-     * The mailer comes from the PACKAGE, not from this host (12-25).
-     *
-     * `@12-apps/auth/notifications` renders the four messages through
-     * `renderAuthMail` and hands each to an `@12-apps/notifications` driver, so
-     * the host supplies only the vendor. That is the whole integration: no
-     * `sendVerification`, no `sendPasswordReset`, no layout and no escaping
-     * written here — the two packages already own a half each, and a host
-     * writing them again is copying.
-     */
-    mailer: createAuthMailer({
-      driver: recordingDriver(pg),
-      // The pack is required now — the journeys read these very sentences out
-      // of auth_sent_mail, so the pt-BR pack is the fixture, chosen by name.
-      pack: PT_BR_MAIL,
-      loginUrl: `${APP_URL}${LOGIN_PATH}`,
-    }),
+    mailer,
     // A RESOLVER, not a fixed object: both switches are flipped mid-scenario by
     // the operator console, and a value captured at construction would take
     // effect on the next restart instead of the next request.
@@ -229,8 +264,94 @@ export function authHost(pg: PGlite): AuthHost {
     loginPath: LOGIN_PATH,
   });
 
-  const apiAuth = createApiAuth({
-    secret: process.env.AUTH_SECRET ?? 'harness-auth-secret-not-a-real-one',
+  const apiAuth = authJsFor(credentials);
+  const userId = resolveUserId(apiAuth, pg);
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: {
+      loggerFor: harnessLoggerFor,
+      // The vendor seam, and the ONLY half of the mailer this host owns.
+      email: recordingDriver(pg),
+    },
+  });
+
+  const adopted = host.adoptServer({
+    manifest: authManifest,
+    // The pack and the login URL are choices no port can carry — which words
+    // the four mails use, and where the "your password changed" notice points.
+    server: authServerManifest({ pack: PT_BR_MAIL, loginUrl: `${APP_URL}${LOGIN_PATH}` }),
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
+    // The environment this host ACTUALLY runs on, its own default included.
+    // `AUTH_SECRET` is declared `required`, and handing over a bare
+    // `process.env` would report it unset and refuse to assemble — while the
+    // server it describes would have started perfectly on the fallback above.
+    // An env answer that disagrees with the running process is worse than none.
+    env: { ...process.env, AUTH_SECRET },
+    bindings: {
+      http: {
+        mountPath: AUTH_MOUNT_PATH,
+        config: { credentials, messages: PT_BR_MESSAGES },
+      },
+      email: {},
+    },
+  });
+  mail.current = adopted.mailer as EmailCredentialsMailer;
+
+  host.adoptServer({
+    manifest: authPlatformManifest,
+    server: authPlatformServerManifest,
+    bindings: {
+      http: { mountPath: AUTH_PLATFORM_MOUNT_PATH, config: { store: settings } },
+    },
+  });
+
+  const wired = host.assemble();
+  const routesOf = (name: string) => wired.routes.filter((route) => route.packageName === name);
+
+  return {
+    credentials,
+    apiAuth,
+    report: wired.report,
+    routes: wired.routes,
+    emailRouter: honoRouterFor(routesOf(authManifest.name), userId),
+    settingsRouter: honoRouterFor(routesOf(authPlatformManifest.name), userId),
+    harnessRoutes: harnessRouter(pg),
+  };
+}
+
+/**
+ * A mailer that forwards to the one the binder built.
+ *
+ * Not a stub: every call lands on the package's own composition of this host's
+ * driver, and a send before the adoption completed is a wiring bug this throws
+ * on rather than swallows.
+ */
+function forwardingMailer(mail: { current: EmailCredentialsMailer | null }): EmailCredentialsMailer {
+  const bound = (): EmailCredentialsMailer => {
+    if (!mail.current) throw new Error('the auth mailer is not bound yet');
+    return mail.current;
+  };
+  return {
+    sendVerification: (message) => bound().sendVerification(message),
+    sendPasswordReset: (message) => bound().sendPasswordReset(message),
+    sendAccountExists: (message) => bound().sendAccountExists(message),
+    sendPasswordChanged: (message) => bound().sendPasswordChanged?.(message) ?? Promise.resolve(),
+    canDeliver: () => bound().canDeliver?.() ?? true,
+  };
+}
+
+/**
+ * Real Auth.js, with the flow's `authenticate` handed to its credentials
+ * provider — so a password sign-in mints a real session rather than a fixture.
+ *
+ * Extracted from the binder below because none of it is wiring: it is this
+ * host's session layer, which `@12-apps/auth`'s http capability neither
+ * provides nor knows about.
+ */
+function authJsFor(credentials: EmailCredentials): ReturnType<typeof createApiAuth> {
+  return createApiAuth({
+    secret: AUTH_SECRET,
     authUrl: APP_URL,
     basePath: '/api/auth',
     // The SPA reaches this server through Vite's proxy, so the Host header
@@ -249,14 +370,4 @@ export function authHost(pg: PGlite): AuthHost {
     // harness with no allowlist is the permissive end of that, deliberately.
     signInGate: () => true,
   });
-
-  const userId = resolveUserId(apiAuth, pg);
-
-  return {
-    credentials,
-    apiAuth,
-    emailRouter: emailAuthRouter({ credentials, messages: PT_BR_MESSAGES, resolveUserId: userId }),
-    settingsRouter: emailAuthSettingsRouter({ store: settings, resolveUserId: userId }),
-    harnessRoutes: harnessRouter(pg),
-  };
 }
