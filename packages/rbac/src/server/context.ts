@@ -2,6 +2,7 @@ import type { RbacCatalog } from '../core/compose';
 import type { AuthzContext, OwnershipPredicate } from '../core/types';
 
 import type { RbacDbProvider } from './db';
+import type { RbacNotifyPort } from './notifications';
 
 /**
  * What every route in this surface shares (12-13): the actor, the request, the
@@ -145,8 +146,20 @@ export interface RbacPendingInvite {
  * the packaged screen hides the affordance.
  */
 export interface RbacInvitesPort {
-  /** Grant-or-invite by e-mail; the host decides which happened. */
-  invite(tenantId: string, email: string): Promise<{ status: 'added' | 'invited' }>;
+  /**
+   * Grant-or-invite by e-mail; the host decides which happened.
+   *
+   * `userId` is the account membership was granted to, when there was one —
+   * the `added` branch. It is what makes the invitee REACHABLE: a notification
+   * needs a recipient, and this port is the only thing that knows whether the
+   * address resolved to an account. Optional, so an existing implementation
+   * keeps compiling; omitted, the invite notification is skipped with a
+   * written reason rather than sent to nobody.
+   */
+  invite(
+    tenantId: string,
+    email: string,
+  ): Promise<{ status: 'added' | 'invited'; userId?: string }>;
   listPending(tenantId: string): Promise<RbacPendingInvite[]>;
   /** Cancel a pending invite by id. Idempotent. */
   cancel(tenantId: string, inviteId: string): Promise<void>;
@@ -265,6 +278,15 @@ export interface RbacServerConfig<
   audit?: RbacAuditSink;
   /** Optional invites seam — see {@link RbacInvitesPort}. */
   invites?: RbacInvitesPort;
+  /**
+   * OPTIONAL notification port — how this package tells an invitee they were
+   * invited. Bound, `POST /team` emits `rbac.team.invited` after the write
+   * commits and the host's pipeline delivers it with no new host code.
+   * Unbound, nothing is emitted, which is the behaviour every host has today —
+   * the difference is that the silence is now a capability a host declines
+   * rather than a hole nobody can see. See `./notifications`.
+   */
+  notify?: RbacNotifyPort;
   /** Walk a scope to its parent (`org:` chains). Default: flat scopes. */
   scopeParent?: (scope: string) => string | null;
   /**

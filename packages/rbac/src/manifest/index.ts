@@ -13,13 +13,24 @@
  *
  * Two narrowings are deliberate:
  *
- * - **No `web` inventory**, though `./react` ships the role editor and the
- *   team screens. Listing it would oblige every SERVER host adopting this
- *   manifest to answer for a React surface it never mounts — `assemble()`
- *   refuses a declared-but-unanswered capability, so the inventory must not
- *   overstate.
  * - **No `env`.** This package reads `process.env` nowhere; every
  *   deployment decision reaches it as an argument.
+ * - **No static `notifications` capability**, though this package now owns
+ *   one event. The invite notice's words and CTA are host copy, so a
+ *   blueprint pre-worded here would be a silent pt-BR default — the exact
+ *   thing the copy gate refuses. It ships as the factory
+ *   `createTeamInvitedBlueprint(copy)` (`../server/notifications`, with
+ *   `PT_BR_TEAM_INVITED_COPY` carrying the origin host's words), the same
+ *   carve-out `createResearchBudgetBlueprint` documents one package over.
+ *
+ * The `web` inventory USED to be a third narrowing, on a premise that is
+ * false: it claimed a server host adopting this manifest would be obliged to
+ * answer for a React surface it never mounts. The consumer reports a
+ * capability declared for the OTHER runtime as `out-of-scope` and returns
+ * fine — only an applicable, unanswered capability is `unbound`, which
+ * `@12-apps/wiring`'s own fixture suite asserts. The narrowing protected
+ * nothing and made the role editor and team screens undeclarable to any web
+ * host; `./manifest/web` declares them now.
  *
  * ON THE `db` DECLARATION, and what it does NOT claim. It says this package
  * SHIPS `prisma/rbac.prisma` — five models plus the migration that built
@@ -52,4 +63,5 @@ export const rbacManifest = {
    */
   observability: { namespace: 'rbac' },
   server: ['http'],
+  web: ['surface', 'areas'],
 } as const satisfies PackageManifest;

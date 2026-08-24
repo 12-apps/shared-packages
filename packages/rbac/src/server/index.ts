@@ -160,3 +160,23 @@ export {
   type RoleWireSchemas,
 } from './wire';
 export type { MemberDetailPayload, MyPermissionsPayload } from './payloads';
+
+/**
+ * The team-invite notification: the blueprint factory a host words itself, the
+ * event type, and the port shape that fires it. See `./notifications` for why
+ * the copy is an argument and the twins are local.
+ */
+export {
+  createTeamInvitedBlueprint,
+  TEAM_INVITED_NOTIFICATION_TYPE,
+  type RbacNotificationBlueprint,
+  type RbacNotificationContent,
+  type RbacNotifyEvent,
+  type RbacNotifyOutcome,
+  type RbacNotifyPort,
+  type RbacNotifyRecipient,
+  type TeamInvitedCopy,
+  type TeamInvitedPayload,
+} from './notifications';
+export { PT_BR_TEAM_INVITED_COPY } from './pt-BR';
+export { EN_US_TEAM_INVITED_COPY } from './en-US';
