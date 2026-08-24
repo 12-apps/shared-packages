@@ -2,6 +2,7 @@
   "name": "@12-apps/impersonation",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": ["**/e2e/**"],
   "description": "Generic, portable impersonation / preview sessions. An operator previews as a tenant user: reads are scoped, writes are refused unless opted in, money paths are always refused, and revoking the entitlement ends the session live. Framework-free core (cookie codec, path rules, per-kind write rule, permission vocabulary), host-mounted backend surface (./server: start/stop/describe descriptors, the per-request write gate, the audit and directory ports), Hono adapter (./hono), React banner + start dialog (./react), and the packaged Gherkin journeys (./e2e). Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",

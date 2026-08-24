@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "description": "Reusable guided onboarding: React provider + GuidedSection and the API-bound OnboardingStore (.), the host-mounted progress surface (./server: createApiOnboarding \u2014 GET/PATCH progress with save/dismiss/reset), a Hono adapter (./hono), and the package-owned Prisma partial + migration for OnboardingState. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": {

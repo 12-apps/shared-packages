@@ -2,6 +2,7 @@
   "name": "@12-apps/payments-e2e",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": ["**/steps-platform/**","**/steps/**"],
   "description": "The payments buyer journeys, as Gherkin a host runs against its own app",
   "repository": {
     "type": "git",

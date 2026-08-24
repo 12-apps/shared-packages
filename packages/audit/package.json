@@ -2,6 +2,7 @@
   "name": "@12-apps/audit",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Generic, portable action audit. Framework-free core (the action/resource vocabulary and the deny-by-default diff redaction), host-mounted backend surface (./server: the transactional writer, the per-request actor context, the created_by/updated_by stamp and append-only Prisma extensions, the retention sweep and the audit-log listing endpoints), Hono adapter (./hono), the React audit-log viewer (./react) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
