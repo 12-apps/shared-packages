@@ -15,6 +15,7 @@ export type {
 
 export { EMAIL_AUTH_STATUS } from "./messages";
 export { PT_BR_MESSAGES } from "./pt-BR";
+export { EN_US_MESSAGES } from "./en-US";
 export type { EmailAuthMessages } from "./messages";
 
 export { emailAuthSettingsRoutes } from "./settings-routes";
@@ -25,6 +26,7 @@ export type {
 
 export { renderAuthMail } from "./mail-templates";
 export { PT_BR_MAIL } from "./mail-templates.pt-BR";
+export { EN_US_MAIL } from "./mail-templates.en-US";
 export type { MailCopy, MailPack, RenderedMail } from "./mail-templates";
 
 /**

@@ -275,6 +275,7 @@ export function createEmailAuthSettingsScreen(
 export type { EmailAuthSettingsCopy } from "./copy";
 /** A ready pt-BR pack, still passed by name. See the file for why that is not a default. */
 export { PT_BR_SETTINGS } from "./pt-BR";
+export { EN_US_SETTINGS } from "./en-US";
 export {
   createEmailAuthSettingsClient,
 } from "./client";

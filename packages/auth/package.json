@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
-  "description": "Plug-and-play authentication plugin: Auth.js wiring and the e-mail + password flow (.), host-mounted backend surface (./server: routes, messages, mail templates, the duck-typed credential and settings store seams), auth UI (./react: screens, whole login/sign-up pages, the platform settings screen), a Hono mount (./hono), delivery through @12-apps/notifications (./notifications) and packaged Gherkin journeys (./e2e) — plus the package-owned Prisma fragment synced into the host schema. Who the users are is the host's and arrives as config. Adoption contract in ADOPTING.md.",
+  "description": "Plug-and-play authentication plugin: Auth.js wiring and the e-mail + password flow (.), host-mounted backend surface (./server: routes, messages, mail templates, the duck-typed credential and settings store seams), auth UI (./react: screens, whole login/sign-up pages, the platform settings screen), a Hono mount (./hono), delivery through @12-apps/notifications (./notifications) and packaged Gherkin journeys (./e2e) \u2014 plus the package-owned Prisma fragment synced into the host schema. Who the users are is the host's and arrives as config. Adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./server": "./src/server/index.ts",
@@ -20,6 +20,7 @@
       "types": "./dist/e2e/index.d.ts",
       "default": "./dist/e2e/index.js"
     },
+    "./locales": "./src/locales.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/i18n": "workspace:*",
     "@12-apps/notifications": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/ui": "workspace:*",
@@ -187,7 +189,7 @@
       },
       {
         "name": "SKIP_ENV_VALIDATION",
-        "description": "Skips the env schema — build steps that never serve a request."
+        "description": "Skips the env schema \u2014 build steps that never serve a request."
       }
     ]
   }
