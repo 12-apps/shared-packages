@@ -306,11 +306,18 @@ export function CurrentStatus({
   features,
   planOrder,
   config,
+  headed = true,
 }: {
   features: TenantFeatureView[];
   /** The comparison's tier keys, cheapest first — the grouping's order. */
   planOrder: string[];
   config: ResolvedWebConfig;
+  /**
+   * Whether the band draws its own heading. False on the audit ROUTE, whose
+   * page header already says it — two "Seu plano hoje" in a row reads as a
+   * rendering bug rather than a section.
+   */
+  headed?: boolean;
 }): JSX.Element {
   const copy = config.copy.planPage;
   const [showAll, setShowAll] = useState(false);
@@ -322,7 +329,7 @@ export function CurrentStatus({
 
   return (
     <Box>
-      <Heading level="h3">{copy.statusHeading}</Heading>
+      {headed ? <Heading level="h3">{copy.statusHeading}</Heading> : null}
       <Box sx={{ mb: 1 }}>
         <Text as="div" color="secondary" size="sm">
           {copy.statusIntro}
