@@ -255,6 +255,42 @@ describe('the host bridge, on routes that must NOT have a caller', () => {
     expect(await response.json()).toEqual({ actor: null });
   });
 
+  it('does not even ASK the host who is calling on such a route', async () => {
+    // Resolving is a session lookup. An `<img>` loading a store's photo would
+    // pay for one it can never satisfy — and a route handed a resolved actor
+    // invites a handler to read one the contract says is not there.
+    const asked = { count: 0 };
+    const counting = countingBridge(asked);
+
+    expect((await counting.request('/probe/open')).status).toBe(200);
+    expect(asked.count).toBe(0);
+  });
+
+  /** A bridge over one public route, counting how often the host is asked. */
+  function countingBridge(asked: { count: number }): Hono {
+    const app = new Hono();
+    app.route(
+      '/probe',
+      honoRouterFor(
+        [
+          {
+            route: {
+              method: 'GET',
+              path: '/open',
+              kind: 'public',
+              handle: async () => ({ status: 200, body: { ok: true } }),
+            },
+          } as never,
+        ],
+        () => {
+          asked.count += 1;
+          return { userId: 'probe' };
+        },
+      ),
+    );
+    return app;
+  }
+
   it('serves a webhook route the same way — a signature is not a session', async () => {
     const response = await bridgeOverKind('webhook').request('/probe/open');
 
