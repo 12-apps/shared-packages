@@ -49,7 +49,11 @@ export const PT_BR_TEAM_INVITED_COPY: TeamInvitedCopy = {
     payload.status === 'added' ? 'Você foi adicionado à equipe' : 'Convite para a equipe',
   body: (payload) =>
     payload.status === 'added'
-      ? 'Sua conta agora faz parte desta loja. Acesse o painel para começar.'
-      : `Enviamos um convite para ${payload.email}. Conclua o cadastro para acessar a loja.`,
+      // No noun for the tenant: every candidate ("loja", "empresa", "conta")
+      // is one application's word for it, and a shared package that picks one
+      // hands that vocabulary to every adopter. The second person carries both
+      // sentences without naming what the reader is joining.
+      ? 'Sua conta agora tem acesso. Abra o painel para começar.'
+      : `Enviamos um convite para ${payload.email}. Conclua o cadastro para ter acesso.`,
   link: () => '/admin',
 };

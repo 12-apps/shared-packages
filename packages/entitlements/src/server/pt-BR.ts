@@ -1,5 +1,6 @@
 import type { EntitlementsMessages } from './copy';
 import type { EntitlementPermissionLabels } from './contribution';
+import type { PlanChangedCopy, PlanLabelLookup } from './notifications';
 
 /**
  * The pt-BR pack — the origin host's exact sentences, now a NAMED export a
@@ -67,3 +68,35 @@ export const PT_BR_ENTITLEMENTS_PERMISSION_LABELS: EntitlementPermissionLabels =
   domains: { plan: 'Plano' },
   actions: { request: 'Solicitar mudança' },
 };
+
+/**
+ * The plan-change notice's phrasing and CTA — pass to
+ * `createPlanChangedBlueprint`.
+ *
+ * A FACTORY over the host's plan-label lookup, not a constant: the tier names
+ * are a commercial catalog this package does not hold, so the pack asks for
+ * the spelling and supplies only the sentence around it.
+ *
+ * Three sentences because there are three facts, and telling a downgraded
+ * tenant it has "more room now" is the failure worth avoiding.
+ */
+export const ptBrPlanChangedCopy = (label: PlanLabelLookup): PlanChangedCopy => ({
+  title: (payload) =>
+    payload.direction === 'downgrade' ? 'Seu plano foi alterado' : 'Seu plano foi atualizado',
+  body: (payload) => {
+    const to = label(payload.toPlanKey);
+    // No noun for the tenant. Every candidate is one application's word for
+    // it, and a shared package that ships one hands that vocabulary to every
+    // adopter — which the brand gate refuses, rightly, and refuses in comments
+    // too. The second person carries the sentence without naming what the
+    // reader owns.
+    if (payload.direction === 'upgrade') {
+      return `Você agora está no plano ${to}. Os novos recursos já estão liberados.`;
+    }
+    if (payload.direction === 'downgrade') {
+      return `Você passou para o plano ${to}. Alguns recursos podem não estar mais disponíveis.`;
+    }
+    return `Você agora está no plano ${to}.`;
+  },
+  link: () => '/admin/plano',
+});

@@ -117,3 +117,20 @@ export type {
   TenantFeatureReason,
   TenantPlanPayload,
 } from '../plan-wire';
+
+/**
+ * The plan-change notice: the blueprint factory a host words itself, plus the
+ * two ready packs. This package DECLARES the content and does not emit it —
+ * the tier write is the platform writer's, host-side. See `./notifications`.
+ */
+export {
+  createPlanChangedBlueprint,
+  PLAN_CHANGED_NOTIFICATION_TYPE,
+  type EntitlementsNotificationBlueprint,
+  type EntitlementsNotificationContent,
+  type PlanChangedCopy,
+  type PlanChangedPayload,
+  type PlanLabelLookup,
+} from './notifications';
+export { ptBrPlanChangedCopy } from './pt-BR';
+export { enUsPlanChangedCopy } from './en-US';

@@ -44,7 +44,8 @@ export const EN_US_TEAM_INVITED_COPY: TeamInvitedCopy = {
     payload.status === 'added' ? 'You were added to the team' : 'Team invitation',
   body: (payload) =>
     payload.status === 'added'
-      ? 'Your account is now part of this store. Open the dashboard to get started.'
-      : `We sent an invitation to ${payload.email}. Finish signing up to access the store.`,
+      // No noun for the tenant — see the pt-BR pack.
+      ? 'Your account now has access. Open the dashboard to get started.'
+      : `We sent an invitation to ${payload.email}. Finish signing up to get access.`,
   link: () => '/admin',
 };

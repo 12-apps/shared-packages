@@ -176,7 +176,7 @@ describe('the blueprint the host words itself', () => {
     const invited = blueprint.generate(payload('invited'));
 
     expect(added.title).toBe('Você foi adicionado à equipe');
-    expect(added.body).toContain('Sua conta agora faz parte');
+    expect(added.body).toContain('Sua conta agora tem acesso');
     expect(invited.title).toBe('Convite para a equipe');
     expect(invited.body).toContain('Conclua o cadastro');
     expect(invited.body).toContain('novo@example.com');
