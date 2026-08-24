@@ -34,11 +34,14 @@ export {
 } from './contribution';
 export type {
   EntitlementDenialMessages,
+  EntitlementsCopyResolver,
+  EntitlementsCopySource,
   EntitlementsMessages,
   PlanDiffMessages,
   PlanImpactMessages,
   PlanViewMessages,
 } from './copy';
+export { resolveEntitlementsCopy } from './copy';
 export {
   PT_BR_ENTITLEMENTS_MESSAGES,
   PT_BR_ENTITLEMENTS_PERMISSION_LABELS,

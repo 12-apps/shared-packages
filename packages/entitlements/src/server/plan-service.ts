@@ -11,7 +11,8 @@ import type {
   UsageCounter,
 } from '../core/types';
 import type { ComparisonTier, TenantPlanPayload, TenantPlanView } from '../plan-wire';
-import type { PlanViewMessages } from './copy';
+import type { EntitlementsCopySource, PlanViewMessages } from './copy';
+import { resolveEntitlementsCopy } from './copy';
 import { buildTenantPlanView, type PricingRow, type QuotaUsageView } from './plan-view';
 
 interface PlanServiceConfig<F extends string> {
@@ -24,13 +25,24 @@ interface PlanServiceConfig<F extends string> {
   comparison?: ((currentPlanKey: string) => ComparisonTier[]) | undefined;
   /** Required — the host's currency wording. See `plan-view.ts`. */
   formatPrice: (priceCents: number | null) => string | null;
-  /** Required — the host's situation notes. See `plan-view.ts`. */
-  messages: PlanViewMessages;
+  /**
+   * Required — the host's situation notes. See `plan-view.ts`.
+   *
+   * A host serving more than one language passes a RESOLVER instead of the
+   * words. The service is built ONCE per process, so the resolution happens in
+   * `getPlanView` below, per call, from the locale its caller forwards.
+   */
+  messages: EntitlementsCopySource<PlanViewMessages>;
 }
 
 export interface PlanService {
-  getPlanView(tenantId: string): Promise<TenantPlanView>;
-  getPlanPayload(tenantId: string): Promise<TenantPlanPayload>;
+  /**
+   * `locale` is the caller's, forwarded by whatever holds the request. Absent
+   * is meaningful and not an error: a single-audience host never sets it, and
+   * the configured resolver decides what no answer means.
+   */
+  getPlanView(tenantId: string, locale?: string): Promise<TenantPlanView>;
+  getPlanPayload(tenantId: string, locale?: string): Promise<TenantPlanPayload>;
 }
 
 /** Is this an ENABLED quota row the host can measure? */
@@ -46,7 +58,7 @@ function isMeasurableQuota<F extends string>(
 export function createPlanService<F extends string>(config: PlanServiceConfig<F>): PlanService {
   const { engine, features, plans, usage: usagePort } = config;
 
-  async function getPlanView(tenantId: string): Promise<TenantPlanView> {
+  async function getPlanView(tenantId: string, locale?: string): Promise<TenantPlanView> {
     const snapshot = await engine.toSnapshot(tenantId);
 
     // Live usage for every ENABLED quota row, so the screen can show the
@@ -79,14 +91,15 @@ export function createPlanService<F extends string>(config: PlanServiceConfig<F>
       (feature) => (features.has(feature) ? features.def(feature).description : null),
       usage,
       config.formatPrice,
-      config.messages,
+      // Resolved HERE, per call — not where the service was built.
+      resolveEntitlementsCopy(config.messages, locale),
     );
   }
 
   return {
     getPlanView,
-    async getPlanPayload(tenantId) {
-      const view = await getPlanView(tenantId);
+    async getPlanPayload(tenantId, locale) {
+      const view = await getPlanView(tenantId, locale);
       return { ...view, comparison: config.comparison?.(view.planKey) ?? [] };
     },
   };
