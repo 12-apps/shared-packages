@@ -158,6 +158,16 @@ export interface HarnessBackend {
   research: Hosts['research'];
   /** Its wiring report — an aggregate, not a route. */
   entitlements: Hosts['entitlements'];
+  /**
+   * Every mounted host, by name.
+   *
+   * One field rather than one per package: this interface had grown a field per
+   * wiring adoption, and every adoption after the first collided with the one
+   * before it in exactly the same place. What a suite reaches in here for is
+   * never a route — the wiring REPORT, a package's BOUND job blueprints, or a
+   * lever no endpoint exposes.
+   */
+  hosts: Hosts;
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -299,6 +309,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     onboarding: hosts.onboarding,
     research: hosts.research,
     entitlements: hosts.entitlements,
+    hosts,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream
       // severed after its driver is gone throws into the sink rather than closing cleanly.
