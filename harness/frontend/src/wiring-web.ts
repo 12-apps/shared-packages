@@ -29,17 +29,31 @@ import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
  * namespace rather than nowhere. A real host hands its Sentry scope here; the
  * harness's sink is the console, which is the one legitimate console call in
  * this app.
+ *
+ * EXPORTED as well as passed. A package whose config takes its own error sink
+ * — `@12-apps/discounts` requires an `onError`, and argues why: a surface whose
+ * failures reach nobody is indistinguishable from one that never fails — needs
+ * the same sink this host already answers `observability` with. The host does
+ * not re-expose its ports (they are the consumer's to consume), so without
+ * this the page would copy the shim and the app would have two definitions of
+ * where a failure goes, drifting independently.
  */
+export function webLoggerFor(namespace: string): {
+  info: (message: string, ...meta: unknown[]) => void;
+  warn: (message: string, ...meta: unknown[]) => void;
+  error: (message: string, ...meta: unknown[]) => void;
+} {
+  return {
+    info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
+    warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
+    error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
+  };
+}
+
 export const webWiringHost = createWiringHost({
   name: 'harness-frontend',
   kind: 'web',
-  ports: {
-    loggerFor: (namespace) => ({
-      info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
-      warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
-      error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
-    }),
-  },
+  ports: { loggerFor: webLoggerFor },
 });
 
 /** The aggregate report over everything adopted so far — see the note above. */

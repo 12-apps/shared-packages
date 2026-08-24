@@ -38,6 +38,7 @@ test.describe('the frontend host wiring report', () => {
       '@12-apps/audit',
       '@12-apps/auth',
       '@12-apps/auth-platform',
+      '@12-apps/discounts',
       '@12-apps/entitlements',
       '@12-apps/entity-lifecycle',
       '@12-apps/feature-flags',

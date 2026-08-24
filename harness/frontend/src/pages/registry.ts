@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
+import { DiscountsPage } from './discounts';
 import { AUTH_PAGES, AUTH_SETTINGS_PAGE } from './auth-pages';
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { FeatureFlagsPage } from './feature-flags';
@@ -193,6 +194,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/impersonation',
     group: 'backoffice',
     Component: ImpersonationPage,
+  },
+  {
+    slug: 'discounts',
+    title: 'Promotions',
+    pkg: '@12-apps/discounts',
+    group: 'backoffice',
+    Component: DiscountsPage,
   },
   {
     slug: 'rbac-admin',
