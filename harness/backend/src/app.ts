@@ -150,6 +150,8 @@ export interface HarnessBackend {
    * the vault sessions live in.
    */
   billing: Hosts['billing'];
+  /** Its wiring report — an aggregate, not a route. */
+  entitlements: Hosts['entitlements'];
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -287,6 +289,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     realtimeDriver: hosts.realtimeDriver,
     shift: hosts.shift,
     billing: hosts.billing,
+    entitlements: hosts.entitlements,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream
       // severed after its driver is gone throws into the sink rather than closing cleanly.
