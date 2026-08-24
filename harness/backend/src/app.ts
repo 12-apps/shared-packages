@@ -51,7 +51,9 @@
  *    is @12-apps/notifications' (12-15) — the only surface here that is
  *    TENANT-FREE, because every one of its endpoints is scoped to the signed-in
  *    user rather than to a store;
- *  - `/__harness/**` is the SUITE'S, and belongs to none of them.
+ *  - `/__harness/**` is the SUITE'S, and belongs to none of them —
+ *    `/__harness/locale/**` included, which is where @12-apps/i18n's SERVER half
+ *    (a request becoming a locale) is observable at all.
  *
  * MOUNT ORDER is load-bearing for the lifecycle surface (ADOPTING rule 7).
  * Hono resolves by REGISTRATION order, mounted sub-routers included, and a
@@ -108,6 +110,7 @@ import { applyDiscountMigrations } from './discounts-db';
 import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
 import { provisionShift, reseedShifts, shiftHost } from './shift-host';
 import { mountRequestScope, requestScopeProbes } from './request-scope-host';
+import { localeProbes } from './i18n-host';
 import { provisionResearch, researchHost, reseedResearch } from './research-host';
 import { observability } from './observability-host';
 import { reseedBilling } from './billing-host';
@@ -287,6 +290,11 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // before any body is read — where a host puts it.
   app.use('/api/*', hosts.impersonation.writeGate);
   app.route('/__harness/scope', requestScopeProbes());
+  // The locale ladder (@12-apps/i18n), as its own probe router. Mounted rather
+  // than called inline because `localeFromRequest` reads the RAW request, and
+  // routing it proves the host's framework hands one over intact — the hop the
+  // frontend harness's `useLocaleCopy` specs sit downstream of and cannot see.
+  app.route('/__harness/locale', localeProbes());
   mountReset(app, pg, hosts);
   mountRealtimeControls(app, pg, hosts);
   mountAppShellControls(app, hosts.appShell);
