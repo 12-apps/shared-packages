@@ -31,11 +31,13 @@ test.describe('the frontend host wiring report', () => {
   test('accounts for every package this app adopted', async ({ page }) => {
     await page.goto('/#/wiring-report');
 
-    // The nine web manifests this host binds. Named rather than counted: a
-    // count passes when one package silently replaces another, which is the
-    // drift the report exists to catch.
+    // Every web manifest this host binds. Named rather than counted: a count
+    // passes when one package silently replaces another, which is the drift the
+    // report exists to catch.
     for (const name of [
       '@12-apps/audit',
+      '@12-apps/auth',
+      '@12-apps/auth-platform',
       '@12-apps/entitlements',
       '@12-apps/entity-lifecycle',
       '@12-apps/feature-flags',
