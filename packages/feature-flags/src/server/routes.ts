@@ -16,7 +16,7 @@ import type {
   FeatureFlagsRoute,
   FeatureFlagsServerConfig,
 } from "./context";
-import type { FeatureFlagsServerCopy } from "./copy";
+import { resolveServerCopy, type FeatureFlagsServerCopy } from "./copy";
 
 const PER_PAGE_DEFAULT = 20;
 const PER_PAGE_MAX = 100;
@@ -111,7 +111,11 @@ export function flagsIndexRoute(config: FeatureFlagsServerConfig): FeatureFlagsR
     method: "GET",
     path: "/",
     async handle(request) {
-      const denied = unauthenticated(request, config.copy);
+      // Resolved per request, never at mount: this surface is a lazy singleton
+      // in every host that has one, and a copy chosen when it was built answers
+      // in the same language for the life of the process.
+      const copy = resolveServerCopy(config.copy, request.locale);
+      const denied = unauthenticated(request, copy);
       if (denied) return denied;
       const db = await config.db();
       // One unbounded read, deliberately: grants are a beta cohort, bounded by
@@ -148,11 +152,15 @@ export function userFlagsRoute(config: FeatureFlagsServerConfig): FeatureFlagsRo
     method: "GET",
     path: "/users/:userId",
     async handle(request) {
-      const denied = unauthenticated(request, config.copy);
+      // Resolved per request, never at mount: this surface is a lazy singleton
+      // in every host that has one, and a copy chosen when it was built answers
+      // in the same language for the life of the process.
+      const copy = resolveServerCopy(config.copy, request.locale);
+      const denied = unauthenticated(request, copy);
       if (denied) return denied;
       const userId = request.params["userId"];
       if (userId === undefined || userId.trim() === "") {
-        return failure(422, "invalid_user", config.copy.invalidUser);
+        return failure(422, "invalid_user", copy.invalidUser);
       }
       const db = await config.db();
       const rows = await db.userFeatureGrant.findMany({
@@ -179,10 +187,14 @@ export function grantsListRoute(config: FeatureFlagsServerConfig): FeatureFlagsR
     method: "GET",
     path: "/:key/grants",
     async handle(request) {
-      const denied = unauthenticated(request, config.copy);
+      // Resolved per request, never at mount: this surface is a lazy singleton
+      // in every host that has one, and a copy chosen when it was built answers
+      // in the same language for the life of the process.
+      const copy = resolveServerCopy(config.copy, request.locale);
+      const denied = unauthenticated(request, copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag(config.copy);
+      if (!flag) return unknownFlag(copy);
       const page = positiveInt(request.query["page"], 1);
       const perPage = Math.min(positiveInt(request.query["perPage"], PER_PAGE_DEFAULT), PER_PAGE_MAX);
       const db = await config.db();
@@ -256,14 +268,18 @@ export function grantByEmailRoute(config: FeatureFlagsServerConfig): FeatureFlag
     method: "POST",
     path: "/:key/grants",
     async handle(request) {
-      const denied = unauthenticated(request, config.copy);
+      // Resolved per request, never at mount: this surface is a lazy singleton
+      // in every host that has one, and a copy chosen when it was built answers
+      // in the same language for the life of the process.
+      const copy = resolveServerCopy(config.copy, request.locale);
+      const denied = unauthenticated(request, copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag(config.copy);
-      const input = parseEmailGrant(request, config.copy);
+      if (!flag) return unknownFlag(copy);
+      const input = parseEmailGrant(request, copy);
       if ("status" in input) return input;
       const person = await config.directory.findUserByEmail(input.email);
-      if (!person) return failure(404, "user_not_found", config.copy.userNotFound);
+      if (!person) return failure(404, "user_not_found", copy.userNotFound);
       const { row, existed } = await regrant(config, request, flag.key, person, input.note);
       await config.audit?.({
         action: existed ? "updated" : "granted",
@@ -334,16 +350,20 @@ export function grantUpdateRoute(config: FeatureFlagsServerConfig): FeatureFlags
     method: "PUT",
     path: "/:key/grants/:userId",
     async handle(request) {
-      const denied = unauthenticated(request, config.copy);
+      // Resolved per request, never at mount: this surface is a lazy singleton
+      // in every host that has one, and a copy chosen when it was built answers
+      // in the same language for the life of the process.
+      const copy = resolveServerCopy(config.copy, request.locale);
+      const denied = unauthenticated(request, copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag(config.copy);
-      const patch = parseGrantPatch(request, config.copy);
+      if (!flag) return unknownFlag(copy);
+      const patch = parseGrantPatch(request, copy);
       if ("status" in patch) return patch;
       const userId = request.params["userId"] ?? "";
       const row = await patchGrant(config, request, flag.key, userId, patch);
       if (row === null) {
-        return failure(404, "grant_not_found", config.copy.grantNotFound);
+        return failure(404, "grant_not_found", copy.grantNotFound);
       }
       await config.audit?.({
         action: "updated",
@@ -364,16 +384,20 @@ export function grantRevokeRoute(config: FeatureFlagsServerConfig): FeatureFlags
     method: "DELETE",
     path: "/:key/grants/:userId",
     async handle(request) {
-      const denied = unauthenticated(request, config.copy);
+      // Resolved per request, never at mount: this surface is a lazy singleton
+      // in every host that has one, and a copy chosen when it was built answers
+      // in the same language for the life of the process.
+      const copy = resolveServerCopy(config.copy, request.locale);
+      const denied = unauthenticated(request, copy);
       if (denied) return denied;
       const flag = flagOf(config.catalog, request.params);
-      if (!flag) return unknownFlag(config.copy);
+      if (!flag) return unknownFlag(copy);
       const userId = request.params["userId"] ?? "";
       const db = await config.db();
       const where = { userId_flagKey: { userId, flagKey: flag.key } };
       const existing = await db.userFeatureGrant.findUnique({ where });
       if (!existing) {
-        return failure(404, "grant_not_found", config.copy.grantNotFound);
+        return failure(404, "grant_not_found", copy.grantNotFound);
       }
       await db.userFeatureGrant.delete({ where });
       await config.audit?.({
