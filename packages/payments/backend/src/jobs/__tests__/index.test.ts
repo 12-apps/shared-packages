@@ -188,7 +188,10 @@ function activationCtx(outstanding: number): PaymentsJobDeps['activation'] {
       reference: verificationReference('pagbank', merchantId),
     };
   });
-  return {
+  // A RESOLVER, matching the dep: a host builds this bundle off a lazily
+  // constructed gateway, so the only shape it can hand over at bind time is one
+  // that reaches for it when the sweep runs.
+  const context = {
     providers: { has: () => false, get: () => undefined } as never,
     settings: {
       applyChargeVerification: () => Promise.resolve(undefined),
@@ -201,7 +204,8 @@ function activationCtx(outstanding: number): PaymentsJobDeps['activation'] {
       listOutstanding: () => Promise.resolve(rows),
       findProcessedDeliveryPayload: () => Promise.resolve(null),
     },
-  } as PaymentsJobDeps['activation'];
+  } as Awaited<ReturnType<PaymentsJobDeps['activation']>>;
+  return () => Promise.resolve(context);
 }
 
 interface Logged {

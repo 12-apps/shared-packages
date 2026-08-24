@@ -110,7 +110,7 @@ export const reconcileActivations: PaymentsJobBlueprint = {
   attempts: 1,
   lease: { ttlMs: 5 * 60_000 },
   handle: async (_payload, deps, context) => {
-    const report: ActivationReport = await reconcileActivationCharges(deps.activation);
+    const report: ActivationReport = await reconcileActivationCharges(await deps.activation());
     // Silent when nothing is outstanding — that is the steady state.
     if (report.checked === 0) return;
     context.logger.info(

@@ -104,8 +104,25 @@ export interface PaymentsJobDeps extends PendingSweepDeps {
    * `Pick`.
    */
   replayWebhooks(options?: WebhookReplayOptions): Promise<WebhookReplayReport>;
-  /** The stranded-activation reconcile's context, over the host's tables. */
-  activation: ActivationReconcileContext;
+  /**
+   * The stranded-activation reconcile's context, over the host's tables — as a
+   * RESOLVER rather than the context itself.
+   *
+   * The context is a bundle of ports (`settings`, `config`, `charges`, the
+   * proof store, the logger) that a host reads off its gateway, and every host
+   * that has one builds that gateway lazily: constructing it at module load
+   * would drag a database client into anything that so much as mentions
+   * payments. So the context is only available inside a promise, and a
+   * value-shaped dep would be unbindable — `adoptServer` takes the bindings
+   * synchronously and the mount comes out the other side.
+   *
+   * The alternative a host is left with otherwise is a hand-written deferred
+   * twin of every port in the bundle, which is host code this seam exists to
+   * delete. One arrow, resolved when the sweep runs, is the same shape
+   * {@link AuditJobDeps.retention} and `NotificationsJobDeps` take for the
+   * same reason.
+   */
+  activation(): Promise<ActivationReconcileContext>;
   /** The OAuth renewal seam. */
   oauth: PaymentsOAuthJobDeps;
 }
