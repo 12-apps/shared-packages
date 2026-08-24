@@ -33,7 +33,19 @@ export {
   type WebEntitlements,
 } from './create-web-entitlements';
 export { createWithEntitlement, type EntitlementGate } from './with-entitlement';
+/**
+ * The comparison band, and the derivation the cards are built on.
+ *
+ * Published because a host commonly renders the SAME catalog somewhere the
+ * plan screen cannot reach — a public pricing page, where there is no tenant,
+ * no session and therefore no `PlanScreen`. Without these, that page
+ * re-implements the delta arithmetic and the matrix by hand, which is exactly
+ * how the two drift into disagreeing about what a tier includes.
+ */
+export { ComparisonTable } from './comparison-table';
+export { tierHighlights, type TierHighlights } from './tier-highlights';
 export type {
+  ComparisonTableCopy,
   EntitlementsWebCopy,
   PageLockCopy,
   PlanPageCopy,

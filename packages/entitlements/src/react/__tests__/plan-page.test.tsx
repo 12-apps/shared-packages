@@ -32,7 +32,13 @@ const NETWORK_CARD: ComparisonTier = {
   upgrade: true,
   recommended: true,
   sections: [
-    { title: 'Telemetria', lines: [{ label: 'Estações', included: true, detail: 'ilimitado' }] },
+    {
+      title: 'Telemetria',
+      lines: [
+        { label: 'Estações', included: true, detail: 'ilimitado' },
+        { label: 'Alertas por naipe', included: true, detail: null },
+      ],
+    },
   ],
 };
 
@@ -46,6 +52,15 @@ const HOBBY_CARD: ComparisonTier = {
   current: true,
   upgrade: false,
   recommended: false,
+  sections: [
+    {
+      title: 'Telemetria',
+      lines: [
+        { label: 'Estações', included: true, detail: 'até 3' },
+        { label: 'Alertas por naipe', included: false, detail: null },
+      ],
+    },
+  ],
 };
 
 function payload(): TenantPlanPayload {
@@ -75,6 +90,18 @@ function payload(): TenantPlanPayload {
         reason: 'disabled-by-tenant',
         limit: null,
         used: null,
+        requiredPlan: null,
+        requiredPlanLabel: null,
+      },
+      // An ON row, so the status list has something to fold away.
+      {
+        feature: 'stations.live',
+        description: 'Estações ao vivo',
+        enabled: true,
+        note: 'Incluído no seu plano',
+        reason: 'enabled',
+        limit: 3,
+        used: 1,
         requiredPlan: null,
         requiredPlanLabel: null,
       },
@@ -154,6 +181,19 @@ describe('the plan screen', () => {
     expect(link.querySelector('a')?.getAttribute('href')).toBe('/acme/alertas');
   });
 
+  it('separates the note from the upsell, and marks the row with a chip', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
+    // Two SENTENCES from two sources. Run together they read as one broken
+    // one, and the note's own language decides whether it ends in punctuation.
+    const row = screen.getByTestId('plan-feature-forecast.history');
+    expect(row.textContent).toContain('Não incluído no seu plano ·');
+    // The marker is a chip rather than MUI's notification-DOT Badge, whose
+    // children render as unstyled text — the one thing distinguishing an
+    // available row from a withheld one has to be visible.
+    expect(screen.getByTestId('plan-status-forecast.history').textContent).toBe('Indisponível');
+  });
+
   it('asks for a tier from its card and lands on the request banner', async () => {
     const { host } = renderPage();
     await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
@@ -180,6 +220,72 @@ describe('the plan screen', () => {
     await waitFor(() => expect(screen.queryByTestId('tier-cta-network')).toBeNull());
     // The tenant's own card still shows its disabled "Plano atual" marker.
     expect(screen.getByTestId('tier-cta-hobby')).toBeDefined();
+  });
+
+  it('gives each card its DELTA, not the whole catalog', async () => {
+    // The defect this replaced: every card printed every line of every
+    // section, so four of them repeated the same labels four times and pushed
+    // the price and the button below the fold.
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
+    const upgrade = screen.getByTestId('tier-highlights-network');
+    // What Network ADDS over Hobby, headed by Hobby's commercial name.
+    expect(upgrade.textContent).toContain('Hobby');
+    expect(upgrade.textContent).toContain('Alertas por naipe');
+    // …and the row Hobby already had, because its ceiling moved.
+    expect(upgrade.textContent).toContain('ilimitado');
+    // The entry card has nothing to inherit from, so it says so differently.
+    expect(screen.getByTestId('tier-highlights-hobby').textContent).not.toContain('Hobby,');
+  });
+
+  it('keeps the full matrix behind one press, with each label stated once', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
+    await waitFor(() => expect(screen.queryByTestId('plan-comparison-table')).toBeNull());
+
+    fireEvent.click(screen.getByTestId('plan-compare-toggle'));
+    const table = screen.getByTestId('plan-comparison-table');
+    expect(table.textContent).toContain('Estações');
+    // Two tiers, one row: the cards would have said it twice.
+    expect(table.querySelectorAll('tbody tr th[scope="row"]')).toHaveLength(2);
+  });
+
+  it('opens the status list on what is BLOCKED, and folds the rest behind a press', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('plan-page')).toBeDefined());
+    // The two denials are the half a tenant can act on.
+    expect(screen.getByTestId('plan-feature-forecast.history')).toBeDefined();
+    expect(screen.getByTestId('plan-feature-alerts.digest')).toBeDefined();
+    await waitFor(() => expect(screen.queryByTestId('plan-feature-stations.live')).toBeNull());
+
+    fireEvent.click(screen.getByTestId('plan-status-toggle'));
+    expect(screen.getByTestId('plan-feature-stations.live')).toBeDefined();
+
+    fireEvent.click(screen.getByTestId('plan-status-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('plan-feature-stations.live')).toBeNull());
+  });
+
+  it('says so plainly when the plan withholds nothing', async () => {
+    const host = fakeHost();
+    const everythingOn: typeof host.fetchImpl = async (input, init) => {
+      if (String(input).endsWith('/plan') && (init?.method ?? 'GET') === 'GET') {
+        const base = payload();
+        return Response.json({
+          data: {
+            plan: {
+              ...base,
+              features: base.features.map((feature) => ({ ...feature, enabled: true })),
+            },
+          },
+        });
+      }
+      return host.fetchImpl(input, init);
+    };
+    renderPage({}, { state: host.state, fetchImpl: everythingOn });
+    await waitFor(() => expect(screen.getByTestId('plan-status-none-blocked')).toBeDefined());
+    // Still one press to the whole inventory — a store that wants it should
+    // not have to hunt for it either.
+    expect(screen.getByTestId('plan-status-toggle')).toBeDefined();
   });
 
   it('refuses to build without the two answers only the host has', () => {

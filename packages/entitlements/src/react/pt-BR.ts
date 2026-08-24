@@ -17,6 +17,9 @@ export const PT_BR_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     statusHeading: 'Seu plano hoje',
     statusIntro: 'O que está ativo agora — e, quando não está, por quê.',
     statusEmpty: 'Nenhum recurso gerenciado por plano no momento.',
+    statusShowAll: ({ count }) => `Ver todos os recursos (+${String(count)})`,
+    statusShowBlocked: 'Ver apenas o que está bloqueado',
+    statusNothingBlocked: 'Tudo que o seu plano inclui está ativo.',
     ceilingUnlimited: 'ilimitado',
     ceilingUpTo: ({ limit }) => `até ${String(limit)}`,
     availableOn: ({ planLabel }) => `Disponível no plano ${planLabel}.`,
@@ -29,6 +32,16 @@ export const PT_BR_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     priceUnpriced: 'Sob consulta',
     currentAction: 'Plano atual',
     requestAction: 'Quero este plano',
+    inheritsFrom: ({ planName }) => `Tudo do ${planName}, e mais:`,
+    highlightsHeading: 'Inclui:',
+    moreIncluded: ({ count }) => `+ ${String(count)} outros recursos`,
+  },
+  comparisonTable: {
+    open: 'Comparar todos os recursos',
+    close: 'Ocultar a comparação',
+    featureColumn: 'Recurso',
+    included: 'Incluído',
+    excluded: 'Não incluído',
   },
   upsell: {
     reasons: {

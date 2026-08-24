@@ -40,6 +40,15 @@ export interface PlanPageCopy {
   statusIntro: string;
   statusEmpty: string;
   /**
+   * The status list opens on what is BLOCKED, because that is the half a
+   * tenant can act on; the rest is one press away. `count` is how many rows
+   * the press would add.
+   */
+  statusShowAll: (context: { count: number }) => string;
+  statusShowBlocked: string;
+  /** The list's own empty state when the plan withholds nothing at all. */
+  statusNothingBlocked: string;
+  /**
    * A quota ceiling beside a row's note. A ZERO ceiling renders neither —
    * "up to 0" is a denial pretending to be a limit, and the note already
    * says the feature is not included.
@@ -64,6 +73,42 @@ export interface TierCardsCopy {
   currentAction: string;
   /** The press-to-ask CTA on an upgrade card. */
   requestAction: string;
+  /**
+   * Over the short list on a card that builds on the tier before it —
+   * `planName` is that cheaper tier's COMMERCIAL name, never its key.
+   */
+  inheritsFrom: (context: { planName: string }) => string;
+  /** The same line on the ENTRY tier, which builds on nothing. */
+  highlightsHeading: string;
+  /**
+   * The tail of a trimmed list: how many more lines the full matrix holds for
+   * this tier. Rendered only when `count` is positive.
+   */
+  moreIncluded: (context: { count: number }) => string;
+}
+
+/**
+ * The full matrix, which the cards deliberately no longer are.
+ *
+ * A card that printed every line made the four of them ~35 rows tall each and
+ * pushed price and CTA under a fold — the comparison a customer came for was
+ * the one thing the page could not show. The rows moved here, behind a
+ * disclosure, where a label is stated ONCE across all tiers instead of once
+ * per card.
+ */
+export interface ComparisonTableCopy {
+  /** The disclosure, closed and open. */
+  open: string;
+  close: string;
+  /** The row-header column's own heading. */
+  featureColumn: string;
+  /**
+   * What the ✓ and the − SAY. A card's mark is decoration beside a label that
+   * carries the meaning; a matrix cell has no label of its own, so these are
+   * the cell's only reading and are never decorative.
+   */
+  included: string;
+  excluded: string;
 }
 
 export interface UpsellHostCopy {
@@ -111,6 +156,7 @@ export interface EntitlementsWebCopy {
   requestFailed: (context: { status: number }) => string;
   planPage: PlanPageCopy;
   tierCards: TierCardsCopy;
+  comparisonTable: ComparisonTableCopy;
   upsell: UpsellHostCopy;
   pageLock: PageLockCopy;
 }

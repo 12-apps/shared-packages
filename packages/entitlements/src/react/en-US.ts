@@ -27,6 +27,9 @@ export const EN_US_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     statusHeading: 'Your plan today',
     statusIntro: 'What is active right now — and, where it is not, why.',
     statusEmpty: 'No plan-managed features at the moment.',
+    statusShowAll: ({ count }) => `Show every feature (+${String(count)})`,
+    statusShowBlocked: 'Show only what is blocked',
+    statusNothingBlocked: 'Everything your plan includes is on.',
     ceilingUnlimited: 'unlimited',
     ceilingUpTo: ({ limit }) => `up to ${String(limit)}`,
     availableOn: ({ planLabel }) => `Available on the ${planLabel} plan.`,
@@ -39,6 +42,16 @@ export const EN_US_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     priceUnpriced: 'On request',
     currentAction: 'Current plan',
     requestAction: 'I want this plan',
+    inheritsFrom: ({ planName }) => `Everything in ${planName}, plus:`,
+    highlightsHeading: 'Includes:',
+    moreIncluded: ({ count }) => `+ ${String(count)} more features`,
+  },
+  comparisonTable: {
+    open: 'Compare every feature',
+    close: 'Hide the comparison',
+    featureColumn: 'Feature',
+    included: 'Included',
+    excluded: 'Not included',
   },
   upsell: {
     reasons: {
