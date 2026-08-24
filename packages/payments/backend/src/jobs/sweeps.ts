@@ -71,8 +71,8 @@ export const webhookDrain: PaymentsJobBlueprint = {
   lease: { ttlMs: 20 * 60_000 },
   handle: async (_payload, deps, context) => {
     const report = await deps.replayWebhooks({ now: (deps.now ?? (() => new Date()))() });
-    // Counts only, never content: the payload is the provider\'s own data about
-    // a buyer and the headers carry the delivery\'s signature, so neither may
+    // Counts only, never content: the payload is the provider's own data about
+    // a buyer and the headers carry the delivery's signature, so neither may
     // reach a log. The per-row detail support wants is already durable in
     // `PaymentWebhookEvent.lastError`.
     //
@@ -97,7 +97,7 @@ export const webhookDrain: PaymentsJobBlueprint = {
  * proof never did. Nothing else comes back for these rows — webhook redelivery
  * included, because the inbox remembers that delivery as settled.
  *
- * No provider call is made: the pass joins the config\'s outstanding charge
+ * No provider call is made: the pass joins the config's outstanding charge
  * against the charge row the verified webhook already wrote, which is why its
  * lease is the short one.
  */
@@ -124,7 +124,7 @@ export const reconcileActivations: PaymentsJobBlueprint = {
  *
  * The failure this prevents does not degrade. A lapsed grant does not slow
  * checkout down or fail one shopper: every charge for that merchant stops at
- * once, and the only way back is the owner reauthorizing on the provider\'s
+ * once, and the only way back is the owner reauthorizing on the provider's
  * site. Providers publish no lifetime, and an observed connection carried
  * roughly a year — long enough that nobody would be watching when it ran out.
  *
@@ -136,7 +136,7 @@ export const reconcileActivations: PaymentsJobBlueprint = {
  * rule that used to live in a host comment. Renewal ROTATES: the provider
  * issues a new refresh token and kills the one just spent, so two ticks
  * overlapping on one connection means the second response invalidates the
- * first\'s tokens and BOTH believe they succeeded. Concurrency 1 on the sweep
+ * first's tokens and BOTH believe they succeeded. Concurrency 1 on the sweep
  * queue bounds one process; the lease bounds all of them. Neither is tuning,
  * and a host that restates them by hand is a host that can get them wrong.
  */

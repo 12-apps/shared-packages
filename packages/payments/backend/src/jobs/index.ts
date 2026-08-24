@@ -104,7 +104,7 @@ export interface PaymentsJobDeps extends PendingSweepDeps {
    * `Pick`.
    */
   replayWebhooks(options?: WebhookReplayOptions): Promise<WebhookReplayReport>;
-  /** The stranded-activation reconcile\'s context, over the host\'s tables. */
+  /** The stranded-activation reconcile's context, over the host's tables. */
   activation: ActivationReconcileContext;
   /** The OAuth renewal seam. */
   oauth: PaymentsOAuthJobDeps;
