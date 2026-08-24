@@ -11,26 +11,52 @@ Effort scale: **S** — manifest is a thin wrapper over existing exports (an
 afternoon); **M** — one seam must be added or reshaped first; **L** — the
 capability itself does not exist yet and is real design work.
 
+> **What has since shipped.** The rows below describe what each package WOULD
+> declare; several now do. Phases 1-3 of the RFC's plan are complete, plus the
+> `web` half of five packages that had narrowed it away on a premise the
+> consumer never held (see "the stale narrowing" below). What remains open is
+> tracked in the RFC's phase 4-5, not here — this document stays the record of
+> what each package's adaptation MEANT, which is what makes a later reviewer
+> able to tell a deliberate absence from a forgotten one.
+
+### The stale narrowing, recorded so it is not re-derived
+
+Four manifests (rbac, notifications, entitlements, onboarding) narrowed `web`
+away with the same sentence: listing it "would oblige every SERVER host
+adopting this manifest to answer for a React surface it never mounts".
+
+That is not how the consumer behaves, and never was. A capability declared for
+the OTHER runtime is answered `out-of-scope` — "a web host answers for this" —
+and `assemble()` returns; only a capability applicable to the adopting runtime
+and left unanswered is `unbound`. `wiring`'s own fixture package declares both
+halves and its server-host suite asserts exactly that.
+
+The narrowing therefore protected nothing and cost the capability its purpose:
+a host cannot adopt screens no manifest mentions, which is why the origin host
+hand-duplicated the notifications preferences screen and its push setup. All
+five now declare `web` — impersonation included, where the absence was not even
+narrowed, on the one surface its README calls mandatory.
+
 ## Summary
 
 | package | http | jobs | email | notif. | mcp | perms | db | surface | areas | effort | note |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | report-builder | ✔ | — | want | want | ✔ schemas | ✔ | ✔ | ✔ | ✔ | **S** | reference producer; exposes the working-copy gap |
-| entity-lifecycle | ✔ | — | — | want | ✔ +annot. | ✔ | ✔ | ✔ | ✔ | **S** | already the MCP example |
-| payments-backend | ✔ | ✔ (dead seam) | want | want | schemas | — | ✔ | — | — | **S/M** | blueprints exist, unconsumed |
+| entity-lifecycle | ✔ | — | — | want | ✔ +annot. | ✔ | ✔ | ✔ | ✔ | **shipped** | annotations declared on all eight |
+| payments-backend | ✔ | ✔ | ✔ | want | schemas | — | ✔ | — | — | **shipped** | all four sweeps; receipt mailer |
 | billing | ✔ | want | — | want | — | — | — (host FKs) | — | — | **shipped** | extracted from the origin host; every number, table and sentence is host config |
 | payments-frontend | — | — | — | — | — | — | — | ✔ | ✔ | **S** | slots stay config |
 | jobs | — | n/a (runtime) | — | — | — | — | ✔ | — | — | **S** | consumer-side runtime; `BoundJob` feeds `defineJob` |
-| notifications | ✔ | ✔ | n/a (owns port) | n/a (owns runtime) | — | — | ✔ | ✔ | — | **M** | re-home `EmailDriver` as `EmailPort`; accept blueprints |
-| auth | ✔ | — | ✔ (`createAuthMailer`) | ✔ | — | — | — | ✔ | — | **S** | the email reference producer |
-| rbac | ✔ | — | want | **want (invites)** | ✔ coverage | ✔ | ✔ | ✔ | ✔ | **M** | closes the silent-invite hole |
+| notifications | ✔ | ✔ | n/a (owns port) | n/a (owns runtime) | — | — | ✔ | ✔ | — | **shipped** | `wireNotifyPort`; jobs + web declared |
+| auth | ✔ | — | ✔ (`createAuthMailer`) | ✔ | — | — | — | ✔ | — | **shipped** | type-only contract dep (was runtime) |
+| rbac | ✔ | — | want | ✔ (invites) | ✔ coverage | ✔ | ✔ | ✔ | ✔ | **shipped** | silent invite closed; web declared |
 | realtime | ✔ | ✔ (outbox drain) | — | — | — | — | ✔ | ✔ | — | **M** | driver stays its own port |
-| audit | ✔ | ✔ (retention) | — | — | schemas | ✔ | ✔ | ✔ | — | **S** | actor middleware stays explicit |
-| entitlements | ✔ | — | — | want | schemas | — | — | ✔ | — | **S** | denial semantics unchanged |
-| impersonation | ✔ | — | — | want | schemas | ✔ | — | ✔ (banner!) | ✔ | **M** | banner is per-document, not per-page |
-| onboarding | ✔ | — | — | — | — | — | ✔ | ✔ | — | **S** | |
+| audit | ✔ | ✔ (retention) | — | — | schemas | ✔ | ✔ | ✔ | — | **shipped** | actor middleware stays explicit |
+| entitlements | ✔ | — | — | ✔ (blueprint) | schemas | — | — | ✔ | — | **shipped** | `plan.changed` declared, host emits |
+| impersonation | ✔ | — | — | want | schemas | ✔ | — | ✔ (banner!) | ✔ | **shipped** | banner is per-document, not per-page |
+| onboarding | ✔ | — | — | — | — | — | ✔ | ✔ | — | **shipped** | grew the `createWeb*` factory it lacked |
 | storage | ✔ | — | — | — | schemas | — | — | ✔ | — | **S** | actor-scoped mounts documented in manifest |
-| mcp | ✔ (oauth) | — | — | — | n/a (owns runtime) | — | ✔ | ✔ | — | **M** | accept `annotations` on `McpEndpoint` |
+| mcp | ✔ (oauth) | — | — | — | n/a (owns runtime) | — | ✔ | ✔ | — | **M** | `annotations` accepted; own manifest open |
 | product-research | ✔ | ✔ (runs) | — | ✔ (budget) | schemas | ✔ | ✔ | — | — | **M** | research.run/reenqueue as blueprints |
 | product-research-ui | — | — | — | — | — | — | — | ✔ | ✔ | **S** | `ResearchApiClient` stays its port |
 | shift | ✔ | ✔ (auto-close) | — | want | — | ✔ | ✔ | — | — | **M** | |

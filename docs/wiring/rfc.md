@@ -164,7 +164,7 @@ new subpath beside existing exports.
 
 **Phase 0 — land the contract.** This PR. Package in the workspace, unreleased.
 
-**Phase 1 — the two dead seams, made alive.**
+**Phase 1 — the two dead seams, made alive.** *(shipped)*
 1. payments-backend: type `PaymentsJobBlueprint` against `WireJobBlueprint`
    (dev-only assignability test), ship `manifest` + `manifest/server` wrapping
    `paymentsJobBlueprints()`; the origin host deletes its hand-rolled
@@ -174,24 +174,46 @@ new subpath beside existing exports.
    `[]` — which immediately surfaces the three unmounted working-copy
    endpoints as the red test they should have been.
 
-**Phase 2 — the ports.**
+**Phase 2 — the ports.** *(shipped)*
 3. notifications: re-export `EmailDriver` as satisfying `EmailPort` (type
    test), ship a `wireNotifyPort(api)` adapter, accept
-   `WireNotificationBlueprint[]` beside its own generators (same shape).
+   `WireNotificationBlueprint[]` beside its own generators (same shape). The
+   adapter's emit NEVER throws and reports a specific reason per failure —
+   "no generator is registered" is a wiring gap and "the recipient does not
+   resolve" is an ordinary one, and a host reading a log needs to tell them
+   apart. Reaching nobody is deliberately not a failure: a tenant with no
+   manager is a correct fan-out that reached zero people.
 4. auth: `createAuthMailer` accepts `EmailPort` (it already structurally
    does); declare `email` in its manifest.
 5. rbac: declare the `notes → invitee` notification blueprint and take an
    optional `NotifyPort` in the invites endpoint — closing the silent-invite
-   hole.
+   hole. Two things the implementation settled that the plan left open: the
+   blueprint is a FACTORY over host copy (a pre-worded one would be a silent
+   pt-BR default inside a library), and `RbacInvitesPort.invite` had to start
+   returning the `userId` it granted — nothing else knows whether the address
+   resolved to an account, and without it there is no recipient to emit to. An
+   accountless invitee is still not reached here: with no account there is no
+   inbox, and that reader needs a mail addressed to an e-mail, which is a
+   different port and stays the host's signup flow.
 
-**Phase 3 — MCP annotations.** `@12-apps/mcp` accepts `WireMcpTool` (add
+**Phase 3 — MCP annotations.** *(shipped)* `@12-apps/mcp` accepts `WireMcpTool` (add
 optional `annotations` to `McpEndpoint` — additive), `entity-lifecycle`
 annotates its eight per-collection tools, and the origin host's
 `tool-policy-hints.ts` becomes overrides-only, seeded from package defaults.
 
+The precedence had to be decided and is worth stating: the HOST wins every
+field it states. A package's claim is a default, not a fact about a given
+deployment — the same endpoint can be read-only in one app and reach a vendor
+in another — and inverting it would let a version bump silently re-classify a
+tool an operator had already audited. A field neither side supplies is a
+refusal, so completeness stays a refusal rather than a lint pass over a table
+that quietly grew a hole. `title` stays host copy: behaviour is the package's
+knowledge, the label is not.
+
 **Phase 4 — the rest of the estate**, in the order the adaptation report
 lists, as each package is next touched (the touch-must-fix pattern, not a big
-bang). The reference harness (`harness/backend`) adopts alongside, replacing
+bang). Ten packages have landed; what phases 1-3 actually shipped, and the one
+premise they had to correct, is recorded at the top of the adaptation report. The reference harness (`harness/backend`) adopts alongside, replacing
 per-package host files where the capability is covered — the harness becomes
 the living consumer example, which it already almost is.
 
