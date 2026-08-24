@@ -162,6 +162,91 @@ test.describe('Histórico de versões (the packaged dialog in a host editor)', (
     await page.getByTestId('version-history-dialog-close').click();
     await expect(page.getByTestId('demo-item-prod-agua')).toContainText('Água com gás 500ml');
   });
+
+  test('clicking a version lines it up against its neighbours (FUT-247)', async ({ page }) => {
+    // The comparison panel, which is the half of this dialog nothing here
+    // exercised. It is entirely the package's — the four ROLE labels, the
+    // column-per-version table, and the `?compare=N` query its own generated
+    // route answers. A host contributes the tenant slug and nothing else.
+    //
+    // What it is FOR: a version row stores only the new values of the fields
+    // that changed, so a list can name those fields and nothing more. Clicking
+    // one lines that version up with the one before it, the one after it, and
+    // the record as it stands today — which is how you tell what a change
+    // actually DID rather than merely which fields it touched.
+    await openPage(page);
+
+    // FOUR versions, because the first edit records the adoption snapshot: v1
+    // is the item as adopted and v2..v4 are the deltas. Four is the smallest
+    // history in which all four roles name a different version.
+    for (const name of ['Água sem gás', 'Água com gás', 'Água tônica', 'Água de coco']) {
+      await page.getByTestId('demo-item-edit-prod-agua').click();
+      await page.getByTestId('demo-item-name').fill(name);
+      await page.getByTestId('demo-item-save').click();
+      await expect(page.getByTestId('demo-outcome')).toContainText('Item salvo.');
+    }
+
+    await page.getByTestId('demo-item-history-prod-agua').click();
+    await expect(page.getByTestId('version-history-dialog')).toBeVisible();
+
+    // A MIDDLE version: four distinct columns, one per role. This is the case
+    // the collapsing rules below are measured against.
+    await page.getByTestId('version-row-2').click();
+    await expect(page.getByTestId('version-comparison-table')).toBeVisible();
+    await expect(page.getByTestId('comparison-column-1')).toContainText('Anterior');
+    await expect(page.getByTestId('comparison-column-2')).toContainText('Selecionada');
+    await expect(page.getByTestId('comparison-column-3')).toContainText('Seguinte');
+    await expect(page.getByTestId('comparison-column-4')).toContainText('Atual');
+  });
+
+  test('collapses the roles that name the same version, rather than printing it twice', async ({
+    page,
+  }) => {
+    // The NEWEST version is both the selection's "next" and the current record.
+    // A column per ROLE would print the same version twice and read as two
+    // different states of the item — which is the failure this asserts against.
+    await openPage(page);
+
+    // Exactly TWO versions: the adoption snapshot and one delta.
+    for (const name of ['Água sem gás', 'Água com gás']) {
+      await page.getByTestId('demo-item-edit-prod-agua').click();
+      await page.getByTestId('demo-item-name').fill(name);
+      await page.getByTestId('demo-item-save').click();
+      await expect(page.getByTestId('demo-outcome')).toContainText('Item salvo.');
+    }
+
+    await page.getByTestId('demo-item-history-prod-agua').click();
+    await page.getByTestId('version-row-2').click();
+    await expect(page.getByTestId('version-comparison-table')).toBeVisible();
+
+    // Two versions, two columns: v1 is "Anterior" and v2 is both the selected
+    // one and the current one, in ONE column carrying both words.
+    await expect(page.getByTestId('comparison-column-1')).toContainText('Anterior');
+    await expect(page.getByTestId('comparison-column-2')).toContainText('Selecionada');
+    await expect(page.getByTestId('comparison-column-2')).toContainText('Atual');
+    await expect(page.getByTestId('comparison-column-3')).toHaveCount(0);
+  });
+
+  test('marks which fields the version actually changed', async ({ page }) => {
+    // The reason the panel exists rather than a diff of two records: a version
+    // row holds only what MOVED, so the row for a field that changed is marked
+    // and the rest are context.
+    await openPage(page);
+
+    for (const name of ['Água sem gás', 'Água tônica 500ml']) {
+      await page.getByTestId('demo-item-edit-prod-agua').click();
+      await page.getByTestId('demo-item-name').fill(name);
+      await page.getByTestId('demo-item-save').click();
+      await expect(page.getByTestId('demo-outcome')).toContainText('Item salvo.');
+    }
+
+    await page.getByTestId('demo-item-history-prod-agua').click();
+    await page.getByTestId('version-row-2').click();
+    await expect(page.getByTestId('version-comparison-table')).toBeVisible();
+
+    await expect(page.getByTestId('comparison-row-name')).toHaveAttribute('data-changed', 'true');
+    await expect(page.getByTestId('comparison-cell-name-2')).toContainText('Água tônica 500ml');
+  });
 });
 
 test.describe('Rascunhos (the packaged banner in a host editor)', () => {
