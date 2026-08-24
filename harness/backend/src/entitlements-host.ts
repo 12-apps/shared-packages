@@ -20,6 +20,8 @@ import {
   type MemorySource,
 } from '@12-apps/entitlements';
 import {
+  entitlementDenialResponse,
+  isEntitlementDenial,
   PLAN_REQUEST_PERMISSION,
   PT_BR_ENTITLEMENTS_MESSAGES,
   type ComparisonTier,
@@ -205,4 +207,23 @@ export function createEntitlementsHost(): EntitlementsHost {
       source.set(TENANT, seededState());
     },
   };
+}
+
+/**
+ * A HOST endpoint standing behind the package's guard — the arrangement every
+ * gated host route has. What it proves is the denial WIRE: the free tenant answers
+ * 402 here with the body the react half's 402 interceptor parses into an upsell
+ * prompt.
+ */
+export function mountEntitlementDemo(app: Hono, entitlements: EntitlementsHost): void {
+  app.get('/api/admin/:tenantSlug/jury-demo', async (c) => {
+    try {
+      await entitlements.requireEntitlement(TENANT, 'jury.deliberation');
+      return c.json({ entries: [] });
+    } catch (error) {
+      if (!isEntitlementDenial(error)) throw error;
+      const denial = entitlementDenialResponse(error, PT_BR_ENTITLEMENTS_MESSAGES);
+      return c.json(denial.body, denial.status as 402);
+    }
+  });
 }
