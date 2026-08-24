@@ -107,6 +107,14 @@ export { availabilityFromText } from './normalize/availability';
 // the Brazilian pack a host passes by hand (FUT-760).
 export type { MarketVocabulary } from './normalize/vocabulary';
 export { PT_BR_MARKET_VOCABULARY } from './normalize/pt-BR';
+export { EN_US_MARKET_VOCABULARY } from './normalize/en-US';
+export {
+  MARKET_VOCABULARY,
+  RESEARCH_BUDGET_COPY,
+  RESEARCH_DIAGNOSTICS,
+  RESEARCH_HTTP_MESSAGES,
+  RESEARCH_PERMISSION_LABELS,
+} from './locales';
 export { isBrlPrice } from './normalize/currency';
 export { parseMoneyToCents } from './normalize/money';
 export { parsePack } from './normalize/pack';
