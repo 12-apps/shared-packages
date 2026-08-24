@@ -19,9 +19,54 @@ interface NotesActor {
   canManage: boolean;
 }
 
+/**
+ * What a package declares locally to take copy per reader, mirrored structurally
+ * rather than imported.
+ *
+ * `@12-apps/i18n` exports these same two shapes, and a package importing them
+ * from there is exactly what the copy port forbids: `payments/no-host-imports`
+ * bars a sibling workspace import outright, and every other package is meant to
+ * lift into a repo that has never heard of `@12-apps/i18n`. The declarations
+ * agree structurally, which is all an assignment needs.
+ *
+ * The context is deliberately loose — `WireRequest.locale` is a raw tag off the
+ * wire and nothing here narrows it. Matching it is the resolver's job, and the
+ * resolver belongs to the host.
+ */
+type NotesCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type NotesCopySource<T> = T | NotesCopyResolver<T>;
+
+/** Resolve at the moment the sentence is needed — never when the mount is built. */
+function resolveNotesCopy<T>(source: NotesCopySource<T>, locale: string | undefined): T {
+  return typeof source === "function" ? (source as NotesCopyResolver<T>)({ locale }) : source;
+}
+
+export interface NotesCopy {
+  empty: string;
+}
+
+/** What a single-audience host passes: the words themselves. */
+export const PT_BR_NOTES_COPY: NotesCopy = { empty: "Nenhuma nota." };
+/** Not exported: reached through {@link NOTES_COPY}, the way a host reaches it. */
+const EN_US_NOTES_COPY: NotesCopy = { empty: "No notes." };
+
+/** The pack a bilingual host turns into a resolver. */
+export const NOTES_COPY = {
+  "pt-BR": PT_BR_NOTES_COPY,
+  "en-US": EN_US_NOTES_COPY,
+} as const;
+
 /** The host vocabulary the HTTP capability requires. No defaults. */
 interface NotesServerConfig {
   store: NotesStore;
+  /**
+   * Either the words themselves, or a resolver asked per request.
+   *
+   * The plain value stays legal so a single-audience host's adoption does not
+   * change; the resolver is what a host reaches for once the language is a
+   * property of the caller rather than of the deployment.
+   */
+  copy: NotesCopySource<NotesCopy>;
 }
 
 export interface NotesJobDeps {
@@ -91,10 +136,15 @@ export const notesManifest = defineManifest({
 });
 
 async function listNotes(
-  store: NotesStore,
+  config: NotesServerConfig,
   request: WireRequest<NotesActor>,
 ): Promise<WireResponse> {
-  return { status: 200, body: { data: await store.list(request.actor.tenantId) } };
+  const data = await config.store.list(request.actor.tenantId);
+  // Resolved HERE, per request, rather than folded into the mount above. A
+  // package that resolves once and stores the result has re-frozen the language
+  // into its factory, and a single-locale host cannot tell the difference.
+  const copy = resolveNotesCopy(config.copy, request.locale);
+  return { status: 200, body: { data, empty: data.length === 0 ? copy.empty : null } };
 }
 
 async function addNote(store: NotesStore, request: WireRequest<NotesActor>): Promise<WireResponse> {
@@ -112,7 +162,7 @@ export const notesServerManifest = defineServerManifest(notesManifest, {
           {
             method: "GET" as const,
             path: "/notes",
-            handle: (request: WireRequest<NotesActor>) => listNotes(config.store, request),
+            handle: (request: WireRequest<NotesActor>) => listNotes(config, request),
           },
           {
             method: "POST" as const,

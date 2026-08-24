@@ -23,6 +23,8 @@ import { createTicketSecretResolver, type TicketSecretSource } from "./ticket-se
 import {
   EventsDenial,
   isEventsDenial,
+  resolveEventsCopy,
+  type EventsCopySource,
   type EventsAuthorization,
   type EventsMessages,
   type EventsRequestContext,
@@ -96,8 +98,12 @@ export interface EventsServerConfig {
    * from `./pt-BR`, which is the exact set the origin host's SPAs already
    * read; requiring it is what turns that choice into a line in the host's
    * diff instead of a silence.
+   *
+   * A bilingual host passes a RESOLVER instead — `localeCopy(EVENTS_MESSAGES)`
+   * — and each request is then answered in its own caller's language. The
+   * plain value stays legal, so a host with one audience changes nothing.
    */
-  messages: EventsMessages;
+  messages: EventsCopySource<EventsMessages>;
   /** Enable the transactional outbox by saying where its rows live. */
   outbox?: Omit<RealtimeOutboxOptions, "logger">;
   /**
@@ -161,7 +167,11 @@ interface RouteDeps {
   logger: RealtimeLogger;
   connections: ConnectionLedger;
   ticketSecret: () => string | null;
-  messages: EventsMessages;
+  /**
+   * The SOURCE, unresolved. Holding a value here is what would re-freeze the
+   * language into the factory — `deps` is built once, per process.
+   */
+  messages: EventsCopySource<EventsMessages>;
 }
 
 /**
@@ -185,16 +195,19 @@ function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
     surface: surface.name,
     kind: "stream",
     handle: async (context): Promise<EventsRouteResult> => {
+      // Resolved here, per request, from the tag the adapter put on the
+      // context — never in the factory, which ran once at boot.
+      const messages = resolveEventsCopy(deps.messages, context.locale);
       let granted: EventsAuthorization;
       try {
-        granted = await authorizeRequest(surface, context, deps.messages);
+        granted = await authorizeRequest(surface, context, messages);
       } catch (error) {
         return denialResult(error);
       }
 
       // After auth, deliberately: "realtime is off" is not information an unauthorized
       // caller should be able to collect.
-      if (!getRealtimeDriver()) return { status: 503, body: { error: deps.messages.unavailable } };
+      if (!getRealtimeDriver()) return { status: 503, body: { error: messages.unavailable } };
 
       // A stream subscribed to nothing is the LYING channel FUT-657 exists to prevent: it
       // opens, reports `connected`, heartbeats an empty topic list and the consumer
@@ -202,14 +215,14 @@ function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
       // client's own heartbeat check would reach the same conclusion a beat later anyway.
       if (granted.topics.length === 0) {
         deps.logger.error(`surface "${surface.name}" authorized zero topics; refusing the stream.`);
-        return { status: 503, body: { error: deps.messages.unavailable } };
+        return { status: 503, body: { error: messages.unavailable } };
       }
 
       const release = deps.connections.acquire(granted.subjectId);
       if (!release) {
         return {
           status: 429,
-          body: { error: surface.tooManyMessage ?? deps.messages.tooMany },
+          body: { error: surface.tooManyMessage ?? messages.tooMany },
         };
       }
 
@@ -237,17 +250,20 @@ function ticketRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
     surface: surface.name,
     kind: "json",
     handle: async (context): Promise<EventsRouteResult> => {
+      // Per request, exactly as the stream route does: the two transports must
+      // not disagree about the language any more than about the authorization.
+      const messages = resolveEventsCopy(deps.messages, context.locale);
       let granted: EventsAuthorization;
       try {
         // The identical authorization the stream route performs, so the two transports
         // can never disagree about who may watch what.
-        granted = await authorizeRequest(surface, context, deps.messages);
+        granted = await authorizeRequest(surface, context, messages);
       } catch (error) {
         return denialResult(error);
       }
 
       const secret = deps.ticketSecret();
-      if (!secret) return { status: 503, body: { error: deps.messages.unavailable } };
+      if (!secret) return { status: 503, body: { error: messages.unavailable } };
 
       // A ticket travels in a query string, so the signed payload caps its topic list
       // (`MAX_TICKET_TOPICS`). `maxTopicsPerConnection` bounds the SPECS, not the resolved
@@ -262,7 +278,7 @@ function ticketRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute
             `carries 1..${MAX_TICKET_TOPICS}. The WebSocket transport is unavailable for ` +
             `this connection; the client falls back to SSE.`,
         );
-        return { status: 503, body: { error: deps.messages.unavailable } };
+        return { status: 503, body: { error: messages.unavailable } };
       }
 
       return {
@@ -298,8 +314,8 @@ export function createApiEvents(config: EventsServerConfig): EventsApi {
     logger,
     connections,
     ticketSecret: createTicketSecretResolver(config.ticketSecret, logger),
-    // Resolved ONCE, and per field, so a host overriding one string keeps the defaults for
-    // the other three rather than having to restate the wire contract to change a word.
+    // Carried unresolved. Each handler resolves against its own request's
+    // locale, which is the whole reason the field takes a resolver at all.
     messages: config.messages,
   };
   const outbox = config.outbox ? createRealtimeOutbox({ ...config.outbox, logger }) : null;
