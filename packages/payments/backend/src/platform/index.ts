@@ -5,6 +5,7 @@
  * otherwise carry.
  */
 export { PT_BR_CONNECT_APPLICATION_COPY, PT_BR_HOMOLOGACAO_ANSWERS } from './pt-BR';
+export { EN_US_CONNECT_APPLICATION_COPY } from './en-US';
 export {
   consultConnectApplications,
   type ConnectApplicationCopy,

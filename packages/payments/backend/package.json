@@ -15,6 +15,7 @@
     "./pagbank-public-key": "./src/providers/pagbank-public-key.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",
+    "./locales": "./src/locales.ts",
     "./package.json": "./package.json"
   },
   "wiring": {

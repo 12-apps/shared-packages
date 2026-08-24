@@ -29,3 +29,10 @@ export {
   PT_BR_STONE_COPY,
   PT_BR_STRIPE_COPY,
 } from './pt-BR';
+export {
+  EN_US_INFINITEPAY_COPY,
+  EN_US_PAGBANK_COPY,
+  EN_US_PROVIDER_COPY,
+  EN_US_STONE_COPY,
+  EN_US_STRIPE_COPY,
+} from './en-US';

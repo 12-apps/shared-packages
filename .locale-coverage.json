@@ -1,7 +1,6 @@
 {
   "packages/discounts": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
   "packages/mcp": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
-  "packages/payments/backend": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
   "packages/payments/frontend": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
   "packages/product-research-ui": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
   "packages/report-builder": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it."
