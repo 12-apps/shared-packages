@@ -58,6 +58,12 @@ export interface WebEntitlementsConfig {
   /** The plan screen's own path, for the prompt host's "Ver todos os planos". */
   plansPath?: string;
   /**
+   * Where the host routes the feature AUDIT — the same surface's other half.
+   * Optional like `plansPath`, and for the same reason: a host that mounts no
+   * such route gets no link rather than a dead one.
+   */
+  featuresPath?: string;
+  /**
    * The anchor the surface renders links with. Defaults to a plain `<a>` over
    * `to` — pass the router's `Link` so client-side navigation survives.
    */
@@ -72,5 +78,6 @@ export interface ResolvedWebConfig {
   copy: EntitlementsWebCopy;
   switchLocation: (feature: string) => TenantSwitchLocation | null;
   plansPath: string | null;
+  featuresPath: string | null;
   LinkComponent: ComponentType<EntitlementsLinkProps>;
 }

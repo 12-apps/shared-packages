@@ -17,7 +17,7 @@
 import type { ComponentType, JSX } from 'react';
 
 import type { EntitlementsLinkProps, ResolvedWebConfig, WebEntitlementsConfig } from './web-config';
-import { PlanScreen } from './plan-page';
+import { PlanFeaturesScreen, PlanScreen, PlanSummary, PlansScreen } from './plan-page';
 import { UpsellPromptHost } from './upsell-host';
 import { createWithEntitlement, type EntitlementGate } from './with-entitlement';
 
@@ -31,8 +31,23 @@ function PlainAnchor({ to, onClick, children, ...rest }: EntitlementsLinkProps):
 }
 
 export interface WebEntitlements {
-  /** The plan screen: pricing cards + the tenant's live status. */
+  /**
+   * The whole plan surface on ONE screen: pricing cards, the full matrix and
+   * the tenant's live status. Kept for hosts that route it that way; a host
+   * with the room to split it wants the three below instead, which is what
+   * `plansPage` + `featuresPage` + `planSummary` are for.
+   */
   page: ComponentType;
+  /** The CATALOG alone — cards, matrix and the ask flow. Route it at /plans. */
+  plansPage: ComponentType;
+  /** The AUDIT alone — what is on for this tenant, and why it is off. */
+  featuresPage: ComponentType;
+  /**
+   * The surface as it belongs on an ACCOUNT page: the current plan in one
+   * line, and links into the two above. Reads the same payload, so the
+   * features link carries how many rows the audit would show.
+   */
+  planSummary: ComponentType;
   /** Mount ONCE in the layout: the upgrade prompt every trigger lands on. */
   UpsellHost: ComponentType;
   /** The page gate. Wrap a routed page's export; pairs with a server guard. */
@@ -80,6 +95,7 @@ export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitle
     copy: config.copy,
     switchLocation: config.switchLocation ?? (() => null),
     plansPath: config.plansPath ?? null,
+    featuresPath: config.featuresPath ?? null,
     LinkComponent: config.LinkComponent ?? PlainAnchor,
   };
 
@@ -88,6 +104,21 @@ export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitle
   }
   Page.displayName = 'EntitlementsPlanPage';
 
+  function Plans(): JSX.Element {
+    return <PlansScreen config={resolved} />;
+  }
+  Plans.displayName = 'EntitlementsPlansPage';
+
+  function Features(): JSX.Element {
+    return <PlanFeaturesScreen config={resolved} />;
+  }
+  Features.displayName = 'EntitlementsPlanFeaturesPage';
+
+  function Summary(): JSX.Element {
+    return <PlanSummary config={resolved} />;
+  }
+  Summary.displayName = 'EntitlementsPlanSummary';
+
   function Host(): JSX.Element | null {
     return <UpsellPromptHost config={resolved} />;
   }
@@ -95,6 +126,9 @@ export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitle
 
   return {
     page: Page,
+    plansPage: Plans,
+    featuresPage: Features,
+    planSummary: Summary,
     UpsellHost: Host,
     withEntitlement: createWithEntitlement(config.copy.pageLock),
   };

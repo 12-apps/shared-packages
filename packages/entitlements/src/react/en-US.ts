@@ -34,6 +34,8 @@ export const EN_US_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     ceilingUpTo: ({ limit }) => `up to ${String(limit)}`,
     availableOn: ({ planLabel }) => `Available on the ${planLabel} plan.`,
     openSwitch: ({ label }) => `Turn on in ${label}`,
+    summaryPlansLink: 'See plans',
+    summaryFeaturesLink: ({ blocked }) => `See plan features · ${String(blocked)} unavailable`,
     statusBadge: { enabled: 'On', disabled: 'Unavailable' },
   },
   tierCards: {
