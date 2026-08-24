@@ -1,8 +1,7 @@
-import { defineWebManifest } from "@12-apps/wiring/producer";
+import type { AnyWebManifest } from "@12-apps/wiring";
 
 import { createWebEmailAuth } from "../react/create-web-email-auth";
 import { createEmailAuthSettingsScreen } from "../react/settings";
-import { authManifest, authPlatformManifest } from "./index";
 
 /**
  * The WEB runtime manifest — the surface factories and where each area's
@@ -17,10 +16,14 @@ import { authManifest, authPlatformManifest } from "./index";
  *
  * Screen names are the KEYS of the built surface, so a host projecting a route
  * looks the component up rather than guessing at a name.
+ *
+ * Plain `satisfies`-checked values — see `./index` for why the contract package
+ * stays a type-only devDependency; the inventory check against the shared
+ * manifest runs in the test suite.
  */
 
 /** The five sign-in screens, in the two areas that show them. */
-export const authWebManifest = defineWebManifest(authManifest, {
+export const authWebManifest = {
   name: "@12-apps/auth",
   surface: { create: createWebEmailAuth },
   areas: [
@@ -51,7 +54,7 @@ export const authWebManifest = defineWebManifest(authManifest, {
       ],
     },
   ],
-});
+} as const satisfies AnyWebManifest;
 
 /**
  * The operator console, and the one nav entry it needs.
@@ -59,7 +62,7 @@ export const authWebManifest = defineWebManifest(authManifest, {
  * It sits in the PLATFORM block rather than under a tenant because sign-in
  * happens before a tenant is known.
  */
-export const authPlatformWebManifest = defineWebManifest(authPlatformManifest, {
+export const authPlatformWebManifest = {
   name: "@12-apps/auth-platform",
   surface: { create: createEmailAuthSettingsScreen },
   areas: [
@@ -69,4 +72,4 @@ export const authPlatformWebManifest = defineWebManifest(authPlatformManifest, {
       nav: [{ testId: "auth-settings", path: "auth-settings" }],
     },
   ],
-});
+} as const satisfies AnyWebManifest;

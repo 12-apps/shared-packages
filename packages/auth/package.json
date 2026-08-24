@@ -38,7 +38,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@12-apps/wiring": "workspace:*",
     "@auth/core": "0.41.0",
     "zod": "^4.3.5"
   },
@@ -48,6 +47,7 @@
     "@12-apps/notifications": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/ui": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
     "@playwright/test": "^1.56.1",
     "@storybook/addon-docs": "^9.1.10",
     "@storybook/addon-links": "^9.1.10",
@@ -103,7 +103,8 @@
     "hono": ">=4.0.0",
     "@playwright/test": ">=1.40.0",
     "playwright-bdd": ">=8.0.0",
-    "@12-apps/notifications": ">=4.0.0"
+    "@12-apps/notifications": ">=4.0.0",
+    "@12-apps/wiring": ">=1.3.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -125,6 +126,9 @@
       "optional": true
     },
     "@12-apps/notifications": {
+      "optional": true
+    },
+    "@12-apps/wiring": {
       "optional": true
     }
   },
