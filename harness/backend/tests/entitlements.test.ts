@@ -166,7 +166,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
 
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.entitlements.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+      backend.hosts.entitlements.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -198,7 +198,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     //
     // The property that actually matters is the last line: nothing the web half
     // declares can leave this server host's assembly incomplete.
-    const entries = backend.entitlements.report.packages[0]?.capabilities ?? [];
+    const entries = backend.hosts.entitlements.report.packages[0]?.capabilities ?? [];
     const statuses = new Map(entries.map((entry) => [entry.kind, entry.status]));
 
     expect(statuses.get('surface')).toBe('out-of-scope');
@@ -207,7 +207,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.entitlements;
+    const { routes } = backend.hosts.entitlements;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} /api/admin/:tenantSlug${mounted.route.path}`);
@@ -218,6 +218,6 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.entitlements.report)).toContain('/api/admin/:tenantSlug');
+    expect(renderWiringReport(backend.hosts.entitlements.report)).toContain('/api/admin/:tenantSlug');
   });
 });

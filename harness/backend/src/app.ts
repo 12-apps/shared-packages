@@ -138,26 +138,22 @@ export interface HarnessBackend {
    */
   realtimeDriver: RealtimeDriver;
   /**
-   * `@12-apps/shift`'s service, for the overdue sweep — which has NO route,
-   * deliberately: it is a scheduled cross-tenant job, and an endpoint closing
-   * other people's shifts on request is a very different thing.
+   * Every mounted host, by name.
+   *
+   * One field rather than one per package, and the reason is a scar: this
+   * interface had grown eight, one per wiring adoption, and every adoption
+   * after the first collided with the one before it in exactly the same place
+   * — two branches each adding a line to the same list. Four identical merge
+   * conflicts is the shape telling you it is the wrong shape.
+   *
+   * What a suite reaches in here for is never a route: the wiring REPORT, a
+   * package's BOUND job blueprints, a lever no endpoint exposes (which acquirer
+   * the platform collects through), or a service that deliberately has no
+   * endpoint at all — `@12-apps/shift`'s sweep is a scheduled cross-tenant job,
+   * and an endpoint closing other people's shifts on request is a very
+   * different thing.
    */
-  shift: Hosts['shift'];
-  /**
-   * `@12-apps/billing`'s host, for the two levers a suite has to pull that no
-   * endpoint exposes: which acquirer the PLATFORM collects through (a real
-   * rotation, through the credential store's own `setChain`), and the gateway
-   * the vault sessions live in.
-   */
-  billing: Hosts['billing'];
-  /** Its wiring report — an aggregate, not a route. */
-  audit: Hosts['audit'];
-  /** Its wiring report — an aggregate, not a route. */
-  onboarding: Hosts['onboarding'];
-  /** Its wiring report and its BOUND job blueprints — neither has an endpoint. */
-  research: Hosts['research'];
-  /** Its wiring report — an aggregate, not a route. */
-  entitlements: Hosts['entitlements'];
+  hosts: Hosts;
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -293,12 +289,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     storageRoot: hosts.storage.root,
     pg,
     realtimeDriver: hosts.realtimeDriver,
-    shift: hosts.shift,
-    billing: hosts.billing,
-    audit: hosts.audit,
-    onboarding: hosts.onboarding,
-    research: hosts.research,
-    entitlements: hosts.entitlements,
+    hosts,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream
       // severed after its driver is gone throws into the sink rather than closing cleanly.

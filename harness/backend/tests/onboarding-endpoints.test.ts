@@ -252,7 +252,7 @@ describe('isolation — the row key is (user, tenant, feature)', () => {
 describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.onboarding.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+      backend.hosts.onboarding.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -271,7 +271,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.onboarding;
+    const { routes } = backend.hosts.onboarding;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} ${ONBOARDING_MOUNT_PATH}${mounted.route.path}`);
@@ -282,6 +282,6 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.onboarding.report)).toContain(ONBOARDING_MOUNT_PATH);
+    expect(renderWiringReport(backend.hosts.onboarding.report)).toContain(ONBOARDING_MOUNT_PATH);
   });
 });

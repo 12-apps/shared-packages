@@ -22,10 +22,19 @@ import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
 import type { NotificationGenerator } from '@12-apps/notifications';
-import { notificationsRouter } from '@12-apps/notifications/hono';
+import { notificationsManifest } from '@12-apps/notifications/manifest';
+import {
+  notificationsServerManifest,
+  type createWireApiNotifications,
+} from '@12-apps/notifications/manifest/server';
+import type { BoundJob, MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 import { notificationsDb } from './notifications-db';
 import { createOutboxLatch, type OutboxLatch } from './notifications-latch';
+import { harnessControls } from './notifications-controls';
 
 /** The mounted surface's type — inferred, so the host keeps its exact shape. */
 export type HarnessNotifications = ReturnType<typeof notificationsHost>;
@@ -245,88 +254,6 @@ function audienceDirectory(pg: PGlite) {
  * They live under `/__harness` so nothing here can be mistaken for part of the
  * published surface.
  */
-function harnessControls(
-  surface: Pick<
-    HarnessNotifications,
-    'notify' | 'notifyByPermission' | 'drainPending' | 'dispatchDeliveries'
-  >,
-  outbox: OutboxEntry[],
-  latch: OutboxLatch,
-): Hono {
-  const routes = new Hono();
-  routes.get('/outbox', (c) => c.json({ data: { entries: outbox } }));
-  // The dispatcher, addressable one notification at a time — so the suite can
-  // start TWO of them against the same row and assert that only one send comes
-  // out. Paired with hold/release, which is what keeps both inside the window.
-  routes.post('/dispatch', async (c) => {
-    await surface.dispatchDeliveries(c.req.query('id') ?? '');
-    return c.json({ data: { ok: true } });
-  });
-  routes.post('/hold', (c) => {
-    latch.hold();
-    return c.json({ data: { held: true } });
-  });
-  routes.post('/release', (c) => {
-    latch.release();
-    return c.json({ data: { held: false } });
-  });
-  routes.post('/emit', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as {
-      type?: string;
-      userId?: string;
-      clientId?: string | null;
-      payload?: Record<string, unknown>;
-    };
-    const result = await surface.notify(
-      {
-        type: body.type ?? 'order.paid',
-        recipient: {
-          userId: body.userId ?? 'owner-1',
-          ...(body.clientId === null ? {} : { clientId: body.clientId ?? NOTIFICATIONS_TENANT_ID }),
-        },
-        payload: body.payload ?? { code: 'A-9999' },
-      },
-      { sync: true },
-    );
-    return c.json({ data: result });
-  });
-  routes.post('/drain', async (c) => {
-    // The retry sweep a host puts on a cron, reachable from the suite and from
-    // the page — the delivery rows are the durable record, so this is what turns
-    // a failed send into a delivered one. `take` is exposed so the suite can
-    // assert the bound over real SQL rather than only against the fake.
-    const take = c.req.query('take');
-    return c.json({
-      data: await surface.drainPending(
-        Number(c.req.query('olderThanMs') ?? 0),
-        take === undefined ? undefined : Number(take),
-      ),
-    });
-  });
-  routes.post('/fan-out', async (c) =>
-    c.json({
-      data: await surface.notifyByPermission(
-        NOTIFICATIONS_TENANT_ID,
-        SHORT_PAYMENT_PERMISSIONS,
-        { type: 'payment.short', payload: { missing: 'R$ 18,00' } },
-      ),
-    }),
-  );
-  return routes;
-}
-
-/**
- * The four channels this harness declares, and what each one has to STATE.
- *
- * Lifted out of `notificationsHost` so the wiring reads as the fixed
- * declaration it is — and so the function stays inside the size gate, which
- * the `linkLabel` line was what finally pushed it past.
- *
- * `linkLabel` (EMAIL), `defaultCountryCode` (both phone channels) and
- * `templateLanguage` (WhatsApp) are all REQUIRED for one reason: a package
- * default would be this product's answer landing in a stranger's inbox, on a
- * foreign number, or under a template registered in the wrong language.
- */
 const TRANSPORTS = [
   { channel: 'EMAIL', driver: 'harness', appUrl: 'https://harness.test', linkLabel: 'Ver detalhes' },
   { channel: 'SMS', driver: 'harness', appUrl: 'https://harness.test', defaultCountryCode: '55' },
@@ -341,26 +268,31 @@ const TRANSPORTS = [
   { channel: 'WEB_PUSH', driver: 'harness', publicKey: 'BHarnessVapidPublicKey' },
 ] as const;
 
-/** The mounted surface: the package's router behind this host's seams. */
-export function notificationsHost(pg: PGlite) {
-  const outbox: OutboxEntry[] = [];
-  const latch = createOutboxLatch();
-
-  const surface = notificationsRouter({
-    // The harness declares its own categories and its own copy, because the
-    // package ships neither — this is the wiring every adopter now performs.
+/**
+ * Everything `createApiNotifications` requires, as one value.
+ *
+ * Its own function so the adoption below reads as the contract mechanics it is,
+ * and because this is the half a reader compares against the package's own list
+ * of required config — the taxonomy, the four wire sentences, the generators,
+ * the transports and the plan gate.
+ */
+function apiConfig(pg: PGlite, outbox: OutboxEntry[], latch: OutboxLatch) {
+  return {
+    // The harness declares its own categories and its own copy, because
+    // the package ships neither — this is the wiring every adopter now
+    // performs.
     //
-    // These four names are generic enough that a hardware shop uses the same
-    // words the extraction origin did; the LABELS beside them, which are the
-    // part that is actually somebody's language, are this host's. That pairing
-    // is the point: `categories` became required one release ago while
-    // `categoryLabels` kept defaulting, so a host could declare its own
-    // taxonomy and still be handed another product's descriptions for it.
+    // These four names are generic enough that a hardware shop uses the
+    // same words the extraction origin did; the LABELS beside them, which
+    // are the part that is actually somebody's language, are this host's.
+    // That pairing is the point: `categories` became required one release
+    // ago while `categoryLabels` kept defaulting, so a host could declare
+    // its own taxonomy and still be handed another product's descriptions
+    // for it.
     categories: ['orders', 'payments', 'stock', 'system'],
-    // Required now, and only the FOUR the server half puts on a wire — the
-    // panel's own forty belong to the react mount, which states them in
-    // `frontend/src/notifications/notification-copy.ts`. Stated here in this
-    // host's words, because the package ships none.
+    // Required now, and only the FOUR the server half puts on a wire —
+    // the panel's own forty belong to the react mount. Stated here in
+    // this host's words, because the package ships none.
     messages: {
       unauthenticated: 'Entre na sua conta para ver os avisos.',
       invalidBody: 'Não foi possível ler o pedido.',
@@ -370,30 +302,104 @@ export function notificationsHost(pg: PGlite) {
     db: () => Promise.resolve(notificationsDb(pg)),
     generators: GENERATORS,
     contacts: {
-      getContact: (userId) => {
+      getContact: (userId: string) => {
         const person = CONTACTS.get(userId);
-        return Promise.resolve(person ? { email: person.email, phone: person.phone } : null);
+        return Promise.resolve(
+          person ? { email: person.email, phone: person.phone } : null,
+        );
       },
     },
     transports: TRANSPORTS,
     drivers: recorder(outbox, latch),
-    // The plan gate: the free tenant pays for the inbox and nothing else, so a
-    // tenant-scoped emit there DEGRADES to zero channels rather than vanishing.
-    channelPolicy: (clientId, channels) =>
+    // The plan gate: the free tenant pays for the inbox and nothing else,
+    // so a tenant-scoped emit there DEGRADES to zero channels rather than
+    // vanishing.
+    channelPolicy: (clientId: string, channels: readonly string[]) =>
       clientId === NOTIFICATIONS_TENANT_FREE_ID ? [] : [...channels],
     audience: audienceDirectory(pg),
-    logger: { info: () => undefined, error: () => undefined },
-    resolveActor: (c) => {
+  };
+}
+
+/** Where `mount-surfaces.ts` hangs it — TENANT-FREE, so no slug. */
+export const NOTIFICATIONS_MOUNT_PATH = '/api/account';
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer`.
+ *
+ * `logger` leaves the config, and this is the package where that matters most
+ * of the six so far: the host was passing `{ info: () => undefined, error: () =>
+ * undefined }` — a logger that swallowed everything, written once and never
+ * revisited. A delivery driver failing is exactly the thing nobody watches for,
+ * and the binder now hands this package a logger scoped to its namespace
+ * instead of whatever the host happened to type at the mount.
+ */
+export function notificationsHost(pg: PGlite): ReturnType<typeof createWireApiNotifications> & {
+  router: ReturnType<typeof honoRouterFor>;
+  harnessRoutes: Hono;
+  outbox: OutboxEntry[];
+  latch: OutboxLatch;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+  jobs: readonly BoundJob[];
+} {
+  const outbox: OutboxEntry[] = [];
+  const latch = createOutboxLatch();
+
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  host.adoptServer({
+    manifest: notificationsManifest,
+    server: notificationsServerManifest,
+    bindings: {
+      http: {
+        mountPath: NOTIFICATIONS_MOUNT_PATH,
+        config: {
+          ...apiConfig(pg, outbox, latch),
+        },
+      },
+      /**
+       * The dispatch fast path and the retry sweep, bound rather than declined.
+       *
+       * The package moved their cadence into the blueprints — the attempts, the
+       * backoff, the five-minute tick and the single-flight lease — because
+       * every one of those is a claim about ITS pipeline, and every host had
+       * been restating them by hand. A harness that exists to be the living
+       * consumer example should take the declaration rather than repeat that.
+       *
+       * Deferred through arrows: `surface` is what `adoptServer` returns, so
+       * the deps reach for it when a job runs rather than when the binding is
+       * written.
+       */
+      jobs: {
+        deps: {
+          dispatchDeliveries: (notificationId) => surface.dispatchDeliveries(notificationId),
+          drainPending: (olderThanMs, take) => surface.drainPending(olderThanMs, take),
+        },
+      },
+    },
+  });
+
+  const wired = host.assemble();
+  const surface = wired.http[notificationsManifest.name] as ReturnType<
+    typeof createWireApiNotifications
+  >;
+
+  return {
+    ...surface,
+    report: wired.report,
+    routes: wired.routes,
+    jobs: wired.jobs,
+    router: honoRouterFor(wired.routes, (c) => {
       // The SPA sends no header and acts as the seeded owner; a spec that needs
       // another vantage sets one, and `anonymous` exercises the 401 path.
       const userId = c.req.header(ACTOR_HEADER) ?? 'owner-1';
       return userId === 'anonymous' ? null : { userId };
-    },
-  });
-
-  return {
-    ...surface,
-    harnessRoutes: harnessControls(surface, outbox, latch),
+    }),
+    harnessRoutes: harnessControls(surface as never, outbox, latch),
     outbox,
     latch,
   };

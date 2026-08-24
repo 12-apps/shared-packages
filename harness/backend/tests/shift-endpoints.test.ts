@@ -378,7 +378,7 @@ describe('the overdue sweep', () => {
     // through a backdated clock also makes it deterministic — nothing here
     // depends on when the test ran, and the package refuses a `startedAt` more
     // than 24 hours old anyway.
-    const result = await backend.shift.service.autoCloseOverdue({
+    const result = await backend.hosts.shift.service.autoCloseOverdue({
       // Derived from the row rather than from a clock, so the case is decided
       // entirely by data. A second past the north shift's own start is past a
       // one-millisecond window and nowhere near a sixteen-hour one.
@@ -416,7 +416,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
     // had been restating them in its own `defineJob`, and a harness that drives
     // `service.autoCloseOverdue` by hand repeats that in the one place that
     // exists to catch it.
-    const sweep = backend.shift.jobs.find((job) => job.name === 'shift.auto-close');
+    const sweep = backend.hosts.shift.jobs.find((job) => job.name === 'shift.auto-close');
 
     expect(sweep).toBeDefined();
     expect(sweep?.schedule).toEqual({ pattern: '*/15 * * * *' });
@@ -438,7 +438,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
     shiftSweep.maxDurationMsForTenant = async (clientId) =>
       clientId === SHIFT_TENANT_ID ? 1 : 16 * 60 * 60 * 1000;
 
-    const sweep = backend.shift.jobs.find((job) => job.name === 'shift.auto-close');
+    const sweep = backend.hosts.shift.jobs.find((job) => job.name === 'shift.auto-close');
     await sweep?.handle(undefined as never, { logger: console } as never);
 
     expect(await pageFrom(await as('ana').list('?open=true'))).toMatchObject({ items: [] });
@@ -446,7 +446,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
 
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.shift.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
+      backend.hosts.shift.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -464,7 +464,7 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.shift;
+    const { routes } = backend.hosts.shift;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} ${SHIFT_MOUNT_PATH}${mounted.route.path}`);
@@ -475,6 +475,6 @@ describe('adopted through @12-apps/wiring, not by calling the factory', () => {
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.shift.report)).toContain(SHIFT_MOUNT_PATH);
+    expect(renderWiringReport(backend.hosts.shift.report)).toContain(SHIFT_MOUNT_PATH);
   });
 });

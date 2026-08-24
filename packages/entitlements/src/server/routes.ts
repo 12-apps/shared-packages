@@ -5,7 +5,11 @@
  */
 import type { EntitlementsEngine } from '../core/engine';
 import type { FiledPlanRequest, OpenPlanRequest } from '../plan-wire';
-import type { EntitlementsMessages } from './copy';
+import {
+  resolveEntitlementsCopy,
+  type EntitlementsCopySource,
+  type EntitlementsMessages,
+} from './copy';
 import type { PlanService } from './plan-service';
 import { entitlementDenialResponse, isEntitlementDenial, type WireResponse } from './wire';
 
@@ -40,6 +44,16 @@ export interface EntitlementsActor {
 export interface EntitlementsRequest {
   actor: EntitlementsActor;
   body?: unknown;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** One endpoint, framework-neutral. Paths are relative to the mount. */
@@ -145,7 +159,7 @@ function askRoute(
   leads: PlanChangeRequestPort,
   isKnownPlan: (key: string) => boolean,
   requestPermission: string,
-  messages: EntitlementsMessages,
+  copyFor: (request: EntitlementsRequest) => EntitlementsMessages,
 ): EntitlementsRoute {
   return {
     // "I want a bigger plan." Writes a LEAD, never a plan: moving a tenant
@@ -154,8 +168,10 @@ function askRoute(
     // tenant anything.
     method: 'POST',
     path: '/plan/request',
-    handle: ({ actor, body }) =>
-      answering(messages, async () => {
+    handle: (request) => {
+      const { actor, body } = request;
+      const messages = copyFor(request);
+      return answering(messages, async () => {
         if (!actor.permissions.includes(requestPermission)) {
           return {
             status: 403,
@@ -169,7 +185,7 @@ function askRoute(
         // From the engine, not the caller: a client that could name its own
         // current tier could file a lead saying the tenant is on a tier it is
         // not.
-        const view = await service.getPlanView(actor.tenantId);
+        const view = await service.getPlanView(actor.tenantId, request.locale);
         const userId = actor.userId ?? null;
         const result = await leads.create({
           tenantId: actor.tenantId,
@@ -185,7 +201,8 @@ function askRoute(
         // request" is simply true, and an error would read as though the ask
         // had been lost.
         return ok({ request: result.request, created: result.created });
-      }),
+      });
+    },
   };
 }
 
@@ -196,10 +213,17 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
   isKnownPlan: (key: string) => boolean;
   /** The permission id `POST /plan/request` requires of the actor. */
   requestPermission: string;
-  /** The refusal/denial sentences — REQUIRED, the host's words. */
-  messages: EntitlementsMessages;
+  /**
+   * The refusal/denial sentences — REQUIRED, the host's words, or a RESOLVER
+   * for a host serving more than one language. These routes are built once per
+   * process, so a resolver is called per request rather than here.
+   */
+  messages: EntitlementsCopySource<EntitlementsMessages>;
 }): EntitlementsRoute[] {
   const { engine, service, leads, messages } = deps;
+  /** This caller's words. Never hoisted — see the field's docblock. */
+  const copyFor = (request: EntitlementsRequest): EntitlementsMessages =>
+    resolveEntitlementsCopy(messages, request.locale);
 
   const routes: EntitlementsRoute[] = [
     {
@@ -207,8 +231,10 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
       // renders from. The client NEVER re-resolves.
       method: 'GET',
       path: '/entitlements',
-      handle: ({ actor }) =>
-        answering(messages, async () => ok({ snapshot: await engine.toSnapshot(actor.tenantId) })),
+      handle: (request) =>
+        answering(copyFor(request), async () =>
+          ok({ snapshot: await engine.toSnapshot(request.actor.tenantId) }),
+        ),
     },
     {
       // What plan this tenant is on. READ-ONLY, permissionless, and it
@@ -217,8 +243,10 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
       // when it is needed.
       method: 'GET',
       path: '/plan',
-      handle: ({ actor }) =>
-        answering(messages, async () => ok({ plan: await service.getPlanPayload(actor.tenantId) })),
+      handle: (request) =>
+        answering(copyFor(request), async () =>
+          ok({ plan: await service.getPlanPayload(request.actor.tenantId, request.locale) }),
+        ),
     },
   ];
 
@@ -230,10 +258,12 @@ export function buildEntitlementsRoutes<F extends string>(deps: {
         // colleague already asked, rather than being invited to ask again.
         method: 'GET',
         path: '/plan/request',
-        handle: ({ actor }) =>
-          answering(messages, async () => ok({ request: await leads.getOpen(actor.tenantId) })),
+        handle: (request) =>
+          answering(copyFor(request), async () =>
+            ok({ request: await leads.getOpen(request.actor.tenantId) }),
+          ),
       },
-      askRoute(service, leads, deps.isKnownPlan, deps.requestPermission, messages),
+      askRoute(service, leads, deps.isKnownPlan, deps.requestPermission, copyFor),
     );
   }
 
