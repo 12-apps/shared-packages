@@ -146,6 +146,35 @@ describe("authServerManifest", () => {
     expect(wire).toEqual(descriptors);
   });
 
+  it("says which routes need a caller, in the CONTRACT's vocabulary", () => {
+    // Six of the eight sign-in endpoints are anonymous by definition, and
+    // `kind` defaults to `authenticated` — which is what a host's gate reads.
+    // Without this the whole sign-in surface answers 401 before a handler runs,
+    // while the two account routes work: a package nobody can sign in to,
+    // mounting cleanly. The Hono adapter never noticed because it asks
+    // `route.session` itself; only the wire view has to say it.
+    const credentials = {} as Parameters<typeof createApiEmailAuth>[0]["credentials"];
+    const kinds = new Map(
+      createApiEmailAuth({ credentials, messages: {} as never }).routes.map((route) => [
+        `${route.method} ${route.path}`,
+        route.kind,
+      ]),
+    );
+
+    expect(kinds.get("POST /signup")).toBe("public");
+    expect(kinds.get("POST /forgot-password")).toBe("public");
+    expect(kinds.get("POST /reset-password")).toBe("public");
+    expect([...kinds.values()].filter((kind) => kind === "authenticated")).toHaveLength(2);
+  });
+
+  it("marks BOTH platform verbs authenticated — an operator switch has a caller", () => {
+    const store = { read: vi.fn(), write: vi.fn() };
+
+    createApiEmailAuthSettings({ store }).routes.forEach((route) => {
+      expect(route.kind).toBe("authenticated");
+    });
+  });
+
   it("contributes both platform verbs", () => {
     const store = { read: vi.fn(), write: vi.fn() };
     const wire = createApiEmailAuthSettings({ store }).routes.map((r) => r.method);
