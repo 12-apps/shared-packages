@@ -133,12 +133,22 @@ export function createFormats({ locale, currency, timeZone }: FormatOptions): Fo
     },
 
     parseDecimal: (typed) => {
-      const normalized = typed.trim().split(group).join('').replace(decimal, '.');
+      // `replaceAll`, not `replace`. A well-formed number has one decimal
+      // separator, so the two agree on every input a form is supposed to
+      // produce — but `replace` with a string argument rewrites only the FIRST
+      // match, which means "1,2,3" would normalize to "1.2,3" and read as the
+      // number 1.2 rather than as nonsense. Rejecting malformed input is the
+      // whole job of returning `null`, and a partial rewrite is how a parser
+      // accidentally accepts half of it.
+      const normalized = typed.trim().split(group).join('').replaceAll(decimal, '.');
       if (normalized === '') return null;
       const parsed = Number(normalized);
       return Number.isFinite(parsed) ? parsed : null;
     },
 
-    toInput: (value) => String(value).replace('.', decimal),
+    // `replaceAll` for the same reason as above, though `String(number)` can
+    // only ever hold one `.`: the two spellings differ on nothing here, and the
+    // one that is right for every input is the one worth writing.
+    toInput: (value) => String(value).replaceAll('.', decimal),
   };
 }

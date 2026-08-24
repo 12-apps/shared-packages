@@ -79,3 +79,12 @@ describe('what the operator typed', () => {
     expect(enUS().decimalSeparator).toBe('.');
   });
 });
+
+describe('a malformed number', () => {
+  it('is rejected rather than half-read', () => {
+    // `replace` (first match only) would normalize "1,2,3" to "1.2,3" and read
+    // it as 1.2 — accepting half of an input that means nothing.
+    expect(ptBR().parseDecimal('1,2,3')).toBeNull();
+    expect(enUS().parseDecimal('1.2.3')).toBeNull();
+  });
+});
