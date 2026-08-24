@@ -65,5 +65,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_JOB_STATUS: ${{ job.status }}
-          RELEASE_ALERT_WEBHOOK: ${{ secrets.RELEASE_ALERT_WEBHOOK }}
+          # The SAME fallback chain cd.yml uses, and it has to be the same one.
+          # This workflow and the Release job run the identical script for the
+          # identical purpose; if they read different secret names, the channel
+          # that works is whichever the repo happened to configure. cd.yml
+          # gained the fallback and this did not, so with SLACK_WEBHOOK_URL set
+          # and RELEASE_ALERT_WEBHOOK unset, a stuck package reported to Slack
+          # from a merge and to nobody from the watchdog.
+          #
+          # That is the worst place for the two to disagree. This is the check
+          # that still fires when the Release job cannot run at all — the last
+          # resort — so it is the one that must never be the silent one.
+          RELEASE_ALERT_WEBHOOK: ${{ secrets.RELEASE_ALERT_WEBHOOK || secrets.SLACK_WEBHOOK_URL || secrets.SLACK_DEPLOY_WEBHOOK_URL }}
         run: node scripts/release-alert.mjs
