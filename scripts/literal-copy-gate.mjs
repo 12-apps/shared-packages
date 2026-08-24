@@ -72,6 +72,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+import { checkLedger, readLedger, summarize } from "./lib/exception-ledger.mjs";
 import { inScope } from "./lib/shipped-source.mjs";
 import { stripComments } from "./copy-portability-gate.mjs";
 
@@ -214,11 +215,6 @@ function scanRepo() {
   return new Set(keyed);
 }
 
-function readExceptions() {
-  if (!existsSync(EXCEPTIONS_PATH)) return {};
-  return JSON.parse(readFileSync(EXCEPTIONS_PATH, "utf8"));
-}
-
 function selftest() {
   const cases = [
     [findLiterals('<Button label="Publicar" />').length === 1, "a copy prop with a literal is a finding"],
@@ -249,32 +245,29 @@ function selftest() {
 function main() {
   if (!selftest()) process.exit(1);
   const findings = scanRepo();
-  const exceptions = readExceptions();
-  const failures = [];
-  for (const finding of findings) {
-    if (finding in exceptions) continue;
-    failures.push(
+  const ledger = readLedger(EXCEPTIONS_PATH, { existsSync, readFileSync });
+  const { failures, counts } = checkLedger({
+    findings,
+    ledger,
+    ledgerPath: EXCEPTIONS_PATH,
+    unlisted: (finding) =>
       `a word this package WROTE rather than asked for: ${finding} — user-facing copy is host ` +
-        `config with no default. Add the key to the package's copy contract and its pt-BR pack, ` +
-        `and read it here.`,
-    );
-  }
-  for (const finding of Object.keys(exceptions)) {
-    if (!findings.has(finding)) {
-      failures.push(
-        `stale exception: ${finding} is no longer a finding (fixed, moved or renamed) — delete its ` +
-          `line from ${EXCEPTIONS_PATH}`,
-      );
-    }
-  }
+      `config with no default. Add the key to the package's copy contract and its pt-BR pack, ` +
+      `and read it here.`,
+  });
   if (failures.length > 0) {
     console.error(`${LABEL} ${failures.length} violation(s):`);
     for (const failure of failures) console.error(`  ✗ ${failure}`);
     process.exit(1);
   }
   console.log(
-    `${LABEL} clean — ${findings.size} literal(s) in shipped .tsx, all ${findings.size} ` +
-      `grandfathered (shrink-only; the burn-down is each package's copy contract).`,
+    summarize({
+      label: LABEL,
+      total: findings.size,
+      noun: "literal(s) in shipped .tsx",
+      counts,
+      burndown: "the burn-down is each package's copy contract",
+    }),
   );
 }
 
