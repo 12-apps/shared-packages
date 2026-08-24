@@ -544,6 +544,14 @@
     "./pt-BR": {
       "types": "./dist/types/pt-BR.d.ts",
       "default": "./dist/pt-BR.js"
+    },
+    "./en-US": {
+      "types": "./dist/types/en-US.d.ts",
+      "default": "./dist/en-US.js"
+    },
+    "./locales": {
+      "types": "./dist/types/locales.d.ts",
+      "default": "./dist/locales.js"
     }
   },
   "typesVersions": {
@@ -620,6 +628,7 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/i18n": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@playwright/test": "^1.55.0",
     "@storybook/addon-docs": "^9.1.10",
