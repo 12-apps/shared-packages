@@ -6,6 +6,7 @@
 export type { ActivationContext } from './context';
 export type { ActivationCopy } from './copy';
 export { PT_BR_ACTIVATION_COPY } from './pt-BR';
+export { EN_US_ACTIVATION_COPY } from './en-US';
 export {
   ownsVerificationReference,
   parseVerificationReference,
