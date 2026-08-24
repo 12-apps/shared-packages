@@ -33,12 +33,16 @@ import { randomUUID } from 'node:crypto';
 
 import type { PGlite } from '@electric-sql/pglite';
 import { createShiftService, ShiftError } from '@12-apps/shift';
-import { createApiShift, type ShiftApi, type ShiftHttpPort } from '@12-apps/shift/http';
+import type { ShiftHttpPort } from '@12-apps/shift/http';
+import { shiftManifest } from '@12-apps/shift/manifest';
+import { shiftServerManifest } from '@12-apps/shift/manifest/server';
+import type { BoundJob, MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 import type { Shift, ShiftResource } from '@12-apps/shift/types';
 
 import { applyShiftMigrations, createShiftHostTables, shiftDb } from './shift-db';
 import { Params, type SqlRunner } from './shift-rows';
-import { honoRouterFor } from './wire-hono';
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /**
  * This host's staff structure — a library's, not a restaurant's.
@@ -113,6 +117,7 @@ export async function createShiftHostSchema(pg: PGlite): Promise<void> {
 
 /** Back to the seeded catalog, with no shift and no claim outstanding. */
 export async function reseedShifts(pg: PGlite): Promise<void> {
+  shiftSweep.reset();
   // A plain DELETE, and it is worth saying why it works: the package's
   // immutability trigger is UPDATE-only since FUT-446. `client_id` is a
   // by-value tenant reference with no foreign key — that is what keeps the
@@ -188,12 +193,62 @@ async function deskFromBody(
 
 export type HarnessShift = ReturnType<typeof shiftHost>;
 
-export function shiftHost(pg: PGlite): ShiftApi & {
+/**
+ * The cross-tenant sweep's HOST half: how long a shift of each branch may run,
+ * and at which moment overdue is measured.
+ *
+ * The blueprint's dep takes NO arguments — it owns the cadence, the lease and
+ * the reporting, and says so: "the host binds only what is genuinely its own:
+ * the service instance and the per-tenant duration policy, closed over into one
+ * dep." This is that policy, in a container a suite can set, because "how long
+ * may a shift run here" is a fact about a deployment that no endpoint exposes.
+ */
+export const shiftSweep = {
+  /** Per TENANT: a cross-tenant sweep asks each branch about its own shifts. */
+  maxDurationMsForTenant: (async () => 16 * 60 * 60 * 1000) as (
+    clientId: string,
+  ) => Promise<number>,
+  /** `null` = now. A suite derives one from a row so the case is data-decided. */
+  detectedAt: null as Date | null,
+  reset(): void {
+    shiftSweep.maxDurationMsForTenant = async () => 16 * 60 * 60 * 1000;
+    shiftSweep.detectedAt = null;
+  },
+};
+
+export interface ShiftWiring {
   /** The three routes, served over Hono by the host's own one bridge. */
   router: ReturnType<typeof honoRouterFor>;
   /** The service itself, for the sweep case — no route drives auto-close. */
   service: ReturnType<typeof createShiftService<typeof SHIFT_KINDS>>;
-} {
+  /** The consumer's account of what was bound, declined or left over. */
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+  /** The package's OWN blueprints, bound to this host's deps. */
+  jobs: readonly BoundJob[];
+}
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer`.
+ *
+ * `@12-apps/shift` declares `http`, `jobs`, `db` and a MANDATORY
+ * `observability` namespace whose reason it states in one line — "a sweep that
+ * fails files under `shift`, not nowhere." A host calling `createApiShift`
+ * directly gets none of that: the factory takes no logger, so the binder is the
+ * only thing that can supply one.
+ *
+ * The `jobs` half is the sharper half here. The package moved the sweep's
+ * cadence, its lease ttl and its reporting INTO the blueprint precisely because
+ * "every one of those numbers is a claim about THIS package's domain", and the
+ * origin host had been restating them in its own `defineJob`. A harness that
+ * drives `service.autoCloseOverdue` by hand — which is what this one did —
+ * repeats that mistake in the one place that exists to catch it.
+ *
+ * It also carries the first `lease` field the contract shipped, and the
+ * package's instruction for a host that cannot honour one is explicit: decline
+ * the jobs binding rather than run the sweep unfenced. This host binds it.
+ */
+export function shiftHost(pg: PGlite): ShiftWiring {
   const db = shiftDb(pg);
   const service = createShiftService(db, { kinds: SHIFT_KINDS, createId: randomUUID });
 
@@ -220,33 +275,56 @@ export function shiftHost(pg: PGlite): ShiftApi & {
     list: (input) => service.listShifts(input),
   };
 
-  const api = createApiShift({
-    shifts: port,
-    serialize: serializeShift,
-    resources: { fromBody: (body, actor) => deskFromBody(pg, body, actor) },
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The port behind the mandatory namespace above.
+    ports: { loggerFor: harnessLoggerFor },
   });
 
-  return {
-    ...api,
-    service,
-    // `ShiftRoute` is a structural twin of the wiring contract's
-    // `WireRoute`, which the package states outright — so the host's ONE
-    // bridge serves these three the same way it serves every assembled
-    // surface, and this adoption needs no shift-shaped adapter of its own.
-    // Wrapping each descriptor as a `MountedRoute` is the whole translation.
-    router: honoRouterFor(
-      api.routes.map((route) => ({ route }) as never),
-      (c) => {
-        // No header means NO CALLER, so the actor is null and the bridge
-        // answers 401 before any handler runs — what a real host's missing
-        // session does. Returning an actor with an empty userId instead would
-        // reach `open`, and the package would dutifully record a shift for the
-        // person named ''.
-        const userId = c.req.header(SHIFT_USER_HEADER);
-        if (!userId) return null;
-        return { clientId: c.req.param('tenantSlug') ?? SHIFT_TENANT_ID, userId };
+  host.adoptServer({
+    manifest: shiftManifest,
+    server: shiftServerManifest,
+    bindings: {
+      http: {
+        mountPath: SHIFT_MOUNT_PATH,
+        config: {
+          shifts: port,
+          serialize: serializeShift,
+          resources: { fromBody: (body: unknown, actor: unknown) => deskFromBody(pg, body, actor) },
+        },
       },
-    ),
+      jobs: {
+        deps: {
+          autoCloseOverdue: () =>
+            service.autoCloseOverdue({
+              maxDurationMsForTenant: shiftSweep.maxDurationMsForTenant,
+              ...(shiftSweep.detectedAt === null ? {} : { detectedAt: shiftSweep.detectedAt }),
+            }),
+        },
+      },
+    },
+  });
+
+  const wired = host.assemble();
+
+  return {
+    service,
+    report: wired.report,
+    routes: wired.routes,
+    jobs: wired.jobs,
+    // `ShiftRoute` is a structural twin of the wiring contract's `WireRoute`,
+    // which the package states outright — so the host's ONE bridge serves these
+    // three the same way it serves every assembled surface.
+    router: honoRouterFor(wired.routes, (c) => {
+      // No header means NO CALLER, so the actor is null and the bridge answers
+      // 401 before any handler runs — what a real host's missing session does.
+      // Returning an actor with an empty userId instead would reach `open`, and
+      // the package would dutifully record a shift for the person named ''.
+      const userId = c.req.header(SHIFT_USER_HEADER);
+      if (!userId) return null;
+      return { clientId: c.req.param('tenantSlug') ?? SHIFT_TENANT_ID, userId };
+    }),
   };
 }
 
