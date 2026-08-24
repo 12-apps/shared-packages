@@ -88,6 +88,38 @@ AES-GCM codec, the four path tables in this app's URLs, the roster, the trail
 (an array, where a real adopter has an append-only table) and the branch switch a
 spec flips to prove a live revocation.
 
+## The words a HOST page has (`@12-apps/i18n`)
+
+A package that renders a sentence declares it as a typed interface with no
+defaults and ships a named pack per language; a host passes a pack and never
+authors loose strings. Every page here follows that —
+`PT_BR_RESEARCH_MESSAGES`, `PT_BR_RBAC_WEB_COPY`, `PT_BR_WEB_STORAGE_MESSAGES`
+— because the package under test supplies the words.
+
+**The observability page is the exception, and the reason is the interesting
+one:** `@12-apps/observability-frontend` ships no copy, and correctly. It
+renders nothing — it attaches to three error funnels and sends events — so
+there is no screen in it to have words. That makes the words on its page the
+HOST's, which is precisely the case the copy-portability doctrine is about: a
+host that hardcodes them has frozen one language into a page and cannot be
+told, because a single-locale app cannot tell the difference.
+
+So `pages/observability-copy.ts` states them the way a package would, in two
+locales, and `main.tsx` puts the locale in scope with one reviewable line —
+`useLocale` THROWS outside a provider rather than assuming a default, which is
+`@12-apps/i18n`'s own argument that "a language reached by saying nothing is
+the one that ships to the wrong audience unnoticed."
+
+Two locales rather than one, deliberately: a pack with a single entry is a
+hardcoded string with extra steps, and a switch nothing exercises proves no
+axis exists. `?locale=en-US` on any page hash flips it, and the spec asserts
+the page came back in the other language.
+
+Host copy that is harness SCAFFOLDING — a section heading, an error
+placeholder, the label on a gated demo div — stays in English instead, by this
+repo's own rule that everything a developer reads is English. The distinction
+is whether a person outside this repo would ever read the string.
+
 ## The error-reporting page (`observability`)
 
 The one page whose package the page does not mount. `startObservability` runs in

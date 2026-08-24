@@ -1,5 +1,6 @@
 import { useState, type JSX } from 'react';
 
+import { useLocaleCopy } from '@12-apps/i18n/react';
 import {
   reportRouteCrash,
   reportWarning,
@@ -8,6 +9,8 @@ import {
 import { Button } from '@12-apps/ui/form/Button';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
+
+import { OBSERVABILITY_COPY, type ObservabilityCopy } from './observability-copy';
 
 /**
  * The three funnels `@12-apps/observability-frontend` attaches to, plus the two
@@ -46,13 +49,19 @@ import { Text } from '@12-apps/ui/typography/Text';
  * retry. The button below stands in for that boundary.
  */
 
+/** What every button group takes: the callback, and the words. */
+interface ButtonsProps {
+  onAct: (note: string) => void;
+  t: ObservabilityCopy;
+}
+
 /** Named so `main.tsx`'s `isStaleChunk` classifier recognises it, as a host's would. */
 class HarnessChunkError extends Error {
   override name = 'HarnessChunkError';
 }
 
 /** The three funnels the package attaches to — nothing here calls it by name. */
-function CrashButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element {
+function CrashButtons({ onAct, t }: ButtonsProps): JSX.Element {
   return (
     <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
       <Button
@@ -67,7 +76,7 @@ function CrashButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element
           onAct('uncaught');
         }}
       >
-        Erro não capturado
+        {t.uncaught}
       </Button>
 
       <Button
@@ -77,7 +86,7 @@ function CrashButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element
           onAct('rejection');
         }}
       >
-        Promessa rejeitada
+        {t.rejection}
       </Button>
 
       <Button
@@ -87,14 +96,14 @@ function CrashButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element
           reportRouteCrash(new Error('harness boundary boom'), '\n    at HarnessPage');
         }}
       >
-        Falha de página
+        {t.boundary}
       </Button>
     </Stack>
   );
 }
 
 /** One report that is not a crash, and the three the noise filter must drop. */
-function NoiseButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element {
+function NoiseButtons({ onAct, t }: ButtonsProps): JSX.Element {
   return (
     <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
       <Button
@@ -111,7 +120,7 @@ function NoiseButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element
           });
         }}
       >
-        Aviso sem quebra
+        {t.warning}
       </Button>
 
       <Button
@@ -123,7 +132,7 @@ function NoiseButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element
           onAct('noise');
         }}
       >
-        Ruído do navegador
+        {t.noise}
       </Button>
 
       <Button
@@ -138,7 +147,7 @@ function NoiseButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element
           onAct('stale-chunk');
         }}
       >
-        Chunk morto
+        {t.staleChunk}
       </Button>
 
       <Button
@@ -150,14 +159,14 @@ function NoiseButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element
           onAct('ignorable');
         }}
       >
-        Resposta 4xx
+        {t.ignorable}
       </Button>
     </Stack>
   );
 }
 
 /** Who is reporting — two INDEPENDENT writers, which is the point. */
-function ContextButtons({ onAct }: { onAct: (note: string) => void }): JSX.Element {
+function ContextButtons({ onAct, t }: ButtonsProps): JSX.Element {
   return (
     <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
       <Button
@@ -169,7 +178,7 @@ function ContextButtons({ onAct }: { onAct: (note: string) => void }): JSX.Eleme
           setObservabilityContext({ tenant: 'ferragens-norte', role: 'OWNER' });
         }}
       >
-        Identificar a loja
+        {t.identify}
       </Button>
 
       <Button
@@ -182,7 +191,7 @@ function ContextButtons({ onAct }: { onAct: (note: string) => void }): JSX.Eleme
           setObservabilityContext({ impersonating: true, impersonatedStore: 'padaria-sul' });
         }}
       >
-        Entrar como outra loja
+        {t.impersonate}
       </Button>
     </Stack>
   );
@@ -190,15 +199,20 @@ function ContextButtons({ onAct }: { onAct: (note: string) => void }): JSX.Eleme
 
 export function ObservabilityPage(): JSX.Element {
   const [note, setNote] = useState('');
+  // The locale in scope, resolved where the sentence is USED. Binding it at
+  // module load would re-freeze the language into the page, which is the exact
+  // thing the axis exists to undo — and it would do so invisibly, because a
+  // single-locale host cannot tell the difference.
+  const t = useLocaleCopy(OBSERVABILITY_COPY);
 
   return (
     <Stack spacing={2} data-testid="observability-page">
-      <Text variant="heading" as="h2" size="md">
-        Relato de erros do navegador
+      <Text variant="heading" as="h2" size="md" data-testid="obs-title">
+        {t.title}
       </Text>
-      <CrashButtons onAct={setNote} />
-      <NoiseButtons onAct={setNote} />
-      <ContextButtons onAct={setNote} />
+      <CrashButtons onAct={setNote} t={t} />
+      <NoiseButtons onAct={setNote} t={t} />
+      <ContextButtons onAct={setNote} t={t} />
       <Text variant="body" as="p" data-testid="obs-last-action">
         {note}
       </Text>

@@ -41,7 +41,7 @@ const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
 
 /** A host page that exists only behind the plan gate. */
 function JuryArea(): JSX.Element {
-  return <div data-testid="jury-area">Sala de júri da mostra</div>;
+  return <div data-testid="jury-area">Jury room</div>;
 }
 
 const GatedJuryArea = withEntitlement('jury.deliberation', JuryArea);
@@ -73,7 +73,7 @@ export function EntitlementsPlanPage(): JSX.Element {
     };
   }, []);
 
-  if (failed) return <p data-testid="entitlements-error">snapshot indisponível</p>;
+  if (failed) return <p data-testid="entitlements-error">snapshot unavailable</p>;
   if (snapshot === null) return <p data-testid="entitlements-loading">carregando…</p>;
 
   return (
