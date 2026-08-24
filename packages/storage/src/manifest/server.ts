@@ -57,11 +57,20 @@ function asWireRoute(route: StorageRoute): {
   method: StorageRoute['method'];
   path: string;
   kind: 'authenticated' | 'public';
+  wildcardParam?: string;
   handle(request: WireRequest): Promise<WireRouteAnswer>;
 } {
   return {
     method: route.method,
     path: route.path,
+    // Forwarded, and it has to be: the serve route's key is FOUR segments
+    // (`products/<scope>/<uuid>/card-320.webp`), so an adapter that registers
+    // only `path` answers the prefix and 404s every real object. `./hono`
+    // spells the Hono form from this name; the contract carries the name so any
+    // other adapter can spell its own. Dropping it here is what made this
+    // package unmountable through a consumer at all — silently, because the
+    // upload route worked and only reads 404'd.
+    ...(route.wildcardParam === undefined ? {} : { wildcardParam: route.wildcardParam }),
     // The descriptor's own `auth` flag IS the contract's route kind: a
     // `public` object read is anonymous by design, and the host's gates read
     // this rather than a second table that could disagree with it.

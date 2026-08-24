@@ -25,6 +25,27 @@ import type { Context } from 'hono';
 
 import type { MountedRoute, WireResponse } from '@12-apps/wiring';
 
+/**
+ * The route's path in HONO's syntax.
+ *
+ * `wildcardParam` names the trailing parameter that swallows the rest of the
+ * path; the contract carries the NAME because `:key{.+}` is Hono's spelling and
+ * `*key` is Express's, and a package writing either would have chosen its
+ * host's framework. Composing it here is the adapter's half of that bargain.
+ *
+ * `:key{.+}` and not `*`: the whole remainder is ONE parameter, which is what
+ * makes a nested key (`products/<scope>/<uuid>/card-320.webp`) arrive intact
+ * instead of as a path Hono has already split.
+ *
+ * An adapter that ignores this does not fail loudly — it registers the prefix,
+ * and every request carrying a deeper key 404s while the sibling routes keep
+ * working. That is exactly how it hid.
+ */
+function honoPath(route: MountedRoute['route']): string {
+  const wildcard = (route as { wildcardParam?: string }).wildcardParam;
+  return wildcard === undefined ? route.path : `${route.path}/:${wildcard}{.+}`;
+}
+
 /** Resolve the caller; `null` answers 401 before any handler runs. */
 export type ResolveWireActor = (c: Context) => Promise<unknown> | unknown;
 
@@ -67,7 +88,7 @@ export function honoRouterFor(
 ): Hono {
   const app = new Hono();
   routes.forEach((mounted) => {
-    app.on(mounted.route.method, mounted.route.path, async (c) => {
+    app.on(mounted.route.method, honoPath(mounted.route), async (c) => {
       const actor = await resolveActor(c);
       if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
       const response = await mounted.route.handle({
