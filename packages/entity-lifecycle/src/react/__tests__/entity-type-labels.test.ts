@@ -28,12 +28,21 @@ const REACT_SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 describe('entity-type labels', () => {
   it('exports no label catalog of its own', () => {
     // Read off the public entry rather than asserting one name is gone: a
-    // catalog reintroduced under any other name fails this too. The one
-    // sanctioned string-carrying export is the NAMED pt-BR copy pack — its
-    // name says which language it is, and a host passes it by hand, which is
-    // the opposite of the silent default this test forbids.
+    // catalog reintroduced under any other name fails this too. The sanctioned
+    // string-carrying exports are the NAMED locale packs — a name that says
+    // which language it is, passed by hand, which is the opposite of the silent
+    // default this test forbids.
+    //
+    // The filter was `PT_BR_` while that was the only language. It is now the
+    // SHAPE of a language tag, and that widening is the narrowest one that
+    // admits `EN_US_LIFECYCLE_WEB_COPY` while keeping the property intact: the
+    // test still fails for a catalog exported under any name that does not
+    // declare a language, which is the whole of what it defends. Naming each
+    // tag instead would mean this assertion silently stops covering the third
+    // language the day one is added.
+    const NAMED_LOCALE_PACK = /^[A-Z]{2}_[A-Z]{2}_/;
     const exported = Object.entries(reactEntry as Record<string, unknown>).filter(
-      ([name]) => !name.startsWith('PT_BR_'),
+      ([name]) => !NAMED_LOCALE_PACK.test(name),
     );
     const catalogs = exported.filter(
       ([, value]) =>
