@@ -23,10 +23,12 @@ name: Slack Notify
 # thinks to open the Actions tab.
 #
 # Posting is plain `curl` rather than slackapi/slack-github-action: a webhook
-# URL is a credential, and handing one to a mutable third-party tag is what
-# 12-apps/future-pay's mailer pins a full commit SHA to avoid. A single POST of
-# a one-field JSON body needs no action, so there is no SHA to pin and no bump
-# to remember — the same reason release-alert.mjs uses a plain `fetch`.
+# URL is a credential — anyone holding it can post to the channel — and handing
+# one to a mutable third-party tag is exactly what pinning an action to a full
+# commit SHA exists to avoid, since a retargeted tag would hand it to code
+# nobody here reviewed. A single POST of a one-field JSON body needs no action
+# at all, so there is no SHA to pin and no bump to remember — the same reason
+# release-alert.mjs reaches its webhook with a plain `fetch`.
 #
 # The webhook is the org secret SLACK_WEBHOOK_URL, falling back to
 # SLACK_DEPLOY_WEBHOOK_URL — the one that exists on 12-apps today. Both are org
