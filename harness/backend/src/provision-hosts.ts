@@ -37,6 +37,9 @@ import { applyOnboardingMigrations, onboardingHost } from './onboarding-host';
 import { pwaHost } from './pwa-host';
 import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
+import { paymentsHost } from './payments-host';
+import { applyPaymentsMigrations } from './payments-stores';
+import { createPrismaClient } from './prisma';
 import { applyRealtimeMigrations } from './realtime-db';
 import { realtimeHost } from './realtime-host';
 import { provisionResearch, researchHost } from './research-host';
@@ -109,7 +112,13 @@ async function provisionStored(pg: PGlite) {
   // host is the two tables its reference probes read (storage-host.ts) and a
   // directory to keep objects in.
   const storage = await createStorageHost(pg);
-  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage };
+  // @12-apps/payments-backend is the one surface here built on the GENERATED
+  // client rather than on hand-written SQL: the package ships Prisma stores,
+  // and a consumer that re-wrote them would be testing its own SQL. See
+  // `payments-stores.ts`.
+  await applyPaymentsMigrations(pg);
+  const payments = paymentsHost(await createPrismaClient(pg));
+  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments };
 }
 
 export async function provisionHosts(pg: PGlite): Promise<Hosts> {
@@ -157,5 +166,6 @@ export interface Hosts {
   impersonation: ReturnType<typeof impersonationHost>;
   appShell: ReturnType<typeof appShellHost>;
   storage: Awaited<ReturnType<typeof createStorageHost>>;
+  payments: ReturnType<typeof paymentsHost>;
 }
 
