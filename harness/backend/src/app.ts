@@ -150,6 +150,10 @@ export interface HarnessBackend {
    * the vault sessions live in.
    */
   billing: Hosts['billing'];
+  /** Its wiring report, and the guards that stay a library beside the routes. */
+  rbac: Hosts['rbac'];
+  /** Its wiring report — an aggregate, not a route. */
+  notifications: Hosts['notifications'];
   /** Its wiring report — an aggregate, not a route. */
   onboarding: Hosts['onboarding'];
   /** Its wiring report and its BOUND job blueprints — neither has an endpoint. */
@@ -293,6 +297,8 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     realtimeDriver: hosts.realtimeDriver,
     shift: hosts.shift,
     billing: hosts.billing,
+    rbac: hosts.rbac,
+    notifications: hosts.notifications,
     onboarding: hosts.onboarding,
     research: hosts.research,
     entitlements: hosts.entitlements,

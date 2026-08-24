@@ -4,7 +4,10 @@
    same app the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
+import { RBAC_MOUNT_PATH } from '../src/rbac-host';
 import { RBAC_TENANT_B_ID, RBAC_TENANT_ID } from '../src/rbac-host';
 
 /**
@@ -369,5 +372,54 @@ describe('team — the roster over the directory seam', () => {
 
     const stranger = await owner.get('/team/nobody');
     expect(stranger.status).toBe(404);
+  });
+});
+
+describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.rbac.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    expect(statuses.get('observability')).toBe('bound');
+    expect(statuses.get('db')).toBe('collected');
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('collects the permission ids this host composes back into its catalog', () => {
+    // The first adoption where a COLLECTED capability is something the host
+    // actually consumes: the package contributes ids, and `rbac-catalog.ts`
+    // composes them with two other owners' into the one catalog passed back as
+    // config. Without the report a host could ship a catalog missing the
+    // package's own ids and nothing would ask.
+    const contributed = backend.rbac.report.packages[0]?.capabilities.find(
+      (e) => e.kind === 'permissions',
+    );
+
+    expect(contributed?.status).toBe('collected');
+  });
+
+  it('keeps the guards reachable beside the routes, not rebuilt', () => {
+    // The manifest is explicit that `engine`, `governance`, the stores and
+    // `seedTenantRoles` stay a library: "this surface is the one every OTHER
+    // host surface asks permission from, so the capability being mounted does
+    // not make the guards stop being a library." Two engines over one database
+    // is two answers to "may they".
+    expect(typeof backend.rbac.engine).toBe('object');
+    expect(typeof backend.rbac.seedTenantRoles).toBe('function');
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.rbac;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} ${RBAC_MOUNT_PATH}${mounted.route.path}`);
+
+    expect(unclaimedRoutes(routes, allButOne)).toHaveLength(1);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.rbac.report)).toContain(RBAC_MOUNT_PATH);
   });
 });
