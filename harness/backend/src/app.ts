@@ -69,9 +69,6 @@ import { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
 import {
-  entitlementDenialResponse,
-  isEntitlementDenial,
-  PT_BR_ENTITLEMENTS_MESSAGES,
 } from '@12-apps/entitlements/server';
 import {
   createInlineRealtimeDriver,
@@ -86,7 +83,7 @@ import { applyAuditMigrations } from './audit-db';
 import { auditHost, reseedAudit } from './audit-host';
 import { applyAuthMigrations, reseedAuth } from './auth-db';
 import { authHost } from './auth-host';
-import { createEntitlementsHost, TENANT } from './entitlements-host';
+import { createEntitlementsHost, mountEntitlementDemo } from './entitlements-host';
 import { impersonationHost, mountImpersonationDemo } from './impersonation-host';
 import { mcpProbeRouter } from './harness-mcp-probe';
 import { applyLifecycleMigrations } from './lifecycle-db';
@@ -108,6 +105,7 @@ import { mountSurfaces } from './mount-surfaces';
 import { applyDiscountMigrations } from './discounts-db';
 import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
 import { provisionShift, reseedShifts, shiftHost } from './shift-host';
+import { mountRequestScope, requestScopeProbes } from './request-scope-host';
 import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
@@ -280,25 +278,6 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
 }
 
 /**
- * A HOST endpoint standing behind the package's guard — the arrangement every
- * gated host route has. What it proves is the denial WIRE: the free tenant answers
- * 402 here with the body the react half's 402 interceptor parses into an upsell
- * prompt.
- */
-function mountEntitlementDemo(app: Hono, hosts: Hosts): void {
-  app.get('/api/admin/:tenantSlug/jury-demo', async (c) => {
-    try {
-      await hosts.entitlements.requireEntitlement(TENANT, 'jury.deliberation');
-      return c.json({ entries: [] });
-    } catch (error) {
-      if (!isEntitlementDenial(error)) throw error;
-      const denial = entitlementDenialResponse(error, PT_BR_ENTITLEMENTS_MESSAGES);
-      return c.json(denial.body, denial.status as 402);
-    }
-  });
-}
-
-/**
  * The suite's realtime controls — the stand-in for a domain mutation's publisher.
  *
  * Deliberately under `/__harness` rather than `/api`: nothing may mistake them for part of
@@ -357,6 +336,11 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // mount below. A host puts it here rather than in front of the audit routes
   // alone: the stamp is what the writer and the created_by/updated_by extension
   // read, so every surface's writes need it in scope.
+  // FIRST of all: the ambient request scope (@12-apps/request-scope). Every
+  // middleware below it may read a cookie or a header, and both accessors throw
+  // outside a scope — so opening it anywhere later would make the order of the
+  // mounts a correctness question instead of a preference.
+  mountRequestScope(app);
   app.use('*', hosts.audit.actorContext);
 
   // Liveness, and what Playwright's `webServer` waits on before starting the
@@ -366,6 +350,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // The impersonation write gate (12-24), in front of EVERY api route and
   // before any body is read — where a host puts it.
   app.use('/api/*', hosts.impersonation.writeGate);
+  app.route('/__harness/scope', requestScopeProbes());
   mountReset(app, pg, hosts);
   mountRealtimeControls(app, pg, hosts);
   mountAppShellControls(app, hosts.appShell);
@@ -377,7 +362,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
   // The suite's own window onto what the authorization server wrote, and its
   // one-endpoint resource server (harness-mcp-probe.ts). Hashes and flags only.
   app.route('/', mcpProbeRouter(pg, hosts.mcpOauth));
-  mountEntitlementDemo(app, hosts);
+  mountEntitlementDemo(app, hosts.entitlements);
   // The host endpoints that stand BEHIND the gate above.
   mountImpersonationDemo(app, hosts.impersonation);
 
