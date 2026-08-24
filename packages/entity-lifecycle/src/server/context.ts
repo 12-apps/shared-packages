@@ -43,6 +43,16 @@ export interface LifecycleRequest {
   params: Record<string, string | undefined>;
   query: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** What a handler answers with; the host maps this onto its response type. */
@@ -104,9 +114,42 @@ export interface LifecycleMessages {
   unauthenticated: string;
 }
 
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type LifecycleCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type LifecycleCopySource<T> = T | LifecycleCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED, never where the surface is built: a
+ * factory that resolves once and stores the result has re-frozen the language
+ * into its mount, and a single-locale host cannot tell the difference. The
+ * route wrappers in `routes-shared.ts` and `routes-entity.ts` are the only two
+ * callers, which is what keeps every helper below them on a plain value.
+ */
+export function resolveLifecycleCopy<T>(
+  source: LifecycleCopySource<T>,
+  locale: string | undefined,
+): T {
+  return typeof source === 'function'
+    ? (source as LifecycleCopyResolver<T>)({ locale })
+    : source;
+}
+
 /** The messages in force — REQUIRED host config; pt-BR ships as `./pt-BR`. */
-export function messagesOf(config: { messages: LifecycleMessages }): LifecycleMessages {
-  return config.messages;
+export function messagesOf(
+  config: { messages: LifecycleCopySource<LifecycleMessages> },
+  locale?: string,
+): LifecycleMessages {
+  return resolveLifecycleCopy(config.messages, locale);
 }
 
 /** A user-safe API error carrying the HTTP status the wire promises. */

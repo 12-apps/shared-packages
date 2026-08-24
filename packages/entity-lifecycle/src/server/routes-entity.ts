@@ -35,8 +35,10 @@ import {
   resolveActorNames,
   writeResponse,
   LifecycleApiError,
+  resolveLifecycleCopy,
   type LifecycleActor,
   type LifecycleMessages,
+  type LifecycleCopySource,
   type LifecycleRequest,
   type LifecycleResponse,
   type LifecycleRoute,
@@ -46,6 +48,7 @@ import {
 import type { LifecycleEntityRegistration } from './registration';
 import type { VersionComparisonWire, VersionsWire } from '../wire';
 
+/** What a HANDLER sees: this request's words, already chosen. */
 interface EntityRouteDeps {
   registration: LifecycleEntityRegistration;
   lifecycle: EntityLifecycle;
@@ -53,18 +56,39 @@ interface EntityRouteDeps {
   messages: LifecycleMessages;
 }
 
-/** Wrap a handler so thrown {@link LifecycleApiError}s become responses. */
+/**
+ * What a BUILDER sees: the copy still as a source, because these routes are
+ * built once per process and the reader changes per call.
+ */
+type EntityRouteConfig = Omit<EntityRouteDeps, 'messages'> & {
+  messages: LifecycleCopySource<LifecycleMessages>;
+};
+
+/**
+ * Wrap a handler so thrown {@link LifecycleApiError}s become responses, and so
+ * it receives the copy for THIS caller.
+ *
+ * Resolving here is what makes the surface follow a reader: every helper below
+ * still takes a plain `LifecycleMessages`, so nothing under this line had to
+ * learn about locales — but none of them can be reached with the language the
+ * process happened to boot with. `registration` and `lifecycle` stay bound at
+ * BUILD time, correctly: neither varies per caller.
+ */
 function route(
+  config: EntityRouteConfig,
   method: LifecycleRoute['method'],
   path: string,
-  handler: (request: LifecycleRequest) => Promise<LifecycleResponse>,
+  handler: (request: LifecycleRequest, deps: EntityRouteDeps) => Promise<LifecycleResponse>,
 ): LifecycleRoute {
   return {
     method,
     path,
     async handle(request) {
       try {
-        return await handler(request);
+        return await handler(request, {
+          ...config,
+          messages: resolveLifecycleCopy(config.messages, request.locale),
+        });
       } catch (error) {
         return foldApiError(error);
       }
@@ -150,13 +174,13 @@ function comparisonJson(
  * the fields a version touched, but a version row stores only the new values,
  * so "what did it say before" needs the chain replayed.
  */
-function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
-  const { registration, lifecycle, directory, messages } = deps;
-  return route('GET', `/${registration.slug}/:id/versions`, async ({ actor, params, query }) => {
-    const id = requireParam(params, 'id', messages);
-    const compare = requestedComparison(query, messages);
+function versionsRoute(config: EntityRouteConfig): LifecycleRoute {
+  const { registration, lifecycle, directory } = config;
+  return route(config, 'GET', `/${registration.slug}/:id/versions`, async ({ actor, params, query }, deps) => {
+    const id = requireParam(params, 'id', deps.messages);
+    const compare = requestedComparison(query, deps.messages);
     const ctx = await ctxOf(deps, actor);
-    const history = await foldLifecycle(messages, () => lifecycle.history(ctx, id));
+    const history = await foldLifecycle(deps.messages, () => lifecycle.history(ctx, id));
     const names = await resolveActorNames(directory, history.map((row) => row.actorId));
     // A host that mirrors a published-version column is the authority on it —
     // including `null` (the entity is archived/gone), which the origin host's
@@ -171,7 +195,7 @@ function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
     const comparison =
       compare === null
         ? null
-        : await foldLifecycle(messages, () =>
+        : await foldLifecycle(deps.messages, () =>
             lifecycle.compareVersion(ctx, id, compare, { currentVersion: publishedVersion }),
           );
     const payload: VersionsWire = {
@@ -200,21 +224,22 @@ function versionsRoute(deps: EntityRouteDeps): LifecycleRoute {
  * immediately and records a RESTORE version — or, when approvals are active
  * and the actor cannot approve, parks the restore as a change request (202).
  */
-function restoreRoute(deps: EntityRouteDeps): LifecycleRoute {
-  const { registration, lifecycle, messages } = deps;
+function restoreRoute(config: EntityRouteConfig): LifecycleRoute {
+  const { registration, lifecycle } = config;
   return route(
+    config,
     'POST',
     `/${registration.slug}/:id/versions/:version/restore`,
-    async ({ actor, params }) => {
-      const id = requireParam(params, 'id', messages);
+    async ({ actor, params }, deps) => {
+      const id = requireParam(params, 'id', deps.messages);
       // Strict digits only — `parseInt` would accept "1.5"/"1abc" and
       // silently restore v1; the origin host's zod coercion answers 400.
-      const raw = requireParam(params, 'version', messages);
-      if (!/^[0-9]+$/.test(raw)) throw new LifecycleApiError(400, messages.invalidBody);
+      const raw = requireParam(params, 'version', deps.messages);
+      if (!/^[0-9]+$/.test(raw)) throw new LifecycleApiError(400, deps.messages.invalidBody);
       const version = Number.parseInt(raw, 10);
-      if (version < 1) throw new LifecycleApiError(400, messages.invalidBody);
+      if (version < 1) throw new LifecycleApiError(400, deps.messages.invalidBody);
       const ctx = await ctxOf(deps, actor);
-      const result = await foldLifecycle(messages, () =>
+      const result = await foldLifecycle(deps.messages, () =>
         lifecycle.restoreVersion(ctx, id, version),
       );
       return writeResponse(result);
@@ -228,20 +253,20 @@ function restoreRoute(deps: EntityRouteDeps): LifecycleRoute {
  * creates/updates it WITHOUT touching the live record. 403 when drafts are
  * off for the tenant.
  */
-function itemDraftRoutes(deps: EntityRouteDeps): LifecycleRoute[] {
-  const { registration, lifecycle, messages } = deps;
+function itemDraftRoutes(config: EntityRouteConfig): LifecycleRoute[] {
+  const { registration, lifecycle } = config;
   return [
-    route('GET', `/${registration.slug}/:id/draft`, async ({ actor, params }) => {
-      const id = requireParam(params, 'id', messages);
+    route(config, 'GET', `/${registration.slug}/:id/draft`, async ({ actor, params }, deps) => {
+      const id = requireParam(params, 'id', deps.messages);
       const ctx = await ctxOf(deps, actor);
-      const draft = await foldLifecycle(messages, () => lifecycle.openDraft(ctx, id));
+      const draft = await foldLifecycle(deps.messages, () => lifecycle.openDraft(ctx, id));
       return ok(draftJson(draft));
     }),
-    route('PUT', `/${registration.slug}/:id/draft`, async ({ actor, params, body }) => {
-      const id = requireParam(params, 'id', messages);
-      const data = parseSnapshotBody(body, messages);
+    route(config, 'PUT', `/${registration.slug}/:id/draft`, async ({ actor, params, body }, deps) => {
+      const id = requireParam(params, 'id', deps.messages);
+      const data = parseSnapshotBody(body, deps.messages);
       const ctx = await ctxOf(deps, actor);
-      const draft = await foldLifecycle(messages, () => lifecycle.saveDraft(ctx, id, data));
+      const draft = await foldLifecycle(deps.messages, () => lifecycle.saveDraft(ctx, id, data));
       return ok(draftJson(draft));
     }),
   ];
@@ -252,18 +277,18 @@ function itemDraftRoutes(deps: EntityRouteDeps): LifecycleRoute[] {
  * GET lists them (per-item drafts AND drafts of new, not-yet-created items);
  * POST starts a NEW-item draft (`entityId: null`).
  */
-function draftCollectionRoutes(deps: EntityRouteDeps): LifecycleRoute[] {
-  const { registration, lifecycle, messages } = deps;
+function draftCollectionRoutes(config: EntityRouteConfig): LifecycleRoute[] {
+  const { registration, lifecycle } = config;
   return [
-    route('GET', `/${registration.slug}/drafts`, async ({ actor }) => {
+    route(config, 'GET', `/${registration.slug}/drafts`, async ({ actor }, deps) => {
       const ctx = await ctxOf(deps, actor);
-      const drafts = await foldLifecycle(messages, () => lifecycle.listDrafts(ctx));
+      const drafts = await foldLifecycle(deps.messages, () => lifecycle.listDrafts(ctx));
       return ok({ drafts: drafts.map((draft) => draftJson(draft).draft) });
     }),
-    route('POST', `/${registration.slug}/drafts`, async ({ actor, body }) => {
-      const data = parseSnapshotBody(body, messages);
+    route(config, 'POST', `/${registration.slug}/drafts`, async ({ actor, body }, deps) => {
+      const data = parseSnapshotBody(body, deps.messages);
       const ctx = await ctxOf(deps, actor);
-      const draft = await foldLifecycle(messages, () => lifecycle.saveDraft(ctx, null, data));
+      const draft = await foldLifecycle(deps.messages, () => lifecycle.saveDraft(ctx, null, data));
       return ok(draftJson(draft));
     }),
   ];
@@ -279,36 +304,36 @@ function draftCollectionRoutes(deps: EntityRouteDeps): LifecycleRoute[] {
  * lifecycle write: records a version, or parks for approval (202, draft
  * stays OPEN until applied).
  */
-function draftItemRoutes(deps: EntityRouteDeps): LifecycleRoute[] {
-  const { registration, lifecycle, messages } = deps;
+function draftItemRoutes(config: EntityRouteConfig): LifecycleRoute[] {
+  const { registration, lifecycle } = config;
   return [
-    route('POST', `/${registration.slug}/drafts/:draftId/publish`, async ({ actor, params }) => {
-      const draftId = requireParam(params, 'draftId', messages);
+    route(config, 'POST', `/${registration.slug}/drafts/:draftId/publish`, async ({ actor, params }, deps) => {
+      const draftId = requireParam(params, 'draftId', deps.messages);
       const ctx = await ctxOf(deps, actor);
-      const result = await foldLifecycle(messages, () => lifecycle.publishDraft(ctx, draftId));
+      const result = await foldLifecycle(deps.messages, () => lifecycle.publishDraft(ctx, draftId));
       return writeResponse(result);
     }),
-    route('DELETE', `/${registration.slug}/drafts/:draftId`, async ({ actor, params }) => {
-      const draftId = requireParam(params, 'draftId', messages);
+    route(config, 'DELETE', `/${registration.slug}/drafts/:draftId`, async ({ actor, params }, deps) => {
+      const draftId = requireParam(params, 'draftId', deps.messages);
       const ctx = await ctxOf(deps, actor);
-      await foldLifecycle(messages, () => lifecycle.discardDraft(ctx, draftId));
+      await foldLifecycle(deps.messages, () => lifecycle.discardDraft(ctx, draftId));
       return noContent();
     }),
   ];
 }
 
 /** Every generated endpoint for one registration, in mount order. */
-export function entityRoutes(deps: EntityRouteDeps): LifecycleRoute[] {
+export function entityRoutes(config: EntityRouteConfig): LifecycleRoute[] {
   return [
     // Literal segments first. A stable, readable emission order — not a
     // collision guard: no two paths here can shadow each other (`/x/drafts` is
     // two segments, `/x/:id/draft` three). The order that DOES decide a winner
     // is the host's, between this router and its own `/:slug/:id` routes
     // (ADOPTING rule 7).
-    ...draftCollectionRoutes(deps),
-    ...draftItemRoutes(deps),
-    ...itemDraftRoutes(deps),
-    versionsRoute(deps),
-    restoreRoute(deps),
+    ...draftCollectionRoutes(config),
+    ...draftItemRoutes(config),
+    ...itemDraftRoutes(config),
+    versionsRoute(config),
+    restoreRoute(config),
   ];
 }
