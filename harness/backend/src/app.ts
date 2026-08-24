@@ -107,6 +107,7 @@ import { realtimeHost } from './realtime-host';
 import { mountSurfaces } from './mount-surfaces';
 import { applyDiscountMigrations } from './discounts-db';
 import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
+import { createShiftHostSchema, reseedShifts, shiftHost } from './shift-host';
 import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
@@ -130,6 +131,15 @@ export interface HarnessBackend {
    * would sit open and silent, which is the failure the liveness watch exists for.
    */
   realtimeDriver: RealtimeDriver;
+  /**
+   * `@12-apps/shift`'s service, for the overdue sweep.
+   *
+   * Exposed because the sweep has NO route and deliberately so: it is a
+   * scheduled cross-tenant job, and an endpoint that closed other people's
+   * shifts on request would be a very different thing from one that closes
+   * them because their window ran out.
+   */
+  shift: Hosts['shift'];
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -190,6 +200,14 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
   await applyDiscountMigrations(pg);
   await createDiscountCatalogTables(pg);
   await reseedDiscounts(pg);
+  // FUT-146: the two shift tables, out of the package's own tarball. What is
+  // NOT in that tarball is `resource_assignments` — the package asks a host to
+  // create, check and end the claims, and names the index it must carry, while
+  // owning no model for it. WHAT a shift claims is host domain, so the ledger
+  // is the host's and the package keeps only the snapshot it copied. See
+  // shift-db.ts; `harness_desks` is the catalog that makes the claim real.
+  await createShiftHostSchema(pg);
+  await reseedShifts(pg);
   // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
   // host is the two tables its reference probes read (storage-host.ts) and a
   // directory to keep objects in.
@@ -205,6 +223,7 @@ async function provisionHosts(pg: PGlite): Promise<Hosts> {
     realtime: realtimeHost(pg, realtimeDriver),
     onboarding: onboardingHost(pg),
     discounts: discountsHost(pg),
+    shift: shiftHost(pg),
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
     entitlements: createEntitlementsHost(),
@@ -229,6 +248,7 @@ export interface Hosts {
   realtimeDriver: RealtimeDriver;
   onboarding: ReturnType<typeof onboardingHost>;
   discounts: ReturnType<typeof discountsHost>;
+  shift: ReturnType<typeof shiftHost>;
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
@@ -258,6 +278,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedLifecycle(pg);
     await reseedNotifications(pg, hosts.notifications);
     await reseedDiscounts(pg);
+    await reseedShifts(pg);
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();
@@ -375,6 +396,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     storageRoot: hosts.storage.root,
     pg,
     realtimeDriver: hosts.realtimeDriver,
+    shift: hosts.shift,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream
       // severed after its driver is gone throws into the sink rather than closing cleanly.
