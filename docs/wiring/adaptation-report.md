@@ -38,7 +38,6 @@ capability itself does not exist yet and is real design work.
 | pwa | ✔ (root) | — | — | — | — | — | — | — | — | **shipped** | root-mount constraint recorded in the manifest, `Vary` shared with `./hono` |
 | observability-\* | — | — | — | — | — | — | — | — | — | **S** | ports only (logger) |
 | forms-core / shared-helpers / ui | — | — | — | — | — | — | — | — | — | — | libraries, not plugins — no manifest |
-| state-api (shared-private) | ✔ | — | — | — | — | — | — | — | — | **shipped** | already `mountStateApi(config)`; harness-only posture documented in the manifest |
 
 "want" = the package has a real use for the capability today and no way to
 express it; the manifest is where it becomes expressible.
@@ -242,12 +241,11 @@ banner host) captured as manifest documentation, `areas` for the
 super-admin start dialog, `permissions`. "want": a `desk-session.started`
 notification blueprint for the trail.
 
-### onboarding / storage / pwa / app-shell / state-api (shipped)
+### onboarding / storage / pwa / app-shell (shipped)
 
 Thin manifest wrappers over `createApiOnboarding` / storage's actor-scoped
-routers / the two root-mounted PWA endpoints / `createApiAppShell` /
-`mountStateApi`. Three of them needed a decision written down rather than a
-wrapper:
+routers / the two root-mounted PWA endpoints / `createApiAppShell`. Two of them
+needed a decision written down rather than a wrapper:
 
 - **pwa** — the ROOT-MOUNT constraint. `PwaRoute.path` is absolute from the
   origin root, not relative to a mount, because a service worker's scope is
@@ -269,8 +267,6 @@ wrapper:
   `createWebAppShell` would satisfy the contribution structurally, but it IS
   the shell other surfaces are mounted inside rather than cargo a host
   places, so the three SPAs keep calling it directly at their root.
-- **state-api** — the one `access: restricted` package, so its manifest is
-  also where the harness-only posture is written down.
 
 ### mcp (manifest shipped; the annotations landing still open)
 
