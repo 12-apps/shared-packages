@@ -19,8 +19,11 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import {
+  RESEARCH_MOUNT_PATH,
   RESEARCH_TENANT_B_ID,
   RESEARCH_TENANT_ID,
   RESEARCH_USER_HEADER,
@@ -452,5 +455,60 @@ describe('the run the HOST has to produce', () => {
 
     const leaked = await as(RESEARCH_TENANT_B_ID).getRun(String(view.latestRun?.id));
     expect(await dataOf<RunView | null>(leaked)).toBeNull();
+  });
+});
+
+describe('adopted through @12-apps/wiring, not by calling the factory', () => {
+  // This package declares FIVE capabilities and only one of them is `http`.
+  // The first version of this adoption called `createApiProductResearch`
+  // directly, which does not decline the other four — it does not see them.
+
+  it('binds the package\'s OWN job blueprint, retry policy and all', () => {
+    const { jobs } = backend.research;
+
+    // The numbers are the PACKAGE's, and it argues for them: "three attempts,
+    // exponentially spaced from five seconds, cheap because the pipeline is
+    // idempotent per runId and the source-budget truncation makes attempts two
+    // and three nearly free." A host-written worker's numbers are nobody's.
+    const run = jobs.find((job) => job.name.endsWith('run'));
+    expect(run).toBeDefined();
+    expect(run?.attempts).toBe(3);
+    expect(run?.backoff).toEqual({ type: 'exponential', delayMs: 5_000 });
+    // Dot-namespaced, which is the wire key and the scheduler id — a host that
+    // invented its own name would collide with the next package to ship a
+    // job called `run`.
+    expect(run?.name).toBe('research.run');
+  });
+
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.research.report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    expect(statuses.get('jobs')).toBe('bound');
+    // Collected still means COUNTED: they appear in the report, so a host can
+    // be asked what it did with them rather than never being told they exist.
+    expect(statuses.get('permissions')).toBe('collected');
+    expect(statuses.get('db')).toBe('collected');
+    expect(statuses.get('mcp')).toBe('collected');
+    // The day this package declares a sixth, `assemble()` throws naming it
+    // instead of the harness quietly not running it.
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.research;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} ${RESEARCH_MOUNT_PATH}${mounted.route.path}`);
+
+    const missing = unclaimedRoutes(routes, allButOne);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.route.path).toBe(routes[0]?.route.path);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.research.report)).toContain(RESEARCH_MOUNT_PATH);
   });
 });
