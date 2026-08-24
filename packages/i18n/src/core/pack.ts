@@ -34,14 +34,39 @@
  * resolver. {@link localeCopy} turns a pack into the resolver, which is the
  * one line a host writes at a mount.
  */
-import { DEFAULT_LOCALE, type Locale } from './locale';
+import { DEFAULT_LOCALE, matchLocale, type Locale } from './locale';
 
 /** One value per canonical locale. */
 export type LocalePack<T> = Readonly<Record<Locale, T>>;
 
-/** What a resolver is told. A bag, so a later axis (currency, tenant) is additive. */
+/**
+ * What a resolver is told. A bag, so a later axis (currency, tenant) is additive.
+ *
+ * ## Why `locale` is a loose string, and why it may be absent
+ *
+ * The caller is a PACKAGE, and a package cannot import this module — that is
+ * the portability rule the whole copy port rests on, restated in the file
+ * docblock. So the thing that calls a resolver holds a locally-declared
+ * structural mirror of {@link CopyResolver}, and what it can honestly put in
+ * this bag is whatever its own transport handed it: `@12-apps/wiring` carries
+ * `WireRequest.locale`, a raw BCP-47 string off the wire, and nothing narrows
+ * it to {@link Locale} on the way.
+ *
+ * Requiring `Locale` here would make that mirror structurally incompatible
+ * under `strictFunctionTypes` — a host's `localeCopy(PACK)` would not be
+ * assignable to a package's `copy` field — and the workaround every adopter
+ * would reach for is a cast, which is the type system being told to stop
+ * checking at exactly the seam this contract exists to police.
+ *
+ * **Absent means "nobody told me", not "the default is fine".** An adapter
+ * that never populates a locale, a package mounted outside a request, a job
+ * with no reader — each has no language to report, and saying so is different
+ * from asserting pt-BR. {@link localeCopy} is what turns "not told" into
+ * {@link DEFAULT_LOCALE}, in one place a reader can find, rather than at each
+ * of the dozens of call sites that would otherwise each pick a fallback.
+ */
 export interface CopyContext {
-  readonly locale: Locale;
+  readonly locale?: Locale | string | null;
 }
 
 /** Copy chosen per call, rather than bound once at mount. */
@@ -64,9 +89,18 @@ export function selectCopy<T>(pack: LocalePack<T>, locale: Locale = DEFAULT_LOCA
   return pack[locale] ?? pack[DEFAULT_LOCALE];
 }
 
-/** A pack as the resolver a locale-aware config field takes. */
+/**
+ * A pack as the resolver a locale-aware config field takes.
+ *
+ * The tag is MATCHED rather than trusted, because {@link CopyContext} accepts
+ * whatever the package's transport was handed — `?lang=en`, an `Accept-Language`
+ * fragment, a stale `es-AR` on a user row. `matchLocale` answers `null` for
+ * anything this app does not speak, and that (like an absent tag) lands on
+ * {@link DEFAULT_LOCALE}: a language we cannot render is not a reason to render
+ * nothing, and it is the same fallback the negotiation path already applies.
+ */
 export function localeCopy<T>(pack: LocalePack<T>): CopyResolver<T> {
-  return ({ locale }) => selectCopy(pack, locale);
+  return ({ locale }) => selectCopy(pack, matchLocale(locale) ?? DEFAULT_LOCALE);
 }
 
 /**

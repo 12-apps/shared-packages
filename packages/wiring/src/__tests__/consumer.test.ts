@@ -8,6 +8,10 @@ import { defineManifest, defineServerManifest } from "../producer";
 import {
   notesManifest,
   notesServerManifest,
+  PT_BR_NOTES_COPY,
+  EN_US_NOTES_COPY,
+  type NotesCopy,
+  type NotesCopySource,
   notesWebManifest,
   type NotesJobDeps,
   type NotesStore,
@@ -33,7 +37,7 @@ function adoptNotes(host: ReturnType<typeof createWiringHost>, deps: NotesJobDep
     server: notesServerManifest,
     observability: { declined: "the capabilities suite owns this" },
     bindings: {
-      http: { mountPath: MOUNT, config: { store: deps.store } },
+      http: { mountPath: MOUNT, config: { store: deps.store, copy: PT_BR_NOTES_COPY } },
       jobs: { deps },
       email: {},
     },
@@ -92,7 +96,7 @@ describe("a server host adopting the fixture package", () => {
       server: notesServerManifest,
       observability: { declined: "the capabilities suite owns this" },
       bindings: {
-        http: { mountPath: MOUNT, config: { store: deps.store } },
+        http: { mountPath: MOUNT, config: { store: deps.store, copy: PT_BR_NOTES_COPY } },
         jobs: { deps },
         email: {},
       },
@@ -177,6 +181,71 @@ describe("a server host adopting the fixture package", () => {
   });
 });
 
+/**
+ * The property the `locale` field on `WireRequest` exists to buy: ONE mount,
+ * built once for the life of the process, answering two readers in their own
+ * languages.
+ *
+ * This is the seam's whole reason for being. A package that states its copy as
+ * a required config field can be locale-aware only if something tells it who is
+ * reading, and the mount cannot — it happened at boot. So the tag rides on the
+ * request, and the package resolves at the moment it needs a sentence.
+ */
+describe("one mount, two languages", () => {
+  /** What a bilingual host writes: `localeCopy(PACK)`, spelled out. */
+  const resolver = ({ locale }: { readonly locale?: string | null }) =>
+    locale === "en-US" ? EN_US_NOTES_COPY : PT_BR_NOTES_COPY;
+
+  function mountWith(copy: NotesCopySource<NotesCopy>) {
+    // Named apart from the `host` every `it` below declares: the flakiness gate
+    // reads a binding of that name at describe scope as state the tests share.
+    const mounted = createWiringHost({
+      name: "api",
+      kind: "server",
+      ports: { email: memoryEmailPort().port },
+    });
+    mounted.adoptServer({
+      manifest: notesManifest,
+      server: notesServerManifest,
+      observability: { declined: "the capabilities suite owns this" },
+      bindings: {
+        http: { mountPath: MOUNT, config: { store: memoryStore(), copy } },
+        jobs: { declined: "no worker in this harness" },
+        email: {},
+      },
+    });
+    const listing = mounted
+      .assemble()
+      .routes.find((mounted) => mounted.route.method === "GET" && mounted.route.path === "/notes");
+    return (locale?: string) =>
+      listing?.route.handle({
+        actor: { tenantId: "t1", canManage: false },
+        params: {},
+        query: {},
+        locale,
+      } as never) as Promise<{ body: { empty: string | null } }>;
+  }
+
+  it("answers each reader from a single mount", async () => {
+    const call = mountWith(resolver);
+    expect((await call("pt-BR")).body.empty).toBe("Nenhuma nota.");
+    expect((await call("en-US")).body.empty).toBe("No notes.");
+  });
+
+  it("answers the configured words when the adapter populated no locale", async () => {
+    // Absent is not an error: a host with one audience never sets it, and the
+    // package must answer rather than invent a language.
+    const call = mountWith(resolver);
+    expect((await call()).body.empty).toBe("Nenhuma nota.");
+  });
+
+  it("leaves a host that passes plain copy exactly as it was", async () => {
+    // The adoption cost of this seam for a single-audience host: zero.
+    const call = mountWith(PT_BR_NOTES_COPY);
+    expect((await call("en-US")).body.empty).toBe("Nenhuma nota.");
+  });
+});
+
 describe("refusals", () => {
   it("refuses to assemble while a declared capability is unanswered", () => {
     const host = createWiringHost({ name: "api", kind: "server" });
@@ -185,7 +254,7 @@ describe("refusals", () => {
       server: notesServerManifest,
       observability: { declined: "the capabilities suite owns this" },
       bindings: {
-        http: { mountPath: MOUNT, config: { store: memoryStore() } },
+        http: { mountPath: MOUNT, config: { store: memoryStore(), copy: PT_BR_NOTES_COPY } },
         jobs: { declined: "no worker in this harness" },
         email: {},
       },
@@ -200,7 +269,7 @@ describe("refusals", () => {
       server: notesServerManifest,
       observability: { declined: "the capabilities suite owns this" },
       bindings: {
-        http: { mountPath: MOUNT, config: { store: memoryStore() } },
+        http: { mountPath: MOUNT, config: { store: memoryStore(), copy: PT_BR_NOTES_COPY } },
         jobs: { declined: "no worker in this harness" },
         email: {},
       },
@@ -265,7 +334,7 @@ describe("refusals", () => {
       server: notesServerManifest,
       observability: { declined: "the capabilities suite owns this" },
       bindings: {
-        http: { mountPath: MOUNT, config: { store: memoryStore() } },
+        http: { mountPath: MOUNT, config: { store: memoryStore(), copy: PT_BR_NOTES_COPY } },
         jobs: { declined: "not this test's subject" },
         email: { declined: "not this test's subject" },
       },
@@ -281,7 +350,7 @@ describe("refusals", () => {
       server: notesServerManifest,
       observability: { declined: "the capabilities suite owns this" },
       bindings: {
-        http: { mountPath: MOUNT, config: { store: memoryStore() } },
+        http: { mountPath: MOUNT, config: { store: memoryStore(), copy: PT_BR_NOTES_COPY } },
         jobs: { declined: "not this test's subject" },
         email: {},
       },
