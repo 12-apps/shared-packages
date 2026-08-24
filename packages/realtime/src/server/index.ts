@@ -81,3 +81,5 @@ export {
   type EventsTopicSpec,
 } from "./types";
 export { PT_BR_EVENTS_MESSAGES } from "./pt-BR";
+export { EN_US_EVENTS_MESSAGES } from "./en-US";
+export { EVENTS_MESSAGES } from "./locales";
