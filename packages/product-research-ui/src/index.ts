@@ -9,6 +9,8 @@
 export type { ResearchApiClient } from './client';
 export { resolveMessages } from './messages';
 export { PT_BR_RESEARCH_MESSAGES } from './pt-BR';
+export { EN_US_RESEARCH_MESSAGES } from './en-US';
+export { RESEARCH_MESSAGES } from './locales';
 export type { ResearchMessages } from './messages';
 export type {
   CatalogRef,
