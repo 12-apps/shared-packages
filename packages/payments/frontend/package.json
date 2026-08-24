@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Browser half of the vendor-agnostic payments platform: plug-and-play MUI components for the per-provider settings page (credential form from each provider's schema, masked hints, verify/enable) and the checkout page (PIX QR + polling, card tokenization, hosted-checkout redirect), plus the headless hooks and fetch clients they build on. Talks only to the host's payments HTTP surface \u2014 never to a provider directly. Microfrontend-ready: no app coupling, host injects theme and auth.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./locales": "./src/locales.ts"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage storybook-static",
