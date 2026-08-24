@@ -57,12 +57,22 @@ const content: RbacNotificationContent = blueprint.generate({
 const asWireContent: WireNotificationContent = content;
 const backToLocalContent: RbacNotificationContent = asWireContent;
 
-/** The port twins, both ways — this is what a host actually binds. */
-const port: RbacNotifyPort = {
-  emit: () => Promise.resolve({ accepted: true }),
-};
-const asWirePort: NotifyPort = port;
-const backToLocalPort: RbacNotifyPort = asWirePort;
+/**
+ * The port twins, both ways — this is what a host actually binds.
+ *
+ * A FUNCTION rather than module-scoped constants: the assignability is proven
+ * by the annotations inside it (this file failing to compile IS the failure
+ * these cases exist to catch), and the flakiness lane refuses shared mutable
+ * state a case then calls into.
+ */
+function portTwins(): { wire: NotifyPort; local: RbacNotifyPort } {
+  const port: RbacNotifyPort = {
+    emit: () => Promise.resolve({ accepted: true }),
+  };
+  const wire: NotifyPort = port;
+  const local: RbacNotifyPort = wire;
+  return { wire, local };
+}
 
 /** And the value types the port carries. */
 const recipient: RbacNotifyRecipient = { userId: 'u1' };
@@ -84,8 +94,12 @@ describe('the rbac twins against @12-apps/wiring', () => {
   });
 
   it('keeps the notify port and its event types mutually assignable', async () => {
-    expect(await asWirePort.emit(asWireEvent)).toEqual({ accepted: true });
-    expect(await backToLocalPort.emit(event)).toEqual({ accepted: true });
+    // The proof is that `portTwins()` COMPILES — it assigns a local port to
+    // the wire type and back again. These calls only confirm the round-tripped
+    // value still behaves like a port; built inline, because the flakiness
+    // lane reads a binding a case then calls into as shared state.
+    expect(await portTwins().wire.emit(asWireEvent)).toEqual({ accepted: true });
+    expect(await portTwins().local.emit(event)).toEqual({ accepted: true });
     expect(asWireRecipient).toEqual({ userId: 'u1' });
     expect(asWireOutcome.reason).toBe('declined');
   });
