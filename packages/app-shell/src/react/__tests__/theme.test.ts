@@ -165,3 +165,149 @@ describe('createAppTheme components', () => {
     expect(withKey.components).toEqual(without.components);
   });
 });
+
+/**
+ * A HOST's own primary is a brand too.
+ *
+ * `separateFromBrand` was written for one failure and states it plainly: a brand
+ * that lands on the danger hue makes 'Remover' and 'Adicionar' the same colour,
+ * and the one distinction on the screen that must never be missed is the one
+ * that disappears. The rotation guarding against it only ever read the TENANT's
+ * seed — so it fired for stores that paid to replace the palette and never once
+ * for the platform's own screens, which is most of the product.
+ */
+describe('createAppTheme semantics vs the host token', () => {
+  // 4° from this module's own danger anchor. A real palette: the primary of a
+  // warm brand whose manual argues, by name, against danger sharing it.
+  const WARM_RED = '#D42B1F';
+
+  it('rotates a semantic off the host primary, with no tenant in sight', () => {
+    const plain = createAppTheme('light');
+    const warm = createAppTheme('light', {
+      tokens: { light: { primary: WARM_RED, secondary: '#EE7B1F' } },
+    });
+
+    expect(warm.palette.error.main).not.toBe(plain.palette.error.main);
+    // And only that one: the brand collides with danger, not with the meanings
+    // sitting elsewhere on the wheel.
+    expect(warm.palette.success.main).toBe(plain.palette.success.main);
+    expect(warm.palette.info.main).toBe(plain.palette.info.main);
+  });
+
+  it('leaves the host token itself alone', () => {
+    // The semantic yields, never the brand — the host chose that hex.
+    const warm = createAppTheme('light', {
+      tokens: { light: { primary: WARM_RED, secondary: '#EE7B1F' } },
+    });
+
+    expect(warm.palette.primary.main).toBe(WARM_RED);
+  });
+
+  it('lets the tenant seed win over the host token as the thing to avoid', () => {
+    // A white-labelled store's buttons are ITS colour, so that is the one a
+    // semantic can be confused with. The host's token is not on screen.
+    const amberTenantOnRedHost = createAppTheme('light', {
+      tokens: { light: { primary: WARM_RED, secondary: '#EE7B1F' } },
+      override: { primary: '#F5C518' },
+    });
+    const plain = createAppTheme('light');
+
+    expect(amberTenantOnRedHost.palette.warning.main).not.toBe(plain.palette.warning.main);
+    expect(amberTenantOnRedHost.palette.error.main).toBe(plain.palette.error.main);
+  });
+});
+
+/**
+ * The three keys a host had no way to state, and the one trap they remove.
+ */
+describe('createAppTheme grounds, rule and meanings', () => {
+  const SAL = '#FDF8F2';
+  const LINHA = '#EBD9C7';
+
+  it('paints the grounds the host says it paints', () => {
+    const theme = createAppTheme('light', {
+      background: { light: { default: SAL, paper: '#FFFFFF' } },
+    });
+
+    expect(theme.palette.background.default).toBe(SAL);
+    expect(theme.palette.background.paper).toBe('#FFFFFF');
+  });
+
+  it('keeps MUI’s ground for a mode the host did not state', () => {
+    const theme = createAppTheme('dark', {
+      background: { light: { default: SAL, paper: '#FFFFFF' } },
+    });
+
+    expect(theme.palette.background.default).toBe(createAppTheme('dark').palette.background.default);
+  });
+
+  it('rules with the host’s hairline', () => {
+    expect(createAppTheme('light', { divider: { light: LINHA } }).palette.divider).toBe(LINHA);
+  });
+
+  it('takes the host’s own meanings verbatim, without rotating them', () => {
+    // Stated danger sits 4° from the brand — exactly where the rotation would
+    // fire on an anchor. It must not fire here: the host looked at both hexes
+    // and decided, and a factory second-guessing that moves a chosen colour.
+    const theme = createAppTheme('light', {
+      tokens: { light: { primary: '#D42B1F', secondary: '#EE7B1F' } },
+      semantics: { light: { error: '#7C2A1C', success: '#4E7A2B' } },
+    });
+
+    expect(theme.palette.error.main).toBe('#7C2A1C');
+    expect(theme.palette.success.main).toBe('#4E7A2B');
+  });
+
+  it('falls back per meaning, not all-or-nothing', () => {
+    const theme = createAppTheme('light', { semantics: { light: { error: '#7C2A1C' } } });
+
+    expect(theme.palette.error.main).toBe('#7C2A1C');
+    expect(theme.palette.info.main).toBe(createAppTheme('light').palette.info.main);
+  });
+
+  /**
+   * The trap these keys would otherwise ADD: `surface` and `background.default`
+   * are the same page asked about twice, and two spellings of one fact drift.
+   */
+  it('measures legibility against the ground the host paints', () => {
+    const tinted = '#3A1010';
+    const theme = createAppTheme('light', {
+      background: { light: { default: tinted, paper: tinted } },
+      override: { primary: '#7ED957' },
+    });
+
+    // Corrected against the DARK page it actually paints, so the seed is allowed
+    // to stay bright — against white it would have been driven darker.
+    expect(contrastRatio(theme.palette.primary.main, tinted)).toBeGreaterThanOrEqual(
+      MIN_TEXT_CONTRAST,
+    );
+  });
+
+  it('lets an explicit surface win over the painted ground', () => {
+    // Not the same question: a host may read its tenant's text against a card
+    // rather than against the page behind it.
+    const onCard = createAppTheme('light', {
+      background: { light: { default: '#3A1010', paper: '#FFFFFF' } },
+      surface: { light: '#FFFFFF' },
+      override: { primary: '#7ED957' },
+    });
+
+    expect(contrastRatio(onCard.palette.primary.main, '#FFFFFF')).toBeGreaterThanOrEqual(
+      MIN_TEXT_CONTRAST,
+    );
+  });
+
+  it('builds the same palette as before when a host states none of them', () => {
+    // All three are additive. A host that never heard of them gets what it got.
+    const withKeys = createAppTheme('light', {
+      background: undefined,
+      divider: undefined,
+      semantics: undefined,
+    });
+    const without = createAppTheme('light');
+
+    expect(withKeys.palette.background).toEqual(without.palette.background);
+    expect(withKeys.palette.divider).toBe(without.palette.divider);
+    expect(withKeys.palette.error.main).toBe(without.palette.error.main);
+  });
+});
