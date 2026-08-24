@@ -76,6 +76,8 @@ export {
   type StorageProblem,
 } from './problems';
 export { PT_BR_STORAGE_MESSAGES, PT_BR_STORAGE_UNAUTHENTICATED } from './pt-BR';
+export { EN_US_STORAGE_MESSAGES, EN_US_STORAGE_UNAUTHENTICATED } from './en-US';
+export { STORAGE_MESSAGES, STORAGE_UNAUTHENTICATED } from './locales';
 
 export {
   imageSources,

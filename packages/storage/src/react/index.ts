@@ -42,3 +42,5 @@ export {
   type WebStorageMessages,
 } from './failures';
 export { PT_BR_WEB_STORAGE_MESSAGES } from './pt-BR';
+export { EN_US_WEB_STORAGE_MESSAGES } from './en-US';
+export { WEB_STORAGE_MESSAGES } from './locales';
