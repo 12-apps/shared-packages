@@ -7,7 +7,7 @@ import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
 import { BILLING_MOUNT_PATH } from './billing-host';
 import { FEATURE_FLAGS_MOUNT_PATH, wireFeatureFlags } from './feature-flags-host';
-import { IMPERSONATION_PLATFORM_PATH } from './impersonation-host';
+import { IMPERSONATION_PLATFORM_PATH, IMPERSONATION_TENANT_MOUNT } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { observabilityHarnessRoutes, observabilityRoutes } from './observability-host';
 import { REALTIME_MOUNT_PATH } from './realtime-host';
@@ -43,7 +43,7 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
 
   // BEFORE the broader `/api/admin/:tenantSlug` mounts below: this file's rule
   // is more-specific-first, and Hono resolves by registration order.
-  app.route('/api/admin/:tenantSlug/desk-session', hosts.impersonation.tenant);
+  app.route(IMPERSONATION_TENANT_MOUNT, hosts.impersonation.tenant);
   app.route(IMPERSONATION_PLATFORM_PATH, hosts.impersonation.platform);
 
   // @12-apps/feature-flags (FUT-884): user-level beta grants, the platform

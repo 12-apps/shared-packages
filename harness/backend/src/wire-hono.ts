@@ -7,7 +7,9 @@
  * `@12-apps/report-builder/hono` established, held here verbatim so the
  * consumer path answers byte-for-byte what the per-package adapter answers:
  *
- *  - a `null` actor is 401 before any handler runs;
+ *  - a `null` actor is 401 before any handler runs — on an `authenticated`
+ *    route, which is the contract's default and every route this host mounted
+ *    before storage;
  *  - GET/HEAD carry no body; every other method may, DELETE included — an
  *    endpoint URL is not a path segment, so a delete-by-endpoint has nowhere
  *    else to put it. A malformed JSON body is `undefined` (the handler's own
@@ -101,6 +103,28 @@ function respond(c: Context, answer: WireRouteAnswer): Response {
 }
 
 /**
+ * Does this route sit behind the host's actor gate?
+ *
+ * `kind` is the contract's answer and the default is `authenticated`, so the
+ * gate stays on unless a package says otherwise. The two exceptions are exactly
+ * the ones the contract names:
+ *
+ * - `public` — "anonymous by design (a storefront read)". `@12-apps/storage`
+ *   serves an object to an `<img>` that carries no session at all.
+ * - `webhook` — "an unauthenticated provider callback, verified by signature
+ *   inside the handler; must NOT sit behind tenant guards".
+ *
+ * A bridge that 401s these is the FOURTH thing this adapter got wrong by
+ * generalising from the surfaces it happened to serve first, and the quietest:
+ * the package mounts, its authenticated routes work, and the one route whose
+ * whole point is having no caller answers "not authenticated" to everybody.
+ */
+function needsActor(route: MountedRoute['route']): boolean {
+  const kind = (route as { kind?: string }).kind ?? 'authenticated';
+  return kind === 'authenticated';
+}
+
+/**
  * A router serving the given mounted routes, addressed by their
  * package-relative paths — mount it at the prefix the adoption named as
  * `mountPath`, exactly as the per-package routers are mounted today.
@@ -113,7 +137,9 @@ export function honoRouterFor(
   routes.forEach((mounted) => {
     app.on(mounted.route.method, honoPath(mounted.route), async (c) => {
       const actor = await resolveActor(c);
-      if (!actor) return c.json({ error: 'Não autenticado.' }, 401);
+      if (!actor && needsActor(mounted.route)) {
+        return c.json({ error: 'Não autenticado.' }, 401);
+      }
       const response = await mounted.route.handle({
         actor: actor as never,
         params: c.req.param() as Record<string, string | undefined>,

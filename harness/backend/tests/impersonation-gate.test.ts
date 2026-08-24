@@ -24,12 +24,17 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import {
-  IMPERSONATION_PLATFORM_PATH,
   IMPERSONATION_TENANTS,
   SECOND_SYSTEM_LIBRARIAN,
   SYSTEM_LIBRARIAN,
+} from '../src/impersonation-directory';
+import {
+  IMPERSONATION_PLATFORM_PATH,
+  IMPERSONATION_TENANT_MOUNT,
 } from '../src/impersonation-host';
 import { RBAC_TENANT_ID, RBAC_USERS } from '../src/rbac-host';
 
@@ -380,5 +385,76 @@ describe('a session that stops being valid', () => {
     });
     expect(second.status).toBe(200);
     expect(await dataOf(second)).toMatchObject({ ended: false });
+  });
+});
+
+describe('adopted through @12-apps/wiring, as TWO manifests', () => {
+  it('keeps the two mounts apart, each at its own prefix', () => {
+    // The package ships two manifests because this is a PRIVILEGE SPLIT: the
+    // operator mount answers to platform authority and carries no slug; the
+    // preview mount is slug-scoped and gated on permissions in that tenant. One
+    // binding would hand this host a single `mountPath` for both, and a version
+    // bump could then widen the tenant mount with a platform row nobody
+    // re-reviewed.
+    const mounts = new Map(
+      backend.hosts.impersonation.routes.map((mounted) => [
+        `${mounted.packageName} ${mounted.route.method}`,
+        mounted.mountPath,
+      ]),
+    );
+
+    expect(mounts.get('@12-apps/impersonation POST')).toBe(IMPERSONATION_PLATFORM_PATH);
+    expect(mounts.get('@12-apps/impersonation-preview POST')).toBe(IMPERSONATION_TENANT_MOUNT);
+  });
+
+  it('accounts for every capability of BOTH manifests, and declines the world', () => {
+    const report = backend.hosts.impersonation.report;
+    const byPackage = new Map(report.packages.map((entry) => [entry.packageName, entry]));
+    const statusIn = (name: string, kind: string) =>
+      byPackage.get(name)?.capabilities.find((entry) => entry.kind === kind)?.status;
+
+    expect(statusIn('@12-apps/impersonation', 'http')).toBe('bound');
+    expect(statusIn('@12-apps/impersonation-preview', 'http')).toBe('bound');
+    // Both manifests name the SAME namespace (`impersonation`), because a
+    // refusal on either mount is one story.
+    expect(statusIn('@12-apps/impersonation', 'observability')).toBe('bound');
+    expect(statusIn('@12-apps/impersonation-preview', 'observability')).toBe('bound');
+    // The e2e world is the operator manifest's, and this host declines it in
+    // writing — the web harness's `playwright.config.ts` binds it, reading
+    // `impersonationFeatures` and `impersonationSteps` off the package. That
+    // pairing is the capability's whole point: a shipped world nobody adopts is
+    // a few hundred lines of journeys re-derived by hand in a host.
+    expect(statusIn('@12-apps/impersonation', 'e2e')).toBe('declined');
+    // The preview manifest declares no world of its own — the journeys enter
+    // through the operator surface.
+    expect(statusIn('@12-apps/impersonation-preview', 'e2e')).toBeUndefined();
+    const statuses = report.packages.flatMap((entry) =>
+      entry.capabilities.map((capability) => capability.status),
+    );
+    expect(statuses).not.toContain('unanswered');
+    expect(statuses).not.toContain('unbound');
+  });
+
+  it('renders a report naming BOTH mounts', () => {
+    const rendered = renderWiringReport(backend.hosts.impersonation.report);
+    expect(rendered).toContain(IMPERSONATION_PLATFORM_PATH);
+    expect(rendered).toContain(IMPERSONATION_TENANT_MOUNT);
+  });
+
+  it('folds a refusal into the status the package chose, rather than 500', async () => {
+    // The defect this adoption found, and the reason it is worth a case in the
+    // HOST as well as in the package: every refusal on this surface is THROWN,
+    // and the manifest's wire view was not folding them. The `/hono` adapter
+    // always had. So the consumer path answered correctly on the happy path and
+    // 500'd on exactly the cases this surface exists for — a start with no
+    // reason, a caller without authority, an unknown branch.
+    const refused = await backend.app.request(IMPERSONATION_PLATFORM_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', [ACTOR_HEADER]: SYSTEM_LIBRARIAN.id },
+      body: JSON.stringify({ targetUserId: MEMBER?.id, targetApp: 'counter', reason: 'too short' }),
+    });
+
+    expect(refused.status).toBe(400);
+    expect((await refused.json()) as { error?: string }).toHaveProperty('error');
   });
 });

@@ -205,3 +205,83 @@ describe('the host bridge, on the two halves a JSON handler never needs', () => 
     expect((await seen.request?.formData())?.has('file')).toBe(true);
   });
 });
+
+describe('the host bridge, on routes that must NOT have a caller', () => {
+  /**
+   * `kind` is the contract's third obligation on an adapter, after the raw
+   * request and the raw answer — and the one whose failure is quietest. The
+   * default is `authenticated`, so this bridge's 401 was right for every
+   * surface adopted so far; the contract names two exceptions and both are
+   * arriving:
+   *
+   * - `public` — "anonymous by design (a storefront read)": `@12-apps/storage`
+   *   serves an object to an `<img>` that carries no session;
+   * - `webhook` — "must NOT sit behind tenant guards", because a provider
+   *   callback verified by signature has no caller to resolve.
+   *
+   * A bridge that gates these mounts the package, serves its authenticated
+   * routes correctly, and answers "not authenticated" to everybody on the one
+   * route whose whole point is having no caller.
+   */
+  function bridgeOverKind(kind: string): Hono {
+    const app = new Hono();
+    app.route(
+      '/probe',
+      honoRouterFor(
+        [
+          {
+            route: {
+              method: 'GET',
+              path: '/open',
+              kind,
+              handle: async (request: { actor?: unknown }) => ({
+                status: 200,
+                body: { actor: request.actor ?? null },
+              }),
+            },
+          } as never,
+        ],
+        // NO caller — the anonymous case, which is the whole point.
+        () => null,
+      ),
+    );
+    return app;
+  }
+
+  it('serves a public route to a caller the host could not resolve', async () => {
+    const response = await bridgeOverKind('public').request('/probe/open');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ actor: null });
+  });
+
+  it('serves a webhook route the same way — a signature is not a session', async () => {
+    const response = await bridgeOverKind('webhook').request('/probe/open');
+
+    expect(response.status).toBe(200);
+  });
+
+  /** A bridge over one route that declares NO kind. Built per case. */
+  function bridgeOverDefault(): Hono {
+    const app = new Hono();
+    app.route(
+      '/probe',
+      honoRouterFor(
+        [
+          {
+            route: { method: 'GET', path: '/guarded', handle: async () => ({ status: 200 }) },
+          } as never,
+        ],
+        () => null,
+      ),
+    );
+    return app;
+  }
+
+  it('still 401s the default, so the gate did not simply come off', async () => {
+    // `kind` defaults to `authenticated`, and every route adopted before
+    // storage carries no `kind` at all — so the absent case is the one that
+    // must keep answering 401.
+    expect((await bridgeOverDefault().request('/probe/guarded')).status).toBe(401);
+  });
+});

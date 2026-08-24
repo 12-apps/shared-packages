@@ -37,6 +37,7 @@ import type { AnyServerManifest, WireRequest, WireRouteAnswer } from '@12-apps/w
 import type { ImpersonationCookie } from '../core/types';
 import {
   createApiImpersonation,
+  foldApiError,
   type ApiImpersonation,
   type ImpersonationRequest,
   type ImpersonationResponse,
@@ -98,16 +99,28 @@ function asWireRoute(
     path: route.path,
     handle: async (request) =>
       asWireAnswer(
-        await route.handle({
-          actor: request.actor as ImpersonationRequest['actor'],
-          params: request.params,
-          body: request.body,
-          // The SESSION cookie's value, not the whole header. The package owns
-          // its own cookie name (`codec.cookieName`), so picking the entry out
-          // is mechanism — a host that re-derives it is one rename away from
-          // reading nothing and silently seeing no session.
-          cookieValue: readCookie(request.request?.headers.get('cookie') ?? null, cookieName),
-        }),
+        await route
+          .handle({
+            actor: request.actor as ImpersonationRequest['actor'],
+            params: request.params,
+            body: request.body,
+            // The SESSION cookie's value, not the whole header. The package owns
+            // its own cookie name (`codec.cookieName`), so picking the entry out
+            // is mechanism — a host that re-derives it is one rename away from
+            // reading nothing and silently seeing no session.
+            cookieValue: readCookie(request.request?.headers.get('cookie') ?? null, cookieName),
+          })
+          // EVERY refusal this surface makes is THROWN, not returned: the
+          // lateral-move 403, the invalid-body 400, the unknown-tenant 404, the
+          // machine-token refusal. `foldApiError` turns those back into the
+          // status and sentence the package chose, and rethrows anything else.
+          //
+          // The `/hono` adapter has always done this. Leaving it out here made
+          // the wire view answer correctly only on the happy path: a consumer's
+          // bridge would see an exception where the contract promises an answer,
+          // and the surface whose entire purpose is refusing would 500 on every
+          // refusal while its successes looked fine.
+          .catch(foldApiError),
       ),
   };
 }
