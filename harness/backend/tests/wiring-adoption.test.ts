@@ -14,6 +14,7 @@ import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
 import type { SavedReportDb } from '@12-apps/report-builder/server';
 
 import { REPORTS_MOUNT_PATH, wireReports } from '../src/reports-host';
+import { honoRouterFor } from '../src/wire-hono';
 
 /** The same duck-typed store shape `report-hono.test.ts` passes as `db`. */
 function emptySavedReportDb(): SavedReportDb {
@@ -93,5 +94,76 @@ describe('report-builder adopted through @12-apps/wiring', () => {
     const missing = unclaimedRoutes(routes, allButOne);
     expect(missing).toHaveLength(1);
     expect(missing[0]?.route.path).toBe(routes[0]?.route.path);
+  });
+});
+
+describe('the host bridge, on the two halves a JSON handler never needs', () => {
+  /**
+   * `wire-hono.ts` is this host's ONE framework adapter, and the contract puts
+   * two obligations on it that no adopted surface here exercised:
+   *
+   * - it must be able to forward the RAW `Request`, for "the handlers the
+   *   parsed fields cannot serve: a webhook verifying a provider signature over
+   *   the exact bytes, an SSE stream reading `Last-Event-ID`, an OAuth callback
+   *   echoing the whole URL";
+   * - and doing so must not cost the parsed body, because `params`, `query` and
+   *   `body` are "the halves every adapter is obliged to fill".
+   *
+   * Those two pull against each other: reading the body consumes the stream, so
+   * a naive bridge that does both hands the handler a locked request. That is
+   * not hypothetical — `@12-apps/storage` throws by name when the raw request
+   * is missing, and `ReadableStream is locked` when it has been eaten.
+   */
+  function bridgeOver(seen: { request?: Request; body?: unknown }): Hono {
+    const app = new Hono();
+    app.route(
+      '/probe',
+      honoRouterFor(
+        [
+          {
+            route: {
+              method: 'POST',
+              path: '/echo',
+              handle: async (request: { request?: Request; body?: unknown }) => {
+                seen.request = request.request;
+                seen.body = request.body;
+                return { status: 200, body: { ok: true } };
+              },
+            },
+          } as never,
+        ],
+        () => ({ userId: 'probe' }),
+      ),
+    );
+    return app;
+  }
+
+  it('forwards the raw request AND the parsed body from the same call', async () => {
+    const seen: { request?: Request; body?: unknown } = {};
+    const response = await bridgeOver(seen).request('/probe/echo', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ term: 'café' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(seen.body).toEqual({ term: 'café' });
+    // Still readable: the parse went through a CLONE. Without that this is
+    // `TypeError: Invalid state: ReadableStream is locked`, thrown inside
+    // whichever package asked for the bytes.
+    expect(await seen.request?.json()).toEqual({ term: 'café' });
+  });
+
+  it('leaves a body that is not JSON to the handler, unread', async () => {
+    // A multipart upload is the case: it was never JSON, so the parsed body is
+    // undefined and the handler streams the raw request to its driver.
+    const seen: { request?: Request; body?: unknown } = {};
+    const form = new FormData();
+    form.append('file', new Blob([new Uint8Array([1, 2, 3])]), 'x.png');
+
+    await bridgeOver(seen).request('/probe/echo', { method: 'POST', body: form });
+
+    expect(seen.body).toBeUndefined();
+    expect((await seen.request?.formData())?.has('file')).toBe(true);
   });
 });

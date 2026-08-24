@@ -28,11 +28,25 @@ import type { MountedRoute, WireResponse } from '@12-apps/wiring';
 /** Resolve the caller; `null` answers 401 before any handler runs. */
 export type ResolveWireActor = (c: Context) => Promise<unknown> | unknown;
 
+/**
+ * The parsed JSON body — read from a CLONE, so the raw request below is still
+ * readable.
+ *
+ * `c.req.json()` consumes the underlying stream, and a handler that then
+ * reaches for `request.request` gets `ReadableStream is locked`. That is not
+ * hypothetical: `@12-apps/storage` streams a multipart upload straight to its
+ * driver, so it needs the raw request on the very routes whose body this would
+ * otherwise have eaten. Cloning is what lets one bridge serve both kinds of
+ * handler without asking a route to declare which it is.
+ */
 async function readBody(c: Context): Promise<unknown> {
   if (c.req.method === 'GET' || c.req.method === 'DELETE') return undefined;
   try {
-    return await c.req.json();
+    return await c.req.raw.clone().json();
   } catch {
+    // A malformed body — or a multipart one, which was never JSON. Either way
+    // the handler's own validation reports it better than a parse failure
+    // would.
     return undefined;
   }
 }
@@ -61,6 +75,20 @@ export function honoRouterFor(
         params: c.req.param() as Record<string, string | undefined>,
         query: c.req.query() as Record<string, string | undefined>,
         body: await readBody(c),
+        // The raw `Request`, forwarded for the handlers the parsed fields
+        // cannot serve — a webhook verifying a signature over the exact bytes,
+        // an SSE stream reading `Last-Event-ID`, a multipart upload streaming
+        // to a driver. The contract says the host's adapter populates it for
+        // `webhook` and `stream` routes "and may for the rest", and this one
+        // does: forwarding it costs nothing (it is the object Hono already
+        // holds), while NOT forwarding it is a runtime throw a package can
+        // only report at the first request that needed it —
+        // `@12-apps/storage` says exactly that, by name.
+        //
+        // A JSON handler must still not come to depend on it: `params`,
+        // `query` and `body` are the halves every adapter is obliged to fill,
+        // and they stay the ones the packages here read.
+        request: c.req.raw,
       });
       return respond(c, response);
     });
