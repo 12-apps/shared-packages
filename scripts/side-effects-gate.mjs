@@ -9,8 +9,8 @@
 // ## Why it is worth saying
 //
 // Without it a bundler must assume any module reachable from a barrel might do
-// work at import time, so it keeps them. Measured on the Future Pay storefront,
-// whose `closed-store-gate.tsx` imports exactly one predicate —
+// work at import time, so it keeps them. Measured in an adopting storefront,
+// where a single always-mounted module imports exactly one predicate —
 // `hostedCheckoutReturnPending` — from `@12-apps/payments-frontend`'s root: the
 // eager chunk retained ~200 modules of this package, the whole PIX checkout
 // view, `qrcode-generator` and `react-qr-code`. Declaring these flags took that
