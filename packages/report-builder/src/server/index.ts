@@ -8,6 +8,11 @@ export {
   type ReportResponse,
   type ReportRoute,
 } from './create-report-builder';
+export {
+  messagesOf,
+  type ReportCopyResolver,
+  type ReportCopySource,
+} from './context';
 /**
  * The period a report runs over. Exported because a host resolves the SAME
  * window for its own non-report surfaces (a dashboard tile, an export), and

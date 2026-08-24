@@ -1,3 +1,4 @@
+import { EN_US_REPORT_SERVER_MESSAGES } from '../en-US';
 import { PT_BR_REPORT_SERVER_MESSAGES } from '../pt-BR';
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { describe, expect, it } from 'vitest';
@@ -8,6 +9,7 @@ import type { ReportWindow } from '../adapter-shared';
 import {
   createApiReportBuilder,
   type ReportActor,
+  type ReportBuilderServerConfig,
   type ReportResponse,
   type ReportRoute,
 } from '../create-report-builder';
@@ -123,6 +125,7 @@ interface Harness {
       params?: Record<string, string | undefined>;
       query?: Record<string, string | undefined>;
       body?: unknown;
+      locale?: string;
     },
   ): Promise<ReportResponse>;
   stored(): SavedReportRecord[];
@@ -142,6 +145,8 @@ function setup(
     seed?: SavedReportRecord[];
     duplicateName?: boolean;
     systemReports?: SystemReportDef[];
+    /** A resolver rather than a pack, for the bilingual cases below. */
+    messages?: ReportBuilderServerConfig['messages'];
   } = {},
 ): Harness {
   const state = { rows: options.seed ?? [record()], next: 1 };
@@ -184,7 +189,7 @@ function setup(
   const { routes } = createApiReportBuilder({
     catalog: CATALOG,
     copy: PT_BR_REPORT_ENGINE_COPY,
-    messages: PT_BR_REPORT_SERVER_MESSAGES,
+    messages: options.messages ?? PT_BR_REPORT_SERVER_MESSAGES,
     // A FACTORY, so the window each request resolves is observable: an adapter
     // that never saw the window would silently report on all of history.
     adapter: ({ window }) => {
@@ -218,6 +223,7 @@ function setup(
         params: request.params ?? {},
         query: request.query ?? {},
         body: request.body,
+        ...(request.locale === undefined ? {} : { locale: request.locale }),
       });
     },
     stored: () => state.rows,
@@ -683,5 +689,59 @@ describe('the dry run', () => {
 
     expect(response.status).toBe(400);
     expect((response.body as { error: string }).error).toMatch(/fantasma/);
+  });
+});
+
+describe('one mount, two languages', () => {
+  /**
+   * The property the resolver form of the copy port exists for: these routes
+   * are built ONCE per process and the language changes per caller. Every case
+   * above passes either way, which is exactly why this one is here.
+   *
+   * `messagesOf(config, locale)` is called at each of the ~28 use sites rather
+   * than once where the routes are assembled — that is the whole adoption, and
+   * the two cases below cover both halves of it: a route file's own refusal,
+   * and the shared `forbidden` helper in `context.ts`.
+   */
+  const bilingual = (): Harness =>
+    setup({
+      // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out so
+      // this package keeps no dependency on it.
+      messages: ({ locale }) =>
+        locale === 'en-US' ? EN_US_REPORT_SERVER_MESSAGES : PT_BR_REPORT_SERVER_MESSAGES,
+    });
+
+  const errorOf = (response: ReportResponse): string =>
+    (response.body as { error: string }).error;
+
+  /** An actor with no authoring permission — the 403 every write answers. */
+  const reader = (): ReportActor => actor({ permissions: [] });
+
+  it('answers a write refusal in each caller’s language', async () => {
+    const { call } = bilingual();
+    const pt = await call('POST', '/reports/custom', { actor: reader(), body: {}, locale: 'pt-BR' });
+    const en = await call('POST', '/reports/custom', { actor: reader(), body: {}, locale: 'en-US' });
+    expect(errorOf(pt)).toBe(PT_BR_REPORT_SERVER_MESSAGES.forbiddenCreate);
+    expect(errorOf(en)).toBe(EN_US_REPORT_SERVER_MESSAGES.forbiddenCreate);
+  });
+
+  it('hands an absent locale to the resolver rather than refusing', async () => {
+    // A host with one audience populates nothing. The resolver decides what no
+    // answer means, and here it means the default.
+    const { call } = bilingual();
+    const response = await call('POST', '/reports/custom', { actor: reader(), body: {} });
+    expect(errorOf(response)).toBe(PT_BR_REPORT_SERVER_MESSAGES.forbiddenCreate);
+  });
+
+  it('leaves a plain-value host byte-identical', async () => {
+    // The whole compatibility claim: words rather than a resolver behaves
+    // exactly as before the field widened.
+    const { call } = setup();
+    const response = await call('POST', '/reports/custom', {
+      actor: reader(),
+      body: {},
+      locale: 'en-US',
+    });
+    expect(errorOf(response)).toBe(PT_BR_REPORT_SERVER_MESSAGES.forbiddenCreate);
   });
 });
