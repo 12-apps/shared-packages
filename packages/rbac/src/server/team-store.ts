@@ -41,6 +41,17 @@ export interface TeamStoreCtx {
   directory: RbacUserDirectory;
 }
 
+/**
+ * The team roster's write and read paths.
+ *
+ * Every method that can REFUSE takes a trailing optional `locale` — the caller's
+ * language, forwarded by whatever holds the request. It is last and optional
+ * because it is not part of what the method DOES: omit it and the refusal takes
+ * the default rendering of the host's `messages`, which is a single-audience
+ * host's whole behaviour. The reads that answer no sentence of their own
+ * (`listTenantMemberExtraRoles`, `getMemberRole`) do not take one, because a
+ * parameter they never read would be a claim they do something they do not.
+ */
 export interface TeamStore {
   listTeamPage(
     tenantId: string,
@@ -51,14 +62,30 @@ export interface TeamStore {
   listTenantMemberExtraRoles(tenantId: string): Promise<Map<string, string[]>>;
   /** The actor's own base role at the tenant, or null (not a member). */
   getMemberRole(tenantId: string, userId: string): Promise<string | null>;
-  setMemberRole(tenantId: string, userId: string, role: string): Promise<void>;
-  grantCustomRoleToMember(tenantId: string, userId: string, roleName: string): Promise<void>;
-  revokeCustomRoleFromMember(tenantId: string, userId: string, roleName: string): Promise<void>;
-  setMembershipActive(tenantId: string, userId: string, active: boolean): Promise<void>;
+  setMemberRole(tenantId: string, userId: string, role: string, locale?: string): Promise<void>;
+  grantCustomRoleToMember(
+    tenantId: string,
+    userId: string,
+    roleName: string,
+    locale?: string,
+  ): Promise<void>;
+  revokeCustomRoleFromMember(
+    tenantId: string,
+    userId: string,
+    roleName: string,
+    locale?: string,
+  ): Promise<void>;
+  setMembershipActive(
+    tenantId: string,
+    userId: string,
+    active: boolean,
+    locale?: string,
+  ): Promise<void>;
   removeTenantMemberGuarded(
     tenantId: string,
     userId: string,
     actor: RbacActorTier,
+    locale?: string,
   ): Promise<void>;
 }
 
@@ -307,14 +334,27 @@ type TeamStoreConfig<P extends string> = Pick<
 >;
 
 export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): TeamStore {
-  const ctx: TeamStoreCtx = {
+  const base = {
     db: config.db,
     audit: fencedAudit(config.audit),
-    messages: messagesOf(config),
     ownerRoles: new Set(ownerRolesOf(config)),
     customerRole: config.customerRole,
     directory: config.directory,
   };
+  /**
+   * The context for ONE call, with that caller's words already chosen.
+   *
+   * Built per call rather than once per store, which is the whole adoption:
+   * this store is constructed at boot and lives for the process, so a
+   * `messages` resolved here would answer every reader in the language the
+   * process started with. Everything below still reads `ctx.messages` as a
+   * plain value, so no store function had to learn about locales.
+   */
+  const ctxFor = (locale?: string): TeamStoreCtx => ({
+    ...base,
+    messages: messagesOf(config, locale),
+  });
+  const ctx = ctxFor();
   return {
     listTeamPage: (tenantId, query) => listTeamPage(ctx, tenantId, query),
     getTenantMemberDetail: (tenantId, userId) => getTenantMemberDetail(ctx, tenantId, userId),
@@ -330,14 +370,15 @@ export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): T
       if (!row || !row.active) return null;
       return row.role;
     },
-    setMemberRole: (tenantId, userId, role) => setMemberRole(ctx, tenantId, userId, role),
-    grantCustomRoleToMember: (tenantId, userId, roleName) =>
-      grantCustomRoleToMember(ctx, tenantId, userId, roleName),
-    revokeCustomRoleFromMember: (tenantId, userId, roleName) =>
-      revokeCustomRoleFromMember(ctx, tenantId, userId, roleName),
-    setMembershipActive: (tenantId, userId, active) =>
-      setMembershipActive(ctx, tenantId, userId, active),
-    removeTenantMemberGuarded: (tenantId, userId, actor) =>
-      removeTenantMemberGuarded(ctx, tenantId, userId, actor),
+    setMemberRole: (tenantId, userId, role, locale) =>
+      setMemberRole(ctxFor(locale), tenantId, userId, role),
+    grantCustomRoleToMember: (tenantId, userId, roleName, locale) =>
+      grantCustomRoleToMember(ctxFor(locale), tenantId, userId, roleName),
+    revokeCustomRoleFromMember: (tenantId, userId, roleName, locale) =>
+      revokeCustomRoleFromMember(ctxFor(locale), tenantId, userId, roleName),
+    setMembershipActive: (tenantId, userId, active, locale) =>
+      setMembershipActive(ctxFor(locale), tenantId, userId, active),
+    removeTenantMemberGuarded: (tenantId, userId, actor, locale) =>
+      removeTenantMemberGuarded(ctxFor(locale), tenantId, userId, actor),
   };
 }

@@ -51,8 +51,9 @@ interface TeamRouteDeps<P extends string> {
 async function requireAdminTier<P extends string>(
   deps: TeamRouteDeps<P>,
   actor: RbacActor,
+  locale?: string,
 ): Promise<RbacActorTier> {
-  const messages = messagesOf(deps.config);
+  const messages = messagesOf(deps.config, locale);
   const adminRoles = new Set(deps.config.adminRoles);
   if (actor.isSuper) return { role: null, isPlatformActor: true };
   if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
@@ -83,9 +84,9 @@ function rosterRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
   return {
     method: 'GET',
     path: '/team',
-    async handle({ actor, query }) {
+    async handle({ actor, query, locale }) {
       try {
-        await requireAdminTier(deps, actor);
+        await requireAdminTier(deps, actor, locale);
         const page = await deps.team.listTeamPage(actor.tenantId, parseTeamListQuery(query));
         return pageResponse(page.data, page.pagination);
       } catch (error) {
@@ -99,10 +100,10 @@ function inviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
   return {
     method: 'POST',
     path: '/team',
-    async handle({ actor, body }) {
+    async handle({ actor, body, locale }) {
       try {
-        await requireAdminTier(deps, actor);
-        const messages = messagesOf(deps.config);
+        await requireAdminTier(deps, actor, locale);
+        const messages = messagesOf(deps.config, locale);
         // Accountless invites need storage this package does not own — the
         // optional invites port; without it the affordance does not exist.
         if (!deps.config.invites) {
@@ -137,9 +138,9 @@ function contextRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
   return {
     method: 'GET',
     path: '/team/context',
-    async handle({ actor }) {
+    async handle({ actor, locale }) {
       try {
-        await requireAdminTier(deps, actor);
+        await requireAdminTier(deps, actor, locale);
         // Same gate as the member-detail read: the context exposes invite
         // e-mails and per-member role assignments.
         await requirePermission(deps, actor, gatesOf(deps.config).readTeam);
@@ -168,11 +169,11 @@ function cancelInviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
   return {
     method: 'DELETE',
     path: '/team/invites/:inviteId',
-    async handle({ actor, params }) {
+    async handle({ actor, params, locale }) {
       try {
-        await requireAdminTier(deps, actor);
+        await requireAdminTier(deps, actor, locale);
         await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         if (!deps.config.invites) {
           return { status: 501, body: { error: messages.invitesNotConfigured } };
         }
@@ -197,11 +198,11 @@ function memberDetailRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
   return {
     method: 'GET',
     path: '/team/:userId',
-    async handle({ actor, params }) {
+    async handle({ actor, params, locale }) {
       try {
-        await requireAdminTier(deps, actor);
+        await requireAdminTier(deps, actor, locale);
         await requirePermission(deps, actor, gatesOf(deps.config).readTeam);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         const member = await deps.team.getTenantMemberDetail(
           actor.tenantId,
           requireParam(params, 'userId', messages),
@@ -234,11 +235,11 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
   return {
     method: 'PATCH',
     path: '/team/:userId',
-    async handle({ actor, params, body }) {
+    async handle({ actor, params, body, locale }) {
       try {
-        await requireAdminTier(deps, actor);
+        await requireAdminTier(deps, actor, locale);
         await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.setMemberRoleBody, body, messages);
         const userId = requireParam(params, 'userId', messages);
         // The BASE role is a closed set — the non-owner template names, or
@@ -263,7 +264,7 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
         // The shared governance (escalation / scope-ceiling / SoD /
         // owner-protected) runs BEFORE the write.
         await deps.governance.assertCanGrantRole(actor, input.role, userId);
-        await deps.team.setMemberRole(actor.tenantId, userId, input.role);
+        await deps.team.setMemberRole(actor.tenantId, userId, input.role, locale);
         return ok({ status: 'updated' as const, role: input.role });
       } catch (error) {
         return foldApiError(error);
@@ -276,13 +277,14 @@ function removeMemberRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
   return {
     method: 'DELETE',
     path: '/team/:userId',
-    async handle({ actor, params }) {
+    async handle({ actor, params, locale }) {
       try {
-        const tier = await requireAdminTier(deps, actor);
+        const tier = await requireAdminTier(deps, actor, locale);
         await deps.team.removeTenantMemberGuarded(
           actor.tenantId,
-          requireParam(params, 'userId', messagesOf(deps.config)),
+          requireParam(params, 'userId', messagesOf(deps.config, locale)),
           tier,
+          locale,
         );
         return ok({ status: 'removed' as const });
       } catch (error) {
@@ -296,16 +298,17 @@ function memberStatusRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
   return {
     method: 'PATCH',
     path: '/team/:userId/status',
-    async handle({ actor, params, body }) {
+    async handle({ actor, params, body, locale }) {
       try {
-        await requireAdminTier(deps, actor);
+        await requireAdminTier(deps, actor, locale);
         await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.setMemberActiveBody, body, messages);
         await deps.team.setMembershipActive(
           actor.tenantId,
           requireParam(params, 'userId', messages),
           input.active,
+          locale,
         );
         return ok({ status: 'updated' as const });
       } catch (error) {
@@ -319,14 +322,14 @@ function grantMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRou
   return {
     method: 'POST',
     path: '/team/:userId/roles',
-    async handle({ actor, params, body }) {
+    async handle({ actor, params, body, locale }) {
       try {
         await requirePermission(deps, actor, gatesOf(deps.config).manageRoles);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.grantMemberRoleBody, body, messages);
         const userId = requireParam(params, 'userId', messages);
         await deps.governance.assertCanGrantRole(actor, input.role, userId);
-        await deps.team.grantCustomRoleToMember(actor.tenantId, userId, input.role);
+        await deps.team.grantCustomRoleToMember(actor.tenantId, userId, input.role, locale);
         return ok({ status: 'granted' as const, role: input.role });
       } catch (error) {
         return foldApiError(error);
@@ -339,15 +342,16 @@ function revokeMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRo
   return {
     method: 'DELETE',
     path: '/team/:userId/roles/:role',
-    async handle({ actor, params }) {
+    async handle({ actor, params, locale }) {
       try {
         await requirePermission(deps, actor, gatesOf(deps.config).manageRoles);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         // Idempotent — revoking a role the member doesn't hold is a no-op.
         await deps.team.revokeCustomRoleFromMember(
           actor.tenantId,
           requireParam(params, 'userId', messages),
           requireParam(params, 'role', messages),
+          locale,
         );
         return ok({ status: 'revoked' as const });
       } catch (error) {

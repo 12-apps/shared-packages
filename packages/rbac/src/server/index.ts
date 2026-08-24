@@ -20,6 +20,8 @@ export {
   type RbacAuditSink,
   type RbacGatePermissions,
   type RbacInvitesPort,
+  type RbacCopyResolver,
+  type RbacCopySource,
   type RbacMessages,
   type RbacPendingInvite,
   type RbacRequest,
