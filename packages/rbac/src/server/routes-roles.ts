@@ -77,20 +77,24 @@ function createRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
   return {
     method: 'POST',
     path: '/roles',
-    async handle({ actor, body }) {
+    async handle({ actor, body, locale }) {
       try {
         await requireManageRoles(deps, actor);
-        const input = parseBody(deps.wire.roleWriteBody, body, messagesOf(deps.config));
+        const input = parseBody(deps.wire.roleWriteBody, body, messagesOf(deps.config, locale));
         // Governance runs BEFORE the write (immediate feedback).
         await deps.governance.assertCanCreateRole(actor, {
           name: input.name,
           permissions: input.permissions,
         });
-        const role = await deps.roles.createTenantRole(actor.tenantId, {
-          name: input.name,
-          description: input.description ?? null,
-          permissions: input.permissions,
-        });
+        const role = await deps.roles.createTenantRole(
+          actor.tenantId,
+          {
+            name: input.name,
+            description: input.description ?? null,
+            permissions: input.permissions,
+          },
+          locale,
+        );
         return ok(role);
       } catch (error) {
         return foldApiError(error);
@@ -103,10 +107,10 @@ function updateRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
   return {
     method: 'PATCH',
     path: '/roles/:id',
-    async handle({ actor, params, body }) {
+    async handle({ actor, params, body, locale }) {
       try {
         await requireManageRoles(deps, actor);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.roleWriteBody, body, messages);
         await deps.governance.assertCanCreateRole(actor, {
           name: input.name,
@@ -120,6 +124,7 @@ function updateRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
             description: input.description ?? null,
             permissions: input.permissions,
           },
+          locale,
         );
         // A stale id or another tenant's row → 404.
         return role ? ok(role) : { status: 404, body: { error: messages.roleNotFound } };
@@ -134,13 +139,14 @@ function deleteRoleRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
   return {
     method: 'DELETE',
     path: '/roles/:id',
-    async handle({ actor, params }) {
+    async handle({ actor, params, locale }) {
       try {
         await requireManageRoles(deps, actor);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         const deleted = await deps.roles.deleteTenantRole(
           requireParam(params, 'id', messages),
           actor.tenantId,
+          locale,
         );
         return deleted
           ? ok({ status: 'deleted' as const })
@@ -156,10 +162,10 @@ function overrideTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRo
   return {
     method: 'PUT',
     path: '/roles/templates/:name',
-    async handle({ actor, params, body }) {
+    async handle({ actor, params, body, locale }) {
       try {
         await requireManageRoles(deps, actor);
-        const messages = messagesOf(deps.config);
+        const messages = messagesOf(deps.config, locale);
         const name = requireParam(params, 'name', messages);
         deps.governance.assertEditableTemplateName(name);
         const input = parseBody(deps.wire.templateOverrideBody, body, messages);
@@ -167,10 +173,15 @@ function overrideTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRo
           name,
           permissions: input.permissions,
         });
-        const role = await deps.roles.upsertTemplateOverride(actor.tenantId, name, {
-          description: input.description ?? null,
-          permissions: input.permissions,
-        });
+        const role = await deps.roles.upsertTemplateOverride(
+          actor.tenantId,
+          name,
+          {
+            description: input.description ?? null,
+            permissions: input.permissions,
+          },
+          locale,
+        );
         return ok(role);
       } catch (error) {
         return foldApiError(error);
@@ -195,10 +206,10 @@ function resetTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute
   return {
     method: 'DELETE',
     path: '/roles/templates/:name',
-    async handle({ actor, params }) {
+    async handle({ actor, params, locale }) {
       try {
         await requireManageRoles(deps, actor);
-        const name = requireParam(params, 'name', messagesOf(deps.config));
+        const name = requireParam(params, 'name', messagesOf(deps.config, locale));
         deps.governance.assertEditableTemplateName(name);
         const seedPermissions = deps.roles.templateSeedPermissions(name);
         // An unseeded name writes nothing, so there is nothing to govern: it
@@ -209,7 +220,7 @@ function resetTemplateRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute
             permissions: seedPermissions,
           });
         }
-        await deps.roles.resetTemplateRole(actor.tenantId, name);
+        await deps.roles.resetTemplateRole(actor.tenantId, name, locale);
         // Reset is idempotent — a no-op still answers `reset`.
         return ok({ status: 'reset' as const });
       } catch (error) {

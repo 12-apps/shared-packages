@@ -41,6 +41,16 @@ export interface RbacRequest {
   params: Record<string, string | undefined>;
   query: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** What a handler answers with; the host maps this onto its response type. */
@@ -300,7 +310,7 @@ export interface RbacServerConfig<
    * verbatim what the origin host's routes said; requiring it turns that
    * choice into a line in the host's diff instead of a silence.
    */
-  messages: RbacMessages;
+  messages: RbacCopySource<RbacMessages>;
 }
 
 /** A user-safe API error carrying the HTTP status the wire promises. */
@@ -348,9 +358,35 @@ export function pageResponse(data: unknown[], pagination: PaginationMeta): RbacR
   return { status: 200, body: { data, pagination } };
 }
 
-/** The messages in force — REQUIRED host config; pt-BR ships as `./pt-BR`. */
-export function messagesOf(config: { messages: RbacMessages }): RbacMessages {
-  return config.messages;
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type RbacCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type RbacCopySource<T> = T | RbacCopyResolver<T>;
+
+/**
+ * The messages in force — REQUIRED host config; pt-BR ships as `./pt-BR`.
+ *
+ * Call this where the sentence is USED, never once when a surface is built: the
+ * route table and the team store are both assembled at boot, so a value read
+ * there answers every reader in the language the process started with — and a
+ * single-locale host cannot tell the difference. Every call site here already
+ * had this shape, which is what kept the adoption to one argument.
+ */
+export function messagesOf(
+  config: { messages: RbacCopySource<RbacMessages> },
+  locale?: string,
+): RbacMessages {
+  const source = config.messages;
+  return typeof source === 'function'
+    ? (source as RbacCopyResolver<RbacMessages>)({ locale })
+    : source;
 }
 
 /** The gate permission ids in force. */
