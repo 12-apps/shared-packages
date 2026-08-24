@@ -21,6 +21,7 @@ import { PaymentsProviderConnectPage } from './payments-provider-connect';
 import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
 import { PaymentsProviderSettingsPage } from './payments-provider-settings';
 import { PaymentsWalletPage } from './payments-wallet';
+import { PaymentsWiringPage } from './payments-wiring';
 
 /**
  * `@12-apps/payments-frontend`'s pages, as two exports the registry spreads in.
@@ -156,6 +157,12 @@ export const PAYMENTS_STOREFRONT_PAGES: readonly HarnessPage[] = [
  * Titles name only what VARIES; the parent row already says "Provider settings".
  */
 export const PAYMENTS_ADMIN_PAGES: readonly HarnessPage[] = [
+  {
+    ...PAYMENTS_ADMIN,
+    slug: 'payments-wiring',
+    title: 'Adopted surfaces',
+    Component: PaymentsWiringPage,
+  },
   {
     ...PAYMENTS_ADMIN,
     slug: 'payments-provider-settings',
