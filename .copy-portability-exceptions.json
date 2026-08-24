@@ -1,5 +1,14 @@
 {
-  "packages/payments/backend/src/platform/homologacao-anexo.ts": "PERMANENT — what remains is the anexo's own Portuguese STRUCTURE, which is the document PagBank's reviewer reads: 'ANEXO DE HOMOLOGACAO', 'Ambiente dos testes', 'Credenciais', the redaction note, and PagBank's service names. Translating any of it produces a submission their form does not accept. The three parts that WERE the origin host's — the integration narrative, and the guide's products and access answers beside it — became required facts on the input (FUT-760)",
-  "packages/payments/backend/src/platform/homologacao-guide.ts": "PERMANENT — 'Desenvolvimento proprio' and 'API de Pedidos e Pagamentos (Order)' are OPTIONS on PagBank's Pipefy form, and a translated option is a rejected submission. The three answers that described the origin host's business — what it sells, how a reviewer signs in, the SLA it promises — are required facts now, with the pt-BR wording available as a sample pack a host reads before adopting (FUT-760)",
-  "packages/payments/backend/src/providers/pagbank-vault.ts": "PERMANENT — the sentence is English; the only Portuguese in it is PagBank's own field name, quoted so an owner can find the box. \"Chave publica\" is what PagBank's dashboard calls it, exactly as Stripe's form says \"Secret key (sk_...)\", and translating a vendor's label sends someone hunting for a field that does not exist under that name (FUT-760)"
+  "packages/payments/backend/src/platform/homologacao-anexo.ts": {
+    "kind": "exempt",
+    "why": "what remains is the anexo's own Portuguese STRUCTURE, which is the document PagBank's reviewer reads: 'ANEXO DE HOMOLOGACAO', 'Ambiente dos testes', 'Credenciais', the redaction note, and PagBank's service names. Translating any of it produces a submission their form does not accept. The three parts that WERE the origin host's — the integration narrative, and the guide's products and access answers beside it — became required facts on the input (FUT-760)"
+  },
+  "packages/payments/backend/src/platform/homologacao-guide.ts": {
+    "kind": "exempt",
+    "why": "'Desenvolvimento proprio' and 'API de Pedidos e Pagamentos (Order)' are OPTIONS on PagBank's Pipefy form, and a translated option is a rejected submission. The three answers that described the origin host's business — what it sells, how a reviewer signs in, the SLA it promises — are required facts now, with the pt-BR wording available as a sample pack a host reads before adopting (FUT-760)"
+  },
+  "packages/payments/backend/src/providers/pagbank-vault.ts": {
+    "kind": "exempt",
+    "why": "the sentence is English; the only Portuguese in it is PagBank's own field name, quoted so an owner can find the box. \"Chave publica\" is what PagBank's dashboard calls it, exactly as Stripe's form says \"Secret key (sk_...)\", and translating a vendor's label sends someone hunting for a field that does not exist under that name (FUT-760)"
+  }
 }

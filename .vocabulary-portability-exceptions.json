@@ -1,4 +1,10 @@
 {
-  "packages/payments/backend/src/platform/homologacao-anexo.ts": "PERMANENT — the remaining 'pedido'/'pagamento' are inside PagBank's own service name ('API de Pedidos e Pagamentos'), not this repo's vocabulary. The narrative that DID describe multi-tenant lojas is a required host fact now (FUT-760)",
-  "packages/payments/backend/src/platform/homologacao-guide.ts": "PERMANENT — 'pedido'/'pagamento' survive only in PagBank's service name and in a link to their own documentation page. The products answer that named cardapios, lojas and restaurants is a required host fact now (FUT-760)"
+  "packages/payments/backend/src/platform/homologacao-anexo.ts": {
+    "kind": "exempt",
+    "why": "the remaining 'pedido'/'pagamento' are inside PagBank's own service name ('API de Pedidos e Pagamentos'), not this repo's vocabulary. The narrative that DID describe multi-tenant lojas is a required host fact now (FUT-760)"
+  },
+  "packages/payments/backend/src/platform/homologacao-guide.ts": {
+    "kind": "exempt",
+    "why": "'pedido'/'pagamento' survive only in PagBank's service name and in a link to their own documentation page. The products answer that named cardapios, lojas and restaurants is a required host fact now (FUT-760)"
+  }
 }

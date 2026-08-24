@@ -38,6 +38,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+import { checkLedger, readLedger, summarize } from "./lib/exception-ledger.mjs";
 import { inScope } from "./lib/shipped-source.mjs";
 
 export { inScope };
@@ -121,11 +122,6 @@ function scanRepo() {
   return findings;
 }
 
-function readExceptions() {
-  if (!existsSync(EXCEPTIONS_PATH)) return {};
-  return JSON.parse(readFileSync(EXCEPTIONS_PATH, "utf8"));
-}
-
 function selftest() {
   const cases = [
     [firstLeakLine('const a = "Não autenticado.";') === 1, "accented string is a leak"],
@@ -151,31 +147,28 @@ function selftest() {
 function main() {
   if (!selftest()) process.exit(1);
   const findings = scanRepo();
-  const exceptions = readExceptions();
-  const failures = [];
-  for (const [path, line] of findings) {
-    if (!(path in exceptions)) {
-      failures.push(
-        `pt-BR in shipped source: ${path}:${line} — copy is host vocabulary. Move it behind ` +
-          `required copy config, or ship it as a named pt-BR pack a host imports by hand.`,
-      );
-    }
-  }
-  for (const path of Object.keys(exceptions)) {
-    if (!findings.has(path)) {
-      failures.push(
-        `stale exception: ${path} no longer leaks (or no longer exists) — delete its line from ${EXCEPTIONS_PATH}`,
-      );
-    }
-  }
+  const ledger = readLedger(EXCEPTIONS_PATH, { existsSync, readFileSync });
+  const { failures, counts } = checkLedger({
+    findings: new Set(findings.keys()),
+    ledger,
+    ledgerPath: EXCEPTIONS_PATH,
+    unlisted: (path) =>
+      `pt-BR in shipped source: ${path}:${findings.get(path)} — copy is host vocabulary. Move it ` +
+      `behind required copy config, or ship it as a named pt-BR pack a host imports by hand.`,
+  });
   if (failures.length > 0) {
     console.error(`${LABEL} ${failures.length} violation(s):`);
     for (const failure of failures) console.error(`  ✗ ${failure}`);
     process.exit(1);
   }
-  const grandfathered = Object.keys(exceptions).length;
   console.log(
-    `${LABEL} clean — ${findings.size} pt-BR file(s), all ${grandfathered} grandfathered (shrink-only; the burn-down is each package's adoption wave).`,
+    summarize({
+      label: LABEL,
+      total: findings.size,
+      noun: "pt-BR file(s)",
+      counts,
+      burndown: "the burn-down is each package's adoption wave",
+    }),
   );
 }
 
