@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, type JSX } from 'react';
 
-import {
-  createWebEntityLifecycle,
-  PT_BR_LIFECYCLE_WEB_COPY,
-} from '@12-apps/entity-lifecycle/react';
+import type { createWebEntityLifecycle } from '@12-apps/entity-lifecycle/react';
+import { PT_BR_LIFECYCLE_WEB_COPY } from '@12-apps/entity-lifecycle/react';
 import type { DraftWire } from '@12-apps/entity-lifecycle/react';
+import { entityLifecycleManifest } from '@12-apps/entity-lifecycle/manifest';
+import { entityLifecycleWebManifest } from '@12-apps/entity-lifecycle/manifest/web';
+
+import { webWiringHost } from '../wiring-web';
 
 /**
  * The whole wiring a frontend host performs for @12-apps/entity-lifecycle
@@ -37,12 +39,28 @@ import type { DraftWire } from '@12-apps/entity-lifecycle/react';
  */
 const ENTITY_TYPE_LABELS = { product: 'Produto', supplier: 'Fornecedor' };
 
-const lifecycle = createWebEntityLifecycle({
-  apiBase: '/api/admin/harness',
-  // The screens' sentences are required host config; this host is pt-BR.
-  copy: PT_BR_LIFECYCLE_WEB_COPY,
-  entityTypeLabels: ENTITY_TYPE_LABELS,
+/**
+ * Adopted through `@12-apps/wiring/consumer`. The surface is the same object
+ * `createWebEntityLifecycle` returns — the page, the history dialog, the draft
+ * banner and the api — built ONCE by the binder, which is the memoisation rule
+ * this wiring used to carry as a comment: the factory returns component types,
+ * and rebuilding one unmounts the tree under it.
+ */
+const { surface } = webWiringHost.adoptWeb({
+  manifest: entityLifecycleManifest,
+  web: entityLifecycleWebManifest,
+  bindings: {
+    surface: {
+      config: {
+        apiBase: '/api/admin/harness',
+        // The screens' sentences are required host config; this host is pt-BR.
+        copy: PT_BR_LIFECYCLE_WEB_COPY,
+        entityTypeLabels: ENTITY_TYPE_LABELS,
+      },
+    },
+  },
 });
+const lifecycle = surface as ReturnType<typeof createWebEntityLifecycle>;
 const { page: LifecycleSurface, VersionHistoryDialog, DraftBanner, api } = lifecycle;
 
 interface ItemWire {
