@@ -12,6 +12,9 @@
  * going to keep acquiring.
  */
 import type { PGlite } from '@electric-sql/pglite';
+import { wireFeatureFlags } from './feature-flags-host';
+import { wireReports } from './reports-host';
+import { savedReportDb } from './saved-report-db';
 import { createInlineRealtimeDriver } from '@12-apps/realtime';
 
 import { appShellHost } from './app-shell-host';
@@ -143,11 +146,26 @@ export async function provisionHosts(pg: PGlite): Promise<Hosts> {
     // 12-18: no migration and no table — the shell owns no model, so its state is a
     // Map here exactly as it is a column on `users` in a real adopter.
     appShell: appShellHost(),
+    // Built HERE rather than inline at their mount, like the eighteen above.
+    // Both already adopt through the consumer and both already return a
+    // report — the reports were simply dropped on the floor, because these two
+    // were constructed inside `mountSurfaces` and only their routers kept.
+    //
+    // That inconsistency was not cosmetic: it made two genuinely-adopted
+    // packages invisible to any check that asks "which packages did this
+    // backend answer for", which is exactly what
+    // `tests/manifest-adoption.test.ts` asks. A completeness gate reading an
+    // incomplete list reports false gaps, and a gate that cries wolf is one
+    // nobody trusts enough to keep.
+    featureFlags: wireFeatureFlags(),
+    reports: wireReports(savedReportDb(pg)),
   };
 }
 
 /** The mounted hosts one harness server is assembled from. */
 export interface Hosts {
+  featureFlags: ReturnType<typeof wireFeatureFlags>;
+  reports: ReturnType<typeof wireReports>;
   auth: ReturnType<typeof authHost>;
   rbac: ReturnType<typeof rbacHost>;
   audit: ReturnType<typeof auditHost>;

@@ -6,13 +6,12 @@ import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
 import { BILLING_MOUNT_PATH } from './billing-host';
-import { FEATURE_FLAGS_MOUNT_PATH, wireFeatureFlags } from './feature-flags-host';
+import { FEATURE_FLAGS_MOUNT_PATH } from './feature-flags-host';
 import { IMPERSONATION_PLATFORM_PATH, IMPERSONATION_TENANT_MOUNT } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { observabilityHarnessRoutes, observabilityRoutes } from './observability-host';
 import { mountPaymentsControls, PAYMENTS_MOUNT_PATH } from './payments-host';
 import { REALTIME_MOUNT_PATH } from './realtime-host';
-import { reportsRouter } from './reports-host';
 import { savedReportDb } from './saved-report-db';
 
 /**
@@ -51,12 +50,12 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // operator's surface. Its own prefix, so it sits with the other platform
   // mounts and ahead of the broader `/api` routes below. The reset control is
   // the packaged journeys' way back to the seeded cohort.
-  const featureFlags = wireFeatureFlags();
+  const featureFlags = hosts.featureFlags;
   app.route(FEATURE_FLAGS_MOUNT_PATH, featureFlags.router);
   app.route('/__harness/feature-flags', featureFlags.harnessRoutes);
 
   app.route('/api/admin/:tenantSlug', hosts.entitlements.router);
-  app.route('/api/admin/:tenantSlug', reportsRouter(savedReportDb(pg)));
+  app.route('/api/admin/:tenantSlug', hosts.reports.router);
   app.route('/api/admin/:tenantSlug', hosts.rbac.router);
   app.route('/api/admin/:tenantSlug', hosts.audit.router);
   app.route('/api/admin/:tenantSlug', hosts.onboarding.router);
