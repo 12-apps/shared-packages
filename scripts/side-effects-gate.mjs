@@ -60,6 +60,28 @@
 // A package with no declaration at all fails too. Tree-shakeability is part of
 // the published contract here, so "did not get round to it" is not a state a
 // new package may sit in.
+//
+// ## The globs describe SOURCE, and most of these packages ship a bundled dist
+//
+// This audits `src/**`, so an allowlist entry names a source file. Several
+// packages resolve their exports to a BUNDLED `dist` instead, where tsup has
+// already merged many source modules into one emitted chunk — so a glob like
+// `**/chart-spec-registry.*` matches nothing a consumer's bundler will ever
+// see, and for that build the package behaves as fully side-effect-free.
+//
+// That is sound rather than a hole, and it is worth knowing why. Bundling only
+// ever MERGES modules, and the effect and its observer merge together:
+// `@12-apps/ui`'s renderer registrations, the Map they write to and the getter
+// that reads it all land in one emitted chunk. Elision works on whole modules,
+// so it can only drop all three at once — which is the correct outcome, since
+// nothing imported them. The entry stays because it is the truthful statement
+// about the source this repo maintains, and because a chunk's emitted name is
+// content-derived and could not be listed here anyway.
+//
+// What WOULD break the reasoning is a package whose import-time effect is
+// observed from a DIFFERENT emitted chunk. None here is: every allowlisted file
+// either mutates a binding its own chunk owns, or is an e2e entry a bundler
+// never reaches.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
