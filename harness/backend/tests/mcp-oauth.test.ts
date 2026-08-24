@@ -325,6 +325,37 @@ describe('authorize — identity and the open-redirect guard', () => {
   });
 });
 
+describe('the ADOPTION, not just the mount', () => {
+  it('accounts for every capability @12-apps/mcp declares', () => {
+    // The claim `mcpOauthRouter(config)` could not make. A package a host
+    // mounts but never ADOPTS is not an unanswered capability — it is a package
+    // the report never hears about, so a declared surface can go unbound with
+    // nothing red.
+    const entry = backend.hosts.mcpOauth.report.packages.find(
+      (pkg) => pkg.packageName === '@12-apps/mcp',
+    );
+
+    expect(entry, 'the authorization server must appear in its own host report').toBeDefined();
+    const statuses = entry?.capabilities.map((capability) => capability.status) ?? [];
+    expect(statuses).not.toHaveLength(0);
+    expect(statuses).not.toContain('unanswered');
+    expect(statuses).not.toContain('unbound');
+  });
+
+  it('mounts every route as PUBLIC, which is what an authorization server is', () => {
+    // Every endpoint here is reached by a caller who has no session with this
+    // surface yet — that is the point of it. A bridge that gated them would 401
+    // the discovery documents and the token endpoint alike, which is a failure
+    // that looks like "the connector cannot find us".
+    const kinds = backend.hosts.mcpOauth.routes.map(
+      (mounted) => (mounted.route as { kind?: string }).kind ?? 'authenticated',
+    );
+
+    expect(kinds).not.toHaveLength(0);
+    expect(new Set(kinds)).toEqual(new Set(['public']));
+  });
+});
+
 describe('the authorization_code grant', () => {
   it('issues a token the resource server on this origin accepts', async () => {
     const { tokens } = await grant();

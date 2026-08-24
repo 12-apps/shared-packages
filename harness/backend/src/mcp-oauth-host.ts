@@ -17,8 +17,15 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { PGlite } from '@electric-sql/pglite';
+import { mcpManifest } from '@12-apps/mcp/manifest';
+import { mcpServerManifest } from '@12-apps/mcp/manifest/server';
 import { signingKeyProvider } from '@12-apps/mcp/oauth';
-import { mcpOauthRouter } from '@12-apps/mcp/hono';
+import { createWiringHost } from '@12-apps/wiring/consumer';
+
+/** The resource-server half the probe binds — see the note at its use. */
+type McpVerifyBearer = (bearer: string, request: Request) => Promise<unknown>;
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 import { mcpOauthDb } from './mcp-oauth-db';
 
@@ -83,8 +90,19 @@ export async function reseedMcpOauth(pg: PGlite): Promise<void> {
   await pg.exec('TRUNCATE TABLE oauth_clients, oauth_refresh_tokens, mcp_connections');
 }
 
-export function mcpOauthHost(pg: PGlite) {
-  return mcpOauthRouter({
+/**
+ * Where `mount-surfaces.ts` hangs the router: the ORIGIN ROOT.
+ *
+ * Not a prefix, and that is the package's requirement rather than a harness
+ * convenience — a connector reads `/.well-known/oauth-authorization-server`
+ * from the origin, so an authorization server mounted under `/api` is one no
+ * client can discover.
+ */
+export const MCP_OAUTH_MOUNT_PATH = '/';
+
+/** Everything `@12-apps/mcp/oauth` asks a host for. */
+function oauthConfig(pg: PGlite) {
+  return {
     stores: mcpOauthDb(pg),
     signingKey: signingKeyProvider(() => ({ pem: SIGNING_PEM, kid: MCP_SIGNING_KID })),
     /**
@@ -121,8 +139,62 @@ export function mcpOauthHost(pg: PGlite) {
      * protects an OPEN registration endpoint from minting a code for a client the
      * signed-in user never agreed to.
      */
-    resolveApproval: (request) => request.headers.get(APPROVAL_HEADER) !== 'deny',
+    resolveApproval: (request: Request) => request.headers.get(APPROVAL_HEADER) !== 'deny',
+  };
+}
+
+/**
+ * The OAuth 2.1 authorization server, ADOPTED rather than routed.
+ *
+ * This host used to call `mcpOauthRouter(config)` — the package's own Hono
+ * mount, which works and binds nothing. `@12-apps/mcp` declares
+ * `server: ['http']`, and a manifest no host adopts is not an unanswered
+ * capability: it is a package the wiring report never hears about. Same blind
+ * spot that left three WEB manifests unbound in the sibling harness, and the
+ * same one `@12-apps/app-shell` had.
+ *
+ * Every route is `public` — an authorization server's endpoints are reached by
+ * callers who have no session with it yet, which is the whole point — and each
+ * needs the RAW request forwarded, because the package's wire view throws
+ * without one rather than silently handling half a request. This harness's
+ * bridge does both, and that is not incidental: forwarding the raw request was
+ * one of the defects adopting these manifests found in the bridge itself.
+ */
+export function mcpOauthHost(pg: PGlite) {
+  const wiring = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
   });
+  wiring.adoptServer({
+    manifest: mcpManifest,
+    server: mcpServerManifest,
+    bindings: { http: { mountPath: MCP_OAUTH_MOUNT_PATH, config: oauthConfig(pg) } },
+  });
+  const wired = wiring.assemble();
+
+  /**
+   * The created surface itself, not just its routes.
+   *
+   * `assemble()` keys `http` by package name and hands back exactly what
+   * `http.create` returned — which for this package is more than a route table:
+   * `verifyBearer` is on it, and the harness's one-endpoint RESOURCE SERVER
+   * (`harness-mcp-probe.ts`) is bound to it.
+   *
+   * Worth stating because dropping it is what this conversion did first, and
+   * the suite caught it: `/whoami` answered 401 for a token the authorization
+   * server had just minted. That failure is the whole reason the probe exists —
+   * "minted for origin A, verified against origin B" only appears when both
+   * halves are real — so it failing here was the fixture working, not noise.
+   */
+  const api = wired.http[mcpManifest.name] as { verifyBearer: McpVerifyBearer };
+
+  return {
+    ...api,
+    router: honoRouterFor(wired.routes, () => null),
+    report: wired.report,
+    routes: wired.routes,
+  };
 }
 
 /** The mounted surface's type — inferred, so the handlers keep their shape. */
