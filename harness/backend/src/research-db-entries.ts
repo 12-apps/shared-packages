@@ -5,18 +5,44 @@
  * and answer different questions: these are the history, those are the
  * configuration.
  */
-import { Params, sourceRow, type SqlRunner } from './research-db-rows';
+import { normalizeText } from '@12-apps/product-research';
 import type { NormalizedManualRow, ResearchHttpStore } from '@12-apps/product-research/http';
 
-export function requestsGroup(sql: SqlRunner): ResearchHttpStore['requests'] {
+import { Params, sourceRow, type SqlRunner } from './research-db-rows';
+import {
+  LATEST_RUN_JOIN,
+  OFFER_VIEW_COLUMNS,
+  REQUEST_VIEW_COLUMNS,
+  toRequestView,
+  toRunView,
+} from './research-views';
+
+/**
+ * The history rows.
+ *
+ * `term_normalized` is written HERE, by the host, because the package's own
+ * migration says so — it backfills the column once and leaves it "kept in sync
+ * by the host on write". The value comes from the package's exported
+ * `normalizeText`, never from a second implementation beside it: the column
+ * exists so a lookup finds a term past renames and accent variants, and a host
+ * that folded accents its own way would index rows its own search could not
+ * find. The column is nullable and no write path fails without it, so the
+ * omission is silent — which is why the listing suite asserts an accented term
+ * is found by its unaccented spelling rather than asserting the column.
+ */
+export function requestsGroup(
+  sql: SqlRunner,
+  enqueue: ResearchHttpStore['requests']['enqueueRun'],
+): ResearchHttpStore['requests'] {
   return {
   async create(clientId, input) {
     const params = new Params();
     const { rows } = await sql.query<{ id: string }>(
       `INSERT INTO research_requests
-         (id, client_id, term, brand, ean, quantity, region, catalog_ref_type,
-          catalog_ref_id, requested_by)
+         (id, client_id, term, term_normalized, brand, ean, quantity, region,
+          catalog_ref_type, catalog_ref_id, requested_by)
        VALUES (gen_random_uuid()::text, ${params.add(clientId)}, ${params.add(input.term)},
+               ${params.add(normalizeText(input.term))},
                ${params.add(input.brand ?? null)}, ${params.add(input.ean ?? null)},
                ${params.add(input.quantity)}, ${params.add(input.region ?? null)},
                ${params.add(input.catalogRefType ?? null)},
@@ -33,46 +59,58 @@ export function requestsGroup(sql: SqlRunner): ResearchHttpStore['requests'] {
   async view(requestId, clientId) {
     const params = new Params();
     const { rows } = await sql.query<Record<string, unknown>>(
-      `SELECT r.id, r.term, r.quantity, r.region,
-              run.id AS "runId", run.status AS "runStatus"
+      `SELECT ${REQUEST_VIEW_COLUMNS}
          FROM research_requests r
-         LEFT JOIN research_runs run ON run.request_id = r.id
-        WHERE r.id = ${params.add(requestId)} AND r.client_id = ${params.add(clientId)}
-        ORDER BY run.created_at DESC LIMIT 1`,
+         ${LATEST_RUN_JOIN}
+        WHERE r.id = ${params.add(requestId)} AND r.client_id = ${params.add(clientId)}`,
       params.values,
     );
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row === undefined ? null : toRequestView(row);
   },
 
   async run(runId, clientId) {
     const params = new Params();
     const { rows } = await sql.query<Record<string, unknown>>(
-      `SELECT id, status, source_stats AS "sourceStats"
+      `SELECT id, request_id AS "requestId", status, source_stats AS "sourceStats",
+              error, started_at AS "startedAt", finished_at AS "finishedAt"
          FROM research_runs
         WHERE id = ${params.add(runId)} AND client_id = ${params.add(clientId)}`,
       params.values,
     );
-    return rows[0] ?? null;
+    const row = rows[0];
+    if (row === undefined) return null;
+    const offerParams = new Params();
+    const { rows: offers } = await sql.query<Record<string, unknown>>(
+      // NULLS LAST: an unranked offer is one the ranker never reached, and it
+      // belongs under the ranked ones rather than above them.
+      `SELECT ${OFFER_VIEW_COLUMNS}
+         FROM supplier_offers
+        WHERE run_id = ${offerParams.add(runId)} AND hidden_at IS NULL
+        ORDER BY rank ASC NULLS LAST`,
+      offerParams.values,
+    );
+    return toRunView(row, offers);
   },
 
   /**
    * Durable row first, then the enqueue — which must NEVER throw.
    *
-   * The package's own note: `enqueued: false` still answers 202, because a
-   * reconciliation sweep re-enqueues run-less requests. This host has no
-   * queue, so it always answers false — which is the honest answer and
-   * exercises the branch a host with a healthy queue never reaches.
+   * The enqueue itself is the HOST's (`research-worker.ts`): the package's own
+   * note is that `enqueued: false` still answers 202, because a reconciliation
+   * sweep re-enqueues run-less requests. So this is a seam a host fills with
+   * its queue, and the harness fills it with an INLINE worker — the same choice
+   * it makes for realtime, and the thing that makes the run screen's poll
+   * resolve here the way it resolves on a deploy.
    */
-  async enqueueRun() {
-    return { enqueued: false };
-  },
+  enqueueRun: enqueue,
   };
 }
 
 export function manualGroup(sql: SqlRunner): ResearchHttpStore['manual'] {
   return {
   async requireSource(sourceId, clientId) {
-    const row = await sourceRow(sourceId, clientId);
+    const row = await sourceRow(sql, sourceId, clientId);
     if (!row) throw new Error(`no source ${sourceId}`);
     return { id: row.id, name: row.name };
   },

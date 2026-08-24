@@ -36,7 +36,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { PT_BR_MARKET_VOCABULARY } from '@12-apps/product-research';
+import { normalizeText, PT_BR_MARKET_VOCABULARY } from '@12-apps/product-research';
 import {
   createApiProductResearch,
   type ResearchApi,
@@ -47,7 +47,12 @@ import {
   PT_BR_RESEARCH_MESSAGES,
 } from '@12-apps/product-research/pt-BR';
 
+import { Hono } from 'hono';
+
 import { applyResearchMigrations, researchStore } from './research-db';
+import { settleResearchRun } from './research-worker';
+import { Params, type SqlRunner } from './rbac-db-shared';
+import { LATEST_RUN_JOIN, REQUEST_VIEW_COLUMNS, toRequestView } from './research-views';
 import { honoRouterFor } from './wire-hono';
 
 export const RESEARCH_TENANT_ID = 'research-harness';
@@ -87,9 +92,21 @@ export const researchProbes = {
   credentialResult: null as ResearchCheckResult,
   /** `null` = the URL is acceptable; a string is the SSRF gate's own reason. */
   urlViolation: null as string | null,
+  /**
+   * Whether this host's queue accepted the run.
+   *
+   * `'inline'` settles it there and then — what makes the run screen's poll
+   * resolve here the way it resolves on a deploy. `'unavailable'` is the OTHER
+   * branch the package documents and a healthy host never reaches: the request
+   * is persisted, the answer is still 202, `enqueued` is false, and no run
+   * exists until a reconciliation sweep re-enqueues it. Neither is a failure,
+   * which is the whole point of the flag.
+   */
+  queue: 'inline' as 'inline' | 'unavailable',
   reset(): void {
     researchProbes.credentialResult = null;
     researchProbes.urlViolation = null;
+    researchProbes.queue = 'inline';
   },
 };
 
@@ -117,7 +134,11 @@ export function researchHost(pg: PGlite): ResearchApi & {
   router: ReturnType<typeof honoRouterFor>;
 } {
   const api = createApiProductResearch({
-    store: researchStore(pg),
+    store: researchStore(pg, async (clientId, requestId) => {
+      if (researchProbes.queue === 'unavailable') return { enqueued: false };
+      await settleResearchRun(pg, requestId, clientId);
+      return { enqueued: true };
+    }),
     diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
     vocabulary: PT_BR_MARKET_VOCABULARY,
     checks: {
@@ -153,6 +174,74 @@ export function researchHost(pg: PGlite): ResearchApi & {
       },
     ),
   };
+}
+
+/**
+ * The ONE research route that is deliberately the host's.
+ *
+ * The package declares sixteen descriptors and stops short of the history
+ * grid's `GET /research` listing, and says why: its query grammar and result
+ * envelope come from the host's own search machinery — facets, sort keys and
+ * pagination derived from a host grid config over host-named columns — so a
+ * descriptor there could only restate that config or drift from it.
+ *
+ * The START on the same path IS the package's. So this router mounts BESIDE
+ * the packaged one on the same prefix, and the two share a path while owning
+ * different verbs — which is the arrangement a real adopter has and the reason
+ * it is worth mounting here rather than skipping the listing entirely.
+ */
+export function researchListingRoutes(pg: PGlite): Hono {
+  const app = new Hono();
+  app.get('/research', async (c) => {
+    const userId = c.req.header(RESEARCH_USER_HEADER);
+    // The same refusal the packaged routes give, spelled by the host: a route
+    // beside a package's is still the host's to guard, and a listing that
+    // answered rows to a caller the surface next door refuses would be the
+    // whole tenant's history leaking through the one endpoint nobody adopted.
+    if (!userId) return c.json({ error: 'unauthenticated' }, 401);
+
+    const clientId = c.req.param('tenantSlug') ?? RESEARCH_TENANT_ID;
+    const term = c.req.query('term');
+    const pageSize = Math.min(Number(c.req.query('pageSize') ?? 10) || 10, 50);
+    const page = Math.max(Number(c.req.query('page') ?? 1) || 1, 1);
+    const params = new Params();
+    const where = [`r.client_id = ${params.add(clientId)}`];
+    // The host's own matching, over the column the package's migration
+    // backfilled for exactly this — and folded by the package's OWN
+    // `normalizeText`, the same function that wrote the column. Two foldings
+    // would index one spelling and search for another.
+    if (term) where.push(`r.term_normalized LIKE ${params.add(`%${normalizeText(term)}%`)}`);
+    const sql = pg as unknown as SqlRunner;
+    const { rows } = await sql.query<Record<string, unknown>>(
+      // The SAME columns and the SAME join the package's own request view uses
+      // (`research-views.ts`) — this route is the one place a host writes that
+      // wire shape by hand, so it must not be a second spelling of it.
+      `SELECT ${REQUEST_VIEW_COLUMNS}
+         FROM research_requests r
+         ${LATEST_RUN_JOIN}
+        WHERE ${where.join(' AND ')}
+        ORDER BY r.created_at DESC
+        LIMIT ${params.add(pageSize)} OFFSET ${params.add((page - 1) * pageSize)}`,
+      params.values,
+    );
+    // The same predicate, counted. Each clause above contributes exactly one
+    // parameter and all of them are added before the page window, so the first
+    // `where.length` values are precisely this query's.
+    const { rows: counted } = await sql.query<{ total: string }>(
+      `SELECT COUNT(*)::text AS total FROM research_requests r WHERE ${where.join(' AND ')}`,
+      params.values.slice(0, where.length),
+    );
+    const total = Number(counted[0]?.total ?? 0);
+    return c.json({
+      data: rows.map(toRequestView),
+      pagination: {
+        total,
+        pageCount: Math.max(Math.ceil(total / pageSize), 1),
+        hasNextPage: page * pageSize < total,
+      },
+    });
+  });
+  return app;
 }
 
 /** The package's own migrations, then a clean slate. */

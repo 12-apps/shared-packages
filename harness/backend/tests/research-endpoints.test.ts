@@ -62,6 +62,11 @@ function as(tenantId: string = RESEARCH_TENANT_ID) {
       }),
     removeIntegration: (type: string) =>
       backend.app.request(`${base}/integrations/${type}`, { method: 'DELETE', headers }),
+    startResearch: (body: Record<string, unknown>) =>
+      backend.app.request(base, { method: 'POST', headers, body: JSON.stringify(body) }),
+    listResearch: (query = '') => backend.app.request(`${base}${query}`, { headers }),
+    getRequest: (id: string) => backend.app.request(`${base}/requests/${id}`, { headers }),
+    getRun: (id: string) => backend.app.request(`${base}/runs/${id}`, { headers }),
   };
 }
 
@@ -229,5 +234,223 @@ describe('the caller', () => {
       `/api/admin/${RESEARCH_TENANT_ID}/research/integrations`,
     );
     expect(response.status).toBe(401);
+  });
+});
+
+describe('the history listing beside the package', () => {
+  // The one route of the seventeen that is the HOST's — the package declares
+  // sixteen and stops short of this one because its query grammar and envelope
+  // come from the host's own search machinery. What is worth exercising is not
+  // the SQL but the arrangement: a host route and a package route sharing a
+  // path, splitting the verbs, and neither shadowing the other.
+
+  interface HistoryRow {
+    id: string;
+    term: string;
+    quantity: number;
+  }
+
+  // The start body nests under `query` — the package reads `body.query.term`,
+  // and a flat `{ term }` is accepted with a 202 and an EMPTY term, because it
+  // coerces `query['term'] ?? ''`. So the shape is worth spelling once here.
+  async function start(term: string, quantity = 1): Promise<void> {
+    const response = await as().startResearch({ query: { term, quantity } });
+    expect(response.status).toBe(202);
+  }
+
+  it('lists what the package\'s own POST on the same path wrote', async () => {
+    await start('Água mineral 500ml', 12);
+
+    const rows = await dataOf<HistoryRow[]>(await as().listResearch());
+    expect(rows.map((row) => row.term)).toEqual(['Água mineral 500ml']);
+    expect(rows[0]?.quantity).toBe(12);
+  });
+
+  it('does not shadow the POST it shares a path with', async () => {
+    // Two routers on one prefix, one path, two verbs. Mount them the other way
+    // round and the wrong one answers — silently, because both return 200-shaped
+    // JSON. Asserting the pair here is the only thing that can see it.
+    await start('Café em grão');
+    const listed = await as().listResearch();
+
+    expect(listed.status).toBe(200);
+    expect((await dataOf<HistoryRow[]>(listed)).length).toBe(1);
+  });
+
+  it('finds an accented term by its unaccented spelling', async () => {
+    // `term_normalized` is the host's to keep in sync on write — the package
+    // backfills it once and says so. Nothing fails when a host forgets: the
+    // column is nullable and every write still succeeds, the search just
+    // quietly matches nothing. This is the case that sees it.
+    await start('Água mineral 500ml');
+
+    const rows = await dataOf<HistoryRow[]>(await as().listResearch('?term=agua'));
+    expect(rows.map((row) => row.term)).toEqual(['Água mineral 500ml']);
+  });
+
+  it('shows one store nothing of another', async () => {
+    await start('Café em grão');
+
+    expect(await dataOf<HistoryRow[]>(await as(RESEARCH_TENANT_B_ID).listResearch())).toEqual([]);
+  });
+
+  it('refuses a caller the surface next door refuses', async () => {
+    // The host's own guard, because a route beside a package's is still the
+    // host's to protect. Skipping it here would leak the whole tenant's history
+    // through the one endpoint nobody adopted.
+    const response = await backend.app.request(`/api/admin/${RESEARCH_TENANT_ID}/research`);
+    expect(response.status).toBe(401);
+  });
+});
+
+describe('the run the HOST has to produce', () => {
+  // The package's start route persists a request, calls `enqueueRun` and
+  // answers 202 — and says why the accepted answer cannot carry a run id: the
+  // run is created by the worker, later. So every screen
+  // `@12-apps/product-research-ui` ships past the form renders rows a HOST
+  // wrote, and none of them can be exercised without one. `research-worker.ts`
+  // is this harness's, and these cases are the contract between the two.
+
+  interface RunStamp {
+    id: string;
+    status: string;
+    startedAt: string | null;
+  }
+  interface RequestView {
+    id: string;
+    term: string;
+    brand: string | null;
+    ean: string | null;
+    quantity: number;
+    region: string | null;
+    catalogRef: { type: string; id: string } | null;
+    createdAt: string;
+    latestRun: RunStamp | null;
+  }
+  interface Offer {
+    supplierName: string;
+    priceCents: number;
+    shippingCents: number | null;
+    totalCents: number;
+    rank: number | null;
+  }
+  interface RunView {
+    id: string;
+    requestId: string;
+    status: string;
+    offers: Offer[];
+    sourceStats: { name: string; status: string; error?: string }[];
+  }
+
+  async function started(term: string, quantity = 1): Promise<string> {
+    const response = await as().startResearch({ query: { term, quantity } });
+    expect(response.status).toBe(202);
+    return ((await response.json()) as { data: { requestId: string } }).data.requestId;
+  }
+
+  it('answers the request view FIELD BY FIELD, as the screens read it', async () => {
+    const requestId = await started('Café em grão', 6);
+    const view = await dataOf<RequestView>(await as().getRequest(requestId));
+
+    // Every field of `ResearchRequestView`, because the store seam is typed
+    // `Promise<unknown>` on purpose — a host answering a smaller shape gets
+    // screens rendering `undefined` and no type error anywhere to say so.
+    expect(view).toMatchObject({
+      id: requestId,
+      term: 'Café em grão',
+      brand: null,
+      ean: null,
+      quantity: 6,
+      region: null,
+      catalogRef: null,
+    });
+    expect(view.createdAt).not.toBe('');
+    expect(view.latestRun?.status).toBe('COMPLETED');
+  });
+
+  it('leaves the request run-less when the queue is unavailable', async () => {
+    // The other branch the package documents, and the reason `enqueued: false`
+    // is still a 202: the request is DURABLE, and a reconciliation sweep
+    // re-enqueues it. A host that treated this as a failure would lose the row.
+    researchProbes.queue = 'unavailable';
+    const response = await as().startResearch({ query: { term: 'Açúcar', quantity: 1 } });
+
+    expect(response.status).toBe(202);
+    const body = (await response.json()) as { data: { requestId: string; enqueued: boolean } };
+    expect(body.data.enqueued).toBe(false);
+
+    // `latestRun: null` is what the run screen POLLS on — it must be a real
+    // null rather than a missing key, or the screen cannot tell "not yet" from
+    // "this host answers a different shape".
+    const view = await dataOf<RequestView>(await as().getRequest(body.data.requestId));
+    expect(view.latestRun).toBeNull();
+  });
+
+  it('ranks the offers by what the buyer actually pays', async () => {
+    const requestId = await started('Água mineral 500ml', 10);
+    const view = await dataOf<RequestView>(await as().getRequest(requestId));
+    const run = await dataOf<RunView>(await as().getRun(String(view.latestRun?.id)));
+
+    expect(run.requestId).toBe(requestId);
+    expect(run.status).toBe('COMPLETED');
+    // Ten units: 430×10 + unstated shipping beats 480×10 + 1200.
+    expect(run.offers.map((offer) => offer.supplierName)).toEqual([
+      'Atacado Litoral',
+      'Distribuidora Central',
+    ]);
+    expect(run.offers.map((offer) => offer.rank)).toEqual([1, 2]);
+  });
+
+  it('carries an unstated shipping as NULL, not as free', async () => {
+    // FUT-518, and the reason the column is nullable rather than optional:
+    // null means the source never stated a cost, so `totalCents` is a LOWER
+    // BOUND the surface must caveat. A worker that wrote 0 would make an
+    // unknown look like a promise of free delivery.
+    const requestId = await started('Água mineral 500ml', 10);
+    const view = await dataOf<RequestView>(await as().getRequest(requestId));
+    const run = await dataOf<RunView>(await as().getRun(String(view.latestRun?.id)));
+
+    const [cheapest, other] = run.offers;
+    expect(cheapest?.shippingCents).toBeNull();
+    expect(other?.shippingCents).toBe(1200);
+  });
+
+  it('reports a source that failed rather than shortening the list', async () => {
+    // Degradation is the case the run screen is built around — a failed source
+    // is a banner, never a silently shorter list. A worker that only ever
+    // succeeded would leave that path unrendered in the one place the
+    // published component is actually mounted.
+    const requestId = await started('Café em grão');
+    const view = await dataOf<RequestView>(await as().getRequest(requestId));
+    const run = await dataOf<RunView>(await as().getRun(String(view.latestRun?.id)));
+
+    const failed = run.sourceStats.find((stat) => stat.status === 'FAILED');
+    expect(failed?.name).toBe('Mercado Norte');
+    expect(failed?.error).toBe('tempo esgotado');
+    expect(run.sourceStats).toHaveLength(3);
+  });
+
+  it('replaces the run when the same request is settled again', async () => {
+    const requestId = await started('Café em grão');
+    const first = await dataOf<RequestView>(await as().getRequest(requestId));
+
+    // A repeat drives the same request through the worker a second time. The
+    // history must not grow a duplicate run, and the request must point at the
+    // NEW one — a stale pointer is a screen showing yesterday's prices.
+    await as().startResearch({ query: { term: 'Café em grão', quantity: 1 } });
+    const { rows } = await backend.pg.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM research_runs WHERE request_id = $1`,
+      [requestId],
+    );
+    expect(rows[0]?.count).toBe('1');
+    expect(first.latestRun).not.toBeNull();
+  });
+
+  it('shows one store nothing of another store\'s run', async () => {
+    const requestId = await started('Café em grão');
+    const view = await dataOf<RequestView>(await as().getRequest(requestId));
+
+    const leaked = await as(RESEARCH_TENANT_B_ID).getRun(String(view.latestRun?.id));
+    expect(await dataOf<RunView | null>(leaked)).toBeNull();
   });
 });

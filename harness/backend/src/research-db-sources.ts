@@ -147,7 +147,7 @@ export function sourcesGroup(sql: SqlRunner): ResearchHttpStore['sources'] {
 
   /** `null` is what lets the package answer its own 404 rather than throw. */
   async typeOf(sourceId, clientId) {
-    return (await sourceRow(sourceId, clientId))?.type ?? null;
+    return (await sourceRow(sql, sourceId, clientId))?.type ?? null;
   },
   };
 }
@@ -155,7 +155,7 @@ export function sourcesGroup(sql: SqlRunner): ResearchHttpStore['sources'] {
 export function credentialsGroup(sql: SqlRunner): ResearchHttpStore['credentials'] {
   return {
   async requireSource(sourceId, clientId) {
-    const row = await sourceRow(sourceId, clientId);
+    const row = await sourceRow(sql, sourceId, clientId);
     if (!row) throw new Error(`no source ${sourceId}`);
     // Scrubbed on the way out, per the seam's own promise: the ciphertext
     // stops here, and the package never has to be trusted with it.

@@ -64,10 +64,13 @@ export async function applyResearchMigrations(pg: PGlite): Promise<void> {
  * is grouped that way, the groups address different tables, and one factory
  * holding all eighteen methods says nothing about which is which.
  */
-export function researchStore(pg: PGlite): ResearchHttpStore {
+export function researchStore(
+  pg: PGlite,
+  enqueue: ResearchHttpStore['requests']['enqueueRun'],
+): ResearchHttpStore {
   const sql = pg as unknown as SqlRunner;
   return {
-    requests: requestsGroup(sql),
+    requests: requestsGroup(sql, enqueue),
     integrations: integrationsGroup(sql),
     sources: sourcesGroup(sql),
     credentials: credentialsGroup(sql),
