@@ -2,7 +2,7 @@ import type { RbacCatalog } from '../core/compose';
 import type { AuthzContext, OwnershipPredicate } from '../core/types';
 
 import type { RbacDbProvider } from './db';
-import type { RbacInvitesPort, RbacPendingInvite } from './invites';
+import type { RbacInvitesPort } from './invites';
 import type { RbacNotifyPort } from './notifications';
 
 /**
