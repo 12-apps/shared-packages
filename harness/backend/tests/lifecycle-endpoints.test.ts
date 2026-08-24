@@ -4,7 +4,10 @@
    over a real Postgres (PGlite), driving the same app the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
+import { LIFECYCLE_MOUNT_PATH } from '../src/lifecycle-host';
 import { LIFECYCLE_TENANT_ID, LIFECYCLE_TENANT_OFF_ID } from '../src/lifecycle-host';
 
 /**
@@ -487,5 +490,52 @@ describe('approvals — writes by non-approvers park as change requests', () => 
       await asUser('owner-1').get('/recycle-bin'),
     );
     expect(after.data.entries.map((entry) => entry.label)).toContain('Suco de laranja');
+  });
+});
+
+describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.hosts.lifecycle.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    expect(statuses.get('observability')).toBe('bound');
+    expect(statuses.get('db')).toBe('collected');
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('hands the routes back with the LITERAL segment before the param', () => {
+    // The property mount order depends on, now the consumer's rather than this
+    // file's. `/catalog-items/drafts` is a literal second segment and
+    // `/catalog-items/:id/draft` is a parameter — reversed, the parameter
+    // swallows `drafts` and that endpoint starts answering "not found" while
+    // every other lifecycle endpoint keeps working, which is what makes it a
+    // silent breakage rather than a red one.
+    //
+    // The routes are GENERATED per registration, so the slugs are literal here
+    // (`/catalog-items/...`, not `/:slug/...`) — the ordering rule bites within
+    // one entity's own routes.
+    const routePaths = backend.hosts.lifecycle.routes.map((mounted) => mounted.route.path);
+    const drafts = routePaths.indexOf('/catalog-items/drafts');
+    const byId = routePaths.indexOf('/catalog-items/:id/draft');
+
+    // Both exist — a conditional assertion would pass on a table that lost one.
+    expect(drafts).toBeGreaterThanOrEqual(0);
+    expect(byId).toBeGreaterThanOrEqual(0);
+    expect(drafts).toBeLessThan(byId);
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.hosts.lifecycle;
+    const allButOne = routes
+      .slice(1)
+      .map((m) => `${m.route.method} ${LIFECYCLE_MOUNT_PATH}${m.route.path}`);
+
+    expect(unclaimedRoutes(routes, allButOne)).toHaveLength(1);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.hosts.lifecycle.report)).toContain(LIFECYCLE_MOUNT_PATH);
   });
 });

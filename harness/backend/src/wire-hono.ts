@@ -25,7 +25,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 
-import type { MountedRoute, WireResponse } from '@12-apps/wiring';
+import type { MountedRoute, WireRouteAnswer } from '@12-apps/wiring';
 
 /**
  * The route's path in HONO's syntax.
@@ -81,9 +81,23 @@ async function readBody(c: Context): Promise<unknown> {
   }
 }
 
-function respond(c: Context, response: WireResponse): Response {
-  if (response.body === undefined) return c.body(null, response.status as 204);
-  return c.json(response.body as Record<string, unknown>, response.status as 200);
+/**
+ * The two arms of `WireRouteAnswer`, discriminated on `response`.
+ *
+ * The raw one is "an answer the adapter must return UNTOUCHED: a live SSE
+ * stream, a redirect whose headers are the payload, a provider-shaped webhook
+ * body", and the contract spells out what happens without it — "a serialized
+ * stream is a hung request and a redirect with no `Location` is a dead end".
+ *
+ * This bridge handled only the JSON arm, which was fine while every adopted
+ * surface answered JSON and is the third thing `@12-apps/realtime` would have
+ * broken on: its subscribe route holds a stream OPEN, and `c.json` over that is
+ * a request that never completes.
+ */
+function respond(c: Context, answer: WireRouteAnswer): Response {
+  if ('response' in answer) return answer.response;
+  if (answer.body === undefined) return c.body(null, answer.status as 204);
+  return c.json(answer.body as Record<string, unknown>, answer.status as 200);
 }
 
 /**
