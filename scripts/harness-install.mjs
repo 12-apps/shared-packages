@@ -88,12 +88,35 @@ function npmInstall(dir) {
   }
 }
 
+/**
+ * Assemble the schema and GENERATE the client, for a harness that has one.
+ *
+ * Part of the INSTALL rather than of a test script, and the reason is the lane
+ * that found it: `harness/backend`'s `pretest` used to be the only caller, so
+ * the client existed whenever its own suite ran and nowhere else — and the
+ * moment the server itself imported `@prisma/client` (the payments adoption,
+ * whose stores are the package's own Prisma ones), every OTHER lane that boots
+ * that server died at import with `MODULE_NOT_FOUND`, minutes into a run, in a
+ * job whose name says Gherkin.
+ *
+ * An adopter's install includes `prisma generate` too. Doing it here makes the
+ * installed harness usable by whoever starts it, which is the property a
+ * `pretest` hook cannot give.
+ */
+function generatePrisma(harness, dir) {
+  const scripts = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).scripts ?? {};
+  if (!scripts["prisma:generate"]) return;
+  run("npm", ["run", "prisma:generate"], dir);
+  console.log(`generated the prisma client for ${harness}`);
+}
+
 function install(harness, tarballs) {
   const dir = join(REPO_ROOT, harness);
   if (!existsSync(join(dir, "package.base.json"))) throw new Error(`${harness} has no package.base.json`);
   writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifestFor(dir, tarballs), null, 2)}\n`);
   npmInstall(dir);
   console.log(`installed ${harness} against ${tarballs.size} tarballs`);
+  generatePrisma(harness, dir);
 }
 
 const staging = mkdtempSync(join(tmpdir(), "harness-tarballs-"));
