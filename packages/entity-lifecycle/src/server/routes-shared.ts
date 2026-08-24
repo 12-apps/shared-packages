@@ -21,8 +21,10 @@ import {
   resolveActorNames,
   writeOutcome,
   LifecycleApiError,
+  resolveLifecycleCopy,
   type LifecycleActor,
   type LifecycleMessages,
+  type LifecycleCopySource,
   type LifecycleRequest,
   type LifecycleResponse,
   type LifecycleRoute,
@@ -35,6 +37,7 @@ export interface RegisteredEntity {
   lifecycle: EntityLifecycle;
 }
 
+/** What a HANDLER sees: this request's words, already chosen. */
 interface SharedRouteDeps {
   entities: ReadonlyMap<string, RegisteredEntity>;
   recycleBin: RecycleBinStore;
@@ -43,17 +46,38 @@ interface SharedRouteDeps {
   messages: LifecycleMessages;
 }
 
+/**
+ * What a BUILDER sees: the copy still as a source, because the routes are built
+ * once per process and the reader changes per call.
+ */
+type SharedRouteConfig = Omit<SharedRouteDeps, 'messages'> & {
+  messages: LifecycleCopySource<LifecycleMessages>;
+};
+
+/**
+ * Wrap a handler so thrown {@link LifecycleApiError}s become responses, and so
+ * it receives the copy for THIS caller.
+ *
+ * Resolving here is what makes the whole surface follow a reader: every helper
+ * below still takes a plain `LifecycleMessages`, so nothing under this line had
+ * to learn about locales — but none of them can be reached with the language
+ * the process happened to boot with.
+ */
 function route(
+  config: SharedRouteConfig,
   method: LifecycleRoute['method'],
   path: string,
-  handler: (request: LifecycleRequest) => Promise<LifecycleResponse>,
+  handler: (request: LifecycleRequest, deps: SharedRouteDeps) => Promise<LifecycleResponse>,
 ): LifecycleRoute {
   return {
     method,
     path,
     async handle(request) {
       try {
-        return await handler(request);
+        return await handler(request, {
+          ...config,
+          messages: resolveLifecycleCopy(config.messages, request.locale),
+        });
       } catch (error) {
         return foldApiError(error);
       }
@@ -101,8 +125,8 @@ const dispatchContext = async (
  * per-collection gate lands on the item routes below, where the row names the
  * collection.
  */
-function binListRoute(deps: SharedRouteDeps): LifecycleRoute {
-  return route('GET', '/recycle-bin', async ({ actor, query }) => {
+function binListRoute(config: SharedRouteConfig): LifecycleRoute {
+  return route(config, 'GET', '/recycle-bin', async ({ actor, query }, deps) => {
     // An EMPTY `?entityType=` is a malformed filter, not an absent one —
     // the origin host's `z.string().min(1).optional()` answers 400 rather than
     // silently listing every collection.
@@ -144,26 +168,29 @@ function binListRoute(deps: SharedRouteDeps): LifecycleRoute {
  * definitivamente"): the hard delete removes the record and its satellites;
  * the bin row is kept, flipped to PURGED (audit trail). Both bodyless 204.
  */
-function binItemRoutes(deps: SharedRouteDeps): LifecycleRoute[] {
-  const { messages } = deps;
-  const rootOf = async (tenantId: string, entryId: string | undefined) => {
-    if (!entryId) throw new LifecycleApiError(400, messages.invalidBody);
+function binItemRoutes(config: SharedRouteConfig): LifecycleRoute[] {
+  const rootOf = async (
+    deps: SharedRouteDeps,
+    tenantId: string,
+    entryId: string | undefined,
+  ) => {
+    if (!entryId) throw new LifecycleApiError(400, deps.messages.invalidBody);
     const tree = await deps.recycleBin.getTree(tenantId, entryId);
     const root = tree[0];
-    if (!root) throw new LifecycleApiError(404, messages.entryNotFound);
+    if (!root) throw new LifecycleApiError(404, deps.messages.entryNotFound);
     return root;
   };
   return [
-    route('POST', '/recycle-bin/:entryId/restore', async ({ actor, params }) => {
-      const root = await rootOf(actor.tenantId, params.entryId);
+    route(config, 'POST', '/recycle-bin/:entryId/restore', async ({ actor, params }, deps) => {
+      const root = await rootOf(deps, actor.tenantId, params.entryId);
       const { entity, ctx } = await dispatchContext(deps, root.entityType, actor);
-      await foldLifecycle(messages, () => entity.lifecycle.restoreDeleted(ctx, root.id));
+      await foldLifecycle(deps.messages, () => entity.lifecycle.restoreDeleted(ctx, root.id));
       return noContent();
     }),
-    route('DELETE', '/recycle-bin/:entryId', async ({ actor, params }) => {
-      const root = await rootOf(actor.tenantId, params.entryId);
+    route(config, 'DELETE', '/recycle-bin/:entryId', async ({ actor, params }, deps) => {
+      const root = await rootOf(deps, actor.tenantId, params.entryId);
       const { entity, ctx } = await dispatchContext(deps, root.entityType, actor);
-      await foldLifecycle(messages, () => entity.lifecycle.purgeDeleted(ctx, root.id));
+      await foldLifecycle(deps.messages, () => entity.lifecycle.purgeDeleted(ctx, root.id));
       return noContent();
     }),
   ];
@@ -177,8 +204,8 @@ const APPROVAL_STATUSES = new Set(['PENDING', 'APPROVED', 'REJECTED']);
  * from its payload so the inbox reads "Suco de laranja — alteração" rather
  * than UUIDs.
  */
-function approvalsListRoute(deps: SharedRouteDeps): LifecycleRoute {
-  return route('GET', '/approvals', async ({ actor, query }) => {
+function approvalsListRoute(config: SharedRouteConfig): LifecycleRoute {
+  return route(config, 'GET', '/approvals', async ({ actor, query }, deps) => {
     const status = query.status ?? 'PENDING';
     if (!APPROVAL_STATUSES.has(status)) {
       throw new LifecycleApiError(400, deps.messages.invalidBody);
@@ -223,39 +250,49 @@ function approvalsListRoute(deps: SharedRouteDeps): LifecycleRoute {
  * `POST /approvals/:requestId/reject` — reject with an optional note; the
  * live record stays untouched, the request is kept as REJECTED history (204).
  */
-function approvalItemRoutes(deps: SharedRouteDeps): LifecycleRoute[] {
-  const { messages } = deps;
-  const requestOf = async (tenantId: string, requestId: string | undefined) => {
-    if (!requestId) throw new LifecycleApiError(400, messages.invalidBody);
+function approvalItemRoutes(config: SharedRouteConfig): LifecycleRoute[] {
+  const requestOf = async (
+    deps: SharedRouteDeps,
+    tenantId: string,
+    requestId: string | undefined,
+  ) => {
+    if (!requestId) throw new LifecycleApiError(400, deps.messages.invalidBody);
     const request = await deps.approvals.get(tenantId, requestId);
-    if (!request) throw new LifecycleApiError(404, messages.requestNotFound);
+    if (!request) throw new LifecycleApiError(404, deps.messages.requestNotFound);
     return request;
   };
   return [
-    route('POST', '/approvals/:requestId/approve', async ({ actor, params }) => {
-      const request = await requestOf(actor.tenantId, params.requestId);
+    route(config, 'POST', '/approvals/:requestId/approve', async ({ actor, params }, deps) => {
+      const request = await requestOf(deps, actor.tenantId, params.requestId);
       const { entity, ctx } = await dispatchContext(deps, request.entityType, actor);
-      const result = await foldLifecycle(messages, () =>
+      const result = await foldLifecycle(deps.messages, () =>
         entity.lifecycle.approveChange(ctx, request.id),
       );
       return ok(writeOutcome(result));
     }),
-    route('POST', '/approvals/:requestId/reject', async ({ actor, params, body }) => {
-      const note = parseRejectBody(body, messages);
-      const request = await requestOf(actor.tenantId, params.requestId);
-      const { entity, ctx } = await dispatchContext(deps, request.entityType, actor);
-      await foldLifecycle(messages, () => entity.lifecycle.rejectChange(ctx, request.id, note));
-      return noContent();
-    }),
+    route(
+      config,
+      'POST',
+      '/approvals/:requestId/reject',
+      async ({ actor, params, body }, deps) => {
+        const note = parseRejectBody(body, deps.messages);
+        const request = await requestOf(deps, actor.tenantId, params.requestId);
+        const { entity, ctx } = await dispatchContext(deps, request.entityType, actor);
+        await foldLifecycle(deps.messages, () =>
+          entity.lifecycle.rejectChange(ctx, request.id, note),
+        );
+        return noContent();
+      },
+    ),
   ];
 }
 
 /** The shared surfaces, in mount order. */
-export function sharedRoutes(deps: SharedRouteDeps): LifecycleRoute[] {
+export function sharedRoutes(config: SharedRouteConfig): LifecycleRoute[] {
   return [
-    binListRoute(deps),
-    ...binItemRoutes(deps),
-    approvalsListRoute(deps),
-    ...approvalItemRoutes(deps),
+    binListRoute(config),
+    ...binItemRoutes(config),
+    approvalsListRoute(config),
+    ...approvalItemRoutes(config),
   ];
 }

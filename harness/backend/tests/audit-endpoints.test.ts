@@ -263,7 +263,7 @@ describe('the actor options', () => {
 describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.audit.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+      backend.hosts.audit.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -278,7 +278,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     // orders by specificity and the bridge registers in the order it is given,
     // so the property survives the move; reversed, the actors endpoint would
     // be swallowed by the list route and answer a page of rows.
-    const paths = backend.audit.routes.map((mounted) => mounted.route.path);
+    const paths = backend.hosts.audit.routes.map((mounted) => mounted.route.path);
     const actors = paths.indexOf('/audit-logs/actors');
     const list = paths.indexOf('/audit-logs');
 
@@ -288,7 +288,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.audit;
+    const { routes } = backend.hosts.audit;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} ${AUDIT_MOUNT_PATH}${mounted.route.path}`);
@@ -298,6 +298,6 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.audit.report)).toContain(AUDIT_MOUNT_PATH);
+    expect(renderWiringReport(backend.hosts.audit.report)).toContain(AUDIT_MOUNT_PATH);
   });
 });
