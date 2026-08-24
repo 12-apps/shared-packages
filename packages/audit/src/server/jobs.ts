@@ -59,8 +59,18 @@ export interface AuditRetentionRange {
 
 /** What the host closes over when it binds the sweep. */
 export interface AuditJobDeps {
-  /** The package's own retention object, built from the same db seam. */
-  retention: AuditRetention;
+  /**
+   * The package's own delete path, as the two METHODS the sweep calls rather
+   * than the whole object.
+   *
+   * A `Pick` of the real interface, so a reshape of either method stops
+   * compiling here — and, more practically, so a host can DEFER. The retention
+   * object usually comes off a mount that does not exist yet when the bindings
+   * are written (`adoptServer` takes the bindings; the api comes out the other
+   * side), so a host passes two arrows that reach for it when the sweep runs.
+   * That is the same shape `NotificationsJobDeps` takes for the same reason.
+   */
+  retention: Pick<AuditRetention, 'purgeExpired' | 'purgeTenantWindow'>;
   /**
    * The per-tenant windows the host authorises this pass, or omitted for a
    * host with no tier windows at all. Called once per run; a host streaming
@@ -110,8 +120,12 @@ const purgeExpired: WireJobBlueprint<void, AuditJobDeps> = {
     }
 
     if (floorRows > 0 || tenantRows > 0) {
+      // The floor's LENGTH is not named here: the sweep no longer holds the
+      // whole retention object, and a number the host configured is a number
+      // the host can already read. What the line has to carry is what this
+      // pass DID, which is the part nothing else records.
       context.logger.info(
-        `audit.retention removed ${floorRows} entry(ies) past the ${deps.retention.floorDays}-day floor ` +
+        `audit.retention removed ${floorRows} entry(ies) past the global floor ` +
           `and ${tenantRows} inside ${ranges.length} tenant window(s)`,
       );
     }

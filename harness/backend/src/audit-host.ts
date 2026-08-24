@@ -19,7 +19,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { defineAuditVocabulary } from '@12-apps/audit';
 import { auditManifest } from '@12-apps/audit/manifest';
 import { auditServerManifest, type createWireApiAudit } from '@12-apps/audit/manifest/server';
-import type { MountedRoute } from '@12-apps/wiring';
+import type { BoundJob, MountedRoute } from '@12-apps/wiring';
 import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 import type { Context, MiddlewareHandler } from 'hono';
 
@@ -134,6 +134,7 @@ export function auditHost(pg: PGlite): {
   actorContext: MiddlewareHandler;
   report: WiringReport;
   routes: readonly MountedRoute[];
+  jobs: readonly BoundJob[];
 } & Omit<ReturnType<typeof createWireApiAudit>, 'routes'> {
   const host = createWiringHost({
     name: 'harness-backend',
@@ -167,6 +168,32 @@ export function auditHost(pg: PGlite): {
           resolveActor: (request: { raw?: unknown }) => request.raw ?? null,
         },
       },
+      /**
+       * The retention sweep, bound rather than declined.
+       *
+       * The package moved the cadence, the single-flight lease and the pass
+       * structure into the blueprint because every one of those numbers is a
+       * claim about its own delete path — and this harness had the sweep
+       * available and no schedule for it, which is exactly the shape the
+       * declaration exists to expose.
+       *
+       * `retention` comes off the mounted api, so the sweep deletes through
+       * the same object `audit-retention.test.ts` drives directly. There is no
+       * `tenantWindows`: who decides a TENANT's window is a billing question,
+       * and this host has no plan resolver — omitting it is the fail-safe
+       * direction, sweeping the global floor and nothing more.
+       */
+      jobs: {
+        deps: {
+          // Deferred: `api` is what `adoptServer` returns, so the arrows reach
+          // for it when the sweep runs rather than when the binding is written.
+          retention: {
+            purgeExpired: (days) => api.retention.purgeExpired(days),
+            purgeTenantWindow: (clientId, since, cutoff) =>
+              api.retention.purgeTenantWindow(clientId, since, cutoff),
+          },
+        },
+      },
     },
   });
 
@@ -177,6 +204,7 @@ export function auditHost(pg: PGlite): {
     ...api,
     report: wired.report,
     routes: wired.routes,
+    jobs: wired.jobs,
     router: honoRouterFor(wired.routes, actorFrom),
     actorContext: (c, next) =>
       api.withActorContext(
