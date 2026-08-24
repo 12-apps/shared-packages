@@ -3,6 +3,7 @@ import type { PGlite } from '@electric-sql/pglite';
 
 import type { Hosts } from './app';
 import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
+import { SHIFT_MOUNT_PATH } from './shift-host';
 import { FEATURE_FLAGS_MOUNT_PATH, wireFeatureFlags } from './feature-flags-host';
 import { IMPERSONATION_PLATFORM_PATH } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
@@ -46,6 +47,7 @@ export function mountSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   app.route('/api/admin/:tenantSlug', hosts.audit.router);
   app.route('/api/admin/:tenantSlug', hosts.onboarding.router);
   app.route(DISCOUNTS_MOUNT_PATH, hosts.discounts.router);
+  app.route(SHIFT_MOUNT_PATH, hosts.shift.router);
   // Self-scoped and TENANT-FREE (12-15): the account surface every signed-in
   // user has, wherever their stores are.
   app.route('/api/account', hosts.notifications.router);

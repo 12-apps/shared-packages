@@ -12,10 +12,22 @@
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
     },
-    "./jobs": "./src/jobs.ts",
-    "./http": "./src/http.ts",
-    "./manifest": "./src/manifest/index.ts",
-    "./manifest/server": "./src/manifest/server.ts",
+    "./jobs": {
+      "types": "./dist/jobs.d.ts",
+      "default": "./dist/jobs.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest/index.d.ts",
+      "default": "./dist/manifest/index.js"
+    },
+    "./manifest/server": {
+      "types": "./dist/manifest/server.d.ts",
+      "default": "./dist/manifest/server.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
