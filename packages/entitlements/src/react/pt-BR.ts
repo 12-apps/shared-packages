@@ -24,6 +24,8 @@ export const PT_BR_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     ceilingUpTo: ({ limit }) => `até ${String(limit)}`,
     availableOn: ({ planLabel }) => `Disponível no plano ${planLabel}.`,
     openSwitch: ({ label }) => `Ativar em ${label}`,
+    summaryPlansLink: 'Ver planos',
+    summaryFeaturesLink: ({ blocked }) => `Ver recursos do plano · ${String(blocked)} indisponíveis`,
     statusBadge: { enabled: 'Ativo', disabled: 'Indisponível' },
   },
   tierCards: {

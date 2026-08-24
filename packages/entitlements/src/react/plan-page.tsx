@@ -35,7 +35,7 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Heading } from '@12-apps/ui/typography/Heading';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { ComparisonTier, OpenPlanRequest } from '../plan-wire';
+import type { ComparisonTier, OpenPlanRequest, TenantPlanPayload } from '../plan-wire';
 import { ComparisonTable } from './comparison-table';
 import type { PlanPageCopy } from './copy';
 import { createPlanApi, useRead } from './plan-api';
@@ -122,6 +122,64 @@ function mayAsk(
   );
 }
 
+/**
+ * The read every plan screen makes, plus the two states none of them renders
+ * anything else in.
+ *
+ * Three screens now read the same payload — the catalog, the audit and the
+ * summary line — and each is a separate ROUTE, so each makes its own request.
+ * That is not waste: they are different pages, reached at different times, and
+ * a shared cache would be a second mechanism to keep honest for no gain a user
+ * can see.
+ */
+function usePlanShell(config: ResolvedWebConfig): {
+  plan: TenantPlanPayload | null;
+  fallback: JSX.Element | null;
+} {
+  const api = createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed);
+  const planRead = useRead(api.getPlan);
+  if (planRead.pending) return { plan: null, fallback: <LoadingState dataTestId="plan-loading" /> };
+  if (planRead.error !== null || planRead.data === null) {
+    return {
+      plan: null,
+      fallback: (
+        <ErrorState
+          title={config.copy.planPage.loadFailedTitle}
+          message={planRead.error?.message ?? ''}
+        />
+      ),
+    };
+  }
+  return { plan: planRead.data.plan, fallback: null };
+}
+
+/** The heading and the one line under it: what this tenant is on, priced. */
+function PlanHeader({
+  title,
+  plan,
+  copy,
+}: {
+  title: string;
+  plan: TenantPlanPayload;
+  copy: PlanPageCopy;
+}): JSX.Element {
+  return (
+    <Box>
+      <Heading level="h2">{title}</Heading>
+      <Box sx={{ mt: 0.5 }}>
+        {/* The name slot is markup, so the sentence ships as prefix + detail
+            around it — each half carries its own spacing and the detail
+            carries the closing punctuation. */}
+        <Text as="div" color="secondary" size="sm">
+          {copy.currentPlanPrefix}
+          <strong data-testid="plan-name">{plan.name}</strong>
+          {copy.currentPlanDetail({ price: plan.price })}
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
 export function PlanScreen({ config }: { config: ResolvedWebConfig }): JSX.Element {
   const copy = config.copy.planPage;
   const api = createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed);
@@ -174,6 +232,109 @@ export function PlanScreen({ config }: { config: ResolvedWebConfig }): JSX.Eleme
         planOrder={plan.comparison.map((tier) => tier.key)}
         config={config}
       />
+    </Stack>
+  );
+}
+
+/**
+ * The CATALOG — what every tier is and costs, and the full matrix under it.
+ *
+ * One of the two halves the plan surface splits into as separate routes, and
+ * the one somebody arrives at deliberately: from an upsell prompt, or because
+ * they are thinking about paying more. It carries the ask flow, because asking
+ * for a tier is the action a catalog exists to offer.
+ *
+ * The AUDIT is not here. "Why is this locked for me" and "what would the next
+ * tier give me" are one journey, but they are two questions, and a page that
+ * answered both was ~35 rows of cards followed by ~40 rows of audit — the
+ * screen this split exists to end.
+ */
+export function PlansScreen({ config }: { config: ResolvedWebConfig }): JSX.Element {
+  const copy = config.copy.planPage;
+  const api = createPlanApi(config.apiBase, config.fetchImpl, config.copy.requestFailed);
+  const requestRead = useRead(api.getOpenRequest);
+  const { asking, askError, askFor } = useAskForPlan(config, requestRead.reload);
+  const { plan, fallback } = usePlanShell(config);
+  if (plan === null) return fallback ?? <LoadingState dataTestId="plan-loading" />;
+
+  const openRequest = requestRead.data?.request ?? null;
+  const canRequest = mayAsk(config, requestRead, openRequest);
+
+  return (
+    <Stack spacing={3} data-testid="plans-page">
+      <PlanHeader title={copy.title} plan={plan} copy={copy} />
+      <RequestBanners openRequest={openRequest} error={askError} copy={copy} />
+      <TierCards
+        tiers={plan.comparison}
+        onRequest={canRequest ? askFor : null}
+        pending={asking}
+        copy={config.copy.tierCards}
+      />
+      <ComparisonTable tiers={plan.comparison} copy={config.copy.comparisonTable} />
+    </Stack>
+  );
+}
+
+/**
+ * The AUDIT — what is on for THIS tenant, and why it is off where it is.
+ *
+ * Its own route because it is reached for a specific reason (something was
+ * locked) rather than browsed, and because it is long: a registry of forty-odd
+ * capabilities has no business sitting under a price list somebody is reading
+ * for a different question.
+ */
+export function PlanFeaturesScreen({ config }: { config: ResolvedWebConfig }): JSX.Element {
+  const copy = config.copy.planPage;
+  const { plan, fallback } = usePlanShell(config);
+  if (plan === null) return fallback ?? <LoadingState dataTestId="plan-loading" />;
+  return (
+    <Stack spacing={3} data-testid="plan-features-page">
+      <PlanHeader title={copy.statusHeading} plan={plan} copy={copy} />
+      <CurrentStatus
+        features={plan.features}
+        planOrder={plan.comparison.map((tier) => tier.key)}
+        config={config}
+        headed={false}
+      />
+    </Stack>
+  );
+}
+
+/**
+ * The SUMMARY — the whole plan surface as it appears on an account page.
+ *
+ * What this tenant is on, and the two ways in. Deliberately not a third copy
+ * of the catalog: an account page answers "what am I paying", and the two
+ * links are how somebody who came for that question leaves with a different
+ * one. The features link carries the COUNT, because "21 recursos
+ * indisponíveis" is the only part of a forty-row audit that belongs on a page
+ * this short — and it is what makes opening it worth the click.
+ */
+export function PlanSummary({ config }: { config: ResolvedWebConfig }): JSX.Element {
+  const copy = config.copy.planPage;
+  const { plan, fallback } = usePlanShell(config);
+  if (plan === null) return fallback ?? <LoadingState dataTestId="plan-loading" />;
+
+  const Link = config.LinkComponent;
+  const blocked = plan.features.filter(
+    (feature) => !feature.enabled || feature.requiredPlan !== null,
+  ).length;
+
+  return (
+    <Stack spacing={1} data-testid="plan-summary">
+      <PlanHeader title={copy.title} plan={plan} copy={copy} />
+      <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
+        {config.plansPath === null ? null : (
+          <Text as="span" size="sm" data-testid="plan-summary-plans">
+            <Link to={config.plansPath}>{copy.summaryPlansLink}</Link>
+          </Text>
+        )}
+        {config.featuresPath === null ? null : (
+          <Text as="span" size="sm" data-testid="plan-summary-features">
+            <Link to={config.featuresPath}>{copy.summaryFeaturesLink({ blocked })}</Link>
+          </Text>
+        )}
+      </Stack>
     </Stack>
   );
 }

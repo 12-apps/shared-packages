@@ -61,6 +61,13 @@ export interface PlanPageCopy {
   openSwitch: (context: { label: string }) => string;
   /** The row's on/off badge. */
   statusBadge: { enabled: string; disabled: string };
+  /**
+   * The two ways out of the SUMMARY — the plan surface as it appears on a
+   * host's account page. `blocked` is how many rows the audit would show,
+   * which is the one number worth carrying onto a page that short.
+   */
+  summaryPlansLink: string;
+  summaryFeaturesLink: (context: { blocked: number }) => string;
 }
 
 export interface TierCardsCopy {
