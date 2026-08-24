@@ -14,9 +14,11 @@ import {
 import type { PackageManifest } from '@12-apps/wiring';
 
 import packageJson from '../../../package.json';
+import { actor, testServerConfig } from '../../__tests__/fixtures';
 import { impersonationManifest, impersonationPreviewManifest } from '../index';
 import {
   asWireAnswer,
+  createWireApiImpersonation,
   impersonationPreviewServerManifest,
   impersonationServerManifest,
   readCookie,
@@ -156,5 +158,86 @@ describe('reading the session cookie off a request', () => {
   it('does not match a cookie whose name merely ends with the one asked for', () => {
     // `xfp_imp` is a different cookie; a naive `includes` would return it.
     expect(readCookie('xfp_imp=wrong', 'fp_imp')).toBeUndefined();
+  });
+});
+
+describe('the wire view, on the answers this surface exists to give', () => {
+  /**
+   * EVERY refusal here is THROWN — the lateral-move 403, the invalid-body 400,
+   * the unknown-tenant 404, the machine-token refusal — because the route
+   * bodies read as straight-line prose that way. `/hono` has always folded them
+   * back into a response at its edge (`.catch(foldApiError)`), and the wire view
+   * shipped without that: it answered correctly on the happy path and threw on
+   * every refusal.
+   *
+   * That is the worse of the two failure shapes. A consumer's bridge sees an
+   * exception where the contract promises a `WireRouteAnswer`, so the surface
+   * whose entire purpose is refusing 500s on exactly the cases it exists for,
+   * while its successes look perfect — found by adopting it, not by reading it.
+   */
+  /** A start the schema accepts, so the refusal under test is the one meant. */
+  const VALID_START = {
+    targetUserId: 'u-target',
+    targetApp: 'console',
+    tenantId: 't-1',
+    reason: 'reproducing the reported problem',
+  };
+
+  const routeFor = (method: string, path: string) => {
+    const api = createWireApiImpersonation(testServerConfig());
+    const route = api.routes.find((entry) => entry.method === method && entry.path === path);
+    if (!route) throw new Error(`no ${method} ${path} on the platform mount`);
+    return route;
+  };
+
+  it('folds a refusal into the status and sentence the package chose', async () => {
+    // A start with no reason at all: the package refuses with 400 and its own
+    // `invalidBody` sentence.
+    const answer = await routeFor('POST', '').handle({
+      actor: actor({ isPlatformAdmin: true }),
+      params: {},
+      body: {},
+      query: {},
+    } as never);
+
+    expect(answer).toEqual({ status: 400, body: { error: expect.any(String) } });
+  });
+
+  it('folds an authorization refusal too, rather than throwing past the bridge', async () => {
+    // No platform authority: 403. Before the fold this rejected, and a host
+    // bridge would have answered 500 to a caller the package refused on purpose.
+    const answer = await routeFor('POST', '').handle({
+      actor: actor(),
+      params: {},
+      body: VALID_START,
+      query: {},
+    } as never);
+
+    expect(answer).toMatchObject({ status: 403 });
+  });
+
+  it('still throws what is NOT a refusal — a host bug is not a 4xx', async () => {
+    // `foldApiError` rethrows anything that is not an `ImpersonationApiError`,
+    // which is what keeps a broken directory port from being reported to the
+    // caller as an ordinary denial.
+    const base = testServerConfig();
+    const api = createWireApiImpersonation({
+      ...base,
+      directory: {
+        ...base.directory,
+        findTenant: () => Promise.resolve({ id: 't-1', slug: 't-1', name: 'Tenant One' }),
+        resolveTarget: () => Promise.reject(new Error('the directory is down')),
+      },
+    });
+    const start = api.routes.find((entry) => entry.method === 'POST' && entry.path === '');
+
+    await expect(
+      start?.handle({
+        actor: actor({ isPlatformAdmin: true }),
+        params: {},
+        body: VALID_START,
+        query: {},
+      } as never),
+    ).rejects.toThrow('the directory is down');
   });
 });
