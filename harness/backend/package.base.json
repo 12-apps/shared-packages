@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Consumer harness for the server-side packages, built against the PUBLISHED tarballs. scripts/harness-install.mjs turns this into package.json by adding the @12-apps dependencies as file: tarballs.",
   "scripts": {
+    "prisma:sync": "tsx prisma/sync-partials.ts",
+    "prisma:generate": "npm run prisma:sync && prisma generate",
+    "pretest": "npm run prisma:generate",
     "test": "vitest run",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts"
@@ -13,8 +16,11 @@
     "@aws-sdk/client-s3": "^3.703.0",
     "@electric-sql/pglite": "^0.2.17",
     "@hono/node-server": "^1.14.0",
+    "@prisma/client": "7.8.0",
     "@types/ws": "^8.5.13",
     "hono": "^4.6.0",
+    "pglite-prisma-adapter": "0.7.2",
+    "prisma": "7.8.0",
     "tsx": "^4.19.0",
     "vitest": "^3.2.4",
     "web-push": "^3.6.7",
@@ -23,5 +29,6 @@
   "//s3": "@aws-sdk/client-s3 is @12-apps/storage's OPTIONAL peer (12-20), installed here on purpose: it is what a consumer that wants a bucket installs, and the only way `@12-apps/storage/s3` can be proven to resolve from the tarball. It arrived transitively via shared-helpers before, which is not a promise anything holds.",
   "//server": "No longer tests-only: `src/` is a REAL server, mounting the package's own Hono router over a real PGlite, so the SPA's Save leaves the tab and survives a reload. `tsx` runs the TypeScript directly — the harness has no build step and should not grow one, because a `dist/` between the source and the server is one more thing that can explain a failure that is supposed to be about OUR packages.",
   "//realtime": "ws + @types/ws are here because @12-apps/realtime/gateway declares ws as an OPTIONAL peer and only that entry imports it. tests/realtime-gateway.test.ts starts the published gateway and connects a real socket to it, which is the only way to prove the runnable entry is genuinely runnable from a tarball.",
-  "//notifications": "web-push is here for the same reason: @12-apps/notifications/web-push declares it as an OPTIONAL peer and only that entry imports it, so a host that never enables the channel never installs it. tests/notifications-entry-points.test.ts builds a real VAPID signer out of the tarball, which is what proves that subpath resolves at all."
+  "//notifications": "web-push is here for the same reason: @12-apps/notifications/web-push declares it as an OPTIONAL peer and only that entry imports it, so a host that never enables the channel never installs it. tests/notifications-entry-points.test.ts builds a real VAPID signer out of the tarball, which is what proves that subpath resolves at all.",
+  "//prisma": "prisma + @prisma/client + pglite-prisma-adapter are pinned EXACTLY, and to the same versions packages/prisma uses. Prisma's generated client and its CLI are one artifact split across two packages, and a range would let npm resolve them apart on a lockfile-less install — which fails as a generated client the runtime refuses rather than as an install error. pglite-prisma-adapter is what makes a REAL PrismaClient run over the same in-process PGlite the SQL seams use; see src/prisma.ts for why the harness wants both."
 }
