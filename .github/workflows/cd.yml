@@ -205,6 +205,58 @@ jobs:
         shell: bash
         run: node scripts/verify-released.mjs
 
+      # The counterpart: say so when the release DID deliver.
+      #
+      # Deliberately not folded into release-alert.mjs, which writes nothing at
+      # all on a healthy release — its own selftest asserts that, and the
+      # comment above `resolveIssue` records why. So the success channel is a
+      # step, and the failure channel stays that script's business.
+      #
+      # `git tag --points-at HEAD` is the test for "did anything ship": on a
+      # fresh main commit those are exactly the tags semantic-release just cut,
+      # so a merge that released nothing posts nothing rather than announcing an
+      # empty deploy every time.
+      #
+      # It WARNS on a bad webhook where slack-notify.yml fails — the difference
+      # is that this step shares a job with the release. A red step here would
+      # make the `always()` alerter above report a release that did not deliver,
+      # i.e. a Slack outage would file a GitHub issue about npm. Notifying is
+      # never allowed to invent a release failure.
+      - name: Announce the release on Slack
+        if: success()
+        continue-on-error: true
+        shell: bash
+        env:
+          DEPLOY_WEBHOOK: ${{ secrets.SLACK_DEPLOY_SUCCESS_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # awk, not `paste -sd', '`: paste treats the operand as a LIST of
+          # delimiters and cycles it, so three tags come out
+          # "a,b c" rather than "a, b, c".
+          released=$(git tag --points-at HEAD | sort | awk '{ printf "%s%s", sep, $0; sep = ", " }')
+          if [ -z "$released" ]; then
+            echo "Nothing was tagged on this commit — no release to announce."
+            exit 0
+          fi
+          if [ -z "${DEPLOY_WEBHOOK}" ]; then
+            echo "::warning::SLACK_DEPLOY_SUCCESS_WEBHOOK_URL is not set — release not announced on Slack."
+            exit 0
+          fi
+          # jq builds the body so a package name or version can never break it.
+          payload=$(jq -n --arg released "$released" --arg url "$RUN_URL" --arg repo "$REPO" \
+            '{text: ":package: *Published to npm* — \($repo)\n\($released)\n<\($url)|View run>"}')
+          code=$(curl -sS -o /tmp/slack.out -w '%{http_code}' \
+            -X POST -H 'content-type: application/json' \
+            --data "$payload" "$DEPLOY_WEBHOOK")
+          if [ "$code" != "200" ]; then
+            echo "::warning::Slack rejected the release announcement (HTTP ${code}): $(cat /tmp/slack.out)"
+            exit 0
+          fi
+          echo "Announced release of ${released} on Slack."
+
+
       # Everything above reports into this run's log and summary, which is where
       # nobody looks: a release runs on push to main long after its author moved
       # on, and one red Release job sits in a list of green ones. auth-v1.22.0
@@ -223,5 +275,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_JOB_STATUS: ${{ job.status }}
-          RELEASE_ALERT_WEBHOOK: ${{ secrets.RELEASE_ALERT_WEBHOOK }}
+          # Falls back to SLACK_WEBHOOK_URL, which is the name the Slack alerting
+          # uses across these repos. release-alert.mjs already POSTs
+          # `{"text": …}` — the exact body a Slack incoming webhook expects — so
+          # pointing this at a Slack hook needs no code change, and the headline
+          # Slack receives is the one that names which packages are stuck.
+          # RELEASE_ALERT_WEBHOOK still wins where it is set, so an existing
+          # non-Slack hook keeps working.
+          RELEASE_ALERT_WEBHOOK: ${{ secrets.RELEASE_ALERT_WEBHOOK || secrets.SLACK_WEBHOOK_URL || secrets.SLACK_DEPLOY_WEBHOOK_URL }}
         run: node scripts/release-alert.mjs

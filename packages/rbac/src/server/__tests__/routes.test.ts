@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { RbacRequest, RbacResponse, RbacRoute } from '../context';
 
+import { EN_US_RBAC_MESSAGES } from '../en-US';
+import { PT_BR_RBAC_MESSAGES } from '../pt-BR';
 import { enrolMember, seedRole } from './fake-db';
 import { createTestHost, memberActor, superActor, type TestHost } from './server-fixtures';
 
@@ -797,5 +799,88 @@ describe('team routes', () => {
     });
     expect(data(response)).toEqual({ status: 'invited' });
     expect(invites).toEqual([{ email: 'novo@example.com' }]);
+  });
+});
+
+describe('one mount, two languages', () => {
+  /**
+   * The property the resolver form of the copy port exists for. rbac has THREE
+   * layers that are each built once per process — the route table, the team
+   * store and the roles store — plus the guards, which the host also calls
+   * directly. A resolver wired into one of them answers a refusal in the
+   * reader's language and the next one in the deployment's, on the same screen.
+   *
+   * So the cases below cover a ROUTE refusal and a STORE refusal separately.
+   */
+  const bilingual = (): TestHost =>
+    createTestHost({
+      // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out so
+      // this package keeps no dependency on it.
+      messages: ({ locale }) =>
+        locale === 'en-US' ? EN_US_RBAC_MESSAGES : PT_BR_RBAC_MESSAGES,
+    });
+
+  const errorOf = (response: RbacResponse): string =>
+    (response.body as { error: string }).error;
+
+  it('answers a ROUTE refusal in each caller’s language', async () => {
+    // A member with no admin role — `requireAdminTier`, in the routes layer.
+    const h = bilingual();
+    const actor = memberActor(TENANT, 'u-nobody');
+    const pt = await call(h, 'GET', '/team', { actor, locale: 'pt-BR' });
+    const en = await call(h, 'GET', '/team', { actor, locale: 'en-US' });
+    expect(errorOf(pt)).toBe(PT_BR_RBAC_MESSAGES.forbidden);
+    expect(errorOf(en)).toBe(EN_US_RBAC_MESSAGES.forbidden);
+  });
+
+  it('carries the locale past the routes, into a store built at boot', async () => {
+    // Setting the role of somebody who is not a member. The actor IS permitted
+    // and the route's own checks all pass, so the refusal is thrown INSIDE
+    // `createTeamStore` — a store constructed once per process, and therefore
+    // the layer a routes-only adoption would leave answering the language the
+    // process started with.
+    //
+    // Deliberately not a 404 the ROUTE decides (a stale role id, say): that
+    // would look like this and prove nothing about the store.
+    const h = bilingual();
+    await h.api.seedTenantRoles(TENANT);
+    enrolMember(h.state, TENANT, 'owner-1', 'DIRECTOR');
+    const actor = memberActor(TENANT, 'owner-1');
+    const body = { role: 'HEAD_LIBRARIAN' };
+
+    const pt = await call(h, 'PATCH', '/team/:userId', {
+      actor,
+      params: { userId: 'nao-e-membro' },
+      body,
+      locale: 'pt-BR',
+    });
+    const en = await call(h, 'PATCH', '/team/:userId', {
+      actor,
+      params: { userId: 'nao-e-membro' },
+      body,
+      locale: 'en-US',
+    });
+    expect(pt.status).toBe(404);
+    expect(errorOf(pt)).toBe(PT_BR_RBAC_MESSAGES.notAMember);
+    expect(errorOf(en)).toBe(EN_US_RBAC_MESSAGES.notAMember);
+  });
+
+  it('hands an absent locale to the resolver rather than refusing', async () => {
+    // A host with one audience populates nothing. The resolver decides what no
+    // answer means, and here it means the default.
+    const h = bilingual();
+    const response = await call(h, 'GET', '/team', { actor: memberActor(TENANT, 'u-nobody') });
+    expect(errorOf(response)).toBe(PT_BR_RBAC_MESSAGES.forbidden);
+  });
+
+  it('leaves a plain-value host byte-identical', async () => {
+    // The whole compatibility claim: words rather than a resolver behaves
+    // exactly as before the field widened.
+    const h = createTestHost();
+    const response = await call(h, 'GET', '/team', {
+      actor: memberActor(TENANT, 'u-nobody'),
+      locale: 'en-US',
+    });
+    expect(errorOf(response)).toBe(PT_BR_RBAC_MESSAGES.forbidden);
   });
 });

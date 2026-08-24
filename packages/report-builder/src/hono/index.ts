@@ -7,6 +7,7 @@ import {
   type ReportBuilderServerConfig,
   type ReportRoute,
 } from '../server/create-report-builder';
+import { messagesOf } from '../server/context';
 
 /**
  * `@12-apps/report-builder/hono` — the reports endpoints as a mountable router.
@@ -38,6 +39,18 @@ export type ResolveActor = (c: Context) => Promise<ReportActor | null> | ReportA
 
 export interface ReportBuilderHonoConfig extends ReportBuilderServerConfig {
   resolveActor: ResolveActor;
+  /**
+   * Which language to answer this caller in, as a BCP-47 tag.
+   *
+   * An ADAPTER seam, deliberately, because the adapter is the only layer that
+   * holds the cookie, the header and whatever preference the host stored — and
+   * this package negotiates none of it. Omit it and every request answers with
+   * the default rendering of `messages`, which is the whole behaviour of a host
+   * with one audience.
+   *
+   * Pointless unless `messages` is a resolver: a plain pack has one rendering.
+   */
+  resolveLocale?: (c: Context) => string | undefined;
 }
 
 /**
@@ -68,14 +81,20 @@ export function reportBuilderRouter(config: ReportBuilderHonoConfig): Hono {
 
   for (const route of routes) {
     const handler = async (c: Context) => {
+      const locale = config.resolveLocale?.(c);
       const actor = await config.resolveActor(c);
-      if (!actor) return c.json({ error: config.messages.unauthenticated }, 401);
+      // Rendered per request like every other sentence here, so a 401 cannot be
+      // the one answer stuck in the language the process booted with.
+      if (!actor) {
+        return c.json({ error: messagesOf(config, locale).unauthenticated }, 401);
+      }
 
       const response = await route.handle({
         actor,
         params: c.req.param() as Record<string, string | undefined>,
         query: c.req.query() as Record<string, string | undefined>,
         body: await readBody(c),
+        ...(locale === undefined ? {} : { locale }),
       });
 
       // A handler that chose NO body means exactly that (204). Serializing

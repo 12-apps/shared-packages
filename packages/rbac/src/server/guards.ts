@@ -41,6 +41,20 @@ export interface RbacPermissionOptions {
   resource?: string | null;
   /** Extra ABAC context threaded to caveats. */
   context?: Record<string, unknown>;
+  /**
+   * The language to word this refusal in, as a BCP-47 tag.
+   *
+   * An option of the CALL, not of the guard, because the guards are built once
+   * per process and the reader changes per caller. Absent takes the default
+   * rendering of the host's `messages`, which is a single-audience host's whole
+   * behaviour — and is also right for the callers that have no reader at all: a
+   * job, a script, a boot-time check.
+   *
+   * It changes the SENTENCE and never the verdict. The refusal's deliberate
+   * vagueness is a security property (one answer for "no such thing" and "not
+   * yours"), and that property is a fact about the wording in every language.
+   */
+  locale?: string;
 }
 
 /** The LIST verdict plus WHO it was resolved for. */
@@ -239,15 +253,25 @@ export function createRbacGuards<P extends string>(
   engine: Rbac<P>,
   config: GuardConfig<P>,
 ): RbacGuards<P> {
-  const ctx: GuardCtx<P> = {
+  const base = {
     engine,
     permissions: config.catalog.permissions,
     warmScope: config.warmScope,
-    messages: messagesOf(config),
   };
+  /**
+   * The context for ONE call, with that caller's words already chosen. Built
+   * per call rather than once per guard set: these guards live for the process,
+   * so a `messages` resolved here would answer every reader in the language the
+   * process started with.
+   */
+  const ctxFor = (locale?: string): GuardCtx<P> => ({
+    ...base,
+    messages: messagesOf(config, locale),
+  });
+  const ctx = ctxFor();
   return {
     requirePermission: (actor, action, opts) =>
-      requirePermission(ctx, normalized(actor), action, opts),
+      requirePermission(ctxFor(opts?.locale), normalized(actor), action, opts),
     can: async (actor, action, opts) => {
       try {
         await requirePermission(ctx, normalized(actor), action, opts);
