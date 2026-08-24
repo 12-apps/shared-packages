@@ -1,6 +1,11 @@
 import type { JSX } from 'react';
 import { useCallback, useState } from 'react';
 
+import { realtimeManifest } from '@12-apps/realtime/manifest';
+import { realtimeWebManifest } from '@12-apps/realtime/manifest/web';
+
+import { webWiringHost } from '../wiring-web';
+
 import { createWebEvents, reconcileRefetchInterval, sharedWorkerConnector } from '@12-apps/realtime/react';
 
 /**
@@ -53,7 +58,16 @@ import { createWebEvents, reconcileRefetchInterval, sharedWorkerConnector } from
  */
 document.cookie = 'harness-actor=owner; path=/; SameSite=Lax';
 
-const events = createWebEvents({
+/**
+ * Adopted through `@12-apps/wiring/consumer`. The manifest declares NO areas
+ * and says why — this package ships plumbing rather than screens, so there is
+ * no route or nav row to suggest — and the report records that as
+ * `out-of-scope` instead of silence.
+ */
+const { surface } = webWiringHost.adoptWeb({
+  manifest: realtimeManifest,
+  web: realtimeWebManifest,
+  bindings: { surface: { config: {
   apiBase: '/api',
   // The cross-tab optimisation, wired the way ADOPTING.md documents it: the WHOLE
   // `new SharedWorker(new URL(…, import.meta.url), { type: "module" })` expression stays in
@@ -68,7 +82,10 @@ const events = createWebEvents({
         name: 'realtime-events',
       }),
   ),
+  } } },
 });
+
+const events = surface as ReturnType<typeof createWebEvents>;
 
 /** How often the screen would re-read without realtime, and with it. */
 const POLL_MS = 5_000;

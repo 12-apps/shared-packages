@@ -1,10 +1,8 @@
-import { useCallback, useMemo, useState, type JSX } from 'react';
+import { useCallback, useState, type JSX } from 'react';
 
 import { Stack } from '@12-apps/ui/mui/Stack';
 import {
   PT_BR_RESEARCH_MESSAGES,
-  ResearchHomeScreen,
-  ResearchRunScreen,
   type CatalogRef,
   type ListPagination,
   type ResearchApiClient,
@@ -13,6 +11,10 @@ import {
   type ResearchRunView,
   type SourceSummary,
 } from '@12-apps/product-research-ui';
+import { productResearchUiManifest } from '@12-apps/product-research-ui/manifest';
+import { productResearchUiWebManifest } from '@12-apps/product-research-ui/manifest/web';
+
+import { webWiringHost } from '../wiring-web';
 
 /**
  * The whole wiring a frontend host performs for `@12-apps/product-research-ui`.
@@ -101,8 +103,39 @@ function createClient(): ResearchApiClient {
  * which is the arrangement the 202 forces: the accepted answer cannot carry a
  * run id, because the run is the host's worker's to create.
  */
+/**
+ * Adopted through `@12-apps/wiring/consumer`, which changes what this page is:
+ * the two screens are no longer imported by name and handed a client per
+ * render — the binder builds the SURFACE once, closed over the client, and the
+ * page renders `home` and `run` off it. The client is therefore module-scoped
+ * too, which it always should have been: the surface holds it, and a per-render
+ * one would rebuild the transport under a screen that is already mounted.
+ *
+ * The manifest also carries the AREA — two admin routes and a nav row — which a
+ * direct screen import leaves on the floor.
+ */
+const RESEARCH_CLIENT = createClient();
+
+const { surface } = webWiringHost.adoptWeb({
+  manifest: productResearchUiManifest,
+  web: productResearchUiWebManifest,
+  bindings: { surface: { config: { client: RESEARCH_CLIENT } } },
+});
+
+const research = surface as {
+  home: (props: {
+    onOpenRequest: (requestId: string) => void;
+    onRepeatRequest: (request: ResearchRequestView) => void;
+    messages: typeof PT_BR_RESEARCH_MESSAGES;
+  }) => JSX.Element;
+  run: (props: {
+    requestId: string;
+    messages: typeof PT_BR_RESEARCH_MESSAGES;
+  }) => JSX.Element;
+};
+
 export function ProductResearchPage(): JSX.Element {
-  const client = useMemo(createClient, []);
+  const client = RESEARCH_CLIENT;
   const [openRequestId, setOpenRequestId] = useState<string | null>(null);
   // The home screen loads its history ONCE, on mount — it has no reason to
   // know that the host just started something. Re-keying it is the host's
@@ -136,20 +169,15 @@ export function ProductResearchPage(): JSX.Element {
 
   return (
     <Stack spacing={4}>
-      <ResearchHomeScreen
+      <research.home
         key={historyKey}
-        client={client}
         onOpenRequest={open}
         onRepeatRequest={repeat}
         messages={PT_BR_RESEARCH_MESSAGES}
       />
       {openRequestId !== null && (
         <div data-testid="research-open-run">
-          <ResearchRunScreen
-            client={client}
-            requestId={openRequestId}
-            messages={PT_BR_RESEARCH_MESSAGES}
-          />
+          <research.run requestId={openRequestId} messages={PT_BR_RESEARCH_MESSAGES} />
         </div>
       )}
     </Stack>

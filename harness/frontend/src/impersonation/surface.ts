@@ -1,5 +1,15 @@
-import { createWebImpersonation } from '@12-apps/impersonation/react';
+import type { createWebImpersonation } from '@12-apps/impersonation/react';
 import type { ImpersonationTenant } from '@12-apps/impersonation';
+import {
+  impersonationManifest,
+  impersonationPreviewManifest,
+} from '@12-apps/impersonation/manifest';
+import {
+  impersonationPreviewWebManifest,
+  impersonationWebManifest,
+} from '@12-apps/impersonation/manifest/web';
+
+import { webWiringHost } from '../wiring-web';
 
 /**
  * The whole wiring a frontend host performs for `@12-apps/impersonation`.
@@ -31,7 +41,18 @@ async function json<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export const impersonation = createWebImpersonation({
+/**
+ * Adopted through `@12-apps/wiring/consumer`, and TWICE — the operator surface
+ * and the tenant PREVIEW one, the same split the server half has. The preview
+ * manifest declares `surface` and no areas at all: a previewing tenant app
+ * mounts the banner so a session can be ended, and never the operator's picker.
+ *
+ * The binder builds each once, which is the rule this file already stated in
+ * prose: ONE surface for the whole app, because the banner is mounted in the
+ * chrome while the dialog is opened from a page, and two wirings would leave
+ * the start handshake waiting on a banner bound to a different transport.
+ */
+const impersonationConfig = {
   platformPath: PLATFORM_PATH,
   tenantPath,
   /**
@@ -141,4 +162,25 @@ export const impersonation = createWebImpersonation({
     loadStaff: (slug) => json<string[]>(`/__harness/impersonation/staff/${slug}`),
     landingUrl: ({ tenantSlug }) => `#/impersonation?branch=${tenantSlug}`,
   },
+};
+
+const { surface: operatorSurface } = webWiringHost.adoptWeb({
+  manifest: impersonationManifest,
+  web: impersonationWebManifest,
+  // The world is DECLARED on this manifest, and this host really runs it:
+  // playwright.config.ts compiles the package's two journeys under this root.
+  // The binding is the report's proof of that, and the pairing is what makes a
+  // shipped world impossible to leave unadopted in silence.
+  e2e: { featuresRoot: '.features-gen' },
+  bindings: { surface: { config: impersonationConfig } },
 });
+
+// The PREVIEW half: same factory, banner only, and no areas — a previewing
+// tenant app never shows the operator's picker.
+webWiringHost.adoptWeb({
+  manifest: impersonationPreviewManifest,
+  web: impersonationPreviewWebManifest,
+  bindings: { surface: { config: impersonationConfig } },
+});
+
+export const impersonation = operatorSurface as ReturnType<typeof createWebImpersonation>;

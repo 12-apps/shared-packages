@@ -186,6 +186,41 @@ Three parts of this adoption are the HOST's and could not be otherwise:
   `normalizeText`. The column is nullable and no write fails without it, so a
   host that forgets simply searches and matches nothing.
 
+## Every manifest is ADOPTED, not called
+
+A package's manifest is only worth what a host does with it, and until recently
+this harness did what most adopters do: it called `createApi*` / `createWeb*`
+directly and let the declarations sit unread. Both halves now go through
+`@12-apps/wiring/consumer`.
+
+- **The server half** — `backend/src/*-host.ts`. Each builds a
+  `createWiringHost({ kind: 'server' })`, adopts the package's manifests, binds
+  every declared capability (or DECLINES one in writing), and mounts the
+  assembled routes through the host's ONE bridge, `backend/src/wire-hono.ts`.
+- **The web half** — `frontend/src/wiring-web.ts` holds a single
+  `createWiringHost({ kind: 'web' })` and every page adopts into it at module
+  scope, which is also the memoisation the surface factories require.
+
+The point of the exercise is `assemble()`: it REFUSES a declared capability that
+was neither bound nor declined, so a release that adds one turns into a red test
+rather than a feature nobody wired. Adopting is also what found four defects in
+the bridge (a dropped raw request, a swallowed DELETE body, a serialized stream,
+a gated `public` route) and two in packages (`@12-apps/impersonation` threw its
+refusals past the contract; `@12-apps/auth` never said which routes need a
+caller) — every one of them invisible to the package's own suite, and every one
+of them found by mounting rather than by reading.
+
+Where the proof lives:
+
+| Half | The claim | Where |
+| --- | --- | --- |
+| server | every capability answered, per package | the `adopted through @12-apps/wiring` block in each `backend/tests/*.test.ts` |
+| web | the same, over the whole app at once | `#/wiring-report` and `frontend/tests/wiring-report.spec.ts` |
+
+The web report is a PAGE because a browser host has no test that runs its module
+graph outside a browser: rendering it runs `assemble()` over every adopted
+surface, so an unanswered capability is a red page instead of a silence.
+
 ## Running it
 
 ```bash

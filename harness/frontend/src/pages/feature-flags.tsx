@@ -4,7 +4,7 @@ import { featureFlagsManifest } from '@12-apps/feature-flags/manifest';
 import { featureFlagsWebManifest } from '@12-apps/feature-flags/manifest/web';
 import { PT_BR_FEATURE_FLAGS_COPY } from '@12-apps/feature-flags/react';
 import type { FeatureFlagsApiClient } from '@12-apps/feature-flags/react';
-import { createWiringHost } from '@12-apps/wiring/consumer';
+import { webWiringHost } from '../wiring-web';
 
 /**
  * `@12-apps/feature-flags` (FUT-884), adopted through the wiring consumer's
@@ -49,31 +49,19 @@ const api: FeatureFlagsApiClient = {
     call(`/${encodeURIComponent(key)}/grants/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
 };
 
-const host = createWiringHost({
-  name: 'harness-frontend',
-  kind: 'web',
-  // The browser half of the observability capability (mandatory since
-  // wiring 1.3.0): errors tag with the package's namespace. The harness's
-  // sink is the console.
-  ports: {
-    loggerFor: (namespace) => ({
-      info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
-      warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
-      error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
-    }),
-  },
-});
-host.adoptWeb({
+/**
+ * Adopted into the host's ONE wiring host (`wiring-web.ts`) rather than into a
+ * private one. Three pages each built their own, so the report was split three
+ * ways and could never answer the question the consumer exists to make askable:
+ * is every declared capability of every adopted package accounted for.
+ */
+const { surface } = webWiringHost.adoptWeb({
   manifest: featureFlagsManifest,
   web: featureFlagsWebManifest,
   bindings: { surface: { config: { api, copy: PT_BR_FEATURE_FLAGS_COPY } } },
 });
 
-const surface = host.assemble().surfaces['@12-apps/feature-flags'] as {
-  page: () => JSX.Element;
-};
-
-const Surface = surface.page;
+const Surface = (surface as { page: () => JSX.Element }).page;
 
 export function FeatureFlagsPage(): JSX.Element {
   return (

@@ -9,7 +9,7 @@ import { reportBuilderManifest } from '@12-apps/report-builder/manifest';
 import { reportBuilderWebManifest } from '@12-apps/report-builder/manifest/web';
 import { PT_BR_REPORT_SCREENS_COPY } from '@12-apps/report-builder/react';
 import type { BlockTemplateGroup, ReportBuilderSurface } from '@12-apps/report-builder/react';
-import { createWiringHost } from '@12-apps/wiring/consumer';
+import { webWiringHost } from '../wiring-web';
 
 /**
  * The whole wiring a frontend host performs for this package.
@@ -211,20 +211,7 @@ const SURFACE: ReportBuilderSurface = {
  * once, which is the rule every hand wiring used to carry as a comment (the
  * factory returns component TYPES; a rebuild unmounts the whole tree).
  */
-const webWiring = createWiringHost({
-  name: 'harness-frontend',
-  kind: 'web',
-  // The browser half of the observability capability: errors tag with the
-  // package's namespace. The harness's sink is the console.
-  ports: {
-    loggerFor: (namespace) => ({
-      info: (message, ...meta) => console.info(`[${namespace}] ${message}`, ...meta),
-      warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
-      error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
-    }),
-  },
-});
-const { surface: reportsSurface } = webWiring.adoptWeb({
+const { surface: reportsSurface } = webWiringHost.adoptWeb({
   manifest: reportBuilderManifest,
   web: reportBuilderWebManifest,
   // This host really runs the declared world: `tests/e2e/steps/reports-world.ts`
@@ -254,8 +241,10 @@ const { surface: reportsSurface } = webWiring.adoptWeb({
     },
   },
 });
-webWiring.assemble();
-const ReportSurface = reportsSurface.page;
+// `assemble()` — the refusal — now runs on `#/wiring-report`, over every
+// adopted package rather than over this one alone. Calling it at this module's
+// evaluation would refuse whichever pages the registry had not imported yet.
+const ReportSurface = (reportsSurface as { page: () => JSX.Element }).page;
 
 /**
  * The cache the surface shares with its host.
