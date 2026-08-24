@@ -1,0 +1,117 @@
+name: Slack Notify
+
+# Tell Slack when main breaks BEFORE the release can run.
+#
+# The publish itself already reports for itself and is deliberately not
+# duplicated here: `cd.yml`'s last step runs scripts/release-alert.mjs under
+# `if: always()`, which posts `{"text": …}` to RELEASE_ALERT_WEBHOOK (falling
+# back to SLACK_WEBHOOK_URL) whenever a package is tagged-but-unpublished,
+# published-but-untagged, wedged, or the Release job simply failed. That message
+# names the stuck packages, which a watcher looking in from outside cannot do,
+# so watching CD from here would only post a second, vaguer copy of it.
+#
+# What NOTHING covered is the case one step earlier. CD is
+# `workflow_run: workflows: [CI], branches: [main]` gated on
+# `conclusion == 'success'`, so a red CI on main means the Release job never
+# starts — no publish, and no release-alert either, because the workflow that
+# would have run it was never triggered. Nothing ships and nobody is told: the
+# silent shape of "fails on publish", and the same class of miss as
+# auth-v1.22.0, one workflow further upstream.
+#
+# PR failures are out of scope on purpose — a PR failure already reaches its
+# author through the PR. Main-line breakage is what only shows up to whoever
+# thinks to open the Actions tab.
+#
+# Posting is plain `curl` rather than slackapi/slack-github-action: a webhook
+# URL is a credential — anyone holding it can post to the channel — and handing
+# one to a mutable third-party tag is exactly what pinning an action to a full
+# commit SHA exists to avoid, since a retargeted tag would hand it to code
+# nobody here reviewed. A single POST of a one-field JSON body needs no action
+# at all, so there is no SHA to pin and no bump to remember — the same reason
+# release-alert.mjs reaches its webhook with a plain `fetch`.
+#
+# The webhook is the org secret SLACK_WEBHOOK_URL, falling back to
+# SLACK_DEPLOY_WEBHOOK_URL — the one that exists on 12-apps today. Both are org
+# secrets, so there is nothing to add per repository; check only that their
+# "Private and internal repositories" visibility covers this repo.
+#
+# Unset secret: warn and skip, so a repo that has not configured Slack does not
+# grow a permanently red workflow. Set but rejected: FAIL, because a notifier
+# that has quietly stopped notifying is the failure this exists to prevent.
+#
+# workflow_run runs the definition from the DEFAULT branch, so edits here take
+# effect only once merged to main.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  # Reading the triggering run's jobs, to name which ones failed.
+  actions: read
+
+jobs:
+  ci-failed:
+    name: Report a red CI on main
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    steps:
+      # Best-effort: the jobs API can 404 while a run is still finalizing, and
+      # "CI failed" with no job list still beats silence.
+      - name: Name the failed jobs
+        id: jobs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          names=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | .name] | join(", ")' || true)
+          [ -n "$names" ] || names="(the run failed without a single job reporting it)"
+          # Delimiter form rather than `names=$names`: a value carrying a
+          # newline would otherwise write extra lines into the output file.
+          {
+            echo "names<<SLACK_JOBS_EOF"
+            echo "$names"
+            echo "SLACK_JOBS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post to Slack
+        env:
+          # Every field goes through env, never straight into the script: a
+          # commit title is attacker-controlled text, and `${{ }}` pasted into a
+          # `run:` block is substituted before bash ever parses the line.
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_DEPLOY_WEBHOOK_URL }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          REPO: ${{ github.repository }}
+          FAILED_JOBS: ${{ steps.jobs.outputs.names }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK}" ]; then
+            echo "::warning::No failure webhook set (SLACK_WEBHOOK_URL / SLACK_DEPLOY_WEBHOOK_URL) — nothing posted to Slack."
+            exit 0
+          fi
+          # jq assembles the whole message, so quotes, newlines and backslashes
+          # in a commit title cannot break the payload or the shell.
+          payload=$(jq -n \
+            --arg branch "$BRANCH" --arg title "$TITLE" --arg jobs "$FAILED_JOBS" \
+            --arg url "$RUN_URL" --arg sha "${SHA:0:7}" --arg actor "$ACTOR" \
+            --arg repo "$REPO" \
+            '{text: (":x: *CI failed on `\($branch)`* — \($repo)\nNothing will publish until this is green.\n\($title)\nFailed: \($jobs)\n<\($url)|View run> · `\($sha)` by \($actor)")}')
+          code=$(curl -sS -o /tmp/slack.out -w '%{http_code}' \
+            -X POST -H 'content-type: application/json' \
+            --data "$payload" "$WEBHOOK")
+          if [ "$code" != "200" ]; then
+            echo "::error::Slack rejected the failure alert (HTTP ${code}): $(cat /tmp/slack.out)"
+            exit 1
+          fi
+          echo "Posted CI failure alert to Slack."
