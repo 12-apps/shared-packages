@@ -112,4 +112,29 @@ describe('the rbac manifest', () => {
     assertDbMirror(rbacManifest, packageJson);
     assertExportsMirror(rbacManifest, packageJson);
   });
+
+  it('declares the packaged journeys, so a host must answer for them', () => {
+    // Undeclared, they were adopted by convention: three specs in the origin
+    // host asserting this package's own test ids from outside it, invisible to
+    // `assemble()`. Declared, a host either binds `featuresRoot` or declines in
+    // writing — and the decline is in the report rather than in nobody's head.
+    expect(rbacManifest.e2e).toEqual({
+      entry: '@12-apps/rbac/e2e',
+      world: { factory: 'defineRbacWorld' },
+    });
+  });
+
+  it('declares no jobs and no email, and the docblock says why', () => {
+    // The contract's rule is bound-or-declined-in-writing, and silence is
+    // neither. Both absences are real — nothing here is deferred, and the one
+    // reader this package cannot reach (an accountless invitee) needs a mail
+    // that belongs to the flow owning the address before an account exists.
+    // What this pins is that they stay ABSENT rather than drifting into an
+    // empty declaration, which would oblige every host to bind deps for work
+    // that does not exist.
+    const manifest = rbacManifest as Record<string, unknown>;
+    expect(manifest.jobs).toBeUndefined();
+    expect(manifest.email).toBeUndefined();
+    expect(rbacManifest.server).toEqual(['http']);
+  });
 });
