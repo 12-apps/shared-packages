@@ -154,6 +154,8 @@ export interface HarnessBackend {
   onboarding: Hosts['onboarding'];
   /** Its wiring report and its BOUND job blueprints — neither has an endpoint. */
   research: Hosts['research'];
+  /** Its wiring report — an aggregate, not a route. */
+  entitlements: Hosts['entitlements'];
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
 }
@@ -293,6 +295,7 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     billing: hosts.billing,
     onboarding: hosts.onboarding,
     research: hosts.research,
+    entitlements: hosts.entitlements,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream
       // severed after its driver is gone throws into the sink rather than closing cleanly.

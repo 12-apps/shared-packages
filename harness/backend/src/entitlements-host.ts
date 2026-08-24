@@ -29,7 +29,12 @@ import {
   type OpenPlanRequest,
   type PlanChangeRequestPort,
 } from '@12-apps/entitlements/server';
-import { entitlementsRouter } from '@12-apps/entitlements/hono';
+import { entitlementsManifest } from '@12-apps/entitlements/manifest';
+import { entitlementsServerManifest } from '@12-apps/entitlements/manifest/server';
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /**
  * A film-festival submissions catalog — a domain this package has no
@@ -132,50 +137,76 @@ function comparison(currentPlanKey: string): ComparisonTier[] {
   }));
 }
 
+/** Where `mount-surfaces.ts` hangs it — the adoption's claim. */
+export const ENTITLEMENTS_MOUNT_PATH = '/api/admin/:tenantSlug';
+
 export interface EntitlementsHost {
   router: Hono;
   engine: EntitlementsEngine<HarnessFeature>;
   requireEntitlement(tenantId: string, feature: HarnessFeature): Promise<void>;
   reset(): void;
+  /** The consumer's account of what was bound, declined or left over. */
+  report: WiringReport;
+  routes: readonly MountedRoute[];
 }
 
-export function createEntitlementsHost(): EntitlementsHost {
-  const source: MemorySource<HarnessFeature> = createMemorySource({
-    [TENANT]: seededState(),
-  });
-
-  // The lead store — standing in for the host's own billing table. Idempotent
-  // by tenant, exactly the contract the port documents.
+/**
+ * The lead store — standing in for the host's own billing table.
+ *
+ * Idempotent by tenant, exactly the contract the port documents, and its own
+ * function because it is the one part of this host that is genuinely a
+ * DATABASE in a real adopter: everything around it is vocabulary.
+ */
+function createPlanChangeRequests(): {
+  port: PlanChangeRequestPort;
+  clear: () => void;
+} {
   const open = new Map<string, OpenPlanRequest>();
   let sequence = 0;
   // The write answers `{ id, status }` only — the read next door carries the
   // details, exactly the split the port documents.
   const filed = (row: OpenPlanRequest): FiledPlanRequest => ({ id: row.id, status: 'open' });
-  const planChangeRequests: PlanChangeRequestPort = {
-    async getOpen(tenantId) {
-      return open.get(tenantId) ?? null;
-    },
-    async create(input) {
-      const existing = open.get(input.tenantId);
-      if (existing) return { request: filed(existing), created: false };
-      sequence += 1;
-      const request: OpenPlanRequest = {
-        id: `req-${sequence}`,
-        requestedPlanKey: input.requestedPlanKey,
-        createdAt: new Date().toISOString(),
-      };
-      open.set(input.tenantId, request);
-      return { request: filed(request), created: true };
+  return {
+    clear: () => open.clear(),
+    port: {
+      async getOpen(tenantId) {
+        return open.get(tenantId) ?? null;
+      },
+      async create(input) {
+        const existing = open.get(input.tenantId);
+        if (existing) return { request: filed(existing), created: false };
+        sequence += 1;
+        const request: OpenPlanRequest = {
+          id: `req-${sequence}`,
+          requestedPlanKey: input.requestedPlanKey,
+          createdAt: new Date().toISOString(),
+        };
+        open.set(input.tenantId, request);
+        return { request: filed(request), created: true };
+      },
     },
   };
+}
 
-  const { app: router, api } = entitlementsRouter<HarnessFeature, HarnessPlan>({
+/**
+ * Everything `createApiEntitlements` requires, as one value.
+ *
+ * Its own function so the adoption above reads as the four lines it is, and
+ * because this is the half a reader compares against the package's own list of
+ * required config — the catalog, the ladder, the source, the pricing DISPLAY
+ * data and the words — while everything around it is contract mechanics.
+ */
+function apiConfig(source: MemorySource<HarnessFeature>, planChangeRequests: PlanChangeRequestPort) {
+  return {
     features: FEATURES,
     plans: PLANS,
     source,
     // The seeded tenant holds four curators against Shorts' ceiling of three —
     // the over-quota state: everything keeps working, inviting more upsells.
-    usage: { count: async (_tenantId, feature) => (feature === 'screeners.invited' ? 4 : 0) },
+    usage: {
+      count: async (_tenantId: string, feature: string) =>
+        feature === 'screeners.invited' ? 4 : 0,
+    },
     defaultPlanKey: 'shorts',
     pricing: PRICING,
     formatPrice,
@@ -184,26 +215,75 @@ export function createEntitlementsHost(): EntitlementsHost {
     // The surface's sentences, passed by hand — required config, exactly like
     // `formatPrice`: the package no longer ships a default voice.
     messages: PT_BR_ENTITLEMENTS_MESSAGES,
-    resolveActor: (c) => {
-      // The host's whole authentication story, reduced to a header the specs
-      // can set: `x-harness-role: staff` is a caller the WRITE refuses. The
-      // id it grants is the PACKAGE's own contribution, composed into what
-      // this host would otherwise call its catalog.
-      const role = c.req.header('x-harness-role') ?? 'admin';
-      return {
-        tenantId: TENANT,
-        userId: 'user-harness',
-        permissions: role === 'admin' ? [PLAN_REQUEST_PERMISSION] : [],
-      };
-    },
+  };
+}
+
+export function createEntitlementsHost(): EntitlementsHost {
+  const source: MemorySource<HarnessFeature> = createMemorySource({
+    [TENANT]: seededState(),
+  });
+  const leads = createPlanChangeRequests();
+
+  /**
+   * The surface, adopted through `@12-apps/wiring/consumer` rather than through
+   * `@12-apps/entitlements/hono`.
+   *
+   * The per-package Hono adapter still works and is not deprecated — what it
+   * cannot do is COUNT. This package declares `http`, `db` and a MANDATORY
+   * `observability` namespace whose reason it states in one line ("a refused
+   * plan change or a failed retention sweep files under `entitlements`, not
+   * nowhere"), and `entitlementsRouter` takes no logger argument: the binder is
+   * the only thing that can supply one.
+   *
+   * Its manifest is also the clearest statement in the repo of why an inventory
+   * must not overstate — it deliberately omits `web` even though `./react`
+   * ships the plan screens, "because listing it would oblige every SERVER host
+   * adopting this manifest to answer for a React surface it never mounts."
+   * Answering that manifest here is therefore a complete answer, not a partial
+   * one.
+   */
+  const wiring = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  wiring.adoptServer({
+    manifest: entitlementsManifest,
+    server: entitlementsServerManifest,
+    bindings: { http: { mountPath: ENTITLEMENTS_MOUNT_PATH, config: apiConfig(source, leads.port) } },
+  });
+
+  const wired = wiring.assemble();
+  // Each package's FULL `http.create` result, which the aggregate hands back
+  // keyed by package name — this is how a host keeps the engine and the guard
+  // it needs beside the routes, without building the surface twice.
+  const api = wired.http[entitlementsManifest.name] as {
+    engine: EntitlementsEngine<HarnessFeature>;
+    requireEntitlement(tenantId: string, feature: HarnessFeature): Promise<void>;
+  };
+
+  const router = honoRouterFor(wired.routes, (c) => {
+    // The host's whole authentication story, reduced to a header the specs can
+    // set: `x-harness-role: staff` is a caller the WRITE refuses. The id it
+    // grants is the PACKAGE's own contribution, composed into what this host
+    // would otherwise call its catalog.
+    const role = c.req.header('x-harness-role') ?? 'admin';
+    return {
+      tenantId: TENANT,
+      userId: 'user-harness',
+      permissions: role === 'admin' ? [PLAN_REQUEST_PERMISSION] : [],
+    };
   });
 
   return {
     router,
     engine: api.engine,
     requireEntitlement: (tenantId, feature) => api.requireEntitlement(tenantId, feature),
+    report: wired.report,
+    routes: wired.routes,
     reset() {
-      open.clear();
+      leads.clear();
       source.set(TENANT, seededState());
     },
   };
