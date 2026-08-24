@@ -4,6 +4,7 @@ import { parseReportDocument } from '../run';
 import { compileDocument } from './compile-document';
 import type { ReportServerMessages } from './messages';
 import {
+  messagesOf,
   fail,
   foldSpecError,
   isDuplicateName,
@@ -102,10 +103,10 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
     permission: DEFAULT_AUTHOR_PERMISSION,
     quota: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
-    async handle({ actor, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenCreate);
+    async handle({ actor, body, locale }) {
+      if (!mayAuthor(config, actor)) return fail(403, messagesOf(config, locale).forbiddenCreate);
       try {
-        const input = parseSaveBody(body, config.messages);
+        const input = parseSaveBody(body, messagesOf(config, locale));
         compileDocument(parseReportDocument(input.spec), config.catalog);
         // Authorship comes from the ACTOR, never from the body — a client
         // that could name its own `createdBy` could author as someone else,
@@ -113,7 +114,7 @@ function createRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
         const record = await store.create(actor.clientId, toInput(input, null), actor.userId);
         return ok(toSummary(record, actor.userId));
       } catch (error) {
-        if (isDuplicateName(error)) return fail(409, config.messages.duplicateName);
+        if (isDuplicateName(error)) return fail(409, messagesOf(config, locale).duplicateName);
         return foldSpecError(error);
       }
     },
@@ -127,21 +128,21 @@ function updateRoute(config: ReportBuilderServerConfig, store: SavedReportStore)
     permission: DEFAULT_AUTHOR_PERMISSION,
     entitlement: REPORT_BUILDER_FEATURES.custom,
     authoring: true,
-    async handle({ actor, params, body }) {
-      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenEdit);
+    async handle({ actor, params, body, locale }) {
+      if (!mayAuthor(config, actor)) return fail(403, messagesOf(config, locale).forbiddenEdit);
       const id = params.id ?? '';
       try {
-        const input = parseSaveBody(body, config.messages);
+        const input = parseSaveBody(body, messagesOf(config, locale));
         compileDocument(parseReportDocument(input.spec), config.catalog);
         const current = await store.get(actor.clientId, id);
         // Absent, or present-but-invisible: the same 404 the reader gets, so an
         // author-permission holder learns nothing here they could not learn
         // from `GET /reports/custom/:id`.
-        if (!current || !canViewSavedReport(current, actor)) return fail(404, config.messages.notFound);
+        if (!current || !canViewSavedReport(current, actor)) return fail(404, messagesOf(config, locale).notFound);
         const record = await store.update(actor.clientId, id, toInput(input, current));
-        return record ? ok(toSummary(record, actor.userId)) : fail(404, config.messages.notFound);
+        return record ? ok(toSummary(record, actor.userId)) : fail(404, messagesOf(config, locale).notFound);
       } catch (error) {
-        if (isDuplicateName(error)) return fail(409, config.messages.duplicateName);
+        if (isDuplicateName(error)) return fail(409, messagesOf(config, locale).duplicateName);
         return foldSpecError(error);
       }
     },
@@ -157,20 +158,20 @@ function deleteRoute(
     path: '/reports/custom/:id',
     permission: DEFAULT_AUTHOR_PERMISSION,
     authoring: true,
-    async handle({ actor, params }) {
-      if (!mayAuthor(config, actor)) return fail(403, config.messages.forbiddenDelete);
+    async handle({ actor, params, locale }) {
+      if (!mayAuthor(config, actor)) return fail(403, messagesOf(config, locale).forbiddenDelete);
       const id = params.id ?? '';
       // READ BEFORE DELETE. The store's `remove` is tenant-scoped and would
       // happily destroy a document this actor may not open, which is the widest
       // possible version of the fail-open: the only feedback is that the row is
       // gone.
       const current = await store.get(actor.clientId, id);
-      if (!current || !canViewSavedReport(current, actor)) return fail(404, config.messages.notFound);
+      if (!current || !canViewSavedReport(current, actor)) return fail(404, messagesOf(config, locale).notFound);
       const removed = await store.remove(actor.clientId, id);
       // 204 with NO body: there is nothing to say about a document that no
       // longer exists, and an envelope here would be the only write on this
       // surface answering with one.
-      return removed ? { status: 204, body: undefined } : fail(404, config.messages.notFound);
+      return removed ? { status: 204, body: undefined } : fail(404, messagesOf(config, locale).notFound);
     },
   };
 }
