@@ -42,3 +42,4 @@ export {
 export { NEW_CARD, type CardDetails, type CardFieldErrors, type CardToken, type SavedCard } from "./types";
 export type { CardCopy, CardFieldCopy, CardTokenizeCopy } from "./copy";
 export { PT_BR_CARD_COPY } from "./pt-BR";
+export { EN_US_CARD_COPY } from "./en-US";
