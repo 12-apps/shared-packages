@@ -1,5 +1,6 @@
 import { CREDENTIALS_KEY } from '../integrations';
 import type { ResearchApiConfig, ResearchRoute } from './types';
+import { resolveResearchCopy } from './types';
 import { ok, recordOf, refuse, credentialFieldsProblem, credentialsOf } from './shared';
 
 /**
@@ -9,15 +10,21 @@ import { ok, recordOf, refuse, credentialFieldsProblem, credentialsOf } from './
  * persists on a refusal, so a store merely down for a minute is never made
  * unaddable; the operator retries.
  */
-type UrlProblem = (edited: Record<string, unknown> | undefined) => Promise<string | null>;
+type UrlProblem = (
+  edited: Record<string, unknown> | undefined,
+  locale: string | undefined,
+) => Promise<string | null>;
 
 function urlProblemOf(config: ResearchApiConfig): UrlProblem {
-  const { checks, messages } = config;
-  return async (edited) => {
+  const { checks } = config;
+  return async (edited, locale) => {
     const baseUrl = edited?.['baseUrl'];
     if (typeof baseUrl !== 'string') return null;
     const violation = await checks.publicUrlViolation(baseUrl);
-    return violation === null ? null : messages.sourceUrlRejected(violation);
+    // Resolved per request: the sentence is the caller's, the SSRF verdict is
+    // not.
+    if (violation === null) return null;
+    return resolveResearchCopy(config.messages, locale).sourceUrlRejected(violation);
   };
 }
 
@@ -42,9 +49,9 @@ function rosterRoutes(config: ResearchApiConfig): ResearchRoute[] {
       method: 'POST',
       path: '/research/sources',
       permission: 'research:write',
-      async handle({ actor, body }) {
+      async handle({ actor, body, locale }) {
         const record = recordOf(body);
-        const urlProblem = await baseUrlProblem(recordOf(record['config']));
+        const urlProblem = await baseUrlProblem(recordOf(record['config']), locale);
         if (urlProblem !== null) return refuse(400, urlProblem);
         const check = await checks.sourceConfig(
           String(record['type'] ?? ''),
@@ -62,12 +69,12 @@ function rosterRoutes(config: ResearchApiConfig): ResearchRoute[] {
       // source's identity is its connector. An edited config re-proves both
       // gates; a rename (no config) touches no connector setting and skips
       // the probe. The stored row answers the 404 through `update`.
-      async handle({ actor, params, body }) {
+      async handle({ actor, params, body, locale }) {
         const record = recordOf(body);
         const sourceId = params['sourceId'] ?? '';
         const edited = record['config'] === undefined ? undefined : recordOf(record['config']);
         if (edited !== undefined) {
-          const urlProblem = await baseUrlProblem(edited);
+          const urlProblem = await baseUrlProblem(edited, locale);
           if (urlProblem !== null) return refuse(400, urlProblem);
           const type = await store.sources.typeOf(sourceId, actor.clientId);
           if (type !== null) {
@@ -95,7 +102,7 @@ function rosterRoutes(config: ResearchApiConfig): ResearchRoute[] {
 
 /** The application key of ONE named source — enters here, leaves as a hint. */
 function credentialRoutes(config: ResearchApiConfig): ResearchRoute[] {
-  const { store, checks, credentials: codec, messages, connectors } = config;
+  const { store, checks, credentials: codec, connectors } = config;
   const now = config.now ?? ((): Date => new Date());
   return [
     {
@@ -105,14 +112,14 @@ function credentialRoutes(config: ResearchApiConfig): ResearchRoute[] {
       // Probed against the stored connector settings plus the submitted key —
       // the exact request a run will make — and stored UNVERIFIED even on a
       // pass: the probe proves the store answers, never that it CHECKED the key.
-      async handle({ actor, params, body }) {
+      async handle({ actor, params, body, locale }) {
         const sourceId = params['sourceId'] ?? '';
         const submitted = credentialsOf(recordOf(body));
         const target = await store.credentials.requireSource(sourceId, actor.clientId);
         const fieldProblem = credentialFieldsProblem(
           connectors.credentialFieldsFor(target.type),
           submitted,
-          messages,
+          resolveResearchCopy(config.messages, locale),
         );
         if (fieldProblem !== null) return refuse(422, fieldProblem);
         const check = await checks.sourceConfig(target.type, {

@@ -42,6 +42,45 @@ export interface ResearchHttpRequest {
   params: Record<string, string | undefined>;
   query: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
+}
+
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type ResearchCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type ResearchCopySource<T> = T | ResearchCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED, never where the routes are built: this
+ * surface is assembled once per process, so a value resolved there answers
+ * every reader in the language the process started with — and a single-locale
+ * host cannot tell the difference.
+ */
+export function resolveResearchCopy<T>(
+  source: ResearchCopySource<T>,
+  locale: string | undefined,
+): T {
+  return typeof source === 'function'
+    ? (source as ResearchCopyResolver<T>)({ locale })
+    : source;
 }
 
 /** Structural twin of the wiring contract's `WireResponse`. */
@@ -196,7 +235,7 @@ export interface ResearchApiConfig {
    * REQUIRED: this package used to compile in its own pt-BR, which made the
    * origin host's Portuguese the silent default for every adopter.
    */
-  diagnostics: ResearchDiagnosticsCopy;
+  diagnostics: ResearchCopySource<ResearchDiagnosticsCopy>;
   /**
    * The words this API READS in somebody else's data — a spreadsheet's column
    * headers, a merchant's stock and delivery lines (FUT-760).
@@ -205,12 +244,19 @@ export interface ResearchApiConfig {
    * mode: an unstated vocabulary does not render another product's language,
    * it silently recognises NOTHING. A supplier sheet whose headers this host
    * cannot match yields zero rows and one problem at line 0.
+   *
+   * Deliberately NOT a `ResearchCopySource`, unlike `diagnostics` and
+   * `messages` beside it. Those are sentences a reader reads, so they follow
+   * the reader; this is a table matched against a FILE somebody uploaded, and
+   * it must follow the file. Resolving it from a request locale would stop an
+   * English-reading admin's Portuguese supplier sheet from parsing at all —
+   * a broken import, dressed as a translation.
    */
   vocabulary: MarketVocabulary;
   store: ResearchHttpStore;
   checks: ResearchHttpChecks;
   credentials: ResearchCredentialCodec;
-  messages: ResearchHttpMessages;
+  messages: ResearchCopySource<ResearchHttpMessages>;
   /**
    * The connector registry as MOUNTED by this host: which types exist here.
    * Feeds the `mounted` flag on integrations and `meta.mountedTypes` on the

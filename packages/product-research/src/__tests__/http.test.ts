@@ -6,6 +6,7 @@ import {
   type ResearchHttpStore,
   type ResearchRoute,
 } from '../http';
+import { EN_US_RESEARCH_DIAGNOSTICS, EN_US_RESEARCH_MESSAGES } from '../en-US';
 import { PT_BR_RESEARCH_DIAGNOSTICS, PT_BR_RESEARCH_MESSAGES } from '../pt-BR';
 import { PT_BR_MARKET_VOCABULARY } from '../normalize/pt-BR';
 
@@ -342,5 +343,76 @@ describe('createApiProductResearch', () => {
       query: { page: '2', pageSize: 'nope' },
     });
     expect(answer.body).toEqual({ data: [], pagination: { page: 2, pageSize: 50 } });
+  });
+});
+
+describe('one mount, two languages', () => {
+  /**
+   * The property the resolver form of the copy port exists for: these sixteen
+   * descriptors are built ONCE per process and the language changes per caller.
+   *
+   * The interesting case here is not that copy follows a reader — it is that
+   * `vocabulary` must NOT. `diagnostics` and `messages` are sentences somebody
+   * reads; `vocabulary` is a table matched against a FILE somebody uploaded, so
+   * it follows the file. Resolving it from a request locale would stop an
+   * English-reading admin's Portuguese supplier sheet parsing at all.
+   */
+  const bilingual = () =>
+    api({
+      // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out so
+      // this package keeps no dependency on it.
+      messages: ({ locale }) =>
+        locale === 'en-US' ? EN_US_RESEARCH_MESSAGES : PT_BR_RESEARCH_MESSAGES,
+      diagnostics: ({ locale }) =>
+        locale === 'en-US' ? EN_US_RESEARCH_DIAGNOSTICS : PT_BR_RESEARCH_DIAGNOSTICS,
+      checks: {
+        integrationCredentials: async () => null,
+        sourceConfig: async () => null,
+        publicUrlViolation: async () => 'private-network',
+      },
+    });
+
+  const errorOf = (body: unknown): string =>
+    (body as { error: { message: string } }).error?.message ?? String((body as { error: string }).error);
+
+  const create = async (routes: readonly ResearchRoute[], locale: string | undefined) =>
+    routeOf(routes, 'POST /research/sources').handle({
+      actor,
+      params: {},
+      query: {},
+      body: { name: 'x', type: 'VTEX', config: { baseUrl: 'http://10.0.0.1' } },
+      ...(locale === undefined ? {} : { locale }),
+    });
+
+  it('answers the SSRF refusal in each caller’s language', async () => {
+    const { routes } = bilingual();
+    expect(errorOf((await create(routes, 'pt-BR')).body)).toContain(
+      'URL da fonte rejeitada',
+    );
+    expect(errorOf((await create(routes, 'en-US')).body)).toContain('Source URL rejected');
+  });
+
+  it('hands an absent locale to the resolver rather than refusing', async () => {
+    // A host with one audience populates nothing. The resolver decides what no
+    // answer means, and here it means the default.
+    const { routes } = bilingual();
+    expect(errorOf((await create(routes, undefined)).body)).toContain(
+      'URL da fonte rejeitada',
+    );
+  });
+
+  it('leaves a plain-value host byte-identical', async () => {
+    // The whole compatibility claim: words rather than a resolver behaves
+    // exactly as before the field widened.
+    const { routes } = api({
+      checks: {
+        integrationCredentials: async () => null,
+        sourceConfig: async () => null,
+        publicUrlViolation: async () => 'private-network',
+      },
+    });
+    expect(errorOf((await create(routes, 'en-US')).body)).toContain(
+      'URL da fonte rejeitada',
+    );
   });
 });
