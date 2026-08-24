@@ -301,6 +301,8 @@ export {
   PaymentProviderSettings,
   type PaymentProviderSettingsProps,
 } from './components/PaymentProviderSettings';
+export { createWebPaymentsSettings } from './flows/create-payments-settings';
+export type { BoundPaymentsSettingsProps, PaymentsSettingsSurface, PaymentsSettingsWebConfig } from './flows/create-payments-settings';
 
 // ---------------------------------------------------------------------------
 // The PLATFORM operations screens (FUT-479 / FUT-483, packaged by FUT-573) —

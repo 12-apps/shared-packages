@@ -120,7 +120,7 @@ export function NotificationsCenterPage(): JSX.Element {
       <h2>Host</h2>
       <HostControls onNavigated={navigated} />
 
-      <h2>Preferências (pacote)</h2>
+      <h2>Preferences (package)</h2>
       <PreferencesSurface />
     </div>
   );

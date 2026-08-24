@@ -98,3 +98,31 @@ export function missingServerCopy(copy: DiscountsServerCopy | undefined): string
   if (copy === undefined) return [...COPY_KEYS];
   return COPY_KEYS.filter((key) => typeof copy[key] !== "string" || copy[key].trim() === "");
 }
+
+/**
+ * What the config field takes once its copy can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off `WireRequest.locale`, unnarrowed — because matching it
+ * is the host resolver's job.
+ */
+export type DiscountsCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type DiscountsCopySource<T> = T | DiscountsCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED — a factory that resolves once and keeps
+ * the result has re-frozen the language into its mount, and a single-locale
+ * host cannot tell the difference.
+ */
+export function resolveDiscountsCopy<T>(
+  source: DiscountsCopySource<T>,
+  locale: string | undefined,
+): T {
+  return typeof source === "function"
+    ? (source as DiscountsCopyResolver<T>)({ locale })
+    : source;
+}

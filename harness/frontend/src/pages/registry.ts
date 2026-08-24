@@ -8,28 +8,10 @@ import { FeatureFlagsPage } from './feature-flags';
 import { ImpersonationPage } from './impersonation';
 import { LifecycleAdminPage } from './lifecycle-admin';
 import { NotificationsCenterPage } from './notifications-center';
-import { PaymentsCheckoutApplePayPage } from './payments-checkout-apple-pay';
-import { PaymentsCheckoutBothPage } from './payments-checkout-both';
-import { PaymentsCheckoutBuyerFieldsPage } from './payments-checkout-buyer-fields';
-import { PaymentsCheckoutCardPage } from './payments-checkout-card';
-import { PaymentsCheckoutChainFailoverPage } from './payments-checkout-chain-failover';
-import { PaymentsCheckoutFailuresPage } from './payments-checkout-failures';
-import { PaymentsCheckoutGooglePayPage } from './payments-checkout-google-pay';
-import { PaymentsCheckoutHeadlessPage } from './payments-checkout-headless';
-import { PaymentsCheckoutMethodGatePage } from './payments-checkout-method-gate';
-import { PaymentsCheckoutNoProviderPage } from './payments-checkout-no-provider';
-import { PaymentsCheckoutPixPage } from './payments-checkout-pix';
-import { PaymentsCheckoutProviderScreensPage } from './payments-checkout-provider-screens';
-import { PaymentsCheckoutRedirectPage } from './payments-checkout-redirect';
-import { PaymentsCheckoutSavedCardsPage } from './payments-checkout-saved-cards';
-import { PaymentsCheckoutSlotsPage } from './payments-checkout-slots';
-import { PaymentsWalletPage } from './payments-wallet';
-import { PaymentsProviderActivationPage } from './payments-provider-activation';
-import { PaymentsProviderChainPage } from './payments-provider-chain';
-import { PaymentsProviderConnectPage } from './payments-provider-connect';
-import { PaymentsProviderCredentialsPage } from './payments-provider-credentials';
-import { PaymentsProviderSettingsPage } from './payments-provider-settings';
+import { ObservabilityPage } from './observability';
 import { OnboardingGuidedPage } from './onboarding-guided';
+import { PAYMENTS_ADMIN_PAGES, PAYMENTS_STOREFRONT_PAGES } from './payments-pages';
+import { ProductResearchPage } from './product-research';
 import { PwaInstallPromptPage } from './pwa-install-prompt';
 import { PwaManifestPage } from './pwa-manifest';
 import { RbacAdminPage } from './rbac-admin';
@@ -145,116 +127,10 @@ export const NAV_GROUPS: readonly HarnessNavGroup[] = [
   },
 ];
 
-/** The `payments-checkout-*` block: one page per BUYER FLOW (FUT-743). */
-const PAYMENTS_FRONTEND = '@12-apps/payments-frontend';
-
-/**
- * Every page of the `checkout` parent shares these, so the flows read as one
- * list of variations rather than thirteen restatements of where they live.
- */
-const CHECKOUT_FLOW = {
-  pkg: PAYMENTS_FRONTEND,
-  group: 'storefront',
-  parent: 'checkout',
-} as const;
-
-/** Every page of the `payments-admin` parent shares these. */
-const PAYMENTS_ADMIN = {
-  pkg: PAYMENTS_FRONTEND,
-  group: 'backoffice',
-  parent: 'payments-admin',
-} as const;
-
 export const PAGES: readonly HarnessPage[] = [
   // --- Storefront: what a BUYER sees --------------------------------------
   //
-  // Titles inside `checkout` name only what VARIES. The parent row already
-  // says "Checkout", so repeating it thirteen times pushed the distinguishing
-  // word — the reason each page exists — off to the right of every row.
-  { ...CHECKOUT_FLOW, slug: 'payments-checkout-pix', title: 'PIX', Component: PaymentsCheckoutPixPage },
-  { ...CHECKOUT_FLOW, slug: 'payments-checkout-card', title: 'Card', Component: PaymentsCheckoutCardPage },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-google-pay',
-    title: 'Google Pay',
-    Component: PaymentsCheckoutGooglePayPage,
-  },
-  { ...CHECKOUT_FLOW, slug: 'payments-checkout-both', title: 'Both methods', Component: PaymentsCheckoutBothPage },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-apple-pay',
-    title: 'Apple Pay',
-    Component: PaymentsCheckoutApplePayPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-no-provider',
-    title: 'Cannot charge',
-    Component: PaymentsCheckoutNoProviderPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-redirect',
-    title: 'Hosted handover',
-    Component: PaymentsCheckoutRedirectPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-chain-failover',
-    title: 'Provider chain',
-    Component: PaymentsCheckoutChainFailoverPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-provider-screens',
-    title: 'Provider screens',
-    Component: PaymentsCheckoutProviderScreensPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-method-gate',
-    title: 'Method gate',
-    Component: PaymentsCheckoutMethodGatePage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-buyer-fields',
-    title: 'Buyer fields',
-    Component: PaymentsCheckoutBuyerFieldsPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-failures',
-    title: 'Refusals',
-    Component: PaymentsCheckoutFailuresPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-saved-cards',
-    title: 'Saved cards',
-    Component: PaymentsCheckoutSavedCardsPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-slots',
-    title: 'Two design systems',
-    Component: PaymentsCheckoutSlotsPage,
-  },
-  {
-    ...CHECKOUT_FLOW,
-    slug: 'payments-checkout-headless',
-    title: 'Composed by hand',
-    Component: PaymentsCheckoutHeadlessPage,
-  },
-  // NOT under `checkout`: saving a card here is deliberately OUTSIDE any
-  // purchase (FUT-183/FUT-478), so the wallet is its own buyer screen.
-  {
-    slug: 'payments-wallet',
-    title: 'Wallet',
-    pkg: PAYMENTS_FRONTEND,
-    group: 'storefront',
-    Component: PaymentsWalletPage,
-  },
+  ...PAYMENTS_STOREFRONT_PAGES,
   ...AUTH_PAGES,
   {
     slug: 'pwa-install-prompt',
@@ -287,38 +163,7 @@ export const PAGES: readonly HarnessPage[] = [
   },
 
   // --- Backoffice: what the STORE sees ------------------------------------
-  // Titles name only what VARIES; the parent row already says "Provider
-  // settings".
-  {
-    ...PAYMENTS_ADMIN,
-    slug: 'payments-provider-settings',
-    title: 'Catalog',
-    Component: PaymentsProviderSettingsPage,
-  },
-  {
-    ...PAYMENTS_ADMIN,
-    slug: 'payments-provider-credentials',
-    title: 'Credentials',
-    Component: PaymentsProviderCredentialsPage,
-  },
-  {
-    ...PAYMENTS_ADMIN,
-    slug: 'payments-provider-connect',
-    title: 'Connect (OAuth)',
-    Component: PaymentsProviderConnectPage,
-  },
-  {
-    ...PAYMENTS_ADMIN,
-    slug: 'payments-provider-activation',
-    title: 'Activation charge',
-    Component: PaymentsProviderActivationPage,
-  },
-  {
-    ...PAYMENTS_ADMIN,
-    slug: 'payments-provider-chain',
-    title: 'Chain & policy',
-    Component: PaymentsProviderChainPage,
-  },
+  ...PAYMENTS_ADMIN_PAGES,
   AUTH_SETTINGS_PAGE,
   {
     slug: 'report-builder',
@@ -396,5 +241,26 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/feature-flags',
     group: 'backoffice',
     Component: FeatureFlagsPage,
+  },
+  // The one page whose package is NOT mounted by the page: `startObservability`
+  // runs in `main.tsx`, for the whole bundle, because it installs its global
+  // handlers before its own config arrives. This entry drives what is already
+  // there — which is exactly the shape a host's adoption has.
+  {
+    slug: 'observability',
+    title: 'Error reporting',
+    pkg: '@12-apps/observability-frontend',
+    group: 'backoffice',
+    Component: ObservabilityPage,
+  },
+  // ONE entry, and the `pkg` is the UI half deliberately: the page is ABOUT
+  // whether the published screens work for a host, and the engine underneath
+  // them is what the backend harness exercises.
+  {
+    slug: 'product-research',
+    title: 'Price research',
+    pkg: '@12-apps/product-research-ui',
+    group: 'backoffice',
+    Component: ProductResearchPage,
   },
 ];

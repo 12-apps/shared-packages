@@ -45,7 +45,7 @@ narrowed, on the one surface its README calls mandatory.
 | entity-lifecycle | ✔ | — | — | want | ✔ +annot. | ✔ | ✔ | ✔ | ✔ | **shipped** | annotations declared on all eight |
 | payments-backend | ✔ | ✔ | ✔ | want | schemas | — | ✔ | — | — | **shipped** | all four sweeps; receipt mailer |
 | billing | ✔ | want | — | want | — | — | — (host FKs) | — | — | **shipped** | extracted from the origin host; every number, table and sentence is host config |
-| payments-frontend | — | — | — | — | — | — | — | ✔ | ✔ | **S** | slots stay config |
+| payments-frontend | — | — | — | — | — | — | — | ✔ | ✔ | **shipped** | two web manifests, mirroring the backend's owner/buyer split; slots and `CheckoutHostPorts` stay surface config |
 | jobs | — | n/a (runtime) | — | — | — | — | ✔ | — | — | **S** | consumer-side runtime; `BoundJob` feeds `defineJob` |
 | notifications | ✔ | ✔ | n/a (owns port) | n/a (owns runtime) | — | — | ✔ | ✔ | — | **shipped** | `wireNotifyPort`; jobs + web declared |
 | auth | ✔ | — | ✔ (`createAuthMailer`) | ✔ | — | — | — | ✔ | — | **shipped** | type-only contract dep (was runtime) |
@@ -56,15 +56,14 @@ narrowed, on the one surface its README calls mandatory.
 | impersonation | ✔ | — | — | want | schemas | ✔ | — | ✔ (banner!) | ✔ | **shipped** | banner is per-document, not per-page |
 | onboarding | ✔ | — | — | — | — | — | ✔ | ✔ | — | **shipped** | grew the `createWeb*` factory it lacked |
 | storage | ✔ | — | — | — | schemas | — | — | ✔ | — | **S** | actor-scoped mounts documented in manifest |
-| mcp | ✔ (oauth) | — | — | — | n/a (owns runtime) | — | ✔ | ✔ | — | **M** | `annotations` accepted; own manifest open |
+| mcp | ✔ (oauth) | — | — | — | n/a (owns runtime) | — | ✔ | — | — | **shipped** | manifest + `db` declaration; no `web` (no bound-surface factory); `annotations` on `McpEndpoint` now accepted |
 | product-research | ✔ | ✔ (runs) | — | ✔ (budget) | schemas | ✔ | ✔ | — | — | **M** | research.run/reenqueue as blueprints |
-| product-research-ui | — | — | — | — | — | — | — | ✔ | ✔ | **S** | `ResearchApiClient` stays its port |
+| product-research-ui | — | — | — | — | — | — | — | ✔ | ✔ | **shipped** | `createWebResearch` binds the port; copy stays a per-render prop |
 | shift | ✔ | ✔ (auto-close) | — | want | — | ✔ | ✔ | — | — | **M** | |
-| app-shell | ✔ (consent) | — | — | — | — | — | — | n/a (IS the shell) | — | **S** | consumer-side anchor for web hosts |
-| pwa | ✔ (root) | — | — | — | — | — | — | — | — | **S** | root-mount constraint in manifest |
+| app-shell | ✔ (consent) | — | — | — | — | — | — | n/a (IS the shell) | — | **shipped** | consumer-side anchor for web hosts; the cookie crosses on the raw answer |
+| pwa | ✔ (root) | — | — | — | — | — | — | — | — | **shipped** | root-mount constraint recorded in the manifest, `Vary` shared with `./hono` |
 | observability-\* | — | — | — | — | — | — | — | — | — | **S** | ports only (logger) |
 | forms-core / shared-helpers / ui | — | — | — | — | — | — | — | — | — | — | libraries, not plugins — no manifest |
-| state-api (shared-private) | ✔ | — | — | — | — | — | — | — | — | **S** | already `mountStateApi(config)` |
 
 "want" = the package has a real use for the capability today and no way to
 express it; the manifest is where it becomes expressible.
@@ -156,12 +155,35 @@ its cycle repository; and a `subscription.charge_failed` notification
 blueprint, which needs the notify port before it can carry anything but a
 type.
 
-### payments-frontend (S)
+### payments-frontend (shipped)
 
-`manifest/web` wrapping `createPaymentFlows` + the settings components;
-`areas` for the admin settings page and client checkout. The
-`CheckoutHostPorts` / design-system slots stay exactly what they are — the
-surface config.
+TWO web manifests, mirroring the backend's privilege split for the same
+reason: the OWNER's provider-settings screen mounts in an admin SPA behind
+that host's admin session, and the SHOPPER's checkout mounts in a storefront
+SPA for an anonymous visitor. One manifest would hand a host one surface
+config for two mounts in two applications, and oblige the storefront to build
+the owner's settings transport in order to render a checkout.
+
+- `@12-apps/payments-frontend` — `surface` is `createWebPaymentsSettings`
+  (new, and the merchant twin of `createPaymentFlows`: it binds the
+  `PaymentsSettingsClient` and nothing else), `areas` puts it at
+  `config/payments` in `admin` with a nav row.
+- `@12-apps/payments-checkout-ui` — `surface` IS `createPaymentFlows`,
+  unchanged; `areas` routes `checkout` in `client` with **no** nav row, since
+  a checkout is reached from a cart and a menu entry pointing at it is a link
+  to an empty basket.
+
+The `CheckoutHostPorts` / design-system slots stay exactly what they are — the
+surface config, which is precisely the shape `create(config)` carries. So do
+the copy packs, and those stay PER-RENDER props rather than factory config:
+copy follows the reader's locale, and binding a pack at factory time pins the
+surface to whichever language was in effect when the host built it.
+
+The manifests are UNTYPED pure data, and their compliance suite lives in
+`packages/wiring/src/__tests__/payments-frontend-manifest.test.ts` — the
+portability ruleset (`payments/no-host-imports`) allows this package no
+`@12-apps/wiring` import at all, type-only included, exactly as for the
+backend.
 
 ### jobs (S)
 
@@ -245,30 +267,90 @@ banner host) captured as manifest documentation, `areas` for the
 super-admin start dialog, `permissions`. "want": a `desk-session.started`
 notification blueprint for the trail.
 
-### onboarding / storage / pwa / app-shell / state-api (S each)
+### onboarding / storage / pwa / app-shell (shipped)
 
 Thin manifest wrappers over `createApiOnboarding` / storage's actor-scoped
-routers / the two root-mounted PWA endpoints / `appShellRouter` +
-`createWebAppShell` / `mountStateApi`. app-shell doubles as the web hosts'
-anchor: the consumer's `surfaces` hand back what `createWebAppShell` builds,
-and the memoisation rule lives in the binder.
+routers / the two root-mounted PWA endpoints / `createApiAppShell`. Two of them
+needed a decision written down rather than a wrapper:
 
-### mcp (M) — the annotations landing
+- **pwa** — the ROOT-MOUNT constraint. `PwaRoute.path` is absolute from the
+  origin root, not relative to a mount, because a service worker's scope is
+  its own directory and the manifest is linked from a static `index.html`
+  that cannot know a prefix. The consumer joins `mountPath + path`, so the
+  only correct binding is `mountPath: '/'`; a host that serves the manifest
+  elsewhere says so through `config.manifestPath`, never through the mount.
+  The manifest exports `PWA_MOUNT_PATH` so an adopter names the constraint
+  instead of retyping a string. The wire view is also the adapter for `Vary`
+  and for the forwarded-host derivation — both moved to `server/request.ts`
+  and shared with `./hono`, because a second copy is exactly where a
+  forgotten `Vary` (one cacheable manifest URL serving every tenant) would
+  get in.
+- **app-shell** — the consent cookie crosses on the contract's RAW answer.
+  `AppShellResponse` carries cookie instructions because a framework-neutral
+  handler has no response object to set one on, and leaving that to each host
+  is what made "the acceptance succeeded but the cookie never left" a
+  per-adapter bug. It declares **no** `web` half, deliberately:
+  `createWebAppShell` would satisfy the contribution structurally, but it IS
+  the shell other surfaces are mounted inside rather than cargo a host
+  places, so the three SPAs keep calling it directly at their root.
 
-`McpEndpoint` gains optional `annotations?: WireMcpAnnotations` (additive;
-`WireMcpTool` is already a structural superset). `generateTools` carries them
-into `ToolAnnotations`; host policy tables become overrides-plus-completeness
-(the gate that every tool ends classified is unchanged — what changes is who
-supplies the default). Its own OAuth server + prisma partial get a manifest.
+### mcp (manifest shipped; the annotations landing still open)
+
+**Shipped.** The OAuth server and the Prisma partial now have a manifest.
+The `db` declaration is the consequential half: this package ships
+`prisma/mcp.prisma` plus a migration, and until now nothing said so in a form
+a host assembler could read — so the partial rode the assembler's STRUCTURAL
+discovery fallback, and three tables reached somebody's database because a
+`readdir` found them rather than because the package declared them. That is
+the anti-pattern `@12-apps/notifications`' manifest was written to close for
+its four models. `composed`, not `isolated`: the models carry no relation as
+shipped, but adopters are invited to add the FK onto `user_id` (the origin
+host's is `ON DELETE CASCADE`), and a package cannot declare isolation for
+models its hosts relate into their own account tables.
+
+`manifest/server` wraps `createApiMcpOauth` in a wire view answering the
+contract's RAW half — every endpoint here answers a 302 whose `Location` is
+the payload, a form-encoded RFC 6749 body, a JWKS with its own cache header
+or an RFC 8414/9728 document, none of which `{ status, body }` can express.
+Every route is `public`, because these six ARE the authentication and a host
+gate in front of them would demand a token from the endpoint that issues
+tokens. The mount is the origin root: `.well-known/*` cannot live under a
+prefix.
+
+Written narrowings: no `mcp` capability (this package IS the runtime and
+advertises no tools of its own), no `permissions` (authorization is the OAuth
+scope set plus bearer passthrough — there is no id to contribute), no `env`
+(the signing-key variable NAMES are exported for a host to read `process.env`
+with; the package reads nothing), no `jobs` (codes are stateless signed
+blobs, so there is nothing to sweep), and no `web` — `./react` exports
+components a host mounts with its own props, not a `createWeb*` factory, and
+inventing one to have something to declare would freeze a props table three
+hosts pass differently.
+
+**Still open.** `McpEndpoint` does NOT yet carry
+`annotations?: WireMcpAnnotations`. `WireMcpTool` is already a structural
+superset (annotations are optional), so the manifest above needed nothing
+from it — but the 48 package-declared lifecycle tools still cost 48
+hand-written host lines. That landing is unchanged work: add the field,
+carry it through `generateTools` into `ToolAnnotations`, and host policy
+tables become overrides-plus-completeness.
 
 ### product-research / product-research-ui / shift (M / S / M)
 
 Research: `http` + schemas + `db` + **jobs blueprints** for `research.run` /
 `research.reenqueue` (host-owned today) + the `research.budget` notification
 blueprint (host-owned today in `lib/notifications/research-budget.ts`).
-UI: `manifest/web` wrapping the screens; `ResearchApiClient` stays the
-surface config. Shift: `http`, `db`, `jobs` (`shift.auto-close`), audit ports
-unchanged.
+UI (**shipped**): `manifest/web` wrapping the screens through a new
+`createWebResearch`, which binds the two things a host was threading into
+each screen by hand — the `ResearchApiClient` port and the realtime
+`runChannel`, whose own contract requires a referentially stable value
+because the run screen uses it as a hook. `messages` deliberately stays a
+per-render prop: those strings follow the reader's locale, and binding the
+pack at factory time would pin the screens to whichever language was in
+effect at mount. `areas` suggests the two admin routes, deep-linkable run
+included, with no gates — `research:read` / `research:write` belong to the
+sibling manifest that enforces them. Shift: `http`, `db`, `jobs`
+(`shift.auto-close`), audit ports unchanged.
 
 ### forms-core, shared-helpers, ui, eslint-config, typescript-config, observability-\*
 

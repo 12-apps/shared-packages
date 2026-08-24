@@ -88,6 +88,104 @@ AES-GCM codec, the four path tables in this app's URLs, the roster, the trail
 (an array, where a real adopter has an append-only table) and the branch switch a
 spec flips to prove a live revocation.
 
+## The words a HOST page has (`@12-apps/i18n`)
+
+A package that renders a sentence declares it as a typed interface with no
+defaults and ships a named pack per language; a host passes a pack and never
+authors loose strings. Every page here follows that —
+`PT_BR_RESEARCH_MESSAGES`, `PT_BR_RBAC_WEB_COPY`, `PT_BR_WEB_STORAGE_MESSAGES`
+— because the package under test supplies the words.
+
+**The observability page is the exception, and the reason is the interesting
+one:** `@12-apps/observability-frontend` ships no copy, and correctly. It
+renders nothing — it attaches to three error funnels and sends events — so
+there is no screen in it to have words. That makes the words on its page the
+HOST's, which is precisely the case the copy-portability doctrine is about: a
+host that hardcodes them has frozen one language into a page and cannot be
+told, because a single-locale app cannot tell the difference.
+
+So `pages/observability-copy.ts` states them the way a package would, in two
+locales, and `main.tsx` puts the locale in scope with one reviewable line —
+`useLocale` THROWS outside a provider rather than assuming a default, which is
+`@12-apps/i18n`'s own argument that "a language reached by saying nothing is
+the one that ships to the wrong audience unnoticed."
+
+Two locales rather than one, deliberately: a pack with a single entry is a
+hardcoded string with extra steps, and a switch nothing exercises proves no
+axis exists. `?locale=en-US` on any page hash flips it, and the spec asserts
+the page came back in the other language.
+
+Host copy that is harness SCAFFOLDING — a section heading, an error
+placeholder, the label on a gated demo div — stays in English instead, by this
+repo's own rule that everything a developer reads is English. The distinction
+is whether a person outside this repo would ever read the string.
+
+## The error-reporting page (`observability`)
+
+The one page whose package the page does not mount. `startObservability` runs in
+`main.tsx`, before `createRoot`, for the whole bundle — because it installs
+`window.onerror` and `unhandledrejection` **synchronously**, before the config it
+needs has arrived, exactly so an error thrown in that window is still caught. A
+hook that ran when a route mounted would miss the errors it exists for. So this
+is where a host puts it, and the page drives what is already installed.
+
+It is OFF here and stays off: the backend answers `/api/observability-config`
+with an empty DSN by default, which is no SDK and no network for every other
+page in this app. That default is the package's own contract, not a harness
+convenience, and `/__harness/reset` restores it.
+
+**The ingest is real.** A DSN is a URL — `<protocol>://<key>@<host>/<projectId>`
+— and the SDK POSTs to `<host>/api/<projectId>/envelope/`. Point the host at the
+harness's own origin and the SDK's real transport, its real serialisation and its
+real `beforeSend` pipeline all run, over Vite's proxy into
+`observability-host.ts`, which parses the envelope and records what arrived.
+Nothing about the package is stubbed; only the far end of the wire is ours.
+
+That matters because of what `beforeSend` is for: **some events must NOT leave**,
+and an event that was dropped and an event that was never produced are
+indistinguishable from inside the page. So every noise case in
+`tests/observability.spec.ts` fires a reportable error beside the dropped one —
+otherwise "the ingest is empty" would also be satisfied by an SDK that never
+started.
+
+The two `setErrorClassifiers` entries in `main.tsx` are the host seam the package
+refuses to guess at: what counts as a routine non-5xx answer depends on this
+app's HTTP client, and what a dead chunk looks like depends on its lazy-route
+strategy. A package shipping either would be filtering another product's errors.
+
+## The price-research page (`product-research`)
+
+Two published tarballs meeting over a socket, which is the only reason this page
+exists. `@12-apps/product-research` declares the routes; `@12-apps/product-research-ui`
+renders their answers; and the shapes between them travel through a store seam
+typed `Promise<unknown>` so a host can answer anything at all. **There is no type
+error when a host's client answers a smaller shape** — only a screen rendering
+`undefined`, in production. Both packages' own suites fake the other side, so
+neither can see it.
+
+Three parts of this adoption are the HOST's and could not be otherwise:
+
+- **the worker** (`harness/backend/src/research-worker.ts`). The start route
+  persists a request, calls `enqueueRun` and answers 202 — and says why the
+  accepted answer cannot carry a run id: the run is created by the background
+  job, later. So every screen past the form renders rows a host produced, and a
+  harness with no worker can render none of them. This one settles inline, the
+  same choice the harness makes for realtime, and deliberately produces a FAILED
+  source beside the OK ones (degradation is a banner, never a shorter list) and
+  one offer with a NULL shipping cost (FUT-518: unstated, so the total is a
+  lower bound). `researchProbes.queue = 'unavailable'` drives the other branch
+  the package documents — a durable request, a 202, and no run.
+- **the history listing.** `GET /research` is the one route of the seventeen the
+  engine deliberately does not declare, because its query grammar is a host's own
+  search-grid config. It is mounted BESIDE the package's own POST on the same
+  path, sharing a path and splitting the verbs, which is the arrangement a real
+  adopter has. Both go through one mapping (`research-views.ts`) — a host that
+  spelled the wire shape twice is exactly what these specs make red.
+- **`term_normalized`.** The package's migration backfills it once and leaves it
+  "kept in sync by the host on write", using the package's exported
+  `normalizeText`. The column is nullable and no write fails without it, so a
+  host that forgets simply searches and matches nothing.
+
 ## Running it
 
 ```bash

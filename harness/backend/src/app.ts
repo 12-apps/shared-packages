@@ -106,6 +106,14 @@ import { applyDiscountMigrations } from './discounts-db';
 import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
 import { provisionShift, reseedShifts, shiftHost } from './shift-host';
 import { mountRequestScope, requestScopeProbes } from './request-scope-host';
+import { provisionResearch, researchHost, reseedResearch } from './research-host';
+import { observability } from './observability-host';
+import { reseedBilling } from './billing-host';
+import { provisionHosts, type Hosts } from './provision-hosts';
+
+// Re-exported: `mount-surfaces.ts` and the suites address `Hosts` through the
+// app, which is where it lived before the provisioning half moved out.
+export type { Hosts } from './provision-hosts';
 import { openReportsDb, reseed } from './saved-report-db';
 import { createStorageHost } from './storage-host';
 
@@ -135,116 +143,21 @@ export interface HarnessBackend {
    * other people's shifts on request is a very different thing.
    */
   shift: Hosts['shift'];
+  /**
+   * `@12-apps/billing`'s host, for the two levers a suite has to pull that no
+   * endpoint exposes: which acquirer the PLATFORM collects through (a real
+   * rotation, through the credential store's own `setChain`), and the gateway
+   * the vault sessions live in.
+   */
+  billing: Hosts['billing'];
+  /** Its wiring report — an aggregate, not a route. */
+  onboarding: Hosts['onboarding'];
+  /** Its wiring report and its BOUND job blueprints — neither has an endpoint. */
+  research: Hosts['research'];
+  /** Its wiring report — an aggregate, not a route. */
+  entitlements: Hosts['entitlements'];
   /** Closing it is the caller's job; the server itself never does. */
   close: () => Promise<void>;
-}
-
-/**
- * Every package's tables + host, applied the way a real deploy would: each
- * package's OWN migrations, read out of its own installed tarball. A host that had
- * to hand-write this DDL would be a host the partial never reached.
- *
- * Extracted from `createHarnessBackend` because the two together outgrew the
- * size gate once 12-17 and 12-23 both landed — the split is along the obvious
- * seam, PROVISIONING here and MOUNTING there, and mount order (see the header)
- * lives entirely on the mounting side.
- */
-async function provisionHosts(pg: PGlite): Promise<Hosts> {
-  // 12-13. This also retired the `/roles` stub that used to answer the reports
-  // "Cargos específicos" picker with an empty page — the picker now reads the REAL
-  // roles endpoint, seeded catalog and all.
-  await applyRbacMigrations(pg);
-  const rbac = rbacHost(pg);
-  await reseedRbac(pg, rbac);
-  // 12-14: the audit table arrives the same way. Its migration is REPLAY-SAFE, so
-  // applying it over a database that already has an `audit_logs` table is a no-op
-  // rather than a failure — `tests/audit-migrations.test.ts` is what pins that.
-  await applyAuditMigrations(pg);
-  const audit = auditHost(pg);
-  await reseedAudit(pg, audit);
-  // 12-23: onboarding, the OAuth 2.1 authorization server, and the PWA endpoints.
-  await applyOnboardingMigrations(pg);
-  await applyMcpMigrations(pg);
-  // 12-17: the lifecycle tables the same way; the two DEMO entity tables are the
-  // host's own (a real adopter's schema already has its equivalents).
-  await applyLifecycleMigrations(pg);
-  await createLifecycleDemoTables(pg);
-  const lifecycle = lifecycleHost(pg);
-  await reseedLifecycle(pg);
-  // 12-15: the notification tables the same way. `notification_audience` is the
-  // HOST's — the authorization engine behind the permission fan-out.
-  await applyNotificationMigrations(pg);
-  await createNotificationHostTables(pg);
-  const notifications = notificationsHost(pg);
-  await reseedNotifications(pg, notifications);
-  // 12-16: the outbox table, again out of the package's own tarball. The driver is
-  // created HERE and shared, for the reason on `HarnessBackend.realtimeDriver`.
-  await applyRealtimeMigrations(pg);
-  const realtimeDriver = createInlineRealtimeDriver({ logger: console });
-  // 12-25: the e-mail + password tables. HAND-WRITTEN, unlike every other
-  // surface here, because @12-apps/auth ships no migration and owns no model —
-  // an account is the host's row. See auth-db.ts for why that is the design.
-  await applyAuthMigrations(pg);
-  await reseedAuth(pg);
-  // FUT-244: the promotions tables, again out of the package's own tarball. Its
-  // migration is REPLAY-SAFE by construction (it adopts an existing `discounts`
-  // table rather than demanding a baseline), so applying it here is a no-op on a
-  // database that already has one. `harness_categories` / `harness_menu_items`
-  // are the HOST's — a discount targets a host's catalog, which is exactly the
-  // separation `ForeignTargetError` protects.
-  await applyDiscountMigrations(pg);
-  await createDiscountCatalogTables(pg);
-  await reseedDiscounts(pg);
-  // FUT-146: the shift tables plus the ledger the package does NOT ship — see
-  // `provisionShift`, and `shift-db.ts` for why that split is the adoption.
-  const shift = await provisionShift(pg);
-  // 12-20: no migrations — @12-apps/storage owns no models. What it needs from a
-  // host is the two tables its reference probes read (storage-host.ts) and a
-  // directory to keep objects in.
-  const storage = await createStorageHost(pg);
-  return {
-    auth: authHost(pg),
-    rbac,
-    audit,
-    lifecycle,
-    storage,
-    notifications,
-    realtimeDriver,
-    realtime: realtimeHost(pg, realtimeDriver),
-    onboarding: onboardingHost(pg),
-    discounts: discountsHost(pg),
-    shift,
-    mcpOauth: mcpOauthHost(pg),
-    pwa: pwaHost(),
-    entitlements: createEntitlementsHost(),
-    // No migrations and no table: @12-apps/impersonation owns no model. The
-    // session IS the cookie, and the trail is a port the host implements —
-    // an array here, an append-only table in a real adopter.
-    impersonation: impersonationHost(),
-    // 12-18: no migration and no table — the shell owns no model, so its state is a
-    // Map here exactly as it is a column on `users` in a real adopter.
-    appShell: appShellHost(),
-  };
-}
-
-/** The mounted hosts one harness server is assembled from. */
-export interface Hosts {
-  auth: ReturnType<typeof authHost>;
-  rbac: ReturnType<typeof rbacHost>;
-  audit: ReturnType<typeof auditHost>;
-  lifecycle: ReturnType<typeof lifecycleHost>;
-  notifications: ReturnType<typeof notificationsHost>;
-  realtime: ReturnType<typeof realtimeHost>;
-  realtimeDriver: RealtimeDriver;
-  onboarding: ReturnType<typeof onboardingHost>;
-  discounts: ReturnType<typeof discountsHost>;
-  shift: ReturnType<typeof shiftHost>;
-  mcpOauth: ReturnType<typeof mcpOauthHost>;
-  pwa: ReturnType<typeof pwaHost>;
-  entitlements: ReturnType<typeof createEntitlementsHost>;
-  impersonation: ReturnType<typeof impersonationHost>;
-  appShell: ReturnType<typeof appShellHost>;
-  storage: Awaited<ReturnType<typeof createStorageHost>>;
 }
 
 /**
@@ -269,10 +182,15 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedNotifications(pg, hosts.notifications);
     await reseedDiscounts(pg);
     await reseedShifts(pg);
+    await reseedResearch(pg);
+    await reseedBilling(pg);
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();
     hosts.impersonation.reset();
+    // Back to NO DSN — the default, and the state every other page in this app
+    // needs, since `startObservability` runs once for the whole bundle.
+    observability.reset();
     return c.body(null, 204);
   });
 }
@@ -374,6 +292,10 @@ export async function createHarnessBackend(): Promise<HarnessBackend> {
     pg,
     realtimeDriver: hosts.realtimeDriver,
     shift: hosts.shift,
+    billing: hosts.billing,
+    onboarding: hosts.onboarding,
+    research: hosts.research,
+    entitlements: hosts.entitlements,
     close: async () => {
       // Streams first, then the bus, then storage's temp dir, then the database: a stream
       // severed after its driver is gone throws into the sink rather than closing cleanly.

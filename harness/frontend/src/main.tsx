@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { DEFAULT_LOCALE, isLocale, type Locale } from '@12-apps/i18n';
+import { LocaleProvider } from '@12-apps/i18n/react';
+import { setErrorClassifiers, startObservability } from '@12-apps/observability-frontend';
+
 import { CssBaseline } from '@12-apps/ui/mui/CssBaseline';
 import { ThemeProvider } from '@12-apps/ui/mui/styles';
 
@@ -51,13 +55,44 @@ function useHashSlug(fallback: string) {
   return slug;
 }
 
+/**
+ * The reader's locale, and where a host says it OUT LOUD.
+ *
+ * `useLocale` THROWS outside a provider rather than assuming a default, and
+ * `@12-apps/i18n` argues why: "a language reached by saying nothing is the one
+ * that ships to the wrong audience unnoticed. A host keeping Portuguese writes
+ * `<LocaleProvider locale={DEFAULT_LOCALE}>` — one reviewable line, never a
+ * silence." This is that line.
+ *
+ * `?locale=` is the harness's own switch, and it is the point of having two
+ * packs at all: a pack with one entry is a hardcoded string with extra steps,
+ * and a switch nothing exercises proves no axis exists. A spec flips it and
+ * asserts the page came back in the other language.
+ */
+function useHarnessLocale(): Locale {
+  const read = () => {
+    const query = window.location.hash.split('?')[1] ?? '';
+    const asked = new URLSearchParams(query).get('locale') ?? '';
+    return isLocale(asked) ? asked : DEFAULT_LOCALE;
+  };
+  const [locale, setLocale] = useState<Locale>(read);
+  useEffect(() => {
+    const onChange = () => setLocale(read());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  });
+  return locale;
+}
+
 function Shell() {
   const slug = useHashSlug(PAGES[0].slug);
+  const locale = useHarnessLocale();
   const page = PAGES.find((candidate) => candidate.slug === slug);
 
   return (
     <ThemeProvider theme={harnessTheme}>
       <CssBaseline />
+      <LocaleProvider locale={locale}>
       <HarnessShell activeSlug={slug}>
         <div data-testid="harness-page" data-page={page?.slug ?? 'unknown'}>
           {/* An unknown slug is a spec pointing at a page that was renamed or
@@ -66,8 +101,38 @@ function Shell() {
           {page ? <page.Component /> : <p data-testid="harness-unknown-page">No harness page named “{slug}”.</p>}
         </div>
       </HarnessShell>
+      </LocaleProvider>
     </ThemeProvider>
   );
 }
+
+/**
+ * `@12-apps/observability-frontend`, wired the ONE way it can be: first, before
+ * `createRoot`, for the whole bundle.
+ *
+ * It cannot be a page's mount. The package installs `window.onerror` and
+ * `unhandledrejection` SYNCHRONOUSLY, before the config it needs has arrived,
+ * precisely so an error thrown in that window is still caught — and a hook that
+ * ran when a route mounted would have missed exactly the errors it exists for.
+ * So this is where a host puts it and where the harness puts it, and the
+ * `observability` page below drives it rather than owning it.
+ *
+ * It is OFF here, and stays off, unless a suite serves a DSN: the backend's
+ * `/api/observability-config` answers an empty one by default, which is no SDK
+ * and no network for every other page in this app. That default is the
+ * package's own contract, not a harness convenience.
+ *
+ * The two classifiers are the host seam the package refuses to guess at — what
+ * counts as a routine non-5xx answer depends on this app's HTTP client, and
+ * what a dead chunk looks like depends on its lazy-route strategy. Both are
+ * spelled here, in this app's own terms, because a package that shipped either
+ * would be filtering another product's errors.
+ */
+setErrorClassifiers({
+  isIgnorableResponse: (error) =>
+    error instanceof Error && /^harness-4\d\d\b/.test(error.message),
+  isStaleChunk: (error) => error instanceof Error && error.name === 'HarnessChunkError',
+});
+void startObservability('harness');
 
 createRoot(document.getElementById('root')!).render(<Shell />);
