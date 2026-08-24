@@ -5,6 +5,7 @@ import type { Hosts } from './app';
 import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
+import { BILLING_MOUNT_PATH } from './billing-host';
 import { FEATURE_FLAGS_MOUNT_PATH, wireFeatureFlags } from './feature-flags-host';
 import { IMPERSONATION_PLATFORM_PATH } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
@@ -79,6 +80,13 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
  * more-specific-first order stated once more between the two halves.
  */
 function mountAccountSurfaces(app: Hono, hosts: Hosts): void {
+  // @12-apps/billing (FUT-340). TENANT-FREE like the notifications surface
+  // below, and for a sharper reason: a card on file is a standing financial
+  // commitment by the person who signed up, so it is scoped to the resolved
+  // OWNER and never to a path segment a caller can choose. First of the two by
+  // this file's more-specific-first rule — `/api/account/billing` is the
+  // narrower prefix.
+  app.route(BILLING_MOUNT_PATH, hosts.billing.router);
   // Self-scoped and TENANT-FREE (12-15): the account surface every signed-in
   // user has, wherever their stores are.
   app.route('/api/account', hosts.notifications.router);
