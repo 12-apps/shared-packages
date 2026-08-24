@@ -274,6 +274,16 @@ async function deleteTenantRole(
   return true;
 }
 
+/**
+ * The tenant role catalog's reads and writes.
+ *
+ * Every method that can REFUSE takes a trailing optional `locale` — the
+ * caller's language, forwarded by whatever holds the request. Last and optional
+ * because it is not part of what the method does: omit it and the refusal takes
+ * the default rendering of the host's `messages`, which is a single-audience
+ * host's whole behaviour. Reads that answer no sentence of their own do not
+ * take one.
+ */
 export interface RolesStore {
   listRolesPage(
     tenantId: string,
@@ -281,15 +291,21 @@ export interface RolesStore {
   ): Promise<{ data: RoleListRecord[]; pagination: PaginationMeta }>;
   getTenantRoleById(id: string, tenantId: string): Promise<RoleRecord | null>;
   listAssignableRoleNames(tenantId: string): Promise<string[]>;
-  createTenantRole(tenantId: string, input: RoleWriteInput): Promise<RoleRecord>;
-  updateTenantRole(id: string, tenantId: string, input: RoleWriteInput): Promise<RoleRecord | null>;
-  deleteTenantRole(id: string, tenantId: string): Promise<boolean>;
+  createTenantRole(tenantId: string, input: RoleWriteInput, locale?: string): Promise<RoleRecord>;
+  updateTenantRole(
+    id: string,
+    tenantId: string,
+    input: RoleWriteInput,
+    locale?: string,
+  ): Promise<RoleRecord | null>;
+  deleteTenantRole(id: string, tenantId: string, locale?: string): Promise<boolean>;
   upsertTemplateOverride(
     tenantId: string,
     name: string,
     input: { description: string | null; permissions: readonly string[] | '*' },
+    locale?: string,
   ): Promise<RoleRecord>;
-  resetTemplateRole(tenantId: string, name: string): Promise<boolean>;
+  resetTemplateRole(tenantId: string, name: string, locale?: string): Promise<boolean>;
   /**
    * The permission set {@link RolesStore.resetTemplateRole} would WRITE for
    * template `name` — the seeded catalog default, parsed — or null when nothing
@@ -306,13 +322,24 @@ type RolesStoreConfig<P extends string> = Pick<
 >;
 
 export function createRolesStore<P extends string>(config: RolesStoreConfig<P>): RolesStore {
-  const ctx: RolesStoreCtx = {
+  const base = {
     db: config.db,
     audit: fencedAudit(config.audit),
-    messages: messagesOf(config),
     templateNames: new Set(config.catalog.roleTemplates.map((role) => role.name)),
     tenantRoleSeeds: config.catalog.tenantRoleSeeds,
   };
+  /**
+   * The context for ONE call, with that caller's words already chosen. Built
+   * per call rather than once per store: this store lives for the process, so a
+   * `messages` resolved here would answer every reader in the language the
+   * process started with. Everything below still reads `ctx.messages` as a
+   * plain value.
+   */
+  const ctxFor = (locale?: string): RolesStoreCtx => ({
+    ...base,
+    messages: messagesOf(config, locale),
+  });
+  const ctx = ctxFor();
   return {
     listRolesPage: (tenantId, query) => listRolesPage(ctx, tenantId, query),
     getTenantRoleById: async (id, tenantId) => getById(await ctx.db(), id, tenantId),
@@ -326,15 +353,18 @@ export function createRolesStore<P extends string>(config: RolesStoreConfig<P>):
       });
       return rows.map((row) => row.name);
     },
-    createTenantRole: (tenantId, input) => createTenantRole(ctx, tenantId, input),
-    updateTenantRole: (id, tenantId, input) => updateTenantRole(ctx, id, tenantId, input),
-    deleteTenantRole: (id, tenantId) => deleteTenantRole(ctx, id, tenantId),
-    upsertTemplateOverride: (tenantId, name, input) =>
-      upsertTemplateOverride(ctx, tenantId, name, {
+    createTenantRole: (tenantId, input, locale) =>
+      createTenantRole(ctxFor(locale), tenantId, input),
+    updateTenantRole: (id, tenantId, input, locale) =>
+      updateTenantRole(ctxFor(locale), id, tenantId, input),
+    deleteTenantRole: (id, tenantId, locale) => deleteTenantRole(ctxFor(locale), id, tenantId),
+    upsertTemplateOverride: (tenantId, name, input, locale) =>
+      upsertTemplateOverride(ctxFor(locale), tenantId, name, {
         description: input.description,
         permissions: serializeRolePermissions(input.permissions),
       }),
-    resetTemplateRole: (tenantId, name) => resetTemplateRole(ctx, tenantId, name),
+    resetTemplateRole: (tenantId, name, locale) =>
+      resetTemplateRole(ctxFor(locale), tenantId, name),
     templateSeedPermissions: (name) => {
       const seed = templateSeedFor(ctx, name);
       return seed ? parseRolePermissions(seed.permissions) : null;
