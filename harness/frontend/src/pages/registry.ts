@@ -18,6 +18,7 @@ import { RbacAdminPage } from './rbac-admin';
 import { RealtimeEventsPage } from './realtime-events';
 import { ReportBuilderPage } from './report-builder';
 import { StorageUploadsPage } from './storage-uploads';
+import { WiringReportPage } from './wiring-report';
 
 /**
  * One page per published surface, and the ONLY place a new one is registered.
@@ -227,6 +228,16 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/realtime',
     group: 'backoffice',
     Component: RealtimeEventsPage,
+  },
+  {
+    // Not a package's screen: the HOST's own report over every web manifest it
+    // adopted. It renders `assemble()`, so an unanswered capability is a red
+    // page rather than a silence.
+    slug: 'wiring-report',
+    title: 'Wiring report',
+    pkg: '@12-apps/wiring',
+    group: 'backoffice',
+    Component: WiringReportPage,
   },
   {
     slug: 'audit-log',

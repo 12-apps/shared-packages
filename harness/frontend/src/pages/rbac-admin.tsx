@@ -1,6 +1,10 @@
 import type { JSX } from 'react';
 
-import { createWebRbac, PT_BR_RBAC_WEB_COPY } from '@12-apps/rbac/react';
+import { PT_BR_RBAC_WEB_COPY } from '@12-apps/rbac/react';
+import { rbacManifest } from '@12-apps/rbac/manifest';
+import { rbacWebManifest } from '@12-apps/rbac/manifest/web';
+
+import { webWiringHost } from '../wiring-web';
 
 import { HARNESS_CATALOG } from '../../../backend/src/rbac-catalog';
 
@@ -29,12 +33,28 @@ import { HARNESS_CATALOG } from '../../../backend/src/rbac-catalog';
  * answers headerless requests as the seeded DIRECTOR, which is who an admin
  * screen assumes is driving it.
  */
-const { page: RbacAdminSurface } = createWebRbac({
-  apiBase: '/api/admin/harness',
-  catalog: HARNESS_CATALOG,
-  // The screens' sentences are required host config; this host is pt-BR.
-  copy: PT_BR_RBAC_WEB_COPY,
+/**
+ * Adopted through `@12-apps/wiring/consumer` rather than by calling the factory:
+ * the same config, handed through a typed binding, and the AREAS the manifest
+ * declares — two admin routes and their nav rows, each naming the permission it
+ * is gated on — collected into the host's report instead of being invisible.
+ */
+const { surface } = webWiringHost.adoptWeb({
+  manifest: rbacManifest,
+  web: rbacWebManifest,
+  bindings: {
+    surface: {
+      config: {
+        apiBase: '/api/admin/harness',
+        catalog: HARNESS_CATALOG,
+        // The screens' sentences are required host config; this host is pt-BR.
+        copy: PT_BR_RBAC_WEB_COPY,
+      },
+    },
+  },
 });
+
+const { page: RbacAdminSurface } = surface as { page: () => JSX.Element };
 
 export function RbacAdminPage(): JSX.Element {
   return <RbacAdminSurface />;

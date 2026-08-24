@@ -1,7 +1,10 @@
 import type { JSX } from 'react';
 
 import { defineAuditVocabulary } from '@12-apps/audit';
-import { createWebAudit } from '@12-apps/audit/react';
+import { auditManifest } from '@12-apps/audit/manifest';
+import { auditWebManifest } from '@12-apps/audit/manifest/web';
+
+import { webWiringHost } from '../wiring-web';
 
 /**
  * The whole wiring a frontend host performs for @12-apps/audit.
@@ -41,10 +44,25 @@ const AUDIT_VOCABULARY = defineAuditVocabulary({
   },
 });
 
-const { page: AuditLogSurface } = createWebAudit({
-  apiBase: '/api/admin/tenant-a',
-  vocabulary: AUDIT_VOCABULARY,
+/**
+ * Adopted through `@12-apps/wiring/consumer`, not by calling the factory.
+ *
+ * The manifest carries an AREA this page could never have stated for itself:
+ * one admin route and its nav row, both gated on `AUDIT_READ_PERMISSION` — the
+ * id the package's own core exports, so the suggestion cannot drift from the
+ * gate its server half enforces. Calling `createWebAudit` directly leaves that
+ * declaration on the floor, which is the drift this package wrote the estate's
+ * definitive argument against.
+ */
+const { surface } = webWiringHost.adoptWeb({
+  manifest: auditManifest,
+  web: auditWebManifest,
+  bindings: {
+    surface: { config: { apiBase: '/api/admin/tenant-a', vocabulary: AUDIT_VOCABULARY } },
+  },
 });
+
+const { page: AuditLogSurface } = surface as { page: () => JSX.Element };
 
 export function AuditLogPage(): JSX.Element {
   return <AuditLogSurface />;

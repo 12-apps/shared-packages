@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type JSX } from 'react';
 
 import { notificationsManifest } from '@12-apps/notifications/manifest';
 import { notificationsWebManifest } from '@12-apps/notifications/manifest/web';
-import { createWiringHost } from '@12-apps/wiring/consumer';
+import { webWiringHost } from '../wiring-web';
 
 import { HARNESS_NOTIFICATION_MESSAGES } from '../notifications/notification-copy';
 
@@ -44,21 +44,7 @@ import { HARNESS_NOTIFICATION_MESSAGES } from '../notifications/notification-cop
  * `out-of-scope` here and the sibling backend harness answers for them, which
  * is the property the declaration exists to make checkable.
  */
-const host = createWiringHost({
-  name: 'frontend-harness',
-  kind: 'web',
-  // Mandatory since wiring 1.3.0. This SPA has no error channel of its own, so
-  // warn/error reach the console deliberately — a harness IS the place a
-  // package's complaint should be visible.
-  ports: {
-    loggerFor: (namespace) => ({
-      info: () => undefined,
-      warn: (message, ...meta) => console.warn(`[${namespace}] ${message}`, ...meta),
-      error: (message, ...meta) => console.error(`[${namespace}] ${message}`, ...meta),
-    }),
-  },
-});
-const { surface: notifications } = host.adoptWeb({
+const { surface: notifications } = webWiringHost.adoptWeb({
   manifest: notificationsManifest,
   web: notificationsWebManifest,
   bindings: {
@@ -75,12 +61,12 @@ const { surface: notifications } = host.adoptWeb({
   },
 });
 
-// Called for its REFUSAL, not its return: `assemble()` is what rejects a
-// capability this host neither bound nor declined, so running it here is what
-// makes the declaration mean something. A release that adds a web capability
-// turns this page into a boot failure rather than a screen quietly missing a
-// feature.
-host.assemble();
+// The REFUSAL that used to live here — `assemble()`, called for its throw
+// rather than its return — moved to `#/wiring-report`, which runs it over
+// EVERY adopted package rather than over this one. Calling it here as well
+// would assemble a host that is still mid-adoption: page modules are imported
+// in registry order, so whichever page called it first would refuse the ones
+// that had not adopted yet.
 const { BellButton, Panel, page: PreferencesSurface, store } = notifications;
 
 interface OutboxEntry {

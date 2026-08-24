@@ -3,9 +3,13 @@ import { useEffect, useState, type JSX } from 'react';
 import {
   EntitlementsProvider,
   PT_BR_ENTITLEMENTS_WEB_COPY,
-  createWebEntitlements,
+  type createWebEntitlements,
 } from '@12-apps/entitlements/react';
 import type { EntitlementSnapshot } from '@12-apps/entitlements/react';
+import { entitlementsManifest } from '@12-apps/entitlements/manifest';
+import { entitlementsWebManifest } from '@12-apps/entitlements/manifest/web';
+
+import { webWiringHost } from '../wiring-web';
 
 /**
  * `@12-apps/entitlements` mounted the way a host mounts it: one
@@ -25,7 +29,11 @@ import type { EntitlementSnapshot } from '@12-apps/entitlements/react';
  */
 const API_BASE = '/api/admin/harness';
 
-const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
+/** Adopted through `@12-apps/wiring/consumer` — the same config, bound. */
+const { surface } = webWiringHost.adoptWeb({
+  manifest: entitlementsManifest,
+  web: entitlementsWebManifest,
+  bindings: { surface: { config: {
   apiBase: API_BASE,
   canRequestPlanChange: true,
   // The screens' sentences, passed by hand — required config; the package no
@@ -37,7 +45,12 @@ const { page: PlanPage, UpsellHost, withEntitlement } = createWebEntitlements({
       ? { path: '#/entitlements-plan', label: 'Ajustes › Curadoria' }
       : null,
   plansPath: '#/entitlements-plan',
+  } } },
 });
+
+const { page: PlanPage, UpsellHost, withEntitlement } = surface as ReturnType<
+  typeof createWebEntitlements
+>;
 
 /** A host page that exists only behind the plan gate. */
 function JuryArea(): JSX.Element {
