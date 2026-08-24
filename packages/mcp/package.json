@@ -56,6 +56,7 @@
   },
   "devDependencies": {
     "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/i18n": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@mui/material": "^6.5.0",
     "@testing-library/react": "^16.1.0",

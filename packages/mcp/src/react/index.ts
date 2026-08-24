@@ -47,6 +47,22 @@ export {
   PT_BR_AI_PERMISSION_MODEL,
 } from "../pt-BR";
 
+// The English twins and the tag-keyed records, re-exported beside them so a
+// screen reaching for the AI surface finds all of it on one subpath — which is
+// how the pt-BR names have always been reachable from here.
+export {
+  EN_US_AI_CAPABILITIES,
+  EN_US_AI_CONNECT_PROMPT,
+  EN_US_AI_HOST_GUIDES,
+  EN_US_AI_PERMISSION_MODEL,
+} from "../en-US";
+export {
+  AI_CAPABILITIES,
+  AI_CONNECT_PROMPT,
+  AI_HOST_GUIDES,
+  AI_PERMISSION_MODEL,
+} from "../locales";
+
 export type {
   AiCapabilitiesCopy,
   AiConnectGuideCopy,
@@ -60,3 +76,5 @@ export type {
   McpAiCopy,
 } from "./copy";
 export { PT_BR_MCP_AI_COPY } from "./pt-BR";
+export { EN_US_MCP_AI_COPY } from "./en-US";
+export { MCP_AI_COPY } from "./locales";
