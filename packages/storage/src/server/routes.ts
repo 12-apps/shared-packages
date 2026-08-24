@@ -1,7 +1,7 @@
 import { CONTENT_TYPE_BY_EXTENSION, acceptedContentTypeOf } from '../content-types';
 import { parseObjectMemberKey } from '../keys';
 import { STORAGE_PATHS } from '../paths';
-import { isStorageProblem, type StorageMessages } from '../problems';
+import { isStorageProblem, type StorageMessageContext, type StorageMessages } from '../problems';
 import type { StorageDriver } from './driver';
 import { readBodyCapped } from './read-body';
 import { storeImage, type StoreImageDeps } from './store-image';
@@ -54,6 +54,12 @@ export interface StorageRouteContext {
   actor: StorageActor | null;
   params: Record<string, string | undefined>;
   request: Request;
+  /**
+   * The language to answer in — the same field `@12-apps/wiring`'s
+   * `WireRequest` carries, mirrored here because this surface builds its own
+   * context. Populated by the host's adapter; absent is not an error.
+   */
+  locale?: string;
 }
 
 /** A JSON answer, an object's bytes, or a redirect to where the object lives. */
@@ -76,9 +82,15 @@ export interface StorageRoute {
   handle(context: StorageRouteContext): Promise<StorageRouteResponse>;
 }
 
-interface RoutesDeps extends StoreImageDeps {
+interface RoutesDeps extends Omit<StoreImageDeps, "messages"> {
   driver: StorageDriver;
-  messages: StorageMessages;
+  /**
+   * The factory, unresolved, plus the limit it needs. Resolving into a value
+   * here is what would re-freeze the language into the mount — this object is
+   * built once, per process.
+   */
+  messages: (context: StorageMessageContext) => StorageMessages;
+  limit: string;
 }
 
 /** Keys are content-addressed (a uuid), so an object may be cached forever. */
@@ -96,9 +108,12 @@ async function handleUpload(
     // override it (`WebStorageMessages.forbidden`).
     return { status: 403, body: { error: 'forbidden' } };
   }
+  // Worded HERE, per request, from the tag the adapter put on the context —
+  // never at the mount, which ran once at boot.
+  const messages = deps.messages({ limit: deps.limit, locale: context.locale });
   const contentType = acceptedContentTypeOf(context.request.headers.get('content-type'));
   if (!contentType) {
-    return { status: 400, body: { error: deps.messages.unsupported_content_type } };
+    return { status: 400, body: { error: messages.unsupported_content_type } };
   }
   // Capped WHILE STREAMING, so an oversize body is refused without ever being
   // held whole in memory.
@@ -111,12 +126,12 @@ async function handleUpload(
     // "o limite é 8 MB": a ceiling nothing enforced, in the one package whose
     // headline claim is that there is exactly ONE number. The sentence is built
     // from this mount's `maxBytes` and carries this mount's `messages` overrides.
-    return { status: 413, body: { error: deps.messages.file_too_large } };
+    return { status: 413, body: { error: messages.file_too_large } };
   }
   try {
     // No byte check here: `storeImage` owns it, so the endpoint and a host write
     // holding raw bytes cannot disagree about whether it ran (see store-image.ts).
-    const imageKey = await storeImage(deps, { bytes, contentType, scope: actor.scope });
+    const imageKey = await storeImage({ ...deps, messages }, { bytes, contentType, scope: actor.scope });
     return { status: 200, body: { data: { imageKey } } };
   } catch (error) {
     // The write path speaks in StorageProblemError precisely so both entrances

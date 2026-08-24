@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { STORAGE_MESSAGES } from '../../locales';
 import { PT_BR_STORAGE_MESSAGES } from "../../pt-BR";
 import type { StorageMessageContext, StorageMessages } from '../../problems';
 
@@ -353,8 +354,8 @@ describe('one number, stated once — the ROUTE says it too', () => {
     const entry = api.routes.find(
       (candidate: StorageRoute) => candidate.method === 'POST',
     ) as StorageRoute;
-    return (request: Request) =>
-      entry.handle({ actor: { scope: SCOPE, mayUpload: true }, params: {}, request });
+    return (request: Request, locale?: string) =>
+      entry.handle({ actor: { scope: SCOPE, mayUpload: true }, params: {}, request, locale });
   }
 
   function oversize(maxBytes: number): Request {
@@ -524,5 +525,74 @@ describe('the byte check belongs to the WRITER, not to an entrance', () => {
 
     expect(response.status).toBe(400);
     expect(bodyOf(response).error).toContain('não corresponde');
+  });
+});
+
+/**
+ * One mount, two readers — the property `StorageMessageContext.locale` buys.
+ *
+ * `messages` was ALREADY a factory here, for a different reason: a host that
+ * raises `maxBytes` must not end up with copy naming the old ceiling. That
+ * shape turned out to be the right one for a second axis too — a function
+ * called per refusal can answer per reader, where a value handed over at the
+ * mount cannot. What changed is only WHEN it is called.
+ */
+describe('createApiStorage — refusals follow the caller', () => {
+  /** What a host writes as `localeCopy(STORAGE_MESSAGES)`, spelled out. */
+  const messages = (context: StorageMessageContext) =>
+    STORAGE_MESSAGES[context.locale === 'en-US' ? 'en-US' : 'pt-BR'](context);
+
+  function mountBilingual() {
+    const api = createApiStorage({
+      driver: memoryDriver(),
+      maxBytes: 8 * 1024 * 1024,
+      imagePipeline: fakePipeline(),
+      unscopedKeys: 'reject',
+      references: [],
+      messages,
+    });
+    const entry = api.routes.find(
+      (candidate: StorageRoute) => candidate.method === 'POST',
+    ) as StorageRoute;
+    return (locale?: string) =>
+      entry.handle({
+        actor: { scope: SCOPE, mayUpload: true },
+        params: {},
+        // A content type this surface refuses, which every locale words.
+        request: new Request('https://x/upload', {
+          method: 'POST',
+          headers: { 'content-type': 'application/zip' },
+          body: new Uint8Array([1, 2, 3]),
+        }),
+        locale,
+      });
+  }
+
+  it('answers one caller in Portuguese and the next in English', async () => {
+    const call = mountBilingual();
+    const pt = (await call('pt-BR')) as { body: { error: string } };
+    const en = (await call('en-US')) as { body: { error: string } };
+    expect(pt.body.error).not.toBe(en.body.error);
+    expect(en.body.error).toBe(
+      STORAGE_MESSAGES['en-US']({ limit: '8 MB' }).unsupported_content_type,
+    );
+  });
+
+  it('still names THIS mount’s ceiling in the caller’s language', async () => {
+    // The reason the factory existed in the first place. The second axis must
+    // not cost the first: an English refusal has to carry the same 8 MB.
+    const call = mountBilingual();
+    const en = (await call('en-US')) as { body: { error: string } };
+    expect(en.body.error).toBe(
+      STORAGE_MESSAGES['en-US']({ limit: '8 MB' }).unsupported_content_type,
+    );
+  });
+
+  it('answers the default when the adapter populated no locale', async () => {
+    const call = mountBilingual();
+    const answer = (await call()) as { body: { error: string } };
+    expect(answer.body.error).toBe(
+      STORAGE_MESSAGES['pt-BR']({ limit: '8 MB' }).unsupported_content_type,
+    );
   });
 });
