@@ -42,3 +42,5 @@ export type {
   OnboardingStatus,
 } from "../types";
 export { PT_BR_ONBOARDING_MESSAGES, PT_BR_ONBOARDING_UNAUTHENTICATED } from './pt-BR';
+export { EN_US_ONBOARDING_MESSAGES, EN_US_ONBOARDING_UNAUTHENTICATED } from './en-US';
+export { ONBOARDING_MESSAGES, ONBOARDING_UNAUTHENTICATED } from './locales';
