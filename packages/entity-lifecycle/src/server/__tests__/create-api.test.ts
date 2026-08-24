@@ -3,6 +3,7 @@
    `buildApi()` created INSIDE its own `it`, backed by a fresh in-memory db.
    The rule flags the names, not an actual cross-test dependency. */
 import { describe, expect, it } from 'vitest';
+import { EN_US_LIFECYCLE_MESSAGES } from '../en-US';
 import { PT_BR_LIFECYCLE_MESSAGES } from '../pt-BR';
 
 import type { EntityOps, Snapshot } from '../../types';
@@ -894,5 +895,95 @@ describe('the registration routePermission', () => {
       { entryId },
     );
     expect(restored.status).toBe(204);
+  });
+});
+
+describe('one mount, two languages', () => {
+  /**
+   * The property the resolver form of the copy port exists for: this surface is
+   * assembled once — a lazy singleton in every host that has one — and the
+   * language changes per caller. A `messages` field read where the routes are
+   * BUILT would answer in whichever language the process started with, and
+   * would pass every case above.
+   *
+   * Both route files are covered, because they resolve independently: the
+   * per-entity routes (`routes-entity.ts`) and the shared bin/approvals ones
+   * (`routes-shared.ts`). A half-adopted surface answers one of them in each
+   * language, which is the failure mode a single case would miss.
+   */
+  function bilingual() {
+    const db = createMemoryLifecycleDb();
+    const { ops } = memoryEntityOps();
+    return createApiEntityLifecycle({
+      // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out so
+      // this package keeps no dependency on it.
+      messages: ({ locale }) =>
+        locale === 'en-US' ? EN_US_LIFECYCLE_MESSAGES : PT_BR_LIFECYCLE_MESSAGES,
+      db: async () => db,
+      entities: [
+        {
+          entityType: 'product',
+          slug: 'products',
+          features: { versioning: true, drafts: true, approvals: true },
+          label: () => 'Item',
+          approvePermission: 'products:approve',
+          ops,
+        },
+      ],
+    });
+  }
+
+  const errorOf = (body: unknown): string => (body as { error: string }).error;
+
+  it('answers a PER-ENTITY route in each caller’s language', async () => {
+    // A missing `:version` — `requireParam`, reached through `routes-entity`.
+    const { routes } = bilingual();
+    const restore = routeOf(routes, 'POST', '/products/:id/versions/:version/restore');
+    const base = { actor: approver, params: { id: 'p1' }, query: {} };
+
+    expect(errorOf((await restore.handle({ ...base, locale: 'pt-BR' })).body)).toBe(
+      PT_BR_LIFECYCLE_MESSAGES.invalidBody,
+    );
+    expect(errorOf((await restore.handle({ ...base, locale: 'en-US' })).body)).toBe(
+      EN_US_LIFECYCLE_MESSAGES.invalidBody,
+    );
+  });
+
+  it('answers a SHARED route in each caller’s language too', async () => {
+    // An empty `?entityType=` — reached through `routes-shared`, which resolves
+    // its own copy. The two files are separate adoptions.
+    const { routes } = bilingual();
+    const bin = routeOf(routes, 'GET', '/recycle-bin');
+    const base = { actor: approver, params: {}, query: { entityType: '' } };
+
+    expect(errorOf((await bin.handle({ ...base, locale: 'pt-BR' })).body)).toBe(
+      PT_BR_LIFECYCLE_MESSAGES.invalidBody,
+    );
+    expect(errorOf((await bin.handle({ ...base, locale: 'en-US' })).body)).toBe(
+      EN_US_LIFECYCLE_MESSAGES.invalidBody,
+    );
+  });
+
+  it('hands an absent locale to the resolver rather than refusing', async () => {
+    // A host with one audience populates nothing. Not a misconfiguration — the
+    // resolver decides what no answer means, and here it means the default.
+    const { routes } = bilingual();
+    const bin = routeOf(routes, 'GET', '/recycle-bin');
+    const response = await bin.handle({ actor: approver, params: {}, query: { entityType: '' } });
+    expect(errorOf(response.body)).toBe(PT_BR_LIFECYCLE_MESSAGES.invalidBody);
+  });
+
+  it('leaves a plain-value host byte-identical', async () => {
+    // The whole compatibility claim: a host that passes words, not a resolver,
+    // behaves exactly as it did before the field widened.
+    const { api } = buildApi();
+    const bin = routeOf(api.routes, 'GET', '/recycle-bin');
+    const response = await bin.handle({
+      actor: approver,
+      params: {},
+      query: { entityType: '' },
+      locale: 'en-US',
+    });
+    expect(errorOf(response.body)).toBe(PT_BR_LIFECYCLE_MESSAGES.invalidBody);
   });
 });

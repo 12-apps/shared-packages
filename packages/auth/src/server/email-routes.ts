@@ -2,7 +2,12 @@ import type { EmailCredentials } from "../email-credentials";
 import type { EmailAuthRefusal } from "../email-credentials/types";
 import type { PasswordPolicyViolation } from "../password";
 
-import { EMAIL_AUTH_STATUS, type EmailAuthMessages } from "./messages";
+import {
+  EMAIL_AUTH_STATUS,
+  resolveEmailAuthCopy,
+  type EmailAuthCopySource,
+  type EmailAuthMessages,
+} from "./messages";
 
 /**
  * The e-mail + password endpoints, as framework-neutral descriptors.
@@ -33,6 +38,16 @@ import { EMAIL_AUTH_STATUS, type EmailAuthMessages } from "./messages";
 export interface EmailAuthRequest {
   body: unknown;
   userId: string | null;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** What a handler answers with. `body` rides a `{ data }` envelope on success. */
@@ -59,8 +74,16 @@ export interface EmailAuthRoute {
 export interface EmailAuthRoutesConfig {
   /** The flow itself, from `createEmailCredentials`. */
   credentials: EmailCredentials;
-  /** What each refusal SAYS. `PT_BR_MESSAGES` ships in the box. */
-  messages: EmailAuthMessages;
+  /**
+   * What each refusal SAYS. `PT_BR_MESSAGES` ships in the box.
+   *
+   * A host serving more than one language passes a RESOLVER instead of the
+   * words — the shape `@12-apps/i18n`'s `localeCopy(PACK)` returns — and the
+   * sentence is then chosen per request from {@link EmailAuthRequest.locale}.
+   * Passing a plain value is unchanged in every respect, which is what keeps a
+   * single-audience host from paying for a choice it never makes.
+   */
+  messages: EmailAuthCopySource<EmailAuthMessages>;
   /**
    * Called after a sign-up succeeds, with the address and name given.
    *
@@ -95,6 +118,22 @@ function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): 
       ...(violations.length > 0 ? { violations } : {}),
     },
   };
+}
+
+/**
+ * A refusal in the CALLER's language, bound to one mount's copy.
+ *
+ * Resolved per refusal rather than where the routes are built: these eight
+ * descriptors are assembled once and the language changes per caller, so a
+ * `messages` read at assembly would answer every reader in whichever language
+ * the process started with — and a single-locale host cannot tell the
+ * difference.
+ */
+function refuserFor(
+  messages: EmailAuthCopySource<EmailAuthMessages>,
+): (refusalResult: EmailAuthRefusal, locale: string | undefined) => EmailAuthResponse {
+  return (refusalResult, locale) =>
+    refusal(refusalResult, resolveEmailAuthCopy(messages, locale));
 }
 
 /** A success, in the envelope the packaged client parses. */
@@ -140,18 +179,18 @@ function optionalStr(body: unknown, key: string): string | undefined {
  * vocabulary and the two would drift.
  */
 export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[] {
-  const { credentials, messages, onSignedUp } = config;
-  const refuse = (r: EmailAuthRefusal): EmailAuthResponse => refusal(r, messages);
+  const { credentials, onSignedUp } = config;
+  const refuse = refuserFor(config.messages);
 
   return [
     {
       method: "POST",
       path: "/signup",
-      handle: async ({ body }) => {
+      handle: async ({ body, locale }) => {
         const email = str(body, "email");
         const name = optionalStr(body, "name");
         const result = await credentials.signUp({ email, password: str(body, "password"), name });
-        if (!result.ok) return refuse(result);
+        if (!result.ok) return refuse(result, locale);
         await onSignedUp?.({ email, name });
         // `user` is deliberately absent: on the `verification-sent` branch there
         // may not be one, and answering with it on the other branch would make
@@ -162,33 +201,33 @@ export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[]
     {
       method: "POST",
       path: "/verify",
-      handle: async ({ body }) => {
+      handle: async ({ body, locale }) => {
         const result = await credentials.verifyEmail(str(body, "token"));
-        return result.ok ? ok(null) : refuse(result);
+        return result.ok ? ok(null) : refuse(result, locale);
       },
     },
     {
       method: "POST",
       path: "/resend-verification",
-      handle: async ({ body }) => {
+      handle: async ({ body, locale }) => {
         const result = await credentials.resendVerification(str(body, "email"));
-        return result.ok ? ok(null) : refuse(result);
+        return result.ok ? ok(null) : refuse(result, locale);
       },
     },
     {
       method: "POST",
       path: "/forgot-password",
-      handle: async ({ body }) => {
+      handle: async ({ body, locale }) => {
         const result = await credentials.requestPasswordReset(str(body, "email"));
-        return result.ok ? ok(null) : refuse(result);
+        return result.ok ? ok(null) : refuse(result, locale);
       },
     },
     {
       method: "POST",
       path: "/reset-password",
-      handle: async ({ body }) => {
+      handle: async ({ body, locale }) => {
         const result = await credentials.resetPassword(str(body, "token"), str(body, "password"));
-        return result.ok ? ok(null) : refuse(result);
+        return result.ok ? ok(null) : refuse(result, locale);
       },
     },
     {
@@ -201,13 +240,13 @@ export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[]
       method: "PUT",
       path: "/password",
       session: true,
-      handle: async ({ body, userId }) => {
+      handle: async ({ body, userId, locale }) => {
         const result = await credentials.setPassword({
           userId: userId as string,
           password: str(body, "password"),
           currentPassword: optionalStr(body, "currentPassword"),
         });
-        return result.ok ? ok(null) : refuse(result);
+        return result.ok ? ok(null) : refuse(result, locale);
       },
     },
     {

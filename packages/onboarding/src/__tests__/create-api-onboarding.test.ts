@@ -2,6 +2,7 @@
    which builds a FRESH in-memory store per case; the rule matches the identifier
    across the file rather than its scope. */
 import { describe, expect, it } from "vitest";
+import { EN_US_ONBOARDING_MESSAGES } from "../server/en-US";
 import { PT_BR_ONBOARDING_MESSAGES } from "../server/pt-BR";
 
 import { createApiOnboarding } from "../server/create-api-onboarding";
@@ -219,5 +220,90 @@ describe("repository — the reach-out list the routes do not expose", () => {
     const inA = await api.repository.listOnboardingByStatus(TENANT_A, FEATURE, "in_progress");
     expect(inA).toHaveLength(1);
     expect(inA[0]?.clientId).toBe(TENANT_A);
+  });
+});
+
+describe("one mount, two languages", () => {
+  /**
+   * The property the resolver form of the copy port exists for: the surface is
+   * built ONCE, per process, and the language changes per caller. A `messages`
+   * field that resolved at construction would pass every case above and still
+   * answer one language forever.
+   */
+  function bilingualPatch(): (
+    featureKey: string,
+    locale: string | undefined,
+  ) => Promise<{ status: number; body: unknown }> {
+    const db = fakeOnboardingDb();
+    const api = createApiOnboarding({
+      // The shape `@12-apps/i18n`'s `localeCopy(PACK)` returns, spelled out
+      // here so this package keeps no dependency on it.
+      messages: ({ locale }) =>
+        locale === "en-US" ? EN_US_ONBOARDING_MESSAGES : PT_BR_ONBOARDING_MESSAGES,
+      db: async () => db,
+      featureKeys: [FEATURE],
+    });
+    const route = api.routes.find((candidate) => candidate.method === "PATCH");
+    if (!route) throw new Error("no PATCH route");
+    return (featureKey, locale) =>
+      route.handle({
+        actor: { userId: USER, clientId: TENANT_A },
+        params: { featureKey },
+        query: {},
+        body: { op: "dismiss" },
+        ...(locale === undefined ? {} : { locale }),
+      });
+  }
+
+  const errorOf = (body: unknown): string => (body as { error: string }).error;
+
+  it("answers the same mount in each caller's language", async () => {
+    const patch = bilingualPatch();
+    expect(errorOf((await patch("nao_existe", "pt-BR")).body)).toBe(
+      PT_BR_ONBOARDING_MESSAGES.unknownFeature,
+    );
+    expect(errorOf((await patch("nao_existe", "en-US")).body)).toBe(
+      EN_US_ONBOARDING_MESSAGES.unknownFeature,
+    );
+  });
+
+  it("hands an absent locale to the resolver rather than refusing", async () => {
+    // A host with one audience populates nothing. That is not a
+    // misconfiguration — the resolver decides what no answer means, and here
+    // it means the default.
+    const patch = bilingualPatch();
+    expect(errorOf((await patch("nao_existe", undefined)).body)).toBe(
+      PT_BR_ONBOARDING_MESSAGES.unknownFeature,
+    );
+  });
+
+  it("resolves the operation refusal per caller too, not just the 404", async () => {
+    // `parseOperation` is a second call site with its own thread of the
+    // locale; a partial adoption would answer one sentence in each language.
+    const db = fakeOnboardingDb();
+    const api = createApiOnboarding({
+      messages: ({ locale }) =>
+        locale === "en-US" ? EN_US_ONBOARDING_MESSAGES : PT_BR_ONBOARDING_MESSAGES,
+      db: async () => db,
+    });
+    const route = api.routes.find((candidate) => candidate.method === "PATCH");
+    if (!route) throw new Error("no PATCH route");
+    const response = await route.handle({
+      actor: { userId: USER, clientId: TENANT_A },
+      params: { featureKey: FEATURE },
+      query: {},
+      body: { op: "nonsense" },
+      locale: "en-US",
+    });
+    expect(errorOf(response.body)).toBe(EN_US_ONBOARDING_MESSAGES.invalidOperation);
+  });
+
+  it("leaves a plain-value host byte-identical", async () => {
+    // The whole compatibility claim. A host that passes words, not a resolver,
+    // must behave exactly as it did before the field widened.
+    const { patch } = harness({ featureKeys: [FEATURE] });
+    expect(errorOf((await patch("nao_existe", { op: "dismiss" })).body)).toBe(
+      PT_BR_ONBOARDING_MESSAGES.unknownFeature,
+    );
   });
 });

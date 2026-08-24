@@ -34,8 +34,8 @@ import type { LifecycleContext, LifecycleStores } from '../types';
 
 import {
   contextOf,
-  messagesOf,
   type LifecycleActor,
+  type LifecycleCopySource,
   type LifecycleMessages,
   type LifecycleRoute,
   type LifecycleUserDirectory,
@@ -56,8 +56,14 @@ export interface EntityLifecycleServerConfig {
   /**
    * The refusal sentences this surface answers with — REQUIRED, the host's
    * words. pt-BR hosts pass `PT_BR_LIFECYCLE_MESSAGES` from `../server/pt-BR`.
+   *
+   * A host serving more than one language passes a RESOLVER instead — the shape
+   * `@12-apps/i18n`'s `localeCopy(PACK)` returns — and the sentence is then
+   * chosen per request from {@link LifecycleRequest.locale}. Passing a plain
+   * value is unchanged in every respect, which is what keeps a single-audience
+   * host from paying for a choice it never makes.
    */
-  messages: LifecycleMessages;
+  messages: LifecycleCopySource<LifecycleMessages>;
 }
 
 /** A registered collection's service + per-request context builder. */
@@ -87,7 +93,11 @@ const RESERVED_SLUGS = new Set(['recycle-bin', 'approvals']);
 export function createApiEntityLifecycle(
   config: EntityLifecycleServerConfig,
 ): ApiEntityLifecycle {
-  const messages = messagesOf(config);
+  // The SOURCE, forwarded to the route builders — they resolve it per request.
+  // Anything here that needs words for its own refusals (a duplicate slug at
+  // assembly, say) reads the DEFAULT rendering, which is the right one: nobody
+  // is being answered yet.
+  const messages = config.messages;
   const stores = createDbLifecycleStores(config.db);
 
   const entities = new Map<string, RegisteredEntity>();

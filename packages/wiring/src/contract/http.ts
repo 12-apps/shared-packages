@@ -159,6 +159,30 @@ export interface WireRoute<
    * can return as-is.
    */
   transport?: "json" | "stream";
+  /**
+   * The trailing parameter that swallows the REST of the path, named.
+   *
+   * `path` is fixed in `:param` form and the host maps the syntax — which
+   * works for every segment except the last one of a route that serves a
+   * whole key space. `@12-apps/storage` serves objects at
+   * `/uploads/local/products/<scope>/<uuid>/card-320.webp`: one parameter
+   * holding four segments, which `:key` alone cannot express because the
+   * adapter has already split the path by the time the handler sees it.
+   *
+   * Declared here as a NAME rather than as syntax, for the same reason `path`
+   * is: `:key{.+}` is Hono's spelling, `*key` is Express's, and a package that
+   * wrote either would be a package that had chosen the host's framework. The
+   * host's adapter composes its own form from this name.
+   *
+   * Absent — the normal case — means every segment of `path` is literal or a
+   * single-segment `:param`.
+   *
+   * An adapter that ignores this does not fail loudly: it registers the
+   * prefix, and every request carrying a deeper key 404s. So an adapter
+   * forwarding routes to a framework MUST read it, and the reference bridge
+   * in the consumer harness does.
+   */
+  wildcardParam?: string;
   handle(request: WireRequest<TActor>): Promise<TAnswer>;
 }
 
