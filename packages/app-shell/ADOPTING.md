@@ -314,12 +314,32 @@ sync, no migration to replay, and no `prisma:sync-*:check` for this package.
   bright lime comes back as a deeper lime, because one tone has to serve both text
   and background; `palette.primary.light` keeps their exact hex for decoration.
   Your own tokens are design decisions already made and are painted as given.
-- **Tell the theme what your page's background actually is.** The correction is
-  computed against `theme.surface` (defaulting to `DEFAULT_SURFACES`: white in
-  light mode, `#121212` in dark). If your app reads text on a tinted card, pass
-  `theme: { surface: { light: '#F7F7F5' } }` — otherwise the seed is corrected to
-  ≥4.5:1 against a background you never paint, and the tenant's text lands under
-  the floor on the surface you do.
+- **Tell the theme what your page's background actually is** — and prefer
+  `background` over `surface` for it. `theme: { background: { light: { default:
+  '#FDF8F2', paper: '#FFFFFF' } } }` both PAINTS the page and becomes the hex the
+  legibility correction is measured against, so the two cannot drift. `surface`
+  still wins when you pass it, for the case where they genuinely differ: your page
+  comes from something the palette never sees, or you read a tenant's text against
+  a card rather than the page behind it. State neither and both stay MUI's default
+  (white in light, `#121212` in dark) — and a seed corrected to ≥4.5:1 against a
+  background you never paint lands under the floor on the one you do.
+- **`background` and `divider` are the tokens a tinted palette cannot skip.**
+  Without them MUI fills its own neutrals in, so painting `body` from a
+  `MuiCssBaseline` override leaves `palette.background.default` saying something
+  else — and that token is what sticky headers, empty states and scroll shadows
+  read in order to MATCH the page. `divider` is the same story one pixel wide: a
+  cold rule between every row of an otherwise warm palette.
+- **`semantics` is for a product that has DECIDED what danger looks like.** The
+  defaults are MUI's anchors and are right for most hosts. Pass
+  `theme: { semantics: { light: { error: '#7C2A1C' } } }` per meaning, per mode —
+  the ones you omit keep the anchor. A hex you state here is used verbatim and is
+  never rotated away from the brand, on the same principle as `tokens`: a decision
+  already made is not re-derived.
+- **A semantic is kept clear of YOUR primary, not only a tenant's.** The rotation
+  reads the effective brand — the tenant's seed when there is one, your own token
+  otherwise. So a platform primary sitting on the danger hue (`#D42B1F` is 4° off
+  MUI's `#d32f2f`) moves danger out of its way on default-branded screens too,
+  which is most of the product. Your token itself is never moved.
 - **`shell.api.fetch` is bound to `shell.api.base`.** `fetch('/consent/status')`
   hits `${base}/consent/status`; pass surface-relative paths, not absolute ones.
   It is `apiFetch` + `joinApiPath`, both of which you can also import directly from
