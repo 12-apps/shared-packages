@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { DEFAULT_LOCALE, isLocale, type Locale } from '@12-apps/i18n';
+import { LocaleProvider } from '@12-apps/i18n/react';
 import { setErrorClassifiers, startObservability } from '@12-apps/observability-frontend';
 
 import { CssBaseline } from '@12-apps/ui/mui/CssBaseline';
@@ -53,13 +55,44 @@ function useHashSlug(fallback: string) {
   return slug;
 }
 
+/**
+ * The reader's locale, and where a host says it OUT LOUD.
+ *
+ * `useLocale` THROWS outside a provider rather than assuming a default, and
+ * `@12-apps/i18n` argues why: "a language reached by saying nothing is the one
+ * that ships to the wrong audience unnoticed. A host keeping Portuguese writes
+ * `<LocaleProvider locale={DEFAULT_LOCALE}>` — one reviewable line, never a
+ * silence." This is that line.
+ *
+ * `?locale=` is the harness's own switch, and it is the point of having two
+ * packs at all: a pack with one entry is a hardcoded string with extra steps,
+ * and a switch nothing exercises proves no axis exists. A spec flips it and
+ * asserts the page came back in the other language.
+ */
+function useHarnessLocale(): Locale {
+  const read = () => {
+    const query = window.location.hash.split('?')[1] ?? '';
+    const asked = new URLSearchParams(query).get('locale') ?? '';
+    return isLocale(asked) ? asked : DEFAULT_LOCALE;
+  };
+  const [locale, setLocale] = useState<Locale>(read);
+  useEffect(() => {
+    const onChange = () => setLocale(read());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  });
+  return locale;
+}
+
 function Shell() {
   const slug = useHashSlug(PAGES[0].slug);
+  const locale = useHarnessLocale();
   const page = PAGES.find((candidate) => candidate.slug === slug);
 
   return (
     <ThemeProvider theme={harnessTheme}>
       <CssBaseline />
+      <LocaleProvider locale={locale}>
       <HarnessShell activeSlug={slug}>
         <div data-testid="harness-page" data-page={page?.slug ?? 'unknown'}>
           {/* An unknown slug is a spec pointing at a page that was renamed or
@@ -68,6 +101,7 @@ function Shell() {
           {page ? <page.Component /> : <p data-testid="harness-unknown-page">No harness page named “{slug}”.</p>}
         </div>
       </HarnessShell>
+      </LocaleProvider>
     </ThemeProvider>
   );
 }

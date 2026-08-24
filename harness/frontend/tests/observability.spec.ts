@@ -25,6 +25,11 @@ import { expect, test, type Page } from '@playwright/test';
 
 const PAGE = '#/observability';
 
+import {
+  EN_US_OBSERVABILITY_COPY,
+  PT_BR_OBSERVABILITY_COPY,
+} from '../src/pages/observability-copy';
+
 interface CapturedEvent {
   level?: string;
   message?: string;
@@ -203,4 +208,30 @@ test('a second component writing context does not erase the first', async ({ pag
   expect(tagged?.tags?.['tenant']).toBe('ferragens-norte');
   expect(tagged?.tags?.['impersonated_store']).toBe('padaria-sul');
   expect(tagged?.tags?.['impersonating']).toBe('true');
+});
+
+test.describe('the words on the page', () => {
+  // `@12-apps/observability-frontend` ships no copy, and correctly — it renders
+  // nothing, so there is no screen in it to have words. That makes the words
+  // here the HOST's, which is exactly the case the copy-portability doctrine is
+  // about: a host that hardcodes them has frozen one language into a page and
+  // cannot be told, because a single-locale app cannot tell the difference.
+  //
+  // These two cases are what stops that. A pack with one entry is a hardcoded
+  // string with extra steps; a switch nothing exercises proves no axis exists.
+
+  test('render in the locale the host put in scope', async ({ page }) => {
+    await expect(page.getByTestId('obs-title')).toHaveText(PT_BR_OBSERVABILITY_COPY.title);
+    await expect(page.getByTestId('obs-boundary')).toHaveText(PT_BR_OBSERVABILITY_COPY.boundary);
+  });
+
+  test('follow the locale when it changes, with no edit to the page', async ({ page }) => {
+    await page.goto(`${PAGE}?locale=en-US`);
+
+    await expect(page.getByTestId('obs-title')).toHaveText(EN_US_OBSERVABILITY_COPY.title);
+    await expect(page.getByTestId('obs-boundary')).toHaveText(EN_US_OBSERVABILITY_COPY.boundary);
+    // And the two packs are genuinely different values — a case that passed
+    // with identical entries would be asserting nothing at all.
+    expect(EN_US_OBSERVABILITY_COPY.title).not.toBe(PT_BR_OBSERVABILITY_COPY.title);
+  });
 });
