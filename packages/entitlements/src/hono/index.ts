@@ -46,6 +46,8 @@ export interface EntitlementsHonoConfig<F extends string, K extends string>
 // and messages — from the one subpath it already imports.
 export type { EntitlementsMessages } from '../server/copy';
 export { PT_BR_ENTITLEMENTS_MESSAGES } from '../server/pt-BR';
+export { EN_US_ENTITLEMENTS_MESSAGES } from '../server/en-US';
+export { ENTITLEMENTS_MESSAGES } from '../server/locales';
 
 /** Reads the JSON body, tolerating an absent or malformed one. */
 async function readBody(c: Context): Promise<unknown> {
