@@ -15,8 +15,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { onboardingRouter } from '@12-apps/onboarding/hono';
-import { PT_BR_ONBOARDING_MESSAGES, PT_BR_ONBOARDING_UNAUTHENTICATED } from '@12-apps/onboarding/server';
+import { onboardingManifest } from '@12-apps/onboarding/manifest';
+import { onboardingServerManifest } from '@12-apps/onboarding/manifest/server';
+import type { MountedRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
+import { PT_BR_ONBOARDING_MESSAGES } from '@12-apps/onboarding/server';
 import type { OnboardingPrisma } from '@12-apps/onboarding/server';
 
 import { onboardingDb } from './onboarding-db';
@@ -60,29 +65,83 @@ export async function reseedOnboarding(pg: PGlite): Promise<void> {
   await pg.exec('TRUNCATE TABLE onboarding_states');
 }
 
-export function onboardingHost(pg: PGlite) {
-  return onboardingRouter({
-    // Required host copy — the refusal sentences and the router's 401.
-    messages: PT_BR_ONBOARDING_MESSAGES,
-    unauthenticatedMessage: PT_BR_ONBOARDING_UNAUTHENTICATED,
-    db: async () => onboardingDb(pg) as unknown as OnboardingPrisma,
-    featureKeys: ONBOARDING_FEATURES,
-    // The harness is not production, and the DEV-only reset is one of the three
-    // operations under test.
-    resetEnabled: () => true,
-    resolveActor: (c) => {
+/** Where `mount-surfaces.ts` hangs it — the adoption's claim. */
+export const ONBOARDING_MOUNT_PATH = '/api/admin/:tenantSlug';
+
+export interface OnboardingHost {
+  router: ReturnType<typeof honoRouterFor>;
+  /** The consumer's account of what was bound, declined or left over. */
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+}
+
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer` rather than through
+ * `@12-apps/onboarding/hono`.
+ *
+ * The per-package adapter still works. What it cannot do is answer the
+ * manifest, and this one declares a MANDATORY `observability` namespace whose
+ * reason it states in one line — "a progress write that fails files under
+ * `onboarding`, not nowhere." `onboardingRouter` takes no logger argument, so
+ * the binder is the only thing that can supply one.
+ *
+ * `db` is collected rather than bound, which still means COUNTED: the partial
+ * and its migrations appear in the report, so a host can be asked what it did
+ * with them instead of never being told they exist.
+ *
+ * ONE thing genuinely changes, and it is worth stating rather than discovering:
+ * the 401 body. `onboardingRouter` took an `unauthenticatedMessage` and wrote
+ * the package's own refusal; the shared bridge answers its own, the same one it
+ * answers for every adopted surface. That is the trade the contract makes on
+ * purpose — a host has ONE framework adapter instead of one per package, so the
+ * sentence a caller with no session reads is the host's, once. The status is
+ * unchanged, and it is still refused before any handler runs.
+ */
+export function onboardingHost(pg: PGlite): OnboardingHost {
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  host.adoptServer({
+    manifest: onboardingManifest,
+    server: onboardingServerManifest,
+    bindings: {
+      http: {
+        mountPath: ONBOARDING_MOUNT_PATH,
+        config: {
+          // Required host copy — the refusal sentences.
+          messages: PT_BR_ONBOARDING_MESSAGES,
+          db: async () => onboardingDb(pg) as unknown as OnboardingPrisma,
+          featureKeys: ONBOARDING_FEATURES,
+          // The harness is not production, and the DEV-only reset is one of the
+          // three operations under test.
+          resetEnabled: () => true,
+        },
+      },
+    },
+  });
+
+  const wired = host.assemble();
+
+  return {
+    report: wired.report,
+    routes: wired.routes,
+    router: honoRouterFor(wired.routes, (c) => {
       // Which tenant: resolved from the mounted path's own slug, the way a real
       // host resolves it — and it is HALF THE ROW'S KEY, so an unknown slug
-      // resolves nobody rather than defaulting to a tenant the caller did not name.
+      // resolves nobody rather than defaulting to a tenant the caller did not
+      // name.
       const clientId = c.req.param('tenantSlug');
       if (clientId !== ONBOARDING_TENANT && clientId !== ONBOARDING_TENANT_B) return null;
       // Who: the SPA sends no header and acts as the seeded owner. A spec that
-      // needs another vantage sets the header; `anonymous` is how it asks for the
-      // unauthenticated path — the host resolves nobody, and the package answers
-      // 401 before any handler runs.
+      // needs another vantage sets the header; `anonymous` is how it asks for
+      // the unauthenticated path — the host resolves nobody, and the bridge
+      // answers 401 before any handler runs.
       const userId = c.req.header(ACTOR_HEADER) ?? 'owner-1';
       if (userId === 'anonymous') return null;
       return { userId, clientId };
-    },
-  });
+    }),
+  };
 }

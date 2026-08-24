@@ -4,8 +4,14 @@
    Postgres, driving the same app the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
-import { ONBOARDING_TENANT, ONBOARDING_TENANT_B } from '../src/onboarding-host';
+import {
+  ONBOARDING_MOUNT_PATH,
+  ONBOARDING_TENANT,
+  ONBOARDING_TENANT_B,
+} from '../src/onboarding-host';
 
 /**
  * The @12-apps/onboarding progress surface end-to-end (12-23): the port of
@@ -240,5 +246,38 @@ describe('isolation — the row key is (user, tenant, feature)', () => {
   it('resolves nobody for a tenant slug the host does not serve', async () => {
     const response = await asUser('owner-1', 'tenant-que-nao-existe').get('ai_integration');
     expect(response.status).toBe(401);
+  });
+});
+
+describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.onboarding.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    // Mandatory, with the reason in one line: "a progress write that fails
+    // files under `onboarding`, not nowhere." `onboardingRouter` takes no
+    // logger argument, so the BINDER is the only thing that can supply one.
+    expect(statuses.get('observability')).toBe('bound');
+    // Collected still means COUNTED: the partial and its migrations appear in
+    // the report, so a host can be asked what it did with them.
+    expect(statuses.get('db')).toBe('collected');
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.onboarding;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} ${ONBOARDING_MOUNT_PATH}${mounted.route.path}`);
+
+    const missing = unclaimedRoutes(routes, allButOne);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.route.path).toBe(routes[0]?.route.path);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.onboarding.report)).toContain(ONBOARDING_MOUNT_PATH);
   });
 });
