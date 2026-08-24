@@ -22,6 +22,7 @@
 import type { AnyServerManifest, WireRequest, WireResponse } from '@12-apps/wiring';
 
 import {
+  AUDIT_JOBS,
   createApiAudit,
   type ApiAudit,
   type AuditRoute,
@@ -58,4 +59,11 @@ export function createWireApiAudit(
 export const auditServerManifest = {
   name: '@12-apps/audit',
   http: { create: createWireApiAudit },
+  /**
+   * The retention sweep with its cadence. The host binds the `retention`
+   * object it already builds from the same db seam, plus — if it has tier
+   * windows at all — the resolver that yields them. See `../server/jobs` for
+   * why the window is a dep and the schedule is not.
+   */
+  jobs: AUDIT_JOBS,
 } as const satisfies AnyServerManifest;

@@ -73,7 +73,7 @@ describe('the impersonation manifests', () => {
     // preview manifest declares no areas at all.
     const [area] = impersonationWebManifest.areas;
     expect(area.area).toBe('super-admin');
-    expect(area.routes).toEqual([{ path: 'impersonar', screen: 'dialog' }]);
+    expect(area.routes).toEqual([{ path: 'impersonate', screen: 'dialog' }]);
     expect(impersonationPreviewWebManifest).not.toHaveProperty('areas');
   });
 

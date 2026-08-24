@@ -44,8 +44,8 @@ export const impersonationWebManifest = {
   areas: [
     {
       area: 'super-admin',
-      routes: [{ path: 'impersonar', screen: 'dialog' }],
-      nav: [{ testId: 'impersonation-start', path: 'impersonar' }],
+      routes: [{ path: 'impersonate', screen: 'dialog' }],
+      nav: [{ testId: 'impersonation-start', path: 'impersonate' }],
     },
   ],
 } as const satisfies AnyWebManifest;

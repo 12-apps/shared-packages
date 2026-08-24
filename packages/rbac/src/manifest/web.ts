@@ -48,12 +48,12 @@ export const rbacWebManifest = {
     {
       area: 'admin',
       routes: [
-        { path: 'equipe', screen: 'TeamScreen', permission: 'team:read' },
-        { path: 'papeis', screen: 'RolesScreen', permission: 'roles:manage' },
+        { path: 'team', screen: 'TeamScreen', permission: 'team:read' },
+        { path: 'roles', screen: 'RolesScreen', permission: 'roles:manage' },
       ],
       nav: [
-        { testId: 'rbac-team', path: 'equipe', permission: 'team:read' },
-        { testId: 'rbac-roles', path: 'papeis', permission: 'roles:manage' },
+        { testId: 'rbac-team', path: 'team', permission: 'team:read' },
+        { testId: 'rbac-roles', path: 'roles', permission: 'roles:manage' },
       ],
     },
   ],

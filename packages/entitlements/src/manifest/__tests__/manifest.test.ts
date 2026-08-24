@@ -77,8 +77,8 @@ describe('the entitlements manifest', () => {
     // separate decision, answered by `canRequestPlanChange`.
     const [area] = entitlementsWebManifest.areas;
     expect(area.area).toBe('admin');
-    expect(area.routes).toEqual([{ path: 'plano', screen: 'page' }]);
-    expect(area.nav[0]).toEqual({ testId: 'entitlements-plan', path: 'plano' });
+    expect(area.routes).toEqual([{ path: 'plan', screen: 'page' }]);
+    expect(area.nav[0]).toEqual({ testId: 'entitlements-plan', path: 'plan' });
   });
 
   it('declares no STATIC notifications capability — the plan words are the host\'s', () => {

@@ -40,8 +40,8 @@ export const entitlementsWebManifest = {
   areas: [
     {
       area: 'admin',
-      routes: [{ path: 'plano', screen: 'page' }],
-      nav: [{ testId: 'entitlements-plan', path: 'plano' }],
+      routes: [{ path: 'plan', screen: 'page' }],
+      nav: [{ testId: 'entitlements-plan', path: 'plan' }],
     },
   ],
 } as const satisfies AnyWebManifest;

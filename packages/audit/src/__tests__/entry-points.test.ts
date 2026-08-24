@@ -118,14 +118,18 @@ describe('the published entry points', () => {
     expect(hookish(honoEntry)).toEqual([]);
   });
 
-  it('are exactly these four, plus the manifest', () => {
+  it('are exactly these four, plus the three manifest halves', () => {
     // Pinned, so adding a subpath is a deliberate act that lands in this diff
-    // together with whatever guard the new surface needs.
+    // together with whatever guard the new surface needs. `./manifest/web` is
+    // this release's: `./react` shipped a real `createWeb*` factory that no
+    // manifest declared, which is the same undeclared-contribution drift the
+    // db paragraph below objects to, with no structural fallback to find it.
     expect(publishedSubpaths()).toEqual([
       '.',
       './hono',
       './manifest',
       './manifest/server',
+      './manifest/web',
       './package.json',
       './react',
       './server',
