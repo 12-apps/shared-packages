@@ -45,6 +45,8 @@ test.describe('the frontend host wiring report', () => {
       '@12-apps/impersonation',
       '@12-apps/notifications',
       '@12-apps/onboarding',
+      '@12-apps/payments-checkout-ui',
+      '@12-apps/payments-frontend',
       '@12-apps/product-research-ui',
       '@12-apps/rbac',
       '@12-apps/realtime',
