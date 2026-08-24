@@ -62,3 +62,13 @@ export {
 
 /** Device detection — the reason this root has to stay browser-safe. */
 export * from "./device-detection";
+
+export {
+  AUTH_ACCESS,
+  AUTH_ERRORS,
+  AUTH_MAIL,
+  AUTH_MESSAGES,
+  AUTH_PAGES,
+  AUTH_SCREENS,
+  AUTH_SETTINGS,
+} from "./locales";

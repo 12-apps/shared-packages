@@ -46,3 +46,4 @@ export type { FlowEmail } from "./flow-email";
 
 export type { AccessCopy } from "./copy";
 export { PT_BR_ACCESS } from "./pt-BR";
+export { EN_US_ACCESS } from "./en-US";

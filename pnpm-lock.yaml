@@ -191,6 +191,9 @@ importers:
       '@12-apps/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@12-apps/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@12-apps/notifications':
         specifier: workspace:*
         version: link:../notifications

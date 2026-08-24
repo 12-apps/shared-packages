@@ -103,6 +103,7 @@ export type {
 } from "../server/email-routes";
 export { EMAIL_AUTH_STATUS } from "../server/messages";
 export { PT_BR_MESSAGES } from "../server/pt-BR";
+export { EN_US_MESSAGES } from "../server/en-US";
 export type { EmailAuthMessages } from "../server/messages";
 
 export { emailAuthSettingsRoutes } from "../server/settings-routes";

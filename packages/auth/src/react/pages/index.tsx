@@ -342,6 +342,8 @@ export function createAuthPages(config: AuthPagesConfig): AuthPages {
 
 export { PT_BR_PAGES } from "./pt-BR";
 export { PT_BR_AUTH_ERRORS } from "./pt-BR";
+export { EN_US_PAGES } from "./en-US";
+export { EN_US_AUTH_ERRORS } from "./en-US";
 export {
   createAuthRoutes,
 } from "./routes";

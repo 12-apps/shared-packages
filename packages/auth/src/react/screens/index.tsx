@@ -126,5 +126,6 @@ export type { EmailAuthScreensConfig, ScreensSession } from "./context";
 export type { EmailAuthCopy, EmailAuthScreenReason } from "./copy";
 /** A ready pt-BR pack, still passed by name. See the file for why that is not a default. */
 export { PT_BR } from "./pt-BR";
+export { EN_US } from "./en-US";
 export { failureMessage } from "./copy";
 export type { SignupConfig } from "./email-signup-form";
