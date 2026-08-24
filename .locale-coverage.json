@@ -14,6 +14,5 @@
   "packages/rbac": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
   "packages/realtime": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
   "packages/report-builder": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
-  "packages/storage": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it.",
-  "packages/ui": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it."
+  "packages/storage": "Copy-ported in FUT-760 and shipping pt-BR alone. en-US lands in this package own PR; the line goes with it."
 }
