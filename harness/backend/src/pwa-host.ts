@@ -14,8 +14,12 @@
  * both paths here, so the browser sees them at its own origin exactly as a
  * deployed SPA does.
  */
-import { pwaRouter } from '@12-apps/pwa/hono';
+import { pwaManifest } from '@12-apps/pwa/manifest';
+import { pwaServerManifest } from '@12-apps/pwa/manifest/server';
 import type { PwaApp } from '@12-apps/pwa/server';
+import { createWiringHost } from '@12-apps/wiring/consumer';
+
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /** A tenant's custom domain — the per-host proof. */
 export const PWA_HOST_A = 'loja.harness.test';
@@ -83,8 +87,18 @@ function isLocal(host: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
-export function pwaHost() {
-  return pwaRouter({
+/**
+ * Where `mount-surfaces.ts` hangs the router: the ORIGIN ROOT.
+ *
+ * A service worker's DIRECTORY bounds its scope, so `/sw.js` served from under
+ * a prefix could only ever control that prefix — and the manifest is linked
+ * from a static `index.html` that cannot know one.
+ */
+export const PWA_MOUNT_PATH = '/';
+
+/** Everything `@12-apps/pwa/server` asks a host for. */
+function pwaConfig() {
+  return {
     /**
      * The host's ONE decision. Returning `null` is a 404, and that 404 is the
      * gate: "installable" exists exactly where the host's own domain rules say it
@@ -101,7 +115,48 @@ export function pwaHost() {
       // reseed nothing while reporting 204.
       neverCachePrefixes: ['/api/', '/__harness/'],
     },
+  };
+}
+
+/**
+ * The installable-app surface, ADOPTED rather than routed.
+ *
+ * This host used to call `pwaRouter(config)` — the package's own Hono mount,
+ * which works and binds nothing. `@12-apps/pwa` declares `server: ['http']`,
+ * and a manifest no host adopts is not an unanswered capability: it is a
+ * package the wiring report never hears about. Third and last of the server
+ * manifests that were in that position, after app-shell and mcp.
+ *
+ * Both routes are `public` and both need the RAW request — the app is resolved
+ * from its Host header, so the package's wire view throws without one rather
+ * than guessing. The wire view also sets `vary` on every answer itself, which
+ * is the half worth checking on a conversion like this: a response that varies
+ * on the forwarded host and does not SAY so is one a cache will hand to the
+ * next domain.
+ */
+export function pwaHost() {
+  const wiring = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
   });
+  wiring.adoptServer({
+    manifest: pwaManifest,
+    server: pwaServerManifest,
+    bindings: { http: { mountPath: PWA_MOUNT_PATH, config: pwaConfig() } },
+  });
+  const wired = wiring.assemble();
+
+  return {
+    // Spread, not just the router: `assemble()` hands back what `http.create`
+    // returned, and for this package that carries the worker source the suite
+    // reads. Dropping it is the mistake the mcp adoption made first, where the
+    // resource-server probe caught it.
+    ...(wired.http[pwaManifest.name] as Record<string, unknown>),
+    router: honoRouterFor(wired.routes, () => null),
+    report: wired.report,
+    routes: wired.routes,
+  };
 }
 
 /** The mounted surface's type — inferred, so the worker source stays reachable. */

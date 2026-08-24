@@ -53,6 +53,33 @@ async function manifestBody(host?: string): Promise<Manifest> {
   return (await response.json()) as Manifest;
 }
 
+describe('the ADOPTION, not just the mount', () => {
+  it('accounts for every capability @12-apps/pwa declares', () => {
+    const entry = backend.hosts.pwa.report.packages.find(
+      (pkg) => pkg.packageName === '@12-apps/pwa',
+    );
+
+    expect(entry, 'the pwa surface must appear in its own host report').toBeDefined();
+    const statuses = entry?.capabilities.map((capability) => capability.status) ?? [];
+    expect(statuses).not.toHaveLength(0);
+    expect(statuses).not.toContain('unanswered');
+    expect(statuses).not.toContain('unbound');
+  });
+
+  it('still says the answer VARIES on the forwarded host', async () => {
+    // The half a conversion like this can silently drop. Which app these routes
+    // answer for is resolved from the Host header, so a response that varies on
+    // it and does not SAY so is one a shared cache will hand to the next domain
+    // — a store serving another store's manifest and icons.
+    const response = await backend.app.request('/manifest.webmanifest', {
+      headers: { host: 'localhost' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('vary')).toBeTruthy();
+  });
+});
+
 describe('the manifest is an endpoint, and answers per host', () => {
   it('serves a different app to each tenant domain on one deployment', async () => {
     const a = await manifestBody(PWA_HOST_A);
