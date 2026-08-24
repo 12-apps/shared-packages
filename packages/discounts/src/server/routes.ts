@@ -9,7 +9,12 @@ import {
   loadTargetGroups,
   type DiscountableCollection,
 } from "./collections";
-import { missingServerCopy, type DiscountsServerCopy } from "./copy";
+import {
+  missingServerCopy,
+  resolveDiscountsCopy,
+  type DiscountsCopySource,
+  type DiscountsServerCopy,
+} from "./copy";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
 import { listDiscountsQuery } from "./mcp";
 import { DISCOUNTS_READ, DISCOUNTS_WRITE } from "./contribution";
@@ -51,8 +56,14 @@ export type DiscountRoute = WireRoute<DiscountsActor>;
 export interface DiscountsApiConfig {
   /** Where the rows are — see {@link DiscountStore}. */
   store: DiscountStore;
-  /** Every sentence this surface answers a human with. Required, no defaults. */
-  copy: DiscountsServerCopy;
+  /**
+   * Every sentence this surface answers a human with. Required, no defaults.
+   *
+   * A bilingual host passes a RESOLVER instead — `localeCopy(DISCOUNTS_SERVER_COPY)`
+   * — and each request is answered in its own caller's language. The plain
+   * value stays legal, so a host with one audience changes nothing.
+   */
+  copy: DiscountsCopySource<DiscountsServerCopy>;
   /**
    * Where this surface says what it did. Required, and for the same reason
    * `copy` is: a default would be a no-op, and a no-op default is exactly the
@@ -114,11 +125,16 @@ function acknowledged(id: string): WireResponse {
  * fold is what narrows the targets to the scope — checking the raw body would
  * reject ids a COMBO-scoped write was about to drop anyway.
  */
-async function prepareWrite(config: DiscountsApiConfig, clientId: string, body: unknown) {
+async function prepareWrite(
+  config: DiscountsApiConfig,
+  copy: DiscountsServerCopy,
+  clientId: string,
+  body: unknown,
+) {
   const input = toDiscountWriteInput(body as DiscountWriteBody);
-  const write = { scalars: toDiscountScalars(input, config.copy), targets: targetsForScope(input) };
+  const write = { scalars: toDiscountScalars(input, copy), targets: targetsForScope(input) };
   if (config.collections) {
-    await assertTargetsOwned(config.collections, clientId, write.targets, config.copy.foreignTarget);
+    await assertTargetsOwned(config.collections, clientId, write.targets, copy.foreignTarget);
   }
   return write;
 }
@@ -160,10 +176,12 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
     method: "GET",
     path: "/discounts",
     permission: DISCOUNTS_READ,
-    handle: endpoint(config, "GET /discounts", async ({ actor, query }) => {
+    handle: endpoint(config, "GET /discounts", async ({ actor, query, locale }) => {
       const parsed = schema.safeParse(query);
       if (!parsed.success) {
-        return { status: 400, body: { error: config.copy.invalidQuery } };
+        // Worded per request, from the tag the adapter put on it — never at the
+        // mount, which ran once at boot.
+        return { status: 400, body: { error: resolveDiscountsCopy(config.copy, locale).invalidQuery } };
       }
       // Returned as-is rather than wrapped: the page IS the `{ data,
       // pagination }` envelope the advertised response describes, and wrapping
@@ -207,9 +225,11 @@ function readRoute(config: DiscountsApiConfig): DiscountRoute {
     method: "GET",
     path: "/discounts/:id",
     permission: DISCOUNTS_READ,
-    handle: endpoint(config, "GET /discounts/:id", async ({ actor, params }) => {
+    handle: endpoint(config, "GET /discounts/:id", async ({ actor, params, locale }) => {
       const record = await config.store.get(actor.clientId, String(params.id));
-      if (record === null) return { status: 404, body: { error: config.copy.notFound } };
+      if (record === null) {
+        return { status: 404, body: { error: resolveDiscountsCopy(config.copy, locale).notFound } };
+      }
       return ok({ data: record as DiscountRecord });
     }),
   };
@@ -221,8 +241,8 @@ function createRoute(config: DiscountsApiConfig): DiscountRoute {
     path: "/discounts",
     permission: DISCOUNTS_WRITE,
     handle: endpoint(config, "POST /discounts", async (request) => {
-      const { actor, body } = request;
-      const write = await prepareWrite(config, actor.clientId, body);
+      const { actor, body, locale } = request;
+      const write = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
       const created = await config.store.create(actor.clientId, write);
       logWrite(config.logger, "created", request, created.id);
       return ok({ data: created });
@@ -236,9 +256,9 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
     path: "/discounts/:id",
     permission: DISCOUNTS_WRITE,
     handle: endpoint(config, "PATCH /discounts/:id", async (request) => {
-      const { actor, params, body } = request;
+      const { actor, params, body, locale } = request;
       const id = String(params.id);
-      const write = await prepareWrite(config, actor.clientId, body);
+      const write = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
       await config.store.update(actor.clientId, id, write);
       logWrite(config.logger, "re-stated", request, id);
       return acknowledged(id);
@@ -288,7 +308,10 @@ function assertLogger(logger: DiscountsLogger | undefined): void {
 export function createApiDiscounts(config: DiscountsApiConfig): {
   routes: readonly DiscountRoute[];
 } {
-  const missing = missingServerCopy(config.copy);
+  // Validated against the DEFAULT rendering — a resolver asked for no locale.
+  // A host that forgot a sentence should fail at the mount, as it always did,
+  // rather than at whichever request first needs the missing one.
+  const missing = missingServerCopy(resolveDiscountsCopy(config.copy, undefined));
   if (missing.length > 0) {
     throw new Error(
       `@12-apps/discounts: createApiDiscounts is missing copy for ${missing.join(", ")} — ` +
