@@ -166,7 +166,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
 
   it('accounts for every capability, with none unanswered', () => {
     const statuses = new Map(
-      backend.entitlements.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+      backend.hosts.entitlements.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
     );
 
     expect(statuses.get('http')).toBe('bound');
@@ -185,14 +185,14 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     // ships the plan screens, "because listing it would oblige every SERVER
     // host adopting this manifest to answer for a React surface it never
     // mounts." So answering it here is a COMPLETE answer, not a partial one.
-    const kinds = backend.entitlements.report.packages[0]?.capabilities.map((e) => e.kind);
+    const kinds = backend.hosts.entitlements.report.packages[0]?.capabilities.map((e) => e.kind);
 
     expect(kinds).not.toContain('surface');
     expect(kinds).not.toContain('areas');
   });
 
   it('names a descriptor this host forgot to claim', () => {
-    const { routes } = backend.entitlements;
+    const { routes } = backend.hosts.entitlements;
     const allButOne = routes
       .slice(1)
       .map((mounted) => `${mounted.route.method} /api/admin/:tenantSlug${mounted.route.path}`);
@@ -203,6 +203,6 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
   });
 
   it('renders a report naming the mount', () => {
-    expect(renderWiringReport(backend.entitlements.report)).toContain('/api/admin/:tenantSlug');
+    expect(renderWiringReport(backend.hosts.entitlements.report)).toContain('/api/admin/:tenantSlug');
   });
 });

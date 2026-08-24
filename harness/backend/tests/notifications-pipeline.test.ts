@@ -4,7 +4,10 @@
    same mount the browser drives. */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
+
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
+import { NOTIFICATIONS_MOUNT_PATH } from '../src/notifications-host';
 import {
   NOTIFICATIONS_TENANT_FREE_ID,
   NOTIFICATIONS_TENANT_ID,
@@ -763,5 +766,36 @@ describe('the permission fan-out against a real grant table', () => {
        WHERE user_id = 'owner-1' AND type = 'payment.short'`,
     );
     expect(rows[0]?.count).toBe('1');
+  });
+});
+
+describe('adopted through @12-apps/wiring, not through the per-package adapter', () => {
+  it('accounts for every capability, with none unanswered', () => {
+    const statuses = new Map(
+      backend.hosts.notifications.report.packages[0]?.capabilities.map((e) => [e.kind, e.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    // The one that matters most here. The host was passing
+    // `{ info: () => undefined, error: () => undefined }` — a logger that
+    // swallowed everything, written once and never revisited — and a delivery
+    // driver failing is exactly the thing nobody watches for. The binder hands
+    // this package a logger scoped to its namespace instead.
+    expect(statuses.get('observability')).toBe('bound');
+    expect(statuses.get('db')).toBe('collected');
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    const { routes } = backend.hosts.notifications;
+    const allButOne = routes
+      .slice(1)
+      .map((m) => `${m.route.method} ${NOTIFICATIONS_MOUNT_PATH}${m.route.path}`);
+
+    expect(unclaimedRoutes(routes, allButOne)).toHaveLength(1);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.hosts.notifications.report)).toContain(NOTIFICATIONS_MOUNT_PATH);
   });
 });
