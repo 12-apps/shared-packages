@@ -25,6 +25,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApiBilling } from '@12-apps/billing/server';
+import { renderWiringReport, unclaimedRoutes } from '@12-apps/wiring/consumer';
 
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import {
@@ -325,5 +326,65 @@ describe('the copy this surface refuses to default', () => {
     expect(() => createApiBilling({ ...(deps as object), copy } as never)).toThrow(
       /detachFailed/,
     );
+  });
+});
+
+describe('adopted through @12-apps/wiring, not by calling the factory', () => {
+  // Calling `createApiBilling` by hand is the failure the contract was written
+  // to stop: "a version bump that adds a capability arrives silently —
+  // report-builder 5.x shipped three working-copy endpoints its own client
+  // calls, and the origin host never mounted them; the editor's autosave 404s
+  // and nothing is red."
+
+  it('accounts for every capability the package declares', () => {
+    const { report } = backend.billing;
+    const statuses = new Map(
+      report.packages[0]?.capabilities.map((entry) => [entry.kind, entry.status]),
+    );
+
+    expect(statuses.get('http')).toBe('bound');
+    // MANDATORY for runtime manifests, and the manifest says why: "the money
+    // path is the one place where 'it failed and filed nowhere' is
+    // unaffordable, so the binder hands this package a logger already scoped to
+    // `billing`." `createApiBilling` takes no logger argument — the BINDER
+    // supplies it, so a hand-mount ships a money path that files nowhere.
+    expect(statuses.get('observability')).toBe('bound');
+    // And nothing is left unanswered: `assemble()` throws while anything is,
+    // which is what turns the next capability billing declares into a red
+    // build rather than an endpoint nobody mounted.
+    expect([...statuses.values()]).not.toContain('unanswered');
+  });
+
+  it('states the four declared absences rather than leaving them to be inferred', () => {
+    // The manifest names them and gives a reason for each: no `db` (the models
+    // still carry foreign keys into host tables), no `permissions` (who may put
+    // a card on file is a role decision), no `notifications` (the one notice is
+    // entirely host copy), no `mcp` (the surface writes a payment instrument,
+    // which stays behind a human). A capability that is absent from the
+    // manifest is absent from the report — which is how a host reading this
+    // knows those four are decisions rather than omissions.
+    const kinds = backend.billing.report.packages[0]?.capabilities.map((entry) => entry.kind);
+
+    expect(kinds).not.toContain('db');
+    expect(kinds).not.toContain('permissions');
+    expect(kinds).not.toContain('mcp');
+  });
+
+  it('names a descriptor this host forgot to claim', () => {
+    // The pin the contract prescribes for a host that mounts by hand. All four
+    // routes go through one router here, so the real list is complete; dropping
+    // one is what proves the check would speak up.
+    const { routes } = backend.billing;
+    const allButOne = routes
+      .slice(1)
+      .map((mounted) => `${mounted.route.method} ${'/api/account/billing'}${mounted.route.path}`);
+
+    const missing = unclaimedRoutes(routes, allButOne);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.route.path).toBe(routes[0]?.route.path);
+  });
+
+  it('renders a report naming the mount', () => {
+    expect(renderWiringReport(backend.billing.report)).toContain('/api/account/billing');
   });
 });

@@ -20,15 +20,18 @@
  *   resolved per call — see `PLATFORM_MERCHANT`.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { createApiBilling, type BillingApiCopy } from '@12-apps/billing/server';
+import { billingManifest } from '@12-apps/billing/manifest';
+import { billingServerManifest } from '@12-apps/billing/manifest/server';
+import type { BillingApiCopy } from '@12-apps/billing/server';
 import { ProviderRequestError } from '@12-apps/payments-backend';
-import type { WireRoute } from '@12-apps/wiring';
+import type { MountedRoute, WireRoute } from '@12-apps/wiring';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 import type { Hono } from 'hono';
 
 import { applyBillingSchema, instrumentStore, subscriptionDirectory } from './billing-db';
 import { createBillingPayments, PLATFORM_MERCHANT } from './billing-payments';
 import { Params, type SqlRunner } from './rbac-db-shared';
-import { honoRouterFor } from './wire-hono';
+import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 /** Where the four routes hang. Self-scoped: a card on file is the OWNER's. */
 export const BILLING_MOUNT_PATH = '/api/account/billing';
@@ -136,36 +139,89 @@ function guarded(route: WireRoute<never>): WireRoute<never> {
 export interface HarnessBilling {
   router: Hono;
   payments: ReturnType<typeof createBillingPayments>;
+  /** The consumer's own account of what was bound, declined or left over. */
+  report: WiringReport;
+  routes: readonly MountedRoute[];
 }
 
+/**
+ * The surface, adopted through `@12-apps/wiring/consumer` — never by calling
+ * `createApiBilling` directly.
+ *
+ * Calling the factory by hand is the failure the contract was written to stop:
+ * "a version bump that adds a capability arrives silently — report-builder 5.x
+ * shipped three working-copy endpoints its own client calls, and the origin
+ * host never mounted them; the editor's autosave 404s and nothing is red."
+ *
+ * Two of this package's declarations are ones a hand-mount drops in exactly
+ * that silent way:
+ *
+ * - **`observability: { namespace: 'billing' }`**, which the manifest marks
+ *   MANDATORY for runtime manifests and gives the reason for: "the money path
+ *   is the one place where 'it failed and filed nowhere' is unaffordable, so
+ *   the binder hands this package a logger already scoped to `billing`."
+ *   `createApiBilling` takes no logger argument — the BINDER supplies it. A
+ *   host that called the factory itself would ship a money path filing
+ *   nowhere, and nothing would say so.
+ * - **the inventory.** The shared manifest inventories the runtime manifests,
+ *   so the day billing declares `jobs` — the cycle collector is already in
+ *   `./server`, unmounted here — this host's `assemble()` goes RED naming the
+ *   capability instead of quietly not running it.
+ *
+ * Every declared capability is therefore bound or DECLINED WITH A REASON.
+ * Silence is what throws.
+ */
 export function billingHost(pg: PGlite): HarnessBilling {
   const sql = pg as unknown as SqlRunner;
   const payments = createBillingPayments();
 
-  const api = createApiBilling({
-    subscriptions: subscriptionDirectory(sql),
-    instruments: instrumentStore(sql),
-    merchant: PLATFORM_MERCHANT,
-    enabled: async () => billingPlatform.enabled,
-    // A promise-returning accessor rather than the built object: a real host
-    // builds its gateway lazily over a database client it also builds lazily,
-    // and a package demanding it at construction would force the whole payment
-    // stack to exist before the first request that needs it.
-    payments: async () => ({
-      gateway: payments.gateway,
-      credentials: payments.credentials,
-    }),
-    copy: BILLING_COPY,
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    // The port behind the mandatory namespace above. This harness's sink is
+    // the console; a real host hands `createFeatureLogger` here.
+    ports: { loggerFor: harnessLoggerFor },
   });
+
+  host.adoptServer({
+    manifest: billingManifest,
+    server: billingServerManifest,
+    bindings: {
+      http: {
+        mountPath: BILLING_MOUNT_PATH,
+        config: {
+          subscriptions: subscriptionDirectory(sql),
+          instruments: instrumentStore(sql),
+          merchant: PLATFORM_MERCHANT,
+          enabled: async () => billingPlatform.enabled,
+          // A promise-returning accessor rather than the built object: a real
+          // host builds its gateway lazily over a database client it also
+          // builds lazily, and a package demanding it at construction would
+          // force the whole payment stack to exist before the first request
+          // that needs it.
+          payments: async () => ({
+            gateway: payments.gateway,
+            credentials: payments.credentials,
+          }),
+          copy: BILLING_COPY,
+        },
+      },
+    },
+  });
+
+  const wired = host.assemble();
 
   return {
     payments,
-    // `WireRoute` is the wiring contract's own shape here, so the host's ONE
-    // bridge serves all four. What this adoption adds around them is the
-    // provider-error mapping above — the one thing the package hands back
-    // rather than answering itself.
+    report: wired.report,
+    routes: wired.routes,
+    // The host's ONE bridge, over the ASSEMBLED routes. What this adoption adds
+    // around them is the provider-error mapping above — the one thing the
+    // package hands back rather than answering itself.
     router: honoRouterFor(
-      api.routes.map((route) => ({ route: guarded(route as WireRoute<never>) }) as never),
+      wired.routes.map(
+        (mounted) => ({ route: guarded(mounted.route as WireRoute<never>) }) as never,
+      ),
       (c) => {
         const ownerId = c.req.header(BILLING_OWNER_HEADER);
         return ownerId ? { ownerId } : null;
