@@ -18,10 +18,10 @@
 //    exercise product copy rather than shipping it — a spec that clicks
 //    "Continuar com Google" is a spec, not a leak.
 //
-// 3. A NAMED PACK. A file whose name says what it is (`pt-BR.ts`, anything
-//    under `locales/`) is the sanctioned way to ship another language: a
-//    host imports it and passes it BY HAND, so choosing Portuguese is a line
-//    in the host's diff rather than a silence.
+// 3. A NAMED PACK. A file whose name says what it is (`pt-BR.ts`, `en-US.ts`,
+//    anything under `locales/`) is the sanctioned way to ship a language: a
+//    host imports it and passes it BY HAND, so choosing Portuguese — or
+//    English — is a line in the host's diff rather than a silence.
 //
 // ## Category 2 is read from the MANIFEST, not only from a regex
 //
@@ -43,10 +43,33 @@
 // `files` field publishes everything, so it simply gets the regex.
 import { existsSync, readFileSync } from "node:fs";
 
+import { localeTagIn } from "./locale-tag.mjs";
+
 const SHIPPED_SOURCE = /^packages\/[^/]+(?:\/[^/]+)?\/src\/.+\.(?:ts|tsx|js|jsx|mjs)$/;
 const CATEGORY_EXCLUDED =
   /(?:__tests__|__stories__|\.test\.|\.spec\.|\.stories\.|\.test-story\.|(?:^|\/)e2e\/|(?:^|\/)features\/|test-helpers)/;
-const NAMED_PACK = /(?:pt-?br[^/]*\.(?:ts|tsx|js|jsx|mjs)$|(?:^|\/)locales\/)/i;
+/**
+ * Whether a path is a NAMED PACK — a file that says which language it is.
+ *
+ * The rule and every spelling it admits live in `./locale-tag.mjs`, shared with
+ * `scripts/locale-coverage-gate.mjs`: two gates asking one question from two
+ * hand-kept patterns is the drift this folder exists to prevent.
+ *
+ * It was `pt-?br…` until a second language existed. That spelling exempted
+ * exactly the one language this repo happened to ship, so `en-US.ts` — the
+ * TRANSLATION of an already-exempt file — came back into scope, where the
+ * vocabulary gate fails it for saying "restaurants" in the English rendering of
+ * a sentence whose Portuguese was fine next door. The rule was always "a file
+ * that says which language it is"; only the pattern was narrower than the rule.
+ *
+ * Measured against the whole tree when it widened: it reclassifies nothing and
+ * exempts no file that is not a pack.
+ */
+function isNamedPack(path) {
+  if (path.includes("/locales/")) return true;
+  const basename = path.slice(path.lastIndexOf("/") + 1);
+  return localeTagIn(basename) !== null;
+}
 
 /**
  * One `files` glob as a regex over the package-relative path.
@@ -115,7 +138,7 @@ export function inScope(path, readManifest) {
   return (
     SHIPPED_SOURCE.test(path) &&
     !CATEGORY_EXCLUDED.test(path) &&
-    !NAMED_PACK.test(path) &&
+    !isNamedPack(path) &&
     !isUnpublished(path, readManifest)
   );
 }

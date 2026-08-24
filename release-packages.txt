@@ -16,6 +16,11 @@
 packages/wiring
 packages/eslint-config
 packages/typescript-config
+# `@12-apps/i18n` has no workspace dependencies at all, so its position is free.
+# It sits near the front because it is the one every copy-shipping package's
+# ADOPTING notes point at, and a reader scanning this list for "what do I need
+# first" should meet it before the packages that reference it.
+packages/i18n
 packages/feature-flags
 packages/request-scope
 packages/observability-backend
