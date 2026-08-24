@@ -59,10 +59,7 @@ export {
 import type { WebhookReplayOptions, WebhookReplayReport } from '../core/webhook-replay';
 import type { ExpiringConnection, ProviderConfigStore, StoredProviderConfig } from '../config/types';
 import type { MerchantRef, ProviderName } from '../core/types';
-import type {
-  ActivationReconcileContext,
-  ActivationReport,
-} from '../activation/reconcile';
+import type { ActivationReconcileContext } from '../activation/reconcile';
 
 /**
  * Why a grant could not be renewed — the two outcomes a host must be able to
