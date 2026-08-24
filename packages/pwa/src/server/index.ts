@@ -24,3 +24,5 @@ export {
   pwaServiceWorkerSource,
   type PwaServiceWorkerOptions,
 } from "./service-worker-source";
+// What every adapter of this surface must decide identically — see `./request`.
+export { pwaRequestHost, PWA_VARY_ON_FORWARDED_HOST } from "./request";

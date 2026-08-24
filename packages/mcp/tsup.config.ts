@@ -26,7 +26,9 @@ export default defineConfig({
     'oauth/index': 'src/oauth/index.ts',
     'hono/index': 'src/hono/index.ts',
     'coverage-gate/index': 'src/coverage-gate/index.ts',
-    'generate/index': 'src/generate/index.ts'
+    'generate/index': 'src/generate/index.ts',
+    'manifest/index': 'src/manifest/index.ts',
+    'manifest/server': 'src/manifest/server.ts'
 },
   format: ['esm'],
   dts: true,

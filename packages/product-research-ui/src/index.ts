@@ -43,6 +43,15 @@ export { ResearchHomeScreen } from './research-home-screen';
 export type { ResearchHomeScreenProps } from './research-home-screen';
 export { ResearchRunScreen } from './research-run-screen';
 export type { ResearchRunScreenProps } from './research-run-screen';
+// The two screens as ONE bound surface — the `createWeb*` convention, and
+// what `@12-apps/product-research-ui/manifest/web` declares.
+export { createWebResearch } from './create-web-research';
+export type {
+  BoundResearchHomeProps,
+  BoundResearchRunProps,
+  ResearchSurface,
+  ResearchWebConfig,
+} from './create-web-research';
 export { useResearchRun } from './use-research-run';
 export type { ResearchPhase, ResearchRunState, UseResearchRunOptions } from './use-research-run';
 // The realtime subscription seam (FUT-439). The wire vocabulary is re-exported
