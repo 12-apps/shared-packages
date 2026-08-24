@@ -58,6 +58,42 @@ import { DISCOUNTS_SERVER_COPY } from '@12-apps/discounts/server/locales';
 copy: localeCopy(DISCOUNTS_SERVER_COPY),
 ```
 
+### How the locale reaches the package
+
+A resolver only helps if something tells the package who is reading, and the
+mount cannot: it happened once, at boot. So the tag rides on the **request**.
+
+`@12-apps/wiring`'s `WireRequest` carries `locale?: string`, and every
+wiring-based package handler already receives one. The host's adapter is the
+only layer that can negotiate a tag — it holds the cookie, the header and
+whatever preference the reader stored — so it populates the field and the
+package reads it:
+
+```ts
+// the host's route entry, once for every package it mounts
+const answer = await route.handle({ actor, params, query, body, locale });
+
+// the package, where the sentence is needed
+const copy = resolveCopy(config.copy, { locale: request.locale });
+```
+
+Three properties are worth stating because each is load-bearing:
+
+- **The package does no negotiating and owns no tag list.** It forwards the raw
+  string it was handed. That is what keeps it liftable into a repo that has
+  never heard of `@12-apps/i18n` — and `localeCopy` matches the tag on the host
+  side anyway, so `en`, `en-US` and a stale `es-AR` all land somewhere sane.
+- **Absent is meaningful, and is not an error.** A host with one audience never
+  populates the field. The package must then answer with the copy it was
+  configured with rather than invent a language, which falls out for free: a
+  plain value ignores the context entirely, and `localeCopy` reads an absent tag
+  as `DEFAULT_LOCALE`.
+- **Resolve where the sentence is USED, never where the surface is built.** A
+  package that resolves once and stores the result has re-frozen the language
+  into its factory — and it does so invisibly, because a single-locale host
+  cannot tell the difference. `packages/wiring`'s own `consumer.test.ts` pins
+  the opposite property: one mount, two readers, two languages.
+
 **In the browser**, mount the provider once, above everything:
 
 ```tsx

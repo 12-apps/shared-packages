@@ -159,6 +159,43 @@ export interface EventsRequestContext {
   params: Record<string, string | undefined>;
   query: Record<string, string | undefined>;
   request?: Request;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag — the same field
+   * `@12-apps/wiring`'s `WireRequest` carries, mirrored here because this
+   * surface predates that contract and builds its own context.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was
+   * configured with rather than invent a language.
+   */
+  locale?: string;
+}
+
+/**
+ * What a config field takes once its copy can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the
+ * host resolver's job, not this package's.
+ */
+export type EventsCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type EventsCopySource<T> = T | EventsCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED, never where the surface is built: a
+ * factory that resolves once and stores the result has re-frozen the language
+ * into its mount, and a single-locale host cannot tell the difference.
+ */
+export function resolveEventsCopy<T>(
+  source: EventsCopySource<T>,
+  locale: string | undefined,
+): T {
+  return typeof source === "function" ? (source as EventsCopyResolver<T>)({ locale }) : source;
 }
 
 /** What a route handler answers. */

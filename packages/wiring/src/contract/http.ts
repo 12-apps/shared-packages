@@ -30,6 +30,30 @@ export interface WireRequest<TActor = unknown> {
   /** Parsed JSON body, for writes. */
   body?: unknown;
   /**
+   * The language this reader is being answered in, as a BCP-47 tag.
+   *
+   * A package that states its copy as a required config field (the copy port's
+   * doctrine) can only follow a reader if something tells it who is reading.
+   * This is that something, and it belongs on the REQUEST rather than in the
+   * mount config for the reason the whole seam exists: the mount happens once
+   * per process and the language changes per caller.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one — it holds the cookie, the header and whatever preference the reader
+   * stored. This package deliberately does no negotiating and owns no tag list:
+   * that is `@12-apps/i18n`'s job in the hosts that want it, and a package
+   * reading a raw string here stays liftable into a repo that has never heard
+   * of it.
+   *
+   * **Optional, and absent is meaningful.** An adapter that populates nothing
+   * is not misconfigured — it is a host with one audience, and a package must
+   * answer such a request with the copy it was configured with rather than
+   * inventing a language. So a handler forwards this value as it found it,
+   * `undefined` included, and lets the host's own resolver decide what no
+   * answer means.
+   */
+  locale?: string;
+  /**
    * The raw fetch `Request`, for the handlers the parsed fields cannot
    * serve: a webhook verifying a provider signature over the exact bytes,
    * an SSE stream reading `Last-Event-ID`, an OAuth callback echoing the

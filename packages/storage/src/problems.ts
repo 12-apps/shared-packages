@@ -54,6 +54,15 @@ export type StorageMessages = Readonly<Record<StorageProblem, string>>;
 export interface StorageMessageContext {
   /** `8 MB`, already formatted. */
   limit: string;
+  /**
+   * The language to answer this caller in, as a BCP-47 tag.
+   *
+   * This field is why `messages` was already the right SHAPE: a factory called
+   * per refusal can answer per reader, where a value handed over at the mount
+   * cannot. Absent means the host's adapter populated nothing — a single
+   * -audience host — and the factory should then answer as it always did.
+   */
+  locale?: string;
 }
 
 /**

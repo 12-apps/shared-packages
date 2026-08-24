@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { EVENTS_MESSAGES } from "../locales";
 import { PT_BR_EVENTS_MESSAGES } from "../pt-BR";
 
 import { resetRealtimeRuntime } from "../../core/runtime";
@@ -61,6 +62,8 @@ interface HarnessOptions {
   connectionCap?: number;
   ticketSecret?: string;
   withDriver?: boolean;
+  /** A resolver, for the cases about following a reader. */
+  messages?: Parameters<typeof createApiEvents>[0]["messages"];
 }
 
 /**
@@ -70,7 +73,7 @@ interface HarnessOptions {
  */
 async function harness(options: HarnessOptions = {}) {
   const api = createApiEvents({
-    messages: PT_BR_EVENTS_MESSAGES,
+    messages: options.messages ?? PT_BR_EVENTS_MESSAGES,
     logger: silentLogger,
     driver: createInlineRealtimeDriver({ logger: silentLogger }),
     ticketSecret: options.ticketSecret ?? "test-secret",
@@ -102,10 +105,16 @@ async function harness(options: HarnessOptions = {}) {
 
   return {
     api,
-    stream: (query: Record<string, string | undefined>, tenantSlug = "loja-a") =>
-      find("GET").handle({ params: { tenantSlug }, query }),
-    ticket: (query: Record<string, string | undefined>, tenantSlug = "loja-a") =>
-      find("POST").handle({ params: { tenantSlug }, query }),
+    stream: (
+      query: Record<string, string | undefined>,
+      tenantSlug = "loja-a",
+      locale?: string,
+    ) => find("GET").handle({ params: { tenantSlug }, query, locale }),
+    ticket: (
+      query: Record<string, string | undefined>,
+      tenantSlug = "loja-a",
+      locale?: string,
+    ) => find("POST").handle({ params: { tenantSlug }, query, locale }),
   };
 }
 
@@ -439,5 +448,53 @@ describe("createApiEvents — lifecycle", () => {
     expect(frame).toContain("mine.event");
     expect(frame).not.toContain("foreign.event");
     await shutDownFully(api);
+  });
+});
+
+/**
+ * One factory, built once at boot, answering two callers in their own languages.
+ *
+ * This is the property the `locale` field exists for. `createApiEvents` is
+ * called ONCE per process — the connection cap and the shutdown hook make a
+ * second factory wrong — so the language cannot be a property of the mount.
+ * Before this, `messages` was resolved into `deps` at construction, which meant
+ * a bilingual host had no way to reach it at all.
+ */
+describe("createApiEvents — copy follows the caller", () => {
+  /** What a host writes as `localeCopy(EVENTS_MESSAGES)`, spelled out. */
+  const messages = ({ locale }: { readonly locale?: string | null }) =>
+    EVENTS_MESSAGES[locale === "en-US" ? "en-US" : "pt-BR"];
+
+  it("answers one caller in Portuguese and the next in English", async () => {
+    const { stream } = await harness({ messages });
+    // No `topics` at all is the refusal every locale has a sentence for.
+    const pt = (await stream({}, "loja-a", "pt-BR")) as { body: { error: string } };
+    const en = (await stream({}, "loja-a", "en-US")) as { body: { error: string } };
+
+    expect(pt.body.error).toBe(EVENTS_MESSAGES["pt-BR"].invalidTopics);
+    expect(en.body.error).toBe(EVENTS_MESSAGES["en-US"].invalidTopics);
+    expect(pt.body.error).not.toBe(en.body.error);
+  });
+
+  it("answers the ticket route in the caller's language too", async () => {
+    // The two transports must not disagree about the language any more than
+    // they may disagree about who is authorized.
+    const { ticket } = await harness({ messages });
+    const en = (await ticket({}, "loja-a", "en-US")) as { body: { error: string } };
+    expect(en.body.error).toBe(EVENTS_MESSAGES["en-US"].invalidTopics);
+  });
+
+  it("answers the default when the adapter populated no locale", async () => {
+    // A host with one audience never sets it, and that is not an error.
+    const { stream } = await harness({ messages });
+    const answer = (await stream({}, "loja-a")) as { body: { error: string } };
+    expect(answer.body.error).toBe(EVENTS_MESSAGES["pt-BR"].invalidTopics);
+  });
+
+  it("leaves a host that passes a plain pack exactly as it was", async () => {
+    // The adoption cost of this seam for a single-audience host: zero.
+    const { stream } = await harness();
+    const answer = (await stream({}, "loja-a", "en-US")) as { body: { error: string } };
+    expect(answer.body.error).toBe(PT_BR_EVENTS_MESSAGES.invalidTopics);
   });
 });

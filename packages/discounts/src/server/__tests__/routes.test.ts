@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { DISCOUNTS_SERVER_COPY } from "../../locales";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
 import { createApiDiscounts, type DiscountRoute, type DiscountsActor } from "../routes";
 import type { DiscountPage, DiscountRecord, DiscountStore, DiscountWrite } from "../store";
@@ -353,5 +354,61 @@ describe("DiscountValidationError", () => {
     expect(error.status).toBe(422);
     expect(error.field).toBe("percentOff");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+/**
+ * One mount, two callers, two languages.
+ *
+ * `createApiDiscounts` is called once when the host assembles its wiring, so
+ * before this the language was a property of that mount and a bilingual host
+ * had no way in. The tag now rides on `WireRequest.locale`, which every
+ * wiring-based handler already receives — so this surface needed no context of
+ * its own, only to stop resolving early.
+ */
+describe("createApiDiscounts — copy follows the caller", () => {
+  /** What a host writes as `localeCopy(DISCOUNTS_SERVER_COPY)`, spelled out. */
+  const copy = ({ locale }: { readonly locale?: string | null }) =>
+    DISCOUNTS_SERVER_COPY[locale === "en-US" ? "en-US" : "pt-BR"];
+
+  function readRoute() {
+    // `null` so the read reaches the 404, which is the refusal every locale words.
+    const { routes } = createApiDiscounts({
+      store: fakeStore(calls, null),
+      copy,
+      logger: recordingLogger(),
+    });
+    const route = routes.find((entry) => entry.method === "GET" && entry.path === "/discounts/:id");
+    if (!route) throw new Error("no read route");
+    return (locale?: string) =>
+      route.handle({ actor: ACTOR, params: { id: "missing" }, query: {}, locale });
+  }
+
+  it("answers one caller in Portuguese and the next in English", async () => {
+    const call = readRoute();
+    const pt = (await call("pt-BR")) as { body: { error: string } };
+    const en = (await call("en-US")) as { body: { error: string } };
+    expect(pt.body.error).toBe(DISCOUNTS_SERVER_COPY["pt-BR"].notFound);
+    expect(en.body.error).toBe(DISCOUNTS_SERVER_COPY["en-US"].notFound);
+    expect(pt.body.error).not.toBe(en.body.error);
+  });
+
+  it("answers the default when the adapter populated no locale", async () => {
+    const answer = (await readRoute()()) as { body: { error: string } };
+    expect(answer.body.error).toBe(DISCOUNTS_SERVER_COPY["pt-BR"].notFound);
+  });
+
+  it("still refuses a host that forgot a sentence, at the MOUNT", async () => {
+    // The construction-time check now validates the DEFAULT rendering. A host
+    // that forgot a key should fail when it assembles its wiring, as it always
+    // did — not at whichever request first needs the missing one.
+    await Promise.resolve();
+    expect(() =>
+      createApiDiscounts({
+        store: fakeStore(calls),
+        copy: () => ({ notFound: "só essa" }) as never,
+        logger: recordingLogger(),
+      }),
+    ).toThrow(/missing copy for/);
   });
 });

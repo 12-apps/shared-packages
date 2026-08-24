@@ -14,7 +14,13 @@ import { clearJobs, defineJob, type JobBlueprint, type JobDefinition } from "@12
 import { createWiringHost } from "../consumer";
 import { memoryEmailPort } from "../ports";
 import type { BoundJob, WireJobBlueprint } from "../contract/jobs";
-import { notesManifest, notesServerManifest, type NotesJobDeps, type NotesStore } from "./fixture-package";
+import {
+  notesManifest,
+  notesServerManifest,
+  PT_BR_NOTES_COPY,
+  type NotesJobDeps,
+  type NotesStore,
+} from "./fixture-package";
 
 interface Payload {
   id: string;
@@ -57,7 +63,7 @@ describe("the jobs twins against @12-apps/jobs itself", () => {
       observability: { declined: "jobs compat is the subject here" },
       server: notesServerManifest,
       bindings: {
-        http: { mountPath: "/api/admin/:tenantSlug", config: { store } },
+        http: { mountPath: "/api/admin/:tenantSlug", config: { store, copy: PT_BR_NOTES_COPY } },
         jobs: { deps },
         email: {},
       },

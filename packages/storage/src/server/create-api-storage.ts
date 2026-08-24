@@ -172,11 +172,14 @@ const SILENT: StorageLogger = { error: () => undefined };
 export function createApiStorage(config: ApiStorageConfig): ApiStorage {
   const specs = config.renditions ?? CATALOG_RENDITIONS;
   const keyPrefix = config.keyPrefix ?? DEFAULT_KEY_PREFIX;
-  const messages: StorageMessages = config.messages({ limit: megabytes(config.maxBytes) });
+  const limit = megabytes(config.maxBytes);
+  // A host write holds no request and no reader, so it takes the words resolved
+  // in the deployment's own language. The ROUTES resolve per caller instead —
+  // see `storageRoutes` below, which is handed the factory rather than this.
   const writeDeps: StoreImageDeps = {
     driver: config.driver,
     pipeline: config.imagePipeline,
-    messages,
+    messages: config.messages({ limit }),
     maxBytes: config.maxBytes,
     specs,
     keyPrefix,
@@ -192,7 +195,7 @@ export function createApiStorage(config: ApiStorageConfig): ApiStorage {
   const resolve = (key: string): string => config.driver.publicUrl(key);
 
   return {
-    routes: storageRoutes(writeDeps),
+    routes: storageRoutes({ ...writeDeps, messages: config.messages, limit }),
     limits: {
       maxBytes: config.maxBytes,
       maxBytesLabel: megabytes(config.maxBytes),
