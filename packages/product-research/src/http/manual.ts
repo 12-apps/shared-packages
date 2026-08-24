@@ -2,6 +2,7 @@ import { normalizeManualRows, parseCsvPriceList } from '../import/manual';
 import type { ManualPriceRowInput, ManualRowProblem } from '../import/manual';
 import { MANUAL_PRICE_DEFAULT_VALIDITY_DAYS } from './types';
 import type { ResearchApiConfig, ResearchRoute } from './types';
+import { resolveResearchCopy } from './types';
 import { ok, recordOf, refuse, intOf } from './shared';
 
 /**
@@ -42,7 +43,10 @@ function priceListRoutes(config: ResearchApiConfig): ResearchRoute[] {
       path: '/research/sources/:sourceId/prices',
       permission: 'research:write',
       // Structured rows or raw CSV; REPLACES the previous list by default.
-      async handle({ actor, params, body }) {
+      async handle({ actor, params, body, locale }) {
+        // Resolved per request. `config.vocabulary` below deliberately is NOT:
+        // it is matched against the uploaded FILE, so it follows the file.
+        const diagnostics = resolveResearchCopy(config.diagnostics, locale);
         const record = recordOf(body);
         const source = await store.manual.requireSource(params['sourceId'] ?? '', actor.clientId);
         const problems: ManualRowProblem[] = [];
@@ -52,7 +56,7 @@ function priceListRoutes(config: ResearchApiConfig): ResearchRoute[] {
         if (record['csv'] !== undefined) {
           const parsed = parseCsvPriceList(
             { ...(record['csv'] as object), headerAliases: config.vocabulary.headerAliases } as never,
-            config.diagnostics.manualImport,
+            diagnostics.manualImport,
           );
           rows = [...rows, ...parsed.rows];
           problems.push(...parsed.problems);
@@ -60,7 +64,7 @@ function priceListRoutes(config: ResearchApiConfig): ResearchRoute[] {
         const normalized = normalizeManualRows(
           rows,
           { defaultValidUntil: validUntilOf(config, record['validUntil']) },
-          config.diagnostics.manualImport,
+          diagnostics.manualImport,
         );
         problems.push(...normalized.problems);
         const stored = await store.manual.store({
@@ -83,19 +87,20 @@ function priceListRoutes(config: ResearchApiConfig): ResearchRoute[] {
 
 /** One typed quote from a phone/WhatsApp negotiation — appended, never replacing. */
 function quoteRoute(config: ResearchApiConfig): ResearchRoute {
-  const { store, messages } = config;
+  const { store } = config;
   return {
     method: 'POST',
     path: '/research/sources/:sourceId/quotes',
     permission: 'research:write',
-    async handle({ actor, params, body }) {
+    async handle({ actor, params, body, locale }) {
       const source = await store.manual.requireSource(params['sourceId'] ?? '', actor.clientId);
       const normalized = normalizeManualRows(
         [recordOf(body) as never],
         { defaultValidUntil: validUntilOf(config, undefined) },
-        config.diagnostics.manualImport,
+        resolveResearchCopy(config.diagnostics, locale).manualImport,
       );
       if (normalized.entries.length === 0) {
+        const messages = resolveResearchCopy(config.messages, locale);
         return refuse(400, normalized.problems[0]?.reason ?? messages.invalidQuote);
       }
       const stored = await store.manual.store({
