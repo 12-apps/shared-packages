@@ -2,7 +2,7 @@
   "name": "@12-apps/wiring",
   "version": "1.0.0",
   "type": "module",
-  "description": "The package-to-host wiring contract: a producer half for packages (capability manifests — HTTP routes, job blueprints, MCP tools with annotations, permissions, notification blueprints, mailers, Prisma partials, web surfaces) and a consumer half for hosts (a typed binder that adopts manifests, binds every declared capability against shared ports, refuses the unbound, orders and conflict-checks the aggregate). Zero dependencies; every capability shape is a structural twin of the seam a package already ships.",
+  "description": "The package-to-host wiring contract: a producer half for packages (capability manifests \u2014 HTTP routes, job blueprints, MCP tools with annotations, permissions, notification blueprints, mailers, Prisma partials, web surfaces) and a consumer half for hosts (a typed binder that adopts manifests, binds every declared capability against shared ports, refuses the unbound, orders and conflict-checks the aggregate). Zero dependencies; every capability shape is a structural twin of the seam a package already ships.",
   "exports": {
     ".": "./src/index.ts",
     "./producer": "./src/producer/index.ts",
@@ -22,6 +22,7 @@
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/jobs": "workspace:*",
     "@12-apps/payments-backend": "workspace:*",
+    "@12-apps/payments-e2e": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "eslint": "^9.39.1",
     "eslint-plugin-test-flakiness": "^1.4.0",

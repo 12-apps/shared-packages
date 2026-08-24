@@ -134,14 +134,28 @@ function assertE2eSubpath(
     }
     return;
   }
-  const prefix = `${manifest.name}/`;
-  if (!manifest.e2e.entry.startsWith(prefix)) {
-    fail(manifest.name, `e2e.entry "${manifest.e2e.entry}" does not start with "${prefix}" — the entry must be this package's own subpath.`);
+  // A package that ships journeys BESIDE its own API puts them at a subpath
+  // (`@12-apps/report-builder/e2e`). A package that IS the journeys exports
+  // them at its root (`@12-apps/payments-e2e`), and that root is just as much
+  // "this package's own entry" — the rule is that the entry resolves from
+  // here, not that it has a slash in it. Refusing the root form would have
+  // forced a redundant `./e2e` subpath onto a package whose whole surface is
+  // already the world and the globs.
+  const subpath = e2eSubpathOf(manifest);
+  if (subpath === null) {
+    fail(manifest.name, `e2e.entry "${manifest.e2e.entry}" is neither "${manifest.name}" nor one of its subpaths — the entry must resolve from this package.`);
   }
-  const subpath = `./${manifest.e2e.entry.slice(prefix.length)}`;
   if (!(subpath in exported)) {
     fail(manifest.name, `e2e.entry points at "${subpath}" but package.json does not export it — the declared journeys do not resolve.`);
   }
+}
+
+/** The exports key an `e2e.entry` names, or `null` if it is not this package's. */
+function e2eSubpathOf(manifest: PackageManifest): string | null {
+  const entry = manifest.e2e?.entry ?? "";
+  if (entry === manifest.name) return ".";
+  const prefix = `${manifest.name}/`;
+  return entry.startsWith(prefix) ? `./${entry.slice(prefix.length)}` : null;
 }
 
 function stableJson(value: unknown): string {
