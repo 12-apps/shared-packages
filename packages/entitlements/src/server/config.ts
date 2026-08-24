@@ -25,7 +25,7 @@ import type {
   UsageCounter,
 } from '../core/types';
 import type { ComparisonTier } from '../plan-wire';
-import type { EntitlementsMessages } from './copy';
+import type { EntitlementsCopySource, EntitlementsMessages } from './copy';
 import type { PricingRow } from './plan-view';
 import type { PlanChangeRequestPort } from './routes';
 
@@ -99,8 +99,14 @@ export interface ApiEntitlementsConfig<F extends string, K extends string> {
    * exactly like `formatPrice` is the host's money: the refusals, the denial
    * bodies, the plan screen's situation notes, and the adapter's 401. pt-BR
    * hosts pass `PT_BR_ENTITLEMENTS_MESSAGES` from `./pt-BR`.
+   *
+   * A host serving more than one language passes a RESOLVER instead — the shape
+   * `@12-apps/i18n`'s `localeCopy(PACK)` returns — and the sentence is then
+   * chosen per request from {@link EntitlementsRequest.locale}. Passing a plain
+   * value is unchanged in every respect, which is what keeps a single-audience
+   * host from paying for a choice it never makes.
    */
-  messages: EntitlementsMessages;
+  messages: EntitlementsCopySource<EntitlementsMessages>;
 }
 
 /** A wiring mistake in the HOST's configuration of this surface. */
