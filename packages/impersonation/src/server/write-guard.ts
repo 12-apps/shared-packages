@@ -3,7 +3,9 @@ import { READ_METHODS } from '../core/paths';
 import { impersonationPermitsWrites } from '../core/write-rules';
 import type { ImpersonationState } from '../core/types';
 
+import { messagesOf } from './context';
 import type {
+  ImpersonationCopySource,
   ImpersonationMessages,
 } from './context';
 import type {
@@ -87,6 +89,14 @@ export interface GuardedRequest {
    * session the host's guards do not honour.
    */
   impersonation: ImpersonationState | null;
+  /**
+   * The language to refuse this write in, as a language tag.
+   *
+   * The refusal is read by the operator whose write was blocked, so it follows
+   * the request rather than the session: the same session refusing two callers
+   * on two locales must answer each in their own.
+   */
+  locale?: string;
 }
 
 export interface ImpersonationGuard {
@@ -107,7 +117,11 @@ export interface ImpersonationGuard {
 
 interface GuardParts {
   rules: PathRules;
-  messages: ImpersonationMessages;
+  /**
+   * The SOURCE, not a resolved pack — `createImpersonationGuard` runs once at
+   * the host's mount and guards every write after it.
+   */
+  messages: ImpersonationCopySource<ImpersonationMessages>;
   previewEntitlement?: PreviewEntitlementPort;
   onError?(message: string, error: unknown): void;
 }
@@ -198,7 +212,7 @@ export function createImpersonationGuard(parts: GuardParts): ImpersonationGuard 
       if (!refusal) return;
       throw new ImpersonationRefusedError(
         refusal,
-        parts.messages[REFUSAL_MESSAGE_KEYS[refusal]],
+        messagesOf(parts, request.locale)[REFUSAL_MESSAGE_KEYS[refusal]],
       );
     },
   };

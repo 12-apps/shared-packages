@@ -10,6 +10,7 @@ import {
   type ImpersonationResponse,
   type ImpersonationRoute,
   type ImpersonationServerConfig,
+  messagesOf,
 } from './context';
 import { authorizedSession } from './live-session';
 import { attemptOf, type AttemptContext, type Refusals } from './refusals';
@@ -53,10 +54,14 @@ interface StartContext {
   target: ImpersonationTarget;
 }
 
-function parseBody(parts: PlatformParts, body: unknown): StartOperatorBody {
+function parseBody(
+  parts: PlatformParts,
+  body: unknown,
+  locale: string | undefined,
+): StartOperatorBody {
   const result = startOperatorBody(parts.config.mintPolicy).safeParse(body);
   if (!result.success) {
-    throw new ImpersonationApiError(400, parts.config.messages.invalidBody);
+    throw new ImpersonationApiError(400, messagesOf(parts.config, locale).invalidBody);
   }
   return result.data;
 }
@@ -91,6 +96,7 @@ async function refuseNesting(
       targetUserId: body.targetUserId,
       reason: body.reason,
     }),
+    request.locale,
   );
 }
 
@@ -106,10 +112,13 @@ async function authorizeStart(
   parts: PlatformParts,
   actor: ImpersonationActor,
   body: StartOperatorBody,
+  locale: string | undefined,
 ): Promise<void> {
   if (actor.isPlatformAdmin) return;
   const tenant = await parts.config.directory.findTenant(body.tenantId);
-  if (!tenant) throw new ImpersonationApiError(403, parts.config.messages.notAuthorized);
+  if (!tenant) {
+    throw new ImpersonationApiError(403, messagesOf(parts.config, locale).notAuthorized);
+  }
   throw await parts.refusals.refuseUnauthorized(
     'not_authorized',
     attemptOf(tenant.id, {
@@ -123,6 +132,7 @@ async function authorizeStart(
       targetUserId: body.targetUserId,
       reason: body.reason,
     }),
+    locale,
   );
 }
 
@@ -140,8 +150,10 @@ async function resolveStart(
   parts: PlatformParts,
   actor: ImpersonationActor,
   body: StartOperatorBody,
+  locale: string | undefined,
 ): Promise<StartContext> {
-  const { directory, messages } = parts.config;
+  const { directory } = parts.config;
+  const messages = messagesOf(parts.config, locale);
   const tenant = await directory.findTenant(body.tenantId);
   if (!tenant) throw new ImpersonationApiError(404, messages.tenantNotFound);
 
@@ -151,14 +163,16 @@ async function resolveStart(
     reason: body.reason,
   });
 
-  if (!actor.userId) throw await parts.refusals.refuse('actor_not_recorded', attempt);
+  if (!actor.userId) {
+    throw await parts.refusals.refuse('actor_not_recorded', attempt, locale);
+  }
   const actorUserId = actor.userId;
   const withActor = { ...attempt, actorUserId };
 
   const target = await directory.resolveTarget(body.targetUserId);
-  if (!target) throw await parts.refusals.refuse('target_not_found', withActor);
+  if (!target) throw await parts.refusals.refuse('target_not_found', withActor, locale);
   if (target.isPlatformAdmin) {
-    throw await parts.refusals.refuse('target_is_platform_admin', withActor);
+    throw await parts.refusals.refuse('target_is_platform_admin', withActor, locale);
   }
   return { tenant, actorUserId, target };
 }
@@ -184,18 +198,18 @@ async function handleStart(
   request: ImpersonationRequest,
 ): Promise<ImpersonationResponse> {
   const { config, codec } = parts;
-  const { actor } = request;
-  const body = parseBody(parts, request.body);
+  const { actor, locale } = request;
+  const body = parseBody(parts, request.body, locale);
 
   if (actor.isMachineToken === true) {
-    throw new ImpersonationApiError(403, config.messages.machineTokenRefused);
+    throw new ImpersonationApiError(403, messagesOf(config, locale).machineTokenRefused);
   }
 
   const nested = await refuseNesting(parts, request, body);
   if (nested) throw nested;
 
-  await authorizeStart(parts, actor, body);
-  const { tenant, actorUserId, target } = await resolveStart(parts, actor, body);
+  await authorizeStart(parts, actor, body, locale);
+  const { tenant, actorUserId, target } = await resolveStart(parts, actor, body, locale);
 
   const refusal = await config.mintPolicy.refuse?.({
     actor,

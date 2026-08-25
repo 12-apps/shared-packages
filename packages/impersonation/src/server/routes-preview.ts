@@ -9,6 +9,7 @@ import {
   type ImpersonationResponse,
   type ImpersonationRoute,
   type ImpersonationServerConfig,
+  messagesOf,
 } from './context';
 import { authorizedSession } from './live-session';
 import { attemptOf, type AttemptContext, type Refusals } from './refusals';
@@ -74,19 +75,24 @@ interface PreviewParts {
 async function requireTenant(
   parts: PreviewParts,
   params: Record<string, string | undefined>,
+  locale: string | undefined,
 ): Promise<ImpersonationTenant> {
   const slug = params.tenantSlug ?? '';
   const tenant = slug ? await parts.config.directory.findTenantBySlug(slug) : null;
   if (!tenant) {
-    throw new ImpersonationApiError(404, parts.config.messages.tenantNotFound);
+    throw new ImpersonationApiError(404, messagesOf(parts.config, locale).tenantNotFound);
   }
   return tenant;
 }
 
-function parseBody(parts: PreviewParts, body: unknown): StartPreviewBody {
+function parseBody(
+  parts: PreviewParts,
+  body: unknown,
+  locale: string | undefined,
+): StartPreviewBody {
   const result = startPreviewBody.safeParse(body);
   if (!result.success) {
-    throw new ImpersonationApiError(400, parts.config.messages.invalidBody);
+    throw new ImpersonationApiError(400, messagesOf(parts.config, locale).invalidBody);
   }
   return result.data;
 }
@@ -104,10 +110,11 @@ async function requirePermission(
   parts: PreviewParts,
   actor: ImpersonationActor,
   attempt: AttemptContext,
+  locale: string | undefined,
 ): Promise<void> {
   if (actor.isPlatformAdmin) return;
   if (actor.permissions.includes(parts.config.previewPermission)) return;
-  throw await parts.refusals.refuseUnauthorized('not_authorized', attempt);
+  throw await parts.refusals.refuseUnauthorized('not_authorized', attempt, locale);
 }
 
 /**
@@ -158,10 +165,10 @@ async function requireStartableActor(
   attempt: AttemptContext,
 ): Promise<string> {
   if (await authorizedSession(parts.codec, parts.config, request)) {
-    throw await parts.refusals.refuse('already_impersonating', attempt);
+    throw await parts.refusals.refuse('already_impersonating', attempt, request.locale);
   }
   if (!attempt.actorUserId) {
-    throw await parts.refusals.refuse('actor_not_recorded', attempt);
+    throw await parts.refusals.refuse('actor_not_recorded', attempt, request.locale);
   }
   return attempt.actorUserId;
 }
@@ -186,15 +193,16 @@ async function assertSubjectAllowed(
   parts: PreviewParts,
   previewOf: StartPreviewBody,
   attempt: AttemptContext,
+  locale: string | undefined,
 ): Promise<void> {
   if (previewOf.as !== 'member') return;
   const [isMember, target] = await Promise.all([
     parts.config.directory.isActiveMember(previewOf.memberUserId, attempt.tenantId),
     parts.config.directory.resolveTarget(previewOf.memberUserId),
   ]);
-  if (!isMember) throw await parts.refusals.refuse('not_a_member', attempt);
+  if (!isMember) throw await parts.refusals.refuse('not_a_member', attempt, locale);
   if (target?.isPlatformAdmin) {
-    throw await parts.refusals.refuse('target_is_platform_admin', attempt);
+    throw await parts.refusals.refuse('target_is_platform_admin', attempt, locale);
   }
 }
 
@@ -203,16 +211,16 @@ async function handleStartPreview(
   request: ImpersonationRequest,
 ): Promise<ImpersonationResponse> {
   const { config, codec } = parts;
-  const { actor } = request;
+  const { actor, locale } = request;
 
   // Before anything else, and before any row is written: a machine token may not
   // open a session for a person to look through.
   if (actor.isMachineToken === true) {
-    throw new ImpersonationApiError(403, config.messages.machineTokenRefused);
+    throw new ImpersonationApiError(403, messagesOf(config, locale).machineTokenRefused);
   }
 
-  const tenant = await requireTenant(parts, request.params);
-  const previewOf = parseBody(parts, request.body);
+  const tenant = await requireTenant(parts, request.params, locale);
+  const previewOf = parseBody(parts, request.body, locale);
   const attempt = attemptOf(tenant.id, {
     actorUserId: actor.userId,
     previewOf,
@@ -223,10 +231,15 @@ async function handleStartPreview(
   // subject is still caller-supplied at this point and nothing has validated it,
   // so writing it into an indexed column would put an unvalidated value there;
   // and this trail records no contact data, so no address either.
-  await requirePermission(parts, actor, attemptOf(tenant.id, { actorUserId: actor.userId }));
+  await requirePermission(
+    parts,
+    actor,
+    attemptOf(tenant.id, { actorUserId: actor.userId }),
+    locale,
+  );
   await requireEntitlement(parts, attempt);
   const realUserId = await requireStartableActor(parts, request, attempt);
-  await assertSubjectAllowed(parts, previewOf, attempt);
+  await assertSubjectAllowed(parts, previewOf, attempt, locale);
 
   const refusal = await config.mintPolicy.refuse?.({
     actor,
@@ -280,7 +293,7 @@ async function handleStopPreview(
   parts: PreviewParts,
   request: ImpersonationRequest,
 ): Promise<ImpersonationResponse> {
-  await requireTenant(parts, request.params);
+  await requireTenant(parts, request.params, request.locale);
   const live = await authorizedSession(parts.codec, parts.config, request);
   await recordEnd(parts.config, live);
   return ok({ ended: live !== null }, parts.codec.end());

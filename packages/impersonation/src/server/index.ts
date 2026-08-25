@@ -20,10 +20,14 @@ export {
   ImpersonationApiError,
   fail,
   foldApiError,
+  messagesOf,
   ok,
+  resolveImpersonationCopy,
 } from './context';
 export type {
   ImpersonationActor,
+  ImpersonationCopyResolver,
+  ImpersonationCopySource,
   ImpersonationMessages,
   ImpersonationRequest,
   ImpersonationResponse,
@@ -31,6 +35,7 @@ export type {
   ImpersonationServerConfig,
   ImpersonationSurface,
 } from './context';
+
 export type {
   ImpersonationAuditBase,
   ImpersonationAuditPort,
