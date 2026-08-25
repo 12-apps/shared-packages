@@ -11,6 +11,7 @@ import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { PT_BR_INFINITEPAY_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
+import { credentialSchemaOf } from "@12-apps/payments-backend";
 
 /**
  * Can a connected store actually REACH the step that switches it on?
@@ -81,7 +82,7 @@ function viewFor({ adapter, stored }: Case, chargeVerifiedAt: string | null): Me
         urlSlug: adapter.urlSlug ?? adapter.name,
         capabilities: adapter.capabilities,
         authMode: adapter.authMode ?? 'credentials',
-        credentialSchema: adapter.credentialSchema,
+        credentialSchema: credentialSchemaOf(adapter),
       },
     ],
     configs: [

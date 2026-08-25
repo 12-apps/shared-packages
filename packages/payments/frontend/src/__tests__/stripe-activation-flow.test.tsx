@@ -14,6 +14,7 @@ import {
 } from '../components/PaymentProviderSettings';
 import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
+import { credentialSchemaOf } from "@12-apps/payments-backend";
 
 /**
  * Which activation flow a host renders for Stripe (FUT-689).
@@ -38,7 +39,7 @@ const VIEW = {
       urlSlug: stripe.name,
       capabilities: stripe.capabilities,
       authMode: stripe.authMode ?? 'credentials',
-      credentialSchema: stripe.credentialSchema,
+      credentialSchema: credentialSchemaOf(stripe),
     },
   ],
   configs: [

@@ -14,6 +14,7 @@ import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
+import { credentialSchemaOf } from "@12-apps/payments-backend";
 
 /**
  * One connection path on screen at a time — and its OWN steps.
@@ -42,7 +43,7 @@ function stripeDescriptor(): ProviderDescriptor {
     displayName: adapter.displayName,
     urlSlug: adapter.name,
     authMode: 'oauth',
-    credentialSchema: adapter.credentialSchema,
+    credentialSchema: credentialSchemaOf(adapter),
   } as unknown as ProviderDescriptor;
 }
 
