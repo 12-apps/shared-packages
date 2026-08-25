@@ -262,3 +262,66 @@ export function touchMustFixFailures({ changedFiles, headLedger, dirByName, ledg
       `${ledgerPath} — finish its wiring (or argue an "exempt" entry) in the same PR`,
   );
 }
+
+/**
+ * ONE ARGUMENT PER CAPABILITY, within a package.
+ *
+ * The ledger already refuses a `why` that is a LABEL rather than an argument
+ * (`NOT_AN_ARGUMENT`, plus a length floor). What it could not see is the same
+ * real argument pasted across a package's whole capability set — and that is
+ * the shape a non-compliant package actually takes.
+ *
+ * Measured, not imagined: a throwaway package declaring only `http` and
+ * answering the other ELEVEN capabilities with one copy-pasted sentence made
+ * the gate report `clean — burn-down complete`. Every individual check passed.
+ * Eleven capabilities had been dismissed by one sentence that was true of at
+ * most one of them.
+ *
+ * A capability is a distinct question — does this package schedule work, does
+ * it send mail, does it own tables — so a narrowing that answers eleven at once
+ * has answered none of them.
+ *
+ * ACROSS packages the same sentence is fine and stays fine: eighteen packages
+ * share the `env` argument because it is one true fact about eighteen packages,
+ * and forcing eighteen paraphrases would buy nothing but variance. The rule is
+ * scoped to a package for that reason.
+ *
+ * No exceptions file: the estate already satisfies this everywhere, so there is
+ * no debt to grandfather and nothing to burn down.
+ */
+
+/** `@12-apps/rbac :: mcp` to `mcp`; a bare name has no capability half. */
+function findingCapability(finding) {
+  const at = finding.indexOf(" :: ");
+  return at === -1 ? finding : finding.slice(at + 4);
+}
+
+/**
+ * Findings whose package answers two capabilities with the same sentence.
+ *
+ * Compared on collapsed whitespace and case, so a reflowed paragraph or a
+ * capitalised first letter cannot buy a second copy — a re-wrap is the one
+ * edit that would otherwise defeat this.
+ */
+export function distinctWhyFailures({ ledger, ledgerPath }) {
+  const seen = new Map();
+  for (const [finding, entry] of ledger) {
+    const why = String(entry.why ?? "");
+    if (!why.trim()) continue;
+    const key = `${findingPackage(finding)} :: ${why.replace(/\s+/g, " ").trim().toLowerCase()}`;
+    const bucket = seen.get(key);
+    if (bucket) bucket.push(finding);
+    else seen.set(key, [finding]);
+  }
+  const failures = [];
+  for (const findings of seen.values()) {
+    if (findings.length < 2) continue;
+    failures.push(
+      `${ledgerPath}: ${findingPackage(findings[0])} answers ${findings.length} capabilities with ` +
+        `ONE argument (${findings.map(findingCapability).join(", ")}) — a capability is a ` +
+        `distinct question, so a sentence that dismisses several has answered none. Argue each ` +
+        `on its own, or declare the ones it does not really cover.`,
+    );
+  }
+  return failures;
+}
