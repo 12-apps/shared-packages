@@ -4,7 +4,14 @@ import type { ChargeQueryStore } from './charge-queries';
 import { hostedChargePayable, pixChargePayable } from './charge-reuse';
 import { UnsupportedOperationError } from './errors';
 import { attemptIdempotencyKey, attemptReference } from './reference';
-import type { CardDetails, ChargeSnapshot, CustomerInfo, MerchantRef, Money } from './types';
+import type {
+  CardDetails,
+  ChargeInput,
+  ChargeSnapshot,
+  CustomerInfo,
+  MerchantRef,
+  Money,
+} from './types';
 
 /**
  * RAISE A CHARGE FOR ONE HOST REFERENCE — the composition every adopting host
@@ -41,18 +48,20 @@ import type { CardDetails, ChargeSnapshot, CustomerInfo, MerchantRef, Money } fr
  * merchant. This function is handed those and decides nothing about them.
  */
 
-/** The gateway operations a raise needs — deliberately narrower than the whole. */
+/**
+ * The gateway operations a raise needs — deliberately narrower than the whole.
+ *
+ * The INPUT is `ChargeInput` itself rather than a restatement of its fields.
+ * It was a restatement, and that is precisely how it went stale: adding
+ * `locale` to `ChargeInput` left this copy without it, so the raiser could not
+ * forward a tag the adapters were by then already reading. A narrowing over
+ * which OPERATIONS are needed is the point here; narrowing their arguments too
+ * just buys a second shape to keep in step.
+ */
 export interface ChargeRaiseGateway {
   charge(
     merchant: MerchantRef,
-    input: {
-      reference: string;
-      amount: Money;
-      method: 'PIX' | 'CARD';
-      customer: CustomerInfo;
-      card?: CardDetails;
-      idempotencyKey?: string;
-    },
+    input: ChargeInput,
   ): Promise<{ reference: string; idempotencyKey: string | null; snapshot: ChargeSnapshot }>;
   cancelCharge(
     merchant: MerchantRef,
@@ -89,6 +98,21 @@ export interface RaiseChargeRequest {
   method: 'PIX' | 'CARD';
   customer: CustomerInfo;
   card?: CardDetails;
+  /**
+   * The BUYER's language, forwarded to the adapter as `ChargeInput.locale`.
+   *
+   * This raiser mints the `ChargeInput` itself — the per-attempt reference and
+   * the idempotency key are rules a host must not restate — so a tag the host
+   * never passes THROUGH here is a tag the adapter can never read, whatever
+   * resolver it was handed. That is what makes this field load-bearing rather
+   * than decorative: it is the only route from a checkout request to the words
+   * a decline comes back in.
+   *
+   * The buyer's, not the merchant's: a decline is read by whoever is standing
+   * at the checkout. Absent means nobody said, and the adapter's resolver
+   * applies its own default.
+   */
+  locale?: string;
 }
 
 /** A still-payable charge left behind by a reprice. */
@@ -211,6 +235,7 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
       customer: request.customer,
       card: attributedCard(request.card),
       idempotencyKey,
+      locale: request.locale,
     });
 
     const mismatch = chargeIdentityMismatch(stored, {

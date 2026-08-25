@@ -1,4 +1,8 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import {
+  resolvePaymentsCopy,
+  type PaymentsCopySource,
+} from '../copy-source';
 import type { StoneCopy } from './copy';
 import { stubDeliveryTrusted } from '../core/stub-mode';
 import type {
@@ -124,7 +128,10 @@ function parseStoneEvent(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
   ];
 }
 
-export function stoneProvider(copy: StoneCopy): PaymentProviderAdapter {
+export function stoneProvider(source: PaymentsCopySource<StoneCopy>): PaymentProviderAdapter {
+  // Resolved at each BOUNDARY below, never here — see `src/copy-source.ts`.
+  const copy = (locale?: string): StoneCopy => resolvePaymentsCopy(source, locale);
+
   return {
     name: NAME,
     displayName: 'Stone',
@@ -144,12 +151,15 @@ export function stoneProvider(copy: StoneCopy): PaymentProviderAdapter {
       tokenization: 'PUBLIC_KEY',
       activationCharge: true,
     },
-    credentialSchema: [
-      { key: 'secretKey', label: copy.fields.secretKey, secret: true, required: true },
-      { key: 'publicKey', label: copy.fields.publicKey, secret: false, required: true },
-      { key: 'webhookUser', label: copy.fields.webhookUser, secret: false, required: true },
-      { key: 'webhookPassword', label: copy.fields.webhookPassword, secret: true, required: true },
-    ],
+    credentialSchema: ({ locale }) => {
+      const { fields } = copy(locale ?? undefined);
+      return [
+        { key: 'secretKey', label: fields.secretKey, secret: true, required: true },
+        { key: 'publicKey', label: fields.publicKey, secret: false, required: true },
+        { key: 'webhookUser', label: fields.webhookUser, secret: false, required: true },
+        { key: 'webhookPassword', label: fields.webhookPassword, secret: true, required: true },
+      ];
+    },
     /**
      * What Stone asks of the buyer (FUT-595) — the honest reading of what
      * `customerPayload` sends: name, e-mail and the CPF/CNPJ (`document`) all
@@ -163,8 +173,8 @@ export function stoneProvider(copy: StoneCopy): PaymentProviderAdapter {
       { key: 'taxId', type: 'CPF', required: false },
     ],
 
-    verifyCredentials: verifyCredentialsWith(copy),
-    createCharge: createChargeWith(copy),
+    verifyCredentials: (credentials, locale) => verifyCredentialsWith(copy(locale))(credentials),
+    createCharge: (input, credentials) => createChargeWith(copy(input.locale))(input, credentials),
     getCharge,
     findChargeByReference,
     cancelCharge,
@@ -175,7 +185,7 @@ export function stoneProvider(copy: StoneCopy): PaymentProviderAdapter {
       parse: async (delivery) => parseStoneEvent(delivery),
     },
 
-    setupGuide: (ctx) => stoneSetupGuide(copy.setupGuide, ctx),
+    setupGuide: (ctx) => stoneSetupGuide(copy(ctx.locale).setupGuide, ctx),
 
     clientConfig(credentials) {
       return {

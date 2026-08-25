@@ -1,3 +1,4 @@
+import type { PaymentsCopySource } from '../copy-source';
 import type {
   ApplePayActivation,
   ApplePayCsr,
@@ -145,8 +146,8 @@ export interface PaymentProviderAdapterBase {
    * a connect button instead of a credential form.
    */
   readonly authMode?: ProviderAuthMode;
-  /** What the host must collect/store to connect a merchant account. */
-  readonly credentialSchema: readonly CredentialFieldSpec[];
+  /** What connects a merchant — COPY, so read it via `./credential-schema`. */
+  readonly credentialSchema: PaymentsCopySource<readonly CredentialFieldSpec[]>;
   /**
    * What this provider asks OF THE BUYER, per field and per method (FUT-595) —
    * `credentialSchema`'s sibling for the checkout form. Three states: a spec
@@ -188,7 +189,7 @@ export interface PaymentProviderAdapterBase {
    * Cheap authenticated call proving the credentials work (the "Verificar"
    * button). Never throws for bad credentials — that's a result, not a bug.
    */
-  verifyCredentials(credentials: ResolvedCredentials): Promise<ProbeOutcome>;
+  verifyCredentials(credentials: ResolvedCredentials, locale?: string): Promise<ProbeOutcome>;
 
   createCharge(input: ChargeInput, credentials: ResolvedCredentials): Promise<ChargeSnapshot>;
 

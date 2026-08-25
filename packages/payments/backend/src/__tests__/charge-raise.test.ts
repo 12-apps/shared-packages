@@ -218,3 +218,40 @@ describe('rule 4 — superseded codes are voided only after the new charge is go
     expect(calls.error.join()).toContain('network');
   });
 });
+
+/**
+ * The BUYER's language reaches the adapter, or it reaches nothing.
+ *
+ * This raiser mints the `ChargeInput` itself, so a tag it does not forward is
+ * one no adapter can read however it was configured — and every decline comes
+ * back in whichever language the process started in, which a single-locale
+ * deployment can never notice.
+ */
+describe('the tag a decline is worded in', () => {
+  it('forwards the buyer locale onto the charge it mints', async () => {
+    const { d } = deps({});
+
+    await createChargeRaiser(d)({ ...REQUEST, locale: 'en-US' });
+
+    const call = (d.gateway.charge as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      unknown,
+      { locale?: string },
+    ];
+    expect(call[1].locale).toBe('en-US');
+  });
+
+  it('forwards absence as absence rather than a default', async () => {
+    const { d } = deps({});
+
+    await createChargeRaiser(d)(REQUEST);
+
+    const call = (d.gateway.charge as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      unknown,
+      { locale?: string },
+    ];
+    // "Nobody said" has to stay distinguishable from "pt-BR was chosen": the
+    // adapter's own resolver owns the default, in one place. A tag invented
+    // here would silently overrule a host that configured a different one.
+    expect(call[1].locale).toBeUndefined();
+  });
+});

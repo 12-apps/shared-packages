@@ -22,6 +22,10 @@ import type {
   ProviderRegistry,
   StoredProviderConfig,
 } from '@12-apps/payments-backend';
+// `credentialSchema` is a COPY SOURCE, so it may be a resolver rather than an
+// array. Reading it through the package's own accessor is what a consumer is
+// meant to do; reaching for the field directly is what broke here.
+import { credentialSchemaOf } from '@12-apps/payments-backend';
 
 import type { AdminStage, AdminStoreSpec } from './admin-store';
 
@@ -97,7 +101,7 @@ function rowFor(
     environments: {
       SANDBOX: shape.oauth
         ? oauthBlobFor(name)
-        : credentialFieldsFor(registry.get(name).credentialSchema),
+        : credentialFieldsFor(credentialSchemaOf(registry.get(name))),
       PRODUCTION: {},
     },
   };

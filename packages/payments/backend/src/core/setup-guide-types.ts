@@ -247,6 +247,12 @@ export type SetupPathVariant = Omit<ProviderSetupGuide, 'credentialsPath'>;
  */
 export interface SetupGuideContext {
   /**
+   * Which language to walk the store owner through the setup in, as a BCP-47
+   * tag (FUT-895). Absent means the adapter's configured words — see
+   * {@link ChargeInput.locale} for the same rule one layer down.
+   */
+  locale?: string;
+  /**
    * What the HOST PLATFORM is called, in the owner's own words — the name a
    * store owner would recognise on the screen they are reading.
    *

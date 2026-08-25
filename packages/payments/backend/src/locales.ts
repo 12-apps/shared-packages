@@ -42,3 +42,29 @@ export const PROVIDER_COPY = {
   'pt-BR': PT_BR_PROVIDER_COPY,
   'en-US': EN_US_PROVIDER_COPY,
 } as const satisfies LocalePack<ProviderCopyPacks>;
+
+/**
+ * ONE adapter's words as a pack, plucked across every language.
+ *
+ * {@link PROVIDER_COPY} pairs the whole BAG — `{ 'pt-BR': { pagbank, stone, … } }`
+ * — but a factory takes one provider's copy, so what a host actually needs is
+ * the transpose: `{ 'pt-BR': …pagbank, 'en-US': …pagbank }`. Without this, every
+ * host builds that object inline, once per adapter, and the four copies grow a
+ * fifth the day a fifth adapter lands.
+ *
+ * It lives here rather than in a host because the shape being transposed is
+ * this package's: `ProviderCopyPacks` names the four keys, so a new adapter
+ * gets a pack from the same `satisfies` that already refuses one without copy,
+ * and no host is asked to notice.
+ *
+ * The result is what a `PaymentsCopySource` resolver reads — see
+ * `src/copy-source.ts` for why the factories take a source rather than a value.
+ */
+export function providerCopyPack<K extends keyof ProviderCopyPacks>(
+  provider: K,
+): LocalePack<ProviderCopyPacks[K]> {
+  return {
+    'pt-BR': PT_BR_PROVIDER_COPY[provider],
+    'en-US': EN_US_PROVIDER_COPY[provider],
+  };
+}

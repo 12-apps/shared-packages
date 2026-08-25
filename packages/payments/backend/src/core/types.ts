@@ -114,6 +114,17 @@ export interface ChargeInput {
    * exact silence this field replaces.
    */
   description?: string;
+  /**
+   * Whose language the BUYER-facing strings on this charge are written in, as
+   * a BCP-47 tag (FUT-895).
+   *
+   * The buyer's, not the store owner's: a boleto's instruction line and the
+   * name on a card statement are printed for whoever paid, and they travel to
+   * the provider inside the charge payload where nobody can edit them
+   * afterwards. Absent means the adapter answers with the words it was
+   * configured with, which is every single-audience deployment.
+   */
+  locale?: string;
   /** Free-form pairs forwarded to the provider where supported. */
   metadata?: Record<string, string>;
   /**

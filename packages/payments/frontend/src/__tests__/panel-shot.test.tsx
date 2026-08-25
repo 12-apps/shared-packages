@@ -13,6 +13,7 @@ import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
+import { credentialSchemaOf } from "@12-apps/payments-backend";
 
 /**
  * The rendered SHAPE of the redesigned panel, asserted where a screenshot
@@ -30,7 +31,7 @@ function descriptorOf(): ProviderDescriptor {
     displayName: adapter.displayName,
     urlSlug: adapter.name,
     authMode: 'oauth',
-    credentialSchema: adapter.credentialSchema,
+    credentialSchema: credentialSchemaOf(adapter),
   } as unknown as ProviderDescriptor;
 }
 

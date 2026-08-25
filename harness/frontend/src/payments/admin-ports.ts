@@ -15,6 +15,12 @@ import type {
   ProviderRegistry,
   RevokeFailureReporter,
 } from '@12-apps/payments-backend';
+// Through the accessor: `credentialSchema` is a COPY SOURCE and may be a
+// resolver, so a consumer reading the field directly gets a function where it
+// expected an array. No locale is passed because the only thing read below is
+// `field.key` — a STRUCTURAL question, which has no reader and must not be
+// made to invent one.
+import { credentialSchemaOf } from '@12-apps/payments-backend';
 
 import type { AdminSinks, AdminStoreSpec, PrepareConnect } from './admin-store';
 
@@ -56,7 +62,7 @@ export function setupContextFor(
 ): NonNullable<PaymentsHttpDeps['setupContextFor']> {
   return async (merchant, provider) => {
     const row = await store.get(merchant, provider);
-    const schema = registry.get(provider).credentialSchema;
+    const schema = credentialSchemaOf(registry.get(provider));
     const fields = row ? row.environments[row.environment] : {};
     return {
       // The ADOPTER's own platform name, supplied by the adopter — the fact

@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { credentialSchemaOf } from '../core/credential-schema';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -21,6 +22,7 @@ import { sha256Hex } from '../providers/shared';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
 import { STUB_CREDS, TENANT, cardInput, pixInput } from './fixtures';
+import { EN_US_PAGBANK_COPY } from '../providers/en-US';
 import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
 /**
  * The platform name every guide in this suite renders under.
@@ -96,7 +98,7 @@ describe('provider skeletons (stub mode)', () => {
     const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
     // The proven trio, plus the Google Pay merchant id (FUT-471) — optional,
     // non-secret, and only read by `clientConfig`.
-    expect(adapter.credentialSchema.map((f) => f.key)).toEqual([
+    expect(credentialSchemaOf(adapter).map((f) => f.key)).toEqual([
       'token',
       'publicKey',
       'webhookToken',
@@ -396,7 +398,9 @@ describe('provider skeletons (stub mode)', () => {
     expect(guide?.sections.find((s) => s.id === 'connect')?.intro).toContain(
       'credenciais manualmente',
     );
-    expect(stripeProvider(PT_BR_STRIPE_COPY).credentialSchema.every((field) => !field.required)).toBe(true);
+    expect(
+      credentialSchemaOf(stripeProvider(PT_BR_STRIPE_COPY)).every((field) => !field.required),
+    ).toBe(true);
   });
 
   it('declares an auth mode per provider: OAuth where the vendor supports it', () => {
@@ -725,3 +729,61 @@ describe('stripe stale deliveries: refused at intake, replayable from the inbox'
     }
   });
 });
+
+/**
+ * An adapter's words follow the caller (FUT-895).
+ *
+ * This package was the last with no adoption at all, and the reason it was
+ * last is the shape: an adapter is built ONCE, when a deployment names its
+ * providers, and then serves every store and every buyer for the life of the
+ * process. So `pagbankProvider(PACK)` froze the credential form, the probe
+ * verdicts and the buyer-facing charge strings into that one mount.
+ *
+ * The factories take a `PaymentsCopySource` now and resolve at each METHOD
+ * boundary — which is what leaves the ~111 internal `copy.x` reads across the
+ * four adapters untouched: every helper still receives a resolved pack, and
+ * only the four factory bodies know a locale exists.
+ */
+describe('an adapter answers in the caller’s language', () => {
+  const bilingual = ({ locale }: { readonly locale?: string | null }) =>
+    locale === 'en-US' ? EN_US_PAGBANK_COPY : PT_BR_PAGBANK_COPY;
+
+  it('labels the credential form per caller', () => {
+    const adapter = pagbankProvider(bilingual);
+    const labelOf = (locale?: string) =>
+      credentialSchemaOf(adapter, locale).find((f) => f.key === 'token')?.label;
+
+    expect(labelOf('en-US')).toBe(EN_US_PAGBANK_COPY.fields.token);
+    expect(labelOf('pt-BR')).toBe(PT_BR_PAGBANK_COPY.fields.token);
+    expect(labelOf('en-US')).not.toBe(labelOf('pt-BR'));
+  });
+
+  it('re-resolves per read, so ONE adapter is not one language', () => {
+    // The case a single-locale test cannot see. Resolving inside the factory
+    // passes everything else here and freezes the whole process.
+    const adapter = pagbankProvider(bilingual);
+    expect(credentialSchemaOf(adapter, 'en-US')[0]?.label).not.toBe(
+      credentialSchemaOf(adapter, 'pt-BR')[0]?.label,
+    );
+  });
+
+  it('leaves a plain-pack adapter byte-identical', () => {
+    // Every adapter written before this passes a pack, including any a HOST
+    // implements itself — the field widened additively for exactly that.
+    const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+    expect(credentialSchemaOf(adapter, 'en-US').map((f) => f.label)).toEqual(
+      credentialSchemaOf(adapter).map((f) => f.label),
+    );
+  });
+
+  it('answers a structural reader with the configured words', () => {
+    // Six of the seven `credentialSchema` readers ask `key` / `required` /
+    // `role` / `secret` and pass no locale. A structural question has no
+    // reader, and must not be forced to invent one.
+    const adapter = pagbankProvider(bilingual);
+    expect(credentialSchemaOf(adapter).map((f) => f.key)).toEqual(
+      credentialSchemaOf(adapter, 'en-US').map((f) => f.key),
+    );
+  });
+});
+
