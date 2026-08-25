@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { credentialSchemaOf } from '../core/provider';
+import { credentialSchemaOf } from '../core/credential-schema';
 
 import { describe, expect, it, vi } from 'vitest';
 

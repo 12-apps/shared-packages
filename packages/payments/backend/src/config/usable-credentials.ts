@@ -1,5 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
-import { credentialSchemaOf } from '../core/provider';
+import { credentialSchemaOf } from '../core/credential-schema';
 
 /**
  * Whether a stored credential set is actually USABLE for its adapter — not

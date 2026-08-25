@@ -129,10 +129,7 @@ function parseStoneEvent(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
 }
 
 export function stoneProvider(source: PaymentsCopySource<StoneCopy>): PaymentProviderAdapter {
-  // Resolved at each BOUNDARY below, never here. Every helper this factory
-  // calls keeps taking a resolved pack, so the ~28 internal `copy.x` reads are
-  // untouched — the language is chosen where a caller asks, and the adapter
-  // itself is still built once when a deployment names its providers.
+  // Resolved at each BOUNDARY below, never here — see `src/copy-source.ts`.
   const copy = (locale?: string): StoneCopy => resolvePaymentsCopy(source, locale);
 
   return {

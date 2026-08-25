@@ -1,8 +1,4 @@
-import {
-  resolvePaymentsCopy,
-  type PaymentsCopySource,
-} from '../copy-source';
-
+import type { PaymentsCopySource } from '../copy-source';
 import type {
   ApplePayActivation,
   ApplePayCsr,
@@ -150,19 +146,7 @@ export interface PaymentProviderAdapterBase {
    * a connect button instead of a credential form.
    */
   readonly authMode?: ProviderAuthMode;
-  /** What the host must collect/store to connect a merchant account. */
-  /**
-   * A resolver here, not just an array, since the labels are COPY (FUT-895).
-   *
-   * Read it through {@link credentialSchemaOf} rather than directly: an adapter
-   * is built once when a deployment names its providers and then serves every
-   * store for the life of the process, so a resolver read where it is built
-   * would freeze the form's language into the mount.
-   *
-   * Additive on purpose. An adapter that declares a plain array — which is
-   * every adapter written before this — is unchanged in every respect, and
-   * a host implementing its own adapter needs no edit.
-   */
+  /** What connects a merchant — COPY, so read it via `./credential-schema`. */
   readonly credentialSchema: PaymentsCopySource<readonly CredentialFieldSpec[]>;
   /**
    * What this provider asks OF THE BUYER, per field and per method (FUT-595) —
@@ -414,20 +398,3 @@ export interface PaymentProviderAdapterBase {
     googlePay?: GooglePayClientConfig;
   };
 }
-
-/**
- * This adapter's credential form, in the language the caller is being answered.
- *
- * Every reader of `credentialSchema` goes through here — seven of them, and
- * only ONE (`config/service.ts`, which ships the form to the browser) actually
- * reads the labels; the rest read `key`, `required`, `role` and `secret`.
- * Those six pass no locale and get the adapter's configured words, which is
- * correct: a structural question has no reader.
- */
-export function credentialSchemaOf(
-  adapter: Pick<PaymentProviderAdapter, 'credentialSchema'>,
-  locale?: string,
-): readonly CredentialFieldSpec[] {
-  return resolvePaymentsCopy(adapter.credentialSchema, locale);
-}
-

@@ -217,10 +217,7 @@ function credentialSchemaFor(copy: StripeCopy): readonly CredentialFieldSpec[] {
 }
 
 export function stripeProvider(source: PaymentsCopySource<StripeCopy>): PaymentProviderAdapter {
-  // Resolved at each BOUNDARY below, never here. Every helper this factory
-  // calls keeps taking a resolved pack, so the ~52 internal `copy.x` reads are
-  // untouched — the language is chosen where a caller asks, and the adapter
-  // itself is still built once when a deployment names its providers.
+  // Resolved at each BOUNDARY below, never here — see `src/copy-source.ts`.
   const copy = (locale?: string): StripeCopy => resolvePaymentsCopy(source, locale);
 
   return {

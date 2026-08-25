@@ -1,5 +1,5 @@
 import type { PaymentProviderAdapter } from './provider';
-import { credentialSchemaOf } from './provider';
+import { credentialSchemaOf } from './credential-schema';
 
 /**
  * Readers of adapter-declared field ROLES (FUT-761, ported from the first

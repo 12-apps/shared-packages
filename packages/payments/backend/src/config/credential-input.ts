@@ -1,6 +1,6 @@
 import { InvalidCredentialsInputError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
-import { credentialSchemaOf } from '../core/provider';
+import { credentialSchemaOf } from '../core/credential-schema';
 import type { CredentialFieldSpec, PaymentEnvironment, ProviderName } from '../core/types';
 
 import type { SaveCredentialsInput } from './types';

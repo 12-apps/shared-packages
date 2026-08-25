@@ -2,7 +2,7 @@ import { CredentialsError, UnknownProviderError } from '../core/errors';
 import { hasUsableCredentials } from './usable-credentials';
 import type { CredentialStore } from '../core/ports';
 import type { PaymentProviderAdapter } from '../core/provider';
-import { credentialSchemaOf } from '../core/provider';
+import { credentialSchemaOf } from '../core/credential-schema';
 import type { ProviderRegistry } from '../core/registry';
 import type {
   MerchantRef,
@@ -47,13 +47,8 @@ import { runVerify, type VerifiedProviderConfig } from './verify';
  */
 
 export interface SettingsService {
-  /**
-   * Every mounted provider's descriptor. `locale` chooses the language of the
-   * credential form's labels — the one part of a descriptor a store owner
-   * READS rather than a screen switching on.
-   */
+  /** `locale` picks the credential form's label language — see `descriptorOf`. */
   listProviders(locale?: string): ProviderDescriptor[];
-  /** `locale` reaches the credential form's labels — see {@link listProviders}. */
   getSettings(merchant: MerchantRef, locale?: string): Promise<MerchantSettingsView>;
   saveCredentials(
     merchant: MerchantRef,
@@ -184,18 +179,10 @@ function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig)
 }
 
 /**
- * One provider's public descriptor, including the credential FORM.
- *
- * `locale` is the only place in this file it matters: the schema's labels are
- * the words a store owner reads on the settings screen, and this is where they
- * cross to the browser. Every other reader of `credentialSchema` asks a
- * structural question and passes nothing.
+ * One provider's public descriptor, including the credential FORM — the one
+ * `credentialSchema` reader that passes a locale (`./core/credential-schema`).
  */
-function descriptorOf(
-  providers: ProviderRegistry,
-  name: string,
-  locale?: string,
-): ProviderDescriptor {
+function descriptorOf(providers: ProviderRegistry, name: string, locale?: string): ProviderDescriptor {
   const adapter = providers.get(name);
   return {
     name: adapter.name,

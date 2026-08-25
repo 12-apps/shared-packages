@@ -1,7 +1,7 @@
 import { AdapterContractError } from '../core/errors';
 
 import type { PaymentProviderAdapter } from '../core/provider';
-import { credentialSchemaOf } from '../core/provider';
+import { credentialSchemaOf } from '../core/credential-schema';
 import type { ProviderRegistry } from '../core/registry';
 import type { MerchantRef, ResolvedCredentials } from '../core/types';
 import type { ProviderConfigStore } from './types';
