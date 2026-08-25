@@ -38,6 +38,22 @@ export interface AppShellRequest {
   query: Record<string, string | undefined>;
   header(name: string): string | undefined;
   raw?: unknown;
+  /**
+   * The language to answer this caller in, as a language tag (`pt-BR`,
+   * `en-US`) — the same field `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can
+   * negotiate one. Absent is meaningful and not an error: a host with one
+   * audience never sets it, and this surface must then answer with the words
+   * it was configured with rather than invent a language.
+   *
+   * Deliberately NOT read off `header('accept-language')` here. Negotiation is
+   * the host's — it owns the precedence order (an explicit `?lang=`, a
+   * remembered cookie, a stored preference) and this surface would only ever
+   * see the last of those, so a package-side read would quietly outrank a
+   * choice the reader already made.
+   */
+  locale?: string;
 }
 
 /** A cookie the surface asks the adapter to set on its response. */
@@ -197,7 +213,23 @@ export interface AppShellServerConfig {
    */
   termsVersion: string;
   consent: ConsentSeam;
-  messages: AppShellServerMessages;
+  /**
+   * The failure body's words — a pack, or a RESOLVER that picks one per reader.
+   *
+   * Read it through {@link messagesOf} at the moment the sentence is needed,
+   * never off this field: a resolver reached where a value was expected is a
+   * runtime `TypeError`, and the accessor is what makes that a compile error
+   * instead.
+   *
+   * A 500 is read by whoever made the request, so the language is the
+   * REQUEST's rather than the deployment's — `appShellRoutes` calls the
+   * accessor with {@link AppShellRequest.locale} inside each handler's catch.
+   * The mount is built once per process (at least one adopter memoises it), so
+   * resolving there would word every refusal that deployment ever emits in the
+   * language its boot happened to run in, and a single-locale host could not
+   * tell that from correct.
+   */
+  messages: AppShellCopySource<AppShellServerMessages>;
   /**
    * Where an unexpected throw is reported before it is folded into a 500.
    *
@@ -223,8 +255,38 @@ export interface AppShellServerConfig {
   onUnexpectedError?: ReportUnexpectedError;
 }
 
-export function messagesOf(config: AppShellServerConfig): AppShellServerMessages {
-  return config.messages;
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type AppShellCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type AppShellCopySource<T> = T | AppShellCopyResolver<T>;
+
+/**
+ * The words this surface is answering with, at the moment one is needed.
+ *
+ * The ONE place a copy source becomes a value, which is what keeps rule E
+ * ("absent stays absent") a property of this package rather than of each call
+ * site: `locale` is passed through exactly as given, and a host that says
+ * nothing gets whatever its own resolver defaults to — this package never
+ * invents a tag.
+ *
+ * Generic in `T` so a host with extra sentences of its own keeps their types
+ * through the call.
+ */
+export function messagesOf<T extends AppShellServerMessages>(
+  config: { messages: AppShellCopySource<T> },
+  locale?: string,
+): T {
+  const source = config.messages;
+  return typeof source === 'function'
+    ? (source as AppShellCopyResolver<T>)({ locale })
+    : source;
 }
 
 /** An error a descriptor answers with directly, status and all. */
