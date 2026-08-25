@@ -1,4 +1,6 @@
+import { EN_US_RESEARCH_DIAGNOSTICS } from '../en-US';
 import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
+import { diagnosticsOf } from '../connectors/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConnectorContext, FetchInit, FetchOutcome } from '../connectors/types';
@@ -202,3 +204,45 @@ describe('sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)', () => {
     expect(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget)).not.toContain('=');
   });
 });
+
+/**
+ * `ResearchDeps.diagnostics` follows the run too.
+ *
+ * The PIPELINE writes some diagnostics itself — a source that spent its whole
+ * wall-clock budget is the pipeline's verdict, not any connector's — so the
+ * copy lives on `deps` as well as on `ctx`. Both are read through the SAME
+ * `diagnosticsOf`, because they answer the same question for the same run and
+ * a second spelling would be a place for them to disagree.
+ */
+describe('the pipeline’s own diagnostics follow the run', () => {
+  const bilingual = ({ locale }: { readonly locale?: string | null }) =>
+    locale === 'en-US' ? EN_US_RESEARCH_DIAGNOSTICS : PT_BR_RESEARCH_DIAGNOSTICS;
+
+  it('resolves a deps-shaped holder exactly as a ctx-shaped one', () => {
+    // One accessor, two holders. If these ever diverge, a single report can
+    // carry a pipeline verdict and a connector failure in two languages.
+    const en = diagnosticsOf({ diagnostics: bilingual, locale: 'en-US' });
+    const pt = diagnosticsOf({ diagnostics: bilingual, locale: 'pt-BR' });
+
+    expect(sourceCeilingError(en.budget)).toBe(sourceCeilingError(EN_US_RESEARCH_DIAGNOSTICS.budget));
+    expect(sourceCeilingError(pt.budget)).toBe(sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget));
+    expect(sourceCeilingError(en.budget)).not.toBe(sourceCeilingError(pt.budget));
+  });
+
+  it('keeps a plain-pack holder byte-identical', () => {
+    const held = diagnosticsOf({ diagnostics: PT_BR_RESEARCH_DIAGNOSTICS, locale: 'en-US' });
+    expect(sourceCeilingError(held.budget)).toBe(
+      sourceCeilingError(PT_BR_RESEARCH_DIAGNOSTICS.budget),
+    );
+  });
+
+  it('still says nothing about the URL it gave up on, in either language', () => {
+    // The property the block above this one pins for pt-BR: a ceiling message
+    // names the budget, never the request. Translating it must not leak one.
+    const en = diagnosticsOf({ diagnostics: bilingual, locale: 'en-US' });
+    expect(sourceCeilingError(en.budget)).not.toContain('http');
+    expect(sourceCeilingError(en.budget)).not.toContain('://');
+    expect(sourceCeilingError(en.budget)).not.toContain('?');
+  });
+});
+

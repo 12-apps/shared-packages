@@ -1,4 +1,5 @@
 import type { ResearchDiagnosticsCopy } from './connectors/diagnostics-copy';
+import type { ResearchCopySource } from './copy-source';
 import type {
   CatalogItem,
   CatalogRef,
@@ -210,8 +211,22 @@ export interface ResearchDeps {
    * Here as well as on `ConnectorContext` because the PIPELINE writes some of
    * them itself — a source that spent its whole wall-clock budget is the
    * pipeline's verdict, not any connector's — and it holds `deps`, not a `ctx`.
+   *
+   * A resolver, and read through {@link diagnosticsOf} — the SAME accessor
+   * `ConnectorContext` uses, because the two objects answer the same question
+   * for the same run and a second spelling of it would be a place for them to
+   * disagree. See {@link ResearchDeps.locale}.
    */
-  diagnostics: ResearchDiagnosticsCopy;
+  diagnostics: ResearchCopySource<ResearchDiagnosticsCopy>;
+  /**
+   * Whose language this RUN answers in, as a BCP-47 tag.
+   *
+   * Set it to the same value as {@link ConnectorContext.locale}: a run's
+   * pipeline verdicts and its connector failures land in one report, read by
+   * one store owner, and nothing would make two languages there anything but
+   * a bug. Absent means the configured words.
+   */
+  locale?: string;
   /** Optional observers (degradation alerts). Absent = nothing listens. */
   events?: ResearchEventsPort;
   /** Optional per-domain fetch pacing. Absent = unthrottled (legacy hosts). */
