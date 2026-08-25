@@ -19,6 +19,7 @@ import {
   evaluatePackage,
   findingPackage,
   runtimeWiringImports,
+  distinctWhyFailures,
   shrinkFailures,
   touchMustFixFailures,
 } from "./lib/wiring-estate.mjs";
@@ -236,6 +237,50 @@ const cases = [
         ledgerPath: ".x.json",
       }).length === 0,
     "an argued exemption is settled — touching the package does not reopen it",
+  ],
+  [
+    () =>
+      distinctWhyFailures({
+        ledger: ledger({
+          "@12-apps/x :: jobs": { kind: "exempt", why: "this package is a thin client and owns none of that" },
+          "@12-apps/x :: email": { kind: "exempt", why: "this package is a thin client and owns none of that" },
+        }),
+        ledgerPath: ".x.json",
+      }).length === 1,
+    "one sentence answering two capabilities in a package is refused",
+  ],
+  [
+    () =>
+      distinctWhyFailures({
+        ledger: ledger({
+          "@12-apps/x :: jobs": { kind: "exempt", why: "nothing here runs on a cadence, so a blueprint would schedule nothing" },
+          "@12-apps/x :: email": { kind: "exempt", why: "no user-reaching moment starts here, so a mailer would invent one" },
+        }),
+        ledgerPath: ".x.json",
+      }).length === 0,
+    "two capabilities argued on their own terms pass",
+  ],
+  [
+    () =>
+      distinctWhyFailures({
+        ledger: ledger({
+          "@12-apps/x :: jobs": { kind: "exempt", why: "this package is a thin client and owns none of that" },
+          "@12-apps/y :: jobs": { kind: "exempt", why: "this package is a thin client and owns none of that" },
+        }),
+        ledgerPath: ".x.json",
+      }).length === 0,
+    "the SAME argument across two packages stays legal — one fact about both",
+  ],
+  [
+    () =>
+      distinctWhyFailures({
+        ledger: ledger({
+          "@12-apps/x :: jobs": { kind: "exempt", why: "this package is a thin client\n  and owns none of that" },
+          "@12-apps/x :: email": { kind: "exempt", why: "This package is a thin client and owns none of that" },
+        }),
+        ledgerPath: ".x.json",
+      }).length === 1,
+    "a re-wrap and a capitalised first letter do not buy a second copy",
   ],
 ];
 
