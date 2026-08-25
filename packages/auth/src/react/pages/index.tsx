@@ -88,7 +88,20 @@ export interface AuthPagesConfig {
   screens: EmailAuthScreens;
   copy: AuthPagesCopy;
   routes: AuthRoutes;
-  Link: AuthLink;
+  /**
+   * The host router's link component, for the footer that points each page at
+   * the other.
+   *
+   * OPTIONAL, and its absence is a statement rather than an omission: a host
+   * serving SEVERAL routers off one set of screens has no single `Link` to name
+   * at factory time, and builds its pages per router with
+   * {@link WebEmailAuth.createPages}. Without one, both footers are simply not
+   * rendered — the same meaning omitting `routes.signup` already carries, and
+   * the reason the alternative was refused: defaulting to a plain anchor would
+   * turn the one cross-link on a sign-in page into a full page load, silently,
+   * in exactly the SPA hosts this package is written for.
+   */
+  Link?: AuthLink;
   /**
    * How wide the card may get.
    *
@@ -262,7 +275,7 @@ function LoginView({
           />
         )}
         <Providers label={emailEnabled ? copy.login.providerDivider : undefined}>{providers}</Providers>
-        {routes.signup !== undefined && (
+        {routes.signup !== undefined && Link !== undefined && (
           <Footer
             prompt={copy.login.signupPrompt}
             linkText={copy.login.signupLink}
@@ -306,13 +319,15 @@ function SignupView({
           />
         )}
         <Providers label={emailEnabled ? copy.signup.providerDivider : undefined}>{providers}</Providers>
-        <Footer
-          prompt={copy.signup.loginPrompt}
-          linkText={copy.signup.loginLink}
-          to={routes.login}
-          Link={Link}
-          dataTestId="go-to-login"
-        />
+        {Link !== undefined && (
+          <Footer
+            prompt={copy.signup.loginPrompt}
+            linkText={copy.signup.loginLink}
+            to={routes.login}
+            Link={Link}
+            dataTestId="go-to-login"
+          />
+        )}
       </SocialLoginContainer>
     </Container>
   );
