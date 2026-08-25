@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { ACTIVATION_COPY, CONNECT_APPLICATION_COPY, PROVIDER_COPY } from '../locales';
+import {
+  ACTIVATION_COPY,
+  CONNECT_APPLICATION_COPY,
+  PROVIDER_COPY,
+  providerCopyPack,
+} from '../locales';
 import { localeDrift } from './locale-parity';
 
 /**
@@ -51,6 +56,36 @@ describe('the locale packs', () => {
     // that does not exist.
     for (const copy of Object.values(ACTIVATION_COPY)) {
       expect(copy.platformApproval.length).toBeGreaterThan(80);
+    }
+  });
+});
+
+/**
+ * The transpose a host hands to a factory.
+ *
+ * `PROVIDER_COPY` is keyed language-first and a factory takes one adapter's
+ * copy, so every host would otherwise rebuild this object inline, four times.
+ */
+describe('one provider\'s pack, across the languages', () => {
+  it.each(['pagbank', 'stone', 'infinitepay', 'stripe'] as const)(
+    'plucks %s out of every language without touching the words',
+    (provider) => {
+      // Identity, not equality: a pluck that COPIED would be a second pack to
+      // keep in step with the first, which is the duplication this removes.
+      expect(providerCopyPack(provider)['pt-BR']).toBe(PROVIDER_COPY['pt-BR'][provider]);
+      expect(providerCopyPack(provider)['en-US']).toBe(PROVIDER_COPY['en-US'][provider]);
+    },
+  );
+
+  it('covers every adapter the copy interface names', () => {
+    // The guard against the real failure mode: a fifth adapter lands, gets a
+    // pack in both languages, and nothing here notices it is unreachable. The
+    // key set is read off the pack rather than restated, so the day
+    // `ProviderCopyPacks` grows this case grows with it.
+    const named = Object.keys(PROVIDER_COPY['pt-BR']) as (keyof typeof PROVIDER_COPY['pt-BR'])[];
+    for (const provider of named) {
+      const pack = providerCopyPack(provider);
+      expect(localeDrift(pack as never), provider).toEqual([]);
     }
   });
 });

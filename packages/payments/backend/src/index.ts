@@ -29,6 +29,8 @@
  */
 
 export { defineProviders, type ProviderRegistry } from './core/registry';
+export { credentialSchemaOf } from './core/credential-schema';
+export { resolvePaymentsCopy, type PaymentsCopyResolver, type PaymentsCopySource } from './copy-source';
 export {
   createPaymentsGateway,
   type ChargeOptions,
@@ -355,10 +357,7 @@ export {
   type ProviderConfigDelegate,
   type TransactionRunner,
 } from './prisma/config-store';
-export {
-  createPrismaWebhookInbox,
-  type WebhookEventDelegate,
-} from './prisma/webhook-inbox';
+export { createPrismaWebhookInbox, type WebhookEventDelegate } from './prisma/webhook-inbox';
 
 // ---- The wiring producer half (FUT-889) ----------------------------------
 // Countable views over the two mounts and the receipt-mailer seam. The
@@ -376,10 +375,7 @@ export {
   type MemoryCredentialStore,
   type MemoryProviderConfigStore,
 } from './memory';
-export {
-  createMemoryWebhookInbox,
-  type MemoryWebhookInbox,
-} from './memory-webhook-inbox';
+export { createMemoryWebhookInbox, type MemoryWebhookInbox } from './memory-webhook-inbox';
 
 // ---- Activation & verification (FUT-558) ---------------------------------
 // The "prove a real charge actually moved" flow (FUT-463): probe amounts,

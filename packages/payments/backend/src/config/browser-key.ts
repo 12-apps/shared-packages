@@ -1,6 +1,7 @@
 import { AdapterContractError } from '../core/errors';
 
 import type { PaymentProviderAdapter } from '../core/provider';
+import { credentialSchemaOf } from '../core/credential-schema';
 import type { ProviderRegistry } from '../core/registry';
 import type { MerchantRef, ResolvedCredentials } from '../core/types';
 import type { ProviderConfigStore } from './types';
@@ -80,7 +81,7 @@ export async function cacheFetchedField(
   value: string,
 ): Promise<void> {
   const adapter = deps.providers.get(provider);
-  const spec = adapter.credentialSchema.find((entry) => entry.key === field);
+  const spec = credentialSchemaOf(adapter).find((entry) => entry.key === field);
   if (!spec) throw new AdapterContractError(provider, `no credential field '${field}' to cache into`);
   if (spec.secret) {
     throw new AdapterContractError(provider, `'${field}' is secret and must not be cached this way`);
