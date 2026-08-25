@@ -10,6 +10,8 @@
  * its cache header) type-checks perfectly.
  */
 
+import { readdirSync, readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import {
   assertDbMirror,
@@ -102,6 +104,57 @@ describe("the mcp manifest", () => {
     expect(declared().e2e).toBeUndefined();
     expect(mcpServerManifest).not.toHaveProperty("jobs");
     expect(mcpServerManifest).not.toHaveProperty("email");
+  });
+
+  /**
+   * The `env` narrowing, made falsifiable.
+   *
+   * It used to claim "the package reads nothing itself", which was untrue —
+   * an unfalsifiable sentence is exactly how a narrowing rots. The corrected
+   * claim is narrower and checkable: the ONLY `process.env` reads in shipped
+   * source sit inside the three named helpers, and none runs at import time.
+   * A fourth read, or one at module scope, breaks this — which is the point.
+   */
+  it("reads process.env only inside the named helpers, and never at import time", () => {
+    /* eslint-disable test-flakiness/no-unmocked-fs -- the real source tree IS
+       the subject: the claim is about which shipped files read process.env,
+       and a mocked fs would let the file the claim is about go unread. */
+    const dir = new URL("../../", import.meta.url).pathname;
+    const offenders: string[] = [];
+    const walk = (at: string): void => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const full = `${at}${entry.name}`;
+        if (entry.isDirectory()) {
+          if (entry.name !== "__tests__") walk(`${full}/`);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue;
+        // Comments are stripped first: the narrowing's own explanation names
+        // `process.env` in prose, and prose is not a read.
+        const code = readFileSync(full, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/^\s*\/\/.*$/gm, "");
+        if (code.includes("process.env")) offenders.push(full.slice(dir.length));
+      }
+    };
+    walk(dir);
+    /* eslint-enable test-flakiness/no-unmocked-fs */
+
+    // Exactly the two files the narrowing names, and nothing else.
+    expect(offenders.sort()).toEqual(["oauth/config.ts", "oauth/keys.ts"]);
+
+    // …and every read is inside a function body, so importing the package
+    // touches no environment. A module-scope read would make the narrowing
+    // false again in the one way the file list above cannot see.
+    for (const file of offenders) {
+      const code = readFileSync(`${dir}${file}`, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      for (const line of code.split("\n")) {
+        if (!line.includes("process.env")) continue;
+        expect(line.startsWith(" ") || line.startsWith("\t")).toBe(true);
+      }
+    }
   });
 
   it("mirrors the db declaration and the manifest subpaths into package.json", () => {
