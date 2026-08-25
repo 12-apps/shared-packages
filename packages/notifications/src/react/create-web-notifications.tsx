@@ -10,8 +10,10 @@ import {
   type NotificationsSubscribe,
 } from './hooks';
 import { createInboxStore, type InboxStore } from './inbox-state';
-import { NotificationsPanel, type NotificationsPanelProps } from './panel';
-import { PreferencesScreen, type PreferencesScreenProps } from './preferences-screen';
+import { lazyNotificationsPanel } from './panel-lazy';
+import type { NotificationsPanelProps } from './panel';
+import { lazyPreferencesPage } from './page-lazy';
+import type { PreferencesScreenProps } from './preferences-screen';
 import { httpNotificationsTransport, type NotificationsTransport } from './transport';
 import type { WebPushSetupConfig } from './web-push-setup';
 
@@ -56,11 +58,22 @@ export interface NotificationsWebConfig {
 }
 
 export interface WebNotifications {
-  /** The routed surface: the preferences screen. */
+  /**
+   * The routed surface: the preferences screen.
+   *
+   * Loaded on demand — see `page-lazy.tsx`. A host that mounts only the bell and
+   * the panel never downloads it, and a host that routes to it fetches it while
+   * entering that route.
+   */
   page: ComponentType<PreferencesScreenProps>;
   /** The bell, already bound to the shared store. */
   BellButton: ComponentType<BellButtonProps>;
-  /** The inbox slide-over, sharing that store. */
+  /**
+   * The inbox slide-over, sharing that store.
+   *
+   * Loaded the first time it is opened — see `panel-lazy.tsx`. Until then a
+   * host's chrome carries the bell and nothing else.
+   */
   Panel: ComponentType<NotificationsPanelProps>;
   /**
    * Bell + panel as ONE element, for a host that just wants the feature in its
@@ -97,9 +110,7 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
   const Bell: ComponentType<BellButtonProps> = (props) => (
     <BellButton {...props} store={store} messages={messages} {...subscribeOption} />
   );
-  const Panel: ComponentType<NotificationsPanelProps> = (props) => (
-    <NotificationsPanel {...props} store={store} messages={messages} />
-  );
+  const Panel = lazyNotificationsPanel({ store, messages });
 
   function useBoundUnreadCount(options: { enabled?: boolean } = {}): number {
     return useUnreadCount(store, { ...options, ...subscribeOption });
@@ -126,9 +137,7 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
   }
 
   return {
-    page: (props) => (
-      <PreferencesScreen {...props} api={api} messages={messages} webPush={webPush} />
-    ),
+    page: lazyPreferencesPage({ api, messages, webPush }),
     BellButton: Bell,
     Panel,
     BellWithPanel,

@@ -225,10 +225,34 @@ function mountDialog(options: MountOptions = {}) {
   return { posted: () => requested.filter((call) => call.method === 'POST'), onClose };
 }
 
+/**
+ * Wait for the dialog to be ON SCREEN, allowing for the chunk it now arrives in.
+ *
+ * The dialog is loaded on demand, so this wait covers a dynamic import as well
+ * as a render — and `waitFor`'s 1000ms default was tuned for the render alone.
+ * Measured: the first case takes ~550ms here against ~256ms before the boundary,
+ * which passes on a developer's machine and FAILED on a loaded CI runner at
+ * 1206ms. A budget that depends on how busy the runner is belongs to nobody.
+ *
+ * The assertion is unchanged — only the patience. A dialog that never renders
+ * still fails this, five seconds later.
+ *
+ * Warming the module in `beforeAll` was measured first and is NOT the fix here:
+ * it moved nothing (549ms from a cold Vite cache, 543ms warmed), because what
+ * this pays for is the Suspense round trip rather than a transform. It IS the
+ * fix in `@12-apps/app-shell`, whose surface is a heavier transform — same
+ * boundary, different cost, so a different remedy.
+ */
+async function dialogOnScreen(): Promise<void> {
+  await waitFor(() => expect(screen.getByTestId('impersonation-dialog')).toBeTruthy(), {
+    timeout: 5_000,
+  });
+}
+
 describe('the rendered dialog', () => {
   it('will not send until the reason is long enough, and says which rule blocks', async () => {
     mountDialog();
-    await waitFor(() => expect(screen.getByTestId('impersonation-dialog')).toBeTruthy());
+    await dialogOnScreen();
 
     const confirm = screen.getByTestId('impersonation-confirm') as HTMLButtonElement;
     expect(confirm.disabled).toBe(true);
@@ -250,7 +274,7 @@ describe('the rendered dialog', () => {
         throw refusal;
       },
     });
-    await waitFor(() => expect(screen.getByTestId('impersonation-dialog')).toBeTruthy());
+    await dialogOnScreen();
 
     await act(async () => {
       fill(screen.getByTestId('impersonation-reason'), 'card reported not scanning');
@@ -276,7 +300,7 @@ describe('the rendered dialog', () => {
 
   it('DOES NOT START AT ALL when no banner is mounted in this document', async () => {
     const { posted, onClose } = mountDialog({ withBanner: false });
-    await waitFor(() => expect(screen.getByTestId('impersonation-dialog')).toBeTruthy());
+    await dialogOnScreen();
 
     await act(async () => {
       fill(screen.getByTestId('impersonation-reason'), 'card reported not scanning');

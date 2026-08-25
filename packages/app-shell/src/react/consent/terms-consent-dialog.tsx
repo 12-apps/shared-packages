@@ -1,14 +1,24 @@
-import { useEffect, type JSX } from 'react';
-
-import { Alert } from '@12-apps/ui/data-display/Alert';
-import { Button } from '@12-apps/ui/form/Button';
-import { Dialog, DialogActions, DialogContent } from '@12-apps/ui/feedback/Dialog';
-import { Stack } from '@12-apps/ui/mui/Stack';
-import { Text } from '@12-apps/ui/typography/Text';
+import { Suspense, lazy, useEffect, type JSX } from 'react';
 
 import { stripTrailingSlashes } from '../../core/paths';
 import { messagesOf, type AppShellMessages } from '../messages';
 import { useTermsConsent } from './use-terms-consent';
+
+/**
+ * The dialog itself, fetched the first time consent is actually stale.
+ *
+ * This component renders `null` on essentially every render, so `lazy`'s
+ * fetch-on-first-render is exactly the trigger wanted: nothing is requested
+ * until the gate has decided there is something to show. See
+ * `terms-consent-surface.tsx` for what that saves every host.
+ *
+ * The fallback is `null` — the same nothing this component was already
+ * rendering a moment earlier. A spinner would announce an interruption before
+ * there is one to explain.
+ */
+const TermsConsentSurface = lazy(async () => ({
+  default: (await import('./terms-consent-surface')).TermsConsentSurface,
+}));
 
 /**
  * The realtime accelerator's SEAM.
@@ -124,51 +134,14 @@ export function TermsConsentDialog({
   if (isReadingTheDocuments([termsHref, privacyHref])) return null;
 
   return (
-    <Dialog
-      open
-      persistent
-      showCloseButton={false}
-      title={messages.consentTitle}
-      data-testid="terms-consent-dialog"
-    >
-      <DialogContent>
-        <Stack spacing={2}>
-          <Text variant="body" size="sm">
-            {messages.consentBody}
-          </Text>
-          {/*
-            Named plainly. The whole failure this replaces was a user being stopped
-            without being told why — repeating that here, with a vague "não foi
-            possível continuar", would just move the dead end.
-          */}
-          <Alert
-            variant="info"
-            title={messages.consentWhyTitle}
-            description={messages.consentWhyBody}
-          />
-          <Text variant="body" size="sm" color="secondary">
-            <a href={termsHref} target="_blank" rel="noreferrer">
-              {messages.consentTermsLink}
-            </a>
-            {' · '}
-            <a href={privacyHref} target="_blank" rel="noreferrer">
-              {messages.consentPrivacyLink}
-            </a>
-          </Text>
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button
-          variant="solid"
-          color="primary"
-          loading={accepting}
-          disabled={accepting}
-          onClick={() => void accept()}
-          dataTestId="terms-consent-accept"
-        >
-          {messages.consentAccept}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <Suspense fallback={null}>
+      <TermsConsentSurface
+        messages={messages}
+        termsHref={termsHref}
+        privacyHref={privacyHref}
+        accepting={accepting}
+        accept={() => void accept()}
+      />
+    </Suspense>
   );
 }

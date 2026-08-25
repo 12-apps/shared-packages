@@ -38,7 +38,7 @@ export interface ImpersonationAppOption {
 }
 
 /** Everything the dialog needs that the banner does not. */
-interface DialogParts {
+export interface DialogParts {
   endpoints: ImpersonationEndpoints;
   labels: ImpersonationDialogLabels;
   rules: DialogRules;

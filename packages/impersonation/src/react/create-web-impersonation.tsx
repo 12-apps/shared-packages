@@ -6,11 +6,11 @@ import {
   bindImpersonationBanner,
   type ImpersonationBannerProps,
 } from './banner';
-import {
-  bindImpersonationDialog,
-  type ImpersonationAppOption,
-  type ImpersonationDialogProps,
+import type {
+  ImpersonationAppOption,
+  ImpersonationDialogProps,
 } from './dialog';
+import { lazyImpersonationDialog, prefetchImpersonationDialog } from './dialog-lazy';
 import type { ImpersonationLabels } from './labels';
 import {
   startImpersonation,
@@ -85,6 +85,12 @@ export interface WebImpersonation {
    * The start dialog, or `null` when {@link ImpersonationWebConfig.dialog} was
    * not configured — an app that only ever WEARS sessions (a storefront) mounts
    * the banner and nothing else.
+   *
+   * "Nothing else" is now true of the BUNDLE as well as of this object: the
+   * dialog's module is reached through a dynamic import, so an app that
+   * configures no dialog never downloads its form controls. An app
+   * that does configure one gets the chunk prefetched at bind time — see
+   * `dialog-lazy.ts`.
    */
   dialog: ComponentType<ImpersonationDialogProps> | null;
   /**
@@ -133,7 +139,11 @@ export function createWebImpersonation(
   const dialogConfig = config.dialog;
   if (!dialogConfig || !dialogLabels) return { banner, dialog: null, startPreview };
 
-  const dialog = bindImpersonationDialog({
+  // A host that configured a dialog gets its chunk on the way, so the first
+  // click is no slower than when this module was part of the entry bundle.
+  prefetchImpersonationDialog();
+
+  const dialog = lazyImpersonationDialog({
     endpoints,
     labels: dialogLabels,
     rules: {
