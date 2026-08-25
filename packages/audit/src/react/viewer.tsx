@@ -54,6 +54,8 @@ export interface AuditViewerProps {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
+  /** The reader's tag, for the vocabulary's labels. See `AuditWebConfig.locale`. */
+  locale?: string;
   /**
    * The host's wired `DataViews` table — the one it already gives every other
    * list, carrying its saved-view persistence and its `?view=` sync. Omitted,
@@ -124,10 +126,14 @@ function useGridConfig(
   vocabulary: AuditVocabulary,
   actors: readonly AuditActorOptionWire[],
   filterKey: string,
+  locale?: string,
 ) {
   return {
     columns: useMemo(() => auditColumns(labels), [labels]),
-    fields: useMemo(() => auditFields(labels, vocabulary, actors), [labels, vocabulary, actors]),
+    fields: useMemo(
+      () => auditFields(labels, vocabulary, actors, locale),
+      [labels, vocabulary, actors, locale],
+    ),
     rangeFields: useMemo(() => auditRangeFields(labels), [labels]),
     sortFields: useMemo(() => auditSortFields(labels), [labels]),
     initialState: useMemo(
@@ -183,7 +189,7 @@ function serverFor(
 }
 
 export function AuditViewer(props: AuditViewerProps): JSX.Element {
-  const { api, labels, vocabulary, formatDate, fixedFilters } = props;
+  const { api, labels, vocabulary, formatDate, locale, fixedFilters } = props;
   const [filters, applyFilters] = useFilterState(props);
   const [reloadToken, setReloadToken] = useState(0);
   const { page, error, loading } = useAuditPage(
@@ -194,10 +200,10 @@ export function AuditViewer(props: AuditViewerProps): JSX.Element {
   );
   const actors = useActorOptions(api);
   const rows = useMemo(
-    () => toAuditRows(page?.data ?? [], { labels, vocabulary, formatDate }),
-    [page, labels, vocabulary, formatDate],
+    () => toAuditRows(page?.data ?? [], { labels, vocabulary, formatDate, locale }),
+    [page, labels, vocabulary, formatDate, locale],
   );
-  const config = useGridConfig(labels, vocabulary, actors, JSON.stringify(filters));
+  const config = useGridConfig(labels, vocabulary, actors, JSON.stringify(filters), locale);
 
   // The grid owns the page-reset rule — it emits page 1 on any effective-query
   // change and the requested page on a pager click — so nothing here re-decides

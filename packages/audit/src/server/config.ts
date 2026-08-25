@@ -4,6 +4,7 @@
  * adapter mounts.
  */
 import { AUDIT_READ_PERMISSION } from '../core/permissions';
+import type { AuditCopySource } from '../core/copy';
 import type { AuditVocabulary } from '../core/vocabulary';
 
 import type { AuditDbProvider } from './db';
@@ -277,14 +278,15 @@ export interface AuditServerConfig {
 /**
  * What a copy field takes once its words can follow a reader.
  *
- * Declared here rather than imported from `@12-apps/i18n`: this package must
- * stay liftable into a repo that has never heard of it, so the two agree
- * STRUCTURALLY and nothing forces the dependency. The context is deliberately
- * loose — a raw tag off the wire, unnarrowed — because matching it is the host
- * resolver's job, not this package's.
+ * The declarations moved to `core/copy.ts` when the VOCABULARY's labels started
+ * taking a resolver too — `core/` cannot import from `server/`, and two
+ * structurally-identical copies of a seam type is how the two halves come to
+ * disagree about it. Re-exported here under the names adopters already import.
  */
-export type AuditCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
-export type AuditCopySource<T> = T | AuditCopyResolver<T>;
+// `AuditCopyContext` is deliberately NOT re-exported: nothing here consumes it,
+// and this surface's job is to keep the names adopters already import working,
+// not to widen them. It is reachable from `core/copy.ts` where it is declared.
+export type { AuditCopyResolver, AuditCopySource } from '../core/copy';
 
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class AuditApiError extends Error {

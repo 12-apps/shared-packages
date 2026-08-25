@@ -117,6 +117,15 @@ interface SurfaceParts {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
+  /**
+   * The reader's tag, carried UNRESOLVED to the components that render a label.
+   *
+   * Note what is deliberately not here: the vocabulary's labels, resolved. This
+   * object is built once per adoption, so resolving them into it would re-freeze
+   * the language at the mount — the exact failure the resolver exists to undo,
+   * and one a single-locale host could never see.
+   */
+  locale?: string;
   exportLimits: AuditExportLimits;
   table?: AuditTableComponent;
   fixedFilters?: AuditLogFilters;
@@ -143,6 +152,7 @@ function surfaceParts(config: AuditWebConfig): SurfaceParts {
     vocabulary,
     formatDate: config.formatDate ?? ((iso) => formatter.format(new Date(iso))),
     exportLimits: config.exportLimits ?? DEFAULT_EXPORT_LIMITS,
+    ...(config.locale === undefined ? {} : { locale: config.locale }),
     ...(config.table ? { table: config.table } : {}),
     ...(config.fixedFilters ? { fixedFilters: config.fixedFilters } : {}),
   };
@@ -166,6 +176,7 @@ export function createWebAudit(config: AuditWebConfig): WebAudit {
         labels={parts.labels}
         vocabulary={parts.vocabulary}
         formatDate={parts.formatDate}
+        {...(parts.locale === undefined ? {} : { locale: parts.locale })}
         {...props}
         table={props.table ?? parts.table}
         {...(parts.fixedFilters ? { fixedFilters: parts.fixedFilters } : {})}

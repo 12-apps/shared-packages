@@ -361,3 +361,104 @@ describe('assertAuditVocabulary', () => {
     );
   });
 });
+
+/**
+ * The locale axis, and the line it deliberately stops at.
+ *
+ * An audit log is opened by whichever operator is looking, so a label follows
+ * the REQUEST. The ids around it must not: they are what a writer persists, a
+ * filter enum advertises and a parser matches on, so a vocabulary that varied
+ * them per reader would validate a row for one operator and refuse it for the
+ * next. The shape is what enforces that — these cases pin both halves.
+ */
+describe('vocabulary labels follow the reader', () => {
+  /** A pack keyed by tag, resolved the way a host's `localeCopy` would. */
+  const pack = (words: Record<string, string>) => {
+    return ({ locale }: { readonly locale?: string | null }): string =>
+      words[typeof locale === 'string' ? locale : ''] ?? words['pt-BR'] ?? '';
+  };
+
+  const bilingual = () =>
+    defineAuditVocabulary({
+      actions: {
+        'reel.ingest': { label: pack({ 'pt-BR': 'Bobina recebida', 'en-US': 'Reel ingested' }) },
+      },
+      resources: {
+        reel: { label: pack({ 'pt-BR': 'Bobina', 'en-US': 'Reel' }), fields: ['title'] },
+      },
+    });
+
+  it('resolves each label for the reader that asked, per call', () => {
+    const vocabulary = bilingual();
+    expect(vocabulary.actionLabel('reel.ingest', { locale: 'pt-BR' })).toBe('Bobina recebida');
+    expect(vocabulary.actionLabel('reel.ingest', { locale: 'en-US' })).toBe('Reel ingested');
+    expect(vocabulary.resourceLabel('reel', { locale: 'en-US' })).toBe('Reel');
+    // The SAME vocabulary answered both, so nothing was frozen at assembly.
+    expect(vocabulary.actionLabel('reel.ingest', { locale: 'pt-BR' })).toBe('Bobina recebida');
+  });
+
+  it('treats an absent locale as "nobody said" and lets the host resolver decide', () => {
+    // Not the same as asserting pt-BR: the package passes the empty context
+    // through, and what that falls back to is the host resolver's own line.
+    const vocabulary = bilingual();
+    expect(vocabulary.actionLabel('reel.ingest')).toBe('Bobina recebida');
+    expect(vocabulary.actionLabel('reel.ingest', {})).toBe('Bobina recebida');
+    expect(vocabulary.actionLabel('reel.ingest', { locale: null })).toBe('Bobina recebida');
+  });
+
+  it('keeps every id, predicate and allowlist fixed across readers', () => {
+    // Rule H, structurally: there is nowhere to hang a resolver on an id, so
+    // this is the axis the copy port must never reach. If it ever did, a row
+    // would validate for one operator and be refused for the next.
+    const vocabulary = bilingual();
+    expect(vocabulary.actionIds).toEqual(['reel.ingest']);
+    expect(vocabulary.resourceIds).toEqual(['reel']);
+    expect(vocabulary.hasAction('reel.ingest')).toBe(true);
+    expect(vocabulary.hasResource('reel')).toBe(true);
+    expect([...(vocabulary.allowlistFor('reel') ?? [])]).toEqual(['title']);
+    // Reading every label in the other language changes none of it.
+    vocabulary.actionLabel('reel.ingest', { locale: 'en-US' });
+    vocabulary.resourceLabel('reel', { locale: 'en-US' });
+    expect(vocabulary.actionIds).toEqual(['reel.ingest']);
+    expect(vocabulary.hasAction('reel.ingest')).toBe(true);
+    expect([...(vocabulary.allowlistFor('reel') ?? [])]).toEqual(['title']);
+  });
+
+  it('probes a resolver at ASSEMBLY, so a host whose lookup missed fails to boot', () => {
+    // The same move `messagesOf` makes for the refusals: widening the type
+    // must not turn assembly's refusals into "unless you pass a function".
+    expect(() =>
+      defineAuditVocabulary({
+        actions: { 'reel.ingest': { label: () => '' } },
+        resources: { reel: { label: 'Reel', fields: ['title'] } },
+      }),
+    ).toThrow(AuditConfigError);
+    expect(() =>
+      defineAuditVocabulary({
+        actions: { 'reel.ingest': { label: 'Reel ingested' } },
+        resources: { reel: { label: () => '   ', fields: ['title'] } },
+      }),
+    ).toThrow(AuditConfigError);
+  });
+
+  it('falls back to the id when one language of a pack is short a line', () => {
+    // Assembly already probed, so reaching here means the pack has a hole for
+    // THIS reader only. A raw dotted id in one cell beats a viewer that throws
+    // mid-render and shows an operator no rows at all.
+    const vocabulary = defineAuditVocabulary({
+      actions: { 'reel.ingest': { label: pack({ 'pt-BR': 'Bobina recebida', 'en-US': '' }) } },
+      resources: { reel: { label: 'Reel', fields: ['title'] } },
+    });
+    expect(vocabulary.actionLabel('reel.ingest', { locale: 'pt-BR' })).toBe('Bobina recebida');
+    expect(vocabulary.actionLabel('reel.ingest', { locale: 'en-US' })).toBe('reel.ingest');
+  });
+
+  it('still takes a plain string, so a single-audience host changes nothing', () => {
+    const vocabulary = defineAuditVocabulary({
+      actions: { 'reel.ingest': { label: 'Reel ingested' } },
+      resources: { reel: { label: 'Reel', fields: ['title'] } },
+    });
+    expect(vocabulary.actionLabel('reel.ingest', { locale: 'en-US' })).toBe('Reel ingested');
+    expect(vocabulary.actionLabel('reel.ingest')).toBe('Reel ingested');
+  });
+});
