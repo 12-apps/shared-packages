@@ -11,7 +11,7 @@
  * one of those ships to anyone who renders one text box.
  *
  * Measured in one adopter's storefront, whose header search box is the eager
- * caller: taking that ONE box off `TextField` is worth 36.4 KiB raw and 31
+ * caller: taking that ONE box off `TextField` is worth 35.8 KiB raw and 13
  * fewer `@mui/material` component modules on the critical path — more than any
  * other single item in that bundle.
  *
