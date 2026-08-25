@@ -1,4 +1,5 @@
 import type { PaymentProviderAdapter } from './provider';
+import { credentialSchemaOf } from './provider';
 
 /**
  * Readers of adapter-declared field ROLES (FUT-761, ported from the first
@@ -19,6 +20,6 @@ import type { PaymentProviderAdapter } from './provider';
  * verification by live call-back).
  */
 export function webhookFieldOf(adapter: PaymentProviderAdapter): string | null {
-  const spec = adapter.credentialSchema.find((field) => field.role === 'webhookSecret');
+  const spec = credentialSchemaOf(adapter).find((field) => field.role === 'webhookSecret');
   return spec?.key ?? null;
 }

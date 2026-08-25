@@ -1,4 +1,9 @@
 import { ProviderRequestError } from '../core/errors';
+import {
+  resolvePaymentsCopy,
+  type PaymentsCopySource,
+} from '../copy-source';
+import type { CredentialFieldSpec } from '../core/types';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { StripeCopy } from './copy';
 import type { CustomerSchema } from '../core/customer-schema';
@@ -186,7 +191,7 @@ const oauth: NonNullable<PaymentProviderAdapter['oauth']> = {
  * per call, and inlining it pushed `stripeProvider` past the size gate — the
  * adapter's shape is what that function is for, not four field descriptions.
  */
-function credentialSchemaFor(copy: StripeCopy): PaymentProviderAdapter['credentialSchema'] {
+function credentialSchemaFor(copy: StripeCopy): readonly CredentialFieldSpec[] {
   return [
     { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
     { key: 'publishableKey', label: 'Publishable key (pk_...)', secret: false, required: false },
@@ -211,7 +216,13 @@ function credentialSchemaFor(copy: StripeCopy): PaymentProviderAdapter['credenti
   ];
 }
 
-export function stripeProvider(copy: StripeCopy): PaymentProviderAdapter {
+export function stripeProvider(source: PaymentsCopySource<StripeCopy>): PaymentProviderAdapter {
+  // Resolved at each BOUNDARY below, never here. Every helper this factory
+  // calls keeps taking a resolved pack, so the ~52 internal `copy.x` reads are
+  // untouched — the language is chosen where a caller asks, and the adapter
+  // itself is still built once when a deployment names its providers.
+  const copy = (locale?: string): StripeCopy => resolvePaymentsCopy(source, locale);
+
   return {
     name: NAME,
     displayName: 'Stripe',
@@ -240,10 +251,10 @@ export function stripeProvider(copy: StripeCopy): PaymentProviderAdapter {
     // key under `accessToken`, never `secretKey` (`apiKeyOf` says why the two
     // must not share a slot) — `fulfilledBy` is what keeps the masked view
     // reading that store as configured, not as empty fields (FUT-691).
-    credentialSchema: credentialSchemaFor(copy),
+    credentialSchema: ({ locale }) => credentialSchemaFor(copy(locale ?? undefined)),
     customerSchema,
 
-    verifyCredentials: verifyCredentialsWith(copy),
+    verifyCredentials: (credentials, locale) => verifyCredentialsWith(copy(locale))(credentials),
     createCharge,
     getCharge,
     findChargeByReference,
@@ -260,7 +271,7 @@ export function stripeProvider(copy: StripeCopy): PaymentProviderAdapter {
       parse: async (delivery) => parseStripeEvent(delivery),
     },
 
-    setupGuide: (ctx) => stripeSetupGuide(copy.setupGuide, ctx),
+    setupGuide: (ctx) => stripeSetupGuide(copy(ctx.locale).setupGuide, ctx),
 
     clientConfig(credentials) {
       return {

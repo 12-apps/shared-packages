@@ -29,6 +29,12 @@
  */
 
 export { defineProviders, type ProviderRegistry } from './core/registry';
+export { credentialSchemaOf } from './core/provider';
+export {
+  resolvePaymentsCopy,
+  type PaymentsCopyResolver,
+  type PaymentsCopySource,
+} from './copy-source';
 export {
   createPaymentsGateway,
   type ChargeOptions,

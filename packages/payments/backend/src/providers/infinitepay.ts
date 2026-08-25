@@ -1,4 +1,8 @@
 import { ProviderRequestError } from '../core/errors';
+import {
+  resolvePaymentsCopy,
+  type PaymentsCopySource,
+} from '../copy-source';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type {
   ChargeInput,
@@ -322,7 +326,13 @@ const identity = {
   referenceOfDelivery: infinitePayDeliveryReference,
 } satisfies Partial<PaymentProviderAdapter>;
 
-export function infinitePayProvider(copy: InfinitePayCopy): PaymentProviderAdapter {
+export function infinitePayProvider(source: PaymentsCopySource<InfinitePayCopy>): PaymentProviderAdapter {
+  // Resolved at each BOUNDARY below, never here. Every helper this factory
+  // calls keeps taking a resolved pack, so the ~23 internal `copy.x` reads are
+  // untouched — the language is chosen where a caller asks, and the adapter
+  // itself is still built once when a deployment names its providers.
+  const copy = (locale?: string): InfinitePayCopy => resolvePaymentsCopy(source, locale);
+
   return {
     name: NAME,
     displayName: 'InfinitePay',
@@ -343,13 +353,13 @@ export function infinitePayProvider(copy: InfinitePayCopy): PaymentProviderAdapt
       // `payment_check` confirms — a different protocol, the same proof.
       activationCharge: true,
     },
-    credentialSchema: infinitePayCredentialSchema(copy),
+    credentialSchema: ({ locale }) => infinitePayCredentialSchema(copy(locale ?? undefined)),
     customerSchema,
     // The buyer finishes on the provider's own page — no card form, no PIX pane.
     checkoutScreen: 'hosted-link',
 
-    verifyCredentials: verifyCredentialsWith(copy),
-    createCharge: createChargeWith(copy),
+    verifyCredentials: (credentials, locale) => verifyCredentialsWith(copy(locale))(credentials),
+    createCharge: (input, credentials) => createChargeWith(copy(input.locale))(input, credentials),
 
     async getCharge(providerChargeId, credentials, hints) {
       if (credentials.stub) return stubPendingSnapshot(NAME, providerChargeId);
@@ -375,7 +385,7 @@ export function infinitePayProvider(copy: InfinitePayCopy): PaymentProviderAdapt
       parse: parseInfinitePayEvent,
     },
 
-    setupGuide: (ctx) => infinitePaySetupGuide(copy.setupGuide, ctx),
+    setupGuide: (ctx) => infinitePaySetupGuide(copy(ctx.locale).setupGuide, ctx),
 
     clientConfig() {
       // Redirect flow: the client needs nothing but the per-charge

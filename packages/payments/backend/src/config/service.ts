@@ -2,6 +2,7 @@ import { CredentialsError, UnknownProviderError } from '../core/errors';
 import { hasUsableCredentials } from './usable-credentials';
 import type { CredentialStore } from '../core/ports';
 import type { PaymentProviderAdapter } from '../core/provider';
+import { credentialSchemaOf } from '../core/provider';
 import type { ProviderRegistry } from '../core/registry';
 import type {
   MerchantRef,
@@ -46,8 +47,14 @@ import { runVerify, type VerifiedProviderConfig } from './verify';
  */
 
 export interface SettingsService {
-  listProviders(): ProviderDescriptor[];
-  getSettings(merchant: MerchantRef): Promise<MerchantSettingsView>;
+  /**
+   * Every mounted provider's descriptor. `locale` chooses the language of the
+   * credential form's labels — the one part of a descriptor a store owner
+   * READS rather than a screen switching on.
+   */
+  listProviders(locale?: string): ProviderDescriptor[];
+  /** `locale` reaches the credential form's labels — see {@link listProviders}. */
+  getSettings(merchant: MerchantRef, locale?: string): Promise<MerchantSettingsView>;
   saveCredentials(
     merchant: MerchantRef,
     provider: ProviderName,
@@ -140,7 +147,7 @@ function secretHint(value: string): string {
 
 function maskEnvironment(adapter: PaymentProviderAdapter, fields: Record<string, string>): MaskedFields {
   const masked: MaskedFields = {};
-  for (const spec of adapter.credentialSchema) {
+  for (const spec of credentialSchemaOf(adapter)) {
     // `fulfilledBy` is the adapter-declared bridge from an OAuth exchange's
     // own field names to the schema keys this view is built from — without it
     // an OAuth-connected store masked as `configured: false` on every field,
@@ -176,7 +183,19 @@ function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig)
   };
 }
 
-function descriptorOf(providers: ProviderRegistry, name: string): ProviderDescriptor {
+/**
+ * One provider's public descriptor, including the credential FORM.
+ *
+ * `locale` is the only place in this file it matters: the schema's labels are
+ * the words a store owner reads on the settings screen, and this is where they
+ * cross to the browser. Every other reader of `credentialSchema` asks a
+ * structural question and passes nothing.
+ */
+function descriptorOf(
+  providers: ProviderRegistry,
+  name: string,
+  locale?: string,
+): ProviderDescriptor {
   const adapter = providers.get(name);
   return {
     name: adapter.name,
@@ -184,7 +203,7 @@ function descriptorOf(providers: ProviderRegistry, name: string): ProviderDescri
     urlSlug: providers.urlSlugOf(adapter.name),
     capabilities: adapter.capabilities,
     authMode: adapter.authMode ?? 'credentials',
-    credentialSchema: adapter.credentialSchema,
+    credentialSchema: credentialSchemaOf(adapter, locale),
   };
 }
 
@@ -214,6 +233,7 @@ async function buildSettingsView(
   providers: ProviderRegistry,
   store: ProviderConfigStore,
   merchant: MerchantRef,
+  locale?: string,
 ): Promise<MerchantSettingsView> {
   const configs = await store.list(merchant);
   // Only providers the registry still knows can be routed to; a row left
@@ -227,7 +247,7 @@ async function buildSettingsView(
     .sort((a, b) => a.priority - b.priority || a.provider.localeCompare(b.provider))
     .map((c) => c.provider);
   return {
-    providers: providers.names.map((name) => descriptorOf(providers, name)),
+    providers: providers.names.map((name) => descriptorOf(providers, name, locale)),
     configs: known.map((c) => toMasked(providers.get(c.provider), c)),
     providerChain: chain,
     activeProvider: chain[0] ?? null,
@@ -262,11 +282,11 @@ export function createSettingsService(
   }
 
   return {
-    listProviders() {
-      return providers.names.map((name) => descriptorOf(providers, name));
+    listProviders(locale) {
+      return providers.names.map((name) => descriptorOf(providers, name, locale));
     },
 
-    getSettings: (merchant) => buildSettingsView(providers, store, merchant),
+    getSettings: (merchant, locale) => buildSettingsView(providers, store, merchant, locale),
 
     async saveCredentials(merchant, provider, input) {
       const adapter = providers.get(provider);

@@ -1,4 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import { credentialSchemaOf } from '../core/provider';
 
 /**
  * Whether a stored credential set is actually USABLE for its adapter — not
@@ -21,8 +22,8 @@ export function hasUsableCredentials(
     const value = fields?.[key];
     return typeof value === 'string' && value !== '';
   };
-  const required = adapter.credentialSchema.filter((spec) => spec.required);
+  const required = credentialSchemaOf(adapter).filter((spec) => spec.required);
   return required.length > 0
     ? required.every((spec) => present(spec.key))
-    : adapter.credentialSchema.some((spec) => present(spec.key));
+    : credentialSchemaOf(adapter).some((spec) => present(spec.key));
 }

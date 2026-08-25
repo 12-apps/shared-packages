@@ -1,5 +1,6 @@
 import { InvalidCredentialsInputError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+import { credentialSchemaOf } from '../core/provider';
 import type { CredentialFieldSpec, PaymentEnvironment, ProviderName } from '../core/types';
 
 import type { SaveCredentialsInput } from './types';
@@ -295,6 +296,6 @@ export function assertSaveCredentialsInput(
     }
     credentials[key] = value;
   }
-  assertFieldsMatchSchema(adapter.name, adapter.credentialSchema, credentials);
+  assertFieldsMatchSchema(adapter.name, credentialSchemaOf(adapter), credentials);
   return parsed;
 }

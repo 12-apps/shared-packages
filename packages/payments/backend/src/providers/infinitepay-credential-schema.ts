@@ -1,4 +1,4 @@
-import type { PaymentProviderAdapter } from '../core/provider';
+import type { CredentialFieldSpec } from '../core/types';
 import type { InfinitePayCopy } from './copy';
 
 /**
@@ -19,7 +19,7 @@ import type { InfinitePayCopy } from './copy';
  */
 export function infinitePayCredentialSchema(
   copy: InfinitePayCopy,
-): PaymentProviderAdapter['credentialSchema'] {
+): readonly CredentialFieldSpec[] {
   return [
     {
       key: 'handle',

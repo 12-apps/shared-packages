@@ -1,4 +1,9 @@
 import type { PaymentProviderAdapter } from '../core/provider';
+import type { CredentialFieldSpec } from '../core/types';
+import {
+  resolvePaymentsCopy,
+  type PaymentsCopySource,
+} from '../copy-source';
 import type { PagbankCopy } from './copy';
 import { stubDeliveryTrusted } from '../core/stub-mode';
 import type { ChargeInput, NormalizedWebhookEvent, ResolvedCredentials } from '../core/types';
@@ -230,7 +235,7 @@ const webhookPath = (tenantSlug: string): string =>
   `/api/webhooks/pagseguro/${tenantSlug}/notifications`;
 
 /** What connecting a PagBank account collects. Hoisted for the size gate. */
-function credentialSchemaFor(copy: PagbankCopy): PaymentProviderAdapter['credentialSchema'] {
+function credentialSchemaFor(copy: PagbankCopy): readonly CredentialFieldSpec[] {
   return [
     { key: 'token', label: copy.fields.token, secret: true, required: true },
     { key: 'publicKey', label: copy.fields.publicKey, secret: false, required: false },
@@ -269,7 +274,13 @@ const browserKey = {
     }),
 };
 
-export function pagbankProvider(copy: PagbankCopy): PaymentProviderAdapter {
+export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): PaymentProviderAdapter {
+  // Resolved at each BOUNDARY below, never here. Every helper this factory
+  // calls keeps taking a resolved pack, so the ~8 internal `copy.x` reads are
+  // untouched — the language is chosen where a caller asks, and the adapter
+  // itself is still built once when a deployment names its providers.
+  const copy = (locale?: string): PagbankCopy => resolvePaymentsCopy(source, locale);
+
   return {
     name: NAME,
     displayName: 'PagBank',
@@ -295,15 +306,15 @@ export function pagbankProvider(copy: PagbankCopy): PaymentProviderAdapter {
       tokenization: 'PUBLIC_KEY',
       activationCharge: true,
     },
-    credentialSchema: credentialSchemaFor(copy),
+    credentialSchema: ({ locale }) => credentialSchemaFor(copy(locale ?? undefined)),
     customerSchema,
     // A PIX code and a card typed on OUR page (FUT-596). Named for the SHAPE,
     // not for this vendor: Stone's flow is the same shape and declares the same
     // id rather than forking a second screen.
     checkoutScreen: 'pix-and-card',
 
-    verifyCredentials: verifyPagbankCredentials(copy),
-    createCharge: createChargeWith(copy),
+    verifyCredentials: (credentials, locale) => verifyPagbankCredentials(copy(locale))(credentials),
+    createCharge: (input, credentials) => createChargeWith(copy(input.locale))(input, credentials),
     oauth: pagbankOAuth,
 
     // Card vaulting WITHOUT a purchase (FUT-478/FUT-183) — the dedicated
