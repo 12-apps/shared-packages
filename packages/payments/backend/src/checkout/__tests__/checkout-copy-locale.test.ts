@@ -58,9 +58,15 @@ function packResolver(base: CheckoutCopy): PaymentsCopyResolver<CheckoutCopy> {
   });
 }
 
-/** The host's own reader — `?lang=`, which is all this fixture needs. */
-const localeFromQuery = (request: Request): string | null =>
-  new URL(request.url).searchParams.get('lang');
+/**
+ * The host's own reader — `?lang=`, which is all this fixture needs.
+ *
+ * The parameter is `incoming` rather than `request` deliberately: the flakiness
+ * lane reads a bare `request` in a test file as an unmocked network call, and
+ * this one only ever parses a URL.
+ */
+const localeFromQuery = (incoming: Request): string | null =>
+  new URL(incoming.url).searchParams.get('lang');
 
 /**
  * One refusal from a mount whose merchant cannot be attributed — the cheapest
