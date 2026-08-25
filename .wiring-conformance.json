@@ -309,7 +309,7 @@
   },
   "@12-apps/mcp :: env": {
     "kind": "exempt",
-    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+    "why": "three helpers here DO read process.env (trustedOriginsFromEnv, and loadSigningKeyFromEnv for the key and its id), so the estate's usual 'no reads of its own' line would be false here. The narrowing that IS true: nothing is read at import time or unconditionally, so a host that never calls them has no environment dependency at all; and where they are called the variable's NAME is the caller's — an argument for trustedOriginsFromEnv, a per-call override for loadSigningKeyFromEnv. Declaring env would oblige every host to answer for names it may have spelled differently or never reads"
   },
   "@12-apps/mcp :: jobs": {
     "kind": "exempt",
