@@ -51,6 +51,36 @@ export interface BillingApiCopy {
   invalidSession: HttpRefusal;
 }
 
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — `WireRequest.locale` is a raw tag off the wire, unnarrowed — because
+ * matching it is the host resolver's job, not this package's.
+ */
+export type BillingCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type BillingCopySource<T> = T | BillingCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this inside the HANDLER, never in `createApiBilling`'s body: the routes
+ * are assembled once at the host's mount, so a value read there answers every
+ * later request in whichever language the process started with — and a
+ * single-locale host cannot tell the difference.
+ */
+export function copyOf(
+  config: { copy: BillingCopySource<BillingApiCopy> },
+  locale?: string,
+): BillingApiCopy {
+  const source = config.copy;
+  return typeof source === "function"
+    ? (source as BillingCopyResolver<BillingApiCopy>)({ locale })
+    : source;
+}
+
 /** Whoever the host resolved. The owner id is the only thing this surface reads. */
 export interface BillingActor {
   /** Scopes every read and write below; the host's guard produced it. */
@@ -58,7 +88,13 @@ export interface BillingActor {
 }
 
 export interface BillingApiConfig extends CardVaultDeps {
-  copy: BillingApiCopy;
+  /**
+   * Every sentence this surface can produce — REQUIRED, no default.
+   *
+   * A pack, or a RESOLVER for a host whose tenants do not share a language.
+   * Read it through {@link copyOf} inside the handler that needs a sentence.
+   */
+  copy: BillingCopySource<BillingApiCopy>;
 }
 
 const REJECTIONS: readonly VaultRejection[] = [
@@ -77,6 +113,20 @@ function assertRefusal(what: string, refusal: HttpRefusal | undefined): void {
   }
 }
 
+/**
+ * Every sentence present and usable — asked at the MOUNT, against the
+ * resolver's DEFAULT rendering.
+ *
+ * `copyOf(config)` is called with no locale deliberately. A host that forgot a
+ * sentence must still fail at ASSEMBLY, where a reviewer sees it, rather than
+ * on the one request that happens to need the missing refusal.
+ *
+ * What this cannot check is a resolver whose OTHER language is incomplete: it
+ * sees one rendering, and asking for every canonical tag here would make this
+ * package know the locale list, which is exactly the dependency the mirrored
+ * `BillingCopySource` exists to avoid. A cross-locale parity assertion is the
+ * tool for that, and it belongs to whoever wrote the pack.
+ */
 function assertCopy(copy: BillingApiCopy | undefined): void {
   if (!copy) throw new BillingConfigError("copy", "is required; this surface ships no default copy.");
   for (const rejection of REJECTIONS) assertRefusal(`rejections.${rejection}`, copy.rejections?.[rejection]);
@@ -96,9 +146,8 @@ function sessionIdOf(body: unknown): string | null {
 }
 
 export function createApiBilling(config: BillingApiConfig): { routes: readonly WireRoute<BillingActor>[] } {
-  assertCopy(config.copy);
+  assertCopy(copyOf(config));
   const vault = createCardVault(config);
-  const { copy } = config;
 
   async function cardsOf(ownerId: string): Promise<readonly InstrumentCard[]> {
     return config.instruments.listCards(ownerId);
@@ -111,23 +160,25 @@ export function createApiBilling(config: BillingApiConfig): { routes: readonly W
 
   async function beginSession(request: WireRequest<BillingActor>): Promise<WireResponse> {
     const result = await vault.begin(request.actor.ownerId);
-    if (!result.ok) return refuse(copy.rejections[result.rejection]);
+    if (!result.ok) return refuse(copyOf(config, request.locale).rejections[result.rejection]);
     return { status: 200, body: result.start };
   }
 
   async function completeSession(request: WireRequest<BillingActor>): Promise<WireResponse> {
     const sessionId = sessionIdOf(request.body);
-    if (!sessionId) return refuse(copy.invalidSession);
+    if (!sessionId) return refuse(copyOf(config, request.locale).invalidSession);
 
     const result = await vault.complete(request.actor.ownerId, sessionId);
-    if (!result.ok) return refuse(copy.rejections[result.rejection]);
+    if (!result.ok) return refuse(copyOf(config, request.locale).rejections[result.rejection]);
     return cardList(request.actor.ownerId);
   }
 
   async function forgetCards(request: WireRequest<BillingActor>): Promise<WireResponse> {
     // The only failure left by the time this returns false is one a retry can
     // actually clear — everything permanent has already dropped the pointer.
-    if (!(await vault.forgetAll(request.actor.ownerId)).ok) return refuse(copy.detachFailed);
+    if (!(await vault.forgetAll(request.actor.ownerId)).ok) {
+      return refuse(copyOf(config, request.locale).detachFailed);
+    }
     return cardList(request.actor.ownerId);
   }
 

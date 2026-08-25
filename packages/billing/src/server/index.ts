@@ -26,10 +26,13 @@ export {
   type VaultStart,
 } from "./vault";
 export {
+  copyOf,
   createApiBilling,
   type BillingActor,
   type BillingApiConfig,
   type BillingApiCopy,
+  type BillingCopyResolver,
+  type BillingCopySource,
   type HttpRefusal,
 } from "./routes";
 export type {
