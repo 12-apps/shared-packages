@@ -40,6 +40,7 @@ import {
   contractCapabilities,
   evaluatePackage,
   runtimeWiringImports,
+  distinctWhyFailures,
   shrinkFailures,
   touchMustFixFailures,
 } from "./lib/wiring-estate.mjs";
@@ -205,7 +206,11 @@ function main() {
         : `${finding} ships no "./manifest" — a wireable package declares one, a library gets ` +
           `an argued "exempt" entry in ${LEDGER_PATH}`,
   });
-  failures.push(...checked.failures, ...ratchetFailures(ledger));
+  failures.push(
+    ...checked.failures,
+    ...ratchetFailures(ledger),
+    ...distinctWhyFailures({ ledger, ledgerPath: LEDGER_PATH }),
+  );
 
   if (failures.length > 0) {
     console.error(`${LABEL} ${failures.length} violation(s):`);
