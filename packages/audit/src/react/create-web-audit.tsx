@@ -4,18 +4,21 @@ import type { AuditLogFilters } from '../core/types';
 import { assertAuditVocabulary, type AuditVocabulary } from '../core/vocabulary';
 
 import { createAuditApiClient, type AuditApiClient } from './api';
-import { resolveDayFormat, type DayFormat } from './day-bound';
+import { DEFAULT_EXPORT_LIMITS, type AuditExportLimits } from './export';
+import type { AuditTableComponent } from './grid-table';
 import { createAuditLabels, type AuditLabelOverrides, type AuditLabels } from './labels';
+import { AuditScreen, type AuditScreenProps } from './screen';
 import { httpAuditTransport, type AuditTransport } from './transport';
-import { AuditViewer } from './viewer';
+import { AuditViewer, type AuditViewerProps } from './viewer';
 
 /**
  * The one thing this package exposes to a FRONTEND host.
  *
- * Everything the audit viewer IS — the filter bar, the pills, the day bounds, the
- * table, the diff summary, the pagination, the impersonation PAIR — lives inside
- * this package. The host names where the API is mounted and what its own words
- * are:
+ * Everything the audit screen IS — the dashboard chrome, the filter bar, the
+ * grid, the diff summary, the saved-view chrome, the pagination, the export and
+ * the rendering of the impersonation PAIR — lives inside this package. The host
+ * names where the API is mounted, what its own words are, and which of ITS
+ * wiring the screen should render through:
  *
  *   const { page: AuditLog } = createWebAudit({ apiBase, vocabulary });
  *
@@ -43,6 +46,19 @@ export interface AuditWebConfig {
   /** Label overrides — the host's copy. See `labels.ts` for the defaults. */
   labels?: AuditLabelOverrides;
   /**
+   * The host's own `DataViews` table — the wrapper it already gives every other
+   * admin list, carrying its saved-view persistence and its `?view=` URL sync.
+   *
+   * Optional, and the absence is not a degraded screen: the trail renders on
+   * the same grid either way. What a host loses by omitting it is saved views,
+   * because there is nowhere to save one TO — persistence is a backend the
+   * package cannot invent, exactly as the router is one it cannot know.
+   *
+   * Bind it once, beside the rest of this config: the member is a component
+   * TYPE, so a wrapper rebuilt per render would remount the whole grid.
+   */
+  table?: AuditTableComponent;
+  /**
    * How a timestamp is written. Default: the RUNTIME's own locale, short date
    * and short time.
    *
@@ -54,16 +70,17 @@ export interface AuditWebConfig {
    */
   formatDate?: (iso: string) => string;
   /**
-   * BCP-47 tag for the default stamp formatter AND for the day bounds' segment
-   * order — `01/07/2026` for `pt-BR`, `07/01/2026` for `en-US`. Default: the
-   * runtime's.
+   * BCP-47 tag for the default stamp formatter. Default: the runtime's.
    *
-   * The order is not cosmetic. The bounds are masked fields precisely so this
-   * surface CHOOSES it (a native date input renders in the browser's own locale,
-   * which the page cannot see or set), and a merchant who types the day first
-   * into a month-first field silently filters the wrong window.
+   * It no longer decides the DAY-BOUND field order: the period filter is the
+   * grid's own day-range pill now, and its inputs follow the host's
+   * `DataViewsCopy` and locale like every other date field in an adopting host
+   * — which is the consistency the masked fields it replaces were paying for
+   * with a control nobody else on the screen had.
    */
   locale?: string;
+  /** How much one export may collect. See `export.ts`. */
+  exportLimits?: AuditExportLimits;
   /**
    * Filters pinned IN THE UI — merged over the operator's own on every request, so
    * an embedded screen always shows the slice the host framed it for (an order page
@@ -79,16 +96,19 @@ export interface AuditWebConfig {
 }
 
 export interface WebAudit {
-  /** The whole surface: the filter bar and the trail. */
-  page: ComponentType;
   /**
-   * The same screen with the filter state LIFTED, for a host that mirrors filters
-   * into its own router's URL (which a package cannot do for it).
+   * The whole SCREEN: the dashboard frame, the header and the trail. A host
+   * names its breadcrumb's earlier crumbs and, if it lifts the filter state,
+   * mirrors that state into its own URL.
    */
-  Viewer: ComponentType<{
-    filters: AuditLogFilters;
-    onFiltersChange: (filters: AuditLogFilters) => void;
-  }>;
+  page: ComponentType<AuditScreenProps>;
+  /**
+   * The trail's BODY alone — filters and grid, no page chrome. For a trail
+   * embedded in something else (an order's detail page with `fixedFilters`).
+   */
+  Viewer: ComponentType<
+    Pick<AuditViewerProps, 'filters' | 'onFiltersChange' | 'views' | 'table'>
+  >;
 }
 
 /** The config, resolved once — what every bound component shares. */
@@ -97,7 +117,8 @@ interface SurfaceParts {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
-  dayFormat: DayFormat;
+  exportLimits: AuditExportLimits;
+  table?: AuditTableComponent;
   fixedFilters?: AuditLogFilters;
 }
 
@@ -121,10 +142,8 @@ function surfaceParts(config: AuditWebConfig): SurfaceParts {
     labels,
     vocabulary,
     formatDate: config.formatDate ?? ((iso) => formatter.format(new Date(iso))),
-    // Resolved ONCE, with the rest of the config: it is a stable value the day
-    // bounds re-sync on, and rebuilding it per render would re-run their guard
-    // on every keystroke.
-    dayFormat: resolveDayFormat(config.locale),
+    exportLimits: config.exportLimits ?? DEFAULT_EXPORT_LIMITS,
+    ...(config.table ? { table: config.table } : {}),
     ...(config.fixedFilters ? { fixedFilters: config.fixedFilters } : {}),
   };
 }
@@ -132,25 +151,23 @@ function surfaceParts(config: AuditWebConfig): SurfaceParts {
 export function createWebAudit(config: AuditWebConfig): WebAudit {
   const parts = surfaceParts(config);
   return {
-    page: (): JSX.Element => (
-      <AuditViewer
-        api={parts.api}
-        labels={parts.labels}
-        vocabulary={parts.vocabulary}
-        formatDate={parts.formatDate}
-        dayFormat={parts.dayFormat}
-        {...(parts.fixedFilters ? { fixedFilters: parts.fixedFilters } : {})}
+    page: (props: AuditScreenProps): JSX.Element => (
+      <AuditScreen
+        parts={parts}
+        {...props}
+        // The config's table is the default; a call site may still override it,
+        // which is what lets one surface serve a page and an embed.
+        table={props.table ?? parts.table}
       />
     ),
-    Viewer: ({ filters, onFiltersChange }): JSX.Element => (
+    Viewer: (props): JSX.Element => (
       <AuditViewer
         api={parts.api}
         labels={parts.labels}
         vocabulary={parts.vocabulary}
         formatDate={parts.formatDate}
-        dayFormat={parts.dayFormat}
-        filters={filters}
-        onFiltersChange={onFiltersChange}
+        {...props}
+        table={props.table ?? parts.table}
         {...(parts.fixedFilters ? { fixedFilters: parts.fixedFilters } : {})}
       />
     ),
