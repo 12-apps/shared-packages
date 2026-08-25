@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createEmailAuth } from "../create-email-auth";
 import { createWebEmailAuth } from "../create-web-email-auth";
 import { PT_BR as SCREEN_COPY } from "../screens/pt-BR";
-import { PT_BR_PAGES } from "../pages/pt-BR";
+import { PT_BR_AUTH_ERRORS, PT_BR_PAGES } from "../pages/pt-BR";
 import type { AuthLink } from "../pages";
 
 /**
@@ -113,7 +113,14 @@ describe("createWebEmailAuth", () => {
       Link,
     });
 
-    render(<forAdmin.SignupPage callbackUrl="/" onSignedIn={() => {}} emailEnabled />);
+    render(
+      <forAdmin.SignupPage
+        callbackUrl="/"
+        onBeforeSubmit={async () => {}}
+        onSignedIn={() => {}}
+        emailEnabled
+      />,
+    );
     expect(screen.getByTestId("go-to-login").getAttribute("href")).toBe("/admin/login");
   });
 
@@ -128,11 +135,11 @@ describe("createWebEmailAuth", () => {
       copy: PT_BR_PAGES,
       routes: { login: "/login", signup: "/signup" },
       Link,
-      errors: { default: "Não foi possível entrar." },
+      errors: PT_BR_AUTH_ERRORS,
       useNavigate: () => vi.fn(),
       useSearchParams: () => new URLSearchParams(),
       useSession: () => ({ status: "unauthenticated" }) as never,
-      getSettings: async () => ({ emailSignInEnabled: true, requireEmailVerification: false }),
+      getSettings: async () => ({ enabled: true, requireEmailVerification: false }),
     });
 
     expect(typeof routes.LoginRoute).toBe("function");
