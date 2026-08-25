@@ -24,7 +24,7 @@ describe('the locale packs', () => {
     for (const copy of Object.values(RBAC_WEB_COPY)) {
       expect(copy.rolesList.dialogTitles.edit('Gerente')).toContain('Gerente');
       expect(copy.teamRoleDialog.title('Ana')).toContain('Ana');
-      expect(copy.teamScreen.pendingInviteLine('a@b.test', 'Owner')).toContain('a@b.test');
+      expect(copy.rolesList.dialogTitles.override('Gerente')).toContain('Gerente');
     }
   });
 

@@ -615,10 +615,6 @@
     "kind": "exempt",
     "why": "the product is two root-mounted endpoints — the web-app manifest and the service worker; there is no React surface, only the constraint (recorded in the manifest) that both mount at the root"
   },
-  "@12-apps/rbac :: e2e": {
-    "kind": "exempt",
-    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
-  },
   "@12-apps/rbac :: email": {
     "kind": "exempt",
     "why": "an accountless invitee needs mail addressed to an e-mail, which is the host's signup flow and a different port — the invite notification reaches account holders through RbacNotifyPort instead"
@@ -633,7 +629,7 @@
   },
   "@12-apps/rbac :: mcp": {
     "kind": "exempt",
-    "why": "the coverage CLI is tooling, not a tool surface; agent exposure of roles and teams is host vocabulary, authored per host over the wire schemas"
+    "why": "the seventeen tools cannot exist without a host's mount path, catalog, assignable roles and sentences, so they ship as the factory rbacMcpEndpoints(vocabulary) and join the aggregate through the adoption's mcpEndpoints — the entity-lifecycle carve-out the contract names, not an absence"
   },
   "@12-apps/rbac :: notifications": {
     "kind": "exempt",

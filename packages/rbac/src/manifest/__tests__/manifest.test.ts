@@ -4,6 +4,9 @@
  * devDependency, so the producer factories' runtime assertions run HERE.
  */
 
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 import {
   assertDbMirror,
@@ -16,6 +19,7 @@ import type { PackageManifest } from '@12-apps/wiring';
 
 import packageJson from '../../../package.json';
 import { RBAC_PERMISSIONS } from '../../permissions';
+import { rbacMcpEndpoints } from '../../mcp';
 import { rbacManifest } from '../index';
 import { rbacServerManifest } from '../server';
 import { rbacWebManifest } from '../web';
@@ -88,7 +92,10 @@ describe('the rbac manifest', () => {
     const area = rbacWebManifest.areas[0];
     expect(area.area).toBe('admin');
     const gates = area.routes.map((route) => route.permission);
-    expect(gates).toEqual(['team:read', 'roles:manage']);
+    // The DISTINCT set, not the list: the roster and the per-member profile
+    // are two routes behind one gate, and pinning the list would make adding a
+    // route behind an ALREADY-contributed id look like a violation.
+    expect([...new Set(gates)].sort()).toEqual(['roles:manage', 'team:read']);
     gates.forEach((gate) => {
       expect(RBAC_PERMISSIONS.ids).toContain(gate);
     });
@@ -111,5 +118,86 @@ describe('the rbac manifest', () => {
   it('mirrors the db declaration and the manifest subpaths into package.json', () => {
     assertDbMirror(rbacManifest, packageJson);
     assertExportsMirror(rbacManifest, packageJson);
+  });
+
+  it('declares the packaged journeys, so a host must answer for them', () => {
+    // Undeclared, they were adopted by convention: three specs in the origin
+    // host asserting this package's own test ids from outside it, invisible to
+    // `assemble()`. Declared, a host either binds `featuresRoot` or declines in
+    // writing — and the decline is in the report rather than in nobody's head.
+    expect(rbacManifest.e2e).toEqual({
+      entry: '@12-apps/rbac/e2e',
+      world: { factory: 'defineRbacWorld' },
+    });
+  });
+
+  it('declares no jobs and no email, and the docblock says why', () => {
+    // The contract's rule is bound-or-declined-in-writing, and silence is
+    // neither. Both absences are real — nothing here is deferred, and the one
+    // reader this package cannot reach (an accountless invitee) needs a mail
+    // that belongs to the flow owning the address before an account exists.
+    // What this pins is that they stay ABSENT rather than drifting into an
+    // empty declaration, which would oblige every host to bind deps for work
+    // that does not exist.
+    const manifest = rbacManifest as Record<string, unknown>;
+    expect(manifest.jobs).toBeUndefined();
+    expect(manifest.email).toBeUndefined();
+    expect(rbacManifest.server).toEqual(['http']);
+  });
+
+  it('declares no STATIC mcp capability — the seventeen tools need a vocabulary', () => {
+    // The contract carves this case out by name, and `lifecycleMcpEndpoints`
+    // is the precedent: a tool table that cannot exist without the host's
+    // mount path, catalog and sentences joins the aggregate through the
+    // adoption's `mcpEndpoints` rather than sitting in the manifest.
+    //
+    // What this pins is that the carve-out stays HONEST in both directions —
+    // no static declaration appears, AND the factory the docblock promises is
+    // really exported. A narrowing whose replacement went missing would read
+    // exactly like this one and ship no tools at all.
+    expect((rbacManifest as Record<string, unknown>).mcp).toBeUndefined();
+    expect(typeof rbacMcpEndpoints).toBe('function');
+  });
+
+  it('reads no process.env in shipped source, which is what `no env` claims', () => {
+    // The one narrowing that can rot WITHOUT anybody touching this manifest:
+    // `env` is absent because every deployment-shaped decision reaches this
+    // package as an argument, and the day somebody adds a `process.env` read
+    // the manifest is silently wrong — a host would never be asked to declare
+    // a variable the package had started depending on.
+    //
+    // Tests and the packaged journeys are excluded: neither ships, and a
+    // journey legitimately reads the environment its host puts it in.
+    //
+    // COMMENTS ARE STRIPPED FIRST, and that is not a convenience: the
+    // narrowing's own explanation — one file up — contains the words
+    // `process.env` in the sentence saying this package never reads it. A
+    // scanner counting prose would fire on the docblock justifying the rule,
+    // which is the same reason the payments and adapter budgets count code
+    // lines only. Documenting a boundary must never cost.
+    /* eslint-disable test-flakiness/no-unmocked-fs --
+       the real source tree IS the subject. A mocked filesystem here would
+       assert that a fixture contains no `process.env`, which is true of every
+       fixture and says nothing about what this package ships. The walk reads
+       tracked files that cannot change while the test runs. */
+    const src = join(import.meta.dirname, '../..');
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          if (entry !== '__tests__' && entry !== 'e2e') walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry) || /\.test\./.test(entry)) continue;
+        const code = readFileSync(full, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/^\s*\/\/.*$/gm, '');
+        if (code.includes('process.env')) offenders.push(full.slice(src.length + 1));
+      }
+    };
+    walk(src);
+    /* eslint-enable test-flakiness/no-unmocked-fs */
+    expect(offenders).toEqual([]);
   });
 });

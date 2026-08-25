@@ -1,268 +1,208 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
+'use client';
 
-import { Stack } from '@12-apps/ui/mui/Stack';
-import { Text } from '@12-apps/ui/typography/Text';
+import { useMemo, useState, type JSX } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-import { Alert } from '@12-apps/ui/data-display/Alert';
+import { useServerDataViews } from '@12-apps/app-shell/react';
+import { DataViewsCopyProvider } from '@12-apps/ui/data-display/DataViews';
+import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
+import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
+import { Dashboard } from '@12-apps/ui/layout/Dashboard';
 
+import type { RbacApiClient } from './api';
 import { useCan } from './context';
-
-import type { RbacApiClient, TeamContextWire } from './api';
-import type {
-  TeamRoleDialogCopy,
-  TeamRowMenuCopy,
-  TeamScreenCopy,
-  TeamTableCopy,
-} from './copy';
+import type { RbacWebCopy } from './copy';
 import type { RbacLabels } from './labels';
-import { ConfirmDialog } from './confirm-dialog';
-import { SearchField } from './search-field';
-import { useConfirmable } from './use-confirmable';
 import {
-  applyRoleChanges,
-  splitRoleSelection,
-  RoleEditDialog,
-  type MemberWithRoles,
-} from './team-role-dialog';
-import { TeamTable } from './team-table';
+  buildTeamRowActions,
+  teamQueryToParams,
+  teamSearch,
+  teamSyncState,
+  type TeamRow,
+} from './team-grid-config';
+import { RoleEditDialog } from './team-role-dialog';
+import { HeaderControls, InviteDialog, TeamBanners, TeamBody } from './team-screen-parts';
+import {
+  useCancelInviteConfirm,
+  useRemoveConfirm,
+  useRoleEditor,
+  useTeamActions,
+} from './use-team-actions';
+import { useTeamData } from './use-team-data';
 
 /**
- * Equipe — the staff roster (12-13), ported from the origin host's
- * `apps/admin/src/pages/team/*`: the members grid, the unified role-edit
- * dialog (in `team-role-dialog.tsx`), enable/disable and remove. Same test
- * ids (`team-grid`, `team-search-all`, `team-actions-<userId>`,
- * `role-edit-dialog`) so the e2e specs moved with the screen. Every sentence
- * comes from the host's {@link TeamScreenCopy} (and its table/dialog/menu
- * siblings).
+ * Equipe — the staff roster, on the shared server-driven grid: the URL params
+ * ARE the query, a unified read-only roles column beside status, a ⋮ kebab per
+ * row and per card, and the invite flow.
+ *
+ * Test ids (`team-grid`, `team-actions-<userId>`, `role-edit-dialog`,
+ * `invite-dialog`, `status-<userId>`) are the surface the packaged e2e journeys
+ * drive, and they are ids rather than sentences precisely so a host that words
+ * the screen differently still runs them.
  */
 
-export { splitRoleSelection };
+export { splitRoleSelection } from './team-role-dialog';
 
-interface TeamScreenProps {
+export interface TeamScreenProps {
   api: RbacApiClient;
   labels: RbacLabels;
   /** The SYSTEM roles assignable as a member's base (owner tier excluded). */
   systemRoles: readonly string[];
   /**
-   * The owner tier — never disabled/removed from the roster; the rows whose
-   * kebab hides "Desativar" and "Remover".
+   * The owner tier — never disabled or removed from the roster.
    *
-   * REQUIRED, with no `['OWNER']` fallback. `createWebRbac` passes
-   * `catalog.governance.ownerRoles`, but a host is invited to route this
-   * screen itself, and a default meant such a host rendered destructive
-   * affordances on rows the server then refuses — the screen and the endpoints
-   * disagreeing about who an owner is, which is precisely what one composed
-   * catalog exists to prevent.
+   * REQUIRED, with no `['OWNER']` fallback: a default meant a host routing this
+   * screen itself rendered destructive affordances on rows the server then
+   * refuses, which is the screen and the endpoints disagreeing about who an
+   * owner is.
    */
   ownerRoles: readonly string[];
   managePermission: string;
-  copy: TeamScreenCopy;
-  tableCopy: TeamTableCopy;
-  dialogCopy: TeamRoleDialogCopy;
-  menuCopy: TeamRowMenuCopy;
-}
-
-/** The roster + context read, joined into rows with their custom roles. */
-function useTeamPage(api: RbacApiClient, query: string, loadFailed: string): {
-  rows: MemberWithRoles[] | null;
-  context: TeamContextWire | null;
-  loadError: string | null;
-  refresh: () => void;
-} {
-  const [rows, setRows] = useState<MemberWithRoles[] | null>(null);
-  const [context, setContext] = useState<TeamContextWire | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [generation, setGeneration] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([api.listTeam(query ? { q: query } : {}), api.teamContext()])
-      .then(([page, teamContext]) => {
-        if (cancelled) return;
-        const customByMember = new Map(
-          teamContext.customRolesByMember.map((entry) => [entry.userId, entry.roles]),
-        );
-        setRows(
-          page.data.map((member) => ({
-            ...member,
-            customRoles: customByMember.get(member.userId) ?? [],
-          })),
-        );
-        setContext(teamContext);
-        setLoadError(null);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadError(loadFailed);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api, query, generation, loadFailed]);
-
-  return {
-    rows,
-    context,
-    loadError,
-    refresh: useCallback(() => setGeneration((value) => value + 1), []),
-  };
+  copy: RbacWebCopy;
+  /** The crumbs above the title. The host owns its own information hierarchy. */
+  breadcrumb?: readonly { label: string; href?: string }[];
+  /** Open one member's profile. Absent when the host routes no profile screen. */
+  onOpenMember?: (userId: string) => void;
 }
 
 /**
- * The role-edit popup's state + save orchestration — the origin host's
- * `use-role-editor.ts`, hookified against the packaged api client: the base
- * change and the custom-role diff map onto the EXISTING endpoints, so no new
- * server surface exists for the dialog.
+ * The roster's derived vocabulary, its role editor, its two confirm popups and
+ * the ⋮ entries built from all of them.
+ *
+ * One hook rather than six statements in the screen, because they are one
+ * thing: the actions are what the confirms and the editor are FOR, and the
+ * owner and system sets exist only to shape them. Splitting them across the
+ * component body was six lines of the size gate spent on plumbing.
  */
-function useRoleEditor(
-  api: RbacApiClient,
-  systemSet: ReadonlySet<string>,
-  refresh: () => void,
+function useRosterControls(
+  props: TeamScreenProps,
+  data: ReturnType<typeof useTeamData>,
+  actions: ReturnType<typeof useTeamActions>,
 ): {
-  editing: MemberWithRoles | null;
-  busy: boolean;
-  error: string | null;
-  open: (member: MemberWithRoles) => void;
-  close: () => void;
-  save: (roleNames: string[]) => Promise<void>;
+  customRoles: string[];
+  editor: ReturnType<typeof useRoleEditor>;
+  removeConfirm: ReturnType<typeof useRemoveConfirm>;
+  cancelInviteConfirm: ReturnType<typeof useCancelInviteConfirm>;
+  rowActions: ReturnType<typeof buildTeamRowActions>;
 } {
-  const [editing, setEditing] = useState<MemberWithRoles | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return {
-    editing,
-    busy,
-    error,
-    open: setEditing,
-    close: () => setEditing(null),
-    async save(roleNames) {
-      if (!editing) return;
-      const { base, customRoles } = splitRoleSelection(roleNames, systemSet);
-      if (!base) return; // the dialog blocks a save without exactly one system role
-      setBusy(true);
-      setError(null);
-      const failure = await applyRoleChanges(api, editing, base, customRoles);
-      setBusy(false);
-      setError(failure);
-      if (!failure) {
-        setEditing(null);
-        refresh();
-      }
+  const { copy } = props;
+  const systemSet = useMemo(() => new Set(props.systemRoles), [props.systemRoles]);
+  const ownerSet = useMemo(() => new Set(props.ownerRoles), [props.ownerRoles]);
+  const customRoles = useMemo(
+    () => (data.context?.assignableRoles ?? []).filter((name) => !systemSet.has(name)),
+    [data.context, systemSet],
+  );
+  const editor = useRoleEditor(props.api, systemSet, data.refresh, actions.setError);
+  const removeConfirm = useRemoveConfirm(actions, copy);
+  const cancelInviteConfirm = useCancelInviteConfirm(actions, copy);
+  // Rebuilt per render rather than memoised on identity: the handlers close
+  // over `actions`, and a memo keyed on it would keep a stale closure the first
+  // time one of those functions is recreated.
+  const rowActions = buildTeamRowActions(
+    {
+      openRoleEdit: editor.open,
+      toggleActive: (row) => void actions.toggleActive(row),
+      remove: (row) => removeConfirm.request([row]),
+      cancelInvite: (row) => cancelInviteConfirm.request([row]),
     },
-  };
+    ownerSet,
+    copy.teamRowMenu,
+  );
+  return { customRoles, editor, removeConfirm, cancelInviteConfirm, rowActions };
 }
 
-/** The confirm step for the roster's one destructive act. */
-function RemoveConfirm({
-  removal,
-  copy,
-}: {
-  removal: ReturnType<typeof useConfirmable<MemberWithRoles>>;
-  copy: TeamScreenCopy;
-}): JSX.Element {
-  return (
-    <ConfirmDialog
-      open={removal.pending !== null}
-      title={copy.removeConfirm.title}
-      body={copy.removeConfirm.body}
-      confirmLabel={copy.removeConfirm.confirmLabel}
-      cancelLabel={copy.cancelAction}
-      busy={removal.busy}
-      onConfirm={() => void removal.confirm()}
-      onCancel={removal.cancel}
-    />
-  );
-}
-
-/** The accountless invites awaiting signup, when the host wires the port. */
-function PendingInvites({
-  context,
-  labels,
-  copy,
-}: {
-  context: TeamContextWire | null;
-  labels: RbacLabels;
-  copy: TeamScreenCopy;
-}): JSX.Element | null {
-  if (!context || context.pendingInvites.length === 0) return null;
-  return (
-    <Stack spacing={0.5}>
-      <Text variant="caption" as="p" color="secondary">
-        {copy.pendingInvitesTitle}
-      </Text>
-      {context.pendingInvites.map((invite) => (
-        <Text key={invite.id} as="p">
-          {copy.pendingInviteLine(invite.email, labels.roleLabel(invite.role))}
-        </Text>
-      ))}
-    </Stack>
-  );
+/** What the screen renders INSTEAD of the roster, or null when it is ready. */
+function rosterGate(
+  data: ReturnType<typeof useTeamData>,
+  copy: RbacWebCopy,
+): JSX.Element | null {
+  if (data.loading) return <LoadingState dataTestId="team-loading" />;
+  if (data.error !== null) {
+    return (
+      <ErrorState
+        title={copy.teamScreen.loadFailed}
+        message={data.error}
+        retryLabel={copy.teamScreen.retryAction}
+        onRetry={data.refresh}
+      />
+    );
+  }
+  return null;
 }
 
 export function TeamScreen(props: TeamScreenProps): JSX.Element {
-  const { api, labels, copy, systemRoles } = props;
-  const can = useCan();
-  const canManage = can(props.managePermission);
-  const [query, setQuery] = useState('');
-  const { rows, context, loadError, refresh } = useTeamPage(api, query, copy.loadFailed);
-  const [toggleError, setToggleError] = useState<string | null>(null);
-  const removal = useConfirmable<MemberWithRoles>(
-    (member) => api.removeMember(member.userId),
-    refresh,
-  );
-  const actionError = removal.error ?? toggleError;
+  const { api, labels, copy } = props;
+  const canManage = useCan()(props.managePermission);
+  const [searchParams] = useSearchParams();
+  const search = teamSearch(searchParams);
+  const data = useTeamData(api, search, copy.teamScreen.loadFailed);
+  const actions = useTeamActions(api, copy, data.refresh);
+  const [visibleRows, setVisibleRows] = useState<TeamRow[]>([]);
 
-  const toggleActive = async (member: MemberWithRoles): Promise<void> => {
-    const result = await api.setMemberActive(member.userId, !member.active);
-    // A refused flip (e.g. "Não é possível desativar um proprietário.")
-    // must SAY so, not render nothing.
-    setToggleError(result.ok ? null : result.error);
-    if (result.ok) refresh();
-  };
+  const { customRoles, editor, removeConfirm, cancelInviteConfirm, rowActions } =
+    useRosterControls(props, data, actions);
 
-  const ownerRoles = useMemo(() => new Set(props.ownerRoles), [props.ownerRoles]);
-  const systemSet = useMemo(() => new Set(systemRoles), [systemRoles]);
-  const availableCustomRoles = useMemo(
-    () => (context?.assignableRoles ?? []).filter((name) => !systemSet.has(name)),
-    [context, systemSet],
-  );
-  const editor = useRoleEditor(api, systemSet, refresh);
+  // The URL-driven controls, re-derived on every address-bar change so browser
+  // back/forward re-applies search, pills and sort. The grid merges it over its
+  // own state, so column visibility is never disturbed.
+  const syncState = useMemo(() => teamSyncState(searchParams), [searchParams]);
+  const server = useServerDataViews({
+    totalCount: data.pagination?.total ?? 0,
+    page: data.pagination?.page ?? 1,
+    pageSize: data.pagination?.pageSize ?? 20,
+    toParams: teamQueryToParams,
+  });
+
+  const blocked = rosterGate(data, copy);
+  if (blocked) return blocked;
 
   return (
-    <Stack spacing={2}>
-      <Text variant="heading" size="lg" as="h1">
-        {copy.title}
-      </Text>
-      <SearchField placeholder={copy.searchPlaceholder} testId="team-search-all" onCommit={setQuery} />
-      {loadError && <Text as="p">{loadError}</Text>}
-      {actionError && (
-        <Alert variant="danger" description={actionError} data-testid="team-error" />
-      )}
-      {rows && (
-        <TeamTable
-          rows={rows}
+    // The grid, its toolbar and its saved-view dialogs read their words from
+    // here: `@12-apps/ui` ships none and throws rather than falling back.
+    <DataViewsCopyProvider copy={copy.dataViews}>
+      <Dashboard testIdPrefix="team-dashboard">
+        {props.breadcrumb && <Dashboard.Breadcrumb items={[...props.breadcrumb]} />}
+        <Dashboard.Header title={copy.teamScreen.title}>
+          <HeaderControls
+            rows={visibleRows}
+            labels={labels}
+            copy={copy}
+            canManage={canManage}
+            onInvite={actions.toggleForm}
+          />
+        </Dashboard.Header>
+        {canManage && <InviteDialog actions={actions} copy={copy} />}
+        <Dashboard.Body>
+          <TeamBanners actions={actions} copy={copy} />
+          <TeamBody
+            rows={data.rows}
+            labels={labels}
+            copy={copy}
+            systemRoles={props.systemRoles}
+            customRoles={customRoles}
+            canManage={canManage}
+            rowActions={rowActions}
+            server={server}
+            syncState={syncState}
+            onVisibleRowsChange={setVisibleRows}
+            onOpenMember={props.onOpenMember}
+          />
+        </Dashboard.Body>
+        {removeConfirm.dialog}
+        {cancelInviteConfirm.dialog}
+        <RoleEditDialog
+          member={editor.editing}
+          systemRoles={props.systemRoles}
+          availableCustomRoles={customRoles}
           labels={labels}
-          copy={props.tableCopy}
-          menuCopy={props.menuCopy}
-          canManage={canManage}
-          ownerRoles={ownerRoles}
-          onEditRoles={editor.open}
-          onToggleActive={(member) => void toggleActive(member)}
-          onRemove={removal.request}
+          copy={copy.teamRoleDialog}
+          busy={editor.busy}
+          error={null}
+          onClose={editor.close}
+          onSave={(roleNames) => void editor.save(roleNames)}
         />
-      )}
-      <PendingInvites context={context} labels={labels} copy={copy} />
-      <RemoveConfirm removal={removal} copy={copy} />
-      <RoleEditDialog
-        member={editor.editing}
-        systemRoles={systemRoles}
-        availableCustomRoles={availableCustomRoles}
-        labels={labels}
-        copy={props.dialogCopy}
-        busy={editor.busy}
-        error={editor.error}
-        onClose={editor.close}
-        onSave={(roleNames) => void editor.save(roleNames)}
-      />
-    </Stack>
+      </Dashboard>
+    </DataViewsCopyProvider>
   );
 }
+
