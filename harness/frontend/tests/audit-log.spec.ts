@@ -12,11 +12,28 @@ import { expect, test, type Page } from '@playwright/test';
  * The package ships no product vocabulary at all, which is what makes this a
  * consumer proof rather than a restatement of a default.
  *
+ * Since the trail moved onto `@12-apps/ui`'s `DataViews` grid, the CONTROLS
+ * below are that grid's — the search box, the filter pills, the period range,
+ * the counter — and the page is mounted with no `table` binding, which is the
+ * arrangement a host that wires no saved-view backend gets. So this also proves
+ * the standalone fallback renders and filters, and not only the wired path.
+ *
  * The one thing the extraction origin's own e2e spec could not assert, because
  * its screen did not render it, is here: the impersonation PAIR. Its API carried
  * both names and the viewer dropped them, so a support session was
  * indistinguishable on screen from the account owner working alone.
  */
+
+/**
+ * Wider than the default 1280, and that is about the SPEC rather than the
+ * screen. The grid's filter bar is responsive: it measures itself and folds
+ * whatever will not fit into a "Mais N" panel, so at 1280 the period range
+ * moves out of reach the moment a pill is active — and a case that then failed
+ * would be reporting the ladder, not the trail. The ladder is `@12-apps/ui`'s
+ * own to test; these cases are about what the audit surface asks the grid for,
+ * so they are given a viewport where every control it declares is on screen.
+ */
+test.use({ viewport: { width: 1800, height: 900 } });
 
 test.beforeEach(async ({ request }) => {
   /* eslint-disable-next-line test-flakiness/no-unmocked-network --
@@ -27,16 +44,47 @@ test.beforeEach(async ({ request }) => {
   expect(response.status()).toBe(204);
 });
 
+/**
+ * Open the trail and wait for the grid SHELL.
+ *
+ * The container rather than the table, deliberately: the table is only in the
+ * DOM once there are rows, so a case that narrows a filter to nothing would be
+ * waiting for an element the screen is correct not to have.
+ */
 async function openTrail(page: Page): Promise<void> {
   await page.goto('#/audit-log');
-  await expect(page.getByTestId('audit-log-grid')).toBeVisible();
+  await expect(page.getByTestId('audit-log-grid-container')).toBeVisible();
+}
+
+/** Tick one option inside a filter pill's menu, by the label the host gave it. */
+async function pickOption(page: Page, fieldId: string, label: string): Promise<void> {
+  await page.getByTestId(`audit-log-filter-${fieldId}`).click();
+  // By ROLE, not by text: an option's label is the same word the column it
+  // filters renders in every row, so a bare text query matches the menu item
+  // and the table at once.
+  await page.getByRole('menuitem', { name: label }).click();
+  await page.keyboard.press('Escape');
 }
 
 /**
- * Type a `YYYY-MM-DD` day into one of the bounds, in the order THE FIELD asks
- * for, and answer what it should then read.
+ * The unpaginated total the SERVER answered, off the toolbar counter.
  *
- * The bounds are masked text fields whose segment order comes from the surface's
+ * The counter reads "<matched> de <total>"; this returns the second number,
+ * which is the database's `count` rather than a tally of loaded rows — the
+ * useful assertion the moment a filter narrows past one page.
+ */
+async function serverTotal(page: Page): Promise<number> {
+  const text = (await page.getByTestId('audit-log-counter').textContent()) ?? '';
+  const parts = text.match(/(\d+)\D+(\d+)/);
+  expect(parts).not.toBeNull();
+  return Number(parts?.[2]);
+}
+
+/**
+ * Type a `YYYY-MM-DD` day into one of the period bounds, in the order THE FIELD
+ * asks for, and answer what it should then read.
+ *
+ * The bounds are masked text fields whose segment order comes from the running
  * locale, so the eight digits a person types are not the order the wire carries.
  * This spec used to `fill('2020-01-01')`, and under a month-first runtime that
  * is a 20th month: refused, nothing committed, and the filter silently never
@@ -50,14 +98,14 @@ async function openTrail(page: Page): Promise<void> {
  * finished value and never visits the intermediate states, which is where a
  * controlled date field loses what is being typed.
  */
-async function typeDayBound(page: Page, testId: string, iso: string): Promise<string> {
-  const field = page.getByTestId(testId);
+async function typeDayBound(page: Page, bound: 'min' | 'max', iso: string): Promise<string> {
+  const field = page.getByTestId(`audit-log-range-period-${bound}`);
   const placeholder = (await field.getAttribute('placeholder')) ?? '';
   const [year, month, day] = iso.split('-') as [string, string, string];
   const tokens = placeholder.split(/[^A-Za-z]+/).filter(Boolean);
   // A bound that announces no order is a bound whose order nobody can know —
-  // including this helper, which would then type nothing into `testId` and let
-  // every assertion below pass vacuously.
+  // including this helper, which would then type nothing and let every
+  // assertion below pass vacuously.
   expect(tokens).toHaveLength(3);
   const segments = tokens.map((token) => {
     const head = token.slice(0, 1).toLowerCase();
@@ -70,11 +118,19 @@ async function typeDayBound(page: Page, testId: string, iso: string): Promise<st
   return segments.join(separator);
 }
 
+/** Open the period pill's popover, where both bounds live. */
+async function openPeriod(page: Page): Promise<void> {
+  await page.getByTestId('audit-log-range-period').click();
+  await expect(page.getByTestId('audit-log-range-period-panel')).toBeVisible();
+}
+
 test.describe('The trail', () => {
   test('renders the seeded entries with labelled actions and resources', async ({ page }) => {
     await openTrail(page);
 
-    await expect(page.getByRole('heading', { name: 'Audit trail' })).toBeVisible();
+    // The page HEADER's own title, not a loose text match: "Audit trail" is
+    // also the breadcrumb's last crumb, and the two are different claims.
+    await expect(page.getByTestId('audit-log-dashboard-header')).toContainText('Audit trail');
     const grid = page.getByTestId('audit-log-grid');
     // Labels come from the vocabulary the BACKEND validates against — one value,
     // so an action that exists is an action the screen can name.
@@ -113,66 +169,68 @@ test.describe('The trail', () => {
 test.describe('The filters', () => {
   test('an action pill narrows the trail through the backend', async ({ page }) => {
     await openTrail(page);
+    expect(await serverTotal(page)).toBe(4);
 
-    await page.getByTestId('audit-log-action-lamp.extinguish').click();
+    await pickOption(page, 'action', 'Lamp extinguished');
 
     const grid = page.getByTestId('audit-log-grid');
     await expect(grid.getByText('Lamp extinguished')).toBeVisible();
     await expect(grid.getByText('Keeper assigned')).toHaveCount(0);
     // The count came back from the database, not from a client-side filter.
-    await expect(page.getByTestId('audit-log-page-status')).toHaveText(
-      'Page 1 of 1 · 1 entries',
-    );
+    await expect
+      .poll(() => serverTotal(page))
+      .toBe(1);
   });
 
   test('a resource pill and the keyword search compose', async ({ page }) => {
     await openTrail(page);
 
-    await page.getByTestId('audit-log-resource-lamp').click();
-    await expect(page.getByTestId('audit-log-page-status')).toHaveText(
-      'Page 1 of 1 · 2 entries',
-    );
+    await pickOption(page, 'resourceType', 'Lamp');
+    await expect.poll(() => serverTotal(page)).toBe(2);
 
-    const search = page.getByTestId('audit-log-search');
-    await search.fill('beacon-7');
-    await search.press('Enter');
+    // The grid's own search box, debounced — so the assertion polls rather than
+    // reading once, exactly as an operator waits a beat after typing.
+    await page.getByTestId('audit-log-search-all').fill('beacon-7');
 
-    await expect(page.getByTestId('audit-log-page-status')).toHaveText(
-      'Page 1 of 1 · 1 entries',
-    );
+    await expect.poll(() => serverTotal(page)).toBe(1);
     await expect(page.getByTestId('audit-log-grid')).toContainText('beacon-7');
   });
 
-  test('the actor picker is the tenant roster, and filters by the chosen person', async ({
+  test('the actor pill is the tenant roster, and filters by the chosen person', async ({
     page,
   }) => {
     await openTrail(page);
 
     // Populated by the package's own `/audit-logs/actors` route through the host
-    // directory port — a host with no directory gets a free-text id instead.
-    await page.getByTestId('audit-log-actor-select').selectOption({ label: 'Cora Wick' });
+    // directory port — a host with no directory is offered no actor pill at all,
+    // because a pill whose menu is empty reads as a broken filter.
+    await pickOption(page, 'actorUserId', 'Cora Wick');
 
     await expect(page.getByTestId('audit-log-grid')).toContainText('Keeper assigned');
-    await expect(page.getByTestId('audit-log-page-status')).toHaveText(
-      'Page 1 of 1 · 1 entries',
-    );
+    await expect.poll(() => serverTotal(page)).toBe(1);
   });
 
-  test('a day range with no entries shows the empty state, and Clear filters restores', async ({
+  test('a period with no entries shows the empty state, and Clear filters restores', async ({
     page,
   }) => {
     await openTrail(page);
 
-    await typeDayBound(page, 'audit-log-from', '2020-01-01');
-    await typeDayBound(page, 'audit-log-to', '2020-01-02');
+    await openPeriod(page);
+    await typeDayBound(page, 'min', '2020-01-01');
+    await typeDayBound(page, 'max', '2020-01-02');
+    await page.keyboard.press('Escape');
 
-    await expect(page.getByTestId('audit-log-empty')).toBeVisible();
+    // The grid writes its OWN empty state when something is narrowing the list —
+    // "nothing here yet" under an active filter is a different sentence, and the
+    // wrong one.
+    await expect(page.getByTestId('audit-log-empty-filtered')).toBeVisible();
 
-    await page.getByTestId('audit-log-clear').click();
+    // The way out the FILTERED empty state carries, which is the whole reason
+    // the grid writes its own sentence there rather than deferring to the
+    // host's "nothing here yet": the fix is one click, and it is right there.
+    await page.getByTestId('audit-log-empty-clear').click();
     await expect(page.getByTestId('audit-log-grid')).toBeVisible();
-    await expect(page.getByTestId('audit-log-page-status')).toHaveText(
-      'Page 1 of 1 · 4 entries',
-    );
+    await expect.poll(() => serverTotal(page)).toBe(4);
   });
 
   test('a day bound typed one digit at a time keeps every digit', async ({ page }) => {
@@ -181,51 +239,55 @@ test.describe('The filters', () => {
     // digit, the surface's own commit comes back a render later, and the
     // browser's segment buffer is discarded mid-edit — so `2026` was applied as
     // the year `0006`, which is a valid date and looks like it worked.
+    //
+    // The field moved into `@12-apps/ui` with the grid; the property did not
+    // move with it, because it is about a masked field COMBINED with a surface
+    // that commits and re-renders around it. This is still where those meet.
     await openTrail(page);
+    await openPeriod(page);
 
     // A year the seed cannot reach whatever day the suite runs on, so the empty
     // state means "the year that arrived is the year that was typed". An edit
     // interrupted mid-year lands in the 00xx range, which is BEFORE every seeded
     // row — the grid would still be full, and the old field failed exactly that
     // way while looking like it had worked.
-    const displayed = await typeDayBound(page, 'audit-log-from', '2099-12-31');
+    const displayed = await typeDayBound(page, 'min', '2099-12-31');
 
-    await expect(page.getByTestId('audit-log-from')).toHaveValue(displayed);
-    await expect(page.getByTestId('audit-log-empty')).toBeVisible();
+    await expect(page.getByTestId('audit-log-range-period-min')).toHaveValue(displayed);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('audit-log-empty-filtered')).toBeVisible();
   });
 
-  test('each bound clears on its own, without dropping the other', async ({ page }) => {
-    // "Clear filters" drops every pill, the search and both bounds; dropping one
-    // end of a window should not cost the rest of the screen. The ✕ also has to
-    // survive its own re-render — it lives in the field's adornment, so a blur
-    // that rebuilds it between mousedown and mouseup swallows the click.
-    await openTrail(page);
-
-    // A window wide enough to hold whatever day the seed stamped, so what the
-    // ✕ changes is the only thing under test.
-    const upper = await typeDayBound(page, 'audit-log-to', '2099-12-31');
-    const lower = await typeDayBound(page, 'audit-log-from', '2020-01-01');
-    await expect(page.getByTestId('audit-log-from')).toHaveValue(lower);
-
-    await page.getByTestId('audit-log-from-clear').click();
-
-    await expect(page.getByTestId('audit-log-from')).toHaveValue('');
-    await expect(page.getByTestId('audit-log-to')).toHaveValue(upper);
-    await expect(page.getByTestId('audit-log-grid')).toBeVisible();
-  });
-
-  test('the footer reports the SERVER totals, and pins both ends of one page', async ({
+  test('the period clears from its own ✕, without dropping the other filters', async ({
     page,
   }) => {
+    // "Clear filters" drops every pill, the search and the window; dropping the
+    // window alone should not cost the rest of the screen.
+    await openTrail(page);
+    await pickOption(page, 'action', 'Lamp extinguished');
+    await expect.poll(() => serverTotal(page)).toBe(1);
+
+    await openPeriod(page);
+    // A window wide enough to hold whatever day the seed stamped, so what the
+    // ✕ changes is the only thing under test.
+    await typeDayBound(page, 'min', '2020-01-01');
+    await page.keyboard.press('Escape');
+
+    await page.getByTestId('audit-log-range-period-clear').click();
+
+    // The action pill survived: still one entry, not four.
+    await expect.poll(() => serverTotal(page)).toBe(1);
+    await expect(page.getByTestId('audit-log-grid')).toContainText('Lamp extinguished');
+  });
+
+  test('the counter reports the SERVER total, and one page needs no pager', async ({ page }) => {
     await openTrail(page);
 
-    // Four seeded entries at the default page size of 20: one page, so neither
-    // control is live. The number is the database's `count`, not a row tally —
-    // which is what makes it the useful assertion when a filter narrows.
-    await expect(page.getByTestId('audit-log-page-status')).toHaveText(
-      'Page 1 of 1 · 4 entries',
-    );
-    await expect(page.getByTestId('audit-log-prev')).toBeDisabled();
-    await expect(page.getByTestId('audit-log-next')).toBeDisabled();
+    // Four seeded entries at the default page size of 20: one page, so the
+    // pager is not rendered at all. The number is the database's `count`, not a
+    // row tally — which is what makes it the useful assertion when a filter
+    // narrows.
+    expect(await serverTotal(page)).toBe(4);
+    await expect(page.getByTestId('audit-log-pagination')).toHaveCount(0);
   });
 });

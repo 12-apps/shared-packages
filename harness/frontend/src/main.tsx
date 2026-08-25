@@ -5,6 +5,8 @@ import { DEFAULT_LOCALE, isLocale, type Locale } from '@12-apps/i18n';
 import { LocaleProvider } from '@12-apps/i18n/react';
 import { setErrorClassifiers, startObservability } from '@12-apps/observability-frontend';
 
+import { DataViewsCopyProvider } from '@12-apps/ui/data-display/DataViews';
+import { EN_US_DATA_VIEWS_COPY } from '@12-apps/ui/en-US';
 import { CssBaseline } from '@12-apps/ui/mui/CssBaseline';
 import { ThemeProvider } from '@12-apps/ui/mui/styles';
 
@@ -25,6 +27,13 @@ import { harnessTheme } from './shell/theme';
  * `apps/admin/src/App.tsx` performs it. Without them, every package under test
  * renders against MUI's stock palette instead of the design system's, so a
  * page that looks right here would look wrong in the only place it ships.
+ *
+ * `DataViewsCopyProvider` is the third, for the same reason and by the same
+ * rule: any package rendering a `DataViews` grid — `@12-apps/audit`'s trail is
+ * the first, and it will not be the last — needs the grid's own words, and
+ * `useDataViewsCopy` THROWS outside a provider rather than falling back to some
+ * package's Portuguese. A host mounts it once at its root; so does this. The
+ * en-US pack, because every package default this harness asserts is English.
  *
  * The chrome itself lives in `shell/` — see `harness-nav.tsx` for what it takes
  * from the admin sidebar and what it leaves behind.
@@ -93,6 +102,7 @@ function Shell() {
     <ThemeProvider theme={harnessTheme}>
       <CssBaseline />
       <LocaleProvider locale={locale}>
+      <DataViewsCopyProvider copy={EN_US_DATA_VIEWS_COPY}>
       <HarnessShell activeSlug={slug}>
         <div data-testid="harness-page" data-page={page?.slug ?? 'unknown'}>
           {/* An unknown slug is a spec pointing at a page that was renamed or
@@ -101,6 +111,7 @@ function Shell() {
           {page ? <page.Component /> : <p data-testid="harness-unknown-page">No harness page named “{slug}”.</p>}
         </div>
       </HarnessShell>
+      </DataViewsCopyProvider>
       </LocaleProvider>
     </ThemeProvider>
   );
