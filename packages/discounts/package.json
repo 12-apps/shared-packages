@@ -2,6 +2,7 @@
   "name": "@12-apps/discounts",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "The discount/promotion domain: a host-agnostic evaluator (percentage or fixed amount, order/category/item scope, automatic or coupon-triggered, stacking and exclusivity, integer-cent allocation) plus the admin CRUD surface as wiring-contract route descriptors over a store port. No database, no framework, no baked user copy.",
   "exports": {
     ".": "./src/index.ts",

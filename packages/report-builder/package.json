@@ -2,6 +2,7 @@
   "name": "@12-apps/report-builder",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": ["**/e2e/**"],
   "description": "Plug-and-play reporting plugin (FUT-302): spec engine (.), host-mounted backend surface (./server: endpoints, period, lifecycle, SavedReport store seam, wire schemas) and reports UI (./react), plus the package-owned Prisma fragment synced into the host schema. The catalog, the built-ins and the adapter are the host's and arrive as config. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",

@@ -2,6 +2,7 @@
   "name": "@12-apps/mcp",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "App-agnostic MCP server core: generate one MCP tool per OpenAPI operation and proxy each call carrying the caller's bearer token (permission passthrough). Also ships the OAuth 2.1 authorization server (./oauth, ./hono: register/authorize/token, JWKS and both .well-known documents), the package-owned Prisma partial + migration for its three tables, the mcp:generate/mcp:check (./generate) and mcp:coverage (./coverage) gates, and the reusable AI-connect onboarding UI (./react).",
   "exports": {
     ".": {

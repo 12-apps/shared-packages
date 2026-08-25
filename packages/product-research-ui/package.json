@@ -2,6 +2,7 @@
   "name": "@12-apps/product-research-ui",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Host-agnostic research screens for the product-research engine: search form, streaming per-source status, ranked offer comparison, history. Components take a ResearchApiClient the host implements \u2014 no fetch, no router, no auth assumptions \u2014 and every string comes from an overridable pt-BR messages layer.",
   "exports": {
     ".": "./src/index.ts",
