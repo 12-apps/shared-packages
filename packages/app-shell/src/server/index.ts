@@ -18,6 +18,8 @@ export {
   noContent,
   ok,
   type AppShellCookie,
+  type AppShellCopyResolver,
+  type AppShellCopySource,
   type AppShellRequest,
   type AppShellResponse,
   type AppShellRoute,

@@ -78,7 +78,7 @@ function statusRoute(config: AppShellServerConfig): AppShellRoute {
       } catch (error) {
         return foldApiError(
           error,
-          messagesOf(config),
+          messagesOf(config, request.locale),
           reporterFor(config, 'GET', CONSENT_STATUS_PATH),
         );
       }
@@ -139,7 +139,7 @@ function acceptRoute(config: AppShellServerConfig): AppShellRoute {
       } catch (error) {
         return foldApiError(
           error,
-          messagesOf(config),
+          messagesOf(config, request.locale),
           reporterFor(config, 'POST', CONSENT_ACCEPT_PATH),
         );
       }

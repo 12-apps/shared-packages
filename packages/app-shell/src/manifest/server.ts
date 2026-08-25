@@ -4,6 +4,14 @@
  * `http.create` wraps `createApiAppShell` in a WIRE VIEW, for two fields the
  * contract's `WireRequest`/`WireResponse` pair does not carry.
  *
+ * **`locale`, inbound.** The one field the pair DOES share, and the reason it
+ * is spelled out here: the 500 body follows the caller, and this view is the
+ * only thing between the host's negotiated tag and the accessor that renders
+ * that sentence. Dropping it would leave the widened field
+ * perfectly typed and permanently inert — every adopter mounting through the
+ * manifest would resolve with no locale forever, which reads exactly like a
+ * host that chose not to translate.
+ *
  * **`header` and `raw`, inbound.** `AppShellRequest` gives a handler a
  * `header(name)` accessor and an adapter-shaped `raw` escape hatch, and
  * NEITHER is read by any descriptor in this package — both exist for the one
@@ -95,6 +103,7 @@ function asWireRoute(route: AppShellRoute): {
         await route.handle({
           params: request.params,
           query: request.query,
+          locale: request.locale,
           header: (name) => request.request?.headers.get(name) ?? undefined,
           raw: request.request,
         }),
