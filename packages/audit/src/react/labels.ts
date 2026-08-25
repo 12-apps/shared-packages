@@ -13,15 +13,43 @@
  * separate files in separate apps before this package existed, and did: nine
  * actions the writer could emit had no label at all and rendered a raw dotted
  * id to an operator.
+ *
+ * ## What the GRID's own chrome says, and why it is not here
+ *
+ * Since the trail moved onto `@12-apps/ui`'s `DataViews` grid, the words on the
+ * controls that grid owns — the search box's placeholder, a range pill's
+ * `De`/`Até`, the column and display panels, "Limpar filtros", the pager — come
+ * from the host's `DataViewsCopy`, through the provider it already mounts for
+ * every other list. That is the same rule this file states, one layer out: the
+ * words belong to the host, declared once.
+ *
+ * Thirteen labels left with those controls (`searchPlaceholder`, `filterFrom`,
+ * `filterTo`, the three `dayPlaceholder*`, `clearBound`, `sortByDate`,
+ * `clearFilters`, `previousPage`, `nextPage`, `pageStatus`, `actorAny`). They
+ * are REMOVED rather than kept as accepted-and-ignored config: a label a host
+ * still passes and nothing renders is a promise the surface has stopped
+ * keeping, and the compiler telling an adopter so at the call site is the whole
+ * value of copy being config.
  */
 import { AuditConfigError } from '../core/errors';
 
 export interface AuditLabels {
   title: string;
-  /** The one-paragraph explanation above the list. */
+  /** Heading of the `[i]` popover that explains the page. */
+  aboutTitle: string;
+  /** The one-paragraph explanation inside it. */
   about: string;
   columnDate: string;
   columnActor: string;
+  /**
+   * The impersonated subject, as the EXPORT's own column.
+   *
+   * On screen the pair is one cell over two lines; in a spreadsheet it has to
+   * be a column of its own — "which rows happened during a support session" is
+   * a question filtering and pivoting answer, and a suffix inside the actor
+   * cell answers it for nobody.
+   */
+  columnOnBehalfOf: string;
   columnAction: string;
   columnResource: string;
   columnResourceId: string;
@@ -29,30 +57,8 @@ export interface AuditLabels {
   filterAction: string;
   filterResource: string;
   filterActor: string;
-  filterFrom: string;
-  filterTo: string;
-  /**
-   * The day bounds' placeholder segments, in the host's words.
-   *
-   * The ORDER they appear in is the locale's (see `resolveDayFormat`); these are
-   * only the letters, which are a translation like any other — a Brazilian
-   * merchant reads `aaaa` where an English one reads `yyyy`, and a field that
-   * spells its own format is the difference between typing it right the first
-   * time and discovering the order by getting it wrong.
-   */
-  dayPlaceholderDay: string;
-  dayPlaceholderMonth: string;
-  dayPlaceholderYear: string;
-  /**
-   * Accessible name for ONE bound's clear button — "{field}" is the bound's own
-   * label. Each bound carries its own, because clearing just "From" otherwise
-   * means pressing "Clear filters" and losing every other filter on the screen.
-   */
-  clearBound: string;
-  /** Accessible name for the date column's sort toggle. */
-  sortByDate: string;
-  /** Placeholder for the free-text resource-id search. */
-  searchPlaceholder: string;
+  /** The day-range pill's label — the window the trail is read over. */
+  filterPeriod: string;
   /** The actor cell for an entry with no actor (a webhook, a job). */
   systemActor: string;
   /**
@@ -72,21 +78,30 @@ export interface AuditLabels {
    */
   requestFailed: string;
   retry: string;
-  clearFilters: string;
-  previousPage: string;
-  nextPage: string;
-  /** "Page {page} of {pageCount} · {total} entries". */
-  pageStatus: string;
-  actorAny: string;
+  /** The export button. */
+  exportAction: string;
+  exportCsv: string;
+  exportJson: string;
+  /** The downloaded file's base name (no extension). */
+  exportFileName: string;
+  /** "Only the first {count} entries were exported." */
+  exportTruncated: string;
+  /**
+   * Why a saved-view mutation could not run — shown only where no host wired
+   * persistence for the trail's table (an embedded trail, a bare mount).
+   */
+  viewsUnavailable: string;
 }
 
 export const DEFAULT_LABELS: AuditLabels = {
   title: 'Audit trail',
+  aboutTitle: 'About the audit trail',
   about:
     'Everything recorded here is permanent: who did it, what changed and when. ' +
     'Entries cannot be edited or deleted.',
   columnDate: 'Date',
   columnActor: 'Actor',
+  columnOnBehalfOf: 'On behalf of',
   columnAction: 'Action',
   columnResource: 'Resource',
   columnResourceId: 'Identifier',
@@ -94,14 +109,7 @@ export const DEFAULT_LABELS: AuditLabels = {
   filterAction: 'Action',
   filterResource: 'Resource',
   filterActor: 'Actor',
-  filterFrom: 'From',
-  filterTo: 'To',
-  dayPlaceholderDay: 'dd',
-  dayPlaceholderMonth: 'mm',
-  dayPlaceholderYear: 'yyyy',
-  clearBound: 'Clear {field}',
-  sortByDate: 'Sort by date',
-  searchPlaceholder: 'Search by identifier',
+  filterPeriod: 'Period',
   systemActor: 'System',
   onBehalfOf: '{actor} on behalf of {subject}',
   unknownActor: 'Deleted user',
@@ -110,11 +118,12 @@ export const DEFAULT_LABELS: AuditLabels = {
   errorTitle: 'Could not load the audit trail',
   requestFailed: 'Could not load the audit trail.',
   retry: 'Try again',
-  clearFilters: 'Clear filters',
-  previousPage: 'Previous',
-  nextPage: 'Next',
-  pageStatus: 'Page {page} of {pageCount} · {total} entries',
-  actorAny: 'All',
+  exportAction: 'Export',
+  exportCsv: 'CSV (.csv)',
+  exportJson: 'JSON (.json)',
+  exportFileName: 'audit-trail',
+  exportTruncated: 'Only the first {count} entries were exported.',
+  viewsUnavailable: 'Saved views are not available on this screen.',
 };
 
 export type AuditLabelOverrides = Partial<AuditLabels>;

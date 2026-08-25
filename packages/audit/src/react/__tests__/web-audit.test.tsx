@@ -4,8 +4,12 @@
    const array created inside each case's own transport — the isolation heuristic
    reads the name as shared. */
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { JSX, ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+
+import { DataViewsCopyProvider } from '@12-apps/ui/data-display/DataViews';
+import { EN_US_DATA_VIEWS_COPY } from '@12-apps/ui/en-US';
 
 import type { AuditLogPageWire, AuditLogWire } from '../../core/types';
 import { defineAuditVocabulary } from '../../core/vocabulary';
@@ -14,17 +18,21 @@ import type { AuditTransport } from '../transport';
 import { AuditRequestError } from '../transport';
 
 /**
- * The viewer, driven the way a host mounts it: ONE call to
- * `createWebAudit({ apiBase, vocabulary })`, no screen imported by name.
+ * The screen, driven the way a host mounts it: ONE call to
+ * `createWebAudit({ apiBase, vocabulary })`, no component imported by name.
  *
  * The transport is substituted rather than `globalThis.fetch` stubbed, which is
  * the package's own seam — so what these cases assert is the URL the surface
  * actually builds and the row it renders from the body it actually receives.
  *
  * The vocabulary is a fixture in a domain this package was not extracted from,
- * and it is REQUIRED now: there is no default to fall back to, which is the
- * whole point of this release. A host's actions, its resources and its words
- * arrive together or the surface refuses to assemble.
+ * and it is REQUIRED: there is no default to fall back to. A host's actions, its
+ * resources and its words arrive together or the surface refuses to assemble.
+ *
+ * The grid's OWN chrome is host copy too, which is why every mount here is
+ * wrapped: `useDataViewsCopy` throws outside a provider rather than falling back
+ * to some package's Portuguese, and a host mounting the trail beside its other
+ * lists has already provided it once at its root.
  */
 const VOCABULARY = defineAuditVocabulary({
   actions: {
@@ -36,6 +44,7 @@ const VOCABULARY = defineAuditVocabulary({
     supply: { label: 'Supply run', fields: ['crates'] },
   },
 });
+
 const entry = (overrides: Partial<AuditLogWire> = {}): AuditLogWire => ({
   id: 'a1',
   createdAt: '2026-08-01T15:04:00.000Z',
@@ -71,11 +80,13 @@ interface Harness {
 }
 
 /** A transport that records every path and answers from the given handlers. */
-function harness(options: {
-  entries?: AuditLogWire[];
-  actors?: { id: string; label: string }[];
-  listError?: AuditRequestError;
-} = {}): Harness {
+function harness(
+  options: {
+    entries?: AuditLogWire[];
+    actors?: { id: string; label: string }[];
+    listError?: AuditRequestError;
+  } = {},
+): Harness {
   const paths: string[] = [];
   const transport: AuditTransport = {
     get<T>(path: string): Promise<T> {
@@ -90,6 +101,11 @@ function harness(options: {
   return { paths, transport };
 }
 
+/** The host's root provider, which every adopter mounts once. */
+const Host = ({ children }: { children: ReactNode }): JSX.Element => (
+  <DataViewsCopyProvider copy={EN_US_DATA_VIEWS_COPY}>{children}</DataViewsCopyProvider>
+);
+
 const mount = (h: Harness, config: Record<string, unknown> = {}) => {
   const { page: Page } = createWebAudit({
     apiBase: '/api/admin/beacon-authority',
@@ -97,13 +113,59 @@ const mount = (h: Harness, config: Record<string, unknown> = {}) => {
     transport: h.transport,
     ...config,
   });
-  return render(<Page />);
+  return render(
+    <Host>
+      <Page />
+    </Host>,
+  );
 };
 
 /** Mount against a bare transport, for the cases that build their own. */
 function mountWith(transport: AuditTransport, apiBase = '/api/admin/beacon-authority') {
   const { page: Page } = createWebAudit({ apiBase, vocabulary: VOCABULARY, transport });
-  return render(<Page />);
+  return render(
+    <Host>
+      <Page />
+    </Host>,
+  );
+}
+
+/** The last path the transport was asked for. */
+const lastPath = (h: Harness): string => h.paths[h.paths.length - 1] ?? '';
+
+/**
+ * A wire day (`YYYY-MM-DD`) written in the order THIS field asks for.
+ *
+ * The mask and the placeholder are one string in `@12-apps/ui`, so reading the
+ * order back off the element is reading the same source the parser uses — which
+ * is what keeps this helper from ever disagreeing with the field, whichever
+ * copy pack a host provides.
+ */
+function inMaskOrder(field: HTMLElement, iso: string): string {
+  const mask = field.getAttribute('placeholder') ?? 'dd/mm/aaaa';
+  const [year, month, day] = iso.split('-') as [string, string, string];
+  const tokens = mask.split(/[^A-Za-z]+/).filter(Boolean);
+  // A field announcing no order is one whose order nobody can know — including
+  // this helper, which would otherwise type a string the mask rejects and let
+  // the assertion below fail for the wrong reason.
+  expect(tokens).toHaveLength(3);
+  const separator = mask.replace(/[A-Za-z]/g, '').slice(0, 1) || '/';
+  return tokens
+    .map((token) => {
+      const head = token.slice(0, 1).toLowerCase();
+      if (head === 'y' || head === 'a') return year;
+      return head === 'd' ? day : month;
+    })
+    .join(separator);
+}
+
+/** Open a filter pill and tick one of its options by label. */
+async function pickOption(fieldId: string, optionLabel: string): Promise<void> {
+  fireEvent.click(screen.getByTestId(`audit-log-filter-${fieldId}`));
+  // By ROLE, not by text: an option's label is the same word the column it
+  // filters renders in every row, so a bare text query matches the menu item
+  // and the table at once.
+  fireEvent.click(await screen.findByRole('menuitem', { name: optionLabel }));
 }
 
 describe('the trail', () => {
@@ -113,12 +175,12 @@ describe('the trail', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    const row = screen.getByTestId('audit-log-row-a1');
+    const grid = screen.getByTestId('audit-log-grid');
     // The labels come from the VOCABULARY the backend half validates against, so
     // an action that exists is an action this screen can name.
-    expect(row.textContent).toContain('Lamp extinguished');
-    expect(row.textContent).toContain('Lamp');
-    expect(row.textContent).toContain('state: LIT → DARK');
+    expect(grid.textContent).toContain('Lamp extinguished');
+    expect(grid.textContent).toContain('Lamp');
+    expect(grid.textContent).toContain('state: LIT → DARK');
     // "Who · under which role".
     expect(screen.getByTestId('audit-log-actor-a1').textContent).toBe('Ada Keeper · OWNER');
   });
@@ -126,7 +188,8 @@ describe('the trail', () => {
   it('renders the impersonation PAIR, naming both people', async () => {
     // The regression that motivated the viewer this was ported from: its API
     // carried `onBehalfOfName` and the screen dropped it, so a support session
-    // looked exactly like the account owner working alone.
+    // looked exactly like the account owner working alone. The grid moved the
+    // rows onto shared machinery; it must not have moved this off them.
     const h = harness({
       entries: [
         entry({
@@ -179,7 +242,26 @@ describe('the trail', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-empty')).toBeDefined());
+    await waitFor(() =>
+      expect(screen.getByTestId('audit-log-empty-reason').textContent).toBe(
+        'No entries recorded for the chosen filters.',
+      ),
+    );
+  });
+
+  it('does not call an unread trail empty', async () => {
+    // A read that FAILED is not an empty trail, and neither is one still in
+    // flight. The grid has no rows in either case, so the sentence under it is
+    // the only thing that distinguishes "nothing happened here" from "we do not
+    // know yet" — and stating the first over the second is a claim nobody made.
+    const h = harness({ listError: new AuditRequestError(403, 'Forbidden.') });
+
+    mount(h);
+
+    await waitFor(() => expect(screen.getByTestId('audit-log-error')).toBeDefined());
+    expect(screen.getByTestId('audit-log-empty-reason').textContent).toBe(
+      'Could not load the audit trail',
+    );
   });
 
   it('surfaces the server message on a denial, with a retry', async () => {
@@ -188,9 +270,7 @@ describe('the trail', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-error')).toBeDefined());
-    expect(screen.getByTestId('audit-log-error').textContent).toContain(
-      'Você não tem permissão.',
-    );
+    expect(screen.getByTestId('audit-log-error').textContent).toContain('Você não tem permissão.');
     const before = h.paths.length;
     fireEvent.click(screen.getByTestId('audit-log-retry'));
     await waitFor(() => expect(h.paths.length).toBeGreaterThan(before));
@@ -198,19 +278,17 @@ describe('the trail', () => {
 });
 
 describe('the filters', () => {
-  it('asks the backend for the resource-id keyword on Enter', async () => {
+  it('asks the backend for the resource-id keyword', async () => {
     const h = harness();
 
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    const search = screen.getByTestId('audit-log-search');
-    fireEvent.change(search, { target: { value: 'order-1' } });
-    fireEvent.keyDown(search, { key: 'Enter' });
+    fireEvent.change(screen.getByTestId('audit-log-search-all'), {
+      target: { value: 'order-1' },
+    });
 
-    await waitFor(() =>
-      expect(h.paths.some((path) => path.includes('q=order-1'))).toBe(true),
-    );
+    await waitFor(() => expect(h.paths.some((path) => path.includes('q=order-1'))).toBe(true));
   });
 
   it('turns an action pill into the action_in filter, and toggles it off again', async () => {
@@ -219,36 +297,71 @@ describe('the filters', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
-    await waitFor(() =>
-      expect(h.paths.some((path) => path.includes('action_in=lamp.extinguish'))).toBe(true),
-    );
+    await pickOption('action', 'Lamp extinguished');
+    await waitFor(() => expect(lastPath(h)).toContain('action_in=lamp.extinguish'));
 
-    const before = h.paths.length;
-    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
-    await waitFor(() => expect(h.paths.length).toBeGreaterThan(before));
-    expect(h.paths[h.paths.length - 1]).not.toContain('action_in');
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Lamp extinguished' }));
+    await waitFor(() => expect(lastPath(h)).not.toContain('action_in'));
   });
 
-  it('sends the resource pill and the day bounds', async () => {
-    const h = harness();
+  it('offers every action the vocabulary declares, not the ones the page happens to hold', async () => {
+    // #924's property, at the surface where it was visible. A page of twenty
+    // rows knows about the actions it happens to contain, which is precisely
+    // the wrong list to filter a trail by — twelve actions were unselectable
+    // when this screen built its options from what it could name.
+    const h = harness({ entries: [entry()] });
 
-    // The bounds are masked fields in the surface's declared locale, so what is
-    // TYPED is `dd/mm/aaaa` and what is SENT is the ISO day. The digit-by-digit
-    // properties of that field are `day-bound.test.tsx`'s; this case is about
-    // the query the surface builds from a whole one.
-    mount(h, { locale: 'pt-BR' });
+    mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-resource-lamp'));
-    fireEvent.change(screen.getByTestId('audit-log-from'), { target: { value: '01/07/2026' } });
-    fireEvent.change(screen.getByTestId('audit-log-to'), { target: { value: '31/07/2026' } });
+    fireEvent.click(screen.getByTestId('audit-log-filter-action'));
+    // `supply.deliver` appears in no loaded row.
+    expect(await screen.findByRole('menuitem', { name: 'Supply run delivered' })).toBeDefined();
+  });
+
+  it('sends the resource pill', async () => {
+    const h = harness();
+
+    mount(h);
+
+    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await pickOption('resourceType', 'Lamp');
+
+    await waitFor(() => expect(lastPath(h)).toContain('resourceType_in=lamp'));
+  });
+
+  it('sends the period pill as the endpoint inclusive day bounds', async () => {
+    const h = harness();
+
+    mount(h);
+
+    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    fireEvent.click(screen.getByTestId('audit-log-range-period'));
+    const panel = await screen.findByTestId('audit-log-range-period-panel');
+    // The grid's day inputs are MASKED text fields, for the same reason this
+    // package's retired ones were: a native date input renders in the
+    // BROWSER's locale rather than the surface's, and cannot take a date typed
+    // as one continuous run of digits.
+    //
+    // The order is read off each field's own PLACEHOLDER rather than written
+    // here, and that is the whole point: this suite mounts the en-US pack,
+    // whose mask is `mm/dd/yyyy`, so a hardcoded `01/07/2026` is the 7th of
+    // January and not the 1st of July. Typing one order into a field asking
+    // for the other is precisely the defect `@12-apps/ui`'s day input was
+    // fixed for — and a case that hardcoded it would be asserting that bug
+    // rather than the day bounds.
+    const bounds = within(panel).getAllByRole('textbox');
+    // Named before use: a panel that rendered one field (or none) would
+    // otherwise fail inside the mask helper, reporting the placeholder rather
+    // than the missing bound.
+    expect(bounds).toHaveLength(2);
+    const [from, to] = bounds as [HTMLElement, HTMLElement];
+    fireEvent.change(from, { target: { value: inMaskOrder(from, '2026-07-01') } });
+    fireEvent.change(to, { target: { value: inMaskOrder(to, '2026-07-31') } });
 
     await waitFor(() => {
-      const last = h.paths[h.paths.length - 1] ?? '';
-      expect(last).toContain('resourceType_in=lamp');
-      expect(last).toContain('from=2026-07-01');
-      expect(last).toContain('to=2026-07-31');
+      expect(lastPath(h)).toContain('from=2026-07-01');
+      expect(lastPath(h)).toContain('to=2026-07-31');
     });
   });
 
@@ -257,48 +370,28 @@ describe('the filters', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-actor-select')).toBeDefined());
-    fireEvent.change(screen.getByTestId('audit-log-actor-select'), {
-      target: { value: 'u-real' },
-    });
+    await waitFor(() => expect(screen.getByTestId('audit-log-filter-actorUserId')).toBeDefined());
+    await pickOption('actorUserId', 'Ada Keeper');
 
-    await waitFor(() =>
-      expect(h.paths.some((path) => path.includes('actorUserId=u-real'))).toBe(true),
-    );
+    await waitFor(() => expect(lastPath(h)).toContain('actorUserId=u-real'));
   });
 
-  it('falls back to a free-text actor id when there is no roster', async () => {
-    // A host with no directory answers an empty option list; the filter degrades
-    // rather than disappearing, because an operator pasting an id out of another
-    // system is exactly who still needs it.
+  it('does not offer an actor pill with nothing in it', async () => {
+    // A host with no directory answers an empty option list. A pill whose menu
+    // is empty reads as a broken filter rather than an absent one; an operator
+    // pasting an id out of another system still matches through the search box,
+    // which is what that field was always doing.
     const h = harness();
 
     mount(h);
 
-    // Both inside the same waitFor: the picker's shape settles when the (empty)
-    // options answer arrives, so asserting the absence separately would read the
-    // DOM before that resolved.
+    // Both inside the same waitFor: the bar's shape settles when the (empty)
+    // options answer arrives, so asserting the absence separately would read
+    // the DOM before that resolved.
     await waitFor(() => {
-      expect(screen.getByTestId('audit-log-actor-id')).toBeDefined();
-      expect(screen.queryByTestId('audit-log-actor-select')).toBeNull();
+      expect(screen.getByTestId('audit-log-grid')).toBeDefined();
+      expect(screen.queryByTestId('audit-log-filter-actorUserId')).toBeNull();
     });
-  });
-
-  it('clears every filter at once', async () => {
-    const h = harness();
-
-    mount(h);
-
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
-    await waitFor(() =>
-      expect(h.paths.some((path) => path.includes('action_in'))).toBe(true),
-    );
-    fireEvent.click(screen.getByTestId('audit-log-clear'));
-
-    await waitFor(() =>
-      expect(h.paths[h.paths.length - 1]).toBe('/api/admin/beacon-authority/audit-logs'),
-    );
   });
 
   it('keeps a host fixedFilters pin on every request', async () => {
@@ -308,27 +401,27 @@ describe('the filters', () => {
     mount(h, { fixedFilters: { resourceId: 'order-1' } });
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
+    await pickOption('action', 'Lamp extinguished');
 
     await waitFor(() => {
-      const last = h.paths[h.paths.length - 1] ?? '';
-      expect(last).toContain('resourceId=order-1');
-      expect(last).toContain('action_in=lamp.extinguish');
+      expect(lastPath(h)).toContain('resourceId=order-1');
+      expect(lastPath(h)).toContain('action_in=lamp.extinguish');
     });
   });
 
   it('returns to page 1 whenever a filter changes', async () => {
     // Keeping page 5 while narrowing to three results shows an empty list that
-    // looks exactly like a broken filter.
-    const h = harness({ entries: [entry()], actors: [] });
+    // looks exactly like a broken filter. The rule is the GRID's now — it emits
+    // page 1 on any effective-query change — which is why nothing in this
+    // package re-decides it.
+    const h = harness();
 
-    const { paths } = h;
     mount(h);
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.click(screen.getByTestId('audit-log-action-lamp.extinguish'));
+    await pickOption('action', 'Lamp extinguished');
 
-    await waitFor(() => expect(paths[paths.length - 1]).toContain('action_in'));
-    expect(paths[paths.length - 1]).not.toContain('page=');
+    await waitFor(() => expect(lastPath(h)).toContain('action_in'));
+    expect(lastPath(h)).not.toContain('page=');
   });
 });
 
@@ -339,7 +432,7 @@ describe('the request the surface builds', () => {
     mount(h);
 
     await waitFor(() => expect(h.paths).toHaveLength(2));
-    expect(h.paths.sort()).toEqual([
+    expect(h.paths.slice().sort()).toEqual([
       '/api/admin/beacon-authority/audit-logs',
       '/api/admin/beacon-authority/audit-logs/actors',
     ]);
@@ -359,7 +452,7 @@ describe('the request the surface builds', () => {
     mountWith(transport);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    expect(screen.getByTestId('audit-log-actor-id')).toBeDefined();
+    expect(screen.getByTestId('audit-log-actor-a1')).toBeDefined();
   });
 
   it('takes a SECOND host vocabulary and labels rows from that one instead', async () => {
@@ -378,8 +471,8 @@ describe('the request the surface builds', () => {
     });
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    expect(screen.getByTestId('audit-log-row-a1').textContent).toContain('Ticket refunded');
-    expect(screen.getByText('Ledger history')).toBeDefined();
+    expect(screen.getByTestId('audit-log-grid').textContent).toContain('Ticket refunded');
+    expect(screen.getAllByText('Ledger history').length).toBeGreaterThan(0);
   });
 
   it('formats the stamp with the host formatter', async () => {
@@ -387,15 +480,37 @@ describe('the request the surface builds', () => {
 
     mount(h, { formatDate: (iso: string) => `at ${iso}` });
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-row-a1')).toBeDefined());
-    expect(screen.getByTestId('audit-log-row-a1').textContent).toContain(
+    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    expect(screen.getByTestId('audit-log-grid').textContent).toContain(
       'at 2026-08-01T15:04:00.000Z',
     );
   });
 });
 
-describe('the paginated footer', () => {
-  it('walks pages and reports where it is', async () => {
+describe('the page frame', () => {
+  it('titles the page and closes the breadcrumb with its own name', async () => {
+    // The host names the path it owns; the last crumb is the page's own title,
+    // so nobody restates it in a second place and lets the two drift.
+    const h = harness();
+    const { page: Page } = createWebAudit({
+      apiBase: '/api/admin/beacon-authority',
+      vocabulary: VOCABULARY,
+      transport: h.transport,
+    });
+
+    render(
+      <Host>
+        <Page breadcrumb={[{ label: 'Home', href: '/home' }]} />
+      </Host>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    const crumbs = screen.getByTestId('audit-log-dashboard-breadcrumb');
+    expect(crumbs.textContent).toContain('Home');
+    expect(crumbs.textContent).toContain('Audit trail');
+  });
+
+  it('paginates on the grid own pager, from the server answer', async () => {
     const paths: string[] = [];
     const transport: AuditTransport = {
       get<T>(path: string): Promise<T> {
@@ -416,18 +531,10 @@ describe('the paginated footer', () => {
 
     mountWith(transport, '/api/admin/loja');
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-page-status')).toBeDefined());
-    expect(screen.getByTestId('audit-log-page-status').textContent).toBe(
-      'Page 1 of 3 · 45 entries',
-    );
-    fireEvent.click(screen.getByTestId('audit-log-next'));
+    await waitFor(() => expect(screen.getByTestId('audit-log-pagination')).toBeDefined());
+    const pager = screen.getByTestId('audit-log-pagination');
+    fireEvent.click(within(pager).getByRole('button', { name: /2/ }));
+
     await waitFor(() => expect(paths.some((path) => path.includes('page=2'))).toBe(true));
-    // Vitest keeps the mock ordering, so the second page's status proves the state
-    // came from the SERVER's answer rather than from a local counter.
-    await waitFor(() =>
-      expect(screen.getByTestId('audit-log-page-status').textContent).toBe(
-        'Page 2 of 3 · 45 entries',
-      ),
-    );
   });
 });

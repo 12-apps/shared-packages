@@ -1,287 +1,248 @@
-import { useCallback, useEffect, useState, type JSX } from 'react';
+/**
+ * The audit-log viewer — the trail's BODY: the shared filter bar, the grid, the
+ * saved-view chrome and the server-mode pager, over one filter set.
+ *
+ * Server-driven, like the page it came from: every filter, the ordering and the
+ * pagination run in the database. What changed in this release is only WHAT
+ * renders them — `@12-apps/ui`'s `DataViews` grid, the same one every other
+ * list in an adopting host uses, instead of a bar this package drew itself.
+ * The reasoning is in `grid-config.tsx`.
+ *
+ * It still deliberately does NOT read or write the URL, because a package
+ * cannot know the host's router. A host that wants bookmarkable filters lifts
+ * the state (`filters` / `onFiltersChange`); one that does not gets the same
+ * screen holding its own.
+ */
+import { useCallback, useMemo, useState, type JSX } from 'react';
 
 import { Button } from '@12-apps/ui/form/Button';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
+import type {
+  DataViewExport,
+  DataViewQuery,
+  DataViewServer,
+  SavedViewSummary,
+} from '@12-apps/ui/data-display/DataViews';
 
-import {
-  DEFAULT_AUDIT_SORT,
-  type AuditActorOptionWire,
-  type AuditLogFilters,
-  type AuditLogPageWire,
-  type AuditSort,
+import type {
+  AuditActorOptionWire,
+  AuditLogFilters,
+  AuditLogPageWire,
 } from '../core/types';
 import type { AuditVocabulary } from '../core/vocabulary';
 
 import type { AuditApiClient } from './api';
-import type { DayFormat } from './day-bound';
-import { AuditEntriesTable } from './entries-table';
-import { AuditFilterBar } from './filter-bar';
-import { formatLabel, type AuditLabels } from './labels';
+import {
+  auditColumns,
+  auditFields,
+  auditRangeFields,
+  auditSortFields,
+  filtersFromQuery,
+  stateFromFilters,
+} from './grid-config';
+import { toAuditRows } from './grid-rows';
+import { StandaloneAuditTable, type AuditTableComponent } from './grid-table';
+import { useActorOptions, useAuditPage } from './use-audit-data';
+import type { AuditLabels } from './labels';
 
-/**
- * The audit-log viewer.
- *
- * Server-driven, like the page it came from: every filter, the ordering and the
- * pagination run in the database. The screen holds the filter state and turns it
- * into ONE query string — it deliberately does NOT read or write the URL, because
- * a package cannot know the host's router (a host that wants bookmarkable filters
- * lifts the state; see `filters`/`onFiltersChange`).
- */
+/** The endpoint's own default, for the frame before the first page lands. */
+const FALLBACK_PAGE_SIZE = 20;
 
 export interface AuditViewerProps {
   api: AuditApiClient;
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
-  /** How the locale writes a numeric date — the day bounds' mask. */
-  dayFormat: DayFormat;
+  /**
+   * The host's wired `DataViews` table — the one it already gives every other
+   * list, carrying its saved-view persistence and its `?view=` sync. Omitted,
+   * the trail renders on {@link StandaloneAuditTable}: the same grid with no
+   * saved views behind it.
+   */
+  table?: AuditTableComponent;
+  /** The saved views for this table, from the host's own store. */
+  views?: SavedViewSummary[];
   /** Controlled filter state, for a host that mirrors it into its URL. */
   filters?: AuditLogFilters;
   onFiltersChange?: (filters: AuditLogFilters) => void;
   /** Filters the host pins and the operator cannot change (e.g. one resource). */
   fixedFilters?: AuditLogFilters;
+  /** Opt-in "Exportar" control — the whole filtered set, re-queried. */
+  exportConfig?: DataViewExport;
 }
 
-/** The screen's async state — one value, so no impossible combination exists. */
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'ready'; page: AuditLogPageWire };
-
-function PageFooter({
+/** The error panel, above a trail that may still be showing its last page. */
+function LoadError({
   labels,
-  page,
-  onPage,
-}: {
-  labels: AuditLabels;
-  page: AuditLogPageWire;
-  onPage: (next: number) => void;
-}): JSX.Element {
-  const { pagination } = page;
-  return (
-    <Stack direction="row" spacing={1} alignItems="center">
-      <Button
-        variant="text"
-        disabled={pagination.page <= 1}
-        dataTestId="audit-log-prev"
-        onClick={() => onPage(pagination.page - 1)}
-      >
-        {labels.previousPage}
-      </Button>
-      <Text variant="caption" as="span" data-testid="audit-log-page-status">
-        {formatLabel(labels.pageStatus, {
-          page: String(pagination.page),
-          pageCount: String(pagination.pageCount),
-          total: String(pagination.total),
-        })}
-      </Text>
-      <Button
-        variant="text"
-        disabled={!pagination.hasNextPage}
-        dataTestId="audit-log-next"
-        onClick={() => onPage(pagination.page + 1)}
-      >
-        {labels.nextPage}
-      </Button>
-    </Stack>
-  );
-}
-
-/** The list body: loading, the error with its retry, the empty state, or rows. */
-function ViewerBody({
-  state,
-  labels,
-  vocabulary,
-  formatDate,
-  sort,
-  onSortChange,
+  message,
   onRetry,
-  onPage,
 }: {
-  state: LoadState;
   labels: AuditLabels;
-  vocabulary: AuditVocabulary;
-  formatDate: (iso: string) => string;
-  sort: AuditSort;
-  onSortChange: (next: AuditSort) => void;
+  message: string;
   onRetry: () => void;
-  onPage: (next: number) => void;
 }): JSX.Element {
-  if (state.status === 'loading') {
-    return (
-      <Text variant="body" as="p" data-testid="audit-log-loading">
-        {labels.loading}
-      </Text>
-    );
-  }
-  if (state.status === 'error') {
-    return (
-      <Stack spacing={1} data-testid="audit-log-error">
-        <Text variant="body" as="p">
-          {labels.errorTitle}
-        </Text>
-        <Text variant="caption" as="p">
-          {state.message}
-        </Text>
-        <Button variant="outline" dataTestId="audit-log-retry" onClick={onRetry}>
-          {labels.retry}
-        </Button>
-      </Stack>
-    );
-  }
-  if (state.page.data.length === 0) {
-    return (
-      <Text variant="body" as="p" data-testid="audit-log-empty">
-        {labels.empty}
-      </Text>
-    );
-  }
   return (
-    <Stack spacing={1}>
-      <AuditEntriesTable
-        entries={state.page.data}
-        labels={labels}
-        vocabulary={vocabulary}
-        formatDate={formatDate}
-        sort={sort}
-        onSortChange={onSortChange}
-      />
-      <PageFooter labels={labels} page={state.page} onPage={onPage} />
+    <Stack spacing={1} data-testid="audit-log-error">
+      <Text variant="body" as="p">
+        {labels.errorTitle}
+      </Text>
+      <Text variant="caption" as="p">
+        {message}
+      </Text>
+      <Button variant="outline" dataTestId="audit-log-retry" onClick={onRetry}>
+        {labels.retry}
+      </Button>
     </Stack>
   );
 }
 
 /**
- * The page for one filter set.
+ * Why the grid has no rows.
  *
- * The dependency is the SERIALIZED filter set, deliberately, and not
- * `filters`/`fixedFilters` themselves: the fetch must re-run when a filter VALUE
- * changes, not when a controlled host hands over a new object literal carrying
- * the same values — which it does on every one of its own renders, and which
- * would refetch the page each time.
+ * A read that FAILED is not an empty trail, and neither is one still in flight.
+ * The grid has no rows in any of the three cases, so this sentence is the only
+ * thing that separates "nothing happened here" from "we do not know yet" — and
+ * stating the first over the second is a claim nobody made.
  */
-function useAuditPage(
-  api: AuditApiClient,
-  filters: AuditLogFilters,
-  errorTitle: string,
-  reloadToken: number,
-): LoadState {
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const query = JSON.stringify(filters);
-
-  useEffect(() => {
-    let cancelled = false;
-    setState({ status: 'loading' });
-    api
-      // Read back out of the serialized form the dependency is keyed on, so the
-      // request and the cache key can never describe different filters.
-      // `AuditLogFilters` is JSON-safe by construction (strings, numbers, string
-      // arrays — the day bounds are `YYYY-MM-DD`, not Dates), so the round trip
-      // is lossless.
-      .listEntries(JSON.parse(query) as AuditLogFilters)
-      .then((page) => {
-        if (!cancelled) setState({ status: 'ready', page });
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setState({
-          status: 'error',
-          message: error instanceof Error ? error.message : errorTitle,
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api, query, reloadToken, errorTitle]);
-
-  return state;
+function emptyReason(labels: AuditLabels, error: string | null, loading: boolean): string {
+  if (error) return labels.errorTitle;
+  if (loading) return labels.loading;
+  return labels.empty;
 }
 
 /**
- * The actor-filter options, fetched once per client.
+ * The grid's declarations, rebuilt only when what they are made of changes.
  *
- * A failure is swallowed into an empty list: the options are an affordance, not
- * the data — a host with no directory answers empty, and a failure here must not
- * take the trail down with it. The picker then falls back to a free-text id.
+ * `initialState` is keyed on the filter VALUES: the base merges it back over
+ * live grid state whenever its reference changes (that is how browser
+ * back/forward re-applies the controls), so a fresh object per render would
+ * re-sync on every one.
  */
-function useActorOptions(api: AuditApiClient): readonly AuditActorOptionWire[] {
-  const [actors, setActors] = useState<readonly AuditActorOptionWire[]>([]);
+function useGridConfig(
+  labels: AuditLabels,
+  vocabulary: AuditVocabulary,
+  actors: readonly AuditActorOptionWire[],
+  filterKey: string,
+) {
+  return {
+    columns: useMemo(() => auditColumns(labels), [labels]),
+    fields: useMemo(() => auditFields(labels, vocabulary, actors), [labels, vocabulary, actors]),
+    rangeFields: useMemo(() => auditRangeFields(labels), [labels]),
+    sortFields: useMemo(() => auditSortFields(labels), [labels]),
+    initialState: useMemo(
+      () => stateFromFilters(JSON.parse(filterKey) as AuditLogFilters),
+      [filterKey],
+    ),
+  };
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .listActors()
-      .then((options) => {
-        if (!cancelled) setActors(options);
-      })
-      .catch(() => {
-        if (!cancelled) setActors([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api]);
+/**
+ * The filter state in force, and the one way to change it.
+ *
+ * CONTROLLED when the host passed `filters` — it mirrors them into its URL and
+ * hands them back — and uncontrolled otherwise, holding its own. Both are the
+ * same call site, so nothing downstream has to know which mode it is in.
+ */
+function useFilterState(
+  props: Pick<AuditViewerProps, 'filters' | 'onFiltersChange'>,
+): [AuditLogFilters, (next: AuditLogFilters) => void] {
+  const [ownFilters, setOwnFilters] = useState<AuditLogFilters>({});
+  const controlled = props.filters;
+  const { onFiltersChange } = props;
+  const apply = useCallback(
+    (next: AuditLogFilters): void => {
+      onFiltersChange?.(next);
+      if (!controlled) setOwnFilters(next);
+    },
+    [controlled, onFiltersChange],
+  );
+  return [controlled ?? ownFilters, apply];
+}
 
-  return actors;
+/**
+ * The server-mode wiring, from the page that actually loaded.
+ *
+ * Every number comes from the RESPONSE rather than from a local counter, so the
+ * pager states where the database put the reader and not where the browser
+ * asked to be. The fallbacks cover exactly one frame — before the first page
+ * lands there is no answer to read.
+ */
+function serverFor(
+  page: AuditLogPageWire | null,
+  filters: AuditLogFilters,
+  onQueryChange: (query: DataViewQuery) => void,
+): DataViewServer {
+  const pagination = page?.pagination;
+  return {
+    totalCount: pagination?.total ?? 0,
+    page: pagination?.page ?? filters.page ?? 1,
+    pageSize: pagination?.pageSize ?? FALLBACK_PAGE_SIZE,
+    onQueryChange,
+  };
 }
 
 export function AuditViewer(props: AuditViewerProps): JSX.Element {
-  const { api, labels, vocabulary, formatDate, dayFormat, fixedFilters } = props;
-  const [ownFilters, setOwnFilters] = useState<AuditLogFilters>({});
-  const filters = props.filters ?? ownFilters;
+  const { api, labels, vocabulary, formatDate, fixedFilters } = props;
+  const [filters, applyFilters] = useFilterState(props);
   const [reloadToken, setReloadToken] = useState(0);
-  const state = useAuditPage(
+  const { page, error, loading } = useAuditPage(
     api,
-    { ...filters, ...fixedFilters },
+    useMemo(() => ({ ...filters, ...fixedFilters }), [filters, fixedFilters]),
     labels.errorTitle,
     reloadToken,
   );
   const actors = useActorOptions(api);
-
-  const applyFilters = useCallback(
-    (next: AuditLogFilters): void => {
-      // A filter change always returns to page 1: keeping page 5 while narrowing
-      // to three results shows an empty list that looks like a broken filter.
-      const withFirstPage = { ...next, page: 1 };
-      props.onFiltersChange?.(withFirstPage);
-      if (!props.filters) setOwnFilters(withFirstPage);
-    },
-    [props],
+  const rows = useMemo(
+    () => toAuditRows(page?.data ?? [], { labels, vocabulary, formatDate }),
+    [page, labels, vocabulary, formatDate],
   );
+  const config = useGridConfig(labels, vocabulary, actors, JSON.stringify(filters));
+
+  // The grid owns the page-reset rule — it emits page 1 on any effective-query
+  // change and the requested page on a pager click — so nothing here re-decides
+  // it. That rule used to live in this file, and stating it in both places is
+  // how the two come to disagree.
+  const onQueryChange = useCallback(
+    (query: DataViewQuery): void => applyFilters(filtersFromQuery(query)),
+    [applyFilters],
+  );
+
+  const Table = props.table;
+  const tableProps = {
+    ...config,
+    inlineFilters: true,
+    rows,
+    server: serverFor(page, filters, onQueryChange),
+    views: props.views ?? [],
+    getRowId: (row: { id: string }) => row.id,
+    dataTestId: 'audit-log-grid',
+    testIdPrefix: 'audit-log',
+    ...(props.exportConfig ? { exportConfig: props.exportConfig } : {}),
+    emptyState: (
+      // The grid's own wrapper already carries `audit-log-empty` (and
+      // `-filtered` when something is narrowing the list, which is a different
+      // sentence it writes itself). This id names the REASON inside it.
+      <Text variant="body" as="p" data-testid="audit-log-empty-reason">
+        {emptyReason(labels, error, loading)}
+      </Text>
+    ),
+  };
 
   return (
     <Stack spacing={2} data-testid="audit-log">
-      <Text variant="heading" as="h1">
-        {labels.title}
-      </Text>
-      <Text variant="caption" as="p">
-        {labels.about}
-      </Text>
-      <AuditFilterBar
-        filters={filters}
-        labels={labels}
-        vocabulary={vocabulary}
-        actors={actors}
-        dayFormat={dayFormat}
-        onChange={applyFilters}
-      />
-      <ViewerBody
-        state={state}
-        labels={labels}
-        vocabulary={vocabulary}
-        formatDate={formatDate}
-        sort={filters.sort ?? DEFAULT_AUDIT_SORT}
-        // A re-ordering returns to page 1 for the reason a filter change does:
-        // page 5 of "newest first" is not page 5 of "oldest first".
-        onSortChange={(sort) => applyFilters({ ...filters, sort })}
-        onRetry={() => setReloadToken((token) => token + 1)}
-        onPage={(page) => {
-          const next = { ...filters, page };
-          props.onFiltersChange?.(next);
-          if (!props.filters) setOwnFilters(next);
-        }}
-      />
+      {error ? (
+        <LoadError
+          labels={labels}
+          message={error}
+          onRetry={() => setReloadToken((token) => token + 1)}
+        />
+      ) : null}
+      {Table ? (
+        <Table {...tableProps} />
+      ) : (
+        <StandaloneAuditTable {...tableProps} viewsUnavailable={labels.viewsUnavailable} />
+      )}
     </Stack>
   );
 }

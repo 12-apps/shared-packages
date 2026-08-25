@@ -150,22 +150,44 @@ labels:   { title: '…', systemActor: '…', onBehalfOf: '{actor} … {subject}
 locale:   'pt-BR'   // the stamp formatter, or pass formatDate for full control
 ```
 
-`locale` also decides the DAY BOUNDS' segment order — `01/07/2026` under `pt-BR`,
-`07/01/2026` under `en-US` — and `labels.dayPlaceholder{Day,Month,Year}` supply
-its letters (`aaaa` rather than `yyyy` for a Portuguese screen). The order comes
-from `Intl`, the words come from you.
+`locale` decides the STAMP formatter and nothing else. The day window is the
+grid's own day-range pill now, and its inputs follow the host's `DataViewsCopy`
+and locale like every other date field on the screen — which is the consistency
+this package's own masked bounds used to buy at the price of a control nobody
+else on the page had. (They are still masked text fields rather than
+`<input type="date">`, for the two reasons that made them so here: a controlled
+native date input reports a WHOLE date from the year's first digit and cannot
+survive a URL-mirroring host's commit latency, and it renders in the BROWSER's
+locale, which the page can neither read nor set. `@12-apps/ui` carries the
+measurement.)
 
-The bounds are masked text fields rather than `<input type="date">`, for two
-reasons worth knowing before you restyle them:
+## 4b. The grid the trail renders on
 
-- **A controlled native date input cannot survive commit latency.** It reports a
-  WHOLE date from the year's first digit (`0002-…`), and a host mirroring filters
-  into a URL hands that back one commit later — mid-edit, over the browser's own
-  segment buffer. Typing `2026` at a 150 ms commit lag measured as the year
-  `0006`: a valid date, applied as a filter, with nothing on screen to say so.
-  A masked field commits only a WHOLE day, and never overwrites a half-typed one.
-- **A native date input renders in the BROWSER's locale**, which the page cannot
-  read or set, so the same field asks two merchants for two different orders.
+Since 6.0 the screen is a `DataViews` table — the same one every other admin
+list in an adopting host renders — so it arrives with a search box, filter
+pills, a sort dropdown, column visibility, the display panel, saved views and a
+server-mode pager, and an operator moving between lists learns one filter bar
+rather than two.
+
+Two things follow for a host:
+
+- **The grid's own words are `DataViewsCopy`,** provided once at your root
+  through `DataViewsCopyProvider`. `useDataViewsCopy` THROWS outside a provider
+  rather than falling back to some package's language, so a host that renders
+  any `@12-apps/ui` list already has this mounted.
+- **Saved views need a backend, so they are yours.** Pass the wrapper you
+  already give your other lists as `table` and the trail saves views like they
+  do; omit it and the same grid renders with no view persistence behind it.
+
+```tsx
+createWebAudit({
+  apiBase,
+  vocabulary: AUDIT,
+  // Bind it ONCE, beside the rest of the config: the member is a component
+  // TYPE, so a wrapper rebuilt per render remounts the whole grid.
+  table: (props) => <DataViewsTable tenantSlug={slug} scope="AUDIT" {...props} />,
+});
+```
 
 A blank override is refused at assembly: a blank message renders a denial as an
 empty box, and a blank label renders an empty cell — both read as a broken
@@ -244,7 +266,7 @@ not exist for whoever was looking.
 | **Core** | `@12-apps/audit` | `defineAuditVocabulary`, the deny-by-default `redactDiff`, `AUDIT_READ_PERMISSION`, and the wire types both halves speak. Framework-free and Prisma-free — importable from a surface that must not pull a database client in (an offline tool registry, a build-time doc generator). |
 | **Server** | `@12-apps/audit/server` | Call `createApiAudit(config)`. Mount the `routes` it returns, call `write(tx, entry)` from your mutations, wrap your client with `extendPrismaClient`, wrap your requests with `withActorContext`, and call `retention` from your sweep job. |
 | **Hono** | `@12-apps/audit/hono` | `const audit = auditRouter(config); app.use('*', audit.actorContext); app.route('/api/admin/:tenantSlug', audit.router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root or `/server` never resolves it. |
-| **React** | `@12-apps/audit/react` | Call `createWebAudit({ apiBase, vocabulary })` and mount the `page` it returns, or take `Viewer` and hold the filter state yourself (a host that mirrors filters into its router's URL). |
+| **React** | `@12-apps/audit/react` | Call `createWebAudit({ apiBase, vocabulary })` and mount the `page` it returns — the whole screen, breadcrumb and header included — passing `filters`/`onFiltersChange` if you mirror the filter state into your router's URL, and `table` to render on your own wired `DataViews` wrapper. `Viewer` is the same trail with no page chrome, for embedding. |
 | **Prisma** | `prisma/audit.prisma` + `prisma/migrations/*` | Run `node node_modules/@12-apps/audit/scripts/sync-audit-schema.mjs <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma; a symlinked partial dangles under `turbo prune`). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 
 ## 8. The impersonation attribution PAIR
@@ -421,7 +443,7 @@ and dropped, because an accepted-and-dropped sort answers a caller's request
 with the opposite order and no way to notice.
 
 Viewer config: `apiBase` and `vocabulary` are required; `transport`, `labels`,
-`locale`, `formatDate` and `fixedFilters` are optional.
+`locale`, `formatDate`, `table`, `exportLimits` and `fixedFilters` are optional.
 
 ## 11. Checklist
 
@@ -433,7 +455,8 @@ node node_modules/@12-apps/audit/scripts/sync-audit-schema.mjs packages/prisma/p
 # 3. declare your vocabulary in ONE module (§2)
 # 4. wire the mount + the middleware, and wrap your Prisma client once
 # 5. replace your own audit writer's call sites with write(tx, entry)
-# 6. mount the viewer: createWebAudit({ apiBase, vocabulary })
+# 6. mount the viewer: createWebAudit({ apiBase, vocabulary, table }) — and make
+#    sure DataViewsCopyProvider is mounted at your root (§4b)
 # 7. pass your messages/labels, and compose AUDIT_READ_PERMISSION into your catalog
 # 8. call retention from your sweep job
 ```

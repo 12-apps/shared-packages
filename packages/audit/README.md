@@ -156,13 +156,20 @@ const { page: AuditLog } = createWebAudit({
 });
 ```
 
-The whole viewer: the resource-id search, the action and resource pills, the
-actor picker, the day bounds (masked, in the declared locale's order, each with
-its own clear), the sortable date column, the trail with its diff summary and
-pagination —
-and the impersonation pair rendered as one line naming **both** people. The
-vocabulary is shared with the backend half, so an action that exists is an action
-the viewer can label.
+The whole SCREEN, on the shared `DataViews` grid: the dashboard header with its
+`[i]` and its export, the search box, the action / resource / actor filter
+pills, the period range, the sortable date column, column visibility, saved
+views, the trail with its diff summary and the server-mode pager — and the
+impersonation pair rendered as one line naming **both** people. The vocabulary
+is shared with the backend half, so an action that exists is an action the
+viewer can label.
+
+Being the SAME grid the host's other lists use is the point: an operator moving
+between Pedidos, Produtos and the trail learns one filter bar. Two host-side
+requirements come with it — `DataViewsCopyProvider` at your root (the grid's own
+words are yours, and it refuses to invent them), and a `table` wrapper if you
+want saved views, because persistence is a backend a package cannot invent. See
+ADOPTING.md §4b.
 
 Copy defaults to English and dates to the runtime's own locale. Both are
 fallbacks rather than recommendations — a package cannot know your market, and

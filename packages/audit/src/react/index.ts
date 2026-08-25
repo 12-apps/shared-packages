@@ -20,13 +20,35 @@ export {
   type AuditTransport,
   type AuditTransportOptions,
 } from './transport';
+export { AuditScreen, type AuditCrumb, type AuditScreenProps } from './screen';
 export { AuditViewer, type AuditViewerProps } from './viewer';
+// The grid seam: the props a host's own `DataViews` wrapper is bound through,
+// and the fallback the surface renders on when it is given none.
 export {
-  DayBound,
-  resolveDayFormat,
-  type DayBoundProps,
-  type DayFormat,
-  type DaySegment,
-} from './day-bound';
-export { AuditEntriesTable, formatDiff, type AuditEntriesTableProps } from './entries-table';
-export { AuditFilterBar, type AuditFilterBarProps } from './filter-bar';
+  StandaloneAuditTable,
+  type AuditTableComponent,
+  type AuditTableProps,
+  type StandaloneAuditTableProps,
+} from './grid-table';
+// The grid's declarations, for a host assembling the trail into a table of its
+// own — and `formatDiff`, which was published beside the hand-rolled table this
+// replaces and is the one piece of it that was never about the table.
+export {
+  auditColumns,
+  auditExportColumns,
+  auditFields,
+  auditRangeFields,
+  auditSortFields,
+  filtersFromQuery,
+  stateFromFilters,
+  AUDIT_FIELD,
+  AUDIT_RANGE_PERIOD,
+  AUDIT_SORT_COLUMN,
+} from './grid-config';
+export { formatDiff, toAuditRow, toAuditRows, type AuditRow } from './grid-rows';
+export {
+  collectAuditEntries,
+  DEFAULT_EXPORT_LIMITS,
+  type AuditExportLimits,
+  type AuditExportResult,
+} from './export';

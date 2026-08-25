@@ -31,44 +31,117 @@ import { TextField } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 
 
-/** `AAAA-MM-DD` (the wire) → `dd/mm/aaaa` (what the merchant reads). */
-export function isoToBr(iso: string): string {
+/**
+ * THE MASK IS THE ORDER, and both halves of this file read it.
+ *
+ * The placeholder a host supplies (`copy.filters.dayMask` — `dd/mm/aaaa` for
+ * pt-BR, `mm/dd/yyyy` for en-US) is not decoration: it tells the reader which
+ * segment comes first. Everything below therefore derives the segment order
+ * FROM that same string, so the shape on screen and the shape the parser
+ * expects cannot disagree.
+ *
+ * They did disagree, and the failure was silent in the worst direction. The
+ * mask/parse pair was hardcoded day-first (the `Br` in the old names was
+ * accurate) while the placeholder followed the copy pack — so under `en-US` the
+ * field ASKED for `mm/dd/yyyy`, and a reader who typed exactly that got a day
+ * of 12 and a month of 31, which is not a date, which commits nothing. No
+ * error, no filter, a full list that reads like an answer. The en-US pack's own
+ * comment already said the mask "is the shape that gets a date entered
+ * backwards"; nothing enforced it.
+ */
+
+/** What one segment of a mask is, and how many digits it takes. */
+type DaySegment = 'year' | 'month' | 'day';
+const SEGMENT_WIDTH: Readonly<Record<DaySegment, number>> = { year: 4, month: 2, day: 2 };
+
+/**
+ * The segments a mask asks for, in its own order.
+ *
+ * Keyed on each token's FIRST letter so one rule covers every spelling a host
+ * might use — `aaaa`/`yyyy` for the year, `mm` for the month, `dd`/`tt` for the
+ * day. An unreadable mask falls back to day-first rather than throwing: this
+ * runs on every keystroke, and a field that renders is recoverable where one
+ * that crashes the grid is not.
+ */
+function segmentsOf(mask: string): readonly DaySegment[] {
+  const tokens = mask.split(/[^A-Za-z]+/).filter(Boolean);
+  if (tokens.length !== 3) return ['day', 'month', 'year'];
+  const segments = tokens.map((token): DaySegment => {
+    const head = token.slice(0, 1).toLowerCase();
+    if (head === 'y' || head === 'a') return 'year';
+    return head === 'm' ? 'month' : 'day';
+  });
+  // A mask naming the same segment twice describes no date. Fall back rather
+  // than build a parser that can never succeed.
+  return new Set(segments).size === 3 ? segments : ['day', 'month', 'year'];
+}
+
+/** The separator the mask uses, defaulting to `/`. */
+const separatorOf = (mask: string): string => mask.replace(/[A-Za-z]/g, '').slice(0, 1) || '/';
+
+/** `AAAA-MM-DD` (the wire) → the mask's own order (what the reader sees). */
+export function isoToMasked(iso: string, mask: string): string {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  return parts ? `${parts[3]}/${parts[2]}/${parts[1]}` : '';
+  if (!parts) return '';
+  const value: Record<DaySegment, string> = {
+    year: parts[1] as string,
+    month: parts[2] as string,
+    day: parts[3] as string,
+  };
+  return segmentsOf(mask)
+    .map((segment) => value[segment])
+    .join(separatorOf(mask));
 }
 
 /**
- * `dd/mm/aaaa` → `AAAA-MM-DD`, but ONLY for a day that exists. `31/02/2026`
- * parses fine as three numbers and is not a date, and `Date` would silently
- * roll it into March rather than reject it — so the round trip through UTC is
- * the check: if the month or day comes back changed, the input was not a day.
+ * The mask's order → `AAAA-MM-DD`, but ONLY for a day that exists.
+ *
+ * `31/02/2026` parses fine as three numbers and is not a date, and `Date` would
+ * silently roll it into March rather than reject it — so the round trip through
+ * UTC is the check: if the month or day comes back changed, the input was not a
+ * day.
  */
-export function brToIso(text: string): string {
-  const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
-  if (!parts) return '';
-  const [, dd, mm, yyyy] = parts;
-  const day = Number(dd);
-  const month = Number(mm);
-  const year = Number(yyyy);
+export function maskedToIso(text: string, mask: string): string {
+  const segments = segmentsOf(mask);
+  const digits = text.replace(/\D/g, '');
+  if (digits.length !== 8) return '';
+  const value = {} as Record<DaySegment, string>;
+  let cursor = 0;
+  for (const segment of segments) {
+    value[segment] = digits.slice(cursor, cursor + SEGMENT_WIDTH[segment]);
+    cursor += SEGMENT_WIDTH[segment];
+  }
+  const year = Number(value.year);
+  const month = Number(value.month);
+  const day = Number(value.day);
   if (year < 1000) return '';
   const probe = new Date(Date.UTC(year, month - 1, day));
   if (probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return '';
-  return `${yyyy}-${mm}-${dd}`;
+  return `${value.year}-${value.month}-${value.day}`;
 }
 
 /**
- * Digits only, capped at eight, with the separators put back as you type.
+ * Digits only, capped at the mask's width, with the separators put back as you
+ * type.
  *
  * Deriving the whole string from the digits — rather than editing the text in
- * place — is what makes backspace behave. Four digits render as `06/08`, not
- * `06/08/`, so deleting the first digit of the year removes the trailing
- * separator with it instead of leaving a dead keystroke that changes nothing.
+ * place — is what makes backspace behave. Four digits of `dd/mm/aaaa` render as
+ * `06/08`, not `06/08/`, so deleting the first digit of the year removes the
+ * trailing separator with it instead of leaving a dead keystroke that changes
+ * nothing.
  */
-export function maskBrDate(raw: string): string {
+export function maskDate(raw: string, mask: string): string {
+  const segments = segmentsOf(mask);
+  const separator = separatorOf(mask);
   const digits = raw.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  const out: string[] = [];
+  let cursor = 0;
+  for (const segment of segments) {
+    if (cursor >= digits.length) break;
+    out.push(digits.slice(cursor, cursor + SEGMENT_WIDTH[segment]));
+    cursor += SEGMENT_WIDTH[segment];
+  }
+  return out.join(separator);
 }
 
 /**
@@ -142,7 +215,7 @@ export function DayBoundInput({
   mask: string;
 }): React.JSX.Element {
   const applied = value ?? '';
-  const [text, setText] = useState(() => isoToBr(applied));
+  const [text, setText] = useState(() => isoToMasked(applied, mask));
 
   // The bound is the APPLIED filter; `text` is what is being typed. Re-sync only
   // when the applied value moved somewhere the text does not already mean — a
@@ -150,8 +223,10 @@ export function DayBoundInput({
   // guard the field's own write bounces straight back mid-edit and resets the
   // caret, which is the native control's worst habit reproduced by hand.
   useEffect(() => {
-    setText((current) => (brToIso(current) === applied ? current : isoToBr(applied)));
-  }, [applied]);
+    setText((current) =>
+      maskedToIso(current, mask) === applied ? current : isoToMasked(applied, mask),
+    );
+  }, [applied, mask]);
 
   return (
     <TextField
@@ -162,19 +237,19 @@ export function DayBoundInput({
       placeholder={mask}
       value={text}
       onChange={(event) => {
-        const next = maskBrDate(event.target.value);
+        const next = maskDate(event.target.value, mask);
         setText(next);
         // Emptying clears the bound. A COMPLETE day applies it. A partial one
         // does NEITHER — it leaves whatever is applied alone, so typing is never
         // fought and a half-typed year never reaches the backend.
         if (next === '') return onChange(undefined);
-        const iso = brToIso(next);
+        const iso = maskedToIso(next, mask);
         if (iso) onChange(iso);
       }}
       // Leaving a half-typed (or impossible) date on screen would show a filter
       // the list is not actually using. On blur the field snaps back to what IS
       // applied; a complete date already equals it, so this only ever tidies.
-      onBlur={() => setText(isoToBr(applied))}
+      onBlur={() => setText(isoToMasked(applied, mask))}
       // The placeholder occupies the space an un-shrunk label would render into.
       InputLabelProps={{ shrink: true }}
       inputProps={dayInputProps(testId, describedBy)}

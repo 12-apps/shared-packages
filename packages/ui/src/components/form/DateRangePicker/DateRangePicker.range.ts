@@ -7,7 +7,7 @@
  * indistinguishable from one that ignored you. The caller reads
  * {@link DateRangeStatus} and keeps its own confirm button shut.
  */
-import { isoToBr } from '../../data-display/DataViews/data-views-day-input';
+import { isoToMasked } from '../../data-display/DataViews/data-views-day-input';
 
 import { dayCount, isAfterDay } from './DateRangePicker.dates';
 import type {
@@ -53,6 +53,11 @@ export function resolveDayRange(
  * moves both halves of the decision to the same place.
  */
 export function defaultMessages(): DateRangePickerMessages {
+  // ONE mask, read by both the fields and the summary below. They are the same
+  // date in the same control, so a summary formatted in a different order from
+  // the boxes it summarises is a control arguing with itself — which is what
+  // two independent literals eventually become.
+  const dayMask = 'dd/mm/yyyy';
   return {
     from: 'Start date',
     to: 'End date',
@@ -60,9 +65,9 @@ export function defaultMessages(): DateRangePickerMessages {
     incomplete: 'Choose both dates.',
     reversed: 'The end date must be on or after the start date.',
     overMax: ({ maxRangeDays }) => `Choose a range of at most ${maxRangeDays} days.`,
-    summary: ({ from, to }) => `${isoToBr(from)} – ${isoToBr(to)}`,
+    summary: ({ from, to }) => `${isoToMasked(from, dayMask)} – ${isoToMasked(to, dayMask)}`,
     calendarLabel: 'Calendar',
-    dayMask: 'dd/mm/yyyy',
+    dayMask,
   };
 }
 
