@@ -15,11 +15,39 @@
  * asserting — that a reconnect and a pushed hint both RE-ASK the server.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { CLUB_MESSAGES } from '../../__tests__/host-copy';
 import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
 import { TermsConsentDialog, type ConsentSignalHook } from '../consent/terms-consent-dialog';
+
+/**
+ * Load the dialog's SURFACE once, before any case renders.
+ *
+ * The gate fetches it on demand (`terms-consent-surface.tsx`), which in a
+ * browser is one small request for a chunk and in Vitest is an on-the-fly
+ * transform of that module and everything it pulls from the design system.
+ *
+ * Paid inside the first `findBy`, that transform does not fit. Measured on an
+ * IDLE machine, the first case took 1042ms against the 1000ms those helpers
+ * allow — so it passed here and failed on a loaded CI runner, which is the
+ * worst shape a test can have. Warming the module first takes the same case to
+ * 425ms.
+ *
+ * The cost moves to setup, where it belongs, and nothing about the cases
+ * changes: they still render the gate and still wait for the dialog through the
+ * same Suspense boundary, so a gate that stopped showing it would still fail
+ * every one of them.
+ *
+ * Deliberately NOT done in the sibling packages' suites. Their surfaces are
+ * lazy too, but the boundary costs them a Suspense round trip rather than a
+ * heavy transform (447ms and 565ms at their slowest), and warming those
+ * measured as no help at all — a hook that buys nothing is a hook that misleads
+ * the next reader.
+ */
+beforeAll(async () => {
+  await import('../consent/terms-consent-surface');
+});
 
 /** Stub `fetch` for the status check and the acceptance POST. */
 function server(options: { stale: boolean; acceptOk?: boolean }): string[] {
