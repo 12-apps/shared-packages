@@ -39,7 +39,7 @@ import type { InboxStore } from './inbox-state';
 import type { NotificationsPanelProps } from './panel';
 
 /** What the factory binds into the panel, and the host never passes. */
-export interface PanelParts {
+interface PanelParts {
   store: InboxStore;
   messages: NotificationMessages;
 }

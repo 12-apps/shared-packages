@@ -23,7 +23,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 
 import type { AppShellMessages } from '../messages';
 
-export interface TermsConsentSurfaceProps {
+interface TermsConsentSurfaceProps {
   messages: AppShellMessages;
   termsHref: string;
   privacyHref: string;

@@ -34,7 +34,7 @@ import type { PreferencesScreenProps } from './preferences-screen';
 import type { WebPushSetupConfig } from './web-push-setup';
 
 /** What the factory binds into the screen, and the host never passes. */
-export interface PreferencesPageParts {
+interface PreferencesPageParts {
   api: NotificationsApiClient;
   messages: NotificationMessages;
   webPush: WebPushSetupConfig;
