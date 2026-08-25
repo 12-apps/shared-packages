@@ -1,4 +1,8 @@
-import type { NotificationWireMessages } from '../messages';
+import {
+  messagesOf,
+  type NotificationsCopySource,
+  type NotificationWireMessages,
+} from '../messages';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from '../types';
 
 import {
@@ -40,7 +44,11 @@ interface NotificationRoutesDeps {
   transports: TransportRegistry;
   contacts: NotificationContactDirectory;
   categories: readonly string[];
-  messages: NotificationWireMessages;
+  /**
+   * The SOURCE, not a resolved pack — the route table is built once per
+   * process and every handler below runs per request.
+   */
+  messages: NotificationsCopySource<NotificationWireMessages>;
   /** Told when a write actually changed something (for a realtime hint). */
   onInboxChanged?: (userId: string) => void;
 }
@@ -98,8 +106,13 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'GET',
       path: '/notifications',
-      handle: guarded(async ({ actor, query }) =>
-        ok(await deps.inbox.list(actor.userId, parseListQuery(query, deps.messages))),
+      handle: guarded(async ({ actor, query, locale }) =>
+        ok(
+          await deps.inbox.list(
+            actor.userId,
+            parseListQuery(query, messagesOf(deps, locale)),
+          ),
+        ),
       ),
     },
     {
@@ -113,8 +126,8 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'POST',
       path: '/notifications/mark-read',
-      handle: guarded(async ({ actor, body }) => {
-        const target = parseMarkReadBody(body, deps.messages);
+      handle: guarded(async ({ actor, body, locale }) => {
+        const target = parseMarkReadBody(body, messagesOf(deps, locale));
         const updated =
           'all' in target
             ? await deps.inbox.markAllRead(actor.userId)
@@ -131,10 +144,10 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
       method: 'POST',
       // POST, not DELETE, because the ids travel in a JSON body.
       path: '/notifications/delete',
-      handle: guarded(async ({ actor, body }) => {
+      handle: guarded(async ({ actor, body, locale }) => {
         const deleted = await deps.inbox.softDelete(
           actor.userId,
-          parseDeleteBody(body, deps.messages),
+          parseDeleteBody(body, messagesOf(deps, locale)),
         );
         // Same rule as mark-read. A delete can move the badge too — an UNREAD
         // row that is removed takes its place in the count with it.
@@ -155,10 +168,13 @@ function preferenceRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'PUT',
       path: '/notification-preferences',
-      handle: guarded(async ({ actor, body }) => {
+      handle: guarded(async ({ actor, body, locale }) => {
         // The dispatch pipeline reads these on every emit, so a save takes
         // effect immediately — no cache to invalidate.
-        await deps.preferences.save(actor.userId, parsePreferencesBody(body, deps.messages));
+        await deps.preferences.save(
+          actor.userId,
+          parsePreferencesBody(body, messagesOf(deps, locale)),
+        );
         return ok(await preferencesPayload(deps, actor.userId));
       }),
     },
@@ -170,8 +186,8 @@ function pushRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'GET',
       path: '/push-subscriptions',
-      handle: guarded(async ({ actor, query }) => {
-        const endpoint = parsePushEndpointQuery(query, deps.messages);
+      handle: guarded(async ({ actor, query, locale }) => {
+        const endpoint = parsePushEndpointQuery(query, messagesOf(deps, locale));
         return ok({
           // null = web push is not configured on this deployment.
           vapidPublicKey: deps.transports.webPushPublicKey(),
@@ -188,8 +204,8 @@ function pushRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'POST',
       path: '/push-subscriptions',
-      handle: guarded(async ({ actor, body, headers }) => {
-        const input = parsePushSubscriptionBody(body, deps.messages);
+      handle: guarded(async ({ actor, body, headers, locale }) => {
+        const input = parsePushSubscriptionBody(body, messagesOf(deps, locale));
         const userAgent = headers?.['user-agent'];
         await deps.pushSubscriptions.save(actor.userId, {
           ...input,
@@ -202,10 +218,10 @@ function pushRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
       method: 'DELETE',
       // The endpoint is a long opaque URL, unusable as a path param.
       path: '/push-subscriptions',
-      handle: guarded(async ({ actor, body }) => {
+      handle: guarded(async ({ actor, body, locale }) => {
         await deps.pushSubscriptions.remove(
           actor.userId,
-          parsePushEndpointBody(body, deps.messages),
+          parsePushEndpointBody(body, messagesOf(deps, locale)),
         );
         return ok({ count: await deps.pushSubscriptions.count(actor.userId) });
       }),
