@@ -10,7 +10,12 @@
 import { describe, expect, it } from "vitest";
 
 import { BillingConfigError } from "../errors";
-import { createApiBilling, type BillingActor, type BillingApiCopy } from "../server/routes";
+import {
+  copyOf,
+  createApiBilling,
+  type BillingActor,
+  type BillingApiCopy,
+} from "../server/routes";
 import type { WireRequest, WireRoute } from "@12-apps/wiring";
 import {
   MERCHANT,
@@ -161,5 +166,120 @@ describe("the four endpoints", () => {
       status: 200,
       body: { cards: CARDS },
     });
+  });
+});
+
+describe("the copy can follow the reader", () => {
+  /**
+   * `createApiBilling` assembles its route table ONCE at the host's mount, and
+   * the four handlers below it run per request. The old `const { copy } =
+   * config` closed over one pack there, so every tenant for the life of the
+   * process was refused in whichever language that mount was built with — and
+   * a single-locale host could not tell that from correct.
+   */
+  const OTHER: BillingApiCopy = {
+    rejections: {
+      "no-platform-account": { status: 503, message: "[other] not configured" },
+      "no-subscription": { status: 404, message: "[other] no subscription" },
+      "provider-cannot-vault": { status: 503, message: "[other] cannot save cards" },
+    },
+    detachFailed: { status: 502, message: "[other] could not reach the provider" },
+    invalidSession: { status: 400, message: "[other] a session id is required" },
+  };
+
+  const pickByLocale = ({ locale }: { readonly locale?: string | null }) =>
+    locale === "en-US" ? OTHER : COPY;
+
+  function resolverSurface() {
+    const gateway = fakeGateway();
+    const { payments } = fakePayments(gateway);
+    return createApiBilling({
+      payments,
+      merchant: MERCHANT,
+      enabled: async () => true,
+      subscriptions: fakeDirectory(TARGET),
+      instruments: fakeInstruments([], CARDS),
+      copy: pickByLocale,
+    });
+  }
+
+  it("answers two callers in their own languages from ONE mount", async () => {
+    const { routes } = resolverSurface();
+    const complete = route(routes, "POST", "/card");
+
+    // No session id: the refusal is this surface's own, and needs no provider.
+    const [pt, en] = await Promise.all([
+      complete.handle(request({ body: {}, locale: "pt-BR" })),
+      complete.handle(request({ body: {}, locale: "en-US" })),
+    ]);
+
+    expect(pt.body).toEqual({ message: COPY.invalidSession.message });
+    expect(en.body).toEqual({ message: OTHER.invalidSession.message });
+  });
+
+  it("keeps the STATUS fixed while the sentence follows the reader", async () => {
+    // Rule H on the half a client branches on. A 400 that became a 404 in
+    // another language would make error handling language-dependent.
+    const { routes } = resolverSurface();
+    const complete = route(routes, "POST", "/card");
+
+    const [pt, en] = await Promise.all([
+      complete.handle(request({ body: {}, locale: "pt-BR" })),
+      complete.handle(request({ body: {}, locale: "en-US" })),
+    ]);
+
+    expect(en.status).toBe(pt.status);
+    expect(en.body).not.toEqual(pt.body);
+  });
+
+  it("validates a resolver's DEFAULT rendering at the mount", () => {
+    /**
+     * Rule E, and why the mount asks with no locale at all.
+     *
+     * A host that forgot a sentence must still fail at ASSEMBLY, where a
+     * reviewer sees it — not on the one request that happens to need the
+     * missing refusal. So the mount resolves with `undefined` and validates
+     * what comes back.
+     */
+    const incomplete = () =>
+      createApiBilling({
+        payments: fakePayments(fakeGateway()).payments,
+        merchant: MERCHANT,
+        enabled: async () => true,
+        subscriptions: fakeDirectory(TARGET),
+        instruments: fakeInstruments([], CARDS),
+        copy: () => ({ ...COPY, invalidSession: undefined }) as unknown as BillingApiCopy,
+      });
+
+    expect(incomplete).toThrow(BillingConfigError);
+  });
+
+  it("asks the resolver with no locale at the mount, then per request", () => {
+    const asked: Array<string | null | undefined> = [];
+    const { routes } = createApiBilling({
+      payments: fakePayments(fakeGateway()).payments,
+      merchant: MERCHANT,
+      enabled: async () => true,
+      subscriptions: fakeDirectory(TARGET),
+      instruments: fakeInstruments([], CARDS),
+      copy: ({ locale }) => {
+        asked.push(locale);
+        return COPY;
+      },
+    });
+
+    expect(asked).toEqual([undefined]);
+
+    void route(routes, "POST", "/card").handle(
+      request({ body: {}, locale: "en-US" }),
+    );
+    expect(asked).toEqual([undefined, "en-US"]);
+  });
+});
+
+describe("copyOf", () => {
+  it("passes a plain pack through and asks a resolver for its locale", () => {
+    expect(copyOf({ copy: COPY }, "en-US")).toBe(COPY);
+    expect(copyOf({ copy: ({ locale }) => (locale === "en-US" ? COPY : COPY) }, "en-US")).toBe(COPY);
   });
 });
