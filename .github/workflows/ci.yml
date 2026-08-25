@@ -1049,6 +1049,24 @@ jobs:
     # that still fires when the release workflow cannot run at all.
     needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts]
     steps:
+      # The wiring conformance gate runs HERE, not in a filtered job: it holds
+      # a COMPLETENESS property (every package answers every capability kind,
+      # the ledger only shrinks, touching a package with pending entries pays
+      # them off), and a completeness gate behind a paths filter fails as "no
+      # run" instead of red — the exact drift the ledger exists to refuse.
+      # Plain node over the checkout, no install; fetch-depth 0 so the
+      # shrink-only and touch-must-fix rules can see the merge base.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Wiring conformance (selftest + gate)
+        run: pnpm quality:wiring
       - name: Verify all required jobs passed
         shell: bash
         run: |
