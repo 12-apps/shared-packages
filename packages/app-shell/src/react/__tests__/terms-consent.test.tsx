@@ -14,7 +14,15 @@
  * cases below drive that seam by hand, which is closer to what they were always
  * asserting — that a reconnect and a pushed hint both RE-ASK the server.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { CLUB_MESSAGES } from '../../__tests__/host-copy';
@@ -39,15 +47,26 @@ import { TermsConsentDialog, type ConsentSignalHook } from '../consent/terms-con
  * same Suspense boundary, so a gate that stopped showing it would still fail
  * every one of them.
  *
- * Deliberately NOT done in the sibling packages' suites. Their surfaces are
- * lazy too, but the boundary costs them a Suspense round trip rather than a
- * heavy transform (447ms and 565ms at their slowest), and warming those
- * measured as no help at all — a hook that buys nothing is a hook that misleads
- * the next reader.
+ * The sibling packages' suites do NOT warm theirs. Their surfaces are lazy too,
+ * but the boundary costs them a Suspense round trip rather than a heavy
+ * transform, and warming those measured as no help at all (549ms from a cold
+ * Vite cache, 543ms warmed) — a hook that buys nothing is a hook that misleads
+ * the next reader. They raise the wait instead, as this file also does below.
  */
 beforeAll(async () => {
   await import('../consent/terms-consent-surface');
 });
+
+/**
+ * And a budget that covers the boundary even when the warm-up is not enough.
+ *
+ * 425ms is a comfortable margin here and NOT on a runner running thirty
+ * packages' suites at once: the sibling package's equivalent needed 1206ms
+ * there against 550ms here. The warm-up above makes these tests fast; this
+ * makes them insensitive to how busy the machine is. Both, because they answer
+ * different halves of the same failure.
+ */
+configure({ asyncUtilTimeout: 5_000 });
 
 /** Stub `fetch` for the status check and the acceptance POST. */
 function server(options: { stale: boolean; acceptOk?: boolean }): string[] {
