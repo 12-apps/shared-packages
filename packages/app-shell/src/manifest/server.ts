@@ -5,9 +5,9 @@
  * contract's `WireRequest`/`WireResponse` pair does not carry.
  *
  * **`locale`, inbound.** The one field the pair DOES share, and the reason it
- * is spelled out here: the 500 body follows the caller (FUT-925), and this
- * view is the only thing between the host's negotiated tag and the accessor
- * that renders that sentence. Dropping it would leave the widened field
+ * is spelled out here: the 500 body follows the caller, and this view is the
+ * only thing between the host's negotiated tag and the accessor that renders
+ * that sentence. Dropping it would leave the widened field
  * perfectly typed and permanently inert — every adopter mounting through the
  * manifest would resolve with no locale forever, which reads exactly like a
  * host that chose not to translate.
