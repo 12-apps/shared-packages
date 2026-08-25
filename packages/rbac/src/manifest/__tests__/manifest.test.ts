@@ -4,6 +4,9 @@
  * devDependency, so the producer factories' runtime assertions run HERE.
  */
 
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 import {
   assertDbMirror,
@@ -16,6 +19,7 @@ import type { PackageManifest } from '@12-apps/wiring';
 
 import packageJson from '../../../package.json';
 import { RBAC_PERMISSIONS } from '../../permissions';
+import { rbacMcpEndpoints } from '../../mcp';
 import { rbacManifest } from '../index';
 import { rbacServerManifest } from '../server';
 import { rbacWebManifest } from '../web';
@@ -139,5 +143,55 @@ describe('the rbac manifest', () => {
     expect(manifest.jobs).toBeUndefined();
     expect(manifest.email).toBeUndefined();
     expect(rbacManifest.server).toEqual(['http']);
+  });
+
+  it('declares no STATIC mcp capability — the seventeen tools need a vocabulary', () => {
+    // The contract carves this case out by name, and `lifecycleMcpEndpoints`
+    // is the precedent: a tool table that cannot exist without the host's
+    // mount path, catalog and sentences joins the aggregate through the
+    // adoption's `mcpEndpoints` rather than sitting in the manifest.
+    //
+    // What this pins is that the carve-out stays HONEST in both directions —
+    // no static declaration appears, AND the factory the docblock promises is
+    // really exported. A narrowing whose replacement went missing would read
+    // exactly like this one and ship no tools at all.
+    expect((rbacManifest as Record<string, unknown>).mcp).toBeUndefined();
+    expect(typeof rbacMcpEndpoints).toBe('function');
+  });
+
+  it('reads no process.env in shipped source, which is what `no env` claims', () => {
+    // The one narrowing that can rot WITHOUT anybody touching this manifest:
+    // `env` is absent because every deployment-shaped decision reaches this
+    // package as an argument, and the day somebody adds a `process.env` read
+    // the manifest is silently wrong — a host would never be asked to declare
+    // a variable the package had started depending on.
+    //
+    // Tests and the packaged journeys are excluded: neither ships, and a
+    // journey legitimately reads the environment its host puts it in.
+    //
+    // COMMENTS ARE STRIPPED FIRST, and that is not a convenience: the
+    // narrowing's own explanation — one file up — contains the words
+    // `process.env` in the sentence saying this package never reads it. A
+    // scanner counting prose would fire on the docblock justifying the rule,
+    // which is the same reason the payments and adapter budgets count code
+    // lines only. Documenting a boundary must never cost.
+    const src = join(import.meta.dirname, '../..');
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          if (entry !== '__tests__' && entry !== 'e2e') walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry) || /\.test\./.test(entry)) continue;
+        const code = readFileSync(full, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/^\s*\/\/.*$/gm, '');
+        if (code.includes('process.env')) offenders.push(full.slice(src.length + 1));
+      }
+    };
+    walk(src);
+    expect(offenders).toEqual([]);
   });
 });
