@@ -22,13 +22,20 @@
  */
 
 import { createWirePaymentFlows } from '../checkout/wire-view';
+import type { PaymentsCopySource } from '../copy-source';
 import { createReceiptMailer, type PaymentsEmailPort, type ReceiptMailCopy } from '../email/receipt';
 import { createWireMountPayments } from '../http/wire-view';
 import { PAYMENTS_JOBS } from '../jobs';
 
 export interface PaymentsServerManifestOptions {
-  /** Which words the receipt mail reads in — REQUIRED, the host's choice. */
-  receiptCopy: ReceiptMailCopy;
+  /**
+   * Which words the receipt mail reads in — REQUIRED, the host's choice.
+   *
+   * A pack for a host with one audience, or a resolver for one whose buyers do
+   * not share a language. Handed to `createReceiptMailer` UNRESOLVED, so the
+   * choice is still open when a receipt finally knows who paid.
+   */
+  receiptCopy: PaymentsCopySource<ReceiptMailCopy>;
 }
 
 /** The merchant-admin (library) surface, the sweeps and the receipt mailer. */
