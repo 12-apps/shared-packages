@@ -9,7 +9,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { DayBoundInput, brToIso, isoToBr, maskBrDate } from "../data-views-day-input";
+import { DayBoundInput, isoToMasked, maskDate, maskedToIso } from "../data-views-day-input";
+
+/**
+ * The two masks in the estate's own packs. Every helper case below runs against
+ * BOTH, because the defect they exist to pin was one order working and the
+ * other silently committing nothing (`en-US` asked for `mm/dd/yyyy` and parsed
+ * `dd/mm/yyyy`, so a reader who typed what the field asked for got no filter).
+ */
+const BR = "dd/mm/aaaa";
+const US = "mm/dd/yyyy";
 
 /** Type `text` one character at a time, the way a keyboard delivers it. */
 function typeSequentially(element: HTMLInputElement, text: string): void {
@@ -24,53 +33,91 @@ function renderInput(value?: string) {
   return { onChange, input: screen.getByTestId("day") as HTMLInputElement };
 }
 
-describe("maskBrDate", () => {
-  it("inserts each separator as the digit that needs it arrives", () => {
-    expect(maskBrDate("0")).toBe("0");
-    expect(maskBrDate("06")).toBe("06");
-    expect(maskBrDate("060")).toBe("06/0");
-    expect(maskBrDate("0608")).toBe("06/08");
-    expect(maskBrDate("06082")).toBe("06/08/2");
-    expect(maskBrDate("06082026")).toBe("06/08/2026");
+describe("maskDate", () => {
+  it("inserts the separators as the digits arrive, in the mask's own order", () => {
+    expect(maskDate("0", BR)).toBe("0");
+    expect(maskDate("06", BR)).toBe("06");
+    expect(maskDate("060", BR)).toBe("06/0");
+    expect(maskDate("0608", BR)).toBe("06/08");
+    expect(maskDate("06082", BR)).toBe("06/08/2");
+    expect(maskDate("06082026", BR)).toBe("06/08/2026");
+    // Same digits, month-first mask: the grouping is identical here because
+    // both orders are 2-2-4 — what differs is what the parser then MEANS by
+    // them, which `maskedToIso` below pins.
+    expect(maskDate("06082026", US)).toBe("06/08/2026");
   });
 
-  it("ignores everything that is not a digit, so a pasted date still lands", () => {
-    expect(maskBrDate("06/08/2026")).toBe("06/08/2026");
-    expect(maskBrDate("2026-08-06")).toBe("20/26/0806");
+  it("keeps a year-first mask's own widths", () => {
+    // `yyyy-mm-dd` is a real locale order, and its first segment is four
+    // digits — a 2-2-4 grouping would put the separator in the wrong place
+    // from the third keystroke.
+    expect(maskDate("2026", "yyyy-mm-dd")).toBe("2026");
+    expect(maskDate("202608", "yyyy-mm-dd")).toBe("2026-08");
+    expect(maskDate("20260806", "yyyy-mm-dd")).toBe("2026-08-06");
   });
 
-  it("stops at eight digits rather than growing past a date", () => {
-    expect(maskBrDate("0608202699")).toBe("06/08/2026");
+  it("strips whatever is not a digit, so a paste still lands", () => {
+    expect(maskDate("06/08/2026", BR)).toBe("06/08/2026");
+    expect(maskDate("2026-08-06", BR)).toBe("20/26/0806");
   });
 
-  it("renders four digits WITHOUT a trailing separator, so backspace never stalls", () => {
-    // "06/08/" would swallow the keystroke that deleted the year's first digit:
-    // the mask would put the separator straight back and nothing would move.
-    expect(maskBrDate("0608")).toBe("06/08");
+  it("caps at the eight digits a day has", () => {
+    expect(maskDate("0608202699", BR)).toBe("06/08/2026");
+  });
+
+  it("falls back to day-first for a mask it cannot read", () => {
+    // This runs on every keystroke; a field that renders is recoverable where
+    // one that throws takes the grid down with it. Only the ORDER falls back —
+    // the separator is still the one the placeholder showed, so the field never
+    // renders a shape its own hint did not promise.
+    expect(maskDate("06082026", "?")).toBe("06?08?2026");
+    expect(maskDate("06082026", "dd/dd/yyyy")).toBe("06/08/2026");
   });
 });
 
-describe("brToIso", () => {
-  it("converts a whole day to the wire format", () => {
-    expect(brToIso("06/08/2026")).toBe("2026-08-06");
+describe("maskedToIso", () => {
+  it("reads each mask in ITS OWN order", () => {
+    // The whole defect, in two lines: the same eight digits are two different
+    // days depending on what the field asked for.
+    expect(maskedToIso("06/08/2026", BR)).toBe("2026-08-06");
+    expect(maskedToIso("06/08/2026", US)).toBe("2026-06-08");
+    expect(maskedToIso("2026-08-06", "yyyy-mm-dd")).toBe("2026-08-06");
   });
 
-  it("rejects a day that does not exist instead of rolling it into next month", () => {
-    expect(brToIso("31/02/2026")).toBe("");
-    expect(brToIso("32/01/2026")).toBe("");
-    expect(brToIso("01/13/2026")).toBe("");
+  it("refuses a day that does not exist, in either order", () => {
+    expect(maskedToIso("31/02/2026", BR)).toBe("");
+    expect(maskedToIso("32/01/2026", BR)).toBe("");
+    expect(maskedToIso("01/13/2026", BR)).toBe("");
+    // `31/12` is a real day day-first and an impossible one month-first — the
+    // asymmetry IS the point, and typing it into an en-US field must commit
+    // nothing rather than roll into the next year.
+    expect(maskedToIso("31/12/2099", BR)).toBe("2099-12-31");
+    expect(maskedToIso("31/12/2099", US)).toBe("");
   });
 
-  it("rejects anything that is not yet a whole date", () => {
-    expect(brToIso("")).toBe("");
-    expect(brToIso("06")).toBe("");
-    expect(brToIso("06/08")).toBe("");
-    expect(brToIso("06/08/20")).toBe("");
+  it("refuses anything that is not eight digits", () => {
+    expect(maskedToIso("", BR)).toBe("");
+    expect(maskedToIso("06/08", BR)).toBe("");
+    expect(maskedToIso("06/08/202", BR)).toBe("");
+  });
+});
+
+describe("isoToMasked", () => {
+  it("writes the wire day in the mask's order", () => {
+    expect(isoToMasked("2026-08-06", BR)).toBe("06/08/2026");
+    expect(isoToMasked("2026-08-06", US)).toBe("08/06/2026");
+    expect(isoToMasked("2026-08-06", "yyyy-mm-dd")).toBe("2026-08-06");
   });
 
-  it("round-trips with isoToBr", () => {
-    expect(isoToBr(brToIso("06/08/2026"))).toBe("06/08/2026");
-    expect(isoToBr("")).toBe("");
+  it("answers empty for anything that is not a wire day", () => {
+    expect(isoToMasked("", BR)).toBe("");
+    expect(isoToMasked("06/08/2026", BR)).toBe("");
+  });
+
+  it("round-trips through the mask it was written with", () => {
+    for (const mask of [BR, US, "yyyy-mm-dd"]) {
+      expect(maskedToIso(isoToMasked("2026-08-06", mask), mask)).toBe("2026-08-06");
+    }
   });
 });
 

@@ -5,6 +5,7 @@ import type {
   EmailCredentialsMailer,
 } from "../email-credentials/types";
 import { renderAuthMail, type MailPack } from "../server/mail-templates";
+import type { EmailAuthCopySource } from "../server/messages";
 
 /**
  * `@12-apps/auth/notifications` — the four auth e-mails, delivered through
@@ -62,8 +63,13 @@ export interface AuthMailerConfig {
    * nothing sent another product's Portuguese, and nothing failed. A pt-BR
    * host passes `PT_BR_MAIL` from `../server/mail-templates.pt-BR` — one
    * reviewable line, never a silence.
+   *
+   * A host whose readers do not share one language passes a RESOLVER instead
+   * — `localeCopy(AUTH_MAIL)` from `@12-apps/i18n` — and each message is
+   * written in its own recipient's language. The resolver is stored, never
+   * called, until `renderAuthMail` has a recipient to ask about.
    */
-  pack: MailPack;
+  pack: EmailAuthCopySource<MailPack>;
   /**
    * Where the "your password changed" notice points — the sign-in page.
    *

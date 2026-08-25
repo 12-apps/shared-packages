@@ -28,6 +28,7 @@ import {
   type AuditRoute,
   type AuditServerConfig,
 } from './config';
+import { messagesOf } from './policy';
 import type { AuditStore } from './store';
 import { parseAuditLogQuery } from './wire';
 
@@ -41,10 +42,25 @@ import { parseAuditLogQuery } from './wire';
  * endpoint instead of as a failure to boot.
  */
 interface RouteDeps {
-  config: Pick<AuditServerConfig, 'resolveActor'>;
+  config: Pick<AuditServerConfig, 'resolveActor' | 'messages'>;
+  /**
+   * The vocabulary, PLAIN — and deliberately not a copy source.
+   *
+   * Everything this half of the package reads off it is MECHANISM: `actionIds`
+   * and `resourceIds` are the wire's allowed filter values, `allowlistFor`
+   * decides which fields `redactDiff` persists to an append-only table, and
+   * `hasAction`/`hasResource` are predicates over values off a wire. None of
+   * that may follow a reader — a resolver here would make the wire CONTRACT
+   * and the contents of an immutable row language-dependent, which is the
+   * failure the "fixed text stays fixed" rule names.
+   *
+   * The label half (`actionLabel`, `resourceLabel`) is consumed only by the
+   * React mount, where props are re-evaluated on every render — so a host that
+   * wants its pills to follow a reader already can, by passing the vocabulary
+   * its `useLocaleCopy` resolved. Nothing on the server ever renders a label.
+   */
   vocabulary: AuditVocabulary;
   store: AuditStore;
-  messages: AuditMessages;
   gates: AuditGatePermissions;
   paging: AuditPagingPolicy;
 }
@@ -58,10 +74,14 @@ interface RouteDeps {
  * resulting `tenantId` the caller's own — so the descriptors never see a tenant
  * identifier that came off the wire.
  */
-async function authorize(deps: RouteDeps, request: AuditRequest): Promise<AuditActor> {
+async function authorize(
+  deps: RouteDeps,
+  request: AuditRequest,
+  messages: AuditMessages,
+): Promise<AuditActor> {
   const actor = await deps.config.resolveActor(request);
-  if (!actor) throw new AuditApiError(401, deps.messages.unauthenticated);
-  requirePermission(actor, deps.gates.read, deps.messages);
+  if (!actor) throw new AuditApiError(401, messages.unauthenticated);
+  requirePermission(actor, deps.gates.read, messages);
   return actor;
 }
 
@@ -71,11 +91,14 @@ function listRoute(deps: RouteDeps): AuditRoute {
     path: '/audit-logs',
     async handle(request: AuditRequest): Promise<AuditResponse> {
       try {
-        const actor = await authorize(deps, request);
+        // Resolved ONCE per request, then handed down: two helpers asking
+        // separately is how one refusal ends up half-translated.
+        const messages = messagesOf(deps.config, request.locale);
+        const actor = await authorize(deps, request, messages);
         const query = parseAuditLogQuery(
           deps.vocabulary,
           request.query,
-          deps.messages,
+          messages,
           deps.paging,
         );
         const page = await deps.store.listPage(actor.tenantId, query);
@@ -103,7 +126,7 @@ function actorsRoute(deps: RouteDeps): AuditRoute {
     path: '/audit-logs/actors',
     async handle(request: AuditRequest): Promise<AuditResponse> {
       try {
-        const actor = await authorize(deps, request);
+        const actor = await authorize(deps, request, messagesOf(deps.config, request.locale));
         return ok(await deps.store.listActors(actor.tenantId));
       } catch (error) {
         return foldApiError(error);

@@ -2,6 +2,7 @@ import type { EmailDriver } from "@12-apps/notifications/server";
 
 import type { EmailCredentialsMailer } from "../email-credentials/types";
 import type { MailPack } from "../server/mail-templates";
+import type { EmailAuthCopySource } from "../server/messages";
 import { createAuthMailer } from "./mailer";
 import { createSinkDriver, createUnconfiguredDriver } from "./drivers";
 
@@ -134,8 +135,13 @@ export interface EnvAuthMailerConfig {
    */
   drivers: Record<string, EmailDriverFactory | undefined>;
   log: AuthMailerLog;
-  /** Which words — REQUIRED, forwarded to `createAuthMailer` unchanged. */
-  pack: MailPack;
+  /**
+   * Which words — REQUIRED, forwarded to `createAuthMailer` unchanged.
+   *
+   * A pack, or a resolver that picks one per recipient; this file only carries
+   * it, so both forms pass through untouched.
+   */
+  pack: EmailAuthCopySource<MailPack>;
   /** The sign-in path the "password changed" notice points at. `/login`. */
   loginPath?: string;
   /** Where links point when no origin variable is set. Dev's own server. */

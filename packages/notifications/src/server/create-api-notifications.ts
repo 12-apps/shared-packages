@@ -1,5 +1,8 @@
 import { createGeneratorRegistry, type NotificationGeneratorRegistry } from '../generators';
-import { messagesOf, type NotificationWireMessages } from '../messages';
+import type {
+  NotificationsCopySource,
+  NotificationWireMessages,
+} from '../messages';
 import type { ChannelRow } from '../preferences-core';
 import {
   taxonomyOf,
@@ -104,8 +107,15 @@ export interface NotificationsServerConfig {
   onInboxChanged?: (userId: string) => void;
   /** The host's authorization engine, for `notifyByPermission`. */
   audience?: NotificationAudienceDirectory;
-  /** User-facing copy overrides (pt-BR product copy by default). */
-  messages: NotificationWireMessages;
+  /**
+   * Every user-facing sentence this surface can produce — REQUIRED host config.
+   *
+   * A pack, or a RESOLVER for a host whose callers do not share a language.
+   * Passed to the routes UNRESOLVED: this factory runs once per process (and
+   * at least one host memoises its call), so resolving here would answer every
+   * later request in the language the process started with.
+   */
+  messages: NotificationsCopySource<NotificationWireMessages>;
   /** The host's logger. Defaults to the console. */
   logger?: NotificationLogger;
 }
@@ -132,8 +142,14 @@ export interface ApiNotifications {
   registerGenerator: NotificationGeneratorRegistry['register'];
   /** The declared transports, for diagnostics and availability probes. */
   transports: TransportRegistry;
-  /** The copy in force, so a host's own screens can reuse a sentence. */
-  messages: NotificationWireMessages;
+  /**
+   * The copy source in force, so a host's own screens can reuse a sentence.
+   *
+   * The SOURCE rather than a resolved pack, for the same reason the routes get
+   * one: a host screen serving two readers must be able to ask per reader.
+   * Read it with `messagesOf({ messages }, locale)`.
+   */
+  messages: NotificationsCopySource<NotificationWireMessages>;
 }
 
 /** Drop the keys the host left unset, so an absent seam stays absent. */
@@ -150,7 +166,15 @@ const consoleLogger: NotificationLogger = {
 };
 
 export function createApiNotifications(config: NotificationsServerConfig): ApiNotifications {
-  const messages = messagesOf(config);
+  /**
+   * The SOURCE travels; nothing is resolved here.
+   *
+   * This factory runs once per process — and at least one host memoises its
+   * call behind an `if (assembled) return assembled;` — so a `messagesOf(config)`
+   * on this line would word every later request in the language the process
+   * started with. The handlers resolve per request instead.
+   */
+  const messages = config.messages;
   const taxonomy = taxonomyOf(config);
   const logger = config.logger ?? consoleLogger;
 

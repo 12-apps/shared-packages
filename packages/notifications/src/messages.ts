@@ -85,7 +85,21 @@ export interface NotificationMessages extends NotificationWireMessages {
 }
 
 /**
- * The messages in force.
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type NotificationsCopyResolver<T> = (context: {
+  readonly locale?: string | null;
+}) => T;
+export type NotificationsCopySource<T> = T | NotificationsCopyResolver<T>;
+
+/**
+ * The messages in force, for ONE reader.
  *
  * A pass-through rather than a merge: there is nothing left to merge WITH, and
  * that is the point of the change. The old version spread the host's table over
@@ -96,8 +110,27 @@ export interface NotificationMessages extends NotificationWireMessages {
  * the same screen.
  *
  * Kept as a function because all three mounts read it off a config object, and
- * because a later rule (a blank-string refusal, say) belongs in one place.
+ * because a later rule (a blank-string refusal, say) belongs in one place —
+ * which is exactly what made it the right place to put the RESOLUTION when the
+ * field learned to take a resolver.
+ *
+ * **Call it where the sentence is used.** `createApiNotifications` runs once
+ * per process, and at least one host memoises its call behind an `if
+ * (assembled) return assembled;`, so a value read there answers every later
+ * request in the language the process started with — and a single-locale host
+ * cannot tell the difference. The route handlers call it per request; the
+ * parsers below them keep taking a plain pack, so one request resolves exactly
+ * once and no helper can disagree with another about the language.
+ *
+ * The generic survives the widening: a host whose pack carries extra keys of
+ * its own still gets them back, resolver or not.
  */
-export function messagesOf<T extends NotificationWireMessages>(config: { messages: T }): T {
-  return config.messages;
+export function messagesOf<T extends NotificationWireMessages>(
+  config: { messages: NotificationsCopySource<T> },
+  locale?: string,
+): T {
+  const source = config.messages;
+  return typeof source === 'function'
+    ? (source as NotificationsCopyResolver<T>)({ locale })
+    : source;
 }
