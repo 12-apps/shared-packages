@@ -1,6 +1,7 @@
 {
   "name": "@12-apps/shared-helpers",
   "version": "1.0.0",
+  "sideEffects": ["**/db/lib/factory.*","**/requests/apiFactory.*"],
   "description": "Shared helper utilities",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

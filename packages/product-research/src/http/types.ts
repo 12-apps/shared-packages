@@ -1,4 +1,9 @@
 import type { ResearchDiagnosticsCopy } from '../connectors/diagnostics-copy';
+import {
+  resolveResearchCopy,
+  type ResearchCopyResolver,
+  type ResearchCopySource,
+} from '../copy-source';
 import type { MarketVocabulary } from '../normalize/vocabulary';
 import type { NormalizedManualRow } from '../import/manual';
 
@@ -54,34 +59,12 @@ export interface ResearchHttpRequest {
   locale?: string;
 }
 
-/**
- * What a copy field takes once its words can follow a reader.
- *
- * Declared here rather than imported from `@12-apps/i18n`: this package must
- * stay liftable into a repo that has never heard of it, so the two agree
- * STRUCTURALLY and nothing forces the dependency. The context is deliberately
- * loose — a raw tag off the wire, unnarrowed — because matching it is the host
- * resolver's job, not this package's.
- */
-export type ResearchCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
-export type ResearchCopySource<T> = T | ResearchCopyResolver<T>;
 
-/**
- * The copy a field is offering, at the moment it is needed.
- *
- * Call this where the sentence is USED, never where the routes are built: this
- * surface is assembled once per process, so a value resolved there answers
- * every reader in the language the process started with — and a single-locale
- * host cannot tell the difference.
- */
-export function resolveResearchCopy<T>(
-  source: ResearchCopySource<T>,
-  locale: string | undefined,
-): T {
-  return typeof source === 'function'
-    ? (source as ResearchCopyResolver<T>)({ locale })
-    : source;
-}
+// Re-exported from the module that now owns them, so every existing import of
+// `ResearchCopySource` from this file keeps working and there is exactly one
+// definition. `connectors/types.ts` needs the same trio, and this file already
+// imports FROM connectors — so the shared home had to be neither of the two.
+export { resolveResearchCopy, type ResearchCopyResolver, type ResearchCopySource };
 
 /** Structural twin of the wiring contract's `WireResponse`. */
 export interface ResearchHttpResponse {

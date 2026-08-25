@@ -1,6 +1,7 @@
 {
   "name": "@12-apps/typescript-config",
   "version": "1.0.2",
+  "sideEffects": false,
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

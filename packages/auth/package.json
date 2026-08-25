@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
+  "sideEffects": ["**/auth-handler.*","**/e2e/**"],
   "description": "Plug-and-play authentication plugin: Auth.js wiring and the e-mail + password flow (.), host-mounted backend surface (./server: routes, messages, mail templates, the duck-typed credential and settings store seams), auth UI (./react: screens, whole login/sign-up pages, the platform settings screen), a Hono mount (./hono), delivery through @12-apps/notifications (./notifications) and packaged Gherkin journeys (./e2e) \u2014 plus the package-owned Prisma fragment synced into the host schema. Who the users are is the host's and arrives as config. Adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",

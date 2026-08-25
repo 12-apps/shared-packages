@@ -2,6 +2,7 @@ import type { ResearchDiagnosticsCopy, VtexValidateCopy } from './diagnostics-co
 import { z } from 'zod';
 import { CREDENTIALS_STRIPPED, describeFetchFailure, fetchJsonOutcome } from './fetch-reason';
 import type { ConnectorContext, FetchFailure, FetchInit, SourceConfigCheck } from './types';
+import { diagnosticsOf } from './types';
 import { vtexAuthInit } from './vtex-auth';
 
 /**
@@ -329,15 +330,15 @@ const judgeKeyedFailure = async (
   url: string,
 ): Promise<SourceConfigCheck> => {
   if (failure.kind === 'transport' && failure.code === CREDENTIALS_STRIPPED) {
-    return credentialsStripped(base, ctx.diagnostics);
+    return credentialsStripped(base, diagnosticsOf(ctx));
   }
   if (failure.kind !== 'http' || !KEY_REJECTION_STATUSES.has(failure.status)) {
-    return judgeFailure(failure, base, ctx.diagnostics);
+    return judgeFailure(failure, base, diagnosticsOf(ctx));
   }
   const unkeyed = await fetchJsonOutcome(ctx, url);
   return unkeyed.ok && looksLikeVtex(unkeyed.payload)
-    ? keyRejected(ctx.diagnostics)
-    : judgeFailure(failure, base, ctx.diagnostics);
+    ? keyRejected(diagnosticsOf(ctx))
+    : judgeFailure(failure, base, diagnosticsOf(ctx));
 };
 
 /**
@@ -361,7 +362,7 @@ export const validateVtexSourceConfig = async (
   ctx: ConnectorContext,
 ): Promise<SourceConfigCheck> => {
   const base = parseBaseUrl(config);
-  const copy = ctx.diagnostics;
+  const copy = diagnosticsOf(ctx);
   if (base === 'invalid') return { ok: false, error: copy.vtexValidate.urlMissing };
   if (base === 'credentials') return { ok: false, error: copy.vtexValidate.urlHasCredentials };
   const url = probeUrl(base);
