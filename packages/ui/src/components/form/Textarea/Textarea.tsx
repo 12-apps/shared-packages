@@ -6,12 +6,30 @@ import {
   TextareaAutosize } from '@mui/material';
 import type { Theme } from '@mui/material';
 import { styled } from '@mui/material';
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 
 import {
   getColorFromTheme,
   textareaEmphasisStyles } from './Textarea.styles';
-import { TextareaRichEditor } from './TextareaRichEditor';
+
+/**
+ * The rich editor is LOADED ON DEMAND, not imported (12-51 follow-up).
+ *
+ * It renders only for `variant === 'rich'`, but a static import made every
+ * consumer of a plain `<Textarea>` pay for it — 387 lines of toolbar plus the
+ * MUI `Tooltip`, `IconButton` and `Divider` its formatting buttons need. That
+ * is not theoretical: an adopting storefront imports this entry for a one-line
+ * order note, and `Tooltip` (8.7 KiB) reached its EAGER chunk through here
+ * while nothing on that critical path renders a tooltip at all.
+ *
+ * `variant` is a prop, so the branch cannot be decided at build time and no
+ * amount of tree-shaking removes it. A lazy boundary is what expresses "only
+ * the rich variant pays", and it costs the rich variant one microtask it can
+ * afford — it is a text editor a user has already chosen to open, never a
+ * first-paint element.
+ */
+const TextareaRichEditor = lazy(async () => ({
+  default: (await import('./TextareaRichEditor')).TextareaRichEditor }));
 import type { TextareaProps } from './Textarea.types';
 
 // Interface for styled component props
@@ -178,6 +196,34 @@ const TextareaIcon: React.FC<{
   </Box>
 );
 
+/**
+ * The rich variant, kept out of the main component's body.
+ *
+ * Two reasons rather than one: the `Suspense` boundary and its props belong
+ * together with the lazy import above, and the component that renders every
+ * OTHER variant stays inside the size the complexity gate allows without
+ * anything being suppressed.
+ */
+function RichVariant({
+  shell,
+  editor }: {
+  shell: Omit<React.ComponentProps<typeof TextareaShell>, 'children'>;
+  editor: React.ComponentProps<typeof TextareaRichEditor>;
+}): React.JSX.Element {
+  return (
+    <TextareaShell {...shell}>
+      {/*
+        `null` rather than a spinner: the editor resolves from the same document
+        the caller is already rendering, so a fallback would flash for a frame
+        and read as a glitch rather than as loading.
+      */}
+      <Suspense fallback={null}>
+        <TextareaRichEditor {...editor} />
+      </Suspense>
+    </TextareaShell>
+  );
+}
+
 export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
   const {
     variant,
@@ -219,18 +265,18 @@ export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
   // If rich text variant, use the rich text editor
   if (variant === 'rich' && richEditorCopy) {
     return (
-      <TextareaShell testId={testId} label={label} glassLabel={glassLabel} error={error} helperText={helperText}>
-        <TextareaRichEditor
-          copy={richEditorCopy}
-          value={richTextValue}
-          onChange={setRichTextValue}
-          placeholder={props.placeholder}
-          error={error}
-          glass={glass}
-          color={color}
-          characterLimit={props.maxLength}
-        />
-      </TextareaShell>
+      <RichVariant
+        shell={{ testId, label, glassLabel, error, helperText }}
+        editor={{
+          copy: richEditorCopy,
+          value: richTextValue,
+          onChange: setRichTextValue,
+          placeholder: props.placeholder,
+          error,
+          glass,
+          color,
+          characterLimit: props.maxLength }}
+      />
     );
   }
 
