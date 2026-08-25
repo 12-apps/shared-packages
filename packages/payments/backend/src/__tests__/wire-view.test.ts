@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createReceiptMailer, type PaymentsEmailMessage } from '../email/receipt';
+import {
+  createReceiptMailer,
+  type PaymentsEmailMessage,
+  type PaymentsReceipt,
+} from '../email/receipt';
 import { LIBRARY_ROUTES } from '../http/route-table';
 import { createWireMountPayments, type PaymentsWireRoute } from '../http/wire-view';
 import type { MerchantRef } from '../core/types';
@@ -164,5 +168,130 @@ describe('createReceiptMailer — the email seam', () => {
     expect(() =>
       createReceiptMailer({ deliver: { send: async () => {} }, copy: {} as never }),
     ).toThrow(/the words are the host/);
+  });
+
+  /**
+   * The buyer's language, not the deployment's and not the caller's.
+   *
+   * A receipt is read by whoever paid, in their own inbox. The send is often a
+   * webhook or a reconciliation sweep, where there is no caller with an
+   * `Accept-Language` at all — so the tag rides on the receipt.
+   */
+  const packs = {
+    'pt-BR': {
+      subject: (r: PaymentsReceipt) => `Recibo ${r.reference}`,
+      text: (r: PaymentsReceipt) => `Pago: ${r.amountCents}`,
+      html: (r: PaymentsReceipt) => `<p>Recibo ${r.reference}</p>`,
+    },
+    'en-US': {
+      subject: (r: PaymentsReceipt) => `Receipt ${r.reference}`,
+      text: (r: PaymentsReceipt) => `Paid: ${r.amountCents}`,
+      html: (r: PaymentsReceipt) => `<p>Receipt ${r.reference}</p>`,
+    },
+  };
+
+  const receipt = (locale?: string): PaymentsReceipt => ({
+    reference: 'inv_1',
+    amountCents: 100,
+    currency: 'BRL',
+    method: 'pix',
+    paidAt: new Date('2026-08-21T12:00:00Z'),
+    ...(locale ? { locale } : {}),
+  });
+
+  function recordingMailer(copy: Parameters<typeof createReceiptMailer>[0]['copy']) {
+    const sent: { to: string; message: PaymentsEmailMessage }[] = [];
+    const mailer = createReceiptMailer({
+      deliver: {
+        send: async (to, message) => {
+          sent.push({ to, message });
+        },
+      },
+      copy,
+    });
+    return { mailer, sent };
+  }
+
+  it('writes each receipt in the language of the buyer who paid', async () => {
+    const h = recordingMailer(({ locale }) =>
+      locale === 'en-US' ? packs['en-US'] : packs['pt-BR'],
+    );
+
+    await h.mailer.sendReceipt('ana@example.com', receipt('pt-BR'));
+    await h.mailer.sendReceipt('bob@example.com', receipt('en-US'));
+
+    expect(h.sent.map((entry) => entry.message.subject)).toEqual([
+      'Recibo inv_1',
+      'Receipt inv_1',
+    ]);
+  });
+
+  it('resolves per RECEIPT, not once at the mount', async () => {
+    /**
+     * The regression a single-locale host could never see: a mailer built once
+     * per process and closed over one pack writes every receipt that
+     * deployment ever sends in the same language, and nothing fails.
+     */
+    const seen = { asked: [] as Array<string | null | undefined> };
+    const h = recordingMailer(({ locale }) => {
+      seen.asked.push(locale);
+      return packs['pt-BR'];
+    });
+
+    // The mount asks once with NO locale — that is the construction check.
+    expect(seen.asked).toEqual([undefined]);
+
+    await h.mailer.sendReceipt('ana@example.com', receipt('pt-BR'));
+    await h.mailer.sendReceipt('bob@example.com', receipt('en-US'));
+    expect(seen.asked).toEqual([undefined, 'pt-BR', 'en-US']);
+  });
+
+  it('treats a buyer with no stored language as "nobody said"', async () => {
+    const seen = { asked: [] as Array<string | null | undefined> };
+    const h = recordingMailer(({ locale }) => {
+      seen.asked.push(locale);
+      return packs['pt-BR'];
+    });
+
+    await h.mailer.sendReceipt('ana@example.com', receipt());
+    expect(seen.asked).toEqual([undefined, undefined]);
+  });
+
+  it('still takes a plain pack, so a single-audience host changes nothing', async () => {
+    const h = recordingMailer(packs['pt-BR']);
+
+    await h.mailer.sendReceipt('ana@example.com', receipt('en-US'));
+    expect(h.sent[0]?.message.subject).toBe('Recibo inv_1');
+  });
+
+  it('refuses a resolver whose DEFAULT rendering is half-built, at the mount', () => {
+    // A receipt that throws mid-webhook is a mail the buyer never gets and a
+    // retry loop nobody asked for. The check belongs where the host wires it.
+    expect(() =>
+      createReceiptMailer({
+        deliver: { send: async () => {} },
+        copy: () => ({ subject: (r: PaymentsReceipt) => r.reference }) as never,
+      }),
+    ).toThrow(/the words are the host/);
+  });
+
+  it('keeps the AMOUNT and the reference fixed while the words move', async () => {
+    /**
+     * Rule H on the half that must never follow a reader. `amountCents`, the
+     * currency code and the host's own reference are what a buyer quotes back
+     * and what reconciliation matches on — a language may change how they are
+     * introduced, never what they are.
+     */
+    const h = recordingMailer(({ locale }) =>
+      locale === 'en-US' ? packs['en-US'] : packs['pt-BR'],
+    );
+
+    await h.mailer.sendReceipt('ana@example.com', receipt('pt-BR'));
+    await h.mailer.sendReceipt('bob@example.com', receipt('en-US'));
+
+    expect(h.sent[0]?.message.text).toContain('100');
+    expect(h.sent[1]?.message.text).toContain('100');
+    expect(h.sent[0]?.message.html).toContain('inv_1');
+    expect(h.sent[1]?.message.html).toContain('inv_1');
   });
 });
