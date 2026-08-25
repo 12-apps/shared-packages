@@ -5,6 +5,8 @@ import type { ChargeQueryStore, ChargeStore, CredentialStore } from '../core/por
 import type { ProviderRegistry } from '../core/registry';
 import type { ChargeSnapshot, MerchantRef, PaymentMethodKind } from '../core/types';
 
+import { resolvePaymentsCopy, type PaymentsCopySource } from '../copy-source';
+
 import type { CheckoutCopy } from './copy';
 import { checkoutRefusalFor, type CheckoutRefusal, type FailureContext } from './failure';
 import type {
@@ -84,7 +86,33 @@ export interface PaymentFlowsBEConfig<Caller, View extends object, Display = unk
   vault?: BuyerVaultPort<Caller>;
   browserKey?: BrowserKeyPort;
 
-  copy: CheckoutCopy;
+  /**
+   * Every sentence a buyer can be refused with — REQUIRED, no default.
+   *
+   * A pack, or a RESOLVER for a host whose buyers do not share a language. The
+   * mount is built ONCE per process and then serves every store and every
+   * buyer, so a pack named here answers all of them in whichever language the
+   * process started in — which a single-locale host cannot tell apart from
+   * working. `runFlow` resolves it per request; see {@link requestRuntime}.
+   *
+   * A decline is read by the BUYER whose card was refused, so the language is
+   * the request's rather than the deployment's.
+   */
+  copy: PaymentsCopySource<CheckoutCopy>;
+  /**
+   * Which language to answer THIS request in, read off the request itself.
+   *
+   * A port rather than a rule, because only the host knows where its readers'
+   * preference lives — a cookie it named, a `?lang=`, a column on the buyer.
+   * This package must not guess: reading `Accept-Language` here would answer a
+   * Portuguese storefront's errors in English for every reader whose browser
+   * happens to be set that way, and nobody chose that.
+   *
+   * Absent — or answering nothing — means "nobody said", which is not the same
+   * as asserting a default. `resolvePaymentsCopy` is where that becomes one, in
+   * the single place a reader can find it.
+   */
+  locale?: (request: Request) => string | null | undefined;
   /** One vendor's error vocabulary. See `FailureContext.mapProviderError`. */
   mapProviderError?: (error: unknown) => CheckoutErrorBody | null;
   /**
@@ -166,11 +194,45 @@ export function createRuntime<Caller, View extends object, Display>(
     gateway: async () =>
       typeof config.gateway === 'function' ? config.gateway() : config.gateway,
     charges: config.charges,
-    copy: config.copy,
+    /**
+     * The DEFAULT rendering, resolved with no locale.
+     *
+     * Held so that a runtime which never reaches `requestRuntime` — a host
+     * calling a flow helper directly, a test — still has words rather than a
+     * resolver where a value was expected (rule C: that failure is a runtime
+     * TypeError, not a type error). Every served request replaces it: `run` in
+     * `factory.ts` scopes the runtime before `runFlow` sees it.
+     */
+    copy: resolvePaymentsCopy(config.copy, undefined),
     respond: config.respond ?? defaultResponder,
     log: config.logger ?? silentLogger,
     payableRefField: config.payableRefField ?? 'orderId',
   };
+}
+
+/**
+ * The runtime this ONE request runs against — the same object, with its words
+ * chosen for whoever is asking.
+ *
+ * This is the whole of the per-request half, and it is deliberately shaped so
+ * that nothing downstream changes: `copy` stays a resolved {@link CheckoutCopy},
+ * so every flow, every refusal helper and every `failureContext` reads it
+ * exactly as before. Resolving HERE rather than at each of the dozen read sites
+ * means one request cannot word two of its own sentences in two languages.
+ *
+ * `factory.ts` calls it in `run`, which is the single door: both the mounted
+ * verb handlers and the per-kind handlers dispatch through it, so a flow cannot
+ * be reached with an unscoped runtime.
+ */
+export function requestRuntime<Caller, View extends object, Display>(
+  runtime: CheckoutRuntime<Caller, View, Display>,
+  request: Request,
+): CheckoutRuntime<Caller, View, Display> {
+  const source = runtime.config.copy;
+  // Nothing to choose between: a host that passed a plain pack gets the object
+  // it passed, and no `locale` port is consulted.
+  if (typeof source !== 'function') return runtime;
+  return { ...runtime, copy: resolvePaymentsCopy(source, runtime.config.locale?.(request) ?? undefined) };
 }
 
 /** Send a refusal through the host's responder. */

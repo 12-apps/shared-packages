@@ -8,6 +8,7 @@ import { beginVault, completeVault } from './flows-vault';
 import { CHECKOUT_ROUTES } from './route-table';
 import {
   createRuntime,
+  requestRuntime,
   notConfigured,
   type CheckoutRuntime,
   type PaymentFlowsBEConfig,
@@ -193,7 +194,11 @@ export function createPaymentFlowsBE<Caller, View extends object, Display = unkn
     const intent = intentFor(spec, segments, params);
     const authorized = await authorize(config, spec.principal, request, intent);
     if ('response' in authorized) return authorized.response;
-    return runFlow(runtime, spec, request, intent, authorized.caller);
+    // Scoped ONCE, here, because this is the single door every row comes
+    // through — the mounted verb handlers and the per-kind handlers both
+    // dispatch into it. Everything below reads `runtime.copy` as a resolved
+    // pack exactly as it did before; what changed is which language it holds.
+    return runFlow(requestRuntime(runtime, request), spec, request, intent, authorized.caller);
   };
 
   return { ...mountedRoutes(config, rows, run), layout: rows };
