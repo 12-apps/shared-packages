@@ -29,6 +29,16 @@ export interface RbacMemberFixture {
   email: string;
   /** What the grid PRINTS for them — the name when there is one. */
   label: string;
+  /**
+   * The base role they hold NOW.
+   *
+   * The role editor is a checklist over all roles with exactly-one-system-role
+   * enforced, so reassigning means unchecking this one as well as checking the
+   * new one. A scenario that only checked the new one would sit on an invalid
+   * selection with a disabled save — passing or failing for a reason unrelated
+   * to the reassignment.
+   */
+  currentRole: string;
 }
 
 /**

@@ -27,3 +27,28 @@ Feature: The staff roster
     And I open the role editor for the matching member
     And I assign the seeded base role
     Then the team grid shows the member with that role
+
+  Scenario: A row opens that member's profile
+    # The roster's rows are the ONLY way into the profile, so the navigation is
+    # part of the roster's contract rather than a separate screen's.
+    When I open the team screen
+    And I open the matching member’s profile
+    Then the member profile is visible
+    And the profile names the member
+
+  Scenario: The open profile tab is shareable
+    When I open the team screen
+    And I open the matching member’s profile
+    And I open the member’s activity tab
+    Then the address bar carries that tab
+
+  Scenario: Adding an administrator can be abandoned without inviting anybody
+    # Dismissal, not submission: a real invite writes to the host's own storage
+    # and no world method can put that back. What this pins is that the
+    # affordance exists and costs nothing to open.
+    When I open the team screen
+    And I start adding an administrator
+    Then the invite form is open
+    When I dismiss the invite form
+    Then the invite form is closed
+    And the team grid is visible

@@ -138,6 +138,11 @@ export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
   host.adoptServer({
     manifest: rbacManifest,
     server: rbacServerManifest,
+    // The packaged journeys drive SCREENS — the roster grid, the role editor,
+    // the member profile — so the world they ask for is a browser's, and this
+    // process has no browser. `harness/frontend` binds it, as it does for
+    // auth, impersonation and reports.
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
     bindings: {
       http: {
         mountPath: RBAC_MOUNT_PATH,

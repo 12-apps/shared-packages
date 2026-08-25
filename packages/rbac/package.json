@@ -69,7 +69,8 @@
     "hono": ">=4.0.0",
     "playwright-bdd": ">=8.3.0",
     "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
+    "react-dom": ">=19.0.0",
+    "react-router-dom": ">=7.0.0"
   },
   "peerDependenciesMeta": {
     "@12-apps/wiring": {
@@ -88,6 +89,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "react-router-dom": {
       "optional": true
     }
   },
@@ -109,7 +113,8 @@
     "react-dom": "^19.2.0",
     "tsup": "^8.0.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "react-router-dom": "^7.9.4"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -144,7 +149,10 @@
     "features"
   ],
   "dependencies": {
+    "@12-apps/app-shell": "workspace:*",
+    "@12-apps/forms-core": "workspace:*",
     "@12-apps/ui": "workspace:*",
+    "@mui/icons-material": "^6.5.0",
     "zod": "^4.3.5"
   },
   "wiring": {

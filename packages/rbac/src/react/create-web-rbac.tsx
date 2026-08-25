@@ -14,6 +14,9 @@ import { createRbacApiClient, type RbacApiClient } from './api';
 import { RbacProvider } from './context';
 import type { RbacWebCopy } from './copy';
 import { createRbacLabels, type RbacLabels } from './labels';
+import { MemberScreen, type MemberScreenProps } from './member-screen';
+import type { RoleMenuContext } from './role-actions-menu';
+import type { RoleSeedDefault } from './role-grid-config';
 import { RolesScreen } from './roles-screen';
 import { TeamScreen } from './team-screen';
 import { httpRbacTransport, type RbacTransport } from './transport';
@@ -36,6 +39,8 @@ import { httpRbacTransport, type RbacTransport } from './transport';
 export interface RbacWebConfig<P extends string = string> {
   /** The admin mount the routes live under, e.g. `/api/admin/minha-loja`. */
   apiBase: string;
+  /** The tenant these screens act inside. See {@link RolesScreenProps.tenantSlug}. */
+  tenantSlug: string;
   /**
    * The host's composed catalog — registry, role templates, governance and the
    * merged labels, as ONE object. It used to be three optional fields
@@ -55,14 +60,51 @@ export interface RbacWebConfig<P extends string = string> {
   labels?: RbacLabelVocabulary;
   /** Gate permission ids, when the host's catalog spells them differently. */
   gatePermissions?: { manageRoles?: string; manageTeam?: string };
+  /**
+   * The seed defaults a seeded role is compared against to decide whether it has
+   * been EDITED away from the catalog. Absent, no row ever reads as edited and
+   * the reset affordance never appears — the safe direction, and the honest one
+   * for a host that materialises its roles some other way.
+   */
+  roleSeeds?: ReadonlyMap<string, RoleSeedDefault>;
+  /**
+   * How the two dates on a member's profile are formatted.
+   *
+   * REQUIRED, and required rather than defaulted for two separate reasons. A
+   * date's presentation is a locale decision the host owns, so an
+   * `Intl.DateTimeFormat` in here would pick one for every adopter. And
+   * `manifest/web` DECLARES the member screen as an area route: a config that
+   * could leave it unbuilt would leave a host projecting that row a nav entry
+   * resolving to `undefined`, with the wiring report saying everything is fine
+   * — the exact silent hole `manifest/__tests__/web.test.ts` exists to close.
+   */
+  formatters: MemberScreenProps['formatters'];
+  /** The crumbs above each screen's title. The host owns its own hierarchy. */
+  breadcrumbs?: {
+    roles?: readonly { label: string; href?: string }[];
+    team?: readonly { label: string; href?: string }[];
+    /** The crumbs BEFORE the member's own name, which the screen appends. */
+    member?: readonly { label: string; href?: string }[];
+  };
+  /** Row-click destinations, when the host routes the screen they open. */
+  navigate?: {
+    /** Open one member's profile from the roster. */
+    member?: (userId: string) => void;
+    /** Show who holds a role, from the catalog. */
+    roleMembers?: (roleName: string) => void;
+  };
+  /** See {@link RoleMenuContext.renderVersionHistory}. */
+  renderVersionHistory?: RoleMenuContext['renderVersionHistory'];
 }
 
 export interface WebRbac {
   /** The whole surface: Papéis + Equipe behind the package's own tabs. */
   page: ComponentType;
-  /** The two screens individually, for hosts that route them themselves. */
+  /** The screens individually, for hosts that route them themselves. */
   RolesScreen: ComponentType;
   TeamScreen: ComponentType;
+  /** One member's profile, at `/team/:userId` — the route the roster's rows open. */
+  MemberScreen: ComponentType;
 }
 
 /** The config, resolved once — what every bound component shares. */
@@ -76,6 +118,8 @@ interface SurfaceParts {
   ownerRoles: string[];
   manageRoles: string;
   manageTeam: string;
+  seeds: ReadonlyMap<string, RoleSeedDefault>;
+  config: RbacWebConfig;
 }
 
 function surfaceParts(config: RbacWebConfig): SurfaceParts {
@@ -105,6 +149,8 @@ function surfaceParts(config: RbacWebConfig): SurfaceParts {
     ownerRoles: [...governance.ownerRoles],
     manageRoles: config.gatePermissions?.manageRoles ?? 'roles:manage',
     manageTeam: config.gatePermissions?.manageTeam ?? 'team:manage',
+    seeds: config.roleSeeds ?? new Map(),
+    config: config as RbacWebConfig,
   };
 }
 
@@ -147,9 +193,12 @@ function BoundRolesScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       governance={parts.governance}
       labels={parts.labels}
       managePermission={parts.manageRoles}
-      copy={parts.copy.rolesList}
-      tableCopy={parts.copy.rolesTable}
-      formCopy={parts.copy.roleForm}
+      tenantSlug={parts.config.tenantSlug}
+      copy={parts.copy}
+      seeds={parts.seeds}
+      breadcrumb={parts.config.breadcrumbs?.roles}
+      onOpenMembers={parts.config.navigate?.roleMembers}
+      renderVersionHistory={parts.config.renderVersionHistory}
     />
   );
 }
@@ -162,10 +211,27 @@ function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       systemRoles={parts.systemRoles}
       ownerRoles={parts.ownerRoles}
       managePermission={parts.manageTeam}
-      copy={parts.copy.teamScreen}
-      tableCopy={parts.copy.teamTable}
-      dialogCopy={parts.copy.teamRoleDialog}
-      menuCopy={parts.copy.teamRowMenu}
+      copy={parts.copy}
+      breadcrumb={parts.config.breadcrumbs?.team}
+      onOpenMember={parts.config.navigate?.member}
+    />
+  );
+}
+
+function BoundMemberScreen({
+  parts,
+  formatters,
+}: {
+  parts: SurfaceParts;
+  formatters: NonNullable<RbacWebConfig['formatters']>;
+}): JSX.Element {
+  return (
+    <MemberScreen
+      api={parts.api}
+      labels={parts.labels}
+      copy={parts.copy}
+      formatters={formatters}
+      breadcrumb={parts.config.breadcrumbs?.member}
     />
   );
 }
@@ -209,6 +275,7 @@ export function createWebRbac<P extends string = string>(
   config: RbacWebConfig<P>,
 ): WebRbac {
   const parts = surfaceParts(config);
+  const { formatters } = config;
   return {
     page: () => (
       <WithPermissions parts={parts}>
@@ -223,6 +290,11 @@ export function createWebRbac<P extends string = string>(
     TeamScreen: () => (
       <WithPermissions parts={parts}>
         <BoundTeamScreen parts={parts} />
+      </WithPermissions>
+    ),
+    MemberScreen: () => (
+      <WithPermissions parts={parts}>
+        <BoundMemberScreen parts={parts} formatters={formatters} />
       </WithPermissions>
     ),
   };

@@ -88,7 +88,10 @@ describe('the rbac manifest', () => {
     const area = rbacWebManifest.areas[0];
     expect(area.area).toBe('admin');
     const gates = area.routes.map((route) => route.permission);
-    expect(gates).toEqual(['team:read', 'roles:manage']);
+    // The DISTINCT set, not the list: the roster and the per-member profile
+    // are two routes behind one gate, and pinning the list would make adding a
+    // route behind an ALREADY-contributed id look like a violation.
+    expect([...new Set(gates)].sort()).toEqual(['roles:manage', 'team:read']);
     gates.forEach((gate) => {
       expect(RBAC_PERMISSIONS.ids).toContain(gate);
     });

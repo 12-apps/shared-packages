@@ -1,271 +1,341 @@
-import { useCallback, useEffect, useState, type JSX } from 'react';
+'use client';
 
+import { useMemo, useState, type JSX } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+import AddIcon from '@mui/icons-material/Add';
+
+import { useServerDataViews } from '@12-apps/app-shell/react';
+import { CardActionsProvider } from '@12-apps/ui/data-display/CardKit';
+import { DataViewsCopyProvider, DataViewsGrid } from '@12-apps/ui/data-display/DataViews';
+import { EmptyState } from '@12-apps/ui/data-display/EmptyState';
+import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
+import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
 import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
-import { Button } from '@12-apps/ui/form/Button';
-import { Stack } from '@12-apps/ui/mui/Stack';
+import { HeaderButton } from '@12-apps/ui/form/HeaderButton';
+import { Dashboard } from '@12-apps/ui/layout/Dashboard';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { GovernanceCatalog } from '../governance';
 import type { PermissionRegistry } from '../core/types';
+
+import type { RbacApiClient } from './api';
 import { useCan } from './context';
-
-import type { RbacApiClient, RoleListRowWire } from './api';
-import type { RoleFormCopy, RolesListCopy, RolesTableCopy } from './copy';
+import type { RbacWebCopy } from './copy';
 import type { RbacLabels } from './labels';
-import { Alert } from '@12-apps/ui/data-display/Alert';
-
-import { ConfirmDialog } from './confirm-dialog';
+import { RoleActionsMenu, type RoleMenuContext } from './role-actions-menu';
+import { RoleCard } from './role-card';
 import { RoleForm, type RoleFormValue } from './role-form';
-import { RolesTable } from './roles-table';
-import { SearchField } from './search-field';
-import { useConfirmable } from './use-confirmable';
+import {
+  roleCells,
+  RoleListCard,
+} from './role-list-card';
+import {
+  roleColumns,
+  roleFields,
+  rolesQueryToParams,
+  rolesSearch,
+  rolesSyncState,
+  type RoleRow,
+  type RoleSeedDefault,
+} from './role-grid-config';
+import { useRolesData } from './use-roles-data';
 
 /**
- * Papéis — the tenant role catalog (12-13): the seeded template roles plus
- * the tenant's custom roles, with compose/edit/override/reset/delete. Ported
- * from the origin host's `apps/admin/src/pages/roles/*`; the grid keeps the same
- * test ids (`roles-grid`, `roles-search-all`, `add-role-button`,
- * `role-dialog`) so the e2e specs moved with the screen. Every sentence comes
- * from the host's {@link RolesListCopy} (and its table/form siblings).
+ * Papéis — the tenant role catalog: the seeded system roles plus the tenant's
+ * own, as a grid, a card grade or a list. Per-row actions live in the
+ * self-contained {@link RoleActionsMenu} shared by every layout; the screen
+ * keeps the create flow and the row-click navigation.
+ *
+ * Test ids (`roles-grid`, `add-role-button`, `role-dialog`,
+ * `role-actions-<id>`) are the surface the packaged e2e journeys drive.
  */
 
-interface RolesScreenProps {
+export interface RolesScreenProps {
   api: RbacApiClient;
+  /**
+   * The tenant every action in this screen acts inside.
+   *
+   * REQUIRED because `CardActionsProvider`'s contract asks for it, and its
+   * contract is right to: the row menus below it are self-contained, so a menu
+   * entry a host adds later reads the tenant from context rather than being
+   * drilled it through the grid, the layout and the card. This package's own
+   * entries never read it — its api client is already tenant-scoped through
+   * `apiBase` — which is exactly why it must be stated rather than inferred:
+   * there is nothing here to catch a wrong value.
+   */
+  tenantSlug: string;
   permissions: Pick<PermissionRegistry<string>, 'list' | 'kind'>;
   governance: Pick<GovernanceCatalog, 'ownerPermissions' | 'sodPairs'>;
   labels: RbacLabels;
-  /** The gate permission for the write affordances. */
+  /** The gate permission for the write affordances AND for the screen itself. */
   managePermission: string;
-  copy: RolesListCopy;
-  tableCopy: RolesTableCopy;
-  formCopy: RoleFormCopy;
+  copy: RbacWebCopy;
+  /**
+   * The catalog seed defaults, keyed by role name — what a seeded row is
+   * compared against to decide whether it has been edited. Empty is legal and
+   * means no row ever reads as edited, which is the safe direction.
+   */
+  seeds: ReadonlyMap<string, RoleSeedDefault>;
+  breadcrumb?: readonly { label: string; href?: string }[];
+  /** Show who holds this role. Absent when the host routes no roster screen. */
+  onOpenMembers?: (roleName: string) => void;
+  /** See {@link RoleMenuContext.renderVersionHistory}. */
+  renderVersionHistory?: RoleMenuContext['renderVersionHistory'];
 }
 
-type DialogState =
-  | { mode: 'closed' }
-  | { mode: 'create' }
-  | { mode: 'edit'; role: RoleListRowWire }
-  | { mode: 'override'; role: RoleListRowWire };
-
-/** A destructive act awaiting its confirm step (FUT-546's shape). */
-type PendingAction = { kind: 'delete' | 'reset'; role: RoleListRowWire } | null;
-
-/**
- * The confirm step's words for the pending act. The delete is an ARCHIVE (the
- * row survives for 12-17's restore surface), but what the admin must weigh is
- * the immediate consequence — which is what the host's `deleteConfirm.body`
- * states.
- */
-function confirmWordsOf(
-  copy: RolesListCopy,
-  kind: 'delete' | 'reset',
-): { title: string; body: string; confirmLabel: string } {
-  return kind === 'delete' ? copy.deleteConfirm : copy.resetConfirm;
-}
-
-function dialogTitle(dialog: DialogState, copy: RolesListCopy): string {
-  if (dialog.mode === 'create') return copy.dialogTitles.create;
-  if (dialog.mode === 'override') return copy.dialogTitles.override(dialog.role.name);
-  if (dialog.mode === 'edit') return copy.dialogTitles.edit(dialog.role.name);
-  return '';
-}
-
-function dialogInitial(dialog: DialogState): RoleFormValue | null {
-  if (dialog.mode !== 'edit' && dialog.mode !== 'override') return null;
-  return {
-    name: dialog.role.name,
-    description: dialog.role.description,
-    permissions: dialog.role.permissions === '*' ? [] : [...dialog.role.permissions],
-  };
-}
-
-/** Route a form submission to the write the open dialog stands for. */
-function submitDialog(
-  api: RbacApiClient,
-  dialog: DialogState,
-  value: RoleFormValue,
-): ReturnType<RbacApiClient['createRole']> {
-  if (dialog.mode === 'edit') return api.updateRole(dialog.role.id, value);
-  if (dialog.mode === 'override') {
-    return api.overrideTemplate(dialog.role.name, {
-      description: value.description,
-      permissions: value.permissions,
-    });
-  }
-  return api.createRole(value);
-}
-
-/** The confirm step for the two destructive role writes. */
-function RolesConfirm({
-  confirmable,
-  copy,
+/** The create popup. Edit, reset and delete all live in the row/card menu. */
+function CreateDialog({
+  open,
+  screen,
+  busy,
+  error,
+  onClose,
+  onSubmit,
 }: {
-  confirmable: ReturnType<typeof useConfirmable<NonNullable<PendingAction>>>;
-  copy: RolesListCopy;
-}): JSX.Element {
-  const pending = confirmable.pending;
-  const words = pending ? confirmWordsOf(copy, pending.kind) : null;
-  return (
-    <ConfirmDialog
-      open={pending !== null}
-      title={words?.title ?? ''}
-      body={words?.body ?? ''}
-      confirmLabel={words?.confirmLabel ?? ''}
-      cancelLabel={copy.cancelAction}
-      busy={confirmable.busy}
-      onConfirm={() => void confirmable.confirm()}
-      onCancel={confirmable.cancel}
-    />
-  );
-}
-
-/** The list read + refresh cycle, isolated from the screen's rendering. */
-function useRolesPage(api: RbacApiClient, query: string, loadFailed: string): {
-  rows: RoleListRowWire[] | null;
-  loadError: string | null;
-  refresh: () => void;
-} {
-  const [rows, setRows] = useState<RoleListRowWire[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [generation, setGeneration] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .listRoles(query ? { q: query } : {})
-      .then((page) => {
-        if (!cancelled) {
-          setRows(page.data);
-          setLoadError(null);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setLoadError(loadFailed);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api, query, generation, loadFailed]);
-
-  return {
-    rows,
-    loadError,
-    refresh: useCallback(() => setGeneration((value) => value + 1), []),
-  };
-}
-
-/** The compose/edit dialog around {@link RoleForm}. */
-function RoleFormDialog(props: {
+  open: boolean;
   screen: RolesScreenProps;
-  dialog: DialogState;
   busy: boolean;
-  formError: string | null;
-  onSubmit: (value: RoleFormValue) => void;
+  error: string | null;
   onClose: () => void;
+  onSubmit: (value: RoleFormValue) => void;
 }): JSX.Element {
-  const { dialog } = props;
   return (
     <Dialog
-      open={dialog.mode !== 'closed'}
-      onClose={props.onClose}
-      title={dialogTitle(dialog, props.screen.copy)}
+      open={open}
+      onClose={onClose}
+      title={screen.copy.rolesList.dialogTitles.create}
       size="md"
       showCloseButton
       dataTestId="role-dialog"
     >
-      <DialogContent>
-        {dialog.mode !== 'closed' && (
+      {open && (
+        <DialogContent>
           <RoleForm
-            permissions={props.screen.permissions}
-            governance={props.screen.governance}
-            labels={props.screen.labels}
-            copy={props.screen.formCopy}
-            initial={dialogInitial(dialog)}
-            template={dialog.mode === 'override'}
-            busy={props.busy}
-            error={props.formError}
-            onSubmit={props.onSubmit}
-            onCancel={props.onClose}
+            permissions={screen.permissions}
+            governance={screen.governance}
+            labels={screen.labels}
+            copy={screen.copy.roleForm}
+            initial={null}
+            template={false}
+            busy={busy}
+            error={error}
+            onSubmit={onSubmit}
+            onCancel={onClose}
           />
-        )}
-      </DialogContent>
+        </DialogContent>
+      )}
     </Dialog>
   );
 }
 
-export function RolesScreen(props: RolesScreenProps): JSX.Element {
-  const { api, copy } = props;
-  const can = useCan();
-  const canManage = can(props.managePermission);
-  const [query, setQuery] = useState('');
-  const { rows, loadError, refresh } = useRolesPage(api, query, copy.loadFailed);
-  const [dialog, setDialog] = useState<DialogState>({ mode: 'closed' });
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const confirmable = useConfirmable<NonNullable<PendingAction>>(
-    (pending) =>
-      pending.kind === 'delete'
-        ? api.deleteRole(pending.role.id)
-        : api.resetTemplate(pending.role.name),
-    refresh,
-  );
-
-  const closeDialog = (): void => {
-    setDialog({ mode: 'closed' });
-    setFormError(null);
-  };
-
-  const submit = async (value: RoleFormValue): Promise<void> => {
-    setBusy(true);
-    setFormError(null);
-    const result = await submitDialog(api, dialog, value);
-    setBusy(false);
-    if (!result.ok) {
-      setFormError(result.error);
-      return;
-    }
-    closeDialog();
-    refresh();
-  };
-
+/** The grid, split out so the screen body stays inside the size gate. */
+function RolesBody({
+  rows,
+  copy,
+  context,
+  canManage,
+  server,
+  syncState,
+  onOpenMembers,
+}: {
+  rows: RoleRow[];
+  copy: RbacWebCopy;
+  context: RoleMenuContext;
+  canManage: boolean;
+  server: ReturnType<typeof useServerDataViews>;
+  syncState: ReturnType<typeof rolesSyncState>;
+  onOpenMembers?: (roleName: string) => void;
+}): JSX.Element {
   return (
-    <Stack spacing={2}>
-      <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-        <Text variant="heading" size="lg" as="h1">
-          {copy.title}
+    <DataViewsGrid<RoleRow>
+      inlineFilters
+      rows={rows}
+      columns={roleColumns(copy.rolesTable)}
+      fields={roleFields(copy.rolesTable)}
+      syncState={syncState}
+      getRowId={(row) => row.id}
+      onRowClick={onOpenMembers ? (row) => onOpenMembers(row.name) : undefined}
+      renderRowMenu={canManage ? (row) => <RoleActionsMenu row={row} context={context} /> : undefined}
+      renderCard={(row, selection) => (
+        <RoleCard row={row} selection={selection} context={context} />
+      )}
+      renderListRow={(row, selection) => (
+        <RoleListCard row={row} selection={selection} context={context} />
+      )}
+      listGroup={{ cells: roleCells(copy.rolesTable) }}
+      dataTestId="roles-grid"
+      testIdPrefix="roles"
+      server={server}
+      emptyState={
+        <Text variant="body" as="p">
+          {copy.rolesList.emptyState}
         </Text>
-        {canManage && (
-          <Button dataTestId="add-role-button" onClick={() => setDialog({ mode: 'create' })}>
-            {copy.newRoleAction}
-          </Button>
-        )}
-      </Stack>
-      <SearchField placeholder={copy.searchPlaceholder} testId="roles-search-all" onCommit={setQuery} />
-      {loadError && <Text as="p">{loadError}</Text>}
-      {confirmable.error && (
-        <Alert variant="danger" description={confirmable.error} data-testid="roles-error" />
-      )}
-      {rows && (
-        <RolesTable
-          rows={rows}
-          copy={props.tableCopy}
-          canManage={canManage}
-          onEdit={(role) =>
-            setDialog(role.kind === 'SYSTEM' ? { mode: 'override', role } : { mode: 'edit', role })
-          }
-          onReset={(role) => confirmable.request({ kind: 'reset', role })}
-          onDelete={(role) => confirmable.request({ kind: 'delete', role })}
-        />
-      )}
-      <RolesConfirm confirmable={confirmable} copy={copy} />
-      <RoleFormDialog
-        screen={props}
-        dialog={dialog}
-        busy={busy}
-        formError={formError}
-        onSubmit={(value) => void submit(value)}
-        onClose={closeDialog}
-      />
-    </Stack>
+      }
+    />
   );
 }
+
+/**
+ * The ambient config every row and card menu below the grid reads. Memoised on
+ * its parts rather than rebuilt per render: it is passed to components that
+ * hold popups open, and a new object each render remounts them mid-edit.
+ */
+function useMenuContext(props: RolesScreenProps): RoleMenuContext {
+  const { api, permissions, governance, labels, copy, managePermission, renderVersionHistory } =
+    props;
+  return useMemo(
+    () => ({ api, permissions, governance, labels, copy, managePermission, renderVersionHistory }),
+    [api, permissions, governance, labels, copy, managePermission, renderVersionHistory],
+  );
+}
+
+/**
+ * What the screen renders INSTEAD of the catalog, or null when the catalog is
+ * ready.
+ *
+ * The refusal case is first and answers with a neutral not-found rather than a
+ * refusal, mirroring the endpoints: "you may not" and "there is nothing here"
+ * are deliberately the same sentence there, so the screen may not reveal more.
+ */
+function rolesGate({
+  canManage,
+  data,
+  copy,
+}: {
+  canManage: boolean;
+  data: ReturnType<typeof useRolesData>;
+  copy: RbacWebCopy;
+}): JSX.Element | null {
+  if (!canManage) {
+    return (
+      <EmptyState
+        variant="minimal"
+        title={copy.rolesList.forbiddenTitle}
+        description={copy.rolesList.forbiddenBody}
+        dataTestId="roles-not-found"
+      />
+    );
+  }
+  if (data.loading) return <LoadingState dataTestId="roles-loading" />;
+  if (data.error !== null) {
+    return (
+      <ErrorState
+        title={copy.rolesList.loadFailed}
+        message={data.error}
+        retryLabel={copy.rolesList.retryAction}
+        onRetry={data.refresh}
+      />
+    );
+  }
+  return null;
+}
+
+/** The create flow's state and its one write. */
+function useCreateRole(
+  api: RbacApiClient,
+  refresh: () => void,
+): {
+  open: boolean;
+  busy: boolean;
+  error: string | null;
+  start: () => void;
+  close: () => void;
+  submit: (value: RoleFormValue) => Promise<void>;
+} {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return {
+    open,
+    busy,
+    error,
+    start: () => setOpen(true),
+    close: () => {
+      setOpen(false);
+      setError(null);
+    },
+    async submit(value) {
+      setBusy(true);
+      setError(null);
+      const result = await api.createRole(value);
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+      refresh();
+    },
+  };
+}
+
+export function RolesScreen(props: RolesScreenProps): JSX.Element {
+  const { api, copy } = props;
+  const canManage = useCan()(props.managePermission);
+  const [searchParams] = useSearchParams();
+  const search = rolesSearch(searchParams);
+  const data = useRolesData(api, search, props.seeds, copy.rolesList.loadFailed, canManage);
+  const create = useCreateRole(api, data.refresh);
+
+  const syncState = useMemo(() => rolesSyncState(searchParams), [searchParams]);
+  const server = useServerDataViews({
+    totalCount: data.pagination?.total ?? 0,
+    page: data.pagination?.page ?? 1,
+    pageSize: data.pagination?.pageSize ?? 20,
+    toParams: rolesQueryToParams,
+  });
+  const context = useMenuContext(props);
+
+  const blocked = rolesGate({ canManage, data, copy });
+  if (blocked) return blocked;
+
+  return (
+    <DataViewsCopyProvider copy={copy.dataViews}>
+      <Dashboard testIdPrefix="roles-dashboard">
+        {props.breadcrumb && <Dashboard.Breadcrumb items={[...props.breadcrumb]} />}
+        <Dashboard.Header title={copy.rolesList.title}>
+          <Dashboard.Info title={copy.rolesList.aboutTitle}>
+            {copy.rolesList.aboutBody}
+          </Dashboard.Info>
+          <Dashboard.Spacer />
+          <Dashboard.Action>
+            <HeaderButton
+              text={copy.rolesList.newRoleAction}
+              icon={<AddIcon fontSize="small" />}
+              onClick={create.start}
+              dataTestId="add-role-button"
+            />
+          </Dashboard.Action>
+        </Dashboard.Header>
+        <Dashboard.Body>
+          <CardActionsProvider
+            errorDismissLabel={copy.closeLabel}
+            errorTitle={copy.actionErrorTitle}
+            tenantSlug={props.tenantSlug}
+            onRefresh={data.refresh}
+          >
+            <RolesBody
+              rows={data.rows}
+              copy={copy}
+              context={context}
+              canManage={canManage}
+              server={server}
+              syncState={syncState}
+              onOpenMembers={props.onOpenMembers}
+            />
+          </CardActionsProvider>
+        </Dashboard.Body>
+        <CreateDialog
+          open={create.open}
+          screen={props}
+          busy={create.busy}
+          error={create.error}
+          onClose={create.close}
+          onSubmit={(value) => void create.submit(value)}
+        />
+      </Dashboard>
+    </DataViewsCopyProvider>
+  );
+}
+
