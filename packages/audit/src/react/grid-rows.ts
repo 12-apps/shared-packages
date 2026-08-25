@@ -98,11 +98,21 @@ interface AuditRowContext {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
+  /**
+   * The reader's tag, carried to the two vocabulary labels below.
+   *
+   * Threaded down to HERE rather than resolved once in `surfaceParts`: a label
+   * read at mount answers every later render in the language the surface was
+   * built with, and in a browser that is the language of whoever loaded the
+   * tab. Absent means nobody said — the host's own resolver decides what that
+   * falls back to.
+   */
+  locale?: string;
 }
 
 /** One wire entry → one grid row. */
 export function toAuditRow(entry: AuditLogWire, context: AuditRowContext): AuditRow {
-  const { labels, vocabulary, formatDate } = context;
+  const { labels, vocabulary, formatDate, locale } = context;
   return {
     id: entry.id,
     createdAt: entry.createdAt,
@@ -116,9 +126,9 @@ export function toAuditRow(entry: AuditLogWire, context: AuditRowContext): Audit
     onBehalfOfLabel: onBehalfOfText(entry, labels),
     actorUserId: entry.actorUserId ?? '',
     action: entry.action,
-    actionLabel: vocabulary.actionLabel(entry.action),
+    actionLabel: vocabulary.actionLabel(entry.action, { locale }),
     resourceType: entry.resourceType,
-    resourceLabel: vocabulary.resourceLabel(entry.resourceType),
+    resourceLabel: vocabulary.resourceLabel(entry.resourceType, { locale }),
     resourceId: entry.resourceId,
     changeLabel: formatDiff(entry.before, entry.after),
   };

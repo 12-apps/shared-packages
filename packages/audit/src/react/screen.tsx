@@ -64,6 +64,8 @@ interface AuditScreenParts {
   labels: AuditLabels;
   vocabulary: AuditVocabulary;
   formatDate: (iso: string) => string;
+  /** The reader's tag, for the vocabulary's labels. See `AuditWebConfig.locale`. */
+  locale?: string;
   exportLimits: AuditExportLimits;
   fixedFilters?: AuditLogFilters;
 }
@@ -89,7 +91,7 @@ async function runExport(
   filters: AuditLogFilters,
   format: string,
 ): Promise<string | null> {
-  const { labels, vocabulary, formatDate } = parts;
+  const { labels, vocabulary, formatDate, locale } = parts;
   try {
     const { entries, truncated } = await collectAuditEntries(
       parts.api,
@@ -98,7 +100,7 @@ async function runExport(
     );
     exportRows(
       format === 'json' ? 'json' : 'csv',
-      toAuditRows(entries, { labels, vocabulary, formatDate }),
+      toAuditRows(entries, { labels, vocabulary, formatDate, locale }),
       auditExportColumns(labels),
       labels.exportFileName,
     );
