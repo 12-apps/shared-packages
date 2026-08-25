@@ -74,6 +74,11 @@ const CurrencyField = ({ name, label }: { name: string; label: string }): JSX.El
 const log = webLoggerFor('@12-apps/discounts');
 
 const { surface } = webWiringHost.adoptWeb({
+  // BOUND, not declined: the package ships its own promotions journeys plus the
+  // `DiscountsWorld` port, and this harness implements that port in
+  // `tests/e2e/steps/discounts-world.ts`. A scenario added upstream runs here on
+  // the next bump instead of being quietly missed.
+  e2e: { featuresRoot: '.features-gen' },
   manifest: discountsManifest,
   web: discountsWebManifest,
   bindings: {
