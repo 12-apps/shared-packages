@@ -53,12 +53,18 @@
  *   three hosts pass differently, which is the opposite of what a surface
  *   contribution is for. When the flow grows a real bound surface, the
  *   inventory grows with it.
- * - **No `env`.** The signing-key variables (`DEFAULT_SIGNING_KEY_ENV`,
- *   `DEFAULT_SIGNING_KEY_ID_ENV`) and `trustedOriginsFromEnv` are NAMES this
- *   package exports for a host to read `process.env` with; the package reads
- *   nothing itself, and the names are overridable per call. Declaring them
- *   would oblige a host to answer for variables it may legitimately have
- *   spelled differently.
+ * - **No `env`.** Three helpers here DO read `process.env`
+ *   (`trustedOriginsFromEnv`, and `loadSigningKeyFromEnv` for the key and its
+ *   id) — this used to say "the package reads nothing itself", which was
+ *   simply untrue and is the kind of sentence that makes a narrowing unfalsifiable.
+ *   The accurate reason is narrower and still holds: nothing is read at import
+ *   time or unconditionally, so a host that never calls these helpers has no
+ *   environment dependency on this package at all; and where they ARE called,
+ *   the variable's NAME is the caller's — passed as an argument by
+ *   `trustedOriginsFromEnv`, and defaulted but overridable per call by
+ *   `loadSigningKeyFromEnv`. `env` declares variables a host must answer for.
+ *   Declaring these would oblige every host to answer for names it may
+ *   legitimately have spelled differently, or never reads at all.
  * - **No `e2e`.** This package packages no journeys.
  * - **No `jobs`.** Nothing here sweeps: authorization codes are stateless
  *   signed blobs (the partial's header says so — there is no `oauth_codes`
