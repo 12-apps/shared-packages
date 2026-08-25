@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { AuthEmailMessage } from "../../email-credentials/types";
+import { AUTH_MAIL } from "../../locales";
 import { renderAuthMail } from "../mail-templates";
+import { EN_US_MAIL } from "../mail-templates.en-US";
 import { PT_BR_MAIL } from "../mail-templates.pt-BR";
 
 /**
@@ -92,5 +94,81 @@ describe("renderAuthMail", () => {
     // that never supplied one.
     expect(mail.text.startsWith("Olá,")).toBe(true);
     expect(mail.text).not.toContain("null");
+  });
+});
+
+describe("renderAuthMail, when the pack is a resolver", () => {
+  /**
+   * A host whose recipients do not share one language hands a RESOLVER rather
+   * than a pack, and each message is written for whoever receives it.
+   *
+   * The locale is the RECIPIENT's, off their own row — never the request's.
+   * On `alreadyRegistered` and `passwordChanged` the caller may be an attacker,
+   * and negotiating from their `Accept-Language` would let them pick the
+   * language the victim is warned in.
+   */
+  const resolver = ({ locale }: { readonly locale?: string | null }) =>
+    locale === "en-US" ? EN_US_MAIL : PT_BR_MAIL;
+
+  it("writes each message in its own recipient's language", () => {
+    const english = renderAuthMail(resolver, "verification", message({ locale: "en-US" }), NOW);
+    const portuguese = renderAuthMail(resolver, "verification", message({ locale: "pt-BR" }), NOW);
+
+    expect(english.subject).toBe(EN_US_MAIL.verification.subject);
+    expect(portuguese.subject).toBe(PT_BR_MAIL.verification.subject);
+    // The chrome follows too — the fallback hint lives on the pack, not the
+    // message, so a half-resolved render would mix the two languages.
+    expect(english.html).toContain(EN_US_MAIL.fallbackHint);
+    expect(portuguese.html).toContain(PT_BR_MAIL.fallbackHint);
+  });
+
+  it("resolves per message rather than once", () => {
+    /**
+     * Rule B, and the only failure here a single-locale host could not see: a
+     * `renderAuthMail` that resolved at import — or a mailer that resolved at
+     * its mount and closed over the result — would answer both of these with
+     * whichever language it happened to see first, and every existing test
+     * would still pass.
+     */
+    const asked: Array<string | null | undefined> = [];
+    const recording = ({ locale }: { readonly locale?: string | null }) => {
+      asked.push(locale);
+      return locale === "en-US" ? EN_US_MAIL : PT_BR_MAIL;
+    };
+
+    renderAuthMail(recording, "passwordReset", message({ locale: "pt-BR" }), NOW);
+    renderAuthMail(recording, "passwordReset", message({ locale: "en-US" }), NOW);
+
+    expect(asked).toEqual(["pt-BR", "en-US"]);
+  });
+
+  it("treats a recipient with no stored language as 'nobody said'", () => {
+    // Absent is not an assertion of pt-BR — it is the resolver that decides,
+    // in one place, rather than this module inventing a fallback.
+    const seen: Array<string | null | undefined> = [];
+    renderAuthMail(
+      ({ locale }) => {
+        seen.push(locale);
+        return PT_BR_MAIL;
+      },
+      "verification",
+      message({ locale: null }),
+      NOW,
+    );
+
+    expect(seen).toEqual([undefined]);
+  });
+
+  it("still takes a plain pack, so a single-audience host changes nothing", () => {
+    const mail = renderAuthMail(PT_BR_MAIL, "verification", message(), NOW);
+
+    expect(mail.subject).toBe(PT_BR_MAIL.verification.subject);
+  });
+
+  it("pairs both languages under one tag-keyed pack", () => {
+    // What a host actually hands `localeCopy` — proving the export exists in
+    // the shape the adoption line assumes.
+    expect(AUTH_MAIL["pt-BR"]).toBe(PT_BR_MAIL);
+    expect(AUTH_MAIL["en-US"]).toBe(EN_US_MAIL);
   });
 });

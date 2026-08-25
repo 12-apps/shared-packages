@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { EmailDriver, EmailMessage } from "@12-apps/notifications/server";
 
 import type { AuthEmailMessage } from "../../email-credentials/types";
+import { EN_US_MAIL } from "../../server/mail-templates.en-US";
 import { PT_BR_MAIL } from "../../server/mail-templates.pt-BR";
 import { createAuthMailer } from "../index";
 
@@ -116,5 +117,53 @@ describe("createAuthMailer", () => {
     // said the wrong one would send people back for a second link they did not
     // need, or let them trust one that had already died.
     expect(driver.sent[0]?.message.text).toContain("1 hora");
+  });
+});
+
+describe("createAuthMailer, given a resolver rather than a pack", () => {
+  /**
+   * Rule B at the level where it actually goes wrong.
+   *
+   * A factory is exactly where a language gets re-frozen: resolve `pack` once
+   * in `createAuthMailer` and close over the result, and every mail this
+   * process ever sends is written in whichever language the FIRST one was —
+   * which a single-locale deployment cannot tell from correct. One mailer,
+   * two recipients, two languages is the assertion that says otherwise.
+   */
+  it("writes two recipients their own languages from ONE mailer", async () => {
+    const driver = recordingDriver();
+    const mailer = createAuthMailer({
+      driver,
+      pack: ({ locale }) => (locale === "en-US" ? EN_US_MAIL : PT_BR_MAIL),
+      now: () => NOW,
+    });
+
+    await mailer.sendVerification(message({ to: "ana@example.test", locale: "pt-BR" }));
+    await mailer.sendVerification(message({ to: "bob@example.test", locale: "en-US" }));
+
+    expect(driver.sent.map((entry) => entry.message.subject)).toEqual([
+      PT_BR_MAIL.verification.subject,
+      EN_US_MAIL.verification.subject,
+    ]);
+  });
+
+  it("carries the recipient's language through the password-changed notice", async () => {
+    /**
+     * The one message the mailer REBUILDS rather than forwards — it supplies a
+     * link, a token and an expiry of its own. A spread that dropped `locale`
+     * would leave exactly this notice in the wrong language, and it is the one
+     * whose whole purpose is that a person who did not do this can act on it.
+     */
+    const driver = recordingDriver();
+    const mailer = createAuthMailer({
+      driver,
+      pack: ({ locale }) => (locale === "en-US" ? EN_US_MAIL : PT_BR_MAIL),
+      loginUrl: "https://loja.example.test/login",
+      now: () => NOW,
+    });
+
+    await mailer.sendPasswordChanged?.({ to: "bob@example.test", name: "Bob", locale: "en-US" });
+
+    expect(driver.sent[0]?.message.subject).toBe(EN_US_MAIL.passwordChanged.subject);
   });
 });

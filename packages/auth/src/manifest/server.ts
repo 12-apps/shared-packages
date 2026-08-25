@@ -3,6 +3,7 @@ import type { AnyServerManifest, EmailPort } from "@12-apps/wiring";
 import type { EmailCredentialsMailer } from "../email-credentials/types";
 import { createAuthMailer } from "../notifications/mailer";
 import type { MailPack } from "../server/mail-templates";
+import type { EmailAuthCopySource } from "../server/messages";
 import {
   createApiEmailAuth,
   createApiEmailAuthSettings,
@@ -29,8 +30,15 @@ import {
  * check against the shared manifest runs in the test suite.
  */
 export interface AuthServerManifestOptions {
-  /** Which words the four mails use — REQUIRED, the host's choice by name. */
-  pack: MailPack;
+  /**
+   * Which words the four mails use — REQUIRED, the host's choice by name.
+   *
+   * A pack for a host with one audience, or a resolver
+   * (`localeCopy(AUTH_MAIL)`) for one whose recipients do not share a
+   * language. It is handed to `createAuthMailer` unresolved, so the choice is
+   * still open when a message finally knows who it is for.
+   */
+  pack: EmailAuthCopySource<MailPack>;
   /**
    * Where the "your password changed" notice points — the sign-in page.
    *

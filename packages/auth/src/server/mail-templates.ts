@@ -1,4 +1,5 @@
 import type { AuthEmailMessage } from "../email-credentials/types";
+import { resolveEmailAuthCopy, type EmailAuthCopySource } from "./messages";
 
 /**
  * The four auth e-mails: one layout, and a pack of words per language.
@@ -12,10 +13,19 @@ import type { AuthEmailMessage } from "../email-credentials/types";
  * than a style choice. The sentences are product voice, and belong to whoever
  * ships the product.
  *
- * So a host picks a pack, or writes one. `PT_BR_MAIL` is the only pack bundled
- * today: one is enough to make the seam real, and a translation nobody has read
- * is worse than an obvious gap. Adding `EN_MAIL` later is a new object in this
- * file and no change to any host that did not ask for it.
+ * So a host picks a pack, or writes one. Both languages ship — `PT_BR_MAIL`
+ * from `./mail-templates.pt-BR`, `EN_US_MAIL` from `./mail-templates.en-US`,
+ * paired as `AUTH_MAIL` in `../locales` — and a host with one audience still
+ * passes one of them by name.
+ *
+ * ## Which language a given message is written in
+ *
+ * The pack field is a {@link EmailAuthCopySource}, so a host may hand a
+ * RESOLVER instead of a pack and let each message follow its recipient.
+ * {@link renderAuthMail} resolves it here, per message, from
+ * {@link AuthEmailMessage.locale} — never once at the mount, which would
+ * re-freeze the language into the deployment and look identical to a host that
+ * only speaks one.
  */
 
 /** Escape anything that reaches the HTML body — a display name is user input. */
@@ -83,13 +93,22 @@ export interface RenderedMail {
   html: string;
 }
 
-/** Render one of the four, from a pack and what the flow knows. */
+/**
+ * Render one of the four, from a pack and what the flow knows.
+ *
+ * The pack is resolved HERE rather than by the caller, because this is the
+ * moment the recipient is known: `message.locale` is their stored language,
+ * carried by the flow off their own row. A caller that resolved first and
+ * passed a value would have had to pick a language before it knew whose
+ * message this was.
+ */
 export function renderAuthMail(
-  pack: MailPack,
+  source: EmailAuthCopySource<MailPack>,
   kind: "verification" | "passwordReset" | "alreadyRegistered" | "passwordChanged",
   message: AuthEmailMessage,
   now: number = Date.now(),
 ): RenderedMail {
+  const pack = resolveEmailAuthCopy(source, message.locale ?? undefined);
   const copy = pack[kind];
   const validFor = pack.validFor(hoursUntil(message.expiresAt, now));
   const parts = {
