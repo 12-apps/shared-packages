@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { PaginationWire, RbacApiClient, TeamContextWire } from './api';
 import type { MemberRowStatus, TeamRow } from './team-grid-config';
+import { useLatestRead } from './use-latest-read';
 
 /**
  * The roster's two reads, and the composition that turns them into rows.
@@ -112,22 +113,19 @@ export function useTeamData(
   const [context, setContext] = useState<TeamContextWire | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
-  // Every in-flight read is stamped and only the LATEST may write. Two
-  // keystrokes can be in flight at once and can answer out of order; the slower
-  // one landing last would put an older page on screen with nothing to say so.
-  const latest = useRef(0);
+  const reads = useLatestRead();
 
   useEffect(() => {
-    const ticket = ++latest.current;
+    const ticket = reads.claim();
     Promise.all([api.listTeam(search), api.teamContext()])
       .then(([nextPage, nextContext]) => {
-        if (ticket !== latest.current) return;
+        if (!reads.isCurrent(ticket)) return;
         setPage(nextPage);
         setContext(nextContext);
         setError(null);
       })
       .catch(() => {
-        if (ticket === latest.current) setError(loadFailed);
+        if (reads.isCurrent(ticket)) setError(loadFailed);
       });
   }, [api, search, nonce, loadFailed]);
 

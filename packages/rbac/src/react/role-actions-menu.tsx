@@ -8,7 +8,6 @@ import {
   useRowConfirm,
   type RowConfirm,
 } from '@12-apps/ui/data-display/CardKit';
-import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
 import type { DropdownMenuItem } from '@12-apps/ui/navigation/DropdownMenu';
 
 import type { GovernanceCatalog } from '../governance';
@@ -18,7 +17,8 @@ import type { RbacApiClient } from './api';
 import { useCan } from './context';
 import type { RbacWebCopy } from './copy';
 import type { RbacLabels } from './labels';
-import { RoleForm, type RoleFormValue } from './role-form';
+import { RoleFormDialog } from './role-form-dialog';
+import { useRoleWrite } from './use-role-write';
 import type { RoleRow } from './role-grid-config';
 
 /**
@@ -87,62 +87,6 @@ function roleMenuItems(
   return items;
 }
 
-/** The edit popup, owned by the menu. */
-function RoleEditPopup({
-  row,
-  open,
-  context,
-  busy,
-  error,
-  onClose,
-  onSubmit,
-}: {
-  row: RoleRow;
-  open: boolean;
-  context: RoleMenuContext;
-  busy: boolean;
-  error: string | null;
-  onClose: () => void;
-  onSubmit: (value: RoleFormValue) => void;
-}): JSX.Element {
-  const { copy } = context;
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={
-        row.system
-          ? copy.rolesList.dialogTitles.override(row.name)
-          : copy.rolesList.dialogTitles.edit(row.name)
-      }
-      size="md"
-      showCloseButton
-      dataTestId="role-dialog"
-    >
-      {open && (
-        <DialogContent>
-          <RoleForm
-            permissions={context.permissions}
-            governance={context.governance}
-            labels={context.labels}
-            copy={copy.roleForm}
-            initial={{
-              name: row.name,
-              description: row.description,
-              permissions: row.permissions === '*' ? [] : [...row.permissions],
-            }}
-            template={row.system}
-            busy={busy}
-            error={error}
-            onSubmit={onSubmit}
-            onCancel={onClose}
-          />
-        </DialogContent>
-      )}
-    </Dialog>
-  );
-}
-
 /**
  * One destructive role write behind its confirm step. Both entries take the
  * same shape, so they take the same hook — the difference is which call and
@@ -178,54 +122,6 @@ function useRoleConfirm(
   });
 }
 
-/** The edit popup's open/busy/error state and its one write. */
-function useRoleEdit(
-  row: RoleRow,
-  context: RoleMenuContext,
-): {
-  open: boolean;
-  busy: boolean;
-  error: string | null;
-  start: () => void;
-  close: () => void;
-  submit: (value: RoleFormValue) => Promise<void>;
-} {
-  const { api } = context;
-  const { onRefresh } = useCardActions();
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return {
-    open,
-    busy,
-    error,
-    start: () => setOpen(true),
-    close: () => {
-      setOpen(false);
-      setError(null);
-    },
-    async submit(value) {
-      setBusy(true);
-      setError(null);
-      // A seeded role is OVERRIDDEN by name; a tenant's own is updated by id.
-      // Two endpoints, because they mean two different things to the catalog.
-      const result = row.system
-        ? await api.overrideTemplate(row.name, {
-            description: value.description,
-            permissions: value.permissions,
-          })
-        : await api.updateRole(row.id, value);
-      setBusy(false);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setOpen(false);
-      onRefresh();
-    },
-  };
-}
-
 export function RoleActionsMenu({
   row,
   context,
@@ -240,7 +136,19 @@ export function RoleActionsMenu({
   // Declared above the `canManage` gate: a hook cannot sit behind a return.
   const remove = useRoleConfirm(row, context, 'delete');
   const reset = useRoleConfirm(row, context, 'reset');
-  const edit = useRoleEdit(row, context);
+  // A seeded role is OVERRIDDEN by name; a tenant's own is updated by id. Two
+  // endpoints, because they mean two different things to the catalog — and that
+  // choice is the ONLY thing this differs from the create flow in.
+  const edit = useRoleWrite(
+    (value) =>
+      row.system
+        ? context.api.overrideTemplate(row.name, {
+            description: value.description,
+            permissions: value.permissions,
+          })
+        : context.api.updateRole(row.id, value),
+    onRefresh,
+  );
 
   if (!canManage) return null;
 
@@ -261,10 +169,22 @@ export function RoleActionsMenu({
       />
       {remove.dialog}
       {reset.dialog}
-      <RoleEditPopup
-        row={row}
+      <RoleFormDialog
         open={edit.open}
+        // A SEEDED role is overridden rather than freely edited, and the two
+        // are different acts — the title says which one this is.
+        title={
+          row.system
+            ? copy.rolesList.dialogTitles.override(row.name)
+            : copy.rolesList.dialogTitles.edit(row.name)
+        }
         context={context}
+        initial={{
+          name: row.name,
+          description: row.description,
+          permissions: row.permissions === '*' ? [] : [...row.permissions],
+        }}
+        template={row.system}
         busy={edit.busy}
         error={edit.error}
         onClose={edit.close}

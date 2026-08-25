@@ -175,6 +175,11 @@ describe('the rbac manifest', () => {
     // scanner counting prose would fire on the docblock justifying the rule,
     // which is the same reason the payments and adapter budgets count code
     // lines only. Documenting a boundary must never cost.
+    /* eslint-disable test-flakiness/no-unmocked-fs --
+       the real source tree IS the subject. A mocked filesystem here would
+       assert that a fixture contains no `process.env`, which is true of every
+       fixture and says nothing about what this package ships. The walk reads
+       tracked files that cannot change while the test runs. */
     const src = join(import.meta.dirname, '../..');
     const offenders: string[] = [];
     const walk = (dir: string): void => {
@@ -192,6 +197,7 @@ describe('the rbac manifest', () => {
       }
     };
     walk(src);
+    /* eslint-enable test-flakiness/no-unmocked-fs */
     expect(offenders).toEqual([]);
   });
 });

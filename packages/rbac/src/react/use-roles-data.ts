@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { PaginationWire, RbacApiClient, RoleListRowWire } from './api';
+import { useLatestRead } from './use-latest-read';
 import { toRoleRow, type RoleRow, type RoleSeedDefault } from './role-grid-config';
 
 /**
@@ -33,24 +34,21 @@ export function useRolesData(
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
-  // Only the LATEST read may write: two keystrokes can be in flight at once and
-  // can answer out of order, and the slower one landing last would put an older
-  // page on screen with nothing to say so.
-  const latest = useRef(0);
+  const reads = useLatestRead();
 
   useEffect(() => {
     // The endpoint refuses an actor without the gate — don't fetch just to fail.
     if (!enabled) return;
-    const ticket = ++latest.current;
+    const ticket = reads.claim();
     api
       .listRoles(search)
       .then((next) => {
-        if (ticket !== latest.current) return;
+        if (!reads.isCurrent(ticket)) return;
         setPage(next);
         setError(null);
       })
       .catch(() => {
-        if (ticket === latest.current) setError(loadFailed);
+        if (reads.isCurrent(ticket)) setError(loadFailed);
       });
   }, [api, search, nonce, loadFailed, enabled]);
 

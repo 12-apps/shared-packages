@@ -88,4 +88,6 @@ export {
   type RoleSeedDefault,
 } from './role-grid-config';
 export { composeTeamRows, matchingInvites } from './use-team-data';
+export { useRoleWrite, type RoleWrite } from './use-role-write';
+export { useLatestRead, type LatestRead } from './use-latest-read';
 export { type RoleMenuContext } from './role-actions-menu';

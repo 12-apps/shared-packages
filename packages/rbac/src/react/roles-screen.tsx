@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type JSX } from 'react';
+import { useMemo, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -11,7 +11,6 @@ import { DataViewsCopyProvider, DataViewsGrid } from '@12-apps/ui/data-display/D
 import { EmptyState } from '@12-apps/ui/data-display/EmptyState';
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
-import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
 import { HeaderButton } from '@12-apps/ui/form/HeaderButton';
 import { Dashboard } from '@12-apps/ui/layout/Dashboard';
 import { Text } from '@12-apps/ui/typography/Text';
@@ -25,7 +24,8 @@ import type { RbacWebCopy } from './copy';
 import type { RbacLabels } from './labels';
 import { RoleActionsMenu, type RoleMenuContext } from './role-actions-menu';
 import { RoleCard } from './role-card';
-import { RoleForm, type RoleFormValue } from './role-form';
+import { RoleFormDialog } from './role-form-dialog';
+import { useRoleWrite } from './use-role-write';
 import {
   roleCells,
   RoleListCard,
@@ -82,51 +82,6 @@ export interface RolesScreenProps {
   onOpenMembers?: (roleName: string) => void;
   /** See {@link RoleMenuContext.renderVersionHistory}. */
   renderVersionHistory?: RoleMenuContext['renderVersionHistory'];
-}
-
-/** The create popup. Edit, reset and delete all live in the row/card menu. */
-function CreateDialog({
-  open,
-  screen,
-  busy,
-  error,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  screen: RolesScreenProps;
-  busy: boolean;
-  error: string | null;
-  onClose: () => void;
-  onSubmit: (value: RoleFormValue) => void;
-}): JSX.Element {
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={screen.copy.rolesList.dialogTitles.create}
-      size="md"
-      showCloseButton
-      dataTestId="role-dialog"
-    >
-      {open && (
-        <DialogContent>
-          <RoleForm
-            permissions={screen.permissions}
-            governance={screen.governance}
-            labels={screen.labels}
-            copy={screen.copy.roleForm}
-            initial={null}
-            template={false}
-            busy={busy}
-            error={error}
-            onSubmit={onSubmit}
-            onCancel={onClose}
-          />
-        </DialogContent>
-      )}
-    </Dialog>
-  );
 }
 
 /** The grid, split out so the screen body stays inside the size gate. */
@@ -231,52 +186,13 @@ function rolesGate({
   return null;
 }
 
-/** The create flow's state and its one write. */
-function useCreateRole(
-  api: RbacApiClient,
-  refresh: () => void,
-): {
-  open: boolean;
-  busy: boolean;
-  error: string | null;
-  start: () => void;
-  close: () => void;
-  submit: (value: RoleFormValue) => Promise<void>;
-} {
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return {
-    open,
-    busy,
-    error,
-    start: () => setOpen(true),
-    close: () => {
-      setOpen(false);
-      setError(null);
-    },
-    async submit(value) {
-      setBusy(true);
-      setError(null);
-      const result = await api.createRole(value);
-      setBusy(false);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setOpen(false);
-      refresh();
-    },
-  };
-}
-
 export function RolesScreen(props: RolesScreenProps): JSX.Element {
   const { api, copy } = props;
   const canManage = useCan()(props.managePermission);
   const [searchParams] = useSearchParams();
   const search = rolesSearch(searchParams);
   const data = useRolesData(api, search, props.seeds, copy.rolesList.loadFailed, canManage);
-  const create = useCreateRole(api, data.refresh);
+  const create = useRoleWrite((value) => api.createRole(value), data.refresh);
 
   const syncState = useMemo(() => rolesSyncState(searchParams), [searchParams]);
   const server = useServerDataViews({
@@ -326,9 +242,12 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
             />
           </CardActionsProvider>
         </Dashboard.Body>
-        <CreateDialog
+        <RoleFormDialog
           open={create.open}
-          screen={props}
+          title={copy.rolesList.dialogTitles.create}
+          context={context}
+          initial={null}
+          template={false}
           busy={create.busy}
           error={create.error}
           onClose={create.close}
