@@ -119,10 +119,6 @@
     "kind": "exempt",
     "why": "no packaged screens: the card-on-file UI is host code and the payment flows are @12-apps/payments-frontend's — this package is deliberately the API half only"
   },
-  "@12-apps/discounts :: e2e": {
-    "kind": "exempt",
-    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
-  },
   "@12-apps/discounts :: email": {
     "kind": "exempt",
     "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
