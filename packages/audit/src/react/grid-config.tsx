@@ -162,6 +162,7 @@ export function auditFields(
   labels: AuditLabels,
   vocabulary: AuditVocabulary,
   actors: readonly AuditActorOptionWire[],
+  locale?: string,
 ): FilterFieldConfig<AuditRow>[] {
   const fields: FilterFieldConfig<AuditRow>[] = [
     {
@@ -173,7 +174,10 @@ export function auditFields(
       control: 'multiselect',
       searchEnabled: true,
       accessor: (row) => row.action,
-      options: vocabulary.actionIds.map((id) => ({ value: id, label: vocabulary.actionLabel(id) })),
+      options: vocabulary.actionIds.map((id) => ({
+        value: id,
+        label: vocabulary.actionLabel(id, { locale }),
+      })),
     },
     {
       id: AUDIT_FIELD.resource,
@@ -181,7 +185,7 @@ export function auditFields(
       accessor: (row) => row.resourceType,
       options: vocabulary.resourceIds.map((id) => ({
         value: id,
-        label: vocabulary.resourceLabel(id),
+        label: vocabulary.resourceLabel(id, { locale }),
       })),
     },
   ];

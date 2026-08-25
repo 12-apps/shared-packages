@@ -19,6 +19,7 @@
  * or the reverse — so `hasAction` is derived FROM `actionIds`, both from one
  * frozen copy, and there is no second statement of the set to fall behind.
  */
+import { type AuditCopyContext, type AuditCopySource, resolveAuditCopy } from './copy';
 import { AuditConfigError, AuditVocabularyError, describe } from './errors';
 
 /** JSON-safe scalar an audit diff may carry. */
@@ -37,13 +38,19 @@ export interface AuditActionSpec {
    * id to an operator. The read path still falls back to the id for an entry
    * written before a rename — that is defensive, and a different thing from
    * declaring an action nobody named.
+   *
+   * May be a RESOLVER, and that is the only part of a vocabulary that may be:
+   * an audit log is opened by whichever operator is looking, so the words
+   * follow the REQUEST rather than the deployment. See {@link AuditVocabulary}
+   * for why the ids around this field deliberately cannot.
    */
-  readonly label: string;
+  readonly label: AuditCopySource<string>;
 }
 
 /** What a host declares about ONE kind of thing an entry may point at. */
 export interface AuditResourceSpec {
-  readonly label: string;
+  /** What a human reads. Host copy, and a resolver where it follows a reader. */
+  readonly label: AuditCopySource<string>;
   /**
    * The ONLY fields a `before`/`after` diff may carry for this resource.
    *
@@ -107,10 +114,25 @@ export interface AuditVocabulary<
   hasResource(id: unknown): id is Resource;
   /** The allowlist for a resource, or `undefined` when it is not declared. */
   allowlistFor(resourceType: string): ReadonlySet<string> | undefined;
-  /** The label for an action; falls back to the raw id for an unknown one. */
-  actionLabel(id: string): string;
-  /** The label for a resource; falls back to the raw id for an unknown one. */
-  resourceLabel(id: string): string;
+  /**
+   * The label for an action, for ONE reader; falls back to the raw id for an
+   * unknown one.
+   *
+   * **The only locale-aware member of this interface, on purpose.** Everything
+   * above it — the ids, the two predicates, the field allowlist — is wire
+   * vocabulary: values a writer persists, a filter enum advertises and a parser
+   * matches on. If those followed a reader, the same row would validate for one
+   * operator and be refused for the next, and a diff column would vanish for
+   * whoever read it in the other language. So the copy axis stops at the label,
+   * and the shape is what stops it: a resolver can only ever be reached through
+   * the two accessors, and there is nowhere to hang one on an id.
+   *
+   * Pass the reader's tag at the moment the label is rendered. Omitting the
+   * context is legal and means "nobody said" — see {@link AuditCopyContext}.
+   */
+  actionLabel(id: string, context?: AuditCopyContext): string;
+  /** The label for a resource, for ONE reader. See {@link AuditVocabulary.actionLabel}. */
+  resourceLabel(id: string, context?: AuditCopyContext): string;
 }
 
 /** The action union a vocabulary carries — what a host names its own type. */
@@ -169,10 +191,10 @@ export function defineAuditVocabulary<
   const actionIds = freezeIds('actions', Object.keys(actions) as Action[]);
   const resourceIds = freezeIds('resources', Object.keys(resources) as Resource[]);
 
-  const actionLabels = new Map<string, string>(
+  const actionLabels = new Map<string, AuditCopySource<string>>(
     actionIds.map((id) => [id, requireLabel(`actions["${id}"].label`, actions[id]?.label)]),
   );
-  const resourceLabels = new Map<string, string>(
+  const resourceLabels = new Map<string, AuditCopySource<string>>(
     resourceIds.map((id) => [id, requireLabel(`resources["${id}"].label`, resources[id]?.label)]),
   );
   const allowlists = new Map<string, ReadonlySet<string>>(
@@ -193,8 +215,10 @@ export function defineAuditVocabulary<
     hasAction: (id: unknown): id is Action => typeof id === 'string' && actionSet.has(id),
     hasResource: (id: unknown): id is Resource => typeof id === 'string' && resourceSet.has(id),
     allowlistFor: (resourceType: string) => allowlists.get(resourceType),
-    actionLabel: (id: string) => actionLabels.get(id) ?? id,
-    resourceLabel: (id: string) => resourceLabels.get(id) ?? id,
+    actionLabel: (id: string, context: AuditCopyContext = {}) =>
+      readLabel(actionLabels.get(id), id, context),
+    resourceLabel: (id: string, context: AuditCopyContext = {}) =>
+      readLabel(resourceLabels.get(id), id, context),
   }) as AuditVocabulary<Action, Resource>;
 }
 
@@ -308,7 +332,27 @@ function requireId(path: string, id: string): void {
 }
 
 /** A label a human can read, or a config error. */
-function requireLabel(path: string, label: unknown): string {
+function requireLabel(path: string, label: unknown): AuditCopySource<string> {
+  // A RESOLVER is probed once, here, with no locale — the same move
+  // `createApiAudit` makes for `messages`, and for the same reason: a host
+  // whose label lookup missed should fail to BOOT, not render an empty cell to
+  // the one operator who happens to read in the language that was wrong. The
+  // probe is what keeps assembly's refusals honest now that the value can be
+  // computed; without it, widening the type would have quietly turned every
+  // check below into "unless you pass a function".
+  if (typeof label === 'function') {
+    const probed: unknown = (label as AuditCopyResolverProbe)({});
+    assertLabelText(`${path}()`, probed);
+    return label as AuditCopySource<string>;
+  }
+  assertLabelText(path, label);
+  return label as string;
+}
+
+/** The probe shape — a resolver called with the empty context, nothing more. */
+type AuditCopyResolverProbe = (context: AuditCopyContext) => unknown;
+
+function assertLabelText(path: string, label: unknown): void {
   if (typeof label !== 'string' || label.trim() === '') {
     throw new AuditConfigError(
       path,
@@ -316,7 +360,27 @@ function requireLabel(path: string, label: unknown): string {
         'expects the name of what happened.',
     );
   }
-  return label;
+}
+
+/**
+ * One label, for one reader.
+ *
+ * Falls back to the raw id twice over: for an id this vocabulary never declared
+ * (an entry written before a rename — the behaviour that predates the locale
+ * axis), and for a resolver that answered with nothing usable for THIS reader.
+ * The second is deliberately not a throw: assembly already probed every
+ * resolver, so reaching here means one language of a pack is short a line, and
+ * a raw dotted id in one cell is a better answer to that than a viewer that
+ * renders no rows at all.
+ */
+function readLabel(
+  source: AuditCopySource<string> | undefined,
+  id: string,
+  context: AuditCopyContext,
+): string {
+  if (source === undefined) return id;
+  const label = resolveAuditCopy(source, context);
+  return typeof label === 'string' && label.trim() !== '' ? label : id;
 }
 
 /** One resource's allowlist as a frozen set — or a config error. */

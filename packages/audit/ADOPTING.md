@@ -101,6 +101,30 @@ Four things to decide deliberately, because each is a promise:
    refused; the read path still falls back to the raw id for an entry written
    before a rename, which is defensive and a different thing.
 
+   A label may also be a RESOLVER, and it is the only part of a vocabulary that
+   may be:
+
+   ```ts
+   actions: {
+     'post.publish': { label: localeCopy({ 'pt-BR': 'Post publicado', 'en-US': 'Post published' }) },
+   }
+   ```
+
+   An audit log is opened by whichever operator is looking, so the words follow
+   the REQUEST rather than the deployment. The ids around the label deliberately
+   cannot: `actionIds`, the two predicates and `fields` are what a writer
+   persists, a filter enum advertises and a parser matches on, so a vocabulary
+   that varied them per reader would validate a row for one operator and refuse
+   it for the next — and a diff column would vanish for whoever read it in the
+   other language. The shape is what enforces the line: a resolver can only be
+   reached through `actionLabel(id, ctx)` / `resourceLabel(id, ctx)`, and there
+   is nowhere to hang one on an id.
+
+   Resolvers are PROBED at assembly with an empty context, so a host whose copy
+   lookup missed fails to boot rather than rendering an empty cell to the one
+   operator who reads in the language that was wrong. If a pack is later short a
+   line for one reader only, that cell falls back to the raw id.
+
 ## 3. Wire the two halves with the SAME value
 
 ```ts
@@ -202,7 +226,7 @@ slightly wrong, opens a door. They all throw `AuditConfigError` at BOOT.
 | --- | --- |
 | `actions: {}` / `resources: {}` | not a closed door: the writer throws for every action and `redactDiff` for every resource type, INSIDE each caller's transaction — so a vocabulary assembled from a settings table that came back empty rolls back every audited mutation in the app, at runtime, with assembly green |
 | `fields: []` on a resource | the resource is declared, so nothing throws, and every field of every diff for it is dropped: the trail records that something changed without recording what to, permanently |
-| a blank `label` | the viewer renders an empty cell where an operator expects the name of what happened |
+| a blank `label`, or a resolver that probes blank | the viewer renders an empty cell where an operator expects the name of what happened |
 | an id or field with **surrounding whitespace** | see below |
 | a blank id or field | admitted by every "is it filled in" check a host has, so an unset value validates as a deliberate declaration |
 | a duplicate field | "the allowlist widened" and "it did not" produce the same array length, which is what a drift test usually watches |
