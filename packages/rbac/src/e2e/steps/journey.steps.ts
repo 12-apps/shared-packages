@@ -110,6 +110,17 @@ Then('the seeded custom role is listed', async ({ page }) => {
   await expect(page.getByTestId(ROLES_GRID).getByText(rbacWorld().fixtures.customRole)).toBeVisible();
 });
 
+/**
+ * One role checkbox's INPUT.
+ *
+ * The design system puts the test id on the wrapping element and keeps a real
+ * `<input type="checkbox">` inside it, so a click lands either way but
+ * `toBeChecked()` only means something on the input.
+ */
+function roleOption(page: Page, role: string) {
+  return page.getByTestId(`role-opt-${role}`).locator('input[type="checkbox"]');
+}
+
 When('I open the role editor for the matching member', async ({ page }) => {
   const { matching } = rbacWorld().fixtures;
   await page.getByTestId(`team-actions-${matching.id}`).click();
@@ -127,10 +138,25 @@ When('I assign the seeded base role', async ({ page }) => {
   await expect(page.getByTestId('role-edit-dialog')).toHaveCount(0);
 });
 
-Then('the team grid shows the member with that role', async ({ page }) => {
+/**
+ * The reassignment is proved by REOPENING the editor, not by reading the grid.
+ *
+ * The roster's roles column renders a role's LABEL — host copy, different in
+ * every adopter — so an assertion there would either name one app's words or
+ * need the fixture to carry them, and a journey that asserts a sentence is the
+ * coupling these replaced. `role-opt-<name>` is keyed on the WIRE value, which
+ * means the same thing everywhere.
+ *
+ * It is also the stronger claim: reopening refetches, so what is checked is
+ * what the SERVER stored rather than what the dialog left on screen.
+ */
+Then('the role editor shows the seeded base role selected', async ({ page }) => {
   const { matching, assignableRole } = rbacWorld().fixtures;
-  const row = page.getByTestId(TEAM_GRID).getByRole('row', { name: new RegExp(matching.label) });
-  await expect(row.getByText(assignableRole)).toBeVisible();
+  await expect(roleOption(page, assignableRole)).toBeChecked();
+  // And the old one is GONE — exactly one system role may be held, so a
+  // reassignment that only ADDED would leave an invalid selection the dialog
+  // refuses to save, which a check on the new role alone passes straight over.
+  await expect(roleOption(page, matching.currentRole)).not.toBeChecked();
 });
 
 When('I start composing a new role', async ({ page }) => {

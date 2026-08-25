@@ -23,10 +23,15 @@ Feature: The staff roster
     And the excluded member is not listed
 
   Scenario: A manager reassigns a member's base role from the roster
+    # Reopened rather than read off the grid: the roles column shows a role's
+    # LABEL, which is host copy, and the editor's checkboxes are keyed on the
+    # wire value. Reopening also refetches, so this asserts what the server
+    # stored rather than what the dialog left behind.
     When I open the team screen
     And I open the role editor for the matching member
     And I assign the seeded base role
-    Then the team grid shows the member with that role
+    And I open the role editor for the matching member
+    Then the role editor shows the seeded base role selected
 
   Scenario: A row opens that member's profile
     # The roster's rows are the ONLY way into the profile, so the navigation is
