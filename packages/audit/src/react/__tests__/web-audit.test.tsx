@@ -284,14 +284,43 @@ describe('the filters', () => {
     mount(h);
 
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
-    fireEvent.change(screen.getByTestId('audit-log-search-all'), {
-      target: { value: 'order-1' },
-    });
+    const box = screen.getByTestId('audit-log-search-all');
+    fireEvent.change(box, { target: { value: 'order-1' } });
+    // Enter, not the debounce. The box waits 350ms after the last keystroke
+    // before it queries, and that timer is `@12-apps/ui`'s own behaviour, tested
+    // where it lives (`data-views-export.test.tsx`). Sleeping it out here bought
+    // no coverage this suite doesn't already have and made the case the second
+    // slowest in the file — 508ms, of which 350 was a wall-clock wait. What THIS
+    // surface owes an assertion is that a keyword becomes `q=` on the wire, and
+    // Enter commits immediately, ahead of the timer, by the field's own contract.
+    fireEvent.keyDown(box, { key: 'Enter' });
 
     await waitFor(() => expect(h.paths.some((path) => path.includes('q=order-1'))).toBe(true));
   });
 
-  it('turns an action pill into the action_in filter, and toggles it off again', async () => {
+  /**
+   * Split from its `toggles it off again` twin, which is not cosmetic.
+   *
+   * As one case this was five sequential `waitFor` round trips over a full
+   * DataViews grid render — the heaviest in the file at ~530ms, and the one
+   * that died 748ms over vitest's 5s default in a repo-wide run where this
+   * file took 34s against 3.9s alone. Two cases do the same work under two
+   * budgets instead of one, which is the difference between fitting and not
+   * on a loaded runner. They also fail separately now: "the pill never
+   * applied" and "the pill never came off" were one red line before.
+   */
+  it('turns an action pill into the action_in filter', async () => {
+    const h = harness();
+
+    mount(h);
+
+    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await pickOption('action', 'Lamp extinguished');
+
+    await waitFor(() => expect(lastPath(h)).toContain('action_in=lamp.extinguish'));
+  });
+
+  it('toggles that same action pill back off', async () => {
     const h = harness();
 
     mount(h);
@@ -300,7 +329,9 @@ describe('the filters', () => {
     await pickOption('action', 'Lamp extinguished');
     await waitFor(() => expect(lastPath(h)).toContain('action_in=lamp.extinguish'));
 
+    // The menu stays open on a multi-select, so the same item is the toggle.
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Lamp extinguished' }));
+
     await waitFor(() => expect(lastPath(h)).not.toContain('action_in'));
   });
 
