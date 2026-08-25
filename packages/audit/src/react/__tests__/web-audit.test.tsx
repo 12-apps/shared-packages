@@ -133,6 +133,32 @@ function mountWith(transport: AuditTransport, apiBase = '/api/admin/beacon-autho
 /** The last path the transport was asked for. */
 const lastPath = (h: Harness): string => h.paths[h.paths.length - 1] ?? '';
 
+/**
+ * A wire day (`YYYY-MM-DD`) written in the order THIS field asks for.
+ *
+ * The mask and the placeholder are one string in `@12-apps/ui`, so reading the
+ * order back off the element is reading the same source the parser uses — which
+ * is what keeps this helper from ever disagreeing with the field, whichever
+ * copy pack a host provides.
+ */
+function inMaskOrder(field: HTMLElement, iso: string): string {
+  const mask = field.getAttribute('placeholder') ?? 'dd/mm/aaaa';
+  const [year, month, day] = iso.split('-') as [string, string, string];
+  const tokens = mask.split(/[^A-Za-z]+/).filter(Boolean);
+  // A field announcing no order is one whose order nobody can know — including
+  // this helper, which would otherwise type a string the mask rejects and let
+  // the assertion below fail for the wrong reason.
+  expect(tokens).toHaveLength(3);
+  const separator = mask.replace(/[A-Za-z]/g, '').slice(0, 1) || '/';
+  return tokens
+    .map((token) => {
+      const head = token.slice(0, 1).toLowerCase();
+      if (head === 'y' || head === 'a') return year;
+      return head === 'd' ? day : month;
+    })
+    .join(separator);
+}
+
 /** Open a filter pill and tick one of its options by label. */
 async function pickOption(fieldId: string, optionLabel: string): Promise<void> {
   fireEvent.click(screen.getByTestId(`audit-log-filter-${fieldId}`));
@@ -312,15 +338,21 @@ describe('the filters', () => {
     await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
     fireEvent.click(screen.getByTestId('audit-log-range-period'));
     const panel = await screen.findByTestId('audit-log-range-period-panel');
-    // The grid's day inputs are MASKED `dd/mm/aaaa` text fields, for the same
-    // reason this package's retired ones were: a native date input renders in
-    // the browser's locale rather than the surface's, and cannot take a date
-    // typed as one run of digits. So what is TYPED is the merchant's order and
-    // what is SENT is the ISO day — a case that confused the two would be
-    // asserting the bug the mask exists to prevent.
+    // The grid's day inputs are MASKED text fields, for the same reason this
+    // package's retired ones were: a native date input renders in the
+    // BROWSER's locale rather than the surface's, and cannot take a date typed
+    // as one continuous run of digits.
+    //
+    // The order is read off each field's own PLACEHOLDER rather than written
+    // here, and that is the whole point: this suite mounts the en-US pack,
+    // whose mask is `mm/dd/yyyy`, so a hardcoded `01/07/2026` is the 7th of
+    // January and not the 1st of July. Typing one order into a field asking
+    // for the other is precisely the defect `@12-apps/ui`'s day input was
+    // fixed for — and a case that hardcoded it would be asserting that bug
+    // rather than the day bounds.
     const [from, to] = within(panel).getAllByRole('textbox');
-    fireEvent.change(from as HTMLElement, { target: { value: '01/07/2026' } });
-    fireEvent.change(to as HTMLElement, { target: { value: '31/07/2026' } });
+    fireEvent.change(from as HTMLElement, { target: { value: inMaskOrder(from, '2026-07-01') } });
+    fireEvent.change(to as HTMLElement, { target: { value: inMaskOrder(to, '2026-07-31') } });
 
     await waitFor(() => {
       expect(lastPath(h)).toContain('from=2026-07-01');
