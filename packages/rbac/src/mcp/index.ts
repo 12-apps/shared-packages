@@ -20,5 +20,7 @@ export {
   permissionSetOf,
   inviteBody,
   setMemberActiveBody,
+  setMemberRoleBodyOf,
   grantMemberRoleBody,
+  rbacMcpParams,
 } from './schemas';

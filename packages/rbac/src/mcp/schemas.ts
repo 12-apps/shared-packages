@@ -147,3 +147,47 @@ export function templateOverrideBodyOf(catalogPermissions: readonly string[]) {
     permissions: permissionSetOf(catalogPermissions),
   });
 }
+
+/**
+ * The path params of every route this package mounts.
+ *
+ * Exported because the HOST's route files need them — a route declares the
+ * params it parses, and a host restating `z.object({ tenantSlug, userId })`
+ * beside a package that already builds it is the same drift the response
+ * schemas had: two descriptions of one shape, reconciled by review. They are
+ * small, which is exactly why nobody would notice one going stale.
+ *
+ * A frozen object rather than a factory: nothing here varies by host. The
+ * `*Of` builders above take the catalog because a permission set genuinely
+ * does.
+ */
+export const rbacMcpParams = {
+  /** The tenant-scoped collection — `/team`, `/roles`, `/permissions`. */
+  tenant: z.object({ tenantSlug: z.string().min(1) }),
+  /** One member — `/team/:userId`. */
+  member: z.object({ tenantSlug: z.string().min(1), userId: z.string().min(1) }),
+  /** One of a member's additive roles — `/team/:userId/roles/:role`. */
+  memberRole: z.object({
+    tenantSlug: z.string().min(1),
+    userId: z.string().min(1),
+    role: z.string().min(1),
+  }),
+  /** One pending invite — `/team/invites/:inviteId`. */
+  invite: z.object({ tenantSlug: z.string().min(1), inviteId: z.string().min(1) }),
+  /** One tenant-composed role, keyed by ID — `/roles/:id`. */
+  role: z.object({ tenantSlug: z.string().min(1), id: z.string().min(1) }),
+  /** One seeded template role, keyed by NAME — `/roles/templates/:name`. */
+  template: z.object({ tenantSlug: z.string().min(1), name: z.string().min(1) }),
+} as const;
+
+/**
+ * The body of `PATCH /team/:userId` — a member's BASE role.
+ *
+ * A factory over the host's assignable tier list, because the base role is a
+ * CLOSED set and which of a host's roles a roster may assign is the host's
+ * fact. An open `z.string()` here would advertise that any role name is
+ * acceptable while the endpoint refuses everything outside the list.
+ */
+export function setMemberRoleBodyOf(assignableRoles: readonly [string, ...string[]]) {
+  return z.object({ role: z.enum(assignableRoles) });
+}

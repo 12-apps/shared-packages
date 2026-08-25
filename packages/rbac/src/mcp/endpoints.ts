@@ -3,10 +3,12 @@ import { z } from "zod";
 import {
   grantMemberRoleBody,
   inviteBody,
+  rbacMcpParams,
   roleListRowSchemaOf,
   roleSchemaOf,
   roleWriteBodyOf,
   setMemberActiveBody,
+  setMemberRoleBodyOf,
   teamContextSchema,
   teamMemberDetailSchema,
   teamMemberSchema,
@@ -115,17 +117,10 @@ function endpoint(
 
 /** The path params every endpoint here is keyed by, built once. */
 function paramsOf() {
-  const tenant = z.object({ tenantSlug: z.string().min(1) });
-  const member = tenant.extend({ userId: z.string().min(1) });
-  const role = tenant.extend({ id: z.string().min(1) });
-  return {
-    tenant,
-    member,
-    memberRole: member.extend({ role: z.string().min(1) }),
-    invite: tenant.extend({ inviteId: z.string().min(1) }),
-    role,
-    template: tenant.extend({ name: z.string().min(1) }),
-  };
+  // The SAME objects the host's route files parse with — see `rbacMcpParams`.
+  // Building a second set here is how an advertised path param and a parsed one
+  // drift, which is the whole class of bug this module exists to close.
+  return rbacMcpParams;
 }
 
 type RbacParams = ReturnType<typeof paramsOf>;
@@ -181,7 +176,7 @@ function teamEndpoints(
       ALTERS_ACCESS,
       {
         params: member,
-        body: z.object({ role: z.enum(vocabulary.assignableRoles) }),
+        body: setMemberRoleBodyOf(vocabulary.assignableRoles),
         response: envelope(
           z.object({ status: z.literal("updated"), role: z.string() }),
         ),
