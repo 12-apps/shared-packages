@@ -3,6 +3,8 @@ import type { PreviewSubject } from '../core/types';
 import {
   ImpersonationApiError,
   type ImpersonationMessages,
+  messagesOf,
+  type ImpersonationCopySource,
 } from './context';
 import type {
   ImpersonationAuditPort,
@@ -58,7 +60,14 @@ const REFUSAL_MESSAGE_KEYS: Record<string, keyof ImpersonationMessages> = {
 interface RefusalParts {
   audit: ImpersonationAuditPort;
   directory: ImpersonationDirectory;
-  messages: ImpersonationMessages;
+  /**
+   * The SOURCE, not a resolved pack.
+   *
+   * `createRefusals` runs once at the host's mount and its methods run per
+   * request, so a pack resolved on the way in would word every later denial in
+   * the language the process started with.
+   */
+  messages: ImpersonationCopySource<ImpersonationMessages>;
   onError?(message: string, error: unknown): void;
 }
 
@@ -77,6 +86,8 @@ export interface Refusals {
   refuse(
     refusal: ImpersonationRefusal,
     attempt: AttemptContext,
+    /** The caller's language, for the sentence only — never for the trail. */
+    locale?: string,
   ): Promise<ImpersonationApiError>;
   /**
    * The same, for the two AUTHORIZATION denials — where the caller may be a
@@ -105,6 +116,8 @@ export interface Refusals {
   refuseUnauthorized(
     refusal: ImpersonationRefusal,
     attempt: AttemptContext,
+    /** The caller's language, for the sentence only — never for the trail. */
+    locale?: string,
   ): Promise<ImpersonationApiError>;
   /**
    * Record an authorization denial WITHOUT building an error, for a caller that
@@ -120,13 +133,17 @@ export interface Refusals {
 }
 
 export function createRefusals(parts: RefusalParts): Refusals {
-  const errorFor = (refusal: ImpersonationRefusal): ImpersonationApiError => {
+  const errorFor = (
+    refusal: ImpersonationRefusal,
+    locale: string | undefined,
+  ): ImpersonationApiError => {
     // A host-supplied entitlement code lands on the 403 fallback; it never
     // reaches here, because that gate answers with the host's own status.
     const key = REFUSAL_MESSAGE_KEYS[refusal];
+    const messages = messagesOf(parts, locale);
     return new ImpersonationApiError(
       REFUSAL_STATUS[refusal] ?? 403,
-      key ? parts.messages[key] : parts.messages.notAuthorized,
+      key ? messages[key] : messages.notAuthorized,
     );
   };
 
@@ -158,13 +175,13 @@ export function createRefusals(parts: RefusalParts): Refusals {
   return {
     record,
     recordUnauthorized,
-    async refuse(refusal, attempt) {
+    async refuse(refusal, attempt, locale) {
       await record(refusal, attempt);
-      return errorFor(refusal);
+      return errorFor(refusal, locale);
     },
-    async refuseUnauthorized(refusal, attempt) {
+    async refuseUnauthorized(refusal, attempt, locale) {
       await recordUnauthorized(refusal, attempt);
-      return errorFor(refusal);
+      return errorFor(refusal, locale);
     },
   };
 }

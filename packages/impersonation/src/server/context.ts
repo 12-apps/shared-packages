@@ -70,6 +70,16 @@ export interface ImpersonationRequest {
   body?: unknown;
   /** The raw value of the session cookie on this request, or undefined. */
   cookieValue?: string;
+  /**
+   * The language to answer this caller in, as a language tag (`pt-BR`,
+   * `en-US`) — the same field `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can negotiate
+   * one. Absent is meaningful and not an error: a host with one audience never
+   * sets it, and this package must then answer with the words it was configured
+   * with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** What a handler answers with; the host maps this onto its response type. */
@@ -210,14 +220,62 @@ export interface ImpersonationServerConfig {
     state: ImpersonationState,
     actor: ImpersonationActor,
   ): boolean | Promise<boolean>;
-  /** Every user-facing sentence, in the host's own voice. */
-  messages: ImpersonationMessages;
+  /**
+   * Every user-facing sentence, in the host's own voice.
+   *
+   * A pack, or a RESOLVER (`localeCopy(IMPERSONATION_MESSAGES)`) for a host
+   * whose operators do not share a language. Read it through
+   * {@link messagesOf} at the moment a sentence is needed — never once when
+   * the surface is assembled.
+   */
+  messages: ImpersonationCopySource<ImpersonationMessages>;
   /**
    * Report an internal failure that was deliberately swallowed — a failed END
    * audit write, or an entitlement re-check that errored. Optional; without it
    * such failures are silent, which is the same behaviour with less to read.
    */
   onError?(message: string, error: unknown): void;
+}
+
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type ImpersonationCopyResolver<T> = (context: {
+  readonly locale?: string | null;
+}) => T;
+export type ImpersonationCopySource<T> = T | ImpersonationCopyResolver<T>;
+
+/**
+ * The copy a field is offering, at the moment it is needed.
+ *
+ * Call this where the sentence is USED, never once when the surface is built.
+ * Both readers below this line are FACTORIES the host calls at its mount —
+ * `createRefusals` and `createImpersonationGuard` — so a value resolved on the
+ * way in would answer every later request in whichever language the process
+ * started with, and a single-locale host could not tell the difference. They
+ * therefore carry the SOURCE and resolve per call.
+ */
+export function resolveImpersonationCopy<T>(
+  source: ImpersonationCopySource<T>,
+  locale: string | undefined,
+): T {
+  return typeof source === 'function'
+    ? (source as ImpersonationCopyResolver<T>)({ locale })
+    : source;
+}
+
+/** The sentences in force for one request — REQUIRED host config, no default. */
+export function messagesOf(
+  config: { messages: ImpersonationCopySource<ImpersonationMessages> },
+  locale?: string,
+): ImpersonationMessages {
+  return resolveImpersonationCopy(config.messages, locale);
 }
 
 /* ────────────────────────────── plumbing ─────────────────────────────── */
