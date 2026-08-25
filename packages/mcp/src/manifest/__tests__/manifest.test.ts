@@ -120,7 +120,11 @@ describe("the mcp manifest", () => {
        the subject: the claim is about which shipped files read process.env,
        and a mocked fs would let the file the claim is about go unread. */
     const dir = new URL("../../", import.meta.url).pathname;
-    const offenders: string[] = [];
+    // Path → comment-stripped source, kept from the ONE walk so the
+    // module-scope check below re-reads nothing: a second pass over the same
+    // files could disagree with the first, and would be a second unmocked read
+    // to justify for no benefit.
+    const offenders = new Map<string, string>();
     const walk = (at: string): void => {
       for (const entry of readdirSync(at, { withFileTypes: true })) {
         const full = `${at}${entry.name}`;
@@ -134,22 +138,19 @@ describe("the mcp manifest", () => {
         const code = readFileSync(full, "utf8")
           .replace(/\/\*[\s\S]*?\*\//g, "")
           .replace(/^\s*\/\/.*$/gm, "");
-        if (code.includes("process.env")) offenders.push(full.slice(dir.length));
+        if (code.includes("process.env")) offenders.set(full.slice(dir.length), code);
       }
     };
     walk(dir);
     /* eslint-enable test-flakiness/no-unmocked-fs */
 
     // Exactly the two files the narrowing names, and nothing else.
-    expect(offenders.sort()).toEqual(["oauth/config.ts", "oauth/keys.ts"]);
+    expect([...offenders.keys()].sort()).toEqual(["oauth/config.ts", "oauth/keys.ts"]);
 
     // …and every read is inside a function body, so importing the package
     // touches no environment. A module-scope read would make the narrowing
     // false again in the one way the file list above cannot see.
-    for (const file of offenders) {
-      const code = readFileSync(`${dir}${file}`, "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/^\s*\/\/.*$/gm, "");
+    for (const code of offenders.values()) {
       for (const line of code.split("\n")) {
         if (!line.includes("process.env")) continue;
         expect(line.startsWith(" ") || line.startsWith("\t")).toBe(true);
