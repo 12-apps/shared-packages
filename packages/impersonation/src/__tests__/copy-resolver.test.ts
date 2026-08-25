@@ -22,21 +22,23 @@ const { paths } = testServerConfig();
 /** A second language, distinguishable from `TEST_MESSAGES` in every field. */
 const OTHER: ImpersonationMessages = Object.fromEntries(
   Object.entries(TEST_MESSAGES).map(([key, value]) => [key, `[other] ${value}`]),
-) as ImpersonationMessages;
+) as unknown as ImpersonationMessages;
 
 const pickByLocale = ({ locale }: { readonly locale?: string | null }) =>
   locale === 'en-US' ? OTHER : TEST_MESSAGES;
 
+/** A fixed clock: nothing in this suite depends on the wall clock moving. */
+const NOW = Date.parse('2026-05-01T12:00:00.000Z');
+
 function state(): ImpersonationState {
   return {
     kind: 'operator',
-    realUserId: 'operator-1',
-    subjectUserId: 'subject-1',
-    tenantId: 'tenant-1',
-    targetApp: 'admin',
-    reason: 'looking into a support ticket that is long enough',
+    tenantId: 't-1',
+    subjectUserId: 'u-target',
+    realUserId: 'u-actor',
     allowWrites: false,
-    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    previewRoleName: null,
+    expiresAt: NOW + 60_000,
   };
 }
 
@@ -84,7 +86,7 @@ describe('the write guard, given a resolver', () => {
     (await guard
       .assertAllowed({
         impersonation: state(),
-        pathname: '/api/tenants/tenant-1/settings',
+        pathname: '/api/tenants/t-1/settings',
         method: 'POST',
         locale,
       })
@@ -107,7 +109,7 @@ describe('the write guard, given a resolver', () => {
      */
     const [pt, en] = await Promise.all([refuse('pt-BR'), refuse('en-US')]);
 
-    expect(en.refusal).toBe(pt.refusal);
+    expect(en.code).toBe(pt.code);
     expect(en.message).not.toBe(pt.message);
   });
 
@@ -119,7 +121,7 @@ describe('the write guard, given a resolver', () => {
     const error = (await plain
       .assertAllowed({
         impersonation: state(),
-        pathname: '/api/tenants/tenant-1/settings',
+        pathname: '/api/tenants/t-1/settings',
         method: 'POST',
         locale: 'en-US',
       })
