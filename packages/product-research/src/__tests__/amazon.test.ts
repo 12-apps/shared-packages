@@ -1,3 +1,4 @@
+import { EN_US_RESEARCH_DIAGNOSTICS } from '../en-US';
 import { PT_BR_RESEARCH_DIAGNOSTICS } from '../pt-BR';
 import { describe, expect, it } from 'vitest';
 import { createAmazonConnector, parseAmazonResponse } from '../connectors/amazon';
@@ -428,3 +429,65 @@ describe('amazon offers inside a research run', () => {
     expect(statuses).toEqual(['BUDGET_EXCEEDED', 'OK']);
   });
 });
+
+/**
+ * A connector's diagnostics follow the store owner who will read them.
+ *
+ * The scope here is the RUN, not a request, and that is the honest shape: a
+ * research run belongs to one tenant and its failures are read later by that
+ * store's owner. So the host builds a `ConnectorContext` per run and states
+ * `locale` once; `diagnosticsOf(ctx)` resolves at each of the fifteen sites
+ * that used to read `ctx.diagnostics` directly.
+ *
+ * The indirection is the whole adoption. A resolver stored as a value where
+ * the context is assembled would answer an entire run in one language, and a
+ * single-locale host could never tell — which is why the third case exists
+ * beside the second.
+ */
+describe('connector diagnostics follow the reader', () => {
+  const bilingual = ({ locale }: { readonly locale?: string | null }) =>
+    locale === 'en-US' ? EN_US_RESEARCH_DIAGNOSTICS : PT_BR_RESEARCH_DIAGNOSTICS;
+
+  /** A source whose config cannot parse — the cheapest diagnostic to provoke. */
+  const brokenSource = { id: 's1', type: 'amazon', config: { amazonDomain: 42 } } as never;
+
+  const runWith = async (locale?: string) => {
+    const ctx: ConnectorContext = {
+      logger: silentLogger,
+      diagnostics: bilingual,
+      ...(locale === undefined ? {} : { locale }),
+      fetchJson: () => Promise.resolve(null),
+    };
+    const result = await amazonConnector().search({ term: 'cafe' } as never, brokenSource, ctx);
+    return result.ok ? '' : result.error;
+  };
+
+  it('answers in the language the RUN was started for', async () => {
+    expect(await runWith('en-US')).toContain('source configuration is invalid');
+    expect(await runWith('pt-BR')).toContain('Configuração da fonte');
+  });
+
+  it('re-resolves per call, so one context is not one language', async () => {
+    // Two runs, one module. The failure a stored value would produce.
+    const en = await runWith('en-US');
+    const pt = await runWith('pt-BR');
+    expect(en).not.toBe(pt);
+  });
+
+  it('treats an absent locale as the resolver’s business, not an error', async () => {
+    // A single-audience host sets nothing; the resolver decides what that means.
+    expect(await runWith()).toContain('Configuração da fonte');
+  });
+
+  it('leaves a plain-pack host byte-identical', async () => {
+    const ctx: ConnectorContext = {
+      logger: silentLogger,
+      diagnostics: PT_BR_RESEARCH_DIAGNOSTICS,
+      locale: 'en-US',
+      fetchJson: () => Promise.resolve(null),
+    };
+    const result = await amazonConnector().search({ term: 'cafe' } as never, brokenSource, ctx);
+    expect(result.ok ? '' : result.error).toContain('Configuração da fonte');
+  });
+});
+

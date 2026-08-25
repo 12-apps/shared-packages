@@ -39,7 +39,7 @@ export function runRoute(config: ReportBuilderServerConfig): ReportRoute {
         // table is this check.
         if (!mayQueryEntity(config, actor, parsed.data.spec.entity)) return forbidden(config);
         const range = windowOfBody(config, parsed.data);
-        const result = await runReport(parsed.data.spec, await runOptions(config, actor, range));
+        const result = await runReport(parsed.data.spec, await runOptions(config, actor, range, locale));
         return ok({ range: toReportRangeView(range), render: result.render });
       } catch (error) {
         return foldSpecError(error);
