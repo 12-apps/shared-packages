@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
+import { messagesOf } from '../../messages';
 
 import { createApiNotifications, type ApiNotifications } from '../create-api-notifications';
 import type { NotificationsResponse, NotificationsRoute } from '../context';
@@ -58,7 +59,13 @@ function route(method: string, path: string): NotificationsRoute {
 function call(
   method: string,
   path: string,
-  request: { userId?: string; body?: unknown; query?: Record<string, string>; headers?: Record<string, string> } = {},
+  request: {
+    userId?: string;
+    body?: unknown;
+    query?: Record<string, string>;
+    headers?: Record<string, string>;
+    locale?: string;
+  } = {},
 ): Promise<NotificationsResponse> {
   return route(method, path).handle({
     actor: { userId: request.userId ?? 'u1' },
@@ -66,6 +73,7 @@ function call(
     query: request.query ?? {},
     ...(request.body !== undefined ? { body: request.body } : {}),
     ...(request.headers ? { headers: request.headers } : {}),
+    ...(request.locale ? { locale: request.locale } : {}),
   });
 }
 
@@ -420,8 +428,12 @@ describe('the copy table reaches the wire', () => {
     // does not serve is the kind of tax that gets a migration reverted rather
     // than adopted. The four here are the ones this half actually puts on a
     // wire; the panel's own copy belongs to the react mount.
-    expect(api.messages.unauthenticated).toBe(CLINIC_MESSAGES.unauthenticated);
-    expect(api.messages.invalidBody).toBe(CLINIC_MESSAGES.invalidBody);
+    // Read through the accessor, never off the field: `messages` is a copy
+    // SOURCE now, so a direct property read is a `TypeError` waiting for the
+    // first host that passes a resolver — and a runtime one, not a type error.
+    const inForce = messagesOf(api);
+    expect(inForce.unauthenticated).toBe(CLINIC_MESSAGES.unauthenticated);
+    expect(inForce.invalidBody).toBe(CLINIC_MESSAGES.invalidBody);
   });
 });
 
@@ -434,5 +446,92 @@ describe('the logger seam', () => {
     // `notify` returns before it resolves — that IS the fire-and-forget contract
     // — so the assertion waits for the report rather than for a fixed delay.
     await vi.waitFor(() => expect(error_).toHaveBeenCalled());
+  });
+});
+
+describe('the wire copy can follow the caller', () => {
+  /**
+   * `createApiNotifications` runs once per process and builds the route table
+   * there — and at least one adopter's binding is a memoised singleton (`if
+   * (assembled) return assembled;`), so it runs exactly once for the life of
+   * the server.
+   *
+   * The old `const messages = messagesOf(config)` on that line therefore
+   * worded every refusal this process would ever emit in the language the
+   * mount was built with. A single-locale host cannot tell that from correct,
+   * which is why it is asserted here rather than left to review.
+   */
+  const OTHER = { ...CLINIC_MESSAGES, invalidBody: '[other] bad request' };
+
+  beforeEach(() => {
+    mount({
+      messages: ({ locale }: { readonly locale?: string | null }) =>
+        locale === 'en-US' ? OTHER : CLINIC_MESSAGES,
+    });
+  });
+
+  it('refuses two callers in their own languages from ONE mount', async () => {
+    const [pt, en] = await Promise.all([
+      call('POST', '/notifications/delete', { body: { ids: [] }, locale: 'pt-BR' }),
+      call('POST', '/notifications/delete', { body: { ids: [] }, locale: 'en-US' }),
+    ]);
+
+    expect(error(pt)).toBe(CLINIC_MESSAGES.invalidBody);
+    expect(error(en)).toBe(OTHER.invalidBody);
+  });
+
+  it('keeps the STATUS fixed while the sentence follows the caller', async () => {
+    // Rule H on the half a client branches on.
+    const [pt, en] = await Promise.all([
+      call('POST', '/notifications/delete', { body: { ids: [] }, locale: 'pt-BR' }),
+      call('POST', '/notifications/delete', { body: { ids: [] }, locale: 'en-US' }),
+    ]);
+
+    expect(en.status).toBe(pt.status);
+    expect(error(en)).not.toBe(error(pt));
+  });
+
+  it('resolves ONCE per request, not once per parser', async () => {
+    /**
+     * The property that keeps the seven parsers on a plain pack honest: the
+     * handler resolves and hands the result down, so one request cannot end up
+     * half-translated by two helpers asking separately.
+     */
+    const asked: Array<string | null | undefined> = [];
+    mount({
+      messages: ({ locale }: { readonly locale?: string | null }) => {
+        asked.push(locale);
+        return CLINIC_MESSAGES;
+      },
+    });
+
+    // Nothing is asked at the MOUNT — that is the whole point.
+    expect(asked).toEqual([]);
+
+    await call('POST', '/notifications/delete', { body: { ids: [] }, locale: 'en-US' });
+    expect(asked).toEqual(['en-US']);
+  });
+
+  it('treats a caller with no locale as "nobody said"', async () => {
+    const asked: Array<string | null | undefined> = [];
+    mount({
+      messages: ({ locale }: { readonly locale?: string | null }) => {
+        asked.push(locale);
+        return CLINIC_MESSAGES;
+      },
+    });
+
+    await call('POST', '/notifications/delete', { body: { ids: [] } });
+    expect(asked).toEqual([undefined]);
+  });
+
+  it('still takes a plain pack, so a single-audience host changes nothing', async () => {
+    mount({ messages: CLINIC_MESSAGES });
+    const response = await call('POST', '/notifications/delete', {
+      body: { ids: [] },
+      locale: 'en-US',
+    });
+
+    expect(error(response)).toBe(CLINIC_MESSAGES.invalidBody);
   });
 });

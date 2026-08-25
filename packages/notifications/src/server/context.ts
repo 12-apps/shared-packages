@@ -32,6 +32,16 @@ export interface NotificationsRequest {
   body?: unknown;
   /** Headers the surface reads (`user-agent`, for the device hint). */
   headers?: Record<string, string | undefined>;
+  /**
+   * The language to answer this caller in, as a language tag (`pt-BR`,
+   * `en-US`) — the same field `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can
+   * negotiate one. Absent is meaningful and not an error: a host with one
+   * audience never sets it, and this surface must then answer with the words
+   * it was configured with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /** What a handler answers with; the adapter maps it onto its response type. */
