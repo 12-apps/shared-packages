@@ -13,6 +13,16 @@ import { rbacWorld } from '../world.js';
  * sign-in, routing, which rows exist — arrives through the world port rather
  * than being written down here.
  *
+ * ## Why `package.json` declares this file under `sideEffects`
+ *
+ * Every `Given`/`When`/`Then` below runs at IMPORT time — registering a step is
+ * the whole point of the module, and it exports nothing anybody imports by
+ * name. To a bundler doing tree-shaking that reads as dead weight, and dropping
+ * it is licensed: the result is a suite where bddgen reports the features
+ * compiled and every scenario then fails on an undefined step, or worse,
+ * silently binds none. `**\/e2e/steps/*.steps.*` covers both the source here and
+ * the compiled twin a consumer actually resolves.
+ *
  * The kebab entries are reached by `team-action-<id>` / `role-action-<id>`,
  * derived from each action's STABLE id. Clicking one by its visible label would
  * pin the scenario to a single adopter's copy, which is the coupling these

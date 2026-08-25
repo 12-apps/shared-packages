@@ -2,6 +2,9 @@
   "name": "@12-apps/rbac",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": [
+    "**/e2e/steps/*.steps.*"
+  ],
   "description": "Generic, portable Role-Based Access Control. Framework-free core (engine, registry, caveats, templates, governance), host-mounted backend surface (./server: role CRUD, permissions, team roster, guard helpers, duck-typed Prisma seam), Hono adapter (./hono), React screens + <Can> (./react), the rbac:coverage gate (./coverage) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": {
