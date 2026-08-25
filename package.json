@@ -22,7 +22,8 @@
     "bdd:gen": "cd harness/frontend && npx bddgen test",
     "test:bdd": "cd harness/frontend && npx bddgen test && npx playwright test --project=journeys",
     "quality:bdd": "node scripts/bdd-gate.mjs",
-    "quality:all": "pnpm quality && pnpm quality:dup && pnpm quality:quarantine && pnpm quality:knip && pnpm quality:bdd",
+    "quality:wiring": "node scripts/wiring-conformance-selftest.mjs && node scripts/wiring-conformance-gate.mjs",
+    "quality:all": "pnpm quality && pnpm quality:dup && pnpm quality:quarantine && pnpm quality:knip && pnpm quality:bdd && pnpm quality:wiring",
     "quality:agnostic": "node scripts/host-brand-gate.mjs",
     "quality:migrations": "node scripts/migration-freeze-gate.mjs",
     "quality:migrations:update": "node scripts/migration-freeze-gate.mjs --update"
