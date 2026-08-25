@@ -218,10 +218,18 @@ describe("a host that is not the one this package came from — the screen", () 
   it("renders the fleet's sentences and nobody else's", async () => {
     const { page: Page } = createWebFeatureFlags({ api: fleetScreenApi(), copy: FLEET_COPY });
     render(<Page />);
-    expect(await screen.findByText(FLEET_COPY.title)).toBeTruthy();
+    // The wait is anchored on the FLAG ROW, which is the only thing here that
+    // needs the catalog load. The title and subtitle are static header copy
+    // rendered on mount, so awaiting one of THOSE resolves on the very first
+    // render and leaves the synchronous queries below racing the load — the
+    // row is then absent for a reason that has nothing to do with portability.
+    // Same anchoring as the empty-state case underneath, for the same reason.
+    expect((await screen.findByTestId("ff-flag-sonar-array")).textContent).toContain(
+      "Towed sonar array",
+    );
+    expect(screen.getByText(FLEET_COPY.title)).toBeTruthy();
     expect(screen.getByText(FLEET_COPY.subtitle)).toBeTruthy();
     expect(screen.getByTestId("ff-select-prompt").textContent).toBe(FLEET_COPY.selectPrompt);
-    expect(screen.getByTestId("ff-flag-sonar-array").textContent).toContain("Towed sonar array");
   });
 
   it("renders the fleet's empty state when no trial is under way", async () => {
