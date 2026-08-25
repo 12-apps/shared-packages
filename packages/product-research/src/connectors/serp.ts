@@ -16,6 +16,7 @@ import {
 import type { SearchApiKeySource } from './searchapi';
 import { regionToLocation } from './serp-location';
 import type { ConnectorContext, ConnectorResult, PriceSourceConnector } from './types';
+import { diagnosticsOf } from './types';
 
 /**
  * SERP connector (FUT-418): Google Shopping Brazil through SearchApi.io — the
@@ -185,7 +186,7 @@ export const createSerpConnector = (options: SerpConnectorOptions): PriceSourceC
       // 'Busca web' is the tenant-facing name of this integration everywhere
       // else (the admin card, the seeded source), so the reason names what the
       // operator sees rather than the internal `SERP` type.
-      return { ok: false, error: invalidConfigMessage('Busca web', config.error, ctx.diagnostics.sourceConfig) };
+      return { ok: false, error: invalidConfigMessage('Busca web', config.error, diagnosticsOf(ctx).sourceConfig) };
     }
     const result = await callSearchApi(ctx, {
       engine: GOOGLE_SHOPPING_ENGINE,

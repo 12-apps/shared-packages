@@ -9,6 +9,7 @@ export {
   type ReportRoute,
 } from './create-report-builder';
 export {
+  engineCopyOf,
   messagesOf,
   type ReportCopyResolver,
   type ReportCopySource,

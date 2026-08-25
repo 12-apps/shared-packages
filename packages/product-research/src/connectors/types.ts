@@ -1,4 +1,5 @@
 import type { ResearchDiagnosticsCopy } from './diagnostics-copy';
+import { resolveResearchCopy, type ResearchCopySource } from '../copy-source';
 import type { LoggerPort } from '../ports';
 import type { RawOffer, ResearchQuery, SourceRecord } from '../types';
 
@@ -109,8 +110,24 @@ export interface ConnectorContext {
    * holds a `ctx` precisely so a host can supply what only a host knows. The
    * package ships no default: `PT_BR_RESEARCH_DIAGNOSTICS` is the wording it
    * used to compile in, now chosen by name.
+   *
+   * A host serving more than one language passes a RESOLVER, and sets
+   * {@link ConnectorContext.locale} beside it. Read it through
+   * {@link diagnosticsOf} rather than directly — see that function for why the
+   * indirection is the whole point.
    */
-  diagnostics: ResearchDiagnosticsCopy;
+  diagnostics: ResearchCopySource<ResearchDiagnosticsCopy>;
+  /**
+   * Whose language this RUN answers in, as a BCP-47 tag.
+   *
+   * A research run belongs to one tenant and its diagnostics are read by that
+   * store's owner, so unlike an HTTP surface the honest scope here is the run
+   * rather than the request — a host builds a context per run and states the
+   * tag once. Absent is meaningful and not an error: a single-audience host
+   * never sets it, and `diagnostics` must then answer with what it was
+   * configured with rather than invent a language.
+   */
+  locale?: string;
   /** Never-throw JSON fetch the host provides (timeout, identified UA). */
   fetchJson(url: string, init?: FetchInit): Promise<unknown | null>;
   /**
@@ -237,3 +254,20 @@ export interface PriceSourceConnector {
     ctx: ConnectorContext,
   ): Promise<SourceConfigCheck | null>;
 }
+
+/**
+ * This context's diagnostics, resolved for the run it belongs to.
+ *
+ * Every connector calls this instead of reading `ctx.diagnostics` directly.
+ * The indirection IS the adoption: a context is built once per run and passed
+ * down through a dozen helpers, so a resolver stored as a value where the
+ * context is assembled would answer the whole run in one language and a
+ * single-locale host could never tell.
+ */
+export function diagnosticsOf(ctx: {
+  readonly diagnostics: ResearchCopySource<ResearchDiagnosticsCopy>;
+  readonly locale?: string;
+}): ResearchDiagnosticsCopy {
+  return resolveResearchCopy(ctx.diagnostics, ctx.locale);
+}
+

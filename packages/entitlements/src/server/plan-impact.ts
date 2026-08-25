@@ -22,7 +22,11 @@
  */
 import { toLimit } from '../core/quota';
 import type { PlanCatalog } from '../core/types';
-import type { PlanImpactMessages } from './copy';
+import {
+  resolveEntitlementsCopy,
+  type EntitlementsCopySource,
+  type PlanImpactMessages,
+} from './copy';
 
 /** One measured surface: the feature key that gates it, and its report label. */
 export interface ImpactSurface<F extends string> {
@@ -113,20 +117,20 @@ export interface PlanImpact<S extends string, K extends string> {
    * there are none. Lives here rather than in a CLI because it is a claim
    * about how the headline was computed, and claims need tests.
    */
-  formatOffLadderNote(offLadder: number, total: number): string | null;
+  formatOffLadderNote(offLadder: number, total: number, locale?: string): string | null;
   /**
    * The line for tenants the catalog cannot score at all — not "measured
    * against a fallback" but "not measured", which is a gap in the evidence
    * rather than a caveat on it.
    */
-  formatUnscorableNote(unscorable: number, total: number): string | null;
+  formatUnscorableNote(unscorable: number, total: number, locale?: string): string | null;
   /**
    * Render a tier -> count map for the report footer: the ladder in price
    * order, then EVERYTHING ELSE flagged — a tenant on a tier the ladder no
    * longer has is itself something the decision needs to see, and dropping it
    * silently would make the distribution stop summing to the fleet total.
    */
-  formatTierBreakdown(counts: Record<string, number>): string;
+  formatTierBreakdown(counts: Record<string, number>, locale?: string): string;
 }
 
 export interface PlanImpactConfig<F extends string, S extends string, K extends string> {
@@ -140,8 +144,13 @@ export interface PlanImpactConfig<F extends string, S extends string, K extends 
    * `PT_BR_ENTITLEMENTS_MESSAGES`, which satisfies the slice). What stays
    * here is WHEN a note exists and how the breakdown is ordered; what a
    * caveat says about the operator's fleet is copy.
+   *
+   * A host serving more than one language passes a RESOLVER instead — the
+   * shape `@12-apps/i18n`'s `localeCopy(PACK)` returns — and each formatter
+   * then chooses per call, from the `locale` its caller passes. Passing a
+   * plain value is unchanged in every respect.
    */
-  messages: PlanImpactMessages;
+  messages: EntitlementsCopySource<PlanImpactMessages>;
 }
 
 /** Type guard over the catalog's own key list. */
@@ -192,21 +201,28 @@ function formatters<F extends string, K extends string>(
   plans: PlanCatalog<F, K>,
   defaultPlanKey: K,
   isPlanKey: (value: string) => value is K,
-  messages: PlanImpactMessages,
+  source: EntitlementsCopySource<PlanImpactMessages>,
 ): Pick<PlanImpact<string, K>, 'formatOffLadderNote' | 'formatUnscorableNote' | 'formatTierBreakdown'> {
+  // Resolved INSIDE each formatter, never here. `createPlanImpact` runs once
+  // per process, so a `const messages` on this line would answer every reader
+  // in whichever language the process started with — and a single-locale host
+  // could never tell, which is what makes that mistake survive review.
+  const copy = (locale?: string): PlanImpactMessages =>
+    resolveEntitlementsCopy(source, locale);
   return {
     // Whether a note exists is the package's (zero means no caveat); the
     // sentence is the host's, and it never names WHAT a tenant is — the
     // compiled-in copy once carried one host's own word for its customers.
-    formatOffLadderNote(offLadder, total) {
+    formatOffLadderNote(offLadder, total, locale) {
       if (offLadder <= 0) return null;
-      return messages.offLadderNote({ offLadder, total, defaultPlanKey });
+      return copy(locale).offLadderNote({ offLadder, total, defaultPlanKey });
     },
-    formatUnscorableNote(unscorable, total) {
+    formatUnscorableNote(unscorable, total, locale) {
       if (unscorable <= 0) return null;
-      return messages.unscorableNote({ unscorable, total });
+      return copy(locale).unscorableNote({ unscorable, total });
     },
-    formatTierBreakdown(counts) {
+    formatTierBreakdown(counts, locale) {
+      const messages = copy(locale);
       const known = plans.list
         .filter((tier) => (counts[tier] ?? 0) > 0)
         .map((tier) => `${tier} ${counts[tier]}`);

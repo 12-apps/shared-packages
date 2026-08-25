@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { definePlans } from '../../core/plans';
 import { defineFeatures } from '../../core/registry';
 import { createPlanImpact } from '../plan-impact';
+import { EN_US_ENTITLEMENTS_MESSAGES } from '../en-US';
 import { PT_BR_ENTITLEMENTS_MESSAGES } from '../pt-BR';
 
 const FEATURES = defineFeatures({
@@ -162,3 +163,69 @@ describe('the assembly check', () => {
     ).toThrow(/does not declare/);
   });
 });
+
+/**
+ * The report's sentences follow the reader.
+ *
+ * `createPlanImpact` runs ONCE per process, so `messages` was the last field
+ * on this surface that could still freeze a language into a mount. It takes a
+ * resolver now, and the three formatters choose per call.
+ *
+ * Both directions are pinned. The compatibility case matters as much as the
+ * other: every existing adopter passes a plain pack, and a widened field that
+ * quietly changed their output would be a worse bug than the one being fixed.
+ */
+describe('the report follows the reader', () => {
+  const bilingual = ({ locale }: { readonly locale?: string | null }) =>
+    locale === 'en-US' ? EN_US_ENTITLEMENTS_MESSAGES : PT_BR_ENTITLEMENTS_MESSAGES;
+
+  const resolving = () =>
+    createPlanImpact({
+      plans: PLANS,
+      defaultPlanKey: 'hobby',
+      messages: bilingual,
+      surfaces: { stations: { feature: 'stations.online', label: 'estações' } },
+    });
+
+  it('leaves a plain-value host byte-identical', () => {
+    // An absent locale reaches a resolver as `undefined` rather than being
+    // refused, and a plain pack never sees one at all.
+    expect(calc().formatOffLadderNote(2, 10)).toBe(
+      PT_BR_ENTITLEMENTS_MESSAGES.offLadderNote({ offLadder: 2, total: 10, defaultPlanKey: 'hobby' }),
+    );
+  });
+
+  it('answers each formatter in the locale it is given', () => {
+    const impact = resolving();
+    expect(impact.formatOffLadderNote(2, 10, 'en-US')).toBe(
+      EN_US_ENTITLEMENTS_MESSAGES.offLadderNote({ offLadder: 2, total: 10, defaultPlanKey: 'hobby' }),
+    );
+    expect(impact.formatUnscorableNote(1, 10, 'en-US')).toBe(
+      EN_US_ENTITLEMENTS_MESSAGES.unscorableNote({ unscorable: 1, total: 10 }),
+    );
+    expect(impact.formatTierBreakdown({ none: 3 }, 'en-US')).toBe(
+      EN_US_ENTITLEMENTS_MESSAGES.tierBreakdownAboveTop({ topTier: 'network', count: 3 }),
+    );
+  });
+
+  it('re-resolves per CALL, so one calculator serves two readers', () => {
+    // The case a single-locale test cannot see: resolving once inside
+    // `createPlanImpact` passes everything above and freezes the language.
+    const impact = resolving();
+    expect(impact.formatOffLadderNote(2, 10, 'en-US')).not.toBe(
+      impact.formatOffLadderNote(2, 10, 'pt-BR'),
+    );
+    expect(impact.formatOffLadderNote(2, 10, 'pt-BR')).toBe(
+      PT_BR_ENTITLEMENTS_MESSAGES.offLadderNote({ offLadder: 2, total: 10, defaultPlanKey: 'hobby' }),
+    );
+  });
+
+  it('keeps the COUNTS out of the locale axis', () => {
+    // Only the sentence moves. `formatTierBreakdown`'s known-tier half is
+    // `tier count` pairs read off the ladder, which are data.
+    const impact = resolving();
+    expect(impact.formatTierBreakdown({ hobby: 4 }, 'en-US')).toBe('hobby 4');
+    expect(impact.formatTierBreakdown({ hobby: 4 }, 'pt-BR')).toBe('hobby 4');
+  });
+});
+

@@ -34,6 +34,15 @@ export type {
   PriceSourceConnector,
   SourceConfigCheck,
 } from './connectors/types';
+export { diagnosticsOf } from './connectors/types';
+// The resolver trio, from the module that owns it. `http/types.ts` re-exports
+// the same three so the HTTP surface's existing imports are untouched — one
+// definition, two reachable paths, no copy.
+export {
+  resolveResearchCopy,
+  type ResearchCopyResolver,
+  type ResearchCopySource,
+} from './copy-source';
 export { ConnectorRegistry } from './connectors/registry';
 export {
   CREDENTIALS_KEY,
