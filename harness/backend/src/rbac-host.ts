@@ -124,17 +124,12 @@ export const RBAC_MOUNT_PATH = '/api/admin/:tenantSlug';
  * is how the host keeps them beside the routes without building the surface
  * twice — two engines over one database is two answers to "may they".
  */
-export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
-  router: ReturnType<typeof honoRouterFor>;
-  report: WiringReport;
-  routes: readonly MountedRoute[];
-} {
-  const host = createWiringHost({
-    name: 'harness-backend',
-    kind: 'server',
-    ports: { loggerFor: harnessLoggerFor },
-  });
-
+/**
+ * The adoption itself, lifted out of {@link rbacHost} so that function stays
+ * inside the size gate. Everything here is CONFIG — what this host answers for
+ * each capability the manifest declares.
+ */
+function adoptRbac(host: ReturnType<typeof createWiringHost>, pg: PGlite): void {
   host.adoptServer({
     manifest: rbacManifest,
     server: rbacServerManifest,
@@ -180,6 +175,20 @@ export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
       },
     },
   });
+}
+
+export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
+  router: ReturnType<typeof honoRouterFor>;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+} {
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  adoptRbac(host, pg);
 
   const wired = host.assemble();
   const api = wired.http[rbacManifest.name] as ReturnType<typeof createApiRbac>;
