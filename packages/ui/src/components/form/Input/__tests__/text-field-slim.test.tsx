@@ -86,45 +86,51 @@ describe('the slim text field renders what MUI’s TextField renders', () => {
 
   for (const [name, props] of cases) {
     it(`matches for ${name}`, () => {
-      const { slim, mui } = bothOf(props);
+      const rendered = bothOf(props);
 
-      expect(shapeOf(slim, idOf(slim))).toBe(shapeOf(mui, idOf(mui)));
+      expect(shapeOf(rendered.slim, idOf(rendered.slim))).toBe(
+        shapeOf(rendered.mui, idOf(rendered.mui)),
+      );
     });
   }
 
   it('carries the root class a stylesheet reaches for, spelled as MUI spells it', () => {
-    const { slim, mui } = bothOf({ label: 'Nome' });
+    const rendered = bothOf({ label: 'Nome' });
 
     // Asserted against the REAL TextField rather than against a literal, so a
     // rename in MUI shows up here instead of in somebody's stylesheet.
-    expect(mui.classList).toContain('MuiTextField-root');
-    expect(slim.classList).toContain('MuiTextField-root');
+    expect([...rendered.mui.classList]).toContain('MuiTextField-root');
+    expect([...rendered.slim.classList]).toContain('MuiTextField-root');
   });
 
   it('joins the helper text to the field for a screen reader', () => {
-    const { slim } = bothOf({ label: 'Nome', helperText: 'Como no documento' });
-    const input = slim.querySelector('input') as HTMLInputElement;
+    const rendered = bothOf({ label: 'Nome', helperText: 'Como no documento' });
+    const input = rendered.slim.querySelector('input') as HTMLInputElement;
     const describedBy = input.getAttribute('aria-describedby') ?? '';
 
     expect(describedBy).not.toBe('');
-    expect(slim.querySelector(`#${CSS.escape(describedBy)}`)?.textContent).toBe(
+    expect(rendered.slim.querySelector(`#${CSS.escape(describedBy)}`)?.textContent).toBe(
       'Como no documento',
     );
   });
 
   it('points the label at the input it labels', () => {
-    const { slim } = bothOf({ label: 'Nome' });
-    const input = slim.querySelector('input') as HTMLInputElement;
-    const label = slim.querySelector('label') as HTMLLabelElement;
+    const rendered = bothOf({ label: 'Nome' });
+    const input = rendered.slim.querySelector('input') as HTMLInputElement;
+    const label = rendered.slim.querySelector('label') as HTMLLabelElement;
 
     expect(label.getAttribute('for')).toBe(input.id);
     expect(input.id).not.toBe('');
   });
 
   it('drops children, because only the select branch ever rendered them', () => {
-    const { slim, mui } = bothOf({ children: <span data-testid="orphan" /> } as TextFieldSlimProps);
+    const rendered = bothOf({ children: <span data-testid="orphan" /> } as TextFieldSlimProps);
 
-    expect(slim.querySelector('[data-testid="orphan"]')).toBeNull();
-    expect(mui.querySelector('[data-testid="orphan"]')).toBeNull();
+    // Asserted on the MARKUP rather than as a missing-element lookup: nothing is
+    // being removed here, so there is no state to wait for — the child was never
+    // rendered by either component, and `outerHTML` says that without pretending
+    // to be a disappearance check.
+    expect(rendered.slim.outerHTML).not.toContain('orphan');
+    expect(rendered.mui.outerHTML).not.toContain('orphan');
   });
 });

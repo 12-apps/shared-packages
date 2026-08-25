@@ -10,10 +10,10 @@
  * `Popover`, `NativeSelect`, `List`, `Modal`, `Paper`, `Portal` and `Grow`. Every
  * one of those ships to anyone who renders one text box.
  *
- * Measured on the Future Pay storefront, whose header search box is the eager
- * caller: taking that ONE box off `TextField` is worth 73.3 KiB raw / 16.9 KiB
- * brotli and 23 fewer `@mui/material` component modules on the critical path —
- * more than any other single item in that bundle.
+ * Measured in one adopter's storefront, whose header search box is the eager
+ * caller: taking that ONE box off `TextField` is worth 36.4 KiB raw and 31
+ * fewer `@mui/material` component modules on the critical path — more than any
+ * other single item in that bundle.
  *
  * `Input` has never supported `select`: its props are `InputHTMLAttributes`, so
  * no caller can even pass one. The branch was pure cost.
@@ -51,6 +51,8 @@ import type {
   OutlinedInputProps,
 } from '@mui/material';
 import React from 'react';
+
+import { withDefaults } from '../../../utils/withDefaults';
 
 const VARIANT_COMPONENT = {
   standard: StandardInput,
@@ -116,105 +118,140 @@ export interface TextFieldSlimProps
   FormHelperTextProps?: Partial<FormHelperTextProps>;
 }
 
-export const TextFieldSlim = React.forwardRef<HTMLDivElement, TextFieldSlimProps>(
-  function TextFieldSlim(props, ref) {
-    const {
-      // `children` is deliberately NOT destructured: `TextField` renders it only
-      // inside the select branch, so for a text box it is dropped. Naming it
-      // here would silently start rendering something MUI never did.
-      autoComplete,
-      autoFocus = false,
-      className,
-      color = 'primary',
-      defaultValue,
-      disabled = false,
-      error = false,
-      FormHelperTextProps: formHelperTextProps,
-      fullWidth = false,
-      helperText,
-      id: idOverride,
-      InputLabelProps: inputLabelProps,
-      inputProps,
-      InputProps: inputComponentProps,
-      inputRef,
-      label,
-      maxRows,
-      minRows,
-      multiline = false,
-      name,
-      onBlur,
-      onChange,
-      onFocus,
-      placeholder,
-      required = false,
-      rows,
-      type,
-      value,
-      variant = 'outlined',
-      ...other
-    } = props;
+/**
+ * `TextField`'s own defaults, as a table.
+ *
+ * One `= default` per destructured prop is one branch per prop, and eight of
+ * them put this component over the complexity bar before it rendered anything —
+ * which is the same reason `AppHeader` keeps its defaults in a table. The values
+ * are `TextField`'s, unchanged; the parity test would fail if any drifted.
+ */
+const DEFAULTS: Partial<TextFieldSlimProps> = {
+  autoFocus: false,
+  color: 'primary',
+  disabled: false,
+  error: false,
+  fullWidth: false,
+  multiline: false,
+  required: false,
+  variant: 'outlined',
+};
 
+/** The two ids a labelled, described field needs, and the input's own. */
+function idsOf(props: TextFieldSlimProps, generated: string): {
+  id: string;
+  helperTextId: string | undefined;
+  inputLabelId: string | undefined;
+} {
+  const id = props.id ?? generated;
+  return {
+    id,
+    helperTextId: props.helperText && id ? `${id}-helper-text` : undefined,
+    inputLabelId: props.label && id ? `${id}-label` : undefined,
+  };
+}
+
+/**
+ * What only the OUTLINED variant needs: it draws its own notch around the
+ * label, so it has to be told the label and whether the caller pinned it shrunk
+ * (FUT-729's `shrink` case).
+ */
+function outlinedPropsOf(props: TextFieldSlimProps): Record<string, unknown> {
+  if (props.variant !== 'outlined') return {};
+  const shrink = props.InputLabelProps?.shrink;
+  return { label: props.label, ...(shrink === undefined ? {} : { notched: shrink }) };
+}
+
+interface FieldIds {
+  id: string;
+  helperTextId: string | undefined;
+  inputLabelId: string | undefined;
+}
+
+/**
+ * Everything the input (or this component) consumes by name.
+ *
+ * A key LIST rather than the omit-by-destructuring idiom, which would name
+ * twenty-four bindings only to leave every one of them unused — twenty-four
+ * lint warnings, in a package that allows none.
+ *
+ * `fullWidth`, `disabled`, `error`, `required`, `color` and `variant` are
+ * deliberately absent: `TextField` hands those to the root, and `fullWidth` to
+ * both.
+ */
+const CONSUMED_BY_FIELD: ReadonlySet<string> = new Set([
+  'autoComplete', 'autoFocus', 'children', 'className', 'defaultValue',
+  'FormHelperTextProps', 'helperText', 'id', 'InputLabelProps', 'inputProps',
+  'InputProps', 'inputRef', 'label', 'maxRows', 'minRows', 'multiline', 'name',
+  'onBlur', 'onChange', 'onFocus', 'placeholder', 'rows', 'type', 'value',
+]);
+
+/**
+ * What the ROOT `FormControl` gets: the props `TextField` hands it by name,
+ * plus everything it did not recognise.
+ *
+ * That second half is `TextField`'s behaviour and not a choice made here: an
+ * unrecognised HTML attribute lands on the root `div`, which is why `Input` has
+ * to route `aria-label` through `inputProps`. The parity test pins it.
+ */
+function rootPropsOf(props: TextFieldSlimProps): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(props).filter(([key]) => !CONSUMED_BY_FIELD.has(key)),
+  );
+}
+
+/** What the INPUT gets, by name, exactly as `TextField` names them. */
+function fieldPropsOf(props: TextFieldSlimProps, ids: FieldIds): Record<string, unknown> {
+  return {
+    'aria-describedby': ids.helperTextId,
+    autoComplete: props.autoComplete,
+    autoFocus: props.autoFocus,
+    defaultValue: props.defaultValue,
+    fullWidth: props.fullWidth,
+    multiline: props.multiline,
+    name: props.name,
+    rows: props.rows,
+    maxRows: props.maxRows,
+    minRows: props.minRows,
+    type: props.type,
+    value: props.value,
+    id: ids.id,
+    inputRef: props.inputRef,
+    onBlur: props.onBlur,
+    onChange: props.onChange,
+    onFocus: props.onFocus,
+    placeholder: props.placeholder,
+    inputProps: props.inputProps,
+    ...outlinedPropsOf(props),
+    ...props.InputProps,
+  };
+}
+
+export const TextFieldSlim = React.forwardRef<HTMLDivElement, TextFieldSlimProps>(
+  function TextFieldSlim(rawProps, ref) {
+    const props = withDefaults(rawProps, DEFAULTS);
     // `TextField` uses `@mui/utils`'s `useId`, which is React's with a fallback
     // for React 17. The peer here is React 19, so React's own is the same thing
-    // without the dependency. The override still wins, exactly as it did.
-    const generatedId = React.useId();
-    const id = idOverride ?? generatedId;
-    const helperTextId = helperText && id ? `${id}-helper-text` : undefined;
-    const inputLabelId = label && id ? `${id}-label` : undefined;
-    const InputComponent = VARIANT_COMPONENT[variant];
-
-    // Outlined draws its own notch around the label, so it needs to know both
-    // the label and whether the caller pinned it shrunk (FUT-729's `shrink`).
-    const outlinedProps =
-      variant === 'outlined'
-        ? {
-            label,
-            ...(inputLabelProps?.shrink === undefined ? {} : { notched: inputLabelProps.shrink }),
-          }
-        : {};
+    // without the dependency. The override still wins, exactly as it did — and
+    // it is read from the RAW props, before `withDefaults` could supply one.
+    const ids = idsOf(rawProps, React.useId());
+    const InputComponent = VARIANT_COMPONENT[props.variant ?? 'outlined'];
+    const { label, helperText } = props;
 
     return (
       <TextFieldSlimRoot
-        className={[TEXT_FIELD_ROOT_CLASS, className].filter(Boolean).join(' ')}
+        className={[TEXT_FIELD_ROOT_CLASS, props.className].filter(Boolean).join(' ')}
         ref={ref}
-        disabled={disabled}
-        error={error}
-        fullWidth={fullWidth}
-        required={required}
-        color={color}
-        variant={variant}
-        {...other}
+        {...rootPropsOf(props)}
       >
         {label !== null && label !== undefined && label !== '' ? (
-          <InputLabel htmlFor={id} id={inputLabelId} {...inputLabelProps}>
+          <InputLabel htmlFor={ids.id} id={ids.inputLabelId} {...props.InputLabelProps}>
             {label}
           </InputLabel>
         ) : null}
-        <InputComponent
-          aria-describedby={helperTextId}
-          autoComplete={autoComplete}
-          autoFocus={autoFocus}
-          defaultValue={defaultValue}
-          fullWidth={fullWidth}
-          multiline={multiline}
-          name={name}
-          rows={rows}
-          maxRows={maxRows}
-          minRows={minRows}
-          type={type}
-          value={value}
-          id={id}
-          inputRef={inputRef}
-          onBlur={onBlur}
-          onChange={onChange}
-          onFocus={onFocus}
-          placeholder={placeholder}
-          inputProps={inputProps}
-          {...outlinedProps}
-          {...inputComponentProps}
-        />
+        <InputComponent {...fieldPropsOf(props, ids)} />
         {helperText ? (
-          <FormHelperText id={helperTextId} {...formHelperTextProps}>
+          <FormHelperText id={ids.helperTextId} {...props.FormHelperTextProps}>
             {helperText}
           </FormHelperText>
         ) : null}
