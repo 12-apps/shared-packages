@@ -29,6 +29,8 @@
  * structurally.
  */
 
+import { resolveEntitlementsCopy, type EntitlementsCopySource } from './copy';
+
 /** How a permission is decided once the actor holds it. */
 export type EntitlementPermissionKind = 'class' | 'instance';
 
@@ -101,13 +103,21 @@ export function definePermissionContribution<
 >(input: {
   source: string;
   permissions: M;
-  labels?: EntitlementPermissionLabels;
+  /**
+   * The segment words — a pack, or a resolver that picks one per reader.
+   *
+   * See {@link entitlementsPermissions} for where a resolver is called and
+   * why that is the composition rather than something deeper.
+   */
+  labels?: EntitlementsCopySource<EntitlementPermissionLabels>;
+  /** Whose language to compose in. Absent means "nobody said". */
+  locale?: string;
 }): EntitlementPermissionContribution<keyof M & string> {
   return {
     source: input.source,
     ids: Object.keys(input.permissions) as (keyof M & string)[],
     permissions: input.permissions,
-    labels: input.labels ?? {},
+    labels: resolveEntitlementsCopy(input.labels ?? {}, input.locale),
   };
 }
 
@@ -121,12 +131,35 @@ export function definePermissionContribution<
  * segments THIS id uses are needed; pt-BR hosts pass
  * `PT_BR_ENTITLEMENTS_PERMISSION_LABELS` from `./pt-BR` at the same
  * composition seam the rest of their catalog is assembled at.
+ *
+ * ## Which language, and where that is decided
+ *
+ * `labels` takes a pack or a RESOLVER — `localeCopy(ENTITLEMENTS_PERMISSION_LABELS)`
+ * — so a host whose readers do not share a language no longer has to reach
+ * into the pack by tag and hand over a value.
+ *
+ * The resolver is called HERE, at the composition, and that is the honest
+ * boundary rather than a shortcut. A permission catalog is not a sentence
+ * rendered on demand: `composePermissions` merges every source's vocabulary
+ * into one static structure, and the screens read `catalog.labels` off it. So
+ * the latest moment a language can still be chosen IS the compose — a host
+ * with one audience composes once, and a host whose readers differ composes
+ * per reader, which is the same thing that lets a React screen's props follow
+ * a locale without the props themselves being resolvers.
+ *
+ * Deferring further would mean widening `@12-apps/rbac`'s
+ * `PermissionContribution` to carry resolvers through composition. That is a
+ * real option and a different change; it is not what this field was missing.
+ * What it was missing is that `localeCopy(...)` did not type-check at all,
+ * which left the choice unavailable however the host composed.
  */
 export function entitlementsPermissions(
-  labels: EntitlementPermissionLabels,
+  labels: EntitlementsCopySource<EntitlementPermissionLabels>,
+  locale?: string,
 ): EntitlementPermissionContribution<'plan:request'> {
   return definePermissionContribution({
     source: '@12-apps/entitlements',
+    locale,
     permissions: {
       /**
        * File a plan-change request — the one write on this surface.
