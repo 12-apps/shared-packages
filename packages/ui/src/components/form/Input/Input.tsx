@@ -1,5 +1,7 @@
-import { CircularProgress, InputAdornment, styled, TextField } from '@mui/material';
+import { CircularProgress, InputAdornment, styled } from '@mui/material';
 import React from 'react';
+
+import { TextFieldSlim } from './text-field-slim';
 
 import {
   filledStyles,
@@ -13,7 +15,14 @@ import {
 } from './Input.styles';
 import type { InputProps } from './Input.types';
 
-const StyledTextField = styled(TextField, {
+/**
+ * `TextFieldSlim`, not `TextField` — see `text-field-slim.tsx`. MUI's own
+ * `TextField` imports `Select` unconditionally, and through it `Menu`,
+ * `Popover`, `Modal` and seven more component modules, so every screen with one
+ * text box shipped a dropdown it can never render. Same composition, same DOM,
+ * same prop routing; the select branch is the only thing missing.
+ */
+const StyledTextField = styled(TextFieldSlim, {
   shouldForwardProp: (prop) =>
     !['customVariant', 'floating', 'glow', 'pulse', 'loading'].includes(prop as string),
 })<{
@@ -108,8 +117,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onBlur={onBlur}
       /*
        * `aria-label` has to ride `inputProps` to reach the `<input>` (FUT-755).
-       * Spread with the rest it lands on the FormControl DIV that TextField
-       * renders as its root, which carries no role — so the field itself kept
+       * Spread with the rest it lands on the FormControl DIV that the text
+       * field renders as its root, which carries no role — so the field kept
        * no accessible name, and a source grep saying "this input is labelled"
        * disagreed with the DOM. The reports search box and the block-title
        * inputs were both named in source and anonymous to a screen reader.

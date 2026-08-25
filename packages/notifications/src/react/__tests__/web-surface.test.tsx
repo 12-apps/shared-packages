@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { CLINIC_MESSAGES } from '../../__tests__/host-copy';
@@ -15,6 +23,23 @@ import type { NotificationsResult, NotificationsTransport } from '../transport';
  * that seam exists for: the assertions are about the screens and the shared
  * store, and every URL the packaged client builds is asserted directly.
  */
+
+/**
+ * Waits here cover a CHUNK LOAD, not only a render.
+ *
+ * The panel and the preferences screen are fetched on demand, so the first
+ * assertion after opening either one waits for a dynamic import as well —
+ * and `waitFor`'s 1000ms default was tuned for the render alone. Measured: the
+ * slowest case here went 160ms to 447ms when the boundary landed. That passes on
+ * a developer's machine, and the sibling package's equivalent FAILED at 1206ms
+ * on a loaded CI runner. A budget that depends on how busy the runner is belongs
+ * to nobody.
+ *
+ * Set once for the file rather than at fifteen call sites, which is the trade:
+ * a wait that is genuinely stuck now takes five seconds to say so instead of
+ * one. No assertion changes — a panel that never renders still fails.
+ */
+configure({ asyncUtilTimeout: 5_000 });
 
 /** Fixed: nothing here asserts a relative timestamp, only the row's identity. */
 const SEEDED_AT = '2026-08-13T09:00:00.000Z';
