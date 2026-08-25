@@ -34,15 +34,41 @@ import type {
   AppShellServerConfig,
 } from '../server/config';
 
-/** The adapter takes exactly the server config — there is no second thing to wire. */
-export type AppShellHonoConfig = AppShellServerConfig;
+/**
+ * The adapter takes the server config, plus the one thing only an adapter can
+ * answer: which language this caller is reading in.
+ *
+ * `resolveLocale` is OPTIONAL and has no default, and both halves of that are
+ * deliberate. Precedence between `?lang=`, a remembered cookie, a stored user
+ * or tenant preference and `Accept-Language` is host POLICY — the estate's own
+ * host deliberately ignores the header, because a page whose browser half
+ * cannot honour it would come back half-translated — so a package that picked
+ * an order would be picking it for every adopter. And a host with one audience
+ * needs none of it: omit the seam, `AppShellRequest.locale` stays absent, and
+ * {@link AppShellServerConfig.messages} answers with the pack it was
+ * configured with.
+ *
+ * A host that already resolves a locale writes one line:
+ *
+ * ```ts
+ * appShellRouter({ …config, resolveLocale: (c) => resolveRequestLocale(c.req.raw) })
+ * ```
+ *
+ * The mount through `@12-apps/wiring` needs nothing: `WireRequest` carries the
+ * tag already and `manifest/server` copies it across.
+ */
+export interface AppShellHonoConfig extends AppShellServerConfig {
+  /** The reader's language tag, or `undefined` for "nobody said". */
+  resolveLocale?(c: Context): string | undefined;
+}
 
 export interface AppShellHono extends ApiAppShell {
   router: Hono;
 }
 
 /** The normalized request a descriptor sees, built from a Hono context. */
-function toAppShellRequest(c: Context): AppShellRequest {
+function toAppShellRequest(c: Context, config: AppShellHonoConfig): AppShellRequest {
+  const locale = config.resolveLocale?.(c);
   return {
     params: c.req.param() as Record<string, string | undefined>,
     query: c.req.query() as Record<string, string | undefined>,
@@ -50,6 +76,10 @@ function toAppShellRequest(c: Context): AppShellRequest {
     // The escape hatch `resolveActor` needs: reading a session cookie is host
     // work, and no handler in the package touches it.
     raw: c,
+    // Spread rather than assigned, so an unwired seam leaves the key ABSENT
+    // instead of present-and-undefined. The two are the same to a resolver and
+    // not to a reader of this object, and absent is the honest one.
+    ...(locale === undefined ? {} : { locale }),
   };
 }
 
@@ -74,9 +104,9 @@ function respond(c: Context, response: AppShellResponse): Response {
   return c.json(response.body, response.status as 200);
 }
 
-function mount(router: Hono, route: AppShellRoute): void {
+function mount(router: Hono, route: AppShellRoute, config: AppShellHonoConfig): void {
   const handler = async (c: Context): Promise<Response> =>
-    respond(c, await route.handle(toAppShellRequest(c)));
+    respond(c, await route.handle(toAppShellRequest(c, config)));
   if (route.method === 'GET') router.get(route.path, handler);
   else router.post(route.path, handler);
 }
@@ -86,6 +116,6 @@ export function appShellRouter(config: AppShellHonoConfig): AppShellHono {
   const shell = createApiAppShell(config);
   const router = new Hono();
   // Verbatim, in the order the surface declares — see `routes.ts`.
-  for (const route of shell.routes) mount(router, route);
+  for (const route of shell.routes) mount(router, route, config);
   return { ...shell, router };
 }

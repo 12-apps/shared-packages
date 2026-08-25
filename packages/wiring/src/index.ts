@@ -50,6 +50,7 @@ export type {
   WirePermissionSpec,
   WirePermissionsContribution,
   WirePermissionVocabulary,
+  WirePermissionVocabularyResolver,
 } from "./contract/permissions";
 
 export type {

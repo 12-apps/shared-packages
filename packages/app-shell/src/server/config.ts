@@ -23,6 +23,7 @@
  * until it wires that key — see its own docstring for why that is the one default
  * worth being loud about in a review.
  */
+import { resolveAppShellCopy, type AppShellCopySource } from '../core/copy';
 
 /**
  * One request, as this surface sees it — framework-neutral.
@@ -40,7 +41,8 @@ export interface AppShellRequest {
   raw?: unknown;
   /**
    * The language to answer this caller in, as a language tag (`pt-BR`,
-   * `en-US`) — the same field `@12-apps/wiring`'s `WireRequest` carries.
+   * `en-US`) — the same field `@12-apps/wiring`'s `WireRequest` carries, and
+   * the field `manifest/server` copies across from it.
    *
    * Populated by the host's adapter, which is the only layer that can
    * negotiate one. Absent is meaningful and not an error: a host with one
@@ -51,7 +53,8 @@ export interface AppShellRequest {
    * the host's — it owns the precedence order (an explicit `?lang=`, a
    * remembered cookie, a stored preference) and this surface would only ever
    * see the last of those, so a package-side read would quietly outrank a
-   * choice the reader already made.
+   * choice the reader already made. `./hono` takes a `resolveLocale(c)` seam
+   * for exactly that answer; the wiring mount needs none.
    */
   locale?: string;
 }
@@ -175,6 +178,13 @@ export interface ConsentSeam {
  * Server-side copy for the failure body — the HOST's, like every other sentence
  * this package renders. The pt-BR default that used to sit here was one
  * adopter's wording reached by omission; see `react/messages.ts`.
+ *
+ * There is still no pack in this package, and that is the same decision rather
+ * than an unfinished one. These words are wholly the host's, so the PAIR of
+ * languages lives where the words do: a host ships `{ 'pt-BR': …, 'en-US': … }`
+ * beside its own copy and hands `localeCopy(…)` to
+ * {@link AppShellServerConfig.messages}. A pack here would be one adopter's
+ * wording again, merely reachable by two names instead of by none.
  */
 export interface AppShellServerMessages {
   /** Body of the 500 when the host's `record` threw. */
@@ -258,21 +268,20 @@ export interface AppShellServerConfig {
 /**
  * What a copy field takes once its words can follow a reader.
  *
- * Declared here rather than imported from `@12-apps/i18n`: this package must
- * stay liftable into a repo that has never heard of it, so the two agree
- * STRUCTURALLY and nothing forces the dependency. The context is deliberately
- * loose — a raw tag off the wire, unnarrowed — because matching it is the host
- * resolver's job, not this package's.
+ * Re-exported from `../core/copy`, which is where the declaration now lives:
+ * the BROWSER half's `messages` took the same widening, and one mirror between
+ * the two halves is what stops them drifting into two spellings of the same
+ * idea. The names, the shape and this import path are unchanged, so nothing an
+ * adopter wrote moves.
  */
-export type AppShellCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
-export type AppShellCopySource<T> = T | AppShellCopyResolver<T>;
+export type { AppShellCopyResolver, AppShellCopySource } from '../core/copy';
 
 /**
  * The words this surface is answering with, at the moment one is needed.
  *
- * The ONE place a copy source becomes a value, which is what keeps rule E
- * ("absent stays absent") a property of this package rather than of each call
- * site: `locale` is passed through exactly as given, and a host that says
+ * The ONE place a copy source becomes a value on this half, which is what keeps
+ * rule E ("absent stays absent") a property of this package rather than of each
+ * call site: `locale` is passed through exactly as given, and a host that says
  * nothing gets whatever its own resolver defaults to — this package never
  * invents a tag.
  *
@@ -283,10 +292,7 @@ export function messagesOf<T extends AppShellServerMessages>(
   config: { messages: AppShellCopySource<T> },
   locale?: string,
 ): T {
-  const source = config.messages;
-  return typeof source === 'function'
-    ? (source as AppShellCopyResolver<T>)({ locale })
-    : source;
+  return resolveAppShellCopy(config.messages, locale);
 }
 
 /** An error a descriptor answers with directly, status and all. */

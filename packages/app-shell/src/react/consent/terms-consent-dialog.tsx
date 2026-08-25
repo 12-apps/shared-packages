@@ -1,7 +1,13 @@
 import { Suspense, lazy, useEffect, type JSX } from 'react';
 
+import type { AppShellCopySource } from '../../core/copy';
 import { stripTrailingSlashes } from '../../core/paths';
-import { messagesOf, type AppShellMessages } from '../messages';
+import {
+  messagesOf,
+  noLocale,
+  type AppShellLocaleHook,
+  type AppShellMessages,
+} from '../messages';
 import { useTermsConsent } from './use-terms-consent';
 
 /**
@@ -97,8 +103,17 @@ export interface TermsConsentDialogProps {
   apiBase?: string;
   termsHref?: string;
   privacyHref?: string;
-  messages: AppShellMessages;
+  /** The nine sentences, or a resolver over a tag-keyed pack. */
+  messages: AppShellCopySource<AppShellMessages>;
   useSignal?: ConsentSignalHook;
+  /**
+   * Which language to read them in. See {@link AppShellLocaleHook}.
+   *
+   * A hook, so the dialog re-renders when the reader changes it — a prop
+   * carrying the resolved tag would freeze at whatever the parent last passed,
+   * and the parent here is a factory-built component with no props at all.
+   */
+  useLocale?: AppShellLocaleHook;
 }
 
 /**
@@ -120,10 +135,18 @@ export function TermsConsentDialog({
   apiBase,
   termsHref = '/terms',
   privacyHref = '/privacidade',
-  messages: override,
+  messages: source,
   useSignal,
+  useLocale,
 }: TermsConsentDialogProps): JSX.Element | null {
-  const messages = messagesOf(override);
+  // Hooks may not be called conditionally, so an absent seam is stood in for by
+  // a no-op rather than branched on at the call site — the same shape
+  // `useConsentStream` uses one line down, and for the same rule.
+  const locale = (useLocale ?? noLocale)();
+  // Resolved HERE, in the render that shows the dialog. This component is
+  // mounted app-wide and renders `null` on nearly every pass, so the language
+  // is chosen at the one moment a reader is actually about to read it.
+  const messages = messagesOf(source, locale);
   const { stale, accepting, accept, refresh } = useTermsConsent(
     apiBase === undefined ? {} : { apiBase },
   );

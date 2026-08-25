@@ -28,13 +28,14 @@ import {
   assertSpecDeclaresItself,
   RbacCatalogError,
 } from './catalog-integrity';
+import { resolveRbacCopy, type RbacCopyResolver, type RbacCopySource } from './copy';
 import {
   mergeLabelVocabulary,
   type PermissionContribution,
   type PermissionOf,
-  type PermissionSpec,
   type RbacLabelVocabulary,
 } from './contribution';
+import { collectLabels, type CatalogEntry } from './label-vocabulary';
 import type { PermissionKind, PermissionRegistry, RoleDef } from './types';
 
 /**
@@ -45,6 +46,15 @@ export {
   RbacCatalogError,
   type RbacCatalogErrorCode,
 } from './catalog-integrity';
+
+/**
+ * The accessor every reader of {@link RbacCatalog.labels} goes through,
+ * re-exported here so the import path is the one that already carries
+ * `composePermissions`. It lives in `./label-vocabulary` with the merge it
+ * performs — see that module for why the words are the one product of
+ * composition that is not decided at composition.
+ */
+export { labelsOf } from './label-vocabulary';
 
 /**
  * The host's ROLE policy — the half of governance no package can own.
@@ -75,8 +85,20 @@ export interface RbacRolePolicy<P extends string = string> {
    * the tenant's own admins can then see and hand out.
    */
   readonly platformOnlyRoles: readonly string[];
-  /** Presentation labels for the role names. */
-  readonly roleLabels?: Readonly<Record<string, string>>;
+  /**
+   * Presentation labels for the role names — a table, or a RESOLVER over a
+   * tag-keyed pack.
+   *
+   * Widened alongside the segment vocabulary because they end up in the same
+   * merged structure and are read by the same screens. Leaving this one plain
+   * would have made a roster whose permission words followed the reader and
+   * whose role names did not: one grid, two languages, which reads as a broken
+   * translation rather than as a setting.
+   *
+   * The role NAMES are untouched — they are the ids `validateGrant` and the
+   * seeded rows are keyed on.
+   */
+  readonly roleLabels?: RbacCopySource<Readonly<Record<string, string>>>;
 }
 
 /**
@@ -95,8 +117,23 @@ export interface RbacCatalog<P extends string = string> {
   readonly governance: GovernanceCatalog;
   /** The rows `seedTenantRoles` materializes for a new tenant. */
   readonly tenantRoleSeeds: readonly TenantRoleSeed[];
-  /** Every contributed label, merged; the screens read it. */
-  readonly labels: RbacLabelVocabulary;
+  /**
+   * Every contributed label, merged — as a RESOLVER the screens call.
+   *
+   * Not a value, and that is the whole of the change. A catalog is composed
+   * ONCE per process: a host's `CATALOG` is a module-scope singleton its API
+   * routes and its browser screens both import, so there is no per-reader
+   * composition to hide a language in. Merging into a static structure here
+   * would therefore pin every source's words to whatever language that module
+   * was first evaluated in — invisibly, since a single-locale host cannot tell
+   * the difference.
+   *
+   * So the merge stays lazy and each source's own {@link PermissionContribution.labels}
+   * travels intact until a screen asks. Read it through {@link labelsOf}: a
+   * resolver reached where a value was expected is a runtime `TypeError`, not a
+   * type error.
+   */
+  readonly labels: RbacCopyResolver<RbacLabelVocabulary>;
   /** Which source contributed an id — diagnostics, and the collision message. */
   sourceOf(permission: string): string | undefined;
 }
@@ -109,17 +146,11 @@ export interface ComposedPermissions<P extends string = string> {
   readonly ownerPermissions: readonly P[];
   /** SoD pairs, derived from every `separateFrom` declaration. */
   readonly sodPairs: readonly SodPair[];
-  readonly labels: RbacLabelVocabulary;
+  /** The merged vocabulary, as a resolver. See {@link RbacCatalog.labels}. */
+  readonly labels: RbacCopyResolver<RbacLabelVocabulary>;
   sourceOf(permission: string): string | undefined;
   /** Bind the host's ROLE policy and get the catalog the factories take. */
   withRoles(policy: RbacRolePolicy<P>): RbacCatalog<P>;
-}
-
-/** One id with its declaration and the source that owns it. */
-interface CatalogEntry {
-  id: string;
-  spec: PermissionSpec;
-  source: string;
 }
 
 /** Flatten the contributions, refusing a second claim on any id. */
@@ -180,23 +211,6 @@ function collectSodPairs(
     });
   }
   return pairs;
-}
-
-/** Merge every source's segment words, then layer the per-id overrides on. */
-function collectLabels(
-  contributions: readonly PermissionContribution<string>[],
-  entries: readonly CatalogEntry[],
-): RbacLabelVocabulary {
-  const vocabulary = contributions.reduce<RbacLabelVocabulary>(
-    (merged, contribution) => mergeLabelVocabulary(merged, contribution.labels),
-    {},
-  );
-  const permissions = Object.fromEntries(
-    entries.flatMap((entry) =>
-      entry.spec.label === undefined ? [] : [[entry.id, entry.spec.label]],
-    ),
-  );
-  return mergeLabelVocabulary(vocabulary, { permissions });
 }
 
 /** Every permission a role grants, wildcard excluded (nothing to check there). */
@@ -303,7 +317,13 @@ function composeUntyped(
           sodPairs,
         },
         tenantRoleSeeds: tenantRoleSeeds(policy),
-        labels: mergeLabelVocabulary(labels, { roles: policy.roleLabels }),
+        // The host's role words layered on LAST, per reader, over the composed
+        // vocabulary resolved for that same reader — so one grid cannot end up
+        // half in one language.
+        labels: (context) =>
+          mergeLabelVocabulary(labels(context), {
+            roles: resolveRbacCopy(policy.roleLabels ?? {}, context.locale),
+          }),
         sourceOf,
       };
     },

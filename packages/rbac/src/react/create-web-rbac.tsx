@@ -1,11 +1,12 @@
-import { useEffect, useState, type ComponentType, type JSX, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ComponentType, type JSX, type ReactNode } from 'react';
 
 import { Button } from '@12-apps/ui/form/Button';
 import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { RbacCatalog } from '../core/compose';
+import { labelsOf, type RbacCatalog } from '../core/compose';
+import { resolveRbacCopy, type RbacCopySource } from '../core/copy';
 import { mergeLabelVocabulary, type RbacLabelVocabulary } from '../core/contribution';
 import type { GovernanceCatalog } from '../governance';
 import type { PermissionRegistry } from '../core/types';
@@ -56,8 +57,16 @@ export interface RbacWebConfig<P extends string = string> {
   copy: RbacWebCopy;
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: RbacTransport;
-  /** Label overrides layered over the catalog's own. */
-  labels?: RbacLabelVocabulary;
+  /**
+   * Label overrides layered over the catalog's own — a vocabulary, or a
+   * RESOLVER over a tag-keyed pack.
+   *
+   * These are the host's last word on a segment, so they must be able to follow
+   * a reader for the same reason the catalog's can: an override that stayed
+   * frozen would be the ONE word on the screen still in the old language, which
+   * reads as a bug rather than as a setting.
+   */
+  labels?: RbacCopySource<RbacLabelVocabulary>;
   /** Gate permission ids, when the host's catalog spells them differently. */
   gatePermissions?: { manageRoles?: string; manageTeam?: string };
   /**
@@ -95,7 +104,37 @@ export interface RbacWebConfig<P extends string = string> {
   };
   /** See {@link RoleMenuContext.renderVersionHistory}. */
   renderVersionHistory?: RoleMenuContext['renderVersionHistory'];
+  /**
+   * Which language the permission and role LABELS read in — the host's own
+   * hook, called inside the renders that show one.
+   *
+   * A hook rather than a tag because this surface is built ONCE, in a
+   * `useMemo` keyed on the tenant: its members are component TYPES, so
+   * rebuilding it per render remounts the whole tree below and the role form
+   * could not be typed into. A tag passed here would therefore be the language
+   * that was true when the tenant was last switched.
+   *
+   * It is CONFIG rather than a dependency for the reason every seam in this
+   * package is: `@12-apps/rbac` must stay liftable into a repo that has never
+   * heard of `@12-apps/i18n`. A host on it passes `useLocale`; a host with one
+   * audience passes nothing and gets the words its catalog contributed.
+   *
+   * `copy` is deliberately NOT paired with this. Those sentences are already an
+   * ordinary value the host hands over per surface, so a host that resolves
+   * them with `useLocaleCopy` has always been able to; the labels could not,
+   * because they arrive inside a catalog composed once for the whole process.
+   */
+  useLocale?: RbacLocaleHook;
 }
+
+/**
+ * How a host says which language the labels are read in. See
+ * {@link RbacWebConfig.useLocale}.
+ */
+export type RbacLocaleHook = () => string | null | undefined;
+
+/** The "no locale wired" implementation: nobody said, on every render. */
+const noLocale: RbacLocaleHook = () => undefined;
 
 export interface WebRbac {
   /** The whole surface: Papéis + Equipe behind the package's own tabs. */
@@ -112,7 +151,16 @@ interface SurfaceParts {
   api: RbacApiClient;
   permissions: PermissionRegistry<string>;
   governance: GovernanceCatalog;
-  labels: RbacLabels;
+  /**
+   * The labels for the CURRENT reader — a hook, not a table.
+   *
+   * The rest of this object is genuinely resolved-once config (a client bound
+   * to a base URL, the registry, the governance catalog). The words are not,
+   * and putting them here as a value is exactly how they came to be frozen:
+   * `surfaceParts` runs inside the host's `useMemo`, so a table built here is
+   * the language that was in force when the tenant was last switched.
+   */
+  useLabels: () => RbacLabels;
   copy: RbacWebCopy;
   systemRoles: string[];
   ownerRoles: string[];
@@ -124,7 +172,39 @@ interface SurfaceParts {
 
 function surfaceParts(config: RbacWebConfig): SurfaceParts {
   const { copy } = config;
-  const { permissions, governance, roleTemplates, labels } = config.catalog;
+  const { permissions, governance, roleTemplates } = config.catalog;
+  const useLocale = config.useLocale ?? noLocale;
+
+  /**
+   * The three vocabularies, merged for whoever is reading this render.
+   *
+   * The merge order is unchanged and is the whole reason it is stated in one
+   * place: the copy's words for THIS package's own segments sit UNDER the
+   * catalog merge — the position its contribution's pt-BR labels used to hold —
+   * so a host relabelling a shared segment in its own contribution still wins,
+   * and explicit `labels` overrides still win over everything.
+   *
+   * Memoised on the tag, so a re-render that did not change language does the
+   * same work it did before this axis existed: none. `createRbacLabels` returns
+   * closures the grids and the picker hold, so a fresh object per render would
+   * also invalidate every `useMemo` keyed on it downstream.
+   */
+  function useLabels(): RbacLabels {
+    // Hooks may not be called conditionally, so the no-op stands in for an
+    // absent seam rather than the call site branching on it.
+    const locale = useLocale();
+    return useMemo(
+      () =>
+        createRbacLabels(
+          mergeLabelVocabulary(
+            mergeLabelVocabulary(copy.permissionLabels, labelsOf(config.catalog, locale)),
+            resolveRbacCopy(config.labels ?? {}, locale),
+          ),
+        ),
+      [locale],
+    );
+  }
+
   // The assignable SYSTEM roles — every template except the owner tier,
   // which is never assignable from the roster.
   const systemRoles = roleTemplates
@@ -137,13 +217,7 @@ function surfaceParts(config: RbacWebConfig): SurfaceParts {
     ),
     permissions,
     governance,
-    // The copy's words for this package's own segments sit UNDER the catalog
-    // merge — the position its contribution's pt-BR labels used to hold — so
-    // a host relabelling a shared segment in its own contribution still wins,
-    // and explicit `labels` overrides still win over everything.
-    labels: createRbacLabels(
-      mergeLabelVocabulary(mergeLabelVocabulary(copy.permissionLabels, labels), config.labels),
-    ),
+    useLabels,
     copy,
     systemRoles,
     ownerRoles: [...governance.ownerRoles],
@@ -186,12 +260,13 @@ function WithPermissions({
 }
 
 function BoundRolesScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
+  const labels = parts.useLabels();
   return (
     <RolesScreen
       api={parts.api}
       permissions={parts.permissions}
       governance={parts.governance}
-      labels={parts.labels}
+      labels={labels}
       managePermission={parts.manageRoles}
       tenantSlug={parts.config.tenantSlug}
       copy={parts.copy}
@@ -204,10 +279,11 @@ function BoundRolesScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
 }
 
 function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
+  const labels = parts.useLabels();
   return (
     <TeamScreen
       api={parts.api}
-      labels={parts.labels}
+      labels={labels}
       systemRoles={parts.systemRoles}
       ownerRoles={parts.ownerRoles}
       managePermission={parts.manageTeam}
@@ -225,10 +301,11 @@ function BoundMemberScreen({
   parts: SurfaceParts;
   formatters: NonNullable<RbacWebConfig['formatters']>;
 }): JSX.Element {
+  const labels = parts.useLabels();
   return (
     <MemberScreen
       api={parts.api}
-      labels={parts.labels}
+      labels={labels}
       copy={parts.copy}
       formatters={formatters}
       breadcrumb={parts.config.breadcrumbs?.member}

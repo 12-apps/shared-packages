@@ -9,7 +9,7 @@
  * the same 401.
  */
 import { QueryClient, useQueryClient } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, renderHook, screen, waitFor } from '@testing-library/react';
 import { createContext, useContext, type JSX } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -248,7 +248,11 @@ describe('createWebAppShell', () => {
     expect(shell.brand.name).toBe('Harness');
     expect(typeof shell.lazyRoute).toBe('function');
     expect(typeof shell.RouteErrorBoundary).toBe('function');
-    expect(shell.messages.consentAccept).toBe(CLUB_MESSAGES.consentAccept);
+    // A HOOK now, so a host renders the same sentence in the same language the
+    // shell is currently rendering rather than the one it was imported in.
+    expect(renderHook(() => shell.useMessages()).result.current.consentAccept).toBe(
+      CLUB_MESSAGES.consentAccept,
+    );
     // One theme object, built once: a theme rebuilt per render is a new object
     // identity and re-runs every `styled` cache below it.
     expect(shell.theme).toBe(shell.theme);

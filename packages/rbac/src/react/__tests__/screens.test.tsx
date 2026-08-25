@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
+import { labelsOf } from '../../core/compose';
 import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
 
 import type { RbacApiClient } from '../api';
@@ -26,7 +27,7 @@ import { TeamScreen } from '../team-screen';
 
 const PAGINATION = { total: 1, page: 1, pageSize: 20, pageCount: 1, hasNextPage: false };
 const COPY = PT_BR_RBAC_WEB_COPY;
-const LABELS = createRbacLabels(DEMO_CATALOG.labels);
+const LABELS = createRbacLabels(labelsOf(DEMO_CATALOG));
 const SYSTEM_ROLES = ['HEAD_LIBRARIAN', 'BRANCH_LEAD', 'CLERK', 'CONSERVATOR'];
 
 function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {

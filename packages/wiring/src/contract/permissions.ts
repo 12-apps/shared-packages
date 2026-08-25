@@ -31,10 +31,29 @@ export interface WirePermissionVocabulary {
 }
 
 /**
+ * A vocabulary chosen per reader — the twin of rbac's `RbacCopyResolver`.
+ *
+ * Restated here rather than imported for the reason every twin in this file
+ * exists: a package declaring permissions must not depend on `@12-apps/rbac`,
+ * and neither may depend on `@12-apps/i18n`. The context is deliberately loose,
+ * matching `WireRequest.locale` — a raw language tag as some adapter handed it
+ * over, unnarrowed.
+ */
+export type WirePermissionVocabularyResolver = (context: {
+  readonly locale?: string | null;
+}) => WirePermissionVocabulary;
+
+/**
  * Twin of `PermissionContribution`: one source's ids and words. `labels` is
  * optional here where rbac requires it, so a contribution built for rbac is
  * assignable to this shape (never the reverse concern — the consumer only
  * aggregates and duplicate-checks; composing stays `composePermissions`' job).
+ *
+ * The ids and specs are MECHANISM and stay plain — an id is a value the wire
+ * carries and a `kind` decides whether an entity gate runs, so neither may
+ * follow a reader. Only `labels` admits a resolver, and it does because a
+ * catalog is composed once per PROCESS: without one, the words a picker renders
+ * are pinned to whatever language the catalog module was first evaluated in.
  */
 export interface WirePermissionsContribution {
   /** The owner, named in every composition error — the package's name. */
@@ -43,5 +62,6 @@ export interface WirePermissionsContribution {
   readonly ids: readonly string[];
   /** id → its whole declaration. */
   readonly permissions: Readonly<Record<string, WirePermissionSpec>>;
-  readonly labels?: WirePermissionVocabulary;
+  /** The segment words, or a resolver that picks a pack per reader. */
+  readonly labels?: WirePermissionVocabulary | WirePermissionVocabularyResolver;
 }

@@ -20,7 +20,9 @@
  * break that guarantee or answer from a token minted before the bump.
  *
  * `config.termsVersion` is read when a request is HANDLED, not when the routes are
- * built. That is a property and not an accident: a host may hold the version behind a
+ * built, and since the messages took a resolver `config.messages` is read the same
+ * way — through `messagesOf(config, request.locale)` in the fold, so a refusal is
+ * worded for the caller reading it rather than for the deployment. That is a property and not an accident: a host may hold the version behind a
  * getter and move it without rebuilding its router, which is the only way anything can
  * reproduce a bump without a restart. Keep it that way — hoisting it into a `const`
  * here would silently pin every answer to the version present at boot.
@@ -76,6 +78,10 @@ function statusRoute(config: AppShellServerConfig): AppShellRoute {
         const current = await config.consent.isCurrent(actor, version);
         return ok({ stale: !current, version } satisfies ConsentStatus);
       } catch (error) {
+        // The caller's language, not the process's. `messagesOf` is asked HERE,
+        // inside the request, for the same reason `config.termsVersion` is read
+        // here rather than hoisted: a value taken when the routes were built
+        // answers everybody with whatever was true at boot.
         return foldApiError(
           error,
           messagesOf(config, request.locale),

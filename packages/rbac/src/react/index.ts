@@ -9,7 +9,12 @@ export { Can, type CanProps } from './can';
 // The packaged admin surface (12-13): Papéis + Equipe over the `/server`
 // endpoints, on top of the provider above. Copy is REQUIRED host config; the
 // origin host's sentences ship as the named `PT_BR_RBAC_WEB_COPY` pack.
-export { createWebRbac, type RbacWebConfig, type WebRbac } from './create-web-rbac';
+export {
+  createWebRbac,
+  type RbacLocaleHook,
+  type RbacWebConfig,
+  type WebRbac,
+} from './create-web-rbac';
 export type {
   MemberProfileCopy,
   PermissionLabelsCopy,
