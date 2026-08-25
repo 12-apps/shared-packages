@@ -92,17 +92,23 @@ export function DiscountActionsMenu({
 
   const remove = useDeleteConfirm(row, api, copy, onError);
 
+  // Each entry carries a test id derived from its STABLE id, never its label:
+  // a label is host copy, so a spec clicking one is pinned to a single
+  // adopter's words — which is exactly what the packaged journeys exist not to
+  // be. The origin host's spec reached for `menuitem { name: 'Editar' }`.
   const items: DropdownMenuItem[] = [];
   if (canEdit) {
     items.push({
       id: "edit",
       label: copy.actions.edit,
+      dataTestId: "discount-action-edit",
       onClick: () => setEditOpen(true),
     });
   }
   items.push({
     id: "delete",
     label: copy.actions.delete,
+    dataTestId: "discount-action-delete",
     color: "danger",
     onClick: remove.request,
   });

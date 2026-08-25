@@ -211,6 +211,11 @@ export function discountsHost(pg: PGlite): HarnessDiscounts {
   });
   host.adoptServer({
     manifest: discountsManifest,
+    // The packaged journeys drive SCREENS — the promotions grid, the compose
+    // dialog, the row menu — so the world they ask for is a browser's, and this
+    // process has no browser. `harness/frontend` binds it, as it does for auth,
+    // impersonation, reports and rbac.
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
     server: discountsServerManifest,
     bindings: {
       http: {

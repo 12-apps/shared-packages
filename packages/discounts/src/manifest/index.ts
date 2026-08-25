@@ -82,6 +82,18 @@ export const discountsManifest = {
    * as the order that redeemed it is a rule that can be redeemed twice.
    */
   db: { partial: "prisma/discounts.prisma", migrations: "prisma/migrations" },
+  /**
+   * The promotions journeys (`../e2e`), and the world port a host implements
+   * to run them.
+   *
+   * Undeclared, they were adopted BY CONVENTION: a 167-line spec in the origin
+   * host asserting this package's own test ids from a repo it does not build —
+   * the arrangement whose failure mode is silent from here, since renaming an
+   * id in this package goes red somewhere this package cannot see. Declared, a
+   * host either binds `featuresRoot` or declines in writing, and the decline
+   * lands in the wiring report rather than in nobody's head.
+   */
+  e2e: { entry: "@12-apps/discounts/e2e", world: { factory: "defineDiscountsWorld" } },
   server: ["http"],
   web: ["surface", "areas"],
 } as const satisfies PackageManifest;

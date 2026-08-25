@@ -2,7 +2,9 @@
   "name": "@12-apps/discounts",
   "version": "1.0.0",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/e2e/**"
+  ],
   "description": "The discount/promotion domain: a host-agnostic evaluator (percentage or fixed amount, order/category/item scope, automatic or coupon-triggered, stacking and exclusivity, integer-cent allocation) plus the admin CRUD surface as wiring-contract route descriptors over a store port. No database, no framework, no baked user copy.",
   "exports": {
     ".": "./src/index.ts",
@@ -18,9 +20,14 @@
     "./server/en-US": "./src/server/en-US.ts",
     "./react/en-US": "./src/react/en-US.ts",
     "./locales": "./src/locales.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./e2e": {
+      "types": "./dist/e2e/index.d.ts",
+      "default": "./dist/e2e/index.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.e2e.json",
     "check-types": "tsc --noEmit",
     "clean": "rm -rf node_modules coverage dist",
     "dev": "storybook dev -p 6009",
@@ -44,7 +51,9 @@
     "@12-apps/wiring": ">=1.3.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0",
-    "react-router-dom": ">=7.0.0"
+    "react-router-dom": ">=7.0.0",
+    "@playwright/test": ">=1.55.0",
+    "playwright-bdd": ">=8.3.0"
   },
   "peerDependenciesMeta": {
     "@12-apps/wiring": {
@@ -58,6 +67,12 @@
     },
     "react-router-dom": {
       "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    },
+    "playwright-bdd": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -69,6 +84,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^6.5.0",
+    "@playwright/test": "^1.61.1",
     "@storybook/addon-docs": "^9.1.10",
     "@storybook/addon-links": "^9.1.10",
     "@storybook/react-vite": "^9.1.10",
@@ -80,6 +96,7 @@
     "eslint-plugin-storybook": "9.1.10",
     "eslint-plugin-test-flakiness": "^1.4.0",
     "jsdom": "^25.0.1",
+    "playwright-bdd": "^9.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.0.0",
@@ -117,7 +134,8 @@
     "!**/*.stories.*",
     "!**/*.test-story.*",
     "!**/test-helpers.*",
-    "!**/__stories__/**"
+    "!**/__stories__/**",
+    "features"
   ],
   "wiring": {
     "db": {
