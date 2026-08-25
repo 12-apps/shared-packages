@@ -2,6 +2,7 @@
   "name": "@12-apps/observability-frontend",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Browser error reporting for a React SPA, on Sentry: deferred init behind a served DSN, the noise rules that keep a deploy from filing one issue per open tab, a PII scrub, a route error boundary and a self-check page that proves the chain is live in the deployed bundle. Host-agnostic \u2014 what an app-specific error looks like, what a crashed page renders and where the config lives all arrive through named seams.",
   "exports": {
     ".": "./src/index.ts",
