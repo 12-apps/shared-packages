@@ -124,20 +124,20 @@ export const RBAC_MOUNT_PATH = '/api/admin/:tenantSlug';
  * is how the host keeps them beside the routes without building the surface
  * twice — two engines over one database is two answers to "may they".
  */
-export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
-  router: ReturnType<typeof honoRouterFor>;
-  report: WiringReport;
-  routes: readonly MountedRoute[];
-} {
-  const host = createWiringHost({
-    name: 'harness-backend',
-    kind: 'server',
-    ports: { loggerFor: harnessLoggerFor },
-  });
-
+/**
+ * The adoption itself, lifted out of {@link rbacHost} so that function stays
+ * inside the size gate. Everything here is CONFIG — what this host answers for
+ * each capability the manifest declares.
+ */
+function adoptRbac(host: ReturnType<typeof createWiringHost>, pg: PGlite): void {
   host.adoptServer({
     manifest: rbacManifest,
     server: rbacServerManifest,
+    // The packaged journeys drive SCREENS — the roster grid, the role editor,
+    // the member profile — so the world they ask for is a browser's, and this
+    // process has no browser. `harness/frontend` binds it, as it does for
+    // auth, impersonation and reports.
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
     bindings: {
       http: {
         mountPath: RBAC_MOUNT_PATH,
@@ -175,6 +175,20 @@ export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
       },
     },
   });
+}
+
+export function rbacHost(pg: PGlite): ReturnType<typeof createApiRbac> & {
+  router: ReturnType<typeof honoRouterFor>;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+} {
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+
+  adoptRbac(host, pg);
 
   const wired = host.assemble();
   const api = wired.http[rbacManifest.name] as ReturnType<typeof createApiRbac>;

@@ -1,3 +1,6 @@
+import type { ConfirmActionCopy } from '@12-apps/ui/copy';
+import type { DataViewsCopy } from '@12-apps/ui/data-display/DataViews';
+
 /**
  * Every sentence the roles + team admin renders — REQUIRED host config, with
  * NO defaults (the copy-portability doctrine): two screens, their tables,
@@ -31,6 +34,22 @@ export interface RolesListCopy {
   newRoleAction: string;
   searchPlaceholder: string;
   loadFailed: string;
+  /** The load error's retry affordance. */
+  retryAction: string;
+  /** The header explainer, over the catalog. */
+  aboutTitle: string;
+  aboutBody: string;
+  /** The grid's empty state. */
+  emptyState: string;
+  /**
+   * What an actor without the manage gate sees INSTEAD of the screen.
+   *
+   * A neutral not-found rather than a refusal, mirroring what the endpoints
+   * answer: "you may not" and "there is nothing here" are the same sentence on
+   * purpose, so the screen reveals no more than the API does.
+   */
+  forbiddenTitle: string;
+  forbiddenBody: string;
   /** The compose/edit dialog's title, per mode. */
   dialogTitles: {
     create: string;
@@ -45,13 +64,38 @@ export interface RolesListCopy {
 
 export interface RolesTableCopy {
   headers: { name: string; description: string; kind: string; permissions: string; actions: string };
-  /** The chip naming a row's kind. */
-  kinds: { system: string; custom: string };
+  /**
+   * The chip naming a row's kind. `systemEdited` is a seeded role whose
+   * effective permissions or description have drifted from the catalog seed —
+   * the state `resetAction` exists to undo, and the only one a reader can act on.
+   */
+  kinds: { system: string; systemEdited: string; custom: string };
+  /** The single "kind" filter facet, and its two option labels. */
+  kindFilter: string;
   /** The permission count of a wildcard (`'*'`) role. */
   allPermissions: string;
+  /** The unit under the count on a role card ("permissions"). */
+  permissionsUnit: string;
+  /** A role with no description at all, on the card's secondary line. */
+  noDescription: string;
+  /** Whether the row may be edited at all, and its two values. */
+  editableLabel: string;
+  editableYes: string;
+  /** A locked (owner-tier) role — never editable. */
+  lockedLabel: string;
+  /** The card's permission list when the role grants none. */
+  noPermissions: string;
+  /** A field with nothing to show. */
+  emptyValue: string;
   editAction: string;
   resetAction: string;
   deleteAction: string;
+  /** The version-history entry, shown only when the host wires the slot. */
+  historyAction: string;
+  /** What a failed delete says when the server sent no sentence of its own. */
+  deleteFailed: string;
+  /** What a failed reset says, for the same reason. */
+  resetFailed: string;
 }
 
 export interface RoleFormCopy {
@@ -75,17 +119,82 @@ export interface TeamScreenCopy {
   title: string;
   searchPlaceholder: string;
   loadFailed: string;
+  /** The load error's retry affordance. */
+  retryAction: string;
+  /** The header explainer, over the roster. */
+  aboutTitle: string;
+  aboutBody: string;
+  /** The header's "add administrator" button, and the dialog it opens. */
+  inviteAction: string;
+  inviteDialogTitle: string;
+  /** The e-mail field's label, and the sentence under it. */
+  inviteEmailLabel: string;
+  inviteHint: string;
+  /** The success banner shown when a grant was DEFERRED to the person's signup. */
+  inviteDeferredTitle: string;
+  inviteDeferredBody: string;
+  /** The banner over a failed roster mutation. */
+  errorTitle: string;
+  /** The grid's empty state. */
+  emptyState: string;
+  /** The export's file stem — no extension; the format appends its own. */
+  exportFileName: string;
   removeConfirm: { title: string; body: string; confirmLabel: string };
+  /** Cancelling a pending invite. `cancelLabel` is the popup's BACK-OUT, which
+   *  cannot also read "cancel" when the action itself is a cancellation. */
+  cancelInviteConfirm: {
+    title: string;
+    body: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    failed: string;
+  };
+  /** What a failed removal says when the server sent no sentence of its own. */
+  removeFailed: string;
   /** The confirm step's back-out. */
   cancelAction: string;
-  pendingInvitesTitle: string;
-  /** One pending accountless invite, from its e-mail and role label. */
-  pendingInviteLine: (email: string, role: string) => string;
 }
 
 export interface TeamTableCopy {
   headers: { name: string; email: string; roles: string; status: string };
-  status: { active: string; disabled: string };
+  /** The three roster row states — a pending invite is neither active nor off. */
+  status: { active: string; disabled: string; pending: string };
+  /** The two filter facets over the roster. */
+  filters: { roles: string; status: string };
+  /** The export's column headers, in order. */
+  exportHeaders: { name: string; email: string; role: string; customRoles: string; status: string };
+}
+
+/**
+ * The per-member profile (`/team/:userId`) — a tabbed read-only view of one
+ * person's access.
+ *
+ * The three tabs beyond the first are PLACEHOLDERS in the origin host and stay
+ * placeholders here: they are named so a host can decide whether to offer them
+ * at all ({@link MemberProfileCopy.tabs} is the whole list), and
+ * {@link MemberProfileCopy.comingSoon} is the one sentence they share.
+ */
+export interface MemberProfileCopy {
+  /** The tab labels, keyed as the screen keys them. */
+  tabs: { details: string; actions: string; ai: string; items: string };
+  /** The body of a tab whose feature has not shipped. */
+  comingSoon: string;
+  /** The read-only fields on the details tab. */
+  fields: {
+    baseRole: string;
+    customRoles: string;
+    memberSince: string;
+    lastLogin: string;
+  };
+  /** A field with nothing to show (no custom roles, no recorded sign-in). */
+  emptyValue: string;
+  /** A userId that is not a member of this tenant. */
+  notFoundTitle: string;
+  notFoundBody: string;
+  /** The read failed for any other reason. */
+  loadFailed: string;
+  retryAction: string;
+  loading: string;
 }
 
 export interface TeamRoleDialogCopy {
@@ -105,6 +214,8 @@ export interface TeamRowMenuCopy {
   activate: string;
   deactivate: string;
   remove: string;
+  /** Burning a pending accountless invite. */
+  cancelInvite: string;
   /** The menu's fallback row for an actor who may change nothing. */
   noActions: string;
 }
@@ -117,6 +228,23 @@ export interface RbacWebCopy {
   /** When that fetch fails — the surface renders nothing else. */
   permissionsLoadFailed: string;
   tabs: { roles: string; team: string };
+  /**
+   * The words `@12-apps/ui`'s grid, toolbar and saved-view dialogs render.
+   *
+   * Typed as the UI package's own port and passed through — the grid ships no
+   * sentences and THROWS rather than falling back, so a host mounting these
+   * screens has to answer for it either way. Answering it here keeps the whole
+   * surface's copy in one object instead of two.
+   */
+  dataViews: DataViewsCopy;
+  /** The kebab's accessible name, announced verbatim by a screen reader. */
+  menuLabel: string;
+  /** The heading over a failed row action, in the shared snackbar. */
+  actionErrorTitle: string;
+  /** The dismiss affordance on a closable banner. */
+  closeLabel: string;
+  /** The confirm popups' shared words (the primitive's own port). */
+  confirmAction: ConfirmActionCopy;
   permissionLabels: PermissionLabelsCopy;
   rolesList: RolesListCopy;
   rolesTable: RolesTableCopy;
@@ -125,4 +253,5 @@ export interface RbacWebCopy {
   teamTable: TeamTableCopy;
   teamRoleDialog: TeamRoleDialogCopy;
   teamRowMenu: TeamRowMenuCopy;
+  memberProfile: MemberProfileCopy;
 }

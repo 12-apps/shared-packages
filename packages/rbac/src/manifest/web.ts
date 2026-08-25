@@ -49,6 +49,10 @@ export const rbacWebManifest = {
       area: 'admin',
       routes: [
         { path: 'team', screen: 'TeamScreen', permission: 'team:read' },
+        // The per-member profile the roster's rows open. NOT in `nav`: it is
+        // reachable only from a row, and a nav entry to a route needing a
+        // `:userId` it cannot supply is a link to nothing.
+        { path: 'team/:userId', screen: 'MemberScreen', permission: 'team:read' },
         { path: 'roles', screen: 'RolesScreen', permission: 'roles:manage' },
       ],
       nav: [

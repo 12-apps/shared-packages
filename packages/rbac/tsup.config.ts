@@ -28,7 +28,13 @@ export default defineConfig({
     'manifest/index': 'src/manifest/index.ts',
     'manifest/server': 'src/manifest/server.ts',
     'manifest/web': 'src/manifest/web.ts',
-},
+    'mcp/index': 'src/mcp/index.ts',
+    'e2e/index': 'src/e2e/index.ts',
+    // COMPILED, unlike everything else here: these are loaded by NODE (bddgen
+    // imports the step files) and Node refuses to strip types under
+    // node_modules. Same reason the impersonation journeys are built.
+    'e2e/steps/journey.steps': 'src/e2e/steps/journey.steps.ts',
+  },
   format: ['esm'],
   dts: true,
   splitting: true,

@@ -2,7 +2,9 @@
   "name": "@12-apps/rbac",
   "version": "1.0.0",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/e2e/steps/*.steps.*"
+  ],
   "description": "Generic, portable Role-Based Access Control. Framework-free core (engine, registry, caveats, templates, governance), host-mounted backend surface (./server: role CRUD, permissions, team roster, guard helpers, duck-typed Prisma seam), Hono adapter (./hono), React screens + <Can> (./react), the rbac:coverage gate (./coverage) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": {
@@ -41,7 +43,17 @@
       "types": "./dist/manifest/web.d.ts",
       "default": "./dist/manifest/web.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js",
+      "default": "./dist/mcp/index.js"
+    },
+    "./e2e": {
+      "types": "./dist/e2e/index.d.ts",
+      "import": "./dist/e2e/index.js",
+      "default": "./dist/e2e/index.js"
+    }
   },
   "scripts": {
     "build": "rm -rf dist && tsup",
@@ -56,12 +68,24 @@
   },
   "peerDependencies": {
     "@12-apps/wiring": ">=1.3.0",
+    "@playwright/test": ">=1.55.0",
     "hono": ">=4.0.0",
+    "playwright-bdd": ">=8.3.0",
     "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
+    "react-dom": ">=19.0.0",
+    "react-router-dom": ">=7.0.0"
   },
   "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    },
     "hono": {
+      "optional": true
+    },
+    "playwright-bdd": {
       "optional": true
     },
     "react": {
@@ -70,7 +94,7 @@
     "react-dom": {
       "optional": true
     },
-    "@12-apps/wiring": {
+    "react-router-dom": {
       "optional": true
     }
   },
@@ -79,6 +103,7 @@
     "@12-apps/i18n": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@12-apps/wiring": "workspace:*",
+    "@playwright/test": "^1.61.1",
     "@testing-library/react": "^16.1.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
@@ -86,11 +111,13 @@
     "eslint-plugin-test-flakiness": "^1.4.0",
     "hono": "^4.6.0",
     "jsdom": "^25.0.1",
+    "playwright-bdd": "^9.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tsup": "^8.0.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "react-router-dom": "^7.9.4"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -121,10 +148,14 @@
     "!**/*.spec.*",
     "!**/*.stories.*",
     "!**/*.test-story.*",
-    "!**/test-helpers.*"
+    "!**/test-helpers.*",
+    "features"
   ],
   "dependencies": {
+    "@12-apps/app-shell": "workspace:*",
+    "@12-apps/forms-core": "workspace:*",
     "@12-apps/ui": "workspace:*",
+    "@mui/icons-material": "^6.5.0",
     "zod": "^4.3.5"
   },
   "wiring": {

@@ -1,3 +1,8 @@
+import {
+  PT_BR_CONFIRM_ACTION_COPY,
+  PT_BR_DATA_VIEWS_COPY,
+} from '@12-apps/ui/pt-BR';
+
 import type { RbacWebCopy } from './copy';
 
 /**
@@ -10,6 +15,11 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
   loading: 'Carregando…',
   permissionsLoadFailed: 'Não foi possível carregar suas permissões.',
   tabs: { roles: 'Papéis', team: 'Equipe' },
+  dataViews: PT_BR_DATA_VIEWS_COPY,
+  confirmAction: PT_BR_CONFIRM_ACTION_COPY,
+  menuLabel: 'Ações',
+  actionErrorTitle: 'Não foi possível concluir a ação',
+  closeLabel: 'Fechar',
   permissionLabels: {
     domains: { roles: 'Papéis', team: 'Equipe' },
     actions: { read: 'Ver', manage: 'Gerenciar' },
@@ -19,6 +29,13 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     newRoleAction: 'Novo papel',
     searchPlaceholder: 'Buscar papel',
     loadFailed: 'Não foi possível carregar os papéis.',
+    retryAction: 'Tentar novamente',
+    aboutTitle: 'Sobre os papéis',
+    aboutBody:
+      'Os papéis do sistema já vêm prontos — você pode ajustar as permissões de cada um para a sua loja (exceto Proprietário). Crie também papéis personalizados combinando permissões do catálogo e atribua-os à sua equipe.',
+    emptyState: 'Nenhum papel encontrado.',
+    forbiddenTitle: 'Página não encontrada',
+    forbiddenBody: 'O endereço acessado não existe ou não está disponível.',
     dialogTitles: {
       create: 'Novo papel',
       edit: (name) => `Editar ${name}`,
@@ -44,11 +61,22 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
       permissions: 'Permissões',
       actions: 'Ações',
     },
-    kinds: { system: 'Sistema', custom: 'Personalizado' },
-    allPermissions: 'todas',
+    kinds: { system: 'Sistema', systemEdited: 'Sistema · editado', custom: 'Personalizado' },
+    kindFilter: 'Tipo',
+    allPermissions: 'Todas',
+    permissionsUnit: 'permissões',
+    noDescription: 'sem descrição',
+    editableLabel: 'Editável',
+    editableYes: 'Sim',
+    lockedLabel: 'Bloqueado',
+    noPermissions: 'Nenhuma permissão',
+    emptyValue: '—',
     editAction: 'Editar',
     resetAction: 'Restaurar padrão',
     deleteAction: 'Excluir',
+    historyAction: 'Histórico de versões',
+    deleteFailed: 'Não foi possível excluir o papel.',
+    resetFailed: 'Não foi possível restaurar o padrão do papel.',
   },
   roleForm: {
     nameLabel: 'Nome do papel',
@@ -64,18 +92,47 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     title: 'Equipe',
     searchPlaceholder: 'Buscar membro',
     loadFailed: 'Não foi possível carregar a equipe.',
+    retryAction: 'Tentar novamente',
+    aboutTitle: 'Sobre a equipe',
+    aboutBody:
+      'Gerencie os administradores desta loja. Você pode convidar por e-mail mesmo quem ainda não tem conta — o acesso é atribuído automaticamente quando a pessoa se cadastra.',
+    inviteAction: 'Adicionar administrador',
+    inviteDialogTitle: 'Adicionar administrador',
+    inviteEmailLabel: 'E-mail do novo administrador',
+    inviteHint:
+      'Se a pessoa já tiver uma conta, o acesso é concedido na hora. Caso contrário, o convite fica pendente e o acesso é atribuído automaticamente quando ela criar a conta com esse e-mail.',
+    inviteDeferredTitle: 'Convite registrado',
+    inviteDeferredBody:
+      'O acesso será concedido automaticamente quando a pessoa criar a conta.',
+    errorTitle: 'Não foi possível atualizar a equipe',
+    emptyState: 'Nenhum administrador cadastrado.',
+    exportFileName: 'equipe',
     removeConfirm: {
       title: 'Remover da equipe?',
-      body: 'A pessoa perde o acesso ao painel imediatamente.',
+      body: 'A pessoa perde o acesso ao painel imediatamente. Para voltar, precisa de um novo convite.',
       confirmLabel: 'Remover',
     },
+    cancelInviteConfirm: {
+      title: 'Cancelar o convite?',
+      body: 'O link enviado deixa de valer. Para convidar de novo, é preciso reenviar.',
+      confirmLabel: 'Cancelar convite',
+      cancelLabel: 'Voltar',
+      failed: 'Não foi possível cancelar o convite.',
+    },
+    removeFailed: 'Não foi possível remover esta pessoa da equipe.',
     cancelAction: 'Cancelar',
-    pendingInvitesTitle: 'Convites pendentes',
-    pendingInviteLine: (email, role) => `${email} — ${role} (Pendente)`,
   },
   teamTable: {
     headers: { name: 'Nome', email: 'E-mail', roles: 'Papéis', status: 'Status' },
-    status: { active: 'Ativo', disabled: 'Desativado' },
+    status: { active: 'Ativo', disabled: 'Desativado', pending: 'Pendente' },
+    filters: { roles: 'Papéis', status: 'Status' },
+    exportHeaders: {
+      name: 'Nome',
+      email: 'E-mail',
+      role: 'Papel',
+      customRoles: 'Papéis',
+      status: 'Status',
+    },
   },
   teamRoleDialog: {
     title: (member) => `Papéis de ${member}`,
@@ -91,6 +148,28 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     activate: 'Ativar',
     deactivate: 'Desativar',
     remove: 'Remover',
+    cancelInvite: 'Cancelar convite',
     noActions: 'Sem ações disponíveis',
+  },
+  memberProfile: {
+    tabs: {
+      details: 'Detalhes do usuário',
+      actions: 'Ações do usuário',
+      ai: 'IA em nome do usuário',
+      items: 'Itens criados',
+    },
+    comingSoon: 'Este recurso estará disponível em breve.',
+    fields: {
+      baseRole: 'Papel base',
+      customRoles: 'Papéis adicionais',
+      memberSince: 'Membro desde',
+      lastLogin: 'Último acesso',
+    },
+    emptyValue: '—',
+    notFoundTitle: 'Membro não encontrado',
+    notFoundBody: 'Este usuário não faz parte da equipe desta loja.',
+    loadFailed: 'Não foi possível carregar o perfil.',
+    retryAction: 'Tentar novamente',
+    loading: 'Carregando…',
   },
 };
