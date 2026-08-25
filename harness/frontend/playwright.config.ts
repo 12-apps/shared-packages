@@ -15,6 +15,7 @@ import {
 } from '@12-apps/impersonation/e2e';
 import { paymentsFeatures, paymentsFeaturesRoot, paymentsSteps } from '@12-apps/payments-e2e';
 import { discountsFeatures, discountsFeaturesRoot, discountsSteps } from '@12-apps/discounts/e2e';
+import { mcpFeatures, mcpFeaturesRoot, mcpSteps } from '@12-apps/mcp/e2e';
 import { rbacFeatures, rbacFeaturesRoot, rbacSteps } from '@12-apps/rbac/e2e';
 import { reportsFeatures, reportsFeaturesRoot, reportsSteps } from '@12-apps/report-builder/e2e';
 import { defineBddConfig } from 'playwright-bdd';
@@ -104,6 +105,7 @@ const journeys = defineBddConfig({
     featureFlagsFeatures,
     rbacFeatures,
     discountsFeatures,
+    mcpFeatures,
   ],
   // Without this the compiled specs mirror each package's node_modules path and
   // Playwright's default testIgnore drops every one of them — bddgen reports
@@ -116,6 +118,7 @@ const journeys = defineBddConfig({
     featureFlagsFeaturesRoot,
     rbacFeaturesRoot,
     discountsFeaturesRoot,
+    mcpFeaturesRoot,
   ),
   // This app's own steps glob stays: it is where every `define…World` call
   // lives, and playwright-bdd imports every step file before the first Given.
@@ -127,6 +130,7 @@ const journeys = defineBddConfig({
     featureFlagsSteps,
     rbacSteps,
     discountsSteps,
+    mcpSteps,
     'tests/e2e/steps/**/*.ts',
   ],
   outputDir: '.features-gen',

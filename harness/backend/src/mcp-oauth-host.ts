@@ -169,6 +169,7 @@ export function mcpOauthHost(pg: PGlite) {
   wiring.adoptServer({
     manifest: mcpManifest,
     server: mcpServerManifest,
+    e2e: { declined: 'the journeys drive screens — the web harness answers for the world' },
     bindings: { http: { mountPath: MCP_OAUTH_MOUNT_PATH, config: oauthConfig(pg) } },
   });
   const wired = wiring.assemble();
