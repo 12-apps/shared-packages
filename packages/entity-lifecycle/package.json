@@ -2,6 +2,7 @@
   "name": "@12-apps/entity-lifecycle",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Generic, portable entity-lifecycle plugin: diff-based version history with restore + retention, recycle-bin soft delete, per-item drafts and change approvals. Framework-free core, host-mounted backend surface (./server: versions/restore/drafts/recycle-bin/approvals endpoints GENERATED per registered collection, duck-typed Prisma seam), Hono adapter (./hono), React screens (./react: Lixeira, Aprova\u00e7\u00f5es, version-history dialog, draft banner) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",

@@ -2,6 +2,7 @@
   "name": "@12-apps/product-research",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Generic, portable research-to-buy engine: multi-source current-price discovery (store connectors, SERP, manual price lists), no-AI relevance scoring, unit-price ranking. Framework-free core with host ports (db/cache/budget/catalog). Zero app coupling.",
   "exports": {
     ".": "./src/index.ts",

@@ -4,6 +4,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.34.5",
   "type": "module",
+  "sideEffects": ["**/chart-spec-registry.*"],
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=9.0.0",

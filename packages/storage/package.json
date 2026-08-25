@@ -2,6 +2,7 @@
   "name": "@12-apps/storage",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Image uploads that land at YOUR OWN ORIGIN, never at the bucket (12-20). Isomorphic core (format allowlist, upload ceiling, object-key grammar, rendition set, refusal taxonomy, wire schemas), host-mounted backend surface (./server: createApiStorage, the local-disk driver, the image-pipeline port, the orphan reclaim), Hono adapter (./hono), the S3-compatible driver behind its own subpath (./s3) and the bound picker + upload hook (./react). Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",

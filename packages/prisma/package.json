@@ -1,6 +1,7 @@
 {
   "name": "@12-apps/prisma",
   "version": "1.0.0",
+  "sideEffects": false,
   "description": "Prisma host: the multi-file schema folder, the plugin migration seam, and the shared PrismaClient singleton with its audit / append-only extensions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

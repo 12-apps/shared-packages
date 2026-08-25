@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "description": "The locale axis for packages whose copy is already the host's: the canonical locale list, locale packs and the resolver a config field takes, Accept-Language negotiation with a stated precedence, locale-aware money/number/date formatting and parsing, a React provider (./react), a Request reader (./server) and the cross-locale parity assertion (./testing). Zero dependencies.",
   "exports": {
     ".": {

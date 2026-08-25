@@ -2,6 +2,7 @@
   "name": "@12-apps/request-scope",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Generic, portable AMBIENT REQUEST SCOPE for hosts serving web-standard Request/Response. Framework-free core (an AsyncLocalStorage-backed per-request store, a paired cookie read/write codec, queued cookie writes drained onto the outgoing response, and the immutable-redirect rebuild that Response.redirect() otherwise makes a 500), a Hono middleware (./hono) and a next/headers-compatible accessor pair for migrating hosts (./next-compat). Zero runtime dependencies. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",

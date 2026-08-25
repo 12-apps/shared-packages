@@ -2,6 +2,7 @@
   "name": "@12-apps/wiring",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "The package-to-host wiring contract: a producer half for packages (capability manifests \u2014 HTTP routes, job blueprints, MCP tools with annotations, permissions, notification blueprints, mailers, Prisma partials, web surfaces) and a consumer half for hosts (a typed binder that adopts manifests, binds every declared capability against shared ports, refuses the unbound, orders and conflict-checks the aggregate). Zero dependencies; every capability shape is a structural twin of the seam a package already ships.",
   "exports": {
     ".": "./src/index.ts",
