@@ -350,9 +350,14 @@ describe('the filters', () => {
     // for the other is precisely the defect `@12-apps/ui`'s day input was
     // fixed for — and a case that hardcoded it would be asserting that bug
     // rather than the day bounds.
-    const [from, to] = within(panel).getAllByRole('textbox');
-    fireEvent.change(from as HTMLElement, { target: { value: inMaskOrder(from, '2026-07-01') } });
-    fireEvent.change(to as HTMLElement, { target: { value: inMaskOrder(to, '2026-07-31') } });
+    const bounds = within(panel).getAllByRole('textbox');
+    // Named before use: a panel that rendered one field (or none) would
+    // otherwise fail inside the mask helper, reporting the placeholder rather
+    // than the missing bound.
+    expect(bounds).toHaveLength(2);
+    const [from, to] = bounds as [HTMLElement, HTMLElement];
+    fireEvent.change(from, { target: { value: inMaskOrder(from, '2026-07-01') } });
+    fireEvent.change(to, { target: { value: inMaskOrder(to, '2026-07-31') } });
 
     await waitFor(() => {
       expect(lastPath(h)).toContain('from=2026-07-01');
