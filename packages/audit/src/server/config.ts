@@ -283,7 +283,10 @@ export interface AuditServerConfig {
  * structurally-identical copies of a seam type is how the two halves come to
  * disagree about it. Re-exported here under the names adopters already import.
  */
-export type { AuditCopyContext, AuditCopyResolver, AuditCopySource } from '../core/copy';
+// `AuditCopyContext` is deliberately NOT re-exported: nothing here consumes it,
+// and this surface's job is to keep the names adopters already import working,
+// not to widen them. It is reachable from `core/copy.ts` where it is declared.
+export type { AuditCopyResolver, AuditCopySource } from '../core/copy';
 
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class AuditApiError extends Error {

@@ -19,7 +19,7 @@
  * or the reverse — so `hasAction` is derived FROM `actionIds`, both from one
  * frozen copy, and there is no second statement of the set to fall behind.
  */
-import { type AuditCopyContext, type AuditCopySource, resolveAuditCopy } from './copy';
+import { type AuditCopyContext, type AuditCopySource, readLabel, requireLabel } from './copy';
 import { AuditConfigError, AuditVocabularyError, describe } from './errors';
 
 /** JSON-safe scalar an audit diff may carry. */
@@ -331,57 +331,6 @@ function requireId(path: string, id: string): void {
   }
 }
 
-/** A label a human can read, or a config error. */
-function requireLabel(path: string, label: unknown): AuditCopySource<string> {
-  // A RESOLVER is probed once, here, with no locale — the same move
-  // `createApiAudit` makes for `messages`, and for the same reason: a host
-  // whose label lookup missed should fail to BOOT, not render an empty cell to
-  // the one operator who happens to read in the language that was wrong. The
-  // probe is what keeps assembly's refusals honest now that the value can be
-  // computed; without it, widening the type would have quietly turned every
-  // check below into "unless you pass a function".
-  if (typeof label === 'function') {
-    const probed: unknown = (label as AuditCopyResolverProbe)({});
-    assertLabelText(`${path}()`, probed);
-    return label as AuditCopySource<string>;
-  }
-  assertLabelText(path, label);
-  return label as string;
-}
-
-/** The probe shape — a resolver called with the empty context, nothing more. */
-type AuditCopyResolverProbe = (context: AuditCopyContext) => unknown;
-
-function assertLabelText(path: string, label: unknown): void {
-  if (typeof label !== 'string' || label.trim() === '') {
-    throw new AuditConfigError(
-      path,
-      'must be a non-blank string — the viewer renders it where an operator ' +
-        'expects the name of what happened.',
-    );
-  }
-}
-
-/**
- * One label, for one reader.
- *
- * Falls back to the raw id twice over: for an id this vocabulary never declared
- * (an entry written before a rename — the behaviour that predates the locale
- * axis), and for a resolver that answered with nothing usable for THIS reader.
- * The second is deliberately not a throw: assembly already probed every
- * resolver, so reaching here means one language of a pack is short a line, and
- * a raw dotted id in one cell is a better answer to that than a viewer that
- * renders no rows at all.
- */
-function readLabel(
-  source: AuditCopySource<string> | undefined,
-  id: string,
-  context: AuditCopyContext,
-): string {
-  if (source === undefined) return id;
-  const label = resolveAuditCopy(source, context);
-  return typeof label === 'string' && label.trim() !== '' ? label : id;
-}
 
 /** One resource's allowlist as a frozen set — or a config error. */
 function freezeFields(resource: string, fields: unknown): ReadonlySet<string> {

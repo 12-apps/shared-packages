@@ -40,6 +40,71 @@ export type AuditCopySource<T> = T | AuditCopyResolver<T>;
  * undo, and it does so invisibly, because a single-locale host cannot tell the
  * difference.
  */
-export function resolveAuditCopy<T>(source: AuditCopySource<T>, context: AuditCopyContext): T {
+function resolveAuditCopy<T>(source: AuditCopySource<T>, context: AuditCopyContext): T {
   return typeof source === 'function' ? (source as AuditCopyResolver<T>)(context) : source;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * A LABEL is copy, so its validation and its read live here too.
+ *
+ * They came out of `core/vocabulary.ts` when the label started taking a
+ * resolver: that module's subject is the CLOSED SETS — which actions exist,
+ * which fields a diff may carry — and three helpers about resolving words were
+ * the only thing in it that was not. Moving them also kept that file under the
+ * complexity gate's line ceiling, which is the gate noticing the same thing.
+ * ---------------------------------------------------------------------------
+ */
+import { AuditConfigError } from './errors';
+
+/** A label a human can read, or a config error. */
+export function requireLabel(path: string, label: unknown): AuditCopySource<string> {
+  // A RESOLVER is probed once, here, with no locale — the same move
+  // `createApiAudit` makes for `messages`, and for the same reason: a host
+  // whose label lookup missed should fail to BOOT, not render an empty cell to
+  // the one operator who happens to read in the language that was wrong. The
+  // probe is what keeps assembly's refusals honest now that the value can be
+  // computed; without it, widening the type would have quietly turned every
+  // check below into "unless you pass a function".
+  if (typeof label === 'function') {
+    const probed: unknown = (label as AuditCopyResolverProbe)({});
+    assertLabelText(`${path}()`, probed);
+    return label as AuditCopySource<string>;
+  }
+  assertLabelText(path, label);
+  return label as string;
+}
+
+/** The probe shape — a resolver called with the empty context, nothing more. */
+type AuditCopyResolverProbe = (context: AuditCopyContext) => unknown;
+
+function assertLabelText(path: string, label: unknown): void {
+  if (typeof label !== 'string' || label.trim() === '') {
+    throw new AuditConfigError(
+      path,
+      'must be a non-blank string — the viewer renders it where an operator ' +
+        'expects the name of what happened.',
+    );
+  }
+}
+
+/**
+ * One label, for one reader.
+ *
+ * Falls back to the raw id twice over: for an id this vocabulary never declared
+ * (an entry written before a rename — the behaviour that predates the locale
+ * axis), and for a resolver that answered with nothing usable for THIS reader.
+ * The second is deliberately not a throw: assembly already probed every
+ * resolver, so reaching here means one language of a pack is short a line, and
+ * a raw dotted id in one cell is a better answer to that than a viewer that
+ * renders no rows at all.
+ */
+export function readLabel(
+  source: AuditCopySource<string> | undefined,
+  id: string,
+  context: AuditCopyContext,
+): string {
+  if (source === undefined) return id;
+  const label = resolveAuditCopy(source, context);
+  return typeof label === 'string' && label.trim() !== '' ? label : id;
 }
