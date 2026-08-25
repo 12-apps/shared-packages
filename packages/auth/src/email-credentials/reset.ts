@@ -48,6 +48,7 @@ export async function requestPasswordReset(
   await ctx.mailer.sendPasswordReset({
     to: user.email,
     name: user.name,
+    locale: user.locale,
     link: issued.link,
     token: issued.token,
     expiresAt: issued.expiresAt,
@@ -99,7 +100,11 @@ export async function resetPassword(
     await ctx.store.markEmailVerified(user.id, ctx.now());
     await ctx.store.deleteTokens(user.id, "EMAIL_VERIFICATION");
   }
-  await ctx.mailer.sendPasswordChanged?.({ to: user.email, name: user.name });
+  await ctx.mailer.sendPasswordChanged?.({
+    to: user.email,
+    name: user.name,
+    locale: user.locale,
+  });
   return { ok: true };
 }
 
@@ -160,7 +165,11 @@ export async function setPassword(
   // A social account's address was proven by the provider that vouched for it,
   // so adding a password does not put it back into an unverified state.
   if (!user.emailVerifiedAt) await ctx.store.markEmailVerified(user.id, ctx.now());
-  await ctx.mailer.sendPasswordChanged?.({ to: user.email, name: user.name });
+  await ctx.mailer.sendPasswordChanged?.({
+    to: user.email,
+    name: user.name,
+    locale: user.locale,
+  });
   return { ok: true };
 }
 

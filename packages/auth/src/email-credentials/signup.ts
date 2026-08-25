@@ -62,6 +62,7 @@ async function noticeExistingAccount(
   await ctx.mailer.sendAccountExists({
     to: user.email,
     name: user.name,
+    locale: user.locale,
     link: issued.link,
     token: issued.token,
     expiresAt: issued.expiresAt,
@@ -85,6 +86,7 @@ async function registerPending(
   await ctx.mailer.sendVerification({
     to: user.email,
     name: user.name,
+    locale: user.locale,
     link: issued.link,
     token: issued.token,
     expiresAt: issued.expiresAt,
@@ -203,6 +205,7 @@ export async function resendVerification(
   await ctx.mailer.sendVerification({
     to: user.email,
     name: user.name,
+    locale: user.locale,
     link: issued.link,
     token: issued.token,
     expiresAt: issued.expiresAt,
