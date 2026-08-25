@@ -223,3 +223,74 @@ When('I dismiss the invite form', async ({ page }) => {
 Then('the invite form is closed', async ({ page }) => {
   await expect(page.getByTestId('invite-dialog')).toHaveCount(0);
 });
+
+/**
+ * THE WRITE JOURNEYS.
+ *
+ * The three above this line only read. These three compose a role, grant and
+ * revoke an additive one, and prove the editor refuses an invalid selection —
+ * the package's own contract, and until now described only by a spec living in
+ * the consumer that happened to be able to reset its database.
+ *
+ * They are safe here for the same reason: `signInAsManager` returns the host to
+ * a known state, which the port has always required.
+ */
+
+When('I compose a role from the seeded permission', async ({ page }) => {
+  const { newRoleName, composablePermission } = rbacWorld().fixtures;
+  await page.getByTestId('add-role-button').click();
+  const dialog = page.getByTestId('role-dialog');
+  await dialog.getByTestId('role-name').fill(newRoleName);
+  // The submit unlocks only with a name AND at least one permission — so the
+  // order here is the rule, not a preference.
+  await dialog.getByTestId(`perm-${composablePermission}`).click();
+  await dialog.getByTestId('role-submit').click();
+  await expect(dialog).toHaveCount(0);
+});
+
+Then('the composed role is listed', async ({ page }) => {
+  // A role's NAME is the one user-visible string that is not copy: the host
+  // chose it in this scenario, so naming it here is naming a fixture.
+  await expect(
+    page.getByTestId(ROLES_GRID).getByText(rbacWorld().fixtures.newRoleName),
+  ).toBeVisible();
+});
+
+When('I add the seeded custom role to the matching member', async ({ page }) => {
+  await toggleCustomRole(page);
+});
+
+When('I take the seeded custom role back', async ({ page }) => {
+  await toggleCustomRole(page);
+});
+
+Then('the member holds the seeded custom role', async ({ page }) => {
+  await expect(roleOption(page, rbacWorld().fixtures.customRole)).toBeChecked();
+});
+
+Then('the member no longer holds the seeded custom role', async ({ page }) => {
+  await expect(roleOption(page, rbacWorld().fixtures.customRole)).not.toBeChecked();
+});
+
+/**
+ * A custom role is ADDITIVE, so the same click grants and revokes it — the
+ * dialog diffs the selection and calls the grant or the revoke endpoint. One
+ * helper, because they are one affordance.
+ */
+async function toggleCustomRole(page: Page): Promise<void> {
+  const { customRole } = rbacWorld().fixtures;
+  await page.getByTestId(`role-opt-${customRole}`).click();
+  await page.getByTestId('role-edit-save').click();
+  await expect(page.getByTestId('role-edit-dialog')).toHaveCount(0);
+}
+
+When("I clear the member's base role", async ({ page }) => {
+  await page.getByTestId(`role-opt-${rbacWorld().fixtures.matching.currentRole}`).click();
+});
+
+Then('the editor refuses the save', async ({ page }) => {
+  // Exactly one system role, always. Zero is as invalid as two, and the
+  // refusal is stated on screen rather than only enforced on submit.
+  await expect(page.getByTestId('role-edit-invalid')).toBeVisible();
+  await expect(page.getByTestId('role-edit-save')).toBeDisabled();
+});

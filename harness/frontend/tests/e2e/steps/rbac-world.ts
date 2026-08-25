@@ -77,5 +77,14 @@ defineRbacWorld({
     /** One of the two seeded custom roles; `Catalogador` is the other, and is
      *  what the catalog search has to drop. */
     customRole: 'Voluntário',
+    /**
+     * A plain CLASS permission — no owner-marker, no separation-of-duties
+     * counterpart — so the composer's checkbox is always togglable on a fresh
+     * form. A marked or paired one would be disabled by the governance rules
+     * the picker enforces, and the scenario would fail on a rule working.
+     */
+    composablePermission: 'copies:read',
+    /** A name no seed uses, so the compose journey's row is unambiguous. */
+    newRoleName: 'Papel do Harness',
   },
 });

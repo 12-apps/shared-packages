@@ -24,3 +24,11 @@ Feature: The role catalog
     When I dismiss the role form
     Then the role form dialog is closed
     And the roles grid is visible
+
+  Scenario: A manager composes a role and finds it in the catalog
+    # The write crosses a real socket into the package's own endpoints and comes
+    # back through the LIST read — which is what makes this different from the
+    # abandon scenario above it.
+    When I open the roles screen
+    And I compose a role from the seeded permission
+    Then the composed role is listed

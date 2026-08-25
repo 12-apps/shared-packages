@@ -57,3 +57,26 @@ Feature: The staff roster
     When I dismiss the invite form
     Then the invite form is closed
     And the team grid is visible
+
+  Scenario: A manager grants an additive custom role, then takes it back
+    # A custom role rides ALONGSIDE the base role rather than replacing it, and
+    # the same checkbox does both: the dialog diffs the selection and calls the
+    # grant or the revoke endpoint. Reopened each time, so both assertions read
+    # what the server stored.
+    When I open the team screen
+    And I open the role editor for the matching member
+    And I add the seeded custom role to the matching member
+    And I open the role editor for the matching member
+    Then the member holds the seeded custom role
+    When I take the seeded custom role back
+    And I open the role editor for the matching member
+    Then the member no longer holds the seeded custom role
+
+  Scenario: The editor refuses a member with no system role
+    # Exactly one, always — zero is as invalid as two. The refusal is stated on
+    # screen and the save is disabled, rather than the selection being accepted
+    # and refused by the endpoint.
+    When I open the team screen
+    And I open the role editor for the matching member
+    And I clear the member's base role
+    Then the editor refuses the save

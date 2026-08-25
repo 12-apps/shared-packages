@@ -64,6 +64,23 @@ export interface RbacFixtures {
   assignableRole: string;
   /** A seeded custom role the catalog lists, for the roles-grid scenarios. */
   customRole: string;
+  /**
+   * A permission the composer can always tick on a fresh form: a plain CLASS
+   * permission with no owner-marker and no separation-of-duties counterpart.
+   *
+   * Named by the host because the catalog is the host's. A marked or paired one
+   * would be DISABLED by the governance rules the picker enforces, and the
+   * scenario would fail on a rule working correctly.
+   */
+  composablePermission: string;
+  /**
+   * A role name no seed uses, for the compose journey.
+   *
+   * The write survives the scenario, so `signInAsManager` has to return the
+   * store to a known state — which every host implementing this port already
+   * does, and is why these journeys can exercise writes at all.
+   */
+  newRoleName: string;
 }
 
 /** What a host must be able to do for these journeys to run in it. */
