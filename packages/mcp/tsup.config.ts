@@ -28,7 +28,14 @@ export default defineConfig({
     'coverage-gate/index': 'src/coverage-gate/index.ts',
     'generate/index': 'src/generate/index.ts',
     'manifest/index': 'src/manifest/index.ts',
-    'manifest/server': 'src/manifest/server.ts'
+    'manifest/server': 'src/manifest/server.ts',
+    'e2e/index': 'src/e2e/index.ts',
+    // COMPILED like everything else here, and for a reason of its own: bddgen
+    // loads step files with NODE, which refuses to strip types under
+    // `node_modules`. A separate `tsc -p tsconfig.e2e.json` would have built
+    // these too — and would have REPLACED this config as the package's build,
+    // dropping every entry above it. Same build, one more entry.
+    'e2e/steps/journey.steps': 'src/e2e/steps/journey.steps.ts',
 },
   format: ['esm'],
   dts: true,

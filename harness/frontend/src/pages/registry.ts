@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
 import { DiscountsPage } from './discounts';
+import { McpAiConnectPage } from './mcp-ai-connect';
 import { AUTH_PAGES, AUTH_SETTINGS_PAGE } from './auth-pages';
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { FeatureFlagsPage } from './feature-flags';
@@ -201,6 +202,13 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/discounts',
     group: 'backoffice',
     Component: DiscountsPage,
+  },
+  {
+    slug: 'mcp-ai-connect',
+    title: 'Connect an assistant',
+    pkg: '@12-apps/mcp',
+    group: 'backoffice',
+    Component: McpAiConnectPage,
   },
   {
     slug: 'rbac-admin',
