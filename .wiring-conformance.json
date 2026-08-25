@@ -1,0 +1,770 @@
+{
+  "@12-apps/app-shell :: areas": {
+    "kind": "exempt",
+    "why": "the shell hosts everyone else's routes; suggesting rows into itself would invert the relationship"
+  },
+  "@12-apps/app-shell :: db": {
+    "kind": "exempt",
+    "why": "owns no models — no table reaches a host database from here, so there is no partial to declare and nothing for the sync tooling to copy"
+  },
+  "@12-apps/app-shell :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/app-shell :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/app-shell :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/app-shell :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/app-shell :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/app-shell :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/app-shell :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/app-shell :: surface": {
+    "kind": "exempt",
+    "why": "it IS the web hosts' shell — the anchor a web host builds around (the consumer side of the surface story), not a contribution some other shell would adopt"
+  },
+  "@12-apps/audit :: e2e": {
+    "kind": "exempt",
+    "why": "no packaged journeys: the trail is asserted through each host's own suites, where the actions that write it live"
+  },
+  "@12-apps/audit :: email": {
+    "kind": "exempt",
+    "why": "the trail notifies nobody: it is written by others' actions, and mail about a log row would be mail about the reader's own click"
+  },
+  "@12-apps/audit :: env": {
+    "kind": "exempt",
+    "why": "AUDIT_RETENTION_DAYS appears only in DOCBLOCKS describing what a host might read — shipped source takes the window as a dep, so there is no env read to declare"
+  },
+  "@12-apps/audit :: mcp": {
+    "kind": "exempt",
+    "why": "wire schemas stay on ./server for hosts that put the trail on an agent surface in their own vocabulary — no package-owned tool set is declared, per the estate's MCP position"
+  },
+  "@12-apps/audit :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts of its own — the trail records what happened; deciding what deserves attention is host policy over the same rows"
+  },
+  "@12-apps/audit :: permissions": {
+    "kind": "exempt",
+    "why": "AUDIT_READ_PERMISSION ships from ./server and the web manifest REFERENCES it so the gate cannot drift — folding it into a host's catalog is that host's assembly; a contribution twin would restate the id without adding a check"
+  },
+  "@12-apps/auth :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: sessions expire by verification, not by sweep, and the one cleanup hosts run is their own retention policy over their own tables"
+  },
+  "@12-apps/auth :: mcp": {
+    "kind": "exempt",
+    "why": "the platform pair stays OFF the tool surface by exclusion: a tool that could turn verification off would open unverified registration on the whole platform in one call — the manifest's own argument for two surfaces"
+  },
+  "@12-apps/auth :: notifications": {
+    "kind": "exempt",
+    "why": "auth already bridges into hosts' notification mounts as config; its own blueprint factories arrive with the notify-port wave, worded by each host — never pre-worded inside the library"
+  },
+  "@12-apps/auth :: permissions": {
+    "kind": "exempt",
+    "why": "admission is identity, not permission: the ids that gate the platform surface are the host's operator catalog, named in config — no package-owned id exists to contribute"
+  },
+  "@12-apps/billing :: areas": {
+    "kind": "exempt",
+    "why": "suggests no routes: it ships no routed screens, so an area row would point at nothing"
+  },
+  "@12-apps/billing :: db": {
+    "kind": "exempt",
+    "why": "subscriptions, cycles and stored instruments still carry foreign keys into the adopting host's account table — the graduation rule: a partial cannot declare a relation into a table it does not own, so the schema stays the host's and reaches this package through the ./server ports"
+  },
+  "@12-apps/billing :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/billing :: email": {
+    "kind": "exempt",
+    "why": "dunning mail is host copy and host recipient policy end to end; this package exposes the failed-charge events and the host owns the words, the channel and the timing"
+  },
+  "@12-apps/billing :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/billing :: jobs": {
+    "kind": "exempt",
+    "why": "the collection tick and the charge attempt stay host jobs on purpose: their handlers reach the host's notification copy and its cycle repository — the blueprints arrive the day those seams invert, and this entry goes stale with them"
+  },
+  "@12-apps/billing :: mcp": {
+    "kind": "exempt",
+    "why": "this surface writes a payment instrument; that stays in a browser, behind a human, by the same policy that keeps the estate's other money writes off the agent surface"
+  },
+  "@12-apps/billing :: notifications": {
+    "kind": "exempt",
+    "why": "the one notice this domain sends — we could not charge your card — is entirely host copy and host recipient policy; a blueprint here would be a sentence with no words in it"
+  },
+  "@12-apps/billing :: permissions": {
+    "kind": "exempt",
+    "why": "who may put a card on file is a role decision — an owner, not merely an administrator, because a subscription card is a standing financial commitment — and not an id this package could name for every host; the host guards the mount"
+  },
+  "@12-apps/billing :: surface": {
+    "kind": "exempt",
+    "why": "no packaged screens: the card-on-file UI is host code and the payment flows are @12-apps/payments-frontend's — this package is deliberately the API half only"
+  },
+  "@12-apps/discounts :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/discounts :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/discounts :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/discounts :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/discounts :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/entitlements :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/entitlements :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/entitlements :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/entitlements :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/entitlements :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/entitlements :: notifications": {
+    "kind": "exempt",
+    "why": "plan.changed ships as createPlanChangedBlueprint(copy) — declared as a factory over host copy, not emitted here, because moving a tenant onto a tier is the platform writer's job"
+  },
+  "@12-apps/entitlements :: permissions": {
+    "kind": "exempt",
+    "why": "the plan route is deliberately UNGATED — hiding the upgrade path behind a permission would hide it from exactly the people who cannot reach what they want; who may request a change is answered by canRequestPlanChange, not by an id"
+  },
+  "@12-apps/entity-lifecycle :: e2e": {
+    "kind": "exempt",
+    "why": "ships Storybook stories, not packaged journeys; declaring an e2e entry it does not export would fail the exports tripwire in its own test run — which is the point of the tripwire"
+  },
+  "@12-apps/entity-lifecycle :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/entity-lifecycle :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/entity-lifecycle :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/entity-lifecycle :: mcp": {
+    "kind": "exempt",
+    "why": "the tools are VOCABULARY-DEPENDENT: lifecycleMcpEndpoints(vocabulary) needs the host's nouns, collection paths and summaries, so the host calls the factory and the results join through the adoption's mcpEndpoints extension — the carve-out WireMcpTool's own docs name"
+  },
+  "@12-apps/entity-lifecycle :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/entity-lifecycle :: permissions": {
+    "kind": "exempt",
+    "why": "every permission id this package touches is HOST vocabulary handed in at registration time (routePermission, approvePermission) — there is no package-owned id a manifest could declare without inventing one"
+  },
+  "@12-apps/eslint-config": {
+    "kind": "exempt",
+    "why": "lint preset — dev-time tooling every workspace consumes; no routes, screens, models or ports to wire, so a manifest here would be noise the contract warns against"
+  },
+  "@12-apps/feature-flags :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/feature-flags :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/feature-flags :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/feature-flags :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/feature-flags :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/feature-flags :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/forms-core": {
+    "kind": "exempt",
+    "why": "a form-state library hosts embed inside their own screens; it mounts nothing and owns nothing host-wired — the contract must stay something only packages with host-wired capabilities carry"
+  },
+  "@12-apps/i18n": {
+    "kind": "exempt",
+    "why": "the locale axis for copy that is already the host's: the canonical locale list and helpers, consumed as a plain library by packages and harnesses alike — nothing to bind, decline or mount"
+  },
+  "@12-apps/impersonation :: db": {
+    "kind": "exempt",
+    "why": "the session lives in a signed COOKIE, not a table — the design decision that makes an impersonation end when the browser says so rather than when a row is cleaned up"
+  },
+  "@12-apps/impersonation :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/impersonation :: env": {
+    "kind": "exempt",
+    "why": "every deployment-shaped choice — the cookie name, `secure`, the time box — is an argument to the factory, so there is no env surface to declare"
+  },
+  "@12-apps/impersonation :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/impersonation :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/impersonation :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/impersonation :: permissions": {
+    "kind": "exempt",
+    "why": "the permission id this surface gates on is the HOST's — the config names it, because which permission admits an operator to a preview is a decision about that host's role matrix"
+  },
+  "@12-apps/jobs :: areas": {
+    "kind": "exempt",
+    "why": "no routed screens to suggest: nothing in a worker runtime is user-navigable"
+  },
+  "@12-apps/jobs :: e2e": {
+    "kind": "exempt",
+    "why": "no packaged journeys: the sweeps are exercised by each producing package's suites and the harness's own coverage"
+  },
+  "@12-apps/jobs :: email": {
+    "kind": "exempt",
+    "why": "sends nothing: mail is a job HANDLER's business, and handlers arrive from the packages that declare them"
+  },
+  "@12-apps/jobs :: http": {
+    "kind": "exempt",
+    "why": "the runtime a server host feeds the aggregate TO — it consumes BoundJobs and answers no routes; its manifest exists for the db and env mirrors alone"
+  },
+  "@12-apps/jobs :: jobs": {
+    "kind": "exempt",
+    "why": "not a producer of blueprints but the runtime that RUNS them — the BoundJob/JobDefinition compat pair is pinned from wiring's own suite, along the dependency edge that exists"
+  },
+  "@12-apps/jobs :: mcp": {
+    "kind": "exempt",
+    "why": "no agent surface: exposing a queue to an agent is a host decision about the host's own operational tooling"
+  },
+  "@12-apps/jobs :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts: a failed job surfaces through the logger and the host's own observability, not through the user-facing inbox"
+  },
+  "@12-apps/jobs :: observability": {
+    "kind": "exempt",
+    "why": "a data-only manifest (db and env mirrors, no runtime capability), so the namespace rule does not attach — the sweeps it runs log through each host's own logger"
+  },
+  "@12-apps/jobs :: permissions": {
+    "kind": "exempt",
+    "why": "no user-facing surface to gate — the worker runs behind the deployment boundary, not behind a role"
+  },
+  "@12-apps/jobs :: surface": {
+    "kind": "exempt",
+    "why": "a worker runtime has no screens; the closest thing — queue introspection — is host tooling over the host's own Redis"
+  },
+  "@12-apps/mcp :: areas": {
+    "kind": "exempt",
+    "why": "no routed screens to suggest: the connect components embed in host settings pages whose routes the host owns"
+  },
+  "@12-apps/mcp :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/mcp :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/mcp :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/mcp :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/mcp :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/mcp :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/mcp :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/mcp :: surface": {
+    "kind": "exempt",
+    "why": "./react ships AI-connect components a host renders where its settings live — no createWeb* factory exists, so there is nothing a web binder could build once and memoise"
+  },
+  "@12-apps/notifications :: areas": {
+    "kind": "exempt",
+    "why": "suggests no routes: it ships no routed screens, so an area row would point at nothing"
+  },
+  "@12-apps/notifications :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/notifications :: email": {
+    "kind": "exempt",
+    "why": "the transports are host-supplied config (config.transports, config.drivers) — declaring an email capability would oblige every adopter to bind a mailer this package never owns"
+  },
+  "@12-apps/notifications :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/notifications :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/notifications :: notifications": {
+    "kind": "exempt",
+    "why": "the MECHANISM, not an author: the inbox, the preference matrix, the transports and the retry sweep — blueprints belong to whichever package raises the alert and arrive through the generators seam at mount"
+  },
+  "@12-apps/notifications :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/observability-backend": {
+    "kind": "exempt",
+    "why": "not a producer but a PORT: the LoggerPort implementation hosts pass INTO adoptions; its Sentry env surface is documented where the port is, and wiring it through a manifest would invert who holds whom"
+  },
+  "@12-apps/observability-frontend": {
+    "kind": "exempt",
+    "why": "the browser half of the logging pair — hosts wire it into their bundles by hand next to their DSN plumbing; nothing here is host-mounted through the contract"
+  },
+  "@12-apps/onboarding :: areas": {
+    "kind": "exempt",
+    "why": "a guided flow is a section inside the host screen that owns the feature — there is no route of its own to suggest, which its web manifest says in as many words"
+  },
+  "@12-apps/onboarding :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/onboarding :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/onboarding :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/onboarding :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/onboarding :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/onboarding :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/onboarding :: permissions": {
+    "kind": "exempt",
+    "why": "the tenant-admin gate this surface sits behind is the HOST's — its id arrives as config, because who counts as an admin is that host's role matrix"
+  },
+  "@12-apps/payments-backend :: areas": {
+    "kind": "exempt",
+    "why": "route suggestions belong to the frontend package's web manifest, beside the screens they point at"
+  },
+  "@12-apps/payments-backend :: e2e": {
+    "kind": "exempt",
+    "why": "the journeys are @12-apps/payments-e2e's own two manifests — a manifest must not declare an entry another package exports, so the pointer lives where the worlds live"
+  },
+  "@12-apps/payments-backend :: env": {
+    "kind": "exempt",
+    "why": "credentials are HOST-held: names like PAGBANK_TOKEN appear in operator-guidance strings, never as reads — configuration reaches the providers as arguments, which is what the portability ruleset exists to keep true"
+  },
+  "@12-apps/payments-backend :: mcp": {
+    "kind": "exempt",
+    "why": "wire schemas stay exported from ./server; money writes stay off the default agent surface, and hosts author read-tools in their own vocabulary where they want them"
+  },
+  "@12-apps/payments-backend :: notifications": {
+    "kind": "exempt",
+    "why": "the payment notices (order-paid, over/short-payment, reversal, reconnect) are host generators today; their blueprint factories over host copy are the notify-port wave's work, and this entry goes stale as they land"
+  },
+  "@12-apps/payments-backend :: permissions": {
+    "kind": "exempt",
+    "why": "who may reach the merchant surface is the host's role matrix, named at the mount — the package's guards take a resolved actor, never a package-owned id"
+  },
+  "@12-apps/payments-backend :: surface": {
+    "kind": "exempt",
+    "why": "the browser half is @12-apps/payments-frontend's web manifest — the split every host relies on so a server never drags React"
+  },
+  "@12-apps/payments-e2e :: areas": {
+    "kind": "exempt",
+    "why": "suggests no routes: it ships no routed screens, so an area row would point at nothing"
+  },
+  "@12-apps/payments-e2e :: db": {
+    "kind": "exempt",
+    "why": "owns no tables: the worlds seed through the harness under test, never through a partial of their own"
+  },
+  "@12-apps/payments-e2e :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/payments-e2e :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/payments-e2e :: http": {
+    "kind": "exempt",
+    "why": "a journeys package: nothing here mounts — its whole surface is the two worlds and their globs, declared so adoption stops being convention"
+  },
+  "@12-apps/payments-e2e :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/payments-e2e :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/payments-e2e :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/payments-e2e :: observability": {
+    "kind": "exempt",
+    "why": "declares only the e2e worlds — no runtime capability for the namespace rule to attach to; journey failures surface in the runner's own report"
+  },
+  "@12-apps/payments-e2e :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/payments-e2e :: surface": {
+    "kind": "exempt",
+    "why": "ships no screens of its own — it drives the frontend package's screens from outside, which is its entire reason to exist"
+  },
+  "@12-apps/payments-frontend :: db": {
+    "kind": "exempt",
+    "why": "a browser bundle owns no tables; the payment models are the backend package's declared partial"
+  },
+  "@12-apps/payments-frontend :: e2e": {
+    "kind": "exempt",
+    "why": "the checkout journeys live in @12-apps/payments-e2e's manifests, which exercise this package's screens from outside it"
+  },
+  "@12-apps/payments-frontend :: email": {
+    "kind": "exempt",
+    "why": "no mail from a browser bundle — the receipt mailer is the backend package's declared email capability"
+  },
+  "@12-apps/payments-frontend :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/payments-frontend :: http": {
+    "kind": "exempt",
+    "why": "no server runtime: the API half is @12-apps/payments-backend, and this package's clients call whatever mount the host binds there"
+  },
+  "@12-apps/payments-frontend :: jobs": {
+    "kind": "exempt",
+    "why": "a browser bundle schedules nothing — the sweeps live in the backend package's blueprints"
+  },
+  "@12-apps/payments-frontend :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/payments-frontend :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/payments-frontend :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/prisma": {
+    "kind": "exempt",
+    "why": "the CONSUMER side of the db capability: the schema host and assembler that reads every other package's declaration — it adopts partials into the schema folder, it does not declare one"
+  },
+  "@12-apps/product-research :: areas": {
+    "kind": "exempt",
+    "why": "route suggestions ride the UI package's web manifest, next to the screens they point at"
+  },
+  "@12-apps/product-research :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/product-research :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/product-research :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/product-research :: notifications": {
+    "kind": "exempt",
+    "why": "the budget alert's words are host copy: createResearchBudgetBlueprint(copy) with the ./pt-BR pack beside it — the host feeds its own notifications mount, one line in its diff, which is the estate's sanctioned shape for package alerts"
+  },
+  "@12-apps/product-research :: surface": {
+    "kind": "exempt",
+    "why": "the screens are @12-apps/product-research-ui's web manifest — the pair is split so a server host never drags React and a web host never drags the run pipeline"
+  },
+  "@12-apps/product-research-ui :: db": {
+    "kind": "exempt",
+    "why": "owns no models — no table reaches a host database from here, so there is no partial to declare and nothing for the sync tooling to copy"
+  },
+  "@12-apps/product-research-ui :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/product-research-ui :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/product-research-ui :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/product-research-ui :: http": {
+    "kind": "exempt",
+    "why": "answers no routes of its own — hosts reach it as a library through its exports, not through a mount"
+  },
+  "@12-apps/product-research-ui :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/product-research-ui :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/product-research-ui :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/product-research-ui :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/pwa :: areas": {
+    "kind": "exempt",
+    "why": "no routed screens: the endpoints serve the browser's install machinery, which no nav row points at"
+  },
+  "@12-apps/pwa :: db": {
+    "kind": "exempt",
+    "why": "owns no models — no table reaches a host database from here, so there is no partial to declare and nothing for the sync tooling to copy"
+  },
+  "@12-apps/pwa :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/pwa :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/pwa :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/pwa :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/pwa :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/pwa :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/pwa :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/pwa :: surface": {
+    "kind": "exempt",
+    "why": "the product is two root-mounted endpoints — the web-app manifest and the service worker; there is no React surface, only the constraint (recorded in the manifest) that both mount at the root"
+  },
+  "@12-apps/rbac :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/rbac :: email": {
+    "kind": "exempt",
+    "why": "an accountless invitee needs mail addressed to an e-mail, which is the host's signup flow and a different port — the invite notification reaches account holders through RbacNotifyPort instead"
+  },
+  "@12-apps/rbac :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/rbac :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/rbac :: mcp": {
+    "kind": "exempt",
+    "why": "the coverage CLI is tooling, not a tool surface; agent exposure of roles and teams is host vocabulary, authored per host over the wire schemas"
+  },
+  "@12-apps/rbac :: notifications": {
+    "kind": "exempt",
+    "why": "team.invited ships as createTeamInvitedBlueprint over HOST copy with the optional RbacNotifyPort beside it — a pre-worded blueprint inside the library would be a silent pt-BR default, the exact failure the carve-out exists to avoid"
+  },
+  "@12-apps/realtime :: areas": {
+    "kind": "exempt",
+    "why": "the web surface is a client provider hosts wrap around their tree, not routed screens — there is no row a nav could point at"
+  },
+  "@12-apps/realtime :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/realtime :: email": {
+    "kind": "exempt",
+    "why": "delivers events, not mail; anything a host wants to say about a missed event is that host's notification policy"
+  },
+  "@12-apps/realtime :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/realtime :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/realtime :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/report-builder :: email": {
+    "kind": "exempt",
+    "why": "FUT-776's 'Envio automático' is still a stub — no mailer exists to declare; the day the send ships, email is declared beside it and this entry fails as stale, by design"
+  },
+  "@12-apps/report-builder :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/report-builder :: jobs": {
+    "kind": "exempt",
+    "why": "no sweeps exist today; the scheduled send FUT-776 plans will arrive as a blueprint beside its mailer, and this entry goes stale the same day"
+  },
+  "@12-apps/report-builder :: notifications": {
+    "kind": "exempt",
+    "why": "publish/share events are future work — when they land they ship as factories over host copy (the product-research carve-out), not as static manifest data"
+  },
+  "@12-apps/request-scope": {
+    "kind": "exempt",
+    "why": "generic ambient request scope a host mounts once as middleware around everything; portable to any web-standard host and carrying no capability a manifest could inventory"
+  },
+  "@12-apps/shared-helpers": {
+    "kind": "exempt",
+    "why": "domain-free utilities (cache, requests, aws, dates) — a deliberately host-wired-free grab bag; the day something here grows a route or a model it graduates into its own package instead"
+  },
+  "@12-apps/shift :: areas": {
+    "kind": "exempt",
+    "why": "suggests no routes: it ships no routed screens, so an area row would point at nothing"
+  },
+  "@12-apps/shift :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/shift :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/shift :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/shift :: mcp": {
+    "kind": "exempt",
+    "why": "the host's four shift tools are host-authored over this package's wire schemas — operation ids and summaries are host vocabulary, per the estate's MCP position"
+  },
+  "@12-apps/shift :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/shift :: permissions": {
+    "kind": "exempt",
+    "why": "which permission gates a close depends on the request BODY's mode, so the guards stay in the host's adapter and the ids it checks stay host vocabulary — a contribution here would freeze a policy the host owns"
+  },
+  "@12-apps/shift :: surface": {
+    "kind": "exempt",
+    "why": "no packaged screens: the shift UI is host code today, composed from the host's own design system over this package's server surface"
+  },
+  "@12-apps/storage :: areas": {
+    "kind": "exempt",
+    "why": "no routed screens to suggest: the React half is embedded components, and the actor-scoped upload routes are server capabilities already declared"
+  },
+  "@12-apps/storage :: db": {
+    "kind": "exempt",
+    "why": "owns no models — no table reaches a host database from here, so there is no partial to declare and nothing for the sync tooling to copy"
+  },
+  "@12-apps/storage :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
+  },
+  "@12-apps/storage :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own: no user-reaching moment originates here, and a mailer would invent one — the silent-default failure the email capability exists to avoid"
+  },
+  "@12-apps/storage :: env": {
+    "kind": "exempt",
+    "why": "no deployment-shaped process.env reads of its own (NODE_ENV stays platform vocabulary, and env-var names inside operator-facing messages are prose, not reads) — configuration reaches this package as arguments"
+  },
+  "@12-apps/storage :: jobs": {
+    "kind": "exempt",
+    "why": "owns no periodic work: nothing here runs on a cadence, so a blueprint would schedule code that does not exist"
+  },
+  "@12-apps/storage :: mcp": {
+    "kind": "exempt",
+    "why": "declares no package-owned tool set: agent exposure of these operations is host vocabulary, authored per host over the wire schemas (the entity-lifecycle carve-out)"
+  },
+  "@12-apps/storage :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
+  },
+  "@12-apps/storage :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no package-owned permission ids — every gate in front of it rides the HOST's catalog, handed in as config (the entity-lifecycle position)"
+  },
+  "@12-apps/storage :: surface": {
+    "kind": "exempt",
+    "why": "the React half is components a host renders inside its own screens, not a mountable surface with its own routes — the one web narrowing in the estate that was always valid"
+  },
+  "@12-apps/typescript-config": {
+    "kind": "exempt",
+    "why": "compiler preset — dev-time tooling only; nothing in this package ever reaches a runtime, let alone a host mount"
+  },
+  "@12-apps/ui": {
+    "kind": "exempt",
+    "why": "the component library: pieces hosts compose into their own screens with their own copy; no mountable surface, no routes, no models — a manifest would invent a plugin where there is a palette"
+  }
+}

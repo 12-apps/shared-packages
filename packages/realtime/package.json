@@ -2,6 +2,7 @@
   "name": "@12-apps/realtime",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Generic, portable realtime EVENT SYSTEM. Framework-free core (typed topic/event envelopes and a publish/subscribe bus behind a swappable driver port: Redis pub/sub across processes, inline in-process for dev and tests), host-mounted backend surface (./server: topic registry, subscribe authorization seam, SSE transport, connection tickets, per-subject connection caps and the transactional outbox), Hono adapter (./hono), a runnable WebSocket gateway (./gateway plus a realtime-gateway bin), the browser half (./react: createWebEvents \u2014 client, reconnect policy with jitter, ws->sse demotion, liveness watch, cross-tab SharedWorker and React hooks), the SharedWorker body (./worker), the publisher-parity gate (./parity) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",

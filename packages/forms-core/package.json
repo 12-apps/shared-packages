@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "description": "Pure, framework-agnostic form primitives — field validators, the Result type, and createServerAction. Zero dependencies, shipped compiled so a Node consumer can import it (Node cannot strip types under node_modules).",
   "exports": {
     ".": {

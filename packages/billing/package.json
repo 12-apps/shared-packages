@@ -2,6 +2,7 @@
   "name": "@12-apps/billing",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Subscription billing: the period arithmetic a renewal anchor survives, the lifecycle a read ages against its own dates, the collection retry policy that never re-presents a card the issuer refused for funds, and the card-on-file surface over a provider vault. Every number, table and sentence with a commercial opinion in it arrives as required config; the package owns the mechanism and none of the policy.",
   "exports": {
     ".": "./src/index.ts",

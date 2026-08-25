@@ -2,6 +2,7 @@
   "name": "@12-apps/pwa",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Making a web app installable, and telling people it is: the beforeinstallprompt state machine + iOS share-sheet detection + overridable pt-BR copy (.), the install invite (./react), the PER-HOST manifest endpoint and the packaged network-first service worker (./server), and a Hono adapter (./hono).",
   "exports": {
     ".": "./src/index.ts",

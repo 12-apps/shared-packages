@@ -134,7 +134,7 @@ export interface ReportBuilderServerConfig {
    * `messages` because they answer different questions: these describe a
    * report, those refuse a request.
    */
-  copy: ReportEngineCopy;
+  copy: ReportCopySource<ReportEngineCopy>;
   /** The semantic model every spec is validated against. The host's. */
   catalog: FieldCatalog;
   /** How rows are read. The host owns the database; this owns the query. */
@@ -232,6 +232,26 @@ export function messagesOf(
   const source = config.messages;
   return typeof source === 'function'
     ? (source as ReportCopyResolver<ReportServerMessages>)({ locale })
+    : source;
+}
+
+/**
+ * The words the ENGINE renders with, for the caller being answered right now.
+ *
+ * `messagesOf`'s sibling, and the distinction between the two is worth keeping
+ * straight: `messages` are this surface's refusals, `copy` is what the engine
+ * prints INSIDE a report — column headings, the bucket a top-N fold produces,
+ * the empty-result line. Both are the host's words and both are needed per
+ * caller; they are separate fields only because a host may well want the API's
+ * refusals and a spreadsheet's headings to come from different packs.
+ */
+export function engineCopyOf(
+  config: ReportBuilderServerConfig,
+  locale?: string,
+): ReportEngineCopy {
+  const source = config.copy;
+  return typeof source === 'function'
+    ? (source as ReportCopyResolver<ReportEngineCopy>)({ locale })
     : source;
 }
 
@@ -356,6 +376,7 @@ export async function runOptions(
   config: ReportBuilderServerConfig,
   actor: ReportActor,
   range: ResolvedReportRange,
+  locale?: string,
 ): Promise<{
   catalog: FieldCatalog;
   adapter: ReportDataSource;
@@ -371,6 +392,6 @@ export async function runOptions(
     adapter,
     timeZone: config.timeZone,
     maxRows: config.maxRows ?? REPORT_RUN_MAX_ROWS,
-    copy: config.copy,
+    copy: engineCopyOf(config, locale),
   };
 }

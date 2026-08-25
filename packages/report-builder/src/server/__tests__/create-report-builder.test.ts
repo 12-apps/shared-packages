@@ -1,5 +1,6 @@
 import { EN_US_REPORT_SERVER_MESSAGES } from '../en-US';
 import { PT_BR_REPORT_SERVER_MESSAGES } from '../pt-BR';
+import { EN_US_REPORT_ENGINE_COPY } from '../../en-US';
 import { PT_BR_REPORT_ENGINE_COPY } from '../../pt-BR';
 import { describe, expect, it } from 'vitest';
 
@@ -147,6 +148,8 @@ function setup(
     systemReports?: SystemReportDef[];
     /** A resolver rather than a pack, for the bilingual cases below. */
     messages?: ReportBuilderServerConfig['messages'];
+    /** The ENGINE's words — `messages`' sibling; see the bilingual block. */
+    copy?: ReportBuilderServerConfig['copy'];
   } = {},
 ): Harness {
   const state = { rows: options.seed ?? [record()], next: 1 };
@@ -188,7 +191,7 @@ function setup(
 
   const { routes } = createApiReportBuilder({
     catalog: CATALOG,
-    copy: PT_BR_REPORT_ENGINE_COPY,
+    copy: options.copy ?? PT_BR_REPORT_ENGINE_COPY,
     messages: options.messages ?? PT_BR_REPORT_SERVER_MESSAGES,
     // A FACTORY, so the window each request resolves is observable: an adapter
     // that never saw the window would silently report on all of history.
@@ -745,3 +748,71 @@ describe('one mount, two languages', () => {
     expect(errorOf(response)).toBe(PT_BR_REPORT_SERVER_MESSAGES.forbiddenCreate);
   });
 });
+
+describe('the ENGINE\'s words follow the reader too', () => {
+  /**
+   * `copy` is `messages`' sibling and the last field on this surface that could
+   * still freeze a language into a mount. The distinction is worth keeping
+   * straight: `messages` are the API's refusals, `copy` is what the engine
+   * prints INSIDE a report — a qualified column heading, the bucket a top-N
+   * fold produces, the line a rowless result carries.
+   *
+   * `runOptions` is the resolution point, and it is reached from three route
+   * files (`routes-run`, `routes-system`, `routes-saved-read`). A locale that
+   * any one of them forgets to pass shows up here as a pt-BR heading.
+   */
+  const bilingualCopy = (): Harness =>
+    setup({
+      copy: ({ locale }: { readonly locale?: string | null }) =>
+        locale === 'en-US' ? EN_US_REPORT_ENGINE_COPY : PT_BR_REPORT_ENGINE_COPY,
+    });
+
+  /** `Receita (contagem)` vs `Receita (count)` — the qualifier is the engine's. */
+  const COUNTED_SPEC = {
+    entity: 'orders',
+    dimensions: [{ field: 'method' }],
+    measures: [{ field: 'totalCents', aggregation: 'count' }],
+    presentation: { kind: 'table' },
+  };
+
+  const headingOf = (response: ReportResponse): string => {
+    const render = data<{ render: { columns: { label: string }[] } }>(response).render;
+    return render.columns[1]?.label ?? '';
+  };
+
+  it('renders a qualified heading in the caller’s language', async () => {
+    const { call } = bilingualCopy();
+    const pt = await call('POST', '/reports/run', { body: { spec: COUNTED_SPEC }, locale: 'pt-BR' });
+    const en = await call('POST', '/reports/run', { body: { spec: COUNTED_SPEC }, locale: 'en-US' });
+
+    expect(headingOf(pt)).toBe('Receita (contagem)');
+    expect(headingOf(en)).toBe('Receita (count)');
+  });
+
+  it('leaves a plain-value host byte-identical', async () => {
+    // Every existing adopter passes a pack. A widened field that quietly
+    // changed their output would be a worse bug than the one it fixes.
+    const { call } = setup();
+    const response = await call('POST', '/reports/run', {
+      body: { spec: COUNTED_SPEC },
+      locale: 'en-US',
+    });
+    expect(headingOf(response)).toBe('Receita (contagem)');
+  });
+
+  it('hands an absent locale to the resolver rather than refusing', async () => {
+    const { call } = bilingualCopy();
+    const response = await call('POST', '/reports/run', { body: { spec: COUNTED_SPEC } });
+    expect(headingOf(response)).toBe('Receita (contagem)');
+  });
+
+  it('keeps the CATALOG\'s own labels out of the locale axis', async () => {
+    // `Forma` is the field's label from the catalog the host declared, not a
+    // word this package owns — it must not move with the reader.
+    const { call } = bilingualCopy();
+    const en = await call('POST', '/reports/run', { body: { spec: COUNTED_SPEC }, locale: 'en-US' });
+    const render = data<{ render: { columns: { label: string }[] } }>(en).render;
+    expect(render.columns[0]?.label).toBe('Forma');
+  });
+});
+

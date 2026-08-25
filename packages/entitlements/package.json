@@ -2,6 +2,7 @@
   "name": "@12-apps/entitlements",
   "version": "1.0.0",
   "type": "module",
+  "sideEffects": false,
   "description": "Generic, portable plan/feature entitlements: layered resolution (code/plan/status/tenant), numeric quotas, per-feature revoke policy and 402-vs-403 denial semantics. Framework-free core plus createApiEntitlements (./server, ./hono adapter) and createWebEntitlements (./react). Knows nothing about money. Zero app coupling.",
   "exports": {
     ".": "./src/index.ts",

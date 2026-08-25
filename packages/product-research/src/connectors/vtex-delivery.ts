@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { ConnectorContext, FetchInit } from './types';
+import { diagnosticsOf } from './types';
 import { vtexFailureMessage } from './vtex-errors';
 
 /**
@@ -89,7 +90,7 @@ export const deliverableSkus = async (
     init,
   );
   if (!outcome.ok) {
-    ctx.logger.info(vtexFailureMessage('simulation', outcome.failure, url, ctx.diagnostics, init !== undefined));
+    ctx.logger.info(vtexFailureMessage('simulation', outcome.failure, url, diagnosticsOf(ctx), init !== undefined));
     return null;
   }
 
