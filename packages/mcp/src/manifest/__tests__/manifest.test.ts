@@ -99,11 +99,28 @@ describe("the mcp manifest", () => {
     expect(declared().web).toBeUndefined();
   });
 
-  it("declares no env, no e2e and no jobs — see the manifest's own narrowings", () => {
+  it("declares no env and no jobs — see the manifest's own narrowings", () => {
     expect(declared().env).toBeUndefined();
-    expect(declared().e2e).toBeUndefined();
     expect(mcpServerManifest).not.toHaveProperty("jobs");
     expect(mcpServerManifest).not.toHaveProperty("email");
+  });
+
+  /**
+   * `e2e` used to be narrowed away here beside `env` and `jobs`, on the
+   * circular ground that "this package packages no journeys" — true only
+   * because none had been written, while `./react` shipped a whole walkthrough
+   * no suite in either repo touched. It is a DECLARATION now, and this asserts
+   * the two halves a host actually consumes: the entry it imports, and the
+   * factory name it calls to install its world.
+   */
+  it("declares e2e, pointing at the entry a host imports and the world it installs", () => {
+    expect(declared().e2e).toEqual({
+      entry: "@12-apps/mcp/e2e",
+      world: { factory: "defineMcpConnectWorld" },
+    });
+    // The declaration is only true if the subpath resolves — an entry naming a
+    // export the package does not carry is the exports tripwire's whole point.
+    expect(packageJson.exports).toHaveProperty(["./e2e"]);
   });
 
   /**

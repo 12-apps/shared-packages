@@ -65,7 +65,17 @@
  *   `loadSigningKeyFromEnv`. `env` declares variables a host must answer for.
  *   Declaring these would oblige every host to answer for names it may
  *   legitimately have spelled differently, or never reads at all.
- * - **No `e2e`.** This package packages no journeys.
+ * - **`e2e` IS declared** (`../e2e`). It was narrowed away with "this package
+ *   packages no journeys", which was true as a statement of fact and circular
+ *   as an argument: it packaged none because nobody had written any, while
+ *   `./react` shipped the entire AI-connect walkthrough — landing, assistant
+ *   picker, endpoint copy, configure, connect, confirm — behind twenty test
+ *   ids that NO suite touched. Not this package's (its two React tests cover
+ *   the status board and the step primitives), and not the origin host's,
+ *   whose `ai.e2e.ts` drives its own plan lock and upsell modal and only
+ *   passes `ai-onboarding` on the way. A flow every adopter's owner has to
+ *   walk was covered in neither repo, which is exactly the omission this
+ *   capability exists to turn into a declaration.
  * - **No `jobs`.** Nothing here sweeps: authorization codes are stateless
  *   signed blobs (the partial's header says so — there is no `oauth_codes`
  *   table and nothing to expire), and refresh-token revocation happens on
@@ -92,4 +102,5 @@ export const mcpManifest = {
    */
   observability: { namespace: "mcp" },
   server: ["http"],
+  e2e: { entry: "@12-apps/mcp/e2e", world: { factory: "defineMcpConnectWorld" } },
 } as const satisfies PackageManifest;
