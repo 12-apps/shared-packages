@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { fetchJsonOutcome } from './fetch-reason';
 import type { ConnectorContext, FetchInit } from './types';
+import { diagnosticsOf } from './types';
 import { vtexFailureMessage } from './vtex-errors';
 
 /**
@@ -56,7 +57,7 @@ export const resolveVtexRegion = async (
   const url = `${root}/api/checkout/pub/regions?country=BRA&postalCode=${cep}`;
   const outcome = await fetchJsonOutcome(ctx, url, init);
   if (!outcome.ok) {
-    ctx.logger.info(vtexFailureMessage('regions', outcome.failure, url, ctx.diagnostics, init !== undefined));
+    ctx.logger.info(vtexFailureMessage('regions', outcome.failure, url, diagnosticsOf(ctx), init !== undefined));
     return { kind: 'unknown' };
   }
   const parsed = regionsSchema.safeParse(outcome.payload);

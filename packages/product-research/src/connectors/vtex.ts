@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ResearchQuery, SourceRecord } from '../types';
 import { fetchJsonOutcome } from './fetch-reason';
 import type { ConnectorContext, ConnectorResult, FetchInit, PriceSourceConnector } from './types';
+import { diagnosticsOf } from './types';
 import { vtexAuthInit } from './vtex-auth';
 import { type DeliverySku, deliverableSkus } from './vtex-delivery';
 import {
@@ -163,7 +164,7 @@ const regionProducts = async (
   const outcome = await fetchJsonOutcome(ctx, url, init);
   if (!outcome.ok) {
     ctx.logger.info(
-      vtexFailureMessage('intelligent-search', outcome.failure, url, ctx.diagnostics, init !== undefined),
+      vtexFailureMessage('intelligent-search', outcome.failure, url, diagnosticsOf(ctx), init !== undefined),
     );
     return null;
   }
@@ -210,7 +211,7 @@ const catalogPayload = async (
   const outcome = await fetchJsonOutcome(ctx, url, init);
   return outcome.ok
     ? { ok: true, payload: outcome.payload }
-    : { ok: false, error: vtexFailureMessage('catalog', outcome.failure, url, ctx.diagnostics, init !== undefined) };
+    : { ok: false, error: vtexFailureMessage('catalog', outcome.failure, url, diagnosticsOf(ctx), init !== undefined) };
 };
 
 /**

@@ -88,7 +88,7 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
         const range = windowOf(config, { query });
         const result = await runReport(
           report.build({ grain }),
-          await runOptions(config, actor, range),
+          await runOptions(config, actor, range, locale),
         );
         return ok({
           key: report.key,

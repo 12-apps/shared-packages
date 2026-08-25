@@ -98,8 +98,9 @@ async function renderSaved(
   range: ResolvedReportRange,
   actor: ReportActor,
   config: ReportBuilderServerConfig,
+  locale: string | undefined,
 ): Promise<unknown> {
-  const options = await runOptions(config, actor, range);
+  const options = await runOptions(config, actor, range, locale);
   const base = {
     id: record.id,
     name: record.name,
@@ -163,7 +164,7 @@ function getRoute(config: ReportBuilderServerConfig, store: SavedReportStore): R
         // appearance.
         if (!mayQueryAll(config, actor, documentEntities(document))) return forbidden(config);
         const range = windowOf(config, { query });
-        return ok(await renderSaved(record, document, range, actor, config));
+        return ok(await renderSaved(record, document, range, actor, config, locale));
       } catch (error) {
         return foldSpecError(error);
       }
