@@ -58,6 +58,16 @@ export interface AuditRequest {
   query: Record<string, string | undefined>;
   header(name: string): string | undefined;
   raw?: unknown;
+  /**
+   * The language to answer this caller in, as a language tag (`pt-BR`,
+   * `en-US`) — the same field `@12-apps/wiring`'s `WireRequest` carries.
+   *
+   * Populated by the host's adapter, which is the only layer that can
+   * negotiate one. Absent is meaningful and not an error: a host with one
+   * audience never sets it, and this surface must then answer with the words
+   * it was configured with rather than invent a language.
+   */
+  locale?: string;
 }
 
 /**
@@ -252,9 +262,29 @@ export interface AuditServerConfig {
   retention?: AuditRetentionConfig;
   directory?: AuditDirectory;
   gatePermissions?: Partial<AuditGatePermissions>;
-  messages?: Partial<AuditMessages>;
+  /**
+   * The refusals this surface puts on the wire — a partial override of the
+   * packaged defaults, or a RESOLVER that picks one per reader.
+   *
+   * Read it through `messagesOf(config, locale)` at the moment a sentence is
+   * needed. An audit log is opened by whichever operator is looking, so the
+   * language is the REQUEST's rather than the deployment's.
+   */
+  messages?: AuditCopySource<Partial<AuditMessages>>;
   pagination?: AuditPaginationConfig;
 }
+
+/**
+ * What a copy field takes once its words can follow a reader.
+ *
+ * Declared here rather than imported from `@12-apps/i18n`: this package must
+ * stay liftable into a repo that has never heard of it, so the two agree
+ * STRUCTURALLY and nothing forces the dependency. The context is deliberately
+ * loose — a raw tag off the wire, unnarrowed — because matching it is the host
+ * resolver's job, not this package's.
+ */
+export type AuditCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
+export type AuditCopySource<T> = T | AuditCopyResolver<T>;
 
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class AuditApiError extends Error {
