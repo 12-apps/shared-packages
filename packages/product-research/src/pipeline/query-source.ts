@@ -5,6 +5,7 @@ import type { ResearchConfig, ResearchDeps } from '../ports';
 import { pacedContext } from './rate-limit';
 import { budgetedContext, hitCeiling, sourceCeilingError, sourceDeadlineAt } from './source-budget';
 import type { RawOffer, ResearchQuery, SourceRecord, SourceStat } from '../types';
+import { diagnosticsOf } from '../connectors/types';
 
 /**
  * Everything about asking ONE source: the cache envelope, the paid-budget
@@ -247,7 +248,7 @@ const settleLiveAnswer = async (
     if (truncated === true) {
       return finish('FAILED', [], {
         truncated,
-        error: sourceCeilingError(deps.diagnostics.budget),
+        error: sourceCeilingError(diagnosticsOf(deps).budget),
       });
     }
     await noteSourceDegraded(deps, source, result.error);
