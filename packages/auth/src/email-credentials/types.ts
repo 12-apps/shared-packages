@@ -26,6 +26,14 @@ export interface EmailCredentialUser {
   passwordHash?: string | null;
   /** When this address was proven to belong to its owner, if ever. */
   emailVerifiedAt?: Date | null;
+  /**
+   * The language this person reads, if the host stores one.
+   *
+   * Optional, and read ONLY to address mail to them — see
+   * {@link AuthEmailMessage.locale}. A host that stores no preference passes
+   * nothing and every mail keeps the language its pack already had.
+   */
+  locale?: string | null;
 }
 
 /** A persisted token row, as `findToken` returns it. */
@@ -90,6 +98,22 @@ export interface AuthEmailMessage {
   /** The raw token, for a host whose template shows a code instead of a link. */
   token: string;
   expiresAt: Date;
+  /**
+   * The language to write this message in — the RECIPIENT's, off their row.
+   *
+   * Not the request's. A mail is read by whoever receives it, at a moment that
+   * has nothing to do with the call that triggered the send, and on a
+   * "somebody tried to register as you" or a "your password changed" notice
+   * the caller may well be an attacker: negotiating the message from THEIR
+   * `Accept-Language` would let them choose what language the victim is warned
+   * in. So the flows carry {@link EmailCredentialUser.locale} here and nothing
+   * on the mail path ever reads the ambient request.
+   *
+   * Absent means "nobody said", which is different from asserting a language:
+   * the pack resolver applies the host's default in one place rather than each
+   * send inventing one.
+   */
+  locale?: string | null;
 }
 
 /**
