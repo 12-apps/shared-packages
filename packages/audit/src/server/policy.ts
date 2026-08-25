@@ -22,20 +22,41 @@ import {
   type AuditGatePermissions,
   type AuditMessages,
   type AuditPagingPolicy,
+  type AuditCopyResolver,
   type AuditServerConfig,
 } from './config';
 
 /**
- * The messages in force.
+ * The messages in force, for ONE reader.
  *
  * A blank override is REFUSED rather than merged: `{ forbidden: '' }` produces
  * `{ error: '' }` on the wire, and the packaged viewer prints the server's own
  * message in place of its generic one — so a denial renders as an empty box
  * with a retry button, which reads as a broken screen rather than a refusal.
  * The likely source is a host threading its copy through a lookup that missed.
+ *
+ * **Call it where the sentence is used.** `createApiAudit` builds the route
+ * table once at the host's mount, so a value read there answers every later
+ * request in the language the process started with — and a single-locale host
+ * cannot tell the difference. The routes call it per request and hand the
+ * merged result down; `requirePermission` and the wire parsers keep taking a
+ * plain pack, so one request resolves exactly once and no helper can disagree
+ * with another about the language of the same refusal.
+ *
+ * The mount still calls it ONCE with no locale — see `createApiAudit` — so a
+ * host whose copy is blank fails to boot rather than 500-ing on the one
+ * endpoint that needed the missing sentence.
  */
-export const messagesOf = (config: Pick<AuditServerConfig, 'messages'>): AuditMessages => {
-  const merged = { ...DEFAULT_MESSAGES, ...config.messages };
+export const messagesOf = (
+  config: Pick<AuditServerConfig, 'messages'>,
+  locale?: string,
+): AuditMessages => {
+  const source = config.messages;
+  const overrides =
+    typeof source === 'function'
+      ? (source as AuditCopyResolver<Partial<AuditMessages>>)({ locale })
+      : source;
+  const merged = { ...DEFAULT_MESSAGES, ...overrides };
   for (const [key, value] of Object.entries(merged)) {
     if (typeof value !== 'string' || value.trim() === '') {
       throw new AuditConfigError(`messages.${key}`, 'must be a non-blank string.');

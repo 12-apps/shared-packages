@@ -85,7 +85,21 @@ export function createApiAudit(config: AuditServerConfig): ApiAudit {
   // because a vocabulary that never went through `defineAuditVocabulary` is the
   // one failure that would otherwise be discovered by a hollow row.
   const vocabulary = assertAuditVocabulary(config.vocabulary);
-  const messages = messagesOf(config);
+  /**
+   * Asked once, with NO locale, and the result deliberately discarded.
+   *
+   * `messagesOf` is where a blank sentence is refused, and that refusal has to
+   * land at BOOT: a host whose copy is empty must fail to start rather than
+   * 500 on whichever endpoint first needed the missing string. So the default
+   * rendering is validated here, and the routes resolve per request for the
+   * language.
+   *
+   * What this cannot check is a resolver whose OTHER language is blank. Asking
+   * for every canonical tag would make this package know the locale list —
+   * exactly the dependency the mirrored `AuditCopySource` exists to avoid — so
+   * that stays a parity assertion's job, and belongs to whoever wrote the pack.
+   */
+  messagesOf(config);
   const gates = gatesOf(config);
   const paging = pagingOf(config);
   const trackedModels = modelNamesOf('trackedModels', config.trackedModels);
@@ -107,7 +121,7 @@ export function createApiAudit(config: AuditServerConfig): ApiAudit {
     applyAppendOnlyGuard(client, { models: appendOnlyModels });
 
   return {
-    routes: auditRoutes({ config, vocabulary, store, messages, gates, paging }),
+    routes: auditRoutes({ config, vocabulary, store, gates, paging }),
     write,
     extendPrismaClient: <T,>(client: T): T => appendOnly(auditStamps(client)),
     extensions: { auditStamps, appendOnly },
