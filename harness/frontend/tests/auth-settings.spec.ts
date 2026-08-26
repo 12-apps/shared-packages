@@ -9,10 +9,10 @@ import { HARNESS_BACKEND_ORIGIN } from '../../backend/src/port';
  *
  * `authPlatformWebManifest` suggests one route, `{ path: 'auth-settings',
  * screen: 'page' }`, and the wiring contract's rule is that a screen name is a
- * KEY of the built surface. Its `surface.create` was
- * `createEmailAuthSettingsScreen`, which returns the component DIRECTLY — so
- * `surface['page']` was `undefined`, and a host projecting the area generically
- * would mount nothing and render a blank page with nothing in any log.
+ * KEY of the built surface. Its `surface.create` returned the component
+ * DIRECTLY — so `surface['page']` was `undefined`, and a host projecting the
+ * area generically would mount nothing and render a blank page with nothing in
+ * any log.
  *
  * It survived because this host cast the surface back to a component and never
  * asked the manifest what its own row said, and because no spec ever visited

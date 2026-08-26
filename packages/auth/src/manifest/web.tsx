@@ -63,10 +63,12 @@ export const authWebManifest = {
  * happens before a tenant is known.
  *
  * The surface is a RECORD keyed `page`, matching the area row below, because a
- * screen name is a key of the built surface. It used to be
- * `createEmailAuthSettingsScreen` itself — the component, not a record — so the
- * one route this manifest suggests resolved to `undefined` in any host that
- * projected areas rather than reaching for the factory by hand.
+ * screen name is a key of the built surface. It used to be a factory returning
+ * the component itself, so the one route this manifest suggests resolved to
+ * `undefined` in any host that projected areas rather than reaching for the
+ * factory by hand. `createWebAuthSettings` is now the only way to build this
+ * screen — a second entry point returning the bare component is what let the
+ * two shapes drift apart.
  */
 export const authPlatformWebManifest = {
   name: "@12-apps/auth-platform",

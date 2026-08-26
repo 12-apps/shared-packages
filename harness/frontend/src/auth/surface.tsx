@@ -152,8 +152,8 @@ const { surface: settingsSurface } = webWiringHost.adoptWeb({
  * `authPlatformWebManifest` suggests `{ path: 'auth-settings', screen: 'page' }`,
  * and a screen name is a key of the built surface — so this is the lookup the
  * manifest's own row describes, rather than a cast that happens to agree with
- * it. It read `settingsSurface as ReturnType<typeof createEmailAuthSettingsScreen>`
- * while the surface WAS the component, which is exactly how the mismatch stayed
+ * it. It used to cast the surface back to the component's own type while the
+ * surface WAS the component, which is exactly how the mismatch stayed
  * invisible: the one adopter never asked the manifest what it said.
  */
 export const AuthSettingsScreen = settingsSurface.page;
