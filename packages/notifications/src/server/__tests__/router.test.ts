@@ -588,3 +588,101 @@ describe('the host seams around the router', () => {
     expect(db.rows.notifications[0]?.category).toBe('stock');
   });
 });
+
+/**
+ * THE STORED ROW IS WRITTEN IN THE RECIPIENT'S LANGUAGE.
+ *
+ * A notification's title and body are COLUMNS: the language is chosen once,
+ * when the row is written, and never again — a reader who switches later still
+ * sees what was stored. So the only honest moment to ask is the moment of the
+ * write, and `notify` is per-person, which means the answer was always
+ * available and simply was not being used.
+ *
+ * The failure this closes is quiet in the worst way: a generator is registered
+ * at BOOT, so before this every recipient got whichever language the process
+ * happened to start in, and a host with one audience could never see it.
+ */
+describe('the recipient decides the language', () => {
+  /** One generator, registered once — exactly how a host mounts one. */
+  const BILINGUAL = {
+    type: 'order.paid',
+    category: 'orders',
+    generate: (payload: { code: string }, context?: { readonly locale?: string | null }) =>
+      context?.locale === 'en-US'
+        ? { title: 'Payment confirmed', body: `Order ${payload.code} paid.` }
+        : { title: 'Pagamento confirmado', body: `Pedido ${payload.code} pago.` },
+  };
+
+  function bilingualMount(): ApiNotifications {
+    return mount({
+      generators: [BILINGUAL as never],
+      contacts: memoryContacts({
+        // The same event, two people, two languages.
+        u1: { email: 'buyer@example.com', phone: null, locale: 'pt-BR' },
+        u2: { email: 'other@example.com', phone: null, locale: 'en-US' },
+        // A person the host has no language for — the ordinary state for a
+        // host that stores none yet.
+        u3: { email: 'third@example.com', phone: null },
+      }),
+    });
+  }
+
+  it('words the same event differently for two recipients', async () => {
+    const api = bilingualMount();
+
+    await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1' }, payload: { code: 'A1' } },
+      { sync: true },
+    );
+    await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u2' }, payload: { code: 'A1' } },
+      { sync: true },
+    );
+
+    const titleFor = (userId: string) =>
+      db.rows.notifications.find((row) => row.userId === userId)?.title;
+
+    expect(titleFor('u1')).toBe('Pagamento confirmado');
+    expect(titleFor('u2')).toBe('Payment confirmed');
+  });
+
+  it('falls back when the host states no language for that person', async () => {
+    const api = bilingualMount();
+
+    await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u3' }, payload: { code: 'A2' } },
+      { sync: true },
+    );
+
+    // "Nobody said" — the generator's own default answers, unchanged.
+    expect(db.rows.notifications.find((row) => row.userId === 'u3')?.title).toBe(
+      'Pagamento confirmado',
+    );
+  });
+
+  it('refuses an unknown recipient BEFORE rendering anything', async () => {
+    /*
+      The ordering this change introduced, asserted rather than assumed: the
+      recipient is loaded first, so a notification addressed to nobody throws
+      without the generator ever running. A generator that threw here would
+      report the wrong failure.
+    */
+    // A COUNTER OBJECT, not a closed-over `let`: reassigning a binding from
+    // inside a stub is what `no-global-state-mutation` refuses.
+    const seen = { rendered: 0 };
+    const counting = {
+      type: 'order.paid',
+      category: 'orders',
+      generate: (payload: { code: string }) => {
+        seen.rendered += 1;
+        return { title: 'x', body: payload.code };
+      },
+    };
+    const api = mount({ generators: [counting as never] });
+
+    await expect(
+      api.notify({ type: 'order.paid', recipient: { userId: 'nobody' }, payload: { code: 'A3' } }),
+    ).rejects.toBeInstanceOf(UnknownNotificationRecipientError);
+    expect(seen.rendered).toBe(0);
+  });
+});

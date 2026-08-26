@@ -17,6 +17,8 @@ import {
   type RbacNotifyPort,
   type TeamInvitedPayload,
 } from '../notifications';
+import { EN_US_TEAM_INVITED_COPY } from '../en-US';
+import { TEAM_INVITED_COPY } from '../locales';
 import { PT_BR_TEAM_INVITED_COPY } from '../pt-BR';
 import type { RbacRequest, RbacResponse } from '../context';
 import { enrolMember } from './fake-db';
@@ -205,5 +207,78 @@ describe('the blueprint the host words itself', () => {
       body: 'Welcome aboard.',
       link: '/dashboard',
     });
+  });
+});
+
+/**
+ * THE WORDS FOLLOW THE INVITEE, not the process.
+ *
+ * A blueprint is built once, at the host's mount, and the notice it renders is
+ * stored as TEXT — so before this, whichever language the mount named was the
+ * language every future invitee read, forever, and a single-locale host could
+ * never tell. These cases pin the two halves that close it: the factory takes
+ * a resolver, and `generate` is what calls it.
+ */
+describe('the invite notice in the reader\'s language', () => {
+  const payload: TeamInvitedPayload = {
+    tenantId: TENANT,
+    email: 'novo@example.test',
+    status: 'invited',
+  };
+
+  /** What a bilingual host writes — the shape `localeCopy(PACK)` produces. */
+  const resolver = ({ locale }: { readonly locale?: string | null }) =>
+    locale === 'en-US' ? TEAM_INVITED_COPY['en-US'] : TEAM_INVITED_COPY['pt-BR'];
+
+  it('renders each recipient in their own language from ONE blueprint', () => {
+    // One blueprint, built once — exactly as a host mounts it.
+    const blueprint = createTeamInvitedBlueprint(resolver);
+
+    expect(blueprint.generate(payload, { locale: 'en-US' }).title).toBe(
+      EN_US_TEAM_INVITED_COPY.title(payload),
+    );
+    expect(blueprint.generate(payload, { locale: 'pt-BR' }).title).toBe(
+      PT_BR_TEAM_INVITED_COPY.title(payload),
+    );
+  });
+
+  it('resolves at generate, never at build — the failure this replaces', () => {
+    /*
+      Asked how many times the resolver ran: once per notice, not once per
+      mount. A factory that resolved eagerly would answer 1 here and would pass
+      every assertion above that used a single language.
+    */
+    // A COUNTER OBJECT, not a closed-over `let`: reassigning a binding from
+    // inside a stub is what `no-global-state-mutation` refuses, and the
+    // recorder above this file follows the same rule for the same reason.
+    const seen = { calls: 0 };
+    const counted = (context: { readonly locale?: string | null }) => {
+      seen.calls += 1;
+      return resolver(context);
+    };
+
+    const blueprint = createTeamInvitedBlueprint(counted);
+    expect(seen.calls).toBe(0);
+
+    blueprint.generate(payload, { locale: 'en-US' });
+    blueprint.generate(payload, { locale: 'pt-BR' });
+    expect(seen.calls).toBe(2);
+  });
+
+  it('treats an absent context as "nobody said" rather than an error', () => {
+    // A runtime with no language for this reader — the honest state for a host
+    // that stores none yet — still renders, in whatever the resolver defaults to.
+    const blueprint = createTeamInvitedBlueprint(resolver);
+
+    expect(blueprint.generate(payload).title).toBe(PT_BR_TEAM_INVITED_COPY.title(payload));
+    expect(blueprint.generate(payload, {}).title).toBe(PT_BR_TEAM_INVITED_COPY.title(payload));
+  });
+
+  it('still accepts a plain table, so a single-audience host is unchanged', () => {
+    const blueprint = createTeamInvitedBlueprint(PT_BR_TEAM_INVITED_COPY);
+
+    expect(blueprint.generate(payload, { locale: 'en-US' }).title).toBe(
+      PT_BR_TEAM_INVITED_COPY.title(payload),
+    );
   });
 });

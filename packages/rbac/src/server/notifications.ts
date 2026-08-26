@@ -45,6 +45,8 @@
  * "twins stay twins" rule prescribes.
  */
 
+import { resolveRbacCopy, type RbacCopySource } from '../core/copy';
+
 /** The wire type; the host's taxonomy maps or vetoes the suggested category. */
 export const TEAM_INVITED_NOTIFICATION_TYPE = 'rbac.team.invited';
 
@@ -73,12 +75,22 @@ export interface RbacNotificationContent {
   data?: Readonly<Record<string, unknown>>;
 }
 
+/** Twin of the wiring contract's `WireNotificationContext`. */
+export interface RbacNotificationContext {
+  readonly locale?: string | null;
+}
+
 /** Twin of the wiring contract's `WireNotificationBlueprint`. */
 export interface RbacNotificationBlueprint {
   type: string;
   /** SUGGESTED preference category; the host's taxonomy decides. */
   category: string;
-  generate(payload: TeamInvitedPayload): RbacNotificationContent;
+  /**
+   * Render the notice for ONE recipient. `context` is optional, so a runtime
+   * that passes nothing is saying it has no language for this reader rather
+   * than asserting a default.
+   */
+  generate(payload: TeamInvitedPayload, context?: RbacNotificationContext): RbacNotificationContent;
 }
 
 /** The host's words for the invite notice, and where its CTA lands. */
@@ -93,22 +105,44 @@ export interface TeamInvitedCopy {
  * Build the blueprint with a host's copy. `category` suggests `system` — an
  * account/access notice rather than an order or payment event — and stays the
  * host taxonomy's to map or veto at adoption.
+ *
+ * ## The words may follow the reader, and this is where they must
+ *
+ * `copy` takes a table OR a RESOLVER, and the resolver is called inside
+ * `generate` — at the one moment the recipient is known — never here. A
+ * blueprint is built ONCE, at the host's mount: resolving at this line would
+ * pin every invitee who ever gets this notice to whichever language the
+ * process started in, and a single-locale host could not tell the difference.
+ *
+ * The reader is the INVITEE. The request that creates an invite belongs to the
+ * administrator who sent it, so a host resolving from `Accept-Language` here
+ * would word the notice for the wrong person — which is why the tag arrives on
+ * the context, off the recipient, rather than from anything ambient.
+ *
+ * A host with one audience passes its table and nothing about its adoption
+ * changes.
  */
-export function createTeamInvitedBlueprint(copy: TeamInvitedCopy): RbacNotificationBlueprint {
+export function createTeamInvitedBlueprint(
+  copy: RbacCopySource<TeamInvitedCopy>,
+): RbacNotificationBlueprint {
   return {
     type: TEAM_INVITED_NOTIFICATION_TYPE,
     category: 'system',
-    generate: (payload) => ({
-      title: copy.title(payload),
-      body: copy.body(payload),
-      link: copy.link(payload),
+    generate: (payload, context) => {
+      // Resolved per notice, from the recipient's own tag.
+      const words = resolveRbacCopy(copy, context?.locale);
+      return {
+      title: words.title(payload),
+      body: words.body(payload),
+      link: words.link(payload),
       data: {
         tenantId: payload.tenantId,
         email: payload.email,
         status: payload.status,
         ...(payload.invitedByUserId ? { invitedByUserId: payload.invitedByUserId } : {}),
       },
-    }),
+      };
+    },
   };
 }
 

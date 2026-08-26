@@ -91,12 +91,45 @@ export interface NotificationEvent<TPayload = unknown> {
  * generator never touches existing generators, the router, or any transport
  * (open/closed).
  */
+/**
+ * Who the content is being rendered FOR — the reader, at the moment the
+ * generator is asked.
+ *
+ * A notification is stored as rendered TEXT: title and body are columns, so
+ * the language is chosen once, when the row is written, and never again. That
+ * makes this the only honest place to ask. A generator is registered at BOOT —
+ * a host that resolved its words there would pin every future reader to
+ * whichever language the process happened to start in, invisibly, because a
+ * single-locale host cannot tell the difference.
+ *
+ * The tag is the RECIPIENT's, never the request's. The person who triggers a
+ * notification is routinely not the person who reads it: an invite is sent
+ * because an administrator acted and is read by the invitee. Reading
+ * `Accept-Language` here would be a bug that only ever surfaces as somebody
+ * being told things in a language they do not speak.
+ *
+ * Absent means "nobody said" — a host with one audience, or one that stores no
+ * per-user language, populates nothing and every generator answers with its
+ * own default exactly as it did before this existed.
+ */
+export interface NotificationGenerateContext {
+  readonly locale?: string | null;
+}
+
 export interface NotificationGenerator<TPayload = unknown> {
   /** The event key, dot-namespaced ("order.paid"). One generator per type. */
   type: string;
   /** The preference category the router gates this type's fan-out on. */
   category: NotificationCategory;
-  generate: (payload: TPayload) => NotificationContent;
+  /**
+   * Render this event's content for ONE recipient.
+   *
+   * `context` is OPTIONAL, and that is what keeps every generator written
+   * before it working: a one-parameter `generate` is assignable to this
+   * signature unchanged. A host that passes nothing is stating a fact — it has
+   * no language for this reader — rather than asserting a default.
+   */
+  generate: (payload: TPayload, context?: NotificationGenerateContext) => NotificationContent;
 }
 
 /**
@@ -108,6 +141,11 @@ export interface NotificationGenerator<TPayload = unknown> {
 export interface TransportRecipient {
   userId: string;
   email: string | null;
+  /**
+   * The recipient's own language, when the host's contact directory states
+   * one. Absent means "nobody said" — see {@link NotificationGenerateContext}.
+   */
+  locale?: string | null;
   /** Phone as the host stores it (transports normalize per provider rules). */
   phone: string | null;
   /** How many active browser push subscriptions the user holds. */

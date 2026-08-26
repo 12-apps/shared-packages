@@ -268,7 +268,11 @@ export function createMemoryDb(): MemoryDb {
 
 /** A contact directory over a fixed table (the host's identity seam). */
 export function memoryContacts(
-  people: Record<string, { email: string | null; phone: string | null }>,
-): { getContact: (userId: string) => Promise<{ email: string | null; phone: string | null } | null> } {
+  people: Record<string, { email: string | null; phone: string | null; locale?: string | null }>,
+): {
+  getContact: (
+    userId: string,
+  ) => Promise<{ email: string | null; phone: string | null; locale?: string | null } | null>;
+} {
   return { getContact: (userId) => Promise.resolve(people[userId] ?? null) };
 }

@@ -235,10 +235,26 @@ export function createNotificationRouter(deps: NotificationRouterDeps): Notifica
 
     async notify(event, options = {}) {
       const generator = deps.generators.resolve(event.type);
-      const content = generator.generate(event.payload as never);
 
+      /*
+        The recipient is loaded BEFORE the content is rendered, and the order is
+        the whole of the fix.
+
+        `notify` is already per-person — `event.recipient.userId` is one user,
+        and a permission fan-out resolves its audience and calls this once each
+        — so the reader was knowable here all along. Rendering first simply
+        threw that away: the row was written in whatever language the generator
+        had been bound to at boot, for everyone.
+
+        Loading first also means a notification addressed to nobody now throws
+        before any content is built, which is the cheaper order anyway.
+      */
       const recipient = await loadRecipient(deps, event.recipient.userId);
       if (!recipient) throw new UnknownNotificationRecipientError(event.recipient.userId);
+
+      // Forwarded exactly as the directory stated it, `undefined` included: the
+      // generator owns the fallback, in one place a reader can find.
+      const content = generator.generate(event.payload as never, { locale: recipient.locale });
 
       const channels = await resolveChannels(deps, event, generator.category, recipient);
       const notification = await commit(deps, event, generator.category, content, channels);

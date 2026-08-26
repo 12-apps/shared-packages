@@ -173,6 +173,7 @@ export {
   TEAM_INVITED_NOTIFICATION_TYPE,
   type RbacNotificationBlueprint,
   type RbacNotificationContent,
+  type RbacNotificationContext,
   type RbacNotifyEvent,
   type RbacNotifyOutcome,
   type RbacNotifyPort,
@@ -182,3 +183,4 @@ export {
 } from './notifications';
 export { PT_BR_TEAM_INVITED_COPY } from './pt-BR';
 export { EN_US_TEAM_INVITED_COPY } from './en-US';
+export { TEAM_INVITED_COPY } from './locales';
