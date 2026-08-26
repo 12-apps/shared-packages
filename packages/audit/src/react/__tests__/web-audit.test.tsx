@@ -569,3 +569,74 @@ describe('the page frame', () => {
     await waitFor(() => expect(paths.some((path) => path.includes('page=2'))).toBe(true));
   });
 });
+
+/**
+ * The reader's tag has to reach the labels through the SCREEN, not only through
+ * the embedded viewer.
+ *
+ * `createWebAudit` binds two entry points over one config, and they reach the
+ * label readers by different routes: `Viewer` is handed `locale` where it is
+ * bound, while `page` carries it through `AuditScreen` on the way. The screen's
+ * render of `<AuditViewer/>` omitted it, so every vocabulary label on the whole
+ * page resolved as "nobody said" and answered in the host resolver's default —
+ * correct-looking output, in the one language that proves nothing.
+ *
+ * Both cases below fail on the frozen behaviour and pass on the threaded one,
+ * and they read the two places a label actually surfaces: a row, and a pill's
+ * options. A vocabulary of plain strings is unaffected either way, which is
+ * exactly why no existing case here noticed.
+ */
+describe('the vocabulary follows the reader', () => {
+  /** The same two ids, named per language, the way a host's pack would. */
+  const BILINGUAL = defineAuditVocabulary({
+    actions: {
+      'lamp.extinguish': {
+        label: ({ locale }) => (locale === 'en-US' ? 'Lamp extinguished' : 'Lampião apagado'),
+      },
+      'supply.deliver': {
+        label: ({ locale }) => (locale === 'en-US' ? 'Supply run delivered' : 'Entrega realizada'),
+      },
+    },
+    resources: {
+      lamp: {
+        label: ({ locale }) => (locale === 'en-US' ? 'Lamp' : 'Lampião'),
+        fields: ['state', 'lumens'],
+      },
+      supply: { label: 'Supply run', fields: ['crates'] },
+    },
+  });
+
+  const mountBilingual = (h: Harness, locale?: string) => {
+    const { page: Page } = createWebAudit({
+      apiBase: '/api/admin/beacon-authority',
+      vocabulary: BILINGUAL,
+      transport: h.transport,
+      ...(locale === undefined ? {} : { locale }),
+    });
+    return render(
+      <Host>
+        <Page />
+      </Host>,
+    );
+  };
+
+  it("names a row's action and resource in the reader's language", async () => {
+    mountBilingual(harness(), 'en-US');
+
+    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    const grid = screen.getByTestId('audit-log-grid');
+    expect(grid.textContent).toContain('Lamp extinguished');
+    // The pt-BR name for the same id is absent rather than alongside it: the
+    // resolver picked, it did not merge.
+    expect(grid.textContent).not.toContain('Lampião apagado');
+  });
+
+  it('answers the other reader from the SAME surface', async () => {
+    mountBilingual(harness(), 'pt-BR');
+
+    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    const grid = screen.getByTestId('audit-log-grid');
+    expect(grid.textContent).toContain('Lampião apagado');
+    expect(grid.textContent).not.toContain('Lamp extinguished');
+  });
+});
