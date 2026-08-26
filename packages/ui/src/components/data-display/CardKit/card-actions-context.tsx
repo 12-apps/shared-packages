@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useState, type JSX, type ReactNode } from 'react';
 
-import Snackbar from '@mui/material/Snackbar';
+import Snackbar from '@mui/material/Snackbar/index.js';
 
 import { Alert } from '../Alert';
 

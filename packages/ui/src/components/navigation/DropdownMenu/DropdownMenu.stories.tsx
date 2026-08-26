@@ -15,8 +15,8 @@ import Save from '@mui/icons-material/Save';
 import Settings from '@mui/icons-material/Settings';
 import Share from '@mui/icons-material/Share';
 import Upload from '@mui/icons-material/Upload';
-import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
+import Box from '@mui/material/Box/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Button } from '../../form/Button';

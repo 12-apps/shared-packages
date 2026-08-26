@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { ButtonProps as MuiButtonProps } from '@mui/material/Button';
+import type { ButtonProps as MuiButtonProps } from '@mui/material/Button/index.js';
 import type * as React from 'react';
 
 export interface ButtonProps extends Omit<MuiButtonProps, 'variant' | 'color' | 'size'> {

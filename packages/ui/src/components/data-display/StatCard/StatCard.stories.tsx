@@ -2,7 +2,7 @@ import PaidIcon from '@mui/icons-material/Paid';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import Box from '@mui/material/Box';
+import Box from '@mui/material/Box/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { StatCard } from './StatCard';

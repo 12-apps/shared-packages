@@ -1,6 +1,6 @@
 import type { RichEditorToolbarCopy } from '../../../copy';
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { TextareaAutosizeProps } from '@mui/material/TextareaAutosize';
+import type { TextareaAutosizeProps } from '@mui/material/TextareaAutosize/index.js';
 import type React from 'react';
 
 /**

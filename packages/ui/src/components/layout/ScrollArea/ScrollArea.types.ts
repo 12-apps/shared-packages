@@ -1,4 +1,4 @@
-import type { BoxProps } from '@mui/material/Box';
+import type { BoxProps } from '@mui/material/Box/index.js';
 import type { ReactNode, RefObject } from 'react';
 
 export type ScrollOrientation = 'vertical' | 'horizontal' | 'both';

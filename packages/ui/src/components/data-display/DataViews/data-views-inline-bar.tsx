@@ -15,7 +15,7 @@
  * the panel is a column of stacked fields, this is a row of pills, and the only
  * thing they share is the prop shape they are both driven by.
  */
-import Box from "@mui/material/Box";
+import Box from "@mui/material/Box/index.js";
 import { useState } from "react";
 
 

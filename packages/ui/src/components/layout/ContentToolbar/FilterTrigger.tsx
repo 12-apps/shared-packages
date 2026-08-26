@@ -1,8 +1,8 @@
 'use client';
 
 import FilterIcon from '@mui/icons-material/FilterListRounded';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
 import React from 'react';
 
 import type { FilterTriggerProps } from './ContentToolbar.types';

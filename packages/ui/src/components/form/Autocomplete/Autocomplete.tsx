@@ -1,5 +1,5 @@
-import Box from '@mui/material/Box';
-import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Box from '@mui/material/Box/index.js';
+import ClickAwayListener from '@mui/material/ClickAwayListener/index.js';
 import React from 'react';
 
 import {

@@ -19,7 +19,7 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import StarOutlineRoundedIcon from "@mui/icons-material/StarOutlined";
 import StarOutlineRoundedIcon2 from "@mui/icons-material/StarOutlineRounded";
-import IconButton from "@mui/material/IconButton";
+import IconButton from "@mui/material/IconButton/index.js";
 
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";

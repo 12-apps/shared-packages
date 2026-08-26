@@ -1,11 +1,11 @@
-import Box from '@mui/material/Box';
-import MuiCard from '@mui/material/Card';
-import MuiCardActions from '@mui/material/CardActions';
-import MuiCardContent from '@mui/material/CardContent';
-import MuiCardHeader from '@mui/material/CardHeader';
-import MuiCardMedia from '@mui/material/CardMedia';
-import CircularProgress from '@mui/material/CircularProgress';
-import { useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import MuiCard from '@mui/material/Card/index.js';
+import MuiCardActions from '@mui/material/CardActions/index.js';
+import MuiCardContent from '@mui/material/CardContent/index.js';
+import MuiCardHeader from '@mui/material/CardHeader/index.js';
+import MuiCardMedia from '@mui/material/CardMedia/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { resolveCardProps } from './Card.helpers';

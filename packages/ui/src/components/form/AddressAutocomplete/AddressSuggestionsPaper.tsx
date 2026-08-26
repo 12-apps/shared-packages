@@ -1,6 +1,6 @@
-import type { PaperProps } from '@mui/material/Paper';
-import Paper from '@mui/material/Paper';
-import { alpha, useTheme } from '@mui/material/styles';
+import type { PaperProps } from '@mui/material/Paper/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

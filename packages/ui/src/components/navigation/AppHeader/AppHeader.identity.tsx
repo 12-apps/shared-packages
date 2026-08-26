@@ -1,10 +1,10 @@
 'use client';
 
 import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
-import Box from '@mui/material/Box';
-import Skeleton from '@mui/material/Skeleton';
-import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import Skeleton from '@mui/material/Skeleton/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { accentFor, type SizeValue } from '../../../tokens/scales';

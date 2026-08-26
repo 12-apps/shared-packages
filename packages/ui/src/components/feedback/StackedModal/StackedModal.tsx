@@ -1,7 +1,7 @@
-import Dialog from '@mui/material/Dialog';
-import Slide from '@mui/material/Slide';
-import { styled } from '@mui/material/styles';
-import type { TransitionProps } from '@mui/material/transitions';
+import Dialog from '@mui/material/Dialog/index.js';
+import Slide from '@mui/material/Slide/index.js';
+import { styled } from '@mui/material/styles/index.js';
+import type { TransitionProps } from '@mui/material/transitions/index.js';
 import type { FC } from 'react';
 import React, { forwardRef, useId } from 'react';
 import { usePanelChrome } from './StackedModal.hooks';

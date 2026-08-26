@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { PaginationProps as MuiPaginationProps } from '@mui/material/Pagination';
+import type { PaginationProps as MuiPaginationProps } from '@mui/material/Pagination/index.js';
 import type { ReactNode } from 'react';
 
 export interface PaginationProps extends Omit<MuiPaginationProps, 'variant' | 'size' | 'color'> {

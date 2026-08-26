@@ -1,7 +1,7 @@
 'use client';
 
 import type { CategorySelectCopy } from "../../../copy";
-import Box from '@mui/material/Box';
+import Box from '@mui/material/Box/index.js';
 
 import { removeChip } from './category-tree';
 import { CategoryMultiFoot, CategorySingleFoot } from './CategoryPanelFoot';

@@ -1,13 +1,13 @@
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import Divider from '@mui/material/Divider';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import { useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { sizeStyles } from './Menubar.styles';

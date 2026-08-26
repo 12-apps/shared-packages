@@ -1,9 +1,9 @@
-import FormControl from '@mui/material/FormControl';
-import FormHelperText from '@mui/material/FormHelperText';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import MuiSelect from '@mui/material/Select';
-import { alpha, type CSSObject, keyframes, styled, type Theme } from '@mui/material/styles';
+import FormControl from '@mui/material/FormControl/index.js';
+import FormHelperText from '@mui/material/FormHelperText/index.js';
+import InputLabel from '@mui/material/InputLabel/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import MuiSelect from '@mui/material/Select/index.js';
+import { alpha, type CSSObject, keyframes, styled, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { SelectProps } from './Select.types';

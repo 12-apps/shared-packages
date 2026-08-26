@@ -1,12 +1,12 @@
 import CloseIcon from '@mui/icons-material/Close';
-import Backdrop from '@mui/material/Backdrop';
-import Box from '@mui/material/Box';
-import Divider from '@mui/material/Divider';
-import Fade from '@mui/material/Fade';
-import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
-import type { Theme } from '@mui/material/styles';
+import Backdrop from '@mui/material/Backdrop/index.js';
+import Box from '@mui/material/Box/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

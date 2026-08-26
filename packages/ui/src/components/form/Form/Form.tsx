@@ -1,6 +1,6 @@
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import { styled } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type {

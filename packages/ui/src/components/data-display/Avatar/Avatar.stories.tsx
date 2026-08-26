@@ -2,11 +2,11 @@ import Email from '@mui/icons-material/Email';
 import Notifications from '@mui/icons-material/Notifications';
 import Phone from '@mui/icons-material/Phone';
 import Settings from '@mui/icons-material/Settings';
-import Badge from '@mui/material/Badge';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
+import Badge from '@mui/material/Badge/index.js';
+import Box from '@mui/material/Box/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 

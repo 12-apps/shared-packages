@@ -1,5 +1,5 @@
-import { alpha } from '@mui/material/styles';
-import type { CSSObject, Theme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { SkeletonProps } from './Skeleton.types';
 

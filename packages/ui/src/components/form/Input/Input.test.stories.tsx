@@ -3,7 +3,7 @@ import Lock from '@mui/icons-material/Lock';
 import Person from '@mui/icons-material/Person';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import IconButton from '@mui/material/IconButton';
+import IconButton from '@mui/material/IconButton/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';

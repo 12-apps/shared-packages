@@ -1,4 +1,4 @@
-import { alpha, type Theme } from '@mui/material/styles';
+import { alpha, type Theme } from '@mui/material/styles/index.js';
 import type { CSSProperties } from 'react';
 
 import type { ChartProps, ChartSeries } from './Chart.types';

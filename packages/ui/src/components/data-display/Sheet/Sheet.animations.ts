@@ -1,4 +1,4 @@
-import { keyframes } from '@mui/material/styles';
+import { keyframes } from '@mui/material/styles/index.js';
 
 /** Spring physics used by the draggable variant's snap-point animation. */
 export const SPRING_CONFIG = {

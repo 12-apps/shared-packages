@@ -1,6 +1,6 @@
-import Box from '@mui/material/Box';
-import type { CSSObject, Theme } from '@mui/material/styles';
-import { styled } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React, { forwardRef, useCallback } from 'react';
 
 import type { StepColors } from './WorkflowStep.helpers';

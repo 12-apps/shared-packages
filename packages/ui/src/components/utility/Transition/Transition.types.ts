@@ -1,4 +1,4 @@
-import type { TransitionProps } from '@mui/material/transitions';
+import type { TransitionProps } from '@mui/material/transitions/index.js';
 import type { ReactNode } from 'react';
 
 export type TransitionVariant = 'fade' | 'slide' | 'scale' | 'collapse' | 'grow' | 'zoom';

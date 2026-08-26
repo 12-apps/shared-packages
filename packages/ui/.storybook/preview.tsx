@@ -1,5 +1,5 @@
-import CssBaseline from '@mui/material/CssBaseline';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline/index.js';
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Preview } from '@storybook/react-vite';
 import React from 'react';
 

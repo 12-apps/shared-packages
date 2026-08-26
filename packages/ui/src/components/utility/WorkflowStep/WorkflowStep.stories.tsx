@@ -6,8 +6,8 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PaymentIcon from '@mui/icons-material/Payment';
 import PersonIcon from '@mui/icons-material/Person';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box/index.js';
+import Paper from '@mui/material/Paper/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { WorkflowStep } from './WorkflowStep';

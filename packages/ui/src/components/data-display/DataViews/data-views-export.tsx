@@ -2,8 +2,8 @@
 
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import CircularProgress from "@mui/material/CircularProgress";
-import Popover from "@mui/material/Popover";
+import CircularProgress from "@mui/material/CircularProgress/index.js";
+import Popover from "@mui/material/Popover/index.js";
 import { useState } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";

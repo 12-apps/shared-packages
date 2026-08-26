@@ -1,7 +1,7 @@
 'use client';
 
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import Box from '@mui/material/Box';
+import Box from '@mui/material/Box/index.js';
 import React from 'react';
 
 import { SR_ONLY_SX, STATUS_COLOR } from './SettingsLayout.styles';

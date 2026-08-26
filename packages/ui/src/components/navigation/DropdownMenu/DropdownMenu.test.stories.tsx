@@ -7,7 +7,7 @@ import FileCopy from '@mui/icons-material/FileCopy';
 import Save from '@mui/icons-material/Save';
 import Settings from '@mui/icons-material/Settings';
 import Share from '@mui/icons-material/Share';
-import Box from '@mui/material/Box';
+import Box from '@mui/material/Box/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 

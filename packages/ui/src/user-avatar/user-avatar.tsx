@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from 'react';
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
 import { Avatar } from '../components/data-display/Avatar';
 import { Button } from '../components/form/Button';
 import { Text } from '../components/typography/Text';

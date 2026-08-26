@@ -1,6 +1,6 @@
-import type { Theme } from '@mui/material/styles';
-import Typography from '@mui/material/Typography';
-import { styled } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { ParagraphProps } from './Paragraph.types';

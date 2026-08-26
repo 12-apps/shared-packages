@@ -1,10 +1,10 @@
 import ArrowForwardIos from '@mui/icons-material/ArrowForwardIos';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import NavigateNext from '@mui/icons-material/NavigateNext';
-import Box from '@mui/material/Box';
-import MuiBreadcrumbs from '@mui/material/Breadcrumbs';
-import { useTheme, styled } from '@mui/material/styles';
-import useMediaQuery from '@mui/material/useMediaQuery';
+import Box from '@mui/material/Box/index.js';
+import MuiBreadcrumbs from '@mui/material/Breadcrumbs/index.js';
+import { useTheme, styled } from '@mui/material/styles/index.js';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import React from 'react';
 
 import {

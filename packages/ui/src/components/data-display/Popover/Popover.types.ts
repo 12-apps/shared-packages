@@ -1,4 +1,4 @@
-import type { PopoverProps as MuiPopoverProps } from '@mui/material/Popover';
+import type { PopoverProps as MuiPopoverProps } from '@mui/material/Popover/index.js';
 
 export interface PopoverProps extends Omit<MuiPopoverProps, 'variant'> {
   /**

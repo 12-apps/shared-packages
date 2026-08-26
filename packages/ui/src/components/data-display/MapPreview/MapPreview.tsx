@@ -1,6 +1,6 @@
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import { alpha, styled, useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

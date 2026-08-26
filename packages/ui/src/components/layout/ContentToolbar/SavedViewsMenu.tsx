@@ -4,14 +4,14 @@ import CheckIcon from '@mui/icons-material/Check';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KebabIcon from '@mui/icons-material/MoreVert';
 import ViewIcon from '@mui/icons-material/Visibility';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import Popover from '@mui/material/Popover';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Popover from '@mui/material/Popover/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React, { useState } from 'react';
 
 import type {

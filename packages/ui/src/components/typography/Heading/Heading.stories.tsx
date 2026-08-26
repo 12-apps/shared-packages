@@ -1,7 +1,7 @@
-import Box from '@mui/material/Box';
-import Divider from '@mui/material/Divider';
-import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Stack from '@mui/material/Stack/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 

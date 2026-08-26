@@ -1,7 +1,7 @@
-import type { SxProps, Theme } from '@mui/material/styles';
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
+import type { SxProps, Theme } from '@mui/material/styles/index.js';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import BrokenImageIcon from '@mui/icons-material/BrokenImage';
 import { LazyImage } from './LazyImage';
 import type { Meta, StoryObj } from '@storybook/react-vite';

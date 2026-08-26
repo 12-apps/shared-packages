@@ -1,5 +1,5 @@
-import Box from '@mui/material/Box';
-import Portal from '@mui/material/Portal';
+import Box from '@mui/material/Box/index.js';
+import Portal from '@mui/material/Portal/index.js';
 import React, { createContext, useCallback, useContext, useRef,useState, useMemo } from 'react';
 
 import type { SonnerContextType, SonnerItem,SonnerProps } from './Sonner.types';

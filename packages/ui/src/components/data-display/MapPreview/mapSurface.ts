@@ -1,5 +1,5 @@
-import type { Theme } from '@mui/material/styles';
-import { alpha } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles/index.js';
+import { alpha } from '@mui/material/styles/index.js';
 
 import type { MapType } from './MapPreview.types';
 

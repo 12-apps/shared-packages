@@ -1,10 +1,10 @@
 import Close from '@mui/icons-material/Close';
-import type { Theme } from '@mui/material/styles';
-import Box from '@mui/material/Box';
-import MuiDrawer from '@mui/material/Drawer';
-import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
-import { alpha, useTheme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles/index.js';
+import Box from '@mui/material/Box/index.js';
+import MuiDrawer from '@mui/material/Drawer/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { DrawerContentProps,DrawerHeaderProps, DrawerProps } from './Drawer.types';

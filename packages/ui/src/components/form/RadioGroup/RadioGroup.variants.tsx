@@ -1,13 +1,13 @@
-import Box from '@mui/material/Box';
-import ButtonBase from '@mui/material/ButtonBase';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormLabel from '@mui/material/FormLabel';
-import Radio from '@mui/material/Radio';
-import MuiRadioGroup from '@mui/material/RadioGroup';
-import Typography from '@mui/material/Typography';
-import { styled } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import ButtonBase from '@mui/material/ButtonBase/index.js';
+import Card from '@mui/material/Card/index.js';
+import CardContent from '@mui/material/CardContent/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import FormLabel from '@mui/material/FormLabel/index.js';
+import Radio from '@mui/material/Radio/index.js';
+import MuiRadioGroup from '@mui/material/RadioGroup/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import {

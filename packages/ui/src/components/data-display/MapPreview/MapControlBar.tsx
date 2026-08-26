@@ -3,10 +3,10 @@ import LayersIcon from '@mui/icons-material/Layers';
 import CenterIcon from '@mui/icons-material/MyLocation';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import { alpha, styled } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Tooltip from '@mui/material/Tooltip/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

@@ -1,6 +1,6 @@
-import type { SxProps, Theme } from '@mui/material/styles';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
+import type { SxProps, Theme } from '@mui/material/styles/index.js';
+import Box from '@mui/material/Box/index.js';
+import Paper from '@mui/material/Paper/index.js';
 import React from 'react';
 
 import { resolveCalendarProps } from './Calendar.helpers';

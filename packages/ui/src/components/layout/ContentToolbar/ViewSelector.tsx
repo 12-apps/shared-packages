@@ -4,17 +4,17 @@ import CheckIcon from '@mui/icons-material/Check';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import GridIcon from '@mui/icons-material/GridViewOutlined';
 import ListIcon from '@mui/icons-material/FormatListBulletedRounded';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import Slider from '@mui/material/Slider';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Slider from '@mui/material/Slider/index.js';
 // `SvgIconComponent` is declared inline in @mui/icons-material's barrel and has
 // no module of its own, so the deep-import equivalent is its own definition:
 // `type SvgIconComponent = typeof SvgIcon`.
-import type SvgIcon from '@mui/material/SvgIcon';
+import type SvgIcon from '@mui/material/SvgIcon/index.js';
 import React, { useState } from 'react';
 
 import type { ViewMode, ViewSelectorProps } from './ContentToolbar.types';

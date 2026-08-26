@@ -1,6 +1,6 @@
-import Box from '@mui/material/Box';
-import FormControl from '@mui/material/FormControl';
-import FormLabel from '@mui/material/FormLabel';
+import Box from '@mui/material/Box/index.js';
+import FormControl from '@mui/material/FormControl/index.js';
+import FormLabel from '@mui/material/FormLabel/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 

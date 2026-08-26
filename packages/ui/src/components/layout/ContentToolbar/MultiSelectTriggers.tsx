@@ -2,9 +2,9 @@
 
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React, { useId } from 'react';
 
 import type { MultiSelectOption } from './ContentToolbar.types';

@@ -1,4 +1,4 @@
-import { alpha, type CSSObject, type Theme } from '@mui/material/styles';
+import { alpha, type CSSObject, type Theme } from '@mui/material/styles/index.js';
 
 /**
  * The prototype's METRICS, verbatim.

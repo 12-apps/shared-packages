@@ -1,17 +1,17 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import Box from '@mui/material/Box';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import IconButton from '@mui/material/IconButton';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import Skeleton from '@mui/material/Skeleton';
-import Switch from '@mui/material/Switch';
-import MuiTable from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableRow from '@mui/material/TableRow';
-import { styled } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Skeleton from '@mui/material/Skeleton/index.js';
+import Switch from '@mui/material/Switch/index.js';
+import MuiTable from '@mui/material/Table/index.js';
+import TableBody from '@mui/material/TableBody/index.js';
+import TableCell from '@mui/material/TableCell/index.js';
+import TableContainer from '@mui/material/TableContainer/index.js';
+import TableRow from '@mui/material/TableRow/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type {

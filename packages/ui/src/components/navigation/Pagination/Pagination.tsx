@@ -2,11 +2,11 @@ import FirstPage from '@mui/icons-material/FirstPage';
 import LastPage from '@mui/icons-material/LastPage';
 import NavigateBefore from '@mui/icons-material/NavigateBefore';
 import NavigateNext from '@mui/icons-material/NavigateNext';
-import type { PaginationRenderItemParams } from '@mui/material/Pagination';
-import Box from '@mui/material/Box';
-import MuiPagination from '@mui/material/Pagination';
-import PaginationItem from '@mui/material/PaginationItem';
-import { styled } from '@mui/material/styles';
+import type { PaginationRenderItemParams } from '@mui/material/Pagination/index.js';
+import Box from '@mui/material/Box/index.js';
+import MuiPagination from '@mui/material/Pagination/index.js';
+import PaginationItem from '@mui/material/PaginationItem/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { ResolvedPaginationProps } from './Pagination.helpers';

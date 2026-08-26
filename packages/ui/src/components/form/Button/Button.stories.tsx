@@ -2,7 +2,7 @@ import Add from '@mui/icons-material/Add';
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import Delete from '@mui/icons-material/Delete';
 import Save from '@mui/icons-material/Save';
-import Stack from '@mui/material/Stack';
+import Stack from '@mui/material/Stack/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Button } from './Button';

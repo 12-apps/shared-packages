@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { LinearProgressProps } from '@mui/material/LinearProgress';
+import type { LinearProgressProps } from '@mui/material/LinearProgress/index.js';
 
 export type ProgressVariant = 'linear' | 'circular' | 'segmented' | 'gradient' | 'glass';
 export type ProgressSize = SizeValue;

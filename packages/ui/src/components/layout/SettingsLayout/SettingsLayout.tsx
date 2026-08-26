@@ -1,7 +1,7 @@
 'use client';
 
-import Box from '@mui/material/Box';
-import type { Theme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React, { useMemo, useState } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

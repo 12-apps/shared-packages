@@ -1,5 +1,5 @@
-import type { Theme } from '@mui/material/styles';
-import { alpha } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles/index.js';
+import { alpha } from '@mui/material/styles/index.js';
 
 import { DEFAULT_ZOOM } from './MapPreview.constants';
 import type { MapPreviewProps } from './MapPreview.types';

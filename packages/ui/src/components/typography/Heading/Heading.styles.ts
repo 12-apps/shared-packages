@@ -1,4 +1,4 @@
-import type { CSSObject, Theme } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { HeadingProps } from './Heading.types';
 import type { ColorValue } from '../../../tokens/scales';

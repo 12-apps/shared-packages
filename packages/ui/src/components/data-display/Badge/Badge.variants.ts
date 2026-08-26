@@ -1,5 +1,5 @@
-import type { CSSObject, Theme } from '@mui/material/styles';
-import { alpha } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import { alpha } from '@mui/material/styles/index.js';
 
 import type { BadgePalette, BadgeSizeStyles } from './Badge.styles';
 

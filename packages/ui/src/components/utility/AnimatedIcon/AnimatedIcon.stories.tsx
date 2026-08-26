@@ -17,12 +17,12 @@ import Settings from '@mui/icons-material/Settings';
 import Star from '@mui/icons-material/Star';
 import Upload from '@mui/icons-material/Upload';
 import Waves from '@mui/icons-material/Waves';
-import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
-import Grid from '@mui/material/Grid';
-import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Grid from '@mui/material/Grid/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 

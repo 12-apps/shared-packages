@@ -1,7 +1,7 @@
-import Backdrop from '@mui/material/Backdrop';
-import Box from '@mui/material/Box';
-import MuiModal from '@mui/material/Modal';
-import { useTheme } from '@mui/material/styles';
+import Backdrop from '@mui/material/Backdrop/index.js';
+import Box from '@mui/material/Box/index.js';
+import MuiModal from '@mui/material/Modal/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

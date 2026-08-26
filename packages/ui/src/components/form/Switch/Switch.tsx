@@ -1,4 +1,4 @@
-import Box from '@mui/material/Box';
+import Box from '@mui/material/Box/index.js';
 import React, { forwardRef } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

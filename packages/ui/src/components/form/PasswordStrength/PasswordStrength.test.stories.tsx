@@ -1,5 +1,5 @@
-import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
+import Stack from '@mui/material/Stack/index.js';
+import TextField from '@mui/material/TextField/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import React, { useState } from 'react';

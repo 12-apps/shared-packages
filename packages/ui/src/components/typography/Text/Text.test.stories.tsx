@@ -1,5 +1,5 @@
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';

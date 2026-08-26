@@ -1,7 +1,7 @@
 'use client';
 
-import Box from '@mui/material/Box';
-import { alpha, useTheme, type Theme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useEffect, useRef, type RefObject } from 'react';
 
 import { SettingsStatusMarker } from './SettingsStatusMarker';

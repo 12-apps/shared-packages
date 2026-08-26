@@ -1,7 +1,7 @@
 "use client";
 
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
-import IconButton from "@mui/material/IconButton";
+import IconButton from "@mui/material/IconButton/index.js";
 
 import { Checkbox } from "../../form/Checkbox";
 import { Box } from "../../../mui/Box";

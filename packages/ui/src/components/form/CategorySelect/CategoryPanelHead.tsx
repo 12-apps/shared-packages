@@ -1,8 +1,8 @@
 'use client';
 
 import type { CategorySelectCopy } from '../../../copy';
-import Box from '@mui/material/Box';
-import InputBase from '@mui/material/InputBase';
+import Box from '@mui/material/Box/index.js';
+import InputBase from '@mui/material/InputBase/index.js';
 
 import { SearchGlyph } from './CategoryIcons';
 import {

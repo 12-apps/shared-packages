@@ -1,7 +1,7 @@
-import Box from '@mui/material/Box';
-import List from '@mui/material/List';
-import ListItemButton from '@mui/material/ListItemButton';
-import { alpha, keyframes, styled } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import List from '@mui/material/List/index.js';
+import ListItemButton from '@mui/material/ListItemButton/index.js';
+import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react';
 import React from 'react';
 

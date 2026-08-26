@@ -1,4 +1,4 @@
-import type { CardProps as MuiCardProps } from '@mui/material/Card';
+import type { CardProps as MuiCardProps } from '@mui/material/Card/index.js';
 import type { ReactNode } from 'react';
 
 export type CardVariant = 'elevated' | 'outlined' | 'glass' | 'gradient' | 'neumorphic' | 'section';

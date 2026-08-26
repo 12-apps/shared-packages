@@ -1,5 +1,5 @@
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box/index.js';
+import Paper from '@mui/material/Paper/index.js';
 import React, { useState } from 'react';
 
 import { NavigationMegaSection } from './NavigationMegaSection';

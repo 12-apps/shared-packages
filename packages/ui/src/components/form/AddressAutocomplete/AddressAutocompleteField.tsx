@@ -1,6 +1,6 @@
-import Alert from '@mui/material/Alert';
-import Autocomplete from '@mui/material/Autocomplete';
-import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert/index.js';
+import Autocomplete from '@mui/material/Autocomplete/index.js';
+import Box from '@mui/material/Box/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

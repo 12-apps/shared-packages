@@ -1,4 +1,4 @@
-import type { Theme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles/index.js';
 
 /**
  * THE TWO VOCABULARIES EVERY COMPONENT SPEAKS.

@@ -1,8 +1,8 @@
 import SearchIcon from '@mui/icons-material/Search';
-import Box from '@mui/material/Box';
-import InputAdornment from '@mui/material/InputAdornment';
-import TextField from '@mui/material/TextField';
-import { alpha, styled } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import InputAdornment from '@mui/material/InputAdornment/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

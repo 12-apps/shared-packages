@@ -1,6 +1,6 @@
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState, type JSX } from 'react';
 

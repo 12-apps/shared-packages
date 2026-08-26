@@ -1,6 +1,6 @@
 "use client";
 
-import Divider from "@mui/material/Divider";
+import Divider from "@mui/material/Divider/index.js";
 
 import {
   ContentToolbar,

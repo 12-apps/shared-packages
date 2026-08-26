@@ -1,11 +1,11 @@
-import Divider from '@mui/material/Divider';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import Typography from '@mui/material/Typography';
-import { alpha, styled } from '@mui/material/styles';
-import type { CSSObject, Theme } from '@mui/material/styles';
+import Divider from '@mui/material/Divider/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React, { cloneElement, isValidElement,useState } from 'react';
 
 import type { ContextMenuItem,ContextMenuProps } from './ContextMenu.types';

@@ -1,8 +1,8 @@
 import LocationIcon from '@mui/icons-material/LocationOn';
-import Box from '@mui/material/Box';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
-import { alpha, styled, useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import Tooltip from '@mui/material/Tooltip/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

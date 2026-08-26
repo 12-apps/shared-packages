@@ -9,8 +9,8 @@ import People from '@mui/icons-material/People';
 import Report from '@mui/icons-material/Report';
 import Settings from '@mui/icons-material/Settings';
 import ShoppingCart from '@mui/icons-material/ShoppingCart';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { NavigationMenu } from '../NavigationMenu';

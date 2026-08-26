@@ -1,57 +1,15 @@
-import MuiAvatar from '@mui/material/Avatar';
-import Badge from '@mui/material/Badge';
-import Fade from '@mui/material/Fade';
-import { alpha, keyframes, useTheme, styled } from '@mui/material/styles';
-import type { CSSObject, Theme } from '@mui/material/styles';
+import MuiAvatar from '@mui/material/Avatar/index.js';
+import Badge from '@mui/material/Badge/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import { alpha, useTheme, styled } from '@mui/material/styles/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { pulseAnimation, rotateAnimation, scaleInAnimation, shimmerAnimation } from './Avatar.animations';
 import type { AvatarSize, AvatarStatus } from './Avatar.types';
 
 export type ContentType = 'children' | 'fallback' | 'icon' | 'default';
 
-const pulseAnimation = keyframes`
-  0% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 1;
-  }
-  70% {
-    box-shadow: 0 0 0 10px currentColor;
-    opacity: 0;
-  }
-  100% {
-    box-shadow: 0 0 0 0 currentColor;
-    opacity: 0;
-  }
-`;
-
-const shimmerAnimation = keyframes`
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-`;
-
-const scaleInAnimation = keyframes`
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-`;
-
-const rotateAnimation = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-`;
 
 interface PaletteLike {
   main: string;

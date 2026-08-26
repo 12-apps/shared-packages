@@ -1,5 +1,5 @@
-import Box from '@mui/material/Box';
-import { useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React, { useMemo } from 'react';
 

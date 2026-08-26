@@ -1,7 +1,7 @@
-import Box from '@mui/material/Box';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableRow from '@mui/material/TableRow';
+import Box from '@mui/material/Box/index.js';
+import TableBody from '@mui/material/TableBody/index.js';
+import TableCell from '@mui/material/TableCell/index.js';
+import TableRow from '@mui/material/TableRow/index.js';
 import React from 'react';
 
 

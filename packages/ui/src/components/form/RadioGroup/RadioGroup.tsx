@@ -1,5 +1,5 @@
-import Box from '@mui/material/Box';
-import FormHelperText from '@mui/material/FormHelperText';
+import Box from '@mui/material/Box/index.js';
+import FormHelperText from '@mui/material/FormHelperText/index.js';
 import React, { forwardRef } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

@@ -1,8 +1,8 @@
-import MuiCheckbox from '@mui/material/Checkbox';
-import CircularProgress from '@mui/material/CircularProgress';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormHelperText from '@mui/material/FormHelperText';
-import { alpha, keyframes, styled } from '@mui/material/styles';
+import MuiCheckbox from '@mui/material/Checkbox/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import FormHelperText from '@mui/material/FormHelperText/index.js';
+import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { makeTestId, resolveCheckboxProps } from './Checkbox.helpers';

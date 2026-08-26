@@ -15,9 +15,9 @@
  * A test that asks "did the grid mount" gets the same answer in every state,
  * and `data-loading` / `data-error` / `data-empty` say WHICH state it is.
  */
-import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
-import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type React from 'react';
 
 /** Shared by all three: the same box, the same role, the same id. */

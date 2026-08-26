@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { RadioGroupProps as MuiRadioGroupProps } from '@mui/material/RadioGroup';
+import type { RadioGroupProps as MuiRadioGroupProps } from '@mui/material/RadioGroup/index.js';
 import type React from 'react';
 
 export interface RadioOption {

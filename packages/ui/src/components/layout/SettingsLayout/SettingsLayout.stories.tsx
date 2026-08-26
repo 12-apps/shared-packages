@@ -4,9 +4,9 @@ import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import PaletteOutlined from '@mui/icons-material/PaletteOutlined';
 import PaymentOutlined from '@mui/icons-material/PaymentOutlined';
 import PersonOutlined from '@mui/icons-material/PersonOutlined';
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 

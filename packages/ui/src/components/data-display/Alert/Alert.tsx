@@ -1,10 +1,10 @@
 import Close from '@mui/icons-material/Close';
-import MuiAlert from '@mui/material/Alert';
-import AlertTitle from '@mui/material/AlertTitle';
-import Box from '@mui/material/Box';
-import Collapse from '@mui/material/Collapse';
-import IconButton from '@mui/material/IconButton';
-import { alpha, styled } from '@mui/material/styles';
+import MuiAlert from '@mui/material/Alert/index.js';
+import AlertTitle from '@mui/material/AlertTitle/index.js';
+import Box from '@mui/material/Box/index.js';
+import Collapse from '@mui/material/Collapse/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import {
@@ -14,7 +14,7 @@ import {
   fadeInScale,
   getColorFromTheme,
   getVariantIcon } from './Alert.styles';
-import type { AlertColor } from '@mui/material/Alert';
+import type { AlertColor } from '@mui/material/Alert/index.js';
 import type { AlertProps } from './Alert.types';
 
 // Define animations

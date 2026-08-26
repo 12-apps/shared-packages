@@ -1,4 +1,4 @@
-import type { CheckboxProps as MuiCheckboxProps } from '@mui/material/Checkbox';
+import type { CheckboxProps as MuiCheckboxProps } from '@mui/material/Checkbox/index.js';
 import type { ChangeEvent, FocusEventHandler,MouseEventHandler } from 'react';
 
 export type CheckboxVariant = 'default' | 'rounded' | 'toggle';

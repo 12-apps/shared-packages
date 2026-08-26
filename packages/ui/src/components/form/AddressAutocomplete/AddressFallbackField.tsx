@@ -1,7 +1,7 @@
-import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
-import InputAdornment from '@mui/material/InputAdornment';
+import Alert from '@mui/material/Alert/index.js';
+import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import InputAdornment from '@mui/material/InputAdornment/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 

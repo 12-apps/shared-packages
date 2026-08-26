@@ -1,7 +1,7 @@
-import Box from '@mui/material/Box';
-import MuiSkeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
-import { useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import MuiSkeleton from '@mui/material/Skeleton/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { resolveSkeletonProps } from './Skeleton.helpers';

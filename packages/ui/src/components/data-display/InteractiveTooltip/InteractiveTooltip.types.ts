@@ -1,5 +1,5 @@
 import type { SizeValue } from '../../../tokens/scales';
-import type { TooltipProps as MuiTooltipProps } from '@mui/material/Tooltip';
+import type { TooltipProps as MuiTooltipProps } from '@mui/material/Tooltip/index.js';
 
 export interface InteractiveTooltipProps extends Omit<MuiTooltipProps, 'variant' | 'title'> {
   /**

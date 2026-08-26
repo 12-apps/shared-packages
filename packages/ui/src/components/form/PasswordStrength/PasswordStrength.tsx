@@ -1,13 +1,13 @@
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 
-import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
-import Fade from '@mui/material/Fade';
-import LinearProgress from '@mui/material/LinearProgress';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import { alpha, keyframes, styled, useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import LinearProgress from '@mui/material/LinearProgress/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, keyframes, styled, useTheme } from '@mui/material/styles/index.js';
 import type { FC} from 'react';
 import React, { useMemo } from 'react';
 

@@ -1,5 +1,5 @@
 import type { SizeValue } from '../../../tokens/scales';
-import type { InputLabelProps as MuiInputLabelProps } from '@mui/material/InputLabel';
+import type { InputLabelProps as MuiInputLabelProps } from '@mui/material/InputLabel/index.js';
 import type { InputHTMLAttributes, ReactNode } from 'react';
 import type React from 'react';
 
