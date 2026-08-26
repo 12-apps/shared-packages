@@ -19,6 +19,7 @@
  * a sibling package to find out what permissions exist, and it never ships an
  * application's catalog.
  */
+import type { RbacCopySource } from './copy';
 import type { PermissionKind } from './types';
 
 /**
@@ -118,8 +119,23 @@ export interface PermissionContribution<P extends string> {
   readonly ids: readonly P[];
   /** id → its whole declaration. */
   readonly permissions: Readonly<Record<string, PermissionSpec>>;
-  /** The segment words this source's ids read in. */
-  readonly labels: PermissionLabelVocabulary;
+  /**
+   * The segment words this source's ids read in — a vocabulary, or a RESOLVER
+   * that picks one per reader (`localeCopy(MY_LABELS)`).
+   *
+   * A source's ids and specs are MECHANISM and stay plain: an id is a value the
+   * wire carries and a `kind` decides whether an entity gate runs, so a
+   * vocabulary that could translate either would make authorization itself
+   * language-dependent. Only the words move.
+   *
+   * The resolver is not called here, and it is deliberately not called at
+   * composition either — see {@link RbacCatalog.labels}. It travels intact
+   * through the merge and is asked in the render that shows a label, because a
+   * catalog is composed ONCE per process (a host's `CATALOG` is a module-scope
+   * singleton shared by its server and its screens) and resolving there would
+   * hand every reader the language that module was first imported in.
+   */
+  readonly labels: RbacCopySource<PermissionLabelVocabulary>;
 }
 
 /**
@@ -154,7 +170,8 @@ export function definePermissionContribution<
 >(input: {
   source: string;
   permissions: M;
-  labels?: PermissionLabelVocabulary;
+  /** The segment words, or a resolver over a tag-keyed pack. */
+  labels?: RbacCopySource<PermissionLabelVocabulary>;
 }): PermissionContribution<keyof M & string> {
   return {
     source: input.source,

@@ -1,3 +1,5 @@
+import { resolveAppShellCopy, type AppShellCopySource } from '../core/copy';
+
 /**
  * Every string the shell renders, stated by the HOST.
  *
@@ -36,13 +38,42 @@ export interface AppShellMessages {
 }
 
 /**
- * The messages in force.
+ * How a host says which language these nine sentences are read in.
  *
- * A pass-through rather than a merge: there is nothing left to merge WITH, and
- * that is the point of the change. Kept as a function because both callers read
- * it off a config object and because a later rule (a blank-string refusal, say)
- * belongs in one place.
+ * A HOOK, because what a host has is a hook: `useLocale()` from
+ * `@12-apps/i18n/react`, or its own equivalent over whatever remembers the
+ * choice. It is CONFIG rather than a dependency for the reason the consent
+ * gate's `useSignal` seam is — this package must stay liftable into a repo that
+ * has never heard of `@12-apps/i18n`, and carrying a second locale context is
+ * how two of them come to disagree.
+ *
+ * Absent is legal and is the single-audience case: no seam, no tag, and
+ * {@link messagesOf} answers with the pack the host configured.
  */
-export function messagesOf(messages: AppShellMessages): AppShellMessages {
-  return messages;
+export type AppShellLocaleHook = () => string | null | undefined;
+
+/** The "no locale wired" implementation: nobody said, on every render. */
+export const noLocale: AppShellLocaleHook = () => undefined;
+
+/**
+ * The messages in force, for whoever is reading this render.
+ *
+ * Still not a merge — there is nothing left to merge WITH, which was the point
+ * of removing the default. What it does now is resolve: a host may pass the
+ * nine sentences, or a resolver over a tag-keyed pack
+ * (`localeCopy(MY_SHELL_MESSAGES)`), and the two are the same to every caller
+ * here.
+ *
+ * **Call it inside the render that shows the sentence.** This is the whole of
+ * rule B, and the failure it prevents is invisible in a single-locale host: the
+ * shell is built once at module scope, so a `messagesOf` at factory time pins
+ * the crashed-page fallback and the consent dialog to whatever language the
+ * app was IMPORTED in — which, for a browser that remembers a choice, is
+ * whatever the first tab happened to load. Both call sites are components.
+ */
+export function messagesOf(
+  source: AppShellCopySource<AppShellMessages>,
+  locale?: string | null,
+): AppShellMessages {
+  return resolveAppShellCopy(source, locale);
 }

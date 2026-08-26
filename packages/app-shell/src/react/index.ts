@@ -58,8 +58,17 @@ export {
 
 export {
   messagesOf,
+  noLocale,
+  type AppShellLocaleHook,
   type AppShellMessages,
 } from './messages';
+
+/**
+ * The copy mirror, re-exported so a browser host satisfies
+ * {@link WebAppShellConfig.messages} without importing the framework-free root
+ * for a type. Same declaration either way — see `core/copy.ts`.
+ */
+export type { AppShellCopyResolver, AppShellCopySource } from '../core/copy';
 
 export {
   sidebarPanelBg,

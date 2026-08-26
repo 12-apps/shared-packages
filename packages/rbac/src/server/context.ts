@@ -1,4 +1,5 @@
 import type { RbacCatalog } from '../core/compose';
+import { resolveRbacCopy, type RbacCopySource } from '../core/copy';
 import type { AuthzContext, OwnershipPredicate } from '../core/types';
 
 import type { RbacDbProvider } from './db';
@@ -354,14 +355,13 @@ export function pageResponse(data: unknown[], pagination: PaginationMeta): RbacR
 /**
  * What a copy field takes once its words can follow a reader.
  *
- * Declared here rather than imported from `@12-apps/i18n`: this package must
- * stay liftable into a repo that has never heard of it, so the two agree
- * STRUCTURALLY and nothing forces the dependency. The context is deliberately
- * loose — a raw tag off the wire, unnarrowed — because matching it is the host
- * resolver's job, not this package's.
+ * Re-exported from `../core/copy`, which is where the declaration now lives:
+ * the label vocabulary took the same widening and is read by the SCREENS, so
+ * both halves of this package share one mirror rather than each declaring a
+ * spelling of it. The names and the shape are unchanged, so every adopter's
+ * import path still resolves.
  */
-export type RbacCopyResolver<T> = (context: { readonly locale?: string | null }) => T;
-export type RbacCopySource<T> = T | RbacCopyResolver<T>;
+export type { RbacCopyResolver, RbacCopySource } from '../core/copy';
 
 /**
  * The messages in force — REQUIRED host config; pt-BR ships as `./pt-BR`.
@@ -376,10 +376,7 @@ export function messagesOf(
   config: { messages: RbacCopySource<RbacMessages> },
   locale?: string,
 ): RbacMessages {
-  const source = config.messages;
-  return typeof source === 'function'
-    ? (source as RbacCopyResolver<RbacMessages>)({ locale })
-    : source;
+  return resolveRbacCopy(config.messages, locale);
 }
 
 /** The gate permission ids in force. */

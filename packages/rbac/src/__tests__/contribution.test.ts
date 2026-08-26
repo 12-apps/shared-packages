@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   composePermissions,
+  labelsOf,
   RbacCatalogError,
   type ComposedPermissions,
 } from '../core/compose';
@@ -327,16 +328,20 @@ describe('composePermissions — separation of duties spans sources', () => {
 
 describe('composePermissions — labels travel with the ids they label', () => {
   it('merges each source\'s segment words and its per-id overrides', () => {
+    // Read through `labelsOf`, never off the field: the merged vocabulary is a
+    // RESOLVER now, and a resolver reached where a value was expected fails at
+    // runtime rather than in the compiler.
     const composed = composePermissions(RBAC_PERMISSIONS, LIFECYCLE, DOMAIN);
-    expect(composed.labels.domains).toMatchObject({
+    const labels = labelsOf(composed);
+    expect(labels.domains).toMatchObject({
       posts: 'Publicações',
       money: 'Dinheiro',
     });
-    expect(composed.labels.actions).toMatchObject({
+    expect(labels.actions).toMatchObject({
       write: 'Editar',
       approve: 'Aprovar',
     });
-    expect(composed.labels.permissions).toEqual({ 'posts:read:own': 'Ver os seus' });
+    expect(labels.permissions).toEqual({ 'posts:read:own': 'Ver os seus' });
   });
 
   it('composes no words from this package — its own ride the web copy port', () => {
@@ -346,7 +351,7 @@ describe('composePermissions — labels travel with the ids they label', () => {
     // `RbacWebCopy.permissionLabels`, so the contribution composes to an
     // empty vocabulary — if a word ever shows up here again, it is the same
     // leak and this fails.
-    const { labels } = composePermissions(RBAC_PERMISSIONS);
+    const labels = labelsOf(composePermissions(RBAC_PERMISSIONS));
     expect(labels.domains).toEqual({});
     expect(labels.actions).toEqual({});
     expect(labels.permissions).toEqual({});
@@ -376,7 +381,7 @@ describe('withRoles — binding the host\'s role policy', () => {
     expect(catalog.governance.sodPairs).toEqual([['posts:approve', 'posts:write']]);
     expect(catalog.governance.leafOnlyRoles).toEqual(['EDITOR']);
     expect(catalog.governance.roles).toBe(ROLES);
-    expect(catalog.labels.roles).toEqual({ EDITOR: 'Editor' });
+    expect(labelsOf(catalog).roles).toEqual({ EDITOR: 'Editor' });
   });
 
   it('projects the seed rows, skipping platform-only and locking owners', () => {
