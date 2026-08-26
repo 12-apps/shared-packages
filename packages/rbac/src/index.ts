@@ -56,12 +56,19 @@ export {
 } from './core/contribution';
 export {
   composePermissions,
+  labelsOf,
   RbacCatalogError,
   type ComposedPermissions,
   type RbacCatalog,
   type RbacCatalogErrorCode,
   type RbacRolePolicy,
 } from './core/compose';
+
+/**
+ * The copy mirror the label vocabulary and the server messages share, so a host
+ * can type its own resolver without depending on `@12-apps/i18n` either.
+ */
+export { resolveRbacCopy, type RbacCopyResolver, type RbacCopySource } from './core/copy';
 
 /** THIS package's own contribution — one input to the host's composition. */
 export { RBAC_PERMISSIONS, type RbacPermission } from './permissions';

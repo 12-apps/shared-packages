@@ -2,6 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { labelsOf } from '../../core/compose';
 import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
 
 import { createRbacLabels, groupPermissions, sodCounterpart } from '../labels';
@@ -18,19 +19,19 @@ import { splitRoleSelection } from '../team-screen';
 
 describe('labels', () => {
   it('translates a permission into pt-BR action + scope', () => {
-    const labels = createRbacLabels(DEMO_CATALOG.labels);
+    const labels = createRbacLabels(labelsOf(DEMO_CATALOG));
     expect(labels.permissionActionLabel('titles:read:all')).toBe('Ver (todos)');
     expect(labels.permissionActionLabel('copies:move')).toBe('Movimentar');
   });
 
   it('falls back to the raw segment for an unknown permission', () => {
     expect(
-      createRbacLabels(DEMO_CATALOG.labels).permissionActionLabel('foo:frobnicate'),
+      createRbacLabels(labelsOf(DEMO_CATALOG)).permissionActionLabel('foo:frobnicate'),
     ).toBe('frobnicate');
   });
 
   it('labels roles with custom names passing through', () => {
-    const labels = createRbacLabels(DEMO_CATALOG.labels);
+    const labels = createRbacLabels(labelsOf(DEMO_CATALOG));
     expect(labels.roleLabel('CLERK')).toBe('Atendente de balcão');
     expect(labels.roleLabel('Voluntário')).toBe('Voluntário');
   });
@@ -88,7 +89,7 @@ describe('RoleForm', () => {
       <RoleForm
         permissions={FORM_PERMISSIONS}
         governance={DEMO_CATALOG.governance}
-        labels={createRbacLabels(DEMO_CATALOG.labels)}
+        labels={createRbacLabels(labelsOf(DEMO_CATALOG))}
         copy={PT_BR_RBAC_WEB_COPY.roleForm}
         initial={null}
         busy={false}

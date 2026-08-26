@@ -103,9 +103,14 @@ function asWireRoute(route: AppShellRoute): {
         await route.handle({
           params: request.params,
           query: request.query,
-          locale: request.locale,
           header: (name) => request.request?.headers.get(name) ?? undefined,
           raw: request.request,
+          // Spread rather than assigned, so a consumer that resolved no tag
+          // leaves the key ABSENT rather than present-and-undefined. The two
+          // are the same to a resolver and not to a reader of this object, and
+          // absent is the honest one — `WireRequest.locale` is whatever that
+          // consumer's own adapter negotiated, and it is allowed to be nothing.
+          ...(request.locale === undefined ? {} : { locale: request.locale }),
         }),
       ),
   };

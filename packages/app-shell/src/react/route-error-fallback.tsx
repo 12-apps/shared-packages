@@ -2,7 +2,14 @@ import type { JSX } from 'react';
 
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 
-import type { AppShellMessages } from './messages';
+import type { AppShellCopySource } from '../core/copy';
+
+import {
+  messagesOf,
+  noLocale,
+  type AppShellLocaleHook,
+  type AppShellMessages,
+} from './messages';
 
 /**
  * What a crashed page looks like.
@@ -17,7 +24,7 @@ import type { AppShellMessages } from './messages';
  * failed field), and hiding it behind "algo deu errado" is how a support call
  * starts with nothing to go on.
  */
-export function errorStateFallback({
+function errorStateFallback({
   error,
   reload,
   messages,
@@ -35,4 +42,36 @@ export function errorStateFallback({
       dataTestId="route-error"
     />
   );
+}
+
+/**
+ * The fallback as a COMPONENT, which is what lets its words follow the reader.
+ *
+ * `createRouteErrorBoundary` calls `fallback(...)` from inside a CLASS
+ * component's `render`, so a hook called there would be a hook in a class —
+ * illegal, and illegal in the quiet way: it only runs on the crash path, so a
+ * suite that never crashes a page never finds out. Wrapping the fallback in a
+ * function component gives the locale hook a render of its own, entered exactly
+ * when the fallback is shown.
+ *
+ * That is also why the boundary is handed the copy SOURCE rather than resolved
+ * words. The boundary is built once at module scope — it must be, or React
+ * remounts the tree below it on every parent render — so anything resolved
+ * there is resolved at import.
+ */
+export function ShellRouteErrorFallback({
+  error,
+  reload,
+  messages: source,
+  useLocale,
+}: {
+  error: Error;
+  reload: () => void;
+  messages: AppShellCopySource<AppShellMessages>;
+  useLocale?: AppShellLocaleHook;
+}): JSX.Element {
+  // Hooks may not be called conditionally; the no-op stands in for an absent
+  // seam. See `AppShellLocaleHook`.
+  const locale = (useLocale ?? noLocale)();
+  return errorStateFallback({ error, reload, messages: messagesOf(source, locale) });
 }

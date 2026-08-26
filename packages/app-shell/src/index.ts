@@ -52,3 +52,9 @@ export {
   CONSENT_STATUS_PATH,
   type ConsentStatus,
 } from './core/consent-wire';
+
+export {
+  resolveAppShellCopy,
+  type AppShellCopyResolver,
+  type AppShellCopySource,
+} from './core/copy';

@@ -38,3 +38,46 @@ export const CLUB_MESSAGES: AppShellMessages = {
 export const CLUB_SERVER_MESSAGES: AppShellServerMessages = {
   recordFailed: 'Não foi possível registrar seu aceite. Tente de novo em instantes.',
 };
+
+/**
+ * The SAME club, reading English — the other half of a pack.
+ *
+ * A resolver is only worth having if there are two things to resolve TO, so the
+ * copy-resolver suite needs a second language rather than a second wording.
+ * Same fictional host, so a default sneaking back is still the thing that
+ * breaks these assertions.
+ */
+export const CLUB_MESSAGES_EN: AppShellMessages = {
+  routeErrorTitle: 'This part of the club would not open',
+  routeErrorRetry: 'Try again',
+  consentTitle: 'Our club rules have changed',
+  consentBody:
+    'We have revised the club rules and the members data policy. We need you to accept the latest version before you can sign up for rides.',
+  consentWhyTitle: 'Why you are seeing this now',
+  consentWhyBody:
+    'Your membership is fine. Only your acceptance is on the previous version — and that is what is blocking the next ride sign-up.',
+  consentTermsLink: 'Read the club rules',
+  consentPrivacyLink: 'Read the data policy',
+  consentAccept: 'I have read and accept the rules',
+};
+
+/** Both languages, keyed by tag — what a host hands `localeCopy`. */
+export const CLUB_MESSAGES_PACK = {
+  'pt-BR': CLUB_MESSAGES,
+  'en-US': CLUB_MESSAGES_EN,
+} as const;
+
+/**
+ * What a bilingual host writes, spelled out rather than imported.
+ *
+ * This is `localeCopy` from `@12-apps/i18n`, which the package cannot depend on
+ * — so the suite states the shape the mirror has to accept instead of asserting
+ * against the real thing. An unrecognised tag lands on the default, exactly as
+ * the real one does, because that is the behaviour the accessor is being handed.
+ */
+export function clubLocaleCopy<T>(pack: {
+  readonly 'pt-BR': T;
+  readonly 'en-US': T;
+}): (context: { readonly locale?: string | null }) => T {
+  return ({ locale }) => (locale === 'en-US' ? pack['en-US'] : pack['pt-BR']);
+}

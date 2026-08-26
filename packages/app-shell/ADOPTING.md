@@ -244,6 +244,29 @@ app.route('/api', shell.router);
    have not written yet. Both halves work this way — `AppShellMessages` on
    `createWebAppShell`, `AppShellServerMessages` on the server mount. Do not
    fork a component to retype a string.
+
+   **If your readers do not share a language, pass a resolver instead of a
+   table.** Both fields take `AppShellCopySource<T>` — the words, or
+   `(ctx) => words`, which is what `localeCopy(PACK)` from `@12-apps/i18n`
+   returns. There is still no pack in this package and there will not be: these
+   sentences are wholly yours, so the pt-BR/en-US pair lives beside your copy,
+   not inside somebody else's dependency.
+
+   Two seams carry the tag to the moment a sentence is rendered, and without one
+   of them a resolver is inert — it resolves, forever, to whatever "nobody said"
+   means to it:
+
+   - **Browser:** `useLocale` on `createWebAppShell` — your own hook
+     (`useLocale` from `@12-apps/i18n/react` is one line). It is a hook rather
+     than a tag because the shell is built ONCE at module scope, so a value
+     passed here would be the language the app was imported in.
+   - **Backend:** `AppShellRequest.locale`. The `@12-apps/wiring` mount carries
+     it for free (`WireRequest.locale`); the Hono adapter takes a
+     `resolveLocale(c)` seam, because precedence between `?lang=`, a cookie, a
+     stored preference and `Accept-Language` is your policy, not ours.
+
+   A host with one audience wires neither, passes its table, and nothing about
+   its adoption changes.
 9. **Static imports only.** A dynamic non-literal `import()` of a subpath
    crashes a bundled server.
 10. **Every entry ships COMPILED, and `./vite` is why the rest do too.** Vite

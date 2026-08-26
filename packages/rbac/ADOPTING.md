@@ -111,7 +111,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `db` | yes | — | lazy provider of the structural `RbacDb` seam (closed shapes in `src/server/db.ts`) |
-| `catalog` | yes | — | `composePermissions(...).withRoles(...)` — the registry, the role templates, the governance catalog, the per-tenant seed rows and the merged labels, as ONE object |
+| `catalog` | yes | — | `composePermissions(...).withRoles(...)` — the registry, the role templates, the governance catalog, the per-tenant seed rows and the label resolver, as ONE object |
 | `directory` | yes | — | `getUsers(ids)`; optional `searchUsers(q)` (without it the roster's `q` is ignored) |
 | `resolveActor` (hono) | yes | — | `{ tenantId, userId, isSuper }`; `null` → 401 |
 | `assignableBaseRoles` | no | non-owner `roleTemplates` names | ENFORCED on `PATCH /team/:userId` before governance |
@@ -125,7 +125,8 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | `ownership` | no | none | entity-gate owner map for INSTANCE permissions |
 | `expandAssignments` | no | identity | e.g. the origin host's sector → mesas expansion |
 | `permissionsExtras` | no | `{}` | merged into `GET /permissions` (e.g. an entitlement snapshot) |
-| `messages` | yes | — | every refusal the surface answers with — the host's words (pt-BR hosts pass `PT_BR_RBAC_MESSAGES` from `/server`) |
+| `messages` | yes | — | every refusal the surface answers with — the host's words (pt-BR hosts pass `PT_BR_RBAC_MESSAGES` from `/server`), or `localeCopy(RBAC_MESSAGES)` to answer each caller in their own |
+| `useLocale` (react) | no | none | your locale hook, so the permission and role LABELS follow the reader — see "If your readers do not share a language" |
 
 **Three ROLE-NAME defaults were removed rather than translated**, because each
 one failed OPEN when it was wrong for a host, and silently:
@@ -357,6 +358,42 @@ back to its raw text, so a permission nobody has translated renders
 untranslated rather than disappearing. Ship your vocabulary in your
 contribution's `labels`, and your role names in `.withRoles({ roleLabels })`.
 This package keeps only its own two domains (`Papéis`, `Equipe`).
+
+### If your readers do not share a language
+
+Both of those fields — a contribution's `labels` and the policy's `roleLabels`
+— take a vocabulary **or a resolver**: `localeCopy(MY_LABELS)` from
+`@12-apps/i18n`, or any `(ctx) => vocabulary`. The words are wholly yours, so
+the pt-BR/en-US pair lives beside them; this package ships a pack only for the
+two segments it owns, and those ride `RbacWebCopy.permissionLabels`.
+
+The resolver is **not** called when you compose. It travels through the merge
+and is asked where a label is about to be rendered, because a catalog is
+composed once per PROCESS — your `CATALOG` is a module-scope singleton your API
+routes and your screens both import, so composing IS boot. Read it through the
+accessor, never off the field:
+
+```ts
+import { labelsOf } from '@12-apps/rbac';
+import { createRbacLabels } from '@12-apps/rbac/react';
+
+const labels = createRbacLabels(labelsOf(CATALOG, locale));
+```
+
+`catalog.labels` is a function; reaching it as a value is a runtime
+`TypeError`, not a compile error, which is why the accessor exists.
+
+For the packaged screens, pass `useLocale` to `createWebRbac` — your own hook
+(`useLocale` from `@12-apps/i18n/react` is one line). It is a hook rather than a
+tag because the surface is built once, in a `useMemo` keyed on the tenant: its
+members are component TYPES, so a tag would be the language that was true when
+the tenant was last switched. Omit it and the screens render exactly the words
+your catalog contributed, as before.
+
+The ids and the specs are untouched by any of this, deliberately. An id is a
+value the wire carries and `kind` decides whether the entity gate runs after
+RBAC — a vocabulary that could translate either would make authorization itself
+depend on who is reading.
 
 Nothing about the DB changes: the five owned tables, their migrations and the
 `roles.permissions` string codec are untouched, so 3.0.0 is a code migration

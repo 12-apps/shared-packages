@@ -21,10 +21,14 @@
  * the reporter is passed in — through the host's OWN observability adapter, which
  * is the import that loads those classifiers.
  */
+import { createElement } from 'react';
+
 import { createRouteErrorBoundary } from '@12-apps/observability-frontend/react';
 
-import { messagesOf, type AppShellMessages } from './messages';
-import { errorStateFallback } from './route-error-fallback';
+import type { AppShellCopySource } from '../core/copy';
+
+import type { AppShellLocaleHook, AppShellMessages } from './messages';
+import { ShellRouteErrorFallback } from './route-error-fallback';
 
 /** Where a caught crash is reported. Matches the boundary's own signature. */
 export type RouteCrashReporter = (error: unknown, componentStack?: string | null) => void;
@@ -35,7 +39,10 @@ export interface ShellRouteErrorBoundaryConfig {
    * default here silently reports through a path with no noise rules on it.
    */
   onCrash: RouteCrashReporter;
-  messages: AppShellMessages;
+  /** The crashed-page words, or a resolver over a tag-keyed pack. */
+  messages: AppShellCopySource<AppShellMessages>;
+  /** Which language to read them in. See {@link AppShellLocaleHook}. */
+  useLocale?: AppShellLocaleHook;
 }
 
 /**
@@ -45,12 +52,26 @@ export interface ShellRouteErrorBoundaryConfig {
  * unmount and remount everything below it whenever the layout re-renders.
  */
 export function createShellRouteErrorBoundary(config: ShellRouteErrorBoundaryConfig) {
-  const messages = messagesOf(config.messages);
   return createRouteErrorBoundary({
     // `reload`, not `reset`: the usual cause of a crashed page is a chunk that
     // stopped existing at the last deploy, and re-rendering the same tree cannot
     // fetch a file that is gone.
-    fallback: ({ error, reload }) => errorStateFallback({ error, reload, messages }),
+    //
+    // The SOURCE is forwarded, never resolved here. This factory runs once at
+    // module scope — it has to, or the boundary is a new component type per
+    // render — so a `messagesOf` on this line would pick the language at import
+    // and hold it for the life of the tab. `ShellRouteErrorFallback` is a
+    // component so the choice happens in its own render instead.
+    //
+    // `createElement` rather than JSX so this module stays JSX-free and reads as
+    // the CONFIGURATION it is; the fallback's markup lives beside the markup.
+    fallback: ({ error, reload }) =>
+      createElement(ShellRouteErrorFallback, {
+        error,
+        reload,
+        messages: config.messages,
+        ...(config.useLocale === undefined ? {} : { useLocale: config.useLocale }),
+      }),
     onCrash: config.onCrash,
   });
 }

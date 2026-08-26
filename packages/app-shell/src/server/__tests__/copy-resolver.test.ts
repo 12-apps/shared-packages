@@ -11,10 +11,18 @@
  * absent locale stays absent instead of becoming a language this package chose,
  * that the accessor is the only reader, and that a host passing a plain pack is
  * unchanged.
+ *
+ * They also cover both ADAPTERS, because a tag that never reaches the accessor
+ * makes every property above unobservable: the manifest's wire view carries
+ * `WireRequest.locale` across, and `./hono` takes a `resolveLocale` seam for the
+ * host that has no contract to carry one. The browser half's own cases are in
+ * `react/__tests__/copy-resolver.test.tsx`.
  */
+import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 
-import { CONSENT_ACCEPT_PATH } from '../../core/consent-wire';
+import { CONSENT_ACCEPT_PATH, CONSENT_STATUS_PATH } from '../../core/consent-wire';
+import { appShellRouter } from '../../hono';
 import { createWireApiAppShell } from '../../manifest/server';
 import { messagesOf, type AppShellRequest, type AppShellServerConfig } from '../config';
 import { createApiAppShell } from '../create-api-app-shell';
@@ -128,6 +136,65 @@ describe('a 500 body follows the caller', () => {
     } as Parameters<typeof wired.handle>[0]);
 
     expect(answer).toEqual({ status: 500, body: { error: EN_US.recordFailed } });
+  });
+
+  /**
+   * The other half of rule F at that seam, and the one a passing test would
+   * hide: absent has to stay ABSENT. Present-and-undefined and missing are the
+   * same to a resolver and not to a reader of the request object, and only one
+   * of them is honest about a consumer that negotiated nothing.
+   */
+  it('leaves the field absent when the consumer resolved none', async () => {
+    const seen: AppShellRequest[] = [];
+    const wired = createWireApiAppShell({
+      ...failingHost(PT_BR),
+      consent: {
+        resolveActor: (received) => {
+          seen.push(received);
+          return null;
+        },
+        isCurrent: () => true,
+        record: () => undefined,
+      },
+    }).routes.find((candidate) => candidate.path === CONSENT_STATUS_PATH);
+    if (!wired) throw new Error('no status route');
+
+    await wired.handle({ params: {}, query: {} } as Parameters<typeof wired.handle>[0]);
+
+    expect(seen).toHaveLength(1);
+    expect('locale' in seen[0]!).toBe(false);
+  });
+
+  /**
+   * The OTHER adapter, and the reason it needed a seam of its own.
+   *
+   * A host mounting through `./hono` has no contract carrying a tag, so without
+   * `resolveLocale` the widened field is inert there exactly as it would be
+   * with no wire view. The seam takes the host's ANSWER rather than the rule:
+   * precedence between `?lang=`, a cookie, a stored preference and
+   * `Accept-Language` is host policy, and this estate's own host deliberately
+   * ignores the header — a package that picked an order would pick it for
+   * every adopter.
+   */
+  it('lets a Hono host negotiate one, and needs nothing when it does not', async () => {
+    const config = failingHost(({ locale }) => (locale === 'en-US' ? EN_US : PT_BR));
+
+    const bilingual = new Hono();
+    bilingual.route(
+      '/api',
+      appShellRouter({ ...config, resolveLocale: (c) => c.req.query('lang') }).router,
+    );
+    const english = await bilingual.request(`/api${CONSENT_ACCEPT_PATH}?lang=en-US`, {
+      method: 'POST',
+    });
+    expect(await english.json()).toEqual({ error: EN_US.recordFailed });
+
+    const silent = new Hono();
+    silent.route('/api', appShellRouter(config).router);
+    const unstated = await silent.request(`/api${CONSENT_ACCEPT_PATH}`, { method: 'POST' });
+    // "Nobody said" reaches the resolver, which is what lets the HOST's own
+    // fallback be the only one in play.
+    expect(await unstated.json()).toEqual({ error: PT_BR.recordFailed });
   });
 
   /** A host with one audience passes a pack and nothing about it changes. */
