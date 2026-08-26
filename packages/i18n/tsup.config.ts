@@ -20,6 +20,8 @@ export default defineConfig({
     index: 'src/index.ts',
     'react/index': 'src/react/index.tsx',
     'server/index': 'src/server/index.ts',
+    'manifest/index': 'src/manifest/index.ts',
+    'manifest/server': 'src/manifest/server.ts',
     'testing/index': 'src/testing/index.ts',
   },
   format: ['esm'],

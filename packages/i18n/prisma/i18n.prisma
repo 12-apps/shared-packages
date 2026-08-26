@@ -1,0 +1,49 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/i18n — the host's multi-file schema folder holds a COPY of
+// this file, written by the partials assembler from this package's `wiring.db`
+// declaration. Never edit the copy.
+//
+// COPIED, never symlinked (the entity-lifecycle doctrine): `npm pack` silently
+// drops symlinked entries, `turbo prune` dangles a link whose owner is not a
+// declared dependency, and Prisma silently SKIPS a symlinked migration
+// directory — a green deploy that applied no schema.
+//
+// Self-contained, the same rule `auth.prisma` states: the user reference is a
+// `user_id` String column with NO foreign key into any host table, so this
+// model works in a repo whose user table is called something else, is in
+// another database, or does not exist yet at migrate time.
+//
+// That constraint is why this is a TABLE rather than a `locale` column on the
+// host's `users` — which is exactly where it started, and where the first
+// implementation put it. A package cannot add a column to a table it does not
+// own, and a host should not have to hand-edit its own model to install a
+// language preference. The auth package learned this with the three credential
+// columns; this is the same lesson, not a new one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Which language one person reads, keyed by the host's user id as an OPAQUE
+/// scalar.
+///
+/// A row EXISTS only once somebody has chosen. That absence is the design, not
+/// an omission: "has not chosen" and "reads pt-BR" are different facts, and a
+/// row-per-user with a default would collapse them — which matters because a
+/// reader's own setting outranks the tenant's, so a default written here would
+/// beat a store language nobody had a chance to lose to.
+///
+/// Storing it at all is what lets a notice follow its READER. A browser's
+/// `localStorage` and cookie answer for a screen, where the reader is present;
+/// they answer nothing for a notification stored as rendered text, or a mail
+/// sent by a background job, because neither has that browser in the room.
+model LocalePreference {
+  /// The host's user id. No relation by design: a stale id simply matches no
+  /// row, which is the same answer a deleted user should produce.
+  userId    String   @id @map("user_id")
+  /// A canonical tag from this package's own list, validated on the way in AND
+  /// on the way out — a value written by an older release or a hand-run SQL fix
+  /// must not become the one thing in the system that never passed `matchLocale`.
+  locale    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("locale_preferences")
+}

@@ -657,6 +657,9 @@ importers:
       '@12-apps/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@12-apps/wiring':
+        specifier: workspace:*
+        version: link:../wiring
       '@testing-library/react':
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -1200,6 +1203,9 @@ importers:
       '@12-apps/feature-flags':
         specifier: workspace:*
         version: link:../feature-flags
+      '@12-apps/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@12-apps/jobs':
         specifier: workspace:*
         version: link:../jobs
