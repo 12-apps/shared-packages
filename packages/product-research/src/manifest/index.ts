@@ -49,6 +49,7 @@ export {
   type ResearchBudgetScope,
   type ResearchNotificationBlueprint,
   type ResearchNotificationContent,
+  type ResearchNotificationContext,
 } from '../notifications';
 
 export const productResearchManifest = {

@@ -173,6 +173,7 @@ export {
   TEAM_INVITED_NOTIFICATION_TYPE,
   type RbacNotificationBlueprint,
   type RbacNotificationContent,
+  type RbacNotificationContext,
   type RbacNotifyEvent,
   type RbacNotifyOutcome,
   type RbacNotifyPort,
