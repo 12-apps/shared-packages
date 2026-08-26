@@ -22,6 +22,8 @@
  * line in the host's diff, which is the point.
  */
 
+import { resolveResearchCopy, type ResearchCopySource } from './copy-source';
+
 /** Which limit was hit — the two scopes the spend counters track. */
 export type ResearchBudgetScope = 'TENANT_DAY' | 'GLOBAL_MONTH';
 
@@ -43,12 +45,25 @@ export interface ResearchNotificationContent {
   data?: Readonly<Record<string, unknown>>;
 }
 
+/** Twin of the wiring contract's `WireNotificationContext`. */
+export interface ResearchNotificationContext {
+  readonly locale?: string | null;
+}
+
 /** Twin of the wiring contract's `WireNotificationBlueprint`. */
 export interface ResearchNotificationBlueprint {
   type: string;
   /** SUGGESTED preference category; the host's taxonomy maps or vetoes it. */
   category: string;
-  generate(payload: ResearchBudgetPayload): ResearchNotificationContent;
+  /**
+   * Render the alert for ONE recipient. `context` is optional, so a runtime
+   * that passes nothing is stating that it has no language for this reader
+   * rather than asserting a default.
+   */
+  generate(
+    payload: ResearchBudgetPayload,
+    context?: ResearchNotificationContext,
+  ): ResearchNotificationContent;
 }
 
 export const RESEARCH_BUDGET_NOTIFICATION_TYPE = 'research.budget-exhausted';
@@ -65,23 +80,40 @@ export interface ResearchBudgetCopy {
  * Build the blueprint with a host's copy. `category` suggests "system" — an
  * operational platform notice, not an order/payment/stock event — and stays
  * the host taxonomy's to map or veto at adoption.
+ *
+ * ## The words may follow the reader, and `generate` is where they must
+ *
+ * `copy` takes a table OR a RESOLVER, and the resolver runs inside `generate`,
+ * at the one moment the recipient is known — never on this line. A blueprint
+ * is built ONCE, at the host's mount, so resolving here would answer every
+ * future reader of this alert in whichever language the process started in,
+ * invisibly, because a single-locale host cannot tell the difference. It is
+ * the same rule `resolveResearchCopy` states for the connector context, on the
+ * one surface where the reader is a person rather than a request.
+ *
+ * A host with one audience passes its table and nothing about its adoption
+ * changes.
  */
 export function createResearchBudgetBlueprint(
-  copy: ResearchBudgetCopy,
+  copy: ResearchCopySource<ResearchBudgetCopy>,
 ): ResearchNotificationBlueprint {
   return {
     type: RESEARCH_BUDGET_NOTIFICATION_TYPE,
     category: 'system',
-    generate: (payload) => ({
-      title: copy.title(payload),
-      body: copy.body(payload),
-      link: copy.link(payload),
+    generate: (payload, context) => {
+      // Resolved per alert, from the recipient's own tag.
+      const words = resolveResearchCopy(copy, context?.locale ?? undefined);
+      return {
+      title: words.title(payload),
+      body: words.body(payload),
+      link: words.link(payload),
       data: {
         scope: payload.scope,
         sourceType: payload.sourceType,
         period: payload.period,
         capUnits: payload.capUnits,
       },
-    }),
+      };
+    },
   };
 }

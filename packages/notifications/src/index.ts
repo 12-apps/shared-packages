@@ -28,6 +28,7 @@ export {
   type NotificationChannel,
   type NotificationContent,
   type NotificationEvent,
+  type NotificationGenerateContext,
   type NotificationGenerator,
   type NotificationLogger,
   type NotificationRecipient,

@@ -246,7 +246,18 @@ export type NotificationsDbProvider = () => Promise<NotificationsDb>;
  * Returning `null` for a user id means "no such recipient", which `notify`
  * treats as a caller bug and throws on — a notification addressed to nobody is
  * never silently dropped.
+ *
+ * `locale` is the recipient's own language, and it is here rather than on the
+ * event because it is a fact about the PERSON, not about what happened
+ * The host owns it for the same reason it owns the address: this
+ * package has no user table to read it from. Absent — the field omitted, or
+ * `null` for a host that stores no language yet — means "nobody said", and
+ * every generator answers with its default exactly as before.
  */
 export interface NotificationContactDirectory {
-  getContact(userId: string): Promise<{ email: string | null; phone: string | null } | null>;
+  getContact(userId: string): Promise<{
+    email: string | null;
+    phone: string | null;
+    locale?: string | null;
+  } | null>;
 }

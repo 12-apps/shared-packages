@@ -99,6 +99,10 @@ export async function loadRecipient(
     userId,
     email: contact.email,
     phone: contact.phone,
+    // Carried through UNRESOLVED and only where the host supplied one: the
+    // absent case has to stay distinguishable from a stated language, because
+    // that is what lets a generator apply its own default in one place.
+    ...(contact.locale === undefined ? {} : { locale: contact.locale }),
     pushSubscriptionCount: await deps.pushSubscriptions.count(userId),
   };
 }
