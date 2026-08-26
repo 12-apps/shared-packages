@@ -667,12 +667,14 @@ describe('the recipient decides the language', () => {
       without the generator ever running. A generator that threw here would
       report the wrong failure.
     */
-    let rendered = 0;
+    // A COUNTER OBJECT, not a closed-over `let`: reassigning a binding from
+    // inside a stub is what `no-global-state-mutation` refuses.
+    const seen = { rendered: 0 };
     const counting = {
       type: 'order.paid',
       category: 'orders',
       generate: (payload: { code: string }) => {
-        rendered += 1;
+        seen.rendered += 1;
         return { title: 'x', body: payload.code };
       },
     };
@@ -681,6 +683,6 @@ describe('the recipient decides the language', () => {
     await expect(
       api.notify({ type: 'order.paid', recipient: { userId: 'nobody' }, payload: { code: 'A3' } }),
     ).rejects.toBeInstanceOf(UnknownNotificationRecipientError);
-    expect(rendered).toBe(0);
+    expect(seen.rendered).toBe(0);
   });
 });

@@ -248,18 +248,21 @@ describe('the invite notice in the reader\'s language', () => {
       mount. A factory that resolved eagerly would answer 1 here and would pass
       every assertion above that used a single language.
     */
-    let calls = 0;
+    // A COUNTER OBJECT, not a closed-over `let`: reassigning a binding from
+    // inside a stub is what `no-global-state-mutation` refuses, and the
+    // recorder above this file follows the same rule for the same reason.
+    const seen = { calls: 0 };
     const counted = (context: { readonly locale?: string | null }) => {
-      calls += 1;
+      seen.calls += 1;
       return resolver(context);
     };
 
     const blueprint = createTeamInvitedBlueprint(counted);
-    expect(calls).toBe(0);
+    expect(seen.calls).toBe(0);
 
     blueprint.generate(payload, { locale: 'en-US' });
     blueprint.generate(payload, { locale: 'pt-BR' });
-    expect(calls).toBe(2);
+    expect(seen.calls).toBe(2);
   });
 
   it('treats an absent context as "nobody said" rather than an error', () => {
