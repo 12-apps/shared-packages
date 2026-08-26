@@ -1,4 +1,4 @@
-import { styled } from '@mui/material';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { headingSx } from './Heading.styles';

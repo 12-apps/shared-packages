@@ -1,15 +1,13 @@
-import {
-  Avatar,
-  Box,
-  Card,
-  CardContent,
-  CircularProgress,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Paper,
-  Typography,
-} from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import Box from '@mui/material/Box/index.js';
+import Card from '@mui/material/Card/index.js';
+import CardContent from '@mui/material/CardContent/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemAvatar from '@mui/material/ListItemAvatar/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useCallback,useState } from 'react';
 

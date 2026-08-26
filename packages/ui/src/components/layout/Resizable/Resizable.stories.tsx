@@ -1,4 +1,9 @@
-import { Box, List, ListItem, ListItemText,Paper, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 

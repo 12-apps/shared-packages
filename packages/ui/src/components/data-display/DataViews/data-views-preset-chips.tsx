@@ -12,7 +12,7 @@
  * nothing when pressed again is a dead control, and the alternative — hunting
  * for the pill's ✕ — is the gesture this row exists to remove.
  */
-import { Box } from "@mui/material";
+import Box from "@mui/material/Box/index.js";
 
 import { isPresetActive, resolvePreset } from "./data-views-range-presets";
 import type { RangePreset, RangeValue } from "./data-views-types";

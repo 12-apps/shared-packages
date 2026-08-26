@@ -1,7 +1,10 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import RemoveIcon from '@mui/icons-material/Remove';
-import { Box, Stack, Typography, useTheme, type Theme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { Skeleton } from '../../layout/Skeleton/Skeleton';

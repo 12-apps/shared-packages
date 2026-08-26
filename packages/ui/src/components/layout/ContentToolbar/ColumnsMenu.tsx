@@ -1,7 +1,12 @@
 'use client';
 
 import ColumnsIcon from '@mui/icons-material/ViewColumnRounded';
-import { Box, Checkbox, IconButton, ListSubheader, Menu, MenuItem } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Checkbox from '@mui/material/Checkbox/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import ListSubheader from '@mui/material/ListSubheader/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
 import React, { useState } from 'react';
 
 import type { ColumnVisibilityOption, ColumnsMenuProps } from './ContentToolbar.types';

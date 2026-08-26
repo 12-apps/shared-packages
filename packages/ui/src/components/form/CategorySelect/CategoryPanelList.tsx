@@ -1,7 +1,9 @@
 'use client';
 
 import type { CategorySelectCopy } from "../../../copy";
-import { Box, Button, Skeleton } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Skeleton from '@mui/material/Skeleton/index.js';
 
 import { categoryCheckState } from './category-tree';
 import {

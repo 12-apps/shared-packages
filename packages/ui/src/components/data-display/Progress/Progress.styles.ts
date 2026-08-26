@@ -1,6 +1,5 @@
-import type { PaletteColor } from '@mui/material';
-import { alpha, keyframes } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material';
+import type { PaletteColor, CSSObject, Theme } from '@mui/material/styles/index.js';
+import { alpha, keyframes } from '@mui/material/styles/index.js';
 
 import type { ProgressSize, ProgressVariant } from './Progress.types';
 

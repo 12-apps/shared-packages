@@ -1,11 +1,9 @@
-import {
-  alpha,
-  Box,
-  FormHelperText,
-  InputLabel,
-  TextareaAutosize } from '@mui/material';
-import type { Theme } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import FormHelperText from '@mui/material/FormHelperText/index.js';
+import InputLabel from '@mui/material/InputLabel/index.js';
+import TextareaAutosize from '@mui/material/TextareaAutosize/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React, { lazy, Suspense, useState } from 'react';
 
 import {

@@ -1,6 +1,8 @@
-import { alpha, Box, ToggleButton, ToggleButtonGroup, useTheme } from '@mui/material';
-import type { Theme } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import ToggleButton from '@mui/material/ToggleButton/index.js';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup/index.js';
+import { alpha, useTheme, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import type { ToggleGroupProps } from './ToggleGroup.types';

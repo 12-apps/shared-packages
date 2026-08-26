@@ -1,4 +1,5 @@
-import { TextField, ThemeProvider, createTheme } from '@mui/material';
+import TextField from '@mui/material/TextField/index.js';
+import { ThemeProvider, createTheme } from '@mui/material/styles/index.js';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 

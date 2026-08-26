@@ -1,6 +1,12 @@
 import RecentIcon from '@mui/icons-material/History';
-import { Box, Divider, List, ListItem, ListItemIcon, ListItemText, Typography } from '@mui/material';
-import { alpha, styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { ShortcutChip } from './ShortcutChip';

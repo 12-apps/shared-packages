@@ -1,4 +1,8 @@
-import { Box, CircularProgress, Paper, Typography, useTheme, type Theme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { ChartProps } from './Chart.types';

@@ -1,4 +1,6 @@
-import { Box, Tooltip, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Tooltip from '@mui/material/Tooltip/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import { forwardRef } from 'react';
 
 import { useDateTimeParts } from './DateTimeDisplay.hooks';

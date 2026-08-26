@@ -1,7 +1,11 @@
 import Add from '@mui/icons-material/Add';
 import Favorite from '@mui/icons-material/Favorite';
 import Home from '@mui/icons-material/Home';
-import { Button, Chip,Paper, Stack, Typography } from '@mui/material';
+import Button from '@mui/material/Button/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 

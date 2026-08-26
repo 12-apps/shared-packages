@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { ToggleButtonProps } from '@mui/material';
+import type { ToggleButtonProps } from '@mui/material/ToggleButton/index.js';
 import type React from 'react';
 
 export interface ToggleProps extends Omit<ToggleButtonProps, 'color' | 'size'> {

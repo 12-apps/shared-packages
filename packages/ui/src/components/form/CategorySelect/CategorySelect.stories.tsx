@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
 import { useState } from 'react';
 
 import { CategorySelect } from './CategorySelect';

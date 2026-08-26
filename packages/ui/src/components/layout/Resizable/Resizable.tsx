@@ -1,4 +1,5 @@
-import { Box, useTheme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { useMemo } from 'react';
 
 import { defaultHandles, handleStyle, resolveResizableProps } from './Resizable.helpers';

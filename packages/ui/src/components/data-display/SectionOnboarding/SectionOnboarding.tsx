@@ -1,7 +1,12 @@
 'use client';
 
 import CheckCircle from '@mui/icons-material/CheckCircle';
-import { Box, Button, Collapse, Stack, Typography, useTheme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Collapse from '@mui/material/Collapse/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { EmptyState } from '../EmptyState/EmptyState';

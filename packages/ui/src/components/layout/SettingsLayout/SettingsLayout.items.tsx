@@ -1,16 +1,13 @@
 'use client';
 
-import {
-  alpha,
-  Box,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Typography,
-  useTheme,
-} from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemButton from '@mui/material/ListItemButton/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { atLeastRail, TOUCH_TARGET } from './SettingsLayout.styles';

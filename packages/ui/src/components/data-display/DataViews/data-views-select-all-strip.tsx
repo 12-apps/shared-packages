@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox } from "@mui/material";
+import Checkbox from "@mui/material/Checkbox/index.js";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";

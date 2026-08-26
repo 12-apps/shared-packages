@@ -1,11 +1,9 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { 
-  Accordion as MuiAccordion,
-  AccordionActions as MuiAccordionActions,
-  AccordionDetails as MuiAccordionDetails,
-  AccordionSummary as MuiAccordionSummary,
-  alpha,
-  useTheme} from '@mui/material';
+import MuiAccordion from '@mui/material/Accordion/index.js';
+import MuiAccordionActions from '@mui/material/AccordionActions/index.js';
+import MuiAccordionDetails from '@mui/material/AccordionDetails/index.js';
+import MuiAccordionSummary from '@mui/material/AccordionSummary/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { accordionVariantStyles } from './Accordion.styles';

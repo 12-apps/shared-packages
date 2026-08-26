@@ -1,5 +1,5 @@
 import type { SizeValue } from '../../../tokens/scales';
-import type { DialogProps as MuiDialogProps } from '@mui/material';
+import type { DialogProps as MuiDialogProps } from '@mui/material/Dialog/index.js';
 import type { ReactNode } from 'react';
 
 export type DialogVariant = 'default' | 'glass' | 'fullscreen' | 'drawer';

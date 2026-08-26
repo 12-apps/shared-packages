@@ -1,4 +1,5 @@
-import { Fade, Slide } from '@mui/material';
+import Fade from '@mui/material/Fade/index.js';
+import Slide from '@mui/material/Slide/index.js';
 import React from 'react';
 
 export interface TransitionProps {

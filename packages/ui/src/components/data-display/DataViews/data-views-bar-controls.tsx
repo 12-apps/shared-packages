@@ -12,7 +12,7 @@
  */
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import FilterAltOffRoundedIcon from "@mui/icons-material/FilterAltOffRounded";
-import { Tooltip } from "@mui/material";
+import Tooltip from "@mui/material/Tooltip/index.js";
 
 import { Box } from "../../../mui/Box";
 import { useDataViewsCopy } from "./data-views-copy-context";

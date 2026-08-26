@@ -1,5 +1,7 @@
 import InfoIcon from '@mui/icons-material/Info';
-import { Box, Stack,TextField } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import TextField from '@mui/material/TextField/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';

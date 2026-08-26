@@ -11,46 +11,44 @@ import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from '@mui/icons-material/Search';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ShareIcon from '@mui/icons-material/Share';
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  Chip,
-  Divider,
-  FormControl,
-  FormControlLabel,
-  Grid,
-  IconButton,
-  InputLabel,
-  LinearProgress,
-  List,
-  ListItem,
-  ListItemText,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
-  Step,
-  StepLabel,
-  Stepper,
-  Switch,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Tabs,
-  TextField,
-  Typography,
-  useMediaQuery,
-  useTheme,
-} from '@mui/material';
+import Alert from '@mui/material/Alert/index.js';
+import Avatar from '@mui/material/Avatar/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Card from '@mui/material/Card/index.js';
+import CardActions from '@mui/material/CardActions/index.js';
+import CardContent from '@mui/material/CardContent/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import FormControl from '@mui/material/FormControl/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import Grid from '@mui/material/Grid/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import InputLabel from '@mui/material/InputLabel/index.js';
+import LinearProgress from '@mui/material/LinearProgress/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Select from '@mui/material/Select/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Step from '@mui/material/Step/index.js';
+import StepLabel from '@mui/material/StepLabel/index.js';
+import Stepper from '@mui/material/Stepper/index.js';
+import Switch from '@mui/material/Switch/index.js';
+import Tab from '@mui/material/Tab/index.js';
+import Table from '@mui/material/Table/index.js';
+import TableBody from '@mui/material/TableBody/index.js';
+import TableCell from '@mui/material/TableCell/index.js';
+import TableContainer from '@mui/material/TableContainer/index.js';
+import TableHead from '@mui/material/TableHead/index.js';
+import TableRow from '@mui/material/TableRow/index.js';
+import Tabs from '@mui/material/Tabs/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useEffect,useState } from 'react';
 

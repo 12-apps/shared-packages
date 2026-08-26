@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Link } from "@mui/material";
+import Box from "@mui/material/Box/index.js";
+import Link from "@mui/material/Link/index.js";
 
 import { StackedModal, StackedModalContent } from "../../feedback/StackedModal";
 import { TableFilter } from "../../layout/TableFilter";

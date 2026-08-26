@@ -1,4 +1,6 @@
-import { Button, TextField,Typography } from '@mui/material';
+import Button from '@mui/material/Button/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor,within } from 'storybook/test';
 

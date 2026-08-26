@@ -1,4 +1,4 @@
-import { alpha, keyframes, type CSSObject, type Theme } from "@mui/material";
+import { alpha, keyframes, type CSSObject, type Theme } from "@mui/material/styles/index.js";
 
 import { fadeInScaleAnimation } from "../Badge/Badge.animations";
 

@@ -8,17 +8,15 @@ import PersonIcon from '@mui/icons-material/Person';
 import SendIcon from '@mui/icons-material/Send';
 import SettingsIcon from '@mui/icons-material/Settings';
 import StarIcon from '@mui/icons-material/Star';
-import {
-  Avatar,
-  Box,
-  Button,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Typography,
-} from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import List from '@mui/material/List/index.js';
+import ListItemButton from '@mui/material/ListItemButton/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';

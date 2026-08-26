@@ -3,9 +3,12 @@ import Close from '@mui/icons-material/Close';
 import Error from '@mui/icons-material/Error';
 import Info from '@mui/icons-material/Info';
 import Warning from '@mui/icons-material/Warning';
-import { alpha, Box, Button, IconButton, Typography } from '@mui/material';
-import type { Theme } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { bannerPartStyles, fadeInSlide, getVariantColor } from './Banner.styles';

@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { SliderProps as MuiSliderProps } from '@mui/material';
+import type { SliderProps as MuiSliderProps } from '@mui/material/Slider/index.js';
 
 export interface SliderProps extends Omit<MuiSliderProps, 'color' | 'size'> {
   /**

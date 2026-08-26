@@ -1,16 +1,14 @@
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import {
-  AppBar,
-  Box,
-  Button,
-  Divider,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Typography,
-  useTheme,
-} from '@mui/material';
+import AppBar from '@mui/material/AppBar/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { useState } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

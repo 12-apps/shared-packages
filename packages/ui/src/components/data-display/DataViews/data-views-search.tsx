@@ -7,7 +7,9 @@
  */
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
-import { IconButton, InputAdornment, TextField } from "@mui/material";
+import IconButton from "@mui/material/IconButton/index.js";
+import InputAdornment from "@mui/material/InputAdornment/index.js";
+import TextField from "@mui/material/TextField/index.js";
 import { useEffect, useRef, useState } from "react";
 
 import { Box } from "../../../mui/Box";

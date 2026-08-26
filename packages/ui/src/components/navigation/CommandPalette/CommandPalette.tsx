@@ -1,19 +1,16 @@
 import CloseIcon from '@mui/icons-material/Close';
 import EnterIcon from '@mui/icons-material/KeyboardReturn';
 import SearchIcon from '@mui/icons-material/Search';
-import {
-  alpha,
-  Box,
-  Dialog,
-  DialogContent,
-  IconButton,
-  InputBase,
-  Paper,
-  Slide,
-  styled,
-  Typography,
-  useTheme } from '@mui/material';
-import type { TransitionProps } from '@mui/material/transitions';
+import Box from '@mui/material/Box/index.js';
+import Dialog from '@mui/material/Dialog/index.js';
+import DialogContent from '@mui/material/DialogContent/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import InputBase from '@mui/material/InputBase/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Slide from '@mui/material/Slide/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
+import type { TransitionProps } from '@mui/material/transitions/index.js';
 import type { FC} from 'react';
 import React, {  } from 'react';
 

@@ -1,5 +1,5 @@
-import { alpha, darken, keyframes, lighten } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material';
+import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 // Define pulse animation globally
 const pulseAnimation = keyframes`

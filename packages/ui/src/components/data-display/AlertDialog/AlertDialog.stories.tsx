@@ -1,7 +1,8 @@
 import Delete from '@mui/icons-material/Delete';
 import Logout from '@mui/icons-material/Logout';
 import Warning from '@mui/icons-material/Warning';
-import { Button, Stack } from '@mui/material';
+import Button from '@mui/material/Button/index.js';
+import Stack from '@mui/material/Stack/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 

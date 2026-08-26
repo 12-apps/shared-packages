@@ -7,7 +7,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 // glyph between them the bar offered the operator no way to tell which was
 // which. On a phone, where both are icon-only, they were indistinguishable.
 import FilterAltRoundedIcon from "@mui/icons-material/FilterAltRounded";
-import { Popover } from "@mui/material";
+import Popover from "@mui/material/Popover/index.js";
 import { useState } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";

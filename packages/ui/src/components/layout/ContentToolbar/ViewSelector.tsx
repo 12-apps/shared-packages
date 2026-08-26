@@ -4,14 +4,22 @@ import CheckIcon from '@mui/icons-material/Check';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import GridIcon from '@mui/icons-material/GridViewOutlined';
 import ListIcon from '@mui/icons-material/FormatListBulletedRounded';
-import { Box, Button, ListItemIcon, ListItemText, Menu, MenuItem, Slider } from '@mui/material';
-// Type-only, so it is erased at build time and costs no barrel transform.
-import type { SvgIconComponent } from '@mui/icons-material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Slider from '@mui/material/Slider/index.js';
+// `SvgIconComponent` is declared inline in @mui/icons-material's barrel and has
+// no module of its own, so the deep-import equivalent is its own definition:
+// `type SvgIconComponent = typeof SvgIcon`.
+import type SvgIcon from '@mui/material/SvgIcon/index.js';
 import React, { useState } from 'react';
 
 import type { ViewMode, ViewSelectorProps } from './ContentToolbar.types';
 
-const VIEW_OPTIONS: { value: ViewMode; label: string; icon: SvgIconComponent }[] = [
+const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof SvgIcon }[] = [
   { value: 'grid', label: 'Grid View', icon: GridIcon },
   { value: 'list', label: 'List View', icon: ListIcon },
 ];

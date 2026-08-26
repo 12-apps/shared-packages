@@ -182,18 +182,29 @@ function missingPackageOf(error) {
 /**
  * A dependency deep-importing ITSELF, which no packaging change here can reach.
  *
- * MUI 6 ships no `exports` map, so under Node ESM only the `@mui/material` ROOT
- * resolves and every deep path is `ERR_UNSUPPORTED_DIR_IMPORT`. That much IS
- * ours to avoid, and `@12-apps/ui` now does — it imports the root barrel. What
- * is not ours is that MUI's internals deep-import each other:
+ * MUI 6 ships no `exports` map, so under Node ESM a BARE deep path like
+ * `@mui/material/Box` is a directory import and fails. That much IS ours to
+ * avoid, and `@12-apps/ui` avoids it by naming the file — `@mui/material/Box/
+ * index.js`, the exact module a bundler picks via that directory's nested
+ * `package.json`. (It used to avoid it by importing the root barrel instead;
+ * FUT-910 stopped, because under Node the barrel silently resolved to MUI's
+ * CJS build via `main`, while every bundler took the ESM barrel and handed
+ * consumers 60 component modules on the storefront's critical path.)
+ *
+ * What is not ours is that MUI's internals deep-import each other:
  *
  *     Directory import '…/node_modules/@mui/material/utils' is not supported
  *     resolving ES modules imported from
  *     …/node_modules/@mui/icons-material/esm/utils/createSvgIcon.js
  *
- * Every component rendering an icon lands there — 15 of them in `ui` — and the
- * importing module is a dependency's own file, so no source change in this
- * repository is on that path. Asserting the property anyway does not make the
+ * Every component rendering an icon lands there, and since FUT-910 so does
+ * every component reaching `@mui/material` at all: naming the file moves the
+ * first unresolvable hop off our output and into MUI's, so most of `ui`'s
+ * entries are now SKIPPED here rather than imported. That is a real loss of
+ * reach for this gate, stated plainly rather than hidden — it still proves
+ * these packages pack, install and resolve, and it still imports every entry
+ * that does not enter MUI's ESM build. The importing module is a dependency's
+ * own file, so no source change in this repository is on that path. Asserting the property anyway does not make the
  * package loadable; it makes the gate permanently red, which is how a gate stops
  * being read.
  *

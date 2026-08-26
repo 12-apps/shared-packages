@@ -1,5 +1,8 @@
-import { Box, Card, CardContent, Popover } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Card from '@mui/material/Card/index.js';
+import CardContent from '@mui/material/CardContent/index.js';
+import Popover from '@mui/material/Popover/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

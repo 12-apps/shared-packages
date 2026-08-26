@@ -1,16 +1,14 @@
 import CloseIcon from '@mui/icons-material/Close';
-import {
-  Backdrop,
-  Box,
-  Dialog as MuiDialog,
-  DialogActions as MuiDialogActions,
-  DialogContent as MuiDialogContent,
-  DialogTitle as MuiDialogTitle,
-  Drawer,
-  IconButton,
-  Typography,
-  useTheme,
-} from '@mui/material';
+import Backdrop from '@mui/material/Backdrop/index.js';
+import Box from '@mui/material/Box/index.js';
+import MuiDialog from '@mui/material/Dialog/index.js';
+import MuiDialogActions from '@mui/material/DialogActions/index.js';
+import MuiDialogContent from '@mui/material/DialogContent/index.js';
+import MuiDialogTitle from '@mui/material/DialogTitle/index.js';
+import Drawer from '@mui/material/Drawer/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { backdropSxOf, variantStylesOf } from './Dialog.styles';

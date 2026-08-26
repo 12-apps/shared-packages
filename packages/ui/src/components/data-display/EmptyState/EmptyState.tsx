@@ -1,13 +1,11 @@
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import {
-  Box,
-  Button,
-  Link,
-  Stack,
-  Typography,
-  useTheme,
-} from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Link from '@mui/material/Link/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { EmptyStateProps } from './EmptyState.types';

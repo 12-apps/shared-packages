@@ -2,17 +2,15 @@
 
 import CloseIcon from '@mui/icons-material/Close';
 import SearchIcon from '@mui/icons-material/Search';
-import {
-  Box,
-  Checkbox,
-  Divider,
-  FormControlLabel,
-  IconButton,
-  InputAdornment,
-  Link,
-  TextField,
-  Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Checkbox from '@mui/material/Checkbox/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import InputAdornment from '@mui/material/InputAdornment/index.js';
+import Link from '@mui/material/Link/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React, { useRef, useState } from 'react';
 
 import { TableFilterContext, useTableFilterContext } from './TableFilterContext';

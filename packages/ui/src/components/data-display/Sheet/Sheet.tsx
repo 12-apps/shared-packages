@@ -1,5 +1,7 @@
-import { Drawer, SwipeableDrawer, useTheme } from '@mui/material';
-import type { BackdropProps } from '@mui/material';
+import Drawer from '@mui/material/Drawer/index.js';
+import SwipeableDrawer from '@mui/material/SwipeableDrawer/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
+import type { BackdropProps } from '@mui/material/Backdrop/index.js';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

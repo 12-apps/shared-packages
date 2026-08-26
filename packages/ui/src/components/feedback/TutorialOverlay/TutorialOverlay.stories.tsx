@@ -1,4 +1,11 @@
-import { Box, Button, Card, CardContent, Paper, Stack, TextField,Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Card from '@mui/material/Card/index.js';
+import CardContent from '@mui/material/CardContent/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { action } from 'storybook/actions';

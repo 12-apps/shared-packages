@@ -1,11 +1,9 @@
-import {
-  Collapse,
-  Fade,
-  Grow,
-  Slide,
-  useTheme,
-  Zoom,
-} from '@mui/material';
+import Collapse from '@mui/material/Collapse/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import Grow from '@mui/material/Grow/index.js';
+import Slide from '@mui/material/Slide/index.js';
+import Zoom from '@mui/material/Zoom/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { transitionDuration, transitionEasing } from './Transition.helpers';

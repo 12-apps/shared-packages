@@ -1,5 +1,11 @@
 import MenuIcon from '@mui/icons-material/Menu';
-import { alpha, Box, Divider, Fade, ListItemIcon, ListItemText, Paper } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import { alpha } from '@mui/material/styles/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 

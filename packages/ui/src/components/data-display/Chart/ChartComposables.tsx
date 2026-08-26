@@ -1,4 +1,7 @@
-import { Box, Paper, Typography, useTheme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 import { Legend, ResponsiveContainer, Tooltip } from 'recharts';
 

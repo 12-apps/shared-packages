@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "@mui/material";
+import { useTheme } from "@mui/material/styles/index.js";
 
 import {
   CARD_RADIUS,

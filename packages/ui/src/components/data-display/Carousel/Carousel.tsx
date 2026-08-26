@@ -1,4 +1,9 @@
-import { Box, CircularProgress, Fade, Slide, useTheme, Zoom } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import Slide from '@mui/material/Slide/index.js';
+import Zoom from '@mui/material/Zoom/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { useCallback, useRef } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

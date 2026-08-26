@@ -1,5 +1,5 @@
-import type { SxProps, Theme } from '@mui/material';
-import { Box } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles/index.js';
+import Box from '@mui/material/Box/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

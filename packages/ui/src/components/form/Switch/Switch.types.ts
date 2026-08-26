@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { SwitchProps as MuiSwitchProps } from '@mui/material';
+import type { SwitchProps as MuiSwitchProps } from '@mui/material/Switch/index.js';
 import type { FocusEventHandler,MouseEventHandler, ReactNode } from 'react';
 
 export interface SwitchProps extends Omit<MuiSwitchProps, 'color' | 'size'> {

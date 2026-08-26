@@ -1,15 +1,13 @@
-import {
-  Box,
-  Button,
-  FormControlLabel,
-  List,
-  ListItem,
-  ListItemText,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Switch from '@mui/material/Switch/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';

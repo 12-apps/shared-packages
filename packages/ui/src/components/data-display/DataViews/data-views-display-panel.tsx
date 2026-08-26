@@ -5,7 +5,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 // Says "display settings" rather than the generic tune sliders it used to
 // share with the "Mais" FILTER trigger — see the note there.
 import DisplaySettingsRoundedIcon from "@mui/icons-material/DisplaySettingsRounded";
-import { Popover } from "@mui/material";
+import Popover from "@mui/material/Popover/index.js";
 import { useState } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";

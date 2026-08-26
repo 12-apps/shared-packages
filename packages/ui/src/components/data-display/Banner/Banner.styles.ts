@@ -1,5 +1,5 @@
-import { alpha, keyframes } from '@mui/material';
-import type { CSSObject, PaletteColor, Theme } from '@mui/material';
+import { alpha, keyframes } from '@mui/material/styles/index.js';
+import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.js';
 
 import type { BannerVariant } from './Banner.types';
 

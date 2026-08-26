@@ -1,5 +1,5 @@
-import { alpha } from '@mui/material';
-import type { Theme } from '@mui/material';
+import { alpha } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 
 import type { AccordionVariant } from './Accordion.types';
 

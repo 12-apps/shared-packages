@@ -1,7 +1,11 @@
 import Delete from '@mui/icons-material/Delete';
 import Help from '@mui/icons-material/Help';
 import Info from '@mui/icons-material/Info';
-import { Box, Button, IconButton, Stack, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';

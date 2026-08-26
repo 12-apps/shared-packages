@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
 import React from 'react';
 
 import { useUploadButton } from './UploadButton.hooks';

@@ -2,7 +2,13 @@
 
 import CheckIcon from '@mui/icons-material/Check';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { Box, Button, Divider, ListSubheader, Menu, MenuItem, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import ListSubheader from '@mui/material/ListSubheader/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React, { useState } from 'react';
 
 import type {

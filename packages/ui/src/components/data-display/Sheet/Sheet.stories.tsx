@@ -5,27 +5,25 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import {
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  FormControlLabel,
-  Grid,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
-  Slider,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Card from '@mui/material/Card/index.js';
+import CardContent from '@mui/material/CardContent/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import Grid from '@mui/material/Grid/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Slider from '@mui/material/Slider/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Switch from '@mui/material/Switch/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 
