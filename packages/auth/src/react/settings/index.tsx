@@ -196,10 +196,8 @@ function SettingsBody({
   );
 }
 
-/** Build the screen. One call, one config object. */
-export function createEmailAuthSettingsScreen(
-  config: EmailAuthSettingsScreenConfig,
-): () => JSX.Element {
+/** The screen itself. Private: {@link createWebAuthSettings} is the only way in. */
+function buildSettingsScreen(config: EmailAuthSettingsScreenConfig): () => JSX.Element {
   const { client, copy, formatWhen } = config;
 
   return function EmailAuthSettingsScreen(): JSX.Element {
@@ -273,28 +271,26 @@ export function createEmailAuthSettingsScreen(
 }
 
 /**
- * The platform surface, as the RECORD its area rows name.
+ * The platform surface, as the RECORD its area rows name. THE only way to build
+ * this screen.
  *
  * `authPlatformWebManifest` suggests one route, `auth-settings`, whose screen
  * is `page` — and a screen name is a KEY of the built surface, which is the
  * whole reason a host projecting a route can look the component up instead of
- * guessing at it. `createEmailAuthSettingsScreen` returns the component
- * DIRECTLY, so that lookup found nothing: `surface["page"]` was `undefined`,
- * which a host renders as a blank page with nothing in any log.
+ * guessing at it. The manifest used to point at a factory returning the
+ * component DIRECTLY, so that lookup found nothing: `surface["page"]` was
+ * `undefined`, which a host renders as a blank page with nothing in any log.
  *
- * It survived because the one adopter reads the surface as a component
- * (`settingsSurface as ReturnType<typeof createEmailAuthSettingsScreen>`) and
- * never asked the manifest what its own row said. That works right up until a
- * second host projects areas generically, which is the only way areas are
- * worth carrying at all.
- *
- * So the manifest builds this, and `createEmailAuthSettingsScreen` stays
- * exported unchanged — a host that wants the bare component still calls it.
+ * That factory, `createEmailAuthSettingsScreen`, is gone from the public
+ * surface rather than kept beside this one. Two exported ways to build one
+ * screen is how the shapes drift apart again: the manifest can only name one of
+ * them, and the other is the one a host reaches for when it wants "just the
+ * component" — which is precisely the reading that hid the defect for a
+ * release. There is no host that wants the bare component; every adopter goes
+ * through the manifest, and this returns what the manifest says it returns.
  */
-export function createWebAuthSettings(
-  config: EmailAuthSettingsScreenConfig,
-): WebAuthSettings {
-  return { page: createEmailAuthSettingsScreen(config) };
+export function createWebAuthSettings(config: EmailAuthSettingsScreenConfig): WebAuthSettings {
+  return { page: buildSettingsScreen(config) };
 }
 
 /** What {@link createWebAuthSettings} builds: the console, under its area's name. */

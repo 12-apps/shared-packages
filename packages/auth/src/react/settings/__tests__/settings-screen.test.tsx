@@ -3,11 +3,7 @@ import type { JSX } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PT_BR_SETTINGS } from "../pt-BR";
-import {
-  createEmailAuthSettingsScreen,
-  createWebAuthSettings,
-  type EmailAuthSettingsSnapshot,
-} from "../index";
+import { createWebAuthSettings, type EmailAuthSettingsSnapshot } from "../index";
 
 /**
  * The operator console for the two platform switches.
@@ -49,7 +45,7 @@ function screenFor(
 ): { Screen: () => JSX.Element; save: ReturnType<typeof vi.fn> } {
   const queue = [...after];
   const save = vi.fn(async () => queue.shift() ?? first);
-  const Screen = createEmailAuthSettingsScreen({
+  const { page: Screen } = createWebAuthSettings({
     client: { read: async () => first, save },
     copy: PT_BR_SETTINGS,
     formatWhen: (iso) => iso,
@@ -57,7 +53,7 @@ function screenFor(
   return { Screen, save };
 }
 
-describe("createEmailAuthSettingsScreen", () => {
+describe("the platform settings screen", () => {
   it("holds verification inert while the method is off, and says why", async () => {
     const { Screen } = screenFor(BOTH_OFF);
     render(<Screen />);
@@ -107,7 +103,7 @@ describe("createEmailAuthSettingsScreen", () => {
   });
 
   it("reports a failed save rather than leaving the toggle where the click put it", async () => {
-    const Screen = createEmailAuthSettingsScreen({
+    const { page: Screen } = createWebAuthSettings({
       client: {
         read: async () => METHOD_ON,
         save: async () => {
@@ -134,6 +130,10 @@ describe("createWebAuthSettings", () => {
     // is a KEY of the built surface. This is the lookup a host projecting areas
     // performs; while the surface WAS the component it returned `undefined`,
     // which renders as a blank page with nothing in any log.
+    //
+    // `Object.keys` is the assertion that keeps this the ONLY shape: a second
+    // exported factory returning the bare component is what let the manifest
+    // and the surface drift apart in the first place.
     const surface = createWebAuthSettings({
       client: { read: async () => METHOD_ON, save: async () => METHOD_ON },
       copy: PT_BR_SETTINGS,
