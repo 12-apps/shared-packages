@@ -6,7 +6,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Heading } from './Heading';
-import { COLOR_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, HEADING_LEVELS } from '../../../tokens/scales';
 
 const meta: Meta<typeof Heading> = {
   title: 'Typography/Heading',
@@ -22,10 +22,18 @@ const meta: Meta<typeof Heading> = {
   },
   tags: ['autodocs', 'component:Heading'],
   argTypes: {
+    // Derived from the vocabulary, never spelled out: this control offered
+    // `[1,2,3,4,5,6]` for a prop that takes `'h1'…'display'`, so every value it
+    // documented was one the component rejects and `display` was undocumented.
     level: {
       control: { type: 'select' },
-      options: [1, 2, 3, 4, 5, 6],
-      description: 'Heading level (h1-h6)',
+      options: HEADING_LEVELS,
+      description: 'Semantic rank — the tag and the document outline',
+    },
+    size: {
+      control: { type: 'select' },
+      options: HEADING_LEVELS,
+      description: 'Scale step to draw, when it differs from the rank (defaults to level)',
     },
     variant: {
       control: { type: 'select' },

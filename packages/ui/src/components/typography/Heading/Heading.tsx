@@ -8,7 +8,7 @@ import type { HeadingProps } from './Heading.types';
 const styledHeading = () =>
   styled('h1', {
     shouldForwardProp: (prop) =>
-      !['customLevel', 'customColor', 'customWeight', 'gradient'].includes(prop as string),
+      !['customSize', 'customColor', 'customWeight', 'gradient'].includes(prop as string),
   })<HeadingFlags>(({ theme, ...flags }) => ({ ...headingSx(theme, flags) }));
 
 /**
@@ -40,14 +40,25 @@ const TAG_FOR_LEVEL: Record<string, keyof typeof STYLED_BY_TAG> = {
   h6: 'h6',
 };
 
+/**
+ * The rank and the size were ALREADY independent in here — `TAG_FOR_LEVEL[level]`
+ * and `customLevel={level}` are two separate derivations from one prop. The
+ * component just never let a caller set them apart, so anyone who needed an
+ * `h1` at a smaller size had to reach around the component and restyle it.
+ * `size` is that seam, exposed: it defaults to `level`, so nothing that exists
+ * renders differently.
+ */
 export const Heading = React.forwardRef<globalThis.HTMLHeadingElement, HeadingProps>(
-  ({ level = 'h2', color = 'neutral', weight = 'bold', gradient = false, children, ...props }, ref) => {
+  (
+    { level = 'h2', size, color = 'neutral', weight = 'bold', gradient = false, children, ...props },
+    ref,
+  ) => {
     const Styled = STYLED_BY_TAG[TAG_FOR_LEVEL[level] ?? 'h2'];
 
     return (
       <Styled
         ref={ref}
-        customLevel={level}
+        customSize={size ?? level}
         customColor={color}
         customWeight={weight}
         gradient={gradient}
