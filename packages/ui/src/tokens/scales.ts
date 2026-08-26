@@ -44,6 +44,21 @@ import type { Theme } from '@mui/material/styles/index.js';
  * omitted `info`, so the control that documents the vocabulary offered a
  * component less than the component accepted.
  */
+/**
+ * The type scale is the THIRD vocabulary, and it lives in `./typography.ts`
+ * because it is metrics rather than a prop union. Re-exported here so
+ * `@12-apps/ui/tokens` stays the one import path for "what words does this
+ * package speak" — a second entry point is how a vocabulary gets missed.
+ */
+export {
+  HEADING_LEVELS,
+  HEADING_SCALE,
+  headingMetrics,
+  type HeadingLevel,
+  type HeadingMetrics,
+  type HeadingScaleOverrides,
+} from './typography';
+
 export type SizeValue = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export const SIZE_VALUES = ['xs', 'sm', 'md', 'lg', 'xl'] as const satisfies readonly SizeValue[];

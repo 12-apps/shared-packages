@@ -1,9 +1,9 @@
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { HeadingProps } from './Heading.types';
+import { HEADING_SCALE, headingMetrics, type HeadingLevel } from '../../../tokens/typography';
 import type { ColorValue } from '../../../tokens/scales';
 
-type Level = NonNullable<HeadingProps['level']>;
 type Weight = NonNullable<HeadingProps['weight']>;
 
 // Exhaustive over ColorValue, and deliberately without a fallback. The map
@@ -37,21 +37,6 @@ const WEIGHTS: Record<Weight, number> = {
   bold: 700,
 };
 
-/**
- * Each level's metrics, plus the weight it uses when the caller asks for
- * `normal`. A heading's "normal" is not body text's 400 — it is the weight that
- * level is meant to carry, which gets heavier as the level gets larger.
- */
-const LEVELS: Record<Level, CSSObject & { normalWeight: number }> = {
-  display: { fontSize: '4rem', lineHeight: 0.95, letterSpacing: '-0.03em', normalWeight: 800 },
-  h1: { fontSize: '3rem', lineHeight: 1.1, letterSpacing: '-0.02em', normalWeight: 700 },
-  h2: { fontSize: '2.5rem', lineHeight: 1.2, letterSpacing: '-0.015em', normalWeight: 700 },
-  h3: { fontSize: '2rem', lineHeight: 1.25, letterSpacing: '-0.01em', normalWeight: 600 },
-  h4: { fontSize: '1.5rem', lineHeight: 1.3, letterSpacing: '-0.005em', normalWeight: 600 },
-  h5: { fontSize: '1.25rem', lineHeight: 1.4, normalWeight: 600 },
-  h6: { fontSize: '1.125rem', lineHeight: 1.4, normalWeight: 600 },
-};
-
 /** The two-stop gradient each colour paints its glyphs with. */
 const PRIMARY_STOPS = (theme: Theme): [string, string] => [
   theme.palette.primary.main,
@@ -80,15 +65,29 @@ const gradientFor = (theme: Theme, color: ColorValue) => {
 };
 
 export interface HeadingFlags {
-  customLevel?: string;
+  /**
+   * The step of the scale to DRAW. Named `customSize` rather than `customLevel`
+   * because the rank is no longer what decides it — see `Heading.tsx`, which
+   * resolves `size ?? level` before it gets here. This file no longer knows
+   * which tag it is styling, and that is the point.
+   */
+  customSize?: string;
   customColor?: ColorValue;
   customWeight?: string;
   gradient?: boolean;
 }
 
+/** A step name the scale actually has, or `h2` — the documented default. */
+const stepOf = (value: string | undefined): HeadingLevel =>
+  value !== undefined && value in HEADING_SCALE ? (value as HeadingLevel) : 'h2';
+
 export const headingSx = (theme: Theme, flags: HeadingFlags): CSSObject => {
-  const { customLevel = 'h2', customColor = 'neutral', customWeight = 'bold', gradient } = flags;
-  const { normalWeight, ...metrics } = LEVELS[customLevel as Level] ?? LEVELS.h2;
+  const { customSize, customColor = 'neutral', customWeight = 'bold', gradient } = flags;
+  // From the THEME, with the package default underneath — never from a table in
+  // this file. A host's `createTheme({ typography: { headingScale } })` is what
+  // sets the house scale now; see `tokens/typography.ts` for why it is our own
+  // key rather than MUI's `typography.h1`.
+  const { normalWeight, ...metrics } = headingMetrics(theme, stepOf(customSize));
 
   const base: CSSObject = {
     fontFamily: theme.typography.h1.fontFamily,
