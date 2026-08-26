@@ -5,12 +5,17 @@ import { localeRoutes, type LocaleRoute, type LocaleRoutesConfig } from './local
 /**
  * The reader's-language surface as a `@12-apps/wiring` HTTP contribution.
  *
- * `@12-apps/wiring` is a TYPE-ONLY devDependency here, the doctrine
- * `@12-apps/auth`'s manifest states in full: importing it as a runtime
- * dependency would make every installer of this package download the contract,
- * and — worse — put this package's releases behind the contract's. This package
- * is depended on by most of the estate, so it is the worst possible place for
- * that edge. Nothing below survives compilation.
+ * `@12-apps/wiring` is imported for TYPES ONLY and declared as an OPTIONAL
+ * PEER — the doctrine `@12-apps/auth`'s manifest states in full. Making it a
+ * runtime dependency would put the contract in every installer's tree and, worse,
+ * put this package's releases behind the contract's; this package is depended on
+ * by most of the estate, so that is the worst possible place for such an edge.
+ *
+ * The peer declaration is not optional bookkeeping. This package ships `src/`,
+ * so a consumer resolving `./server` reads the import below — and a package
+ * importing something it never declares is broken for that consumer even though
+ * the import is erased at build time. Optional, because a host that never adopts
+ * the contract never needs it installed.
  */
 
 /**

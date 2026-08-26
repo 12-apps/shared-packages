@@ -13,6 +13,7 @@
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { wireFeatureFlags } from './feature-flags-host';
+import { wireLocale } from './i18n-host';
 import { wireReports } from './reports-host';
 import { savedReportDb } from './saved-report-db';
 import { createInlineRealtimeDriver } from '@12-apps/realtime';
@@ -158,6 +159,7 @@ export async function provisionHosts(pg: PGlite): Promise<Hosts> {
     // incomplete list reports false gaps, and a gate that cries wolf is one
     // nobody trusts enough to keep.
     featureFlags: wireFeatureFlags(),
+    locale: wireLocale(),
     reports: wireReports(savedReportDb(pg)),
   };
 }
@@ -165,6 +167,7 @@ export async function provisionHosts(pg: PGlite): Promise<Hosts> {
 /** The mounted hosts one harness server is assembled from. */
 export interface Hosts {
   featureFlags: ReturnType<typeof wireFeatureFlags>;
+  locale: ReturnType<typeof wireLocale>;
   reports: ReturnType<typeof wireReports>;
   auth: ReturnType<typeof authHost>;
   rbac: ReturnType<typeof rbacHost>;
