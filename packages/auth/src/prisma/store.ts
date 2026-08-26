@@ -39,6 +39,19 @@ export interface EmailIdentity {
   id: string;
   email: string;
   name?: string | null;
+  /**
+   * The language this person reads, if the host stores one.
+   *
+   * OPTIONAL, and the flow does exactly one thing with it: carries it onto
+   * {@link EmailCredentialUser} so `renderAuthMail` can address the four mails
+   * in the recipient's own words. A host that stores no preference omits it and
+   * every mail keeps the language its pack already had.
+   *
+   * It has to arrive HERE rather than be looked up later, because by the time a
+   * mail is rendered the flow holds a credential user and nothing else — and the
+   * row it came from is the host's, which this package cannot query.
+   */
+  locale?: string | null;
 }
 
 /**
@@ -127,6 +140,10 @@ function merge(
     name: identity.name ?? null,
     passwordHash: credential?.passwordHash ?? null,
     emailVerifiedAt: credential?.emailVerifiedAt ?? null,
+    // Straight through, `null` included. A host that answers nothing leaves
+    // this undefined and `renderAuthMail` falls back to its pack's own
+    // language — the default belongs there, in one place, not here.
+    locale: identity.locale ?? null,
   };
 }
 
