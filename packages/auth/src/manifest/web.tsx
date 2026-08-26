@@ -1,7 +1,7 @@
 import type { AnyWebManifest } from "@12-apps/wiring";
 
 import { createWebEmailAuth } from "../react/create-web-email-auth";
-import { createEmailAuthSettingsScreen } from "../react/settings";
+import { createWebAuthSettings } from "../react/settings";
 
 /**
  * The WEB runtime manifest — the surface factories and where each area's
@@ -61,10 +61,16 @@ export const authWebManifest = {
  *
  * It sits in the PLATFORM block rather than under a tenant because sign-in
  * happens before a tenant is known.
+ *
+ * The surface is a RECORD keyed `page`, matching the area row below, because a
+ * screen name is a key of the built surface. It used to be
+ * `createEmailAuthSettingsScreen` itself — the component, not a record — so the
+ * one route this manifest suggests resolved to `undefined` in any host that
+ * projected areas rather than reaching for the factory by hand.
  */
 export const authPlatformWebManifest = {
   name: "@12-apps/auth-platform",
-  surface: { create: createEmailAuthSettingsScreen },
+  surface: { create: createWebAuthSettings },
   areas: [
     {
       area: "super-admin",
