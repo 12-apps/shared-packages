@@ -1,4 +1,5 @@
-import { Box, SvgIcon } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import SvgIcon from '@mui/material/SvgIcon/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 

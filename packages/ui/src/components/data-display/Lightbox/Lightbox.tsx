@@ -1,4 +1,6 @@
-import { Dialog, Fade, Typography } from '@mui/material';
+import Dialog from '@mui/material/Dialog/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import { makeTestId } from './Lightbox.constants';

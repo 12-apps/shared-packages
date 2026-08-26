@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Box, Button, TextField, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import { fn } from 'storybook/test';
 
 import { Dashboard } from './Dashboard';

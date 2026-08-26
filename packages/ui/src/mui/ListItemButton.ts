@@ -1,2 +1,2 @@
-export type { ListItemButtonProps } from '@mui/material';
-export { ListItemButton, ListItemButton as default } from '@mui/material';
+export type { ListItemButtonProps } from '@mui/material/ListItemButton/index.js';
+export { default as ListItemButton, default } from '@mui/material/ListItemButton/index.js';

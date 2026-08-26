@@ -1,7 +1,7 @@
 'use client';
 
 import type { CategorySelectCopy } from "../../../copy";
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
 
 import { CaretGlyph } from './CategoryIcons';
 import {

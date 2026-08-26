@@ -1,7 +1,11 @@
 import Home from '@mui/icons-material/Home';
 import MoreHoriz from '@mui/icons-material/MoreHoriz';
-import { alpha, Box, Fade, Link, Tooltip, Typography } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import Link from '@mui/material/Link/index.js';
+import Tooltip from '@mui/material/Tooltip/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { breadcrumbLinkStyles } from './Breadcrumbs.styles';

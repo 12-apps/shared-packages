@@ -3,19 +3,16 @@ import CloseIcon from '@mui/icons-material/Close';
 import ErrorIcon from '@mui/icons-material/Error';
 import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
-import type { Theme } from '@mui/material';
-import {
-  Alert,
-  alpha,
-  Box,
-  Button,
-  CircularProgress,
-  IconButton,
-  Portal,
-  Slide,
-  Typography,
-  useTheme,
-} from '@mui/material';
+import type { Theme } from '@mui/material/styles/index.js';
+import Alert from '@mui/material/Alert/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Portal from '@mui/material/Portal/index.js';
+import Slide from '@mui/material/Slide/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React, { createContext, useCallback,useContext, useState } from 'react';
 
 import type { ToastContainerProps, ToastContextType, ToastItem,ToastProps } from './Toast.types';

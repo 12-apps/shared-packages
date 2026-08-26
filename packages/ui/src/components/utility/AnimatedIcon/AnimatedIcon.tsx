@@ -1,4 +1,5 @@
-import { Box, styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

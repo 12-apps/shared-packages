@@ -1,6 +1,10 @@
 import AttachFileOutlined from '@mui/icons-material/AttachFileOutlined';
 import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined';
-import { Box, Button, LinearProgress, Typography, useTheme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import LinearProgress from '@mui/material/LinearProgress/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type React from 'react';
 
 import type { DragHandlers } from './UploadButton.hooks';

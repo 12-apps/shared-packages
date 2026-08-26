@@ -1,4 +1,4 @@
-import { Stack } from '@mui/material';
+import Stack from '@mui/material/Stack/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn,userEvent, within } from 'storybook/test';

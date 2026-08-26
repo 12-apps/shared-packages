@@ -1,4 +1,4 @@
-import { keyframes } from '@mui/material';
+import { keyframes } from '@mui/material/styles/index.js';
 
 export const pulseAnimation = keyframes`
   0% {

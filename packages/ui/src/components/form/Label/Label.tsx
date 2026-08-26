@@ -1,4 +1,7 @@
-import { Box, Tooltip, Typography, useTheme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Tooltip from '@mui/material/Tooltip/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

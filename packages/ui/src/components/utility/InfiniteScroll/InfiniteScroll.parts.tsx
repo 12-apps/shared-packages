@@ -1,4 +1,7 @@
-import { Alert, Box, CircularProgress, Typography } from '@mui/material';
+import Alert from '@mui/material/Alert/index.js';
+import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import type { InfiniteScrollProps } from './InfiniteScroll.types';

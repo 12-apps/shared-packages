@@ -1,4 +1,4 @@
-import type { DialogProps as MuiDialogProps } from '@mui/material';
+import type { DialogProps as MuiDialogProps } from '@mui/material/Dialog/index.js';
 import type React from 'react';
 
 export interface AlertDialogProps extends Omit<MuiDialogProps, 'variant'> {

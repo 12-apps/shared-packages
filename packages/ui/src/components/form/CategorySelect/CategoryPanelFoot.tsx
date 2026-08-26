@@ -1,6 +1,7 @@
 'use client';
 
-import { Box, Button } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
 
 import type { CategorySelectCopy } from '../../../copy';
 import { footerSx, METRICS } from './CategorySelect.styles';

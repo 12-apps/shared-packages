@@ -1,2 +1,2 @@
-export type { Grid2Props } from '@mui/material';
-export { Grid2, Grid2 as default } from '@mui/material';
+export type { Grid2Props } from '@mui/material/Grid2/index.js';
+export { default as Grid2, default } from '@mui/material/Grid2/index.js';

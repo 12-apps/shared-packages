@@ -1,4 +1,6 @@
-import { Paper, Stack, Typography } from '@mui/material';
+import Paper from '@mui/material/Paper/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 

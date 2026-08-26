@@ -1,8 +1,11 @@
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
-import { alpha, Box, IconButton, Typography, useTheme } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

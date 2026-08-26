@@ -1,12 +1,9 @@
-import {
-  alpha,
-  Box,
-  Fade,
-  keyframes,
-  LinearProgress,
-  Paper,
-  Portal,
-  styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Fade from '@mui/material/Fade/index.js';
+import LinearProgress from '@mui/material/LinearProgress/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Portal from '@mui/material/Portal/index.js';
+import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import type { FC} from 'react';
 import React, {  } from 'react';
 

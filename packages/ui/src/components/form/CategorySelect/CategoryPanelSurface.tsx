@@ -1,6 +1,7 @@
 'use client';
 
-import { Drawer, Popover } from '@mui/material';
+import Drawer from '@mui/material/Drawer/index.js';
+import Popover from '@mui/material/Popover/index.js';
 
 import { stackedOverlayZIndex } from '../../../tokens/layers';
 

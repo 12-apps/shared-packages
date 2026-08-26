@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { BadgeProps as MuiBadgeProps } from '@mui/material';
+import type { BadgeProps as MuiBadgeProps } from '@mui/material/Badge/index.js';
 import type React from 'react';
 
 export type BadgeVariant = 

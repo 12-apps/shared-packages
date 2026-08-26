@@ -1,5 +1,5 @@
 import type { ColorValue } from '../../../tokens/scales';
-import type { TableProps as MuiTableProps } from '@mui/material';
+import type { TableProps as MuiTableProps } from '@mui/material/Table/index.js';
 import type React from 'react';
 
 // Advanced feature types

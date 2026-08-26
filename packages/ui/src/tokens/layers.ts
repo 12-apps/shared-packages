@@ -1,4 +1,4 @@
-import type { Theme } from '@mui/material';
+import type { Theme } from '@mui/material/styles/index.js';
 
 /**
  * WHERE A PORTALLED OVERLAY SITS RELATIVE TO A STACK OF SHEETS.

@@ -1,4 +1,6 @@
-import { CircularProgress, InputAdornment, styled } from '@mui/material';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import InputAdornment from '@mui/material/InputAdornment/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { TextFieldSlim } from './text-field-slim';

@@ -19,27 +19,25 @@ import Security from '@mui/icons-material/Security';
 import Settings from '@mui/icons-material/Settings';
 import Timeline from '@mui/icons-material/Timeline';
 import Warning from '@mui/icons-material/Warning';
-import {
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Checkbox,
-  Chip,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
-  Grid,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography,
-} from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Card from '@mui/material/Card/index.js';
+import CardContent from '@mui/material/CardContent/index.js';
+import Checkbox from '@mui/material/Checkbox/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import FormControl from '@mui/material/FormControl/index.js';
+import FormControlLabel from '@mui/material/FormControlLabel/index.js';
+import FormLabel from '@mui/material/FormLabel/index.js';
+import Grid from '@mui/material/Grid/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Radio from '@mui/material/Radio/index.js';
+import RadioGroup from '@mui/material/RadioGroup/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 

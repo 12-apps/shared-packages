@@ -1,5 +1,9 @@
 import CreditCard from '@mui/icons-material/CreditCard';
-import { Box, Chip, SvgIcon, TextField, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import SvgIcon from '@mui/material/SvgIcon/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 

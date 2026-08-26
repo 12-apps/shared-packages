@@ -1,5 +1,6 @@
-import { Button as MuiButton, CircularProgress } from '@mui/material';
-import { styled } from '@mui/material';
+import MuiButton from '@mui/material/Button/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';

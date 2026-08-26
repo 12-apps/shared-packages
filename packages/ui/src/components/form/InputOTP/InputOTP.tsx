@@ -1,5 +1,6 @@
-import { Box, TextField } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

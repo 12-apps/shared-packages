@@ -13,7 +13,10 @@
  */
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { Box, Button, Popover, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Popover from '@mui/material/Popover/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React, { useState } from 'react';
 
 import { useDataViewsCopy } from "./data-views-copy-context";

@@ -6,19 +6,17 @@ import ExportIcon from '@mui/icons-material/FileDownloadOutlined';
 import FilterIcon from '@mui/icons-material/FilterListRounded';
 import InfoIcon from '@mui/icons-material/InfoOutlined';
 import SettingsIcon from '@mui/icons-material/SettingsOutlined';
-import {
-  Badge,
-  Box,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Menu,
-  MenuItem,
-  Popover,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import Badge from '@mui/material/Badge/index.js';
+import Box from '@mui/material/Box/index.js';
+import Dialog from '@mui/material/Dialog/index.js';
+import DialogContent from '@mui/material/DialogContent/index.js';
+import DialogTitle from '@mui/material/DialogTitle/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Popover from '@mui/material/Popover/index.js';
+import Tooltip from '@mui/material/Tooltip/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React, { useState } from 'react';
 
 import { HeaderButton } from '../../form/HeaderButton';

@@ -1,7 +1,11 @@
 import Person from '@mui/icons-material/Person';
 import Star from '@mui/icons-material/Star';
 import Verified from '@mui/icons-material/Verified';
-import { Box,Button, Chip, Stack, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 

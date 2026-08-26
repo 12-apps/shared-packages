@@ -1,4 +1,4 @@
-import type { Theme } from '@mui/material';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 import {
   Area,

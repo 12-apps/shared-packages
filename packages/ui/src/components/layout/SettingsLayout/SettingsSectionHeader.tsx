@@ -1,7 +1,7 @@
 'use client';
 
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
 import React from 'react';
 
 import { displayAcrossRail, TOUCH_TARGET } from './SettingsLayout.styles';

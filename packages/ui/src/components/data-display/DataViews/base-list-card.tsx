@@ -1,6 +1,6 @@
 "use client";
 
-import { Collapse } from "@mui/material";
+import Collapse from "@mui/material/Collapse/index.js";
 import { type ReactNode } from "react";
 
 import { Card } from "../../layout/Card";

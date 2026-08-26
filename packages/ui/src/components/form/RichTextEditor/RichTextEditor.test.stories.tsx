@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';

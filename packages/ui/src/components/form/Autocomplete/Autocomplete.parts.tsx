@@ -1,18 +1,16 @@
 import LinkIcon from '@mui/icons-material/Link';
 import SearchIcon from '@mui/icons-material/Search';
-import {
-  Box,
-  Chip,
-  CircularProgress,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
-  Popper,
-  TextField,
-  Typography,
-} from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import List from '@mui/material/List/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import Popper from '@mui/material/Popper/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { highlightLabel, type MatchMode } from './Autocomplete.helpers';

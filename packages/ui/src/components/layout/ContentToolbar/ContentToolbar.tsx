@@ -1,6 +1,10 @@
 'use client';
 
-import { Box, Button, Checkbox, Divider, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Checkbox from '@mui/material/Checkbox/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import type { ContentToolbarProps } from './ContentToolbar.types';

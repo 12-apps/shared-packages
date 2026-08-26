@@ -1,5 +1,5 @@
 import type { ColorValue } from '../../../tokens/scales';
-import type { AlertProps as MuiAlertProps } from '@mui/material';
+import type { AlertProps as MuiAlertProps } from '@mui/material/Alert/index.js';
 import type React from 'react';
 
 /**

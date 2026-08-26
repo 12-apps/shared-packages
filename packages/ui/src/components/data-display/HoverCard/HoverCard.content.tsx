@@ -1,5 +1,8 @@
-import { Avatar, Box, CircularProgress, Typography } from '@mui/material';
-import { styled } from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { HoverCardProps } from './HoverCard.types';

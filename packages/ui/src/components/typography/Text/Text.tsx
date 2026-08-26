@@ -1,8 +1,8 @@
 'use client';
 
-import type { CSSObject, Theme } from '@mui/material';
-import { alpha,Typography } from '@mui/material';
-import { styled } from '@mui/material';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { TextProps } from './Text.types';

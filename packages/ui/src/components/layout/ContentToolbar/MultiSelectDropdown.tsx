@@ -1,17 +1,15 @@
 'use client';
 
 import SearchIcon from '@mui/icons-material/Search';
-import {
-  Box,
-  Button,
-  Checkbox,
-  Divider,
-  InputAdornment,
-  ListSubheader,
-  Menu,
-  MenuItem,
-  TextField,
-} from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Checkbox from '@mui/material/Checkbox/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import InputAdornment from '@mui/material/InputAdornment/index.js';
+import ListSubheader from '@mui/material/ListSubheader/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import TextField from '@mui/material/TextField/index.js';
 import React, { useMemo, useState } from 'react';
 
 import type {

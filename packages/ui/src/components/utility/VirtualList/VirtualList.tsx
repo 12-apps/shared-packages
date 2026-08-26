@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
 import React, { useRef } from 'react';
 
 import { useVirtualGrid, useVirtualList } from './VirtualList.hooks';

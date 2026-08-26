@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { MenuProps } from '@mui/material';
+import type { MenuProps } from '@mui/material/Menu/index.js';
 import type { ReactNode } from 'react';
 
 export interface ContextMenuItem {

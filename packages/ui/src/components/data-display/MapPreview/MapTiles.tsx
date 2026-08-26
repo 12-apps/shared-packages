@@ -1,4 +1,4 @@
-import { alpha, useTheme } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 

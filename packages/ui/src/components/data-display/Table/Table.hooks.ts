@@ -1,4 +1,5 @@
-import { useMediaQuery, useTheme } from '@mui/material';
+import { useTheme } from '@mui/material/styles/index.js';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { ColumnConfig, TableProps } from './Table.types';

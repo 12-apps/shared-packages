@@ -1,5 +1,5 @@
-import { CssBaseline } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material';
+import CssBaseline from '@mui/material/CssBaseline/index.js';
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 

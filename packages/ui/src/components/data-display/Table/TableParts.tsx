@@ -1,11 +1,10 @@
-import {
-  Box,
-  Checkbox,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TableSortLabel } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Checkbox from '@mui/material/Checkbox/index.js';
+import TableBody from '@mui/material/TableBody/index.js';
+import TableCell from '@mui/material/TableCell/index.js';
+import TableHead from '@mui/material/TableHead/index.js';
+import TableRow from '@mui/material/TableRow/index.js';
+import TableSortLabel from '@mui/material/TableSortLabel/index.js';
 import React, { useCallback } from 'react';
 
 import { useVirtualScrolling } from './Table.hooks';

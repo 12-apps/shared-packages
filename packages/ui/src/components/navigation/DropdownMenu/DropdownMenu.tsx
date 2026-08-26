@@ -1,17 +1,14 @@
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import MoreVert from '@mui/icons-material/MoreVert';
-import {
-  alpha,
-  Box,
-  Divider,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Typography,
-} from '@mui/material';
-import { styled } from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Divider from '@mui/material/Divider/index.js';
+import ListItemIcon from '@mui/material/ListItemIcon/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
+import Menu from '@mui/material/Menu/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React, { cloneElement, isValidElement,useRef, useState } from 'react';
 
 import type { DropdownMenuItem,DropdownMenuProps } from './DropdownMenu.types';

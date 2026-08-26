@@ -1,4 +1,4 @@
-import type { ContainerProps as MuiContainerProps } from '@mui/material';
+import type { ContainerProps as MuiContainerProps } from '@mui/material/Container/index.js';
 import type { ReactNode } from 'react';
 
 export interface ContainerProps extends Omit<MuiContainerProps, 'maxWidth'> {

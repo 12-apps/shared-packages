@@ -3,8 +3,12 @@ import CopyIcon from '@mui/icons-material/ContentCopy';
 import ExitFullscreenIcon from '@mui/icons-material/FullscreenExit';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import WrapIcon from '@mui/icons-material/WrapText';
-import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
-import { alpha, styled } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Tooltip from '@mui/material/Tooltip/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { CodeEditorCopy } from '../../../copy';

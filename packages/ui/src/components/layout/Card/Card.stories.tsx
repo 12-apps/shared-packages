@@ -7,7 +7,14 @@ import Phone from '@mui/icons-material/Phone';
 import Share from '@mui/icons-material/Share';
 import ShoppingCart from '@mui/icons-material/ShoppingCart';
 import Star from '@mui/icons-material/Star';
-import { Avatar, Box, Button, Chip, Grid,IconButton, Stack, Typography } from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Chip from '@mui/material/Chip/index.js';
+import Grid from '@mui/material/Grid/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Card, CardActions, CardContent, CardHeader, CardMedia } from './Card';

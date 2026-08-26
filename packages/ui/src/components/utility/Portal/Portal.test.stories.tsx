@@ -1,4 +1,9 @@
-import { Alert, Box, Button, Paper, TextField,Typography } from '@mui/material';
+import Alert from '@mui/material/Alert/index.js';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import Paper from '@mui/material/Paper/index.js';
+import TextField from '@mui/material/TextField/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';

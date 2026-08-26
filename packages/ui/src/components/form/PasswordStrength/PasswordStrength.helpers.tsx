@@ -1,7 +1,8 @@
 import SecurityIcon from '@mui/icons-material/Security';
 import SuccessIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
-import { Box, Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import type { PasswordRequirementCopy, PasswordStrengthCopy } from '../../../copy';

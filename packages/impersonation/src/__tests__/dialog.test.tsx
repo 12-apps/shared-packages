@@ -24,6 +24,20 @@ import { ImpersonationHttpError, type ImpersonationTransport } from '../react/tr
  * banner does not happen at all.
  */
 
+// The dialog tests wait on a dynamic import, and `dialogOnScreen` below spends
+// up to 10s of that waiting. Vitest's DEFAULT test budget is 5s, so before this
+// the inner wait was as long as the whole test — leaving nothing for mounting
+// or asserting, and making the helper's promise ("a dialog that never renders
+// still fails this, five seconds later") impossible to keep: the TEST expired
+// first, with `Test timed out in 5000ms` and no word about the dialog. CI hit
+// exactly that at 5057ms while this machine renders in ~1.6s.
+//
+// The outer budget must therefore exceed the inner wait, not equal it. Same
+// mechanism as packages/discounts' migration suite, and only the patience
+// changes — a dialog that never renders still fails, now with the assertion
+// that says so.
+vi.setConfig({ testTimeout: 20_000 });
+
 const DIALOG_LABELS: ImpersonationDialogLabels = {
   title: ({ target }) => `Open a desk session for ${target}`,
   notice: {
@@ -235,7 +249,11 @@ function mountDialog(options: MountOptions = {}) {
  * 1206ms. A budget that depends on how busy the runner is belongs to nobody.
  *
  * The assertion is unchanged — only the patience. A dialog that never renders
- * still fails this, five seconds later.
+ * still fails this, ten seconds later — which needs the file's `testTimeout`
+ * above to be LARGER than this wait, or the test expires first and reports a
+ * bare timeout instead of the assertion. CI was measured at 5057ms against the
+ * default 5s test budget, i.e. the dialog arriving in roughly the time this
+ * wait allowed and no time left to prove it.
  *
  * Warming the module in `beforeAll` was measured first and is NOT the fix here:
  * it moved nothing (549ms from a cold Vite cache, 543ms warmed), because what
@@ -245,7 +263,7 @@ function mountDialog(options: MountOptions = {}) {
  */
 async function dialogOnScreen(): Promise<void> {
   await waitFor(() => expect(screen.getByTestId('impersonation-dialog')).toBeTruthy(), {
-    timeout: 5_000,
+    timeout: 10_000,
   });
 }
 

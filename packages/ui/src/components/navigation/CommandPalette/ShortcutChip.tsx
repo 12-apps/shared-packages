@@ -1,5 +1,5 @@
-import type { ChipProps } from '@mui/material';
-import { Chip } from '@mui/material';
+import type { ChipProps } from '@mui/material/Chip/index.js';
+import Chip from '@mui/material/Chip/index.js';
 import React from 'react';
 
 // A plain component rather than styled(Chip): a styled component's inferred type

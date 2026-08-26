@@ -1,5 +1,5 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { IconButton } from '@mui/material';
+import IconButton from '@mui/material/IconButton/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 

@@ -1,4 +1,7 @@
-import { Box, Button, ButtonGroup,Typography } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Button from '@mui/material/Button/index.js';
+import ButtonGroup from '@mui/material/ButtonGroup/index.js';
+import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useEffect,useState } from 'react';
 

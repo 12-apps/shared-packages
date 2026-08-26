@@ -1,10 +1,10 @@
 'use client';
 
-import { alpha } from '@mui/material';
-import { Autocomplete, createFilterOptions } from '@mui/material';
-import type { AutocompleteRenderInputParams } from '@mui/material';
-import { CircularProgress } from '@mui/material';
-import { TextField } from '@mui/material';
+import { alpha } from '@mui/material/styles/index.js';
+import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete/index.js';
+import type { AutocompleteRenderInputParams } from '@mui/material/Autocomplete/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
+import TextField from '@mui/material/TextField/index.js';
 import { useId, useMemo } from 'react';
 
 import { stackedOverlayZIndex } from '../../../tokens/layers';

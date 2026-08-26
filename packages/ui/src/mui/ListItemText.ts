@@ -1,2 +1,2 @@
-export type { ListItemTextProps } from '@mui/material';
-export { ListItemText, ListItemText as default } from '@mui/material';
+export type { ListItemTextProps } from '@mui/material/ListItemText/index.js';
+export { default as ListItemText, default } from '@mui/material/ListItemText/index.js';
