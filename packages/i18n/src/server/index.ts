@@ -1,81 +1,39 @@
 /**
- * The locale a web-standard `Request` is asking for.
+ * The SERVER half of the locale axis.
  *
- * Framework-free by construction — it reads a `Request` and nothing else — so
- * a Hono host, a Next host and a bare `fetch` handler all get the same answer
- * from the same code. Mounting it into an ambient per-request scope is the
- * host's job (`@12-apps/request-scope` is the seam for it here); this module
- * deliberately does not reach for one, because a package that can only be
- * called inside somebody's AsyncLocalStorage is not portable.
+ * Two things live behind this subpath, and the split is deliberate:
  *
- * It returns `null` when the request names no language it recognises, rather
- * than falling back. The fallback belongs to {@link resolveLocale}, which is
- * where the request sits BELOW a stored user preference — and a function that
- * quietly answered `pt-BR` here would out-rank the preference it is supposed
- * to lose to.
+ * - **`./request`** — what one incoming `Request` is asking for. Framework-free,
+ *   stateless, no storage. It has been here since the package shipped.
+ * - **`./store`, `./locale-routes`, `./create-api-locale`** — what one PERSON
+ *   reads, which is the fact the mechanism could never obtain on its own. A
+ *   browser's cookie answers for a screen and answers nothing for a
+ *   notification or a mail, because neither has that browser in the room.
+ *
+ * Behind a subpath so a browser bundle importing `.` or `./react` never
+ * resolves any of it.
  */
-import { matchLocale, type Locale } from '../core/locale';
-import { negotiateLocale } from '../core/negotiate';
+export {
+  localeFromRequest,
+  LOCALE_COOKIE,
+  LOCALE_QUERY_PARAM,
+  type RequestLocaleOptions,
+} from './request';
 
-/** Where a chosen language is remembered between requests, by convention. */
-export const LOCALE_COOKIE = 'locale';
+export {
+  createPrismaLocaleStore,
+  type LocaleDb,
+  type LocaleDbProvider,
+  type LocaleStore,
+  type PrismaLocaleStoreConfig,
+} from './store';
 
-/** Where a request names a language explicitly, by convention. */
-export const LOCALE_QUERY_PARAM = 'lang';
+export {
+  localeRoutes,
+  type LocaleRequest,
+  type LocaleResponse,
+  type LocaleRoute,
+  type LocaleRoutesConfig,
+} from './locale-routes';
 
-export interface RequestLocaleOptions {
-  /** Query parameter carrying an explicit choice. Defaults to `lang`. */
-  queryParam?: string;
-  /** Cookie carrying a remembered choice. Defaults to `locale`. */
-  cookieName?: string;
-  /** Set false to ignore `Accept-Language` entirely. Defaults to true. */
-  acceptLanguage?: boolean;
-}
-
-/**
- * One cookie's value out of a `Cookie` header.
- *
- * Hand-parsed rather than pulled from a cookie library: this package has no
- * dependencies, and the shape needed here is one name out of a `; `-separated
- * list. A value is NOT url-decoded — a BCP-47 tag has no character that needs
- * encoding, and decoding would only widen what a header can smuggle in.
- */
-function readCookie(header: string | null, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(';')) {
-    const cut = part.indexOf('=');
-    if (cut === -1) continue;
-    if (part.slice(0, cut).trim() !== name) continue;
-    return part.slice(cut + 1).trim();
-  }
-  return null;
-}
-
-/**
- * The locale this request names, in the order the request itself ranks them:
- * an explicit `?lang=`, then the remembered cookie, then `Accept-Language`.
- *
- * This is the REQUEST half only. A stored user or tenant preference outranks
- * the header and is not visible from here — hand this result to
- * {@link resolveLocale} as its `explicit`/`acceptLanguage` inputs alongside
- * those, rather than treating it as the final answer.
- */
-export function localeFromRequest(
-  request: Request,
-  options: RequestLocaleOptions = {},
-): Locale | null {
-  const {
-    queryParam = LOCALE_QUERY_PARAM,
-    cookieName = LOCALE_COOKIE,
-    acceptLanguage = true,
-  } = options;
-
-  const url = new URL(request.url);
-  const explicit = matchLocale(url.searchParams.get(queryParam));
-  if (explicit) return explicit;
-
-  const remembered = matchLocale(readCookie(request.headers.get('cookie'), cookieName));
-  if (remembered) return remembered;
-
-  return acceptLanguage ? negotiateLocale(request.headers.get('accept-language')) : null;
-}
+export { createApiLocale } from './create-api-locale';

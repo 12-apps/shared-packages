@@ -42,7 +42,19 @@ import {
   type Formats,
   type Locale,
 } from '@12-apps/i18n';
-import { LOCALE_COOKIE, LOCALE_QUERY_PARAM, localeFromRequest } from '@12-apps/i18n/server';
+import { i18nManifest } from '@12-apps/i18n/manifest';
+import { i18nServerManifest } from '@12-apps/i18n/manifest/server';
+import {
+  LOCALE_COOKIE,
+  LOCALE_QUERY_PARAM,
+  createPrismaLocaleStore,
+  localeFromRequest,
+  type LocaleDb,
+} from '@12-apps/i18n/server';
+import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
+import type { MountedRoute } from '@12-apps/wiring';
+
+import { honoRouterFor, harnessLoggerFor } from './wire-hono';
 
 /** The cookie and query name this host uses — the package's defaults, stated. */
 export const HARNESS_LOCALE_COOKIE = LOCALE_COOKIE;
@@ -86,6 +98,90 @@ export const HARNESS_CURRENCY = 'BRL';
 /** Every formatter one surface needs, for the locale that surface resolved. */
 export function harnessFormats(locale: Locale): Formats {
   return createFormats({ locale, currency: HARNESS_CURRENCY, timeZone: 'UTC' });
+}
+
+/** Where `mount-surfaces.ts` hangs the router — the adoption's claim. */
+export const LOCALE_MOUNT_PATH = '/api/account/locale';
+
+/** Whose language the probes and the mounted surface both act on. */
+const READER = 'u-ana';
+
+/**
+ * The package's own table, in memory.
+ *
+ * A Map behind the DELEGATE shape rather than a hand-rolled `LocaleStore`,
+ * deliberately: routing it through the shipped `createPrismaLocaleStore` is
+ * what makes this adoption prove something. The parts worth proving all live in
+ * that function — the tag is validated on the way out as well as in, a clear
+ * DELETES rather than writing a default, and `"pt-br"` normalises — and a store
+ * written here would assert against this file's own construction instead.
+ */
+function memoryLocaleDb(rows: Map<string, string>): LocaleDb {
+  return {
+    localePreference: {
+      findUnique: async ({ where }) => {
+        const locale = rows.get(where.userId);
+        return locale === undefined ? null : { locale };
+      },
+      upsert: async ({ where, update }) => {
+        rows.set(where.userId, update.locale);
+        return null;
+      },
+      deleteMany: async ({ where }) => {
+        rows.delete(where.userId);
+        return null;
+      },
+    },
+  };
+}
+
+/**
+ * `@12-apps/i18n`'s SERVER surface, adopted through the wiring consumer.
+ *
+ * The probes below prove the request half — how a `Request` becomes a locale.
+ * This proves the other one: that the language a person CHOSE survives past the
+ * request that chose it, which is the half a notification or a mail needs and
+ * the one a browser cannot answer.
+ *
+ * Bound with the harness's single reader, the same way the feature-flags
+ * adoption resolves its one operator: the surface acts on the CALLER and nobody
+ * else, so who that is comes from the host and never from the request body.
+ */
+export function wireLocale(): {
+  router: Hono;
+  report: WiringReport;
+  routes: readonly MountedRoute[];
+  harnessRoutes: Hono;
+} {
+  // `let` + a closure so the suite's reset swaps the rows under the same
+  // adoption — every scenario starts from "this person has not chosen".
+  let rows = new Map<string, string>();
+  const host = createWiringHost({
+    name: 'harness-backend',
+    kind: 'server',
+    ports: { loggerFor: harnessLoggerFor },
+  });
+  host.adoptServer({
+    manifest: i18nManifest,
+    server: i18nServerManifest,
+    bindings: {
+      http: {
+        mountPath: LOCALE_MOUNT_PATH,
+        config: { store: createPrismaLocaleStore({ getDb: async () => memoryLocaleDb(rows) }) },
+      },
+    },
+  });
+  const wired = host.assemble();
+  const harnessRoutes = new Hono().post('/reset', (c) => {
+    rows = new Map<string, string>();
+    return c.body(null, 204);
+  });
+  return {
+    router: honoRouterFor(wired.routes, () => READER),
+    report: wired.report,
+    routes: wired.routes,
+    harnessRoutes,
+  };
 }
 
 /**

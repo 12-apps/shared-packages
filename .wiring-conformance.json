@@ -223,9 +223,41 @@
     "kind": "exempt",
     "why": "a form-state library hosts embed inside their own screens; it mounts nothing and owns nothing host-wired — the contract must stay something only packages with host-wired capabilities carry"
   },
-  "@12-apps/i18n": {
+  "@12-apps/i18n :: areas": {
     "kind": "exempt",
-    "why": "the locale axis for copy that is already the host's: the canonical locale list and helpers, consumed as a plain library by packages and harnesses alike — nothing to bind, decline or mount"
+    "why": "no screen, so no area to register — the same reason as `surface`, one layer up"
+  },
+  "@12-apps/i18n :: e2e": {
+    "kind": "exempt",
+    "why": "ships no world. There is no vendor to stub and no external system to fake: the store is the host's own database, and a test binds it directly"
+  },
+  "@12-apps/i18n :: email": {
+    "kind": "exempt",
+    "why": "sends no mail of its own. It supplies the LANGUAGE a mail is written in; the mail itself belongs to whichever package owns that moment (auth's four, notifications' blueprints) — a mailer here would create a user-reaching moment that does not exist"
+  },
+  "@12-apps/i18n :: env": {
+    "kind": "exempt",
+    "why": "reads no environment variable. Every choice is either an argument to the factory or a column on the row — there is no deployment-shaped knob for a host to set"
+  },
+  "@12-apps/i18n :: jobs": {
+    "kind": "exempt",
+    "why": "nothing to schedule: a preference is written the moment a person chooses and read the moment a notice renders, so there is no periodic work and no queue — a job here would be invented rather than declared"
+  },
+  "@12-apps/i18n :: mcp": {
+    "kind": "exempt",
+    "why": "exposes no tool of its own. Whether an assistant may change a person's reading language is a host's decision about its own agent surface, and the origin host registers that pair over the mounted route — the same carve-out the vocabulary-dependent tools take"
+  },
+  "@12-apps/i18n :: notifications": {
+    "kind": "exempt",
+    "why": "declares no blueprint. This package is the INPUT to other packages' notices — the tag their copy resolves against — never the source of one"
+  },
+  "@12-apps/i18n :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no permission id, and must not. Both endpoints act on the CALLER and nobody else — the user id comes from the host's resolved session, never from the body or the path — so the only authorization question is whether there IS a caller, which `kind: authenticated` already answers. An id here would imply somebody could read or write another person's language, which is exactly what this surface refuses to make expressible"
+  },
+  "@12-apps/i18n :: surface": {
+    "kind": "exempt",
+    "why": "ships no screen. The language switcher is the HOST's own chrome, sitting in an account menu the host lays out; a packaged one would put this package's markup inside every consumer's shell"
   },
   "@12-apps/impersonation :: db": {
     "kind": "exempt",

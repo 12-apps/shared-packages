@@ -7,6 +7,7 @@ import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
 import { BILLING_MOUNT_PATH } from './billing-host';
 import { FEATURE_FLAGS_MOUNT_PATH } from './feature-flags-host';
+import { LOCALE_MOUNT_PATH } from './i18n-host';
 import { IMPERSONATION_PLATFORM_PATH, IMPERSONATION_TENANT_MOUNT } from './impersonation-host';
 import { demoEntityRoutes } from './lifecycle-demo-crud';
 import { observabilityHarnessRoutes, observabilityRoutes } from './observability-host';
@@ -53,6 +54,13 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   const featureFlags = hosts.featureFlags;
   app.route(FEATURE_FLAGS_MOUNT_PATH, featureFlags.router);
   app.route('/__harness/feature-flags', featureFlags.harnessRoutes);
+
+  // The reader's own language, from `@12-apps/i18n`. Beside the probes rather
+  // than instead of them: those prove how a REQUEST becomes a locale, this
+  // proves the choice outlives the request that made it.
+  const locale = hosts.locale;
+  app.route(LOCALE_MOUNT_PATH, locale.router);
+  app.route('/__harness/locale', locale.harnessRoutes);
 
   app.route('/api/admin/:tenantSlug', hosts.entitlements.router);
   app.route('/api/admin/:tenantSlug', hosts.reports.router);
