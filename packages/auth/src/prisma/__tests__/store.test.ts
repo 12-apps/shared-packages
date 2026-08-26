@@ -192,6 +192,40 @@ describe("createPrismaEmailCredentialsStore", () => {
     expect(tokenDeletes).toEqual([{ userId: "u1", purpose: "PASSWORD_RESET" }]);
   });
 
+  /**
+   * The reader's LANGUAGE survives the join.
+   *
+   * All six mail sends already read `user.locale` off the credential user; the
+   * merge simply never put it there, so every host's stored preference was
+   * dropped one statement before the only code that wanted it. That is the kind
+   * of gap nothing goes red for — a mail in the wrong language is not an
+   * exception — so it is pinned on both sides.
+   */
+  it("carries the host's stored locale onto the credential user", async () => {
+    const { db } = dbStub({ credential: null });
+    const store = createPrismaEmailCredentialsStore({
+      getDb: async () => db,
+      identity: identityStub({
+        findByEmail: async () => ({ ...ANA, locale: "en-US" }),
+      }),
+    });
+
+    expect((await store.findByEmail("ana@b.co"))?.locale).toBe("en-US");
+  });
+
+  it("answers null — never a default — for a host that stores no preference", async () => {
+    // The distinction the whole column exists to keep: "has not chosen" is not
+    // "reads pt-BR". Inventing a tag here would outrank the pack's own default
+    // and make a guess indistinguishable from a choice.
+    const { db } = dbStub({ credential: null });
+    const store = createPrismaEmailCredentialsStore({
+      getDb: async () => db,
+      identity: identityStub(),
+    });
+
+    expect((await store.findById("u1"))?.locale).toBeNull();
+  });
+
   it("passes the user id through as an opaque scalar — no row of its own required", async () => {
     // The no-FK property. A host whose user is gone leaves a credential row
     // that simply matches nothing, rather than a constraint violation.
