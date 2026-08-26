@@ -160,6 +160,13 @@ export function AuditScreen(props: AuditScreenProps & { parts: AuditScreenParts 
           labels={labels}
           vocabulary={parts.vocabulary}
           formatDate={parts.formatDate}
+          // The reader's tag, onward to the two places that actually resolve a
+          // vocabulary label: the grid's rows and the filter pills' options.
+          // Omitting it here resolved every one of them as "nobody said" — so
+          // the whole SCREEN answered in the default language while the
+          // embedded `Viewer`, bound separately in `createWebAudit`, answered
+          // correctly. A gap only a bilingual host could see.
+          {...(parts.locale === undefined ? {} : { locale: parts.locale })}
           filters={filters}
           onFiltersChange={applyFilters}
           {...(parts.fixedFilters ? { fixedFilters: parts.fixedFilters } : {})}
