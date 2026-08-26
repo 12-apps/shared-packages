@@ -1,7 +1,8 @@
 import SearchIcon from '@mui/icons-material/Search';
-import { alpha, Box, InputAdornment, styled, TextField } from '@mui/material';
+import { alpha, Box, InputAdornment, styled } from '@mui/material';
 import type { FC } from 'react';
 import React from 'react';
+import { TextFieldSlim } from '../../form/Input/text-field-slim';
 
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
@@ -15,7 +16,7 @@ const SearchBar = styled(Box)(({ theme }) => ({
   maxWidth: 400,
 }));
 
-const SearchField = styled(TextField)(({ theme }) => ({
+const SearchField = styled(TextFieldSlim)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     background: alpha(theme.palette.background.paper, 0.95),
     backdropFilter: 'blur(10px)',

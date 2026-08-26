@@ -1,4 +1,4 @@
-import { Box, TextField } from '@mui/material';
+import { Box } from '@mui/material';
 import { styled } from '@mui/material';
 import React, { forwardRef } from 'react';
 
@@ -8,8 +8,9 @@ import { useOtpDigits } from './InputOTP.hooks';
 import { otpSlotSx } from './InputOTP.styles';
 import type { OtpSlotFlags } from './InputOTP.styles';
 import type { InputOTPProps } from './InputOTP.types';
+import { TextFieldSlim } from '../Input/text-field-slim';
 
-const StyledOTPInput = styled(TextField, {
+const StyledOTPInput = styled(TextFieldSlim, {
   shouldForwardProp: (prop) =>
     !['customColor', 'customSize', 'glass', 'gradient'].includes(prop as string),
 })<OtpSlotFlags>(({ theme, ...flags }) => ({ ...otpSlotSx(theme, flags) }));

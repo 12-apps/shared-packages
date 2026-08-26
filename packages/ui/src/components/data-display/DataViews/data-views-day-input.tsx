@@ -27,9 +27,9 @@
  * years nobody meant. A bound is written only once the text is a WHOLE, real
  * date, which is what keeps the run above at one request rather than four.
  */
-import { TextField } from '@mui/material';
-import React, { useEffect, useState } from 'react';
 
+import React, { useEffect, useState } from 'react';
+import { TextFieldSlim } from '../../form/Input/text-field-slim';
 
 /**
  * THE MASK IS THE ORDER, and both halves of this file read it.
@@ -145,9 +145,9 @@ export function maskDate(raw: string, mask: string): string {
 }
 
 /**
- * What has to land on the `<input>` itself rather than on the `TextField`.
+ * What has to land on the `<input>` itself rather than on the `TextFieldSlim`.
  *
- * Anything `TextField` does not recognise is spread onto its root `FormControl`
+ * Anything `TextFieldSlim` does not recognise is spread onto its root `FormControl`
  * div. `inputMode` went up there once: the attribute sat on a non-editable
  * wrapper, meant nothing, and the phone went on offering the letter keyboard
  * for a field that only takes digits (the `dd/mm/aaaa` hint under a QWERTY
@@ -229,7 +229,7 @@ export function DayBoundInput({
   }, [applied, mask]);
 
   return (
-    <TextField
+    <TextFieldSlim
       size="small"
       type="text"
       label={label}

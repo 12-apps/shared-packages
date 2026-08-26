@@ -7,11 +7,12 @@
  */
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
-import { IconButton, InputAdornment, TextField } from "@mui/material";
+import { IconButton, InputAdornment } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 
 import { Box } from "../../../mui/Box";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { TextFieldSlim } from "../../form/Input/text-field-slim";
 
 /** How long the box waits after the last keystroke before it queries. */
 const SEARCH_DEBOUNCE_MS = 350;
@@ -76,7 +77,7 @@ export function InlineKeyword({
   }, [draft, value, onChange]);
 
   return (
-    <TextField
+    <TextFieldSlim
       size="small"
       value={draft}
       autoFocus={autoFocus}

@@ -2,7 +2,7 @@
 
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
-import { Box, Button, InputAdornment, TextField, Typography } from '@mui/material';
+import { Box, Button, InputAdornment, Typography } from '@mui/material';
 import React from 'react';
 
 import { SettingsRailGroup, type RailShape } from './SettingsLayout.items';
@@ -13,6 +13,7 @@ import type {
   SettingsNavGroup,
   SettingsRailBreakpoint,
 } from './SettingsLayout.types';
+import { TextFieldSlim } from '../../form/Input/text-field-slim';
 
 interface RailToggleProps {
   title?: React.ReactNode;
@@ -164,7 +165,7 @@ function SettingsRailBody({
           : displayAcrossRail(theme, shape.breakpoint, hidden, 'block')
       }
     >
-      <TextField
+      <TextFieldSlim
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
         placeholder={searchPlaceholder}

@@ -1,5 +1,5 @@
 import type { ConfirmActionCopy } from "../../../copy";
-import { Alert, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Stack, Typography } from '@mui/material';
 import React, { type ReactNode } from 'react';
 
 import { AlertDialog } from '../../data-display/AlertDialog';
@@ -10,6 +10,7 @@ import type {
   ConfirmTone,
   UseConfirmActionResult,
 } from './ConfirmAction.types';
+import { TextFieldSlim } from '../../form/Input/text-field-slim';
 
 const DEFAULT_TEST_ID = 'confirm-action';
 
@@ -76,12 +77,12 @@ function TypeToConfirmField({
       <Typography variant="body2" color="text.secondary">
         {label ?? copy.typeToConfirm(expected)}
       </Typography>
-      <TextField
+      <TextFieldSlim
         size="small"
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        // On the INPUT rather than the wrapper: a test id on MUI's TextField
+        // On the INPUT rather than the wrapper: a test id on the field root
         // lands on the outer div, which is not the node a test can type into.
         inputProps={{
           'aria-label': label ?? copy.typeToConfirm(expected),

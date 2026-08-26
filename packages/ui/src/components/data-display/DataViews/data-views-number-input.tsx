@@ -25,7 +25,7 @@
  * thousands group, and reading it as `5000` is the very failure this replaces.
  *
  * WHICH KEYPAD, and where the request has to be made. `inputMode` goes on the
- * `<input>`, via `inputProps` — set on the `TextField` it rides the spread onto
+ * `<input>`, via `inputProps` — set on the `TextFieldSlim` it rides the spread onto
  * the root `FormControl` div, an element nothing types into, so the attribute
  * has no effect and a phone goes on offering letters for a field that accepts
  * none of them. It is `decimal` rather than `numeric` because the numeric pad
@@ -35,8 +35,9 @@
  * saved-value strip covers the keypad to offer names and addresses, none of
  * which survive `ALLOWED` anyway.
  */
-import { Box, TextField } from '@mui/material';
+import { Box } from '@mui/material';
 import React, { useEffect, useState } from 'react';
+import { TextFieldSlim } from '../../form/Input/text-field-slim';
 
 /** Everything this field lets through: digits and the two separators. */
 const ALLOWED = /[^\d.,]/g;
@@ -114,7 +115,7 @@ export function NumberBoundInput({
   }, [applied]);
 
   return (
-    <TextField
+    <TextFieldSlim
       size="small"
       type="text"
       label={label}
@@ -147,7 +148,7 @@ export function NumberBoundInput({
         )
       }
       InputLabelProps={{ shrink: true }}
-      // `inputMode` belongs on the `<input>`, never on the TextField — see the
+      // `inputMode` belongs on the `<input>`, never on the field root — see the
       // keypad note at the top of this file for what goes wrong up there.
       inputProps={{ 'data-testid': testId, inputMode: 'decimal', autoComplete: 'off' }}
       InputProps={
