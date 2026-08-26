@@ -1,4 +1,7 @@
-import { alpha, Box, styled, Tooltip, Typography, useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { alpha, styled, useTheme } from '@mui/material/styles';
 import type { FC, ReactElement } from 'react';
 import React from 'react';
 

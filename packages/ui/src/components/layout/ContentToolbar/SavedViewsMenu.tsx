@@ -4,7 +4,14 @@ import CheckIcon from '@mui/icons-material/Check';
 import ChevronDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KebabIcon from '@mui/icons-material/MoreVert';
 import ViewIcon from '@mui/icons-material/Visibility';
-import { Box, Button, IconButton, Menu, MenuItem, Popover, Stack, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Popover from '@mui/material/Popover';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import React, { useState } from 'react';
 
 import type {

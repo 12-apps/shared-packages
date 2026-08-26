@@ -1,11 +1,8 @@
-import {
-  alpha,
-  Box,
-  CircularProgress,
-  LinearProgress,
-  Typography,
-} from '@mui/material';
-import { styled, useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
+import Typography from '@mui/material/Typography';
+import { alpha, styled, useTheme } from '@mui/material/styles';
 import React from 'react';
 
 import { resolveProgressProps } from './Progress.helpers';

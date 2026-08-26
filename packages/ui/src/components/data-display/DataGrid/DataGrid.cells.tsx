@@ -10,7 +10,13 @@ import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import UnfoldMore from '@mui/icons-material/UnfoldMore';
-import { Button, Checkbox, IconButton, TableCell, TableRow, Typography, useTheme } from '@mui/material';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import IconButton from '@mui/material/IconButton';
+import TableCell from '@mui/material/TableCell';
+import TableRow from '@mui/material/TableRow';
+import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 import React from 'react';
 
 import { cellValue } from './DataGrid.rows';

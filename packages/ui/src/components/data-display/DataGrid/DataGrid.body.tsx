@@ -5,7 +5,12 @@
  * virtualization spacers — which are pure layout, not data — sit next to the
  * rows they pad rather than in the middle of the component that owns the paper.
  */
-import { Checkbox, TableBody, TableCell, TableHead, TableRow, useTheme } from '@mui/material';
+import Checkbox from '@mui/material/Checkbox';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import { useTheme } from '@mui/material/styles';
 import type React from 'react';
 
 import { GridRow, HeaderCell } from './DataGrid.cells';

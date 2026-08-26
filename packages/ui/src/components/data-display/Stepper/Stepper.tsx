@@ -1,10 +1,8 @@
 import CheckCircle from '@mui/icons-material/CheckCircle';
-import {
-  Box,
-  Button,
-  styled,
-  Typography,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import type { Step, StepItemProps, StepperProps } from './Stepper.types';

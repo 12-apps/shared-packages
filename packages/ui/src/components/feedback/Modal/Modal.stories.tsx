@@ -1,5 +1,8 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { Box, Button, IconButton,Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 

@@ -1,4 +1,4 @@
-import type { PopoverProps as MuiPopoverProps } from '@mui/material';
+import type { PopoverProps as MuiPopoverProps } from '@mui/material/Popover';
 
 export type HoverCardPlacement = 
   | 'top' | 'top-start' | 'top-end'

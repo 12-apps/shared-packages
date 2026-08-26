@@ -22,7 +22,7 @@
  * browser resolves rather than what the source declares.
  */
 import { render, screen } from "@testing-library/react";
-import { createTheme, ThemeProvider } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { describe, expect, it } from "vitest";
 
 import { Alert } from "../Alert";

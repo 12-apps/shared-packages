@@ -1,5 +1,5 @@
 import type { SizeValue } from '../../../tokens/scales';
-import type { SelectProps as MuiSelectProps } from '@mui/material';
+import type { SelectProps as MuiSelectProps } from '@mui/material/Select';
 
 export type SelectVariant = 'default' | 'glass' | 'gradient';
 

@@ -1,4 +1,7 @@
-import { Box, CircularProgress, Divider, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import Typography from '@mui/material/Typography';
 import React from 'react';
 
 import type {

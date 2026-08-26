@@ -1,6 +1,12 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { alpha, Backdrop, Box, Divider, Fade, IconButton, Typography, useTheme } from '@mui/material';
-import type { Theme } from '@mui/material';
+import Backdrop from '@mui/material/Backdrop';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import Fade from '@mui/material/Fade';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

@@ -6,7 +6,8 @@ import PlayIcon from '@mui/icons-material/PlayArrow';
 import ResetZoomIcon from '@mui/icons-material/RestartAlt';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import { Box, IconButton } from '@mui/material';
+import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
 import type { FC } from 'react';
 import React from 'react';
 

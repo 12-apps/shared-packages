@@ -1,5 +1,5 @@
 import CancelIcon from '@mui/icons-material/Cancel';
-import { Chip as MuiChip } from '@mui/material';
+import MuiChip from '@mui/material/Chip';
 import { forwardRef } from 'react';
 
 import {

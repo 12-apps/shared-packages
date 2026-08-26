@@ -1,4 +1,7 @@
-import { Box, ListItem, ListItemText,Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useCallback, useRef, useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';

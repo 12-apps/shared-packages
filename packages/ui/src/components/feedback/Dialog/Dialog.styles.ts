@@ -1,5 +1,5 @@
-import type { SxProps, Theme } from '@mui/material';
-import { alpha, keyframes } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
+import { alpha, keyframes } from '@mui/material/styles';
 
 import { dynamicViewportHeight } from '../../../utils/viewport';
 import type { DialogProps } from './Dialog.types';

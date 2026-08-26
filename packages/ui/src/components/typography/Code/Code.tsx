@@ -1,7 +1,9 @@
 import Check from '@mui/icons-material/Check';
 import ContentCopy from '@mui/icons-material/ContentCopy';
-import { alpha,Box, IconButton, Tooltip } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import { alpha, styled } from '@mui/material/styles';
 import React, { useState } from 'react';
 
 import type { CodeProps } from './Code.types';

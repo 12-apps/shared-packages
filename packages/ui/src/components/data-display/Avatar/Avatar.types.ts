@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { AvatarProps as MuiAvatarProps } from '@mui/material';
+import type { AvatarProps as MuiAvatarProps } from '@mui/material/Avatar';
 import type React from 'react';
 
 /**

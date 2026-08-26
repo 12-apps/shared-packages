@@ -1,4 +1,5 @@
-import { Box, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Banknote, CreditCard, Globe, Heart, Shield,Smartphone, Star, Zap } from 'lucide-react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';

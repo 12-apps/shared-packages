@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { TabsProps as MuiTabsProps } from '@mui/material';
+import type { TabsProps as MuiTabsProps } from '@mui/material/Tabs';
 import type { ReactNode } from 'react';
 
 export interface TabItem {

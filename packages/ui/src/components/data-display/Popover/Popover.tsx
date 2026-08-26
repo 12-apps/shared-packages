@@ -1,6 +1,7 @@
-import type { PaperProps } from '@mui/material';
-import { alpha, keyframes,Paper, Popover as MuiPopover } from '@mui/material';
-import { styled } from '@mui/material';
+import type { PaperProps } from '@mui/material/Paper';
+import Paper from '@mui/material/Paper';
+import MuiPopover from '@mui/material/Popover';
+import { alpha, keyframes, styled } from '@mui/material/styles';
 import React from 'react';
 
 import type { PopoverProps } from './Popover.types';

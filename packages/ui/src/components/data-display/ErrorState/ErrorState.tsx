@@ -1,8 +1,12 @@
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import { Box, Button, Stack, Typography, useTheme } from '@mui/material';
-import type { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 import React from 'react';
 
 import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';

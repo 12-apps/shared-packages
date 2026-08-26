@@ -1,5 +1,7 @@
-import { Box, CircularProgress, Fade } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Fade from '@mui/material/Fade';
+import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import type { TabPanelProps } from './Tabs.types';

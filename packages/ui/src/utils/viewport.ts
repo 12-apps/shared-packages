@@ -1,4 +1,4 @@
-import type { CSSObject } from '@mui/material';
+import type { CSSObject } from '@mui/material/styles';
 
 /**
  * Viewport helpers for full-height surfaces (dialogs, drawers, slide-overs).

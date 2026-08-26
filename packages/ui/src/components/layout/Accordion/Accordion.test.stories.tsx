@@ -1,6 +1,9 @@
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import Settings from '@mui/icons-material/Settings';
-import { Box, Button, Stack,Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';

@@ -1,5 +1,7 @@
-import { Box, Slider as MuiSlider, Typography } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import MuiSlider from '@mui/material/Slider';
+import Typography from '@mui/material/Typography';
+import { styled } from '@mui/material/styles';
 import React, { forwardRef } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

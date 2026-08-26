@@ -1,4 +1,5 @@
-import { Box, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Bell, BellOff,Moon, Sun, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-react';
 import { useState } from 'react';

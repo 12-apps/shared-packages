@@ -1,14 +1,12 @@
-import {
-  Alert,
-  Avatar,
-  Box,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Paper,
-  Skeleton,
-  Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Avatar from '@mui/material/Avatar';
+import Box from '@mui/material/Box';
+import ListItem from '@mui/material/ListItem';
+import ListItemAvatar from '@mui/material/ListItemAvatar';
+import ListItemText from '@mui/material/ListItemText';
+import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test';

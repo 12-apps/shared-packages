@@ -1,4 +1,6 @@
-import { Box, Paper, useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import { useTheme } from '@mui/material/styles';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Heart, Pause,Play, Settings, Star } from 'lucide-react';
 import React, { useState } from 'react';

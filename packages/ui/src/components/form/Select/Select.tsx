@@ -1,15 +1,9 @@
-import {
-  alpha,
-  type CSSObject,
-  FormControl,
-  FormHelperText,
-  InputLabel,
-  keyframes,
-  MenuItem,
-  Select as MuiSelect,
-  styled,
-  type Theme,
-} from '@mui/material';
+import FormControl from '@mui/material/FormControl';
+import FormHelperText from '@mui/material/FormHelperText';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import MuiSelect from '@mui/material/Select';
+import { alpha, type CSSObject, keyframes, styled, type Theme } from '@mui/material/styles';
 import React from 'react';
 
 import type { SelectProps } from './Select.types';

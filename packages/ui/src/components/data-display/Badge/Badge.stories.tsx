@@ -12,17 +12,14 @@ import Star from '@mui/icons-material/Star';
 import TrendingUp from '@mui/icons-material/TrendingUp';
 import Verified from '@mui/icons-material/Verified';
 import Warning from '@mui/icons-material/Warning';
-import {
-  Avatar,
-  Box,
-  Button,
-  createTheme,
-  IconButton,
-  Paper,
-  Stack,
-  ThemeProvider,
-  Typography,
-} from '@mui/material';
+import Avatar from '@mui/material/Avatar';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 

@@ -1,5 +1,6 @@
-import type { TextFieldProps } from '@mui/material';
-import { alpha, styled, TextField } from '@mui/material';
+import type { TextFieldProps } from '@mui/material/TextField';
+import TextField from '@mui/material/TextField';
+import { alpha, styled } from '@mui/material/styles';
 import type { FC } from 'react';
 import React from 'react';
 

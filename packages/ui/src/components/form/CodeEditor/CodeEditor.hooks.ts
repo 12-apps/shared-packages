@@ -1,5 +1,5 @@
 import type { Monaco } from '@monaco-editor/react';
-import { useTheme } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import type { editor } from 'monaco-editor';
 import React, { useEffect, useRef } from 'react';
 

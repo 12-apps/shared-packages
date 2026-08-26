@@ -7,7 +7,9 @@ import Edit from '@mui/icons-material/Edit';
 import Settings from '@mui/icons-material/Settings';
 import Share from '@mui/icons-material/Share';
 import Star from '@mui/icons-material/Star';
-import { Box, Paper, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 

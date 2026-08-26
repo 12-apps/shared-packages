@@ -3,14 +3,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import PrevIcon from '@mui/icons-material/NavigateBefore';
 import NextIcon from '@mui/icons-material/NavigateNext';
 import RestartIcon from '@mui/icons-material/Refresh';
-import {
-  alpha,
-  Box,
-  Button,
-  IconButton,
-  Stack,
-  styled,
-  Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { alpha, styled } from '@mui/material/styles';
 import React, {  } from 'react';
 
 import type { TutorialOverlayProps } from './TutorialOverlay.types';

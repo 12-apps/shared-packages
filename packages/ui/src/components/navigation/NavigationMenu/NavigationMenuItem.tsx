@@ -1,17 +1,16 @@
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import {
-  Box,
-  Collapse,
-  Fade,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  Grow,
-  ListItemText,
-  Popover } from '@mui/material';
-import { alpha, styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import Collapse from '@mui/material/Collapse';
+import Fade from '@mui/material/Fade';
+import Grow from '@mui/material/Grow';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Popover from '@mui/material/Popover';
+import { alpha, styled } from '@mui/material/styles';
 import React, {  } from 'react';
 
 import { useMenuItemState } from './NavigationMenuItem.hooks';

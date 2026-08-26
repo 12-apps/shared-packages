@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box';
 import type { ReactNode } from 'react';
 
 import { Text } from '../../typography/Text/Text';

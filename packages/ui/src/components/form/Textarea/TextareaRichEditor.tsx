@@ -8,9 +8,12 @@ import FormatListNumbered from '@mui/icons-material/FormatListNumbered';
 import FormatQuote from '@mui/icons-material/FormatQuote';
 import FormatUnderlined from '@mui/icons-material/FormatUnderlined';
 import Link from '@mui/icons-material/Link';
-import { alpha, Box, Divider, IconButton, Tooltip } from '@mui/material';
-import type { Theme } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import { alpha, styled } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { floatAnimation, getColorFromTheme } from './Textarea.styles';

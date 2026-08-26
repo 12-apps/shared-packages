@@ -1,4 +1,6 @@
-import { Box, Collapse,useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Collapse from '@mui/material/Collapse';
+import { useTheme } from '@mui/material/styles';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 
 import {

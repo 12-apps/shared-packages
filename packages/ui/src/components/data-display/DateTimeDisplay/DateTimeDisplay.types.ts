@@ -1,5 +1,5 @@
 import type { SizeValue } from '../../../tokens/scales';
-import type { SxProps, Theme } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
 
 export interface DateTimeDisplayProps {
   /**

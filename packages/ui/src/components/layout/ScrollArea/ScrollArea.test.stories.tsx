@@ -8,7 +8,12 @@
  * top, scrollHeight for bottom) rather than to arbitrary thresholds.
  */
 /* eslint-disable test-flakiness/no-viewport-dependent -- scroll position is this component's contract */
-import { Box, Button, List, ListItem,TextField, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';

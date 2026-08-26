@@ -1,5 +1,9 @@
 import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp';
-import { alpha, Box, CircularProgress,Fab, useTheme, Zoom } from '@mui/material';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Fab from '@mui/material/Fab';
+import Zoom from '@mui/material/Zoom';
+import { alpha, useTheme } from '@mui/material/styles';
 import type { FC } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 

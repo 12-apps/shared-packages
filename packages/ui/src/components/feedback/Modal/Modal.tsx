@@ -1,4 +1,7 @@
-import { Backdrop, Box, Modal as MuiModal, useTheme } from '@mui/material';
+import Backdrop from '@mui/material/Backdrop';
+import Box from '@mui/material/Box';
+import MuiModal from '@mui/material/Modal';
+import { useTheme } from '@mui/material/styles';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

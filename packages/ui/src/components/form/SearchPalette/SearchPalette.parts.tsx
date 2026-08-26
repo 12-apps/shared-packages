@@ -1,16 +1,14 @@
 import KeyboardReturnIcon from '@mui/icons-material/KeyboardReturn';
 import SearchIcon from '@mui/icons-material/Search';
-import {
-  Avatar,
-  Box,
-  Chip,
-  CircularProgress,
-  InputBase,
-  List,
-  ListItemButton,
-  Paper,
-  Typography,
-} from '@mui/material';
+import Avatar from '@mui/material/Avatar';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import InputBase from '@mui/material/InputBase';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
 import React from 'react';
 
 import type { SearchFilterChip, SearchResultLead } from './SearchPalette.types';

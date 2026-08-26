@@ -4,15 +4,13 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FilterIcon from '@mui/icons-material/FilterListRounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
-import {
-  Box,
-  Breadcrumbs as MuiBreadcrumbs,
-  Button,
-  Collapse,
-  Link as MuiLink,
-  Typography,
-} from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import MuiBreadcrumbs from '@mui/material/Breadcrumbs';
+import Button from '@mui/material/Button';
+import Collapse from '@mui/material/Collapse';
+import MuiLink from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { styled } from '@mui/material/styles';
 import React, { useMemo, useState } from 'react';
 
 import { DashboardContext, useDashboardContext } from './DashboardContext';

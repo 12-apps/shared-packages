@@ -1,4 +1,6 @@
-import { Box, CircularProgress, styled, useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import { styled, useTheme } from '@mui/material/styles';
 import React from 'react';
 import { Skeleton } from '../../layout/Skeleton';
 import type { ResolvedLazyImageProps } from './LazyImage.hooks';

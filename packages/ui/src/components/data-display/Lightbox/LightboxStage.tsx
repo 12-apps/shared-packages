@@ -1,4 +1,7 @@
-import { Box, CircularProgress, DialogContent, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import DialogContent from '@mui/material/DialogContent';
+import Typography from '@mui/material/Typography';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 

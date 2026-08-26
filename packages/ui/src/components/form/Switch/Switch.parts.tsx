@@ -1,5 +1,8 @@
-import { Box, FormHelperText, Switch as MuiSwitch, Typography } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import FormHelperText from '@mui/material/FormHelperText';
+import MuiSwitch from '@mui/material/Switch';
+import Typography from '@mui/material/Typography';
+import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import { switchSx } from './Switch.styles';

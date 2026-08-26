@@ -22,8 +22,10 @@
  * finished window, so a half-picked or impossible range has somewhere to live
  * while it is being fixed. Every `onChange` carries the verdict with it.
  */
-import { Box, Paper, useMediaQuery } from '@mui/material';
-import type { SxProps, Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import type { SxProps, Theme } from '@mui/material/styles';
 import React from 'react';
 
 import { Calendar } from '../Calendar';

@@ -1,5 +1,6 @@
 import LocationIcon from '@mui/icons-material/LocationOn';
-import { alpha, Box, styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import { alpha, styled } from '@mui/material/styles';
 import type { FC, HTMLAttributes } from 'react';
 import React from 'react';
 

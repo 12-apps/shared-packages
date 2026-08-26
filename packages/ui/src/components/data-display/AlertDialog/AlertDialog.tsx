@@ -1,21 +1,17 @@
 import Close from '@mui/icons-material/Close';
 import Error from '@mui/icons-material/Error';
 import Info from '@mui/icons-material/Info';
-import type { ButtonProps } from '@mui/material';
-import {
-  alpha,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  IconButton,
-  keyframes,
-  Typography,
-} from '@mui/material';
-import { styled } from '@mui/material';
+import type { ButtonProps } from '@mui/material/Button';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import { alpha, keyframes, styled } from '@mui/material/styles';
 import React from 'react';
 
 import type { AlertDialogProps } from './AlertDialog.types';

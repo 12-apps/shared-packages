@@ -1,5 +1,5 @@
-import { ToggleButton } from '@mui/material';
-import { styled } from '@mui/material';
+import ToggleButton from '@mui/material/ToggleButton';
+import { styled } from '@mui/material/styles';
 import React, { forwardRef } from 'react';
 
 import {

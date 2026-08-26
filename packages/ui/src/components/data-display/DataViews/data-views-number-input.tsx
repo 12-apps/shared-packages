@@ -35,7 +35,8 @@
  * saved-value strip covers the keypad to offer names and addresses, none of
  * which survive `ALLOWED` anyway.
  */
-import { Box, TextField } from '@mui/material';
+import Box from '@mui/material/Box';
+import TextField from '@mui/material/TextField';
 import React, { useEffect, useState } from 'react';
 
 /** Everything this field lets through: digits and the two separators. */

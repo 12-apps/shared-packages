@@ -1,5 +1,8 @@
 import type { ConfirmActionCopy } from "../../../copy";
-import { Alert, Stack, TextField, Typography } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import React, { type ReactNode } from 'react';
 
 import { AlertDialog } from '../../data-display/AlertDialog';

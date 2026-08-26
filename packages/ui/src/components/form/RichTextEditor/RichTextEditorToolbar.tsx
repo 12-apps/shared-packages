@@ -8,7 +8,13 @@ import FormatStrikethrough from '@mui/icons-material/FormatStrikethrough';
 import FormatUnderlined from '@mui/icons-material/FormatUnderlined';
 import Image from '@mui/icons-material/Image';
 import Link from '@mui/icons-material/Link';
-import { alpha, Box, Divider, IconButton, Toolbar, Tooltip, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import Toolbar from '@mui/material/Toolbar';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import type { FC, ReactElement } from 'react';
 import React from 'react';
 

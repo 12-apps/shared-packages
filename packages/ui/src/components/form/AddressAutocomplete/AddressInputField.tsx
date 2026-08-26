@@ -1,6 +1,8 @@
 import CurrentLocationIcon from '@mui/icons-material/MyLocation';
-import type { AutocompleteRenderInputParams } from '@mui/material';
-import { CircularProgress, IconButton, InputAdornment } from '@mui/material';
+import type { AutocompleteRenderInputParams } from '@mui/material/Autocomplete';
+import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 

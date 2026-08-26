@@ -1,4 +1,7 @@
-import { Alert, Box, CircularProgress, InputAdornment } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import InputAdornment from '@mui/material/InputAdornment';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 

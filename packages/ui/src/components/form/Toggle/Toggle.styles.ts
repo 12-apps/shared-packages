@@ -1,5 +1,5 @@
-import { alpha, keyframes } from '@mui/material';
-import type { CSSObject, PaletteColor, Theme } from '@mui/material';
+import { alpha, keyframes } from '@mui/material/styles';
+import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles';
 
 const glowAnimation = keyframes`
   0% { box-shadow: 0 0 5px currentColor; }

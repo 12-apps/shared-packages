@@ -1,11 +1,9 @@
-import {
-  alpha,
-  Box,
-  Paper,
-  useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import { alpha, useTheme } from '@mui/material/styles';
 import React, { forwardRef } from 'react';
 
-import type { Theme } from '@mui/material';
+import type { Theme } from '@mui/material/styles';
 import { useRichTextEditor } from './RichTextEditor.hooks';
 import type { RichTextEditorProps, ToolbarConfig } from './RichTextEditor.types';
 import { RichTextEditorToolbar } from './RichTextEditorToolbar';

@@ -1,2 +1,2 @@
-export type { InputLabelProps } from '@mui/material';
-export { InputLabel, InputLabel as default } from '@mui/material';
+export type { InputLabelProps } from '@mui/material/InputLabel';
+export { default as InputLabel, default } from '@mui/material/InputLabel';

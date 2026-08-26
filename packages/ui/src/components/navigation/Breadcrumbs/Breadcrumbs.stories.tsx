@@ -10,8 +10,13 @@ import Home from '@mui/icons-material/Home';
 import Security from '@mui/icons-material/Security';
 import Settings from '@mui/icons-material/Settings';
 import Storage from '@mui/icons-material/Storage';
-import { Box, createTheme, CssBaseline, Paper, Stack,ThemeProvider } from '@mui/material';
-import { Button, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import CssBaseline from '@mui/material/CssBaseline';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 

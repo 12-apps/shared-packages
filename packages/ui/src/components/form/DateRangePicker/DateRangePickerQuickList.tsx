@@ -12,8 +12,8 @@
  * the window it hands back, both answer "why can't I have this year?" with
  * silence.
  */
-import { Box } from '@mui/material';
-import type { SxProps, Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import type { SxProps, Theme } from '@mui/material/styles';
 import React, { useId } from 'react';
 
 import type { ResolvedQuickRange } from './DateRangePicker.types';

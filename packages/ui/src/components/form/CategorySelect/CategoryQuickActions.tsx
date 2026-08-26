@@ -1,6 +1,6 @@
 'use client';
 
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box';
 import { useMemo } from 'react';
 
 import type { CategorySelectCopy } from '../../../copy';

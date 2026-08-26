@@ -1,5 +1,6 @@
-import { Badge as MuiBadge, Zoom } from '@mui/material';
-import { styled } from '@mui/material';
+import MuiBadge from '@mui/material/Badge';
+import Zoom from '@mui/material/Zoom';
+import { styled } from '@mui/material/styles';
 import React, { useEffect,useState } from 'react';
 
 import {

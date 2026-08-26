@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { ToggleButtonGroupProps } from '@mui/material';
+import type { ToggleButtonGroupProps } from '@mui/material/ToggleButtonGroup';
 import type React from 'react';
 
 export interface ToggleOption {

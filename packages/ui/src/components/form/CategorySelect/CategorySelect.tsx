@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { useMediaQuery, useTheme } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { summarizeSelection } from './category-tree';
 import { CategoryPanel } from './CategoryPanel';

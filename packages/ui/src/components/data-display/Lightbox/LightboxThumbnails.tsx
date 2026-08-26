@@ -1,5 +1,5 @@
 import PlayIcon from '@mui/icons-material/PlayArrow';
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box';
 import type { FC } from 'react';
 import React from 'react';
 

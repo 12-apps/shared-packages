@@ -3,17 +3,14 @@ import CloseIcon from '@mui/icons-material/Close';
 import ErrorIcon from '@mui/icons-material/Error';
 import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
-import {
-  alpha,
-  Box,
-  Button,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Typography,
-  useTheme,
-} from '@mui/material';
-import type { CSSObject, Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import Collapse from '@mui/material/Collapse';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
+import type { CSSObject, Theme } from '@mui/material/styles';
 import React from 'react';
 
 import type { SonnerItem } from './Sonner.types';

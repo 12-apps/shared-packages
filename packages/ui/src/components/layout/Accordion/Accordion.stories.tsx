@@ -3,7 +3,10 @@ import Help from '@mui/icons-material/Help';
 import Info from '@mui/icons-material/Info';
 import Security from '@mui/icons-material/Security';
 import Settings from '@mui/icons-material/Settings';
-import { Box, Button, Stack,Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 

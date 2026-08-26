@@ -32,24 +32,20 @@
  * (unreachable through `InputProps`, which is `InputHTMLAttributes`), and the
  * dev-only warning about `children` that only the select branch could emit.
  */
-import {
-  FilledInput,
-  FormControl,
-  FormHelperText,
-  Input as StandardInput,
-  InputLabel,
-  OutlinedInput,
-  styled,
-} from '@mui/material';
-import type {
-  FilledInputProps,
-  FormControlProps,
-  FormHelperTextProps,
-  InputBaseComponentProps,
-  InputLabelProps,
-  InputProps as MuiInputProps,
-  OutlinedInputProps,
-} from '@mui/material';
+import FilledInput from '@mui/material/FilledInput';
+import FormControl from '@mui/material/FormControl';
+import FormHelperText from '@mui/material/FormHelperText';
+import StandardInput from '@mui/material/Input';
+import InputLabel from '@mui/material/InputLabel';
+import OutlinedInput from '@mui/material/OutlinedInput';
+import { styled } from '@mui/material/styles';
+import type { FilledInputProps } from '@mui/material/FilledInput';
+import type { FormControlProps } from '@mui/material/FormControl';
+import type { FormHelperTextProps } from '@mui/material/FormHelperText';
+import type { InputProps as MuiInputProps } from '@mui/material/Input';
+import type { InputBaseComponentProps } from '@mui/material/InputBase';
+import type { InputLabelProps } from '@mui/material/InputLabel';
+import type { OutlinedInputProps } from '@mui/material/OutlinedInput';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';

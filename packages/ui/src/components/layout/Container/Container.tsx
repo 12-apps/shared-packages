@@ -1,5 +1,6 @@
-import { Container as MuiContainer, useTheme } from '@mui/material';
-import type { SxProps, Theme } from '@mui/material';
+import MuiContainer from '@mui/material/Container';
+import { useTheme } from '@mui/material/styles';
+import type { SxProps, Theme } from '@mui/material/styles';
 import React from 'react';
 
 import type { ContainerProps } from './Container.types';

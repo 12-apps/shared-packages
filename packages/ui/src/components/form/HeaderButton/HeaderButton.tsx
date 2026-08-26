@@ -1,7 +1,8 @@
 'use client';
 
-import { Box, Button } from '@mui/material';
-import type { ButtonProps } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import type { ButtonProps } from '@mui/material/Button';
 import type { ReactNode } from 'react';
 
 type Breakpoint = 'sm' | 'md' | 'lg';

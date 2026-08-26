@@ -1,6 +1,6 @@
 import Inventory2Icon from '@mui/icons-material/Inventory2';
-import { CssBaseline } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material';
+import CssBaseline from '@mui/material/CssBaseline';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { useState } from 'react';

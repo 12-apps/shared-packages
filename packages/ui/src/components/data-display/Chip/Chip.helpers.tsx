@@ -1,5 +1,5 @@
-import { Avatar } from '@mui/material';
-import type { SxProps, Theme } from '@mui/material';
+import Avatar from '@mui/material/Avatar';
+import type { SxProps, Theme } from '@mui/material/styles';
 import type { KeyboardEvent, ReactElement } from 'react';
 import React from 'react';
 

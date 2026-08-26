@@ -2,7 +2,11 @@ import ContentCopy from '@mui/icons-material/ContentCopy';
 import Edit from '@mui/icons-material/Edit';
 import Folder from '@mui/icons-material/Folder';
 import Star from '@mui/icons-material/Star';
-import { Box, Card, CardContent,Paper, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { ContextMenu } from './ContextMenu';

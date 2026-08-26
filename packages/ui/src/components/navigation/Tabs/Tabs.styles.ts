@@ -1,5 +1,5 @@
-import type { CSSObject, Theme } from '@mui/material';
-import { alpha } from '@mui/material';
+import type { CSSObject, Theme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 
 const sizeStyles = (theme: Theme, size?: string): CSSObject => ({
     ...(size === 'sm' && {

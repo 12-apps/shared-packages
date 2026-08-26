@@ -1,4 +1,5 @@
-import { Box, createTheme,ThemeProvider } from '@mui/material';
+import Box from '@mui/material/Box';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';

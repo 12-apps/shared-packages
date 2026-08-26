@@ -1,12 +1,10 @@
 import Close from '@mui/icons-material/Close';
-import {
-  alpha,
-  Badge,
-  Box,
-  Divider,
-  Tab as MuiTab,
-  Tabs as MuiTabs } from '@mui/material';
-import { styled } from '@mui/material';
+import Badge from '@mui/material/Badge';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import MuiTab from '@mui/material/Tab';
+import MuiTabs from '@mui/material/Tabs';
+import { alpha, styled } from '@mui/material/styles';
 import React from 'react';
 
 import { CustomTabPanel } from './TabsPanel';

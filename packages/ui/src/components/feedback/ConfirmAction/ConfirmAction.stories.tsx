@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Stack } from '@mui/material';
+import Stack from '@mui/material/Stack';
 
 import { Button } from '../../form/Button';
 

@@ -1,5 +1,5 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
-import type { BreadcrumbsProps as MuiBreadcrumbsProps } from '@mui/material';
+import type { BreadcrumbsProps as MuiBreadcrumbsProps } from '@mui/material/Breadcrumbs';
 import type { ReactNode } from 'react';
 import type { BreadcrumbCopy } from '../../../copy';
 

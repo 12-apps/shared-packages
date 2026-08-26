@@ -1,4 +1,7 @@
-import { alpha, Box, Paper, styled, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import { alpha, styled } from '@mui/material/styles';
 import type { FC } from 'react';
 import React, { useMemo } from 'react';
 

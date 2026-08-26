@@ -1,5 +1,5 @@
 import type { SizeValue } from '../../../tokens/scales';
-import type { ModalProps as MuiModalProps } from '@mui/material';
+import type { ModalProps as MuiModalProps } from '@mui/material/Modal';
 import type { ReactNode } from 'react';
 
 export type ModalVariant = 'center' | 'top' | 'bottom' | 'glass';

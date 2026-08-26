@@ -1,4 +1,5 @@
-import { createTheme,Stack, ThemeProvider } from '@mui/material';
+import Stack from '@mui/material/Stack';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';

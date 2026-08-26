@@ -1,17 +1,13 @@
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 
-import {
-  alpha,
-  Box,
-  Chip,
-  Fade,
-  keyframes,
-  LinearProgress,
-  Stack,
-  styled,
-  Typography,
-  useTheme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Fade from '@mui/material/Fade';
+import LinearProgress from '@mui/material/LinearProgress';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { alpha, keyframes, styled, useTheme } from '@mui/material/styles';
 import type { FC} from 'react';
 import React, { useMemo } from 'react';
 

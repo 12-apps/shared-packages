@@ -1,4 +1,6 @@
-import { Dialog, Slide, styled } from '@mui/material';
+import Dialog from '@mui/material/Dialog';
+import Slide from '@mui/material/Slide';
+import { styled } from '@mui/material/styles';
 import type { TransitionProps } from '@mui/material/transitions';
 import type { FC } from 'react';
 import React, { forwardRef, useId } from 'react';

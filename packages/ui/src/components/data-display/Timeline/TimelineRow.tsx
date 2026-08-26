@@ -1,18 +1,16 @@
 import DotIcon from '@mui/icons-material/Circle';
 import ExpandIcon from '@mui/icons-material/ExpandMore';
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Collapse,
-  Fade,
-  IconButton,
-  Stack,
-  Typography,
-} from '@mui/material';
-import { alpha, keyframes, styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
+import Fade from '@mui/material/Fade';
+import IconButton from '@mui/material/IconButton';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { alpha, keyframes, styled } from '@mui/material/styles';
 import React from 'react';
 
 import type { TimelineItem, TimelineProps } from './Timeline.types';

@@ -15,7 +15,8 @@
  * views already use. Same package, imported rather than re-implemented: a
  * second masked date field is a second set of rules for what backspace does.
  */
-import { Box, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import React from 'react';
 
 import { DayBoundInput } from '../../data-display/DataViews/data-views-day-input';

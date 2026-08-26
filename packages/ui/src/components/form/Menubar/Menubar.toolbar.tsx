@@ -1,5 +1,7 @@
-import { Box, CircularProgress, Toolbar } from '@mui/material';
-import type { CSSObject } from '@mui/material';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Toolbar from '@mui/material/Toolbar';
+import type { CSSObject } from '@mui/material/styles';
 import React from 'react';
 
 import { MenubarItemView } from './Menubar.item';

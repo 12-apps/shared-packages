@@ -1,7 +1,8 @@
 'use client';
 
-import { Box, useTheme } from '@mui/material';
-import type { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 import React from 'react';
 
 import type { SizeValue } from '../../../tokens/scales';

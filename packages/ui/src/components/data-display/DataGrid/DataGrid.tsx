@@ -11,7 +11,9 @@
  * on the populated one, so a grid whose first paint had no rows could not be
  * found by a test at all — see `DataGrid.states.tsx` for the full story.
  */
-import { Paper, Table, TableContainer } from '@mui/material';
+import Paper from '@mui/material/Paper';
+import Table from '@mui/material/Table';
+import TableContainer from '@mui/material/TableContainer';
 import type React from 'react';
 
 import { GridBody, GridHeader } from './DataGrid.body';

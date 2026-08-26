@@ -1,4 +1,5 @@
-import { useMediaQuery, useTheme } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useModalStack } from './modal-stack';

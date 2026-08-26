@@ -1,19 +1,17 @@
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import {
-  Box,
-  FormControlLabel,
-  IconButton,
-  Menu,
-  MenuItem,
-  Skeleton,
-  Switch,
-  Table as MuiTable,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow
-  } from '@mui/material';
-import { styled } from '@mui/material';
+import Box from '@mui/material/Box';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import IconButton from '@mui/material/IconButton';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Skeleton from '@mui/material/Skeleton';
+import Switch from '@mui/material/Switch';
+import MuiTable from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableRow from '@mui/material/TableRow';
+import { styled } from '@mui/material/styles';
 import React from 'react';
 
 import type {
