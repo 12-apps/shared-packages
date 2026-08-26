@@ -2,7 +2,7 @@ import type { JSX, ReactNode } from 'react';
 
 import { createWebAuth } from '@12-apps/auth/react';
 import { PT_BR, PT_BR_PAGES } from '@12-apps/auth/react';
-import type { createWebEmailAuth, createEmailAuthSettingsScreen } from '@12-apps/auth/react';
+import type { createWebEmailAuth } from '@12-apps/auth/react';
 import { createEmailAuthSettingsClient, PT_BR_SETTINGS } from '@12-apps/auth/react';
 import { authManifest, authPlatformManifest } from '@12-apps/auth/manifest';
 import { authPlatformWebManifest, authWebManifest } from '@12-apps/auth/manifest/web';
@@ -22,8 +22,8 @@ import { webWiringHost } from '../wiring-web';
  *    `emailAuthRouter` mounts on the backend;
  *  - `createEmailAuthScreens` — the nine screens, bound to that client, this
  *    app's session and a copy pack;
- *  - `createEmailAuthSettingsScreen` — the operator console for the two
- *    platform switches.
+ *  - `createWebAuthSettings` — the operator console for the two platform
+ *    switches, as the record its area row names.
  *
  * Module scope on purpose. Each factory is called once and its components are
  * imported ready-made, so no page below passes config and no component reads a
@@ -146,9 +146,17 @@ const { surface: settingsSurface } = webWiringHost.adoptWeb({
   },
 });
 
-export const AuthSettingsScreen = settingsSurface as ReturnType<
-  typeof createEmailAuthSettingsScreen
->;
+/**
+ * The console, looked up BY THE NAME its area row carries.
+ *
+ * `authPlatformWebManifest` suggests `{ path: 'auth-settings', screen: 'page' }`,
+ * and a screen name is a key of the built surface — so this is the lookup the
+ * manifest's own row describes, rather than a cast that happens to agree with
+ * it. It read `settingsSurface as ReturnType<typeof createEmailAuthSettingsScreen>`
+ * while the surface WAS the component, which is exactly how the mismatch stayed
+ * invisible: the one adopter never asked the manifest what it said.
+ */
+export const AuthSettingsScreen = settingsSurface.page;
 
 
 /** Go to one of them. A plain assignment: the shell routes on `hashchange`. */

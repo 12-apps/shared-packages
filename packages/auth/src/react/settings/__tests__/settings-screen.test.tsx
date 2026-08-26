@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PT_BR_SETTINGS } from "../pt-BR";
 import {
   createEmailAuthSettingsScreen,
+  createWebAuthSettings,
   type EmailAuthSettingsSnapshot,
 } from "../index";
 
@@ -124,5 +125,25 @@ describe("createEmailAuthSettingsScreen", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auth-settings-error")).toBeTruthy();
     });
+  });
+});
+
+describe("createWebAuthSettings", () => {
+  it("builds the console under `page`, the name its area row carries", async () => {
+    // The manifest suggests one route whose screen is `page`, and a screen name
+    // is a KEY of the built surface. This is the lookup a host projecting areas
+    // performs; while the surface WAS the component it returned `undefined`,
+    // which renders as a blank page with nothing in any log.
+    const surface = createWebAuthSettings({
+      client: { read: async () => METHOD_ON, save: async () => METHOD_ON },
+      copy: PT_BR_SETTINGS,
+      formatWhen: (iso) => iso,
+    });
+
+    expect(Object.keys(surface)).toEqual(["page"]);
+
+    const Page = surface.page;
+    render(<Page />);
+    expect(await screen.findByTestId("toggle-email-password")).toBeTruthy();
   });
 });

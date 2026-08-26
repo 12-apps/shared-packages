@@ -223,27 +223,43 @@ describe("authWebManifest", () => {
    * makes tests order-dependent, which the flakiness gate rejects — and here
    * it would be shared across files that never asked for it.
    */
-  const suggestedScreens = (): string[] =>
-    [...(web.areas ?? []), ...(webPlatform.areas ?? [])]
-      .flatMap((area) => area.routes ?? [])
-      .map((route) => route.screen);
+  const suggestedScreens = (manifest: AnyWebManifest): string[] =>
+    (manifest.areas ?? []).flatMap((area) => area.routes ?? []).map((route) => route.screen);
 
   it("names screens that the built surface actually exposes", () => {
     // The integrity property the docs promise: a host projecting a route looks
     // the component up by this name rather than guessing. A rename here that
     // did not reach the surface would be a host-side undefined component,
     // which renders as a blank page with nothing in any log.
-    const surface = authWebManifest.surface?.create({
+    //
+    // Each manifest is checked against ITS OWN surface. Both used to be checked
+    // against the sign-in one, with `page` filtered out — and the filter was
+    // the defect rather than a carve-out: the platform surface was the settings
+    // component itself, so the only row it suggests resolved to `undefined`.
+    const screens = authWebManifest.surface?.create({
       copy: {} as never,
       pages: {} as never,
       useSession: () => ({}) as never,
       Link: (() => null) as never,
     }) as unknown as Record<string, unknown>;
 
-    for (const name of suggestedScreens().filter((n) => n !== "page")) {
-      expect(surface[name], `${name} is suggested by an area but not on the surface`).toBeTypeOf(
-        "function",
-      );
+    const platform = authPlatformWebManifest.surface?.create({
+      client: {} as never,
+      copy: {} as never,
+      formatWhen: () => "",
+    }) as unknown as Record<string, unknown>;
+
+    const cases: [AnyWebManifest, Record<string, unknown>][] = [
+      [web, screens],
+      [webPlatform, platform],
+    ];
+
+    for (const [manifest, surface] of cases) {
+      for (const name of suggestedScreens(manifest)) {
+        expect(surface[name], `${name} is suggested by an area but not on the surface`).toBeTypeOf(
+          "function",
+        );
+      }
     }
   });
 
