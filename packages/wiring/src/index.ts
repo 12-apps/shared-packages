@@ -57,6 +57,7 @@ export type {
   AnyNotificationBlueprint,
   WireNotificationBlueprint,
   WireNotificationContent,
+  WireNotificationContext,
 } from "./contract/notifications";
 
 export type { EmailContribution, EmailPort, WireEmailMessage } from "./contract/email";

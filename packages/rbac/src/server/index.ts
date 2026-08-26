@@ -182,3 +182,4 @@ export {
 } from './notifications';
 export { PT_BR_TEAM_INVITED_COPY } from './pt-BR';
 export { EN_US_TEAM_INVITED_COPY } from './en-US';
+export { TEAM_INVITED_COPY } from './locales';

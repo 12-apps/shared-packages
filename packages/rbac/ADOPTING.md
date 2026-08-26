@@ -361,6 +361,19 @@ This package keeps only its own two domains (`Papéis`, `Equipe`).
 
 ### If your readers do not share a language
 
+**The invite NOTICE too.** `createTeamInvitedBlueprint` takes a table or a
+resolver, and calls it inside `generate` — at the moment the recipient is
+known, never when you build the blueprint. `TEAM_INVITED_COPY` in `/server` is
+the pt-BR/en-US pair; hand it over as `localeCopy(TEAM_INVITED_COPY)`.
+
+The reader is the INVITEE, not the administrator who sent the invite, so the
+tag arrives on the blueprint's context — off the recipient — rather than from
+anything ambient. Your notifications runtime supplies it (`@12-apps/notifications`
+reads it from `getContact`); pass nothing and the blueprint answers with its
+default exactly as before.
+
+### If your readers do not share a language
+
 Both of those fields — a contribution's `labels` and the policy's `roleLabels`
 — take a vocabulary **or a resolver**: `localeCopy(MY_LABELS)` from
 `@12-apps/i18n`, or any `(ctx) => vocabulary`. The words are wholly yours, so

@@ -55,6 +55,20 @@ sweep — endpoints and screens included.
    }
    ```
 
+   `getContact` may also answer `locale` — the recipient's own language. It
+   belongs here rather than on the event because it is a fact about the PERSON,
+   not about what happened, and this package has no user table to read it from.
+   Supplying it is what makes a bilingual generator mean anything: a
+   notification is stored as rendered TEXT, so the language is fixed when the
+   row is written, and the router asks for it at exactly that moment. Omit the
+   field, or answer `null`, and every generator falls back to its own default
+   exactly as before — which is the honest answer for a host that stores no
+   per-user language yet.
+
+   The tag is the RECIPIENT's, never the request's. The person who triggers a
+   notification is routinely not the person who reads it, so resolving from
+   `Accept-Language` would word the notice for the wrong human.
+
    Returning `null` means "no such recipient", and `notify` throws
    `UnknownNotificationRecipientError` on it. That is deliberate: a
    notification addressed to nobody is a caller bug, never a silent drop.
@@ -118,6 +132,24 @@ sweep — endpoints and screens included.
    `short-payment` are the origin host's, not any host's. Pass them in `generators`,
    or call `registerGenerator` for a module imported later. The generator's
    `category` is what the router gates fan-out on.
+
+   `generate` takes an optional second argument, `{ locale }` — the recipient's
+   language, from `getContact`. Reach for it when your readers do not share one:
+
+   ```ts
+   const orderPaid = {
+     type: 'order.paid',
+     category: 'orders',
+     // Resolved HERE, per notice — never where the generator is built.
+     generate: (payload, context) => resolveCopy(ORDER_PAID_COPY, context ?? {}).of(payload),
+   };
+   ```
+
+   Resolving where the generator is BUILT is the mistake this parameter exists
+   to prevent: generators are registered once, at boot, so a table chosen there
+   words every notification the process will ever write in a single language —
+   and a host with one audience cannot tell the difference. A one-parameter
+   `generate` stays valid and unchanged.
 
 7. **Billing stays outside, and its gate is `channelPolicy`.** The money logic
    is the host's — this package never learns what a plan is. What it owns is

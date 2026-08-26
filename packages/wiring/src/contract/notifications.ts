@@ -28,13 +28,44 @@ export interface WireNotificationContent {
   data?: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * Who the content is being rendered FOR — the reader, at the moment the
+ * blueprint is asked.
+ *
+ * A notification is stored as rendered TEXT, so the language is chosen once,
+ * when the row is written. That moment is the only honest place to ask: a
+ * blueprint is registered at boot, and a host that resolved its words there
+ * would pin every future reader to whatever language the process started in.
+ *
+ * The tag is the RECIPIENT's, never the request's. The person who triggers a
+ * notification is routinely not the person who reads it — an invite is sent
+ * because an administrator acted, and it is read by the invitee — so
+ * `Accept-Language` here would be a bug that only ever shows as somebody
+ * getting told things in a language they do not speak.
+ *
+ * Absent means "nobody said": a host with one audience, or one that stores no
+ * per-user language yet, populates nothing and the blueprint answers with its
+ * default exactly as it did before this existed.
+ */
+export interface WireNotificationContext {
+  readonly locale?: string | null;
+}
+
 /** One event type the package can render into agnostic content. */
 export interface WireNotificationBlueprint<TPayload = never> {
   /** The event key, dot-namespaced (`order.paid`). One blueprint per type. */
   type: string;
   /** The SUGGESTED preference category; the host's taxonomy decides. */
   category: string;
-  generate(payload: TPayload): WireNotificationContent;
+  /**
+   * Render the content for ONE recipient.
+   *
+   * `context` is optional so that every blueprint written before it stays
+   * assignable — a one-parameter `generate` satisfies this signature, and a
+   * host runtime that passes nothing is telling the truth rather than
+   * inventing a language.
+   */
+  generate(payload: TPayload, context?: WireNotificationContext): WireNotificationContent;
 }
 
 /** Erased blueprint, for heterogeneous aggregation. */
