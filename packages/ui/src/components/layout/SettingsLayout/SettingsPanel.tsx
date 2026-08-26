@@ -1,8 +1,8 @@
 "use client";
 
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import type { CSSObject, Theme } from "@mui/material";
-import { Box } from "@mui/material";
+import type { CSSObject, Theme } from "@mui/material/styles";
+import Box from "@mui/material/Box";
 import React from "react";
 
 import {

@@ -12,7 +12,7 @@
  * needing a second click. Past that it becomes a {@link MultiSelectDropdown} —
  * see `INLINE_OPTION_LIMIT`.
  */
-import { Checkbox } from "@mui/material";
+import Checkbox from "@mui/material/Checkbox";
 
 import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";

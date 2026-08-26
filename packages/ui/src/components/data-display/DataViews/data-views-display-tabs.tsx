@@ -3,8 +3,8 @@
 import type { DataViewsCopy } from "./data-views-copy";
 import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
-import { useMediaQuery } from "@mui/material";
-import type { Theme } from "@mui/material";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import type { Theme } from "@mui/material/styles";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import type { SortFieldDefinition } from "../../layout/ContentToolbar";

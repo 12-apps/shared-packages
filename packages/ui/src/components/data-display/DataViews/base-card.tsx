@@ -2,7 +2,7 @@
 
 import { type ReactNode } from "react";
 
-import { useTheme, type CSSObject } from "@mui/material";
+import { useTheme, type CSSObject } from "@mui/material/styles";
 
 /** See the note on `CardSx` in `card-surface` — these fragments get merged. */
 type CardSx = CSSObject | Record<string, unknown>;

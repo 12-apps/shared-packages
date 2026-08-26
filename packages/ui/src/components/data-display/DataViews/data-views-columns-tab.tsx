@@ -3,7 +3,7 @@
 import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
-import { Checkbox } from "@mui/material";
+import Checkbox from "@mui/material/Checkbox";
 import { useState } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
