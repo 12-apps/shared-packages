@@ -12,6 +12,8 @@ import { useCodeEditor } from './CodeEditor.hooks';
 import type { CodeEditorProps } from './CodeEditor.types';
 import { EditorToolbar } from './CodeEditorToolbar';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 // Styled components
 const EditorContainer = styled(Paper)(({ theme }) => ({
   display: 'flex',
@@ -19,7 +21,7 @@ const EditorContainer = styled(Paper)(({ theme }) => ({
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
-  border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
+  border: `1px solid ${fieldEdge(theme)}`,
   borderRadius: theme.shape.borderRadius * 2,
   overflow: 'hidden' }));
 

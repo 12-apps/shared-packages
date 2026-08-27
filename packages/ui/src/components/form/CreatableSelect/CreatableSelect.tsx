@@ -1,6 +1,6 @@
 'use client';
 
-import { alpha } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete/index.js';
 import type { AutocompleteRenderInputParams } from '@mui/material/Autocomplete/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
@@ -11,6 +11,8 @@ import { stackedOverlayZIndex } from '../../../tokens/layers';
 import { FormControl, FormLabel, FormMessage } from '../Form';
 import type { CreatableSelectOption, CreatableSelectProps } from './CreatableSelect.types';
 import type { SizeValue } from '../../../tokens/scales';
+
+import { fieldEdge } from '../../../tokens/field-edge';
 
 /** Internal option shape: a real option, or the synthetic "create new" row. */
 interface InternalOption extends CreatableSelectOption {
@@ -35,7 +37,7 @@ const MUI_SIZE = { xs: 'small', sm: 'small', md: 'medium', lg: 'medium', xl: 'me
 const fieldSx = {
   '& .MuiOutlinedInput-root': {
     '& fieldset': {
-      borderColor: (theme: { palette: { divider: string } }) => alpha(theme.palette.divider, 0.23),
+      borderColor: (theme: Theme) => fieldEdge(theme),
     },
     '&:hover fieldset': { borderColor: 'primary.main' },
     '&.Mui-focused fieldset': { borderColor: 'primary.main', borderWidth: 2 },

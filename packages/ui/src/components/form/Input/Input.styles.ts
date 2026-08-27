@@ -3,6 +3,8 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { InputProps } from './Input.types';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 type InputVariant = NonNullable<InputProps['variant']>;
 
 // Define pulse animation
@@ -90,7 +92,7 @@ export const inputBaseStyles = (theme: Theme, variant?: InputVariant): CSSObject
       return {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
         backdropFilter: 'blur(20px)',
-        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+        border: `1px solid ${fieldEdge(theme)}`,
         '&:hover': {
           backgroundColor: alpha(theme.palette.background.paper, 0.15),
           borderColor: alpha(theme.palette.primary.main, 0.3),
@@ -104,7 +106,7 @@ export const inputBaseStyles = (theme: Theme, variant?: InputVariant): CSSObject
     case 'underline':
       return {
         '&:before': {
-          borderBottomColor: alpha(theme.palette.divider, 0.42),
+          borderBottomColor: fieldEdge(theme),
         },
         '&:hover:not(.Mui-disabled):before': {
           borderBottomColor: theme.palette.primary.main,
@@ -155,7 +157,7 @@ const gradientStyles = (theme: Theme): CSSObject => ({
 
 export const outlinedStyles = (theme: Theme): CSSObject => ({
   '& fieldset': {
-    borderColor: alpha(theme.palette.divider, 0.23),
+    borderColor: fieldEdge(theme),
   },
   '&:hover fieldset': {
     borderColor: theme.palette.primary.main,
