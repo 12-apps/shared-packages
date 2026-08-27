@@ -61,3 +61,40 @@ export const notificationsManifest = {
   server: ['http', 'jobs'],
   web: ['surface'],
 } as const satisfies PackageManifest;
+
+/**
+ * The e-mail PREVIEW console — a second manifest, from the same package.
+ *
+ * ## Why a second manifest and not two more keys on the first
+ *
+ * `notificationsManifest` has already spent both slots this surface needs:
+ * `http` is the account inbox at `/api/account`, `surface` is the bell and the
+ * preference matrix. A capability is singular by the contract's shape, so a
+ * package with two genuinely different surfaces declares two manifests — which
+ * is exactly what `@12-apps/auth` does with `@12-apps/auth-platform`, and for
+ * the same reason it gives: those two switches turn a sign-in method off for
+ * EVERYBODY, so they do not belong behind the same gate as "reset my password".
+ *
+ * The split here is the same one. The inbox ships to every signed-in user; this
+ * console publishes the product's whole transactional-mail inventory and the
+ * exact wording and link shape of its verification and reset mails, which is
+ * the reference someone writing a convincing phishing mail would want. Two
+ * manifests keep that expressible: a host mounts the inbox and DECLINES the
+ * console, in writing, rather than silently getting both behind one gate.
+ *
+ * ## What it deliberately does not declare
+ *
+ * No `db` — a catalogue is DERIVED from what a host already sends, so an
+ * adopter mounts it without touching its schema. No `notifications`, because
+ * this surface authors no alert. And no `email`: that capability is a DELIVERY
+ * port, and this manifest renders and never sends. The delivery port is the
+ * OTHER half of this package, and it stays where it is.
+ */
+export const notificationEmailPreviewsManifest = {
+  name: '@12-apps/notifications-email-previews',
+  contract: 1,
+  /** A refusal to render a preview files under its own namespace, not nowhere. */
+  observability: { namespace: 'email-previews' },
+  server: ['http'],
+  web: ['surface'],
+} as const satisfies PackageManifest;

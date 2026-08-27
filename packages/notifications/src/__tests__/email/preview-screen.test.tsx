@@ -1,8 +1,9 @@
+// @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EN_US_EMAIL_PREVIEW_COPY } from '../react/copy.en-US';
-import { createEmailPreviewScreen } from '../react/preview-screen';
+import { EN_US_EMAIL_PREVIEW_COPY } from '../../email/previews/react/copy.en-US';
+import { createEmailPreviewScreen } from '../../email/previews/react/preview-screen';
 
 /**
  * The screen's contract.

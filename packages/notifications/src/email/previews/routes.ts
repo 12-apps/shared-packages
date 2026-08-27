@@ -19,15 +19,24 @@ import {
  * surface must be incapable of — putting a sample in somebody's inbox — is not
  * reachable from this code at all rather than merely not done.
  *
- * ## The gate is the HOST's, and deliberately not declared here
+ * ## The gate is the HOST's — but the POSTURE is declared here
  *
- * These routes are `session: false`: this package cannot know who may look.
- * That is not an invitation to mount them open. The surface reveals a host's
- * whole transactional-mail inventory and the exact wording and link shape of
- * its verification and password-reset mails, which is the reference somebody
- * writing a convincing phishing mail would want — so a host mounts it behind
- * whichever gate it already uses for platform staff, and `ADOPTING.md` says so
- * in the one place an adopter is reading.
+ * Every route carries `kind: 'authenticated'`, the wiring contract's own word
+ * for "behind the host's session resolution and its RBAC". A package cannot
+ * know WHICH gate a host uses, and this one does not try: it names no
+ * permission id, because the ids belong to whichever host mounts it.
+ *
+ * What it must not do is stay silent. `public` is the contract's word for
+ * anonymous-by-design, and the contract's DEFAULT is `authenticated` — so a
+ * descriptor that declared nothing would still read as authenticated to a
+ * host's gates, while saying nothing to the person adopting it. This surface
+ * publishes a host's whole transactional-mail inventory and the exact wording
+ * and link shape of its verification and password-reset mails, which is the
+ * reference somebody writing a convincing phishing mail would want. That is
+ * worth one word in the descriptor rather than a sentence in a document.
+ *
+ * `ADOPTING.md` states the obligation in prose as well, because a host still
+ * has to supply the gate this word only asks for.
  *
  * An unknown LOCALE is a 400 rather than a silent fall back to the default.
  * This is a diagnostic surface: quietly answering the default language to
@@ -50,8 +59,12 @@ export interface EmailPreviewResponse {
 export interface EmailPreviewRoute {
   method: 'GET';
   path: string;
-  /** The host's own gate decides who may look — see the docblock above. */
-  session: false;
+  /**
+   * The wiring contract's `WireRouteKind`, restated. Always `authenticated`
+   * here: the host supplies the gate, and this is the descriptor asking for
+   * one — see the docblock above for why silence was not an option.
+   */
+  kind: 'authenticated';
   handle(request: EmailPreviewRequest): Promise<EmailPreviewResponse>;
 }
 
@@ -75,7 +88,7 @@ export function emailPreviewRoutes(config: EmailPreviewsConfig): EmailPreviewRou
     {
       method: 'GET',
       path: '/',
-      session: false,
+      kind: 'authenticated',
       handle: (request) => {
         const locale = readLocale(previews, request);
         if (!locale.ok) return Promise.resolve(fail(400, `Unknown locale "${locale.tag}".`));
@@ -85,7 +98,7 @@ export function emailPreviewRoutes(config: EmailPreviewsConfig): EmailPreviewRou
     {
       method: 'GET',
       path: '/:id',
-      session: false,
+      kind: 'authenticated',
       handle: (request) => {
         const locale = readLocale(previews, request);
         if (!locale.ok) return Promise.resolve(fail(400, `Unknown locale "${locale.tag}".`));

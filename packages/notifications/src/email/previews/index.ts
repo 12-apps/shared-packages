@@ -1,8 +1,9 @@
 /**
- * `@12-apps/email/server` — the preview catalogue and the routes over it.
+ * `@12-apps/notifications/email/previews` — the preview catalogue and the
+ * routes over it.
  *
- * Behind its own subpath so a web bundle importing `.` or `./react` never
- * resolves the server half.
+ * Behind its own subpath so a web bundle importing `./email` (the layout) or
+ * `./react` (the inbox) never resolves the server half.
  */
 export {
   createEmailPreviews,
@@ -22,4 +23,4 @@ export {
   type EmailPreviewRequest,
   type EmailPreviewResponse,
   type EmailPreviewRoute,
-} from './preview-routes';
+} from './routes';

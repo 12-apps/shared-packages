@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { PT_BR_EMAIL_CHROME } from '../chrome.pt-BR';
-import { renderEmail, renderEmailHtml, safeHref, type EmailDocument } from '../template';
-import { renderEmailText } from '../text';
+import { PT_BR_EMAIL_CHROME } from '../../email/chrome.pt-BR';
+import { renderEmail, renderEmailHtml, safeHref, type EmailDocument } from '../../email/template';
+import { renderEmailText } from '../../email/text';
 
 /**
  * The layout's contract.

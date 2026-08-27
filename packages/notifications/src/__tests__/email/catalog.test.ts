@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { PT_BR_EMAIL_CHROME } from '../chrome.pt-BR';
+import { PT_BR_EMAIL_CHROME } from '../../email/chrome.pt-BR';
 import {
   DuplicateEmailPreviewIdError,
   createEmailPreviews,
   type EmailPreviewMessage,
   type EmailPreviewSource,
-} from '../server/catalog';
-import { emailPreviewRoutes } from '../server/preview-routes';
-import { renderEmail } from '../template';
+} from '../../email/previews/catalog';
+import { emailPreviewRoutes } from '../../email/previews/routes';
+import { renderEmail } from '../../email/template';
 
 /**
  * The catalogue's contract.
@@ -139,10 +139,15 @@ describe('emailPreviewRoutes', () => {
     ]);
   });
 
-  it('declares no session of its own — the gate is the host s', () => {
-    // A package cannot know who a host lets look. ADOPTING.md is where the
-    // obligation to gate the mount is stated.
-    expect(mounted().every((route) => route.session === false)).toBe(true);
+  it('asks for a gate: every route is kind "authenticated"', () => {
+    // The wiring contract's word for "behind the host's session resolution and
+    // its RBAC". A package cannot know WHICH gate a host uses, so it names no
+    // permission id — but silence would have been worse than useless here: the
+    // contract's default is already `authenticated`, so a descriptor saying
+    // nothing reads the same to a host's gates while telling the person
+    // adopting it nothing at all. This surface publishes the product's whole
+    // mail inventory, so the posture is stated rather than inherited.
+    expect(mounted().every((route) => route.kind === 'authenticated')).toBe(true);
   });
 
   it('answers the catalogue in the { data } envelope', async () => {

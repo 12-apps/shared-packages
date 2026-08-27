@@ -4,7 +4,7 @@ import { ToggleGroup } from '@12-apps/ui/form/ToggleGroup';
 import { Box } from '@12-apps/ui/mui/Box';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { EmailPreviewDetail } from '../server/catalog';
+import type { EmailPreviewDetail } from '../catalog';
 
 import type { EmailPreviewScreenCopy } from './copy';
 

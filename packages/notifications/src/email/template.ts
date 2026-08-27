@@ -106,7 +106,8 @@ export interface EmailDocument {
    * The layout's own words, in the recipient's language.
    *
    * REQUIRED, with no default in any language — the copy-portability doctrine.
-   * `@12-apps/email/locales` ships a pack per language and a host passes one BY
+   * `@12-apps/notifications/email/locales` ships a pack per language and a host
+   * passes one BY
    * NAME, which is a decision rather than a silence.
    */
   readonly chrome: EmailChromeCopy;

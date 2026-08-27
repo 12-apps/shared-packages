@@ -123,7 +123,7 @@ export interface EmailPreviewsConfig {
 /** An id that appears in more than one source — the one thing that must not happen. */
 export class DuplicateEmailPreviewIdError extends Error {
   constructor(id: string) {
-    super(`@12-apps/email: two preview messages share the id "${id}".`);
+    super(`@12-apps/notifications: two e-mail preview messages share the id "${id}".`);
     this.name = 'DuplicateEmailPreviewIdError';
     Object.setPrototypeOf(this, DuplicateEmailPreviewIdError.prototype);
   }

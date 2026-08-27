@@ -8,7 +8,7 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { Heading } from '@12-apps/ui/typography/Heading';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { EmailPreviewCoverage, EmailPreviewDetail, EmailPreviewIndex } from '../server/catalog';
+import type { EmailPreviewCoverage, EmailPreviewDetail, EmailPreviewIndex } from '../catalog';
 
 import type { EmailPreviewScreenCopy } from './copy';
 import { MessageList, matchesFilter } from './message-list';
@@ -16,7 +16,7 @@ import { MessageView, type PreviewTab, type PreviewWidth } from './message-view'
 import { fetchEmailPreview, fetchEmailPreviewIndex } from './transport';
 
 /**
- * The operator screen over `@12-apps/email/server`'s catalogue.
+ * The operator screen over the `./email/previews` catalogue.
  *
  * ## What a host supplies, and what it does not
  *
@@ -52,11 +52,25 @@ function searchParam(name: string): string | null {
   return new URLSearchParams(window.location.search).get(name);
 }
 
+/**
+ * Patch the query string in place, keeping everything else about the URL.
+ *
+ * The HASH is carried over deliberately, and it is not defensive coding: a host
+ * that routes on `location.hash` — the consumer harness does, and so does any
+ * SPA served from a static file — would otherwise be navigated off this screen
+ * by its own locale switch, because rebuilding the URL from `pathname` alone
+ * silently drops the fragment that says which page this is.
+ *
+ * `replaceState` rather than `pushState` for the reason the screen exists:
+ * browsing twenty messages is one place to come back from, not twenty
+ * back-button steps.
+ */
 function patchSearch(patch: Record<string, string>): void {
   if (typeof window === 'undefined') return;
   const next = new URLSearchParams(window.location.search);
   for (const [key, value] of Object.entries(patch)) next.set(key, value);
-  window.history.replaceState({}, '', `${window.location.pathname}?${next.toString()}`);
+  const { pathname, hash } = window.location;
+  window.history.replaceState({}, '', `${pathname}?${next.toString()}${hash}`);
 }
 
 /** The surface's honest report about what it cannot show. */

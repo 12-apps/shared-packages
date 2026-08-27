@@ -44,10 +44,6 @@ packages/shift
 packages/payments/frontend
 packages/payments/e2e
 packages/ui
-# `@12-apps/email` depends on `@12-apps/ui` for its operator screen, so it sits
-# after it. Nothing depends on `email` in turn — it is a leaf, and a host adopts
-# it without any other package moving.
-packages/email
 packages/impersonation
 packages/audit
 packages/storage

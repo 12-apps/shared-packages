@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 
-import { emailPreviewRoutes } from '../server/preview-routes';
-import type { EmailPreviewsConfig } from '../server/catalog';
+import { emailPreviewRoutes } from './routes';
+import type { EmailPreviewsConfig } from './catalog';
 
 /**
- * `@12-apps/email/hono` — the preview catalogue as a mountable router.
+ * `@12-apps/notifications/email/previews/hono` — the catalogue as a router.
  *
  * The framework-neutral descriptors in `./server` are the contract; this is the
  * adapter for the framework we happen to use, behind its own subpath with

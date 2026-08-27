@@ -1,4 +1,4 @@
-import type { EmailPreviewDetail, EmailPreviewIndex } from '../server/catalog';
+import type { EmailPreviewDetail, EmailPreviewIndex } from '../catalog';
 
 /**
  * How the screen reaches its own endpoints.

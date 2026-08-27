@@ -25,6 +25,8 @@
 
 import type { AnyServerManifest, WireRequest } from '@12-apps/wiring';
 
+import { emailPreviewRoutes } from '../email/previews/routes';
+import type { EmailPreviewsConfig } from '../email/previews/catalog';
 import {
   createApiNotifications,
   NOTIFICATIONS_JOBS,
@@ -83,4 +85,25 @@ export const notificationsServerManifest = {
    * copies. See `../server/jobs` for why the numbers are the package's.
    */
   jobs: NOTIFICATIONS_JOBS,
+} as const satisfies AnyServerManifest;
+
+/**
+ * The preview console's server half — the two endpoints over the catalogue.
+ *
+ * A CONSTANT, not a factory. `http.create(config)` receives whatever the host
+ * bound at adoption, and "which messages exist" is precisely a host's binding:
+ * a package cannot know that a product sends a "your quota is exhausted"
+ * notice, let alone what data it renders from. Writing `EmailPreviewsConfig`
+ * as a factory argument instead would move that decision out of
+ * `bindings.http`, where `assemble()` can report on it, into a call the report
+ * never sees.
+ *
+ * The routes carry `kind: 'authenticated'` — see `../email/previews/routes`
+ * for why the descriptor states a posture it cannot itself enforce.
+ */
+export const notificationEmailPreviewsServerManifest = {
+  name: '@12-apps/notifications-email-previews',
+  http: {
+    create: (config: EmailPreviewsConfig) => ({ routes: emailPreviewRoutes(config) }),
+  },
 } as const satisfies AnyServerManifest;

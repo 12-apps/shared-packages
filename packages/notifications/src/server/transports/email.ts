@@ -5,6 +5,10 @@ import type {
   TransportRecipient,
 } from '../../types';
 
+import { renderEmail } from '../../email/template';
+import type { EmailChromeCopy } from '../../email/template';
+import type { EmailTheme } from '../../email/theme';
+
 import {
   absoluteLink,
   postOrThrow,
@@ -53,6 +57,31 @@ export interface EmailDriverDeclaration extends DriverDeclarationBase {
    * `from` address.
    */
   linkLabel: string;
+  /**
+   * Render through `../../email` — the ONE layout — instead of the three bare
+   * `<p>` tags below.
+   *
+   * OPTIONAL, and its absence is the pre-layout behaviour verbatim. That is
+   * deliberate rather than timid: `brand` and `chrome` are REQUIRED with no
+   * default anywhere in the layout (a package that defaulted them would sign
+   * another company's mail, in a language nobody chose), so a required field
+   * here would break every host that already declares EMAIL — at runtime, on
+   * the first send, which is the worst place to find out.
+   *
+   * So the seam is opt-in and the ad-hoc path is what remains for a host that
+   * has not taken it. `layout.theme` may still be omitted; `../../email/theme`
+   * argues why that one asymmetry is allowed.
+   */
+  layout?: {
+    /** The product name in the header and the footer. */
+    brand: string;
+    /** The layout's own words. `@12-apps/notifications/email/locales` ships packs. */
+    chrome: EmailChromeCopy;
+    /** The recipient's language, for the document's `lang` attribute. */
+    locale: string;
+    /** Defaults to the layout's neutral palette. */
+    theme?: EmailTheme;
+  };
   logger?: NotificationLogger;
 }
 
@@ -108,6 +137,11 @@ export const EMAIL_DRIVERS: Record<
 /**
  * Agnostic content → subject/text/html. The link becomes a trailing CTA, only
  * when an app base URL is configured.
+ *
+ * Two renderings, and which one runs is the host's choice: with `layout`
+ * declared this is the shared document (`../../email`), and without it the
+ * three bare `<p>` tags that predate it. See `EmailDriverDeclaration.layout`
+ * for why the new path could not simply replace the old one.
  */
 export function formatEmail(
   content: NotificationContent,
@@ -115,6 +149,7 @@ export function formatEmail(
 ): EmailMessage {
   const href = absoluteLink(content.link, declaration.appUrl);
   const label = declaration.linkLabel;
+  if (declaration.layout) return layoutEmail(content, declaration.layout, href, label);
   return {
     subject: content.title,
     text: href ? `${content.body}\n\n${href}` : content.body,
@@ -124,6 +159,33 @@ export function formatEmail(
       ...(href ? [`<p><a href="${escapeHtml(href)}">${escapeHtml(label)}</a></p>`] : []),
     ].join('\n'),
   };
+}
+
+/**
+ * The same notification as a laid-out document.
+ *
+ * The layout escapes and builds the plain-text twin from the SAME object, which
+ * is the pair of defects the branch above still carries by construction: its
+ * text half is assembled separately, and its `href` reaches the anchor through
+ * `escapeHtml` rather than through a scheme check.
+ */
+function layoutEmail(
+  content: NotificationContent,
+  layout: NonNullable<EmailDriverDeclaration['layout']>,
+  href: string | null,
+  label: string,
+): EmailMessage {
+  const rendered = renderEmail({
+    subject: content.title,
+    heading: content.title,
+    paragraphs: [content.body],
+    action: href ? { label, href } : undefined,
+    chrome: layout.chrome,
+    brand: layout.brand,
+    locale: layout.locale,
+    theme: layout.theme,
+  });
+  return { subject: rendered.subject, text: rendered.text, html: rendered.html };
 }
 
 export function emailTransport(

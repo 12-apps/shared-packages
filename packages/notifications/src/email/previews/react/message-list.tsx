@@ -4,7 +4,7 @@ import { Chip } from '@12-apps/ui/data-display/Chip';
 import { Box } from '@12-apps/ui/mui/Box';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { EmailPreviewRow } from '../server/catalog';
+import type { EmailPreviewRow } from '../catalog';
 
 import type { EmailPreviewScreenCopy } from './copy';
 
