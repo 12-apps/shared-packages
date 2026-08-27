@@ -398,3 +398,32 @@ export {
   type ActivationChargeState,
 } from './activation/use-activation-charge';
 export { type ActivationChargeCopy } from './activation/charge-copy';
+
+// ---------------------------------------------------------------------------
+// The ACTIVATION STEP's SCREENS (FUT-764) — the six settled outcomes, the
+// outstanding-payment panel with its link fallback, the two flows and the
+// router between them.
+//
+// The protocol hooks above shipped without them, leaving `renderVerification`
+// as "the host owns the screen". That reads as a boundary and is not one: the
+// screens are a rendering of THIS package's state machines, and the origin
+// host's copies carried a paragraph each about a real payment that went wrong —
+// an owner who paid four times, a dead end blaming a store for a key that was
+// never going to exist, a refusal wearing another failure's clothes. None of
+// that is host knowledge, and a second adopter deriving it again would be
+// deriving it from the same payments.
+//
+// The SENTENCES stay the host's, required and defaultless, as everywhere here.
+// ---------------------------------------------------------------------------
+export {
+  createActivationStep,
+  type ActivationStepConfig,
+  type ActivationStepProps,
+  type CardSurface,
+  type ActivationActionCopy,
+  type ActivationAwaitingCopy,
+  type ActivationIntroCopy,
+  type ActivationOutcomeCopy,
+  type ActivationStepCopy,
+  type ActivationTaxIdCopy,
+} from './activation/screens';
