@@ -25,6 +25,8 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
   clearSelection: () => void;
   rowActions?: RowAction<T>[];
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
+  /** A control between the count and the actions menu — see `selectionExtra`. */
+  selectionExtra?: React.ReactNode;
   sortFields: SortFieldDefinition[];
   activeSortField: string;
   activeSortOrder: "asc" | "desc";
@@ -161,6 +163,7 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
         clearSelection={props.clearSelection}
         selectAllTestId={`${testIdPrefix}-select-all`}
         clearAllTestId={`${testIdPrefix}-clear-all`}
+        selectionExtra={props.selectionExtra}
         actions={renderBulkActions({
           rowActions: props.rowActions,
           bulkActions: props.bulkActions,

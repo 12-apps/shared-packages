@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { TableFilter } from "../../layout/TableFilter";
-import { Text } from "../../typography/Text";
-import { Box } from "../../../mui/Box";
 import { Stack } from "../../../mui/Stack";
 
 import {
@@ -17,6 +15,8 @@ import { GridMain } from "./data-views-grid-bodies";
 import type { ListGroupConfig } from "./list-card-rails";
 import { InlineFilterControls } from "./data-views-inline-bar";
 import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
+import { GridHeaderRow } from "./data-views-header-row";
+import { resolveSelectionExtra, type SelectionExtraRender } from "./data-views-selection-extra";
 import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { DataViewExport } from "./data-views-export";
@@ -35,54 +35,6 @@ import type {
   RowAction,
 } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
-
-/* ── Header row ──────────────────────────────────────────────────────────── */
-
-/**
- * The grid's own header row: the page title on the left, the primary page
- * actions on the right.
- *
- * `title` and `headerActions` were DECLARED on `DataViewsGridProps` and
- * `DataViewsTableBaseProps` but never destructured or forwarded — dead props
- * whose types lied to every caller that set them. Wired here rather than
- * deleted: a table that carries its own title keeps the title, the scope tabs
- * and the toolbar as one block, instead of the page having to space them.
- *
- * Renders NOTHING when neither is supplied, so no existing table gains a row.
- */
-function GridHeaderRow({
-  title,
-  headerActions,
-  testIdPrefix,
-}: {
-  title?: string;
-  headerActions?: React.ReactNode;
-  testIdPrefix: string;
-}): React.JSX.Element | null {
-  if (!title && !headerActions) return null;
-  return (
-    <Box
-      data-testid={`${testIdPrefix}-header`}
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 2,
-        flexWrap: "wrap",
-        pb: 1.5,
-      }}
-    >
-      {title ? (
-        <Text variant="heading" size="lg" as="h2">
-          {title}
-        </Text>
-      ) : (
-        <Box />
-      )}
-      {headerActions && <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{headerActions}</Box>}
-    </Box>
-  );
-}
 
 /* ── Layout ⇄ view-state mirror ──────────────────────────────────────────── */
 
@@ -230,6 +182,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   toolbarRightSlot?: React.ReactNode;
   rowActions?: RowAction<T>[];
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
+  /** A widening control beside the selection count — see `resolveSelectionExtra`. */
+  selectionExtra?: SelectionExtraRender<T>;
   /** Opt-in "Grade" (cards) layout: renders each row as an entity-supplied card.
    *  Omit ⇒ table only (no layout toggle). */
   renderCard?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
@@ -326,6 +280,7 @@ function ShellStack<T extends Record<string, unknown>>({
           testIdPrefix={testIdPrefix}
           rowActions={props.rowActions}
           bulkActions={props.bulkActions}
+          selectionExtra={resolveSelectionExtra(props)}
           toolbarRightSlot={props.toolbarRightSlot}
           compactControls={showInline && split.compactControls}
           counterHidden={showInline && split.counterHidden}

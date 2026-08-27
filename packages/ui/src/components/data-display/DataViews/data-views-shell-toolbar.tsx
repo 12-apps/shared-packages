@@ -22,6 +22,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   testIdPrefix,
   rowActions,
   bulkActions,
+  selectionExtra,
   toolbarRightSlot,
   showInline,
   compactControls,
@@ -40,6 +41,8 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   exportConfig?: DataViewExport;
   rowActions?: RowAction<T>[];
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
+  /** Already resolved by the shell, which is the party that knows the page. */
+  selectionExtra?: React.ReactNode;
   toolbarRightSlot?: React.ReactNode;
   /** Search + filters, rendered on the toolbar line (see `GridToolbar`). */
   filterControls?: React.ReactNode;
@@ -71,6 +74,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
       clearSelection={c.clearSelection}
       rowActions={rowActions}
       bulkActions={bulkActions}
+      selectionExtra={selectionExtra}
       sortFields={c.resolvedSortFields}
       activeSortField={c.activeSortField}
       activeSortOrder={c.activeSortOrder}
