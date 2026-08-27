@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
 import { GridShell } from "./data-views-grid-parts";
+import type { SelectionExtraRender } from "./data-views-selection-extra";
 import type { ListGroupConfig } from "./list-card-rails";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { BoardConfig } from "./DataViewsBoard";
@@ -97,6 +98,17 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    * Receives the selected rows + a `clearSelection` callback.
    */
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
+  /**
+   * A control rendered beside the "N selected" count, for changing WHAT is
+   * selected rather than what happens to it — a "select all N matching the
+   * filter" widening, above all.
+   *
+   * Called only while something is selected, and handed
+   * {@link SelectionExtraContext.allOnPageSelected} so the control can follow
+   * the convention operators already know: the widening appears once the whole
+   * page is ticked, and not before.
+   */
+  selectionExtra?: SelectionExtraRender<T>;
   /**
    * Render a bespoke per-row menu in the actions column instead of the auto
    * kebab — typically an entity's self-contained 3-dots menu that owns its own

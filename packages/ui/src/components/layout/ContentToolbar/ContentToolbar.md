@@ -8,12 +8,19 @@ pages and projects.
 ## Anatomy
 
 ```
-[Select All] [Clear All] | N items selected  <actions>      (o)══  ▦▾   Sort By: … ▾   Content Type: … ▾   ⨏
-└──────────────── left cluster (selection chrome) ─────┘     └──────────── rightControls slot ────────────┘
+[Select All] [Clear All] | N selected  <selectionExtra> <actions>   (o)══  ▦▾   Sort By: … ▾   ⨏
+└─────────────────── left cluster (selection chrome) ──────────────┘   └───── rightControls slot ─────┘
 ```
 
 - **Left cluster** — always shows **Select All**. Once `hasSelection` is true it
-  adds **Clear All**, an "N items selected" count, and an optional `actions` slot.
+  adds **Clear All**, an "N items selected" count, and two optional slots:
+  `selectionExtra` then `actions`.
+- **`selectionExtra` vs `actions`** — `actions` is what HAPPENS to the selection
+  (delete, export, send). `selectionExtra` is what the selection IS: the
+  "select all N matching the filter" widening a paginated list needs once its
+  whole page is ticked. They are separate slots because an operator reasonably
+  expects every entry in an actions menu to write something, and a widening
+  writes nothing.
 - **Right cluster** — a free `rightControls` node. Compose it from the shipped
   controls below (or anything else).
 

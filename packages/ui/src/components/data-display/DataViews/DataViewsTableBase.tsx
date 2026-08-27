@@ -4,6 +4,7 @@ import type { SortFieldDefinition } from "../../layout/ContentToolbar";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { DataViewsGrid } from "./DataViewsGrid";
+import type { SelectionExtraRender } from "./data-views-selection-extra";
 import type { ListGroupConfig } from "./list-card-rails";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import { viewStateKey } from "./data-views-dirty";
@@ -76,6 +77,8 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   rowActionsLeading?: (row: T) => React.ReactNode;
   /** Low-level bulk-action override; prefer `rowActions`. */
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
+  /** A selection-widening control beside the count (e.g. "select all matching"). */
+  selectionExtra?: SelectionExtraRender<T>;
   /** Bespoke per-row menu (an entity's self-contained 3-dots menu) instead of the auto kebab. */
   renderRowMenu?: (row: T) => React.ReactNode;
   /** Opt-in "Grade" (cards) layout — a card renderer per row; adds a Grade/Tabela toggle. */

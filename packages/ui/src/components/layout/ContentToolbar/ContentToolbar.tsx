@@ -28,6 +28,7 @@ type SelectionClusterProps = Pick<
   | 'selectAll'
   | 'clearSelection'
   | 'actions'
+  | 'selectionExtra'
   | 'selectAllTestId'
   | 'clearAllTestId'
   | 'edgeAlign'
@@ -43,6 +44,7 @@ function SelectionCluster({
   selectAll,
   clearSelection,
   actions,
+  selectionExtra,
   selectAllTestId,
   clearAllTestId,
   edgeAlign = false,
@@ -106,6 +108,7 @@ function SelectionCluster({
           >
             {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
           </Typography>
+          {selectionExtra}
           {actionsSlot}
         </>
       ) : (
@@ -219,6 +222,7 @@ export function ContentToolbar({
   rightControls,
   leadingControls,
   actions,
+  selectionExtra,
   selectAllTestId,
   clearAllTestId,
   edgeAlign = false,
@@ -258,6 +262,7 @@ export function ContentToolbar({
           selectAll={selectAll}
           clearSelection={clearSelection}
           actions={actions}
+          selectionExtra={selectionExtra}
           selectAllTestId={selectAllTestId}
           clearAllTestId={clearAllTestId}
           selectAllLabel={selectAllLabel}
