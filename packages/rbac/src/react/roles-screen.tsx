@@ -1,13 +1,17 @@
 'use client';
 
-import { useMemo, type JSX } from 'react';
+import { useMemo, type ComponentType, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import AddIcon from '@mui/icons-material/Add';
 
 import { useServerDataViews } from '@12-apps/app-shell/react';
 import { CardActionsProvider } from '@12-apps/ui/data-display/CardKit';
-import { DataViewsCopyProvider, DataViewsGrid } from '@12-apps/ui/data-display/DataViews';
+import {
+  DataViewsCopyProvider,
+  DataViewsGrid,
+  type RowAction,
+} from '@12-apps/ui/data-display/DataViews';
 import { EmptyState } from '@12-apps/ui/data-display/EmptyState';
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
@@ -82,6 +86,35 @@ export interface RolesScreenProps {
   onOpenMembers?: (roleName: string) => void;
   /** See {@link RoleMenuContext.renderVersionHistory}. */
   renderVersionHistory?: RoleMenuContext['renderVersionHistory'];
+  /**
+   * The host's own multi-select surface for this grid.
+   *
+   * A COMPONENT rather than a list of actions, and rendered INSIDE this
+   * screen's `CardActionsProvider`, because a bulk surface is three things that
+   * have to share one piece of state: the "Ações" entries, whatever chrome
+   * reports what a batch did, and the reload afterwards. Handing the package a
+   * bare `RowAction[]` would leave the host holding the other two somewhere
+   * else, with no way to reach this screen's own refresh.
+   *
+   * From in here the slot can call `useCardActions()` — the same
+   * `onRefresh` the row menus already use, so a batch reloads the grid exactly
+   * as a single-row delete does — and its hooks run unconditionally, which a
+   * render prop invoked after this screen's permission gate could not promise.
+   *
+   * It receives the grid as a render prop so its actions reach the toolbar:
+   * render `children(actions)` wherever the grid belongs, and put the chrome
+   * around that.
+   *
+   * Absent — the default — the grid renders exactly as it did before this
+   * existed: no multi-select entries, no chrome.
+   */
+  bulkSlot?: ComponentType<RolesBulkSlotProps>;
+}
+
+/** What {@link RolesScreenProps.bulkSlot} is handed. */
+export interface RolesBulkSlotProps {
+  /** Render the grid, giving it the multi-select entries it should offer. */
+  children: (actions: readonly RowAction<RoleRow>[]) => JSX.Element;
 }
 
 /** The grid, split out so the screen body stays inside the size gate. */
@@ -93,11 +126,14 @@ function RolesBody({
   server,
   syncState,
   onOpenMembers,
+  bulkActions,
 }: {
   rows: RoleRow[];
   copy: RbacWebCopy;
   context: RoleMenuContext;
   canManage: boolean;
+  /** The host's multi-select entries, when a `bulkSlot` supplied any. */
+  bulkActions?: readonly RowAction<RoleRow>[];
   server: ReturnType<typeof useServerDataViews>;
   syncState: ReturnType<typeof rolesSyncState>;
   onOpenMembers?: (roleName: string) => void;
@@ -110,6 +146,9 @@ function RolesBody({
       fields={roleFields(copy.rolesTable)}
       syncState={syncState}
       getRowId={(row) => row.id}
+      // Gated on `canManage` like the row menu beside it: a reader who may not
+      // manage roles must not be offered a batch that would be refused.
+      rowActions={canManage && bulkActions?.length ? [...bulkActions] : undefined}
       onRowClick={onOpenMembers ? (row) => onOpenMembers(row.name) : undefined}
       renderRowMenu={canManage ? (row) => <RoleActionsMenu row={row} context={context} /> : undefined}
       renderCard={(row, selection) => (
@@ -231,14 +270,20 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
             tenantSlug={props.tenantSlug}
             onRefresh={data.refresh}
           >
-            <RolesBody
-              rows={data.rows}
-              copy={copy}
-              context={context}
-              canManage={canManage}
-              server={server}
-              syncState={syncState}
-              onOpenMembers={props.onOpenMembers}
+            <RolesGrid
+              bulkSlot={props.bulkSlot}
+              render={(bulkActions) => (
+                <RolesBody
+                  rows={data.rows}
+                  copy={copy}
+                  context={context}
+                  canManage={canManage}
+                  server={server}
+                  syncState={syncState}
+                  onOpenMembers={props.onOpenMembers}
+                  bulkActions={bulkActions}
+                />
+              )}
             />
           </CardActionsProvider>
         </Dashboard.Body>
@@ -258,3 +303,22 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
   );
 }
 
+/**
+ * The grid, through the host's bulk slot when there is one.
+ *
+ * Two branches rather than a default slot that renders `children([])`: the slot
+ * is a COMPONENT, so an always-present one would mount host state on every
+ * roles screen including the hosts that declined the feature, and this package
+ * cannot know what that state costs. No slot means the grid renders exactly as
+ * it did before `bulkSlot` existed.
+ */
+function RolesGrid({
+  bulkSlot: Slot,
+  render,
+}: {
+  bulkSlot?: ComponentType<RolesBulkSlotProps>;
+  render: (actions?: readonly RowAction<RoleRow>[]) => JSX.Element;
+}): JSX.Element {
+  if (!Slot) return render();
+  return <Slot>{(actions) => render(actions)}</Slot>;
+}
