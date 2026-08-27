@@ -107,7 +107,8 @@ const menuItems = [
 
 ```tsx
 import { Menubar } from '@procurement/ui';
-import { Avatar, IconButton } from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 
 const Logo = () => (

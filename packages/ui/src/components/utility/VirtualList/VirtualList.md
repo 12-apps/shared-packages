@@ -160,7 +160,10 @@ For displaying items in a multi-column grid layout.
 ### With Material-UI Components
 
 ```tsx
-import { Avatar, ListItem, ListItemAvatar, ListItemText } from '@mui/material';
+import Avatar from '@mui/material/Avatar/index.js';
+import ListItem from '@mui/material/ListItem/index.js';
+import ListItemAvatar from '@mui/material/ListItemAvatar/index.js';
+import ListItemText from '@mui/material/ListItemText/index.js';
 import { VirtualList } from '@app-services-monitoring/ui';
 
 <VirtualList
