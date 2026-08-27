@@ -275,6 +275,78 @@ mount `routes.handlers.<kind>` per file instead. Each is still a one-line mount.
   `tokenization` (`SDK` → load the provider's JS SDK; `PUBLIC_KEY` → encrypt
   with `config.publicKey`; `REDIRECT`/PIX flows need no tokenizer).
 
+### The activation step, mounted (`createActivationStep`, FUT-764)
+
+`renderVerification` on `<PaymentProviderSettings>` is where step 3 goes —
+"connected" and "can charge" are different facts, and this is the step that
+proves the second by putting a real, small charge through the store's own
+account.
+
+That slot used to hand the host the whole screen. It read as a boundary and was
+not one: what goes in it is a rendering of `useActivationCharge` and
+`useRedirectActivation`, both of which ship here. The origin host's copy of it
+was six outcome panels, a polling display, a link fallback and a router between
+two flows — ~800 lines whose comments are a list of real payments that went
+wrong. A second adopter would have had to learn the same lessons from the same
+kind of incident.
+
+So bind it once and put the result in the slot:
+
+```tsx
+// activation-step.ts — one module, one call
+export const ActivationStep = createActivationStep({
+  verifyChargeUrl: (provider) => `/api/admin/${slug}/payments/verify/${provider}`,
+  copy: MY_ACTIVATION_COPY,      // required, and there is no default
+  formatAmount: (cents) => myMoney(cents),
+  CardSurface: MyCardProviders,  // your design system + your card words
+  validateTaxId: myTaxIdValidator,
+  storageKey: "my:verify-settlement",   // only if you shipped this before
+});
+
+// …and in the settings page
+<PaymentProviderSettings
+  renderVerification={(context) => (
+    <ActivationStep
+      {...context}
+      ownerEmail={session.user.email}
+      storeUrl={storefrontUrl}
+      onProviderOrder={() => openProviderList()}
+    />
+  )}
+/>
+```
+
+What the step decides for you, and why each one is a lesson rather than a
+preference:
+
+- **A provider with no in-browser card path gets a payment LINK, not a card
+  form.** Rendering fields for a key that was never going to exist produced a
+  dead end blaming the store.
+- **An already-proven connection renders the proof, never the pay button.** One
+  owner read a re-offered button as "it did not work" and paid four times.
+- **Three creation failures are three screens.** Refused (a provider-side
+  switch — a step, not an error), unreachable (the provider refused nothing, so
+  blame nothing), and refused-on-payment (the connection is fine). One panel
+  served all three and could only give the first one's advice.
+- **`blocked` withholds the pay BUTTON and nothing else.** An outstanding
+  charge, a return trip, a settled result all keep rendering: hiding them
+  behind a setup step is how a payment stops being confirmable.
+- **An unpriced charge names no amount.** Not every provider accepts one cent,
+  so nothing here guesses — your `outcome.someAmount` fills the gap until the
+  endpoint answers.
+
+**`storageKey` matters on a repeat adoption.** An owner can be on the
+provider's site paying RIGHT NOW across a deploy; their ids sit in
+`sessionStorage` under whatever key you shipped, and reading a different one on
+the way back finds nothing and offers to mint a charge for a payment they just
+made.
+
+**`CardSurface` is not optional decoration.** The card fields are this
+package's own, so they read the checkout copy context — a bare passthrough
+throws at the mount. That is deliberate: the owner testing their connection
+must meet the SAME form, validator and tokenizer their shoppers will, or the
+test proves something about a path that never takes money.
+
 ### The buyer checkout, mounted (`createPaymentFlows`, FUT-741)
 
 `<CheckoutFlow>` below is still exported and still works. What it asks of a
