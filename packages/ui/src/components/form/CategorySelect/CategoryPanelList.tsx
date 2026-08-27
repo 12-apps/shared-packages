@@ -5,7 +5,7 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import Skeleton from '@mui/material/Skeleton/index.js';
 
-import { categoryCheckState } from './category-tree';
+import { categoryCheckState, isLeafCategory } from './category-tree';
 import {
   CategoryHeadRow,
   CategorySectionHeading,
@@ -125,7 +125,11 @@ function CategoryGroupRows({
   const { draft, query, single, allowParentSelection, rowIds, activeIndex, sheet } = props;
   const categoryId = group.category.id;
   const expanded = props.isExpanded(categoryId);
-  const asHeading = single && !allowParentSelection;
+  // A childless category is the leaf, so it is selectable whatever the mode says
+  // — the heading reading has no subcategory to point at, and would leave the
+  // row inert.
+  const selectable = allowParentSelection || isLeafCategory(group);
+  const asHeading = single && !selectable;
   const selectedCount = group.subcategories.filter((sub) => draft.has(sub.id)).length;
 
   return (
@@ -139,9 +143,9 @@ function CategoryGroupRows({
           expanded={expanded}
           active={rowIds[activeIndex] === categoryId}
           sheet={sheet}
-          checkState={
-            allowParentSelection ? categoryCheckState(group, draft) : undefined
-          }
+          checkState={selectable ? categoryCheckState(group, draft) : undefined}
+          single={single}
+          expandable={!isLeafCategory(group)}
           selectedCount={selectedCount}
           showCounts={props.showCounts}
           onToggleExpanded={() => props.onToggleExpanded(categoryId)}

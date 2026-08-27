@@ -61,6 +61,10 @@ const MERCADO: CategorySelectOption[] = [
   { id: 'limp.sabao', name: 'Sabonetes e shampoos', parentId: 'limp', count: 48 },
   { id: 'limp.deterg', name: 'Detergentes', parentId: 'limp', count: 39 },
   { id: 'limp.limpg', name: 'Limpeza geral', parentId: 'limp', count: 55 },
+  // No subcategories: this row IS the leaf, so it carries the checkbox and draws
+  // no chevron. Real catalogues are full of these — a shop that never split
+  // "Congelados" into anything.
+  { id: 'cong', name: 'Congelados', count: 47 },
 ];
 
 /** The cantina's shorter menu — useful for the single-select "move to" story. */
@@ -77,6 +81,26 @@ const CANTINA: CategorySelectOption[] = [
   { id: 'sobr', name: 'Sobremesas', count: 15 },
   { id: 'sobr.gelada', name: 'Geladas', parentId: 'sobr', count: 7 },
   { id: 'sobr.sorv2', name: 'Sorvetes', parentId: 'sobr', count: 4 },
+  // Childless, so the "move to…" picker offers it directly rather than drawing
+  // a heading with nothing under it to choose.
+  { id: 'bebida', name: 'Bebidas', count: 18 },
+];
+
+/**
+ * The four cases the `allowParentSelection` matrix has to cover, in one list:
+ * two parents WITH children (`beb`, `merc`) and two WITHOUT (`cong`, `pad`).
+ */
+const MATRIX: CategorySelectOption[] = [
+  { id: 'beb', name: 'Bebidas', count: 97 },
+  { id: 'beb.agua', name: 'Águas', parentId: 'beb', count: 38 },
+  { id: 'beb.refri', name: 'Refrigerantes', parentId: 'beb', count: 52 },
+  { id: 'beb.suco', name: 'Sucos', parentId: 'beb', count: 7 },
+  { id: 'merc', name: 'Mercearia', count: 70 },
+  { id: 'merc.massa', name: 'Massas', parentId: 'merc', count: 44 },
+  { id: 'merc.molho', name: 'Molhos', parentId: 'merc', count: 26 },
+  // No children — these are the rows that used to be inert.
+  { id: 'cong', name: 'Congelados', count: 47 },
+  { id: 'pad', name: 'Padaria', count: 31 },
 ];
 
 const meta = {
@@ -184,6 +208,103 @@ export const WithError: Story = {
           error="Escolha uma categoria para continuar"
           value={value}
           onChange={setValue}
+        />
+      </Box>
+    );
+  },
+};
+
+/**
+ * **Flag ON, parent WITH children.** Ticking `Bebidas` selects every
+ * subcategory under it; the tri-state box reads `partial` while only some are
+ * picked, and the chip tray collapses a complete category back to ONE chip
+ * bearing its name rather than one chip per child.
+ */
+export const ParentSelection: Story = {
+  args: { options: MATRIX, value: [], onChange: () => {} },
+  render: function Render(args) {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Box sx={{ minHeight: 460 }}>
+        <CategorySelect
+          {...args}
+          mode="multi"
+          value={value}
+          onChange={setValue}
+          allowParentSelection
+          showCounts
+        />
+      </Box>
+    );
+  },
+};
+
+/**
+ * **Flag OFF, parent WITH children.** The leaf-only default: `Bebidas` and
+ * `Mercearia` are headings with no box, and the subcategories are what you
+ * tick — which is what keeps "did I pick the parent or the group?" from being
+ * a question at all.
+ *
+ * `Congelados` and `Padaria` still tick, because a childless category IS the
+ * leaf; the flag has nothing to gate there.
+ */
+export const LeafOnlyWithChildlessRows: Story = {
+  args: { options: MATRIX, value: [], onChange: () => {} },
+  render: function Render(args) {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Box sx={{ minHeight: 460 }}>
+        <CategorySelect {...args} mode="multi" value={value} onChange={setValue} showCounts />
+      </Box>
+    );
+  },
+};
+
+/**
+ * **A catalogue that never nested.** Plenty of shops file everything at one
+ * level, so every row here is childless — and every row is selectable, with no
+ * disclosure chevron on any of them, because there is nothing to disclose.
+ *
+ * This is the shape that made the bug visible on Estoque: a whole filter of
+ * rows that drew a chevron, opened onto nothing, and could not be picked.
+ */
+export const FlatCatalogue: Story = {
+  args: { options: [], value: [], onChange: () => {} },
+  render: function Render(args) {
+    const [value, setValue] = useState<string[]>([]);
+    return (
+      <Box sx={{ minHeight: 460 }}>
+        <CategorySelect
+          {...args}
+          mode="multi"
+          options={MATRIX.filter((option) => !option.parentId)}
+          value={value}
+          onChange={setValue}
+          showCounts
+        />
+      </Box>
+    );
+  },
+};
+
+/**
+ * **Single-select, flag ON.** The "move to…" picker where a parent is a legal
+ * destination. The head row draws a RADIO rather than a checkbox: choosing
+ * commits immediately, so there is no accumulation for a checkbox to promise.
+ */
+export const SingleSelectParentAllowed: Story = {
+  args: { options: MATRIX, value: [], onChange: () => {} },
+  render: function Render(args) {
+    const [value, setValue] = useState<string | null>(null);
+    return (
+      <Box sx={{ minHeight: 460 }}>
+        <CategorySelect
+          {...args}
+          mode="single"
+          label="Mover para…"
+          value={value}
+          onChange={setValue}
+          allowParentSelection
         />
       </Box>
     );

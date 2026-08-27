@@ -55,6 +55,12 @@ interface PillControlProps<T extends Record<string, unknown>> {
  * A category set nests, and flattening it into one list is what made "Massas"
  * (mercearia) indistinguishable from "Massas" (pratos principais). `control:
  * "category"` opts a field into the tree, which shows each hit under its parent.
+ *
+ * {@link FilterFieldConfig.allowParentSelection} decides whether a parent row is
+ * itself tickable. It is forwarded rather than fixed here because it is a
+ * per-SCREEN question: a filter over a catalogue where products sit on leaves
+ * wants "the whole category" as one click, while one whose parents are pure
+ * grouping would only offer a tick that means nothing.
  */
 export function PillControl<T extends Record<string, unknown>>({
   fieldId,
@@ -76,6 +82,7 @@ export function PillControl<T extends Record<string, unknown>>({
         label={layout === "stacked" ? pill.label : undefined}
         fullWidth={layout === "stacked"}
         options={pill.options.map(toCategoryOption)}
+        allowParentSelection={pill.allowParentSelection ?? false}
         value={selected}
         onChange={(next) => emitPillDiff(fieldId, selected, next, onTogglePill)}
         dataTestId={testId}
