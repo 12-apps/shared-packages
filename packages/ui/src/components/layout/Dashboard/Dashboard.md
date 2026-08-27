@@ -27,7 +27,13 @@ import { Dashboard } from '@12-apps/ui/layout/Dashboard';
     <Dashboard.Settings title="Product settings">In development</Dashboard.Settings>
     <Dashboard.Spacer />
     <Dashboard.Export onExport={(id) => exportAs(id)} />
-    <Dashboard.Action><Button variant="contained">New product</Button></Dashboard.Action>
+    <Dashboard.Actions
+      moreLabel={copy.moreActions}
+      actions={[
+        { id: 'new-product', text: 'New product', icon: <AddIcon fontSize="small" />, onClick: onCreate },
+        { id: 'import', text: 'Import sheet', icon: <UploadIcon fontSize="small" />, onClick: onImport },
+      ]}
+    />
   </Dashboard.Header>
   <Dashboard.Filters>
     <SearchInput />
@@ -51,7 +57,8 @@ import { Dashboard } from '@12-apps/ui/layout/Dashboard';
 | `Dashboard.Settings` | (in header) | Gear icon. Default: opens a dialog with `children`. With `href` (+ optional `linkComponent`): renders as a link to a settings route (e.g. the page's Configuração section) — no dialog. |
 | `Dashboard.Export` | (in header) | Export dropdown (CSV/Excel/JSON by default); calls `onExport(id)`. |
 | `Dashboard.Spacer` | (in header) | Pushes following controls to the right edge. |
-| `Dashboard.Action` | (in header) | Slot for a primary/secondary button. |
+| `Dashboard.Action` | (in header) | Slot for ONE header control that is not an action — a link, a toggle, a status pill. |
+| `Dashboard.Actions` | (in header) | The header's actions declared as a list. 0 renders nothing, 1 renders a button, n renders the first as a button and the other n−1 in a dropdown. See [HeaderActions](../../form/HeaderActions/HeaderActions.md). |
 | `Dashboard.Filters` | filters | Collapsible search/filter region; visibility driven by `FilterToggle`. |
 | `Dashboard.MoreFilters` | (in filters) | Expandable advanced panel for ranges/dates. |
 | `Dashboard.Body` | body | Main content area (the table/grid). |

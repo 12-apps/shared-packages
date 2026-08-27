@@ -4,6 +4,7 @@ export { DashboardContext, useDashboardContext } from './DashboardContext';
 export type { DashboardContextValue } from './DashboardContext';
 export type {
   DashboardActionProps,
+  DashboardActionsProps,
   DashboardBodyProps,
   DashboardBreadcrumbItem,
   DashboardBreadcrumbProps,

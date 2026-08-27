@@ -1,5 +1,7 @@
 import type { ElementType, ReactNode } from 'react';
 
+import type { HeaderActionsProps } from '../../form/HeaderActions';
+
 /** A single breadcrumb entry for `<Dashboard.Breadcrumb>`. */
 export interface DashboardBreadcrumbItem {
   /** Visible label. */
@@ -138,6 +140,16 @@ export interface DashboardExportProps {
 export interface DashboardActionProps {
   children: ReactNode;
 }
+
+/**
+ * Props for `<Dashboard.Actions>` — the header's actions DECLARED, rather than
+ * composed one `<Dashboard.Action>` at a time.
+ *
+ * `testIdPrefix` is not among them: the Dashboard already has one, from its
+ * root, and letting the part carry a second would give one page two answers to
+ * "what is this header called".
+ */
+export type DashboardActionsProps = Omit<HeaderActionsProps, 'testIdPrefix'>;
 
 /** Props for `<Dashboard.Filters>` — the collapsible search/filter region. */
 export interface DashboardFiltersProps {

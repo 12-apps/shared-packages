@@ -362,6 +362,13 @@ Components for user input and form interactions.
 **Location**: `src/components/form/Form`
 **Docs**: `src/components/form/Form/Form.md`
 
+### HeaderActions
+**Purpose**: Page-header actions sized to how many there are (0 ⇒ nothing, 1 ⇒ a button, n ⇒ a button + a dropdown of the rest)
+**Use Cases**: Any page header with more than one action — catalog/list pages, admin grids, detail screens
+**Features**: Declared as a list rather than composed as JSX (so the count is knowable), priority order (index 0 keeps its button), falsy/`visible: false` entries dropped at the call site, test ids that survive an action moving into the overflow menu, required `moreLabel` (no shipped copy)
+**Location**: `src/components/form/HeaderActions`
+**Docs**: `src/components/form/HeaderActions/HeaderActions.md`
+
 ### Input
 **Purpose**: Text input field
 **Use Cases**: Text entry, search, forms
@@ -511,7 +518,7 @@ Components for structuring and organizing page layouts.
 ### Dashboard
 **Purpose**: Composable page shell (breadcrumb, header, filters, body)
 **Use Cases**: Admin list/detail pages, data-table pages, any page with a title + filters
-**Features**: Opt-in dot-notation parts, context-shared state, order-independent slots, info popover, filter toggle, settings dialog, export menu, advanced more-filters
+**Features**: Opt-in dot-notation parts, context-shared state, order-independent slots, info popover, filter toggle, settings dialog, export menu, `Dashboard.Actions` (HeaderActions wired to the shell's own testIdPrefix), advanced more-filters
 **Location**: `src/components/layout/Dashboard`
 **Docs**: `src/components/layout/Dashboard/Dashboard.md`
 
