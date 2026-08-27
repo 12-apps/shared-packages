@@ -78,6 +78,11 @@ test('filters the list without losing the selection', async ({ page }) => {
 
   await expect(page.getByTestId('email-preview-row-account.reset')).toBeVisible();
   await expect(page.getByTestId('email-preview-row-account.verify')).toBeHidden();
+  // The text stays put. It did not always: picking a row used to refetch the
+  // catalogue, and the loader blanked the list while the request was in flight
+  // — which unmounts the column and takes the filter with it. Fast locally,
+  // visible on a slower connection, and this is the assertion that says so.
+  await expect(page.getByTestId('email-preview-filter')).toHaveValue('reset');
   // The document stays on screen: filtering the CATALOGUE is not choosing a
   // different mail, and clearing the pane would make the filter feel like a
   // navigation.

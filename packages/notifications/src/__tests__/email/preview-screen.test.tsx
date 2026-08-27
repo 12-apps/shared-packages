@@ -112,6 +112,61 @@ describe('the e-mail preview screen', () => {
     });
   });
 
+  /**
+   * The two halves of one defect, found by a slow CI runner and not by a fast
+   * laptop — which is the whole reason they are pinned here.
+   *
+   * The catalogue fetch used to depend on a counter that ticks on EVERY URL
+   * patch, selection included. So clicking a row refetched the list, and the
+   * loader blanked `data` while the request was in flight — which unmounts the
+   * subtree holding the filter text, the open tab and the chosen width. Locally
+   * the answer came back in a millisecond and nobody saw it. On a slower
+   * connection the operator watched what they had just typed vanish.
+   */
+  it('does not refetch the catalogue when a row is picked', async () => {
+    const fetchMock = stubFetch();
+    render(<Page />);
+    await screen.findByTestId('email-preview-row-order.paid');
+
+    const indexCalls = (): number =>
+      fetchMock.mock.calls.filter(([input]) => !String(input).includes(`${API}/`)).length;
+    expect(indexCalls()).toBe(1);
+
+    fireEvent.click(screen.getByTestId('email-preview-row-order.paid'));
+    await screen.findByTestId('email-preview-frame');
+
+    // The list cannot have changed — only which row is current.
+    expect(indexCalls()).toBe(1);
+  });
+
+  it('keeps the typed filter across a reload of the catalogue', async () => {
+    stubFetch();
+    render(<Page />);
+    await screen.findByTestId('email-preview-row-order.paid');
+
+    // Plain DOM assertions rather than jest-dom matchers: this package
+    // registers none, and an unknown matcher inside `waitFor` throws on every
+    // tick and reads as a timeout rather than as the mistake it is.
+    const filter = (): HTMLInputElement =>
+      screen.getByTestId('email-preview-filter') as HTMLInputElement;
+
+    fireEvent.change(await screen.findByTestId('email-preview-filter'), {
+      target: { value: 'payment' },
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId('email-preview-row-auth:verification')).toBeNull();
+    });
+
+    // Picking a row is the patch that used to wipe it.
+    fireEvent.click(screen.getByTestId('email-preview-row-order.paid'));
+    await screen.findByTestId('email-preview-frame');
+
+    expect(filter().value).toBe('payment');
+    await waitFor(() => {
+      expect(screen.queryByTestId('email-preview-row-auth:verification')).toBeNull();
+    });
+  });
+
   it('shows the plain-text twin on its own tab', async () => {
     stubFetch();
     window.history.replaceState({}, '', '/console?id=auth:verification');

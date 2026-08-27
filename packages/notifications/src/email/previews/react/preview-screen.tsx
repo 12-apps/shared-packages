@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
+import { useCallback, useMemo, useState, type JSX } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
-import { Button } from '@12-apps/ui/form/Button';
 import { Input } from '@12-apps/ui/form/Input';
 import { ToggleGroup } from '@12-apps/ui/form/ToggleGroup';
 import { Box } from '@12-apps/ui/mui/Box';
@@ -11,6 +10,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 import type { EmailPreviewCoverage, EmailPreviewDetail, EmailPreviewIndex } from '../catalog';
 
 import type { EmailPreviewScreenCopy } from './copy';
+import { Failure, useLoadable } from './loadable';
 import { MessageList, matchesFilter } from './message-list';
 import { MessageView, type PreviewTab, type PreviewWidth } from './message-view';
 import { fetchEmailPreview, fetchEmailPreviewIndex } from './transport';
@@ -98,57 +98,6 @@ function CoverageNotice({
         </Text>
       ) : null}
     </Alert>
-  );
-}
-
-/** A load that can fail, in the two states a screen has to render. */
-interface Loadable<T> {
-  data: T | null;
-  error: string | null;
-}
-
-function useLoadable<T>(load: () => Promise<T>): Loadable<T> & { reload: () => void } {
-  const [state, setState] = useState<Loadable<T>>({ data: null, error: null });
-  const [nonce, setNonce] = useState(0);
-  useEffect(() => {
-    let live = true;
-    setState({ data: null, error: null });
-    load()
-      .then((data) => live && setState({ data, error: null }))
-      .catch(
-        (error: unknown) =>
-          live &&
-          setState({ data: null, error: error instanceof Error ? error.message : String(error) }),
-      );
-    return () => {
-      // A language switched twice in a second must not let the FIRST answer
-      // land last — the screen would show a document the operator did not ask
-      // for, with the toggle disagreeing.
-      live = false;
-    };
-  }, [load, nonce]);
-  return { ...state, reload: () => setNonce((n) => n + 1) };
-}
-
-function Failure({
-  message,
-  copy,
-  onRetry,
-}: {
-  message: string;
-  copy: EmailPreviewScreenCopy;
-  onRetry: () => void;
-}): JSX.Element {
-  return (
-    <Box data-testid="email-preview-error" sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-start' }}>
-      <Alert severity="error">
-        <Text as="p" size="sm">{copy.loadError}</Text>
-        <Text as="p" size="sm">{message}</Text>
-      </Alert>
-      <Button size="sm" variant="outline" onClick={onRetry}>
-        {copy.retry}
-      </Button>
-    </Box>
   );
 }
 
@@ -333,17 +282,24 @@ export function createEmailPreviewScreen(config: EmailPreviewScreenConfig): {
   const { apiBase, copy } = config;
 
   function EmailPreviewsPage(): JSX.Element {
-    const [urlNonce, setUrlNonce] = useState(0);
+    // The VALUE is deliberately discarded: nothing reads the counter, and the
+    // only thing it has to do is change, so React re-renders and the URL is
+    // re-read below. It used to be a dependency of the catalogue fetch, which
+    // is what made every row click refetch the list.
+    const [, setUrlNonce] = useState(0);
     const locale = searchParam('locale') ?? '';
     const selectedId = searchParam('id');
-    // `urlNonce` is a dependency of the CALLBACK rather than of the effect: a
-    // URL patched in place changes neither `apiBase` nor `locale` by identity,
-    // so without it the list would keep the answer it already had.
+    // The catalogue depends on the LANGUAGE and on nothing else. `urlNonce` is
+    // deliberately absent: it counts every URL patch, selection included, and
+    // including it here refetched the whole catalogue on each row click — for a
+    // list whose contents cannot have changed. What the click actually needs is
+    // a re-RENDER, so `selectedId` is re-read, and `setUrlNonce` already does
+    // that on its own.
     const load = useCallback(
       () => fetchEmailPreviewIndex(apiBase, locale),
-      [locale, urlNonce],
+      [apiBase, locale],
     );
-    const index = useLoadable(load);
+    const index = useLoadable(load, { keepPrevious: true });
 
     const patch = (next: Record<string, string>): void => {
       patchSearch(next);
