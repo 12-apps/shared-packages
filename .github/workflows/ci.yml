@@ -33,6 +33,7 @@ env:
     packages/eslint-config
     packages/typescript-config
     packages/i18n
+    packages/thermal-printing
     packages/feature-flags
     packages/request-scope
     packages/observability-backend

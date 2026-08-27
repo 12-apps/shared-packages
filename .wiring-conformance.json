@@ -779,6 +779,10 @@
     "kind": "exempt",
     "why": "the React half is components a host renders inside its own screens, not a mountable surface with its own routes — the one web narrowing in the estate that was always valid"
   },
+  "@12-apps/thermal-printing": {
+    "kind": "exempt",
+    "why": "a pure library with nothing to wire: it owns no routes, models, jobs, copy or web surface, and its whole contract is four functions over a value type — a manifest would declare capabilities that do not exist so that a gate could tick"
+  },
   "@12-apps/typescript-config": {
     "kind": "exempt",
     "why": "compiler preset — dev-time tooling only; nothing in this package ever reaches a runtime, let alone a host mount"
