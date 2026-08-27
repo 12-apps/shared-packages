@@ -135,6 +135,42 @@
     "kind": "exempt",
     "why": "raises no alerts as static manifest data; the day it has something to say, the blueprint ships as a factory over host copy (the product-research carve-out), never pre-worded inside a library"
   },
+  "@12-apps/email :: areas": {
+    "kind": "exempt",
+    "why": "the screen is ONE console page, and where it belongs in a host's navigation is a judgement about that host's information architecture — a platform tool for staff in one console, a developer aid behind a flag in another. Suggesting a row would be this package guessing at a menu it cannot see."
+  },
+  "@12-apps/email :: db": {
+    "kind": "exempt",
+    "why": "nothing here is persisted. The layout is pure and the catalogue is DERIVED per request from sources the host already holds, which is the whole shape of the package: a host adopts it without touching its schema."
+  },
+  "@12-apps/email :: e2e": {
+    "kind": "exempt",
+    "why": "the surface has no state to seed. Its endpoints answer from the host's own sources, so a fixture would have to be the host's messages — which is exactly what the host's own e2e already owns."
+  },
+  "@12-apps/email :: email": {
+    "kind": "exempt",
+    "why": "the name invites this and it is the wrong seam. The contract's `email` capability is a DELIVERY port — a host's one driver, handed to a package that needs to SEND. This package renders and never sends; sending stays with whoever owns the message. A declaration would advertise a port nothing reads."
+  },
+  "@12-apps/email :: env": {
+    "kind": "exempt",
+    "why": "no variable is read. Every input — the sources, the languages, the mount path — is passed as config, so there is nothing for a host to set in an environment and nothing for this to declare."
+  },
+  "@12-apps/email :: jobs": {
+    "kind": "exempt",
+    "why": "there is no background work. Rendering happens on the request that asks for it, and a catalogue that pre-rendered on a schedule would be answering with a snapshot of sources that change at import time."
+  },
+  "@12-apps/email :: mcp": {
+    "kind": "exempt",
+    "why": "deliberately off the agent surface. This publishes a host's whole transactional-mail inventory and the exact wording of its verification and reset mails — the reference somebody writing a phishing mail would want — so it is gated for human operators and reachable by no tool."
+  },
+  "@12-apps/email :: notifications": {
+    "kind": "exempt",
+    "why": "this package produces no events. It renders messages other packages and the host emit; an event of its own would be a preview surface notifying somebody that a preview exists."
+  },
+  "@12-apps/email :: permissions": {
+    "kind": "exempt",
+    "why": "the gate is the host's and cannot be otherwise: who may read the mail inventory is a platform-staff question every host answers with its own roles. Contributing a permission id would be this package inventing a role name in somebody else's authorization model."
+  },
   "@12-apps/entitlements :: e2e": {
     "kind": "exempt",
     "why": "ships no packaged journeys: its exports carry no e2e entry, and declaring one it does not export would fail the exports tripwire in its own suite"
