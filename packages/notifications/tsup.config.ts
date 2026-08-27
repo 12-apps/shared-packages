@@ -26,6 +26,11 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     'index': 'src/index.ts',
+    'email/index': 'src/email/index.ts',
+    'email/locales': 'src/email/locales.ts',
+    'email/previews/index': 'src/email/previews/index.ts',
+    'email/previews/hono': 'src/email/previews/hono.ts',
+    'email/previews/react/index': 'src/email/previews/react/index.tsx',
     'server/index': 'src/server/index.ts',
     'hono/index': 'src/hono/index.ts',
     'react/index': 'src/react/index.ts',

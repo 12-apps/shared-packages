@@ -3,11 +3,31 @@
   "version": "1.0.0",
   "type": "module",
   "sideEffects": false,
-  "description": "Plug-and-play notification system (12-15): an always-on in-app inbox, per-user \u00d7 per-category channel preferences, and email / SMS / WhatsApp / web-push transports behind vendor DRIVERS so a second provider is a config entry. Framework-free core (.), host-mounted backend surface (./server: inbox / preferences / push-subscription endpoints, the channel router with delivery records + retry sweep, the permission fan-out, duck-typed Prisma seam), Hono adapter (./hono), React surface (./react: bell + badge, inbox drawer, preferences screen), VAPID sender (./web-push) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
+  "description": "Plug-and-play notification system (12-15): an always-on in-app inbox, per-user × per-category channel preferences, and email / SMS / WhatsApp / web-push transports behind vendor DRIVERS so a second provider is a config entry. Framework-free core (.), host-mounted backend surface (./server: inbox / preferences / push-subscription endpoints, the channel router with delivery records + retry sweep, the permission fan-out, duck-typed Prisma seam), Hono adapter (./hono), React surface (./react: bell + badge, inbox drawer, preferences screen), VAPID sender (./web-push) and the package-owned Prisma partial + migrations. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./email": {
+      "types": "./dist/email/index.d.ts",
+      "default": "./dist/email/index.js"
+    },
+    "./email/locales": {
+      "types": "./dist/email/locales.d.ts",
+      "default": "./dist/email/locales.js"
+    },
+    "./email/previews": {
+      "types": "./dist/email/previews/index.d.ts",
+      "default": "./dist/email/previews/index.js"
+    },
+    "./email/previews/hono": {
+      "types": "./dist/email/previews/hono.d.ts",
+      "default": "./dist/email/previews/hono.js"
+    },
+    "./email/previews/react": {
+      "types": "./dist/email/previews/react/index.d.ts",
+      "default": "./dist/email/previews/react/index.js"
     },
     "./server": {
       "types": "./dist/server/index.d.ts",

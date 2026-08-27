@@ -22,6 +22,8 @@ sweep — endpoints and screens included.
 | **Hono** | `@12-apps/notifications/hono` | `const notifications = notificationsRouter({ ...serverConfig, resolveActor }); app.route('/api/account', notifications.router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root, `/server` or `/react` never resolves it. |
 | **React** | `@12-apps/notifications/react` | Call `createWebNotifications({ apiBase })`. `BellWithPanel` is the whole feature as one element; `BellButton` + `Panel` are the pair for a host with its own chrome; `page` is the preferences screen you route to. pt-BR product copy and the origin host's test ids ship inside. |
 | **Web Push** | `@12-apps/notifications/web-push` | `sender: vapidPushSender({ subject, publicKey, privateKey })` on the `WEB_PUSH` declaration. Its own subpath because it is the only piece that needs `web-push` — an OPTIONAL peer a host that never enables the channel never installs. |
+| **Mail layout** | `@12-apps/notifications/email` | `renderEmail(document)` → `{ subject, html, text }`. Framework-free and dependency-free. Turn it on for the EMAIL transport by declaring `layout`; the copy packs are `@12-apps/notifications/email/locales`. |
+| **Previews** | `@12-apps/notifications/email/previews` | The preview catalogue and its two route descriptors. `@12-apps/notifications/email/previews/hono` is the one-call mount; `.../previews/react` is the operator screen. A SECOND wiring manifest — see "The mail layout and its preview console". |
 | **Prisma** | `prisma/notifications.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/notifications prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma; a symlinked partial dangles under `turbo prune`). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 
 ## Host wiring rules (the ones that bite)
@@ -339,6 +341,113 @@ There are **no foreign keys into host tables**: `user_id` and `client_id` are
 by-value scalars. Add your own in a host migration — `ON DELETE CASCADE` on
 both is the recommendation, so a deleted account takes its inbox with it.
 
+## The mail layout and its preview console
+
+Both are optional and independent of everything above: the layout is a pure
+function, and the console declares no `db`, so adopting either touches no schema.
+
+### 1. Turning the layout on for the EMAIL transport
+
+Add `layout` to the driver declaration. Without it you keep the previous
+rendering byte for byte — this is opt-in because `brand` and `chrome` are
+REQUIRED with no default, so making them mandatory would break every host
+already declaring EMAIL, at runtime, on the first send.
+
+```ts
+import { PT_BR_EMAIL_CHROME } from '@12-apps/notifications/email/locales';
+
+{ channel: 'EMAIL', driver: 'resend', apiKey, from, linkLabel: 'Ver detalhes',
+  layout: { brand: 'Loja Exemplo', chrome: PT_BR_EMAIL_CHROME, locale: 'pt-BR' } }
+```
+
+`theme` may be omitted; the layout ships a neutral grey-on-white palette. That
+one asymmetry is deliberate and argued in `src/email/theme.ts`: a wrong-language
+default is invisible until a customer complains, where a missing theme is
+visible in the first preview.
+
+For a host whose recipients do not share a language, resolve `chrome` per
+message rather than at the mount — a mail's language is the RECIPIENT's, not the
+request's.
+
+### 2. YOU gate the console. The routes only ask
+
+`emailPreviewRoutes` declares `kind: 'authenticated'` on both descriptors — the
+wiring contract's word for "behind the host's session resolution and its RBAC".
+It names no permission id, because the ids are yours. **So the descriptor asks
+for a gate; it cannot supply one.**
+
+The surface publishes your whole transactional-mail inventory and the exact
+wording and link shape of your verification and password-reset mails — the
+reference somebody writing a convincing phishing mail for your product would
+want. Mount it behind whichever gate you already use for platform staff:
+
+```ts
+import { emailPreviewsRouter } from '@12-apps/notifications/email/previews/hono';
+
+app.use('/api/platform/email-previews/*', requirePlatformOperator);
+app.route('/api/platform/email-previews', emailPreviewsRouter(previews).router);
+```
+
+`allow` on the config is there for a host that would rather state the refusal
+once in the config than mount middleware around the router. Either is fine;
+neither is optional.
+
+### 3. Declare the SOURCES — and expect to be asked repeatedly
+
+A package cannot know that you send a "your quota is exhausted" notice, let
+alone what data it renders from. So you declare sources, and each is asked
+**per request**:
+
+```ts
+const previews = {
+  sources: [authMailSource(), notificationMailSource()],
+  locales: ['pt-BR', 'en-US'],
+  defaultLocale: 'pt-BR',
+};
+```
+
+Per request rather than once at the mount, because domain modules typically
+register their messages as an import side effect. A catalogue built once lists
+whatever happened to be imported first — which looks exactly like a product that
+sends fewer mails than it does.
+
+Ids must be unique across every source; a duplicate THROWS, because the
+alternative is one message unreachable and the other ambiguous, silently.
+
+### 4. `coverage` is optional, and worth writing
+
+A catalogue that quietly omits a message looks exactly like a product that does
+not send it. Report what you cannot show — a message with no sample data, or
+sample data for a message that no longer exists — and the screen renders it as a
+warning strip. Pair it with a unit test asserting `missing` is empty, and a mail
+added without a sample becomes a red test naming the type rather than a gap
+nobody sees.
+
+### 5. Adopt it as the SECOND manifest
+
+`@12-apps/notifications-email-previews` is a separate manifest from the same
+package, so a host mounts the inbox and declines the console (or vice versa) in
+writing rather than silently getting both behind one gate:
+
+```ts
+host.adoptServer({
+  manifest: notificationEmailPreviewsManifest,
+  server: notificationEmailPreviewsServerManifest,
+  bindings: { http: { mountPath: '/api/platform/email-previews', config: previews } },
+});
+```
+
+The web half binds `{ apiBase, copy }`, with `copy` a pack passed by name —
+`EN_US_EMAIL_PREVIEW_COPY` or `PT_BR_EMAIL_PREVIEW_COPY` from
+`@12-apps/notifications/email/previews/react`.
+
+### 6. Nothing can be sent from the console
+
+It holds no driver, no transport and no address, and `render` is pure by the
+contract `EmailPreviewMessage` states. The one mistake a preview surface must be
+incapable of — putting a sample in somebody's inbox — is not reachable from that
+code at all, rather than merely not done.
+
 ## What does NOT come with it
 
 - **The events.** Generators are host code (see rule 6).
@@ -346,3 +455,7 @@ both is the recommendation, so a deleted account takes its inbox with it.
 - **A plan model.** `channelPolicy` answers; it does not decide.
 - **An authorization engine.** `audience` answers; it does not decide.
 - **A service worker.** The file is the host's (rule 12).
+- **The mail INVENTORY.** The preview console renders what you declare as
+  sources; it cannot discover what your product sends.
+- **A brand, a palette or a sentence.** The layout requires the first, defaults
+  only the second, and ships the third as packs you pass by name.

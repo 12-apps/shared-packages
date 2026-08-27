@@ -38,9 +38,22 @@
 
 import type { AnyWebManifest } from '@12-apps/wiring';
 
+import { createEmailPreviewScreen } from '../email/previews/react/preview-screen';
 import { createWebNotifications } from '../react/create-web-notifications';
 
 export const notificationsWebManifest = {
   name: '@12-apps/notifications',
   surface: { create: createWebNotifications },
+} as const satisfies AnyWebManifest;
+
+/**
+ * The preview console's web half.
+ *
+ * One screen, named `page`, because a screen's NAME is what an area row
+ * resolves against — a surface that was itself the component is the shape that
+ * made an area row resolve to `undefined` in `@12-apps/auth` for a release.
+ */
+export const notificationEmailPreviewsWebManifest = {
+  name: '@12-apps/notifications-email-previews',
+  surface: { create: createEmailPreviewScreen },
 } as const satisfies AnyWebManifest;

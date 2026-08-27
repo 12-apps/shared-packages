@@ -121,6 +121,71 @@ a form B's keys decrypt) and the preferences screen derives "this browser is
 receiving alerts" from the SERVER's answer, not from the browser's own
 subscription object.
 
+## One mail layout, and a console that previews it
+
+`EMAIL` used to render a mail as three bare `<p>` tags. That is a **layout**
+problem rather than a wording one — a paragraph with no document around it
+inherits whatever the client decides: 13px Arial in Gmail, Times New Roman in
+Outlook, no centring anywhere — so the layout ships here, beside the transport
+that needed it.
+
+```ts
+import { renderEmail } from '@12-apps/notifications/email';
+import { PT_BR_EMAIL_CHROME } from '@12-apps/notifications/email/locales';
+```
+
+`renderEmail(document)` takes STRUCTURE — a heading, paragraphs, an optional
+facts table, at most one call to action — and never markup. Three things follow,
+and each was a real defect in the renderers it replaces:
+
+1. **Escaping cannot be forgotten.** It happens in one place.
+2. **The plain-text twin cannot drift.** Both halves render from the same
+   object. A `text/html` part with no `text/plain` twin is scored by every major
+   spam filter.
+3. **A preview is honest**, because the console renders exactly this.
+
+The client constraints are encoded once so no caller has to know them: tables
+rather than divs (Outlook lays HTML out with Word), inline styles only (Gmail
+strips `<style>`), no web fonts or `color-mix()` or CSS variables, a hidden
+preheader, a `bgcolor` attribute **and** a background style on the CTA.
+
+**The EMAIL transport opts in.** Declare `layout` on the driver declaration and
+`formatEmail` renders the shared document; omit it and you keep the previous
+rendering byte for byte. Opt-in rather than automatic because `brand` and
+`chrome` are required with no default — a package that defaulted them would sign
+another company's mail, in a language nobody chose — so making them mandatory
+would break every host already declaring EMAIL, at runtime, on the first send.
+
+```ts
+{ channel: 'EMAIL', driver: 'resend', apiKey, from, linkLabel: 'Ver detalhes',
+  layout: { brand: 'Loja Exemplo', chrome: PT_BR_EMAIL_CHROME, locale: 'pt-BR' } }
+```
+
+### The preview console
+
+There is normally no way to *see* a transactional mail without triggering the
+event that sends it — signing up with a throwaway address for the verification
+mail, settling an order for the receipt. So nobody looks, and a product
+rendering three ways does not find out. A layout nobody can see is one release
+from being three again, which is why the console ships in the same package.
+
+It is the package's **second wiring manifest**
+(`@12-apps/notifications-email-previews`), because the first has already spent
+`http` on the account inbox and `surface` on the bell. That split is deliberate:
+the inbox ships to every signed-in user, and this console publishes the whole
+mail inventory and the exact wording and link shape of the verification and
+reset mails. **You gate the mount** — the routes declare `kind: 'authenticated'`
+and name no permission id, because the ids are the host's.
+
+WHICH messages exist is yours too, declared as `sources` that are asked **per
+request** (a source backed by a registry that fills at import time would
+otherwise answer with whatever was imported first). A source reports its own
+`coverage` — what it cannot show — and the screen renders that as a warning
+strip rather than pretending to be complete. Nothing can be sent from it: it
+holds no driver, no transport and no address.
+
+See **[ADOPTING.md](./ADOPTING.md)** for the mount, the gate and the sources.
+
 ## The models
 
 `prisma/notifications.prisma` — `Notification`, `NotificationDelivery`,
