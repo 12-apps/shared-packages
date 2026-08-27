@@ -55,7 +55,11 @@ export { splitRoleSelection } from './team-role-dialog';
 // The screens themselves, for a host routing them rather than taking the
 // package's tabs. Each is a plain component over the props `createWebRbac`
 // already resolves — the factory is the convenience, not the only door.
-export { RolesScreen, type RolesScreenProps } from './roles-screen';
+export {
+  RolesScreen,
+  type RolesBulkSlotProps,
+  type RolesScreenProps,
+} from './roles-screen';
 export { TeamScreen, type TeamScreenProps } from './team-screen';
 export { MemberScreen, type MemberScreenProps } from './member-screen';
 export {

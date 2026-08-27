@@ -18,7 +18,7 @@ import { createRbacLabels, type RbacLabels } from './labels';
 import { MemberScreen, type MemberScreenProps } from './member-screen';
 import type { RoleMenuContext } from './role-actions-menu';
 import type { RoleSeedDefault } from './role-grid-config';
-import { RolesScreen } from './roles-screen';
+import { RolesScreen, type RolesScreenProps } from './roles-screen';
 import { TeamScreen } from './team-screen';
 import { httpRbacTransport, type RbacTransport } from './transport';
 
@@ -57,6 +57,14 @@ export interface RbacWebConfig<P extends string = string> {
   copy: RbacWebCopy;
   /** How the surface reaches its data. Default: same-origin fetch. */
   transport?: RbacTransport;
+  /**
+   * The host's multi-select surface for the roles grid.
+   *
+   * Optional, and absent it changes nothing. See
+   * {@link RolesScreenProps.bulkSlot} for why it is a component rather than a
+   * list of actions.
+   */
+  rolesBulkSlot?: RolesScreenProps['bulkSlot'];
   /**
    * Label overrides layered over the catalog's own — a vocabulary, or a
    * RESOLVER over a tag-keyed pack.
@@ -274,6 +282,7 @@ function BoundRolesScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       breadcrumb={parts.config.breadcrumbs?.roles}
       onOpenMembers={parts.config.navigate?.roleMembers}
       renderVersionHistory={parts.config.renderVersionHistory}
+      bulkSlot={parts.config.rolesBulkSlot}
     />
   );
 }
