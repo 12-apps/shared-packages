@@ -73,6 +73,7 @@
   "form/CreatableSelect": "src/components/form/CreatableSelect/index.ts",
   "form/DateRangePicker": "src/components/form/DateRangePicker/index.ts",
   "form/Form": "src/components/form/Form/index.ts",
+  "form/HeaderActions": "src/components/form/HeaderActions/index.ts",
   "form/HeaderButton": "src/components/form/HeaderButton/index.ts",
   "form/total-form": "src/components/form/total-form/index.ts",
   "form/Input": "src/components/form/Input/index.ts",

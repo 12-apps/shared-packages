@@ -19,10 +19,12 @@ import Tooltip from '@mui/material/Tooltip/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import React, { useState } from 'react';
 
+import { HeaderActions } from '../../form/HeaderActions';
 import { HeaderButton } from '../../form/HeaderButton';
 import { useDashboardContext } from './DashboardContext';
 import type {
   DashboardActionProps,
+  DashboardActionsProps,
   DashboardExportFormat,
   DashboardExportProps,
   DashboardFilterToggleProps,
@@ -206,3 +208,37 @@ export const DashboardAction = ({ children }: DashboardActionProps): React.JSX.E
   <Box sx={{ display: 'inline-flex' }}>{children}</Box>
 );
 DashboardAction.displayName = 'Dashboard.Action';
+
+/**
+ * The header's actions, declared as a LIST — `<Dashboard.Action>`'s plural.
+ *
+ * `<Dashboard.Action>` is a slot: it renders whatever you hand it, once per
+ * action, and a page with five of them draws five equally-loud buttons. That is
+ * the right primitive for one button and the wrong one for five, and the pages
+ * here that grew a fifth action all grew it the same way — by adding a fifth
+ * slot, because the slot was the only thing on offer.
+ *
+ * This part answers the question the slot cannot: given N actions, how many
+ * belong on the bar? See {@link HeaderActions} for the rule (0 ⇒ nothing,
+ * 1 ⇒ a button, n ⇒ a button and a menu of the rest).
+ *
+ * Both stay. A header still composes `<Dashboard.Action>` for the one control
+ * that is not an action at all — a link, a toggle, a status pill — and reaches
+ * for this when it has actions to rank.
+ */
+export const DashboardActions = ({
+  actions,
+  moreLabel,
+  collapseBelow,
+}: DashboardActionsProps): React.JSX.Element => {
+  const { testIdPrefix } = useDashboardContext();
+  return (
+    <HeaderActions
+      actions={actions}
+      moreLabel={moreLabel}
+      collapseBelow={collapseBelow}
+      testIdPrefix={`${testIdPrefix}-actions`}
+    />
+  );
+};
+DashboardActions.displayName = 'Dashboard.Actions';
