@@ -233,14 +233,12 @@ export const DashboardActions = ({
 }: DashboardActionsProps): React.JSX.Element => {
   const { testIdPrefix } = useDashboardContext();
   return (
-    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-      <HeaderActions
-        actions={actions}
-        moreLabel={moreLabel}
-        collapseBelow={collapseBelow}
-        testIdPrefix={`${testIdPrefix}-actions`}
-      />
-    </Box>
+    <HeaderActions
+      actions={actions}
+      moreLabel={moreLabel}
+      collapseBelow={collapseBelow}
+      testIdPrefix={`${testIdPrefix}-actions`}
+    />
   );
 };
 DashboardActions.displayName = 'Dashboard.Actions';

@@ -2,6 +2,7 @@
 
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import Box from '@mui/material/Box/index.js';
 import ListItemIcon from '@mui/material/ListItemIcon/index.js';
 import ListItemText from '@mui/material/ListItemText/index.js';
 import Menu from '@mui/material/Menu/index.js';
@@ -48,6 +49,14 @@ function present(
  * caller in the estate had therefore hand-written the row, which is how four
  * equally-weighted buttons ended up wrapping the line on a catalog page.
  *
+ * ## One element, so the spacing is the component's and not the mount's
+ *
+ * It renders an `inline-flex` box rather than a fragment. A fragment inherits
+ * whatever gap its parent happens to set, and the two mounts here set
+ * different ones — a `Dashboard.Header` spaces its children, a
+ * `Dashboard.Action` slot does not, which is why the pair of buttons in that
+ * slot sat flush against each other. The gap belongs to the control.
+ *
  * ## The ids survive the move
  *
  * An action that overflows keeps its `dataTestId` on its `MenuItem`. It is a
@@ -72,7 +81,7 @@ export function HeaderActions({
   if (!primary) return null;
 
   return (
-    <>
+    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
       <HeaderButton
         text={primary.text}
         icon={primary.icon}
@@ -120,6 +129,6 @@ export function HeaderActions({
           </Menu>
         </>
       )}
-    </>
+    </Box>
   );
 }

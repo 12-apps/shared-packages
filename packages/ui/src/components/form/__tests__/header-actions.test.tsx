@@ -30,6 +30,17 @@ describe('HeaderActions — how many controls a count produces', () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it('renders ONE element, so the gap is the control\'s and not the mount\'s', () => {
+    const { container } = render(
+      <HeaderActions actions={[action('a', 'Novo'), action('b', 'Exportar')]} moreLabel={MORE} />,
+    );
+
+    // A fragment would inherit whatever gap the parent happened to set, and the
+    // two mounts here set different ones — which is why a pair of buttons in a
+    // `Dashboard.Action` slot used to sit flush.
+    expect(container.childElementCount).toBe(1);
+  });
+
   it('renders nothing when every declared action is gated away', () => {
     const { container } = render(
       <HeaderActions actions={[action('a', 'A', { visible: false }), false, null]} moreLabel={MORE} />,

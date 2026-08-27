@@ -44,6 +44,12 @@ break the suite of the action it pushed out.
 The overflow trigger and its menu take their ids from `testIdPrefix`
 (`header-actions` by default): `…-more-trigger` and `…-more-menu`.
 
+## It brings its own spacing
+
+The component renders one `inline-flex` box, not a fragment. A fragment inherits
+whatever gap its parent sets, and the two mounts set different ones — a
+`Dashboard.Header` spaces its children, a `Dashboard.Action` slot does not.
+
 ## Copy
 
 `moreLabel` is REQUIRED and has no default. This package ships no words of its
