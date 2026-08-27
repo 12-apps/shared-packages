@@ -16,6 +16,7 @@ import React, { useMemo, useState } from 'react';
 import { DashboardContext, useDashboardContext } from './DashboardContext';
 import {
   DashboardAction,
+  DashboardActions,
   DashboardExport,
   DashboardFilterToggle,
   DashboardInfo,
@@ -309,6 +310,7 @@ Dashboard.FilterToggle = DashboardFilterToggle;
 Dashboard.Settings = DashboardSettings;
 Dashboard.Export = DashboardExport;
 Dashboard.Action = DashboardAction;
+Dashboard.Actions = DashboardActions;
 Dashboard.Filters = DashboardFilters;
 Dashboard.MoreFilters = DashboardMoreFilters;
 Dashboard.Body = DashboardBody;
