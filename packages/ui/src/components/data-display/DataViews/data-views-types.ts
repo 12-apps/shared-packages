@@ -110,6 +110,19 @@ export interface FilterFieldConfig<T extends Record<string, unknown>> {
    */
   control?: "checkboxes" | "multiselect" | "category";
   /**
+   * Lets a `control: "category"` pill select a PARENT category, not just its
+   * children. Off by default, which keeps the leaf-only reading: the parent is
+   * a heading and its subcategories are the rows you tick.
+   *
+   * Turn it on where "the whole category" is a filter a user would reach for —
+   * selecting a parent then selects every subcategory under it, and the chip
+   * tray collapses that back to one chip bearing the category's name.
+   *
+   * A category with NO children is selectable either way: it is itself the
+   * leaf, so the flag has nothing to gate there.
+   */
+  allowParentSelection?: boolean;
+  /**
    * Forces this filter to render as a searchable multi-select dropdown with the
    * search box always shown, regardless of how many options are currently
    * loaded. Use it when the option set can grow unbounded (e.g. a filter backed
@@ -157,6 +170,17 @@ export interface DataViewColumn<T extends Record<string, unknown>> extends GridC
 export type DataViewsLayout = "cards" | "list" | "board" | "table";
 
 /** The full, serializable state a view captures. */
+/**
+ * A view-state patch: the fields to merge, or an updater given the CURRENT
+ * state. Use the updater whenever the patch derives from state it also changes
+ * — a render-scoped snapshot would let two calls in one tick read the same
+ * `prev` and the second overwrite the first, which is exactly what a control
+ * emitting one call per changed value does.
+ */
+export type DataViewStatePatch =
+  | Partial<DataViewState>
+  | ((prev: DataViewState) => Partial<DataViewState>);
+
 export interface DataViewState {
   /** Free text matched across every `searchable` column. */
   search: string;

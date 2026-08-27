@@ -1,4 +1,4 @@
-import type { CategoryRowRef } from './category-tree';
+import { isLeafCategory, type CategoryRowRef } from './category-tree';
 import type { CategoryGroup } from './CategorySelect.types';
 
 /** What a key handler is allowed to do to the panel. */
@@ -63,33 +63,52 @@ function handleLeft(context: CategoryKeyContext): void {
 }
 
 /**
- * Space marks. On a category that is only a HEADING it expands instead — the
- * row has no checkbox, so "mark" has nothing to mean there.
+ * What a category row does when it is activated — the one answer the click, the
+ * Space key and (in single-select) Enter all take, so the three cannot disagree
+ * about a row the way they did over a childless category.
+ *
+ * A category that is only a HEADING expands instead of marking: the row has no
+ * control, so "mark" has nothing to mean there. A childless category is not a
+ * heading — it is the leaf — so it marks.
  */
+function activateCategoryRow(context: CategoryKeyContext, categoryId: string): void {
+  const group = groupOf(context, categoryId);
+  if (!group) return;
+  if (!context.allowParentSelection && !isLeafCategory(group)) {
+    context.toggleExpanded(categoryId);
+    return;
+  }
+  if (context.single) {
+    context.pick(categoryId);
+    return;
+  }
+  context.toggleCategory(group);
+}
+
+/** Space marks the row under the cursor. */
 function handleSpace(context: CategoryKeyContext): void {
   const row = activeRow(context);
   if (!row) return;
-  if (context.single) {
-    context.pick(row.id);
-    return;
-  }
   if (row.kind === 'subcategory') {
-    context.toggleSubcategory(row.id);
+    if (context.single) context.pick(row.id);
+    else context.toggleSubcategory(row.id);
     return;
   }
-  const group = groupOf(context, row.id);
-  if (!group) return;
-  if (context.allowParentSelection) context.toggleCategory(group);
-  else context.toggleExpanded(row.id);
+  activateCategoryRow(context, row.id);
 }
 
 function handleEnter(context: CategoryKeyContext): void {
   const row = activeRow(context);
-  if (context.single) {
-    if (row) context.pick(row.id);
+  if (!context.single) {
+    context.commit();
     return;
   }
-  context.commit();
+  if (!row) return;
+  if (row.kind === 'subcategory') {
+    context.pick(row.id);
+    return;
+  }
+  activateCategoryRow(context, row.id);
 }
 
 /** Key → behaviour. A map keeps this dispatch flat instead of a long if-chain. */

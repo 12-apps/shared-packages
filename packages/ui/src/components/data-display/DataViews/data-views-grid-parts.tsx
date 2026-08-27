@@ -200,8 +200,9 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     pills: state.pills,
     ranges: c.ranges,
     onSearchChange: (value) => c.patch({ search: value }),
+    // Updater, never the render's `state` — see {@link DataViewStatePatch}.
     onTogglePill: (fieldId, value, checked) =>
-      c.patch({ pills: { ...state.pills, [fieldId]: togglePillValues(state.pills[fieldId], value, checked) } }),
+      c.patch(({ pills }) => ({ pills: { ...pills, [fieldId]: togglePillValues(pills[fieldId], value, checked) } })),
     onChangeRange: (fieldId, range) => c.patch({ ranges: { ...c.ranges, [fieldId]: range } }),
     onClearField: (fieldId) => c.patch({ pills: { ...state.pills, [fieldId]: [] } }),
     onClearAll: () => c.patch({ search: "", pills: {}, ranges: {} }),

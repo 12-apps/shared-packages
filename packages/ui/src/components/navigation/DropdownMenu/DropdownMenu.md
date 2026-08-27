@@ -22,7 +22,7 @@ import { DropdownMenu } from '@app-services-monitoring/ui';
 import Edit from '@mui/icons-material/Edit';
 import Delete from '@mui/icons-material/Delete';
 import Share from '@mui/icons-material/Share';
-import { Button } from '@mui/material';
+import Button from '@mui/material/Button/index.js';
 
 function MyComponent() {
   const menuItems = [
