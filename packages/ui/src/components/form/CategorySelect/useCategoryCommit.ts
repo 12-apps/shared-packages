@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
+import { isLeafCategory } from './category-tree';
 import type { CategoryGroup, CategorySelectProps } from './CategorySelect.types';
 import type { CategorySelectState } from './useCategorySelect';
 
@@ -63,18 +64,21 @@ export function useCategoryCommit({
   }, [props]);
 
   // A category row means different things per mode: pick the whole category,
-  // tick all its leaves, or — when it is only a heading — just fold it.
+  // tick all its leaves, or — when it is only a heading — just fold it. A
+  // CHILDLESS category is never the last of those: it is the leaf, so it acts
+  // like one even in the leaf-only default.
   const activateCategory = useCallback(
     (group: CategoryGroup) => {
-      if (allowParentSelection && single) {
+      const selectable = allowParentSelection || isLeafCategory(group);
+      if (!selectable) {
+        toggleExpanded(group.category.id);
+        return;
+      }
+      if (single) {
         pick(group.category.id);
         return;
       }
-      if (allowParentSelection) {
-        toggleCategory(group);
-        return;
-      }
-      toggleExpanded(group.category.id);
+      toggleCategory(group);
     },
     [allowParentSelection, single, pick, toggleCategory, toggleExpanded],
   );

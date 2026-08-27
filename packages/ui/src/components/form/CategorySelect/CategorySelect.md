@@ -32,9 +32,36 @@ const options = [
 Never pre-indent `name` (`"— Águas"`). The row draws the nesting; a baked-in dash
 travels everywhere the label goes, including the closed trigger.
 
-A category with no children is selectable in its own right. An option whose
-`parentId` matches nothing is promoted to top level rather than dropped, so a
-partial payload never makes a category invisible.
+An option whose `parentId` matches nothing is promoted to top level rather than
+dropped, so a partial payload never makes a category invisible.
+
+## Which rows are selectable
+
+`allowParentSelection` is the switch, and it gates exactly one thing: whether a
+parent that HAS children can be ticked in its own right.
+
+| `allowParentSelection` | has children | the row |
+| --- | --- | --- |
+| `false` (default) | yes | a **heading** — no control; its subcategories are what you tick |
+| `false` | no | **selectable** — it is itself the leaf |
+| `true` | yes | **selectable** — ticking it selects **every subcategory under it** |
+| `true` | no | **selectable** |
+
+Two of those deserve their reasons written down.
+
+**A parent with children, flag on, selects its CHILDREN** — not an id of its own.
+That is what makes the value a caller receives uniform: always leaves, never a
+mix of leaves and groups that every consumer would have to re-expand. The chip
+tray collapses a fully-selected category back to one chip bearing the category's
+name, so the user still sees "Bebidas" rather than six drinks.
+
+**A childless category is selectable whatever the flag says.** The leaf-only
+reading makes the category a heading and the subcategory the thing you pick — but
+a childless category has no subcategory to offer instead, so that reading leaves
+the row inert: no control, and a disclosure that opens onto nothing. It IS the
+leaf, so it carries the control and draws no chevron. The rest of the component
+always agreed: `leavesOf` returns its own id, `Marcar tudo` ticks it, and a chip
+appears for it. The flag has nothing to gate there.
 
 ## The two modes
 
@@ -87,8 +114,8 @@ reads `Pai › Filha`, so the chosen leaf keeps its context.
 | `↑` `↓` | Move the cursor |
 | `→` | Expand the category |
 | `←` | Collapse it, or jump from a subcategory to its parent |
-| `Space` | Mark the row (single-select: pick it) |
-| `Enter` | Apply (single-select: pick) |
+| `Space` | Mark the row (single-select: pick it) — a heading category expands |
+| `Enter` | Apply (single-select: pick, and expand on a heading, as `Space` does) |
 | `Esc` | Cancel, returning focus to the trigger |
 
 `Space`, `←` and `→` belong to the search field **only while it holds text**. The
@@ -122,7 +149,7 @@ design's own values.
 | `loading` | `boolean` | `false` | Skeleton rows |
 | `fullWidth` | `boolean` | `false` | |
 | `showCounts` | `boolean` | `false` | Trailing `count` per row |
-| `allowParentSelection` | `boolean` | `false` | Makes categories selectable |
+| `allowParentSelection` | `boolean` | `false` | Lets a parent **with children** be ticked (selecting all of them); see the table above |
 | `onCreateCategory` | `() => void` | — | CTA on the empty catalogue |
 | `dataTestId` | `string` | `'category-select'` | |
 
