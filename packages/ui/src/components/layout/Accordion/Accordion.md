@@ -49,7 +49,9 @@ The Accordion component provides expandable/collapsible content sections with sm
 ### Basic Usage
 
 ```tsx
-import { Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
+import Accordion from '@mui/material/Accordion/index.js';
+import AccordionSummary from '@mui/material/AccordionSummary/index.js';
+import AccordionDetails from '@mui/material/AccordionDetails/index.js';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
 function BasicAccordion() {

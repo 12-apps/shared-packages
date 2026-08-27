@@ -417,7 +417,7 @@ test('renders with glass variant', () => {
 
 ```tsx
 import { render, screen } from '@testing-library/react';
-import { useMediaQuery } from '@mui/material';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 
 // Mock useMediaQuery for mobile
 vi.mock('@mui/material', () => ({

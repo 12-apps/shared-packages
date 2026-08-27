@@ -215,7 +215,10 @@ function BasicModalExample() {
 ### Complex Modal with Custom Content
 
 ```tsx
-import { Box, Typography, Button, IconButton } from '@mui/material';
+import Box from '@mui/material/Box/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import Button from '@mui/material/Button/index.js';
+import IconButton from '@mui/material/IconButton/index.js';
 import CloseIcon from '@mui/icons-material/Close';
 
 function ComplexModalExample() {
