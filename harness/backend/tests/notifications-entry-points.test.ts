@@ -13,6 +13,10 @@ import * as hono from '@12-apps/notifications/hono';
 import * as webPush from '@12-apps/notifications/web-push';
 import * as manifest from '@12-apps/notifications/manifest';
 import * as manifestServer from '@12-apps/notifications/manifest/server';
+import * as email from '@12-apps/notifications/email';
+import * as emailLocales from '@12-apps/notifications/email/locales';
+import * as emailPreviews from '@12-apps/notifications/email/previews';
+import * as emailPreviewsHono from '@12-apps/notifications/email/previews/hono';
 
 /**
  * Every published subpath, imported from the INSTALLED tarball and touched.
@@ -40,6 +44,10 @@ const manifestPath = fileURLToPath(
 /** Subpaths proven elsewhere, with where. */
 const COVERED_ELSEWHERE: Record<string, string> = {
   './react': 'harness/frontend — pages/notifications-center.tsx',
+  // Same reason as `./react`: JSX against the DOM. The consumer that proves it
+  // is the SPA's `pages/email-previews.tsx`, which renders the screen the
+  // factory hands back.
+  './email/previews/react': 'harness/frontend — pages/email-previews.tsx',
   // The web manifest is React-bearing (`surface.create` IS the React factory),
   // so importing it here would drag React into a backend suite. It is proven
   // where a web host would use it: the frontend harness adopts it through
@@ -55,7 +63,18 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     };
     const advertised = Object.keys(manifest.exports).sort();
     const proven = [
-      ...['.', './server', './hono', './web-push', './manifest', './manifest/server'],
+      ...[
+        '.',
+        './server',
+        './hono',
+        './web-push',
+        './manifest',
+        './manifest/server',
+        './email',
+        './email/locales',
+        './email/previews',
+        './email/previews/hono',
+      ],
       ...Object.keys(COVERED_ELSEWHERE),
     ].sort();
     expect(advertised).toEqual(proven);
@@ -126,6 +145,52 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     expect(typeof core.createGeneratorRegistry).toBe('function');
     expect(typeof core.inboxWire).toBe('function');
     expect(core.UnknownNotificationTypeError.name).toBe('UnknownNotificationTypeError');
+  });
+
+  it('the EMAIL entry carries the layout, framework-free', () => {
+    // Its own subpath rather than part of `.`: the layout is safe in a browser,
+    // in a job and in a webhook, where `.`'s consumers are the inbox and the
+    // preference matrix. Imported from the TARBALL, which is the only place the
+    // `files` globs, the `exports` keys and `.gitignore` are made to agree.
+    expect(typeof email.renderEmail).toBe('function');
+    const rendered = email.renderEmail({
+      subject: 'Hello',
+      heading: 'Hello',
+      paragraphs: ['A body.'],
+      chrome: emailLocales.EN_US_EMAIL_CHROME,
+      brand: 'Harness Mail',
+      locale: 'en-US',
+    });
+    // Both halves from one object — the property the ad-hoc renderers cannot
+    // hold, since they assemble the text separately and let it drift.
+    expect(rendered.html).toContain('<!DOCTYPE html');
+    expect(rendered.text).toContain('A body.');
+    expect(rendered.text).not.toContain('<');
+    // Tables, not divs: Outlook lays HTML out with Word.
+    expect(rendered.html).toContain('role="presentation"');
+    // A theme may be omitted; a BRAND and a copy pack may not, so the neutral
+    // palette is what a caller passing no theme gets.
+    expect(rendered.html).toContain(email.NEUTRAL_EMAIL_THEME.surface);
+  });
+
+  it('the EMAIL LOCALES entry pairs both languages the layout ships', () => {
+    // A pack per language, passed BY NAME — the copy-portability doctrine. A
+    // default here would mail one product's Portuguese to another's users.
+    expect(Object.keys(emailLocales.EMAIL_CHROME).sort()).toEqual(['en-US', 'pt-BR']);
+    expect(typeof emailLocales.PT_BR_EMAIL_CHROME.automated).toBe('string');
+  });
+
+  it('the EMAIL PREVIEWS entries carry the catalogue, its routes and the mount', () => {
+    expect(typeof emailPreviews.createEmailPreviews).toBe('function');
+    expect(typeof emailPreviews.emailPreviewRoutes).toBe('function');
+    // The refusal a host must be able to catch by type: two sources claiming
+    // one id leaves one message unreachable and the other ambiguous.
+    expect(emailPreviews.DuplicateEmailPreviewIdError.name).toBe(
+      'DuplicateEmailPreviewIdError',
+    );
+    // `hono` is an OPTIONAL peer and only this entry imports it, so this is
+    // what proves the subpath resolves for a host that installed it.
+    expect(typeof emailPreviewsHono.emailPreviewsRouter).toBe('function');
   });
 
   it('the SERVER entry carries the factory, the transports and the drivers', () => {

@@ -6,6 +6,7 @@ import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
 import { BILLING_MOUNT_PATH } from './billing-host';
+import { EMAIL_PREVIEWS_MOUNT_PATH } from './email-host';
 import { FEATURE_FLAGS_MOUNT_PATH } from './feature-flags-host';
 import { LOCALE_MOUNT_PATH } from './i18n-host';
 import { IMPERSONATION_PLATFORM_PATH, IMPERSONATION_TENANT_MOUNT } from './impersonation-host';
@@ -54,6 +55,15 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   const featureFlags = hosts.featureFlags;
   app.route(FEATURE_FLAGS_MOUNT_PATH, featureFlags.router);
   app.route('/__harness/feature-flags', featureFlags.harnessRoutes);
+
+  // The e-mail preview catalogue, on its own `/api/platform` prefix — it
+  // is a platform-staff surface and carries no tenant slug, so it belongs with
+  // the other platform mounts and ahead of the broader `/api/admin` routes
+  // below. The reset control is how a suite registers a message AFTER the mount
+  // was assembled, which is the only way to see the catalogue re-ask a source.
+  const emailPreviews = hosts.emailPreviews;
+  app.route(EMAIL_PREVIEWS_MOUNT_PATH, emailPreviews.router);
+  app.route('/__harness/email-previews', emailPreviews.harnessRoutes);
 
   // The reader's own language, from `@12-apps/i18n`. Beside the probes rather
   // than instead of them: those prove how a REQUEST becomes a locale, this

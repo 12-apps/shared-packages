@@ -5,6 +5,7 @@ import { AuditLogPage } from './audit-log';
 import { DiscountsPage } from './discounts';
 import { McpAiConnectPage } from './mcp-ai-connect';
 import { AUTH_PAGES, AUTH_SETTINGS_PAGE } from './auth-pages';
+import { EmailPreviewsPage } from './email-previews';
 import { EntitlementsPlanPage } from './entitlements-plan';
 import { FeatureFlagsPage } from './feature-flags';
 import { ImpersonationPage } from './impersonation';
@@ -289,5 +290,17 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/product-research-ui',
     group: 'backoffice',
     Component: ProductResearchPage,
+  },
+  // The e-mail preview console — @12-apps/notifications' SECOND manifest.
+  // Backoffice rather than storefront: the
+  // thing it puts in front of a person is a platform-staff diagnostic — every
+  // message the product can send, rendered exactly as the vendor would receive
+  // it — and nothing here is reachable by a buyer.
+  {
+    slug: 'email-previews',
+    title: 'E-mail previews',
+    pkg: '@12-apps/notifications',
+    group: 'backoffice',
+    Component: EmailPreviewsPage,
   },
 ];

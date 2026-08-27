@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { NotificationContent, TransportRecipient } from '../../types';
 import { NotificationProviderError, type FetchImpl } from '../transports/drivers';
+import { PT_BR_EMAIL_CHROME } from '../../email/chrome.pt-BR';
 import { emailTransport, formatEmail } from '../transports/email';
 import { createTransportRegistry } from '../transports/registry';
 import { formatSms, smsTransport } from '../transports/sms';
@@ -93,6 +94,69 @@ describe('the email transport', () => {
     const message = formatEmail(CONTENT, { channel: 'EMAIL', linkLabel: 'Ver detalhes', driver: 'log' });
     expect(message.text).toBe('Pedido A1 pago.');
     expect(message.html).not.toContain('<a ');
+  });
+
+  /**
+   * The layout seam, and the reason this package owns the layout at all.
+   *
+   * `formatEmail`'s three-`<p>` rendering is one of the three ad-hoc renderers
+   * `../../email` replaces. It is still here — a host that declares EMAIL and
+   * nothing else keeps exactly the mail it had — and the cases below pin both
+   * halves, because "opt-in" is only true if the old path genuinely survives.
+   */
+  describe('rendering through the shared layout', () => {
+    const LAYOUT = {
+      brand: 'Loja Exemplo',
+      chrome: PT_BR_EMAIL_CHROME,
+      locale: 'pt-BR',
+    } as const;
+
+    it('renders a whole document when a layout is declared', () => {
+      const message = formatEmail(CONTENT, {
+        channel: 'EMAIL',
+        linkLabel: 'Ver detalhes',
+        driver: 'log',
+        appUrl: 'https://loja.example.com',
+        layout: LAYOUT,
+      });
+      // A document rather than a fragment: the `<table>` is what makes Outlook
+      // (which lays HTML out with Word) agree with everyone else, and the brand
+      // is what a package may never supply for itself.
+      expect(message.html).toContain('<!DOCTYPE html');
+      expect(message.html).toContain('Loja Exemplo');
+      expect(message.html).toContain('role="presentation"');
+      expect(message.subject).toBe('Pagamento confirmado');
+    });
+
+    it('keeps the plain-text twin, built from the same object', () => {
+      const message = formatEmail(CONTENT, {
+        channel: 'EMAIL',
+        linkLabel: 'Ver detalhes',
+        driver: 'log',
+        appUrl: 'https://loja.example.com',
+        layout: LAYOUT,
+      });
+      // The defect the ad-hoc path carries by construction: its two halves are
+      // assembled separately and can drift. Here both come from one document.
+      expect(message.text).toContain('Pedido A1 pago.');
+      expect(message.text).toContain('https://loja.example.com/orders/A1');
+      expect(message.text).not.toContain('<');
+    });
+
+    it('leaves the pre-layout rendering untouched when none is declared', () => {
+      // The compatibility claim, asserted rather than assumed: `brand` and
+      // `chrome` are required with no default, so making the layout mandatory
+      // would have broken every host already declaring EMAIL — at runtime, on
+      // the first send.
+      const message = formatEmail(CONTENT, {
+        channel: 'EMAIL',
+        linkLabel: 'Ver detalhes',
+        driver: 'log',
+        appUrl: 'https://loja.example.com',
+      });
+      expect(message.html).not.toContain('<!DOCTYPE html');
+      expect(message.html).toContain('<p><strong>Pagamento confirmado</strong></p>');
+    });
   });
 
   it('escapes HTML in the content rather than rendering it', () => {

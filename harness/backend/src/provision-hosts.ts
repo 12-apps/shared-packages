@@ -12,6 +12,7 @@
  * going to keep acquiring.
  */
 import type { PGlite } from '@electric-sql/pglite';
+import { wireEmailPreviews } from './email-host';
 import { wireFeatureFlags } from './feature-flags-host';
 import { wireLocale } from './i18n-host';
 import { wireReports } from './reports-host';
@@ -161,12 +162,19 @@ export async function provisionHosts(pg: PGlite): Promise<Hosts> {
     featureFlags: wireFeatureFlags(),
     locale: wireLocale(),
     reports: wireReports(savedReportDb(pg)),
+    // The e-mail preview catalogue — @12-apps/notifications' SECOND manifest,
+    // and the one that needs NOTHING from `provisionStored` above. The four
+    // notification tables belong to the first manifest; a catalogue is DERIVED
+    // from what a host already sends, so it declares no `db` at all and an
+    // adopter mounts it without touching its schema.
+    emailPreviews: wireEmailPreviews(),
   };
 }
 
 /** The mounted hosts one harness server is assembled from. */
 export interface Hosts {
   featureFlags: ReturnType<typeof wireFeatureFlags>;
+  emailPreviews: ReturnType<typeof wireEmailPreviews>;
   locale: ReturnType<typeof wireLocale>;
   reports: ReturnType<typeof wireReports>;
   auth: ReturnType<typeof authHost>;
