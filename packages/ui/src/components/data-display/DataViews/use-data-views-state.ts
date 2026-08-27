@@ -343,7 +343,8 @@ export function useDataViewsState<T extends Record<string, unknown>>({
   );
   const toggleColumn = (id: string, visible: boolean): void =>
     setState((prev) => ({ ...prev, visibleColumns: nextVisibleColumns(prev.visibleColumns, id, visible) }));
-  const selection = useSelection(matched, getRowId);
+  // Server mode is where `matched` is a PAGE — see `useSelection` (FUT-942).
+  const selection = useSelection(matched, getRowId, { rememberOffPage: Boolean(server) });
   const resolvedSortFields = sortFields ?? defaultSortFields(columns);
 
   return {
