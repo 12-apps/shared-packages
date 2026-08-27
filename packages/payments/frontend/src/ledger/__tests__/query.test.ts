@@ -79,4 +79,16 @@ describe('a grid query mapped back onto the URL', () => {
   it('omits a sort with no direction, which the wire cannot express', () => {
     expect(ledgerParams({ search: '', page: 1, sortBy: [{ id: 'createdAt' }] }).sort).toBeUndefined();
   });
+
+  /**
+   * What a real grid actually produces for a column that is in the sort list
+   * with no direction chosen. Absent and `null` mean the same thing here, and
+   * typing only the first made every adopter write `?? undefined` at the call
+   * site — the boilerplate this module exists to delete.
+   */
+  it('treats a null direction exactly as an absent one', () => {
+    expect(
+      ledgerParams({ search: '', page: 1, sortBy: [{ id: 'createdAt', dir: null }] }).sort,
+    ).toBeUndefined();
+  });
 });
