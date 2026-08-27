@@ -45,6 +45,21 @@ export interface ContentToolbarProps {
    * what the action does.
    */
   actions?: ReactNode;
+  /**
+   * A control rendered between the count and {@link actions}, and ONLY while
+   * something is selected.
+   *
+   * It is a second slot rather than more room in `actions` because the two
+   * answer different questions. `actions` is what HAPPENS to the selection;
+   * this is what the selection IS — the "select all 143 matching" widening
+   * that a paginated grid needs once its whole page is ticked. Folding a
+   * widening control into the actions menu would file "change what I picked"
+   * under "do this to what I picked", where an operator reasonably expects
+   * every entry to write something.
+   *
+   * Ignored when nothing is selected: a widening has nothing to widen.
+   */
+  selectionExtra?: ReactNode;
   /** Test id for the Select All button. */
   selectAllTestId?: string;
   /** Test id for the Clear All button. */

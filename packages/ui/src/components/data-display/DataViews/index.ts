@@ -45,6 +45,7 @@ export type {
   DataViewExportFormat,
   DataViewExportRequest,
 } from "./data-views-export";
+export type { SelectionExtraContext, SelectionExtraRender } from "./data-views-selection-extra";
 export {
   DataViewsScopeTabs,
   resolveScope,
