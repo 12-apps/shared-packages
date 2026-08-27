@@ -21,6 +21,11 @@ packages/typescript-config
 # ADOPTING notes point at, and a reader scanning this list for "what do I need
 # first" should meet it before the packages that reference it.
 packages/i18n
+# `@12-apps/thermal-printing` has no workspace dependencies either — it is pure
+# arithmetic plus one node builtin — so its position is free. It sits beside
+# i18n for the same reason: a reader scanning for "what needs nothing first"
+# should meet both before anything that depends on them.
+packages/thermal-printing
 packages/feature-flags
 packages/request-scope
 packages/observability-backend

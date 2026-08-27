@@ -1,0 +1,56 @@
+{
+  "name": "@12-apps/thermal-printing",
+  "version": "1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Receipt printing for the two ways a thermal printer is attached, behind ONE fixed-width document. Isomorphic line model and wrapping (./), the ESC/POS encoder with its CP850 code page (./escpos), the same lines as a print-ready HTML document for a printer on a cable (./html), the raw :9100 socket transport for a printer with an address (./net), and per-destination routing with a default (./routing). Carries no product copy: failures are structured, so the host says them in the reader's language. Standardized adoption contract in ADOPTING.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./escpos": "./src/escpos/index.ts",
+    "./html": "./src/html/index.ts",
+    "./net": "./src/net/index.ts",
+    "./routing": "./src/routing/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/thermal-printing"
+  },
+  "files": [
+    "src",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*"
+  ]
+}
