@@ -149,11 +149,17 @@ does not have, and skips every package it does. Packages already on npm are
 never touched by it, and with no secret set the step is a no-op.
 
 Each newly published package then needs a Trusted Publisher before its **next**
-release, which CI names in the step summary — npmjs.com → the package →
-Settings → Trusted Publisher → GitHub Actions, repository
-`12-apps/shared-packages`, workflow `ci.yml`. Once every package has one the
+release, which the release run names in its step summary — npmjs.com → the
+package → Settings → Trusted Publisher → GitHub Actions, repository
+`12-apps/shared-packages`, workflow **`cd.yml`**. Once every package has one the
 secret is dead weight and can be revoked; npm is
 [phasing out token-based publishing][2fa] in favour of exactly this.
+
+> The workflow filename is the whole trust, so it has to be the one that
+> actually publishes. Publishing moved out of `ci.yml` and into `cd.yml`, and a
+> Trusted Publisher still pointing at `ci.yml` refuses every release after the
+> token-bootstrapped first one — a package that published once and then went
+> quiet, with nothing red to explain it.
 
 [releases]: https://github.com/12-apps/shared-packages/releases
 [oidc-issue]: https://github.com/npm/cli/issues/8544
