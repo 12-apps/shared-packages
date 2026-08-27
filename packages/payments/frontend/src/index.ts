@@ -334,37 +334,35 @@ export { PT_BR_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/pt-BR';
 export type { PaymentEnvironment } from '@12-apps/payments-backend';
 
 // ---------------------------------------------------------------------------
-// The REDIRECT ACTIVATION protocol (FUT-463, packaged by FUT-763) — proving a
-// connection can charge, for a provider whose payer pays on its own page.
+// The ACTIVATION STEP (FUT-463, FUT-763, FUT-764) — proving a connection can
+// actually charge, both protocols and the screens that render them.
 //
-// `renderVerification` above stays what it was: the package decides where the
-// step appears and the host owns the screen. What moved is the protocol behind
-// it — resume-on-mount, the return trip's ids, the refusal/expiry/transport
-// distinctions, the bounded wait. Every one of those was learned from a payment
-// that went wrong, and no second host should have to learn them again.
+// A connection is not a capability: a completed grant says the owner authorized
+// us, not that the account can take money. The owner's own card — or a real
+// link they pay on the provider's page — goes through the SAME path a shopper's
+// does, for a small amount, refunded or landing in their own account.
+//
+// Every branch in there was learned from a payment that went wrong: an owner
+// who paid four times, a dead end blaming a store for a key that was never
+// going to exist, a refusal wearing another failure's clothes. The SENTENCES
+// stay the host's, required and defaultless, as everywhere here.
+//
+// Listed in `./activation/public` — see its header for why it is not inline.
 // ---------------------------------------------------------------------------
-export {
-  useRedirectActivation,
-  type RedirectActivation,
-  type RedirectActivationOptions,
-} from './activation/use-redirect-activation';
-export { type RedirectActivationCopy } from './activation/copy';
-export {
-  creationFailure,
-  postActivation,
-  refusedByProvider,
-  settleActivationPoll,
-  type ActivationClock,
-  type ActivationPendingBody,
-  type ActivationPollBody,
-  type RedirectActivationState,
-  type SettlePollIo,
-} from './activation/redirect-state';
-export {
-  clearReturnedSettlement,
-  takeReturnedSettlement,
-  RETURNED_SETTLEMENT_KEY,
-} from './activation/returned-settlement';
+export * from './activation/public';
+
+// ---------------------------------------------------------------------------
+// The two payment LEDGERS (FUT-764) — every charge raised against every order,
+// and the subset where the provider captured LESS than the order was worth.
+//
+// UI-free on purpose. There is no component in that folder: a ledger is a
+// table, every host already has one, and a grid slot wide enough to satisfy
+// them all would be a worse contract than handing over rows. What moves is
+// what a host was deriving twice and getting subtly wrong both times — which
+// amount is "captured" when the audit diff and the payment row disagree, why a
+// decision is shown INSTEAD of the order status, and what still counts as work.
+// ---------------------------------------------------------------------------
+export * from './ledger';
 
 // ---------------------------------------------------------------------------
 // The connect ROUND TRIP's other end (FUT-763): what the OAuth callback
@@ -378,52 +376,3 @@ export {
   type ConnectErrorCode,
   type ConnectReturn,
 } from './components/connect-return';
-
-// ---------------------------------------------------------------------------
-// The ACTIVATION CHARGE (FUT-463, packaged by FUT-763) — proving a connection
-// can charge, for a provider whose payer pays HERE.
-//
-// A connection is not a capability: a completed grant says the owner authorized
-// us, not that the account can take money. The owner's own card goes through
-// the SAME path a shopper's does — same fields, same validation, same
-// browser-side encryption — for one cent, refunded immediately.
-//
-// The sibling of `useRedirectActivation` for the other half of the same step.
-// As there, the SCREEN stays the host's.
-// ---------------------------------------------------------------------------
-export {
-  useActivationCharge,
-  type ActivationCharge,
-  type ActivationChargeOptions,
-  type ActivationChargeState,
-} from './activation/use-activation-charge';
-export { type ActivationChargeCopy } from './activation/charge-copy';
-
-// ---------------------------------------------------------------------------
-// The ACTIVATION STEP's SCREENS (FUT-764) — the six settled outcomes, the
-// outstanding-payment panel with its link fallback, the two flows and the
-// router between them.
-//
-// The protocol hooks above shipped without them, leaving `renderVerification`
-// as "the host owns the screen". That reads as a boundary and is not one: the
-// screens are a rendering of THIS package's state machines, and the origin
-// host's copies carried a paragraph each about a real payment that went wrong —
-// an owner who paid four times, a dead end blaming a store for a key that was
-// never going to exist, a refusal wearing another failure's clothes. None of
-// that is host knowledge, and a second adopter deriving it again would be
-// deriving it from the same payments.
-//
-// The SENTENCES stay the host's, required and defaultless, as everywhere here.
-// ---------------------------------------------------------------------------
-export {
-  createActivationStep,
-  type ActivationStepConfig,
-  type ActivationStepProps,
-  type CardSurface,
-  type ActivationActionCopy,
-  type ActivationAwaitingCopy,
-  type ActivationIntroCopy,
-  type ActivationOutcomeCopy,
-  type ActivationStepCopy,
-  type ActivationTaxIdCopy,
-} from './activation/screens';
