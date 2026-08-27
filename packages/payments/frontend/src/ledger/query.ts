@@ -55,11 +55,22 @@ export function ledgerSearchTerm(params: URLSearchParams): string {
   return params.get('q') ?? '';
 }
 
-/** A grid query mapped back onto the params a ledger URL owns. */
+/**
+ * A grid query mapped back onto the params a ledger URL owns.
+ *
+ * `dir` accepts `null` as well as absent, because that is what a real grid
+ * produces: a column can be in the sort list with no direction chosen yet, and
+ * a data-grid library spells that `null` rather than by leaving the key out.
+ * The runtime always treated the two the same — an unsorted column contributes
+ * no `sort` param — so this is the TYPE catching up with the behaviour rather
+ * than a change to it. Typed the other way, every adopter writes the same
+ * `?? undefined` mapping at the call site, which is exactly the boilerplate
+ * this module exists to delete.
+ */
 export function ledgerParams(query: {
   search: string;
   page: number;
-  sortBy: readonly { id: string; dir?: 'asc' | 'desc' }[];
+  sortBy: readonly { id: string; dir?: 'asc' | 'desc' | null }[];
 }): Record<string, string | undefined> {
   const sort = query.sortBy[0];
   return {
