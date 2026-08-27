@@ -170,6 +170,17 @@ export interface DataViewColumn<T extends Record<string, unknown>> extends GridC
 export type DataViewsLayout = "cards" | "list" | "board" | "table";
 
 /** The full, serializable state a view captures. */
+/**
+ * A view-state patch: the fields to merge, or an updater given the CURRENT
+ * state. Use the updater whenever the patch derives from state it also changes
+ * — a render-scoped snapshot would let two calls in one tick read the same
+ * `prev` and the second overwrite the first, which is exactly what a control
+ * emitting one call per changed value does.
+ */
+export type DataViewStatePatch =
+  | Partial<DataViewState>
+  | ((prev: DataViewState) => Partial<DataViewState>);
+
 export interface DataViewState {
   /** Free text matched across every `searchable` column. */
   search: string;
