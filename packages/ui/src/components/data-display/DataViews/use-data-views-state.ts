@@ -20,6 +20,7 @@ import {
   type DataViewColumn,
   type DataViewServer,
   type DataViewState,
+  type DataViewStatePatch,
   type DataViewSyncState,
   type FilterFieldConfig,
   type RangeFieldConfig,
@@ -73,7 +74,15 @@ interface UseDataViewsStateArgs<T extends Record<string, unknown>> {
 export interface DataViewsController<T extends Record<string, unknown>> {
   state: DataViewState;
   ranges: Record<string, RangeValue>;
-  patch: (next: Partial<DataViewState>) => void;
+  /**
+   * Merge a partial into the view state.
+   *
+   * The UPDATER form is the one to reach for when the patch is derived from
+   * state you are also changing — successive calls within one tick each see the
+   * previous call's result, where the object form would have every caller build
+   * its patch from the same render-scoped snapshot and the last write would win.
+   */
+  patch: (next: DataViewStatePatch) => void;
   matched: T[];
   gridColumns: GridColumn<T>[];
   /** Columns eligible for the show/hide menu (hideable, with a text header). */
@@ -229,7 +238,7 @@ function seedState(
  * same reason changing any other part of the query clears it.
  */
 function makeSetScope(
-  patch: (next: Partial<DataViewState>) => void,
+  patch: (next: DataViewStatePatch) => void,
   clearSelection: () => void,
 ): (id: string) => void {
   return (id) => {
@@ -327,7 +336,8 @@ export function useDataViewsState<T extends Record<string, unknown>>({
 
   useStateSyncEffects(appliedState, syncState, state, onStateChange, setState);
 
-  const patch = (next: Partial<DataViewState>): void => setState((prev) => ({ ...prev, ...next }));
+  const patch = (next: DataViewStatePatch): void =>
+    setState((prev) => ({ ...prev, ...(typeof next === "function" ? next(prev) : next) }));
   const matched = useMatchedRows(server, rows, columns, fields, rangeFields, state);
   // Resolved at READ time, every render: a stale deep link or a saved view naming
   // a scope that has since been removed falls back to the first declared scope
