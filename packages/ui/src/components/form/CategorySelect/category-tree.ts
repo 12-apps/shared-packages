@@ -47,20 +47,29 @@ export function buildCategoryGroups(options: CategorySelectOption[]): CategoryGr
   return [...groups.values(), ...orphans];
 }
 
+/**
+ * Whether this category IS the leaf, because nothing sits under it.
+ *
+ * The leaf-only default makes a category a heading and the subcategory the thing
+ * you pick — but a childless category has no subcategory to offer instead, so
+ * that reading leaves it unpickable and the row does nothing at all. It is the
+ * leaf, so it is selectable in its own right, whatever `allowParentSelection`
+ * says. Everything below already agreed; only the rows and the activation did
+ * not, which is what made a childless category unselectable on the estoque
+ * filter while `Marcar tudo` could still select it.
+ */
+export function isLeafCategory(group: CategoryGroup): boolean {
+  return group.subcategories.length === 0;
+}
+
 /** Every selectable leaf id across all groups, in display order. */
 export function collectLeafIds(groups: CategoryGroup[]): string[] {
-  return groups.flatMap((group) =>
-    group.subcategories.length > 0
-      ? group.subcategories.map((sub) => sub.id)
-      : [group.category.id],
-  );
+  return groups.flatMap((group) => leavesOf(group));
 }
 
 /** The leaves a category stands for — its subcategories, or itself when childless. */
 export function leavesOf(group: CategoryGroup): string[] {
-  return group.subcategories.length > 0
-    ? group.subcategories.map((sub) => sub.id)
-    : [group.category.id];
+  return isLeafCategory(group) ? [group.category.id] : group.subcategories.map((sub) => sub.id);
 }
 
 export type CategoryCheckState = 'off' | 'partial' | 'on';

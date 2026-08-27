@@ -61,6 +61,10 @@ const MERCADO: CategorySelectOption[] = [
   { id: 'limp.sabao', name: 'Sabonetes e shampoos', parentId: 'limp', count: 48 },
   { id: 'limp.deterg', name: 'Detergentes', parentId: 'limp', count: 39 },
   { id: 'limp.limpg', name: 'Limpeza geral', parentId: 'limp', count: 55 },
+  // No subcategories: this row IS the leaf, so it carries the checkbox and draws
+  // no chevron. Real catalogues are full of these — a shop that never split
+  // "Congelados" into anything.
+  { id: 'cong', name: 'Congelados', count: 47 },
 ];
 
 /** The cantina's shorter menu — useful for the single-select "move to" story. */
@@ -77,6 +81,9 @@ const CANTINA: CategorySelectOption[] = [
   { id: 'sobr', name: 'Sobremesas', count: 15 },
   { id: 'sobr.gelada', name: 'Geladas', parentId: 'sobr', count: 7 },
   { id: 'sobr.sorv2', name: 'Sorvetes', parentId: 'sobr', count: 4 },
+  // Childless, so the "move to…" picker offers it directly rather than drawing
+  // a heading with nothing under it to choose.
+  { id: 'bebida', name: 'Bebidas', count: 18 },
 ];
 
 const meta = {

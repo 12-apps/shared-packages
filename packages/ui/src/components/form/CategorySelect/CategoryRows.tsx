@@ -65,6 +65,10 @@ interface CategoryHeadRowProps {
   sheet: boolean;
   /** Absent in leaf-only mode, where the category is a heading with no checkbox. */
   checkState?: CategoryCheckState;
+  /** Single-select draws a radio for the control: choosing a row is exclusive. */
+  single: boolean;
+  /** False for a childless category — there is nothing under it to disclose. */
+  expandable: boolean;
   selectedCount: number;
   showCounts: boolean;
   onToggleExpanded: () => void;
@@ -84,12 +88,59 @@ function rowMeta(
   return null;
 }
 
+/** The disclosure chevron, or the space it would have taken on a childless row. */
+function HeadRowDisclosure({
+  option,
+  expanded,
+  expandable,
+  onToggleExpanded,
+  dataTestId,
+  copy,
+}: Pick<
+  CategoryHeadRowProps,
+  'option' | 'expanded' | 'expandable' | 'onToggleExpanded' | 'dataTestId' | 'copy'
+>): React.JSX.Element {
+  if (!expandable) {
+    return <Box sx={{ width: METRICS.chevronButton, flex: '0 0 auto' }} />;
+  }
+  return (
+    <Box
+      component="button"
+      type="button"
+      tabIndex={-1}
+      aria-label={expanded ? copy.collapseCategory(option.name) : copy.expandCategory(option.name)}
+      data-testid={`${dataTestId}-expand-${option.id}`}
+      sx={(theme) => chevronButtonSx(theme, expanded)}
+      onClick={(event: React.MouseEvent) => {
+        event.stopPropagation();
+        onToggleExpanded();
+      }}
+    >
+      <DisclosureGlyph />
+    </Box>
+  );
+}
+
+/** The row's selection control, or the space it would have taken on a heading. */
+function HeadRowControl({
+  checkState,
+  single,
+}: Pick<CategoryHeadRowProps, 'checkState' | 'single'>): React.JSX.Element {
+  if (!checkState) return <Box sx={{ width: METRICS.boxSize, flex: '0 0 auto' }} />;
+  // Single-select commits the moment a row is chosen, so the control is a radio
+  // there: a checkbox would promise the accumulation this mode does not do.
+  if (single) return <CategoryRadio on={checkState === 'on'} />;
+  return <CategoryCheckbox state={checkState} />;
+}
+
 /**
  * A top-level category row: disclosure chevron, optional checkbox, name, meta.
  *
  * The chevron is its OWN button inside the row button — clicking it only folds,
  * while clicking the row does the row's job (expand as a heading, or tick when
- * parents are selectable).
+ * the category is selectable). A CHILDLESS category has neither a fold nor a
+ * heading to be: it draws no chevron, and it carries the control, because it is
+ * itself the leaf.
  */
 export function CategoryHeadRow({
   option,
@@ -98,6 +149,8 @@ export function CategoryHeadRow({
   active,
   sheet,
   checkState,
+  single,
+  expandable,
   selectedCount,
   showCounts,
   onToggleExpanded,
@@ -111,32 +164,20 @@ export function CategoryHeadRow({
       component="div"
       role={checkState ? 'option' : 'button'}
       aria-selected={checkState ? checkState === 'on' : undefined}
-      aria-expanded={expanded}
+      aria-expanded={expandable ? expanded : undefined}
       data-testid={`${dataTestId}-category-${option.id}`}
       sx={(theme) => rowSx(theme, active, sheet)}
       onClick={onActivate}
     >
-      <Box
-        component="button"
-        type="button"
-        tabIndex={-1}
-        aria-label={
-          expanded ? copy.collapseCategory(option.name) : copy.expandCategory(option.name)
-        }
-        data-testid={`${dataTestId}-expand-${option.id}`}
-        sx={(theme) => chevronButtonSx(theme, expanded)}
-        onClick={(event: React.MouseEvent) => {
-          event.stopPropagation();
-          onToggleExpanded();
-        }}
-      >
-        <DisclosureGlyph />
-      </Box>
-      {checkState ? (
-        <CategoryCheckbox state={checkState} />
-      ) : (
-        <Box sx={{ width: METRICS.boxSize, flex: '0 0 auto' }} />
-      )}
+      <HeadRowDisclosure
+        option={option}
+        expanded={expanded}
+        expandable={expandable}
+        onToggleExpanded={onToggleExpanded}
+        dataTestId={dataTestId}
+        copy={copy}
+      />
+      <HeadRowControl checkState={checkState} single={single} />
       <Box component="span" sx={(theme) => rowNameSx(theme, true)}>
         <HighlightedName text={option.name} query={query} />
       </Box>

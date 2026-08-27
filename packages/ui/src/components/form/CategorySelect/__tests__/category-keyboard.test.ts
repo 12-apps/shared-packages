@@ -178,3 +178,61 @@ describe('yielding to the search field', () => {
     expect(handleCategoryKeyDown('a', false, makeContext())).toBe(false);
   });
 });
+
+/**
+ * A childless category is the LEAF, so every input path has to treat it as one.
+ * The tree helpers always did (`leavesOf` returns the category's own id), but
+ * the keyboard read it as a heading and only folded a row with nothing under it
+ * to fold — the estoque filter's unselectable parents.
+ */
+describe('a category with no children', () => {
+  const LEAF_OPTIONS: CategorySelectOption[] = [{ id: 'combo', name: 'Combos' }];
+  const LEAF_GROUPS = buildCategoryGroups(LEAF_OPTIONS);
+
+  const leafContext = (overrides: Partial<CategoryKeyContext> = {}): CategoryKeyContext =>
+    makeContext({
+      rows: [{ kind: 'category', id: 'combo' }],
+      groups: LEAF_GROUPS,
+      activeIndex: 0,
+      ...overrides,
+    });
+
+  it('marks with Space instead of folding, in the leaf-only default', () => {
+    const context = leafContext();
+    handleCategoryKeyDown(' ', false, context);
+    expect(context.toggleCategory).toHaveBeenCalledWith(LEAF_GROUPS[0]);
+    expect(context.toggleExpanded).not.toHaveBeenCalled();
+  });
+
+  it('picks with Space in single-select', () => {
+    const context = leafContext({ single: true });
+    handleCategoryKeyDown(' ', false, context);
+    expect(context.pick).toHaveBeenCalledWith('combo');
+  });
+
+  it('picks with Enter in single-select', () => {
+    const context = leafContext({ single: true });
+    handleCategoryKeyDown('Enter', false, context);
+    expect(context.pick).toHaveBeenCalledWith('combo');
+  });
+});
+
+/**
+ * Enter, Space and the row click are one decision. Enter used to pick ANY row in
+ * single-select, so a category the panel drew as an inert heading was still
+ * choosable from the keyboard — a value the mouse could not produce.
+ */
+describe('Enter agrees with Space on a heading category', () => {
+  it('folds rather than picking, in single-select leaf-only', () => {
+    const context = makeContext({ activeIndex: 0, single: true });
+    handleCategoryKeyDown('Enter', false, context);
+    expect(context.pick).not.toHaveBeenCalled();
+    expect(context.toggleExpanded).toHaveBeenCalledWith('beb');
+  });
+
+  it('picks the whole category when parents are selectable', () => {
+    const context = makeContext({ activeIndex: 0, single: true, allowParentSelection: true });
+    handleCategoryKeyDown('Enter', false, context);
+    expect(context.pick).toHaveBeenCalledWith('beb');
+  });
+});

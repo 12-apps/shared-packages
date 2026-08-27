@@ -6,6 +6,7 @@ import {
   collectLeafIds,
   filterCategoryGroups,
   flattenRows,
+  isLeafCategory,
   foldText,
   highlightSegments,
   leavesOf,
@@ -176,5 +177,20 @@ describe('flattenRows', () => {
   it('tags a subcategory with the parent ArrowLeft should jump to', () => {
     const rows = flattenRows(makeGroups(), () => true);
     expect(rows.find((row) => row.id === 'beb.agua')?.parentId).toBe('beb');
+  });
+});
+
+describe('isLeafCategory', () => {
+  it('is the one thing the leaf reading turns on', () => {
+    expect(makeGroups().map(isLeafCategory)).toEqual([false, false, true]);
+  });
+
+  it('agrees with what the category stands for', () => {
+    const groups = makeGroups();
+    groups.forEach((group) => {
+      expect(leavesOf(group)).toEqual(
+        isLeafCategory(group) ? [group.category.id] : group.subcategories.map((sub) => sub.id),
+      );
+    });
   });
 });
