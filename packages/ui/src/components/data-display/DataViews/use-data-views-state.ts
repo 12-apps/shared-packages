@@ -15,6 +15,7 @@ import { computeActiveFilterCount, defaultSortFields } from "./data-views-grid-h
 import { resolveScope, useScopeConfigChecks, type ScopeConfig } from "./data-views-scopes";
 import { serverDerived, useServerQuery } from "./data-views-server-query";
 import { useSelection } from "./data-views-selection";
+import { useStateWriters } from "./data-views-writers";
 import {
   emptyViewState,
   type DataViewColumn,
@@ -166,12 +167,6 @@ function useMatchedRows<T extends Record<string, unknown>>(
           ),
     [server, rows, columns, fields, rangeFields, state.search, state.pills, state.ranges],
   );
-}
-
-/** Add or remove one column id from the visible-columns list. */
-function nextVisibleColumns(current: string[], id: string, visible: boolean): string[] {
-  const without = current.filter((colId) => colId !== id);
-  return visible ? [...without, id] : without;
 }
 
 /**
@@ -336,8 +331,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
 
   useStateSyncEffects(appliedState, syncState, state, onStateChange, setState);
 
-  const patch = (next: DataViewStatePatch): void =>
-    setState((prev) => ({ ...prev, ...(typeof next === "function" ? next(prev) : next) }));
+  const { patch, toggleColumn } = useStateWriters(setState);
   const matched = useMatchedRows(server, rows, columns, fields, rangeFields, state);
   // Resolved at READ time, every render: a stale deep link or a saved view naming
   // a scope that has since been removed falls back to the first declared scope
@@ -351,9 +345,8 @@ export function useDataViewsState<T extends Record<string, unknown>>({
     onRowClick,
     state.order,
   );
-  const toggleColumn = (id: string, visible: boolean): void =>
-    setState((prev) => ({ ...prev, visibleColumns: nextVisibleColumns(prev.visibleColumns, id, visible) }));
-  const selection = useSelection(matched, getRowId);
+  // Server mode is where `matched` is a PAGE — see `useSelection` (FUT-942).
+  const selection = useSelection(matched, getRowId, { rememberOffPage: Boolean(server) });
   const resolvedSortFields = sortFields ?? defaultSortFields(columns);
 
   return {
