@@ -329,8 +329,9 @@ export { isValidCpf } from './core/cpf';
 // Caller-side charge questions (FUT-760): what a reversal event reversed,
 // whether a charge already raised is still payable, and the two instrument
 // questions a checkout asks BEFORE any failover walk begins.
-export { classifyReversalEvent } from './core/reversal';
-export type { DisputeFacts, RefundFacts, ReversalFacts } from './core/reversal';
+// Reacting to a verified webhook: which reversal shape a delivery is, and the
+// FAN-IN deciding the order the reactions run in. See `./core/webhook-public`.
+export * from './core/webhook-public';
 export { chargeDeadlinePassed, hostedChargePayable, pixChargePayable } from './core/charge-reuse';
 export { attributedCard, chainTokenizesInBrowser, holdsInstrumentFor } from './core/card-instrument';
 // What a host may need to know about PagBank — its published Orders API hosts
