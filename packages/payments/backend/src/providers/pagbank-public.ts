@@ -26,3 +26,11 @@ export {
   type PagBankEnv,
   type PagBankEnvSource,
 } from './pagbank-env';
+// Turning a parked legacy `notificationCode` back into the events it meant.
+// This package recognizes the delivery, parks it and ships the resolver; the
+// piece joining them was the one thing a host could only get right by reading
+// our source (FUT-764).
+export {
+  legacyNotificationCode,
+  pagbankLegacyResolver,
+} from './pagbank-legacy-resolve';
