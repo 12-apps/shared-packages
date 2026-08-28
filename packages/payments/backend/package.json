@@ -7,7 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./jobs": "./src/jobs/index.ts",
-    "./pagbank-legacy-notifications": "./src/providers/pagbank-legacy-notifications.ts",
+    "./pagbank-legacy-notifications": "./src/providers/pagbank-legacy-public.ts",
     "./pagbank-webhook-signer": "./src/providers/pagbank-webhook-signer.ts",
     "./providers/pagbank": "./src/providers/pagbank.ts",
     "./providers/stone": "./src/providers/stone.ts",

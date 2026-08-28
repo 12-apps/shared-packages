@@ -13,9 +13,22 @@
  * host before it moved.
  */
 export { pagbankApiBase } from './pagbank-api-base';
+// WHICH buyer field PagBank refused, read from its own error vocabulary. The
+// pipeline may never branch on a vendor's error strings, but the strings are
+// not the host's either: they are identical for every deployment (FUT-764).
+export {
+  classifyPagBankRejection,
+  type PagBankRejection,
+} from './pagbank-rejections';
 export {
   pagbankPlatformFallbackEnabled,
   readPagBankEnv,
   type PagBankEnv,
   type PagBankEnvSource,
 } from './pagbank-env';
+// Turning a parked legacy `notificationCode` back into the events it meant is
+// NOT here, and the omission is load-bearing: it reaches
+// `pagbank-legacy-notifications` and so `./shared`, whose `node:crypto` import
+// breaks the frontend package's Storybook build the moment anything on the
+// root entry pulls it in. It ships beside the resolver it binds, on the
+// `./pagbank-legacy-notifications` subpath — see `./pagbank-legacy-public`.
