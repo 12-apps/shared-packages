@@ -169,14 +169,15 @@ export {
   type StubModeEnv,
 } from './core/stub-mode';
 
-// The FUT-477 legacy-notification resolver (`resolvePagbankNotification`) is
-// deliberately NOT re-exported here. This ROOT entry is value-imported by the
-// frontend package's stories, so any provider-module export placed on it
-// drags `providers/shared.ts` — and its `node:crypto` import — into a browser
-// bundle and breaks the Storybook build. It ships at its own subpath instead,
-// `@12-apps/payments-backend/pagbank-legacy-notifications` (not under
-// `./providers/*`, which the provider-catalog contract reserves for ADAPTER
-// modules), and no browser build reaches any subpath.
+// NOTHING reachable from this entry may import a Node builtin: the frontend
+// package's stories value-import it, so a provider module placed here drags
+// `providers/shared.ts` — and its `node:crypto` — into a browser bundle and
+// breaks the Storybook build. Server-only capabilities ship at their own
+// subpath, which no browser build reaches — the FUT-477 legacy-notification
+// trio is at `./pagbank-legacy-notifications`, never under `./providers/*`,
+// which the provider-catalog contract reserves for ADAPTER modules.
+// Enforced by `scripts/root-entry-browser-safe-gate.mjs`, which records why a
+// comment here was not enough. See `providers/pagbank-legacy-public.ts`.
 
 // The adapters' copy ports and pt-BR packs. Listed in `providers/index.ts`
 // (this file is at the size gate), which also carries the reason those two
@@ -329,8 +330,9 @@ export { isValidCpf } from './core/cpf';
 // Caller-side charge questions (FUT-760): what a reversal event reversed,
 // whether a charge already raised is still payable, and the two instrument
 // questions a checkout asks BEFORE any failover walk begins.
-export { classifyReversalEvent } from './core/reversal';
-export type { DisputeFacts, RefundFacts, ReversalFacts } from './core/reversal';
+// Reacting to a verified webhook: which reversal shape a delivery is, and the
+// FAN-IN deciding the order the reactions run in. See `./core/webhook-public`.
+export * from './core/webhook-public';
 export { chargeDeadlinePassed, hostedChargePayable, pixChargePayable } from './core/charge-reuse';
 export { attributedCard, chainTokenizesInBrowser, holdsInstrumentFor } from './core/card-instrument';
 // What a host may need to know about PagBank — its published Orders API hosts
