@@ -26,11 +26,9 @@ export {
   type PagBankEnv,
   type PagBankEnvSource,
 } from './pagbank-env';
-// Turning a parked legacy `notificationCode` back into the events it meant.
-// This package recognizes the delivery, parks it and ships the resolver; the
-// piece joining them was the one thing a host could only get right by reading
-// our source (FUT-764).
-export {
-  legacyNotificationCode,
-  pagbankLegacyResolver,
-} from './pagbank-legacy-resolve';
+// Turning a parked legacy `notificationCode` back into the events it meant is
+// NOT here, and the omission is load-bearing: it reaches
+// `pagbank-legacy-notifications` and so `./shared`, whose `node:crypto` import
+// breaks the frontend package's Storybook build the moment anything on the
+// root entry pulls it in. It ships beside the resolver it binds, on the
+// `./pagbank-legacy-notifications` subpath — see `./pagbank-legacy-public`.

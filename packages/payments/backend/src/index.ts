@@ -169,14 +169,20 @@ export {
   type StubModeEnv,
 } from './core/stub-mode';
 
-// The FUT-477 legacy-notification resolver (`resolvePagbankNotification`) is
-// deliberately NOT re-exported here. This ROOT entry is value-imported by the
-// frontend package's stories, so any provider-module export placed on it
-// drags `providers/shared.ts` — and its `node:crypto` import — into a browser
-// bundle and breaks the Storybook build. It ships at its own subpath instead,
-// `@12-apps/payments-backend/pagbank-legacy-notifications` (not under
-// `./providers/*`, which the provider-catalog contract reserves for ADAPTER
-// modules), and no browser build reaches any subpath.
+// The FUT-477 legacy-notification capability — `resolvePagbankNotification`
+// and, since FUT-764, the `pagbankLegacyResolver`/`legacyNotificationCode`
+// that bind it — is deliberately NOT re-exported here. This ROOT entry is
+// value-imported by the frontend package's stories, so any provider-module
+// export placed on it drags `providers/shared.ts` — and its `node:crypto`
+// import — into a browser bundle and breaks the Storybook build. It ships at
+// its own subpath instead, `@12-apps/payments-backend/pagbank-legacy-notifications`
+// (not under `./providers/*`, which the provider-catalog contract reserves for
+// ADAPTER modules), and no browser build reaches any subpath.
+//
+// That last sentence is the whole rule, and it is worth knowing it has been
+// broken once: FUT-764 put the binding on `./providers/pagbank-public`, which
+// IS on the root, and the Storybook build was the only thing that noticed.
+// Every other gate — lint, types, unit, the consumer verification — was green.
 
 // The adapters' copy ports and pt-BR packs. Listed in `providers/index.ts`
 // (this file is at the size gate), which also carries the reason those two
