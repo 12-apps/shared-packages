@@ -13,6 +13,13 @@
  * host before it moved.
  */
 export { pagbankApiBase } from './pagbank-api-base';
+// WHICH buyer field PagBank refused, read from its own error vocabulary. The
+// pipeline may never branch on a vendor's error strings, but the strings are
+// not the host's either: they are identical for every deployment (FUT-764).
+export {
+  classifyPagBankRejection,
+  type PagBankRejection,
+} from './pagbank-rejections';
 export {
   pagbankPlatformFallbackEnabled,
   readPagBankEnv,
