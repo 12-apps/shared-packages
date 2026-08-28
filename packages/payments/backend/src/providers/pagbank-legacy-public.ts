@@ -23,4 +23,9 @@
  * Server-only, by construction: a webhook handler is the only caller.
  */
 export { resolvePagbankNotification } from './pagbank-legacy-notifications';
+// The parsed shape a resolved event carries on `raw`. Re-exported because the
+// subpath already served it: this barrel is a superset of what it replaced, so
+// nothing an adopter imports moves — and knip is what proves that, by going
+// red the moment a name stops being reachable from an entry point.
+export type { PagbankLegacyNotificationDetail } from './pagbank-legacy-notifications';
 export { legacyNotificationCode, pagbankLegacyResolver } from './pagbank-legacy-resolve';
