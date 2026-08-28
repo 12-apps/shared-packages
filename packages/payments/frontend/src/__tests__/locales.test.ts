@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ACTIVATION_STEP_COPY,
   CARD_COPY,
   CHECKOUT_COPY,
   CHECKOUT_PAYMENT_COPY,
@@ -22,6 +23,7 @@ import { localeDrift } from './locale-parity';
  */
 describe('the locale packs', () => {
   it.each([
+    ['ACTIVATION_STEP_COPY', ACTIVATION_STEP_COPY],
     ['CARD_COPY', CARD_COPY],
     ['CHECKOUT_SCREENS_COPY', CHECKOUT_SCREENS_COPY],
     ['CHECKOUT_COPY', CHECKOUT_COPY],
@@ -32,6 +34,34 @@ describe('the locale packs', () => {
     ['PLATFORM_HOMOLOGACAO_COPY', PLATFORM_HOMOLOGACAO_COPY],
   ])('%s speaks both languages the same way', (name, pack) => {
     expect(localeDrift(pack as never), name).toEqual([]);
+  });
+
+  it('keeps the activation step\'s untranslatables in both languages', () => {
+    // The three classes `copy-pt-BR.ts` names, asserted rather than promised.
+    // Each is a sentence a translator would reasonably localize and must not:
+    // "Checkout Integrado" is the label on PagBank's own console, so an owner
+    // sent looking for "Integrated Checkout" is looking for a screen that does
+    // not exist; CPF is a Brazilian document; and the mask is a FORMAT, so a
+    // translated one shows a shape the field refuses.
+    for (const copy of Object.values(ACTIVATION_STEP_COPY)) {
+      expect(copy.outcome.refusedBody('PagBank')).toContain('Checkout Integrado');
+      expect(copy.outcome.blockedBody).toContain('Checkout Integrado');
+      expect(copy.taxId.label).toContain('CPF');
+      // The hint names the PROVIDER rather than the document — it is the
+      // sentence explaining who demands the field, and PagBank is a name.
+      expect(copy.taxId.hint).toContain('PagBank');
+      expect(copy.taxId.placeholder).toBe('000.000.000-00');
+    }
+  });
+
+  it('names the provider the owner is looking at, not a generic one', () => {
+    // Both refusal sentences are the ONLY place a provider's display name is
+    // interpolated on this step, and a pack that dropped the argument would
+    // read as a plausible sentence about nothing in particular.
+    for (const copy of Object.values(ACTIVATION_STEP_COPY)) {
+      expect(copy.outcome.refusedTitle('InfinitePay')).toContain('InfinitePay');
+      expect(copy.outcome.refusedBody('InfinitePay')).toContain('InfinitePay');
+    }
   });
 
   it('carries its own formatting locale, so words and money agree', () => {

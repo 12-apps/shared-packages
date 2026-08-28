@@ -1,3 +1,6 @@
+import type { ActivationStepCopy } from './activation/screens/copy';
+import { EN_US_ACTIVATION_STEP_COPY } from './activation/screens/copy-en-US';
+import { PT_BR_ACTIVATION_STEP_COPY } from './activation/screens/copy-pt-BR';
 import type { CardCopy } from './card/copy';
 import { EN_US_CARD_COPY, PT_BR_CARD_COPY } from './card';
 import type { CheckoutPaymentCopy } from './components/checkout-payment-copy';
@@ -39,6 +42,17 @@ import { PT_BR_PAYMENTS_SETTINGS_COPY } from './components/settings-pt-BR';
  * `packages/payments/**` from importing a sibling workspace package at all.
  */
 type LocalePack<T> = { readonly 'pt-BR': T; readonly 'en-US': T };
+
+/**
+ * Step 3's words (FUT-764). `createActivationStep` still REQUIRES its copy and
+ * reads nothing from here — a host that wants these names them, which is the
+ * distinction between a pack and a default. They arrived from the first
+ * adopting host, where they had outlived the screen they belonged to.
+ */
+export const ACTIVATION_STEP_COPY = {
+  'pt-BR': PT_BR_ACTIVATION_STEP_COPY,
+  'en-US': EN_US_ACTIVATION_STEP_COPY,
+} as const satisfies LocalePack<ActivationStepCopy>;
 
 export const CARD_COPY = {
   'pt-BR': PT_BR_CARD_COPY,
@@ -88,6 +102,7 @@ export const PLATFORM_HOMOLOGACAO_COPY = {
  * key them — while the root keeps exporting the pt-BR names it always has, so
  * no existing import moves.
  */
+export { EN_US_ACTIVATION_STEP_COPY } from './activation/screens/copy-en-US';
 export { EN_US_CARD_COPY } from './card';
 export { EN_US_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-en-US';
 export {
