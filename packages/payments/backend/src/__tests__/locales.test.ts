@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ACTIVATION_COPY,
+  CHECKOUT_COPY,
   CONNECT_APPLICATION_COPY,
   PROVIDER_COPY,
   providerCopyPack,
@@ -20,10 +21,41 @@ import { localeDrift } from './locale-parity';
 describe('the locale packs', () => {
   it.each([
     ['ACTIVATION_COPY', ACTIVATION_COPY],
+    ['CHECKOUT_COPY', CHECKOUT_COPY],
     ['CONNECT_APPLICATION_COPY', CONNECT_APPLICATION_COPY],
     ['PROVIDER_COPY', PROVIDER_COPY],
   ])('%s speaks both languages the same way', (name, pack) => {
     expect(localeDrift(pack as never), name).toEqual([]);
+  });
+
+  it('never invites a second payment on an unresolved charge', () => {
+    // The one sentence on this surface where a translation could cost real
+    // money: some provider may be holding it, so the buyer must be told NOT to
+    // pay again. `checkout/copy.ts` states it as a property of the seam rather
+    // than of the words, which means only an assertion can hold the words to it.
+    for (const copy of Object.values(CHECKOUT_COPY)) {
+      expect(copy.unresolvedCharge).toMatch(/NÃO pague de novo|DO NOT pay again/);
+    }
+  });
+
+  it('names the METHOD that failed, never "payment methods"', () => {
+    // A chain can exhaust on CARD purely because no instrument was minted for
+    // its tail, while every provider in it still charges PIX fine. The sentence
+    // has to survive a translation reaching for the buyer's word for the tiles.
+    for (const copy of Object.values(CHECKOUT_COPY)) {
+      expect(copy.chainExhausted('CARD')).toMatch(/PIX/);
+      expect(copy.chainExhausted('PIX')).toMatch(/cartão|card/);
+    }
+  });
+
+  it('marks the field the browser has to highlight, not the one we call it', () => {
+    // `fieldNameOf` is a host/client contract, not copy: a pack that
+    // "translated" `cpf` back to `taxId` would leave the buyer staring at a
+    // form with no field marked and no way to tell why.
+    for (const copy of Object.values(CHECKOUT_COPY)) {
+      expect(copy.fieldNameOf('taxId')).toBe('cpf');
+      expect(copy.fieldNameOf('email')).toBe('email');
+    }
   });
 
   it('keeps the vendor names an owner has to find in a dashboard', () => {
