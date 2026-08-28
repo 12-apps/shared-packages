@@ -4,6 +4,9 @@ import { PT_BR_ACTIVATION_COPY } from './activation/pt-BR';
 import type { ConnectApplicationCopy } from './platform/connect-application';
 import { EN_US_CONNECT_APPLICATION_COPY } from './platform/en-US';
 import { PT_BR_CONNECT_APPLICATION_COPY } from './platform/pt-BR';
+import type { CheckoutCopy } from './checkout/copy';
+import { EN_US_CHECKOUT_COPY } from './checkout/copy-en-US';
+import { PT_BR_CHECKOUT_COPY } from './checkout/copy-pt-BR';
 import type { ProviderCopyPacks } from './providers/copy';
 import { EN_US_PROVIDER_COPY } from './providers/en-US';
 import { PT_BR_PROVIDER_COPY } from './providers/pt-BR';
@@ -32,6 +35,19 @@ export const ACTIVATION_COPY = {
   'pt-BR': PT_BR_ACTIVATION_COPY,
   'en-US': EN_US_ACTIVATION_COPY,
 } as const satisfies LocalePack<ActivationCopy>;
+
+/**
+ * The buyer's whole refusal vocabulary (FUT-764).
+ *
+ * A pack, not the DEFAULT this package deleted in FUT-740: `CheckoutCopy` is
+ * still required and `checkoutRefusalFor` reads nothing from here. The full
+ * argument, and the two keys a host answers for itself, are in
+ * `./checkout/copy-pt-BR.ts`.
+ */
+export const CHECKOUT_COPY = {
+  'pt-BR': PT_BR_CHECKOUT_COPY,
+  'en-US': EN_US_CHECKOUT_COPY,
+} as const satisfies LocalePack<CheckoutCopy>;
 
 export const CONNECT_APPLICATION_COPY = {
   'pt-BR': PT_BR_CONNECT_APPLICATION_COPY,
