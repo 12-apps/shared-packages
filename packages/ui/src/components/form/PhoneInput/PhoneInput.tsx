@@ -17,6 +17,8 @@ import { usePhoneInput } from './PhoneInput.hooks';
 import type { CountryData,PhoneInputProps } from './PhoneInput.types';
 import type { PhoneInputCopy } from '../../../copy';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 // Country data with expanded support
 
 // Styled components
@@ -25,7 +27,7 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
-    border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
+    border: `1px solid ${fieldEdge(theme)}`,
     transition: theme.transitions.create(['border-color', 'box-shadow', 'background']),
     '&:hover': {
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,

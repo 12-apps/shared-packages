@@ -3,6 +3,8 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { glowAnimation, rippleAnimation, scaleAnimation, slideAnimation } from './RadioGroup.animations';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 interface ColorPalette {
   main: string;
   dark?: string;
@@ -119,7 +121,7 @@ const cardBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): CSS
   return {
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    border: `2px solid ${selected ? palette.main : alpha(theme.palette.divider, 0.3)}`,
+    border: `2px solid ${selected ? palette.main : fieldEdge(theme)}`,
     backgroundColor: selected ? alpha(palette.main, 0.05) : theme.palette.background.paper,
     position: 'relative' as const,
     overflow: 'hidden' as const,
@@ -183,7 +185,7 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
     borderRadius: theme.spacing(1),
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontWeight: 500,
-    border: `2px solid ${selected ? palette.main : alpha(theme.palette.divider, 0.5)}`,
+    border: `2px solid ${selected ? palette.main : fieldEdge(theme)}`,
     backgroundColor: selected ? palette.main : 'transparent',
     color: selected ? palette.contrastText || '#fff' : theme.palette.text.primary,
     position: 'relative' as const,

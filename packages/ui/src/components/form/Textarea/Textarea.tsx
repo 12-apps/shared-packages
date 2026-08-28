@@ -30,6 +30,8 @@ const TextareaRichEditor = lazy(async () => ({
   default: (await import('./TextareaRichEditor')).TextareaRichEditor }));
 import type { TextareaProps } from './Textarea.types';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 // Interface for styled component props
 interface StyledTextareaProps {
   customVariant?: string;
@@ -71,7 +73,7 @@ const StyledTextarea = styled(TextareaAutosize, {
     width: '100%',
     fontFamily: theme.typography.fontFamily,
     borderRadius: theme.spacing(1),
-    border: `2px solid ${error ? errorColor.main : theme.palette.divider}`,
+    border: `2px solid ${error ? errorColor.main : fieldEdge(theme)}`,
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
     transition: 'all 0.3s ease',
@@ -108,7 +110,7 @@ const StyledLabel = styled(InputLabel, {
     backdropFilter: 'blur(10px)',
     padding: '4px 8px',
     borderRadius: '4px',
-    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+    border: `1px solid ${fieldEdge(theme)}`,
     display: 'inline-block' }) }));
 
 // IconWrapper - replaced with inline Box component for better TypeScript compatibility

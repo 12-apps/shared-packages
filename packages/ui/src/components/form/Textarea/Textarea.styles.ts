@@ -1,6 +1,8 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 const glowAnimation = keyframes`
   0% {
     box-shadow: 0 0 5px currentColor;
@@ -107,7 +109,7 @@ const glassStyles = glass
   ? {
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
       backdropFilter: 'blur(20px)',
-      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+      border: `1px solid ${fieldEdge(theme)}`,
       '&:hover': {
         backgroundColor: alpha(theme.palette.background.paper, 0.15),
         backdropFilter: 'blur(25px)',

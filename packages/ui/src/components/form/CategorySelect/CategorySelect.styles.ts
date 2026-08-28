@@ -1,5 +1,7 @@
 import { alpha, type CSSObject, type Theme } from '@mui/material/styles/index.js';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 /**
  * The prototype's METRICS, verbatim.
  *
@@ -51,7 +53,7 @@ export const triggerSx = (theme: Theme, selected: boolean, open: boolean): CSSOb
     height: METRICS.triggerHeight,
     padding: '0 10px 0 12px',
     borderRadius: `${METRICS.triggerRadius}px`,
-    border: `1px solid ${open || selected ? brand.edge : theme.palette.divider}`,
+    border: `1px solid ${open || selected ? brand.edge : fieldEdge(theme)}`,
     background: selected ? brand.soft : theme.palette.background.paper,
     color: selected ? brand.ink : theme.palette.text.primary,
     font: 'inherit',

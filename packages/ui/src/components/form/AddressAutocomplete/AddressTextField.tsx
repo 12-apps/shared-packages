@@ -6,6 +6,8 @@ import React from 'react';
 
 import type { AddressAutocompleteProps } from './AddressAutocomplete.types';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 // Kept module-local on purpose: the inferred type of a styled() component cannot
 // be named across a module boundary here (TS2742), so the plain component below
 // is what the rest of the folder imports.
@@ -14,7 +16,7 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
-    border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
+    border: `1px solid ${fieldEdge(theme)}`,
     transition: theme.transitions.create(['border-color', 'box-shadow', 'background']),
     '&:hover': {
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,

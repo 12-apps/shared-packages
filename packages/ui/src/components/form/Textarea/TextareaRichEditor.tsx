@@ -19,6 +19,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { floatAnimation, getColorFromTheme } from './Textarea.styles';
 import type { RichEditorToolbarCopy } from '../../../copy';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   display: 'flex',
   alignItems: 'center',
@@ -104,7 +106,7 @@ const ContentEditableDiv = styled('div')<{
     minHeight: '120px',
     padding: theme.spacing(1.5),
     borderRadius: `0 0 ${theme.spacing(1)} ${theme.spacing(1)}`,
-    border: `2px solid ${error ? errorColor.main : focused ? colorPalette.main : theme.palette.divider}`,
+    border: `2px solid ${error ? errorColor.main : focused ? colorPalette.main : fieldEdge(theme)}`,
     borderTop: 'none',
     backgroundColor: glass
       ? alpha(theme.palette.background.paper, 0.1)

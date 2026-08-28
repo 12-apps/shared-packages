@@ -8,6 +8,8 @@ import React from 'react';
 
 import type { SelectProps } from './Select.types';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 // Define pulse animation
 const pulseAnimation = keyframes`
   0% {
@@ -57,7 +59,7 @@ const pulseStyles = (theme: Theme): CSSObject => ({
 const glassVariant = (theme: Theme): CSSObject => ({
   backgroundColor: alpha(theme.palette.background.paper, 0.1),
   backdropFilter: 'blur(20px)',
-  border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+  border: `1px solid ${fieldEdge(theme)}`,
   '& fieldset': { border: 'none' },
   '&:hover': {
     backgroundColor: alpha(theme.palette.background.paper, 0.15),
@@ -105,7 +107,7 @@ const gradientVariant = (theme: Theme): CSSObject => ({
 
 /** `default` variant: standard outlined borders with hover/focus/error states. */
 const defaultVariant = (theme: Theme): CSSObject => ({
-  '& fieldset': { borderColor: alpha(theme.palette.divider, 0.23) },
+  '& fieldset': { borderColor: fieldEdge(theme) },
   '&:hover fieldset': { borderColor: theme.palette.primary.main },
   '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main, borderWidth: 2 },
   '&.Mui-error fieldset': { borderColor: theme.palette.error.main },
