@@ -1,6 +1,8 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.js';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 const glowAnimation = keyframes`
   0% { box-shadow: 0 0 5px currentColor; }
   50% { box-shadow: 0 0 15px currentColor, 0 0 25px currentColor; }
@@ -74,7 +76,7 @@ export const baseStyles = (
   fontWeight: 500,
   borderRadius: theme.spacing(1),
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  border: `2px solid ${alpha(theme.palette.divider, 0.3)}`,
+  border: `2px solid ${fieldEdge(theme)}`,
   color: theme.palette.text.primary,
   backgroundColor: 'transparent',
   position: 'relative',

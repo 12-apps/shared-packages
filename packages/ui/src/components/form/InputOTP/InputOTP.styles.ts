@@ -1,6 +1,8 @@
 import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { fieldEdge } from '../../../tokens/field-edge';
+
 interface ColorPalette {
   main: string;
   dark?: string;
@@ -82,7 +84,7 @@ export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
       ...(glass && {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
         backdropFilter: 'blur(20px)',
-        '& fieldset': { border: `1px solid ${alpha(theme.palette.divider, 0.2)}` },
+        '& fieldset': { border: `1px solid ${fieldEdge(theme)}` },
       }),
       ...(gradient && {
         '&.Mui-focused fieldset': {
