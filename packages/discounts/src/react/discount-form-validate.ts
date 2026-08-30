@@ -1,3 +1,4 @@
+import { toMinutes, type DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
 import { comboUnits } from "./combo-slot-builder";
@@ -141,16 +142,55 @@ export interface FormTargets {
 }
 
 /** The cross-field rules a per-input schema cannot express. */
+/**
+ * The weekly schedule, when the operator asked for one (FUT-996).
+ *
+ * Three refusals, and each is a thing the operator can SEE and fix on the row
+ * in front of them. Deliberately NOT refused: a `to` earlier than `from` — that
+ * is a bar shutting at 02:00, the commonest happy hour there is, and the
+ * builder's own sentence says "do dia seguinte" so it can be checked rather
+ * than guessed at.
+ *
+ * Every one of these is re-checked on the server (`assertSchedule`), which is
+ * the authority. This half exists so the operator is told before they submit.
+ */
+function checkSchedule(
+  state: ScheduleState,
+  copy: DiscountsWebCopy,
+): Record<string, string> {
+  if (!state.enabled) return {};
+  const { windows } = state.schedule;
+  if (windows.length === 0) return { schedule: copy.schedule.windowsRequired };
+  if (windows.some((window) => window.days.length === 0)) {
+    return { schedule: copy.schedule.daysRequired };
+  }
+  const badTime = windows.some(
+    (window) =>
+      toMinutes(window.from) === null ||
+      toMinutes(window.to) === null ||
+      window.from === window.to,
+  );
+  return badTime ? { schedule: copy.schedule.timesRequired } : {};
+}
+
+/** The schedule editor's state: its switch and its rows, kept separate. */
+interface ScheduleState {
+  enabled: boolean;
+  schedule: DiscountSchedule;
+}
+
 export function validate(
   values: DiscountFormValues,
   targets: FormTargets,
   formatters: DiscountsFormatters,
   copy: DiscountsWebCopy,
+  scheduleState: ScheduleState,
 ): Record<string, string> {
   const slots = targets.comboRequirements;
   const errors: Record<string, string> = {
     ...checkValue(values, slots, formatters, copy),
     ...checkCombo(values, slots, copy),
+    ...checkSchedule(scheduleState, copy),
   };
   if (values.trigger === "CODE" && values.code.trim() === "") {
     errors.code = copy.form.codeRequired;

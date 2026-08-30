@@ -7,6 +7,8 @@ import type {
   DiscountWindowState,
 } from "../engine/kinds";
 
+import type { DiscountsScheduleCopy } from "./schedule-copy";
+
 /**
  * Every word the discounts ADMIN screens put in front of a human — required
  * host config, with NO defaults.
@@ -274,6 +276,7 @@ export interface DiscountsWebCopy {
   readonly screen: DiscountsScreenCopy;
   readonly labels: DiscountsVocabularyCopy;
   readonly window: DiscountsWindowCopy;
+  readonly schedule: DiscountsScheduleCopy;
   readonly form: DiscountsFormCopy;
   readonly combo: DiscountsComboCopy;
   readonly targets: DiscountsTargetCopy;

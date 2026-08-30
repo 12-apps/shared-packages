@@ -1,5 +1,6 @@
 import { comboCoveredLineIds } from "./combo-match";
 import type { DiscountRejectionReason } from "./kinds";
+import { scheduleCovers, type LocalClock } from "./schedule";
 import type { DiscountCartLine, DiscountRule } from "./types";
 
 /**
@@ -32,6 +33,15 @@ interface ScreenContext {
   subtotalCents: number;
   /** Whether R3's covered set came back non-empty for this rule. */
   hasEligibleItems: boolean;
+  /**
+   * True when R3 covered lines the SCHEDULE then took away (FUT-996) — i.e.
+   * the rule would have applied but not at this hour.
+   *
+   * Kept separate from `hasEligibleItems` because the two are different
+   * sentences to a buyer: "não vale para os itens do seu carrinho" is a dead
+   * end, and "o happy hour começa às 16:00" is an invitation.
+   */
+  blockedBySchedule: boolean;
 }
 
 /**
@@ -149,6 +159,69 @@ function screenLimits(rule: DiscountRule, ctx: ScreenContext): DiscountRejection
 }
 
 /**
+ * Which lines a SCHEDULED rule may touch, and whether the schedule is what
+ * emptied the set (FUT-996).
+ *
+ * Screening is PER LINE, against each line's own `committedLocal`, because a
+ * cart is not committed all at once: a beer added at 19:55 and one added at
+ * 20:05 are two different facts, and pricing them alike would mean either
+ * charging for a promotion the shopper earned or honouring one they did not.
+ *
+ * The three scopes answer it differently, and each difference is forced:
+ *
+ * - **`ORDER`** names no line at all, so there is nothing to anchor to and it
+ *   screens against `localNow` — the checkout instant. An order-wide discount
+ *   is a fact about the order, and the order comes into existence at checkout.
+ * - **`COMBO`** is RE-MATCHED over the qualifying lines rather than
+ *   intersected, because a combo's coverage is not a set intersection but a
+ *   match: "leve 3, pague 2 na terça à tarde" must not assemble itself from two
+ *   units bought in the afternoon and one bought at night. Intersecting after
+ *   the fact would have kept the units and lost the requirement.
+ * - **`ITEM` / `CATEGORY`** intersect, which is exactly what they mean.
+ */
+function scheduledCoverage(
+  rule: DiscountRule,
+  lines: readonly DiscountCartLine[],
+  pristine: ReadonlySet<string>,
+  localNow: LocalClock | null | undefined,
+): { covered: ReadonlySet<string>; blockedBySchedule: boolean } {
+  if (rule.schedule === null || rule.schedule === undefined) {
+    return { covered: pristine, blockedBySchedule: false };
+  }
+  if (rule.scope === "ORDER") {
+    const running = scheduleCovers(rule.schedule, localNow);
+    return {
+      covered: running ? pristine : new Set<string>(),
+      blockedBySchedule: !running && pristine.size > 0,
+    };
+  }
+  const qualifying = lines.filter((line) =>
+    scheduleCovers(rule.schedule, line.committedLocal),
+  );
+  const covered =
+    rule.scope === "COMBO"
+      ? comboCoveredLineIds(rule, qualifying)
+      : new Set([...pristine].filter((lineId) => qualifying.some((l) => l.lineId === lineId)));
+  return { covered, blockedBySchedule: covered.size === 0 && pristine.size > 0 };
+}
+
+/**
+ * R3 + the schedule, in one call: what this rule may touch right now, and
+ * whether the schedule is the reason it may touch nothing.
+ *
+ * The two are returned together because a caller needs both to say the right
+ * thing, and computing them apart would mean matching a combo twice.
+ */
+export function coveredLineIdsNow(
+  rule: DiscountRule,
+  lines: readonly DiscountCartLine[],
+  index: LineIndex,
+  localNow: LocalClock | null | undefined,
+): { covered: ReadonlySet<string>; blockedBySchedule: boolean } {
+  return scheduledCoverage(rule, lines, coveredLineIds(rule, lines, index), localNow);
+}
+
+/**
  * R2 — the eligibility screen. Returns the FIRST failing predicate's reason, or
  * null when the rule is a live candidate. The order is not arbitrary: it runs
  * from the least to the most cart-specific reason so the message the buyer ends
@@ -173,5 +246,8 @@ export function screenRule(
   const limits = screenLimits(rule, ctx);
   if (limits !== null) return limits;
   if (ctx.hasEligibleItems) return null;
+  // Before the two coarse reasons, because it is the one the buyer can act on:
+  // this rule DOES cover their cart, just not at this hour.
+  if (ctx.blockedBySchedule) return "OUT_OF_SCHEDULE";
   return rule.scope === "COMBO" ? "COMBO_NOT_MATCHED" : "NO_ELIGIBLE_ITEMS";
 }

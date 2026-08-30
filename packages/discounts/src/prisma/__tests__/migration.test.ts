@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it, vi } from "vitest";
@@ -60,10 +60,22 @@ import { DISCOUNT_SCOPES, DISCOUNT_TARGET_TYPES, DISCOUNT_TYPES } from "../../en
  */
 vi.setConfig({ testTimeout: 60_000 });
 
-const MIGRATION = readFileSync(
-  new URL("../../../prisma/migrations/20260821140000_discounts_package_owned/migration.sql", import.meta.url),
-  "utf8",
-);
+/**
+ * The WHOLE migration folder, in the name order `migrate deploy` applies it in
+ * — DISCOVERED rather than listed.
+ *
+ * It used to name one file. That was the hand-kept list this repo keeps
+ * deleting: a second migration (FUT-996's `schedule` column) landed beside it
+ * and every case here went on asserting against a schema the deploy no longer
+ * builds — green, while testing an artifact that had stopped existing. The
+ * folder cannot fall behind itself.
+ */
+const MIGRATIONS_DIR = new URL("../../../prisma/migrations/", import.meta.url);
+
+const MIGRATION = readdirSync(MIGRATIONS_DIR)
+  .sort()
+  .map((name) => readFileSync(new URL(`${name}/migration.sql`, MIGRATIONS_DIR), "utf8"))
+  .join("\n");
 
 /** The `discounts` table as a host had it BEFORE this package owned the schema. */
 const LEGACY_HOST = `
@@ -411,6 +423,84 @@ describe("a host that already had the table", () => {
     expect(await tableNames(db)).toEqual(
       expect.arrayContaining(["discount_combo_slots", "discount_targets"]),
     );
+    await db.close();
+  });
+});
+
+/**
+ * The weekly schedule column (FUT-996).
+ *
+ * Additive by construction, which is the property worth pinning: this column
+ * arrived in a second migration that sorts AFTER the first, so every case here
+ * also proves the folder still replays as a whole.
+ */
+describe("schedule (FUT-996)", () => {
+  it("is added to a FRESH host", async () => {
+    const db = await migrated();
+    const found = await db.query<{ data_type: string; is_nullable: string }>(
+      `SELECT data_type, is_nullable FROM information_schema.columns
+        WHERE table_name = 'discounts' AND column_name = 'schedule'`,
+    );
+    expect(found.rows).toEqual([{ data_type: "jsonb", is_nullable: "YES" }]);
+    await db.close();
+  });
+
+  it("is added to a host that already had the pre-package table", async () => {
+    // The case a schema diff cannot check: the column has to arrive on a
+    // database whose `discounts` table predates the package entirely.
+    const db = await migrated(LEGACY_HOST);
+    const found = await db.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'discounts' AND column_name = 'schedule'`,
+    );
+    expect(found.rows).toHaveLength(1);
+    await db.close();
+  });
+
+  it("leaves every existing rule NULL — no backfill, no repricing", async () => {
+    // NULL already means what these rows mean ("always, within the campaign"),
+    // so the migration cannot change the price of anything that exists.
+    const db = await migrated(LEGACY_HOST);
+    const found = await db.query<{ schedule: unknown }>(
+      `SELECT "schedule" FROM "discounts" WHERE "id" = 'd-legacy'`,
+    );
+    expect(found.rows).toEqual([{ schedule: null }]);
+    await db.close();
+  });
+
+  it("stores and returns a schedule blob unchanged", async () => {
+    const db = await migrated();
+    await db.exec(
+      insertDiscount({
+        id: "d-hh",
+        client_id: "t1",
+        name: "Happy hour",
+        type: "PERCENTAGE",
+        percent_off_bp: 1000,
+        scope: "CATEGORY",
+        trigger: "AUTOMATIC",
+        schedule: '{"windows":[{"days":[4],"from":"16:00","to":"20:00"}]}',
+      }),
+    );
+    const found = await db.query<{ schedule: { windows: unknown[] } }>(
+      `SELECT "schedule" FROM "discounts" WHERE "id" = 'd-hh'`,
+    );
+    expect(found.rows[0]?.schedule).toEqual({
+      windows: [{ days: [4], from: "16:00", to: "20:00" }],
+    });
+    await db.close();
+  });
+
+  it("replays as a no-op", async () => {
+    // The whole folder, twice. A package migration sorts after a host's, so
+    // "applied again" is a situation that really happens.
+    const db = await migrated();
+    await db.exec(MIGRATION);
+    const found = await db.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'discounts' AND column_name = 'schedule'`,
+    );
+    expect(found.rows).toHaveLength(1);
     await db.close();
   });
 });
