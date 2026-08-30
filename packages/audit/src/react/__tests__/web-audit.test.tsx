@@ -159,6 +159,32 @@ function inMaskOrder(field: HTMLElement, iso: string): string {
     .join(separator);
 }
 
+/**
+ * The grid once it holds a ROW — not merely once its node exists.
+ *
+ * `audit-log-grid` is in the document for the whole load, loading state
+ * included, so waiting on the node alone returns while every cell still reads
+ * the copy pack's "Loading…". Whatever the case asserted next then sampled
+ * that instead of its own subject, which is why two consecutive CI runs of this
+ * file failed on two DIFFERENT tests: the race is in the wait, so its victim is
+ * whichever case the scheduler happens to starve. Locally it never lost, which
+ * is what kept it invisible until the lane grew heavier.
+ *
+ * A row rather than the absence of the loading sentence, because that sentence
+ * belongs to `DataStateCopy` — a different pack from the `DataViewsCopy` this
+ * file provides — so a test asserting on it would be reaching across a seam it
+ * does not control, and would go quietly green the day the string moved. Every
+ * caller below renders at least one entry; the empty and error cases wait on
+ * `audit-log-empty-reason` and `audit-log-error` instead, and are left alone.
+ */
+async function settledGrid(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const grid = screen.getByTestId('audit-log-grid');
+    expect(within(grid).getAllByTestId(/^audit-log-actor-/u).length).toBeGreaterThan(0);
+    return grid;
+  });
+}
+
 /** Open a filter pill and tick one of its options by label. */
 async function pickOption(fieldId: string, optionLabel: string): Promise<void> {
   fireEvent.click(screen.getByTestId(`audit-log-filter-${fieldId}`));
@@ -174,7 +200,7 @@ describe('the trail', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     const grid = screen.getByTestId('audit-log-grid');
     // The labels come from the VOCABULARY the backend half validates against, so
     // an action that exists is an action this screen can name.
@@ -283,7 +309,7 @@ describe('the filters', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     const box = screen.getByTestId('audit-log-search-all');
     fireEvent.change(box, { target: { value: 'order-1' } });
     // Enter, not the debounce. The box waits 350ms after the last keystroke
@@ -314,7 +340,7 @@ describe('the filters', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     await pickOption('action', 'Lamp extinguished');
 
     await waitFor(() => expect(lastPath(h)).toContain('action_in=lamp.extinguish'));
@@ -325,7 +351,7 @@ describe('the filters', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     await pickOption('action', 'Lamp extinguished');
     await waitFor(() => expect(lastPath(h)).toContain('action_in=lamp.extinguish'));
 
@@ -344,7 +370,7 @@ describe('the filters', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     fireEvent.click(screen.getByTestId('audit-log-filter-action'));
     // `supply.deliver` appears in no loaded row.
     expect(await screen.findByRole('menuitem', { name: 'Supply run delivered' })).toBeDefined();
@@ -355,7 +381,7 @@ describe('the filters', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     await pickOption('resourceType', 'Lamp');
 
     await waitFor(() => expect(lastPath(h)).toContain('resourceType_in=lamp'));
@@ -366,7 +392,7 @@ describe('the filters', () => {
 
     mount(h);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     fireEvent.click(screen.getByTestId('audit-log-range-period'));
     const panel = await screen.findByTestId('audit-log-range-period-panel');
     // The grid's day inputs are MASKED text fields, for the same reason this
@@ -431,7 +457,7 @@ describe('the filters', () => {
 
     mount(h, { fixedFilters: { resourceId: 'order-1' } });
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     await pickOption('action', 'Lamp extinguished');
 
     await waitFor(() => {
@@ -448,7 +474,7 @@ describe('the filters', () => {
     const h = harness();
 
     mount(h);
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     await pickOption('action', 'Lamp extinguished');
 
     await waitFor(() => expect(lastPath(h)).toContain('action_in'));
@@ -482,7 +508,7 @@ describe('the request the surface builds', () => {
 
     mountWith(transport);
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     expect(screen.getByTestId('audit-log-actor-a1')).toBeDefined();
   });
 
@@ -501,7 +527,7 @@ describe('the request the surface builds', () => {
       labels: { title: 'Ledger history' },
     });
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     expect(screen.getByTestId('audit-log-grid').textContent).toContain('Ticket refunded');
     expect(screen.getAllByText('Ledger history').length).toBeGreaterThan(0);
   });
@@ -511,7 +537,7 @@ describe('the request the surface builds', () => {
 
     mount(h, { formatDate: (iso: string) => `at ${iso}` });
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     expect(screen.getByTestId('audit-log-grid').textContent).toContain(
       'at 2026-08-01T15:04:00.000Z',
     );
@@ -535,7 +561,7 @@ describe('the page frame', () => {
       </Host>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     const crumbs = screen.getByTestId('audit-log-dashboard-breadcrumb');
     expect(crumbs.textContent).toContain('Home');
     expect(crumbs.textContent).toContain('Audit trail');
@@ -623,7 +649,7 @@ describe('the vocabulary follows the reader', () => {
   it("names a row's action and resource in the reader's language", async () => {
     mountBilingual(harness(), 'en-US');
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     const grid = screen.getByTestId('audit-log-grid');
     expect(grid.textContent).toContain('Lamp extinguished');
     // The pt-BR name for the same id is absent rather than alongside it: the
@@ -634,7 +660,7 @@ describe('the vocabulary follows the reader', () => {
   it('answers the other reader from the SAME surface', async () => {
     mountBilingual(harness(), 'pt-BR');
 
-    await waitFor(() => expect(screen.getByTestId('audit-log-grid')).toBeDefined());
+    await settledGrid();
     const grid = screen.getByTestId('audit-log-grid');
     expect(grid.textContent).toContain('Lampião apagado');
     expect(grid.textContent).not.toContain('Lamp extinguished');
