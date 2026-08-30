@@ -100,10 +100,15 @@ const ASCII_FOLD: Record<string, string> = {
 function infoString(value: string): string {
   let out = "";
   for (const char of value) {
-    const folded = ASCII_FOLD[char] ?? char;
-    for (const piece of folded) {
-      if ((piece.codePointAt(0) ?? 0) <= 127) out += piece;
+    // Every value in the table is ASCII by construction, so a folded character
+    // needs no second check — which is also what keeps this a single pass
+    // rather than a loop inside a loop.
+    const folded = ASCII_FOLD[char];
+    if (folded !== undefined) {
+      out += folded;
+      continue;
     }
+    if ((char.codePointAt(0) ?? 0) <= 127) out += char;
   }
   return pdfString(out);
 }

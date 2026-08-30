@@ -17,18 +17,27 @@ const STICKER: QrSticker = {
   hint: "Aponte a câmera e pague pelo celular",
 };
 
-function build(overrides: Partial<Parameters<typeof buildQrStickerPdf>[0]> = {}): string {
-  const bytes = buildQrStickerPdf({
+/** Fixed, never a live clock: the date is stamped into the document's bytes. */
+const FIXED_DATE = pdfDateOf(new Date(2026, 7, 30, 12, 0, 0));
+
+type BuildOverrides = Partial<Parameters<typeof buildQrStickerPdf>[0]>;
+
+function buildBytes(overrides: BuildOverrides = {}): Uint8Array<ArrayBuffer> {
+  return buildQrStickerPdf({
     stickers: [STICKER],
     size: STICKER_SIZES.small!,
     layout: "individual",
     brandName: "Bar do Zé",
     title: "QR do mercado",
-    date: pdfDateOf(new Date("2026-08-30T12:00:00Z")),
+    date: FIXED_DATE,
     creator: "Test",
     ...overrides,
   });
-  return Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+}
+
+/** The document as latin-1 text, which is what every assertion below reads. */
+function build(overrides: BuildOverrides = {}): string {
+  return Array.from(buildBytes(overrides), (byte) => String.fromCharCode(byte)).join("");
 }
 
 /** Every `N 0 obj` offset the xref table claims, in order. */
@@ -67,16 +76,8 @@ describe("the file a reader has to open", () => {
   it("keeps every byte inside the range the writer can encode", () => {
     // The document is assembled as a string and widened to bytes at the end,
     // which is only sound while one character is one byte.
-    const bytes = buildQrStickerPdf({
-      stickers: [{ ...STICKER, label: "Pão — “especial” • Açaí" }],
-      size: STICKER_SIZES.small!,
-      layout: "individual",
-      brandName: "Bar do Zé",
-      title: "t",
-      date: pdfDateOf(new Date()),
-      creator: "Test",
-    });
-    expect(bytes.every((byte) => byte <= 0xff)).toBe(true);
+    const raw = buildBytes({ stickers: [{ ...STICKER, label: "Pão — “especial” • Açaí" }] });
+    expect(raw.every((byte) => byte <= 0xff)).toBe(true);
   });
 });
 
