@@ -16,7 +16,7 @@ const MARK_SPACE_MM = 5;
 const MARK_LEN_MM = 4;
 
 /** The four corner marks, drawn in the space outside the bleed. */
-export function cropMarks(trimX: number, trimY: number, width: number, height: number): string {
+function cropMarks(trimX: number, trimY: number, width: number, height: number): string {
   const gap = mm(BLEED_MM);
   const len = mm(MARK_LEN_MM);
   const left = trimX;
