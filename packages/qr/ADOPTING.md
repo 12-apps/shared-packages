@@ -11,7 +11,7 @@ parts nobody can verify without a print run.
 | Surface | Export | What the host does |
 |---|---|---|
 | **Print** | `@12-apps/qr/pdf` | `buildQrStickerPdf({ stickers, size, layout, brandName, title, date, creator })` → `Uint8Array`. Pure: no clock, no locale, no DOM. |
-| **Scan** | `@12-apps/qr/scan` | *Not in this release.* The camera hook and the two decoders land in the follow-up; this note exists so an adopter planning both halves knows the subpath is coming and does not build a second one. |
+| **Scan** | `@12-apps/qr/scan` | `useQrCamera(active, onText)` → `{ videoRef, fault, live }`, plus `createQrDecoder()` if you drive your own loop. React is an optional-shaped peer; the pdf half never resolves it. |
 | **Prisma** | — | **None, deliberately.** This package owns no tables. What a code POINTS AT is the host's; a partial here would make every adopter take a migration for rows it does not have. |
 | **Wiring manifest** | — | **None, deliberately.** There is no wireable seam: nothing to mount, nothing to schedule, nothing to configure. It is a function. Recorded as an argued exemption in `.wiring-conformance.json` rather than as debt. |
 
@@ -43,6 +43,16 @@ parts nobody can verify without a print run.
    print shop rather than in review. If you need a different *layout*, compose the
    exported operators (`mm`, `rect`, `line`, `text`, `buildPdf`) rather than
    forking the sticker — that keeps the invisible half shared.
+
+6. **The viewfinder is yours, and so are the five fault sentences.** The package
+   deliberately ships no UI and no copy for the scan half — see the README. What it
+   does own is every path that turns the lens OFF: unmount, `active` going false,
+   a failure part-way through `getUserMedia`, and the stream that arrives after
+   somebody already closed the sheet. Do not re-implement teardown around it.
+
+7. **Write the parser the hook refuses to.** A decoded string is untrusted input.
+   Reduce it to ids you trust before routing, and give every rejection the same
+   answer — a hostile sticker must not be distinguishable from a torn one.
 
 ## Migrating off a local copy
 
