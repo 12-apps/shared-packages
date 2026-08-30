@@ -24,7 +24,7 @@ import { Dashboard } from "@12-apps/ui/layout/Dashboard";
 import { Text } from "@12-apps/ui/typography/Text";
 import { exportRows } from "@12-apps/ui/utils";
 
-import type { DiscountsApiClient, DiscountsPagination, WireTargetGroup } from "./api";
+import type { DiscountsApiClient } from "./api";
 import { fill, type DiscountsWebCopy } from "./copy";
 import { DiscountActionsMenu } from "./discount-actions-menu";
 import { DiscountCard } from "./discount-card";
@@ -39,7 +39,6 @@ import {
   discountExportColumns,
   discountFilters,
   discountsAppliedState,
-  discountsQueryToParams,
   discountsSearch,
 } from "./table-config";
 import { useDiscountsData } from "./use-discounts-data";
