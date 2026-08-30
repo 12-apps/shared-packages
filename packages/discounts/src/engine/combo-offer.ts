@@ -1,5 +1,6 @@
 import { comboRuleAcceptsLine } from "./combo-match";
 import { compareRuleOrder } from "./evaluate-passes";
+import { scheduleCovers, type LocalClock } from "./schedule";
 import type { DiscountType } from "./kinds";
 import type { ComboRequirement, DiscountCartLine, DiscountRule } from "./types";
 
@@ -74,6 +75,8 @@ export interface ComboOffersInput {
   rules: readonly DiscountRule[];
   /** Evaluation instant. Injected — this module never calls `new Date()`. */
   now: Date;
+  /** `now` as the store's wall clock, for a combo that only runs some hours. */
+  localNow?: LocalClock | null;
 }
 
 /** The synthetic one-unit line a slot is tested against. */
@@ -99,11 +102,22 @@ function toOfferLine(input: ComboOffersInput): DiscountCartLine {
  * a covered set), and a card has no cart to answer them from. Feeding it
  * zeroes would reject every combo carrying a minimum basket, which is precisely
  * the sort a merchant advertises.
+ *
+ * It DOES honour the weekly schedule (FUT-996), and that is not optional: this
+ * predicate is a SECOND implementation of "inside its window", so a schedule
+ * taught only to `screenRule` would leave a Tuesday-afternoon combo advertising
+ * itself around the clock while the cart refused to price it. The duplication
+ * above is deliberate; a duplication that disagrees is not.
  */
-function isAdvertisable(rule: DiscountRule, now: Date): boolean {
+function isAdvertisable(
+  rule: DiscountRule,
+  now: Date,
+  localNow: LocalClock | null | undefined,
+): boolean {
   if (rule.scope !== "COMBO" || rule.trigger !== "AUTOMATIC" || !rule.active) return false;
   if (rule.startsAt !== null && now.getTime() < rule.startsAt.getTime()) return false;
   if (rule.endsAt !== null && now.getTime() >= rule.endsAt.getTime()) return false;
+  if (!scheduleCovers(rule.schedule, localNow)) return false;
   return rule.usageLimit === null || rule.usageCount < rule.usageLimit;
 }
 
@@ -139,9 +153,10 @@ function toOffer(rule: DiscountRule): ComboOffer {
 export function advertisableCombos(
   rules: readonly DiscountRule[],
   now: Date,
+  localNow?: LocalClock | null,
 ): readonly ComboOffer[] {
   return rules
-    .filter((rule) => isAdvertisable(rule, now))
+    .filter((rule) => isAdvertisable(rule, now, localNow))
     .sort(compareRuleOrder)
     .map(toOffer);
 }
@@ -155,7 +170,10 @@ export function advertisableCombos(
 export function comboOffersForItem(input: ComboOffersInput): readonly ComboOffer[] {
   const line = toOfferLine(input);
   return input.rules
-    .filter((rule) => isAdvertisable(rule, input.now) && comboRuleAcceptsLine(rule, line))
+    .filter(
+      (rule) =>
+        isAdvertisable(rule, input.now, input.localNow) && comboRuleAcceptsLine(rule, line),
+    )
     .sort(compareRuleOrder)
     .map(toOffer);
 }

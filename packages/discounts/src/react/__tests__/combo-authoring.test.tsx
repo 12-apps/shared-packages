@@ -64,6 +64,7 @@ function payload(overrides: Partial<DiscountFormPayload> = {}): DiscountFormPayl
     categoryIds: [],
     menuItemIds: [],
     comboRequirements: [],
+    schedule: null,
     ...overrides,
   };
 }

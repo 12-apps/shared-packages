@@ -79,6 +79,29 @@ model Discount {
   // either side = open-ended.
   startsAt             DateTime? @map("starts_at")
   endsAt               DateTime? @map("ends_at")
+  // The WEEKLY schedule INSIDE that window (FUT-996) — "toda sexta, das 16:00
+  // às 20:00", "segunda e terça à tarde". NULL = always, within
+  // [starts_at, ends_at), which is what every row predating the feature means.
+  //
+  //   {"windows":[{"days":[4],"from":"16:00","to":"20:00"}]}
+  //
+  // `days` is Monday-first 0..6 — the axis every hours surface uses, and NOT
+  // `Date#getDay()`'s Sunday-first one. `from`/`to` are "HH:MM" in the STORE's
+  // timezone, half-open [from, to) exactly as the campaign window is, and a
+  // `to` earlier than `from` runs past midnight rather than being invalid.
+  //
+  // JSON rather than a fourth table because the recurrence is not usefully
+  // SQL-queryable (the grid's vigência filter already cannot express the
+  // campaign window either), and a fourth table would put a third `include` on
+  // the storefront's hottest read. The cost is that the DATABASE cannot check
+  // this shape: `assertSchedule` is the only gate, and the evaluator treats a
+  // malformed window as covering NOTHING, so a bad blob is a promotion that
+  // does not fire rather than a cart priced wrong.
+  //
+  // A recurring window is a WALL-CLOCK fact, so it is only meaningful against
+  // the store's own timezone. The engine never reads one: a host resolves the
+  // instant into a weekday and a minute-of-day and passes those in.
+  schedule             Json?     @map("schedule")
   // Minimum PRE-DISCOUNT cart subtotal, in cents. Always compared against the
   // untouched subtotal, never a running total — which is what makes the result
   // independent of the order the discounts are applied in.

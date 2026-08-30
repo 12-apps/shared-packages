@@ -1,6 +1,7 @@
 import { expect } from "vitest";
 
 import { evaluateDiscounts } from "../evaluate";
+import { toMinutes, type DiscountSchedule, type LocalClock } from "../schedule";
 import type {
   ComboRequirement,
   DiscountCartLine,
@@ -150,13 +151,40 @@ export function evaluateCart(args: {
   lines?: readonly DiscountCartLine[];
   couponCode?: string | null;
   now?: Date;
+  localNow?: LocalClock | null;
 }): DiscountEvaluation {
   return evaluateDiscounts({
     lines: args.lines ?? [line({ lineId: "l1" })],
     rules: args.rules,
     couponCode: args.couponCode ?? null,
     now: args.now ?? NOW,
+    localNow: args.localNow,
   });
+}
+
+/** Monday-first weekday indices, so a case reads as the day it is about. */
+export const MON = 0;
+export const TUE = 1;
+export const WED = 2;
+export const THU = 3;
+export const FRI = 4;
+export const SAT = 5;
+export const SUN = 6;
+
+/** A store wall clock: `clock(FRI, "17:30")`. */
+export function clock(weekday: number, hhmm: string): LocalClock {
+  const parsed = toMinutes(hhmm);
+  if (parsed === null) throw new Error(`not a time: ${hhmm}`);
+  return { weekday, minutes: parsed };
+}
+
+/** "Toda sexta, das 16:00 às 20:00" — one window, spelled as the merchant says it. */
+export function schedule(
+  days: readonly number[],
+  from: string,
+  to: string,
+): DiscountSchedule {
+  return { windows: [{ days, from, to }] };
 }
 
 function sumBy<T>(items: readonly T[], pick: (item: T) => number): number {

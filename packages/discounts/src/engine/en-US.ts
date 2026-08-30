@@ -25,6 +25,7 @@ export const EN_US_DISCOUNT_REJECTION_COPY: DiscountRejectionCopy = {
   INACTIVE: "That coupon is invalid or expired.",
   NOT_STARTED: "That coupon is invalid or expired.",
   EXPIRED: "That coupon is invalid or expired.",
+  OUT_OF_SCHEDULE: "This promotion is not running right now.",
   MIN_SUBTOTAL_NOT_MET: `This coupon needs a minimum order of ${MIN_SUBTOTAL_TOKEN}.`,
   USAGE_LIMIT_REACHED: "This coupon has reached its usage limit.",
   BUYER_LIMIT_REACHED: "You have already used this coupon.",

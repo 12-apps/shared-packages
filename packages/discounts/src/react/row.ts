@@ -1,4 +1,6 @@
 import type { DiscountWindowState } from "../engine/kinds";
+import { scheduleCovers } from "../engine/schedule";
+import { resolveLocalClock } from "../timezone";
 
 import type { DiscountWireRecord } from "./api";
 import type { DiscountsWebCopy } from "./copy";
@@ -40,6 +42,23 @@ export interface DiscountListItem extends Record<string, unknown> {
   windowLabel: string;
   /** Where it sits relative to its window, as a stable wire token. */
   windowState: DiscountWindowState;
+  /**
+   * Whether this rule's weekly SCHEDULE is running at this moment (FUT-996).
+   *
+   * Deliberately not folded into {@link windowState}. Those three values are
+   * resolved by a store-side SQL predicate so the grid's filter pill and the
+   * badge on a row cannot disagree — and a recurrence predicate is not
+   * expressible there. Widening the enum would mean offering a filter the
+   * backend cannot serve.
+   *
+   * So the pill keeps meaning the CAMPAIGN, and this answers the operator's
+   * actual question ("is my happy hour on right now?") as a row-level dot
+   * computed here. The cost, stated: you cannot FILTER by it.
+   *
+   * `false` for a rule with no schedule — there is nothing intermittent to
+   * report, and a dot on every row would say nothing.
+   */
+  activeNow: boolean;
   /** The record itself, for the edit dialog to re-seed from. */
   record: DiscountWireRecord;
 }
@@ -54,6 +73,8 @@ export function toListItem(
   formatters: DiscountsFormatters,
   copy: DiscountsWebCopy,
   now: Date,
+  /** The store's IANA zone. Omitted ⇒ no live dot; see {@link DiscountListItem.activeNow}. */
+  timezone?: string,
 ): DiscountListItem {
   return {
     ...record,
@@ -61,6 +82,27 @@ export function toListItem(
     valueLabel: formatDiscountValue(record, formatters),
     windowLabel: formatWindow(record, formatters, copy),
     windowState: windowStateOf(record, now),
+    activeNow: isRunningNow(record, now, timezone),
     record,
   };
+}
+
+/**
+ * Is this rule's schedule running right now, in the STORE's timezone?
+ *
+ * Answered with the same `scheduleCovers` the evaluator screens with — never a
+ * second implementation, or the dot and the price a shopper is charged would
+ * disagree about the same minute.
+ */
+function isRunningNow(
+  record: DiscountWireRecord,
+  now: Date,
+  timezone: string | undefined,
+): boolean {
+  if (record.schedule == null || timezone === undefined) return false;
+  const clock = resolveLocalClock(now, timezone);
+  // An unresolvable zone means "we do not know", which must not be drawn as a
+  // confident "on" — `scheduleCovers` answers TRUE for a null clock because a
+  // cart must keep pricing, and that is the wrong default for an indicator.
+  return clock !== null && scheduleCovers(record.schedule, clock);
 }

@@ -48,6 +48,34 @@ export interface DiscountsWebConfig {
   /** ISO 4217, e.g. `BRL`. */
   currency: string;
   /**
+   * The STORE's timezone, as a name an operator recognises ("São Paulo") —
+   * shown under the schedule's clocks (FUT-996).
+   *
+   * A label rather than an IANA id, because it is read by a person and
+   * "America/Sao_Paulo" is not how anyone says it. The engine never sees this:
+   * resolving an instant into the store's wall clock is the SERVER's job, and
+   * this string exists so a merchant typing 16:00 knows whose 16:00 it is —
+   * which is not a rhetorical worry for a store admin sitting in another one.
+   *
+   * Optional: a host that has not adopted schedules yet shows the builder
+   * without the line rather than a wrong one.
+   */
+  timezoneLabel?: string;
+  /**
+   * The store's IANA timezone (`America/Sao_Paulo`) — what the grid's
+   * "ativa agora" dot is computed against (FUT-996).
+   *
+   * Separate from {@link timezoneLabel} because they do different jobs: this
+   * one is read by `Intl`, that one is read by a person. Deriving the label
+   * from this would print "Sao_Paulo" at a merchant.
+   *
+   * Omitted ⇒ no dot. A rule's SCHEDULE still shows in the vigência cell; only
+   * the live "is it running this minute" answer is withheld, because without a
+   * zone it would be the browser's answer rather than the store's — and a shop
+   * whose admin is abroad would be told its happy hour is off while it is on.
+   */
+  timezone?: string;
+  /**
    * Where a failure goes, beyond the operator's own screen — REQUIRED, and for
    * the same reason `createApiDiscounts` requires a logger.
    *
@@ -110,7 +138,7 @@ function assertConfig(config: DiscountsWebConfig): void {
 
 export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   assertConfig(config);
-  const { copy, onError, currencyField, breadcrumb } = config;
+  const { copy, onError, currencyField, breadcrumb, timezoneLabel, timezone } = config;
   const formatters = createFormatters(config.locale, config.currency);
   const transport = config.transport ?? httpDiscountsTransport(copy.form.saveFailed);
   const api = createDiscountsApiClient(config.apiBase, transport, formatters);
@@ -122,6 +150,8 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
     currencyField,
     onError,
     ...(breadcrumb ? { breadcrumb } : {}),
+    ...(timezoneLabel ? { timezoneLabel } : {}),
+    ...(timezone ? { timezone } : {}),
   };
 
   return {
@@ -133,6 +163,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
         formatters={formatters}
         currencyField={currencyField}
         onError={onError}
+        {...(timezoneLabel ? { timezoneLabel } : {})}
         {...props}
       />
     ),

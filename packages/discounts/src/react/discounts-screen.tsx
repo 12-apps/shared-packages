@@ -55,6 +55,10 @@ export interface DiscountsScreenProps {
   api: DiscountsApiClient;
   copy: DiscountsWebCopy;
   formatters: DiscountsFormatters;
+  /** The store's IANA zone, for the grid's live "ativa agora" dot (FUT-996). */
+  timezone?: string;
+  /** The store's timezone as a person says it, for the schedule editor. */
+  timezoneLabel?: string;
   currencyField: CurrencyFieldComponent;
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */
@@ -308,7 +312,7 @@ function ScreenBody({
 }
 
 export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
-  const { api, copy, formatters, currencyField, onError, breadcrumb } = props;
+  const { api, copy, formatters, currencyField, onError, breadcrumb, timezone, timezoneLabel } = props;
   const [searchParams] = useSearchParams();
   const data = useDiscountsData(api, discountsSearch(searchParams), onError);
   const [createOpen, setCreateOpen] = useState(false);
@@ -320,9 +324,9 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   const rows = useMemo(() => {
     const now = new Date();
     return (data.page?.data ?? []).map((record) =>
-      toListItem(record, formatters, copy, now),
+      toListItem(record, formatters, copy, now, timezone),
     );
-  }, [data.page, formatters, copy]);
+  }, [data.page, formatters, copy, timezone]);
 
   // Seeded ONCE from the URL. Re-applying it on every render would wipe the
   // operator's column-visibility choices each time the query synced back.
@@ -344,6 +348,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
     currencyField,
     groups: data.groups,
     onError,
+    ...(timezoneLabel ? { timezoneLabel } : {}),
   };
 
   if (data.loading) return <LoadingState dataTestId="discounts-loading" />;
