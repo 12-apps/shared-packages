@@ -26,6 +26,10 @@ packages/i18n
 # i18n for the same reason: a reader scanning for "what needs nothing first"
 # should meet both before anything that depends on them.
 packages/thermal-printing
+# `@12-apps/qr` has no workspace dependencies either: one third-party encoder
+# and arithmetic. Same reasoning as the two above — a reader scanning for "what
+# needs nothing first" should meet it here.
+packages/qr
 packages/feature-flags
 packages/request-scope
 packages/observability-backend
