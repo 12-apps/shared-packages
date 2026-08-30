@@ -59,7 +59,7 @@ function renderForm(editing: DiscountWireRecord | null = null) {
       editing={editing}
       onSaved={vi.fn()}
       onError={() => {}}
-      timezoneLabel="São Paulo"
+      timezoneLabel="Horário Padrão de Brasília"
     />,
   );
   return { sent };
@@ -293,7 +293,7 @@ describe("the timezone is named", () => {
     // setting hours in their own.
     renderForm();
     chooseSpecificHours();
-    expect(screen.getByText("Horário de São Paulo.")).toBeTruthy();
+    expect(screen.getByText("Fuso horário: Horário Padrão de Brasília.")).toBeTruthy();
   });
 
   it("states the price guarantee where the merchant makes it", () => {

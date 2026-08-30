@@ -121,7 +121,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     weekend: "Saturday and Sunday",
     summary: "{days}, from {from} to {to}.",
     summaryOvernight: "{days}, from {from} to {to} the next day.",
-    timezoneNote: "{timezone} time.",
+    timezoneNote: "Time zone: {timezone}.",
     guaranteeNote: "The price is held from the moment the item went into the cart.",
     orderScopeNote:
       "Applies to orders placed within these hours. Unlike the other scopes, which follow the moment each item went into the cart.",

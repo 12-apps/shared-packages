@@ -55,8 +55,11 @@ export interface DiscountWriteInput {
    * The WEEKLY schedule inside that window (FUT-996), or null for "always".
    * Validated here rather than trusted: it is stored as JSON, so the database
    * cannot check its shape and this is the only gate in front of it.
+   *
+   * Optional so a caller assembling a write input by hand — a test, a script,
+   * an older adopter — does not have to name a field it has no opinion about.
    */
-  schedule: DiscountSchedule | null;
+  schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
@@ -193,7 +196,10 @@ function assertSchedule(
   copy: DiscountsServerCopy,
 ): DiscountSchedule | null {
   const { schedule } = input;
-  if (schedule === null) return null;
+  // `== null` catches BOTH, deliberately: the field is required on the type,
+  // but a caller assembling a write input by hand omits what it does not use,
+  // and "absent" and "explicitly none" are the same promotion.
+  if (schedule == null) return null;
   if (!isUsableSchedule(schedule)) throw invalid("schedule", copy.invalidSchedule);
   return { windows: schedule.windows.map((w) => ({ days: [...w.days], from: w.from, to: w.to })) };
 }

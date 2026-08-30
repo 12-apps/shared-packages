@@ -66,3 +66,31 @@ export function resolveLocalClock(instant: Date, timeZone: string): LocalClock |
     return null;
   }
 }
+
+/**
+ * The zone as a PERSON would read it, in their own language — "Horário Padrão
+ * de Brasília", "Brasilia Standard Time".
+ *
+ * Derived rather than configured, and that is the point: a host passing a
+ * display name would be passing COPY, which this repo's own rules say must
+ * ship bilingual. `Intl` already knows every zone's name in every locale, so
+ * asking it is both less to maintain and correct in languages nobody here
+ * speaks.
+ *
+ * Falls back to the IANA id with its separators softened ("America/Sao_Paulo"
+ * → "Sao Paulo"), which is wrong-looking but never blank — a caption is not
+ * worth an exception for.
+ */
+export function timeZoneLabel(timeZone: string, locale: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat(locale, {
+      timeZone,
+      timeZoneName: "longGeneric",
+    }).formatToParts(new Date());
+    const name = parts.find((part) => part.type === "timeZoneName")?.value;
+    if (name !== undefined && name !== "") return name;
+  } catch {
+    // fall through
+  }
+  return (timeZone.split("/").pop() ?? timeZone).replace(/_/g, " ");
+}

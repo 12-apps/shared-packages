@@ -112,7 +112,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     weekend: "Sábado e domingo",
     summary: "{days}, das {from} às {to}.",
     summaryOvernight: "{days}, das {from} às {to} do dia seguinte.",
-    timezoneNote: "Horário de {timezone}.",
+    timezoneNote: "Fuso horário: {timezone}.",
     guaranteeNote: "O preço é garantido pelo horário em que o item entrou no carrinho.",
     orderScopeNote:
       "Vale para pedidos fechados dentro do horário. Diferente das outras abrangências, que valem pelo horário em que o item entrou no carrinho.",

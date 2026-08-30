@@ -2,6 +2,8 @@
 
 import { useMemo, type ComponentType, type JSX } from "react";
 
+import { timeZoneLabel } from "../timezone";
+
 import { createDiscountsApiClient, type DiscountsApiClient } from "./api";
 import { missingWebCopy, type DiscountsWebCopy } from "./copy";
 import { DiscountForm, type DiscountFormProps } from "./discount-form";
@@ -138,7 +140,12 @@ function assertConfig(config: DiscountsWebConfig): void {
 
 export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   assertConfig(config);
-  const { copy, onError, currencyField, breadcrumb, timezoneLabel, timezone } = config;
+  const { copy, onError, currencyField, breadcrumb, timezone } = config;
+  // DERIVED from the zone unless the host insists otherwise. A host naming the
+  // zone in words would be shipping copy, which has to be bilingual; `Intl`
+  // already knows it in every locale.
+  const timezoneLabel =
+    config.timezoneLabel ?? (timezone ? timeZoneLabel(timezone, config.locale) : undefined);
   const formatters = createFormatters(config.locale, config.currency);
   const transport = config.transport ?? httpDiscountsTransport(copy.form.saveFailed);
   const api = createDiscountsApiClient(config.apiBase, transport, formatters);
