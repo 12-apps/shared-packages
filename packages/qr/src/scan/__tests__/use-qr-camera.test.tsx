@@ -5,49 +5,56 @@
  * scanner that leaves the lens on. Nothing crashes when that happens and no
  * test notices unless it is written — the only symptom is the indicator light
  * on somebody's phone staying lit after they closed the sheet.
+ *
+ * The hook's state is read off the DOM rather than collected into an array by
+ * a callback. Both would work; the array is shared mutable state between
+ * assertions, which is what the flakiness lane refuses and what makes a suite's
+ * results depend on the order it ran in.
  */
-import { act, render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useQrCamera, type CameraFault } from "../use-qr-camera";
+import { useQrCamera } from "../use-qr-camera";
 
-interface Harness {
-  stopped: number;
-  stream: MediaStream;
+/** A stream whose tracks count their own stops, so teardown is observable. */
+function fakeStream(): { stopped: number; stream: MediaStream } {
+  const state = { stopped: 0, stream: null as unknown as MediaStream };
+  const track = { stop: () => (state.stopped += 1) } as unknown as MediaStreamTrack;
+  state.stream = { getTracks: () => [track] } as unknown as MediaStream;
+  return state;
 }
 
-function fakeStream(): Harness {
-  const harness: Harness = { stopped: 0, stream: null as unknown as MediaStream };
-  const track = { stop: () => (harness.stopped += 1) } as unknown as MediaStreamTrack;
-  harness.stream = { getTracks: () => [track] } as unknown as MediaStream;
-  return harness;
-}
-
-/** A component that only exists to run the hook and record what it returned. */
-function Probe({
-  active,
-  onText,
-  onState,
-}: {
-  active: boolean;
-  onText: (text: string) => void;
-  onState: (state: { fault: CameraFault | null; live: boolean }) => void;
-}) {
+/**
+ * A component that exists only to run the hook and publish what it returned.
+ *
+ * The fault and live flag ride on the element as attributes so every assertion
+ * reads the CURRENT render, through `waitFor`, instead of a log of past ones.
+ */
+function Probe({ active = true, onText = () => {} }: { active?: boolean; onText?: (t: string) => void }) {
   const { videoRef, fault, live } = useQrCamera(active, onText);
-  onState({ fault, live });
-  return <video ref={videoRef} data-testid="viewfinder" />;
+  return (
+    <video
+      ref={videoRef}
+      data-testid="viewfinder"
+      data-fault={fault ?? "none"}
+      data-live={live ? "yes" : "no"}
+    />
+  );
 }
 
-let harness: Harness;
+/** The current render of the probe — read fresh, never captured. */
+const viewfinder = () => screen.getByTestId("viewfinder");
+
+let camera: ReturnType<typeof fakeStream>;
 
 beforeEach(() => {
-  harness = fakeStream();
+  camera = fakeStream();
   vi.stubGlobal("isSecureContext", true);
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
-    value: { getUserMedia: vi.fn(async () => harness.stream) },
+    value: { getUserMedia: vi.fn(async () => camera.stream) },
   });
-  // jsdom gives a <video> no dimensions and no play(); the hook reads both.
+  // jsdom gives a <video> no play(); the hook awaits one.
   Object.defineProperty(HTMLVideoElement.prototype, "play", {
     configurable: true,
     value: vi.fn(async () => undefined),
@@ -59,19 +66,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderProbe(active = true, onText: (text: string) => void = () => {}) {
-  const states: { fault: CameraFault | null; live: boolean }[] = [];
-  const view = render(
-    <Probe active={active} onText={onText} onState={(state) => states.push(state)} />,
-  );
-  return { view, states, last: () => states[states.length - 1]! };
-}
-
 describe("opening the camera", () => {
   it("asks for the rear camera and goes live", async () => {
-    const probe = renderProbe();
-    await waitFor(() => expect(probe.last().live).toBe(true));
-    expect(probe.last().fault).toBeNull();
+    render(<Probe />);
+    await waitFor(() => expect(viewfinder().getAttribute("data-live")).toBe("yes"));
+    expect(viewfinder().getAttribute("data-fault")).toBe("none");
     const ask = navigator.mediaDevices.getUserMedia as unknown as ReturnType<typeof vi.fn>;
     // `facingMode`, never a device id: the code is out in front, not the face.
     expect(ask.mock.calls[0]?.[0]).toMatchObject({
@@ -81,10 +80,9 @@ describe("opening the camera", () => {
   });
 
   it("does not touch the camera while inactive", async () => {
-    const probe = renderProbe(false);
-    await act(async () => undefined);
+    render(<Probe active={false} />);
+    await waitFor(() => expect(viewfinder().getAttribute("data-live")).toBe("no"));
     expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
-    expect(probe.last().live).toBe(false);
   });
 });
 
@@ -93,15 +91,15 @@ describe("why there is no picture", () => {
     // getUserMedia rejects with a PERMISSION error on plain http, which would
     // tell somebody they blocked a camera they were never offered.
     vi.stubGlobal("isSecureContext", false);
-    const probe = renderProbe();
-    await waitFor(() => expect(probe.last().fault).toBe("unsupported"));
+    render(<Probe />);
+    await waitFor(() => expect(viewfinder().getAttribute("data-fault")).toBe("unsupported"));
     expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
   });
 
   it("reports `unsupported` where the API is absent entirely", async () => {
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: undefined });
-    const probe = renderProbe();
-    await waitFor(() => expect(probe.last().fault).toBe("unsupported"));
+    render(<Probe />);
+    await waitFor(() => expect(viewfinder().getAttribute("data-fault")).toBe("unsupported"));
   });
 
   it.each([
@@ -113,8 +111,8 @@ describe("why there is no picture", () => {
     ["AbortError", "busy"],
     ["SomethingElse", "failed"],
   ])("maps %s to %s", async (name, expected) => {
-    // Five values, not five sentences: each one is a different thing to DO
-    // about it, which is why this is not a boolean.
+    // Five values, not five sentences: each is a different thing to DO about
+    // it, which is why this is not a boolean.
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: {
@@ -123,54 +121,51 @@ describe("why there is no picture", () => {
         }),
       },
     });
-    const probe = renderProbe();
-    await waitFor(() => expect(probe.last().fault).toBe(expected));
-    expect(probe.last().live).toBe(false);
+    render(<Probe />);
+    await waitFor(() => expect(viewfinder().getAttribute("data-fault")).toBe(expected));
+    expect(viewfinder().getAttribute("data-live")).toBe("no");
   });
 });
 
 describe("turning the lens off", () => {
   it("stops every track on unmount", async () => {
-    const probe = renderProbe();
-    await waitFor(() => expect(probe.last().live).toBe(true));
-    probe.view.unmount();
-    expect(harness.stopped).toBe(1);
+    const mounted = render(<Probe />);
+    await waitFor(() => expect(viewfinder().getAttribute("data-live")).toBe("yes"));
+    mounted.unmount();
+    expect(camera.stopped).toBe(1);
   });
 
   it("stops the stream that arrives AFTER unmount", async () => {
     // The subtle one: somebody closes the sheet while the permission prompt is
     // still up. The stream still arrives, and without the guard the lens stays
     // on with nothing on screen showing it.
-    let grant: (stream: MediaStream) => void = () => {};
+    //
+    // The resolver goes onto a container's property rather than a closed-over
+    // `let` — reassigning a binding from inside a stub is what the flakiness
+    // lane's `no-global-state-mutation` rule exists to catch.
+    const prompt: { grant?: (stream: MediaStream) => void } = {};
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: {
         getUserMedia: vi.fn(
           () =>
             new Promise<MediaStream>((resolve) => {
-              grant = resolve;
+              prompt.grant = resolve;
             }),
         ),
       },
     });
-    const probe = renderProbe();
-    await act(async () => undefined);
-    probe.view.unmount();
-    await act(async () => {
-      grant(harness.stream);
-      await Promise.resolve();
-    });
-    await waitFor(() => expect(harness.stopped).toBe(1));
+    const mounted = render(<Probe />);
+    await waitFor(() => expect(prompt.grant).toBeTypeOf("function"));
+    mounted.unmount();
+    prompt.grant?.(camera.stream);
+    await waitFor(() => expect(camera.stopped).toBe(1));
   });
 
   it("stops the stream when `active` goes false without unmounting", async () => {
-    const noop = () => {};
-    const states: { fault: CameraFault | null; live: boolean }[] = [];
-    const view = render(
-      <Probe active onText={noop} onState={(state) => states.push(state)} />,
-    );
-    await waitFor(() => expect(states[states.length - 1]!.live).toBe(true));
-    view.rerender(<Probe active={false} onText={noop} onState={(s) => states.push(s)} />);
-    expect(harness.stopped).toBe(1);
+    const mounted = render(<Probe active />);
+    await waitFor(() => expect(viewfinder().getAttribute("data-live")).toBe("yes"));
+    mounted.rerender(<Probe active={false} />);
+    await waitFor(() => expect(camera.stopped).toBe(1));
   });
 });
