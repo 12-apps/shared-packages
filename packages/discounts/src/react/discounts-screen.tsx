@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type JSX } from "react";
+import { useState, type JSX } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import AddIcon from "@mui/icons-material/Add";
@@ -32,13 +32,13 @@ import { DiscountForm } from "./discount-form";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
 import { DiscountListCard, discountCells } from "./discount-list-card";
 import type { DiscountsFormatters } from "./format";
-import { toListItem, type DiscountListItem } from "./row";
+import { useDiscountRows, type DiscountListItem } from "./row";
+import { toMenuBinding, usePagedServer } from "./screen-bindings";
 import {
   discountColumns,
   discountExportColumns,
   discountFilters,
   discountsAppliedState,
-  discountsQueryToParams,
   discountsSearch,
 } from "./table-config";
 import { useDiscountsData } from "./use-discounts-data";
@@ -55,6 +55,10 @@ export interface DiscountsScreenProps {
   api: DiscountsApiClient;
   copy: DiscountsWebCopy;
   formatters: DiscountsFormatters;
+  /** The store's IANA zone, for the grid's live "ativa agora" dot (FUT-996). */
+  timezone?: string;
+  /** The store's timezone as a person says it, for the schedule editor. */
+  timezoneLabel?: string;
   currencyField: CurrencyFieldComponent;
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */
@@ -142,7 +146,7 @@ function HeaderControls({
 }
 
 /** Everything the row menu, both cards and the edit form are bound to. */
-type MenuBinding = Omit<Parameters<typeof DiscountActionsMenu>[0], "row">;
+export type MenuBinding = Omit<Parameters<typeof DiscountActionsMenu>[0], "row">;
 
 /**
  * The grid, split from the page container so neither crosses the size gate.
@@ -308,21 +312,14 @@ function ScreenBody({
 }
 
 export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
-  const { api, copy, formatters, currencyField, onError, breadcrumb } = props;
+  const { api, copy, formatters, onError, breadcrumb, timezone } = props;
   const [searchParams] = useSearchParams();
   const data = useDiscountsData(api, discountsSearch(searchParams), onError);
   const [createOpen, setCreateOpen] = useState(false);
   const [visibleRows, setVisibleRows] = useState<DiscountListItem[]>([]);
   const bulkDelete = useBulkDelete(api, copy, data.refresh, onError);
 
-  // ONE instant for the whole render: two rows judged against two different
-  // "now"s could disagree about which of them is still running.
-  const rows = useMemo(() => {
-    const now = new Date();
-    return (data.page?.data ?? []).map((record) =>
-      toListItem(record, formatters, copy, now),
-    );
-  }, [data.page, formatters, copy]);
+  const rows = useDiscountRows(data.page?.data, formatters, copy, timezone);
 
   // Seeded ONCE from the URL. Re-applying it on every render would wipe the
   // operator's column-visibility choices each time the query synced back.
@@ -330,21 +327,8 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
     discountsAppliedState(searchParams, copy),
   );
 
-  const server = useServerDataViews({
-    totalCount: data.page?.pagination.total ?? 0,
-    page: data.page?.pagination.page ?? 1,
-    pageSize: data.page?.pagination.pageSize ?? 20,
-    toParams: discountsQueryToParams,
-  });
-
-  const menu: MenuBinding = {
-    api,
-    copy,
-    formatters,
-    currencyField,
-    groups: data.groups,
-    onError,
-  };
+  const server = usePagedServer(data.page?.pagination);
+  const menu = toMenuBinding(props, data.groups);
 
   if (data.loading) return <LoadingState dataTestId="discounts-loading" />;
   if (data.error !== null) {

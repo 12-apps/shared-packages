@@ -4,6 +4,7 @@ import type {
   DiscountTrigger,
   DiscountType,
 } from "./kinds";
+import type { DiscountSchedule, LocalClock } from "./schedule";
 
 /**
  * The evaluator's type contract (FUT-245). Types only, no logic — the shape
@@ -100,6 +101,16 @@ export interface DiscountRule {
   startsAt: Date | null;
   /** EXCLUSIVE upper bound of the active window; null = never closes. */
   endsAt: Date | null;
+  /**
+   * The WEEKLY schedule INSIDE that window (FUT-996) — "toda sexta, das 16:00
+   * às 20:00". Null or omitted = always, within `[startsAt, endsAt)`, which is
+   * every rule that predates the feature.
+   *
+   * OPTIONAL for the reason `comboRequirements` is: a schedule is a capability
+   * a host opts into, so requiring the field would have made recurring
+   * promotions a breaking change for every adopter that does not want them.
+   */
+  schedule?: DiscountSchedule | null;
   /** Minimum PRE-discount subtotal in cents; null = no threshold. */
   minSubtotalCents: number | null;
   /** Global redemption cap; null = uncapped. */
@@ -137,6 +148,20 @@ export interface DiscountCartLine {
   quantity: number;
   /** Composed unit price in integer cents. */
   unitPriceCents: number;
+  /**
+   * WHEN this line was committed, as the store's own wall clock (FUT-996).
+   *
+   * The instant a scheduled promotion is screened against — never the instant
+   * of payment. For a cart line that is `cart_items.created_at`; for a comanda
+   * line it is the kitchen-send time at which its price was already frozen.
+   * That is what makes "the beer ordered at 19:55 was ordered during happy
+   * hour" true however long the table takes to settle.
+   *
+   * Optional, and `null` means "the host could not resolve one" — which makes
+   * a scheduled rule cover the line rather than skip it. See `scheduleCovers`
+   * for why the unknown fails in that direction.
+   */
+  committedLocal?: LocalClock | null;
 }
 
 export interface DiscountEvaluationInput {
@@ -147,6 +172,17 @@ export interface DiscountEvaluationInput {
   couponCode: string | null;
   /** Evaluation instant. Injected — the evaluator never calls `new Date()`. */
   now: Date;
+  /**
+   * `now` as the STORE's wall clock (FUT-996) — what an `ORDER`-scoped
+   * scheduled rule is screened against.
+   *
+   * `ORDER` scope is the one place a schedule cannot be answered per line: an
+   * order-wide discount names no line, and the order itself comes into
+   * existence at checkout. Every other scope screens each line against its own
+   * `committedLocal`. That asymmetry is deliberate and is surfaced to the
+   * operator in the form rather than left invisible.
+   */
+  localNow?: LocalClock | null;
 }
 
 /** Why a discount the buyer asked for was not applied. */

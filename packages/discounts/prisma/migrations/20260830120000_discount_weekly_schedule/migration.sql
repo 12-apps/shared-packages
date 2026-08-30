@@ -1,0 +1,40 @@
+-- @12-apps/discounts: the WEEKLY schedule (FUT-996).
+--
+-- "Toda sexta, das 16:00 às 20:00" — a recurring window INSIDE the campaign
+-- `[starts_at, ends_at)`, which until now was the only scheduling a rule had.
+--
+-- ── PURELY ADDITIVE, AND THAT IS THE POINT ────────────────────────────────
+-- One nullable column, no backfill, no CHECK to widen, nothing dropped. NULL
+-- means "always, within the campaign window", which is exactly what every
+-- existing row already means — so this migration cannot change the price of
+-- anything, and the release carrying it needs none of the expand/contract
+-- ceremony a destructive DDL would (see the host's CLAUDE.md on why a
+-- `DROP COLUMN` takes production down for the length of a healthcheck).
+--
+-- Replay-safe like its predecessor: `IF NOT EXISTS` throughout.
+--
+-- ── WHY JSON RATHER THAN A FOURTH TABLE ───────────────────────────────────
+-- The recurrence is not SQL-queryable in any useful way. The admin grid's
+-- vigência filter already punts on comparing two nullable timestamps against
+-- `now()` and rides as a separate parameter the store resolves, so a schedule
+-- table would buy queryability that nothing asks for — while adding a third
+-- `include` to `loadDiscountRules`, which is on the storefront's hottest read
+-- (a whole menu page's badge preview walks it once per request).
+--
+-- The trade is stated plainly: the database cannot check this column's SHAPE.
+-- `assertSchedule` in `src/server/validate.ts` is the only gate in front of it,
+-- and the evaluator is deliberately tolerant of a row that got past it — a
+-- malformed window covers NOTHING rather than everything, so the failure mode
+-- of a bad blob is a promotion that does not fire, never a cart priced at zero.
+--
+-- Shape, for a reader with only the database in front of them:
+--
+--   {"windows":[{"days":[4],"from":"16:00","to":"20:00"}]}
+--
+--   * `days`  — Monday-first, 0..6. NOT `Date#getDay()`'s Sunday-first axis.
+--   * `from`/`to` — "HH:MM", 24-hour, in the STORE's timezone, half-open
+--     [from, to) exactly as [starts_at, ends_at) is.
+--   * `to` < `from` means the window runs past midnight (a bar shutting at
+--     02:00), which is the most common happy hour there is.
+
+ALTER TABLE "discounts" ADD COLUMN IF NOT EXISTS "schedule" JSONB;

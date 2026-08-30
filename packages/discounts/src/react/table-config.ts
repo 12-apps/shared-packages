@@ -77,6 +77,21 @@ export function discountColumns(copy: DiscountsWebCopy): DataViewColumn<Discount
     },
     { id: "window", header: copy.screen.columns.window, accessor: (row) => row.windowLabel },
     {
+      // The live answer to "is my happy hour on right now?" (FUT-996).
+      //
+      // Its own column rather than a widening of the vigência pill beside it:
+      // those three values are resolved by a store-side SQL predicate, and a
+      // recurrence predicate is not expressible there. This one is computed in
+      // the browser from the store's timezone, so it can be SHOWN but not
+      // FILTERED — and a cell is honest about that in a way a pill would not be.
+      //
+      // Blank, not "Não", for a rule with no schedule: there is nothing
+      // intermittent to report, and a column of "Não" would read as a fault.
+      id: "activeNow",
+      header: copy.schedule.activeNow,
+      accessor: (row) => (row.activeNow ? copy.schedule.activeNow : EMPTY),
+    },
+    {
       id: "usageCount",
       header: copy.screen.columns.usageCount,
       accessor: (row) => String(row.usageCount),

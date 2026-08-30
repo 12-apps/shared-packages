@@ -34,6 +34,8 @@ export interface DiscountsServerCopy {
   readonly invalidDate: string;
   /** 422 — the window closes at or before it opens, so it is never open. */
   readonly endsBeforeStarts: string;
+  /** The weekly schedule is not one the engine can act on (FUT-996). */
+  readonly invalidSchedule: string;
   /** 422 — a minimum-basket threshold of zero or less. */
   readonly invalidMinSubtotal: string;
   /** 422 — a global redemption cap of zero or less. */
@@ -79,6 +81,7 @@ const COPY_KEYS: readonly (keyof DiscountsServerCopy)[] = [
   "itemTargetRequired",
   "invalidDate",
   "endsBeforeStarts",
+  "invalidSchedule",
   "invalidMinSubtotal",
   "invalidUsageLimit",
   "invalidPerBuyerLimit",

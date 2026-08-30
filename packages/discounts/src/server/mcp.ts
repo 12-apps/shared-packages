@@ -17,6 +17,7 @@ import {
   MAX_COMBO_SLOT_QUANTITY,
   MAX_PERCENT_OFF_BP,
 } from "../engine/kinds";
+import { MAX_SCHEDULE_WINDOWS } from "../engine/schedule";
 import { discountSearchConfig } from "./search";
 
 /**
@@ -67,6 +68,35 @@ export const comboRequirementSchema = z.object({
 });
 
 /**
+ * A `HH:MM` clock time, 24-hour — the schedule's own wire format (FUT-996).
+ *
+ * A string rather than minutes-since-midnight because it is what an operator
+ * typed and what a card reads back; converting at the edge would mean two
+ * representations of one fact and a conversion to get wrong in each direction.
+ */
+const clockTimeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM, 24-hour");
+
+/**
+ * One "these days, these hours" row. `days` is **Monday-first, 0..6** — the
+ * same axis every hours surface uses, and NOT `Date#getDay()`'s Sunday-first.
+ *
+ * `to` earlier than `from` is legal and means the window runs past midnight: a
+ * bar shutting at 02:00 is the most common happy hour there is.
+ */
+const scheduleWindowSchema = z.object({
+  days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  from: clockTimeSchema,
+  to: clockTimeSchema,
+});
+
+/** The weekly schedule. Null = always, within the campaign window. */
+const discountScheduleSchema = z.object({
+  windows: z.array(scheduleWindowSchema).min(1).max(MAX_SCHEDULE_WINDOWS),
+});
+
+/**
  * A discount as the API returns it (JSON-serialized: dates become ISO
  * strings). The two join tables are flattened into id arrays.
  */
@@ -93,6 +123,7 @@ export const discountSchema = z.object({
   code: z.string().nullable(),
   startsAt: z.string().nullable(),
   endsAt: z.string().nullable(),
+  schedule: discountScheduleSchema.nullable().optional(),
   minSubtotalCents: z.number().int().nullable(),
   usageLimit: z.number().int().nullable(),
   perBuyerLimit: z.number().int().nullable(),
@@ -150,6 +181,7 @@ const discountWriteShape = {
   code: z.string().min(1).max(64).nullable().optional(),
   startsAt: calendarDateSchema.nullable().optional(),
   endsAt: calendarDateSchema.nullable().optional(),
+  schedule: discountScheduleSchema.nullable().optional(),
   minSubtotalCents: z.number().int().positive().nullable().optional(),
   usageLimit: z.number().int().positive().nullable().optional(),
   perBuyerLimit: z.number().int().positive().nullable().optional(),

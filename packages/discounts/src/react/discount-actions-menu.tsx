@@ -47,6 +47,8 @@ export interface DiscountActionsMenuProps {
    */
   groups?: readonly WireTargetGroup[];
   onError: (error: unknown, context: string) => void;
+  /** The store's timezone as a person says it, for the schedule editor. */
+  timezoneLabel?: string;
 }
 
 /**
@@ -85,6 +87,7 @@ export function DiscountActionsMenu({
   currencyField,
   groups,
   onError,
+  timezoneLabel,
 }: DiscountActionsMenuProps): JSX.Element {
   const { onRefresh } = useCardActions();
   const [editOpen, setEditOpen] = useState(false);
@@ -143,6 +146,7 @@ export function DiscountActionsMenu({
                 groups={groups}
                 editing={row.record}
                 onError={onError}
+                {...(timezoneLabel ? { timezoneLabel } : {})}
                 onSaved={() => {
                   setEditOpen(false);
                   onRefresh();

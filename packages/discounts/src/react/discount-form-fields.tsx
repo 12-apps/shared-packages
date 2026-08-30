@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 
+import { FormControl, FormLabel } from "@12-apps/ui/form/Form";
 import { Switch } from "@12-apps/ui/form/Switch";
 import { Fields, useFormContext } from "@12-apps/ui/form/total-form";
 import { Box } from "@12-apps/ui/mui/Box";
@@ -9,9 +10,11 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { DISCOUNT_TRIGGERS } from "../engine/kinds";
+import type { DiscountSchedule } from "../engine/schedule";
 
 import type { DiscountsWebCopy } from "./copy";
 import { COMBO_REWARDS, isComboKind, SELECTABLE_DISCOUNT_SCOPES, type DiscountKind } from "./form-kind";
+import { ScheduleBuilder } from "./schedule-builder";
 
 /**
  * The form's inputs, split from the form itself for the 400-line file gate —
@@ -249,14 +252,95 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
   );
 }
 
-/** The active window. Both sides optional; the end date is EXCLUSIVE. */
-export function WindowFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
+/**
+ * "Quando vale" — the campaign PERIOD, and the weekly schedule inside it
+ * (FUT-996).
+ *
+ * The two are one section because they answer one question in two halves, and
+ * an operator reads them together: "de setembro a novembro" and "toda sexta,
+ * das 16 às 20" describe the same promotion. They were a bare pair of date
+ * inputs before there was a second half to pair with.
+ *
+ * Repetition defaults to "Sempre", so every rule that predates this and every
+ * simple new one is untouched — an operator creating a plain 10%-off never sees
+ * the builder. That default is what keeps the screen from getting harder for
+ * the promotions nobody schedules.
+ */
+export function WindowFields({
+  copy,
+  schedule,
+  scheduleEnabled,
+  timezoneLabel,
+  onScheduleChange,
+  onScheduleEnabledChange,
+}: {
+  copy: DiscountsWebCopy;
+  schedule: DiscountSchedule;
+  scheduleEnabled: boolean;
+  timezoneLabel: string | null;
+  onScheduleChange: (next: DiscountSchedule) => void;
+  onScheduleEnabledChange: (next: boolean) => void;
+}): JSX.Element {
   return (
-    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-      <Fields.TextField name="startsAt" label={copy.form.startsAt} type="date" />
-      <Fields.TextField name="endsAt" label={copy.form.endsAt} type="date" />
-    </Box>
+    <Stack spacing={1.5}>
+      <Text variant="heading">{copy.schedule.sectionTitle}</Text>
+      <Stack spacing={0.5}>
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+          <Fields.TextField name="startsAt" label={copy.form.startsAt} type="date" />
+          <Fields.TextField name="endsAt" label={copy.form.endsAt} type="date" />
+        </Box>
+        <Text variant="caption">{copy.schedule.periodHint}</Text>
+      </Stack>
+      <FormControl>
+        <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>
+        <Stack spacing={0.5}>
+          {[
+            [false, copy.schedule.always] as const,
+            [true, copy.schedule.specific] as const,
+          ].map(([value, label]) => (
+            <label key={label} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="radio"
+                name="discount-repetition"
+                checked={scheduleEnabled === value}
+                onChange={() => onScheduleEnabledChange(value)}
+                data-testid={value ? "repetition-specific" : "repetition-always"}
+              />
+              <Text variant="body">{label}</Text>
+            </label>
+          ))}
+        </Stack>
+      </FormControl>
+      {scheduleEnabled && (
+        <>
+          <ScheduleBuilder
+            schedule={schedule}
+            copy={copy}
+            timezone={timezoneLabel ?? ""}
+            onChange={onScheduleChange}
+          />
+          <OrderScopeScheduleNote copy={copy} />
+        </>
+      )}
+    </Stack>
   );
+}
+
+/**
+ * The ORDER-scope asymmetry, at the point of confusion.
+ *
+ * An order-wide rule has no line to anchor a schedule to, so it is judged at
+ * CHECKOUT while every other scope is judged per line — which means a cart
+ * straddling 20:00 behaves differently under "10% em tudo" than under "10% em
+ * cervejas". That is a real difference and an invisible one, so it is said
+ * here, only for the combination that has it, rather than left in a document
+ * nobody opens while filling in a form.
+ */
+function OrderScopeScheduleNote({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+  const { values } = useFormContext();
+  const kind = values.kind ?? "PERCENTAGE";
+  if (isComboKind(kind) || values.scope !== "ORDER") return null;
+  return <Text variant="caption">{copy.schedule.orderScopeNote}</Text>;
 }
 
 /** The minimum basket and the two redemption caps. */

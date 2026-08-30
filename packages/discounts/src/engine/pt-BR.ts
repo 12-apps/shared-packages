@@ -10,6 +10,13 @@ import { MIN_SUBTOTAL_TOKEN, type DiscountRejectionCopy } from "./rejection-copy
  * expired all read the same, because the difference only leaks how the
  * merchant schedules promotions and the buyer could not act on it either way.
  *
+ * `OUT_OF_SCHEDULE` is the SECOND place it stops, and by the same test.
+ * "Inválido ou expirado" sends a buyer away from a shop that will sell them
+ * this in an hour; a promotion that runs on Friday afternoons is one they can
+ * simply come back for. It stays vague about WHEN on purpose — the hours are on
+ * the card, and a rejection message that recited a merchant's whole schedule
+ * would be both long and a leak.
+ *
  * `COMBO_NOT_MATCHED` is the one place that coarsening stops, and for the same
  * test read the other way: a buyer one soda short of the combo can finish it,
  * so telling them WHICH kind of failure this was is the difference between a
@@ -22,6 +29,7 @@ export const PT_BR_DISCOUNT_REJECTION_COPY: DiscountRejectionCopy = {
   INACTIVE: "Cupom inválido ou expirado.",
   NOT_STARTED: "Cupom inválido ou expirado.",
   EXPIRED: "Cupom inválido ou expirado.",
+  OUT_OF_SCHEDULE: "Esta promoção não está valendo agora.",
   MIN_SUBTOTAL_NOT_MET: `Este cupom exige um pedido mínimo de ${MIN_SUBTOTAL_TOKEN}.`,
   USAGE_LIMIT_REACHED: "Este cupom já atingiu o limite de uso.",
   BUYER_LIMIT_REACHED: "Você já usou este cupom.",

@@ -26,6 +26,7 @@ import packageJson from "../../../package.json";
 import { DISCOUNTS_PERMISSIONS } from "../../server/contribution";
 import { DISCOUNTS_MCP_TOOLS } from "../../server/mcp";
 import { recordingLogger } from "../../server/__tests__/recording-logger";
+import { PT_BR_DISCOUNTS_SERVER_COPY } from "../../server/pt-BR";
 import { createApiDiscounts } from "../../server/routes";
 import { discountsManifest } from "../index";
 import { discountsServerManifest } from "../server";
@@ -33,30 +34,20 @@ import { discountsWebManifest } from "../web";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../../react/pt-BR";
 
 /** Every copy key, filled with its own name — the sentences are not the subject here. */
+/**
+ * Every server-copy key, each mapped to its own name so a failure names the
+ * sentence that is missing.
+ *
+ * DERIVED from the pt-BR pack rather than listed. It used to be a literal array
+ * of 21 strings, which is the hand-kept list this repo keeps deleting: adding
+ * `invalidSchedule` (FUT-996) to the contract turned this file red in three
+ * places at once, and the fix a hurried reader reaches for is to paste one more
+ * string. A pack is complete BY TYPE — `DiscountsServerCopy` is a closed record
+ * — so deriving the fixture from one makes it impossible for this to fall
+ * behind the contract again.
+ */
 const FULL_COPY = Object.fromEntries(
-  [
-    "invalidQuery",
-    "notFound",
-    "invalidPercent",
-    "invalidAmount",
-    "codeRequired",
-    "categoryTargetRequired",
-    "itemTargetRequired",
-    "invalidDate",
-    "endsBeforeStarts",
-    "invalidMinSubtotal",
-    "invalidUsageLimit",
-    "invalidPerBuyerLimit",
-    "comboScopeRequired",
-    "invalidComboSlots",
-    "comboTargetRequired",
-    "invalidComboQuantity",
-    "invalidBundlePrice",
-    "invalidFreeUnits",
-    "freeUnitsExceedCombo",
-    "invalidMaxComboApplications",
-    "foreignTarget",
-  ].map((key) => [key, key]),
+  Object.keys(PT_BR_DISCOUNTS_SERVER_COPY).map((key) => [key, key]),
 ) as never;
 
 describe("the shared manifest", () => {

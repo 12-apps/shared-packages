@@ -5,6 +5,7 @@ import {
   type DiscountTrigger,
   type DiscountType,
 } from "../engine/kinds";
+import { isUsableSchedule, type DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 import type { DiscountsServerCopy } from "./copy";
 import { comboRequirementsForScope, toComboColumns } from "./validate-combo";
@@ -50,6 +51,15 @@ export interface DiscountWriteInput {
   /** Calendar dates (`YYYY-MM-DD`) as the form sends them, or null. */
   startsAt: string | null;
   endsAt: string | null;
+  /**
+   * The WEEKLY schedule inside that window (FUT-996), or null for "always".
+   * Validated here rather than trusted: it is stored as JSON, so the database
+   * cannot check its shape and this is the only gate in front of it.
+   *
+   * Optional so a caller assembling a write input by hand — a test, a script,
+   * an older adopter — does not have to name a field it has no opinion about.
+   */
+  schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
@@ -168,6 +178,32 @@ function assertWindow(
   return { startsAt, endsAt };
 }
 
+/**
+ * The weekly schedule, or null (FUT-996).
+ *
+ * Every failure here is ONE message rather than a per-window field error,
+ * because the operator does not edit this as fields: they edit a row of day
+ * chips and two clocks, and "a linha 2 não tem dias" points at something the
+ * form can highlight while `schedule.windows[1].days` does not.
+ *
+ * A `to` earlier than `from` is NOT an error — it is a bar shutting at 02:00,
+ * which is the most common happy hour there is. The only refusals are the ones
+ * that cannot mean anything: no windows at all, a row naming no day, a day off
+ * the Monday-first axis, a malformed clock, and a zero-length window.
+ */
+function assertSchedule(
+  input: DiscountWriteInput,
+  copy: DiscountsServerCopy,
+): DiscountSchedule | null {
+  const { schedule } = input;
+  // `== null` catches BOTH, deliberately: the field is required on the type,
+  // but a caller assembling a write input by hand omits what it does not use,
+  // and "absent" and "explicitly none" are the same promotion.
+  if (schedule == null) return null;
+  if (!isUsableSchedule(schedule)) throw invalid("schedule", copy.invalidSchedule);
+  return { windows: schedule.windows.map((w) => ({ days: [...w.days], from: w.from, to: w.to })) };
+}
+
 /** A cap of zero is not a cap, it is a discount that can never be used. */
 function assertPositiveOrNull(value: number | null, field: string, message: string): void {
   if (value === null) return;
@@ -194,6 +230,8 @@ export interface DiscountScalars {
   code: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
+  /** The weekly schedule, or null. Persisted as a JSON column. */
+  schedule: DiscountSchedule | null;
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
@@ -233,6 +271,7 @@ export function toDiscountScalars(
   const code = assertTrigger(input, copy);
   assertTargets(input, copy);
   const { startsAt, endsAt } = assertWindow(input, copy);
+  const schedule = assertSchedule(input, copy);
   assertLimits(input, copy);
   const combo = toComboColumns(input, copy);
 
@@ -249,6 +288,7 @@ export function toDiscountScalars(
     code,
     startsAt,
     endsAt,
+    schedule,
     minSubtotalCents: input.minSubtotalCents,
     usageLimit: input.usageLimit,
     perBuyerLimit: input.perBuyerLimit,
@@ -277,6 +317,8 @@ export interface DiscountWriteBody {
   code?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
+  /** The weekly schedule, or null/omitted for "always" (FUT-996). */
+  schedule?: DiscountSchedule | null;
   minSubtotalCents?: number | null;
   usageLimit?: number | null;
   perBuyerLimit?: number | null;
@@ -311,6 +353,7 @@ export function toDiscountWriteInput(body: DiscountWriteBody): DiscountWriteInpu
     code: orNull(body.code),
     startsAt: orNull(body.startsAt),
     endsAt: orNull(body.endsAt),
+    schedule: orNull(body.schedule),
     minSubtotalCents: orNull(body.minSubtotalCents),
     usageLimit: orNull(body.usageLimit),
     perBuyerLimit: orNull(body.perBuyerLimit),

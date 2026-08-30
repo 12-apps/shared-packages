@@ -1,6 +1,7 @@
 import { maxDiscountableCents, rawAmountCents } from "./allocate";
-import { buildLineIndex, coveredLineIds, screenRule } from "./eligibility";
+import { buildLineIndex, coveredLineIdsNow, screenRule } from "./eligibility";
 import { compareRuleOrder } from "./evaluate-passes";
+import type { LocalClock } from "./schedule";
 import type { DiscountCartLine, DiscountRule } from "./types";
 
 /**
@@ -76,6 +77,19 @@ export interface ItemDiscountPreviewInput {
   rules: readonly DiscountRule[];
   /** Evaluation instant. Injected — this module never calls `new Date()`. */
   now: Date;
+  /**
+   * `now` as the STORE's wall clock (FUT-996), for a rule that only runs on
+   * certain days and hours.
+   *
+   * A badge is a PRICE, and the price a card may promise is the one a shopper
+   * adding this item RIGHT NOW would get — so the preview screens the schedule
+   * against `now` for both halves: it is the evaluation instant and, for
+   * anything added off the back of this card, the commit instant too.
+   *
+   * Omitted or null → scheduled rules badge as if always running, the same
+   * fail-open direction the rest of the schedule takes.
+   */
+  localNow?: LocalClock | null;
 }
 
 /** What a host needs to render the badge: the struck price and its label. */
@@ -113,6 +127,10 @@ function toPreviewLine(input: ItemDiscountPreviewInput): DiscountCartLine {
     categoryPath: input.categoryPath,
     quantity: 1,
     unitPriceCents: input.priceCents,
+    // The shopper is looking at this card NOW, so the instant it would be
+    // committed at is `now` — which is what lets one predicate answer both the
+    // badge and the cart without the card promising an hour it cannot deliver.
+    committedLocal: input.localNow ?? null,
   };
 }
 
@@ -133,14 +151,22 @@ function bestBadgeRule(
   const index = buildLineIndex([line]);
   const scored = input.rules
     .filter(isBadgeable)
-    .filter(
-      (rule) =>
+    .filter((rule) => {
+      const { covered, blockedBySchedule } = coveredLineIdsNow(
+        rule,
+        [line],
+        index,
+        input.localNow,
+      );
+      return (
         screenRule(rule, {
           now: input.now,
           subtotalCents: input.priceCents,
-          hasEligibleItems: coveredLineIds(rule, [line], index).has(PREVIEW_LINE_ID),
-        }) === null,
-    )
+          hasEligibleItems: covered.has(PREVIEW_LINE_ID),
+          blockedBySchedule,
+        }) === null
+      );
+    })
     .map((rule) => ({
       rule,
       amountCents: Math.min(

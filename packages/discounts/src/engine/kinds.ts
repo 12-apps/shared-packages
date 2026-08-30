@@ -135,6 +135,12 @@ export function discountWindowState(
  * exclusive one — a failing AUTOMATIC discount is silently skipped, because a
  * buyer must not be shown promotions they cannot have.
  *
+ * `OUT_OF_SCHEDULE` earns its own key for the same reason `COMBO_NOT_MATCHED`
+ * does, and NOT the one `NOT_STARTED`/`EXPIRED` share. A campaign that has
+ * ended is over; there is nothing the buyer can do. A promotion that runs on
+ * Fridays from 16:00 is one they can simply come back for, and "expirado" would
+ * send them away from a shop that will sell it to them in an hour.
+ *
  * `COMBO_NOT_MATCHED` is deliberately NOT folded into `NO_ELIGIBLE_ITEMS`,
  * even though the two are the same predicate ("R3 covered nothing"), because
  * the rest of this set is coarse for a reason that does not hold here: those
@@ -149,6 +155,7 @@ export const DISCOUNT_REJECTION_REASONS = [
   "INACTIVE",
   "NOT_STARTED",
   "EXPIRED",
+  "OUT_OF_SCHEDULE",
   "MIN_SUBTOTAL_NOT_MET",
   "USAGE_LIMIT_REACHED",
   "BUYER_LIMIT_REACHED",

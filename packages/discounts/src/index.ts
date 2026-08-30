@@ -64,6 +64,38 @@ export type {
 
 export { evaluateDiscounts } from "./engine/evaluate";
 
+/**
+ * The WEEKLY schedule (FUT-996) — "toda sexta, das 16:00 às 20:00".
+ *
+ * `scheduleCovers` and `nextWindowToday` are exported because a host has two
+ * jobs this package cannot do for it: resolve an instant into the STORE's wall
+ * clock (an IANA zone, which this engine deliberately cannot read), and write
+ * the sentence around a window. Both answers must come from the same predicate
+ * the evaluator screens with, or an admin grid's "ativa agora" dot and the
+ * price a shopper is charged will disagree about the same minute.
+ */
+export {
+  isUsableSchedule,
+  MAX_SCHEDULE_WINDOWS,
+  nextWindowToday,
+  scheduleCovers,
+  toMinutes,
+  type DiscountSchedule,
+  type DiscountScheduleWindow,
+  type LocalClock,
+} from "./engine/schedule";
+
+/**
+ * The teaser: what a card may say about a promotion that has not started yet.
+ * A LABEL, never a price — see `./engine/teaser.ts` for why that line is the
+ * same one `comboOffersForItem` already draws.
+ */
+export {
+  upcomingOffersForItem,
+  type ScheduledOfferTeaser,
+  type ScheduledTeaserInput,
+} from "./engine/teaser";
+
 export {
   previewItemDiscount,
   type ItemDiscountPreview,

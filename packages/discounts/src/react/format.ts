@@ -1,6 +1,8 @@
 import { discountWindowState, type DiscountWindowState } from "../engine/kinds";
+import type { DiscountSchedule } from "../engine/schedule";
 
 import { fill, type DiscountsWebCopy } from "./copy";
+import { formatScheduleCell } from "./schedule-summary";
 
 /**
  * Money, percentages and dates — as ONE locale's reader expects them, and as
@@ -103,6 +105,19 @@ export function formatDiscountValue(
  * mean very different things when it is not running yet.
  */
 export function formatWindow(
+  row: { startsAt: string | null; endsAt: string | null; schedule?: DiscountSchedule | null },
+  formatters: DiscountsFormatters,
+  copy: DiscountsWebCopy,
+): string {
+  const period = formatPeriod(row, formatters, copy);
+  const schedule = formatScheduleCell(row.schedule, copy);
+  // Both facts in one cell (FUT-996): the campaign period answers "for how
+  // long", the schedule answers "and when within that", and a cell showing only
+  // the first would say a happy hour runs all day for three months.
+  return schedule === null ? period : fill(copy.schedule.windowWithSchedule, { window: period, schedule });
+}
+
+function formatPeriod(
   row: { startsAt: string | null; endsAt: string | null },
   formatters: DiscountsFormatters,
   copy: DiscountsWebCopy,

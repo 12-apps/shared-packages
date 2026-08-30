@@ -23,6 +23,7 @@ export const EN_US_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
   // would send an operator to type something the endpoint rejects.
   invalidDate: "Invalid date. Use the format YYYY-MM-DD.",
   endsBeforeStarts: "The end date must be after the start date.",
+  invalidSchedule: "Invalid promotion schedule. Pick at least one day, and a start and end time that differ.",
   invalidMinSubtotal: "The minimum order must be greater than zero (or left blank).",
   invalidUsageLimit: "The usage limit must be greater than zero (or left blank).",
   invalidPerBuyerLimit: "The per-customer limit must be greater than zero (or left blank).",

@@ -24,7 +24,8 @@
     "./e2e": {
       "types": "./dist/e2e/index.d.ts",
       "default": "./dist/e2e/index.js"
-    }
+    },
+    "./timezone": "./src/timezone.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.e2e.json",
