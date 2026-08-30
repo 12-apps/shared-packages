@@ -12,6 +12,7 @@ import {
 } from "@12-apps/ui/form/total-form";
 import { Stack } from "@12-apps/ui/mui/Stack";
 
+import type { DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
 import type { DiscountFormPayload, DiscountsApiClient, DiscountWireRecord, WireTargetGroup } from "./api";
@@ -28,6 +29,7 @@ import {
   type CurrencyFieldComponent,
 } from "./discount-form-fields";
 import { DiscountTargetPicker } from "./discount-target-picker";
+import { blankWindow } from "./schedule-builder";
 import { validate, type FormTargets } from "./discount-form-validate";
 import { initialValues, type DiscountFormValues } from "./discount-form-values";
 import { kindOptions, typeAndScopeFor } from "./form-kind";
@@ -61,17 +63,36 @@ function useNonStringState(editing: DiscountWireRecord | null) {
   const [comboRequirements, setComboRequirements] = useState<ComboRequirement[]>(() =>
     editing?.comboRequirements ? [...editing.comboRequirements] : [],
   );
+  // The weekly schedule (FUT-996) is the fourth: a nested structure edited with
+  // chips and clocks, which `total-form`'s strings cannot hold.
+  //
+  // Its ON/OFF is kept SEPARATE from its contents on purpose. An operator who
+  // switches back to "Sempre" and then changes their mind has not lost the days
+  // they picked — the rows survive the toggle and only the SUBMIT reads the
+  // switch. Collapsing the two would make the radio destructive.
+  const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(
+    () => (editing?.schedule?.windows.length ?? 0) > 0,
+  );
+  const [schedule, setSchedule] = useState<DiscountSchedule>(() =>
+    editing?.schedule && editing.schedule.windows.length > 0
+      ? { windows: editing.schedule.windows.map((w) => ({ ...w, days: [...w.days] })) }
+      : { windows: [blankWindow()] },
+  );
   return {
     active,
     stackable,
     categoryIds,
     menuItemIds,
     comboRequirements,
+    scheduleEnabled,
+    schedule,
     setActive,
     setStackable,
     setCategoryIds,
     setMenuItemIds,
     setComboRequirements,
+    setScheduleEnabled,
+    setSchedule,
   };
 }
 
@@ -88,6 +109,8 @@ export interface DiscountFormProps {
   onSaved: () => void;
   /** Where a refused or failed write is reported, beyond the operator's screen. */
   onError: (error: unknown, context: string) => void;
+  /** The store's timezone as a person says it — shown under the clocks. */
+  timezoneLabel?: string;
 }
 
 /**
@@ -110,7 +133,10 @@ function makeSubmit(
       menuItemIds: extra.menuItemIds,
       comboRequirements: extra.comboRequirements,
     };
-    const invalid = validate(values, targets, formatters, copy);
+    const invalid = validate(values, targets, formatters, copy, {
+      enabled: extra.scheduleEnabled,
+      schedule: extra.schedule,
+    });
     if (Object.keys(invalid).length > 0) {
       setFieldErrors(invalid);
       setError(copy.form.reviewFields);
@@ -118,6 +144,9 @@ function makeSubmit(
     }
     const payload: DiscountFormPayload = {
       ...values,
+      // The switch decides whether the rows are sent at all — see the state
+      // hook for why the two are separate.
+      schedule: extra.scheduleEnabled ? extra.schedule : null,
       // The one place the form's question becomes the API's two columns. Every
       // other consumer — the write path, the evaluator, the CHECK constraints —
       // still sees the `type`/`scope` pair it always did.
@@ -173,7 +202,14 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
         />
         <ComboCapField copy={copy} />
         <TriggerFields copy={copy} />
-        <WindowFields copy={copy} />
+        <WindowFields
+          copy={copy}
+          schedule={extra.schedule}
+          scheduleEnabled={extra.scheduleEnabled}
+          timezoneLabel={props.timezoneLabel ?? null}
+          onScheduleChange={extra.setSchedule}
+          onScheduleEnabledChange={extra.setScheduleEnabled}
+        />
         <LimitFields copy={copy} currencyField={currencyField} />
         <DiscountSwitches
           copy={copy}

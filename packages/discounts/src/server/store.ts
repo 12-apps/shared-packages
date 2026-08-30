@@ -1,6 +1,7 @@
 import type { PaginatedResult, ParsedSearchInput } from "@12-apps/shared-helpers/search";
 
 import type { DiscountScope, DiscountTrigger, DiscountType } from "../engine/kinds";
+import type { DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 import type { DiscountScalars, DiscountTargets } from "./validate";
 
@@ -33,6 +34,13 @@ export interface DiscountRecord {
   code: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
+  /**
+   * The WEEKLY schedule (FUT-996), OPTIONAL for the reason the combo columns
+   * below are: a host that has not added the column keeps compiling and keeps
+   * answering the record it always did. Null or absent = always, within the
+   * campaign window.
+   */
+  schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;

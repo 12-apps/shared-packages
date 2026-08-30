@@ -1,3 +1,4 @@
+import type { DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
 import type { DiscountsFormatters } from "./format";
@@ -30,6 +31,8 @@ export interface DiscountWireRecord {
   code: string | null;
   startsAt: string | null;
   endsAt: string | null;
+  /** The weekly schedule (FUT-996), or null for "always". */
+  schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
@@ -100,6 +103,15 @@ export interface DiscountFormPayload {
   menuItemIds: string[];
   /** The combo's groups, in the operator's own order. Empty at every other scope. */
   comboRequirements: readonly ComboRequirement[];
+  /**
+   * The weekly schedule (FUT-996), or null for "sempre".
+   *
+   * Not a form STRING like the two dates beside it, for the reason the target
+   * id lists are not: it is a nested structure the operator edits with chips
+   * and clocks, so it lives in state beside the container and is merged in at
+   * submit.
+   */
+  schedule: DiscountSchedule | null;
 }
 
 /** A money amount as integer cents, or null when blank. */
@@ -165,6 +177,7 @@ export function toWriteBody(
     code: input.trigger === "CODE" ? toNullable(input.code) : null,
     startsAt: toNullable(input.startsAt),
     endsAt: toNullable(input.endsAt),
+    schedule: input.schedule,
     minSubtotalCents: toCents(input.minSubtotal, formatters),
     usageLimit: toCount(input.usageLimit, formatters),
     perBuyerLimit: toCount(input.perBuyerLimit, formatters),

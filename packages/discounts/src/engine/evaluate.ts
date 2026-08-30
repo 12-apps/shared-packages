@@ -1,6 +1,6 @@
 import { maxDiscountableCents } from "./allocate";
 import { normalizeDiscountCode } from "./kinds";
-import { buildLineIndex, coveredLineIds, screenRule } from "./eligibility";
+import { buildLineIndex, coveredLineIdsNow, screenRule } from "./eligibility";
 import {
   compareRuleOrder,
   lineGrossCents,
@@ -187,11 +187,17 @@ function screenOneRule(
   context: { subtotalCents: number; couponCode: string | null; index: LineIndex },
 ): Screened {
   if (rule.trigger === "CODE" && rule.code !== context.couponCode) return { kind: "skipped" };
-  const covered = coveredLineIds(rule, input.lines, context.index);
+  const { covered, blockedBySchedule } = coveredLineIdsNow(
+    rule,
+    input.lines,
+    context.index,
+    input.localNow,
+  );
   const reason = screenRule(rule, {
     now: input.now,
     subtotalCents: context.subtotalCents,
     hasEligibleItems: covered.size > 0,
+    blockedBySchedule,
   });
   if (reason === null) return { kind: "candidate", candidate: { rule, covered } };
   if (rule.trigger !== "CODE") return { kind: "skipped" };
