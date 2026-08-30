@@ -94,10 +94,10 @@ async function submit(): Promise<void> {
 }
 
 describe("the default is unchanged", () => {
-  it('opens on "Sempre", with no builder on screen', () => {
+  it('opens on "Sempre", with no builder on screen', async () => {
     renderForm();
     expect(checked("repetition-always")).toBe(true);
-    expect(screen.queryByTestId("schedule-builder")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("schedule-builder")).toBeNull());
   });
 
   it("sends schedule: null for an ordinary promotion", async () => {
@@ -141,20 +141,20 @@ describe("toda sexta, das 16:00 às 20:00", () => {
 });
 
 describe("the sentence only appears once it is a real offer", () => {
-  it("says nothing with no day chosen", () => {
+  it("says nothing with no day chosen", async () => {
     // Same rule the free-units builder follows: a sentence over a half-built
     // window would read as confirmation of something about to be refused.
     renderForm();
     chooseSpecificHours();
-    expect(screen.queryByTestId("schedule-summary-0")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("schedule-summary-0")).toBeNull());
   });
 
-  it("says nothing when the two clocks are equal", () => {
+  it("says nothing when the two clocks are equal", async () => {
     renderForm();
     chooseSpecificHours();
     toggleDay("Sex");
     setTime("to", "16:00");
-    expect(screen.queryByTestId("schedule-summary-0")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("schedule-summary-0")).toBeNull());
   });
 
   it("spells out an overnight window rather than accepting it silently", () => {
@@ -268,12 +268,12 @@ describe("editing a rule that already has a schedule", () => {
     expect(screen.getByTestId("schedule-summary-0").textContent).toContain("Toda sexta, das 16:00 às 20:00.");
   });
 
-  it("keeps the rows when the operator toggles back to Sempre and returns", () => {
+  it("keeps the rows when the operator toggles back to Sempre and returns", async () => {
     // The switch must not be destructive: an operator who changes their mind
     // twice has not lost the days they picked.
     renderForm(HAPPY_HOUR);
     fireEvent.click(screen.getByTestId("repetition-always"));
-    expect(screen.queryByTestId("schedule-builder")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("schedule-builder")).toBeNull());
     fireEvent.click(screen.getByTestId("repetition-specific"));
     expect(screen.getByTestId("schedule-summary-0").textContent).toContain("Toda sexta, das 16:00 às 20:00.");
   });

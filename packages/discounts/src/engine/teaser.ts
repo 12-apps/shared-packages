@@ -86,13 +86,29 @@ function toTeaserLine(input: ScheduledTeaserInput): DiscountCartLine {
  * has not opened, which is a date and not an hour.
  */
 function isTeasable(rule: DiscountRule, now: Date, localNow: LocalClock | null): boolean {
-  if (rule.trigger !== "AUTOMATIC" || !rule.active || rule.scope === "ORDER") return false;
-  if (rule.schedule === null || rule.schedule === undefined) return false;
-  if (rule.startsAt !== null && now.getTime() < rule.startsAt.getTime()) return false;
-  if (rule.endsAt !== null && now.getTime() >= rule.endsAt.getTime()) return false;
+  if (!isTeasableShape(rule)) return false;
+  if (!withinCampaign(rule, now)) return false;
   // Already running ⇒ the badge owns this card. Never both.
   if (scheduleCovers(rule.schedule, localNow)) return false;
   return rule.usageLimit === null || rule.usageCount < rule.usageLimit;
+}
+
+/**
+ * The static half: a rule that could ever be teased at all.
+ *
+ * `ORDER` is excluded for the reason `previewItemDiscount` excludes it, and an
+ * unscheduled rule for the reason in the header — it cannot be "starting
+ * later", only running or not yet begun, and the second is a date.
+ */
+function isTeasableShape(rule: DiscountRule): boolean {
+  if (rule.trigger !== "AUTOMATIC" || !rule.active || rule.scope === "ORDER") return false;
+  return rule.schedule !== null && rule.schedule !== undefined;
+}
+
+/** Inside `[startsAt, endsAt)` — the CAMPAIGN, not the weekly schedule. */
+function withinCampaign(rule: DiscountRule, now: Date): boolean {
+  if (rule.startsAt !== null && now.getTime() < rule.startsAt.getTime()) return false;
+  return rule.endsAt === null || now.getTime() < rule.endsAt.getTime();
 }
 
 /** Whether this rule reaches this item at all, by whichever route its scope uses. */

@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { DiscountWindowState } from "../engine/kinds";
 import { scheduleCovers } from "../engine/schedule";
 import { resolveLocalClock } from "../timezone";
@@ -105,4 +107,24 @@ function isRunningNow(
   // confident "on" — `scheduleCovers` answers TRUE for a null clock because a
   // cart must keep pricing, and that is the wrong default for an indicator.
   return clock !== null && scheduleCovers(record.schedule, clock);
+}
+
+/**
+ * The grid's rows, derived once per page load.
+ *
+ * ONE instant for the whole render: two rows judged against two different
+ * "now"s could disagree about which of them is still running, and on a list of
+ * forty that difference is invisible. A hook rather than an inline `useMemo`
+ * because {@link DiscountsScreen} sits at the size gate's ceiling.
+ */
+export function useDiscountRows(
+  records: readonly DiscountWireRecord[] | undefined,
+  formatters: DiscountsFormatters,
+  copy: DiscountsWebCopy,
+  timezone: string | undefined,
+): DiscountListItem[] {
+  return useMemo(() => {
+    const now = new Date();
+    return (records ?? []).map((record) => toListItem(record, formatters, copy, now, timezone));
+  }, [records, formatters, copy, timezone]);
 }
