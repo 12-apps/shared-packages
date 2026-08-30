@@ -639,6 +639,10 @@
     "kind": "exempt",
     "why": "the product is two root-mounted endpoints — the web-app manifest and the service worker; there is no React surface, only the constraint (recorded in the manifest) that both mount at the root"
   },
+  "@12-apps/qr": {
+    "kind": "exempt",
+    "why": "a leaf library: a URL in, PDF bytes out. It mounts nothing, owns no models, reads no env and schedules no work — there is no seam for a host to wire, so a manifest here would be the noise the contract warns against. Its one dependency is an encoder."
+  },
   "@12-apps/rbac :: email": {
     "kind": "exempt",
     "why": "an accountless invitee needs mail addressed to an e-mail, which is the host's signup flow and a different port — the invite notification reaches account holders through RbacNotifyPort instead"
