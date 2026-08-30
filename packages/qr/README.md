@@ -9,6 +9,7 @@ pnpm add @12-apps/qr
 | subpath | what it does |
 | --- | --- |
 | `@12-apps/qr/pdf` | a URL → print-ready sticker artwork a gráfica can run |
+| `@12-apps/qr/scan` | a device camera → the text a QR carries |
 
 ## Why this exists
 
@@ -23,11 +24,13 @@ outside the trim, how many plates the black is built from, and whether the code
 kept its quiet zone. Get any one wrong and you find out when the box of
 laminated stickers arrives.
 
-**Reading.** A camera, a decode loop and two decoders — because there is no one
-way that works. `BarcodeDetector` is the platform's own and is what Chrome and
-Android have; WebKit has never shipped it, so on iOS Safari the "fallback" is
-not a fallback, it is the whole feature. (Shipping in a follow-up; see
-`ADOPTING.md`.)
+**Reading.** A camera has a lifecycle and a component has a render, and mixing
+the two is how a scanner ends up leaving the lens on — a failure nothing crashes
+on and no suite notices, whose only symptom is the indicator light on somebody's
+phone staying lit after they closed the sheet. Plus two decoders, because there
+is no one way that works: `BarcodeDetector` is the platform's own and is what
+Chrome and Android have; WebKit has never shipped it, so on iOS Safari the
+"fallback" is not a fallback, it is the whole feature.
 
 ## Printing a sticker
 
@@ -72,6 +75,45 @@ and its placement are locale facts this package has no business deciding.
 
 The part it cannot help you with: a price change means a reprint. Say so at your
 call site.
+
+## Reading a code
+
+```tsx
+import { useQrCamera } from "@12-apps/qr/scan";
+
+function Scanner({ onCode }: { onCode: (text: string) => void }) {
+  const { videoRef, fault, live } = useQrCamera(true, onCode);
+  if (fault) return <p>{yourCopy[fault]}</p>;
+  return <video ref={videoRef} autoPlay playsInline muted />;
+}
+```
+
+`fault` is one of `unsupported | denied | missing | busy | failed` — five values,
+not five sentences, because each one is a different thing to *do* about it and
+what to SAY is yours, in your languages.
+
+### The pixels are not in this package
+
+A viewfinder is styled chrome. It belongs to whichever design system you already
+ship, and a package bringing its own would either fight that system or drag it in
+as a dependency. You get a hook and a `<video>` ref; the surface around it is
+yours.
+
+### A scanned code is untrusted input
+
+The hook hands you the decoded string and stops there, deliberately. It is a
+sticker — anybody can print one and put it anywhere.
+
+**Never navigate to what comes back.** Reduce it to values you already trust (an
+id you then look up), and route with those. A `javascript:` code, a foreign
+origin, a path escape and a phishing link should all end at the same honest
+refusal. That parser is yours because only you know what a legitimate code says.
+
+### It keeps reading after a hit
+
+A decoded code is not necessarily a *usable* one — a Wi-Fi QR on the same table
+decodes perfectly — so the loop does not stop on the first success. Ignore
+repeats of a code you have already refused.
 
 ## The decisions baked in
 
