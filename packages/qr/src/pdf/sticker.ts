@@ -45,6 +45,7 @@ import qrcode from "qrcode-generator";
 
 import { FILL_BLACK, buildPdf, mm, rect, text } from "./pdf-doc";
 import { individualPages, sheetPages } from "./layout";
+import { fitLines } from "./text-width";
 
 /** What one sticker says. */
 export interface QrSticker {
@@ -144,13 +145,30 @@ function qrOps(matrix: boolean[][], x: number, y: number, side: number): string 
   return ops.join("\n");
 }
 
-/** The type stacked under the code, and how much vertical room it claims. */
+/** The narrowest a caller-supplied string may be set before it stops being type. */
+const MIN_PT = 4;
+
+/**
+ * At most two lines each: a third would eat into the code, which is read range.
+ *
+ * The two strings a CALLER supplies without a length limit go through this —
+ * the product name and the address. Everything else on the sticker is ours and
+ * bounded, so a size derived from the sticker's height is right for it.
+ */
+const MAX_LINES = 2;
+
+/** Baseline-to-baseline, as a multiple of the type size. */
+const LEADING = 1.15;
+
+/** The type stacked under the code, laid out, and what it costs vertically. */
 interface TypeMetrics {
-  label: number;
   brand: number;
   hint: number;
   price: number;
-  url: number;
+  /** The product name, wrapped and sized to the sticker's width. */
+  label: { lines: string[]; size: number };
+  /** The address, likewise — two UUIDs do not fit on one 50 mm line. */
+  url: { lines: string[]; size: number };
   /** What the brand line costs above the code, zero when there is none. */
   above: number;
   /** What everything under the code costs, so the QR can take the rest. */
@@ -158,31 +176,51 @@ interface TypeMetrics {
 }
 
 /**
- * Point sizes derived from the sticker's own height.
+ * Point sizes derived from the sticker's own height, and the two variable-length
+ * strings laid out against its WIDTH.
  *
- * Split out of {@link stickerOps} because it is arithmetic with no drawing in
- * it, and because the price line made the expression long enough that the
- * relationship between the sizes stopped being readable.
+ * Both halves belong here rather than in {@link stickerOps}: the QR takes
+ * whatever the type does not, so the code's size is a function of how many
+ * lines the name and the address actually needed. Computing the fits in the
+ * drawing function and the budget here is how the hint ended up printed over
+ * the address — two places deciding one layout.
  */
-function typeMetrics(size: StickerSize, sticker: QrSticker, brandName: string): TypeMetrics {
-  const label = Math.max(11, mm(size.heightMm) * 0.06);
-  const price = label * 0.78;
-  const hint = label * 0.4;
+function typeMetrics(
+  size: StickerSize,
+  sticker: QrSticker,
+  brandName: string,
+  inner: number,
+): TypeMetrics {
+  const labelPt = Math.max(11, mm(size.heightMm) * 0.06);
+  const price = labelPt * 0.78;
+  const hint = labelPt * 0.4;
+  const label = fitLines(sticker.label, inner, labelPt, MIN_PT, MAX_LINES);
+  const url = fitLines(
+    sticker.url.replace(/^https?:\/\//, ""),
+    inner,
+    Math.max(5, labelPt * 0.28),
+    MIN_PT,
+    MAX_LINES,
+  );
   return {
-    label,
-    brand: label * 0.44,
+    brand: labelPt * 0.44,
     hint,
     price,
-    url: Math.max(5, label * 0.28),
-    above: brandName ? label * 0.44 + mm(2.5) : 0,
+    label,
+    url,
+    above: brandName ? labelPt * 0.44 + mm(2.5) : 0,
     below:
-      label +
+      label.lines.length * label.size * LEADING +
       mm(2) +
       hint +
       mm(3) +
       // The price sits between the label and the hint, so it only costs room
       // when there is one.
-      (sticker.priceLine ? price + mm(1.5) : 0),
+      (sticker.priceLine ? price + mm(1.5) : 0) +
+      // The address is pinned to the foot, and a wrapped one grows UP into the
+      // gap the hint sits in. Charging the code for it is what keeps those two
+      // from being printed over each other.
+      url.lines.length * url.size * LEADING,
   };
 }
 
@@ -205,17 +243,19 @@ export function stickerOps(
   const height = mm(size.heightMm);
   const pad = mm(size.widthMm * 0.07);
   const centre = x + width / 2;
-  const type = typeMetrics(size, sticker, brandName);
+  const inner = width - pad * 2;
+  const type = typeMetrics(size, sticker, brandName, inner);
+  const { label, url } = type;
 
   // Top down: brand, gap, QR, gap, label, [price], gap, hint — with the URL
   // pinned to the foot so it reads as a footnote rather than part of the stack.
-  const qrSide = Math.min(width - pad * 2, height - pad * 2 - type.above - type.below);
+  const qrSide = Math.min(inner, height - pad * 2 - type.above - type.below);
   const qrTop = y + height - pad - type.above;
-  const labelBase = qrTop - qrSide - mm(3.5) - type.label * 0.72;
-  // The price, when present, takes the line under the label and pushes the
-  // hint down by its own height.
-  const priceBase = labelBase - type.price - mm(1.5);
-  const hintBase = (sticker.priceLine ? priceBase : labelBase) - type.hint - mm(1.5);
+  const labelBase = qrTop - qrSide - mm(3.5) - label.size * 0.72;
+  // Everything under the name starts below the LAST of its lines.
+  const labelFoot = labelBase - (label.lines.length - 1) * label.size * LEADING;
+  const priceBase = labelFoot - type.price - mm(1.5);
+  const hintBase = (sticker.priceLine ? priceBase : labelFoot) - type.hint - mm(1.5);
 
   return [
     FILL_BLACK,
@@ -226,7 +266,16 @@ export function stickerOps(
         })
       : "",
     qrOps(matrixFor(sticker.url), x + (width - qrSide) / 2, qrTop - qrSide, qrSide),
-    text(sticker.label, centre, labelBase, { font: "F2", size: type.label, center: true }),
+    // Wrapped and shrunk to fit rather than centred and overflowing: a product
+    // name has no length limit, and one that runs past the trim is cut off by
+    // the blade rather than by us.
+    ...label.lines.map((line, index) =>
+      text(line, centre, labelBase - index * label.size * 1.15, {
+        font: "F2",
+        size: label.size,
+        center: true,
+      }),
+    ),
     // Bold, and the largest thing after the label: on a shelf this is what the
     // shopper is actually looking for.
     sticker.priceLine
@@ -239,10 +288,15 @@ export function stickerOps(
     text(sticker.hint, centre, hintBase, { size: type.hint, center: true }),
     // The address in human type. A code that stops scanning — a torn corner, a
     // phone with no camera — is then still a URL somebody can reach.
-    text(sticker.url.replace(/^https?:\/\//, ""), centre, y + pad * 0.6, {
-      size: type.url,
-      center: true,
-    }),
+    ...url.lines.map((line, index) =>
+      // Bottom-up, so a one-line address sits exactly where it always did and
+      // a wrapped one grows upward into the gap under the hint rather than
+      // downward off the sticker.
+      text(line, centre, y + pad * 0.6 + (url.lines.length - 1 - index) * url.size * 1.15, {
+        size: url.size,
+        center: true,
+      }),
+    ),
   ]
     .filter((part) => part !== "")
     .join("\n");

@@ -160,6 +160,31 @@ describe("the price line (FUT-997)", () => {
     expect(build()).not.toContain("R$");
   });
 
+  it("keeps a subproduct address inside the trim on the smallest sticker", () => {
+    // The defect this closes, stated where the artwork is: two UUIDs is the
+    // densest thing this builder prints, and at a size derived from the
+    // sticker's height alone the address ran off a 50 mm sticker and across
+    // the crop marks. Every structural assertion above still passed — the PDF
+    // was well-formed and the code scanned — so nothing but width catches it.
+    const url =
+      "https://barzedoze.com.br/market/p/3f2a1c88-4b6e-4d21-9a55-7c0e1b2d3f44" +
+      "/9c8b7a66-1d2e-4f30-8b11-2a3c4d5e6f70";
+    const file = build({
+      stickers: [
+        { label: "Heineken Long Neck 330ml", url, hint: "Aponte a câmera", priceLine: "R$ 12,90" },
+      ],
+    });
+    // Every text-showing operator carries an x that must sit inside the trim.
+    const trim = /\/TrimBox \[([\d.\s]+)\]/.exec(file)?.[1]?.trim().split(/\s+/).map(Number) ?? [];
+    const [left, , right] = [trim[0]!, trim[1]!, trim[2]!];
+    const xs = [...file.matchAll(/^([\d.]+) [\d.]+ Td$/gm)].map((m) => Number(m[1]));
+    expect(xs.length).toBeGreaterThan(0);
+    for (const x of xs) {
+      expect(x).toBeGreaterThanOrEqual(left - 0.5);
+      expect(x).toBeLessThanOrEqual(right + 0.5);
+    }
+  });
+
   it("still fits the code on the smallest sticker with a price", () => {
     // The price takes a line from the QR's share; a negative side would draw
     // nothing at all, silently.
