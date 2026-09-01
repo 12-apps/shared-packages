@@ -7,6 +7,7 @@ import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
 import { CheckoutCopyProvider } from "./copy-context";
+import { OneClickProvider, useOneClick } from "./one-click";
 import { CheckoutComponentsProvider, useCheckoutComponents, type CheckoutComponents } from "./ui";
 import type { CheckoutViewCopy } from "./view-copy";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
@@ -59,6 +60,17 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   providerConfig?: CheckoutProviderConfig | null;
   /** Scopes the saved-card list to the store being paid. */
   tenantSlug?: string;
+  /**
+   * The buyer pressed a BUY button rather than opening a checkout — pay with
+   * their saved card and land them on Confirmação, with no tap in between.
+   *
+   * A REQUEST, never an instruction: it is honoured only where it can be, and
+   * degrades to the ordinary flow everywhere else — a store that finishes on
+   * the provider's page, a buyer with no CPF on file, a buyer with no saved
+   * card. See `./one-click.tsx` for the whole decision and why every clause
+   * narrows toward standing down.
+   */
+  oneClick?: boolean;
   /**
    * The host's Apple Pay merchant-validation port (FUT-472): exchange the
    * session's `validationURL` for an Apple merchant session, SERVER-SIDE.
@@ -167,13 +179,14 @@ function StatusStep({
 }
 
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
-  const { copy, cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, ...ports } = props;
+  const { copy, cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, oneClick = false, ...ports } = props;
   // Resolved for NO method on purpose (FUT-595): the Dados step opens before
   // the picker, and the form is filled once — so it asks for the union of what
   // any chain member may need rather than re-opening after the choice. A chain
   // that declares nothing degrades to CPF-required, never to "ask nothing".
   const buyerFields = useMemo(() => buyerFieldsFor(providerConfig?.chain, null), [providerConfig]);
   const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields, tenantSlug);
+  const armed = useOneClick({ requested: oneClick, config: providerConfig, taxIdOnFile, step: c.step, method: c.method, setMethod: c.setMethod });
 
   // A settlement settlement pays already-sent kitchen items — the cart is
   // legitimately empty here, so the empty-cart guard only applies to cart mode.
@@ -210,25 +223,27 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
       ) : null}
 
       {c.step === "payment" ? (
-        <PaymentStep
-          method={c.method}
-          onMethodChange={c.setMethod}
-          order={c.order}
-          buyer={c.buyer}
-          creating={c.creating}
-          createError={c.createError}
-          errorField={c.errorField}
-          errorCode={c.errorCode}
-          onGenerate={(chosen) => void c.startPayment(chosen)}
-          onUseEmail={c.payWithEmail}
-          // Set only for a skipped-Dados flow (the controller decides); the
-          // payer block hides itself when it is absent.
-          onEditBuyer={c.editBuyer}
-          providerConfig={providerConfig}
-          tenantSlug={tenantSlug}
-          validateApplePayMerchant={validateApplePayMerchant}
-          onResolved={c.handleResolved}
-        />
+        <OneClickProvider armed={armed}>
+          <PaymentStep
+            method={c.method}
+            onMethodChange={c.setMethod}
+            order={c.order}
+            buyer={c.buyer}
+            creating={c.creating}
+            createError={c.createError}
+            errorField={c.errorField}
+            errorCode={c.errorCode}
+            onGenerate={(chosen) => void c.startPayment(chosen)}
+            onUseEmail={c.payWithEmail}
+            // Set only for a skipped-Dados flow (the controller decides); the
+            // payer block hides itself when it is absent.
+            onEditBuyer={c.editBuyer}
+            providerConfig={providerConfig}
+            tenantSlug={tenantSlug}
+            validateApplePayMerchant={validateApplePayMerchant}
+            onResolved={c.handleResolved}
+          />
+        </OneClickProvider>
       ) : null}
 
       {c.step === "status" ? (

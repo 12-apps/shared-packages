@@ -467,6 +467,31 @@ order CREATION never enter the package; they arrive as explicit props:
 | `providerConfig` | no | the `GET /api/checkout/config` answer (`fetchCheckoutConfig` is exported); `null` while loading degrades safely |
 | `tenantSlug` | no | scopes the saved-card list to the store being paid |
 | `confirmationExtra` | no | host content on the PAID confirmation (this repo's PWA install invite) |
+| `oneClick` | no | the buyer pressed a BUY button rather than opening a checkout — pay with their saved card and land on Confirmação with no tap (see below) |
+
+**One-click (`oneClick`).** A host that offers a *Buy now* control — beside a
+product, or on a past order — passes `oneClick` and the flow makes the taps
+that button already stands for: it selects the card method (which raises the
+order), charges the buyer's saved instrument, and lands them on Confirmação.
+Nothing about the charge differs from a buyer who tapped it themselves; it is
+the same controller, the same card path, the same failover instruments and the
+same poll.
+
+It is a REQUEST, never an instruction. Every one of these degrades to the
+ordinary flow with nothing charged, because standing down only costs the taps
+the buyer would have made anyway while arming wrongly charges a card nobody
+chose:
+
+- the store finishes payment on the provider's own page (a hosted redirect) —
+  one-click must never redirect a checkout the moment it renders;
+- the chain declares no card path this browser can mint or charge for;
+- `providerConfig` is still `null`, so the store's protocol is a guess;
+- `taxIdOnFile` is false, so the buyer still has a Dados step to fill;
+- the buyer has no saved card at this store — they land on Pagamento with the
+  picker and the card form, which is the ordinary step 2.
+
+A declined card is terminal for one-click: the refusal and the buyer's own
+"Pagar" come back, and nothing retries on their behalf.
 
 **The design-system contract (decision: option 3 — slot injection).** The
 package ships behavior + structure and renders its pixels through a
