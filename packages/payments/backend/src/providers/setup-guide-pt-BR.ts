@@ -88,8 +88,7 @@ export const PT_BR_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
     register: 'No painel, abra “Configurações › Webhooks” e cadastre a URL desta loja:',
     credentials: (brandName) =>
       `Ao cadastrar, o painel pede um usuário e uma senha para autenticar as notificações. Defina os dois e informe exatamente os mesmos valores no formulário acima — é assim que ${brandName} confirma que a notificação veio mesmo da Stone.`,
-    events:
-      'Assine ao menos os eventos de cobrança: charge.paid, charge.payment_failed e charge.refunded.',
+    events: (eventList) => `Assine ao menos estes eventos de cobrança: ${eventList}.`,
     testConnection:
       'Feito isso, clique em “Testar conexão” acima: o teste faz uma chamada autenticada real e avisa se a chave estiver errada.',
     doneLabel: 'Webhook',

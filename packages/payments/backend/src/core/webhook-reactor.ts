@@ -48,6 +48,13 @@ export interface WebhookReactorPorts {
   /**
    * Settle the host's own payable. Must be idempotent on `providerChargeId` —
    * a webhook and a reconciliation sweep race each other routinely.
+   *
+   * `amountCents` is what the provider says it CAPTURED, which is not always
+   * the payable: a provider that reports a short or over payment as a
+   * settlement (Stone maps Pagar.me's `underpaid`/`overpaid` that way) sends
+   * the real figure through here. So a host COMPARES it against what it is
+   * owed rather than assuming coverage — settle iff it covers the payable, and
+   * park the shortfall — which is what makes reporting the truth safe.
    */
   settlePayable(input: {
     reference: string;
@@ -65,13 +72,27 @@ export interface WebhookReactorPorts {
    * Settle the PLATFORM direction — a tenant's subscription payment. Absent
    * means this host has no platform direction, and such a delivery is ignored
    * rather than misrouted into the payable path.
+   *
+   * `amountCents` carries the same warning as {@link settlePayable}'s, and it
+   * is the easier of the two to miss: a host that guards its ORDER path against
+   * a shortfall and records whatever this port hands it gives a tenant a full
+   * billing cycle for a partial transfer. Both directions compare, or neither
+   * is protected.
    */
   settlePlatformPayment?(input: {
     reference: string;
     amountCents: number;
     providerChargeId: string;
   }): Promise<void>;
-  /** Money left: take the payable out of settled, however this host spells it. */
+  /**
+   * Money left: take the payable out of settled, however this host spells it.
+   *
+   * Must be idempotent, for {@link settlePayable}'s reason and one of its own:
+   * `ingestWebhookEvents` skips only a delivery that was already APPLIED, so
+   * one that parked and then failed before `markProcessed` is replayed and
+   * parks again. A provider may also announce a single reversal twice — as a
+   * charge state change AND as a refund — and both reach here.
+   */
   parkReversal(
     facts: { reference: string; providerChargeId: string; refundedCents: number },
     merchant: MerchantRef,
@@ -136,12 +157,30 @@ async function react(
   await applyPaid(ports, event, charge, merchant);
 }
 
+/** {@link baseReference}, for the sources that may legitimately be absent. */
+function baseReferenceOrNull(reference: string | null | undefined): string | null {
+  return reference ? baseReference(reference) : null;
+}
+
 /**
  * WHICH payable a reversal names, in the only order that is safe.
  *
  * The event's own reference wins; then the stored charge row's; then this
  * package's table, scoped to the VERIFIED merchant — so a charge id belonging
  * to another store resolves to nothing here, whatever the payload claims.
+ *
+ * Every one of them is reduced to the payable's BASE, exactly as the settle
+ * path does at both its own call sites. A reference carries the attempt that
+ * raised the charge, so a reversal of any attempt after the first named
+ * `order-1--1` here — an id no payable is keyed by.
+ *
+ * Defence in depth rather than a fix for a measured outage: the one host in
+ * hand already reduces inside both of its own ports, so nothing observable
+ * changes for it. The point is that it should not have to. A port is a
+ * contract, and requiring every adopter to know the `--` attempt convention to
+ * use it correctly is a contract that will eventually be got wrong silently —
+ * a reversal parked against nothing is not an error anywhere, it is an order
+ * that quietly stays settled.
  */
 async function reversalReference(
   ports: WebhookReactorPorts,
@@ -150,10 +189,12 @@ async function reversalReference(
   charge: StoredCharge | null,
   merchant: MerchantRef,
 ): Promise<string | null> {
-  if (reversal.reference) return reversal.reference;
-  if (charge?.reference) return charge.reference;
+  if (reversal.reference) return baseReference(reversal.reference);
+  if (charge?.reference) return baseReference(charge.reference);
   if (!ports.referenceOf || !reversal.providerChargeId) return null;
-  return ports.referenceOf(merchant, event.provider, reversal.providerChargeId);
+  return baseReferenceOrNull(
+    await ports.referenceOf(merchant, event.provider, reversal.providerChargeId),
+  );
 }
 
 async function applyReversal(
@@ -171,7 +212,13 @@ async function applyReversal(
   if (reversal.kind === 'DISPUTE') {
     await ports.recordDispute(
       {
-        reference: reversal.reference ?? charge?.reference ?? null,
+        // Base-reduced for the reason the refund branch is, and missed there
+        // first: `reversal.reference` carries the attempt that raised the
+        // charge, so attempt 2's chargeback named `order-1--2`. (`charge` is
+        // null on every path that reaches here today — the only emitter of a
+        // dispute carries no snapshot by contract — so the second source is
+        // defensive, not reachable.)
+        reference: baseReferenceOrNull(reversal.reference ?? charge?.reference),
         providerChargeId: reversal.providerChargeId,
         eventId: event.eventId,
       },

@@ -84,7 +84,13 @@ export interface StoneSetupGuideCopy {
      * loud, which is why the platform is a parameter rather than a word.
      */
     credentials(brandName: string): string;
-    events: string;
+    /**
+     * The events to subscribe to. A PARAMETER rather than a sentence, for the
+     * reason `credentials` takes one: the list is a fact about the adapter, not
+     * about the language, and a copy pack that retyped it fell out of step with
+     * the parser the first time the parser learned a new event (FUT-674).
+     */
+    events(eventList: string): string;
     testConnection: string;
     doneLabel: string;
     doneValue: string;
