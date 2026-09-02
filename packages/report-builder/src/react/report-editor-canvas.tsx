@@ -179,6 +179,7 @@ export function EditorCanvas({
   entities,
   range,
   startWithPicker = false,
+  editId,
   onChange,
 }: {
   tenantSlug: string;
@@ -196,10 +197,16 @@ export function EditorCanvas({
    * to refuse.
    */
   startWithPicker?: boolean;
+  /**
+   * The report being edited, or `undefined` while it has never been saved.
+   * Scopes the selection to ONE report so it survives the create-navigate but
+   * not a move to a different report — see `useCanvasSelection`.
+   */
+  editId?: string;
   onChange: (next: (draft: ReportDraft) => ReportDraft) => void;
 }): JSX.Element {
   const first = entities[0];
-  const selection = useCanvasSelection();
+  const selection = useCanvasSelection(editId);
   const words = useReportCopy().screens.builder;
   const actions = useCanvasActions({ draft, first, startWithPicker, selection, onChange });
   const dnd = useDragReorder((sourceId, targetId) =>

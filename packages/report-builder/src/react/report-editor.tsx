@@ -225,6 +225,7 @@ function ReportEditorForm({
           range={range}
           // `/new` opens on the picker; `/:id/edit` never does (plan entry 22).
           startWithPicker={editId === undefined}
+          {...(editId ? { editId } : {})}
           onChange={setDraft}
         />
       </Stack>
