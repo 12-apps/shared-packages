@@ -54,7 +54,7 @@ export interface SelectionState {
   sessionId: string | null;
 }
 
-export interface SelectionStore {
+interface SelectionStore {
   state: SelectionState;
   setState: Dispatch<SetStateAction<SelectionState>>;
 }
