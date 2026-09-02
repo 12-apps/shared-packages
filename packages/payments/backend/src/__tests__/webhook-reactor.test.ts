@@ -147,3 +147,91 @@ describe('rule 1 — a parked legacy notification resolves first', () => {
     expect(p.settlePayable).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Rule 2's reference resolution, which had no coverage at all: reverting the
+ * base reduction — or making it answer null — left every one of these green
+ * (FUT-674). A reversal is the one reaction whose failure is silence: park
+ * against an id no payable has and nothing errors, the order simply stays
+ * settled while the money is back with the buyer.
+ */
+describe('rule 2 — a reversal names the PAYABLE, never the attempt', () => {
+  function refundEvent(reference: string | null): NormalizedWebhookEvent {
+    return {
+      provider: 'pagbank',
+      eventId: 'evt_r',
+      type: 'REFUND_UPDATED',
+      refund: {
+        provider: 'pagbank',
+        providerChargeId: 'ch_1',
+        providerRefundId: 'ref_1',
+        ...(reference === null ? {} : { reference }),
+        status: 'REFUNDED',
+        amount: { amountCents: 1000, currency: 'BRL' },
+      },
+    } as NormalizedWebhookEvent;
+  }
+
+  it('reduces the EVENT reference', async () => {
+    const p = ports();
+    await createWebhookReactor(p)(refundEvent('ord_1--2'), null, TENANT);
+    expect(p.parkReversal).toHaveBeenCalledWith(
+      { reference: 'ord_1', providerChargeId: 'ch_1', refundedCents: 1000 },
+      TENANT,
+    );
+  });
+
+  it('reduces the STORED ROW reference when the event names none', async () => {
+    // Reachable wherever an adapter omits the reference from its refund fact
+    // and the pipeline still hands over the row it upserted.
+    const p = ports();
+    await createWebhookReactor(p)(refundEvent(null), storedCharge({ reference: 'ord_1--3' }), TENANT);
+    expect(p.parkReversal).toHaveBeenCalledWith(
+      { reference: 'ord_1', providerChargeId: 'ch_1', refundedCents: 1000 },
+      TENANT,
+    );
+  });
+
+  it('reduces the reference this package resolves from its own table', async () => {
+    const p = ports({ referenceOf: vi.fn().mockResolvedValue('ord_1--4') });
+    await createWebhookReactor(p)(refundEvent(null), null, TENANT);
+    expect(p.parkReversal).toHaveBeenCalledWith(
+      { reference: 'ord_1', providerChargeId: 'ch_1', refundedCents: 1000 },
+      TENANT,
+    );
+  });
+
+  it('records a DISPUTE against the payable too', async () => {
+    // The branch beside the refund one, and the one the fix missed first.
+    const p = ports();
+    await createWebhookReactor(p)(
+      {
+        provider: 'pagbank',
+        eventId: 'evt_d',
+        type: 'DISPUTE_UPDATED',
+        raw: { reference: 'ord_1--2', transactionCode: 'TX_9' },
+      } as NormalizedWebhookEvent,
+      null,
+      TENANT,
+    );
+    expect(p.recordDispute).toHaveBeenCalledWith(
+      { reference: 'ord_1', providerChargeId: 'TX_9', eventId: 'evt_d' },
+      TENANT,
+    );
+  });
+
+  it('still records a dispute that names no payable at all', async () => {
+    // `null` must survive the reduction — a dispute nobody hears about is lost
+    // by default, which is what the port's own docblock refuses.
+    const p = ports();
+    await createWebhookReactor(p)(
+      { provider: 'pagbank', eventId: 'evt_d2', type: 'DISPUTE_UPDATED', raw: {} } as NormalizedWebhookEvent,
+      null,
+      TENANT,
+    );
+    expect(p.recordDispute).toHaveBeenCalledWith(
+      { reference: null, providerChargeId: null, eventId: 'evt_d2' },
+      TENANT,
+    );
+  });
+});

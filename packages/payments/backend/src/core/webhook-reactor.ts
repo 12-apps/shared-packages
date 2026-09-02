@@ -157,6 +157,11 @@ async function react(
   await applyPaid(ports, event, charge, merchant);
 }
 
+/** {@link baseReference}, for the sources that may legitimately be absent. */
+function baseReferenceOrNull(reference: string | null | undefined): string | null {
+  return reference ? baseReference(reference) : null;
+}
+
 /**
  * WHICH payable a reversal names, in the only order that is safe.
  *
@@ -166,15 +171,17 @@ async function react(
  *
  * Every one of them is reduced to the payable's BASE, exactly as the settle
  * path does at both its own call sites. A reference carries the attempt that
- * raised the charge, so a reversal of any attempt after the first parked
- * against `order-1--1` — an id no payable is keyed by — and the host went on
- * saying PAID for money the buyer already had back.
+ * raised the charge, so a reversal of any attempt after the first named
+ * `order-1--1` here — an id no payable is keyed by.
+ *
+ * Defence in depth rather than a fix for a measured outage: the one host in
+ * hand already reduces inside both of its own ports, so nothing observable
+ * changes for it. The point is that it should not have to. A port is a
+ * contract, and requiring every adopter to know the `--` attempt convention to
+ * use it correctly is a contract that will eventually be got wrong silently —
+ * a reversal parked against nothing is not an error anywhere, it is an order
+ * that quietly stays settled.
  */
-/** {@link baseReference}, for the sources that may legitimately be absent. */
-function baseReferenceOrNull(reference: string | null | undefined): string | null {
-  return reference ? baseReference(reference) : null;
-}
-
 async function reversalReference(
   ports: WebhookReactorPorts,
   event: NormalizedWebhookEvent,
@@ -205,10 +212,12 @@ async function applyReversal(
   if (reversal.kind === 'DISPUTE') {
     await ports.recordDispute(
       {
-        // Base-reduced for the reason the refund branch is, and it was missed
-        // there first: both sources carry the attempt that raised the charge,
-        // so attempt 2's chargeback was recorded against `order-1--2` and the
-        // operator's dispute row named no order at all.
+        // Base-reduced for the reason the refund branch is, and missed there
+        // first: `reversal.reference` carries the attempt that raised the
+        // charge, so attempt 2's chargeback named `order-1--2`. (`charge` is
+        // null on every path that reaches here today — the only emitter of a
+        // dispute carries no snapshot by contract — so the second source is
+        // defensive, not reachable.)
         reference: baseReferenceOrNull(reversal.reference ?? charge?.reference),
         providerChargeId: reversal.providerChargeId,
         eventId: event.eventId,

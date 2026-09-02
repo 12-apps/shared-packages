@@ -873,6 +873,23 @@ describe('stone live mode (pagar.me v5)', () => {
     expect(snapshot).toMatchObject({ status: 'REFUNDED', amount: { amountCents: 15_00 } });
   });
 
+  it('reads a PARTIAL reversal as partial even under the word `canceled`', async () => {
+    // Reporting REFUNDED here parks the WHOLE payable for a partial return and
+    // puts the row at rank 4, which nothing can move afterwards.
+    stubFetch([
+      {
+        body: {
+          id: 'or_24',
+          charges: [
+            { id: 'ch_24', status: 'canceled', amount: 25_38, paid_amount: 25_38, canceled_amount: 9_00 },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_24', LIVE);
+    expect(snapshot.status).toBe('PARTIALLY_REFUNDED');
+  });
+
   it('lets a live PAID charge outrank a reversed sibling listed before it', async () => {
     // Membership plus array order is not a choice between siblings: the
     // reversed charge listed first made an order.paid report REFUNDED, which

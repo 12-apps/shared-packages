@@ -42,6 +42,14 @@ describe('the Stone setup guide names every event the adapter acts on', () => {
     });
   });
 
+  it('every EXEMPT event is one the parser still acts on', () => {
+    // The direction the gate was missing: an exemption for an event the parser
+    // has stopped handling survives silently, which is the same "went quietly
+    // short" failure the whole check exists to catch, one list along.
+    const handled = handledEvents();
+    expect([...GUIDE_EXEMPT_EVENTS.keys()].filter((event) => !handled.includes(event))).toEqual([]);
+  });
+
   it('every merchant-facing event is one the parser acts on', () => {
     // The other direction: telling a store to subscribe to something we drop
     // costs it deliveries and tells it the integration does more than it does.

@@ -76,7 +76,7 @@ const STATUS: Record<string, ChargeStatus> = {
   /**
    * A shortfall is a SETTLEMENT, not a pending charge: money arrived, just not
    * enough of it. With no entry here it fell through `statusOf`'s `'PENDING'`
-   * default and the order parked in silence — the reactor only reaches
+   * default and the order was left in silence — neither settled nor parked — the reactor only reaches
    * `settlePayable` for a PAID snapshot, so nothing downstream ever saw the
    * payment, its amount, or that there was anything to reconcile (FUT-674).
    *
@@ -162,7 +162,12 @@ function statusOf(charge: StoneCharge | undefined): ChargeStatus {
   // worse trade, and no real Pagar.me charge omits `paid_amount`.
   const returned = positiveCents(charge?.canceled_amount);
   const captured = positiveCents(charge?.paid_amount);
-  return returned !== null && captured !== null ? 'REFUNDED' : 'CANCELED';
+  if (returned === null || captured === null) return 'CANCELED';
+  // And it is a FULL reversal only if all of it came back. Pagar.me maps a
+  // partial to `partial_canceled`, so this is belt-and-braces — but both
+  // numbers are right here, and reporting REFUNDED for a partial parks the
+  // WHOLE payable and puts the row at rank 4, where nothing can move it again.
+  return returned >= captured ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
 }
 
 /**
@@ -283,10 +288,16 @@ const SHORTFALL_STATUSES = new Set(['underpaid']);
  * stored amount back into the row, two different numbers from one delivery and
  * neither of them loud. An unpaid charge falls through for the same reason, and
  * a pending snapshot is expected to echo the amount raised anyway.
+ *
+ * An ABSENT `paid_amount` and a stated `0` are treated alike, and the void
+ * fixtures depend on the latter. The whole void-versus-refund test in
+ * {@link statusOf} rests on this field being RETAINED after a cancel rather
+ * than zeroed or reported net — if a vendor ever reports what is still HELD,
+ * a full refund reads CANCELED there and the row stays settled.
  */
 function capturedOf(charge: StoneCharge | undefined, captured: boolean): number | undefined {
-  const paid = charge?.paid_amount;
-  if (captured && typeof paid === 'number' && paid > 0) return paid;
+  const paid = positiveCents(charge?.paid_amount);
+  if (captured && paid !== null) return paid;
   if (SHORTFALL_STATUSES.has(charge?.status ?? '')) return undefined;
   return charge?.amount;
 }
