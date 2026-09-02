@@ -36,9 +36,16 @@ export interface WalletCharge {
   errorCode: string | null;
   /** The charge is unresolved: no pay control may render (FUT-563). */
   unresolved: boolean;
+  /**
+   * The last status poll failed. TRANSIENT (FUT-1144): the wait carries on at a
+   * backed-off cadence and this clears on the next success, so the pane shows
+   * it as "still trying" beside {@link pollCheckAgain} rather than as an end.
+   */
   pollError: string | null;
-  /** The healthy-poll cap elapsed while still AWAITING (FUT-191). */
+  /** The bounded AWAITING wait elapsed (FUT-191, now wall-clock — FUT-1144). */
   pollTimedOut: boolean;
+  /** Ask now and restart the wait — the buyer's "verificar de novo". */
+  pollCheckAgain: () => void;
   /**
    * Charge the wallet's key. The button calls this once the sheet resolves.
    * Resolves `true` when the charge was ACCEPTED — paid, confirming, or
@@ -49,10 +56,11 @@ export interface WalletCharge {
 }
 
 /**
- * Healthy-poll cap for the wallet AWAITING wait — the card path's own cap
- * (FUT-191): 36 polls ≈ 90 s at the 2500 ms default interval.
+ * The wallet AWAITING wait — the card path's own bound (FUT-191): 90 s, in WALL
+ * TIME rather than healthy polls (FUT-1144, and see `CARD_AWAITING_WAIT_MS` for
+ * why a count of the polls that SUCCEEDED cannot bound a wait that is failing).
  */
-const WALLET_AWAITING_POLL_CAP = 36;
+const WALLET_AWAITING_WAIT_MS = 90_000;
 
 /** The wallet charge state machine. See the module comment. */
 export function useWalletCharge(
@@ -67,10 +75,15 @@ export function useWalletCharge(
   const client = useCheckoutClientApi();
   const navigate = useCheckoutNavigate();
 
-  const { status, error: pollError, timedOut: pollTimedOut } = usePaymentPolling(order.orderId, {
+  const {
+    status,
+    error: pollError,
+    timedOut: pollTimedOut,
+    checkAgain: pollCheckAgain,
+  } = usePaymentPolling(order.orderId, {
     enabled: phase === "polling",
     intervalMs: pollIntervalMs,
-    maxHealthyPolls: WALLET_AWAITING_POLL_CAP,
+    maxWaitMs: WALLET_AWAITING_WAIT_MS,
   });
 
   useEffect(() => {
@@ -124,6 +137,7 @@ export function useWalletCharge(
     unresolved: errorCode === UNRESOLVED_CODE,
     pollError,
     pollTimedOut,
+    pollCheckAgain,
     payWithKey,
   };
 }

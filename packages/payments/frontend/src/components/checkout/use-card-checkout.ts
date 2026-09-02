@@ -100,7 +100,7 @@ function useCardPublicKey(
 }
 
 /** Everything the card view renders — all checkout state + the submit handler. */
-interface CardCheckout {
+export interface CardCheckout {
   savedCards: SavedCard[];
   selection: string;
   setSelection: (id: string) => void;
@@ -117,9 +117,16 @@ interface CardCheckout {
   errorCode: string | null;
   submitting: boolean;
   submitted: boolean;
+  /**
+   * The last status poll failed. TRANSIENT (FUT-1144): the wait carries on at a
+   * backed-off cadence and this clears on the next success, so the view shows
+   * it as "still trying" beside {@link pollCheckAgain} rather than as an end.
+   */
   pollError: string | null;
-  /** The healthy-poll cap elapsed while still AWAITING (FUT-191 bounded wait). */
+  /** The bounded AWAITING wait elapsed (FUT-191, now wall-clock — FUT-1144). */
   pollTimedOut: boolean;
+  /** Ask now and restart the wait — the buyer's "verificar de novo". */
+  pollCheckAgain: () => void;
   handlePay: () => Promise<void>;
 }
 
@@ -142,14 +149,20 @@ type CardSubmit = Pick<
   | "errorCode"
   | "pollError"
   | "pollTimedOut"
+  | "pollCheckAgain"
   | "handlePay"
 >;
 
 /**
- * Healthy-poll cap for the card AWAITING wait: 36 polls ≈ 90 s at the 2500 ms
- * default interval (FUT-191). PIX passes no cap and keeps today's behavior.
+ * The card AWAITING wait, bounded in WALL TIME: 90 s (FUT-191, FUT-1144).
+ *
+ * It was 36 healthy polls, which is the same 90 s at the default 2500 ms
+ * interval and an unbounded wait at any other — including the one that
+ * mattered, where every poll is FAILING and the healthy count never moves.
+ * PIX passes no bound at all and keeps today's behavior: its charge expires
+ * server-side and comes back as a terminal EXPIRED.
  */
-const CARD_AWAITING_POLL_CAP = 36;
+const CARD_AWAITING_WAIT_MS = 90_000;
 
 /**
  * Hand the buyer to the provider's authentication page (FUT-698) — Stripe's
@@ -211,6 +224,31 @@ async function resolveInstruments(input: {
 }
 
 /**
+ * The card's status wait, named the way the view reads it.
+ *
+ * Its own function so `useCardSubmit` stays inside the size gate, and so the
+ * one decision here — this wait is bounded in WALL TIME — sits beside the
+ * constant that states it rather than inside a submit machine.
+ */
+function useCardWait(
+  orderId: string,
+  submitted: boolean,
+  intervalMs: number,
+): {
+  status: OrderStatus | null;
+  pollError: string | null;
+  pollTimedOut: boolean;
+  pollCheckAgain: () => void;
+} {
+  const { status, error, timedOut, checkAgain } = usePaymentPolling(orderId, {
+    enabled: submitted,
+    intervalMs,
+    maxWaitMs: CARD_AWAITING_WAIT_MS,
+  });
+  return { status, pollError: error, pollTimedOut: timedOut, pollCheckAgain: checkAgain };
+}
+
+/**
  * The submit state machine (FUT-58): validate → tokenize (self-heal) → charge →
  * poll for the async confirmation, bubbling the terminal status up via
  * {@link onResolved}.
@@ -235,11 +273,7 @@ function useCardSubmit(
   const navigate = useCheckoutNavigate();
   const cardCopy = useCheckoutCopy().card;
 
-  const { status, error: pollError, timedOut: pollTimedOut } = usePaymentPolling(order.orderId, {
-    enabled: submitted,
-    intervalMs: pollIntervalMs,
-    maxHealthyPolls: CARD_AWAITING_POLL_CAP,
-  });
+  const { status, ...wait } = useCardWait(order.orderId, submitted, pollIntervalMs);
 
   useEffect(() => {
     if (status && status !== "AWAITING_PAYMENT") onResolved(status);
@@ -293,7 +327,7 @@ function useCardSubmit(
     else setSubmitted(true);
   };
 
-  return { submitting, submitted, error, errorCode, pollError, pollTimedOut, handlePay };
+  return { submitting, submitted, error, errorCode, ...wait, handlePay };
 }
 
 /**

@@ -1,19 +1,28 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCheckoutClientApi } from "./client-context";
+import type { Result } from "../../result";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 
 interface PollingOptions {
-  /** Delay between polls (ms). */
+  /** Delay between successful polls (ms). */
   intervalMs?: number;
   /** Poll only while `true` (e.g. after a card charge is submitted). */
   enabled?: boolean;
   /**
-   * Opt-in bound on successful non-terminal polls (FUT-191): stop scheduling and
-   * report `timedOut` once this many healthy AWAITING responses arrive.
-   * Undefined ⇒ unbounded, today's behavior (the PIX consumer passes no cap).
+   * WALL-CLOCK bound on the whole wait (FUT-1144): stop scheduling and report
+   * `timedOut` once this many milliseconds have passed since the wait began.
+   * Undefined ⇒ unbounded (the PIX consumer passes none — its charge expires
+   * server-side and comes back as a terminal EXPIRED).
+   *
+   * It used to be a count of HEALTHY polls, which measured the wrong thing in
+   * the only case that matters. A wait that is failing makes no healthy polls,
+   * so the count stood still while the clock ran: the hosted-return leg spun
+   * "Confirmando seu pagamento…" forever on a connection that never came back,
+   * because the only counter that could have stopped it was the one the
+   * failure had frozen. Wall time cannot be frozen by the failure it measures.
    */
-  maxHealthyPolls?: number;
+  maxWaitMs?: number;
   /**
    * Opt-in BACKOFF: after this many healthy polls, keep asking at
    * {@link slowIntervalMs} instead of {@link intervalMs}.
@@ -32,8 +41,44 @@ interface PollingOptions {
   slowIntervalMs?: number;
 }
 
-/** Consecutive poll errors tolerated before giving up (avoids an infinite spinner). */
-const MAX_POLL_ERRORS = 4;
+/** What a consumer reads off the wait, and the one action it can take. */
+interface PaymentPollingState {
+  status: OrderStatus | null;
+  /**
+   * The last poll failed. TRANSIENT (FUT-1144): the wait keeps running on a
+   * backoff and this clears the moment a poll succeeds, so a consumer must
+   * render it as "we are still trying", never as "we gave up".
+   */
+  error: string | null;
+  /** The wall-clock bound elapsed — nothing further is scheduled. */
+  timedOut: boolean;
+  /**
+   * Ask NOW, and start the wait over: the buyer's own "check again". Restarts
+   * the clock too, so it is the way back from {@link timedOut}. A no-op once
+   * the order has settled — there is nothing left to ask about.
+   */
+  checkAgain: () => void;
+}
+
+/**
+ * The slowest a failing poll may go (FUT-1144).
+ *
+ * Consecutive failures double the delay — 2.5 s, 5 s, 10 s — and stop there.
+ * The cap is what keeps the recovery cheap: a shopper whose signal comes back
+ * during a Wi-Fi→4G handoff waits at most this long to be told they paid, and
+ * the two re-arm events below usually beat it outright.
+ */
+const MAX_ERROR_BACKOFF_MS = 10_000;
+
+/**
+ * How long a re-arm must stay quiet after the last ask.
+ *
+ * Returning to a tab commonly fires `visibilitychange` and `online` together —
+ * and a shopper flicking between the bank app and the store fires them again
+ * per trip. This collapses a burst into one request without delaying it: the
+ * first re-arm of a burst polls immediately, the rest fall inside the gap.
+ */
+const REARM_QUIET_MS = 1_000;
 
 /**
  * How long before the next ask, given how many healthy polls have happened.
@@ -46,7 +91,7 @@ const MAX_POLL_ERRORS = 4;
  * poll FOLLOWING the threshold rather than one early: a wait described as "N
  * fast polls" has to actually make N of them.
  */
-function pollDelay(healthy: number, options: PollingOptions): number {
+function healthyDelay(healthy: number, options: PollingOptions): number {
   const { intervalMs = 2500, slowAfterPolls, slowIntervalMs } = options;
   const backingOff =
     slowAfterPolls !== undefined && slowIntervalMs !== undefined && healthy >= slowAfterPolls;
@@ -54,23 +99,192 @@ function pollDelay(healthy: number, options: PollingOptions): number {
 }
 
 /**
+ * The same rule with consecutive FAILURES folded in (FUT-1144).
+ *
+ * Errors never stop the wait, they only slow it. Doubling from the healthy
+ * cadence is what makes a ten-second blip cost one extra beat instead of the
+ * whole confirmation: four failures used to be terminal, and four failures is
+ * what a Wi-Fi→4G handoff produces at the default 2.5 s.
+ *
+ * The cap is `MAX_ERROR_BACKOFF_MS` or the healthy cadence, whichever is
+ * larger — a failing poll must never ask FASTER than a succeeding one, which
+ * is what a bare cap would do to a consumer whose slow interval is longer.
+ */
+function pollDelay(healthy: number, errors: number, options: PollingOptions): number {
+  const base = healthyDelay(healthy, options);
+  if (errors === 0) return base;
+  return Math.min(base * 2 ** (errors - 1), Math.max(base, MAX_ERROR_BACKOFF_MS));
+}
+
+/** Where a running wait writes what it has learned. */
+interface PollSink {
+  setStatus: (status: OrderStatus) => void;
+  setError: (error: string | null) => void;
+  setTimedOut: (timedOut: boolean) => void;
+}
+
+/**
+ * The mutable bookkeeping one wait carries.
+ *
+ * `settled` and `stopped` are deliberately NOT the same flag. Settled means the
+ * order reached a terminal status and there is nothing left to ask about, ever.
+ * Stopped only means nothing is scheduled — which the wall clock running out
+ * also produces, and which the buyer's own "check again" is allowed to undo.
+ */
+function newRun() {
+  return {
+    cancelled: false,
+    settled: false,
+    stopped: false,
+    inFlight: false,
+    errors: 0,
+    healthy: 0,
+    startedAt: 0,
+    askedAt: 0,
+    timer: undefined as ReturnType<typeof setTimeout> | undefined,
+  };
+}
+
+/** The handle the hook holds on one running wait. */
+interface PollLoop {
+  /** Reset the clock and the counters, then ask immediately. */
+  restart: () => void;
+  /** Ask immediately, keeping the clock — the re-arm events' entry point. */
+  poke: () => void;
+  /** Tear down: nothing further is scheduled and nothing further is written. */
+  stop: () => void;
+}
+
+/**
+ * One self-scheduling wait, with no React in it.
+ *
+ * A `setTimeout` chain rather than an interval, so requests never overlap; the
+ * mutable counters live in one object because the flakiness gate's
+ * `no-global-state-mutation` is about exactly this shape, and because the
+ * whole loop has to be cancellable from a React cleanup.
+ */
+function createPollLoop(
+  ask: () => Promise<Result<OrderStatus>>,
+  options: PollingOptions,
+  sink: PollSink,
+): PollLoop {
+  const run = newRun();
+
+  const clearPending = (): void => {
+    if (run.timer !== undefined) clearTimeout(run.timer);
+    run.timer = undefined;
+  };
+
+  const outOfTime = (delay: number): boolean =>
+    options.maxWaitMs !== undefined && Date.now() - run.startedAt + delay >= options.maxWaitMs;
+
+  const tick = async (): Promise<void> => {
+    if (run.cancelled || run.settled || run.inFlight) return;
+    run.inFlight = true;
+    run.askedAt = Date.now();
+    const result = await ask();
+    run.inFlight = false;
+    if (run.cancelled || run.settled) return;
+    if (result.ok) {
+      run.errors = 0;
+      sink.setError(null);
+      sink.setStatus(result.data);
+      if (TERMINAL_STATUSES.includes(result.data)) {
+        run.settled = true;
+        run.stopped = true;
+        return;
+      }
+      run.healthy += 1;
+    } else {
+      run.errors += 1;
+      sink.setError(result.error);
+    }
+    const delay = pollDelay(run.healthy, run.errors, options);
+    if (outOfTime(delay)) {
+      run.stopped = true;
+      sink.setTimedOut(true);
+      return;
+    }
+    clearPending();
+    run.timer = setTimeout(() => void tick(), delay);
+  };
+
+  return {
+    restart: (): void => {
+      if (run.cancelled || run.settled) return;
+      clearPending();
+      run.stopped = false;
+      run.errors = 0;
+      run.healthy = 0;
+      run.startedAt = Date.now();
+      sink.setTimedOut(false);
+      sink.setError(null);
+      void tick();
+    },
+    poke: (): void => {
+      if (run.cancelled || run.stopped || run.inFlight) return;
+      if (Date.now() - run.askedAt < REARM_QUIET_MS) return;
+      clearPending();
+      void tick();
+    },
+    stop: (): void => {
+      run.cancelled = true;
+      clearPending();
+    },
+  };
+}
+
+/**
+ * Ask again the moment the shopper could plausibly have an answer for us.
+ *
+ * Those two moments are exactly the ones this bug was reported from: a buyer
+ * switching to their bank app (iOS aborts the in-flight fetches, and the tab
+ * comes back `visible`), and a handset moving between Wi-Fi and 4G (`online`).
+ * Waiting out the backoff after either is time spent not telling somebody
+ * their payment landed.
+ *
+ * Guarded for a host with no DOM — this package is imported by SSR frames, and
+ * a hook that throws at import time takes the whole checkout with it.
+ */
+function listenForRearm(poke: () => void): () => void {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return (): void => undefined;
+  }
+  const onVisible = (): void => {
+    if (document.visibilityState === "visible") poke();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("online", poke);
+  return (): void => {
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("online", poke);
+  };
+}
+
+/**
  * Poll an order's payment status until it reaches a terminal state.
  *
- * Uses a self-scheduling `setTimeout` (never overlapping requests) that stops as
- * soon as the order is PAID/FAILED/EXPIRED, and tears down on unmount or when the
- * order id changes. This is the client half of the async confirmation the
- * PagSeguro webhook drives on the server.
+ * Stops as soon as the order is PAID/FAILED/EXPIRED, when the wall-clock bound
+ * elapses, and on unmount or an order-id change. This is the client half of the
+ * async confirmation the provider's webhook drives on the server.
+ *
+ * A FAILED POLL IS NOT AN ENDING (FUT-1144). It slows the wait and is reported
+ * as `error` so a screen can say so, and the next success clears it. The wait
+ * ended for four consecutive errors once — ~10 s of no signal — and left a PIX
+ * QR under a red alert with no retry, a card spinner replaced by one, and the
+ * hosted return spinning forever. None of the three could recover on its own,
+ * which is what made a blip cost a payment nobody was ever told about.
  */
 export function usePaymentPolling(
   orderId: string | null,
   {
     intervalMs = 2500,
     enabled = true,
-    maxHealthyPolls,
+    maxWaitMs,
     slowAfterPolls,
     slowIntervalMs,
   }: PollingOptions = {},
-): { status: OrderStatus | null; error: string | null; timedOut: boolean } {
+): PaymentPollingState {
   const [status, setStatus] = useState<OrderStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
@@ -78,60 +292,32 @@ export function usePaymentPolling(
   // belongs in the deps below rather than being read out of a ref: a checkout
   // re-pointed at another mount must re-poll against THAT one.
   const client = useCheckoutClientApi();
+  // The live wait, so the returned action stays stable across renders while
+  // still reaching whichever loop the effect currently owns.
+  const loop = useRef<PollLoop | null>(null);
 
   useEffect(() => {
-    if (!orderId || !enabled) {
-      return;
-    }
+    if (!orderId || !enabled) return undefined;
 
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let errorCount = 0;
-    let healthyCount = 0;
-    setTimedOut(false);
-    setError(null);
-
-    const tick = async (): Promise<void> => {
-      const result = await client.getStatus(orderId);
-      if (cancelled) {
-        return;
-      }
-      if (result.ok) {
-        errorCount = 0;
-        setStatus(result.data);
-        if (TERMINAL_STATUSES.includes(result.data)) {
-          return; // terminal — stop polling
-        }
-        healthyCount += 1;
-        if (maxHealthyPolls !== undefined && healthyCount >= maxHealthyPolls) {
-          // A healthy-but-still-AWAITING stream never trips the error cap, so
-          // bound it separately (FUT-191): stop scheduling and let the consumer
-          // show a "taking longer" state instead of an infinite spinner.
-          setTimedOut(true);
-          return;
-        }
-      } else {
-        errorCount += 1;
-        if (errorCount >= MAX_POLL_ERRORS) {
-          // Give up rather than spin forever; surface the error to the consumer.
-          setError(result.error);
-          return;
-        }
-      }
-      timer = setTimeout(() => {
-        void tick();
-      }, pollDelay(healthyCount, { intervalMs, slowAfterPolls, slowIntervalMs }));
-    };
-
-    void tick();
+    const running = createPollLoop(
+      () => client.getStatus(orderId),
+      { intervalMs, maxWaitMs, slowAfterPolls, slowIntervalMs },
+      { setStatus, setError, setTimedOut },
+    );
+    loop.current = running;
+    running.restart();
+    const unlisten = listenForRearm(running.poke);
 
     return () => {
-      cancelled = true;
-      if (timer) {
-        clearTimeout(timer);
-      }
+      unlisten();
+      running.stop();
+      loop.current = null;
     };
-  }, [orderId, intervalMs, enabled, maxHealthyPolls, slowAfterPolls, slowIntervalMs, client]);
+  }, [orderId, intervalMs, enabled, maxWaitMs, slowAfterPolls, slowIntervalMs, client]);
 
-  return { status, error, timedOut };
+  const checkAgain = useCallback(() => {
+    loop.current?.restart();
+  }, []);
+
+  return { status, error, timedOut, checkAgain };
 }

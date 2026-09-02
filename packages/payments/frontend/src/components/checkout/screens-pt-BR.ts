@@ -26,6 +26,8 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     processing: 'Processando pagamento…',
     confirming: 'Estamos confirmando seu pagamento',
     cannotPay: 'Não foi possível pagar',
+    connectionLost: 'Sem conexão no momento — continuamos tentando',
+    checkAgainAction: 'Verificar de novo',
   },
   pix: {
     heading: 'Pague com PIX',

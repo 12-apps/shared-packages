@@ -35,6 +35,10 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     processing: 'Processing payment…',
     confirming: 'We are confirming your payment',
     cannotPay: 'Could not pay',
+    // "we keep trying" is the load-bearing half: the wait has not ended, and a
+    // shopper who reads a final-sounding refusal pays a second time.
+    connectionLost: 'No connection right now — we keep trying',
+    checkAgainAction: 'Check again',
   },
   pix: {
     heading: 'Pay with PIX',

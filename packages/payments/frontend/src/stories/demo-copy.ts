@@ -30,6 +30,9 @@ export const STORY_CHECKOUT_COPY: CheckoutCopyFE = {
   returnPending: "Confirmando seu pagamento…",
   returnTimedOut:
     "Se você já pagou, o pedido é confirmado assim que a operadora avisar — não pague de novo.",
+  returnUnreachable:
+    "Estamos sem conexão com o pagamento e seguimos tentando. Se você já pagou, não pague de novo.",
+  returnCheckAgain: "Verificar de novo",
   returnUnknown:
     "Não encontramos um pagamento em andamento nesta sessão. Verifique seus pedidos em instantes.",
   continueAction: "Continuar",

@@ -59,6 +59,25 @@ export interface CheckoutCopyFE {
    * part only a host can own.
    */
   returnTimedOut?: string;
+  /**
+   * The return leg while the poll cannot REACH us (FUT-1144) — a dropped
+   * connection, or a browser that aborted our requests while the buyer was on
+   * the provider's page. The wait is still running and re-arms the moment the
+   * tab or the signal comes back, so the sentence must say "still trying", not
+   * "failed".
+   *
+   * OPTIONAL, on the {@link returnTimedOut} precedent: without it the screen
+   * shows the transport's own sentence — which the host already owns, through
+   * `views.screens.transport` — under `returnPending` as a warning.
+   */
+  returnUnreachable?: string;
+  /**
+   * The label on the buyer's "ask now" (FUT-1144), offered whenever the wait is
+   * unreachable or has elapsed. OPTIONAL for the same reason, and its ABSENCE
+   * costs the button: a control with no host-written label could only carry
+   * this package's Portuguese.
+   */
+  returnCheckAgain?: string;
   /** The Dados step's primary action. */
   continueAction: string;
   /**

@@ -10,45 +10,47 @@ import {
 
 import { useCheckoutCopy } from "./copy-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
+import { StalledWait } from "./stalled-wait";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, CheckoutOrder, OrderStatus } from "./types";
 import { useCheckoutComponents } from "./ui";
-import { useCardCheckout } from "./use-card-checkout";
+import { useCardCheckout, type CardCheckout } from "./use-card-checkout";
 
 /**
- * Post-submit confirmation state, error > timeout > spinner (FUT-191): a poll
- * failure is a danger Alert, the healthy-poll cap elapsing is a warning (the
- * order stays AWAITING server-side and is recoverable by webhook/reconcile/
- * backfill), and otherwise the — now bounded — confirmation spinner shows.
+ * Post-submit confirmation state: timeout > error > spinner.
+ *
+ * The elapsed wall-clock wait leads (the order stays AWAITING server-side and is
+ * recoverable by webhook/reconcile/backfill, which is what its copy says), then
+ * a poll that cannot reach us — a warning saying we are STILL TRYING, where
+ * FUT-1144 found a danger Alert over a wait that had actually given up — then
+ * the ordinary bounded spinner.
+ *
+ * That order inverted with the meaning of the two flags. An error used to BE the
+ * ending; now the clock is, and a wait that failed its way to the clock carries
+ * both. "We keep trying" over a wait nothing is scheduled for is the lie.
  */
-function SubmittedState({
-  pollError,
-  pollTimedOut,
-}: {
-  pollError: string | null;
-  pollTimedOut: boolean;
-}): JSX.Element {
-  const { Alert, LoadingState } = useCheckoutComponents();
+function SubmittedState({ card }: { card: CardCheckout }): JSX.Element {
+  const { LoadingState } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.settling;
-  if (pollError) {
+  if (card.pollTimedOut) {
     return (
-      <Alert
-        variant="danger"
-        title={copy.cannotConfirm}
-        description={pollError}
-        showIcon
-        data-testid="card-poll-error"
+      <StalledWait
+        title={copy.takingLonger}
+        description={copy.takingLongerHelp}
+        onCheckAgain={card.pollCheckAgain}
+        testId="card-poll-timeout"
+        actionTestId="card-check-again"
       />
     );
   }
-  if (pollTimedOut) {
+  if (card.pollError) {
     return (
-      <Alert
-        variant="warning"
-        title={copy.takingLonger}
-        description={copy.takingLongerHelp}
-        showIcon
-        data-testid="card-poll-timeout"
+      <StalledWait
+        title={copy.connectionLost}
+        description={card.pollError}
+        onCheckAgain={card.pollCheckAgain}
+        testId="card-poll-error"
+        actionTestId="card-check-again"
       />
     );
   }
@@ -139,7 +141,7 @@ export function CardView({
   const unresolved = cc.errorCode === UNRESOLVED_CODE;
 
   if (cc.submitted) {
-    return <SubmittedState pollError={cc.pollError} pollTimedOut={cc.pollTimedOut} />;
+    return <SubmittedState card={cc} />;
   }
 
   return (

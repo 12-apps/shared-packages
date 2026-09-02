@@ -34,8 +34,15 @@ export const PT_BR_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
       "Se você já pagou, o pedido é confirmado assim que a operadora avisar — " +
       "não pague de novo. Você pode fechar esta tela.",
   },
+  awaitingUnreachable: {
+    heading: "Não conseguimos falar com o pagamento agora",
+    support:
+      "Continuamos tentando por aqui. Se você já pagou, não pague de novo — " +
+      "o pedido é confirmado assim que a operadora avisar.",
+  },
   retryAction: "Tentar novamente",
   regenerateAction: "Gerar novo código",
+  checkAgainAction: "Verificar de novo",
   backAction: "Voltar ao cardápio",
   amountLabel: "Valor pago",
   referenceLabel: "Pedido",

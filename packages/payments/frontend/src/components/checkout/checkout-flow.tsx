@@ -174,6 +174,11 @@ function StatusStep({
       onBackToMenu={c.goToMenu}
       paidExtra={confirmationExtra}
       awaitingTimedOut={c.resumeTimedOut}
+      // The resumed leg's own trouble, and the way out of it (FUT-1144). Both
+      // are inert for a checkout that never left this tab — nothing was parked,
+      // so nothing is being polled here.
+      awaitingError={c.resumeError}
+      onCheckAgain={c.resumeCheckAgain}
     />
   );
 }
