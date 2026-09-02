@@ -5,14 +5,8 @@ import type { StoneCopy } from './copy';
 import { unreachableOutcome } from './probe-shared';
 import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
 import { NAME, stoneRequest } from './stone-http';
-import {
-  methodOf,
-  orderPayload,
-  orderSnapshot,
-  settledCharge,
-  type StoneCharge,
-  type StoneOrder,
-} from './stone-orders';
+import { methodOf, orderSnapshot, settledCharge, type StoneCharge, type StoneOrder } from './stone-orders';
+import { orderPayload } from './stone-payload';
 
 /**
  * The Stone adapter's operations, split out so `stone.ts` stays the ADAPTER

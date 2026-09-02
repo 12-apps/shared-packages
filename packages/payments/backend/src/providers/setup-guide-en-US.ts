@@ -94,8 +94,7 @@ export const EN_US_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
     credentials: (brandName) =>
       `When you register it, the dashboard asks for a username and a password to authenticate the notifications. Set both and enter exactly the same values in the form above — that is how ${brandName} confirms a notification really came from Stone.`,
     // Event names are the vendor's own identifiers, not words.
-    events:
-      'Subscribe to at least the charge events: charge.paid, charge.payment_failed and charge.refunded.',
+    events: (eventList) => `Subscribe to at least these charge events: ${eventList}.`,
     testConnection:
       'Once that is done, click “Test connection” above: the test makes a real authenticated call and tells you if the key is wrong.',
     doneLabel: 'Webhook',
