@@ -25,8 +25,10 @@ import type { ActivationStepCopy } from './copy';
  * sent looking for "Integrated Checkout" is looking for a screen that does not
  * exist. **CPF** and its `000.000.000-00` mask are a Brazilian document and a
  * FORMAT — a translated mask shows a shape the field refuses. **PagBank** and
- * **InfinitePay** are names. `{provider}` is this package's own placeholder,
- * substituted after the sentence is chosen.
+ * **InfinitePay** are names — PagBank now only as the console label above, since
+ * the tax-id hint takes the provider as an ARGUMENT rather than naming one
+ * (FUT-675). `{provider}` is this package's own placeholder, substituted after
+ * the sentence is chosen.
  */
 export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
   intro: {
@@ -104,7 +106,7 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
   },
   taxId: {
     label: 'CPF do titular',
-    hint: 'Exigido pelo PagBank em qualquer cobrança no cartão.',
+    hint: (displayName) => `A ${displayName} exige o CPF em qualquer cobrança no cartão.`,
     placeholder: '000.000.000-00',
   },
   charge: {

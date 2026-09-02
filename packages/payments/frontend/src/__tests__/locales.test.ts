@@ -48,19 +48,32 @@ describe('the locale packs', () => {
       expect(copy.outcome.blockedBody).toContain('Checkout Integrado');
       expect(copy.taxId.label).toContain('CPF');
       // The hint names the PROVIDER rather than the document — it is the
-      // sentence explaining who demands the field, and PagBank is a name.
-      expect(copy.taxId.hint).toContain('PagBank');
+      // sentence explaining who demands the field, and a provider's name is a
+      // name. It is an ARGUMENT now rather than a literal (FUT-675): both packs
+      // had spelled PagBank into the string, so a Stone activation told the
+      // owner PagBank required their CPF. What must not be translated is the
+      // name that passes through, which is what this asserts.
+      // Probed with a name that is NOT the old hardcode: passing 'PagBank'
+      // here is the one argument that cannot tell an interpolating pack from
+      // one that re-hardcodes PagBank and ignores its parameter.
+      expect(copy.taxId.hint('Stone')).toContain('Stone');
       expect(copy.taxId.placeholder).toBe('000.000.000-00');
     }
   });
 
   it('names the provider the owner is looking at, not a generic one', () => {
-    // Both refusal sentences are the ONLY place a provider's display name is
-    // interpolated on this step, and a pack that dropped the argument would
-    // read as a plausible sentence about nothing in particular.
+    // The two refusal sentences and the tax-id hint are the only places a
+    // provider's display name is interpolated on this step, and a pack that
+    // dropped the argument would read as a plausible sentence about nothing in
+    // particular — or, as the hint did before FUT-675, as a confident sentence
+    // about the WRONG provider.
     for (const copy of Object.values(ACTIVATION_STEP_COPY)) {
       expect(copy.outcome.refusedTitle('InfinitePay')).toContain('InfinitePay');
       expect(copy.outcome.refusedBody('InfinitePay')).toContain('InfinitePay');
+      expect(copy.taxId.hint('InfinitePay')).toContain('InfinitePay');
+      // And nothing else's name: the bug was a second provider named in a
+      // sentence that already had one.
+      expect(copy.taxId.hint('InfinitePay')).not.toContain('PagBank');
     }
   });
 
