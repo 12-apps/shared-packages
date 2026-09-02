@@ -6,6 +6,7 @@ import { ReportBuilderError } from "../errors";
 import { isValidTimeZone } from "../time";
 
 import { ReportEditorPage } from "./report-editor";
+import { CanvasSelectionProvider } from "./canvas-selection-provider";
 import { ReportsPage } from "./reports-page";
 import { SystemDashboardPage } from "./system-dashboard";
 import { SystemReportPage } from "./system-report";
@@ -205,7 +206,9 @@ export function createWebReportBuilder(config: ReportBuilderConfig): {
         surface={surface}
         copy={copy}
       >
-        <ReportBuilderRoutes tenantSlug={tenantSlug} />
+        <CanvasSelectionProvider>
+          <ReportBuilderRoutes tenantSlug={tenantSlug} />
+        </CanvasSelectionProvider>
       </ReportBuilderProvider>
     );
 
