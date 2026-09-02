@@ -1,3 +1,4 @@
+import { MERCHANT_EVENTS } from './stone-events';
 import type { ProviderSetupGuide, SetupGuideContext, SetupProgress } from '../core/types';
 import type { StoneSetupGuideCopy } from './setup-guide-copy';
 
@@ -72,7 +73,8 @@ export function stoneSetupGuide(
             text: copy.webhook.credentials(ctx.brandName),
           },
           {
-            text: copy.webhook.events,
+            // Composed from the adapter's own list, never retyped per locale.
+            text: copy.webhook.events(MERCHANT_EVENTS.join(', ')),
           },
           {
             // Re-homed from the `activate` section this guide used to ship. The

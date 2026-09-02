@@ -740,6 +740,13 @@ describe('stone live mode (pagar.me v5)', () => {
     expect(jsonOf(calls[0]!.init)['amount']).toBe(500);
   });
 
+  /**
+   * The webhook half used a payload Pagar.me does not send — a bare charge with
+   * no nested order — and passed because it took a shape fallback that no real
+   * delivery reached. That fallback is gone; the fixture is kept only as the
+   * historical case, with the REAL shape asserted beside it. The pipeline-level
+   * account of what the two shapes cost is in `stone-webhook.test.ts` (FUT-674).
+   */
   it('REFUSES a paid charge that carries no amount, on both the poll and the webhook', async () => {
     stubFetch([{ body: { id: 'or_9', charges: [{ id: 'ch_9', status: 'paid' }] } }]);
     await expect(stoneProvider(PT_BR_STONE_COPY).getCharge('or_9', LIVE)).rejects.toThrow(ProviderRequestError);
@@ -758,6 +765,242 @@ describe('stone live mode (pagar.me v5)', () => {
         LIVE,
       ),
     ).rejects.toThrow(ProviderRequestError);
+
+    await expect(
+      stoneProvider(PT_BR_STONE_COPY).webhook.parse(
+        {
+          provider: 'stone',
+          rawBody: JSON.stringify({
+            id: 'evt_9b',
+            type: 'charge.paid',
+            data: { id: 'ch_9', status: 'paid', order: { id: 'or_9', code: 'order-1' } },
+          }),
+          headers: {},
+        },
+        LIVE,
+      ),
+    ).rejects.toThrow(ProviderRequestError);
+  });
+
+  /**
+   * The POLL reads the same mapping the webhook does, and it is the path that
+   * actually reaches most stores today — a merchant who followed the setup
+   * guide before it named `charge.underpaid` gets a shortfall here first
+   * (FUT-674). All three cases were uncovered.
+   */
+  it('reports what a short payment CAPTURED, not what was raised', async () => {
+    stubFetch([
+      {
+        body: {
+          id: 'or_11',
+          code: 'order-1',
+          charges: [
+            { id: 'ch_11', status: 'underpaid', amount: 25_38, paid_amount: 15_00, payment_method: 'pix' },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_11', LIVE);
+    expect(snapshot).toMatchObject({ status: 'PAID', amount: { amountCents: 15_00 } });
+  });
+
+  it('REFUSES a short payment that does not say how much came in', async () => {
+    // The amount RAISED would clear a host's coverage guard and settle an
+    // order for money that never arrived.
+    stubFetch([{ body: { id: 'or_12', charges: [{ id: 'ch_12', status: 'underpaid', amount: 25_38 }] } }]);
+    await expect(stoneProvider(PT_BR_STONE_COPY).getCharge('or_12', LIVE)).rejects.toThrow(
+      ProviderRequestError,
+    );
+  });
+
+  it('answers REFUNDED for a full reversal, which reads `canceled` on the wire', async () => {
+    // CANCELED does not outrank PAID, so mapping the word rather than the money
+    // left a refunded charge's row sitting at PAID for ever.
+    stubFetch([
+      {
+        body: {
+          id: 'or_14',
+          charges: [
+            { id: 'ch_14', status: 'canceled', amount: 25_38, paid_amount: 25_38, canceled_amount: 25_38 },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_14', LIVE);
+    expect(snapshot.status).toBe('REFUNDED');
+  });
+
+  it('still answers CANCELED for a cancellation that returned no money', async () => {
+    stubFetch([{ body: { id: 'or_15', charges: [{ id: 'ch_15', status: 'canceled', amount: 25_38 }] } }]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_15', LIVE);
+    expect(snapshot.status).toBe('CANCELED');
+  });
+
+  it('answers CANCELED for a VOID, which cancels an amount without returning one', async () => {
+    // `canceled_amount` names the amount CANCELLED, not the amount returned —
+    // voiding an unpaid charge cancels its full value with nothing having
+    // arrived. Reading it alone parks a payable for money the buyer never
+    // sent, and marks a void as proof the connection can charge.
+    stubFetch([
+      {
+        body: {
+          id: 'or_17',
+          charges: [
+            { id: 'ch_17', status: 'canceled', amount: 25_38, paid_amount: 0, canceled_amount: 25_38 },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_17', LIVE);
+    expect(snapshot.status).toBe('CANCELED');
+  });
+
+  it('reports what a short-paid charge CAPTURED after it is reversed whole', async () => {
+    // The poll and the webhook read the same order object and must agree: the
+    // webhook path already answers 15_00 here, and reporting the amount raised
+    // writes a capture larger than reality over the row the host parked short.
+    stubFetch([
+      {
+        body: {
+          id: 'or_18',
+          charges: [
+            { id: 'ch_18', status: 'canceled', amount: 25_38, paid_amount: 15_00, canceled_amount: 15_00 },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_18', LIVE);
+    expect(snapshot).toMatchObject({ status: 'REFUNDED', amount: { amountCents: 15_00 } });
+  });
+
+  it('lets a live PAID charge outrank a reversed sibling listed before it', async () => {
+    // Membership plus array order is not a choice between siblings: the
+    // reversed charge listed first made an order.paid report REFUNDED, which
+    // the reactor parks where it used to settle.
+    stubFetch([
+      {
+        body: {
+          id: 'or_20',
+          charges: [
+            { id: 'ch_20a', status: 'canceled', amount: 25_38, paid_amount: 25_38, canceled_amount: 25_38 },
+            { id: 'ch_20b', status: 'paid', amount: 25_38, paid_amount: 25_38, payment_method: 'pix' },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_20', LIVE);
+    expect(snapshot).toMatchObject({ providerChargeId: 'ch_20b', status: 'PAID' });
+  });
+
+  it('does not let a shortfall sibling refuse a delivery a paid charge answers', async () => {
+    // The same defect's sharper half: the underpaid sibling has no
+    // `paid_amount`, so speaking for the order made the WHOLE delivery throw
+    // and an order that really was paid never settled.
+    stubFetch([
+      {
+        body: {
+          id: 'or_21',
+          charges: [
+            { id: 'ch_21a', status: 'underpaid', amount: 25_38 },
+            { id: 'ch_21b', status: 'paid', amount: 25_38, paid_amount: 25_38, payment_method: 'pix' },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_21', LIVE);
+    expect(snapshot).toMatchObject({ providerChargeId: 'ch_21b', status: 'PAID' });
+  });
+
+  it('lets a charge still HOLDING money outrank ones that gave it back', async () => {
+    // The priority's lower rungs, which no assertion pinned until a mutation
+    // reordered them and every test still passed: money the store currently
+    // has speaks over money it has returned, and a partial return over a full
+    // one. Ordered worst-first here so array position cannot supply the answer.
+    stubFetch([
+      {
+        body: {
+          id: 'or_22',
+          charges: [
+            { id: 'ch_22a', status: 'refunded', amount: 25_38, paid_amount: 25_38 },
+            { id: 'ch_22b', status: 'partial_canceled', amount: 25_38, paid_amount: 25_38 },
+            { id: 'ch_22c', status: 'overpaid', amount: 25_38, paid_amount: 30_00, payment_method: 'pix' },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_22', LIVE);
+    expect(snapshot).toMatchObject({ providerChargeId: 'ch_22c', status: 'PAID' });
+  });
+
+  it('lets a PARTIAL reversal outrank a full one', async () => {
+    stubFetch([
+      {
+        body: {
+          id: 'or_23',
+          charges: [
+            { id: 'ch_23a', status: 'refunded', amount: 25_38, paid_amount: 25_38 },
+            { id: 'ch_23b', status: 'partial_canceled', amount: 25_38, paid_amount: 25_38 },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_23', LIVE);
+    expect(snapshot).toMatchObject({ providerChargeId: 'ch_23b', status: 'PARTIALLY_REFUNDED' });
+  });
+
+  it('lets a REVERSED charge speak for its order over a failed sibling', async () => {
+    // The same hole `settledCharge` had for `overpaid`, one status along: a
+    // charge that took money and gave it back still speaks for its order.
+    stubFetch([
+      {
+        body: {
+          id: 'or_19',
+          charges: [
+            { id: 'ch_19a', status: 'failed', amount: 25_38 },
+            { id: 'ch_19b', status: 'refunded', amount: 25_38, paid_amount: 25_38 },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_19', LIVE);
+    expect(snapshot).toMatchObject({ providerChargeId: 'ch_19b', status: 'REFUNDED' });
+  });
+
+  it('lets a SETTLED charge speak for a multi-charge order, not merely a `paid` one', async () => {
+    // A first attempt that failed beside a second that overpaid: reading only
+    // `paid` picks the failure and reports the whole order DECLINED.
+    stubFetch([
+      {
+        body: {
+          id: 'or_16',
+          charges: [
+            { id: 'ch_16a', status: 'failed', amount: 25_38 },
+            { id: 'ch_16b', status: 'overpaid', amount: 25_38, paid_amount: 30_00, payment_method: 'pix' },
+          ],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_16', LIVE);
+    expect(snapshot).toMatchObject({
+      providerChargeId: 'ch_16b',
+      status: 'PAID',
+      amount: { amountCents: 30_00 },
+    });
+  });
+
+  it('answers PARTIALLY_REFUNDED for a partially reversed charge', async () => {
+    // Without a mapping this fell through to PENDING, and the row never left
+    // the pending sweep until its abandon window.
+    stubFetch([
+      {
+        body: {
+          id: 'or_13',
+          charges: [{ id: 'ch_13', status: 'partial_canceled', amount: 25_38, paid_amount: 25_38 }],
+        },
+      },
+    ]);
+    const snapshot = await stoneProvider(PT_BR_STONE_COPY).getCharge('or_13', LIVE);
+    expect(snapshot.status).toBe('PARTIALLY_REFUNDED');
   });
 
   it('still answers PENDING for an unpaid order with no amount', async () => {

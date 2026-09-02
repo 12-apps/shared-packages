@@ -7,10 +7,12 @@ import type { StoneCopy } from './copy';
 import { stubDeliveryTrusted } from '../core/stub-mode';
 import type {
   NormalizedWebhookEvent,
+  RefundSnapshot,
   ResolvedCredentials,
   WebhookDelivery,
 } from '../core/types';
 import { basicAuth } from './http';
+import { CHARGE_EVENTS, FULL_REFUND_EVENTS, REFUND_EVENTS } from './stone-events';
 import { secureEquals, sha256Hex } from './shared';
 import { NAME } from './stone-http';
 import {
@@ -21,7 +23,14 @@ import {
   refund,
   verifyCredentialsWith,
 } from './stone-operations';
-import { methodOf, orderSnapshot, settledCharge, type StoneCharge, type StoneOrder } from './stone-orders';
+import {
+  methodOf,
+  orderSnapshot,
+  positiveCents,
+  settledCharge,
+  type StoneCharge,
+  type StoneOrder,
+} from './stone-orders';
 import { stoneSetupGuide } from './stone-setup-guide';
 
 /**
@@ -40,22 +49,6 @@ import { stoneSetupGuide } from './stone-setup-guide';
  * Same house rules as the other live adapters: a card decline is a RESULT,
  * not an exception; retries only ever happen pre-send; no PAN reaches here.
  */
-
-/** Pagar.me event types that carry a charge state change. */
-const CHARGE_EVENTS = new Set([
-  'charge.paid',
-  'charge.payment_failed',
-  'charge.pending',
-  'charge.processing',
-  'charge.canceled',
-  'charge.underpaid',
-  'charge.overpaid',
-  'order.paid',
-  'order.payment_failed',
-  'order.canceled',
-]);
-
-const REFUND_EVENTS = new Set(['charge.refunded', 'charge.partial_refunded']);
 
 interface StoneWebhookBody {
   id?: string;
@@ -81,15 +74,106 @@ async function verifyStoneWebhook(
 }
 
 /**
- * A delivery may carry either the order or a bare charge, depending on the
- * event family. Normalizing both into an order shape keeps one mapping path.
+ * A delivery may carry either the ORDER or a bare CHARGE, and WHICH it is is
+ * decided by the event family — not by the shape.
+ *
+ * A real Pagar.me `charge.*` delivery puts the charge in `data` and nests an
+ * order STUB at `data.order`: `id`, `code`, `amount`, `status`, and no
+ * `charges` array. Preferring that stub threw away the only account of the
+ * charge the delivery carries — `settledCharge` found no charges, the event
+ * degraded to `UNKNOWN`, and a paid PIX or card NEVER settled by webhook. Only
+ * the buyer's own polling screen saved the order, and `charge.paid` is the
+ * first event the setup guide tells the merchant to subscribe to (FUT-674).
+ *
+ * So a `charge.*` event is normalized the other way round: the charge IS the
+ * payload, and the stub contributes only the order's own handles. `code` is
+ * read from the STUB alone and never from `data` — a charge carries a `code` of
+ * its own (an acquirer NSU, on one raised at a POS terminal), and putting that
+ * where `reference` goes hands the host an id no order of its is keyed by.
  */
-function orderOf(body: StoneWebhookBody): StoneOrder {
+function orderOf(type: string, body: StoneWebhookBody): StoneOrder {
   const data = body.data;
   if (!data) return {};
-  if (data.order) return data.order;
-  if (!data.charges && data.id) return { charges: [data as StoneCharge] };
+  // Unconditional, and the shape is not consulted: on a `charge.*` event
+  // `data` IS the charge, so resolving to the nested stub — which has no
+  // charges — is the defect itself. A shape guard here was tried and is worse
+  // than none: `data` on such a delivery carries the CHARGE's `code` (an
+  // acquirer NSU), so reading it as an order names a reference no payable has.
+  if (type.startsWith('charge.')) return chargeAsOrder(data);
+  // Everything else is an `order.*`, where `data` IS the order, charges and
+  // all. Two shape fallbacks used to sit here and are gone: once `charge.*`
+  // stopped consulting the shape they could be reached by no event this
+  // adapter acts on, and a branch that cannot run is a branch nothing can
+  // keep honest.
   return data;
+}
+
+/** The charge as its own one-charge order, keyed by the stub's handles alone. */
+function chargeAsOrder(data: NonNullable<StoneWebhookBody['data']>): StoneOrder {
+  const stub = data.order;
+  return {
+    ...(stub?.id ? { id: stub.id } : {}),
+    ...(stub?.code ? { code: stub.code } : {}),
+    charges: [data as StoneCharge],
+  };
+}
+
+/**
+ * The refund a reversal event announces — the LEDGER fact, which is the only
+ * account of it the host will ever get for money returned from the Pagar.me
+ * dashboard or a POS terminal. It used to be emitted bare (`REFUND_UPDATED`
+ * with no `refund`), and `classifyReversalEvent` reads the payload rather than
+ * the type, so an estorno reached nothing at all (FUT-674).
+ *
+ * `status` comes from the EVENT, never from the charge: Pagar.me's own
+ * `charge.refunded` example carries `"status": "canceled"` on the charge, so
+ * mapping the charge status here would file a completed refund as a
+ * cancellation.
+ *
+ * The amount is `canceled_amount`, the portion that went back. A FULL reversal
+ * that omits it falls back to what was captured. A PARTIAL one that omits it
+ * yields no refund payload rather than a guessed number — `capturedAmountCents`' rule, one object along: a
+ * fabricated amount is precisely the input a reversal guard exists to catch.
+ * Standing down leaves the bare event this replaces, which is no worse than
+ * before; inventing a figure would be.
+ */
+function refundOf(type: string, order: StoneOrder, body: StoneWebhookBody): RefundSnapshot | undefined {
+  const charge = settledCharge(order);
+  const providerChargeId = charge?.id ?? order.id;
+  const returned = returnedCents(type, charge);
+  if (!providerChargeId || returned === null) return undefined;
+  return {
+    provider: NAME,
+    providerChargeId,
+    // Pagar.me mints no separate refund id: a reversal is a state change on the
+    // charge itself (a DELETE on it), so the charge's id is the only stable
+    // handle the delivery carries — the same call the PagBank adapter makes.
+    providerRefundId: providerChargeId,
+    ...(order.code ? { reference: order.code } : {}),
+    status: 'REFUNDED',
+    amount: { amountCents: returned, currency: (charge?.currency ?? 'BRL').toUpperCase() },
+    raw: body,
+  };
+}
+
+/**
+ * The cents that went BACK, or null when the delivery does not say how many.
+ *
+ * Every read is POSITIVE-or-nothing. `canceled_amount: 0` is what a charge that
+ * was never reversed carries, and taking it at face value emits a refund of
+ * zero — which `classifyReversalEvent` accepts as a real one and hands to
+ * `parkReversal`, taking the payable out of settled for no money at all. A
+ * stated zero and an absent field are the same claim here: nothing came back.
+ */
+function returnedCents(type: string, charge: StoneCharge | undefined): number | null {
+  const canceled = positiveCents(charge?.canceled_amount);
+  if (canceled !== null) return canceled;
+  if (!FULL_REFUND_EVENTS.has(type)) return null;
+  // A full reversal returns what the buyer actually PAID, which on a charge
+  // that settled short is not the amount raised — the same divergence
+  // `capturedOf` exists for. `amount` is the last resort, for a delivery that
+  // names neither.
+  return positiveCents(charge?.paid_amount) ?? positiveCents(charge?.amount);
 }
 
 function parseStoneEvent(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
@@ -98,7 +182,7 @@ function parseStoneEvent(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
   // Pagar.me sends a delivery id; fall back to a body hash so redeliveries
   // stay idempotent even if it is ever absent.
   const eventId = body.id ?? sha256Hex(delivery.rawBody);
-  const order = orderOf(body);
+  const order = orderOf(type, body);
   const charge = settledCharge(order);
 
   if (CHARGE_EVENTS.has(type) && charge) {
@@ -118,14 +202,13 @@ function parseStoneEvent(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
       },
     ];
   }
-  return [
-    {
-      provider: NAME,
-      eventId,
-      type: REFUND_EVENTS.has(type) ? 'REFUND_UPDATED' : 'UNKNOWN',
-      raw: body,
-    },
-  ];
+  if (REFUND_EVENTS.has(type)) {
+    const refund = refundOf(type, order, body);
+    return [
+      { provider: NAME, eventId, type: 'REFUND_UPDATED', ...(refund ? { refund } : {}), raw: body },
+    ];
+  }
+  return [{ provider: NAME, eventId, type: 'UNKNOWN', raw: body }];
 }
 
 export function stoneProvider(source: PaymentsCopySource<StoneCopy>): PaymentProviderAdapter {
