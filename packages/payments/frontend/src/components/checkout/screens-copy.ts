@@ -61,6 +61,25 @@ export interface SettlingCopy {
   confirming: string;
   /** It came back refused. */
   cannotPay: string;
+  /**
+   * We cannot reach the payment right now — a dropped connection, a handset
+   * moving between Wi-Fi and 4G, a browser that aborted our requests while the
+   * shopper was in their bank app (FUT-1144).
+   *
+   * TRANSIENT, and the sentence must say so: the screen is still asking, on a
+   * backoff, and it re-asks the moment the tab comes back or the signal
+   * returns. This was `cannotConfirm` — "não foi possível confirmar o
+   * pagamento" — under which the wait had actually STOPPED, so a shopper who
+   * had paid read a final-sounding refusal and was never told otherwise.
+   */
+  connectionLost: string;
+  /**
+   * Ask again, now. Offered beside {@link connectionLost} and beside the
+   * elapsed wait, because a shopper watching a screen that cannot reach us
+   * needs something to press — and because pressing it is what restarts a wait
+   * that has run out.
+   */
+  checkAgainAction: string;
 }
 
 /** The PIX pane: the QR, the copyable code, and the wait. */

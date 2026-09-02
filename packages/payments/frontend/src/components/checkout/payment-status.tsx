@@ -4,7 +4,7 @@ import type { JSX, ReactNode } from "react";
 import { CheckCircleOutlineIcon, ErrorOutlineIcon, ScheduleIcon } from "./icons";
 import type { OrderStatus } from "./types";
 import { useCheckoutComponents } from "./ui";
-import type { PaymentStatusCopy } from "./view-copy";
+import type { PaymentStatusCopy, StatusOutcomeCopy } from "./view-copy";
 
 /**
  * The last screen of checkout.
@@ -79,37 +79,65 @@ function orderReference(orderId: string): string {
   return orderId.replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
+/** How the wait itself is going, when it has not resolved into an outcome. */
+interface WaitState {
+  /** The bounded wall-clock wait elapsed — nothing further is scheduled. */
+  timedOut: boolean;
+  /** The last poll failed, and the wait is still running (FUT-1144). */
+  unreachable: boolean;
+}
+
+/**
+ * Which of AWAITING's three faces this is.
+ *
+ * STOPPED beats STILL TRYING, and the order is the whole honesty of the screen.
+ * A wait that ran its clock out while failing carries BOTH flags — the last
+ * poll's error is still the last thing that happened — and saying "we keep
+ * trying" over a wait nothing is scheduled for is precisely the lie this ticket
+ * exists to remove. The elapsed state is also the one carrying "não pague de
+ * novo", which is the sentence that matters most when we have stopped looking.
+ *
+ * Both keep AWAITING's neutral clock icon and take WARNING's tone: the order is
+ * not resolved, and calm-but-alert is the visual for that.
+ */
+function awaitingFace(
+  copy: PaymentStatusCopy,
+  wait: WaitState,
+): { outcome: StatusOutcomeCopy; tone: OutcomeVisual["tone"]; testId: string } | null {
+  if (wait.timedOut) {
+    return { outcome: copy.awaitingTimedOut, tone: "warning", testId: "payment-awaiting-timeout" };
+  }
+  if (wait.unreachable) {
+    return { outcome: copy.awaitingUnreachable, tone: "warning", testId: "payment-awaiting-unreachable" };
+  }
+  return null;
+}
+
 /** The headline block: icon, outcome, and one supporting line. */
 function OutcomeHero({
   copy,
   status,
-  timedOut = false,
+  wait,
 }: {
   copy: PaymentStatusCopy;
   status: OrderStatus;
-  timedOut?: boolean;
+  wait: WaitState;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
-  const timedOutWait = timedOut && status === "AWAITING_PAYMENT";
-  // The timed-out wait keeps AWAITING's neutral clock icon but WARNING's tone:
-  // the order is not resolved, and calm-but-alert is the visual for that.
-  const visual = timedOutWait
-    ? { icon: OUTCOME_VISUAL.AWAITING_PAYMENT.icon, tone: "warning" as const }
+  const face = status === "AWAITING_PAYMENT" ? awaitingFace(copy, wait) : null;
+  const visual = face
+    ? { icon: OUTCOME_VISUAL.AWAITING_PAYMENT.icon, tone: face.tone }
     : OUTCOME_VISUAL[status];
-  const outcome = timedOutWait ? copy.awaitingTimedOut : copy[OUTCOME_COPY_KEY[status]];
+  const outcome = face ? face.outcome : copy[OUTCOME_COPY_KEY[status]];
   return (
     <Box
       // `payment-paid` is load-bearing for the storefront journeys — it is how
-      // they assert the buyer actually got there. The timed-out wait gets its
+      // they assert the buyer actually got there. Each unsettled wait gets its
       // OWN id rather than reusing `payment-awaiting_payment`: a test that
-      // cannot tell "still asking" from "stopped asking" is a test that would
-      // pass against the unbounded spinner this replaced.
+      // cannot tell "still asking" from "stopped asking" from "cannot reach the
+      // payment" is a test that would pass against the spinner this replaced.
       data-testid={
-        timedOut && status === "AWAITING_PAYMENT"
-          ? "payment-awaiting-timeout"
-          : status === "PAID"
-            ? "payment-paid"
-            : `payment-${status.toLowerCase()}`
+        face ? face.testId : status === "PAID" ? "payment-paid" : `payment-${status.toLowerCase()}`
       }
       sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, textAlign: "center" }}
     >
@@ -176,23 +204,41 @@ function PaidFacts({
   );
 }
 
-/** The next-action row: retry / regenerate for failures, always back-to-menu. */
+/** The next-action row: retry / regenerate / check-again, always back-to-menu. */
 function StatusActions({
   copy,
   status,
   onRetry,
   onRegenerate,
+  onCheckAgain,
   onBackToMenu,
 }: {
   copy: PaymentStatusCopy;
   status: OrderStatus;
   onRetry?: () => void;
   onRegenerate?: () => void;
+  /**
+   * Offered only while the wait is unsettled AND not visibly working — the
+   * caller decides that; here it is simply present or absent. A button under a
+   * healthy spinner would invite a tap that changes nothing.
+   */
+  onCheckAgain?: () => void;
   onBackToMenu: () => void;
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      {onCheckAgain ? (
+        <Button
+          variant="solid"
+          color="primary"
+          size="lg"
+          onClick={onCheckAgain}
+          dataTestId="payment-check-again"
+        >
+          {copy.checkAgainAction}
+        </Button>
+      ) : null}
       {status === "FAILED" && onRetry ? (
         <Button variant="solid" color="primary" size="lg" onClick={onRetry} dataTestId="payment-retry">
           {copy.retryAction}
@@ -218,18 +264,8 @@ function StatusActions({
   );
 }
 
-export function PaymentStatus({
-  copy,
-  status,
-  totalLabel,
-  orderId,
-  buyerEmail,
-  onRetry,
-  onRegenerate,
-  onBackToMenu,
-  paidExtra,
-  awaitingTimedOut = false,
-}: {
+/** What the last screen of checkout is handed. */
+interface PaymentStatusProps {
   /** Every sentence and label this screen renders — the HOST's words. */
   copy: PaymentStatusCopy;
   status: OrderStatus | null;
@@ -249,14 +285,69 @@ export function PaymentStatus({
    */
   paidExtra?: ReactNode;
   /**
-   * The wait has been given up on — see {@link AWAITING_TIMED_OUT}. Only
-   * meaningful while AWAITING_PAYMENT; every other status has already resolved,
-   * so a stale flag cannot change what a settled screen says.
+   * The wait has been given up on. Only meaningful while AWAITING_PAYMENT;
+   * every other status has already resolved, so a stale flag cannot change what
+   * a settled screen says.
    */
   awaitingTimedOut?: boolean;
-}): JSX.Element {
+  /**
+   * The wait's last poll failed (FUT-1144). Same scope rule as
+   * {@link awaitingTimedOut}, and it YIELDS to it: a wait that failed its way to
+   * the wall clock has both, and the honest thing to say then is that we have
+   * stopped asking.
+   */
+  awaitingError?: string | null;
+  /**
+   * Ask now. Rendered ONLY while the automatic wait is not visibly working —
+   * unreachable, or elapsed — so the buyer always has something to press when
+   * the spinner cannot honestly stand for progress, and nothing extra to think
+   * about when it can.
+   */
+  onCheckAgain?: () => void;
+}
+
+/**
+ * The wait has stopped LOOKING like progress: it cannot reach us, or it has run
+ * its clock out. Either way the spinner would be a lie and the buyer is owed
+ * something to press. Scoped to AWAITING because every other status has already
+ * resolved, so a stale flag cannot change what a settled screen says.
+ */
+function isStalled(status: OrderStatus, wait: WaitState): boolean {
+  if (status !== "AWAITING_PAYMENT") return false;
+  return wait.timedOut || wait.unreachable;
+}
+
+/**
+ * The check-again action, but only where it can honestly be offered — a button
+ * under a healthy spinner invites a tap that changes nothing.
+ */
+function offeredCheckAgain(
+  stalled: boolean,
+  onCheckAgain: (() => void) | undefined,
+): (() => void) | undefined {
+  return stalled ? onCheckAgain : undefined;
+}
+
+export function PaymentStatus({
+  copy,
+  status,
+  totalLabel,
+  orderId,
+  buyerEmail,
+  onRetry,
+  onRegenerate,
+  onBackToMenu,
+  paidExtra,
+  awaitingTimedOut = false,
+  awaitingError = null,
+  onCheckAgain,
+}: PaymentStatusProps): JSX.Element {
   const { LoadingState } = useCheckoutComponents();
   const effective: OrderStatus = status ?? "AWAITING_PAYMENT";
+  const wait: WaitState = { timedOut: awaitingTimedOut, unreachable: awaitingError !== null };
+  const stalled = isStalled(effective, wait);
+  const paid = effective === "PAID";
+  const spinning = effective === "AWAITING_PAYMENT" && !stalled;
 
   return (
     <Box
@@ -265,15 +356,15 @@ export function PaymentStatus({
       data-timed-out={awaitingTimedOut ? "true" : undefined}
       sx={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "stretch", py: 2 }}
     >
-      <OutcomeHero copy={copy} status={effective} timedOut={awaitingTimedOut} />
+      <OutcomeHero copy={copy} status={effective} wait={wait} />
 
-      {effective === "PAID" ? (
+      {paid ? (
         <PaidFacts copy={copy} totalLabel={totalLabel} orderId={orderId} buyerEmail={buyerEmail} />
       ) : null}
 
-      {effective === "PAID" ? paidExtra : null}
+      {paid ? paidExtra : null}
 
-      {effective === "AWAITING_PAYMENT" && !awaitingTimedOut ? (
+      {spinning ? (
         <LoadingState variant="spinner" size="md" message="" dataTestId="payment-pending" />
       ) : null}
 
@@ -282,6 +373,7 @@ export function PaymentStatus({
         status={effective}
         onRetry={onRetry}
         onRegenerate={onRegenerate}
+        onCheckAgain={offeredCheckAgain(stalled, onCheckAgain)}
         onBackToMenu={onBackToMenu}
       />
     </Box>

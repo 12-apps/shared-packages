@@ -74,8 +74,23 @@ export interface PaymentStatusCopy {
   failed: StatusOutcomeCopy;
   expired: StatusOutcomeCopy;
   awaitingTimedOut: StatusOutcomeCopy;
+  /**
+   * The wait cannot reach the payment right now (FUT-1144) — and is STILL
+   * ASKING, which is the whole difference between this outcome and the one
+   * above it, and why the one above it wins when a screen somehow has both. The
+   * resumed hosted return used to render neither: its poll could fail forever
+   * and the screen went on saying "isso costuma levar alguns segundos" under a
+   * spinner, so the one leg with no PIX or card view of its own was also the
+   * one that never mentioned a problem.
+   */
+  awaitingUnreachable: StatusOutcomeCopy;
   retryAction: string;
   regenerateAction: string;
+  /**
+   * Ask now, rather than waiting for the next automatic poll — and, once the
+   * wait has run out, the only thing that starts it again.
+   */
+  checkAgainAction: string;
   backAction: string;
   /** The paid receipt's three row labels. */
   amountLabel: string;

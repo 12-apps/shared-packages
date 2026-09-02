@@ -4,6 +4,7 @@ import QRCode from "react-qr-code";
 
 import { useCheckoutCopy } from "./copy-context";
 import { ContentCopyIcon } from "./icons";
+import { StalledWait } from "./stalled-wait";
 import type { CheckoutOrder, OrderStatus, PixCharge } from "./types";
 import { useCheckoutComponents } from "./ui";
 import { usePaymentPolling } from "./use-payment-polling";
@@ -71,19 +72,38 @@ function PixCodeBox({ pix }: { pix: PixCharge }): JSX.Element {
   );
 }
 
-/** The live footer: poll error, or the pulsing "awaiting payment" indicator. */
-function PixPollFooter({ error }: { error: string | null }): JSX.Element {
-  const { Alert, Text } = useCheckoutComponents();
+/**
+ * The live footer: the pulsing "awaiting payment" indicator, or — while the
+ * poll cannot reach us — the same wait said out loud, with a way to hurry it.
+ *
+ * A WARNING rather than a danger (FUT-1144). The old red panel said "não foi
+ * possível confirmar o pagamento" and meant it: four consecutive failures ended
+ * the wait, so a shopper who paid during a ten-second blip watched a QR under a
+ * final-sounding refusal that would never update. The QR is still good, the
+ * wait is still running, and the sentence now says both.
+ */
+function PixPollFooter({
+  error,
+  onCheckAgain,
+}: {
+  error: string | null;
+  onCheckAgain: () => void;
+}): JSX.Element {
+  const { Text } = useCheckoutComponents();
   const { pix, settling } = useCheckoutCopy().screens;
   if (error) {
+    // The same panel the card and wallet panes show, held to the width of the
+    // copy-and-paste strip above it so the centred PIX column stays a column.
     return (
-      <Alert
-        variant="danger"
-        title={settling.cannotConfirm}
-        description={error}
-        showIcon
-        data-testid="pix-poll-error"
-      />
+      <Box sx={{ width: "100%", maxWidth: 420 }}>
+        <StalledWait
+          title={settling.connectionLost}
+          description={error}
+          onCheckAgain={onCheckAgain}
+          testId="pix-poll-error"
+          actionTestId="pix-check-again"
+        />
+      </Box>
     );
   }
   return (
@@ -107,7 +127,9 @@ export function PixView({
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
-  const { status, error } = usePaymentPolling(order.orderId, { intervalMs: pollIntervalMs });
+  const { status, error, checkAgain } = usePaymentPolling(order.orderId, {
+    intervalMs: pollIntervalMs,
+  });
 
   // Bubble a terminal status up once, so the parent can advance to the status step.
   useEffect(() => {
@@ -160,7 +182,7 @@ export function PixView({
         {copy.validUntil(validUntil)}
       </Text>
 
-      <PixPollFooter error={error} />
+      <PixPollFooter error={error} onCheckAgain={checkAgain} />
     </Box>
   );
 }
