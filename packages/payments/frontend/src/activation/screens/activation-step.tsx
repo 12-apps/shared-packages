@@ -158,6 +158,7 @@ function ActivationBody({
     <CardVerification
       verifyChargeUrl={config.verifyChargeUrl(provider)}
       provider={provider}
+      displayName={displayName}
       ownerEmail={ownerEmail}
       onVerified={onVerified}
       CardSurface={config.CardSurface}

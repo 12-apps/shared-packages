@@ -35,10 +35,13 @@ export type CardSurface = ComponentType<{ children: ReactNode }>;
 function ChargeForm({
   verification,
   amountLabel,
+  displayName,
   validateTaxId,
 }: {
   verification: ActivationCharge;
   amountLabel: string | null;
+  /** The provider being activated, as the owner knows it. */
+  displayName: string;
   validateTaxId: (value: string) => string | undefined;
 }): JSX.Element {
   const { taxId, actions } = useActivationCopy();
@@ -65,7 +68,7 @@ function ChargeForm({
         placeholder={taxId.placeholder}
         value={formatCpf(cpf)}
         error={Boolean(cpfError)}
-        helperText={cpfError ?? taxId.hint}
+        helperText={cpfError ?? taxId.hint(displayName)}
         onChange={(event) => setCpf(onlyDigits(event.target.value))}
         onBlur={() => validateTaxId(cpf)}
         data-testid="verify-charge-cpf"
@@ -110,6 +113,7 @@ function CardOutcome({
 export function CardVerification({
   verifyChargeUrl,
   provider,
+  displayName,
   ownerEmail,
   onVerified,
   CardSurface: Surface,
@@ -118,6 +122,8 @@ export function CardVerification({
 }: {
   verifyChargeUrl: string;
   provider: string;
+  /** The name the OWNER reads; `provider` beside it is the machine key. */
+  displayName: string;
   /** Who is paying — the signed-in owner. The host reads its own session. */
   ownerEmail: string;
   onVerified: () => void;
@@ -173,6 +179,7 @@ export function CardVerification({
           <ChargeForm
             verification={verification}
             amountLabel={amountLabel}
+            displayName={displayName}
             validateTaxId={validateTaxId}
           />
         </Surface>

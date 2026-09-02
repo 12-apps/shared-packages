@@ -126,7 +126,14 @@ export interface ActivationOutcomeCopy {
 /** The CPF field the card flow asks for beside the card. */
 export interface ActivationTaxIdCopy {
   readonly label: string;
-  readonly hint: string;
+  /**
+   * WHO is asking for the document, by name. A parameter rather than a
+   * sentence, for the reason the setup guide's `credentials` takes one: the
+   * provider is a fact about the connection being activated, not about the
+   * language. Both packs had spelled one provider's name into the string, so a
+   * Stone activation told the owner PagBank required their CPF (FUT-675).
+   */
+  readonly hint: (displayName: string) => string;
   readonly placeholder: string;
 }
 

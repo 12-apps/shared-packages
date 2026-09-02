@@ -104,7 +104,7 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
   },
   taxId: {
     label: 'CPF do titular',
-    hint: 'Exigido pelo PagBank em qualquer cobrança no cartão.',
+    hint: (displayName) => `Exigido pelo ${displayName} em qualquer cobrança no cartão.`,
     placeholder: '000.000.000-00',
   },
   charge: {
