@@ -12,6 +12,7 @@ import {
   googlePayConfig,
 } from "./method-capability";
 import type { ProviderCheckoutScreenProps } from "./providers/types";
+import { StalledWait } from "./stalled-wait";
 import { useCheckoutComponents } from "./ui";
 import { useWalletCharge, type WalletCharge } from "./use-wallet-charge";
 
@@ -35,29 +36,29 @@ type WalletPaneProps = ProviderCheckoutScreenProps & {
   order: NonNullable<ProviderCheckoutScreenProps["order"]>;
 };
 
-/** Post-submit confirmation, error > timeout > spinner — the card view's order. */
+/** Post-submit confirmation, timeout > error > spinner — the card view's order. */
 function WalletProcessing({ wallet }: { wallet: WalletCharge }): JSX.Element {
-  const { Alert, LoadingState } = useCheckoutComponents();
+  const { LoadingState } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.settling;
-  if (wallet.pollError) {
+  if (wallet.pollTimedOut) {
     return (
-      <Alert
-        variant="danger"
-        title={copy.cannotConfirm}
-        description={wallet.pollError}
-        showIcon
-        data-testid="wallet-poll-error"
+      <StalledWait
+        title={copy.takingLonger}
+        description={copy.takingLongerHelp}
+        onCheckAgain={wallet.pollCheckAgain}
+        testId="wallet-poll-timeout"
+        actionTestId="wallet-check-again"
       />
     );
   }
-  if (wallet.pollTimedOut) {
+  if (wallet.pollError) {
     return (
-      <Alert
-        variant="warning"
-        title={copy.takingLonger}
-        description={copy.takingLongerHelp}
-        showIcon
-        data-testid="wallet-poll-timeout"
+      <StalledWait
+        title={copy.connectionLost}
+        description={wallet.pollError}
+        onCheckAgain={wallet.pollCheckAgain}
+        testId="wallet-poll-error"
+        actionTestId="wallet-check-again"
       />
     );
   }

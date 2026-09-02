@@ -108,13 +108,60 @@ function buildHostedHandoff(runtime: FlowsRuntime): CheckoutScreens["HostedHando
  * Stated here rather than imported because the two waits are the same DECISION
  * arrived at twice, not one shared implementation: this screen takes its FAST
  * interval from the host's `polling` config when there is one, and a host that
- * tunes that must not have this package's cap silently mean a different
- * wall-clock window than the constant's comment claims.
+ * tunes that must not have this package's bound silently mean a different
+ * wall-clock window than the constant's comment claims — which is exactly what
+ * a bound counted in POLLS did, and why it is counted in milliseconds now
+ * (FUT-1144).
  */
 const RETURN_FAST_MS = 2_500;
 const RETURN_SLOW_MS = 10_000;
 const RETURN_FAST_POLLS = (2 * 60_000) / RETURN_FAST_MS;
-const RETURN_POLL_CAP = RETURN_FAST_POLLS + (13 * 60_000) / RETURN_SLOW_MS;
+const RETURN_WINDOW_MS = 15 * 60_000;
+
+/**
+ * The two ways this wait stops looking like progress, said as a warning with
+ * the buyer's own "ask now" under it (FUT-1144).
+ *
+ * The button is drawn only when the host wrote a label for it. That is the
+ * `returnTimedOut` precedent one step further: a bound with no copy still
+ * stops the spinner, and an action with no copy could only be labelled in this
+ * package's Portuguese, so it is the one half that stands down.
+ */
+function ReturnStalled({
+  runtime,
+  description,
+  onCheckAgain,
+  testId,
+}: {
+  runtime: FlowsRuntime;
+  description: string | undefined;
+  onCheckAgain: () => void;
+  testId: string;
+}): JSX.Element {
+  const { Alert, Button } = useCheckoutComponents();
+  return (
+    <Box data-testid="checkout-hosted-return" sx={{ py: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+      <Alert
+        variant="warning"
+        title={runtime.copy.returnPending}
+        {...(description === undefined ? {} : { description })}
+        showIcon
+        data-testid={testId}
+      />
+      {runtime.copy.returnCheckAgain === undefined ? null : (
+        <Button
+          variant="outline"
+          color="neutral"
+          size="md"
+          onClick={onCheckAgain}
+          dataTestId="checkout-hosted-return-check-again"
+        >
+          {runtime.copy.returnCheckAgain}
+        </Button>
+      )}
+    </Box>
+  );
+}
 
 function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn"] {
   function HostedReturnBody({
@@ -126,15 +173,15 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
     // Read-and-clear, once, on first render: the resumed view belongs to
     // exactly one return trip.
     const [parked] = useState(takeHostedOrder);
-    // Bounded, for the reason on RETURN_POLL_CAP: nothing here can ever reach a
+    // Bounded, for the reason on RETURN_WINDOW_MS: nothing here can ever reach a
     // terminal state on its own, so an unbounded poll is a spinner the buyer
     // watches until they close the tab.
-    const { status, timedOut } = usePaymentPolling(parked?.orderId ?? null, {
+    const { status, timedOut, error, checkAgain } = usePaymentPolling(parked?.orderId ?? null, {
       enabled: Boolean(parked),
       intervalMs: runtime.config.polling?.intervalMs ?? RETURN_FAST_MS,
       slowAfterPolls: RETURN_FAST_POLLS,
       slowIntervalMs: RETURN_SLOW_MS,
-      maxHealthyPolls: RETURN_POLL_CAP,
+      maxWaitMs: RETURN_WINDOW_MS,
     });
 
     useEffect(() => {
@@ -152,19 +199,27 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
         />
       );
     }
+    // STOPPED beats STILL TRYING. A wait that failed its way to the wall clock
+    // carries both, and the elapsed state is the one that stops asking — and the
+    // one whose sentence says not to pay again.
     if (timedOut) {
       return (
-        <Box data-testid="checkout-hosted-return" sx={{ py: 4 }}>
-          <Alert
-            variant="warning"
-            title={runtime.copy.returnPending}
-            {...(runtime.copy.returnTimedOut === undefined
-              ? {}
-              : { description: runtime.copy.returnTimedOut })}
-            showIcon
-            data-testid="checkout-hosted-return-timeout"
-          />
-        </Box>
+        <ReturnStalled
+          runtime={runtime}
+          description={runtime.copy.returnTimedOut}
+          onCheckAgain={checkAgain}
+          testId="checkout-hosted-return-timeout"
+        />
+      );
+    }
+    if (error !== null) {
+      return (
+        <ReturnStalled
+          runtime={runtime}
+          description={runtime.copy.returnUnreachable ?? error}
+          onCheckAgain={checkAgain}
+          testId="checkout-hosted-return-unreachable"
+        />
       );
     }
     return (

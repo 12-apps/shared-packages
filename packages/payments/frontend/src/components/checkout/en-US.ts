@@ -40,8 +40,17 @@ export const EN_US_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
       "If you have already paid, the order is confirmed as soon as the provider tells us — " +
       "do not pay again. You can close this screen.",
   },
+  awaitingUnreachable: {
+    heading: "We cannot reach the payment right now",
+    // "do not pay again" leads the second sentence for the same reason it
+    // leads `awaitingTimedOut`: a second payment is the expensive mistake.
+    support:
+      "We are still trying. If you have already paid, do not pay again — " +
+      "the order is confirmed as soon as the provider tells us.",
+  },
   retryAction: "Try again",
   regenerateAction: "Generate a new code",
+  checkAgainAction: "Check again",
   backAction: "Back to the menu",
   amountLabel: "Amount paid",
   referenceLabel: "Order",

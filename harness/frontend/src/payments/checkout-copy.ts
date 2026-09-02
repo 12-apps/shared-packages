@@ -74,8 +74,15 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           'Se você já pagou, aguarde: o pedido será confirmado assim que o banco avisar — ' +
           'não pague uma segunda vez. Pode fechar esta tela.',
       },
+      awaitingUnreachable: {
+        heading: 'Não estamos conseguindo falar com o pagamento',
+        support:
+          'Seguimos tentando por aqui. Se você já pagou, não pague de novo — ' +
+          'o pedido é confirmado assim que o banco avisar.',
+      },
       retryAction: 'Tentar de novo',
       regenerateAction: 'Gerar outro código',
+      checkAgainAction: 'Verificar agora',
       backAction: 'Voltar à loja',
       amountLabel: 'Total pago',
       referenceLabel: 'Referência',
@@ -148,6 +155,8 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           processing: 'Enviando o pagamento…',
           confirming: 'Conferindo seu pagamento',
           cannotPay: 'Não deu para pagar',
+          connectionLost: 'Sem conexão agora — seguimos tentando',
+          checkAgainAction: 'Verificar agora',
         },
         pix: {
           heading: 'Pagar com PIX',

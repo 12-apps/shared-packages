@@ -147,15 +147,19 @@ function handOverToProvider(
  * confirmation is at most 2.5 s late, and an abandoned checkout costs ~126
  * polls instead of the 360 a flat 2.5 s would have.
  *
- * The three constants are ONE decision — 48 × 2.5 s + 78 × 10 s ≈ 15 min — so
- * the cap is derived rather than typed, and cannot drift from the comment.
- *
  * Fifteen minutes because by then a webhook that was ever coming has come. Past
  * that the answer will not change while the buyer watches: the scheduled
  * reconciliation is what rescues a genuinely late one, and it does that whether
  * the tab is open or not.
  *
- * The card wait is bounded at 90 s (`CARD_AWAITING_POLL_CAP`) because a card
+ * The BOUND is that wall-clock window, not a poll count (FUT-1144). The two are
+ * the same number for a healthy wait — 48 × 2.5 s + 78 × 10 s = 15 min — and
+ * they part company for the wait that needed bounding: a poll that FAILS
+ * incremented nothing, so a connection that never came back left this screen
+ * asking, and spinning, with no end at all. A clock cannot be stopped by the
+ * failure it is measuring.
+ *
+ * The card wait is bounded at 90 s (`CARD_AWAITING_WAIT_MS`) because a card
  * authorises inline and a buyer is holding their phone. This leg is the other
  * shape: the buyer has already been off to another site and back, and may
  * legitimately still be finishing there.
@@ -165,8 +169,7 @@ const HOSTED_RESUME_SLOW_MS = 10_000;
 /** Two minutes at the fast rate, before the wait is worth economising on. */
 const HOSTED_RESUME_FAST_POLLS = (2 * 60_000) / HOSTED_RESUME_FAST_MS;
 /** Thirteen more at the slow one — 15 minutes all told. */
-const HOSTED_RESUME_POLL_CAP =
-  HOSTED_RESUME_FAST_POLLS + (13 * 60_000) / HOSTED_RESUME_SLOW_MS;
+const HOSTED_RESUME_WINDOW_MS = 15 * 60_000;
 
 /**
  * The leg of checkout that resumes after a hosted provider sent the buyer back
@@ -184,21 +187,56 @@ const HOSTED_RESUME_POLL_CAP =
  * had no way to reach a terminal state, because the ORDER has none: expiry is
  * PIX-only, and a redirect charge carries no QR window to lapse. `timedOut` is
  * what the screen says instead of spinning.
+ *
+ * `error` is the half that was dropped on the floor (FUT-1144), and dropping it
+ * is what made this leg the SILENT one. The poll below has always been able to
+ * fail; this hook returned `status` and `timedOut` and nothing else, so a leg
+ * whose every request was failing looked identical to one still waiting — the
+ * spinner, forever, with the reason a `console`-less browser away. It is
+ * surfaced now, together with the wait's own `checkAgain`, because a screen that
+ * says "we cannot reach the payment" and offers nothing to press is only half
+ * of an answer.
  */
 function useHostedResume(tenantSlug?: string): {
   order: CheckoutOrder | null;
   status: OrderStatus | null;
   timedOut: boolean;
+  error: string | null;
+  checkAgain: () => void;
 } {
   const [order] = useState(() => takeHostedOrder(tenantSlug));
-  const { status, timedOut } = usePaymentPolling(order?.orderId ?? null, {
+  const { status, timedOut, error, checkAgain } = usePaymentPolling(order?.orderId ?? null, {
     enabled: Boolean(order),
     intervalMs: HOSTED_RESUME_FAST_MS,
     slowAfterPolls: HOSTED_RESUME_FAST_POLLS,
     slowIntervalMs: HOSTED_RESUME_SLOW_MS,
-    maxHealthyPolls: HOSTED_RESUME_POLL_CAP,
+    maxWaitMs: HOSTED_RESUME_WINDOW_MS,
   });
-  return { order, status, timedOut };
+  return { order, status, timedOut, error, checkAgain };
+}
+
+/**
+ * What the resumed leg contributes to the controller's surface.
+ *
+ * `resumeTimedOut` is only ever true on that leg — `useHostedResume` is the
+ * sole caller that bounds its wait, and a buyer who never left has a card or
+ * PIX view reporting its own. `resumeError` and `resumeCheckAgain` are the
+ * transient failure and the buyer's way out of it (FUT-1144).
+ *
+ * All three are inert for a checkout that never left this tab: with nothing
+ * parked the poll is disabled, so the error stays null, the bound never
+ * elapses, and the action has no wait to restart.
+ */
+function resumeSurface(resume: ReturnType<typeof useHostedResume>): {
+  resumeTimedOut: boolean;
+  resumeError: string | null;
+  resumeCheckAgain: () => void;
+} {
+  return {
+    resumeTimedOut: resume.timedOut,
+    resumeError: resume.error,
+    resumeCheckAgain: resume.checkAgain,
+  };
 }
 
 /**
@@ -338,10 +376,7 @@ export function useCheckoutController(
   return {
     step, setStep, method, setMethod, buyer, setBuyer, saveProfile, setSaveProfile,
     order, finalStatus: finalStatus ?? resume.status, creating,
-    // Only ever true on the resumed leg: `useHostedResume` is the sole caller
-    // that caps its polls, and a buyer who never left has a card or PIX view
-    // reporting its own wait.
-    resumeTimedOut: resume.timedOut,
+    ...resumeSurface(resume),
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu, back, editBuyer,
     goToPayment, startPayment, payWithEmail, handleResolved, retry, completed,
