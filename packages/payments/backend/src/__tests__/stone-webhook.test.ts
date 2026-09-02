@@ -139,10 +139,11 @@ function stoneWorld() {
       reversed.push({ reference, providerChargeId, refundedCents });
     },
     recordDispute: async () => {},
-    // The port future-pay implements as `storedChargeReference`. It is the ONLY
-    // reference source a Stone reversal can reach when the order stub names no
-    // `code`: a REFUND_UPDATED carries no `charge`, so `ingestWebhookEvents`
-    // hands the reactor a null stored charge and the middle fallback is out.
+    // The port an adopting host implements over its own charge table. It is
+    // the ONLY reference source a Stone reversal can reach when the order stub
+    // names no `code`: a REFUND_UPDATED carries no `charge`, so
+    // `ingestWebhookEvents` hands the reactor a null stored charge and the
+    // middle fallback is out.
     referenceOf: async (_merchant, _provider, providerChargeId) =>
       (await charges.findByProviderChargeId('stone', providerChargeId))?.reference ?? null,
   };
