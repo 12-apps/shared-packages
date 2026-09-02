@@ -5,7 +5,15 @@
  * The seam is the DOM: everything here is about locating and revealing an
  * element, and none of it knows what a report block contains.
  */
-import { useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type Dispatch,
+  type MouseEvent as ReactMouseEvent,
+  type SetStateAction,
+} from "react";
 
 import { BLOCK_ID_ATTR } from "./report-editor-block";
 
@@ -24,18 +32,78 @@ export interface CanvasSelection {
   deselect: () => void;
 }
 
-export function useCanvasSelection(): CanvasSelection {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [everOpened, setEverOpened] = useState(false);
+/**
+ * The selection, held ABOVE the routes.
+ *
+ * It has to outlive a route change, because one happens in the middle of an
+ * edit and nobody asked for it: autosaving a report that has never been saved
+ * CREATES it, and `afterCreate` then navigates `/reports/new` →
+ * `/reports/:id/edit` so the URL names the new row. That is a different route,
+ * so the editor page unmounts — and with this state inside it, `everOpened`
+ * went back to false and the canvas rendered NO panel at all. Not the empty
+ * state: nothing. The author's block editor vanished mid-edit, at a moment the
+ * autosave timer chose rather than they did.
+ *
+ * A provider is what survives that, because the remount happens BELOW it. The
+ * store is per builder surface, and `useCanvasSelection` scopes it to one
+ * report — see the session rule there.
+ */
+export interface SelectionState {
+  selectedId: string | null;
+  everOpened: boolean;
+  sessionId: string | null;
+}
+
+interface SelectionStore {
+  state: SelectionState;
+  setState: Dispatch<SetStateAction<SelectionState>>;
+}
+
+export const SelectionContext = createContext<SelectionStore | null>(null);
+
+/**
+ * `sessionId` is the report being edited — `undefined` while it has never been
+ * saved. The rule is deliberately asymmetric:
+ *
+ *  - `undefined` → an id ADOPTS the session. That is the create above: the same
+ *    report the author has been building all along, finally given a row.
+ *  - one id → a DIFFERENT id resets. That is opening another report, where
+ *    carrying a selection over would point the panel at a block id that merely
+ *    happens to collide (`bloco-1` exists in every report).
+ */
+export function useCanvasSelection(sessionId?: string): CanvasSelection {
+  const store = useContext(SelectionContext);
+  const local = useState<SelectionState>({
+    selectedId: null,
+    everOpened: false,
+    sessionId: null,
+  });
+  const state = store ? store.state : local[0];
+  const setState = store ? store.setState : local[1];
+
+  const current = sessionId ?? null;
+  const stale = state.sessionId !== null && current !== null && state.sessionId !== current;
+  const unclaimed = state.sessionId === null && current !== null;
+
+  // Updater form throughout: a `select()` can land between this render and the
+  // effect, and writing a value captured at render would throw it away.
+  useEffect(() => {
+    if (stale) setState({ selectedId: null, everOpened: false, sessionId: current });
+    else if (unclaimed) {
+      setState((prev) => (prev.sessionId === null ? { ...prev, sessionId: current } : prev));
+    }
+  }, [stale, unclaimed, current, setState]);
+
+  // Read through the reset in the same render that detects it, so one frame of
+  // the previous report's panel cannot be shown against the new one.
+  const view = stale ? { selectedId: null, everOpened: false } : state;
 
   return {
-    selectedId,
-    everOpened,
-    select: (id) => {
-      setSelectedId(id);
-      setEverOpened(true);
-    },
-    deselect: () => setSelectedId(null),
+    selectedId: view.selectedId,
+    everOpened: view.everOpened,
+    select: (id) => setState({ selectedId: id, everOpened: true, sessionId: current }),
+    deselect: () =>
+      setState({ selectedId: null, everOpened: view.everOpened, sessionId: current }),
   };
 }
 
