@@ -88,7 +88,7 @@ export const EN_US_ACTIVATION_STEP_COPY: ActivationStepCopy = {
   },
   taxId: {
     label: "Cardholder's CPF",
-    hint: 'PagBank requires it on every card charge.',
+    hint: (displayName) => `${displayName} requires it on every card charge.`,
     placeholder: '000.000.000-00',
   },
   charge: {

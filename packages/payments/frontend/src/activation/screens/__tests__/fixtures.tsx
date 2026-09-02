@@ -63,7 +63,11 @@ export const TEST_COPY: ActivationStepCopy = {
     blockedTitle: 'Finish step 2 first',
     blockedBody: 'Confirm the provider-side switch.',
   },
-  taxId: { label: 'Tax id', hint: 'The card holder tax id', placeholder: '000.000.000-00' },
+  taxId: {
+    label: 'Tax id',
+    hint: (displayName: string) => `${displayName} requires the card holder tax id`,
+    placeholder: '000.000.000-00',
+  },
   charge: {
     card: EN_US_CARD_COPY,
     noTokenizer: 'No card path for {provider}',

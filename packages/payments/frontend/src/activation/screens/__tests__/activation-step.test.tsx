@@ -129,6 +129,18 @@ describe('the activation step router', () => {
     expect(hooks.redirect).not.toHaveBeenCalled();
   });
 
+  it('asks for the CPF in the name of the provider being activated', () => {
+    // The threading was proven only by `tsc` — a regression passing the wrong
+    // but correctly-typed string (`provider`, the machine key; the host's own
+    // brand) compiles and passes every other case. This renders it. The bug
+    // (FUT-675) was a hardcoded name, so the assertion is that a NON-default
+    // provider's name reaches the field.
+    hooks.charge.mockReturnValue(IDLE_CHARGE);
+    mountStep({ provider: 'stone', displayName: 'Stone' });
+
+    expect(screen.getByText('Stone requires the card holder tax id')).not.toBeNull();
+  });
+
   it('hands each flow the host route for the provider that is open', () => {
     hooks.redirect.mockReturnValue(IDLE_REDIRECT);
     mountStep({ provider: 'infinitepay' });
