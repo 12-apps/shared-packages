@@ -53,7 +53,10 @@ describe('the locale packs', () => {
       // had spelled PagBank into the string, so a Stone activation told the
       // owner PagBank required their CPF. What must not be translated is the
       // name that passes through, which is what this asserts.
-      expect(copy.taxId.hint('PagBank')).toContain('PagBank');
+      // Probed with a name that is NOT the old hardcode: passing 'PagBank'
+      // here is the one argument that cannot tell an interpolating pack from
+      // one that re-hardcodes PagBank and ignores its parameter.
+      expect(copy.taxId.hint('Stone')).toContain('Stone');
       expect(copy.taxId.placeholder).toBe('000.000.000-00');
     }
   });
