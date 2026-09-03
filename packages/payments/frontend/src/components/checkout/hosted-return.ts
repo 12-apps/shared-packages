@@ -1,35 +1,58 @@
+import type { CheckoutBasketIdentity } from "./basket";
+import {
+  belongsHere,
+  forgetHostedOrder,
+  isStale,
+  readParked,
+  type ParkedHostedOrder,
+} from "./hosted-store";
 import type { CheckoutOrder } from "./types";
 
 /**
- * Surviving the trip to a hosted checkout (FUT-556).
+ * WHETHER A PARKED CHECKOUT MAY BE RESUMED (FUT-556, FUT-1213).
  *
- * A redirect provider takes the buyer to ITS OWN site, so the SPA is torn down
- * and remounts fresh when they come back. Everything the checkout held —
- * which order was raised, for how much — is gone, and without it the return
- * lands on an empty payment step: no confirmation, no total, no sign that the
- * money they just moved arrived.
+ * The storage half is `./hosted-store.ts`. What is decided here is the money
+ * rule on top of it, and the rule exists because the first version had none:
+ * a parked entry was resumed by whatever checkout mounted next, unconditionally.
  *
- * The webhook still settles the order server-side; that is the mechanism and it
- * does not depend on any of this. What is rescued here is only the buyer's view
- * of it.
+ * ## What that cost
  *
- * `sessionStorage`, not `localStorage`: the handover is one tab's round trip,
- * and a pending order left in durable storage would resurface in a later,
- * unrelated session.
+ * A shopper goes to the provider's page, does NOT pay, and comes back to the
+ * store by a route that is not the checkout — typing the store's address, a
+ * bookmark, history. They empty the basket, add a different product, and press
+ * "pay". The checkout opened on the CONFIRMATION step, polling the old order
+ * for fifteen minutes, with no amount and no reference and nothing on screen
+ * to say which order it was about — and then told a shopper who never paid
+ * "não pague de novo", while their live basket sat behind it. In stub mode it
+ * was worse: the old order self-confirmed and the host's paid-order handler
+ * closed the cart the old order pointed at, which by then held the NEW lines.
+ *
+ * ## The rule (product decision, 2026-09-02)
+ *
+ * "Bind the parked hand-off to the basket, and never lose a paid buyer's
+ * confirmation." Given the parked entry and the basket now in front of the
+ * checkout:
+ *
+ *  1. nothing parked, another store's entry, or a stale one → nothing changes;
+ *  2. the basket is THE SAME as the one the order was raised from, **or it is
+ *     empty** — the server closes a paid cart, so an empty basket is the paid
+ *     buyer's normal state → resume;
+ *  3. the basket is DIFFERENT → ask the server ONCE what the parked order is
+ *     worth before deciding. PAID resumes and shows the confirmation; anything
+ *     else drops the entry and opens a normal checkout for the basket in front
+ *     of the shopper.
+ *
+ * Step 3 is what keeps the confirmation, and it is answerable where the
+ * provider is not: a paid order is settled into the order row by the webhook,
+ * so `GET /status` answers PAID from the database even though InfinitePay's own
+ * `payment_check` cannot be asked without the `transaction_nsu` that only the
+ * paid redirect carries.
+ *
+ * The decision is DEFERRED until the host's cart has loaded — see
+ * {@link CheckoutBasketIdentity.ready}. Deciding against an unseeded cart reads
+ * every basket as empty, which is rule 2, which is the old behaviour with extra
+ * steps.
  */
-
-/**
- * Where the parked order lives, namespaced to this PACKAGE.
- *
- * It used to carry one adopter's brand as its namespace, written into every
- * adopter's browser. A storage key is not a private detail: it is observable
- * surface, asserted on by `@12-apps/payments-e2e` and visible in devtools to
- * anyone running the host. The sibling handover in this same folder already got
- * this right with a `payments:` prefix; this one did not.
- *
- * Exported so a host or a spec names it rather than retyping it.
- */
-export const HOSTED_ORDER_STORAGE_KEY = "payments.checkout.hostedOrder";
 
 /**
  * What a hosted provider appends to the return URL. InfinitePay sends the
@@ -55,7 +78,7 @@ function isReturnTrip(): boolean {
 }
 
 /**
- * Whether a hand-off from THIS tab is still waiting to be resolved.
+ * Whether a payment raised in THIS tab is still waiting to be resolved.
  *
  * Exported because a host needs it and was otherwise forced to reimplement it.
  * `/menu/checkout` is a URL like any other, so a host may put a gate in front
@@ -66,23 +89,55 @@ function isReturnTrip(): boolean {
  * precisely the drift this package exists to stop: the copy went stale the
  * moment Stripe's 3-D Secure markers were added here.
  *
- * Read WITHOUT consuming. The gate asks on every render; only the flow may
- * take the order.
+ * ## It asks the SAME question the resume asks (FUT-1213)
+ *
+ * A gate that stands aside for a return that is not going to happen is a gate
+ * that has been talked out of its job — and at a SHUT store that is the whole
+ * screen. FUT-1213 names it as one of the bug's own harms: the stale entry made
+ * the closed-store curtain stand aside, so an abandoned shopper met
+ * "Confirmando seu pagamento" where they should have met "Loja fechada".
+ *
+ * So this mirrors {@link takeHostedOrder}'s rule rather than merely asking
+ * whether anything is parked: the entry must be THIS store's, not stale, and
+ * still ABOUT the basket in front of the shopper — the same basket it was
+ * raised from, or an empty one, which is the paid buyer's normal state because
+ * the server closes a paid cart. Both directions fall out of it: a buyer who
+ * paid reaches their confirmation at a shut store, and a buyer who abandoned
+ * and rebuilt a different basket meets the curtain.
+ *
+ * It stays LOCAL and NON-CONSUMING, which is what makes it usable from a gate:
+ * the comparison is against the parked signature, so there is no `/status`
+ * round trip, and only the flow may take the order.
+ *
+ * **A host that passes no basket keeps the WIDE answer** — anything parked for
+ * this store stands the gate aside. That is the pre-1213 behaviour, kept so an
+ * un-migrated host is not broken by a bump, and it is the reason a host wiring
+ * `cart.identity` must pass it here too: the gate and the flow behind it are
+ * one decision, and only a host can hand both the same basket.
+ *
+ * A cart that has not LOADED answers `true` for the same reason it answers
+ * `WAIT` on the resume: nothing is known yet, and the permissive answer is the
+ * one that cannot strand a payer. A host that freezes this answer at mount
+ * (`useState(() => …)`) must therefore not freeze it before its cart is ready.
  */
-export function hostedCheckoutReturnPending(tenantSlug?: string): boolean {
+export function hostedCheckoutReturnPending(
+  tenantSlug?: string,
+  basket?: CheckoutBasketIdentity,
+): boolean {
   const parked = readParked();
-  // THE PARKED ENTRY DECIDES whenever there is one — the same two questions the
+  // THE PARKED ENTRY DECIDES whenever there is one — the same questions the
   // resume asks, so a gate and the flow behind it cannot disagree about whose
-  // return this is. Another store's hand-off is not this route's business, and
-  // a stale one is nobody's.
+  // return this is.
   //
   // Asking the URL FIRST is what this used to do, and it made the two disagree
   // exactly where it costs something: a provider marker is per-TAB, so store
   // A's abandoned hand-off plus any marked URL had the gate answer "a return is
   // pending here" on store B while `takeHostedOrder` correctly refused to
-  // resume it. A gate that stands aside for a return that is not going to
-  // happen is a gate that has been talked out of its job.
-  if (parked) return belongsHere(parked, tenantSlug) && !isStale(parked);
+  // resume it.
+  if (parked) {
+    if (!belongsHere(parked, tenantSlug) || isStale(parked)) return false;
+    return aboutThisBasket(parked, basket);
+  }
   // Nothing parked, so the provider's own marker is the only evidence left that
   // a return is in progress. It is kept, and only here, for the case that has
   // no other signal: the flow has already CONSUMED the entry, and a gate
@@ -91,203 +146,106 @@ export function hostedCheckoutReturnPending(tenantSlug?: string): boolean {
 }
 
 /**
- * What is actually parked: the order, WHOSE STORE it belongs to, and when.
+ * Where a resumed checkout opens.
  *
- * `CheckoutOrder` carries no tenant, and on a multi-tenant storefront every
- * store shares one origin — so one tab holds one slot for all of them. Without
- * the slug, a buyer who abandoned store A's hand-off and opened store B's
- * checkout resumed A's order on B's screen: a confirmation for an unrelated
- * order, and B's own checkout skipped.
- *
- * `parkedAt` bounds the other axis. A hand-off is a round trip of minutes; an
- * entry older than {@link MAX_PARKED_AGE_MS} belongs to a session the buyer has
- * long since abandoned, and resuming it tells them about an order they are no
- * longer trying to place.
+ * `status` is the confirmation screen with its poll; `payment` puts the buyer
+ * back in front of the code they were paying.
  */
-interface ParkedHostedOrder {
-  order: CheckoutOrder;
-  /** The store this hand-off belongs to; absent for an unscoped host. */
-  tenantSlug?: string;
-  parkedAt: number;
+export type HostedResumeStep = "status" | "payment";
+
+/**
+ * What the rule decided, and what the caller must do about it.
+ *
+ * `ASK` is the only verdict that leaves the entry PARKED: the caller has not
+ * got its answer yet, and dropping the entry before the server has spoken would
+ * lose a paid buyer's confirmation to a failed request. The caller consumes it
+ * with `forgetHostedOrder` once it knows.
+ */
+export type HostedResumeDecision =
+  | { verdict: "WAIT" }
+  | { verdict: "NONE" }
+  | { verdict: "RESUME"; order: CheckoutOrder; step: HostedResumeStep }
+  | { verdict: "ASK"; order: CheckoutOrder };
+
+/**
+ * Where a resume lands, once one is happening.
+ *
+ * A HAND-OFF always lands on the confirmation: the buyer paid (or did not) on
+ * another site, there is nothing on our page for them to do, and the only way
+ * to learn which it was is to ask. Anything else — a PIX code, a card charge
+ * raised on our own page — lands back on the PAYMENT step, because the thing
+ * the buyer needs is still there and still valid: the server reuses the same
+ * charge and the same code, so nothing is charged twice and the pane's own poll
+ * still carries them to the confirmation the moment it settles.
+ *
+ * Unless the basket is EMPTY, which on this path means the server closed the
+ * cart because the order was paid. Showing that shopper a QR to scan would be
+ * showing them a code for money they have already sent.
+ */
+function resumeStepFor(
+  parked: ParkedHostedOrder,
+  basket: CheckoutBasketIdentity | undefined,
+): HostedResumeStep {
+  if (parked.handoff) return "status";
+  return basket?.signature === null ? "status" : "payment";
 }
 
 /**
- * How long a parked hand-off stays resumable.
+ * The parked order and what to do with it — the rule at the top of this file.
  *
- * Thirty minutes: a hosted payment takes minutes, and the window has to cover a
- * buyer who fetches their card, not one who comes back tomorrow. Beyond it the
- * entry is dropped on read rather than resumed.
+ * Read-and-clear except on `ASK`. The resume happens once per parked checkout,
+ * so leaving and reopening the checkout gives a fresh one; what changed in
+ * FUT-1213 is only WHICH of those reads is allowed to resume.
  */
-const MAX_PARKED_AGE_MS = 30 * 60_000;
-
-/** Park the raised order before handing the buyer to the provider's page. */
-export function rememberHostedOrder(order: CheckoutOrder, tenantSlug?: string): void {
-  try {
-    const parked: ParkedHostedOrder = {
-      order,
-      ...(tenantSlug ? { tenantSlug } : {}),
-      parkedAt: Date.now(),
-    };
-    window.sessionStorage?.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(parked));
-  } catch {
-    // Storage disabled or full. The redirect must still happen: the webhook
-    // settles the order either way, and refusing to send the buyer to pay
-    // would be a far worse failure than a plain return screen.
-  }
-}
-
-/**
- * The parked order, cleared as it is read.
- *
- * This USED to require a marker on the URL, so that a buyer who abandoned the
- * provider's page and reopened checkout got a fresh order rather than resuming
- * one they never paid. That reasoning is inverted for the provider it matters
- * most for, and the inversion is a money bug rather than a UX preference.
- *
- * Pressing the provider's "Continuar" is the ONLY thing that marks the URL.
- * Closing the tab, hitting back, or retyping the store's address are all
- * commoner, and all of them landed the buyer on a live payment step for an
- * order that may already be paid — an invitation to pay twice. It cannot be
- * decided by asking first, either: InfinitePay's `payment_check` refuses to
- * answer without a `transaction_nsu` that only that same redirect carries, so
- * "poll before resuming" reads PAID as PENDING and drops them on the pay
- * button anyway.
- *
- * So a parked order is itself the signal. The cost is that a buyer who truly
- * abandoned sees one confirmation screen reporting what the store actually
- * knows — which is the truth — with the way back on it. The read-and-clear
- * bounds it: the resume happens once per hand-off, and leaving and reopening
- * checkout gives a fresh one.
- *
- * `sessionStorage` already scopes this to one tab's round trip, so nothing
- * here can resurface in a later, unrelated session.
- */
-/**
- * The key before the 2.0.0 rename, READ ONLY — decoded from base64 so no
- * spelling of the old brand, whole or split, appears in shipped source (both
- * brand gates sweep this file), while the RUNTIME string stays exactly what
- * pre-2.0.0 bundles wrote.
- *
- * A buyer who left for the provider's page on a pre-2.0.0 bundle comes back
- * to a newer one with their order parked under the old name. Without this
- * they land on the plain return screen — the order still settles, because the
- * webhook does that and never depended on any of this, but the confirmation
- * they were promised is missing for a reason they could not possibly
- * understand.
- *
- * DELETE when both hold, and not before:
- *  1. every adopter's production has served ONLY >= 2.0.0 bundles for at
- *     least 24 hours (a hosted round trip lasts minutes; a day is
- *     over-margin) — verified against each consumer's lockfile history, not
- *     assumed from this package's release date; and
- *  2. the deletion rides its own release with this note in the body, so an
- *     adopter still rolling back to a pre-2.0.0 bundle knows the window it
- *     reopens.
- * 3.0.0 deleted this shim on the package's clock instead of the hosts' —
- * consumers still pinned 2.x, so their key-renaming deploy had not happened
- * yet — which is why it is back.
- */
-const LEGACY_KEY = atob('ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy');
-
-/**
- * The raw parked payload under either key, cleared as it is read.
- *
- * Split out from {@link takeHostedOrder} so the storage handling and the
- * parsing stay separately readable — the two halves fail for unrelated reasons
- * anyway (storage disabled vs. a value that is not an order).
- *
- * BOTH keys are cleared whichever one answered: this is read-and-clear, and a
- * legacy entry left behind would let a later return trip resume an order that
- * was already consumed.
- */
-function peekParkedPayload(): string | null {
-  try {
-    return (
-      window.sessionStorage?.getItem(HOSTED_ORDER_STORAGE_KEY) ??
-      window.sessionStorage?.getItem(LEGACY_KEY) ??
-      null
-    );
-  } catch {
-    // Storage disabled or unavailable — the same "no parked order" as an empty
-    // slot, and the webhook still settles the order regardless.
-    return null;
-  }
-}
-
-export function takeHostedOrder(tenantSlug?: string): CheckoutOrder | null {
+export function takeHostedOrder(
+  tenantSlug?: string,
+  basket?: CheckoutBasketIdentity,
+): HostedResumeDecision {
+  // Nothing is consumed against a cart that has not loaded: an unseeded cart
+  // reads as empty, and empty is the verdict that resumes unconditionally.
+  if (basket && !basket.ready) return { verdict: "WAIT" };
   const parked = readParked();
-  if (!parked) return null;
-  // A hand-off from ANOTHER store is left where it is rather than consumed: it
+  if (!parked) return { verdict: "NONE" };
+  // A checkout from ANOTHER store is left where it is rather than consumed: it
   // is that store's to resume, and this buyer may well go back to it.
-  if (!belongsHere(parked, tenantSlug)) return null;
-  clearParked();
-  if (isStale(parked)) return null;
-  return parked.order;
-}
-
-/** Whether a parked hand-off is this store's. */
-function belongsHere(parked: ParkedHostedOrder, tenantSlug?: string): boolean {
-  // An unscoped entry (a host that passes no slug, or one parked by an older
-  // bundle) stays readable by anyone — the single-tenant case, where there is
-  // no other store to confuse it with.
-  if (!parked.tenantSlug || !tenantSlug) return true;
-  return parked.tenantSlug === tenantSlug;
-}
-
-/** Whether it has been sitting long enough to no longer be this trip's. */
-function isStale(parked: ParkedHostedOrder): boolean {
-  if (typeof parked.parkedAt !== "number") return false;
-  return Date.now() - parked.parkedAt > MAX_PARKED_AGE_MS;
-}
-
-/**
- * The parked entry, parsed, or null. Tolerates the PRE-SCOPE shape — a bare
- * `CheckoutOrder` — so a buyer mid-hand-off across the deploy still comes back
- * to their confirmation.
- */
-function readParked(): ParkedHostedOrder | null {
-  const raw = peekParkedPayload();
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (isCheckoutOrder(parsed)) return { order: parsed, parkedAt: Date.now() };
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const candidate = parsed as Partial<ParkedHostedOrder>;
-    if (!isCheckoutOrder(candidate.order)) return null;
-    return {
-      order: candidate.order,
-      ...(candidate.tenantSlug ? { tenantSlug: candidate.tenantSlug } : {}),
-      parkedAt: typeof candidate.parkedAt === "number" ? candidate.parkedAt : Date.now(),
-    };
-  } catch {
-    return null;
+  if (!belongsHere(parked, tenantSlug)) return { verdict: "NONE" };
+  if (isStale(parked)) {
+    forgetHostedOrder();
+    return { verdict: "NONE" };
   }
+  if (!aboutThisBasket(parked, basket)) return { verdict: "ASK", order: parked.order };
+  forgetHostedOrder();
+  return { verdict: "RESUME", order: parked.order, step: resumeStepFor(parked, basket) };
 }
 
 /**
- * Trust nothing that came back out of storage: it is the only input here that
- * did not come from this render, and a half-written or hand-edited value would
- * otherwise reach the status view as an order.
- */
-function isCheckoutOrder(value: unknown): value is CheckoutOrder {
-  if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Partial<CheckoutOrder>;
-  return typeof candidate.orderId === "string" && typeof candidate.totalLabel === "string";
-}
-
-/**
- * Drop the parked entry. Split from the read because the READ now has to
- * decide whose it is first — consuming another store's hand-off was the bug
- * this scoping exists to stop.
+ * Whether a parked entry is still ABOUT the basket in front of the shopper.
  *
- * BOTH keys, whichever answered: a legacy entry left behind would let a later
- * return trip resume an order that was already consumed.
+ * THE ONE COMPARISON, used by both the resume and the gate above it, so the
+ * two cannot answer differently about the same shopper — which is the property
+ * the slug and staleness checks already had and this one has to have for the
+ * same reason: a gate that stands aside for a resume that will not happen is
+ * worse than either behaviour on its own.
+ *
+ * Three answers are `true`, and each is a different "nothing here says
+ * otherwise":
+ *
+ *  - the host named no basket (an un-migrated host) — nothing to compare with;
+ *  - the entry recorded none (an older bundle parked it) — nothing to compare;
+ *  - the cart has not LOADED — nothing to compare YET, and the permissive
+ *    answer is the one that cannot strand a payer. The resume's own `WAIT`
+ *    verdict is the same choice made where a caller can act on it.
+ *
+ * And then the real comparison: the SAME basket, or an EMPTY one — the server
+ * closes a paid cart inside the confirmation transaction, so an empty basket is
+ * what a buyer who paid comes back to.
  */
-function clearParked(): void {
-  try {
-    window.sessionStorage?.removeItem(HOSTED_ORDER_STORAGE_KEY);
-    window.sessionStorage?.removeItem(LEGACY_KEY);
-  } catch {
-    // Storage disabled — there was nothing to clear.
-  }
+function aboutThisBasket(
+  parked: ParkedHostedOrder,
+  basket: CheckoutBasketIdentity | undefined,
+): boolean {
+  if (!basket || parked.basket === undefined || !basket.ready) return true;
+  return basket.signature === null || basket.signature === parked.basket;
 }
+
+export { HOSTED_ORDER_STORAGE_KEY, forgetHostedOrder, rememberHostedOrder } from "./hosted-store";

@@ -217,4 +217,18 @@ export interface CheckoutScreensCopy {
   validation: CheckoutValidationCopy;
   /** The step wrapper's own wait, while the charge is being raised. */
   generatingPayment: string;
+  /**
+   * The pay bar's money caption — "Total · 2 itens".
+   *
+   * A FUNCTION because it inflects on the count, which is a property of the
+   * language rather than of the checkout: one item and two items are not the
+   * same word, and they are not the same word in different ways per language.
+   *
+   * It was a hard-coded Portuguese template inside the component until
+   * FUT-1179, which is the ticket about a checkout that never showed the
+   * amount — so the fix put that caption on a SECOND step and made a
+   * single-locale string render twice. Everything else on both bars had been a
+   * host's word since FUT-760; this one had simply been missed.
+   */
+  totalCaption(items: number): string;
 }

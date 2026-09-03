@@ -3,6 +3,7 @@ import type { PaymentProviderAdapter } from '../../core/provider';
 import { defineProviders } from '../../core/registry';
 import type {
   ClientTokenization,
+  DeclineReason,
   MerchantRef,
   Money,
   PaymentMethodKind,
@@ -68,6 +69,12 @@ interface AdapterOptions {
   displayName?: string;
   /** Refuse every charge, provably creating nothing. */
   refuses?: boolean;
+  /**
+   * DECLINE every charge, with the classification the adapters produce
+   * (FUT-340) — which is what FUT-1145 is about publishing. Not the same thing
+   * as `refuses`: a decline is an ANSWER, and the charge exists.
+   */
+  declines?: { reason: DeclineReason; retriable?: boolean };
   cancelable?: boolean;
   /** What a status poll reports back — how much the provider actually took. */
   settledAmount?: Money;
@@ -100,6 +107,17 @@ export function testAdapter(name: string, options: AdapterOptions = {}): Payment
         });
       }
       const snapshot = stubCharge(name, input, credentials);
+      if (options.declines) {
+        return {
+          ...snapshot,
+          status: 'DECLINED',
+          pix: undefined,
+          declineReason: options.declines.reason,
+          ...(options.declines.retriable === undefined
+            ? {}
+            : { declineRetriable: options.declines.retriable }),
+        };
+      }
       if (!options.hosted) return snapshot;
       return {
         ...snapshot,
@@ -131,9 +149,11 @@ export function testAdapter(name: string, options: AdapterOptions = {}): Payment
 /** Every correlation write the mount made, in order — the assertion surface. */
 interface CorrelationLog {
   pending: { ref: string; charge: AttachedCharge }[];
-  cardOutcomes: { ref: string; approved: boolean; amount: Money }[];
+  cardOutcomes: { ref: string; approved: boolean; amount: Money; retriable?: boolean }[];
   settlements: { ref: string; capturedAmount: Money }[];
   expiries: string[];
+  /** The buyer released the payable and the provider agreed (FUT-1146). */
+  abandons: string[];
 }
 
 /** Every vaulting the mount asked for — the opt-in half of the charge body. */
@@ -234,6 +254,7 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     cardOutcomes: [],
     settlements: [],
     expiries: [],
+    abandons: [],
   };
   const vault: VaultLog = { saved: [] };
   /**
@@ -271,9 +292,19 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
       attachPending: async (ref, charge) => {
         correlation.pending.push({ ref, charge });
       },
-      recordCardOutcome: async ({ ref, approved, amount }) => {
-        correlation.cardOutcomes.push({ ref, approved, amount });
-        world.payable = { ...world.payable, state: approved ? 'SETTLED' : 'CLOSED' };
+      recordCardOutcome: async ({ ref, approved, amount, retriable }) => {
+        correlation.cardOutcomes.push({
+          ref,
+          approved,
+          amount,
+          ...(retriable === undefined ? {} : { retriable }),
+        });
+        // A RETRIABLE decline leaves the payable chargeable (FUT-1145): the
+        // buyer is still trying to buy this, and the next instrument goes
+        // against the same payable rather than a freshly minted one. Every
+        // other outcome is terminal, exactly as before.
+        const next = approved ? 'SETTLED' : retriable ? 'OPEN' : 'CLOSED';
+        world.payable = { ...world.payable, state: next };
         return world.payable.state;
       },
       settle: async ({ ref, capturedAmount }) => {
@@ -285,6 +316,11 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
         correlation.expiries.push(ref);
         world.payable = { ...world.payable, state: 'CLOSED' };
         return 'EXPIRED';
+      },
+      abandon: async (ref) => {
+        correlation.abandons.push(ref);
+        world.payable = { ...world.payable, state: 'CLOSED' };
+        return 'RELEASED';
       },
     },
     instruments: {

@@ -148,7 +148,7 @@ function WalletButtons({
 export function WalletCardPane(props: WalletPaneProps): JSX.Element {
   const { Alert } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.settling;
-  const { order, buyer, config, tenantSlug, onResolved, pollIntervalMs } = props;
+  const { order, buyer, config, tenantSlug, onResolved, pollIntervalMs, freshInstrument } = props;
   const wallet = useWalletCharge(order, buyer, onResolved, pollIntervalMs);
   // A sheet failure the wallet reported before any charge existed (pay.js
   // refused, merchant validation unavailable, the sheet errored) — shown
@@ -187,6 +187,7 @@ export function WalletCardPane(props: WalletPaneProps): JSX.Element {
         tenantSlug={tenantSlug}
         onResolved={onResolved}
         pollIntervalMs={pollIntervalMs}
+        freshInstrument={freshInstrument}
       />
     </Box>
   );

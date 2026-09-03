@@ -95,7 +95,7 @@ describe("the resumed hosted return stops asking", () => {
   });
 
   it("gives up once the wait elapses, instead of spinning forever", async () => {
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
     const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
       <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
@@ -113,7 +113,7 @@ describe("the resumed hosted return stops asking", () => {
     // the window may still settle: the scheduled reconciliation keeps asking the
     // provider for hours after this tab is gone. Restating it as FAILED here
     // would tell a buyer who HAS paid that they have not.
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client } = scriptedClient(() => "AWAITING_PAYMENT");
     const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
       <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
@@ -128,7 +128,7 @@ describe("the resumed hosted return stops asking", () => {
   it("keeps asking right up to the bound", async () => {
     // A cap that fired early would be the same bug with a shorter fuse: the
     // commonest reason this screen is open is a payment that IS being confirmed.
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
     const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
       <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
@@ -142,7 +142,7 @@ describe("the resumed hosted return stops asking", () => {
   });
 
   it("confirms a payment that lands inside the window", async () => {
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const seen = { polls: 0 };
     const { client } = scriptedClient(() => {
       seen.polls += 1;
@@ -191,7 +191,7 @@ describe("how fast the resumed return asks", () => {
     // screen has almost always PAID, and this rate is how long they watch a
     // spinner after their money moved. It shipped once at a flat 5 s, which
     // doubled that wait to economise on the buyer who never paid.
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
     const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
       <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
@@ -209,7 +209,7 @@ describe("how fast the resumed return asks", () => {
     // The other end of the same wait. Every poll is a provider round trip, so
     // holding the fast rate for the full window would spend 360 of them on a
     // checkout nobody is going to pay.
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
     const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
       <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>
@@ -225,7 +225,7 @@ describe("how fast the resumed return asks", () => {
   });
 
   it("still reaches its bound in one window, not a longer one", async () => {
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client, calls } = scriptedClient(() => "AWAITING_PAYMENT");
     const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
       <CheckoutClientProvider client={client}>{children}</CheckoutClientProvider>

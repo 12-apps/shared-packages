@@ -168,6 +168,7 @@ export const { GET, POST } = createPaymentFlowsBE({ /* config below */ });
 | `createCheckout` | POST | `/` | BUYER | `resolveMerchant` |
 | `chargeInstrument` | POST | `/charge` | BUYER | the loaded payable |
 | `getStatus` | GET | `/status` | BUYER | the loaded payable |
+| `releaseCheckout` | POST | `/release` | BUYER | the loaded payable |
 | `refreshBrowserKey` | POST | `/refresh-key` | BUYER | the loaded payable |
 
 `principal` is a property of the ROW: `requireAuth` runs for BUYER rows only, so
@@ -222,9 +223,21 @@ requires it when your own payable row has no column to keep one in.
   the `Request` itself — so a host can refuse in its own terms rather than
   smuggling any of it through `Caller`. Reading it is optional: the library
   enforces its own rules on the payable that comes back either way.
-- `correlation` — `attachPending` / `recordCardOutcome` / `settle` / `expire`.
-  Confirming a payment is a transaction only you can compose; the library
-  decides WHEN each fires and WITH WHAT AMOUNT.
+- `correlation` — `attachPending` / `recordCardOutcome` / `settle` / `expire` /
+  `abandon`. Confirming a payment is a transaction only you can compose; the
+  library decides WHEN each fires and WITH WHAT AMOUNT. Two of these carry a
+  decision you have to make on your own rows:
+
+  - **`recordCardOutcome` now also receives `retriable`** (FUT-1145) — the
+    provider's own verdict on whether another attempt with a DIFFERENT
+    instrument could succeed. A host that acts on it leaves the payable OPEN
+    for a retriable decline, so the buyer's next card is charged against the
+    SAME order; a host that ignores it keeps today's behaviour, which is one
+    dead order per refused card in the buyer's own purchase history.
+  - **`abandon` (optional)** is what `POST /release` calls (FUT-1146) once the
+    provider has been asked and did NOT report a payment. Without it that row
+    answers the payable's current state and changes nothing — the buyer's
+    screen still recovers, but the abandoned order stays open on your side.
 - `instruments` — vault storage. The library owns the (merchant, provider)
   scoping rule and the 409 that keeps a scope mismatch from becoming a decline.
 - `vault` — the ownership facts for saving a card OUTSIDE a purchase
@@ -419,6 +432,17 @@ produces a form the buyer completes and a 400 they meet afterwards, naming a
 field there was no input for. A schema that is present and EMPTY is a different
 claim (this chain genuinely needs nothing) and is honoured as one.
 
+**`POST /release` is the buyer saying they did not pay** (FUT-1146). A
+cancelled or refused payment on a provider's own page produces no signal
+anywhere — the hosted check publishes `success`/`paid` and no status field, an
+unpaid webhook delivery fails verification before it is parsed, and the poll
+answers the payable's own status unless the provider says PAID — so the waiting
+screen had no terminal state to reach. This row asks the provider first and
+answers `PAID` (settling, releasing nothing) when it turns out they did pay;
+only a payable with no payment behind it is let go. The client sends the
+settlement hints in the query, exactly as the poll does, because for a hosted
+provider they are the only way to ask at all.
+
 **The hosted handover is two screens now.** `HostedHandoff` parks the order and
 THEN navigates, rendering an explicit link as the fallback — a blocked or slow
 navigation used to leave the buyer on a dead page. `HostedReturn` is the return
@@ -457,7 +481,7 @@ order CREATION never enter the package; they arrive as explicit props:
 
 | port | required | what the host does with it |
 | ---- | -------- | -------------------------- |
-| `cart` | yes | `{ empty, totalLabel, totalItems, discountLines? }` — read from YOUR cart; `discountLines` is your own rendered discount itemization |
+| `cart` | yes | `{ empty, totalLabel, totalItems, discountLines?, identity? }` — read from YOUR cart; `discountLines` is your own rendered discount itemization, and `identity` is what binds a parked payment to a basket (below) |
 | `createOrder(input)` | yes | raise the order from your cart/comanda; close over tenant + comanda scope; answer `CreateOrderResult` (`{ok:true,data:CheckoutOrder}` or a structured `CheckoutError`) |
 | `onExitToMenu()` | yes | navigate to your catalog |
 | `saveBuyerContact(contact)` | no | persist name/phone/CPF on "Continuar" (LGPD-gated by the flow); the WIRE rules — e.g. a blank CPF must be omitted, never sent as `""` — are yours |
@@ -468,6 +492,39 @@ order CREATION never enter the package; they arrive as explicit props:
 | `tenantSlug` | no | scopes the saved-card list to the store being paid |
 | `confirmationExtra` | no | host content on the PAID confirmation (this repo's PWA install invite) |
 | `oneClick` | no | the buyer pressed a BUY button rather than opening a checkout — pay with their saved card and land on Confirmação with no tap (see below) |
+
+**`cart.identity` — WHICH basket this checkout is for (FUT-1213).** Pass
+`{ signature: basketSignature(lines), ready }`, where `lines` is your cart's
+own `{ id, quantity }` list and `ready` is false while that cart is still
+loading. `basketSignature` is exported from the package root; the identity is
+the LINES because "Esvaziar carrinho" keeps the cart row, so a cart id says
+"same basket" for a shopper who threw the old one away.
+
+Without it the flow keeps its pre-1213 behaviour: a payment parked by a hosted
+hand-off resumes on whatever checkout mounts next, which is how a shopper who
+never paid met "Confirmando seu pagamento" over a live basket for fifteen
+minutes. With it, a parked payment met by a DIFFERENT basket is asked about
+once (`GET /status`) and resumed only if it is PAID.
+
+Two related behaviours ride on the same wiring: every raised order is parked,
+not only a hand-off (FUT-1140), so a discarded tab comes back to the payment it
+raised rather than to an empty cart; and a resumed order lands on the
+confirmation for a hand-off and back on the PAYMENT step for a code raised on
+our own page, because that code is still what the buyer needs to look at.
+
+**Pass the same basket to `hostedCheckoutReturnPending(slug, basket)`.** That
+predicate is what a host gate in front of the checkout route asks — a
+closed-shop curtain, a plan check — and it now mirrors the resume's rule
+instead of merely asking whether anything is parked: this store, not stale, and
+still about the basket in front of the shopper (the same one, or an empty one).
+Both directions matter and only the host can supply the basket to both: a buyer
+who PAID reaches "Pedido confirmado" at a shut store, and a buyer who abandoned
+and rebuilt a different basket meets the curtain, which is what a shut store is
+for. A host that passes no basket keeps the WIDE pre-1213 answer — anything
+parked stands the gate aside — so migrating `cart.identity` without migrating
+this call leaves half the fix on the floor. The check stays local and
+non-consuming, so a gate may ask it on every render; a host that freezes the
+answer at mount must not freeze it before its cart is `ready`.
 
 **One-click (`oneClick`).** A host that offers a *Buy now* control — beside a
 product, or on a past order — passes `oneClick` and the flow makes the taps

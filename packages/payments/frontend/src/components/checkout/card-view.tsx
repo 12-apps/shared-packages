@@ -12,7 +12,7 @@ import { useCheckoutCopy } from "./copy-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
 import { StalledWait } from "./stalled-wait";
 import type { CardChainLink } from "./method-capability";
-import type { BuyerInfo, CheckoutOrder, OrderStatus } from "./types";
+import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved } from "./types";
 import { useCheckoutComponents } from "./ui";
 import { useCardCheckout, type CardCheckout } from "./use-card-checkout";
 
@@ -98,6 +98,40 @@ function ChargeFailure({
 }
 
 /**
+ * What the buyer pays WITH: the saved cards they may reuse, and the form for a
+ * new one.
+ *
+ * The picker is absent when there is nothing saved, and the form is absent
+ * while a saved card is selected — so a buyer retrying a refused card (FUT-1145)
+ * lands on the form, because nothing is preselected for them.
+ */
+function CardInstrumentFields({ card }: { card: CardCheckout }): JSX.Element {
+  return (
+    <>
+      {card.savedCards.length > 0 ? (
+        <SavedCardsPicker
+          savedCards={card.savedCards}
+          selection={card.selection}
+          onSelect={card.setSelection}
+        />
+      ) : null}
+
+      {card.usingNewCard ? (
+        <NewCardForm
+          card={card.card}
+          fieldErrors={card.fieldErrors}
+          brand={card.brand}
+          saveCard={card.saveCard}
+          setCard={card.setCard}
+          setFieldErrors={card.setFieldErrors}
+          onSaveCardChange={card.setSaveCard}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
  * Card payment view (FUT-58). Card data is validated + formatted client-side, then
  * tokenized (mock PagBank JS SDK) so the PAN never reaches our server; only the
  * token is charged. Supports reusing a saved card and opting to save a new one for
@@ -115,6 +149,7 @@ export function CardView({
   tenantSlug,
   onResolved,
   pollIntervalMs = 2500,
+  freshInstrument = false,
 }: {
   order: CheckoutOrder;
   buyer?: BuyerInfo;
@@ -128,12 +163,27 @@ export function CardView({
   providerChain?: CardChainLink[];
   /** Scopes the saved-card list to cards the store's provider can charge. */
   tenantSlug?: string;
-  onResolved: (status: OrderStatus) => void;
+  onResolved: OnCheckoutResolved;
   pollIntervalMs?: number;
+  /**
+   * Preselect NOTHING from the saved list (FUT-1145): the buyer is back here
+   * because a card was refused, and the card this would otherwise choose for
+   * them is that one.
+   */
+  freshInstrument?: boolean;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.card;
-  const cc = useCardCheckout(order, buyer, providerConfig, onResolved, pollIntervalMs, tenantSlug, providerChain);
+  const cc = useCardCheckout(
+    order,
+    buyer,
+    providerConfig,
+    onResolved,
+    pollIntervalMs,
+    tenantSlug,
+    providerChain,
+    freshInstrument,
+  );
   // A charge NOBODY can confirm yet is not a decline (FUT-563). Some provider
   // may be holding the buyer's money, so it gets its own presentation: the
   // danger heading "Não foi possível pagar" contradicts the body's "não pague
@@ -150,25 +200,7 @@ export function CardView({
         {copy.heading}
       </Text>
 
-      {cc.savedCards.length > 0 ? (
-        <SavedCardsPicker
-          savedCards={cc.savedCards}
-          selection={cc.selection}
-          onSelect={cc.setSelection}
-        />
-      ) : null}
-
-      {cc.usingNewCard ? (
-        <NewCardForm
-          card={cc.card}
-          fieldErrors={cc.fieldErrors}
-          brand={cc.brand}
-          saveCard={cc.saveCard}
-          setCard={cc.setCard}
-          setFieldErrors={cc.setFieldErrors}
-          onSaveCardChange={cc.setSaveCard}
-        />
-      ) : null}
+      <CardInstrumentFields card={cc} />
 
       {cc.error ? <ChargeFailure message={cc.error} unresolved={unresolved} /> : null}
 

@@ -1,4 +1,5 @@
 import type { CheckoutCopy } from "./copy-context";
+import type { CheckoutDeclineReason } from "./decline";
 
 /**
  * Every string the legacy checkout views render — required props, with NO
@@ -71,8 +72,26 @@ export interface StatusOutcomeCopy {
 export interface PaymentStatusCopy {
   paid: StatusOutcomeCopy;
   awaiting: StatusOutcomeCopy;
+  /**
+   * A refusal with nothing more specific to say. Still the whole of what a
+   * buyer reads when the server sent no `declineReason`, or sent one this
+   * bundle has never heard of — see {@link PaymentStatusCopy.declined}.
+   */
   failed: StatusOutcomeCopy;
   expired: StatusOutcomeCopy;
+  /**
+   * What a REFUSED CARD says, per normalized reason (FUT-1145).
+   *
+   * The server has classified declines since FUT-340 and then discarded the
+   * classification on the wire, so an expired card, a card reported stolen, no
+   * funds, and "attempts exhausted — do not retry" all reached the buyer as one
+   * sentence offering a retry that could not work. Each of those asks something
+   * different of the person holding the phone, and only they can act on it.
+   *
+   * A reason with no entry — a newer server, a host mid-migration — falls back
+   * to {@link PaymentStatusCopy.failed}, which is exactly today's screen.
+   */
+  declined: Partial<Record<CheckoutDeclineReason, StatusOutcomeCopy>>;
   awaitingTimedOut: StatusOutcomeCopy;
   /**
    * The wait cannot reach the payment right now (FUT-1144) — and is STILL
@@ -86,6 +105,19 @@ export interface PaymentStatusCopy {
   awaitingUnreachable: StatusOutcomeCopy;
   retryAction: string;
   regenerateAction: string;
+  /**
+   * "I did not pay" — the buyer's own way out of a wait with no terminal state
+   * (FUT-1146).
+   *
+   * A cancelled or refused payment on a provider's own page produces NO signal
+   * anywhere: the provider's check publishes `success` and `paid` and nothing
+   * else, an unpaid webhook delivery fails verification before it is parsed,
+   * and no server-side writer of FAILED is reachable from it. So the screen
+   * waited fifteen minutes and then told someone who had never paid not to pay
+   * again. The only signal that exists is this one, and it is safe to act on
+   * because the server re-asks the provider before letting anything go.
+   */
+  notPaidAction: string;
   /**
    * Ask now, rather than waiting for the next automatic poll — and, once the
    * wait has run out, the only thing that starts it again.
