@@ -70,10 +70,48 @@ describe('the locale packs', () => {
     for (const copy of Object.values(ACTIVATION_STEP_COPY)) {
       expect(copy.outcome.refusedTitle('InfinitePay')).toContain('InfinitePay');
       expect(copy.outcome.refusedBody('InfinitePay')).toContain('InfinitePay');
-      expect(copy.taxId.hint('InfinitePay')).toContain('InfinitePay');
+      // Probed with a name that is NOT the old hardcode, for the reason the
+      // sibling case above states: 'PagBank' is the one argument that cannot
+      // tell an interpolating pack from one that re-hardcodes PagBank.
+      expect(copy.taxId.hint('Stone')).toContain('Stone');
       // And nothing else's name: the bug was a second provider named in a
       // sentence that already had one.
-      expect(copy.taxId.hint('InfinitePay')).not.toContain('PagBank');
+      expect(copy.taxId.hint('Stone')).not.toContain('PagBank');
+    }
+  });
+
+  it('asks for the CPF without an article, so every card provider reads right', () => {
+    // The WORDING, pinned per pack rather than probed.
+    //
+    // Everything above this asserts that the name passes THROUGH. None of it
+    // can see the sentence around the name, and that sentence is the whole of
+    // FUT-675's second round: `A ${displayName} exige o CPF` interpolates
+    // correctly and is still wrong, because Portuguese gives PagBank a
+    // masculine article ("o PagBank") and Stone and Stripe a feminine one.
+    // A degenerate `(displayName) => displayName` satisfies every `toContain`
+    // in this file; only an equality can reject it.
+    //
+    // `por` takes no contraction, which is what makes ONE string correct for
+    // all three names the card flow can render. The three are spelled out
+    // because the defect is per-name: a phrasing can be right for two of them.
+    for (const displayName of ['PagBank', 'Stone', 'Stripe']) {
+      expect(ACTIVATION_STEP_COPY['pt-BR'].taxId.hint(displayName)).toBe(
+        `Exigido por ${displayName} em qualquer cobrança no cartão.`,
+      );
+      // The equality above pins today's sentence, which catches every
+      // mechanical mutation and none of the social one: the reflexive answer to
+      // a failing string equality is to paste the new string in, and that would
+      // wave a restored article straight through. So the RULE is asserted too,
+      // and it survives any rewording that keeps its promise.
+      expect(ACTIVATION_STEP_COPY['pt-BR'].taxId.hint(displayName)).not.toMatch(
+        /^[AaOo]s?\s/,
+      );
+      // English has no article to get wrong, and the twin is asserted anyway:
+      // a pack that silently stopped interpolating is the failure `localeDrift`
+      // cannot see, because it records a function as its arity alone.
+      expect(ACTIVATION_STEP_COPY['en-US'].taxId.hint(displayName)).toBe(
+        `${displayName} requires it on every card charge.`,
+      );
     }
   });
 
