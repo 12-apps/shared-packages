@@ -119,8 +119,8 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
     // `card/tokenize.ts` has a tokenizer for exactly the three names above and
     // everything else FALLS BACK to redirect. That is a default, not a rule, so
     // the second redirect provider ever added inherits this same bug — along
-    // with `settledBody`, which does not interpolate at all and tells any such
-    // provider's owner that refunds happen in InfinitePay's app.
+    // with `settledBody`, which takes no `displayName` at all and so tells any
+    // such provider's owner that refunds happen in InfinitePay's app.
     hint: (displayName) => `Exigido por ${displayName} em qualquer cobrança no cartão.`,
     placeholder: '000.000.000-00',
   },

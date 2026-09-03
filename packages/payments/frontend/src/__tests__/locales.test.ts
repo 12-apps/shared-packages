@@ -98,6 +98,14 @@ describe('the locale packs', () => {
       expect(ACTIVATION_STEP_COPY['pt-BR'].taxId.hint(displayName)).toBe(
         `Exigido por ${displayName} em qualquer cobrança no cartão.`,
       );
+      // The equality above pins today's sentence, which catches every
+      // mechanical mutation and none of the social one: the reflexive answer to
+      // a failing string equality is to paste the new string in, and that would
+      // wave a restored article straight through. So the RULE is asserted too,
+      // and it survives any rewording that keeps its promise.
+      expect(ACTIVATION_STEP_COPY['pt-BR'].taxId.hint(displayName)).not.toMatch(
+        /^[AaOo]s?\s/,
+      );
       // English has no article to get wrong, and the twin is asserted anyway:
       // a pack that silently stopped interpolating is the failure `localeDrift`
       // cannot see, because it records a function as its arity alone.
