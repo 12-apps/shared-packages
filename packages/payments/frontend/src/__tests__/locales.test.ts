@@ -70,10 +70,13 @@ describe('the locale packs', () => {
     for (const copy of Object.values(ACTIVATION_STEP_COPY)) {
       expect(copy.outcome.refusedTitle('InfinitePay')).toContain('InfinitePay');
       expect(copy.outcome.refusedBody('InfinitePay')).toContain('InfinitePay');
-      expect(copy.taxId.hint('InfinitePay')).toContain('InfinitePay');
+      // A CARD provider: the tax-id field renders only from the card flow, so
+      // InfinitePay — redirect-only — is a name this sentence never actually
+      // shows. PagBank is the one whose article the phrasing had to survive.
+      expect(copy.taxId.hint('PagBank')).toContain('PagBank');
       // And nothing else's name: the bug was a second provider named in a
       // sentence that already had one.
-      expect(copy.taxId.hint('InfinitePay')).not.toContain('PagBank');
+      expect(copy.taxId.hint('Stone')).not.toContain('PagBank');
     }
   });
 

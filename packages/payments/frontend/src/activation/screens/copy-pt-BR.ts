@@ -106,7 +106,13 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
   },
   taxId: {
     label: 'CPF do titular',
-    hint: (displayName) => `A ${displayName} exige o CPF em qualquer cobrança no cartão.`,
+    // No article, deliberately. The refusal sentences above take one ("A
+    // ${displayName} recusou"), which is fine because the REDIRECT flow they
+    // belong to renders only for InfinitePay. This field belongs to the CARD
+    // flow — pagbank, stone, stripe — and no single article fits all three:
+    // "a Stone" and "a Stripe" are natural where PagBank is conventionally
+    // "o PagBank". `por` needs none and is correct for every name (FUT-675).
+    hint: (displayName) => `Exigido por ${displayName} em qualquer cobrança no cartão.`,
     placeholder: '000.000.000-00',
   },
   charge: {
