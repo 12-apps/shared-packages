@@ -131,6 +131,82 @@ function useWait(client: CheckoutClient, options: Parameters<typeof usePaymentPo
   return renderHook(() => usePaymentPolling("o1", options), { wrapper: withClient(client) });
 }
 
+/** A client whose ask NEVER resolves — the dead socket, not the 500. */
+function hangingClient(): { client: CheckoutClient; calls: () => number } {
+  const tally = { asked: 0 };
+  const client = {
+    getStatus: () => {
+      tally.asked += 1;
+      return new Promise<Result<OrderStatus>>(() => {});
+    },
+  } as unknown as CheckoutClient;
+  return { client, calls: () => tally.asked };
+}
+
+describe("an ask that never comes back", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("keeps polling instead of wedging on the first hang", async () => {
+    // The shape the ticket's own fix could not survive: `inFlight` gated the
+    // tick, so ONE request that never resolved stopped the wait for good —
+    // silently, with the spinner still turning.
+    const { client, calls } = hangingClient();
+    useWait(client, { askTimeoutMs: 5_000 });
+
+    await elapse(60_000);
+
+    expect(calls()).toBeGreaterThan(1);
+  });
+
+  it("still times out on the wall clock while an ask is hung", async () => {
+    // `outOfTime` is only consulted once an ask RETURNS, so a hang used to run
+    // straight past the deadline: the one leg the ticket describes as spinning
+    // forever, spinning forever again for a different reason.
+    const { client } = hangingClient();
+    const { result } = useWait(client, { askTimeoutMs: 5_000, maxWaitMs: 20_000 });
+
+    await elapse(60_000);
+
+    expect(result.current.timedOut).toBe(true);
+  });
+
+  it("sends a new request when the buyer presses check-again mid-hang", async () => {
+    // `restart` cleared the panel and returned without asking, because `tick`
+    // refused while `inFlight`. The buyer pressed a button that did nothing and
+    // was shown a screen saying everything was fine.
+    const { client, calls } = hangingClient();
+    const { result } = useWait(client, { askTimeoutMs: 60_000 });
+    await elapse(0);
+    const before = calls();
+
+    await act(async () => {
+      result.current.checkAgain();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(calls()).toBe(before + 1);
+  });
+
+  it("re-arms on `online` mid-hang — the handoff this feature exists for", async () => {
+    // A Wi-Fi to 4G handoff leaves the previous fetch on a socket that will
+    // never answer. That is precisely when `poke` must not be refused.
+    const { client, calls } = hangingClient();
+    useWait(client, { askTimeoutMs: 60_000 });
+    await elapse(2_000);
+    const before = calls();
+
+    await fire(window, "online");
+
+    expect(calls()).toBe(before + 1);
+  });
+});
+
 describe("a run of failed polls", () => {
   beforeEach(() => {
     vi.useFakeTimers();
