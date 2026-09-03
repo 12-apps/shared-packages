@@ -177,7 +177,7 @@ describe("the caption beside the amount", () => {
         onGenerate={vi.fn()}
         onUseEmail={vi.fn()}
         providerConfig={null}
-        cartTotals={{ empty: false, totalLabel: "R$ 9,90", totalItems: 1 }}
+        cartTotals={{ totalLabel: "R$ 9,90", totalItems: 1 }}
         onResolved={vi.fn()}
       />,
     );
