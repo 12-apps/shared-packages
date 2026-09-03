@@ -106,12 +106,21 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
   },
   taxId: {
     label: 'CPF do titular',
-    // No article, deliberately. The refusal sentences above take one ("A
-    // ${displayName} recusou"), which is fine because the REDIRECT flow they
-    // belong to renders only for InfinitePay. This field belongs to the CARD
-    // flow — pagbank, stone, stripe — and no single article fits all three:
-    // "a Stone" and "a Stripe" are natural where PagBank is conventionally
-    // "o PagBank". `por` needs none and is correct for every name (FUT-675).
+    // No article, deliberately (FUT-675). This field renders from the CARD
+    // flow only — pagbank, stone, stripe — and no single article fits all
+    // three: "a Stone" and "a Stripe" are natural where PagBank is
+    // conventionally "o PagBank", so the previous round's "A ${displayName}
+    // exige" bought Stone's grammar with PagBank's. `por` takes no
+    // contraction, so one string is correct for every name.
+    //
+    // The refusal sentences above still take an article ("A ${displayName}
+    // recusou") and are NOT covered by that argument — they belong to the
+    // redirect flow, which today renders for InfinitePay alone because
+    // `card/tokenize.ts` has a tokenizer for exactly the three names above and
+    // everything else FALLS BACK to redirect. That is a default, not a rule, so
+    // the second redirect provider ever added inherits this same bug — along
+    // with `settledBody`, which does not interpolate at all and tells any such
+    // provider's owner that refunds happen in InfinitePay's app.
     hint: (displayName) => `Exigido por ${displayName} em qualquer cobrança no cartão.`,
     placeholder: '000.000.000-00',
   },
