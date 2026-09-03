@@ -508,10 +508,39 @@ describe("the moments a shopper comes back", () => {
     await elapse(10_000);
     const answered = calls();
 
+    // The loop schedules its next ask 2500ms after that answer, so this poke
+    // lands well clear of REARM_QUIET_MS. Pinned as an exact count rather than
+    // "more than": one re-arm must cost one request, not two.
     await elapse(1_100);
     await fire(window, "online");
 
-    expect(calls()).toBeGreaterThan(answered);
+    expect(calls()).toBe(answered + 1);
+  });
+
+  it("hands the buyer's own check-again a fresh budget", async () => {
+    // The budget is per-wait state, so `restart` resets it alongside `errors`
+    // and `healthy`. Without that reset a spent budget leaks across the retry:
+    // the next `online` is swallowed for up to `askTimeoutMs` — the exact
+    // silence "Verificar de novo" exists to break.
+    const { client, calls } = hangingClient();
+    const { result } = useWait(client, { intervalMs: 2500, askTimeoutMs: 60_000 });
+
+    await elapse(0);
+    for (let i = 0; i < 5; i += 1) {
+      await elapse(1_100);
+      await fire(window, "online");
+    }
+    expect(calls()).toBe(4);
+
+    await act(async () => {
+      result.current.checkAgain();
+    });
+    const afterRestart = calls();
+
+    await elapse(1_100);
+    await fire(window, "online");
+
+    expect(calls()).toBe(afterRestart + 1);
   });
 
   it("stops listening once the wait is torn down", async () => {

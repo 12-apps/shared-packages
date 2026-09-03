@@ -38,17 +38,21 @@ const REARM_QUIET_MS = 1_000;
  * trip runs longer than the window — which is the ordinary state of the flaky
  * link this whole feature exists for — every re-arm supersedes an ask that was
  * still alive. Nothing is ever absorbed, so `errors` never rises, so the 2.5s →
- * 5s → 10s backoff never engages, and a handset whose OS reports `online` at
- * roughly 1Hz sits pinned near one request per second instead of decaying to
- * one per ten. That is ~10x the status traffic, spent precisely on the networks
- * least able to carry it.
+ * 5s → 10s backoff never engages, and the wait sits near one request per window
+ * instead of decaying to one per ten.
  *
  * So the budget: after this many abandoned asks with no answer in between, a
  * re-arm stands down and lets the in-flight ask either return or hit its own
- * `askTimeoutMs`. Either outcome reaches `absorb`, which refills the budget —
- * so this only ever bites while genuinely nothing is getting through, and the
- * shopper who really did just come back from their bank app still gets the
- * immediate poll they came back for.
+ * `askTimeoutMs`. Either outcome reaches `absorb`, which refills the budget, so
+ * this only bites while genuinely nothing is getting through.
+ *
+ * **What it does NOT bound: the re-arm rate itself.** A re-arm that finds the
+ * loop idle spends nothing, so on a link whose asks RESOLVE inside the window —
+ * a fast 500, or the immediate `TypeError: Load failed` iOS raises for a killed
+ * socket — six `online` events still cost six requests, exactly as before. That
+ * flavour is bounded by {@link REARM_QUIET_MS} alone and always was. This
+ * constant is about the ask that hangs, which is the one the quiet window
+ * could not see.
  */
 const MAX_SUPERSEDED_ASKS = 3;
 
@@ -59,6 +63,19 @@ const MAX_SUPERSEDED_ASKS = 3;
  * abandons a live ask spends one of the budget above. A re-arm that finds no
  * ask in flight — the loop is simply between ticks — spends nothing, since
  * there is no request to amplify.
+ *
+ * That second rule is what makes a denial safe, and it is an invariant worth
+ * stating: `supersededAsks > 0` implies `inFlight`, because every transition to
+ * `inFlight === false` in a live run either passes through `absorb` (which
+ * refills) or is followed synchronously by a `tick`. So a re-arm arriving at an
+ * IDLE loop is never denied, whatever the budget reads.
+ *
+ * The cost of a denial, stated honestly: the fourth consecutive return from the
+ * bank app does NOT poll immediately. It waits for the in-flight ask to resolve
+ * or reach `askTimeoutMs` (15s by default), plus one backoff step — so worst
+ * case the buyer learns they paid roughly 17s later than they would have. That
+ * is the price of not hammering `/status` on a link that is answering nothing,
+ * and the buyer's own "Verificar de novo" (`restart`) resets the budget outright.
  */
 export function claimRearm(run: RearmState): boolean {
   if (Date.now() - run.askedAt < REARM_QUIET_MS) return false;
