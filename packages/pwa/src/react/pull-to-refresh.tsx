@@ -89,6 +89,11 @@ export interface PullToRefreshProps {
   offsetTop?: number | string;
   /** Above the app's own fixed chrome. Default 1250 (MUI: drawer 1200, modal 1300). */
   zIndex?: number | string;
+  /**
+   * How far the pull has to travel. Read ONCE, when the gesture goes live —
+   * the tracker is built with it and lives for the mount, so changing it
+   * mid-session changes nothing until the component remounts.
+   */
   geometry?: PullGeometry;
   /**
    * Told once per mount whether the gesture is live, and told again if a
