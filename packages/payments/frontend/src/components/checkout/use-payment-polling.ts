@@ -7,6 +7,11 @@ import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 interface PollingOptions {
   /** Delay between successful polls (ms). */
   intervalMs?: number;
+  /**
+   * How long one ask may hang before it is abandoned (ms). Defaults to
+   * {@link DEFAULT_ASK_TIMEOUT_MS}; consumers override it only in tests.
+   */
+  askTimeoutMs?: number;
   /** Poll only while `true` (e.g. after a card charge is submitted). */
   enabled?: boolean;
   /**
@@ -81,6 +86,23 @@ const MAX_ERROR_BACKOFF_MS = 10_000;
 const REARM_QUIET_MS = 1_000;
 
 /**
+ * How long ONE status ask may take before the loop stops waiting on it.
+ *
+ * Comfortably longer than any healthy round trip on a bad link, so an ordinary
+ * slow poll is never mistaken for a dead one; short enough that a socket that
+ * died silently — the iOS case this whole feature exists for — costs one
+ * backoff step rather than the rest of the wait.
+ */
+const DEFAULT_ASK_TIMEOUT_MS = 15_000;
+
+/**
+ * What a timed-out ask reports. It reads as any other transport failure
+ * because that is what it is to everything downstream: the counters, the
+ * backoff and the stalled-wait panel treat it exactly like a 500.
+ */
+const ASK_TIMED_OUT = "timeout";
+
+/**
  * How long before the next ask, given how many healthy polls have happened.
  *
  * A pure function of the options, so it lives out here rather than inside the
@@ -137,6 +159,17 @@ function newRun() {
     settled: false,
     stopped: false,
     inFlight: false,
+    /**
+     * Which ask is the CURRENT one.
+     *
+     * A hung request cannot be un-sent, so it is abandoned instead: every ask
+     * carries the attempt it belongs to, and a late answer from a superseded
+     * attempt is dropped. Without this, `inFlight` stayed true for as long as
+     * the socket did — and `inFlight` gates the tick, the re-arm AND the
+     * buyer's own "check again", so one dead request disabled every mechanism
+     * this loop has for recovering from a dead request.
+     */
+    attempt: 0,
     errors: 0,
     healthy: 0,
     startedAt: 0,
@@ -175,6 +208,21 @@ function createPollLoop(
     run.timer = undefined;
   };
 
+  /**
+   * Give up WAITING on one ask — never on the wait itself.
+   *
+   * Resolves as an ordinary failed poll, so a hang costs exactly what a 500
+   * costs: the error counter rises, the backoff widens, and the next tick is
+   * scheduled. `run.attempt` is what makes it safe — if the real answer lands
+   * afterwards it belongs to a superseded attempt and is dropped.
+   */
+  const askTimeout = (mine: number): Promise<Result<OrderStatus>> =>
+    new Promise((resolve) => {
+      setTimeout(() => {
+        if (run.attempt === mine) resolve({ ok: false, error: ASK_TIMED_OUT });
+      }, options.askTimeoutMs ?? DEFAULT_ASK_TIMEOUT_MS);
+    });
+
   const outOfTime = (delay: number): boolean =>
     options.maxWaitMs !== undefined && Date.now() - run.startedAt + delay >= options.maxWaitMs;
 
@@ -182,7 +230,16 @@ function createPollLoop(
     if (run.cancelled || run.settled || run.inFlight) return;
     run.inFlight = true;
     run.askedAt = Date.now();
-    const result = await ask();
+    const mine = ++run.attempt;
+    // Bounded, because the wall clock below is only consulted once an ask
+    // RETURNS: a request that never returns never reaches it, so the wait that
+    // is supposed to end after `maxWaitMs` runs forever showing "we are still
+    // trying". Racing a timer turns a hang into an ordinary failed poll, which
+    // the backoff and the re-arm already know how to handle.
+    const result = await Promise.race([ask(), askTimeout(mine)]);
+    // A superseded attempt writes nothing: it may be a hung request finally
+    // answering, long after a poke or a restart moved on.
+    if (run.attempt !== mine) return;
     run.inFlight = false;
     if (run.cancelled || run.settled) return;
     if (result.ok) {
@@ -213,6 +270,11 @@ function createPollLoop(
     restart: (): void => {
       if (run.cancelled || run.settled) return;
       clearPending();
+      // Same reasoning as `poke`, and this one is the buyer pressing a button:
+      // "Verificar de novo" that cleared the panel and sent nothing — because
+      // an ask was still notionally in flight — is the exact complaint.
+      run.attempt += 1;
+      run.inFlight = false;
       run.stopped = false;
       run.errors = 0;
       run.healthy = 0;
@@ -222,8 +284,13 @@ function createPollLoop(
       void tick();
     },
     poke: (): void => {
-      if (run.cancelled || run.stopped || run.inFlight) return;
+      if (run.cancelled || run.stopped) return;
       if (Date.now() - run.askedAt < REARM_QUIET_MS) return;
+      // Deliberately NOT gated on `inFlight`: the shopper who just came back
+      // from their bank app is exactly the case where the previous ask is a
+      // socket that died while the screen was hidden. Abandon it and ask now.
+      run.attempt += 1;
+      run.inFlight = false;
       clearPending();
       void tick();
     },
@@ -283,6 +350,7 @@ export function usePaymentPolling(
     maxWaitMs,
     slowAfterPolls,
     slowIntervalMs,
+    askTimeoutMs,
   }: PollingOptions = {},
 ): PaymentPollingState {
   const [status, setStatus] = useState<OrderStatus | null>(null);
@@ -301,7 +369,7 @@ export function usePaymentPolling(
 
     const running = createPollLoop(
       () => client.getStatus(orderId),
-      { intervalMs, maxWaitMs, slowAfterPolls, slowIntervalMs },
+      { intervalMs, maxWaitMs, slowAfterPolls, slowIntervalMs, askTimeoutMs },
       { setStatus, setError, setTimedOut },
     );
     loop.current = running;
@@ -313,7 +381,7 @@ export function usePaymentPolling(
       running.stop();
       loop.current = null;
     };
-  }, [orderId, intervalMs, enabled, maxWaitMs, slowAfterPolls, slowIntervalMs, client]);
+  }, [orderId, intervalMs, enabled, maxWaitMs, slowAfterPolls, slowIntervalMs, askTimeoutMs, client]);
 
   const checkAgain = useCallback(() => {
     loop.current?.restart();
