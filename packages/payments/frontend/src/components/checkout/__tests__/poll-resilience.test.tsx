@@ -29,6 +29,7 @@ import { PaymentStatus } from "../payment-status";
 import { PixView } from "../pix-view";
 import { PT_BR_PAYMENT_STATUS_COPY } from "../pt-BR";
 import type { CheckoutClient } from "../transport";
+import { PT_BR_CHECKOUT_COPY } from "../pt-BR";
 import type { CheckoutOrder, OrderStatus } from "../types";
 import { useCheckoutController, type CheckoutHostPorts } from "../use-checkout-controller";
 import { usePaymentPolling } from "../use-payment-polling";
@@ -143,6 +144,42 @@ function hangingClient(): { client: CheckoutClient; calls: () => number } {
   return { client, calls: () => tally.asked };
 }
 
+/** A client whose ask REJECTS — a host wrapper that rethrows, not a 500. */
+function throwingClient(): { client: CheckoutClient; calls: () => number } {
+  const tally = { asked: 0 };
+  const client = {
+    getStatus: () => {
+      tally.asked += 1;
+      return Promise.reject(new Error("interceptor exploded"));
+    },
+  } as unknown as CheckoutClient;
+  return { client, calls: () => tally.asked };
+}
+
+/**
+ * Attempt 1 is held open and answered by hand; every later ask hangs. No timer
+ * decides when the answer lands, so the interleaving under test is exact.
+ */
+function heldThenHangingClient(): {
+  client: CheckoutClient;
+  answer: (result: Result<OrderStatus>) => void;
+} {
+  // One object rather than a reassigned binding: the flakiness lane reads a
+  // closed-over `let` written from inside a stub as shared state, and it is
+  // right to — a field on a per-call object cannot outlive this factory.
+  const state: { asked: number; release?: (result: Result<OrderStatus>) => void } = { asked: 0 };
+  const client = {
+    getStatus: () => {
+      state.asked += 1;
+      if (state.asked > 1) return new Promise<Result<OrderStatus>>(() => {});
+      return new Promise<Result<OrderStatus>>((resolve) => {
+        state.release = resolve;
+      });
+    },
+  } as unknown as CheckoutClient;
+  return { client, answer: (result) => state.release?.(result) };
+}
+
 describe("an ask that never comes back", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -193,6 +230,38 @@ describe("an ask that never comes back", () => {
     expect(calls()).toBe(before + 1);
   });
 
+  it("times out even while the shopper keeps re-arming it", async () => {
+    // The hole the first pass left, and the sharpest one: `askTimeout` stands
+    // down when its attempt is superseded, and every `poke` supersedes. A
+    // shopper flicking to their bank app more often than `askTimeoutMs` — which
+    // is EXACTLY the behaviour this feature was built for — therefore refreshed
+    // the timeout forever, so no ask ever returned, `outOfTime` was never
+    // reached, and the hosted return span with no error and so no check-again
+    // button. The ticket's own symptom, back through the door the fix opened.
+    const { client } = hangingClient();
+    const { result } = useWait(client, { askTimeoutMs: 15_000, maxWaitMs: 20_000 });
+
+    for (let trip = 0; trip < 12; trip += 1) {
+      await elapse(10_000);
+      await fire(window, "online");
+    }
+
+    expect(result.current.timedOut).toBe(true);
+  });
+
+  it("reads as a dropped connection, not as the word `timeout`", async () => {
+    // `Result.error` is what the BUYER reads — the PIX, card and wallet panels
+    // all render it verbatim — so an abandoned ask must carry the transport's
+    // own sentence rather than an English debug token in a pt-BR panel.
+    const { client } = hangingClient();
+    const { result } = useWait(client, { askTimeoutMs: 5_000 });
+
+    await elapse(6_000);
+
+    expect(result.current.error).toBe(PT_BR_CHECKOUT_COPY.screens.transport.offline);
+    expect(result.current.error).not.toBe("timeout");
+  });
+
   it("re-arms on `online` mid-hang — the handoff this feature exists for", async () => {
     // A Wi-Fi to 4G handoff leaves the previous fetch on a socket that will
     // never answer. That is precisely when `poke` must not be refused.
@@ -204,6 +273,38 @@ describe("an ask that never comes back", () => {
     await fire(window, "online");
 
     expect(calls()).toBe(before + 1);
+  });
+
+  it("keeps polling when the ask REJECTS rather than hangs", async () => {
+    // `Promise.race` rejects the moment either input does, so the timeout gives
+    // no cover here: the await threw, `inFlight` was never cleared, no timer
+    // was scheduled, and the loop was dead with nothing on screen. Our own
+    // transport catches its errors, but `CheckoutClient` is the public host
+    // seam — an auth-refresh wrapper that rethrows wedged the wait for good.
+    const { client, calls } = throwingClient();
+    useWait(client, { askTimeoutMs: 60_000 });
+
+    await elapse(30_000);
+
+    expect(calls()).toBeGreaterThan(1);
+  });
+
+  it("keeps a terminal answer that a re-arm superseded", async () => {
+    // Dropping every superseded answer drops PAID with them. The status is
+    // idempotent and `settled` only goes one way, so the confirmation the whole
+    // wait exists for must be written whenever it arrives — otherwise a shopper
+    // who paid is told nothing, and if the next ask hangs, never told at all.
+    const { client, answer } = heldThenHangingClient();
+    const { result } = useWait(client, { askTimeoutMs: 60_000 });
+
+    await elapse(2_000);
+    await fire(window, "online");
+    await act(async () => {
+      answer({ ok: true, data: "PAID" });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.status).toBe("PAID");
   });
 });
 
