@@ -11,9 +11,10 @@
 /**
  * The state a re-arm decision reads. Structural on purpose: the poll loop's own
  * run object satisfies it, and typing it that way keeps this module free of an
- * import back into the loop that imports it.
+ * import back into the loop that imports it. Module-private — the loop passes
+ * its run and never names this type, so exporting it is an unused export.
  */
-export interface RearmState {
+interface RearmState {
   inFlight: boolean;
   askedAt: number;
   supersededAsks: number;
