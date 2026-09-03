@@ -19,8 +19,15 @@
  * - **Chromium on Android keeps its overscroll refresh in standalone mode.** An
  *   installed PWA there still reloads when the user pulls down at the top of
  *   the page, exactly as a tab does, unless the app itself opted out with
- *   `overscroll-behavior-y: contain | none`. Nothing is missing, and a second
- *   gesture layered on top of a working one is how you get a double reload.
+ *   `overscroll-behavior-y: contain | none`. Nothing is missing, so the default
+ *   leaves it alone: a platform gesture that already works has native feel and
+ *   haptics, and — unlike ours — cannot be lost to a JavaScript failure.
+ *
+ *   Note this is a preference, not a hazard. Turning ours on there does NOT
+ *   stack two gestures, because mounting sets exactly the `overscroll-behavior`
+ *   that switches Chromium's off (see `useOverscrollLock`); ours takes over
+ *   rather than doubling up. Hosts that want one consistent gesture on every
+ *   installed phone pass {@link isInstalledHandheld} and get precisely that.
  * - **iOS home-screen web apps have no reload at all.** No chrome, and the pull
  *   gesture that works in Safari does not reload a standalone web app. The
  *   documented workaround in the wild is to delete the icon and add it again.
@@ -30,7 +37,7 @@
  * That is the same shape as the install invite: two platforms that share
  * nothing, and a package that says so instead of averaging them.
  */
-import { isIosInstallable, isStandalone } from "./install-prompt";
+import { isHandheld, isIosInstallable, isStandalone } from "./install-prompt";
 
 /**
  * Whether this session has no reload the user can reach on their own.
@@ -47,6 +54,36 @@ import { isIosInstallable, isStandalone } from "./install-prompt";
  */
 export function needsPullToRefresh(): boolean {
   return isStandalone() && isIosInstallable();
+}
+
+/**
+ * Every installed app on a touch-primary device — the WIDER answer.
+ *
+ * {@link needsPullToRefresh} asks "did the platform take the reload away", and
+ * answers yes only for iOS. This asks the product question instead: "is this
+ * somebody holding an installed app", which is true on Android too, where a
+ * reload exists but is Chromium's rather than ours.
+ *
+ * Pass it as `PullToRefresh`'s `platform` when you want ONE gesture across
+ * every phone — your own indicator, your own threshold, the same behaviour to
+ * support. The handover is clean rather than doubled: mounting sets
+ * `overscroll-behavior-y: contain`, which is exactly what turns Chromium's own
+ * overscroll refresh off, so the user gets one gesture and it is yours. And it
+ * fails in the safe direction — if the bundle never runs, that property is
+ * never set and Chromium's gesture is still there.
+ *
+ * The cost is real and worth naming: on Android you are replacing a gesture the
+ * platform maintains (native feel, and haptics since Chrome 128) with one you
+ * maintain. Choose it for consistency, or for a browser whose installed apps do
+ * NOT keep the native gesture — not by default.
+ *
+ * `isHandheld()` rather than `isStandalone()` alone, so a DESKTOP installed app
+ * is left out: it has no address bar but it has Ctrl+R and a context menu, no
+ * touchscreen to perform the gesture on, and nothing to gain from having its
+ * document's overscroll altered.
+ */
+export function isInstalledHandheld(): boolean {
+  return isStandalone() && isHandheld();
 }
 
 export interface ReloadAppOptions {
