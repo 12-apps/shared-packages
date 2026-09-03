@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCheckoutClientApi } from "./client-context";
+import { useCheckoutCopy } from "./copy-context";
 import { createPollLoop, type PollLoop, type PollingOptions } from "./poll-loop";
 import type { OrderStatus } from "./types";
 
@@ -83,6 +84,11 @@ export function usePaymentPolling(
   // belongs in the deps below rather than being read out of a ref: a checkout
   // re-pointed at another mount must re-poll against THAT one.
   const client = useCheckoutClientApi();
+  // The buyer's own sentence for "we could not reach the server", reused for an
+  // ask abandoned for hanging. `Result.error` is rendered verbatim by the PIX,
+  // card and wallet panels, so without this a hang printed the English token
+  // `timeout` into a Portuguese screen.
+  const transportCopy = useCheckoutCopy().screens.transport;
   // The live wait, so the returned action stays stable across renders while
   // still reaching whichever loop the effect currently owns.
   const loop = useRef<PollLoop | null>(null);
@@ -92,7 +98,14 @@ export function usePaymentPolling(
 
     const running = createPollLoop(
       () => client.getStatus(orderId),
-      { intervalMs, maxWaitMs, slowAfterPolls, slowIntervalMs, askTimeoutMs },
+      {
+        intervalMs,
+        maxWaitMs,
+        slowAfterPolls,
+        slowIntervalMs,
+        askTimeoutMs,
+        askTimeoutError: transportCopy.offline,
+      },
       { setStatus, setError, setTimedOut },
     );
     loop.current = running;
@@ -104,7 +117,17 @@ export function usePaymentPolling(
       running.stop();
       loop.current = null;
     };
-  }, [orderId, intervalMs, enabled, maxWaitMs, slowAfterPolls, slowIntervalMs, askTimeoutMs, client]);
+    }, [
+    orderId,
+    intervalMs,
+    enabled,
+    maxWaitMs,
+    slowAfterPolls,
+    slowIntervalMs,
+    askTimeoutMs,
+    client,
+    transportCopy,
+  ]);
 
   const checkAgain = useCallback(() => {
     loop.current?.restart();

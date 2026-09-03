@@ -18,6 +18,14 @@ export interface PollingOptions {
    * {@link DEFAULT_ASK_TIMEOUT_MS}; consumers override it only in tests.
    */
   askTimeoutMs?: number;
+  /**
+   * What the BUYER reads when an ask is abandoned for hanging.
+   *
+   * The hook passes the transport's own `copy.offline`, so a dead socket reads
+   * as the dropped connection it is. Optional only so a direct caller of
+   * `createPollLoop` need not thread copy it does not have.
+   */
+  askTimeoutError?: string;
   /** Poll only while `true` (e.g. after a card charge is submitted). */
   enabled?: boolean;
   /**
@@ -83,9 +91,10 @@ const REARM_QUIET_MS = 1_000;
 const DEFAULT_ASK_TIMEOUT_MS = 15_000;
 
 /**
- * What a timed-out ask reports. It reads as any other transport failure
- * because that is what it is to everything downstream: the counters, the
- * backoff and the stalled-wait panel treat it exactly like a 500.
+ * Last resort only, for a host that wired the loop without `askTimeoutError`.
+ * `Result.error` is what the BUYER reads — the PIX, card and wallet panels all
+ * render it verbatim — so the hook passes the transport's own `copy.offline`
+ * down and a hang reads as the dropped connection it is.
  */
 const ASK_TIMED_OUT = "timeout";
 
@@ -162,6 +171,14 @@ function newRun() {
     startedAt: 0,
     askedAt: 0,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
+    /**
+     * The wall clock, as a timer rather than a check after an ask. `outOfTime`
+     * needs an ask to RETURN, and `askTimeout` stands down when its attempt is
+     * superseded — which every `poke` does. A shopper flicking to their bank
+     * app faster than `askTimeoutMs` refreshed it forever, so `maxWaitMs` never
+     * fired and the hosted return span with no error and no check-again button.
+     */
+    deadline: undefined as ReturnType<typeof setTimeout> | undefined,
   };
 }
 
@@ -183,7 +200,9 @@ function askTimeout(
 ): Promise<Result<OrderStatus>> {
   return new Promise((resolve) => {
     setTimeout(() => {
-      if (run.attempt === mine) resolve({ ok: false, error: ASK_TIMED_OUT });
+      if (run.attempt === mine) {
+        resolve({ ok: false, error: options.askTimeoutError ?? ASK_TIMED_OUT });
+      }
     }, options.askTimeoutMs ?? DEFAULT_ASK_TIMEOUT_MS);
   });
 }
@@ -213,6 +232,88 @@ function absorb(run: PollRun, result: Result<OrderStatus>, sink: PollSink): bool
   return true;
 }
 
+/** Cancel whatever tick is scheduled, if any. */
+function clearPending(run: PollRun): void {
+  if (run.timer !== undefined) clearTimeout(run.timer);
+  run.timer = undefined;
+}
+
+/** Cancel the wall clock, if it is armed. */
+function clearDeadline(run: PollRun): void {
+  if (run.deadline !== undefined) clearTimeout(run.deadline);
+  run.deadline = undefined;
+}
+
+/**
+ * The wall clock, armed once per run by `restart`, so `maxWaitMs` holds whether
+ * or not an ask ever returns. `outOfTime` stays too: it ends the wait one delay
+ * EARLIER when asks ARE returning. This is the backstop for when they are not.
+ */
+function armDeadline(run: PollRun, options: PollingOptions, sink: PollSink): void {
+  clearDeadline(run);
+  if (options.maxWaitMs === undefined) return;
+  run.deadline = setTimeout(() => {
+    run.deadline = undefined;
+    if (run.cancelled || run.settled) return;
+    run.stopped = true;
+    clearPending(run);
+    sink.setTimedOut(true);
+  }, options.maxWaitMs);
+}
+
+/**
+ * One ask, bounded by {@link askTimeout} and guaranteed not to throw. `race`
+ * rejects the instant either input does, so an `ask` that throws — a host
+ * client wrapping ours — left `inFlight` true with nothing scheduled: the very
+ * wedge this file removes, through the one door the race does not close.
+ */
+async function askOnce(
+  ask: () => Promise<Result<OrderStatus>>,
+  run: PollRun,
+  mine: number,
+  options: PollingOptions,
+): Promise<Result<OrderStatus>> {
+  try {
+    return await Promise.race([ask(), askTimeout(run, mine, options)]);
+  } catch (error) {
+    const fallback = options.askTimeoutError ?? ASK_TIMED_OUT;
+    return { ok: false, error: error instanceof Error ? error.message : fallback };
+  }
+}
+
+/** Whether sleeping `delay` would carry the wait past its wall-clock bound. */
+function outOfTime(run: PollRun, options: PollingOptions, delay: number): boolean {
+  return options.maxWaitMs !== undefined && Date.now() - run.startedAt + delay >= options.maxWaitMs;
+}
+
+/**
+ * Whether this attempt's answer may still be written. A superseded one writes
+ * nothing — it may be a hung request finally answering — EXCEPT a terminal
+ * status, which is the answer the wait exists for, is idempotent, and would
+ * otherwise be dropped because a re-arm landed first.
+ */
+function mayWrite(run: PollRun, mine: number, result: Result<OrderStatus>): boolean {
+  return run.attempt === mine || (result.ok && TERMINAL_STATUSES.includes(result.data));
+}
+
+/** Book the next tick, or end the wait because its clock has run out. */
+function scheduleNext(
+  run: PollRun,
+  options: PollingOptions,
+  sink: PollSink,
+  again: () => void,
+): void {
+  const delay = pollDelay(run.healthy, run.errors, options);
+  if (outOfTime(run, options, delay)) {
+    run.stopped = true;
+    clearDeadline(run);
+    sink.setTimedOut(true);
+    return;
+  }
+  clearPending(run);
+  run.timer = setTimeout(again, delay);
+}
+
 /** The handle the hook holds on one running wait. */
 export interface PollLoop {
   /** Reset the clock and the counters, then ask immediately. */
@@ -238,13 +339,6 @@ export function createPollLoop(
 ): PollLoop {
   const run = newRun();
 
-  const clearPending = (): void => {
-    if (run.timer !== undefined) clearTimeout(run.timer);
-    run.timer = undefined;
-  };
-
-  const outOfTime = (delay: number): boolean =>
-    options.maxWaitMs !== undefined && Date.now() - run.startedAt + delay >= options.maxWaitMs;
 
   const tick = async (): Promise<void> => {
     if (run.cancelled || run.settled || run.inFlight) return;
@@ -256,27 +350,22 @@ export function createPollLoop(
     // is supposed to end after `maxWaitMs` runs forever showing "we are still
     // trying". Racing a timer turns a hang into an ordinary failed poll, which
     // the backoff and the re-arm already know how to handle.
-    const result = await Promise.race([ask(), askTimeout(run, mine, options)]);
-    // A superseded attempt writes nothing: it may be a hung request finally
-    // answering, long after a poke or a restart moved on.
-    if (run.attempt !== mine) return;
-    run.inFlight = false;
+    const result = await askOnce(ask, run, mine, options);
+    if (!mayWrite(run, mine, result)) return;
+    if (run.attempt === mine) run.inFlight = false;
     if (run.cancelled || run.settled) return;
-    if (!absorb(run, result, sink)) return;
-    const delay = pollDelay(run.healthy, run.errors, options);
-    if (outOfTime(delay)) {
-      run.stopped = true;
-      sink.setTimedOut(true);
+    if (!absorb(run, result, sink)) {
+      clearDeadline(run);
       return;
     }
-    clearPending();
-    run.timer = setTimeout(() => void tick(), delay);
+    if (run.attempt !== mine) return;
+    scheduleNext(run, options, sink, () => void tick());
   };
 
   return {
     restart: (): void => {
       if (run.cancelled || run.settled) return;
-      clearPending();
+      clearPending(run);
       // Same reasoning as `poke`, and this one is the buyer pressing a button:
       // "Verificar de novo" that cleared the panel and sent nothing — because
       // an ask was still notionally in flight — is the exact complaint.
@@ -286,6 +375,7 @@ export function createPollLoop(
       run.errors = 0;
       run.healthy = 0;
       run.startedAt = Date.now();
+      armDeadline(run, options, sink);
       sink.setTimedOut(false);
       sink.setError(null);
       void tick();
@@ -298,12 +388,13 @@ export function createPollLoop(
       // socket that died while the screen was hidden. Abandon it and ask now.
       run.attempt += 1;
       run.inFlight = false;
-      clearPending();
+      clearPending(run);
       void tick();
     },
     stop: (): void => {
       run.cancelled = true;
-      clearPending();
+      clearPending(run);
+      clearDeadline(run);
     },
   };
 }
