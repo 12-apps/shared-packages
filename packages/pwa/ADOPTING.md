@@ -104,10 +104,13 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
     cannot follow* — and the worker only fixes the half that does not need the
     user. Wrap the app in `<PullToRefresh>`; it is INERT unless
     `needsPullToRefresh()` is true, which is iOS home-screen apps and nothing
-    else. Chromium keeps its overscroll refresh in standalone mode, so a second
-    gesture there is one pull reloading twice — **unless your scroll root sets
-    `overscroll-behavior`**, which disables Chromium's; then pass
-    `platform={isStandalone}` and turn it on for Android too. Refresh with
+    else — Chromium keeps its overscroll refresh in standalone mode, so by
+    default the platform's own gesture is left to do the job. **Want one gesture
+    on every phone instead? Pass `platform={isInstalledHandheld}`.** It takes
+    over from Chromium rather than doubling it (mounting sets the
+    `overscroll-behavior` that switches Chromium's off) and fails safe (no
+    bundle, no property, native gesture intact); the trade is that you now
+    maintain on Android what the platform was maintaining. Refresh with
     `reloadApp()` (the default) rather than `location.reload()`: it lets the
     worker update settle first, so a reload issued the moment a deploy lands is
     not answered by the outgoing worker with the very shell the user is escaping.

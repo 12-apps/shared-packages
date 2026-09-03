@@ -3,7 +3,7 @@
    asks for; it flags the per-case reassignment anyway. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { needsPullToRefresh, reloadApp } from "../reload";
+import { isInstalledHandheld, needsPullToRefresh, reloadApp } from "../reload";
 
 /**
  * The reload an installed app took away (12-61).
@@ -37,6 +37,16 @@ function setDisplayMode(standalone: boolean): void {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({ matches: standalone && query.includes("standalone") }),
+  });
+}
+
+/** Standalone AND a given pointer, in one `matchMedia` stub. */
+function setInstalled(standalone: boolean, coarse: boolean): void {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string) => ({
+      matches: query.includes("standalone") ? standalone : query.includes("coarse") && coarse,
+    }),
   });
 }
 
@@ -83,6 +93,37 @@ describe("needsPullToRefresh", () => {
     setDisplayMode(true);
     setUserAgent(ANDROID);
     expect(needsPullToRefresh()).toBe(false);
+  });
+});
+
+describe("isInstalledHandheld", () => {
+  it("is true for an installed app on a phone, whichever engine it is", () => {
+    // The point of the wider predicate: Android counts, where the narrow one
+    // says no because Chromium's own refresh is still there.
+    setInstalled(true, true);
+    setUserAgent(ANDROID);
+    expect(isInstalledHandheld()).toBe(true);
+    setUserAgent(IPHONE);
+    expect(isInstalledHandheld()).toBe(true);
+  });
+
+  it("is false in a browser tab, installed being the whole question", () => {
+    setInstalled(false, true);
+    setUserAgent(ANDROID);
+    expect(isInstalledHandheld()).toBe(false);
+  });
+
+  it("is false for a DESKTOP installed app, which has Ctrl+R and no touchscreen", () => {
+    setInstalled(true, false);
+    setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/141.0.0.0");
+    expect(isInstalledHandheld()).toBe(false);
+  });
+
+  it("is wider than needsPullToRefresh, and only on Android", () => {
+    setInstalled(true, true);
+    setUserAgent(ANDROID);
+    expect(needsPullToRefresh()).toBe(false);
+    expect(isInstalledHandheld()).toBe(true);
   });
 });
 

@@ -32,7 +32,12 @@ export {
 // Reloading an app with no address bar (12-61). Browser-side, React-free, and
 // the gesture's own arithmetic — so a host can ask "does this session even have
 // a reload?" without mounting anything.
-export { needsPullToRefresh, reloadApp, type ReloadAppOptions } from "./reload";
+export {
+  isInstalledHandheld,
+  needsPullToRefresh,
+  reloadApp,
+  type ReloadAppOptions,
+} from "./reload";
 export {
   createPullTracker,
   DEFAULT_PULL_GEOMETRY,
