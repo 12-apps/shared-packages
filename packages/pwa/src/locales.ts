@@ -1,6 +1,6 @@
-import { EN_US_PWA_MESSAGES } from "./en-US";
-import type { PwaMessages } from "./messages";
-import { PT_BR_PWA_MESSAGES } from "./pt-BR";
+import { EN_US_PULL_TO_REFRESH_MESSAGES, EN_US_PWA_MESSAGES } from "./en-US";
+import type { PullToRefreshMessages, PwaMessages } from "./messages";
+import { PT_BR_PULL_TO_REFRESH_MESSAGES, PT_BR_PWA_MESSAGES } from "./pt-BR";
 
 /**
  * Both languages, keyed by tag — what a host hands to `@12-apps/i18n` when the
@@ -17,3 +17,13 @@ export const PWA_MESSAGES = {
   "pt-BR": PT_BR_PWA_MESSAGES,
   "en-US": EN_US_PWA_MESSAGES,
 } as const satisfies LocalePack<PwaMessages>;
+
+/**
+ * The pull-to-refresh strings, both languages. Its own pack for the same reason
+ * it is its own interface — a host adopting the reload gesture is not thereby
+ * adopting the install invite.
+ */
+export const PULL_TO_REFRESH_MESSAGES = {
+  "pt-BR": PT_BR_PULL_TO_REFRESH_MESSAGES,
+  "en-US": EN_US_PULL_TO_REFRESH_MESSAGES,
+} as const satisfies LocalePack<PullToRefreshMessages>;
