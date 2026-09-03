@@ -467,6 +467,82 @@ describe("the moments a shopper comes back", () => {
     expect(calls() - before).toBe(1);
   });
 
+  it("stops abandoning live asks once the re-arm budget runs out", async () => {
+    // FUT-1259. A handset in a Wi-Fi→4G handoff reports `online` about once a
+    // second while each round trip takes longer than that. The quiet window is
+    // measured against the CURRENT ask, so every one of those re-arms abandons
+    // a request that was still alive: nothing is ever absorbed, `errors` never
+    // rises, the backoff never engages, and the status endpoint sits pinned
+    // near one request per second — on the link least able to carry it.
+    const { client, calls } = hangingClient();
+    useWait(client, { intervalMs: 2500, askTimeoutMs: 60_000 });
+
+    await elapse(0);
+    expect(calls()).toBe(1);
+
+    for (let i = 0; i < 6; i += 1) {
+      await elapse(1_100);
+      await fire(window, "online");
+    }
+
+    // Three abandoned asks, and then the loop stands down and lets the fourth
+    // run — six re-arms cost four requests rather than seven.
+    expect(calls()).toBe(4);
+  });
+
+  it("refills that budget once an answer gets through", async () => {
+    // The budget bounds a void, not the shopper. As soon as anything lands —
+    // here the ask hitting its own timeout — the re-arm is honoured again, so
+    // someone genuinely returning from their bank app still polls at once.
+    const { client, calls } = hangingClient();
+    useWait(client, { intervalMs: 2500, askTimeoutMs: 10_000 });
+
+    await elapse(0);
+    for (let i = 0; i < 6; i += 1) {
+      await elapse(1_100);
+      await fire(window, "online");
+    }
+    expect(calls()).toBe(4);
+
+    // The ask the loop stood down for times out: an answer, of a kind.
+    await elapse(10_000);
+    const answered = calls();
+
+    // The loop schedules its next ask 2500ms after that answer, so this poke
+    // lands well clear of REARM_QUIET_MS. Pinned as an exact count rather than
+    // "more than": one re-arm must cost one request, not two.
+    await elapse(1_100);
+    await fire(window, "online");
+
+    expect(calls()).toBe(answered + 1);
+  });
+
+  it("hands the buyer's own check-again a fresh budget", async () => {
+    // The budget is per-wait state, so `restart` resets it alongside `errors`
+    // and `healthy`. Without that reset a spent budget leaks across the retry:
+    // the next `online` is swallowed for up to `askTimeoutMs` — the exact
+    // silence "Verificar de novo" exists to break.
+    const { client, calls } = hangingClient();
+    const { result } = useWait(client, { intervalMs: 2500, askTimeoutMs: 60_000 });
+
+    await elapse(0);
+    for (let i = 0; i < 5; i += 1) {
+      await elapse(1_100);
+      await fire(window, "online");
+    }
+    expect(calls()).toBe(4);
+
+    await act(async () => {
+      result.current.checkAgain();
+    });
+    const afterRestart = calls();
+
+    await elapse(1_100);
+    await fire(window, "online");
+
+    expect(calls()).toBe(afterRestart + 1);
+  });
+
   it("stops listening once the wait is torn down", async () => {
     // A listener outliving its wait is a request against an order this tree no
     // longer shows — and a state update on an unmounted component.
