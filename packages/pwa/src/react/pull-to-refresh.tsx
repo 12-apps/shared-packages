@@ -70,10 +70,11 @@ export interface PullToRefreshProps {
    * Does this session need the gesture? Default {@link needsPullToRefresh}.
    *
    * Injectable because the platform question has more than one right answer.
-   * A host that sets `overscroll-behavior` on its scroll root has disabled
-   * Chromium's own refresh and wants this on Android too (`isStandalone`); an
-   * end-to-end test drives a desktop Chromium that can never satisfy the real
-   * test and needs `() => true` to see the thing it is asserting.
+   * {@link isInstalledHandheld} turns it on for every installed phone —
+   * Android included, where it takes over from Chromium's own refresh rather
+   * than doubling it (see `useOverscrollLock`). An end-to-end test drives a
+   * desktop browser that can never satisfy the real test and needs
+   * `() => true` to see the thing it is asserting.
    */
   platform?: () => boolean;
   /**
@@ -129,14 +130,29 @@ function paint(
 /**
  * Hand the top overscroll to this component while it is live.
  *
- * iOS rubber-bands the whole document at the top, and that bounce is the same
- * finger movement as this gesture: left alone, the page slides down under a
- * chip that is also sliding down, at two different speeds. `contain` keeps the
- * scroll inside the page without disabling it, and is read from `html` by
- * WebKit and from `body` by Chromium — hence both.
+ * `contain` rather than `none`, and the difference is the whole point: it turns
+ * off the browser's own REFRESH gesture while leaving its visual overscroll —
+ * the bounce, the glow — alone. `none` would take both, which on Android means
+ * losing a cue the platform draws for free.
+ *
+ * It therefore does two jobs, depending on who is underneath:
+ *
+ * - **On iOS**, where there is no native refresh to switch off, it stops the
+ *   document's scroll chaining while the gesture owns the top. The bounce is
+ *   not what `contain` removes; what keeps the page still under a claimed pull
+ *   is the `preventDefault` in `onMove`.
+ * - **On Android**, where this only runs if the host opted in with
+ *   {@link isInstalledHandheld}, it is exactly the property that switches
+ *   Chromium's own overscroll refresh off — so the handover is clean and the
+ *   user never gets two gestures for one pull.
+ *
+ * Set on BOTH elements because the engines disagree about which one carries it:
+ * WebKit reads `html`, Chromium reads `body`.
  *
  * Scoped to the mount and restored on unmount, so a host that renders this on
- * some routes and not others does not leave the document altered behind it.
+ * some routes and not others does not leave the document altered behind it —
+ * and if this bundle never runs at all, the property is never set and the
+ * browser's own gesture is untouched. The failure direction is the safe one.
  */
 function useOverscrollLock(active: boolean): void {
   useEffect(() => {

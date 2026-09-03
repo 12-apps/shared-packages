@@ -22,7 +22,7 @@ import { reportWarning } from "@12-apps/observability-frontend";
 
 | entry | what it is |
 |---|---|
-| `@12-apps/pwa` | `useInstallPrompt`, `isIosInstallable`, `isStandalone`, `isHandheld`, the messages layer, `registerServiceWorker` / `postToServiceWorker`, and the **reload** half — `needsPullToRefresh`, `reloadApp`, `createPullTracker` |
+| `@12-apps/pwa` | `useInstallPrompt`, `isIosInstallable`, `isStandalone`, `isHandheld`, the messages layer, `registerServiceWorker` / `postToServiceWorker`, and the **reload** half — `needsPullToRefresh`, `isInstalledHandheld`, `reloadApp`, `createPullTracker` |
 | `@12-apps/pwa/react` | `InstallInvite`, `ShareIcon`, `PullToRefresh` |
 | `@12-apps/pwa/server` | `createApiPwa({ resolveApp })` — the per-host **manifest endpoint** and the packaged service worker; also `buildWebAppManifest` and `pwaServiceWorkerSource` |
 | `@12-apps/pwa/hono` | `pwaRouter({ resolveApp })`, mounted at the origin root. `hono` is an OPTIONAL peer |
@@ -90,12 +90,26 @@ exactly one combination:
 | desktop standalone | yes | no address bar, but `Ctrl+R` and a context menu |
 | **iOS home screen** | **no** | no chrome, and the pull gesture that reloads in Safari does not reload a standalone web app. The workaround in the wild is *delete the icon and add it again* |
 
-So the gesture ships to iOS and nowhere else. Layering a second pull-to-refresh
-over a working one is how one pull reloads twice — which is also why a host that
-*has* set `overscroll-behavior` on its scroll root (and so disabled Chromium's)
-should pass `platform={isStandalone}` to turn it on there too. That prop is the
-platform question, injectable because it has more than one right answer; an
-end-to-end test driving desktop Chromium passes `() => true`.
+So by default the gesture ships to iOS and nowhere else — not because it would
+be *unsafe* elsewhere, but because a platform gesture that already works has
+native feel and haptics and cannot be lost to a JavaScript failure.
+
+**To use it on Android too, pass `platform={isInstalledHandheld}`.** That is a
+supported choice, not a workaround, and the handover is clean rather than
+doubled: mounting sets `overscroll-behavior-y: contain`, which is exactly the
+property that switches Chromium's own overscroll refresh off. One pull, one
+gesture, and it is yours — same indicator and same threshold on both platforms.
+It also fails in the safe direction: if the bundle never runs, the property is
+never set and Chromium's gesture is still there.
+
+Reach for it when you want one gesture to design and support across every phone,
+or for an Android browser whose installed apps do *not* keep the native one.
+Note what you give up: on Android you are replacing a gesture the platform
+maintains with one you maintain.
+
+`isInstalledHandheld` deliberately excludes a DESKTOP installed app — no address
+bar, but `Ctrl+R`, a context menu, and no touchscreen to pull on. An end-to-end
+test driving a desktop browser passes `() => true`.
 
 ### `reloadApp()` is not quite `location.reload()`
 
