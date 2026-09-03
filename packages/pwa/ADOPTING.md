@@ -12,7 +12,7 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
 | Surface | Export | What the host does |
 |---|---|---|
 | **Core** | `@12-apps/pwa` | `useInstallPrompt()` + `isIosInstallable` / `isStandalone` / `isHandheld`, and `registerServiceWorker()` / `postToServiceWorker()`. React-free apart from the hook; no `hono`, no Node. |
-| **React** | `@12-apps/pwa/react` | `<InstallInvite …>` — the captured `beforeinstallprompt` button on Chromium, the share-sheet instruction on iOS, dismissal memory, every string overridable. |
+| **React** | `@12-apps/pwa/react` | `<InstallInvite …>` — the captured `beforeinstallprompt` button on Chromium, the share-sheet instruction on iOS, dismissal memory, every string overridable. And `<PullToRefresh …>` — the reload an installed app has no chrome for (rule 12). |
 | **Server** | `@12-apps/pwa/server` | `createApiPwa({ resolveApp })` and mount the `routes` it returns: the manifest endpoint, and optionally the packaged worker. Also exports `buildWebAppManifest` and `pwaServiceWorkerSource` for a host that serves them its own way. |
 | **Hono** | `@12-apps/pwa/hono` | `const pwa = pwaRouter({ resolveApp }); app.route('/', pwa.router)`. Mounted at the **origin root** (see rule 2). `hono` is an OPTIONAL peer, so importing the root or `./react` never resolves it. |
 | **Prisma** | — | **None, deliberately.** This package owns no tables: the app's identity, its branding and its domain rules all live in the host's own models. A partial for tables nothing writes is worse than none, because every host then adopts migrations it does not need. |
@@ -99,6 +99,18 @@ updates with **no app changes**. Same contract `@12-apps/report-builder` and
     from the browser's own cache with no request leaving the tab. A host resolving
     its app some other way (a path segment, a config map keyed on something else)
     should send the `Vary` matching ITS input instead.
+12. **Give the reload back where the platform took it away.** Rule 5 says the
+    quiet part out loud — *on an installed app "force-refresh" is advice the user
+    cannot follow* — and the worker only fixes the half that does not need the
+    user. Wrap the app in `<PullToRefresh>`; it is INERT unless
+    `needsPullToRefresh()` is true, which is iOS home-screen apps and nothing
+    else. Chromium keeps its overscroll refresh in standalone mode, so a second
+    gesture there is one pull reloading twice — **unless your scroll root sets
+    `overscroll-behavior`**, which disables Chromium's; then pass
+    `platform={isStandalone}` and turn it on for Android too. Refresh with
+    `reloadApp()` (the default) rather than `location.reload()`: it lets the
+    worker update settle first, so a reload issued the moment a deploy lands is
+    not answered by the outgoing worker with the very shell the user is escaping.
 
 ## The config, field by field
 
