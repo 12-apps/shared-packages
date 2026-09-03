@@ -38,3 +38,35 @@ export interface PwaMessages {
   dismiss: string;
 }
 
+
+/**
+ * The pull-to-refresh strings — a SEPARATE interface from {@link PwaMessages},
+ * and deliberately so on two counts.
+ *
+ * The gesture is not the invite: a host can want one without the other (an app
+ * on its own single origin needs no invite at all and still loses its address
+ * bar once installed), and coupling them would make adopting the reload a
+ * breaking change for every host that hand-builds an invite's copy.
+ *
+ * ## These are announcements, not labels
+ *
+ * Nothing here is read by eye. A pull-to-refresh indicator is a spinner under
+ * the user's own thumb, and by the time it is on screen they are looking at
+ * their finger — which is why the visual carries an arrow and a spinner rather
+ * than words. Every string below reaches a SCREEN READER, through a live
+ * region, and that is the whole audience: somebody driving the app by
+ * VoiceOver, for whom the arrow flipping over is nothing at all.
+ *
+ * So they are written as statements of what just happened, not as instructions
+ * about what to do next.
+ */
+export interface PullToRefreshMessages {
+  /** Announced once the pull is claimed but is not yet far enough. */
+  pulling: string;
+  /** Announced when the pull passes the threshold — releasing now refreshes. */
+  armed: string;
+  /** Announced while the app is reloading. */
+  refreshing: string;
+  /** The accessible name of the indicator's live region. */
+  label: string;
+}
