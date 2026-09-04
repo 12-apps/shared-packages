@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import { buyerGateError } from "./buyer-gate";
 import type { CheckoutDecline } from "./decline";
 import { forgetHostedOrder, rememberHostedOrder } from "./hosted-return";
-import type { CheckoutBasketIdentity } from "./basket";
+import { parkedBasket, type CheckoutBasketIdentity } from "./basket";
 import type { CheckoutNavigate } from "./navigate-context";
 import type { CheckoutScreensCopy } from "./screens-copy";
 import type {
@@ -284,7 +284,7 @@ function handOverToProvider(
   // apart later is to record which basket this one was raised from.
   rememberHostedOrder(order, {
     tenantSlug,
-    basket: basket?.signature,
+    basket: parkedBasket(basket),
     handoff: true,
   });
   navigate(order.hostedCheckoutUrl);
@@ -329,7 +329,7 @@ export function useStartPayment(input: {
       // that comes back has never heard of the order it raised — so the buyer
       // meets an empty cart and a retry button instead of the confirmation for
       // the payment they just made.
-      rememberHostedOrder(result.data, { tenantSlug, basket: basket?.signature });
+      rememberHostedOrder(result.data, { tenantSlug, basket: parkedBasket(basket) });
       setOrder(result.data);
       setFinalStatus(null);
     },

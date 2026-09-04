@@ -188,6 +188,34 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
     expect(result.current.step).toBe("status");
   });
 
+  it("decides anyway when the host's cart never loads", async () => {
+    // The deferral assumes the cart eventually answers, and a cart FETCH can
+    // fail — on exactly the flaky connection a buyer has coming back from their
+    // bank app. Waiting forever there is this ticket's bug pointed the other
+    // way: the flow renders Dados and a paid buyer's confirmation never lands.
+    vi.useFakeTimers();
+    try {
+      rememberHostedOrder(ORDER, { basket: RAISED, handoff: true });
+      const { client } = scriptedClient({ status: "PAID" });
+
+      const { result } = renderHook(
+        () =>
+          useCheckoutController(makePorts(), undefined, false, undefined, undefined, {
+            signature: null as string | null,
+            ready: false,
+          }),
+        { wrapper: wrapperFor(client) },
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9_000);
+      });
+
+      expect(result.current.step).toBe("status");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps the entry parked when the ask itself fails", async () => {
     // "We could not reach the server" is not "the order is not paid". The
     // shopper gets their checkout either way, and a later mount can still find

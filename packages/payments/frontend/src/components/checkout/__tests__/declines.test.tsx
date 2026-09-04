@@ -22,6 +22,7 @@ import { PaymentStatus } from "../payment-status";
 import { PT_BR_PAYMENT_STATUS_COPY } from "../pt-BR";
 import { EN_US_PAYMENT_STATUS_COPY } from "../en-US";
 import type { CheckoutOrder } from "../types";
+import type { PaymentStatusCopy } from "../view-copy";
 import { useCheckoutController, type CheckoutHostPorts } from "../use-checkout-controller";
 import { act, render, renderHook, screen } from "./test-utils";
 
@@ -112,6 +113,31 @@ describe("what a refused card says", () => {
         totalLabel="R$ 24,00"
         onBackToMenu={vi.fn()}
         decline={{ reason: "UNKNOWN" }}
+      />,
+    );
+
+    expect(screen.getByText(PT_BR_PAYMENT_STATUS_COPY.failed.heading)).toBeTruthy();
+  });
+
+  it("falls back to the generic refusal for a host that wrote no decline table", () => {
+    // Not a copy default — nothing is invented — but the difference between one
+    // unworded refusal and a TypeError that unmounts a live checkout. The type
+    // still requires the key; this is for the consumer that does not typecheck
+    // its pack, which is exactly how the harness discovered it.
+    // `undefined` rather than a deleted key, because that IS the runtime shape a
+    // pack written without the block produces once it is read.
+    const partial: PaymentStatusCopy = {
+      ...PT_BR_PAYMENT_STATUS_COPY,
+      declined: undefined as unknown as PaymentStatusCopy["declined"],
+    };
+
+    render(
+      <PaymentStatus
+        copy={partial}
+        status="FAILED"
+        totalLabel="R$ 24,00"
+        onBackToMenu={vi.fn()}
+        decline={{ reason: "EXPIRED_CARD" }}
       />,
     );
 

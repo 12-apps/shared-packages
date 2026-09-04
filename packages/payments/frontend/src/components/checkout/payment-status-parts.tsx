@@ -111,7 +111,13 @@ function awaitingFace(
  */
 function failedOutcome(copy: PaymentStatusCopy, decline: CheckoutDecline | null): StatusOutcomeCopy {
   const reason = decline?.reason;
-  return (reason ? copy.declined[reason] : undefined) ?? copy.failed;
+  // `?.` on the TABLE as well as the row: a host that has not written the block
+  // at all lands on `failed`, which is a sentence it did write. The optional
+  // chain is not a copy default — nothing is invented here — it is the
+  // difference between one unworded refusal and a `TypeError` that unmounts a
+  // live checkout. The type still REQUIRES the key, so a host that typechecks
+  // is told; the ones that do not are the reason this is defensive at all.
+  return (reason ? copy.declined?.[reason] : undefined) ?? copy.failed;
 }
 
 /** The headline block: icon, outcome, and one supporting line. */

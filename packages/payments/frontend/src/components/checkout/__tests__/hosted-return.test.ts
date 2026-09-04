@@ -407,12 +407,60 @@ describe("where a resumed checkout opens", () => {
     expect(decision.verdict === "RESUME" ? decision.step : null).toBe("status");
   });
 
+  it("puts an entry with NO handoff flag on the confirmation — the deploy window", () => {
+    // THE BLOCKING CASE. Every entry parked by a bundle that predates the flag
+    // is a hand-off: the redirect link and the 3-D Secure challenge were the
+    // only two things that parked anything. Written by hand, in the shape that
+    // bundle actually wrote, because nothing in this version can produce it.
+    //
+    // Resumed onto the PAYMENT step, that buyer meets the hand-off screen's
+    // "Preparando o pagamento" spinner with nothing to navigate them and no
+    // poll, and their entry already consumed — so the exit they take is a
+    // SECOND order against a cart the first one may have closed.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-18T10:00:00Z"));
+      window.sessionStorage.setItem(
+        HOSTED_ORDER_STORAGE_KEY,
+        JSON.stringify({
+          order: ORDER,
+          tenantSlug: "loja-a",
+          parkedAt: new Date("2026-08-18T09:55:00Z").getTime(),
+        }),
+      );
+
+      const decision = takeHostedOrder("loja-a", { signature: "a", ready: true });
+
+      expect(decision.verdict === "RESUME" ? decision.step : null).toBe("status");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("puts a PRE-SCOPE bare order on the confirmation too", () => {
+    // The oldest shape of all — a bare `CheckoutOrder` with no envelope. Same
+    // reasoning: nothing but a hand-off wrote one.
+    window.sessionStorage.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(ORDER));
+
+    const decision = takeHostedOrder(undefined, { signature: "a", ready: true });
+
+    expect(decision.verdict === "RESUME" ? decision.step : null).toBe("status");
+  });
+
   it("puts a code raised on our own page back in front of the buyer", () => {
     rememberHostedOrder(ORDER, { basket: "a" });
 
     const decision = takeHostedOrder(undefined, { signature: "a", ready: true });
 
     expect(decision.verdict === "RESUME" ? decision.step : null).toBe("payment");
+  });
+
+  it("records the on-page charge EXPLICITLY, so it cannot be read as legacy", () => {
+    rememberHostedOrder(ORDER, { basket: "a" });
+
+    const raw = window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY) ?? "";
+
+    expect(JSON.parse(raw)).toMatchObject({ handoff: false });
   });
 
   it("puts it on the confirmation instead once the cart has been closed", () => {

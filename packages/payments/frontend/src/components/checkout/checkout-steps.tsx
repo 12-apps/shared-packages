@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
+import type { CheckoutBasketIdentity } from "./basket";
 import { displayTotals, PayBarTotal } from "./checkout-totals";
 import { useCheckoutCopy } from "./copy-context";
 import { useMethodChoice } from "./method-choice";
@@ -69,6 +70,7 @@ function PaymentBody({
   creating,
   pollIntervalMs,
   freshInstrument,
+  basket,
   validateApplePayMerchant,
 }: {
   order: CheckoutOrder | null;
@@ -82,6 +84,7 @@ function PaymentBody({
   creating: boolean;
   pollIntervalMs?: number;
   freshInstrument?: boolean;
+  basket?: CheckoutBasketIdentity;
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }): JSX.Element | null {
   const Screen = resolveCheckoutScreen(providerConfig?.chain?.[0]?.checkoutScreen);
@@ -97,6 +100,7 @@ function PaymentBody({
       creating={creating}
       pollIntervalMs={pollIntervalMs}
       freshInstrument={freshInstrument}
+      basket={basket}
       validateApplePayMerchant={validateApplePayMerchant}
     />
   );
@@ -117,28 +121,40 @@ export function EmptyCart({ copy, onBack }: { copy: EmptyCartCopy; onBack: () =>
   );
 }
 
-/**
- * The Pagamento step's own money line (FUT-1179).
- *
- * Renders nothing at all when the host supplied no totals — a step that would
- * otherwise print "Total ·  " with a blank beside it is worse than the silence
- * this ticket is about. Every host mounting `CheckoutFlow` gets them; only a
- * hand-composed step can be missing them.
- */
-function PaymentStepTotal({
-  cartTotals,
-  totalOverride,
-  discountLines,
-}: {
+/** What the step knows about the amount: the charge's, the balance's, the cart's. */
+interface StepMoney {
+  order: CheckoutOrder | null;
   cartTotals?: { totalLabel: string; totalItems: number };
   totalOverride?: { label: string; items: number };
   discountLines?: ReactNode;
-}): JSX.Element | null {
-  if (!cartTotals && !totalOverride) return null;
+}
+
+/**
+ * The Pagamento step's own money line (FUT-1179).
+ *
+ * THE RAISED ORDER'S TOTAL WINS, exactly as the confirmation screen's does
+ * (`statusTotalLabel`). Once a charge exists, that charge's amount is what is
+ * being taken — a repriced cart, or an order resumed from a parked entry, makes
+ * the cart's total a different number from the one about to leave the buyer's
+ * account. Showing the cart's number above a QR for the order's would be this
+ * ticket's own defect in a new place: an amount on screen that is not the
+ * amount being charged.
+ *
+ * The item COUNT stays the cart's — an order carries no line count, and the
+ * caption is a description of the basket rather than of the charge.
+ *
+ * Renders nothing at all when the host supplied no totals and no order — a step
+ * that would otherwise print "Total ·" with a blank beside it is worse than the
+ * silence this ticket is about. Every host mounting `CheckoutFlow` gets them;
+ * only a hand-composed step can be missing them.
+ */
+function PaymentStepTotal({ money }: { money: StepMoney }): JSX.Element | null {
+  const { order, cartTotals, totalOverride, discountLines } = money;
+  if (!cartTotals && !totalOverride && !order) return null;
   const { label, items } = displayTotals(totalOverride, cartTotals ?? { totalLabel: "", totalItems: 0 });
   return (
     <Box data-testid="payment-step-total" sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
-      <PayBarTotal totalLabel={label} totalItems={items}>
+      <PayBarTotal totalLabel={order?.totalLabel ?? label} totalItems={items}>
         {/* Suppressed while settling a balance: those totals come from the
             frozen ticket, not the cart. */}
         {totalOverride ? null : discountLines}
@@ -200,6 +216,13 @@ interface PaymentStepProps {
   pollIntervalMs?: number;
   /** Retrying a refused card — preselect no saved instrument (FUT-1145). */
   freshInstrument?: boolean;
+  /**
+   * WHICH basket this checkout is for (FUT-1213) — passed down because the
+   * card path can park an order too: a 3-D Secure challenge is a hand-off, and
+   * one parked without a basket resumes over any basket at any store, which is
+   * this ticket's own bug on a sibling path.
+   */
+  basket?: CheckoutBasketIdentity;
   /** The host's Apple Pay merchant-validation port (FUT-472) — see the screen contract. */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   onResolved: OnCheckoutResolved;
@@ -240,6 +263,7 @@ export function PaymentStep({
   discountLines,
   pollIntervalMs,
   freshInstrument,
+  basket,
   validateApplePayMerchant,
   onResolved,
 }: PaymentStepProps): JSX.Element {
@@ -254,11 +278,7 @@ export function PaymentStep({
           pane below it — the PIX code, the card form's own pay bar, the
           hand-off button — and a second bar would put two "pay" controls on
           one screen. */}
-      <PaymentStepTotal
-        cartTotals={cartTotals}
-        totalOverride={totalOverride}
-        discountLines={discountLines}
-      />
+      <PaymentStepTotal money={{ order, cartTotals, totalOverride, discountLines }} />
 
       {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
       <PayerSummary name={buyer.name} taxId={buyer.taxId} onEdit={onEditBuyer} />
@@ -283,6 +303,7 @@ export function PaymentStep({
         creating={creating}
         pollIntervalMs={pollIntervalMs}
         freshInstrument={freshInstrument}
+        basket={basket}
         validateApplePayMerchant={validateApplePayMerchant}
       />
 

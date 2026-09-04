@@ -493,10 +493,31 @@ order CREATION never enter the package; they arrive as explicit props:
 | `confirmationExtra` | no | host content on the PAID confirmation (this repo's PWA install invite) |
 | `oneClick` | no | the buyer pressed a BUY button rather than opening a checkout — pay with their saved card and land on Confirmação with no tap (see below) |
 
+**Three copy keys are new and REQUIRED on this bump**, and a hand-written pack
+that misses one fails at RUNTIME rather than at compile time if the host does
+not typecheck the file (the consumer harness in this repo did exactly that, and
+every checkout page in it died on the first render):
+
+| key | where | what it is |
+| --- | --- | --- |
+| `views.screens.totalCaption(items)` | the pay bar, on BOTH steps | "Total · 2 itens" — a function, because the count inflects. It was compiled-in Portuguese until FUT-1179 put the bar on a second step. **Called unconditionally**, so an absent one is a `TypeError` that unmounts the checkout. |
+| `views.status.declined` | the confirmation | one `{heading, support}` per normalized decline reason (FUT-1145); a reason with no entry falls back to `views.status.failed`, so a partial table is legal and `UNKNOWN` is meant to be absent. **Indexed**, so an absent `declined` object is a `TypeError` on the first refusal. |
+| `views.status.notPaidAction` | the confirmation | the buyer's "I could not pay" (FUT-1146). |
+
 **`cart.identity` — WHICH basket this checkout is for (FUT-1213).** Pass
 `{ signature: basketSignature(lines), ready }`, where `lines` is your cart's
 own `{ id, quantity }` list and `ready` is false while that cart is still
-loading. `basketSignature` is exported from the package root; the identity is
+loading.
+
+> **PASS IT UNCONDITIONALLY, `ready: false` and all.** Computing `identity` only
+> once the cart has data — the natural shape, and the one a careful host reaches
+> for — hands the flow `undefined` in the meantime, and `undefined` means "this
+> host has not adopted the port": the pre-1213 resume, silently, on exactly the
+> mount where the decision is made. The package cannot tell the two apart, so
+> this is the one line of the wiring that has to be right by construction. The
+> same goes for `hostedCheckoutReturnPending(slug, basket)` below.
+
+`basketSignature` is exported from the package root; the identity is
 the LINES because "Esvaziar carrinho" keeps the cart row, so a cart id says
 "same basket" for a shopper who threw the old one away.
 
@@ -518,9 +539,16 @@ closed-shop curtain, a plan check — and it now mirrors the resume's rule
 instead of merely asking whether anything is parked: this store, not stale, and
 still about the basket in front of the shopper (the same one, or an empty one).
 Both directions matter and only the host can supply the basket to both: a buyer
-who PAID reaches "Pedido confirmado" at a shut store, and a buyer who abandoned
-and rebuilt a different basket meets the curtain, which is what a shut store is
-for. A host that passes no basket keeps the WIDE pre-1213 answer — anything
+who paid comes back to an EMPTY basket — the server closes a paid cart — so the
+predicate is true for them and "Pedido confirmado" is reachable at a shut store,
+while a buyer who abandoned and rebuilt a different basket meets the curtain,
+which is what a shut store is for. The gate is deliberately local, so it cannot
+ask the server: a payer who somehow returns holding a DIFFERENT basket is
+blocked by it, and the resume behind it never runs to discover they had paid.
+Their order is still settled server-side and still in their purchases; what they
+lose is meeting the confirmation on this visit.
+
+A host that passes no basket keeps the WIDE pre-1213 answer — anything
 parked stands the gate aside — so migrating `cart.identity` without migrating
 this call leaves half the fix on the floor. The check stays local and
 non-consuming, so a gate may ask it on every render; a host that freezes the

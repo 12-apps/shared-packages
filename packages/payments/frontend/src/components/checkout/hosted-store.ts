@@ -86,6 +86,14 @@ const LEGACY_KEY = atob("ZnV0dXJlcGF5LmNoZWNrb3V0Lmhvc3RlZE9yZGVy");
  * while a PIX code raised on our own page is still the thing the buyer needs to
  * look at.
  *
+ * IT IS WRITTEN EXPLICITLY, both ways, and that is a compatibility rule rather
+ * than a style: every entry parked by a PRE-1140 bundle is a hand-off — those
+ * were the only two things that parked anything — so an ABSENT flag has to mean
+ * "hand-off", and a new entry that merely omitted `false` would be read as one
+ * too. A buyer resumed onto the payment step for a hand-off meets a spinner
+ * that never navigates and no poll, having had their parked entry consumed:
+ * the way out they actually take is a second order on a closed cart.
+ *
  * `parkedAt` bounds the other axis. A checkout in flight is minutes; an entry
  * older than {@link MAX_PARKED_AGE_MS} belongs to a session the buyer has long
  * since abandoned, and resuming it tells them about an order they are no longer
@@ -102,7 +110,13 @@ export interface ParkedHostedOrder {
    * "unknown", which the rule treats as today's behaviour.
    */
   basket?: string | null;
-  /** The buyer was sent to the provider's own page for this order. */
+  /**
+   * The buyer was sent to the provider's own page for this order.
+   *
+   * ABSENT means an entry from a bundle that predates the flag, and every one
+   * of those IS a hand-off — see the note above. `false` is written out for a
+   * charge raised on our own page precisely so the two stay distinguishable.
+   */
   handoff?: boolean;
   parkedAt: number;
 }
@@ -133,7 +147,9 @@ export function rememberHostedOrder(order: CheckoutOrder, context: ParkedContext
       order,
       ...(context.tenantSlug ? { tenantSlug: context.tenantSlug } : {}),
       ...(context.basket === undefined ? {} : { basket: context.basket }),
-      ...(context.handoff ? { handoff: true } : {}),
+      // ALWAYS written, both ways: an absent flag is reserved for entries this
+      // version did not write, and those are all hand-offs.
+      handoff: context.handoff === true,
       parkedAt: Date.now(),
     };
     window.sessionStorage?.setItem(HOSTED_ORDER_STORAGE_KEY, JSON.stringify(parked));
@@ -197,7 +213,10 @@ function scopedEntry(candidate: Partial<ParkedHostedOrder>): ParkedHostedOrder |
     order: candidate.order,
     ...(candidate.tenantSlug ? { tenantSlug: candidate.tenantSlug } : {}),
     ...(candidate.basket === undefined ? {} : { basket: candidate.basket }),
-    ...(candidate.handoff ? { handoff: true } : {}),
+    // Preserved as WRITTEN, `false` included — dropping it here would turn
+    // every on-page charge back into the legacy shape and resume it on the
+    // confirmation screen.
+    ...(candidate.handoff === undefined ? {} : { handoff: candidate.handoff === true }),
     parkedAt: typeof candidate.parkedAt === "number" ? candidate.parkedAt : Date.now(),
   };
 }

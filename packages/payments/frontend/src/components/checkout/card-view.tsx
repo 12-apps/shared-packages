@@ -11,6 +11,7 @@ import {
 import { useCheckoutCopy } from "./copy-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
 import { StalledWait } from "./stalled-wait";
+import type { CheckoutBasketIdentity } from "./basket";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved } from "./types";
 import { useCheckoutComponents } from "./ui";
@@ -150,6 +151,7 @@ export function CardView({
   onResolved,
   pollIntervalMs = 2500,
   freshInstrument = false,
+  basket,
 }: {
   order: CheckoutOrder;
   buyer?: BuyerInfo;
@@ -171,6 +173,11 @@ export function CardView({
    * them is that one.
    */
   freshInstrument?: boolean;
+  /**
+   * WHICH basket this checkout is for (FUT-1213) — parked with the order when
+   * a 3-D Secure challenge sends the buyer to the provider's page.
+   */
+  basket?: CheckoutBasketIdentity;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.card;
@@ -183,6 +190,7 @@ export function CardView({
     tenantSlug,
     providerChain,
     freshInstrument,
+    { tenantSlug, basket },
   );
   // A charge NOBODY can confirm yet is not a decline (FUT-563). Some provider
   // may be holding the buyer's money, so it gets its own presentation: the

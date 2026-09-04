@@ -80,9 +80,41 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           'Seguimos tentando por aqui. Se você já pagou, não pague de novo — ' +
           'o pedido é confirmado assim que o banco avisar.',
       },
+      // One sentence per normalized reason (FUT-1145). Worded by THIS host, as
+      // everything else here is: the package publishes the reason and never the
+      // words. A reason with no entry falls back to `failed` above, which is
+      // why `UNKNOWN` is deliberately absent.
+      declined: {
+        INSUFFICIENT_FUNDS: {
+          heading: 'Não havia saldo ou limite',
+          support: 'Nada foi cobrado. Tente com outro cartão.',
+        },
+        CARD_DECLINED: {
+          heading: 'O banco não autorizou',
+          support: 'Nada foi cobrado. Tente outro cartão ou fale com o seu banco.',
+        },
+        INVALID_CARD: {
+          heading: 'Os dados do cartão não foram aceitos',
+          support: 'Nada foi cobrado. Confira número, validade e CVV, ou use outro cartão.',
+        },
+        EXPIRED_CARD: {
+          heading: 'Este cartão está vencido',
+          support: 'Nada foi cobrado. Use um cartão dentro da validade.',
+        },
+        FRAUD_SUSPECTED: {
+          heading: 'O banco bloqueou esta compra',
+          support: 'Nada foi cobrado. Fale com o seu banco ou use outro cartão.',
+        },
+        PROVIDER_ERROR: {
+          heading: 'Não deu para processar agora',
+          support: 'Nada foi cobrado. Tente de novo em instantes.',
+        },
+      },
       retryAction: 'Tentar de novo',
       regenerateAction: 'Gerar outro código',
       checkAgainAction: 'Verificar agora',
+      // The buyer's own way out of a hosted wait that has no ending (FUT-1146).
+      notPaidAction: 'Não consegui pagar',
       backAction: 'Voltar à loja',
       amountLabel: 'Total pago',
       referenceLabel: 'Referência',
@@ -227,6 +259,9 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           required: 'Preencha este campo.',
         },
         generatingPayment: 'Criando o pagamento…',
+        // The caption beside the amount, on both the details and the payment
+        // step. A function because the count inflects.
+        totalCaption: (items) => `Total · ${items} ${items === 1 ? 'item' : 'itens'}`,
       },
     },
   },

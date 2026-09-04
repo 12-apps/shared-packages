@@ -80,11 +80,20 @@ export interface ChargeCorrelationPort {
   /**
    * The BUYER said they did not pay, and the provider agreed (FUT-1146).
    *
-   * Fired by `POST /release` only after the provider has been asked and did
-   * NOT report a payment, so this is never called on a payable anybody has
-   * money for. What "released" means is the host's — cancelled, reopened for
-   * another attempt, or simply closed — which is why it is a port and not a
-   * status this library writes.
+   * Fired by `POST /release` only after the provider has been ASKED and did not
+   * report a payment. Read that literally: "did not report" covers a provider
+   * that said not-paid, one that could not be reached, and one that cannot be
+   * asked at all without a reference only a paid redirect carries — and the
+   * release treats all three the same way, because refusing on "could not ask"
+   * would make the whole affordance inert for the provider it exists for. So
+   * this is not a proof that nobody has the buyer's money; it is a proof that
+   * nobody could tell us they did. The `cancelCharge` attempt beside it is the
+   * half that touches real money, and it is best-effort for the same reason.
+   *
+   * What "released" means is the host's — cancelled, reopened for another
+   * attempt, or simply closed — which is why it is a port and not a status this
+   * library writes. Whatever it means, keep it WEBHOOK-SAFE: a settlement that
+   * lands afterwards must still be recordable.
    *
    * Omit to have the route answer the payable's current state and change
    * nothing. The buyer's screen recovers either way; what is lost is only the

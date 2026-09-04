@@ -22,7 +22,7 @@ import {
   type CardInstruments,
   type RefreshBrowserKey,
 } from "./card-instruments";
-import { handOverToChallenge, reportResolved } from "./card-outcome";
+import { handOverToChallenge, reportResolved, type ChallengeScope } from "./card-outcome";
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
@@ -253,6 +253,9 @@ function useCardSubmit(
   pollIntervalMs: number,
   form: CardFormState,
   providerChain: readonly CardChainLink[],
+  /** WHOSE store and WHICH basket this charge is for — parked with a 3DS
+   *  hand-off, which is otherwise resumable over any basket anywhere. */
+  scope: ChallengeScope,
 ): CardSubmit {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -311,7 +314,7 @@ function useCardSubmit(
     // 3-D Secure (FUT-698): the buyer must finish on the provider's page.
     // `submitting` stays true on purpose — the tab is navigating away.
     if (charged.data.hostedCheckoutUrl) {
-      return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate);
+      return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate, scope);
     }
     // A business outcome shows the status screen, carrying the refusal the
     // server classified (FUT-1145); an accepted charge begins polling.
@@ -341,6 +344,8 @@ export function useCardCheckout(
   providerChain: readonly CardChainLink[] = [],
   /** Do not preselect a saved card — the last one was refused (FUT-1145). */
   freshInstrument = false,
+  /** WHOSE store and WHICH basket, for the 3-D Secure hand-off's parked order. */
+  scope: ChallengeScope = {},
 ): CardCheckout {
   const { savedCards, selection, setSelection } = useSavedCards(tenantSlug, freshInstrument);
   const [card, setCard] = useState<CardDetails>(EMPTY_CARD);
@@ -367,6 +372,7 @@ export function useCardCheckout(
     pollIntervalMs,
     { card, usingNewCard, selection, saveCard, validate, setFieldErrors },
     providerChain,
+    scope,
   );
   // The tap a one-click buyer already made (`./one-click.tsx`). Nothing about
   // the charge differs — this only presses the button, and only while a SAVED

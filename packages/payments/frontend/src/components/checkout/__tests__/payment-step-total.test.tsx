@@ -89,6 +89,42 @@ describe("the amount on the Pagamento step", () => {
     expect(screen.getByTestId("pay-bar-total").textContent).toBe("R$ 118,00");
   });
 
+  it("shows the RAISED ORDER's total once there is one", () => {
+    // The confirmation prefers the order's own label, and so must this: once a
+    // charge exists, that charge's amount is what is being taken. A repriced
+    // cart — or an order resumed from a parked entry — makes the cart's total a
+    // different number from the one leaving the buyer's account, and an amount
+    // on screen that is not the amount being charged is this ticket's own
+    // defect in a new place.
+    render(
+      <PaymentStep
+        method="PIX"
+        onMethodChange={vi.fn()}
+        order={{
+          orderId: "o1",
+          status: "AWAITING_PAYMENT",
+          method: "PIX",
+          totalCents: 3990,
+          subtotalCents: 3990,
+          discountTotalCents: 0,
+          appliedDiscounts: [],
+          totalLabel: "R$ 39,90",
+        }}
+        buyer={{}}
+        creating={false}
+        createError={null}
+        errorField={null}
+        onGenerate={vi.fn()}
+        onUseEmail={vi.fn()}
+        providerConfig={null}
+        cartTotals={CART}
+        onResolved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("pay-bar-total").textContent).toBe("R$ 39,90");
+  });
+
   it("renders nothing at all for a host that composed the step without totals", () => {
     // A blank "Total ·" beside an empty amount is worse than the silence this
     // ticket is about.

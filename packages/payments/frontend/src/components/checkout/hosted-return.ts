@@ -27,6 +27,14 @@ import type { CheckoutOrder } from "./types";
  * was worse: the old order self-confirmed and the host's paid-order handler
  * closed the cart the old order pointed at, which by then held the NEW lines.
  *
+ * THE STUB CASE IS NARROWED HERE, NOT CLOSED. Rule 3 asks the server, and a
+ * host's offline stub settlement answers PAID for a `stub_` charge old enough —
+ * so a dev/CI/demo deployment can still self-confirm the abandoned order and
+ * close the refilled cart behind it. What it cannot do any more is that
+ * silently on the buyer's screen. Production is unaffected for the reason rule
+ * 3 exists at all: a hosted provider cannot report paid without the reference
+ * only the paid redirect carries.
+ *
  * ## The rule (product decision, 2026-09-02)
  *
  * "Bind the parked hand-off to the basket, and never lose a paid buyer's
@@ -181,12 +189,30 @@ export type HostedResumeDecision =
  * Unless the basket is EMPTY, which on this path means the server closed the
  * cart because the order was paid. Showing that shopper a QR to scan would be
  * showing them a code for money they have already sent.
+ *
+ * ## An entry with NO FLAG is a hand-off, and getting this backwards costs a
+ * second payment
+ *
+ * Nothing but a hand-off parked anything before FUT-1140 — the two call sites
+ * were the redirect provider's link and the 3-D Secure challenge — so every
+ * entry written by a bundle that predates the flag is one. A buyer mid-hand-off
+ * across the deploy who was resumed onto the PAYMENT step would meet the
+ * hand-off screen's "Preparando o pagamento" spinner with nothing to navigate
+ * them (the order already exists, so nothing re-raises it) and NO poll (only
+ * the confirmation leg polls) — with their parked entry already consumed, so a
+ * reload cannot recover it. The exit they take is back → checkout again, which
+ * raises a SECOND order against a cart the first one may already have closed.
+ *
+ * `!== false` rather than a truthiness test, and `rememberHostedOrder` writes
+ * the flag both ways for the same reason: this version's own on-page charges
+ * must stay distinguishable from an entry that simply predates the field. It is
+ * the same deploy window the legacy STORAGE KEY is kept for, one field down.
  */
 function resumeStepFor(
   parked: ParkedHostedOrder,
   basket: CheckoutBasketIdentity | undefined,
 ): HostedResumeStep {
-  if (parked.handoff) return "status";
+  if (parked.handoff !== false) return "status";
   return basket?.signature === null ? "status" : "payment";
 }
 

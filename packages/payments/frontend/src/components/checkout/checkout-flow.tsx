@@ -279,6 +279,9 @@ function PagamentoStep({
       // Retrying a refused card: the saved card that failed is not chosen for
       // them again (FUT-1145).
       freshInstrument={c.freshInstrument}
+      // The card path parks an order of its own for a 3-D Secure challenge, so
+      // it needs the same basket the flow was mounted for (FUT-1213).
+      basket={cart.identity}
       validateApplePayMerchant={validateApplePayMerchant}
       onResolved={c.handleResolved}
     />

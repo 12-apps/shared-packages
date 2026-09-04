@@ -106,6 +106,27 @@ export interface HostedResume {
   released: boolean;
 }
 
+/**
+ * How long the decision waits for the host's cart before deciding without it.
+ *
+ * The deferral (FUT-1213) assumes the cart eventually answers. A cart FETCH can
+ * fail — on exactly the flaky connection a buyer has coming back from their
+ * bank app — and an unbounded wait there is the same shape of bug this ticket
+ * is about, pointed the other way: the flow renders Dados forever and a paid
+ * buyer's confirmation never lands.
+ *
+ * So the wait is bounded, and past the bound the decision is made WITHOUT a
+ * basket, which is the pre-1213 answer: resume. That is the permissive
+ * direction, deliberately, and it is the same one `hostedCheckoutReturnPending`
+ * takes for an unloaded cart — a shopper whose cart never loaded cannot check
+ * out with it either way, so the only outcome still worth protecting is the
+ * confirmation of a payment that already happened.
+ *
+ * Eight seconds: long enough that no ordinary cart fetch reaches it, short
+ * enough that a buyer coming back from a payment is not left looking at a form.
+ */
+const BASKET_WAIT_MS = 8_000;
+
 /** The decision, made ONCE, as soon as the basket is loaded enough to make it. */
 function useResumeDecision(
   tenantSlug: string | undefined,
@@ -124,17 +145,21 @@ function useResumeDecision(
   // parked entry, so a second run would find nothing and un-resume a buyer
   // mid-confirmation — which is what StrictMode's double-invoke does for free.
   const decided = useRef(false);
+  const waitedLongEnough = useBasketDeadline();
 
   useResumeEffect(() => {
     if (decided.current) return;
-    const decision = takeHostedOrder(tenantSlug, basket);
+    // Past the deadline the basket is treated as unnamed rather than as
+    // pending — see BASKET_WAIT_MS. A cart that never answered cannot be
+    // compared with, and waiting forever is the worse of the two failures.
+    const decision = takeHostedOrder(tenantSlug, waitedLongEnough ? undefined : basket);
     // WAIT is the host's cart still loading. Nothing was read and nothing was
     // consumed; the next render with a loaded basket decides for real.
     if (decision.verdict === "WAIT") return;
     decided.current = true;
     if (decision.verdict === "RESUME") setResumed({ order: decision.order, step: decision.step });
     if (decision.verdict === "ASK") setAsking(decision.order);
-  }, [tenantSlug, basket]);
+  }, [tenantSlug, basket, waitedLongEnough]);
 
   return { resumed, setResumed, asking, setAsking };
 }
@@ -177,6 +202,16 @@ function useAskBeforeResuming(
       live = false;
     };
   }, [asking, client, onDrop, onResume]);
+}
+
+/** Whether the wait for the host's cart has run out — see {@link BASKET_WAIT_MS}. */
+function useBasketDeadline(): boolean {
+  const [elapsed, setElapsed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setElapsed(true), BASKET_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return elapsed;
 }
 
 /** Whether the "I did not pay" way out may be offered yet — see the constant. */

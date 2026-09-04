@@ -35,11 +35,18 @@ export interface CheckoutBasketLine {
  * Sorted before joining, so the answer does not depend on the order the host
  * happens to hold its lines in — a re-fetch that returns them differently
  * sorted must not read as a different basket.
+ *
+ * The id is ENCODED before it is joined. `id + "x" + quantity` on a `|` join is
+ * ambiguous the moment an id can contain either character: `[a×1, b×2]` and the
+ * single line `["ax1|b" × 2]` produce the same string, and two different baskets
+ * that compare equal is a resume over the wrong one. Unreachable with the cuid
+ * and uuid ids every adopter has today — and this is exported for hosts whose
+ * ids nobody here has seen, so it is encoded rather than argued about.
  */
 export function basketSignature(lines: readonly CheckoutBasketLine[]): string | null {
   if (lines.length === 0) return null;
   return lines
-    .map((line) => `${line.id}x${line.quantity}`)
+    .map((line) => `${encodeURIComponent(line.id)}x${line.quantity}`)
     .sort()
     .join("|");
 }
@@ -59,4 +66,20 @@ export interface CheckoutBasketIdentity {
   signature: string | null;
   /** False while the host's cart is still loading — decide nothing yet. */
   ready: boolean;
+}
+
+/**
+ * The signature to PARK with an order, or nothing.
+ *
+ * `undefined` — meaning "no basket was recorded" — for a host that names none
+ * AND for a cart that has not answered yet. The second is the one worth
+ * stating: a loading cart reports `signature: null`, which is the value that
+ * means EMPTY, and an order parked as "raised from an empty basket" would later
+ * be compared against the real one and read as a different basket. Recording
+ * nothing is honest and degrades to the pre-1213 resume; recording `null` would
+ * be a fact we do not have.
+ */
+export function parkedBasket(basket: CheckoutBasketIdentity | undefined): string | null | undefined {
+  if (!basket || !basket.ready) return undefined;
+  return basket.signature;
 }
