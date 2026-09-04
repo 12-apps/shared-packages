@@ -202,12 +202,26 @@ function scrolledPastTop(element: Element): boolean {
 }
 
 /**
+ * Whether `element` is a horizontal rail the user has already moved.
+ *
+ * A carousel scrolled sideways is mid-gesture even though its `scrollTop` is 0,
+ * and the sideways test in {@link createPullTracker} cannot save it: that only
+ * stands down while `|dx| > |dy|`, and a thumb arcing 25px right and 30px down
+ * — an ordinary flick along a shelf — is neither straight enough to abandon nor
+ * meant for the page.
+ */
+function scrolledSideways(element: Element): boolean {
+  return element.scrollLeft > 0 && element.scrollWidth > element.clientWidth;
+}
+
+/**
  * Whether something between `target` and `boundary` should keep this gesture.
  *
  * Walks the ancestor chain and answers yes for the two cases that would
  * otherwise refresh the page out from under somebody who was reading: a nested
  * scroller that is scrolled DOWN (pulling in it scrolls it back up — that is
- * its gesture, not ours), and an explicit opt-out.
+ * its gesture, not ours), a horizontal rail the user has already moved, and an
+ * explicit opt-out.
  *
  * A nested scroller sitting AT its top is deliberately not a blocker: it has
  * nowhere to go, so the pull belongs to the page, which is what makes the
@@ -217,7 +231,7 @@ export function pullBlockedBy(target: EventTarget | null, boundary: Element | nu
   let node = target instanceof Element ? target : null;
   while (node !== null) {
     if (node.getAttribute(PULL_REFRESH_OPT_OUT_ATTR) === "off") return true;
-    if (scrolledPastTop(node)) return true;
+    if (scrolledPastTop(node) || scrolledSideways(node)) return true;
     if (node === boundary) return false;
     node = node.parentElement;
   }

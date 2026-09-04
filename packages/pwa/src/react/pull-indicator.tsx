@@ -56,8 +56,11 @@ function statusFor(phase: PullIndicatorPhase, messages: PullToRefreshMessages): 
  */
 const SR_ONLY: SxProps<Theme> = {
   position: "absolute",
-  width: 1,
-  height: 1,
+  // "1px", not 1: MUI's sizing transform reads a bare number <= 1 as a RATIO
+  // and emits `width: 100%`, so this box was full-size and hidden only because
+  // `clipPath` happened to be here too.
+  width: "1px",
+  height: "1px",
   overflow: "hidden",
   clip: "rect(0 0 0 0)",
   clipPath: "inset(50%)",
@@ -145,13 +148,21 @@ export function PullIndicator({
       ref={ref}
       data-testid="pull-to-refresh-indicator"
       data-phase={phase}
-      role="status"
-      aria-live="polite"
-      aria-label={messages.label}
+      // The chip is DECORATION: the arrow says nothing the live region below
+      // does not say better, and at rest it is an `opacity: 0` box that is
+      // still in the accessibility tree — so a screen-reader user met an
+      // invisible "Atualizar a tela" at the top of every screen.
+      aria-hidden={phase === "idle"}
       sx={chipSx(offsetTop, zIndex)}
     >
       <Glyph phase={phase} />
-      <Box component="span" sx={SR_ONLY}>
+      {/*
+        The live region is the INNER span, and carries no `aria-label`.
+        Labelling the region itself gives it an accessible name, and a reader
+        that computes the announcement from the name reads that name on every
+        phase change — so all three of the strings below would go unheard.
+      */}
+      <Box component="span" role="status" aria-live="polite" sx={SR_ONLY}>
         {statusFor(phase, messages)}
       </Box>
     </Box>

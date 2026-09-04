@@ -63,5 +63,10 @@ export function isIosInstallable(): boolean {
  */
 export function isHandheld(): boolean {
   if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(pointer: coarse)").matches === true;
+  // No `matchMedia` at all is not "this is a desktop" — it is "this browser
+  // cannot answer". Treating it as false made `isInstalledHandheld` NARROWER
+  // than the iOS-only default it is meant to widen, dropping the one platform
+  // that genuinely has no reload; `navigator.standalone` still identifies it.
+  if (typeof window.matchMedia !== "function") return isIosInstallable();
+  return window.matchMedia("(pointer: coarse)").matches === true;
 }

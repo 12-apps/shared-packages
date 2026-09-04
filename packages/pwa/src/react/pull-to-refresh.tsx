@@ -47,12 +47,14 @@ import { useEffect, useRef, useState } from "react";
 import type { PullToRefreshMessages } from "../messages";
 import {
   createPullTracker,
+  type PullTracker,
   DEFAULT_PULL_GEOMETRY,
   documentAtTop,
   pullBlockedBy,
   type PullGeometry,
 } from "../pull-gesture";
 import { needsPullToRefresh, reloadApp } from "../reload";
+import { acquireOverscrollLock } from "./overscroll-lock";
 import { PullIndicator, type PullIndicatorPhase } from "./pull-indicator";
 
 export interface PullToRefreshProps {
@@ -155,19 +157,7 @@ function paint(
  * browser's own gesture is untouched. The failure direction is the safe one.
  */
 function useOverscrollLock(active: boolean): void {
-  useEffect(() => {
-    if (!active || typeof document === "undefined") return undefined;
-    const targets = [document.documentElement, document.body].filter(Boolean);
-    const previous = targets.map((element) => element.style.overscrollBehaviorY);
-    targets.forEach((element) => {
-      element.style.overscrollBehaviorY = "contain";
-    });
-    return () => {
-      targets.forEach((element, index) => {
-        element.style.overscrollBehaviorY = previous[index] ?? "";
-      });
-    };
-  }, [active]);
+  useEffect(() => (active ? acquireOverscrollLock() : undefined), [active]);
 }
 
 /**
@@ -213,6 +203,46 @@ interface GestureConfig {
   geometry: PullGeometry;
 }
 
+/** Mutable ownership, shared between the handlers and the module helper. */
+interface GestureOwnership {
+  owned: boolean;
+}
+
+/**
+ * One move of a sequence we own.
+ *
+ * Two ways to hand it back: a second finger (a pinch, and zooming while the
+ * page is pinned by our `preventDefault` is a trap the user cannot escape), and
+ * a move the platform will not let us cancel — which means a scroll it has
+ * ALREADY started, since the first `engagePx` are deliberately not prevented
+ * and that is the window WebKit's rubber band begins in. Claiming then would
+ * paint our chip over the browser's own bounce and reload the document on a
+ * gesture the user aimed at the page.
+ */
+function handleMove(
+  event: TouchEvent,
+  context: GestureContext,
+  tracker: PullTracker,
+  state: GestureOwnership,
+  standDown: () => void,
+): void {
+  if (!state.owned) return;
+  if (event.touches.length !== 1) return standDown();
+  const touch = event.touches[0];
+  if (!touch) return;
+  const update = tracker.move({ x: touch.clientX, y: touch.clientY });
+  if (!update.claimed) return;
+  if (!event.cancelable) return standDown();
+  event.preventDefault();
+  context.setPhase(update.phase);
+  paint(
+    context.chip(),
+    update.distance,
+    context.latest.current.geometry.thresholdPx,
+    true,
+  );
+}
+
 /** The four touch handlers, bound to one host element and one tracker. */
 function createHandlers(
   host: HTMLElement,
@@ -220,10 +250,21 @@ function createHandlers(
 ): Record<"start" | "move" | "end" | "cancel", (event: TouchEvent) => void> {
   const { chip, latest, setPhase } = context;
   const tracker = createPullTracker(latest.current.geometry);
+  const state: GestureOwnership = { owned: false };
 
-  const settle = (): void => {
+  // A refresh in flight must survive a stray touch: `reloadApp` waits up to two
+  // seconds for the worker, the page looks frozen, and clearing the latch would
+  // hide the spinner AND re-open `start()`, so a second pull reloads again.
+  const settle = (force = false): void => {
+    if (!force && latest.current.phase === "refreshing") return;
     setPhase("idle");
     paint(chip(), 0, latest.current.geometry.thresholdPx, false);
+  };
+
+  const standDown = (): void => {
+    state.owned = false;
+    tracker.cancel();
+    settle();
   };
 
   const refresh = (): void => {
@@ -240,43 +281,38 @@ function createHandlers(
       // On the default path the document is already being replaced and this
       // never runs, which is exactly right: the spinner must not blink off a
       // frame before the new page paints.
-      .finally(settle);
+      .finally(() => settle(true));
   };
 
   return {
     start(event) {
-      if (latest.current.phase === "refreshing") return;
       const touch = event.touches.length === 1 ? event.touches[0] : undefined;
-      if (!touch || !documentAtTop() || pullBlockedBy(event.target, host)) return;
-      tracker.begin({ x: touch.clientX, y: touch.clientY });
-    },
-
-    move(event) {
-      // A second finger is a pinch-zoom, and zooming while the page is pinned
-      // by our `preventDefault` is a trap the user cannot get out of.
-      if (event.touches.length !== 1) {
+      if (
+        latest.current.phase === "refreshing" ||
+        !touch ||
+        !documentAtTop() ||
+        pullBlockedBy(event.target, host)
+      ) {
+        // Refusing must RESET: a claim left by a sequence whose lift was lost
+        // would otherwise be released by this one's.
+        state.owned = false;
         tracker.cancel();
-        settle();
         return;
       }
-      const touch = event.touches[0];
-      if (!touch) return;
-      const update = tracker.move({ x: touch.clientX, y: touch.clientY });
-      if (!update.claimed) return;
-      if (event.cancelable) event.preventDefault();
-      setPhase(update.phase);
-      paint(chip(), update.distance, latest.current.geometry.thresholdPx, true);
+      tracker.begin({ x: touch.clientX, y: touch.clientY });
+      state.owned = true;
     },
 
+    move: (event) => handleMove(event, context, tracker, state, standDown),
+
     end() {
+      if (!state.owned) return;
+      state.owned = false;
       if (tracker.release()) refresh();
       else settle();
     },
 
-    cancel() {
-      tracker.cancel();
-      settle();
-    },
+    cancel: standDown,
   };
 }
 

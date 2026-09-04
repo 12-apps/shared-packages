@@ -129,15 +129,27 @@ function within(promise: Promise<unknown>, ms: number): Promise<void> {
  * update, a network that never answers — each of them lands on
  * `location.reload()` just the same, because a reload the user asked for must
  * never be something the app declines to do.
+ *
+ * That promise used to be false for a SYNCHRONOUS throw, which is the one shape
+ * `.catch()` cannot see. `navigator.serviceWorker` is a getter and throws
+ * `SecurityError` outright in a sandboxed frame, and `getRegistration()` can
+ * throw before it ever returns a promise; either escaped to the caller and the
+ * reload below never ran. The whole block is inside `try` for that reason — the
+ * update check is an optimisation, and no optimisation may cost the user the
+ * reload they asked for.
  */
 export async function reloadApp(options: ReloadAppOptions = {}): Promise<void> {
   const timeoutMs = options.timeoutMs ?? 2_000;
-  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
-    const update = navigator.serviceWorker
-      .getRegistration()
-      .then((registration) => registration?.update())
-      .catch(() => undefined);
-    await within(update, timeoutMs);
+  try {
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      const update = navigator.serviceWorker
+        .getRegistration()
+        .then((registration) => registration?.update())
+        .catch(() => undefined);
+      await within(update, timeoutMs);
+    }
+  } catch {
+    // Deliberately empty: whatever the worker did, the navigation still happens.
   }
   window.location.reload();
 }
