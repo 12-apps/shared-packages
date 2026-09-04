@@ -18,11 +18,15 @@ parts nobody can verify without a print run.
 ## Host wiring rules (the ones that bite)
 
 1. **The address on the sticker is the decision you cannot undo.** It gets
-   laminated. Prefer the store's own verified domain over `window.location.origin`
-   — a code generated while an admin happened to be open on a preview box bakes in
-   a hostname that dies with the box. This package takes the finished URL and has
-   no way to tell a good one from a bad one, so the choice, and the warning next
-   to it, are yours.
+   laminated. **Derive it; never let it be typed, and never read it off
+   `window.location`.** The browser's origin is whichever host the BACKOFFICE
+   happened to be open on, which is not where the storefront answers, and a text
+   field is a second unvalidated place to state something the product already
+   decides — a store's verified domain when it has one, the deployment's own
+   storefront host otherwise. Both are facts the server knows and can serve
+   alongside the rest of the store. This package takes the finished URL and has
+   no way to tell a good one from a bad one, so the derivation is yours; a
+   warning next to an editable field is not a substitute for it.
 
 2. **Ask for the size in millimetres, not pixels.** That is the unit the
    conversation with a gráfica happens in, and `STICKER_SIZES` deliberately ships

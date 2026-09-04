@@ -68,13 +68,17 @@ export function individualPages(
 
 const A4 = { w: mm(210), h: mm(297) };
 
+/** Between neighbours, and the narrowest margin the grid is allowed to leave. */
+const GUTTER_MM = 4;
+const MARGIN_MM = 10;
+
 /** How many stickers fit across and down an A4 with a 10mm margin and 4mm gutter. */
 function gridFor(size: StickerSize): { cols: number; rows: number } {
-  const usableW = 210 - 20;
-  const usableH = 297 - 20;
+  const usableW = 210 - MARGIN_MM * 2;
+  const usableH = 297 - MARGIN_MM * 2;
   return {
-    cols: Math.max(1, Math.floor((usableW + 4) / (size.widthMm + 4))),
-    rows: Math.max(1, Math.floor((usableH + 4) / (size.heightMm + 4))),
+    cols: Math.max(1, Math.floor((usableW + GUTTER_MM) / (size.widthMm + GUTTER_MM))),
+    rows: Math.max(1, Math.floor((usableH + GUTTER_MM) / (size.heightMm + GUTTER_MM))),
   };
 }
 
@@ -84,16 +88,24 @@ function gridFor(size: StickerSize): { cols: number; rows: number } {
  *
  * Not the gráfica format and not pretending to be: no bleed (there is nowhere
  * for it to go between neighbours) and thin guides rather than corner marks.
+ *
+ * The grid is centred on the page, and centred on the FULL grid rather than on
+ * however many stickers this particular page received. Both halves matter: it
+ * used to hang from the top margin, which on the smallest preset left 10 mm
+ * above and 69 mm of blank paper below; and a last page that re-centred on its
+ * own two stickers would put its cut lines somewhere the other pages' are not,
+ * which is exactly what stops a stack of sheets being guillotined in one pass.
  */
 export function sheetPages(stickers: QrSticker[], size: StickerSize, brandName: string): PdfPage[] {
   const { cols, rows } = gridFor(size);
   const perPage = cols * rows;
   const width = mm(size.widthMm);
   const height = mm(size.heightMm);
-  const stepX = width + mm(4);
-  const stepY = height + mm(4);
-  const originX = (A4.w - (cols * stepX - mm(4))) / 2;
-  const originY = A4.h - mm(10) - height;
+  const gutter = mm(GUTTER_MM);
+  const stepX = width + gutter;
+  const stepY = height + gutter;
+  const originX = (A4.w - (cols * stepX - gutter)) / 2;
+  const originY = (A4.h + (rows * stepY - gutter)) / 2 - height;
   const pages: PdfPage[] = [];
 
   for (let start = 0; start < stickers.length; start += perPage) {

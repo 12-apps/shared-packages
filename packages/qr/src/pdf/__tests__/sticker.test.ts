@@ -198,6 +198,104 @@ describe("the price line (FUT-997)", () => {
   });
 });
 
+/**
+ * The vertical composition (FUT-957).
+ *
+ * The stack used to hang from the top margin with the address pinned to the
+ * foot, so every preset whose code is capped by its WIDTH — which is every one
+ * but the smallest — spent none of its leftover height and pooled all of it in
+ * a single band above the address. Measured on the honest market's default
+ * (100x150 mm): 61 pt, more than a fifth of the sticker's face.
+ *
+ * None of it is visible on screen, and none of the structural assertions above
+ * move: the file is well-formed, the code scans, the marks are outside the
+ * bleed. It is a laminated sticker with a hole in the middle of it.
+ */
+const PLAIN: QrSticker = {
+  label: "Mesa 4",
+  url: "https://paladira.com/bar-do-ze/menu/t4",
+  hint: "Aponte a câmera para ver o cardápio",
+};
+
+/** Every text baseline, in the order the stack draws them. */
+function baselinesOf(pdf: string): number[] {
+  return [...pdf.matchAll(/^[\d.]+ ([\d.]+) Td$/gm)].map((match) => Number(match[1]));
+}
+
+/** Every point size the document sets type at. */
+function typeSizesOf(pdf: string): number[] {
+  return [...pdf.matchAll(/^\/F\d ([\d.]+) Tf$/gm)].map((match) => Number(match[1]));
+}
+
+/** `[bottom, top]` of the trim, which is what every margin below is measured against. */
+function trimYOf(pdf: string): [number, number] {
+  const trim = /\/TrimBox \[([\d.\s]+)\]/.exec(pdf)![1]!.trim().split(/\s+/).map(Number);
+  return [trim[1]!, trim[3]!];
+}
+
+/**
+ * One sticker per preset, laid out with a name, a hint and an address that all
+ * fit on one line — so the four baselines are brand, name, hint, address, in
+ * that order, and each preset's stack can be compared with the others'.
+ */
+type Preset = "small" | "medium" | "tent";
+
+function presets(): Preset[] {
+  return ["small", "medium", "tent"];
+}
+
+function buildPreset(preset: Preset): string {
+  return build({ stickers: [PLAIN], size: STICKER_SIZES[preset]! });
+}
+
+describe("the vertical composition (FUT-957)", () => {
+  it("keeps the last line at least a padding clear of the blade", () => {
+    // The address used to be pinned at 60% of the sticker's own padding, which
+    // is the one line on the artwork that a blade landing a hair off takes
+    // first — and the one the code's failure mode depends on.
+    for (const preset of presets()) {
+      const pdf = buildPreset(preset);
+      const pad = mm(STICKER_SIZES[preset]!.widthMm * 0.07);
+      const [trimBottom] = trimYOf(pdf);
+      expect(Math.min(...baselinesOf(pdf)) - trimBottom).toBeGreaterThanOrEqual(pad);
+    }
+  });
+
+  it("sets the address apart as a footnote, not by whatever the code left over", () => {
+    // The defect itself: on the tent preset that gap was 88 pt against a 425 pt
+    // sticker. A tenth of the height is loose enough to be a bound rather than
+    // a restatement of the constant, and the old value clears it twice over.
+    for (const preset of presets()) {
+      const pdf = buildPreset(preset);
+      const [hint, address] = baselinesOf(pdf).slice(2);
+      const [trimBottom, trimTop] = trimYOf(pdf);
+      expect(hint! - address!).toBeLessThanOrEqual((trimTop - trimBottom) * 0.1);
+    }
+  });
+
+  it("keeps the same proportions on a sticker three times the size", () => {
+    // Fixed millimetres are what made this untrue: the gaps a 50 mm shelf label
+    // wants, printed unchanged on a 150 mm tent card, are a composition sized
+    // for a sticker nobody ordered.
+    const shares = presets().map((preset) => {
+      const pdf = buildPreset(preset);
+      const baselines = baselinesOf(pdf);
+      const [trimBottom, trimTop] = trimYOf(pdf);
+      // Name down to address: the whole footer block, as a share of the face.
+      return (baselines[1]! - baselines[3]!) / (trimTop - trimBottom);
+    });
+    for (const share of shares) expect(Math.abs(share - shares[0]!)).toBeLessThanOrEqual(0.02);
+  });
+
+  it("never sets a line of its own below five points", () => {
+    // The hint is derived from the height, which on the smallest preset put the
+    // one sentence telling a shopper what the code is FOR at 4.76 pt.
+    for (const preset of presets()) {
+      expect(Math.min(...typeSizesOf(buildPreset(preset)))).toBeGreaterThanOrEqual(5);
+    }
+  });
+});
+
 describe("layouts", () => {
   it("gives an individual run one page per sticker", () => {
     const stickers = [STICKER, { ...STICKER, label: "B" }, { ...STICKER, label: "C" }];
@@ -213,6 +311,22 @@ describe("layouts", () => {
     expect(
       /\/Count (\d+)/.exec(build({ stickers: [...nine, STICKER], layout: "sheet" }))?.[1],
     ).toBe("2");
+  });
+
+  it("centres the sheet's grid on the page, identically on every page", () => {
+    // It used to hang from a 10 mm top margin, which on the smallest preset
+    // left 69 mm of blank paper below the last row. Centred on the FULL grid
+    // rather than on the stickers a given page received, so a stack of sheets
+    // still cuts in one pass — a last page re-centred on its own two stickers
+    // would put its guides where none of the others' are.
+    const many = Array.from({ length: 10 }, (_, index) => ({ ...STICKER, label: `Item ${index}` }));
+    const pdf = build({ stickers: many, layout: "sheet" });
+    const guides = [...pdf.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re S/g)].map((match) =>
+      match.slice(1).map(Number),
+    );
+    const top = mm(297) - Math.max(...guides.map((guide) => guide[1]! + guide[3]!));
+    const bottom = Math.min(...guides.map((guide) => guide[1]!));
+    expect(top).toBeCloseTo(bottom, 3);
   });
 
   it("titles the document with the brand so a job list is readable", () => {
