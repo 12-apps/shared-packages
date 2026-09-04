@@ -237,14 +237,56 @@ async function startPasswordSignIn(
   });
 }
 
-/** End the session at the backend. The caller refreshes local state after. */
+/**
+ * End the session at the backend. The caller refreshes local state after.
+ *
+ * ## Why this asks for JSON, and why that is not a nicety
+ *
+ * Auth.js answers sign-out with a **302 to its `callbackUrl`**, which defaults
+ * to the origin of the URL IT SAW — and `fetch` follows redirects by default.
+ * That is fine only while the URL the handler sees is the one the browser used.
+ *
+ * A platform selling CUSTOM DOMAINS cannot arrange that. An OAuth client
+ * registers a fixed list of redirect URIs, so the round trip has to happen on
+ * the platform origin, so the host re-origins every `/api/auth/**` request onto
+ * `AUTH_URL` before handing it over (see `server/session-token.ts` for the other
+ * half of that story). Sign-out on `menu.tenant.example` therefore redirected to
+ * the PLATFORM's homepage, the browser chased it cross-origin, and a homepage
+ * that carries no `Access-Control-Allow-Origin` turned the whole call into an
+ * opaque `TypeError: Failed to fetch`.
+ *
+ * The failure read as a network blip and was the opposite of one. The server HAD
+ * cleared the cookie — the redirect is the LAST thing it does — so the person
+ * was signed out at the backend while this promise rejected: the SPA stayed on
+ * `authenticated`, whatever the caller meant to do after signing out never ran,
+ * and every session-scoped poll still mounted went on asking until it drew a
+ * 401.
+ *
+ * `X-Auth-Return-Redirect` is Auth.js's own answer, the same one
+ * `postPasswordSignIn` takes: it returns `200 { url }` carrying the SAME
+ * `Set-Cookie` headers, so the session is still cleared and there is no
+ * `Location` to chase. The URL is discarded — where to go after signing out is
+ * the caller's decision, and the caller is the only one who can make it
+ * same-origin.
+ *
+ * `redirect: "manual"` is NOT the same fix: it yields an opaque response whose
+ * `status` is 0 and `ok` is false, which the check below cannot tell apart from
+ * a sign-out that genuinely failed.
+ */
 async function postSignOut(basePath: string, fetchImpl: typeof fetch): Promise<void> {
   const csrfToken = await fetchCsrfToken(basePath, fetchImpl);
   const response = await fetchImpl(`${basePath}/signout`, {
     method: "POST",
     credentials: "same-origin",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ csrfToken, json: "true" }).toString(),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      // Answer with JSON instead of a 302 — see the block above.
+      "X-Auth-Return-Redirect": "1",
+    },
+    // `json: "true"` used to ride along here. It is a next-auth v4 form field;
+    // `@auth/core` never reads it, so it did nothing but suggest the redirect
+    // was already handled.
+    body: new URLSearchParams({ csrfToken }).toString(),
   });
   if (!response.ok) {
     throw new Error(`Sign-out request failed: ${response.status}`);
