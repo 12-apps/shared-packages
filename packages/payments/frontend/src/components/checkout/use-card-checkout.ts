@@ -22,12 +22,12 @@ import {
   type CardInstruments,
   type RefreshBrowserKey,
 } from "./card-instruments";
+import { handOverToChallenge, reportResolved, type ChallengeScope } from "./card-outcome";
 import { useCheckoutClientApi } from "./client-context";
-import { rememberHostedOrder } from "./hosted-return";
-import { useCheckoutNavigate, type CheckoutNavigate } from "./navigate-context";
+import { useCheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
 import { useOneClickArmed, useOneClickPay } from "./one-click";
-import type { BuyerInfo, CheckoutOrder, OrderStatus } from "./types";
+import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved, OrderStatus } from "./types";
 import { usePaymentPolling } from "./use-payment-polling";
 import type { CardCopy } from "../../card/copy";
 import { useCheckoutCopy } from "./copy-context";
@@ -40,7 +40,17 @@ const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
  * actually charge are offered. The slug arrives as an argument (the host's
  * routing owns it); absent, the list is unscoped, exactly as before FUT-697.
  */
-function useSavedCards(tenantSlug: string | undefined): {
+function useSavedCards(
+  tenantSlug: string | undefined,
+  /**
+   * The buyer is here because a card was REFUSED (FUT-1145), so the saved card
+   * this would otherwise preselect is the one that just failed. The list is
+   * still offered — another saved card may well work — but nothing is chosen
+   * for them, which puts the form in front of a buyer whose only untried
+   * instrument is a new one.
+   */
+  freshInstrument: boolean,
+): {
   savedCards: SavedCard[];
   selection: string;
   setSelection: (id: string) => void;
@@ -55,12 +65,12 @@ function useSavedCards(tenantSlug: string | undefined): {
       if (!active) return;
       setSavedCards(cards);
       const first = cards[0];
-      if (first) setSelection(first.id);
+      if (first && !freshInstrument) setSelection(first.id);
     });
     return () => {
       active = false;
     };
-  }, [tenantSlug, client]);
+  }, [tenantSlug, client, freshInstrument]);
 
   return { savedCards, selection, setSelection };
 }
@@ -164,24 +174,6 @@ type CardSubmit = Pick<
  */
 const CARD_AWAITING_WAIT_MS = 90_000;
 
-/**
- * Hand the buyer to the provider's authentication page (FUT-698) — Stripe's
- * redirect-based 3-D Secure. Park the order and navigate, the same trip a
- * redirect provider's link takes (FUT-556): the return lands back on this
- * checkout route, where the hosted-resume machinery polls the parked order.
- */
-function handOverToChallenge(
-  order: CheckoutOrder,
-  url: string,
-  navigate: CheckoutNavigate,
-): void {
-  // PARK FIRST. The navigation may not come back to a live SPA at all, and a
-  // return trip that finds nothing parked lands the buyer on a blank
-  // confirmation after they have paid.
-  rememberHostedOrder(order);
-  navigate(url);
-}
-
 /** The buyer's card is invalid — block the submit and show which field. */
 function blockedByForm(form: CardFormState): boolean {
   if (!form.usingNewCard) return false;
@@ -257,10 +249,13 @@ function useCardSubmit(
   order: CheckoutOrder,
   buyer: BuyerInfo,
   providerConfig: CardTokenizationConfig,
-  onResolved: (status: OrderStatus) => void,
+  onResolved: OnCheckoutResolved,
   pollIntervalMs: number,
   form: CardFormState,
   providerChain: readonly CardChainLink[],
+  /** WHOSE store and WHICH basket this charge is for — parked with a 3DS
+   *  hand-off, which is otherwise resumable over any basket anywhere. */
+  scope: ChallengeScope,
 ): CardSubmit {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -319,11 +314,11 @@ function useCardSubmit(
     // 3-D Secure (FUT-698): the buyer must finish on the provider's page.
     // `submitting` stays true on purpose — the tab is navigating away.
     if (charged.data.hostedCheckoutUrl) {
-      return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate);
+      return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate, scope);
     }
-    // A business outcome (e.g. declined → FAILED) shows the status screen;
-    // an accepted charge begins polling for the async confirmation.
-    if (charged.data.status !== "AWAITING_PAYMENT") onResolved(charged.data.status);
+    // A business outcome shows the status screen, carrying the refusal the
+    // server classified (FUT-1145); an accepted charge begins polling.
+    if (charged.data.status !== "AWAITING_PAYMENT") reportResolved(charged.data, onResolved);
     else setSubmitted(true);
   };
 
@@ -338,7 +333,7 @@ export function useCardCheckout(
   order: CheckoutOrder,
   buyer: BuyerInfo,
   providerConfig: CardTokenizationConfig,
-  onResolved: (status: OrderStatus) => void,
+  onResolved: OnCheckoutResolved,
   pollIntervalMs: number,
   /** The store whose saved cards may be offered (host routing owns the slug). */
   tenantSlug?: string,
@@ -347,8 +342,12 @@ export function useCardCheckout(
    * per entry so a card charge can fail over. Omitted ⇒ the head alone.
    */
   providerChain: readonly CardChainLink[] = [],
+  /** Do not preselect a saved card — the last one was refused (FUT-1145). */
+  freshInstrument = false,
+  /** WHOSE store and WHICH basket, for the 3-D Secure hand-off's parked order. */
+  scope: ChallengeScope = {},
 ): CardCheckout {
-  const { savedCards, selection, setSelection } = useSavedCards(tenantSlug);
+  const { savedCards, selection, setSelection } = useSavedCards(tenantSlug, freshInstrument);
   const [card, setCard] = useState<CardDetails>(EMPTY_CARD);
   const [fieldErrors, setFieldErrors] = useState<CardFieldErrors>({});
   const [saveCard, setSaveCard] = useState(false);
@@ -373,6 +372,7 @@ export function useCardCheckout(
     pollIntervalMs,
     { card, usingNewCard, selection, saveCard, validate, setFieldErrors },
     providerChain,
+    scope,
   );
   // The tap a one-click buyer already made (`./one-click.tsx`). Nothing about
   // the charge differs — this only presses the button, and only while a SAVED

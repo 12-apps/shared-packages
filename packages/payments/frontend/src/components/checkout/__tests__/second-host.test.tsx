@@ -14,13 +14,17 @@
  * they are the same hooks the storefront journeys click.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutFlow } from "../checkout-flow";
 import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
 import type { CheckoutOrder, CreateOrderRequest, CreateOrderResult } from "../types";
 
 afterEach(cleanup);
+// A raised order is parked in `sessionStorage` now (FUT-1140), and these suites
+// share one jsdom tab — so without this, one test's checkout resumes the
+// previous test's payment.
+beforeEach(() => window.sessionStorage.clear());
 
 const CARD_ORDER: CheckoutOrder = {
   orderId: "o-2nd-host",

@@ -1,8 +1,10 @@
 import { Box } from "@mui/material";
 import { useMemo, type JSX, type ReactNode } from "react";
 
+import type { CheckoutBasketIdentity } from "./basket";
 import { buyerFieldsFor } from "./buyer-fields";
-import { DadosStep, EmptyCart, PaymentStep } from "./checkout-steps";
+import { EmptyCart, PaymentStep } from "./checkout-steps";
+import { DadosStep } from "./dados-step";
 import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
@@ -29,6 +31,18 @@ export interface CheckoutCartView {
   totalItems: number;
   /** Host-rendered discount itemization under the pay-bar total (FUT-246). */
   discountLines?: ReactNode;
+  /**
+   * WHICH basket this is, so a payment raised from another one cannot resume
+   * itself over it (FUT-1213).
+   *
+   * Optional, and absent means the pre-1213 behaviour — a parked payment
+   * resumes on whatever checkout mounts next, which is what shipped and what
+   * this ticket exists to bound. A host supplies it by calling
+   * `basketSignature(lines)` on its own cart and passing `ready: false` while
+   * that cart is still loading; see `./basket.ts` for why the identity is the
+   * LINES and not the cart's id.
+   */
+  identity?: CheckoutBasketIdentity;
 }
 
 /**
@@ -82,6 +96,16 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   confirmationExtra?: ReactNode;
   /** Design-system slots; unfilled slots render the raw-MUI defaults. */
   components?: Partial<CheckoutComponents>;
+}
+
+/**
+ * Whether the host's cart has actually answered yet.
+ *
+ * `true` for every host that wires no identity, which is what it meant before
+ * there was one to wire.
+ */
+function cartLoaded(cart: CheckoutCartView): boolean {
+  return cart.identity?.ready !== false;
 }
 
 /** The pay-bar total override when settling a settlement (else the cart's own totals). */
@@ -179,6 +203,87 @@ function StatusStep({
       // so nothing is being polled here.
       awaitingError={c.resumeError}
       onCheckAgain={c.resumeCheckAgain}
+      // The buyer's own way out of a hosted wait with no terminal state
+      // (FUT-1146). Absent — and so unrendered — until the resumed leg has one
+      // to offer, which is every checkout that never left this tab.
+      onNotPaid={c.resumeRelease}
+      releasing={c.resumeReleasing}
+      // WHY a card was refused, when the server said (FUT-1145). Read on
+      // FAILED only, where it picks the sentence and decides whether a retry
+      // could work at all.
+      decline={c.decline}
+    />
+  );
+}
+
+/**
+ * Nothing to check out — and the cart has ANSWERED, which is the half FUT-1213
+ * added.
+ *
+ * A settlement pays already-sent items, so the cart is legitimately empty
+ * there. The guard cannot key on the Dados step either: skipping it (FUT-465)
+ * makes Pagamento the first screen. And it holds until an order exists — once
+ * one does, its lines are snapshotted server-side and the cart no longer speaks
+ * for it.
+ *
+ * A cart still being FETCHED is empty in exactly the way a real one is not, so
+ * a host that wires `identity` gets this screen when its cart is empty rather
+ * than when it is late — which is also the moment the resume decision waits for.
+ */
+function nothingToPayFor(
+  settlement: SettlementCheckout | null | undefined,
+  cart: CheckoutCartView,
+  c: ReturnType<typeof useCheckoutController>,
+): boolean {
+  if (settlement || !cart.empty || !cartLoaded(cart)) return false;
+  return !c.order && c.step !== "status";
+}
+
+/** Step 2, with the controller's facts and the host's money mapped onto it. */
+function PagamentoStep({
+  c,
+  cart,
+  settlement,
+  providerConfig,
+  tenantSlug,
+  validateApplePayMerchant,
+}: {
+  c: ReturnType<typeof useCheckoutController>;
+  cart: CheckoutCartView;
+  settlement: SettlementCheckout | null | undefined;
+  providerConfig: CheckoutProviderConfig | null | undefined;
+  tenantSlug: string | undefined;
+  validateApplePayMerchant: ((validationURL: string) => Promise<unknown>) | undefined;
+}): JSX.Element {
+  return (
+    <PaymentStep
+      method={c.method}
+      onMethodChange={c.setMethod}
+      order={c.order}
+      buyer={c.buyer}
+      creating={c.creating}
+      createError={c.createError}
+      errorField={c.errorField}
+      errorCode={c.errorCode}
+      onGenerate={(chosen) => void c.startPayment(chosen)}
+      onUseEmail={c.payWithEmail}
+      // Set only for a skipped-Dados flow (the controller decides); the payer
+      // block hides itself when it is absent.
+      onEditBuyer={c.editBuyer}
+      providerConfig={providerConfig}
+      tenantSlug={tenantSlug}
+      // The amount, on the step that asks for it (FUT-1179).
+      cartTotals={cart}
+      totalOverride={settlementTotalOverride(settlement)}
+      discountLines={cart.discountLines}
+      // Retrying a refused card: the saved card that failed is not chosen for
+      // them again (FUT-1145).
+      freshInstrument={c.freshInstrument}
+      // The card path parks an order of its own for a 3-D Secure challenge, so
+      // it needs the same basket the flow was mounted for (FUT-1213).
+      basket={cart.identity}
+      validateApplePayMerchant={validateApplePayMerchant}
+      onResolved={c.handleResolved}
     />
   );
 }
@@ -190,7 +295,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   // any chain member may need rather than re-opening after the choice. A chain
   // that declares nothing degrades to CPF-required, never to "ask nothing".
   const buyerFields = useMemo(() => buyerFieldsFor(providerConfig?.chain, null), [providerConfig]);
-  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields, tenantSlug);
+  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields, tenantSlug, cart.identity);
   const armed = useOneClick({ requested: oneClick, config: providerConfig, taxIdOnFile, step: c.step, method: c.method, setMethod: c.setMethod });
 
   // A settlement settlement pays already-sent kitchen items — the cart is
@@ -200,7 +305,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   // Pagamento the first screen, so an empty cart would otherwise reach the
   // method picker. It holds until an order exists — once one does, its lines are
   // snapshotted server-side and the cart no longer speaks for it.
-  if (!settlement && cart.empty && !c.order && c.step !== "status") {
+  if (nothingToPayFor(settlement, cart, c)) {
     return <EmptyCart copy={copy.emptyCart} onBack={c.goToMenu} />;
   }
 
@@ -229,24 +334,13 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
 
       {c.step === "payment" ? (
         <OneClickProvider armed={armed}>
-          <PaymentStep
-            method={c.method}
-            onMethodChange={c.setMethod}
-            order={c.order}
-            buyer={c.buyer}
-            creating={c.creating}
-            createError={c.createError}
-            errorField={c.errorField}
-            errorCode={c.errorCode}
-            onGenerate={(chosen) => void c.startPayment(chosen)}
-            onUseEmail={c.payWithEmail}
-            // Set only for a skipped-Dados flow (the controller decides); the
-            // payer block hides itself when it is absent.
-            onEditBuyer={c.editBuyer}
+          <PagamentoStep
+            c={c}
+            cart={cart}
+            settlement={settlement}
             providerConfig={providerConfig}
             tenantSlug={tenantSlug}
             validateApplePayMerchant={validateApplePayMerchant}
-            onResolved={c.handleResolved}
           />
         </OneClickProvider>
       ) : null}

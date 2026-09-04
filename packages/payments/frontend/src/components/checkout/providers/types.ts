@@ -15,11 +15,12 @@
  */
 import type { JSX } from "react";
 
+import type { CheckoutBasketIdentity } from "../basket";
 import type {
   BuyerInfo,
   CheckoutOrder,
   CheckoutProviderConfig,
-  OrderStatus,
+  OnCheckoutResolved,
   PaymentMethod,
 } from "../types";
 
@@ -71,6 +72,19 @@ export interface ProviderCheckoutScreenProps {
   /** The shell's polling cadence, passed through so tests can shorten it. */
   pollIntervalMs?: number;
   /**
+   * The buyer is retrying a REFUSED card (FUT-1145), so no saved instrument is
+   * preselected: the one this would otherwise choose is the one that failed,
+   * and a retry that re-charges it is a second identical decline.
+   */
+  freshInstrument?: boolean;
+  /**
+   * WHICH basket this checkout is for (FUT-1213). A card screen needs it
+   * because it can PARK an order of its own: a redirect-based 3-D Secure
+   * challenge is a hand-off like any other, and an entry parked without a
+   * basket (or without a store) resumes over any basket at any store.
+   */
+  basket?: CheckoutBasketIdentity;
+  /**
    * The host's Apple Pay merchant-validation port (FUT-472): exchange the
    * session's `validationURL` for an Apple merchant session, SERVER-SIDE —
    * the merchant identity certificate must never reach a browser. Optional;
@@ -78,8 +92,11 @@ export interface ProviderCheckoutScreenProps {
    * card form stays the way to pay.
    */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
-  /** A terminal status — the shell moves to Confirmação. */
-  onResolved: (status: OrderStatus) => void;
+  /**
+   * A terminal status — the shell moves to Confirmação, carrying the refusal
+   * when the charge produced one (FUT-1145).
+   */
+  onResolved: OnCheckoutResolved;
 }
 
 /**

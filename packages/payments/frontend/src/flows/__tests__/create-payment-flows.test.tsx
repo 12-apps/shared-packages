@@ -14,12 +14,16 @@
  * far end of them — the two things a browser genuinely cannot have.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CheckoutComponents } from "../../components/checkout/ui";
 import { storyFlows } from "../../stories/host";
 
 afterEach(cleanup);
+// A raised order is parked in `sessionStorage` now (FUT-1140), and these suites
+// share one jsdom tab — so without this, one test's checkout resumes the
+// previous test's payment.
+beforeEach(() => window.sessionStorage.clear());
 
 /** A CPF that passes the check digits, so the Dados gate lets the buyer past. */
 const GOOD_CPF = "529.982.247-25";

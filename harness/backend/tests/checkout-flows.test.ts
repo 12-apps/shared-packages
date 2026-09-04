@@ -205,7 +205,7 @@ async function call(
 }
 
 describe('@12-apps/payments-backend — the published buyer-checkout mount', () => {
-  it('publishes the eight-row table, and 404s anything outside it', async () => {
+  it('publishes the nine-row table, and 404s anything outside it', async () => {
     expect(CHECKOUT_ROUTES.map((row) => row.kind)).toEqual([
       'getCheckoutConfig',
       'listInstruments',
@@ -214,6 +214,7 @@ describe('@12-apps/payments-backend — the published buyer-checkout mount', () 
       'createCheckout',
       'chargeInstrument',
       'getStatus',
+      'releaseCheckout',
       'refreshBrowserKey',
     ]);
     const { routes } = setup([harnessAdapter('alpha')]);

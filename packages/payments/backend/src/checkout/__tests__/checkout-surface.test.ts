@@ -19,7 +19,7 @@ import { MERCHANT, call, request, setupCheckoutWorld, testAdapter } from './harn
  * who may reach it.
  */
 describe('createPaymentFlowsBE — the surface', () => {
-  it('serves all eight kinds at their canonical paths', async () => {
+  it('serves all nine kinds at their canonical paths', async () => {
     const { routes } = setupCheckoutWorld();
     expect(routes.layout.map((row) => `${row.method} /${row.pattern.join('/')}`)).toEqual([
       'GET /config',
@@ -29,6 +29,9 @@ describe('createPaymentFlowsBE — the surface', () => {
       'POST /',
       'POST /charge',
       'GET /status',
+      // The buyer's own "I did not pay" (FUT-1146), beside the poll whose dead
+      // wait it exists to end.
+      'POST /release',
       'POST /refresh-key',
     ]);
   });

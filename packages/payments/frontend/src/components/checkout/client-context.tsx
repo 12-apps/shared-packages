@@ -47,6 +47,9 @@ function unboundClient(copy: CheckoutTransportCopy): CheckoutClient {
     // The vault pair (FUT-183) has no `client.ts` free function to bind — it is
     // newer than that module. Built lazily from the default transport instead,
     // which is the same wire: `/api/checkout`, ambient `fetch` resolved per call.
+    // Same lazy build as the vault pair below, and for the same reason: this
+    // row is newer than `client.ts`, so there is no free function to bind.
+    releaseCheckout: (input) => createCheckoutClient({ copy }).releaseCheckout(input),
     beginVault: () => createCheckoutClient({ copy }).beginVault(),
     completeVault: (input) => createCheckoutClient({ copy }).completeVault(input),
     refreshBrowserKey: (input) => refreshCardPublicKey(input, copy),
