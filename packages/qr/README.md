@@ -132,6 +132,25 @@ These are the ones that only fail on paper, so they are not configurable:
 bleed and marks — what a print shop imposes and die-cuts. `sheet` is A4 with
 thin cut guides, for the office printer at 11pm when one label went missing.
 
+### How one sticker is composed
+
+Brand, code, name, price, hint, address — top to bottom, centred, with the code
+taking whatever the type does not. Two rules decide the rest, and both exist
+because a sticker is ordered in three sizes and reviewed in one:
+
+- **The gaps are fractions of the sticker's own height, not millimetres.** The
+  gutter a 50 mm shelf label wants is not the one a 150 mm tent card wants, and
+  printing the first on the second is a composition sized for a sticker nobody
+  ordered.
+- **Leftover height is split evenly above and below, never pooled at the foot.**
+  The code is capped by the sticker's WIDTH on every preset but the smallest, so
+  its height budget is routinely unspent — and the address used to be pinned to
+  the foot, which turned that slack into one empty band. On the tent preset it
+  was 61 pt, more than a fifth of the face.
+
+So every preset leaves the same margin at the head and the foot, and the last
+line clears the blade by the same padding as the sides.
+
 ## Sizes
 
 | id | trimmed size |
