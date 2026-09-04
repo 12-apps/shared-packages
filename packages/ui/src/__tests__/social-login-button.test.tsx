@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { EN_US_SOCIAL_LOGIN_COPY } from "../en-US";
+import { PT_BR_SOCIAL_LOGIN_COPY } from "../pt-BR";
 import {
   SocialLoginButton,
   SocialLoginContainer,
@@ -11,7 +13,7 @@ describe("SocialLoginButton", () => {
 
   describe.each(providers)("%s provider", (provider) => {
     it(`should render ${provider} button with correct text`, () => {
-      render(<SocialLoginButton provider={provider} />);
+      render(<SocialLoginButton provider={provider} copy={EN_US_SOCIAL_LOGIN_COPY} />);
 
       const expectedTexts: Record<SocialProvider, string> = {
         google: "Continue with Google",
@@ -22,9 +24,34 @@ describe("SocialLoginButton", () => {
       expect(screen.getByText(expectedTexts[provider])).toBeInTheDocument();
     });
 
+    it(`keeps rendering English for ${provider} when no pack is passed`, () => {
+      // What makes this a MINOR rather than a major: an existing caller that
+      // passes no copy is unchanged. Pinned so the default cannot be dropped
+      // without a deliberate breaking release.
+      render(<SocialLoginButton provider={provider} />);
+
+      expect(
+        screen.getByRole("button", { name: EN_US_SOCIAL_LOGIN_COPY[provider] }),
+      ).toBeInTheDocument();
+    });
+
+    it(`renders the host's pack for ${provider}, not a baked-in English default`, () => {
+      // The whole point of the required prop: this package ships both languages
+      // and the host chooses. Before it existed a pt-BR storefront rendered
+      // "Continue with Google" on an otherwise Portuguese sign-in screen, with
+      // no way to reach the string.
+      render(<SocialLoginButton provider={provider} copy={PT_BR_SOCIAL_LOGIN_COPY} />);
+
+      // The ACCESSIBLE NAME, not just DOM text — this button exists to be read
+      // aloud in the right language.
+      expect(
+        screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY[provider] }),
+      ).toBeInTheDocument();
+    });
+
     it(`should call onClick when ${provider} button is clicked`, () => {
       const handleClick = vi.fn();
-      render(<SocialLoginButton provider={provider} onClick={handleClick} />);
+      render(<SocialLoginButton provider={provider} copy={EN_US_SOCIAL_LOGIN_COPY} onClick={handleClick} />);
 
       const button = screen.getByRole("button");
       fireEvent.click(button);
@@ -33,21 +60,21 @@ describe("SocialLoginButton", () => {
     });
 
     it(`should show loading state for ${provider}`, () => {
-      const { container } = render(<SocialLoginButton provider={provider} loading />);
+      const { container } = render(<SocialLoginButton provider={provider} copy={EN_US_SOCIAL_LOGIN_COPY} loading />);
 
       // When loading, Button shows CircularProgress spinner
       expect(container.querySelector('.MuiCircularProgress-root')).toBeInTheDocument();
     });
 
     it(`should be disabled when loading for ${provider}`, () => {
-      render(<SocialLoginButton provider={provider} loading />);
+      render(<SocialLoginButton provider={provider} copy={EN_US_SOCIAL_LOGIN_COPY} loading />);
 
       const button = screen.getByRole("button");
       expect(button).toBeDisabled();
     });
 
     it(`should be disabled when disabled prop is true for ${provider}`, () => {
-      render(<SocialLoginButton provider={provider} disabled />);
+      render(<SocialLoginButton provider={provider} copy={EN_US_SOCIAL_LOGIN_COPY} disabled />);
 
       const button = screen.getByRole("button");
       expect(button).toBeDisabled();
@@ -55,7 +82,7 @@ describe("SocialLoginButton", () => {
   });
 
   it("should apply fullWidth style by default", () => {
-    render(<SocialLoginButton provider="google" />);
+    render(<SocialLoginButton provider="google" copy={EN_US_SOCIAL_LOGIN_COPY} />);
 
     const button = screen.getByRole("button");
     // MUI Button with fullWidth prop applies width: 100%
@@ -63,7 +90,7 @@ describe("SocialLoginButton", () => {
   });
 
   it("should not have fullWidth class when fullWidth is false", () => {
-    render(<SocialLoginButton provider="google" fullWidth={false} />);
+    render(<SocialLoginButton provider="google" copy={EN_US_SOCIAL_LOGIN_COPY} fullWidth={false} />);
 
     const button = screen.getByRole("button");
     expect(button).not.toHaveClass('MuiButton-fullWidth');
@@ -72,7 +99,7 @@ describe("SocialLoginButton", () => {
   it("should not call onClick when disabled", () => {
     const handleClick = vi.fn();
     render(
-      <SocialLoginButton provider="google" onClick={handleClick} disabled />
+      <SocialLoginButton provider="google" copy={EN_US_SOCIAL_LOGIN_COPY} onClick={handleClick} disabled />
     );
 
     const button = screen.getByRole("button");
@@ -83,17 +110,17 @@ describe("SocialLoginButton", () => {
 
   it("should render correct SVG icon for each provider", () => {
     const { container: googleContainer } = render(
-      <SocialLoginButton provider="google" />
+      <SocialLoginButton provider="google" copy={EN_US_SOCIAL_LOGIN_COPY} />
     );
     expect(googleContainer.querySelector("svg")).toBeInTheDocument();
 
     const { container: facebookContainer } = render(
-      <SocialLoginButton provider="facebook" />
+      <SocialLoginButton provider="facebook" copy={EN_US_SOCIAL_LOGIN_COPY} />
     );
     expect(facebookContainer.querySelector("svg")).toBeInTheDocument();
 
     const { container: appleContainer } = render(
-      <SocialLoginButton provider="apple" />
+      <SocialLoginButton provider="apple" copy={EN_US_SOCIAL_LOGIN_COPY} />
     );
     expect(appleContainer.querySelector("svg")).toBeInTheDocument();
   });
@@ -173,9 +200,9 @@ describe("SocialLoginContainer", () => {
   it("should render multiple buttons", () => {
     render(
       <SocialLoginContainer>
-        <SocialLoginButton provider="google" />
-        <SocialLoginButton provider="facebook" />
-        <SocialLoginButton provider="apple" />
+        <SocialLoginButton provider="google" copy={EN_US_SOCIAL_LOGIN_COPY} />
+        <SocialLoginButton provider="facebook" copy={EN_US_SOCIAL_LOGIN_COPY} />
+        <SocialLoginButton provider="apple" copy={EN_US_SOCIAL_LOGIN_COPY} />
       </SocialLoginContainer>
     );
 
