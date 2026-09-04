@@ -26,6 +26,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// Re-exported, not redefined: they moved to a React-free module so that
+// asking "is this installed" cannot pull this file — and the invite that
+// shares its module graph — onto a host's critical path. See ./platform.
+import { isHandheld, isIosInstallable, isStandalone } from "./platform";
+
+export { isHandheld, isIosInstallable, isStandalone };
+
 /** The non-standard event Chromium fires when the app is installable. */
 export interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -71,53 +78,6 @@ export interface InstallPromptState {
   dismiss: () => void;
 }
 
-/** Whether the page is being rendered as an installed app. */
-export function isStandalone(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.matchMedia?.("(display-mode: standalone)").matches) return true;
-  // iOS predates the media query and exposes this instead. Non-standard, so it
-  // is read defensively rather than typed onto Navigator.
-  return (navigator as Navigator & { standalone?: boolean }).standalone === true;
-}
-
-/**
- * An iOS browser that can add this page to the home screen — which, since
- * iOS 16.4, is ALL of them and not Safari alone.
- *
- * Deliberately does not look at WHICH browser. Excluding `CriOS`/`FxiOS`/
- * `EdgiOS` was correct before March 2023 and has been a bug since: it told a
- * large share of iPhone users nothing at all, leaving them no way to discover
- * the app existed.
- *
- * Still an INSTRUCTION rather than a button, and not provisionally so. There is
- * no `beforeinstallprompt` in any Safari through 26.6 or 27 beta; MDN's compat
- * data records `safari: false` with `safari_ios` and `webview_ios` mirroring it
- * — and `webview_ios` is what every iOS browser is, Chrome included. WebKit's
- * standards position on the Web Install API (`navigator.install`) is `oppose`.
- * Design for the share sheet.
- */
-export function isIosInstallable(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  return /iphone|ipad|ipod/i.test(ua) || (/mac/i.test(ua) && navigator.maxTouchPoints > 1);
-}
-
-/**
- * A touch-primary device — phone or tablet.
- *
- * Decides COPY only, never behaviour. `beforeinstallprompt` fires on desktop
- * Chrome and Edge just as it does on Android, so the one-tap branch is reached
- * on a laptop, and telling that visitor to install "on your phone" describes a
- * device they are not holding.
- *
- * `(pointer: coarse)` rather than a user-agent test: the question is whether
- * this is a handheld, and the input device answers it directly instead of
- * inferring it from a string vendors keep rewriting.
- */
-export function isHandheld(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(pointer: coarse)").matches === true;
-}
 
 function wasDismissed(): boolean {
   try {

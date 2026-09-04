@@ -1,4 +1,4 @@
-import type { PullToRefreshMessages, PwaMessages } from "./messages";
+import type { PwaMessages } from "./messages";
 
 /**
  * The pt-BR pack — the exact strings the component defaulted to before copy
@@ -20,17 +20,6 @@ export const PT_BR_PWA_MESSAGES: PwaMessages = {
   dismiss: "Agora não",
 };
 
-/**
- * The pull-to-refresh pack, pt-BR. Same exemption as the invite's above: the
- * filename is what lets Portuguese ship from a package.
- *
- * "Atualizar" rather than "recarregar": it is the word every Brazilian app puts
- * on this gesture, and the user is asking for fresh CONTENT — that the document
- * is reloaded to get it is our implementation detail, not their intent.
- */
-export const PT_BR_PULL_TO_REFRESH_MESSAGES: PullToRefreshMessages = {
-  pulling: "Puxe para atualizar",
-  armed: "Solte para atualizar",
-  refreshing: "Atualizando…",
-  label: "Atualizar a tela",
-};
+// Moved to its own file so a host mounting the gesture does not pull this
+// one — and the invite that shares its chunk — onto the critical path.
+export { PT_BR_PULL_TO_REFRESH_MESSAGES } from "./pull-to-refresh.pt-BR";

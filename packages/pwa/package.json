@@ -7,11 +7,19 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/react/index.ts",
+    "./react/pull-to-refresh": "./src/react/pull-to-refresh.tsx",
+    "./react/install-invite": "./src/react/install-invite.tsx",
+    "./reload": "./src/reload.ts",
+    "./pull-gesture": "./src/pull-gesture.ts",
+    "./messages": "./src/messages.ts",
+    "./locales": "./src/locales.ts",
     "./server": "./src/server/index.ts",
     "./hono": "./src/hono/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./platform": "./src/platform.ts",
+    "./pull-to-refresh-locales": "./src/pull-to-refresh-locales.ts"
   },
   "scripts": {
     "clean": "rm -rf node_modules coverage dist",
