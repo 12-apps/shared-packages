@@ -152,3 +152,16 @@ export interface UploadButtonCopy {
   /** The component's own error, announced. Takes the message it wraps. */
   errorAnnouncement(message: string): string;
 }
+
+/**
+ * The social sign-in buttons' three labels (FUT-1263).
+ *
+ * One key per provider rather than a single string, because the buttons are
+ * rendered from a dynamic provider list — a host mapping over `['google',
+ * 'facebook']` indexes this, instead of growing a switch at the call site.
+ */
+export interface SocialLoginCopy {
+  google: string;
+  facebook: string;
+  apple: string;
+}

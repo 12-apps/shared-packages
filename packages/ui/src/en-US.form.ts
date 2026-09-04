@@ -9,6 +9,7 @@ import type {
   PasswordStrengthCopy,
   PhoneInputCopy,
   RichEditorToolbarCopy,
+  SocialLoginCopy,
   UploadButtonCopy,
 } from './copy';
 
@@ -100,4 +101,10 @@ export const EN_US_UPLOAD_BUTTON_COPY: UploadButtonCopy = {
   percentUploaded: (percent) => `${percent}% uploaded`,
   uploadInProgress: (percent) => `Upload in progress: ${percent}%`,
   errorAnnouncement: (message) => `Error: ${message}`,
+};
+
+export const EN_US_SOCIAL_LOGIN_COPY: SocialLoginCopy = {
+  google: "Continue with Google",
+  facebook: "Continue with Facebook",
+  apple: "Continue with Apple",
 };

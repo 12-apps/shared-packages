@@ -6,6 +6,7 @@ import { Container } from "@12-apps/ui/layout/Container";
 import { Spacer } from "@12-apps/ui/layout/Spacer";
 import { Text } from "@12-apps/ui/typography/Text";
 import { SocialLoginButton, SocialLoginContainer } from "@12-apps/ui/social-login-button";
+import { EN_US_SOCIAL_LOGIN_COPY } from "@12-apps/ui/en-US";
 
 import { createEmailAuth } from "../react/create-email-auth";
 import { createWebAuth } from "../react/create-web-auth";
@@ -140,9 +141,17 @@ function Mailbox({
 function SocialBlock({ onPick }: { onPick: (provider: string) => void }): JSX.Element {
   return (
     <>
-      <SocialLoginButton provider="google" onClick={() => onPick("google")} />
+      <SocialLoginButton
+        provider="google"
+        copy={EN_US_SOCIAL_LOGIN_COPY}
+        onClick={() => onPick("google")}
+      />
       <Spacer size="sm" />
-      <SocialLoginButton provider="facebook" onClick={() => onPick("facebook")} />
+      <SocialLoginButton
+        provider="facebook"
+        copy={EN_US_SOCIAL_LOGIN_COPY}
+        onClick={() => onPick("facebook")}
+      />
       {/*
         The container's own `showDivider` renders AFTER its children, which puts
         the rule under the whole form rather than between the two ways in. This
