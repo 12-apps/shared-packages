@@ -232,8 +232,16 @@ function handleMove(
   if (!touch) return;
   const update = tracker.move({ x: touch.clientX, y: touch.clientY });
   if (!update.claimed) return;
-  if (!event.cancelable) return standDown();
-  event.preventDefault();
+  // Claim even when the platform will not let us cancel. Standing down here is
+  // tempting — an uncancelable move means a scroll the browser has already
+  // started, and our chip would sit over its own bounce — but it was MEASURED
+  // to kill the gesture outright: in headless Chromium driven through CDP,
+  // every touch event on a mounted gesture arrives `cancelable: false`, so the
+  // stand-down refused all of them and nothing ever refreshed. The two failure
+  // modes are not comparable. Claiming a move we cannot prevent costs one
+  // cosmetic double-bounce; refusing costs the feature. Revisit only with a
+  // measurement from a real iOS home-screen app.
+  if (event.cancelable) event.preventDefault();
   context.setPhase(update.phase);
   paint(
     context.chip(),

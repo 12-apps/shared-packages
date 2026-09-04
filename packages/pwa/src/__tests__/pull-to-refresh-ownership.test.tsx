@@ -178,11 +178,13 @@ describe("a refresh already in flight", () => {
 });
 
 describe("a move the platform will not let us cancel", () => {
-  it("hands the gesture back instead of claiming it", async () => {
-    // WebKit marks the rest of a sequence non-cancelable once its rubber band
-    // has started, which the deliberately-unprevented first 12px allow. Our
-    // `preventDefault` is then inert, so claiming would paint a chip over the
-    // browser's own bounce and reload on a gesture aimed at the document.
+  it("still refreshes, because refusing would kill the gesture outright", async () => {
+    // Deliberate, and measured rather than assumed. Standing down on an
+    // uncancelable move looks right — it means a scroll the browser has already
+    // started — but in headless Chromium driven through CDP every touch event
+    // on a mounted gesture arrives `cancelable: false`, so that rule refused
+    // ALL of them and nothing ever refreshed. Claiming a move we cannot prevent
+    // costs one cosmetic double-bounce; refusing costs the feature.
     const onRefresh = vi.fn(async () => {});
     const { child } = mountGesture(onRefresh);
 
@@ -191,7 +193,7 @@ describe("a move the platform will not let us cancel", () => {
       fire(child, "touchend", []);
     });
 
-    expect(onRefresh).not.toHaveBeenCalled();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });
 
