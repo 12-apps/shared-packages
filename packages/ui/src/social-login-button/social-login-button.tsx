@@ -8,6 +8,8 @@ import { Card, CardContent } from '../components/layout/Card';
 import { Heading } from '../components/typography/Heading';
 import { Text } from '../components/typography/Text';
 import { Separator } from '../components/layout/Separator';
+import type { SocialLoginCopy } from '../copy/form';
+import { EN_US_SOCIAL_LOGIN_COPY } from '../en-US.form';
 
 export type SocialProvider = 'google' | 'facebook' | 'apple';
 
@@ -51,7 +53,6 @@ const AppleIcon = (): React.ReactElement => (
 );
 
 interface ProviderConfig {
-  label: string;
   Icon: () => React.ReactElement;
   variant: 'solid' | 'outline' | 'ghost';
   color: 'primary' | 'secondary' | 'neutral';
@@ -60,7 +61,6 @@ interface ProviderConfig {
 
 const providerConfig: Record<SocialProvider, ProviderConfig> = {
   google: {
-    label: "Continue with Google",
     Icon: GoogleIcon,
     variant: 'outline',
     color: 'neutral',
@@ -75,7 +75,6 @@ const providerConfig: Record<SocialProvider, ProviderConfig> = {
     },
   },
   facebook: {
-    label: "Continue with Facebook",
     Icon: FacebookIcon,
     variant: 'solid',
     color: 'primary',
@@ -88,7 +87,6 @@ const providerConfig: Record<SocialProvider, ProviderConfig> = {
     },
   },
   apple: {
-    label: "Continue with Apple",
     Icon: AppleIcon,
     variant: 'solid',
     color: 'neutral',
@@ -108,13 +106,47 @@ export interface SocialLoginButtonProps {
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
+  /**
+   * The three provider labels (FUT-1263). `SOCIAL_LOGIN_COPY` ships both
+   * languages, so a host passes `SOCIAL_LOGIN_COPY["pt-BR"]` rather than
+   * authoring a word.
+   *
+   * These used to be English string literals inside `providerConfig`, reachable
+   * by nothing: a pt-BR storefront rendered "Continue with Google" on an
+   * otherwise Portuguese sign-in screen and had no way to change it.
+   *
+   * OPTIONAL, unlike every other `copy` in this package, and defaulted to the
+   * en-US pack. That is a deliberate exception so this ships as a MINOR: making
+   * it required would break every existing caller on a routine update. The cost
+   * is the one this package's convention exists to avoid — a host that says
+   * nothing still renders English — so a consumer wanting Portuguese must pass
+   * the pack, and FUT-1263 is not closed until it does.
+   */
+  copy?: SocialLoginCopy;
+  /**
+   * Per-provider test hook. Without one all three buttons render the same
+   * `data-testid`, leaving their visible text as the only selector — which is
+   * exactly the text a host is now expected to translate.
+   */
+  dataTestId?: string;
 }
 
 /**
  * Social login button using UI package Button component
  */
 export const SocialLoginButton = React.forwardRef<HTMLButtonElement, SocialLoginButtonProps>(
-  ({ provider, onClick, loading = false, disabled = false, fullWidth = true }, ref) => {
+  (
+    {
+      provider,
+      onClick,
+      loading = false,
+      disabled = false,
+      fullWidth = true,
+      copy = EN_US_SOCIAL_LOGIN_COPY,
+      dataTestId,
+    },
+    ref,
+  ) => {
     const config = providerConfig[provider];
 
     return (
@@ -127,6 +159,7 @@ export const SocialLoginButton = React.forwardRef<HTMLButtonElement, SocialLogin
         disabled={disabled}
         onClick={onClick}
         icon={<config.Icon />}
+        dataTestId={dataTestId}
         fullWidth={fullWidth}
         sx={{
           minHeight: 48,
@@ -135,7 +168,7 @@ export const SocialLoginButton = React.forwardRef<HTMLButtonElement, SocialLogin
           ...config.sx,
         }}
       >
-        {config.label}
+        {copy[provider]}
       </Button>
     );
   }

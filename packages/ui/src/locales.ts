@@ -38,12 +38,13 @@ import type {
   PhoneInputCopy,
   RichEditorToolbarCopy,
   SectionOnboardingCopy,
+  SocialLoginCopy,
   TableFilterCopy,
   TimingDiagramCopy,
   TutorialCopy,
   UploadButtonCopy,
   UserAvatarCopy,
-} from './copy';
+} from "./copy";
 import * as en from './en-US';
 import * as pt from './pt-BR';
 
@@ -76,6 +77,10 @@ export const TUTORIAL_COPY = pack<TutorialCopy>(pt.PT_BR_TUTORIAL_COPY, en.EN_US
 export const CHROME_COPY = pack<ChromeCopy>(pt.PT_BR_CHROME_COPY, en.EN_US_CHROME_COPY);
 
 // form
+export const SOCIAL_LOGIN_COPY = pack<SocialLoginCopy>(
+  pt.PT_BR_SOCIAL_LOGIN_COPY,
+  en.EN_US_SOCIAL_LOGIN_COPY,
+);
 export const ADDRESS_AUTOCOMPLETE_COPY = pack<AddressAutocompleteCopy>(
   pt.PT_BR_ADDRESS_AUTOCOMPLETE_COPY,
   en.EN_US_ADDRESS_AUTOCOMPLETE_COPY,
