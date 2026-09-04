@@ -1,4 +1,4 @@
-import type { PullToRefreshMessages, PwaMessages } from "./messages";
+import type { PwaMessages } from "./messages";
 
 /**
  * The en-US pack — the same prompts for an English-reading audience. The
@@ -23,10 +23,4 @@ export const EN_US_PWA_MESSAGES: PwaMessages = {
   dismiss: "Not now",
 };
 
-/** The pull-to-refresh pack, en-US. */
-export const EN_US_PULL_TO_REFRESH_MESSAGES: PullToRefreshMessages = {
-  pulling: "Pull to refresh",
-  armed: "Release to refresh",
-  refreshing: "Refreshing…",
-  label: "Refresh the screen",
-};
+export { EN_US_PULL_TO_REFRESH_MESSAGES } from "./pull-to-refresh.en-US";

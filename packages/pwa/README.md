@@ -111,6 +111,33 @@ maintains with one you maintain.
 bar, but `Ctrl+R`, a context menu, and no touchscreen to pull on. An end-to-end
 test driving a desktop browser passes `() => true`.
 
+### Import the gesture from its own path, not the barrel
+
+A host mounts `PullToRefresh` at its app ROOT, so whatever that import reaches
+is on its critical path. `@12-apps/pwa/react` re-exports `InstallInvite`, and
+`@12-apps/pwa` re-exports the invite's message packs and the
+`beforeinstallprompt` state machine — so importing the gesture from either
+barrel puts the invite in the entry's module graph, and a bundler then folds the
+invite's small chunk down into the entry.
+
+That is measured, not theoretical. In a host that mounts the gesture at its
+root, the install invite moved out of a lazy chunk and **into the entry chunk**:
++9.3 KiB raw / +2.4 KiB brotli of first-paint code that only ever runs on a
+checkout confirmation screen.
+
+```ts
+// on the critical path — reaches the gesture and nothing else
+import { PullToRefresh } from "@12-apps/pwa/react/pull-to-refresh";
+import { PULL_TO_REFRESH_MESSAGES } from "@12-apps/pwa/pull-to-refresh-locales";
+import { isInstalledHandheld } from "@12-apps/pwa/reload";
+```
+
+The barrels are still correct for a host importing the invite anyway, or one
+that does not gate on bundle size. Three splits make the narrow path possible
+and none of them change a public name: `platform.ts` holds the three predicates
+with no React, `pull-to-refresh.{pt-BR,en-US}.ts` hold the gesture's copy away
+from the invite's, and every original module re-exports what moved.
+
 ### `reloadApp()` is not quite `location.reload()`
 
 The open document is controlled by whichever worker was active when it loaded,

@@ -37,7 +37,7 @@
  * That is the same shape as the install invite: two platforms that share
  * nothing, and a package that says so instead of averaging them.
  */
-import { isHandheld, isIosInstallable, isStandalone } from "./install-prompt";
+import { isHandheld, isIosInstallable, isStandalone } from "./platform";
 
 /**
  * Whether this session has no reload the user can reach on their own.
