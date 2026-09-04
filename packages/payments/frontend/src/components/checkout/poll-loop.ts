@@ -1,4 +1,5 @@
 import type { Result } from "../../result";
+import { claimRearm } from "./poll-rearm";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 
 /**
@@ -69,16 +70,6 @@ export interface PollingOptions {
  * the two re-arm events below usually beat it outright.
  */
 const MAX_ERROR_BACKOFF_MS = 10_000;
-
-/**
- * How long a re-arm must stay quiet after the last ask.
- *
- * Returning to a tab commonly fires `visibilitychange` and `online` together —
- * and a shopper flicking between the bank app and the store fires them again
- * per trip. This collapses a burst into one request without delaying it: the
- * first re-arm of a burst polls immediately, the rest fall inside the gap.
- */
-const REARM_QUIET_MS = 1_000;
 
 /**
  * How long ONE status ask may take before the loop stops waiting on it.
@@ -170,6 +161,8 @@ function newRun() {
     healthy: 0,
     startedAt: 0,
     askedAt: 0,
+    /** Live asks abandoned by a re-arm since the last answer. See `claimRearm`. */
+    supersededAsks: 0,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
     /**
      * The wall clock, as a timer rather than a check after an ask. `outOfTime`
@@ -215,6 +208,9 @@ function askTimeout(
  * it has to be consulted against the delay it is about to sleep for.
  */
 function absorb(run: PollRun, result: Result<OrderStatus>, sink: PollSink): boolean {
+  // An answer got through, so the re-arm budget is no longer being spent into
+  // a void: refill it whether the answer was an error or a status.
+  run.supersededAsks = 0;
   if (!result.ok) {
     run.errors += 1;
     sink.setError(result.error);
@@ -374,6 +370,7 @@ export function createPollLoop(
       run.stopped = false;
       run.errors = 0;
       run.healthy = 0;
+      run.supersededAsks = 0;
       run.startedAt = Date.now();
       armDeadline(run, options, sink);
       sink.setTimedOut(false);
@@ -382,10 +379,11 @@ export function createPollLoop(
     },
     poke: (): void => {
       if (run.cancelled || run.stopped) return;
-      if (Date.now() - run.askedAt < REARM_QUIET_MS) return;
       // Deliberately NOT gated on `inFlight`: the shopper who just came back
       // from their bank app is exactly the case where the previous ask is a
-      // socket that died while the screen was hidden. Abandon it and ask now.
+      // socket that died while the screen was hidden. Abandon it and ask now —
+      // but `claimRearm` bounds how many live asks that may abandon in a row.
+      if (!claimRearm(run)) return;
       run.attempt += 1;
       run.inFlight = false;
       clearPending(run);

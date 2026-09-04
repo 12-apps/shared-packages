@@ -1,7 +1,7 @@
 import { assertLocaleParity } from "@12-apps/i18n/testing";
 import { describe, expect, it } from "vitest";
 
-import { PWA_MESSAGES } from "../locales";
+import { PULL_TO_REFRESH_MESSAGES, PWA_MESSAGES } from "../locales";
 
 /**
  * `tsc` already refuses a MISSING key — both packs are typed against
@@ -23,6 +23,18 @@ describe("the locale pack", () => {
       expect(messages.promptHandheld("Acme")).toContain("Acme");
       expect(messages.promptDesktop("Acme")).toContain("Acme");
       expect(messages.iosBenefit("Acme")).toContain("Acme");
+    }
+  });
+
+  it("speaks both languages the same way about the reload, too", () => {
+    assertLocaleParity("PULL_TO_REFRESH_MESSAGES", PULL_TO_REFRESH_MESSAGES);
+  });
+
+  it("says something in every phase the indicator can be announced in", () => {
+    // These strings reach a screen reader and nothing else — an empty one is a
+    // gesture that happens in silence for the person who cannot see the arrow.
+    for (const messages of Object.values(PULL_TO_REFRESH_MESSAGES)) {
+      for (const line of Object.values(messages)) expect(line.trim().length).toBeGreaterThan(0);
     }
   });
 });

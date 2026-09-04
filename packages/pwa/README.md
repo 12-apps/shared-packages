@@ -22,8 +22,8 @@ import { reportWarning } from "@12-apps/observability-frontend";
 
 | entry | what it is |
 |---|---|
-| `@12-apps/pwa` | `useInstallPrompt`, `isIosInstallable`, `isStandalone`, `isHandheld`, the messages layer, and `registerServiceWorker` / `postToServiceWorker` |
-| `@12-apps/pwa/react` | `InstallInvite`, `ShareIcon` |
+| `@12-apps/pwa` | `useInstallPrompt`, `isIosInstallable`, `isStandalone`, `isHandheld`, the messages layer, `registerServiceWorker` / `postToServiceWorker`, and the **reload** half — `needsPullToRefresh`, `isInstalledHandheld`, `reloadApp`, `createPullTracker` |
+| `@12-apps/pwa/react` | `InstallInvite`, `ShareIcon`, `PullToRefresh` |
 | `@12-apps/pwa/server` | `createApiPwa({ resolveApp })` — the per-host **manifest endpoint** and the packaged service worker; also `buildWebAppManifest` and `pwaServiceWorkerSource` |
 | `@12-apps/pwa/hono` | `pwaRouter({ resolveApp })`, mounted at the origin root. `hono` is an OPTIONAL peer |
 
@@ -59,6 +59,89 @@ produced it, and a history fallback answers a vanished chunk with `index.html` �
 which fails on the MIME type, reaches `React.lazy`, and renders the page blank. A
 naive cache-first worker pins that old shell and makes the blank page PERMANENT;
 on an installed app "force-refresh" is advice the user cannot follow.
+
+## Getting the reload back
+
+Installing the app takes the address bar away, and with it the reload button —
+which is fine right up to the moment the app is wedged: a shell from an old
+deploy, a session that expired without the page noticing, a screen whose one
+fetch failed. This package already says what that costs, in rule 5 of
+[ADOPTING.md](./ADOPTING.md): *on an installed app "force-refresh" is advice the
+user cannot follow.* The worker fixes the half that can be fixed without the
+user. `PullToRefresh` is the other half.
+
+```tsx
+import { PullToRefresh } from "@12-apps/pwa/react";
+import { PULL_TO_REFRESH_MESSAGES } from "@12-apps/pwa";
+
+<PullToRefresh messages={PULL_TO_REFRESH_MESSAGES["pt-BR"]} onDiagnostic={reportWarning}>
+  <App />
+</PullToRefresh>
+```
+
+**Wrapping the whole app costs nothing where it is not needed**, because there
+it mounts nothing at all. `needsPullToRefresh()` is the gate, and it is true on
+exactly one combination:
+
+| where | has a reload? | why |
+|---|---|---|
+| any browser tab | yes | address bar, plus the browser's own overscroll refresh |
+| Chromium standalone (Android) | yes | **it keeps that overscroll refresh when installed** — unless the app itself opted out with `overscroll-behavior-y: contain \| none` |
+| desktop standalone | yes | no address bar, but `Ctrl+R` and a context menu |
+| **iOS home screen** | **no** | no chrome, and the pull gesture that reloads in Safari does not reload a standalone web app. The workaround in the wild is *delete the icon and add it again* |
+
+So by default the gesture ships to iOS and nowhere else — not because it would
+be *unsafe* elsewhere, but because a platform gesture that already works has
+native feel and haptics and cannot be lost to a JavaScript failure.
+
+**To use it on Android too, pass `platform={isInstalledHandheld}`.** That is a
+supported choice, not a workaround, and the handover is clean rather than
+doubled: mounting sets `overscroll-behavior-y: contain`, which is exactly the
+property that switches Chromium's own overscroll refresh off. One pull, one
+gesture, and it is yours — same indicator and same threshold on both platforms.
+It also fails in the safe direction: if the bundle never runs, the property is
+never set and Chromium's gesture is still there.
+
+Reach for it when you want one gesture to design and support across every phone,
+or for an Android browser whose installed apps do *not* keep the native one.
+Note what you give up: on Android you are replacing a gesture the platform
+maintains with one you maintain.
+
+`isInstalledHandheld` deliberately excludes a DESKTOP installed app — no address
+bar, but `Ctrl+R`, a context menu, and no touchscreen to pull on. An end-to-end
+test driving a desktop browser passes `() => true`.
+
+### `reloadApp()` is not quite `location.reload()`
+
+The open document is controlled by whichever worker was active when it loaded,
+and the browser's own update check races the navigation rather than preceding
+it — so a reload issued the moment a deploy lands can still be served by the
+outgoing worker, handing back the very shell the user was trying to escape.
+`reloadApp()` asks for the update first and waits for it, bounded (2s by
+default) because the person who just pulled down is usually the person whose
+network is having a bad day. Every failure path still reloads: a reload the user
+asked for is never something the app declines to do.
+
+### What the gesture will not take
+
+Three things it must not break, each prevented by construction rather than by a
+check somebody has to remember:
+
+- **Scrolling.** The first 12px of travel are *watched and not consumed* —
+  `preventDefault()` is called only once the tracker claims the gesture, which
+  it never does for a finger moving up or sideways.
+- **Anything in a portal.** The listeners are on the component's own subtree,
+  so a MUI `Drawer` or `Dialog` — rendered into `document.body`, a sibling of
+  everything inside — cannot reach them.
+- **Nested scrollers.** A list already scrolled down keeps its own pull. A
+  region that wants its vertical drags for something else says so in the markup:
+  `data-pull-refresh="off"`.
+
+The wrapper is `display: contents`, so it changes no layout: children stay their
+parent's own flex or grid items. `offsetTop` and `zIndex` place the indicator
+above the host's fixed chrome — exposed rather than hard-coded, because the app
+that adopted the install invite had to override *its* fixed placement with
+`!important`.
 
 ## Two platforms that share nothing
 
