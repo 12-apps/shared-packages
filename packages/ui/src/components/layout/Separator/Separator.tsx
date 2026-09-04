@@ -26,6 +26,10 @@ export const Separator: React.FC<SeparatorProps> = ({
     return (
       <Box
         className={className}
+        // The plain branch below has always carried the caller's hook; this one
+        // silently dropped it, so a LABELLED separator was the one variant no
+        // test could address except through its own words.
+        data-testid={dataTestId}
         sx={{
           display: 'flex',
           alignItems: 'center',
@@ -35,14 +39,17 @@ export const Separator: React.FC<SeparatorProps> = ({
         }}
       >
         <Box sx={styles} />
+        {/*
+          No background behind the label. The two rules and the words are a FLEX
+          ROW — the rules stop where the label starts — so there is nothing for a
+          background to mask, and painting one made the label a coloured pill on
+          every surface that is not `background.default`. On a white card it read
+          as a highlight nobody had asked for.
+        */}
         <Typography
           variant="body2"
           color="text.secondary"
-          sx={{
-            flexShrink: 0,
-            padding: theme.spacing(0, 1),
-            backgroundColor: theme.palette.background.default,
-          }}
+          sx={{ flexShrink: 0, padding: theme.spacing(0, 1) }}
         >
           {children}
         </Typography>
