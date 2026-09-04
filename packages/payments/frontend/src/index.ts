@@ -198,6 +198,28 @@ export {
   type CheckoutStepperStep,
   type CheckoutTextProps,
 } from './components/checkout/ui';
+/**
+ * WHICH basket a checkout is for (FUT-1213).
+ *
+ * A host computes the signature from its own cart lines and hands it to the
+ * flow on `cart.identity`, so a payment raised from an ABANDONED basket cannot
+ * resume itself over the one the shopper is holding now. Exported because the
+ * host owns the cart and therefore has to build it — see `basket.ts` for why
+ * the identity is the lines and never the cart's id.
+ */
+export {
+  basketSignature,
+  type CheckoutBasketIdentity,
+  type CheckoutBasketLine,
+} from './components/checkout/basket';
+/**
+ * WHY a card was refused, and whether another attempt could work (FUT-1145).
+ * A host wiring the confirmation screen's per-reason copy names these.
+ */
+export type {
+  CheckoutDecline,
+  CheckoutDeclineReason,
+} from './components/checkout/decline';
 export {
   type BuyerContact,
   type BuyerField,

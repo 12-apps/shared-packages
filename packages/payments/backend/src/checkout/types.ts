@@ -160,18 +160,6 @@ export interface BuyerCheckoutConfig {
   chain: readonly BuyerProviderLink[];
 }
 
-/** The correlation the host must write to find this charge again. */
-export interface AttachedCharge {
-  provider: ProviderName;
-  providerChargeId: string;
-  /**
-   * The provider's SECOND correlation id where it has one (PagBank's `ORDE_…`),
-   * else the charge id. Derived by the library from the snapshot, so no host
-   * reads a provider payload to get it.
-   */
-  providerOrderId: string;
-}
-
 /**
  * Bringing a payable into existence, finding one, and rendering it — the port
  * that keeps "what an order is" entirely outside this package.
@@ -242,47 +230,11 @@ export interface PayablePort<Caller, View extends object> {
 }
 
 /**
- * Writing a charge back onto the payable.
- *
- * Every method is the host's because confirming a payment is a TRANSACTION only
- * the host can compose — one adopter's writes the payment row, decrements stock
- * with exact COGS, rolls the payable onto the customer profile, emits the
- * buyer's notification and closes a fully-paid table session, all at once, with
- * a shortfall guard that parks a short payment for reconciliation. What the
- * library owns is WHEN each is called and WITH WHAT AMOUNT.
+ * Writing a charge back onto the payable — {@link ChargeCorrelationPort}, in
+ * `./correlation-port.ts` since FUT-1146 gave it a third writer and this file
+ * reached its size ceiling. Re-exported so no import moves.
  */
-export interface ChargeCorrelationPort {
-  /**
-   * A charge exists and is PAYABLE — a live QR, a hosted link, a pending 3-D
-   * Secure. The payable stays OPEN; only a webhook or a poll settles it.
-   */
-  attachPending(ref: string, charge: AttachedCharge): Promise<void>;
-  /**
-   * A CARD charge that settled synchronously. Returns the host's state token.
-   */
-  recordCardOutcome(input: {
-    ref: string;
-    charge: AttachedCharge;
-    approved: boolean;
-    amount: Money;
-  }): Promise<string>;
-  /**
-   * A settlement the library has proof of. `capturedAmount` is what the
-   * PROVIDER reported, never the payable's total (FUT-373) — echoing our own
-   * total back would settle any capture however small, and would make the
-   * host's shortfall guard compare a number with itself. The one exception is
-   * the offline stub path, where the library passes the payable's own amount
-   * and says so, because a stub snapshot hardcodes zero (FUT-374).
-   */
-  settle(input: {
-    ref: string;
-    charge: AttachedCharge;
-    capturedAmount: Money;
-    method: PaymentMethodKind;
-  }): Promise<string>;
-  /** A payable whose payment window lapsed. Omit to never expire. */
-  expire?(ref: string): Promise<string>;
-}
+export type { AttachedCharge, ChargeCorrelationPort } from './correlation-port';
 
 /** A vaulted instrument only means anything to this pair (FUT-697). */
 export interface InstrumentScope {
@@ -366,6 +318,7 @@ export type CheckoutIntentKind =
   | 'createCheckout'
   | 'chargeInstrument'
   | 'getStatus'
+  | 'releaseCheckout'
   | 'refreshBrowserKey'
   | 'beginVault'
   | 'completeVault';

@@ -2,6 +2,7 @@ import { chargeSnapshotMismatch } from '../core/charge-identity';
 import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
 
 import { buyerCheckoutConfig, usesHostedCheckout } from './config';
+import { cardOutcomeOf, declineOf } from './decline-wire';
 import { chargeDraftOf } from './draft';
 import { classifyFirstCharge, type FirstChargeSettlement } from './first-charge';
 import { chargeMismatchRefusal } from './failure';
@@ -337,15 +338,12 @@ export async function chargeInstrument<C, V extends object, D>(
     const pending = await pendingCardResponse(runtime, payable, snapshot);
     if (pending) return pending;
 
-    const status = await runtime.config.correlation.recordCardOutcome({
-      ref: payable.ref,
-      charge: attachedChargeOf(snapshot),
-      // A decline is a business OUTCOME the provider reports, not an error.
-      approved: snapshot.status === 'PAID' || snapshot.status === 'AUTHORIZED',
-      amount: payable.amount,
-    });
+    const refusal = declineOf(snapshot);
+    const status = await runtime.config.correlation.recordCardOutcome(
+      cardOutcomeOf(payable, snapshot, refusal),
+    );
     await maybeSaveInstrument(runtime, caller, payable, snapshot, draft, instrument.vaulted);
-    return runtime.respond.ok({ status });
+    return runtime.respond.ok({ status, ...refusal });
   } catch (error) {
     // `payable.method` IS 'CARD' here — `unchargeableBy` refused anything else
     // before the try, so the wording names the method that was actually charged.

@@ -60,7 +60,10 @@ const SAVED_CARD = {
 };
 
 function Harness({ onResolved }: { onResolved: (status: OrderStatus) => void }): JSX.Element {
-  const cc = useCardCheckout(ORDER, {}, STRIPE_CONFIG, onResolved, 10, "acme");
+  const cc = useCardCheckout(ORDER, {}, STRIPE_CONFIG, onResolved, 10, "acme", [], false, {
+    tenantSlug: "acme",
+    basket: { signature: "line-1x2", ready: true },
+  });
   return (
     <div>
       <span data-testid="submitted">{String(cc.submitted)}</span>
@@ -125,9 +128,22 @@ describe("card charge → 3DS handover (FUT-698)", () => {
     const envelope = JSON.parse(parked as string) as {
       order: { orderId: string };
       parkedAt: number;
+      tenantSlug?: string;
+      basket?: string | null;
+      handoff?: boolean;
     };
     expect(envelope.order.orderId).toBe("o1");
     expect(typeof envelope.parkedAt).toBe("number");
+    // …and with the SAME facts the redirect-provider hand-off records
+    // (FUT-1213). This call site named neither, and both absences read as "no
+    // opinion" to the resume: an entry with no store resumes at any store, and
+    // one with no basket resumes over any basket. A challenge the buyer
+    // abandoned was exempt from both.
+    expect(envelope).toMatchObject({
+      tenantSlug: "acme",
+      basket: "line-1x2",
+      handoff: true,
+    });
     // The tab is navigating away: nothing resolved, no poll started here.
     expect(onResolved).not.toHaveBeenCalled();
     expect(client.pollOrderStatus).not.toHaveBeenCalled();

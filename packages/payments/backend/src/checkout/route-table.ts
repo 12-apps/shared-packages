@@ -84,6 +84,16 @@ export const CHECKOUT_ROUTES: readonly CheckoutRouteSpec[] = [
     principal: 'BUYER',
     payableScoped: true,
   },
+  // The buyer's own "I did not pay" (FUT-1146). Payable-scoped like the poll it
+  // sits beside: the merchant comes from the loaded payable, and the host's
+  // `load` is the authorization scope that decides whose payable this is.
+  {
+    kind: 'releaseCheckout',
+    method: 'POST',
+    pattern: ['release'],
+    principal: 'BUYER',
+    payableScoped: true,
+  },
   {
     kind: 'refreshBrowserKey',
     method: 'POST',

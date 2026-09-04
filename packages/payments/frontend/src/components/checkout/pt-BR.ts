@@ -40,9 +40,42 @@ export const PT_BR_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
       "Continuamos tentando por aqui. Se você já pagou, não pague de novo — " +
       "o pedido é confirmado assim que a operadora avisar.",
   },
+  /**
+   * One refusal at a time, in the cardholder's own terms (FUT-1145).
+   *
+   * `UNKNOWN` is deliberately absent: with no recognised reason there is
+   * nothing specific to say, and `failed` above is already that sentence.
+   */
+  declined: {
+    INSUFFICIENT_FUNDS: {
+      heading: "Não havia saldo ou limite",
+      support: "Nenhum valor foi cobrado. Tente outro cartão.",
+    },
+    CARD_DECLINED: {
+      heading: "Seu banco não autorizou o pagamento",
+      support: "Nenhum valor foi cobrado. Tente outro cartão ou fale com o seu banco.",
+    },
+    INVALID_CARD: {
+      heading: "Os dados do cartão não foram aceitos",
+      support: "Nenhum valor foi cobrado. Confira o número, a validade e o CVV, ou use outro cartão.",
+    },
+    EXPIRED_CARD: {
+      heading: "O cartão está vencido",
+      support: "Nenhum valor foi cobrado. Use um cartão com a validade em dia.",
+    },
+    FRAUD_SUSPECTED: {
+      heading: "O banco bloqueou esta compra por segurança",
+      support: "Nenhum valor foi cobrado. Fale com o seu banco ou use outro cartão.",
+    },
+    PROVIDER_ERROR: {
+      heading: "Não foi possível processar o pagamento agora",
+      support: "Nenhum valor foi cobrado. Tente de novo em alguns instantes.",
+    },
+  },
   retryAction: "Tentar novamente",
   regenerateAction: "Gerar novo código",
   checkAgainAction: "Verificar de novo",
+  notPaidAction: "Não consegui pagar",
   backAction: "Voltar ao cardápio",
   amountLabel: "Valor pago",
   referenceLabel: "Pedido",

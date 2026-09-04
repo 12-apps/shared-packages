@@ -114,4 +114,5 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     required: 'This field is required.',
   },
   generatingPayment: 'Generating payment…',
+  totalCaption: (items) => `Total · ${items} ${items === 1 ? 'item' : 'items'}`,
 };

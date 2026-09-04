@@ -48,9 +48,42 @@ export const EN_US_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
       "We are still trying. If you have already paid, do not pay again — " +
       "the order is confirmed as soon as the provider tells us.",
   },
+  /**
+   * One refusal at a time, in the cardholder's own terms (FUT-1145).
+   *
+   * `UNKNOWN` is deliberately absent: with no recognised reason there is
+   * nothing specific to say, and `failed` above is already that sentence.
+   */
+  declined: {
+    INSUFFICIENT_FUNDS: {
+      heading: "There were not enough funds",
+      support: "Nothing was charged. Try another card.",
+    },
+    CARD_DECLINED: {
+      heading: "Your bank did not authorise the payment",
+      support: "Nothing was charged. Try another card, or talk to your bank.",
+    },
+    INVALID_CARD: {
+      heading: "The card details were not accepted",
+      support: "Nothing was charged. Check the number, the expiry and the CVV, or use another card.",
+    },
+    EXPIRED_CARD: {
+      heading: "That card has expired",
+      support: "Nothing was charged. Use a card that is still in date.",
+    },
+    FRAUD_SUSPECTED: {
+      heading: "Your bank blocked this purchase for security",
+      support: "Nothing was charged. Talk to your bank, or use another card.",
+    },
+    PROVIDER_ERROR: {
+      heading: "We could not process the payment right now",
+      support: "Nothing was charged. Try again in a moment.",
+    },
+  },
   retryAction: "Try again",
   regenerateAction: "Generate a new code",
   checkAgainAction: "Check again",
+  notPaidAction: "I could not pay",
   backAction: "Back to the menu",
   amountLabel: "Amount paid",
   referenceLabel: "Order",

@@ -89,7 +89,7 @@ function definedHints(url: string): SettlementHints | undefined {
  * forever after, and the buyer's screen never settled even though the provider
  * had said PAID.
  */
-async function latestCharge<C, V extends object, D>(
+export async function latestCharge<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   payable: Payable,
 ): Promise<StoredCharge | null> {
@@ -127,14 +127,26 @@ async function offlineSettle<C, V extends object, D>(
   });
 }
 
-/** Ask the provider what really happened, and apply it if it says PAID. */
-async function reconcile<C, V extends object, D>(
+/**
+ * Ask the provider what really happened, and apply it if it says PAID —
+ * answering `null` for every other outcome.
+ *
+ * `null` covers three different things on purpose: the provider said not-paid,
+ * the provider could not be reached, and the provider could not be ASKED (a
+ * hosted charge whose `payment_check` refuses to answer without the redirect's
+ * own reference). None of them is evidence of a payment, and the one caller
+ * that acts on the difference — the buyer's own release (FUT-1146) — must
+ * treat all three the same way or it becomes a way to abandon a live payment.
+ *
+ * Exported for that caller. `getStatus` below folds it back into its own
+ * "unchanged" answer, which is what it always did.
+ */
+export async function reconcilePaid<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   payable: Payable,
   charge: StoredCharge,
   url: string,
-): Promise<string> {
-  const unchanged = runtime.config.payables.stateToken(payable);
+): Promise<string | null> {
   let snapshot;
   try {
     const gateway = await runtime.gateway();
@@ -151,9 +163,9 @@ async function reconcile<C, V extends object, D>(
       `[checkout] status reconcile failed for ${payable.ref}: ` +
         `${error instanceof Error ? error.message : String(error)}`,
     );
-    return unchanged;
+    return null;
   }
-  if (snapshot.status !== 'PAID') return unchanged;
+  if (snapshot.status !== 'PAID') return null;
   // FUT-373 — forward what the provider ACTUALLY captured, never the payable's
   // total. Echoing our own total back would settle any capture however small,
   // and would make the host's shortfall guard compare a number with itself.
@@ -163,6 +175,19 @@ async function reconcile<C, V extends object, D>(
     capturedAmount: snapshot.amount,
     method: snapshot.method,
   });
+}
+
+/** The same ask, as the poll wants it: the settled token, or "unchanged". */
+async function reconcile<C, V extends object, D>(
+  runtime: Runtime<C, V, D>,
+  payable: Payable,
+  charge: StoredCharge,
+  url: string,
+): Promise<string> {
+  return (
+    (await reconcilePaid(runtime, payable, charge, url)) ??
+    runtime.config.payables.stateToken(payable)
+  );
 }
 
 /**

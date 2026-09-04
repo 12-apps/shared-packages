@@ -37,7 +37,10 @@ function useHandover(payable: CheckoutOrder, url: string, navigate: (url: string
   useEffect(() => {
     if (done) return;
     setDone(true);
-    rememberHostedOrder(payable);
+    // `handoff: true` is what tells the return leg this order was finished on
+    // ANOTHER SITE (FUT-1140): only such an order resumes onto the confirmation
+    // screen, because only such an order has nothing left on our page to show.
+    rememberHostedOrder(payable, { handoff: true });
     navigate(url);
   }, [done, payable, url, navigate]);
 }
@@ -163,6 +166,20 @@ function ReturnStalled({
   );
 }
 
+/**
+ * The parked order this return trip is for, or null.
+ *
+ * This screen is mounted at the host's RETURN route, so it carries no basket to
+ * weigh the entry against and the FUT-1213 rule cannot ask for one: with no
+ * basket named the decision is the pre-1213 one — resume what was parked —
+ * which is the right answer for a URL that exists only for buyers coming back
+ * from a payment. `ASK` is unreachable from here.
+ */
+function resumeParked(): CheckoutOrder | null {
+  const decision = takeHostedOrder();
+  return decision.verdict === "RESUME" ? decision.order : null;
+}
+
 function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn"] {
   function HostedReturnBody({
     onResolved,
@@ -172,7 +189,7 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
     const { Alert, LoadingState } = useCheckoutComponents();
     // Read-and-clear, once, on first render: the resumed view belongs to
     // exactly one return trip.
-    const [parked] = useState(takeHostedOrder);
+    const [parked] = useState(resumeParked);
     // Bounded, for the reason on RETURN_WINDOW_MS: nothing here can ever reach a
     // terminal state on its own, so an unbounded poll is a spinner the buyer
     // watches until they close the tab.

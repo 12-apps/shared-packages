@@ -100,4 +100,7 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     required: 'Campo obrigatório.',
   },
   generatingPayment: 'Gerando pagamento…',
+  // Verbatim what the component rendered before the key existed, so nothing
+  // changes for a Brazilian shopper.
+  totalCaption: (items) => `Total · ${items} ${items === 1 ? 'item' : 'itens'}`,
 };

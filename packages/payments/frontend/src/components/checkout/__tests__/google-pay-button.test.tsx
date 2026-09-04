@@ -117,6 +117,7 @@ function fakeClient(options: FakeClientOptions = {}) {
   const client: CheckoutClient = {
     getConfig: async () => err("not in this test"),
     getStatus: async () => ok<OrderStatus>(options.statusResult ?? "PAID"),
+    releaseCheckout: async () => err("not in this test"),
     charge: async () => err("not in this test"),
     chargeWallet: async (input) => {
       walletCharges.push(input);

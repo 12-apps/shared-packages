@@ -128,6 +128,7 @@ function fakeClient(chargeResult?: Awaited<ReturnType<CheckoutClient["chargeWall
   const client: CheckoutClient = {
     getConfig: async () => err("not in this test"),
     getStatus: async () => ok<OrderStatus>("PAID"),
+    releaseCheckout: async () => err("not in this test"),
     charge: async () => err("not in this test"),
     chargeWallet: async (input) => {
       walletCharges.push(input);

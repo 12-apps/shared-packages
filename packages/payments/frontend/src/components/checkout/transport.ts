@@ -96,10 +96,20 @@ export interface CheckoutTransport {
 export type CheckoutTransportBinding = Omit<CheckoutTransport, "copy"> &
   Partial<Pick<CheckoutTransport, "copy">>;
 
-/** The eight calls the buyer checkout makes, pre-bound to a {@link CheckoutTransport}. */
+/** The nine calls the buyer checkout makes, pre-bound to a {@link CheckoutTransport}. */
 export interface CheckoutClient {
   getConfig(tenantSlug: string): Promise<Result<CheckoutProviderConfig>>;
   getStatus(ref: string): Promise<Result<OrderStatus>>;
+  /**
+   * `POST /release` (FUT-1146): the buyer says they did not pay, and the
+   * charge they were sent away for has no terminal state of its own.
+   *
+   * Answers the payable's status AFTER the server has re-asked the provider,
+   * so a payment that actually succeeded comes back `PAID` and nothing is
+   * released — the race against a late webhook resolves in the shopper's
+   * favour rather than against it.
+   */
+  releaseCheckout(input: { orderId: string }): Promise<Result<OrderStatus>>;
   charge(input: ChargeCardInput): Promise<Result<ChargeOutcome>>;
   /** A wallet instrument against the same `/charge` route (FUT-471/472). */
   chargeWallet(input: ChargeWalletInput): Promise<Result<ChargeOutcome>>;
@@ -265,6 +275,16 @@ export function createCheckoutClient(transport: CheckoutTransport): CheckoutClie
         `/status?${new URLSearchParams({ orderId: ref, ...returnedSettlement() }).toString()}`,
         { method: "GET" },
       ),
+
+    releaseCheckout: (input) =>
+      // The settlement hints ride in the QUERY, exactly as the poll's do: they
+      // are the only way a hosted provider can be asked anything at all, so a
+      // release must carry them or the server decides "not paid" from a
+      // question it was never able to put.
+      call<OrderStatus>(`/release?${new URLSearchParams(returnedSettlement()).toString()}`, {
+        method: "POST",
+        body: JSON.stringify({ orderId: input.orderId }),
+      }),
 
     charge: (input) =>
       call<ChargeOutcome>("/charge", { method: "POST", body: flatChargeBody(input) }),

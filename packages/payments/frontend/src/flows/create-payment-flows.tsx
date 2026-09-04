@@ -150,6 +150,8 @@ function buildUseCheckout(runtime: FlowsRuntime): () => CheckoutController {
   return function useCheckout(): CheckoutController {
     const { config } = useResolvedConfig(runtime);
     const defaults = runtime.config.useBuyerDefaults?.() ?? {};
+    const cart = runtime.config.useCart();
+    const scope = { tenantSlug: runtime.useTenantSlug() };
     return useCheckoutController(
       {
         createOrder: ports.createPayable,
@@ -162,6 +164,11 @@ function buildUseCheckout(runtime: FlowsRuntime): () => CheckoutController {
       // Resolved for NO method: the gate runs on the Dados step, before the
       // picker, and FUT-595's rule is to collect the union up front.
       buyerFieldsFor(config?.chain, null),
+      scope.tenantSlug,
+      // WHICH basket, so a payment raised from another one cannot resume itself
+      // over it (FUT-1213). The host answers on its cart view; a host that does
+      // not gets the pre-1213 behaviour.
+      cart.identity,
     );
   };
 }

@@ -9,6 +9,8 @@
  * the ports declared on `CheckoutFlowProps`.
  */
 
+import type { CheckoutDecline, CheckoutDeclineReason } from "./decline";
+
 /** Payment methods offered at checkout. Mirrors `Payment.method` (FUT-42). */
 export type PaymentMethod = "PIX" | "CARD";
 
@@ -33,6 +35,16 @@ export type OrderStatus = "AWAITING_PAYMENT" | "PAID" | "FAILED" | "EXPIRED";
 
 /** Terminal states — polling stops once the order reaches one of these. */
 export const TERMINAL_STATUSES: readonly OrderStatus[] = ["PAID", "FAILED", "EXPIRED"];
+
+/**
+ * What a payment pane calls once the charge has an answer.
+ *
+ * The refusal rides along OPTIONALLY (FUT-1145): a pane that has one hands it
+ * over so the confirmation screen can say which refusal this was and whether
+ * another instrument could work, and every caller that has nothing to add keeps
+ * calling this with one argument exactly as before.
+ */
+export type OnCheckoutResolved = (status: OrderStatus, decline?: CheckoutDecline | null) => void;
 
 /** Buyer contact captured at checkout. */
 export interface BuyerInfo {
@@ -358,8 +370,20 @@ export interface CheckoutProviderConfig {
  * present when the provider demands the buyer finish the charge on ITS page —
  * Stripe's redirect-based 3-D Secure — and the client then hands the buyer
  * over exactly as it does for a redirect provider's link (FUT-556).
+ *
+ * `declineReason` / `retriable` ride along on a refusal (FUT-1145). The server
+ * has classified every acquirer decline since FUT-340 — 33 PagBank codes with
+ * issuer sub-reasons, each carrying the vendor's own retry verdict — and then
+ * answered `{ status }` and threw the classification away, so an expired card,
+ * a stolen card and "attempts exhausted, do not retry" all reached the buyer as
+ * "Pagamento não concluído. Você pode tentar novamente."
+ *
+ * BOTH OPTIONAL, and the degrade direction is today's behaviour: a server that
+ * sends neither renders exactly the generic refusal it always did.
  */
 export interface ChargeOutcome {
   status: OrderStatus;
   hostedCheckoutUrl?: string;
+  declineReason?: CheckoutDeclineReason;
+  retriable?: boolean;
 }

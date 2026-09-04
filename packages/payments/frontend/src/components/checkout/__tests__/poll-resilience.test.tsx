@@ -647,7 +647,7 @@ describe("the resumed hosted return", () => {
     // `useHostedResume` returned status and timedOut and dropped the error, so
     // this leg — the only one with no PIX or card view of its own — reported a
     // dead connection as an ordinary wait.
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client } = scriptedClient(() => DOWN);
     const { result } = renderHook(() => useCheckoutController(makePorts()), {
       wrapper: withClient(client),
@@ -660,7 +660,7 @@ describe("the resumed hosted return", () => {
   });
 
   it("hands the buyer a way to ask again, and it works", async () => {
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const wait = switchableClient();
     const { result } = renderHook(() => useCheckoutController(makePorts()), {
       wrapper: withClient(wait.client),
@@ -680,7 +680,7 @@ describe("the resumed hosted return", () => {
   });
 
   it("times out on the clock rather than on a counter the failure froze", async () => {
-    rememberHostedOrder(ORDER);
+    rememberHostedOrder(ORDER, { handoff: true });
     const { client } = scriptedClient(() => DOWN);
     const { result } = renderHook(() => useCheckoutController(makePorts()), {
       wrapper: withClient(client),

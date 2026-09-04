@@ -1,9 +1,9 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
-import { BuyerInfoForm } from "./buyer-info-form";
+import type { CheckoutBasketIdentity } from "./basket";
+import { displayTotals, PayBarTotal } from "./checkout-totals";
 import { useCheckoutCopy } from "./copy-context";
-import { LockOutlinedIcon } from "./icons";
 import { useMethodChoice } from "./method-choice";
 import { MethodPicker } from "./method-picker";
 import { PaymentErrorPanel } from "./payment-error-panel";
@@ -12,13 +12,12 @@ import { resolveCheckoutScreen } from "./providers/registry";
 import type {
   BuyerField,
   BuyerInfo,
-  CheckoutCustomerField,
   CheckoutOrder,
   CheckoutProviderConfig,
-  OrderStatus,
+  OnCheckoutResolved,
   PaymentMethod,
 } from "./types";
-import type { DadosStepCopy, EmptyCartCopy } from "./view-copy";
+import type { EmptyCartCopy } from "./view-copy";
 import { useCheckoutComponents } from "./ui";
 
 /**
@@ -70,6 +69,8 @@ function PaymentBody({
   onStart,
   creating,
   pollIntervalMs,
+  freshInstrument,
+  basket,
   validateApplePayMerchant,
 }: {
   order: CheckoutOrder | null;
@@ -77,11 +78,13 @@ function PaymentBody({
   providerConfig: CheckoutProviderConfig | null;
   method: PaymentMethod | null;
   tenantSlug?: string;
-  onResolved: (status: OrderStatus) => void;
+  onResolved: OnCheckoutResolved;
   /** Set only when the shell hid its picker — see {@link PaymentStep}. */
   onStart?: () => void;
   creating: boolean;
   pollIntervalMs?: number;
+  freshInstrument?: boolean;
+  basket?: CheckoutBasketIdentity;
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }): JSX.Element | null {
   const Screen = resolveCheckoutScreen(providerConfig?.chain?.[0]?.checkoutScreen);
@@ -96,6 +99,8 @@ function PaymentBody({
       onStart={onStart}
       creating={creating}
       pollIntervalMs={pollIntervalMs}
+      freshInstrument={freshInstrument}
+      basket={basket}
       validateApplePayMerchant={validateApplePayMerchant}
     />
   );
@@ -116,162 +121,45 @@ export function EmptyCart({ copy, onBack }: { copy: EmptyCartCopy; onBack: () =>
   );
 }
 
-/**
- * The totals shown on the pay bar: the settled balance's when settling a settlement
- * one, otherwise the cart's own — both supplied by the host, which
- * is the only side that knows either.
- */
-function displayTotals(
-  override: { label: string; items: number } | undefined,
-  cart: { totalLabel: string; totalItems: number },
-): { label: string; items: number } {
-  return { label: override?.label ?? cart.totalLabel, items: override?.items ?? cart.totalItems };
-}
-
-/** The pay bar's money column: item count, grand total, host discount lines. */
-function PayBarTotal({
-  totalLabel,
-  totalItems,
-  children,
-}: {
-  totalLabel: string;
-  totalItems: number;
-  children?: ReactNode;
-}): JSX.Element {
-  const { Text } = useCheckoutComponents();
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-      <Text variant="caption" size="xs" color="secondary" as="span">
-        Total · {totalItems} {totalItems === 1 ? "item" : "itens"}
-      </Text>
-      <Text variant="heading" size="md" weight="bold" color="primary" as="span" data-testid="pay-bar-total">
-        {totalLabel}
-      </Text>
-      {children}
-    </Box>
-  );
-}
-
-/**
- * Step 1 "Dados" — the buyer's register info (CPF plus optional name/email/
- * phone; contact pre-filled from the saved buyer profile). NO payment method
- * here (that's step 2); nav lives in the slim checkout header. "Continuar"
- * (sticky, with the live total) validates the CPF and advances to "Pagamento"
- * — no charge yet.
- */
-export function DadosStep({
-  copy,
-  buyer,
-  onBuyerChange,
-  saveProfile,
-  onSaveProfileChange,
-  createError,
-  errorField,
-  onContinue,
-  cartTotals,
-  buyerFields,
-  discountLines,
-  totalOverride,
-}: {
-  /** The step's own sentences — the HOST's words (see `./view-copy`). */
-  copy: DadosStepCopy;
-  buyer: BuyerInfo;
-  onBuyerChange: (buyer: BuyerInfo) => void;
-  saveProfile: boolean;
-  onSaveProfileChange: (value: boolean) => void;
-  createError: string | null;
-  errorField: BuyerField | null;
-  onContinue: () => void;
-  /** The host cart's own totals — what the pay bar shows in cart mode. */
-  cartTotals: { totalLabel: string; totalItems: number };
-  /** What the store's chain declares it needs (FUT-595); absent ⇒ CPF-required. */
-  buyerFields?: readonly CheckoutCustomerField[];
-  /**
-   * The saving, itemized under the total the buyer is about to authorize
-   * (FUT-246) — RENDERED BY THE HOST from its cart (the storefront passes its
-   * cart footer's money block), never re-implemented here, so the two surfaces
-   * can never word the same discount differently.
- */
-  discountLines?: ReactNode;
-  /** Settling an open balance: totals come from the settlement, not the cart. */
+/** What the step knows about the amount: the charge's, the balance's, the cart's. */
+interface StepMoney {
+  order: CheckoutOrder | null;
+  cartTotals?: { totalLabel: string; totalItems: number };
   totalOverride?: { label: string; items: number };
-}): JSX.Element {
-  const { Checkbox } = useCheckoutComponents();
-  const { label: totalLabel, items: totalItems } = displayTotals(totalOverride, cartTotals);
+  discountLines?: ReactNode;
+}
 
+/**
+ * The Pagamento step's own money line (FUT-1179).
+ *
+ * THE RAISED ORDER'S TOTAL WINS, exactly as the confirmation screen's does
+ * (`statusTotalLabel`). Once a charge exists, that charge's amount is what is
+ * being taken — a repriced cart, or an order resumed from a parked entry, makes
+ * the cart's total a different number from the one about to leave the buyer's
+ * account. Showing the cart's number above a QR for the order's would be this
+ * ticket's own defect in a new place: an amount on screen that is not the
+ * amount being charged.
+ *
+ * The item COUNT stays the cart's — an order carries no line count, and the
+ * caption is a description of the basket rather than of the charge.
+ *
+ * Renders nothing at all when the host supplied no totals and no order — a step
+ * that would otherwise print "Total ·" with a blank beside it is worse than the
+ * silence this ticket is about. Every host mounting `CheckoutFlow` gets them;
+ * only a hand-composed step can be missing them.
+ */
+function PaymentStepTotal({ money }: { money: StepMoney }): JSX.Element | null {
+  const { order, cartTotals, totalOverride, discountLines } = money;
+  if (!cartTotals && !totalOverride && !order) return null;
+  const { label, items } = displayTotals(totalOverride, cartTotals ?? { totalLabel: "", totalItems: 0 });
   return (
-    <>
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pb: { xs: createError ? 22 : 14, sm: createError ? 20 : 12 } }}>
-        <BuyerInfoForm
-          value={buyer}
-          onChange={onBuyerChange}
-          fields={buyerFields}
-          fieldError={errorField && createError ? { field: errorField, message: createError } : null}
-        />
-        <Checkbox
-          checked={saveProfile}
-          onChange={(_event, checked) => onSaveProfileChange(checked)}
-          label={copy.saveProfile}
-          data-testid="buyer-save-profile"
-        />
-      </Box>
-
-      <DadosPayBar
-        copy={copy}
-        totalLabel={totalLabel}
-        totalItems={totalItems}
-        createError={createError}
-        onContinue={onContinue}
-      >
+    <Box data-testid="payment-step-total" sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
+      <PayBarTotal totalLabel={order?.totalLabel ?? label} totalItems={items}>
         {/* Suppressed while settling a balance: those totals come from the
             frozen ticket, not the cart. */}
         {totalOverride ? null : discountLines}
-      </DadosPayBar>
-    </>
-  );
-}
-
-/** The sticky "Continuar" bar: the refusal, the money, and the one action. */
-function DadosPayBar({
-  copy,
-  totalLabel,
-  totalItems,
-  createError,
-  onContinue,
-  children,
-}: {
-  copy: DadosStepCopy;
-  totalLabel: string;
-  totalItems: number;
-  createError: string | null;
-  onContinue: () => void;
-  children?: ReactNode;
-}): JSX.Element {
-  const { ActionBar, Alert, Button, Text } = useCheckoutComponents();
-  return (
-    <ActionBar dataTestId="checkout-pay-bar">
-      <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
-        {createError ? (
-          <Alert variant="danger" title={copy.cannotContinueTitle} description={createError} showIcon data-testid="checkout-error" />
-        ) : null}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <PayBarTotal totalLabel={totalLabel} totalItems={totalItems}>{children}</PayBarTotal>
-          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5, minWidth: 0 }}>
-            <Button variant="solid" color="primary" size="lg" fullWidth onClick={onContinue} dataTestId="checkout-continue">
-              {copy.continueAction}
-            </Button>
-            {copy.secureNotice ? (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
-                <LockOutlinedIcon sx={{ fontSize: 13 }} />
-                <Text variant="caption" size="xs" color="secondary" as="span">
-                  {copy.secureNotice}
-                </Text>
-              </Box>
-            ) : null}
-          </Box>
-        </Box>
-      </Box>
-    </ActionBar>
+      </PayBarTotal>
+    </Box>
   );
 }
 
@@ -305,10 +193,39 @@ interface PaymentStepProps {
   providerConfig?: CheckoutProviderConfig | null;
   /** Scopes the saved-card list to the store being paid (host routing owns it). */
   tenantSlug?: string;
+  /**
+   * WHAT THE BUYER IS ABOUT TO PAY (FUT-1179) — the host cart's own totals, or
+   * the settlement's where one is being settled.
+   *
+   * The Pagamento step showed no amount at all before a method was chosen, and
+   * a store that finishes on the provider's page sent a buyer with a CPF on
+   * file straight out to that provider with NO total ever having been on
+   * screen: the flow opens on Pagamento, the hand-off screen owns the only
+   * button, and the amount lived exclusively on the Dados step they skipped.
+   * Asking for money without showing the amount is the one thing a checkout
+   * may not do.
+   *
+   * Optional so a host composing this step by hand is not broken by the
+   * addition; absent, the step renders as it did.
+   */
+  cartTotals?: { totalLabel: string; totalItems: number };
+  /** Settling an open balance: totals come from the settlement, not the cart. */
+  totalOverride?: { label: string; items: number };
+  /** The host's own rendered discount itemization, under the total (FUT-246). */
+  discountLines?: ReactNode;
   pollIntervalMs?: number;
+  /** Retrying a refused card — preselect no saved instrument (FUT-1145). */
+  freshInstrument?: boolean;
+  /**
+   * WHICH basket this checkout is for (FUT-1213) — passed down because the
+   * card path can park an order too: a 3-D Secure challenge is a hand-off, and
+   * one parked without a basket resumes over any basket at any store, which is
+   * this ticket's own bug on a sibling path.
+   */
+  basket?: CheckoutBasketIdentity;
   /** The host's Apple Pay merchant-validation port (FUT-472) — see the screen contract. */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
-  onResolved: (status: OrderStatus) => void;
+  onResolved: OnCheckoutResolved;
 }
 
 /**
@@ -341,18 +258,28 @@ export function PaymentStep({
   onEditBuyer,
   providerConfig,
   tenantSlug,
+  cartTotals,
+  totalOverride,
+  discountLines,
   pollIntervalMs,
+  freshInstrument,
+  basket,
   validateApplePayMerchant,
   onResolved,
 }: PaymentStepProps): JSX.Element {
-  const { LoadingState } = useCheckoutComponents();
-  const screens = useCheckoutCopy().screens;
   const config = providerConfig ?? null;
   const choice = useMethodChoice(config, method, onMethodChange);
   useAutoRaiseOrder(order, method, creating, createError, onGenerate);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      {/* THE AMOUNT, before anything asks for it (FUT-1179). At the top rather
+          than in a sticky bar of its own: this step's actions belong to the
+          pane below it — the PIX code, the card form's own pay bar, the
+          hand-off button — and a second bar would put two "pay" controls on
+          one screen. */}
+      <PaymentStepTotal money={{ order, cartTotals, totalOverride, discountLines }} />
+
       {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
       <PayerSummary name={buyer.name} taxId={buyer.taxId} onEdit={onEditBuyer} />
 
@@ -375,26 +302,74 @@ export function PaymentStep({
         onStart={choice.onStart}
         creating={creating}
         pollIntervalMs={pollIntervalMs}
+        freshInstrument={freshInstrument}
+        basket={basket}
         validateApplePayMerchant={validateApplePayMerchant}
       />
 
-      {/* The shell's own busy spinner, SUPPRESSED for a hand-off screen: that
-          screen renders its own "Preparando o pagamento" while the charge is
-          raised, and two stacked spinners saying the same thing is what the
-          buyer actually saw. */}
-      {!order && creating && !choice.atProvider ? (
-        <LoadingState variant="spinner" size="md" message={screens.generatingPayment} dataTestId="payment-generating" />
-      ) : null}
-
-      {!order && method && createError ? (
-        <PaymentErrorPanel
-          message={createError}
-          emailFlagged={errorField === "email"}
-          code={errorCode}
-          onUseEmail={onUseEmail}
-          onRetry={() => onGenerate(method)}
-        />
-      ) : null}
+      <RaisingState
+        order={order}
+        method={method}
+        creating={creating && !choice.atProvider}
+        createError={createError}
+        errorField={errorField}
+        errorCode={errorCode}
+        onUseEmail={onUseEmail}
+        onGenerate={onGenerate}
+      />
     </Box>
+  );
+}
+
+/**
+ * What the shell says while the order is being raised, and if raising it
+ * failed.
+ *
+ * The spinner is SUPPRESSED for a hand-off screen — that screen renders its own
+ * "Preparando o pagamento" while the charge is raised, and two stacked spinners
+ * saying the same thing is what the buyer actually saw. The caller decides
+ * that; here `creating` is simply true or false.
+ */
+function RaisingState({
+  order,
+  method,
+  creating,
+  createError,
+  errorField,
+  errorCode,
+  onUseEmail,
+  onGenerate,
+}: {
+  order: CheckoutOrder | null;
+  method: PaymentMethod | null;
+  creating: boolean;
+  createError: string | null;
+  errorField: BuyerField | null;
+  errorCode?: string | null;
+  onUseEmail: (email: string) => void;
+  onGenerate: (method: PaymentMethod) => void;
+}): JSX.Element | null {
+  const { LoadingState } = useCheckoutComponents();
+  const screens = useCheckoutCopy().screens;
+  if (order) return null;
+  if (creating) {
+    return (
+      <LoadingState
+        variant="spinner"
+        size="md"
+        message={screens.generatingPayment}
+        dataTestId="payment-generating"
+      />
+    );
+  }
+  if (!method || !createError) return null;
+  return (
+    <PaymentErrorPanel
+      message={createError}
+      emailFlagged={errorField === "email"}
+      code={errorCode}
+      onUseEmail={onUseEmail}
+      onRetry={() => onGenerate(method)}
+    />
   );
 }
