@@ -10,6 +10,7 @@ import {
   type NotificationsSubscribe,
 } from './hooks';
 import { createInboxStore, type InboxStore } from './inbox-state';
+import type { LiveActivitiesConfig } from './live-config';
 import { lazyNotificationsPanel } from './panel-lazy';
 import type { NotificationsPanelProps } from './panel';
 import { lazyPreferencesPage } from './page-lazy';
@@ -55,6 +56,15 @@ export interface NotificationsWebConfig {
   useSignal?: NotificationsSignalHook;
   /** The browser push enable step's host seams (SW path, platform hint). */
   webPush?: WebPushSetupConfig;
+  /**
+   * LIVE ACTIVITIES — the ongoing-state entries pinned above the inbox list.
+   *
+   * Opt-in, and absent means absent: a host that passes nothing gets the panel
+   * it had, with no section, no heading and no reserved space. See
+   * `./live-config` for the two things a host has to supply (where they come
+   * from, and what the section says) and `../live` for what one IS.
+   */
+  liveActivities?: LiveActivitiesConfig;
 }
 
 export interface WebNotifications {
@@ -110,7 +120,11 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
   const Bell: ComponentType<BellButtonProps> = (props) => (
     <BellButton {...props} store={store} messages={messages} {...subscribeOption} />
   );
-  const Panel = lazyNotificationsPanel({ store, messages });
+  const Panel = lazyNotificationsPanel({
+    store,
+    messages,
+    ...(config.liveActivities ? { live: config.liveActivities } : {}),
+  });
 
   function useBoundUnreadCount(options: { enabled?: boolean } = {}): number {
     return useUnreadCount(store, { ...options, ...subscribeOption });

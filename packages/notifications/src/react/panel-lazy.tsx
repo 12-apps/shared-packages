@@ -36,12 +36,15 @@ import { Suspense, lazy, useEffect, useState, type ComponentType, type JSX } fro
 import type { NotificationMessages } from '../messages';
 
 import type { InboxStore } from './inbox-state';
+import type { LiveActivitiesConfig } from './live-config';
 import type { NotificationsPanelProps } from './panel';
 
 /** What the factory binds into the panel, and the host never passes. */
 interface PanelParts {
   store: InboxStore;
   messages: NotificationMessages;
+  /** Absent unless the host turned live activities on — see `./live-config`. */
+  live?: LiveActivitiesConfig;
 }
 
 export function lazyNotificationsPanel(

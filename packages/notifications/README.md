@@ -186,6 +186,79 @@ holds no driver, no transport and no address.
 
 See **[ADOPTING.md](./ADOPTING.md)** for the mount, the gate and the sources.
 
+## Live activities — the centre's second kind of entry
+
+An inbox notification is an EVENT: it happened, it is stamped, it is read or
+unread, and tomorrow it still says the same thing. A **live activity** is
+ONGOING STATE — pinned above the list, no read/unread, nothing to delete, it
+updates itself, and it is gone the moment the thing it tracks finishes.
+
+The distinction is not cosmetic. "Your order is on its way", read an hour later,
+is a claim about the past presented as news; the more reliable the inbox is, the
+more of those a person accumulates, and somewhere in the pile is the question
+they actually have — *where is it now*.
+
+Opt-in, and absent means absent: a host that passes nothing renders the panel it
+had, with no section, no heading and no reserved space.
+
+```ts
+createWebNotifications({
+  apiBase: '/api/account',
+  messages,
+  liveActivities: {
+    // A HOOK, so it may read context — the tenant, the session, a query client.
+    useActivities: ({ active }) => useMyLiveThings({ enabled: active }),
+    messages: { sectionTitle, openActivity, updated },
+    renderIcon: (activity) => ICONS[activity.kind],
+  },
+});
+```
+
+`active` is whether anyone is looking — `false` while the panel is shut. Pass it
+to your query's `enabled`. It is a hint about NEED, never about correctness, and
+it is not what makes an unopened inbox free: the panel is fetched lazily and the
+drawer unmounts its content on close, so a host that ignores `active` still
+issues nothing until somebody opens the bell.
+
+One activity is `{ id, kind, title, body, link, steps, activeStepId, updatedAt }`
+— `LiveActivity`, importable from either entry (`@12-apps/notifications` or
+`@12-apps/notifications/react`, so a host wiring the surface needs one import
+line, not two). It is defined in `src/live.ts`. `steps` + `activeStepId` draw a lane, because "how far along is
+this" is the shape almost every ongoing subject has; both are optional in effect
+— an activity with no lane is a heading, a sentence and a timestamp that keeps
+moving. An `activeStepId` naming no step draws NO lane rather than a lane with
+nothing lit, which would read as a process that has stopped.
+
+### On a phone: one tray entry, one buzz
+
+The other half is the OS notification, and it is one field. A generator whose
+event is about something also tracked live puts the activity's id in `data`:
+
+```ts
+import { LIVE_SUBJECT_KEY } from '@12-apps/notifications';   // the root entry
+
+data: { [LIVE_SUBJECT_KEY]: `order:${orderId}` }
+```
+
+`formatWebPush` turns that into a `tag` on the push payload, and a tag makes the
+next push about the same subject **replace** the one already in the tray —
+silently — instead of stacking under it. Four stages then cost one entry and one
+buzz, and the entry that remains is the current one. Without it a phone
+accumulates one alert per stage, each still asserting a stage the subject has
+since left.
+
+`tag` is `null` for an ordinary event rather than absent, so a service worker
+reads one payload shape. A worker that ignores it keeps today's behaviour
+exactly — which is what makes the field safe to ship ahead of the workers:
+
+```js
+self.registration.showNotification(payload.title, {
+  body: payload.body,
+  data: { link: payload.link },
+  ...(payload.tag ? { tag: payload.tag, renotify: false } : {}),
+});
+```
+
 ## The models
 
 `prisma/notifications.prisma` — `Notification`, `NotificationDelivery`,
