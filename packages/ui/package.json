@@ -225,6 +225,10 @@
       "default": "./dist/data-display/Popover.js"
     },
     "./data-display/Progress": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Progress/index.native.d.ts",
+        "default": "./dist/native/data-display/Progress.js"
+      },
       "types": "./dist/types/components/data-display/Progress/index.d.ts",
       "default": "./dist/data-display/Progress.js"
     },

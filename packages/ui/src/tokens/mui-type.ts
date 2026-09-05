@@ -15,7 +15,7 @@ import type { UiTheme } from './theme';
  * halves and not these; each component that reads this records that as a
  * known gap in its `NATIVE-NOTES.md`.
  */
-export type MuiTypeVariantName = 'h6' | 'body1' | 'body2';
+export type MuiTypeVariantName = 'h6' | 'body1' | 'body2' | 'caption';
 
 export interface MuiTypeVariant {
   fontSize: number;
@@ -28,6 +28,7 @@ export const MUI_TYPE: Record<MuiTypeVariantName, MuiTypeVariant> = {
   h6: { fontSize: 20, lineHeight: 1.6, fontWeight: 500, letterSpacingEm: 0.0075 },
   body1: { fontSize: 16, lineHeight: 1.5, fontWeight: 400, letterSpacingEm: 0.00938 },
   body2: { fontSize: 14, lineHeight: 1.43, fontWeight: 400, letterSpacingEm: 0.01071 },
+  caption: { fontSize: 12, lineHeight: 1.66, fontWeight: 400, letterSpacingEm: 0.03333 },
 };
 
 /** MUI's `theme.typography.fontWeightMedium`, which several web styles name outright. */

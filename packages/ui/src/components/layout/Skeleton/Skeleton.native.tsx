@@ -2,7 +2,6 @@ import * as React from 'react';
 import {
   Animated,
   Easing,
-  Platform,
   StyleSheet,
   View,
   type DimensionValue,
@@ -33,12 +32,12 @@ import type {
   SkeletonProps,
   SkeletonVariant,
 } from './Skeleton.types.native';
+import { useLoopedProgress } from '../../../platform/animation';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import { alpha } from '../../../tokens/color';
 import type { UiTheme } from '../../../tokens/theme';
 
-const nativeDriver = Platform.OS !== 'web';
 /** MUI's `pulseKeyframe` runs `ease-in-out`. */
 const PULSE_EASING = Easing.inOut(Easing.ease);
 const PERCENT = /^-?\d+(?:\.\d+)?%$/;
@@ -121,33 +120,6 @@ export function skeletonBoxStyle(theme: UiTheme, a: SkeletonBoxStyleArgs): ViewS
   return a.glassmorphism ? { ...style, ...glassStyle(theme) } : style;
 }
 
-/** A 0→1 progress that loops forever, after the CSS animation's initial delay. */
-function useLoop(
-  enabled: boolean,
-  durationMs: number,
-  delayMs: number,
-  easing: (value: number) => number,
-): Animated.Value {
-  const progress = React.useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
-    if (!enabled) return undefined;
-    const animation = Animated.sequence([
-      Animated.delay(delayMs),
-      Animated.loop(
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: durationMs,
-          easing,
-          useNativeDriver: nativeDriver,
-        }),
-      ),
-    ]);
-    animation.start();
-    return () => animation.stop();
-  }, [enabled, durationMs, delayMs, easing, progress]);
-  return progress;
-}
-
 interface WashProps {
   color: string;
   durationMs: number;
@@ -163,7 +135,7 @@ interface WashProps {
  * shared stories count the boxes by that attribute.
  */
 function Wash({ color, durationMs, delayMs, testID }: WashProps): React.JSX.Element {
-  const progress = useLoop(true, durationMs, delayMs, Easing.linear);
+  const progress = useLoopedProgress(true, { durationMs, delayMs, easing: Easing.linear });
   return (
     <Animated.View
       testID={testID}
@@ -204,7 +176,11 @@ function SkeletonBox({
 }: SkeletonBoxProps): React.JSX.Element {
   const theme = useUiTheme();
   const animates = effectiveAnimation(styleArgs.variant, animation);
-  const pulse = useLoop(animates === 'pulse', PULSE.durationMs, PULSE.delayMs, PULSE_EASING);
+  const pulse = useLoopedProgress(animates === 'pulse', {
+    durationMs: PULSE.durationMs,
+    delayMs: PULSE.delayMs,
+    easing: PULSE_EASING,
+  });
   const box = skeletonBoxStyle(theme, styleArgs);
   const washId = testID ? `${testID}-wash` : undefined;
 

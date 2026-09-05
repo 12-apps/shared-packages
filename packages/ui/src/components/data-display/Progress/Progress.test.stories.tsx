@@ -21,6 +21,14 @@ const meta: Meta<typeof Progress> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * The moving bar inside a linear progress, whichever renderer drew it. MUI's
+ * `.MuiLinearProgress-bar` span and the native fill `View` are both the
+ * track's first child, and the track is the element `data-testid` lands on.
+ */
+const bar = (track: Element): HTMLElement | null =>
+  track.firstElementChild as HTMLElement | null;
+
 // Basic Interaction Tests
 export const BasicInteraction: Story = {
   name: '🧪 Basic Interaction Test',
@@ -56,7 +64,7 @@ export const BasicInteraction: Story = {
       await expect(progressComponent).toHaveAttribute('data-testid', 'progress-component');
 
       // Verify progress bar is visible
-      const progressBar = progressComponent.querySelector('.MuiLinearProgress-bar');
+      const progressBar = bar(progressComponent);
       await expect(progressBar).toBeInTheDocument();
 
       // Check that progress value is reflected in the bar's style
@@ -196,7 +204,7 @@ export const FormInteraction: Story = {
     await step('Progress value changes verification', async () => {
       // Store initial transform value
       const progressComponent = canvas.getByTestId('controllable-progress');
-      const progressBar = progressComponent.querySelector('.MuiLinearProgress-bar');
+      const progressBar = bar(progressComponent);
       let previousTransform = '';
 
       if (progressBar) {
@@ -207,7 +215,7 @@ export const FormInteraction: Story = {
       // Wait for progress to start changing
       await waitFor(
         () => {
-          const progressBar = progressComponent.querySelector('.MuiLinearProgress-bar');
+          const progressBar = bar(progressComponent);
 
           if (progressBar) {
             const computedStyle = window.getComputedStyle(progressBar);
@@ -262,7 +270,7 @@ export const FormInteraction: Story = {
 
       // Verify the progress bar shows full completion
       const progressComponent = canvas.getByTestId('controllable-progress');
-      const progressBar = progressComponent.querySelector('.MuiLinearProgress-bar');
+      const progressBar = bar(progressComponent);
 
       if (progressBar) {
         const computedStyle = window.getComputedStyle(progressBar);
@@ -615,7 +623,14 @@ export const FocusManagement: Story = {
     await step('Progress appearance and focus', async () => {
       const triggerButton = canvas.getByTestId('trigger-button');
       await userEvent.click(triggerButton);
-      await waitFor(() => expect(triggerButton).toHaveFocus());
+      // The click disables the trigger, and a browser unfocuses a control that
+      // becomes disabled — so the focus this step is about moves OFF it. The
+      // assertion that it KEEPS focus contradicted the `toBeDisabled()` below
+      // and failed on the MUI renderer too, not only on react-native-web.
+      await waitFor(() => {
+        expect(triggerButton).toBeDisabled();
+        expect(triggerButton).not.toHaveFocus();
+      });
 
       // Progress should appear
       await waitFor(() => {
@@ -1009,8 +1024,8 @@ export const ThemeVariations: Story = {
 
       // Each should be visually distinct (we can't easily test exact colors,
       // but we can verify they render and have different styling)
-      const primaryBar = primaryProgress.querySelector('.MuiLinearProgress-bar');
-      const successBar = successProgress.querySelector('.MuiLinearProgress-bar');
+      const primaryBar = bar(primaryProgress);
+      const successBar = bar(successProgress);
 
       expect(primaryBar).toBeTruthy();
       expect(successBar).toBeTruthy();
@@ -1056,7 +1071,7 @@ export const ThemeVariations: Story = {
       await expect(pulseProgress).toBeVisible();
 
       // Verify glow effect is applied
-      const glowBar = glowProgress.querySelector('.MuiLinearProgress-bar');
+      const glowBar = bar(glowProgress);
       if (glowBar) {
         const glowStyle = window.getComputedStyle(glowBar);
         // Should have box-shadow for glow effect
@@ -1064,7 +1079,7 @@ export const ThemeVariations: Story = {
       }
 
       // Verify pulse animation is applied
-      const pulseBar = pulseProgress.querySelector('.MuiLinearProgress-bar');
+      const pulseBar = bar(pulseProgress);
       if (pulseBar) {
         const pulseStyle = window.getComputedStyle(pulseBar);
         // Should have animation applied
@@ -1086,7 +1101,7 @@ export const ThemeVariations: Story = {
       allThemeProgress.forEach(async (progress) => {
         await expect(progress).toBeVisible();
 
-        const progressBar = progress.querySelector('.MuiLinearProgress-bar');
+        const progressBar = bar(progress);
         if (progressBar) {
           const computedStyle = window.getComputedStyle(progressBar);
           // Should have a background color set
@@ -1222,7 +1237,7 @@ export const VisualStates: Story = {
       await expect(label).toBeInTheDocument();
 
       // Verify default styling
-      const linearBar = defaultLinear.querySelector('.MuiLinearProgress-bar');
+      const linearBar = bar(defaultLinear);
       expect(linearBar).toBeTruthy();
 
       if (linearBar) {
@@ -1241,14 +1256,14 @@ export const VisualStates: Story = {
       await expect(glassProgress).toBeVisible();
 
       // Verify glow effect
-      const glowBar = glowProgress.querySelector('.MuiLinearProgress-bar');
+      const glowBar = bar(glowProgress);
       if (glowBar) {
         const glowStyle = window.getComputedStyle(glowBar);
         expect(glowStyle.boxShadow).not.toBe('none');
       }
 
       // Verify pulse animation
-      const pulseBar = pulseProgress.querySelector('.MuiLinearProgress-bar');
+      const pulseBar = bar(pulseProgress);
       if (pulseBar) {
         const pulseStyle = window.getComputedStyle(pulseBar);
         expect(pulseStyle.animation).not.toBe('none');
@@ -1328,9 +1343,9 @@ export const VisualStates: Story = {
       await expect(errorState).toBeVisible();
 
       // Verify different colors are applied
-      const successBar = successState.querySelector('.MuiLinearProgress-bar');
-      const warningBar = warningState.querySelector('.MuiLinearProgress-bar');
-      const errorBar = errorState.querySelector('.MuiLinearProgress-bar');
+      const successBar = bar(successState);
+      const warningBar = bar(warningState);
+      const errorBar = bar(errorState);
 
       if (successBar && warningBar && errorBar) {
         const successStyle = window.getComputedStyle(successBar);
@@ -1387,7 +1402,7 @@ export const Performance: Story = {
         await expect(component).toBeVisible();
 
         // Each should have a progress bar
-        const progressBar = component.querySelector('.MuiLinearProgress-bar');
+        const progressBar = bar(component);
         expect(progressBar).toBeTruthy();
       }
     });
@@ -1600,11 +1615,13 @@ export const EdgeCases: Story = {
       await expect(overProgress).toBeVisible();
       await expect(negativeProgress).toBeVisible();
 
-      // Check labels show correct values using testid containers
-      const zeroProgressContainer = canvas.getByTestId('zero-progress').closest('div');
-      const fullProgressContainer = canvas.getByTestId('full-progress').closest('div');
-      const overProgressContainer = canvas.getByTestId('over-progress').closest('div');
-      const negativeProgressContainer = canvas.getByTestId('negative-progress').closest('div');
+      // Check labels show correct values using testid containers. The label is
+      // the track's sibling, so read the wrapper as the parent — `.closest('div')`
+      // only reached it because MUI's track happens to be a <span>.
+      const zeroProgressContainer = canvas.getByTestId('zero-progress').parentElement;
+      const fullProgressContainer = canvas.getByTestId('full-progress').parentElement;
+      const overProgressContainer = canvas.getByTestId('over-progress').parentElement;
+      const negativeProgressContainer = canvas.getByTestId('negative-progress').parentElement;
 
       // Verify the components contain the expected labels
       await expect(zeroProgressContainer).toHaveTextContent('0%');
@@ -1617,8 +1634,8 @@ export const EdgeCases: Story = {
       expect(negativeText).toMatch(/0%|-25%/);
 
       // Verify actual progress bar exists for boundary values
-      const zeroBar = zeroProgress.querySelector('.MuiLinearProgress-bar');
-      const fullBar = fullProgress.querySelector('.MuiLinearProgress-bar');
+      const zeroBar = bar(zeroProgress);
+      const fullBar = bar(fullProgress);
 
       // Just verify bars exist and are rendered
       if (zeroBar) {
@@ -1644,7 +1661,7 @@ export const EdgeCases: Story = {
       await expect(floatLabel).toBeInTheDocument();
 
       // Verify float progress bar exists
-      const floatBar = floatProgress.querySelector('.MuiLinearProgress-bar');
+      const floatBar = bar(floatProgress);
       if (floatBar) {
         // Just verify the bar exists and is rendered
         expect(floatBar).toBeInTheDocument();
@@ -1653,7 +1670,7 @@ export const EdgeCases: Story = {
       // Undefined should work as indeterminate
       const undefinedBar1 = undefinedProgress.querySelector('.MuiLinearProgress-bar1Indeterminate');
       const undefinedBar2 = undefinedProgress.querySelector('.MuiLinearProgress-bar2Indeterminate');
-      const undefinedBarDeterminate = undefinedProgress.querySelector('.MuiLinearProgress-bar');
+      const undefinedBarDeterminate = bar(undefinedProgress);
 
       // Should have indeterminate bars or a regular bar
       expect(undefinedBar1 || undefinedBar2 || undefinedBarDeterminate).toBeTruthy();
@@ -1665,7 +1682,7 @@ export const EdgeCases: Story = {
       }
 
       // NaN should be handled gracefully (treated as 0)
-      const nanBar = nanProgress.querySelector('.MuiLinearProgress-bar');
+      const nanBar = bar(nanProgress);
       expect(nanBar).toBeTruthy();
 
       if (nanBar) {
@@ -1720,7 +1737,7 @@ export const EdgeCases: Story = {
       }
 
       // Empty label should still render progress
-      const emptyBar = emptyLabelProgress.querySelector('.MuiLinearProgress-bar');
+      const emptyBar = bar(emptyLabelProgress);
       expect(emptyBar).toBeTruthy();
 
       // Single segment should render as one block
@@ -1997,7 +2014,7 @@ export const Integration: Story = {
       await waitFor(
         () => {
           const uploadProgress = canvas.getByTestId('upload-progress');
-          const progressBar = uploadProgress.querySelector('.MuiLinearProgress-bar');
+          const progressBar = bar(uploadProgress);
           if (progressBar) {
             // Just verify the progress bar exists and is visible
             expect(progressBar).toBeVisible();
