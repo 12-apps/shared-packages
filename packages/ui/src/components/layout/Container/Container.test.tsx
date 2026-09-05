@@ -42,17 +42,23 @@ describe('Container (web)', () => {
     expect(screen.getByTestId('xl')).toHaveStyle({ padding: '48px' });
   });
 
-  it('paints what it has always painted for none and padded', () => {
+  it('paints no inset for none, and padded above and below', () => {
     render(
       <>
-        <Container padding="none" dataTestId="none">x</Container>
-        <Container variant="padded" dataTestId="padded">x</Container>
+        <Container padding="none" responsive={false} dataTestId="none">x</Container>
+        <Container variant="padded" responsive={false} dataTestId="padded">x</Container>
       </>,
     );
-    // `none`'s 0 falls through `||` to the default; `padded`'s 64px is declared
-    // before the `padding` shorthand and overridden by it.
-    expect(screen.getByTestId('none')).toHaveStyle({ padding: '24px' });
-    expect(screen.getByTestId('padded')).toHaveStyle({ paddingTop: '24px', paddingBottom: '24px' });
+    // `none` is 0 — the `??` that replaced a `||` reading 0 as falsy.
+    expect(screen.getByTestId('none')).toHaveStyle({ padding: '0px' });
+    // `padded` keeps the horizontal inset and paints 64px above and below,
+    // declared AFTER the shorthand that used to override it.
+    expect(screen.getByTestId('padded')).toHaveStyle({
+      paddingTop: '64px',
+      paddingBottom: '64px',
+      paddingLeft: '24px',
+      paddingRight: '24px',
+    });
   });
 
   it('hands MUI the resolved breakpoint: fluid none, centered md, a stranger lg', () => {
