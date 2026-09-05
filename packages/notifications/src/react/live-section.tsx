@@ -20,7 +20,7 @@
  * - It does not fetch. `useActivities` is the host's, and `active` tells it
  *   whether anyone is looking.
  */
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useId, useState, type JSX } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
 import { Text } from '@12-apps/ui/typography/Text';
@@ -35,8 +35,11 @@ import type { LiveActivitiesConfig } from './live-config';
  * How often the section re-reads the clock.
  *
  * Every minute, because the timestamps under the cards are in minutes and a
- * tick that cannot change what is on screen is a wasted render. It runs only
- * while the section is on screen, so a shut panel schedules nothing.
+ * tick that cannot change what is on screen is a wasted render — which is why
+ * it is gated on there being something to tick as well as on the panel being
+ * open. An open panel with nothing live schedules nothing at all; the earlier
+ * gate was `active` alone, and it re-rendered a section that renders `null`
+ * once a minute for as long as somebody left the inbox open.
  */
 const TICK_MS = 60_000;
 
@@ -69,8 +72,7 @@ export interface LiveSectionProps {
   onOpen?: (activity: LiveActivity) => void;
 }
 
-/** Ties the region to its own heading, so the block is named rather than loose. */
-const HEADING_ID = 'live-activities-heading';
+
 
 export function LiveSection({
   config,
@@ -81,7 +83,11 @@ export function LiveSection({
   // Unconditional, because it is a hook. `active` is how it is told nobody is
   // looking — the same arrangement `useSignal` has one seam over.
   const activities = config.useActivities({ active });
-  const now = useMinuteTick(active);
+  const now = useMinuteTick(active && activities.length > 0);
+  // Per MOUNT, not per module: `LiveSection` is exported, and a host with a
+  // desktop and a mobile panel would otherwise emit one id twice and have both
+  // regions resolve their label to whichever came first.
+  const headingId = useId();
 
   if (activities.length === 0) return null;
 
@@ -91,17 +97,24 @@ export function LiveSection({
     // panel's own title is the drawer's heading and cannot describe this block.
     <Box
       component="section"
-      aria-labelledby={HEADING_ID}
+      aria-labelledby={headingId}
       data-testid="live-activities"
       sx={{ pb: 1.5 }}
     >
+      {/*
+        A SPAN, not a heading. `aria-labelledby` names the region perfectly well
+        from one, and an `<h2>` here would sit under the drawer's own `<h6>`
+        title and ABOVE the inbox's `<h3>` empty state — an outline in which the
+        inbox's states read as part of the live block, which is the opposite of
+        what the two blocks are.
+      */}
       <Text
-        id={HEADING_ID}
+        id={headingId}
         variant="caption"
         size="xs"
         color="secondary"
         weight="semibold"
-        as="h2"
+        as="span"
       >
         {config.messages.sectionTitle}
       </Text>

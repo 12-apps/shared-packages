@@ -23,7 +23,7 @@
  * are its siblings: valid markup, and a target that still covers everything a
  * reader would aim at.
  */
-import type { JSX, ReactNode } from 'react';
+import { useId, type JSX, type ReactNode } from 'react';
 
 import { Stepper } from '@12-apps/ui/data-display/Stepper';
 import { Box } from '@12-apps/ui/mui/Box';
@@ -37,6 +37,9 @@ import type { LiveActivitiesConfig, LiveActivityMessages } from './live-config';
 import { relativeTime } from './relative-time';
 
 const cardSx = {
+  // `relative`, so the button below can stretch a hit area over the whole card
+  // — see `targetSx`.
+  position: 'relative',
   border: '1px solid',
   borderColor: (t: Theme) => alpha(t.palette.primary.main, 0.35),
   bgcolor: (t: Theme) => alpha(t.palette.primary.main, 0.06),
@@ -45,7 +48,7 @@ const cardSx = {
   mb: 1,
 } as const;
 
-/** The tap target: everything a reader would aim at, and nothing focusable. */
+/** The text block: the mark, the heading and the sentence under it. */
 const targetSx = {
   display: 'flex',
   alignItems: 'center',
@@ -57,6 +60,26 @@ const targetSx = {
   border: 'none',
   background: 'none',
   p: 0,
+} as const;
+
+/**
+ * The button, stretched over the WHOLE card.
+ *
+ * Taking the lane out of the link fixed the markup and left the card looking
+ * like one target while only its top half was one — the lane is the most
+ * visually distinctive part of it, and its own step buttons carry
+ * `pointer-events: none`, so aiming at the obvious thing did nothing.
+ *
+ * A stretched pseudo-element is the remedy that keeps the structure: the
+ * `<button>` stays a sibling of the lane in the tree, so nothing nests, and its
+ * `::after` covers the card. `z-index: 0` on the lane and the timestamp is not
+ * needed — they paint after the button in document order and the overlay is the
+ * button's own child, which is what puts it on top of both.
+ */
+const stretchedSx = {
+  ...targetSx,
+  cursor: 'pointer',
+  '&::after': { content: '""', position: 'absolute', inset: 0 },
 } as const;
 
 /**
@@ -139,11 +162,15 @@ function ActivityIcon({ icon }: { icon: ReactNode }): JSX.Element | null {
   );
 }
 
-/** The mark, the heading and the line under it — the card's tap target. */
+/** The mark, the heading and the line under it. */
 function ActivityTarget({
   activity,
   renderIcon,
-}: Pick<LiveActivityCardProps, 'activity' | 'renderIcon'>): JSX.Element {
+  bodyId,
+}: Pick<LiveActivityCardProps, 'activity' | 'renderIcon'> & {
+  /** Ties the sentence to the button, so a label does not swallow it. */
+  bodyId: string;
+}): JSX.Element {
   return (
     <>
       <ActivityIcon icon={renderIcon?.(activity)} />
@@ -171,7 +198,7 @@ function ActivityTarget({
           {activity.title}
         </Text>
         {activity.body === null ? null : (
-          <Text variant="caption" size="xs" color="secondary" as="span">
+          <Text id={bodyId} variant="caption" size="xs" color="secondary" as="span">
             {activity.body}
           </Text>
         )}
@@ -189,7 +216,14 @@ export function LiveActivityCard({
   onOpen,
 }: LiveActivityCardProps): JSX.Element {
   const followable = activity.link !== null && onOpen !== undefined;
-  const target = <ActivityTarget activity={activity} {...(renderIcon ? { renderIcon } : {})} />;
+  const bodyId = useId();
+  const target = (
+    <ActivityTarget
+      activity={activity}
+      bodyId={bodyId}
+      {...(renderIcon ? { renderIcon } : {})}
+    />
+  );
   return (
     <Box data-testid={`live-activity-${activity.id}`} sx={cardSx}>
       {followable ? (
@@ -197,9 +231,13 @@ export function LiveActivityCard({
           component="button"
           type="button"
           onClick={() => onOpen(activity)}
+          // `aria-label` REPLACES the contents, so the sentence under the
+          // heading — the detail that makes the heading actionable — would be
+          // announced to nobody. `aria-describedby` puts it back.
           aria-label={live.openActivity(activity.title)}
+          {...(activity.body === null ? {} : { 'aria-describedby': bodyId })}
           data-testid={`live-activity-open-${activity.id}`}
-          sx={{ ...targetSx, cursor: 'pointer' }}
+          sx={stretchedSx}
         >
           {target}
         </Box>

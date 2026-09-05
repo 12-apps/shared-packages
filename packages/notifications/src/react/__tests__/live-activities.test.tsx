@@ -90,6 +90,32 @@ function source(
   };
 }
 
+/**
+ * The `::after` rule emitted for an element's own classes.
+ *
+ * Emotion writes its rules into `<style>` tags in the document, and jsdom
+ * exposes those through `document.styleSheets` — which is the only way to see a
+ * pseudo-element from here. Throws rather than returning empty when it finds
+ * nothing, because a helper that silently answers "" makes the assertion above
+ * unfailable.
+ */
+function overlayRuleFor(element: Element): string {
+  const classes = [...element.classList];
+  const matches: string[] = [];
+  for (const sheet of document.styleSheets) {
+    for (const rule of sheet.cssRules) {
+      const text = rule.cssText;
+      if (text.includes('::after') && classes.some((name) => text.includes(`.${name}`))) {
+        matches.push(text);
+      }
+    }
+  }
+  if (matches.length === 0) {
+    throw new Error(`no ::after rule found for classes ${classes.join(' ')}`);
+  }
+  return matches.join('\n');
+}
+
 function mount(live?: LiveActivitiesConfig): ReturnType<typeof createWebNotifications> {
   return createWebNotifications({
     apiBase: '/api/account',
@@ -134,6 +160,74 @@ describe('the live section', () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(panel.contains(section)).toBe(true);
+  });
+
+  it('is a NAMED region, so it is not a loose run of controls ahead of the inbox', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    // The heading is a span rather than a heading element on purpose — an <h2>
+    // here would put the inbox's own empty and error states under the live
+    // block in the outline. `aria-labelledby` names the region from one either
+    // way, and this is the assertion that stops the naming being tidied away.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: CLINIC_LIVE_MESSAGES.sectionTitle }),
+      ).toBeTruthy(),
+    );
+  });
+
+  it('does not schedule a clock for a section that renders nothing', async () => {
+    const config = source([]);
+    const { Panel } = mount(config);
+    const timers = vi.spyOn(globalThis, 'setInterval');
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('notifications-empty')).toBeTruthy());
+    // A tick that cannot change what is on screen is a wasted render, once a
+    // minute, for as long as somebody leaves the inbox open.
+    expect(
+      timers.mock.calls.filter(([, ms]) => ms === 60_000),
+    ).toHaveLength(0);
+    timers.mockRestore();
+  });
+
+  it('makes the WHOLE card the target, not only the half above the lane', async () => {
+    // Taking the lane out of the link fixed the markup and left the card
+    // looking like one target while only its top half was one.
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-open-visit-42')).toBeTruthy());
+    // The card has to be the containing block, or the overlay stretches over
+    // whatever ancestor happens to be positioned.
+    expect(globalThis.getComputedStyle(screen.getByTestId('live-activity-visit-42')).position).toBe(
+      'relative',
+    );
+    // jsdom computes no pseudo-element styles and does no hit-testing, so the
+    // overlay is read off the stylesheet it was emitted into. Asserted rather
+    // than skipped: this is the whole of what makes the lane clickable, and it
+    // is one `sx` key away from being tidied out.
+    expect(overlayRuleFor(screen.getByTestId('live-activity-open-visit-42'))).toMatch(
+      /position:\s*absolute/,
+    );
+  });
+
+  it('keeps the sentence audible even though the label replaces the contents', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-open-visit-42')).toBeTruthy());
+    const described = screen
+      .getByTestId('live-activity-open-visit-42')
+      .getAttribute('aria-describedby');
+    expect(described).toBeTruthy();
+    expect(document.getElementById(described ?? '')?.textContent).toBe(
+      'A Nina já está com a veterinária.',
+    );
   });
 
   it('draws the lane with the stops BEFORE the active one completed', async () => {
