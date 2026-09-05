@@ -83,6 +83,8 @@ export const BasicInteraction: Story = {
 };
 
 export const VariantStatesTest: Story = {
+  // Asserts a CSS `backdrop-filter` blur and a `linear-gradient` background; React Native styles express neither.
+  tags: ['native-skip'],
   name: '🎨 Variant States Test',
   render: () => (
     <Stack spacing={2} direction="row" flexWrap="wrap">
@@ -483,6 +485,8 @@ export const CardActionsTest: Story = {
 };
 
 export const CardMediaTest: Story = {
+  // Asserts the rendered `<img>` tag and its `height`/`title` DOM attributes, which only the DOM renderer has.
+  tags: ['native-skip'],
   name: '🖼️ Card Media Test',
   render: () => (
     <Card sx={{ width: 350 }}>
@@ -567,6 +571,8 @@ export const KeyboardNavigationTest: Story = {
 
 // Visual States Test
 export const VisualStatesTest: Story = {
+  // Asserts the opacity and pointer-events a story sets through `sx`, the web renderer's own style prop.
+  tags: ['native-skip'],
   name: '👁️ Visual States Test',
   render: () => (
     <Stack spacing={2}>
@@ -1061,6 +1067,8 @@ export const PerformanceTest: Story = {
 
 // Integration Test
 export const IntegrationWithOtherComponentsTest: Story = {
+  // Finds the media by its DOM `title` attribute (`getByTitle`), which React Native has no equivalent of.
+  tags: ['native-skip'],
   name: '🔗 Integration Test',
   render: () => (
     <Card sx={{ width: 400 }}>

@@ -457,6 +457,10 @@
       "default": "./dist/layout/Box.js"
     },
     "./layout/Card": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Card/index.native.d.ts",
+        "default": "./dist/native/layout/Card.js"
+      },
       "types": "./dist/types/components/layout/Card/index.d.ts",
       "default": "./dist/layout/Card.js"
     },

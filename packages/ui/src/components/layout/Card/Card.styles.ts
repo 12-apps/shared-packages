@@ -1,18 +1,35 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
-import type { CardProps, CardVariant } from './Card.types';
+import type { CardBorderRadius, CardVariant } from './Card.base';
+import {
+  CARD_BORDER_WIDTH,
+  CARD_ELEVATION,
+  CARD_GLASS,
+  CARD_GLOW,
+  CARD_GRADIENT,
+  CARD_INTERACTIVE_LIFT,
+  CARD_NEUMORPHIC,
+  CARD_PULSE,
+  CARD_RADIUS_FULL,
+  CARD_RADIUS_UNITS,
+  CARD_SECTION_BACKGROUND,
+  neumorphicShadows,
+  shadowCss,
+  shadowListCss,
+} from './Card.metrics';
 
-type BorderRadius = NonNullable<CardProps['borderRadius']>;
+type BorderRadius = CardBorderRadius;
 
-// Define pulse animation
+// Define pulse animation. The 15px spread and the 2s period are the shared
+// metrics, so the native ring grows by exactly as much for exactly as long.
 const pulseAnimation = keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 15px currentColor;
+    box-shadow: 0 0 0 ${CARD_PULSE.spread}px currentColor;
     opacity: 0;
   }
   100% {
@@ -22,20 +39,10 @@ const pulseAnimation = keyframes`
 `;
 
 const borderRadiusFor = (theme: Theme, radius: BorderRadius): number | string => {
-  switch (radius) {
-    case 'none':
-      return 0;
-    case 'sm':
-      return theme.spacing(0.5);
-    case 'lg':
-      return theme.spacing(2);
-    case 'xl':
-      return theme.spacing(3);
-    case 'full':
-      return '50%';
-    default:
-      return theme.spacing(1);
-  }
+  if (radius === 'full') return CARD_RADIUS_FULL;
+  const units = CARD_RADIUS_UNITS[radius] ?? CARD_RADIUS_UNITS.md;
+  // `none` is a bare 0 rather than `spacing(0)`, as this has always written it.
+  return units === 0 ? 0 : theme.spacing(units);
 };
 
 const pulseSurface = (theme: Theme): CSSObject => ({
@@ -50,27 +57,43 @@ const pulseSurface = (theme: Theme): CSSObject => ({
     bottom: '0',
     borderRadius: 'inherit',
     backgroundColor: theme.palette.primary.main,
-    opacity: 0.3,
-    animation: `${pulseAnimation} 2s infinite`,
+    opacity: CARD_PULSE.alpha,
+    animation: `${pulseAnimation} ${CARD_PULSE.durationMs / 1000}s infinite`,
     pointerEvents: 'none',
-    zIndex: -1,
+    zIndex: CARD_PULSE.zIndex,
   },
 });
 
 const neumorphicShadow = (theme: Theme, lifted: boolean): string => {
-  const spread = lifted ? 12 : 8;
-  const blur = spread * 2;
+  const { dark, light } = CARD_NEUMORPHIC.alpha;
+  const [near, far] =
+    theme.palette.mode === 'dark'
+      ? [
+          alpha(theme.palette.common.black, dark.near),
+          alpha(theme.palette.common.white, dark.far),
+        ]
+      : [
+          alpha(theme.palette.grey[400], lifted ? light.near.lifted : light.near.rest),
+          alpha(theme.palette.common.white, lifted ? light.far.lifted : light.far.rest),
+        ];
 
-  return theme.palette.mode === 'dark'
-    ? `${spread}px ${spread}px ${blur}px ${alpha(theme.palette.common.black, 0.3)}, -${spread}px -${spread}px ${blur}px ${alpha(theme.palette.common.white, 0.1)}`
-    : `${spread}px ${spread}px ${blur}px ${alpha(theme.palette.grey[400], lifted ? 0.3 : 0.2)}, -${spread}px -${spread}px ${blur}px ${alpha(theme.palette.common.white, lifted ? 0.9 : 0.8)}`;
+  return shadowListCss(neumorphicShadows(lifted, near, far));
 };
 
 const sectionBackground = (theme: Theme, lifted: boolean): string => {
-  if (theme.palette.mode === 'dark') {
-    return lifted ? 'rgba(0, 0, 0, 0.25)' : 'rgba(0, 0, 0, 0.2)';
-  }
-  return lifted ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.02)';
+  const wash = CARD_SECTION_BACKGROUND[theme.palette.mode === 'dark' ? 'dark' : 'light'];
+  return lifted ? wash.lifted : wash.rest;
+};
+
+const glowShadow = (theme: Theme, lifted: boolean): string => {
+  const { blurRadius, alpha: opacity } = lifted ? CARD_GLOW.lifted : CARD_GLOW.rest;
+  return shadowCss({
+    offsetX: 0,
+    offsetY: 0,
+    blurRadius,
+    spreadDistance: 0,
+    color: alpha(theme.palette.primary.main, opacity),
+  });
 };
 
 interface Surface {
@@ -85,30 +108,48 @@ interface Surface {
  */
 const VARIANT_SURFACES: Record<CardVariant, (theme: Theme, lifted: boolean) => Surface> = {
   elevated: (_theme, lifted) => ({
-    surface: { elevation: 4 } as CSSObject,
-    hover: { elevation: lifted ? 8 : 4 } as CSSObject,
+    surface: { elevation: CARD_ELEVATION.rest } as CSSObject,
+    hover: { elevation: lifted ? CARD_ELEVATION.lifted : CARD_ELEVATION.rest } as CSSObject,
   }),
   outlined: (theme, lifted) => ({
-    surface: { border: `1px solid ${theme.palette.divider}`, boxShadow: 'none' },
+    surface: {
+      border: `${CARD_BORDER_WIDTH}px solid ${theme.palette.divider}`,
+      boxShadow: 'none',
+    },
     hover: { borderColor: lifted ? theme.palette.primary.main : theme.palette.divider },
   }),
   glass: (theme, lifted) => ({
     surface: {
-      backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
-      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+      backgroundColor: alpha(theme.palette.background.paper, CARD_GLASS.backgroundAlpha.rest),
+      backdropFilter: `blur(${CARD_GLASS.blurPx}px)`,
+      border: `${CARD_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, CARD_GLASS.borderAlpha.rest)}`,
+      boxShadow: shadowCss({
+        offsetX: 0,
+        offsetY: CARD_GLASS.shadow.offsetY,
+        blurRadius: CARD_GLASS.shadow.blurRadius,
+        spreadDistance: 0,
+        color: alpha(theme.palette.common.black, CARD_GLASS.shadow.alpha),
+      }),
     },
     hover: {
-      backgroundColor: alpha(theme.palette.background.paper, lifted ? 0.15 : 0.1),
-      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+      backgroundColor: alpha(
+        theme.palette.background.paper,
+        lifted ? CARD_GLASS.backgroundAlpha.lifted : CARD_GLASS.backgroundAlpha.rest,
+      ),
+      border: `${CARD_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, CARD_GLASS.borderAlpha.lifted)}`,
     },
   }),
   gradient: (theme, lifted) => ({
     surface: {
       background: cardGradient(theme, false),
       color: theme.palette.primary.contrastText,
-      boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.3)}`,
+      boxShadow: shadowCss({
+        offsetX: 0,
+        offsetY: CARD_GRADIENT.shadow.offsetY,
+        blurRadius: CARD_GRADIENT.shadow.blurRadius,
+        spreadDistance: 0,
+        color: alpha(theme.palette.primary.main, CARD_GRADIENT.shadow.alpha),
+      }),
     },
     hover: { background: cardGradient(theme, lifted) },
   }),
@@ -133,8 +174,8 @@ const VARIANT_SURFACES: Record<CardVariant, (theme: Theme, lifted: boolean) => S
 
 const cardGradient = (theme: Theme, dark: boolean): string =>
   dark
-    ? `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.secondary.dark})`
-    : `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`;
+    ? `linear-gradient(${CARD_GRADIENT.angleDeg}deg, ${theme.palette.primary.dark}, ${theme.palette.secondary.dark})`
+    : `linear-gradient(${CARD_GRADIENT.angleDeg}deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`;
 
 // An unrecognised variant gets the shared base only — no interactive, glow or
 // pulse decoration, as before.
@@ -170,12 +211,12 @@ export const cardStyles = (
   return {
     ...base,
     ...(interactive && { cursor: 'pointer', '&:active': { transform: 'translateY(0)' } }),
-    ...(glow && { boxShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.3)}` }),
+    ...(glow && { boxShadow: glowShadow(theme, false) }),
     ...(pulse && pulseSurface(theme)),
     ...chosen.surface,
     '&:hover': {
-      ...(interactive && { transform: 'translateY(-2px)' }),
-      ...(glow && { boxShadow: `0 0 30px ${alpha(theme.palette.primary.main, 0.4)}` }),
+      ...(interactive && { transform: `translateY(-${CARD_INTERACTIVE_LIFT}px)` }),
+      ...(glow && { boxShadow: glowShadow(theme, true) }),
       ...chosen.hover,
     },
   };

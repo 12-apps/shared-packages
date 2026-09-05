@@ -9,6 +9,12 @@ import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { resolveCardProps } from './Card.helpers';
+import {
+  CARD_CONTENT_PADDING_UNITS,
+  CARD_HEADER_CHILDREN_PADDING_UNITS,
+  CARD_LOADING,
+  CARD_MEDIA_HEIGHT,
+} from './Card.metrics';
 import { cardStyles } from './Card.styles';
 import type {
   CardActionsProps,
@@ -59,7 +65,7 @@ export const Card: React.FC<CardProps> = (rawProps) => {
       sx={{
         ...cardStyles(theme, { variant, interactive, glow, pulse, borderRadius }),
         position: 'relative',
-        opacity: loading ? 0.6 : 1,
+        opacity: loading ? CARD_LOADING.opacity : 1,
         pointerEvents: loading ? 'none' : 'auto',
         ...sx,
       }}
@@ -72,7 +78,7 @@ export const Card: React.FC<CardProps> = (rawProps) => {
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            zIndex: 10,
+            zIndex: CARD_LOADING.spinnerZIndex,
           }}
         >
           <CircularProgress />
@@ -93,7 +99,14 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   ...props
 }) => {
   if (children) {
-    return <Box sx={{ p: 2 }} data-testid={dataTestId || 'card-header'}>{children}</Box>;
+    return (
+      <Box
+        sx={{ p: CARD_HEADER_CHILDREN_PADDING_UNITS }}
+        data-testid={dataTestId || 'card-header'}
+      >
+        {children}
+      </Box>
+    );
   }
 
   return (
@@ -118,9 +131,9 @@ export const CardContent: React.FC<CardContentProps> = ({ children, dense = fals
     <MuiCardContent
       data-testid={dataTestId || 'card-content'}
       sx={{
-        padding: dense ? 1 : 2,
+        padding: dense ? CARD_CONTENT_PADDING_UNITS.dense : CARD_CONTENT_PADDING_UNITS.normal,
         '&:last-child': {
-          paddingBottom: dense ? 1 : 2,
+          paddingBottom: dense ? CARD_CONTENT_PADDING_UNITS.dense : CARD_CONTENT_PADDING_UNITS.normal,
         },
       }}
       {...props}
@@ -167,7 +180,7 @@ export const CardMedia: React.FC<CardMediaProps> = ({
   component = 'div',
   image,
   title,
-  height = 200,
+  height = CARD_MEDIA_HEIGHT,
   children,
   dataTestId,
   ...props
