@@ -57,7 +57,8 @@ test.describe('the native build of @12-apps/ui, bundled by Metro, rendered throu
       const button = page.getByTestId(`button-size-${size}`);
       expect(await px(button, 'padding-top')).toBe(metrics.paddingVertical);
       expect(await px(button, 'padding-left')).toBe(metrics.paddingHorizontal);
-      expect(await px(button.locator('div, span').first(), 'font-size')).toBe(metrics.fontSize);
+      // The label node is the one carrying the size's own text.
+      expect(await px(button.getByText(size, { exact: true }), 'font-size')).toBe(metrics.fontSize);
     }
     await expect(page.getByTestId('button-size-md')).toHaveCSS('border-top-left-radius', '8px');
   });
@@ -119,7 +120,7 @@ test.describe('the native build of @12-apps/ui, bundled by Metro, rendered throu
       const box = await page.getByTestId(`icon-size-${size}`).boundingBox();
       expect(Math.round(box!.width)).toBe(expected);
     }
-    await expect(page.getByTestId('icon-color-danger').locator('path').first()).toHaveAttribute('fill', '#d32f2f');
+    await expect(page.getByTestId('icon-color-danger').locator('path')).toHaveAttribute('fill', '#d32f2f');
     await expect(page.getByTestId('icon-labelled')).toHaveAttribute('aria-label', 'Atenção');
     await expect(page.getByTestId('icon-size-md')).toHaveAttribute('aria-hidden', 'true');
   });

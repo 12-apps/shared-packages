@@ -27,7 +27,7 @@ export default defineConfig({
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
   webServer: {
-    command: `npm run export:web && npx --yes serve dist/web -l ${PORT} --no-clipboard --single`,
+    command: `npm run export:web && npx serve dist/web -l ${PORT} --no-clipboard --single`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 300_000,

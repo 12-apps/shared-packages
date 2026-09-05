@@ -28,16 +28,23 @@ if (files.length === 0) {
 }
 const source = files.map((file) => readFileSync(file, 'latin1')).join('\n');
 
-// The Close glyph's path, as generated into @12-apps/ui's paths.generated.ts.
+// Metro strips import specifiers from a production bundle (they become
+// `_dependencyMap` indices), and MUI builds its class names at runtime, so a
+// package name or a class name proves nothing. These are RUNTIME LITERALS that
+// exactly one renderer carries, checked against real exports of this harness:
+// the native react-native-svg elements register `RNSVGSvgView`/`RNSVGPath`
+// (absent from the web export, which draws through react-native-svg's DOM
+// shapes); react-dom keys its container fibers `__reactContainer$`; emotion
+// tags every style element `data-emotion`; MUI's Button asks the theme for
+// overrides by the name `MuiButton`.
 const MUST_CONTAIN = [
-  ['the generated icon paths (the native Icon)', 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z'],
+  ['the native react-native-svg elements (the native Icon)', 'RNSVGSvgView'],
   ['the harness gallery', 'section-button'],
 ];
 const MUST_NOT_CONTAIN = [
-  ['MUI', '@mui/material'],
-  ['emotion', '@emotion/react'],
-  ['react-dom', 'react-dom/client'],
-  ['MUI class names', 'MuiButton-root'],
+  ['react-dom', '__reactContainer$'],
+  ['emotion', 'data-emotion'],
+  ['MUI', 'MuiButton'],
 ];
 
 let failed = false;
