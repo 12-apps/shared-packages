@@ -1,11 +1,25 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import Stack from '@mui/material/Stack/index.js';
 
+import { PT_BR_CONFIRM_ACTION_COPY } from '../../../pt-BR';
 import { Button } from '../../form/Button';
 
 import { ConfirmAction } from './ConfirmAction';
-import { ConfirmButton } from './ConfirmButton';
+import { createConfirmButton } from './ConfirmButton';
 import { withConfirmation } from './with-confirmation';
+
+/**
+ * The wording every story here confirms in.
+ *
+ * `copy` and `errorText` are REQUIRED props (FUT-760) — this package ships no
+ * default sentences — so a story that omits them does not render at all. These
+ * stories are pt-BR throughout, so they pass the pt-BR pack, exactly as a host
+ * does.
+ */
+const COPY = PT_BR_CONFIRM_ACTION_COPY;
+
+/** `ConfirmButton` is BUILT from copy, not imported ready-made. */
+const ConfirmButton = createConfirmButton(COPY, COPY.defaultError);
 
 const meta: Meta<typeof ConfirmAction> = {
   title: 'Overlays/ConfirmAction',
@@ -35,6 +49,8 @@ const slowWrite = () => new Promise<void>((resolve) => setTimeout(resolve, 1200)
 
 export const Default: Story = {
   args: {
+    copy: COPY,
+    errorText: COPY.defaultError,
     title: 'Excluir a categoria?',
     entityName: 'Bebidas',
     description: 'Ela vai para a lixeira e pode ser restaurada de lá.',
@@ -123,6 +139,8 @@ export const WithConfirmationHoc: StoryObj = {
 
 /** Wording baked into the wrapper once; each instance only says what differs. */
 const DeleteButton = withConfirmation(Button, {
+  copy: COPY,
+  errorText: COPY.defaultError,
   title: 'Excluir o item?',
   confirmText: 'Excluir',
   description: 'Ele vai para a lixeira e pode ser restaurado de lá.',

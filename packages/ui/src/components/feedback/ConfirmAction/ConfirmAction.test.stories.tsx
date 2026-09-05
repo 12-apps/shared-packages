@@ -1,10 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
+import { PT_BR_CONFIRM_ACTION_COPY } from '../../../pt-BR';
 import { Button } from '../../form/Button';
 
 import { ConfirmAction } from './ConfirmAction';
-import { ConfirmButton } from './ConfirmButton';
+import { createConfirmButton } from './ConfirmButton';
+
+/** `copy` and `errorText` are required props; there are no default sentences. */
+const COPY = PT_BR_CONFIRM_ACTION_COPY;
+
+/** `ConfirmButton` is BUILT from copy, not imported ready-made. */
+const ConfirmButton = createConfirmButton(COPY, COPY.defaultError);
 
 const meta: Meta<typeof ConfirmAction> = {
   title: 'Overlays/ConfirmAction/Tests',
@@ -25,13 +32,16 @@ const BASE = {
   confirmText: 'Excluir',
 };
 
+/** `BASE` plus the two props `ConfirmAction` cannot render without. */
+const SPOKEN = { ...BASE, copy: COPY, errorText: COPY.defaultError };
+
 /** The popup lives on `document.body`, so queries run against the whole screen. */
 const body = (): ReturnType<typeof within> => within(document.body);
 
 export const OpensWithoutRunningTheAction: Story = {
   name: '🧪 Trigger opens the popup and runs nothing',
   args: {
-    ...BASE,
+    ...SPOKEN,
     onConfirm: fn(),
     children: (request) => (
       <Button color="danger" onClick={request}>
