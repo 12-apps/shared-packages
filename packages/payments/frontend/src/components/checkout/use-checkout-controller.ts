@@ -28,6 +28,7 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from "./types";
+import { useResolutionActions } from "./resolution-actions";
 import { useHostedResume } from "./use-hosted-resume";
 
 const STEP_ORDER: Step[] = ["dados", "payment", "status"];
@@ -140,17 +141,9 @@ export function useCheckoutController(
     buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure,
     setCreating, setDecline, setOrder, setFinalStatus,
   });
-  const payWithEmail = useCallback((email: string) => {
-    if (!method) return;
-    const next = { ...buyer, email };
-    setBuyerState(next);
-    void startPayment(method, next);
-  }, [buyer, method, startPayment]);
-  const handleResolved = useCallback((s: OrderStatus, refusal?: CheckoutDecline | null) => {
-    setDecline(refusal ?? null);
-    setFinalStatus(s);
-    setStep("status");
-  }, []);
+  const { payWithEmail, handleResolved } = useResolutionActions({
+    buyer, method, startPayment, setBuyerState, setDecline, setFinalStatus, setStep,
+  });
   const retry = useRetryAction({
     decline, order, clearError, setOrder, setDecline, setFinalStatus, setStep, setFreshInstrument,
   });
