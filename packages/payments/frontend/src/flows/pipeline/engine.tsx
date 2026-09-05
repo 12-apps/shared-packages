@@ -248,9 +248,17 @@ function EngineBody(props: {
   useSettled({ ctx, wiring, runtime });
   const resuming = useResumePending(ctx);
   const admission = decideAdmission({ gates: wiring.gates, facts: gateFacts, ctx, resuming });
+  // Read BEFORE the early returns below. `runtime.useAvailability()` wraps the
+  // host's `ports.useAvailability` and is therefore a hook: leaving it at its
+  // only use site put it after `refused`, so a gate answering `pending` and then
+  // `pass` changed this component's hook count between renders and React threw
+  // "Rendered more hooks than during the previous render". Nothing caught it —
+  // eslint-plugin-react-hooks only reads `X.useFoo()` as a hook when X is
+  // PascalCase, and `runtime` is not.
+  const payable = runtime.useAvailability().payable;
   const refused = admittedOrScreen(admission, ctx, store, runtime.config.copy.views);
   if (refused !== null) return refused;
-  if (storeCannotCharge(ctx.config, ctx.configPending, runtime.useAvailability().payable)) {
+  if (storeCannotCharge(ctx.config, ctx.configPending, payable)) {
     return <screens.PaymentsUnavailable />;
   }
   if (nothingToPayFor(ctx, resuming)) return <screens.EmptyCart />;

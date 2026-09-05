@@ -139,13 +139,26 @@ function usePlaceOrder(input: EngineWritersInput): (methodId?: string) => Promis
       // The walk is re-derived FOR THE CHOSEN METHOD, not read off the render
       // that offered the picker: a step whose `applies` asks which settlement
       // this is would otherwise be absent from the request that settles it.
+      // ONE context, used for both halves. Deriving the walk against the chosen
+      // method and then building the request against the un-overridden `ctx` let
+      // a step's `contribute` read `ctx.method === null` on the immediate-place
+      // path, which is the path a method with no Review takes — so the field
+      // ADOPTING.md says a step may set "when the settlement has a finer name
+      // than the tile does" was written from a context that did not know it.
+      const applyingCtx = { ...ctx, method: chosen };
       const applying = applyingSteps({
         steps: wiring.steps,
-        ctx: { ...ctx, method: chosen },
+        ctx: applyingCtx,
         facts: stepFacts,
         methods: wiring.methods,
       });
-      const request = createRequest({ ctx, applying, stepFacts, saveProfile, methodId: chosen });
+      const request = createRequest({
+        ctx: applyingCtx,
+        applying,
+        stepFacts,
+        saveProfile,
+        methodId: chosen,
+      });
       const result = await runtime.config.ports.createPayable(request);
       if (!result.ok) {
         store.patch({ placing: false, error: result.error });

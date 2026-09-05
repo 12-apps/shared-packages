@@ -16,7 +16,7 @@ import type {
 } from "../../../components/checkout/types";
 import { STORY_CHECKOUT_COPY } from "../../../stories/demo-copy";
 import { createPaymentFlows } from "../../create-payment-flows";
-import type { PaymentFlows, PaymentFlowsConfig } from "../../types";
+import type { CheckoutAvailability, PaymentFlows, PaymentFlowsConfig } from "../../types";
 
 import { orderOf } from "./fixtures";
 
@@ -73,6 +73,12 @@ interface HostOptions {
   navigate?: (url: string) => void;
   createPayable?: (input: CreateOrderRequest) => Promise<CreateOrderResult>;
   config?: CheckoutProviderConfig | null;
+  /**
+   * The host's own availability HOOK. Left off by default, because most suites
+   * do not care — but a host that wires it makes the engine call a hook it
+   * otherwise never calls, which is the whole subject of `engine-hook-order`.
+   */
+  useAvailability?: () => CheckoutAvailability;
 }
 
 /** One factory, plus the ports a suite asserts on. */
@@ -112,6 +118,7 @@ export function buildHost(
       saveBuyerContact,
       exitToCatalog,
       navigate: host.navigate ?? (() => undefined),
+      ...(host.useAvailability ? { useAvailability: host.useAvailability } : {}),
     },
   };
   // COPIED AS DESCRIPTORS, not spread. A spread reads a getter once and freezes
