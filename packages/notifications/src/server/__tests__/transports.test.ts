@@ -372,9 +372,12 @@ describe('the web push transport', () => {
       source(rows),
     );
     await transport.send(transport.format(CONTENT), reachable);
+    // `tag` is on the wire for every push, `null` when the notification is an
+    // ordinary event — the same shape `link` has, so a service worker reads one
+    // payload rather than branching on a key's presence.
     expect(seen).toEqual([
-      'https://push.example.com/a:{"title":"Pagamento confirmado","body":"Pedido A1 pago.","link":"/orders/A1","data":{}}',
-      'https://push.example.com/b:{"title":"Pagamento confirmado","body":"Pedido A1 pago.","link":"/orders/A1","data":{}}',
+      'https://push.example.com/a:{"title":"Pagamento confirmado","body":"Pedido A1 pago.","link":"/orders/A1","data":{},"tag":null}',
+      'https://push.example.com/b:{"title":"Pagamento confirmado","body":"Pedido A1 pago.","link":"/orders/A1","data":{},"tag":null}',
     ]);
   });
 
