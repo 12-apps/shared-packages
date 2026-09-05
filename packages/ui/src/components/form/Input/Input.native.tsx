@@ -1,8 +1,6 @@
 import * as React from 'react';
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
   Platform,
   StyleSheet,
   Text as RNText,
@@ -17,14 +15,13 @@ import {
 } from 'react-native';
 
 import { resolveInputProps } from './Input.helpers';
+import { FieldPulse } from '../field-pulse.native';
 import { fieldLook, helperStyle, labelStyle, type FieldState } from './Input.look.native';
 import { ADORNMENT_GAP, INPUT_GLOW, INPUT_LOADING, INPUT_PULSE } from './Input.metrics';
 import type { InputProps } from './Input.types.native';
 import { webAria, webClick, webDisabled } from '../../../platform/aria';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
-
-const nativeDriver = Platform.OS !== 'web';
 
 /**
  * The keyboard an HTML input `type` asks for.
@@ -50,51 +47,6 @@ export function typeProps(type: string | undefined): {
   if (type === 'password') return { secureTextEntry: true };
   const mode = type === undefined ? undefined : INPUT_MODE_FOR[type];
   return mode === undefined ? {} : { inputMode: mode };
-}
-
-/** The web's `::after` bar: a 56px wash of the primary hue, pulsing outward behind the field. */
-function Pulse({ color, radius, testID }: { color: string; radius: number; testID: string }): React.JSX.Element {
-  const progress = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: INPUT_PULSE.ms,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: nativeDriver,
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [progress]);
-
-  return (
-    <Animated.View
-      testID={testID}
-      aria-hidden
-      style={[
-        styles.pulse,
-        {
-          borderRadius: radius,
-          backgroundColor: color,
-          opacity: progress.interpolate({
-            inputRange: [0, 0.7, 1],
-            outputRange: [INPUT_PULSE.opacity, 0, 0],
-          }),
-          transform: [
-            { translateY: -INPUT_PULSE.height / 2 },
-            {
-              scale: progress.interpolate({
-                inputRange: [0, 0.7, 1],
-                outputRange: [1, 1 + INPUT_PULSE.spread / INPUT_PULSE.height, 1],
-              }),
-            },
-          ],
-        },
-      ]}
-    />
-  );
 }
 
 /** MUI's `0 0 15px` halo, 20px and stronger once the field is focused. */
@@ -226,7 +178,7 @@ export const Input = React.forwardRef<RNTextInput, InputProps>((rawProps, ref) =
       ]}
     >
       {pulse ? (
-        <Pulse
+        <FieldPulse
           color={theme.palette.primary.main}
           radius={theme.spacing(INPUT_PULSE.radiusUnits)}
           testID={idFor('pulse')}
@@ -284,13 +236,5 @@ const styles = StyleSheet.create({
   slot: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  pulse: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    height: INPUT_PULSE.height,
-    pointerEvents: 'none',
   },
 });

@@ -8,6 +8,7 @@
   "data-display/LoadingState": "src/components/data-display/LoadingState/index.native.ts",
   "form/Button": "src/components/form/Button/index.native.ts",
   "form/Input": "src/components/form/Input/index.native.ts",
+  "form/Select": "src/components/form/Select/index.native.ts",
   "layout/Box": "src/components/layout/Box/index.native.ts",
   "layout/Container": "src/components/layout/Container/index.native.ts",
   "layout/Spacer": "src/components/layout/Spacer/index.native.ts",

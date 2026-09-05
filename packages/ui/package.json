@@ -405,6 +405,10 @@
       "default": "./dist/form/SearchPalette.js"
     },
     "./form/Select": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Select/index.native.d.ts",
+        "default": "./dist/native/form/Select.js"
+      },
       "types": "./dist/types/components/form/Select/index.d.ts",
       "default": "./dist/form/Select.js"
     },

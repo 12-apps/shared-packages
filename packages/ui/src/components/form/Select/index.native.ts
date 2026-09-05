@@ -1,8 +1,9 @@
-export { Select } from './Select';
+export { Select } from './Select.native';
 export type {
   SelectBaseProps,
+  SelectChangeEvent,
   SelectOption,
   SelectProps,
   SelectValue,
   SelectVariant,
-} from './Select.types';
+} from './Select.types.native';

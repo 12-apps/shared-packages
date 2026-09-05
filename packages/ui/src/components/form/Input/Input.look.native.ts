@@ -70,6 +70,16 @@ export function borderWidthFor(variant: InputVariant, focused: boolean): number 
 }
 
 /**
+ * The width the border takes out of the horizontal inset — 0 where the web's
+ * border adds to the box rather than floating over it. Exported because the
+ * `Select` draws the same box and has to place its arrow inside the same edge.
+ */
+export function horizontalBorderInset(variant: InputVariant, focused: boolean): number {
+  if (BORDER_SIDES[variant] !== 'all' || !BORDER_IS_FREE[variant]) return 0;
+  return borderWidthFor(variant, focused);
+}
+
+/**
  * What colour. Error and disabled outrank focus, as they do in MUI's source
  * order; a resting `filled` keeps MUI's own underline grey because the web
  * override only replaces its background.

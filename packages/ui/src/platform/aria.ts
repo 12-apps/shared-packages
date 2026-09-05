@@ -66,3 +66,32 @@ export function webDisabled(disabled: boolean): object {
 export function webClick<E>(handler: ((event: E) => void) | undefined): object {
   return handler === undefined ? {} : { onClick: handler };
 }
+
+/**
+ * A `role` React Native's own union does not carry.
+ *
+ * `Role` (0.83) stops at `list` and `menu`: `listbox`, the role a dropdown's
+ * option list owes a screen reader, is not in it. react-native-web forwards
+ * whatever string it is given, and a device ignores a role it does not know —
+ * the same trade `webAria` makes for the attributes below it.
+ */
+export function webRole(role: string): object {
+  return { role };
+}
+
+/** The half of a DOM keyboard event a component needs, without the DOM lib. */
+export interface WebKeyEvent {
+  key: string;
+}
+
+/**
+ * `onKeyDown` for a react-native-web element.
+ *
+ * React Native has no key events on a `View` — a phone has no keyboard to
+ * press Escape on — so nothing here is typed by react-native and nothing here
+ * fires on a device. react-native-web forwards it to the DOM, which is what
+ * lets a native dropdown still answer Escape and the arrow keys in a browser.
+ */
+export function webKeyDown(handler: (event: WebKeyEvent) => void): object {
+  return { onKeyDown: handler };
+}
