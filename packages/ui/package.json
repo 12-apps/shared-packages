@@ -493,6 +493,10 @@
       "default": "./dist/layout/Sidebar.js"
     },
     "./layout/Skeleton": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Skeleton/index.native.d.ts",
+        "default": "./dist/native/layout/Skeleton.js"
+      },
       "types": "./dist/types/components/layout/Skeleton/index.d.ts",
       "default": "./dist/layout/Skeleton.js"
     },

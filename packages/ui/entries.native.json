@@ -9,6 +9,7 @@
   "form/Button": "src/components/form/Button/index.native.ts",
   "layout/Box": "src/components/layout/Box/index.native.ts",
   "layout/Container": "src/components/layout/Container/index.native.ts",
+  "layout/Skeleton": "src/components/layout/Skeleton/index.native.ts",
   "layout/Spacer": "src/components/layout/Spacer/index.native.ts",
   "layout/Stack": "src/components/layout/Stack/index.native.ts",
   "typography/Heading": "src/components/typography/Heading/index.native.ts",

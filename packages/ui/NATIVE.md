@@ -80,7 +80,7 @@ installs them.
 ## Ledger
 
 <!-- native-parity:start -->
-Ported: **15 of 140** public subpaths carry a `react-native` condition.
+Ported: **16 of 140** public subpaths carry a `react-native` condition.
 
 | subpath | shared stories run natively | skipped (`native-skip`) | known gaps |
 |---|---|---|---|
@@ -94,6 +94,7 @@ Ported: **15 of 140** public subpaths carry a `react-native` condition.
 | `@12-apps/ui/form/Button` | 24 | 2 | — |
 | `@12-apps/ui/layout/Box` | 7 | 1 | — |
 | `@12-apps/ui/layout/Container` | 36 | 0 | `responsive` reads `useWindowDimensions().width < 600` in place of MUI's `sm` media query, and `centered` reads the window height in place of `100vh`; both track the window, as CSS would, but a container inside a narrower parent still measures the window, not the parent. |
+| `@12-apps/ui/layout/Skeleton` | 21 | 4 | MUI's `wave` sweep and the `shimmer` overlay are gradient pseudo-elements travelling across the box; React Native core has neither, so both are drawn as the same wash (`action.hover` for the wave, `alpha(#fff, 0.3)` for the shimmer) fading in and out over the whole box on the web's own cadence — 1.6s linear after 0.5s for the wave, 2s for the shimmer.; `glassmorphism` paints the 135° gradient's first stop (`alpha(paper, 0.8)`) flat and keeps the hairline and the `0 8px 32px 0 rgba(0, 0, 0, 0.1)` shadow, but not the 20px backdrop blur — React Native has no backdrop filter.; The `text` variant is drawn at its FINAL height. MUI gives it a `1.2em` line box and squashes the box to 60% with `transform: scale(1, 0.6)`; React Native transforms do not change layout, so the two are multiplied out (11.52px at the theme's 16px body size) and the elliptical `4px/6.7px` radius the squash rounds off is drawn as the plain 4px it lands on.; `width`, `height` and `borderRadius` accept a number or a percentage; any other CSS length (`10rem`, `calc(…)`) has no React Native equivalent and leaves the box to size itself from its content. |
 | `@12-apps/ui/layout/Spacer` | 21 | 1 | — |
 | `@12-apps/ui/layout/Stack` | 6 | 0 | — |
 | `@12-apps/ui/typography/Heading` | 26 | 1 | `gradient` paints the gradient's first stop as a flat colour: React Native has no `background-clip: text` and no gradient fill in core. A host wanting the real thing adds a masked-gradient library. |
