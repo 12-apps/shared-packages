@@ -49,6 +49,8 @@ export const SpinnerAccessibility: Story = {
 };
 
 export const SkeletonAccessibility: Story = {
+  // Counts `.MuiSkeleton-*` class names, which only the MUI renderer emits.
+  tags: ['native-skip'],
   name: '🧪 Skeleton Accessibility',
   args: {
     variant: 'skeleton',

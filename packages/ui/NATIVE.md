@@ -80,19 +80,20 @@ installs them.
 ## Ledger
 
 <!-- native-parity:start -->
-Ported: **11 of 140** public subpaths carry a `react-native` condition.
+Ported: **12 of 140** public subpaths carry a `react-native` condition.
 
 | subpath | shared stories run natively | skipped (`native-skip`) | known gaps |
 |---|---|---|---|
 | `@12-apps/ui/tokens` | 0 | 0 | — |
 | `@12-apps/ui/provider` | 0 | 0 | — |
 | `@12-apps/ui/icons` | 8 | 0 | — |
-| `@12-apps/ui/layout/Box` | 7 | 1 | — |
-| `@12-apps/ui/layout/Stack` | 6 | 0 | — |
-| `@12-apps/ui/typography/Text` | 26 | 3 | — |
+| `@12-apps/ui/data-display/LoadingState` | 11 | 1 | The spinner is the platform's `ActivityIndicator`, not MUI's 3.6-unit arc: same diameter and primary colour, the platform's own stroke; on iOS the two built-in sizes stand in for the five (`md` and up draw `large`).; The skeleton rows are the static tint (`alpha(text.primary, 0.13)`); MUI's `wave` sweep is a gradient pseudo-element React Native cannot draw.; The message is set in MUI's default `body2`/`body1`/`h6` numbers; a host that re-themes MUI's typography variants moves the web only. |
 | `@12-apps/ui/form/Button` | 24 | 2 | — |
-| `@12-apps/ui/layout/Spacer` | 21 | 1 | — |
-| `@12-apps/ui/typography/Paragraph` | 17 | 1 | — |
-| `@12-apps/ui/typography/Heading` | 26 | 1 | `gradient` paints the gradient's first stop as a flat colour: React Native has no `background-clip: text` and no gradient fill in core. A host wanting the real thing adds a masked-gradient library. |
+| `@12-apps/ui/layout/Box` | 7 | 1 | — |
 | `@12-apps/ui/layout/Container` | 36 | 0 | `variant="padded"` adds no vertical padding on either renderer: the web declares its 64px above and below BEFORE the `padding` shorthand, which overrides them, and native paints the same insets so the two agree. The fix is a web change (`Container.tsx` order) plus `containerPaddingUnits`, made together.; `padding="none"` paints the `md` inset on either renderer: the web reads its map with `||`, so `none`'s 0 falls through to the default. Same one-place fix.; `responsive` reads `useWindowDimensions().width < 600` in place of MUI's `sm` media query, and `centered` reads the window height in place of `100vh`; both track the window, as CSS would, but a container inside a narrower parent still measures the window, not the parent. |
+| `@12-apps/ui/layout/Spacer` | 21 | 1 | — |
+| `@12-apps/ui/layout/Stack` | 6 | 0 | — |
+| `@12-apps/ui/typography/Heading` | 26 | 1 | `gradient` paints the gradient's first stop as a flat colour: React Native has no `background-clip: text` and no gradient fill in core. A host wanting the real thing adds a masked-gradient library. |
+| `@12-apps/ui/typography/Paragraph` | 17 | 1 | — |
+| `@12-apps/ui/typography/Text` | 26 | 3 | — |
 <!-- native-parity:end -->

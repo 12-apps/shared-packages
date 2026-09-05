@@ -1,7 +1,7 @@
-export { LoadingState } from './LoadingState';
+export { LoadingState } from './LoadingState.native';
 export type {
   LoadingStateBaseProps,
   LoadingStateProps,
   LoadingStateSize,
   LoadingStateVariant,
-} from './LoadingState.types';
+} from './LoadingState.types.native';

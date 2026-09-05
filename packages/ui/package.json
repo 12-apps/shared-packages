@@ -253,6 +253,10 @@
       "default": "./dist/data-display/ErrorState.js"
     },
     "./data-display/LoadingState": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/LoadingState/index.native.d.ts",
+        "default": "./dist/native/data-display/LoadingState.js"
+      },
       "types": "./dist/types/components/data-display/LoadingState/index.d.ts",
       "default": "./dist/data-display/LoadingState.js"
     },
