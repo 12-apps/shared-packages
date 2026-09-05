@@ -16,7 +16,7 @@
  * Both halves are needed to reproduce, which is why this suite builds both.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AnyCheckoutGate } from "../types";
@@ -43,6 +43,29 @@ function stillAsking(): AnyCheckoutGate {
   } as AnyCheckoutGate;
 }
 
+/**
+ * Catches what the render throws, so the assertion can name it. A `window`
+ * error listener would read the same failure, but the flakiness lane forbids
+ * mutating globals from a test — rightly, since the listener outlives a failed
+ * run and reports into the next one.
+ */
+class Boundary extends Component<{ children: ReactNode }, { caught: Error | null }> {
+  public constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { caught: null };
+  }
+
+  public static getDerivedStateFromError(caught: Error): { caught: Error } {
+    return { caught };
+  }
+
+  public override render(): ReactNode {
+    const { caught } = this.state;
+    if (caught !== null) return <p data-testid="boundary-caught">{caught.message}</p>;
+    return this.props.children;
+  }
+}
+
 describe("the engine's hooks do not move with a gate's verdict", () => {
   it("survives a gate going from pending to pass while the host reads availability", async () => {
     // The host's port is a real hook — the shape that makes the count matter.
@@ -50,12 +73,8 @@ describe("the engine's hooks do not move with a gate's verdict", () => {
       const [payable] = useState(true);
       return { payable };
     };
-    const thrown: unknown[] = [];
-    const onError = (event: ErrorEvent): void => {
-      thrown.push(event.error);
-    };
-    window.addEventListener("error", onError);
-    // React logs the hook-order error before it throws; keep the run readable.
+    // React logs the hook-order error before the boundary sees it; keep the run
+    // readable without hiding the assertion, which reads the boundary.
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     try {
@@ -63,13 +82,23 @@ describe("the engine's hooks do not move with a gate's verdict", () => {
         { gates: [stillAsking()] },
         { taxIdOnFile: true, useAvailability },
       );
-      render(<flows.Checkout />);
+      render(
+        <Boundary>
+          <flows.Checkout />
+        </Boundary>,
+      );
 
-      // The walk it could not reach while the hook count was unstable.
-      await waitFor(() => expect(screen.queryByTestId("checkout-method")).not.toBeNull());
-      expect(thrown).toEqual([]);
+      // Settle on EITHER outcome first, so the assertion below reports React's
+      // own sentence rather than a timeout. Waiting only for the walk would
+      // still fail, but after fifteen seconds and saying nothing useful.
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("checkout-method") ?? screen.queryByTestId("boundary-caught"),
+        ).not.toBeNull(),
+      );
+      expect(screen.queryByTestId("boundary-caught")?.textContent ?? null).toBeNull();
+      expect(screen.queryByTestId("checkout-method")).not.toBeNull();
     } finally {
-      window.removeEventListener("error", onError);
       consoleError.mockRestore();
     }
   });
