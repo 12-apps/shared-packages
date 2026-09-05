@@ -66,22 +66,36 @@ export function resolveContainerMaxWidth(
 }
 
 /**
- * The inset every side of the container is PAINTED with, in spacing units.
+ * The inset every side of the container is painted with, in spacing units.
  *
- * This is the web's painted result, not its declared intent, and two of its
- * rules are worth knowing before reaching for them:
- *
- * - `padding="none"` paints the default. The web reads its map with `||`, so
- *   `none`'s 0 falls through to `md`.
- * - `variant="padded"` paints the same inset as `default`. The web declares its
- *   {@link CONTAINER_PADDED_VERTICAL_UNITS} above and below BEFORE the
- *   `padding` shorthand, which therefore overrides them.
- *
- * Both renderers read this one function so they agree today; either fix is a
- * change to the web's emitted CSS and to this function, made together.
+ * `??`, not `||`: `none` is 0, and 0 is falsy. Reading the map with `||` sent
+ * `padding="none"` through to the `md` default, so the one value a caller
+ * would reach for to remove the inset was the one value that could not.
+ * A word outside the vocabulary still reads as the default.
  */
 export function containerPaddingUnits(padding: ContainerPadding | string, compact: boolean): number {
   if (compact) return CONTAINER_COMPACT_PADDING_UNITS;
   const units = (CONTAINER_PADDING_UNITS as Record<string, number | undefined>)[padding];
-  return units || CONTAINER_PADDING_UNITS[CONTAINER_DEFAULT_PADDING];
+  return units ?? CONTAINER_PADDING_UNITS[CONTAINER_DEFAULT_PADDING];
+}
+
+/**
+ * What `variant="padded"` paints above and below, in spacing units — the
+ * horizontal inset stays whatever `padding` says.
+ *
+ * The variant used to paint nothing of its own: the web declared these before
+ * the `padding` shorthand, which overrode them, and the native half copied the
+ * painted result so the two would agree. Now both read this.
+ *
+ * A `responsive` container under {@link CONTAINER_COMPACT_BELOW} compacts, as
+ * every other inset does; a tall vertical inset is the first thing a phone
+ * cannot spare.
+ */
+export function containerVerticalUnits(
+  variant: ContainerVariant,
+  padding: ContainerPadding | string,
+  compact: boolean,
+): number {
+  if (variant !== 'padded') return containerPaddingUnits(padding, compact);
+  return compact ? CONTAINER_COMPACT_PADDING_UNITS : CONTAINER_PADDED_VERTICAL_UNITS;
 }
