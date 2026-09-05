@@ -5,6 +5,7 @@ import {
   CONTAINER_COMPACT_BELOW,
   CONTAINER_MAX_WIDTHS,
   containerPaddingUnits,
+  containerVerticalUnits,
   resolveContainerMaxWidth,
 } from './Container.metrics';
 import type { ContainerMaxWidth, ContainerPadding, ContainerProps, ContainerVariant } from './Container.types.native';
@@ -27,8 +28,8 @@ export interface ContainerStyleArgs {
  * `width: 100%` between auto margins is MUI's own centring rule; `maxWidth` is
  * the breakpoint the web applies under `min-width` (below it the column is
  * narrower anyway); the `responsive` media query becomes a window-width test;
- * `centered`'s `100vh` becomes the window height. `padded` and `padding="none"`
- * paint what the web paints — see `containerPaddingUnits`.
+ * `centered`'s `100vh` becomes the window height. `padded`'s vertical inset
+ * and `padding="none"`'s zero come from the same two functions the web reads.
  */
 export function containerStyle(theme: UiTheme, a: ContainerStyleArgs): ViewStyle {
   const compact = a.responsive && a.window.width < CONTAINER_COMPACT_BELOW;
@@ -39,6 +40,7 @@ export function containerStyle(theme: UiTheme, a: ContainerStyleArgs): ViewStyle
     marginRight: 'auto',
     maxWidth: limit === false ? undefined : CONTAINER_MAX_WIDTHS[limit],
     padding: theme.spacing(containerPaddingUnits(a.padding, compact)),
+    paddingVertical: theme.spacing(containerVerticalUnits(a.variant, a.padding, compact)),
     ...(a.variant === 'centered'
       ? { alignItems: 'center', justifyContent: 'center', minHeight: a.window.height }
       : null),

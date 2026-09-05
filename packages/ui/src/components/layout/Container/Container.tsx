@@ -5,8 +5,8 @@ import React from 'react';
 
 import {
   CONTAINER_COMPACT_PADDING_UNITS,
-  CONTAINER_PADDED_VERTICAL_UNITS,
   containerPaddingUnits,
+  containerVerticalUnits,
   resolveContainerMaxWidth,
 } from './Container.metrics';
 import type { ContainerProps } from './Container.types';
@@ -38,14 +38,20 @@ export const Container: React.FC<ContainerProps> = ({
       justifyContent: 'center',
       minHeight: '100vh',
     }),
-    ...(variant === 'padded' && {
-      paddingTop: theme.spacing(CONTAINER_PADDED_VERTICAL_UNITS),
-      paddingBottom: theme.spacing(CONTAINER_PADDED_VERTICAL_UNITS),
-    }),
+    // The shorthand FIRST: a `paddingTop` declared before it is overridden by
+    // it, which is how `variant="padded"` painted no vertical inset at all.
     padding: theme.spacing(containerPaddingUnits(padding, false)),
+    ...(variant === 'padded' && {
+      paddingTop: theme.spacing(containerVerticalUnits(variant, padding, false)),
+      paddingBottom: theme.spacing(containerVerticalUnits(variant, padding, false)),
+    }),
     ...(responsive && {
       [theme.breakpoints.down('sm')]: {
         padding: theme.spacing(CONTAINER_COMPACT_PADDING_UNITS),
+        ...(variant === 'padded' && {
+          paddingTop: theme.spacing(containerVerticalUnits(variant, padding, true)),
+          paddingBottom: theme.spacing(containerVerticalUnits(variant, padding, true)),
+        }),
       },
     }),
     ...(sx || {}),

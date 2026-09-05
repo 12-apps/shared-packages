@@ -82,15 +82,18 @@ describe('Container (native)', () => {
       expect(containerStyle(ui, base({ padding })).padding, padding).toBe(expected[padding]);
     }
     // The web reads its map with `||`, so `none`'s 0 falls through to `md` — see NATIVE-NOTES.md.
-    expect(containerStyle(ui, base({ padding: 'none' })).padding).toBe(24);
+    expect(containerStyle(ui, base({ padding: 'none' })).padding).toBe(0);
     expect(containerPaddingUnits('huge', false)).toBe(3);
   });
 
-  it('paints padded with the same insets as default, as the web does', () => {
+  it('paints padded above and below, keeping the horizontal inset', () => {
     const ui = createUiTheme();
-    // The web declares 64px above and below BEFORE its `padding` shorthand,
-    // which overrides them — see NATIVE-NOTES.md.
-    expect(containerStyle(ui, base({ variant: 'padded' }))).toEqual(containerStyle(ui, base({})));
+    const padded = containerStyle(ui, base({ variant: 'padded' }));
+    expect(padded.paddingVertical).toBe(64);
+    expect(padded.padding).toBe(24);
+    // A responsive container under the breakpoint compacts, vertical inset included.
+    const compact = containerStyle(ui, base({ variant: 'padded', window: { width: 400, height: 800 } }));
+    expect(compact.paddingVertical).toBe(16);
   });
 
   it('tightens to two units under 600px only while responsive', () => {
