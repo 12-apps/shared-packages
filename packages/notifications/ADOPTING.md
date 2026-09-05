@@ -472,8 +472,11 @@ createWebNotifications({
    your session, your query client), which is the same reason
    `NotificationsSignalHook` exists one seam over. `active` is `false` while the
    panel is shut; pass it to your query's `enabled`. Ignoring it is correct and
-   merely costs money — and an unopened inbox is free either way, because the
-   panel is lazy and the drawer unmounts its content on close.
+   merely costs money — but that money is now real: the BELL calls this hook
+   too, and the bell is mounted for as long as your app is. There is no
+   "unopened inbox is free" any more. A host answering with a poll polls for
+   every signed-in reader on every screen; answer from a pushed cache if you
+   can.
 2. **Three sentences**, in their own pack rather than on
    `NotificationMessages` — live activities are opt-in, and requiring copy for a
    section you never render is the tax that gets a required-config change
@@ -481,8 +484,15 @@ createWebNotifications({
 
 **Two rules that are ours, not yours:**
 
-- A live activity NEVER touches `unread`. It is not news, and a number the bell
-  cannot clear is worse than no number.
+- A live activity DOES count on the bell, and it is not counted as unread. The
+  badge's number is `unread + live`, and its TONE says which: `primary` when
+  something has happened, `neutral` when the only thing there has already been
+  looked at. That distinction is the answer to the original objection — a number
+  no amount of reading can clear — which is why the tone exists at all.
+- **Do not also send an inbox notification for a subject you report as live**,
+  or the same thing is counted twice. If you already do (the stage pushes that
+  carry `LIVE_SUBJECT_KEY` are exactly this shape), decide which surface owns
+  the count before you turn live activities on.
 - It leaves when your hook stops returning it. There is no dismiss, no read and
   no delete — the subject finishing is the only exit, which is what stops the
   section becoming a second inbox.

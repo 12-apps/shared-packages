@@ -53,6 +53,38 @@ function activity(overrides: Partial<LiveActivity> = {}): LiveActivity {
 
 const EMPTY_INBOX = { items: [], nextCursor: null };
 
+/** One inbox row, so a remount of the list is something a test can SEE. */
+const ONE_ROW = {
+  items: [
+    {
+      id: 'n1',
+      title: 'Recibo disponível',
+      body: null,
+      link: null,
+      readAt: null,
+      createdAt: '2026-09-01T19:00:00.000Z',
+      data: {},
+    },
+  ],
+  nextCursor: null,
+};
+
+function inboxTransport(): NotificationsTransport {
+  const pages: Record<string, unknown> = {
+    '/api/account/notifications/unread-count': { count: 1 },
+    '/api/account/notifications?limit=20': ONE_ROW,
+  };
+  return {
+    get<T>(path: string): Promise<T> {
+      if (!(path in pages)) return Promise.reject(new Error(`no stub for ${path}`));
+      return Promise.resolve(pages[path] as T);
+    },
+    send<T>(): Promise<NotificationsResult<T>> {
+      return Promise.resolve({ ok: true, data: {} as T });
+    },
+  };
+}
+
 /** Reads only; nothing here writes, and an unstubbed path must still fail loudly. */
 function readOnlyTransport(): NotificationsTransport {
   const pages: Record<string, unknown> = {
@@ -536,6 +568,37 @@ describe('the live section', () => {
       expect(screen.getByTestId('notifications-badge').getAttribute('data-tone')).toBe('new'),
     );
     expect(screen.getByTestId('notifications-badge').textContent).toBe('2');
+  });
+
+  it('keeps the inbox MOUNTED when the live section appears', async () => {
+    // React reconciles fragment children by INDEX. The live section and the
+    // inbox are siblings in one fragment, so a branch that stops rendering the
+    // section's slot moves the inbox from index 1 to index 0 — and React tears
+    // down every row and builds it again. For a reader scrolling their inbox
+    // with keyboard focus on a row, that throws focus to `<body>` inside a
+    // focus-trapped drawer, the moment a pedido happens to start or finish.
+    let current: readonly LiveActivity[] = [];
+    const config: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? current : []),
+    };
+    const { Panel } = createWebNotifications({
+      apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
+      transport: inboxTransport(),
+      liveActivities: config,
+    });
+    const { rerender } = render(<Panel open onClose={() => undefined} />);
+
+    const row = await screen.findByTestId('notification-n1');
+    expect(screen.queryByTestId('live-activities')).toBeNull();
+
+    current = [activity()];
+    rerender(<Panel open onClose={() => undefined} />);
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+
+    // The SAME DOM node, not merely a node with the same test id.
+    expect(screen.getByTestId('notification-n1')).toBe(row);
   });
 
   it('does not claim the panel is empty while something is live', async () => {

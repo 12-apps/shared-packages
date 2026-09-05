@@ -1,4 +1,5 @@
 import { config as baseConfig } from '@12-apps/eslint-config/base';
+import { config as reactConfig } from '@12-apps/eslint-config/react-internal';
 import testFlakiness from 'eslint-plugin-test-flakiness';
 
 /**
@@ -10,6 +11,7 @@ import testFlakiness from 'eslint-plugin-test-flakiness';
  */
 export default [
   ...baseConfig,
+  ...reactConfig.map((c) => ({ ...c, files: ['src/react/**/*.tsx'] })),
   {
     files: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
     plugins: { 'test-flakiness': testFlakiness },

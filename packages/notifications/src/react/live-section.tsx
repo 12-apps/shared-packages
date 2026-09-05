@@ -12,11 +12,15 @@
  *
  * ## What it deliberately does NOT do
  *
- * - It does not touch `unread`. A live entry is not news; counting it would put
- *   a number on the bell that no amount of reading can clear.
- * - It renders nothing at all when there is nothing live — no heading, no empty
- *   state, no reserved space. A panel with one permanent empty section in it is
- *   a panel that has taught its reader to skip the top.
+ * - It does not mark anything READ. A live entry counts on the bell, but as
+ *   itself rather than as unread — the tone, not the number, is what says
+ *   whether it is news. (This once read "it does not touch `unread`", on the
+ *   argument that counting it would put a number on the bell no amount of
+ *   reading can clear. The argument stands; the tone is what answers it.)
+ * - It renders no heading, no empty state and no reserved space when there is
+ *   nothing live — but it still renders its SLOT, so the inbox below keeps its
+ *   position and is not torn down and rebuilt every time a subject starts or
+ *   finishes.
  * - It does not fetch. `useActivities` is the host's, and `active` tells it
  *   whether anyone is looking.
  */
@@ -129,14 +133,22 @@ export function LiveSection({
     if (active && liveCount > 0) seen?.mark(activities);
   }, [active, liveCount, activities, seen]);
 
-  if (liveCount === 0) return <>{children?.(0)}</>;
-
   return (
     <>
-    // A NAMED region. Without the label a screen-reader user meets a loose run
-    // of controls ahead of the inbox with nothing saying what they are; the
-    // panel's own title is the drawer's heading and cannot describe this block.
-    <Box
+      {/*
+        A NAMED region. Without the label a screen-reader user meets a loose run
+        of controls ahead of the inbox with nothing saying what they are; the
+        panel's own title is the drawer's heading and cannot describe this block.
+
+        `null` rather than an early return, and the inbox keeps its slot either
+        way, because React reconciles fragment children by INDEX. A branch that
+        dropped this position would move the inbox from index 1 to index 0, and
+        every `NotificationRow` would unmount and remount the moment a pedido
+        starts or finishes — throwing keyboard focus to `<body>` inside a
+        focus-trapped drawer, for a reader who was only scrolling their inbox.
+      */}
+      {liveCount === 0 ? null : (
+        <Box
       component="section"
       aria-labelledby={headingId}
       data-testid="live-activities"
@@ -170,9 +182,10 @@ export function LiveSection({
             {...(onOpen ? { onOpen } : {})}
             {...(config.renderIcon ? { renderIcon: config.renderIcon } : {})}
           />
-        ))}
-      </Box>
-      </Box>
+            ))}
+          </Box>
+        </Box>
+      )}
       {children?.(liveCount)}
     </>
   );
