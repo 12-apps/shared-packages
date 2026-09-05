@@ -603,7 +603,11 @@ describe("what ends the wait", () => {
   });
 
   it("never fires for a consumer that asked for no bound", async () => {
-    // PIX passes none: its charge expires server-side and comes back terminal.
+    // `maxWaitMs: undefined` is still a supported option and this pins it. It is
+    // no longer PIX that reaches it: FUT-1170 gave PIX a bound of its own
+    // (`expiresAt` + grace, or 15 minutes), because "the charge expires
+    // server-side and comes back terminal" is only true while the poll is still
+    // being answered.
     const { client, calls } = scriptedClient(() => DOWN);
     const { result } = useWait(client, { intervalMs: 2500 });
 

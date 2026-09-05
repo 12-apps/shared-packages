@@ -91,6 +91,12 @@ export function resumeSurface(
   awaitingTimedOut: boolean;
   awaitingError: string | null;
   awaitingCheckAgain: () => void;
+  /** @deprecated Renamed to `awaitingTimedOut`; kept so the rename ships additively. */
+  resumeTimedOut: boolean;
+  /** @deprecated Renamed to `awaitingError`; kept so the rename ships additively. */
+  resumeError: string | null;
+  /** @deprecated Renamed to `awaitingCheckAgain`; kept so the rename ships additively. */
+  resumeCheckAgain: () => void;
   resumeRelease: (() => void) | undefined;
   resumeReleasing: boolean;
 } {
@@ -99,6 +105,16 @@ export function resumeSurface(
     awaitingTimedOut: live.timedOut,
     awaitingError: live.error,
     awaitingCheckAgain: live.checkAgain,
+    // The three old spellings, beside the new ones rather than replaced by them.
+    // This shape is PUBLIC — `CheckoutController` is `ReturnType<typeof
+    // useCheckoutController>` (flows/types.ts:148), re-exported from index.ts,
+    // and `PaymentFlows.useCheckout()` returns it. Dropping three members of it
+    // is a source break for any adopter that hand-composes the flow, and this
+    // release is a patch. The rename was cosmetic; breaking a published type for
+    // it is not a trade worth making, so the old names stay until a major.
+    resumeTimedOut: live.timedOut,
+    resumeError: live.error,
+    resumeCheckAgain: live.checkAgain,
     resumeRelease: resume.release,
     resumeReleasing: resume.releasing,
   };
