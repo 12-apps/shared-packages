@@ -455,6 +455,104 @@ confirmed.
 `createPaymentFlowsBE` mount in the page — so a state can be reviewed without
 seeding a store or running a backend.
 
+### The checkout PIPELINE — steps, gates and settlement methods (FUT-1240)
+
+Everything above stays true. What this adds is a way to say three things the
+config had no room for: *this store has a step of its own*, *this shopper may
+not check out yet*, and *this settlement raises no charge* — the last of which
+had no seam at all, so every in-person payment path was written BESIDE the
+checkout instead of inside it.
+
+**It is opt-in, key by key.** Set any of `steps`, `gates`, `settlementMethods`,
+`useIntent`, `useOpenPayable`, `exit` or `onSettled` and `<flows.Checkout />`
+renders through the pipeline. Set none and it renders exactly the flat
+`CheckoutFlow` it always did — same screens, same test ids. There is no flag to
+flip and no migration to schedule.
+
+```tsx
+// checkout-plugins.ts — MODULE SCOPE. See "hook order" below.
+const STEPS = [scheduleStep, addressStep] as const;
+const GATES = [sessionGate, storeOpenGate, cartGate] as const;
+const METHODS = [payOnDeliveryMethod, payTheWaiterMethod] as const;
+
+export const checkout = createPaymentFlows({
+  /* everything from the section above, plus: */
+  steps: STEPS, gates: GATES, settlementMethods: METHODS,
+  useIntent, useOpenPayable, exit: catalogExit, onSettled,
+});
+```
+
+**A step declares WHERE it sits and WHEN it is finished, never that it is
+"current".** The current step is DERIVED — the first applying step whose
+`complete()` is false — so a reload, a discarded tab and a return from a
+provider's own page all land where the server's facts say they should, rather
+than on whatever a `useState` had before the page went away.
+
+```tsx
+export const addressStep: CheckoutStep<void, { cart: CartView }> = {
+  id: "address", phase: "details", order: 0, label: "dados",
+  useFacts: () => ({ cart: useCart() }),          // runs EVERY render, in array order
+  applies: (ctx, f) => ctx.settlement === null,   // pure
+  complete: (_ctx, f) => f.cart.deliveryAddress !== null,  // the cart ROW, not React state
+  answersCodes: ["DELIVERY_ADDRESS_REQUIRED"],    // re-rendered HERE, never as a generic retry
+  render: ({ advance, error }) => <AddressForm error={error} onSaved={advance} />,
+};
+```
+
+**`back` and `editBuyer` are the engine's**, and they reproduce the flat
+controller exactly: back re-opens the PREVIOUS APPLYING step and leaves for the
+catalog when there is none, so a shopper whose buyer-details step was skipped
+goes back to the catalog rather than to a form they never saw — and `editBuyer`
+(the payer block's "alterar") makes that step part of their flow from then on.
+
+**A step's slice is declared, not held.** `persist: "session"` parks it under
+`payments.checkout.<slug>.<stepId>` — scoped to the store, because one tab
+holds one slot for every store on a multi-tenant storefront. Nothing is
+rehydrated without the step's own `parse`: storage is the one input that did
+not come from this render.
+
+**`raisesCharge: false` is the no-charge seam.** A settlement method that
+declares it mounts NO `pay`-phase step — no buyer-details-for-the-charge, no
+method pane, no polling — and placing the order IS the settlement, so the walk
+goes straight to the confirmation. The engine enforces that ONCE, over the
+phase, so no lane can forget it.
+
+```tsx
+export const payOnDeliveryMethod: SettlementMethodDescriptor<TablesState | undefined> = {
+  id: "ON_DELIVERY", raisesCharge: false, pane: null,
+  useFacts: () => useMenuTables(slug).data,
+  offered: (ctx, tables) => tables?.delivery?.payOnDelivery === true,
+  Review: ConfirmOnDelivery,       // optional: what they confirm before it is placed
+  Confirmation: DeliveryPlaced,    // optional: default is the package's PaymentStatus
+  tile: (copy) => ({ label: copy.…, hint: copy.… }),
+};
+```
+
+**A gate is `useFacts()` + a pure `decide()`**, evaluated in array order before
+any step renders; the first non-`pass` verdict wins, so put the gate that is
+still WAITING for a fact before the one that would curtain the screen.
+`standsAsideForResume` skips a gate for a shopper coming back from a payment —
+that route is where money gets confirmed. The same list is exported headless as
+`flows.useAdmission()`, so a cart drawer's CTA and a buy-now button consume the
+answer the checkout will give rather than a second one of their own.
+
+**Refusals are ROUTED.** A server refusal whose `code` a step's `answersCodes`
+names re-opens that step and renders there; a gate's code re-renders the gate.
+A code nobody claimed still reaches the shopper, on whichever step they are on
+— which is what lets a host adopt this one plugin at a time.
+
+**Hook order is a function of the ARRAYS.** Every plugin's `useFacts()` runs on
+every render in array order, so `steps`, `gates` and `settlementMethods` must
+be the SAME arrays each render: hoist them to module scope or memoise them. A
+config that rebuilds one (a getter, a `filter` in a component body) THROWS in a
+development build, naming the array — because the failure it prevents is
+silent, and only appears the day a plugin leaves the middle of a list.
+
+**Two new copy keys are required**, both under `copy.views.pipeline`:
+`loading` (what is on screen while a gate decides) and `awaitingHandover`, a
+record keyed by settlement-method id. Both packs ship PIX and CARD; a host
+registering a charged method of its own adds one line.
+
 ### The buyer checkout surface (`<CheckoutFlow>`, FUT-564)
 
 The full three-step buyer flow — Dados (CPF + LGPD "salvar meus dados") →
