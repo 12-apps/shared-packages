@@ -603,7 +603,11 @@ describe("what ends the wait", () => {
   });
 
   it("never fires for a consumer that asked for no bound", async () => {
-    // PIX passes none: its charge expires server-side and comes back terminal.
+    // `maxWaitMs: undefined` is still a supported option and this pins it. It is
+    // no longer PIX that reaches it: FUT-1170 gave PIX a bound of its own
+    // (`expiresAt` + grace, or 15 minutes), because "the charge expires
+    // server-side and comes back terminal" is only true while the poll is still
+    // being answered.
     const { client, calls } = scriptedClient(() => DOWN);
     const { result } = useWait(client, { intervalMs: 2500 });
 
@@ -655,8 +659,8 @@ describe("the resumed hosted return", () => {
 
     await elapse(30_000);
 
-    expect(result.current.resumeError).toBe(OFFLINE);
-    expect(result.current.resumeTimedOut).toBe(false);
+    expect(result.current.awaitingError).toBe(OFFLINE);
+    expect(result.current.awaitingTimedOut).toBe(false);
   });
 
   it("hands the buyer a way to ask again, and it works", async () => {
@@ -667,15 +671,15 @@ describe("the resumed hosted return", () => {
     });
 
     await elapse(30_000);
-    expect(result.current.resumeError).toBe(OFFLINE);
+    expect(result.current.awaitingError).toBe(OFFLINE);
 
     wait.answerWith({ ok: true, data: "PAID" });
     await act(async () => {
-      result.current.resumeCheckAgain();
+      result.current.awaitingCheckAgain();
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(result.current.resumeError).toBeNull();
+    expect(result.current.awaitingError).toBeNull();
     expect(result.current.finalStatus).toBe("PAID");
   });
 
@@ -688,7 +692,7 @@ describe("the resumed hosted return", () => {
 
     await elapse(16 * 60_000);
 
-    expect(result.current.resumeTimedOut).toBe(true);
+    expect(result.current.awaitingTimedOut).toBe(true);
     // Never restated as failed. Nothing was ever learned about this order — no
     // poll got an answer — and "we could not ask" is not "you did not pay": the
     // reconciliation sweep is what rescues a genuinely late webhook, and it does

@@ -104,7 +104,7 @@ describe("the resumed hosted return stops asking", () => {
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
     await elapse(WINDOW_MS + SLOW_MS * 10);
 
-    expect(result.current.resumeTimedOut).toBe(true);
+    expect(result.current.awaitingTimedOut).toBe(true);
     expect(calls()).toBe(POLL_CAP);
   });
 
@@ -137,7 +137,7 @@ describe("the resumed hosted return stops asking", () => {
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
     await elapse(WINDOW_MS - SLOW_MS * 2);
 
-    expect(result.current.resumeTimedOut).toBe(false);
+    expect(result.current.awaitingTimedOut).toBe(false);
     expect(calls()).toBeGreaterThan(POLL_CAP - 5);
   });
 
@@ -156,7 +156,7 @@ describe("the resumed hosted return stops asking", () => {
     await elapse(FAST_MS * 5);
 
     expect(result.current.finalStatus).toBe("PAID");
-    expect(result.current.resumeTimedOut).toBe(false);
+    expect(result.current.awaitingTimedOut).toBe(false);
   });
 
   it("never starts the wait for a buyer who did not come back from anywhere", async () => {
@@ -170,7 +170,7 @@ describe("the resumed hosted return stops asking", () => {
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
     await elapse(WINDOW_MS + SLOW_MS * 10);
 
-    expect(result.current.resumeTimedOut).toBe(false);
+    expect(result.current.awaitingTimedOut).toBe(false);
     expect(calls()).toBe(0);
   });
 });
@@ -234,7 +234,7 @@ describe("how fast the resumed return asks", () => {
     const { result } = renderHook(() => useCheckoutController(makePorts()), { wrapper });
     await elapse(WINDOW_MS + SLOW_MS);
 
-    expect(result.current.resumeTimedOut).toBe(true);
+    expect(result.current.awaitingTimedOut).toBe(true);
     expect(calls()).toBe(POLL_CAP);
   });
 });
