@@ -9,20 +9,30 @@
  *
  * ## It reproduces `useCheckoutNav` exactly, and that is the point
  *
- * `checkout-actions.ts`'s nav has two rules that look like details and are
+ * `checkout-actions.ts`'s nav has three rules that look like details and are
  * not, because the money path walks through them:
  *
  *  - back off the payment step lands on Dados — UNLESS the buyer has a CPF on
  *    file and has never opened Dados, in which case that step is not part of
  *    their flow and the only honest destination is the catalog;
  *  - "alterar" (`editBuyer`) exists ONLY for a buyer whose Dados was skipped,
- *    and opening it makes Dados part of their flow from then on.
+ *    and opening it makes Dados part of their flow from then on;
+ *  - back off the CONFIRMATION is the catalog, always. The flat nav maps back
+ *    to Dados only from `payment`; every other step goes to the menu.
  *
- * Both fall out of one general rule here: **back re-opens the PREVIOUS APPLYING
- * step, and exits when there is none.** A skipped Dados does not apply, so it
- * is not the previous applying step, so back exits — which is the second rule
- * verbatim. `editBuyer` flips the Dados slice's `opened`, after which Dados
- * applies and back returns to it — which is the first.
+ * The first two fall out of one general rule here: **back re-opens the PREVIOUS
+ * APPLYING step, and exits when there is none.** A skipped Dados does not
+ * apply, so it is not the previous applying step, so back exits — which is the
+ * second rule verbatim. `editBuyer` flips the Dados slice's `opened`, after
+ * which Dados applies and back returns to it — which is the first.
+ *
+ * The third does NOT, and stating it separately is the whole of {@link
+ * deriveNav}'s `terminal`. A paid Pix order leaves its pane APPLYING — an order
+ * exists, nothing handed over — and merely COMPLETE, so the previous applying
+ * step behind the confirmation is the payment surface for money that already
+ * moved. Re-opening it puts a live pay button in front of a shopper who has
+ * paid, which is the hazard `ADOPTING.md` records under one owner paying four
+ * times.
  */
 import type {
   AnyCheckoutStep,
@@ -120,12 +130,39 @@ interface DeriveStepInput {
   reopened?: string | null;
 }
 
+/**
+ * THE PANE RULE, stated once — the other half of the no-charge one.
+ *
+ * A `pay`-phase step that some registered method named as its
+ * {@link AnySettlementMethod.pane} belongs to THAT method: it applies while
+ * that method is the chosen one and never otherwise. A `pay` step nobody named
+ * — the hand-off interstitial, which is about the ORDER rather than about the
+ * method — is untouched by this.
+ *
+ * Stated here rather than as a `ctx.method === "PIX"` inside each pane, because
+ * a descriptor field that decides nothing is config that lies: `pane` was
+ * declared, documented and read nowhere while the two panes hard-coded the very
+ * ids it names.
+ */
+function paneApplies(
+  step: AnyCheckoutStep,
+  ctx: CheckoutContext,
+  methods: readonly AnySettlementMethod[],
+): boolean {
+  if (!methods.some((entry) => entry.pane === step.id)) return true;
+  const chosen = methods.find((entry) => entry.id === ctx.method);
+  return chosen?.pane === step.id;
+}
+
 /** The steps that apply to this shopper, with the no-charge rule already applied. */
 export function applyingSteps(input: DeriveStepInput): AnyCheckoutStep[] {
   const { ctx, facts, methods } = input;
   const charges = raisesCharge(ctx.method, methods);
   return orderedSteps(input.steps).filter((step) => {
-    if (!charges && step.phase === "pay") return false;
+    if (step.phase === "pay") {
+      if (!charges) return false;
+      if (!paneApplies(step, ctx, methods)) return false;
+    }
     return step.applies(ctx, facts[step.id]);
   });
 }
@@ -169,15 +206,24 @@ interface NavPorts {
  * `editBuyer` is `undefined` unless Dados was SKIPPED — the payer block keys
  * off its presence, so the decision lives here rather than being re-derived by
  * every caller, exactly as it did in the flat controller.
+ *
+ * `terminal` is `ctx.outcome !== null`, and it is the flat nav's "from `status`
+ * you go to the menu" — see the third rule at the top of this file. It is asked
+ * of the OUTCOME rather than of the last step's identity so that a host's own
+ * confirmation, and a FAILED or EXPIRED one, answer the same way: once this
+ * checkout has an outcome there is nothing behind it a shopper should be sent
+ * back into.
  */
 export function deriveNav(input: {
   applying: readonly AnyCheckoutStep[];
   index: number;
   taxIdOnFile: boolean;
+  /** The walk has an outcome — `ctx.outcome !== null`. */
+  terminal: boolean;
   ports: NavPorts;
 }): { back(): void; editBuyer: (() => void) | undefined } {
   const { applying, index, ports } = input;
-  const previous = index > 0 ? applying[index - 1] : undefined;
+  const previous = input.terminal || index <= 0 ? undefined : applying[index - 1];
   return {
     back() {
       if (previous) ports.reopen(previous.id);

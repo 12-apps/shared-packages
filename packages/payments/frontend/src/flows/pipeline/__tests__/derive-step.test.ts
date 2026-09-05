@@ -16,9 +16,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { applyingSteps, deriveNav, deriveStep, raisesCharge } from "../derive-step";
-import { PACKAGE_METHODS } from "../methods";
+import { CARD_PANE_STEP, PACKAGE_METHODS, PIX_PANE_STEP } from "../methods";
 import { buildMethodStep, dadosStep, DADOS_STEP_ID } from "../steps/buyer-steps";
-import { cardStep, handoffStep, pixStep } from "../steps/pay-steps";
+import { cardStep, handoffStep, HANDOFF_STEP_ID, pixStep } from "../steps/pay-steps";
 import { statusStep } from "../steps/status-step";
 import type { AnyCheckoutStep, AnySettlementMethod, CheckoutContext } from "../types";
 
@@ -63,8 +63,8 @@ describe("the derived step reproduces the skipped-Dados flow (FUT-465)", () => {
 
   it("states who is being charged, and offers to change it", () => {
     const ports = { reopen: vi.fn(), openDados: vi.fn(), exitToCatalog: vi.fn() };
-    const skipped = deriveNav({ applying: [], index: 0, taxIdOnFile: true, ports });
-    const asked = deriveNav({ applying: [], index: 0, taxIdOnFile: false, ports });
+    const skipped = deriveNav({ applying: [], index: 0, taxIdOnFile: true, terminal: false, ports });
+    const asked = deriveNav({ applying: [], index: 0, taxIdOnFile: false, terminal: false, ports });
     // The payer block keys off its PRESENCE, so this is the whole of "offers
     // to change it" — and its absence is the whole of "there is nothing to
     // change, you filled the form yourself".
@@ -102,6 +102,7 @@ describe("the derived step reproduces the skipped-Dados flow (FUT-465)", () => {
       applying: derived.applying,
       index: derived.index,
       taxIdOnFile: true,
+      terminal: false,
       ports,
     }).back();
     // Dados IS part of their flow now, so back returns to it, not to the menu.
@@ -118,6 +119,68 @@ describe("the derived step reproduces the skipped-Dados flow (FUT-465)", () => {
       applying: derived.applying,
       index: derived.index,
       taxIdOnFile: true,
+      terminal: false,
+      ports,
+    }).back();
+    expect(ports.exitToCatalog).toHaveBeenCalledTimes(1);
+    expect(ports.reopen).not.toHaveBeenCalled();
+  });
+
+  it.each(["PIX", "CARD"] as const)(
+    "sends a shopper who settled with %s to the menu, not back to the pane",
+    (method) => {
+      // `useCheckoutNav` maps back to Dados only FROM `payment`; every other
+      // step goes to the menu. A settled order leaves its pane APPLYING — an
+      // order exists and nothing handed over — and merely COMPLETE, so "the
+      // previous applying step" behind the confirmation is the payment surface
+      // for money that already moved.
+      const settled = ctxOf({
+        taxIdOnFile: true,
+        method,
+        order: orderOf({ method }),
+        outcome: "PAID",
+      });
+      const derived = deriveStep({
+        steps: walk(CHARGED),
+        ctx: settled,
+        facts: {},
+        methods: CHARGED,
+      });
+      expect(derived.step?.id).toBe("status");
+      // The pane really is behind them — this is not a walk that happens to
+      // have nothing to go back to.
+      expect(derived.applying.map((step) => step.id)).toContain(method.toLowerCase());
+
+      const ports = { reopen: vi.fn(), openDados: vi.fn(), exitToCatalog: vi.fn() };
+      deriveNav({
+        applying: derived.applying,
+        index: derived.index,
+        taxIdOnFile: true,
+        terminal: settled.outcome !== null,
+        ports,
+      }).back();
+      expect(ports.exitToCatalog).toHaveBeenCalledTimes(1);
+      expect(ports.reopen).not.toHaveBeenCalled();
+    },
+  );
+
+  it("sends a shopper back to the menu from a REFUSED confirmation too", () => {
+    // The rule is the OUTCOME, not the word "paid": a FAILED confirmation
+    // carries its own retry, and the pane behind it is no more a destination
+    // than it is after a payment that worked.
+    const failed = ctxOf({
+      taxIdOnFile: true,
+      method: "PIX",
+      order: orderOf({ method: "PIX" }),
+      outcome: "FAILED",
+    });
+    const derived = deriveStep({ steps: walk(CHARGED), ctx: failed, facts: {}, methods: CHARGED });
+    const ports = { reopen: vi.fn(), openDados: vi.fn(), exitToCatalog: vi.fn() };
+    deriveNav({
+      applying: derived.applying,
+      index: derived.index,
+      taxIdOnFile: true,
+      terminal: true,
       ports,
     }).back();
     expect(ports.exitToCatalog).toHaveBeenCalledTimes(1);
@@ -126,9 +189,11 @@ describe("the derived step reproduces the skipped-Dados flow (FUT-465)", () => {
 });
 
 describe("a settlement that raises no charge mounts no payment surface", () => {
-  it.each(NO_CHARGE_METHODS.map((method) => [method.id, method] as const))(
+  // The row itself is no longer a parameter: what it carried was `pane`, and
+  // both rows declare it `null`, so the assertion it fed asserted nothing.
+  it.each(NO_CHARGE_METHODS.map((method) => method.id))(
     "derives no pay-phase step for %s, at any point in its walk",
-    (id, method) => {
+    (id) => {
       expect(raisesCharge(id, ALL_METHODS)).toBe(false);
       // Every state the walk can be in AFTER the method is chosen: nothing
       // raised yet, an order in hand, and the order answered.
@@ -149,8 +214,16 @@ describe("a settlement that raises no charge mounts no payment surface", () => {
           facts: {},
           methods: ALL_METHODS,
         });
+        // NOT `method.pane`: both no-charge rows declare `pane: null`, so
+        // naming it here only ever asserted "the walk derived SOME step". The
+        // panes that could actually be derived are the package's own, and they
+        // are asserted FIRST so this reads as the failure it is meant to catch
+        // rather than as a consequence of the phase check below.
+        const derivedId = stepIdFor(ctx, ALL_METHODS);
+        expect(derivedId).not.toBe(PIX_PANE_STEP);
+        expect(derivedId).not.toBe(CARD_PANE_STEP);
+        expect(derivedId).not.toBe(HANDOFF_STEP_ID);
         expect(applying.map((step) => step.phase)).not.toContain("pay");
-        expect(stepIdFor(ctx, ALL_METHODS)).not.toBe(method.pane);
       }
     },
   );

@@ -44,13 +44,20 @@ function CardView({ ctx }: CheckoutStepRender<void>): JSX.Element | null {
   return <CardEntry payable={ctx.order} onResolved={actions.resolve} />;
 }
 
-/** The Pix code, once one exists. */
+/**
+ * The Pix code, once one exists.
+ *
+ * WHICH method this pane belongs to is not asked here: the engine reads it off
+ * the descriptor that named this step as its `pane`, so a method the package
+ * has never heard of can reuse the pane by naming it, and no pane states its
+ * own method twice.
+ */
 export const pixStep: CheckoutStep = {
   id: PIX_PANE_STEP,
   phase: "pay",
   order: 0,
   applies(ctx) {
-    return ctx.method === "PIX" && ctx.order !== null && !handedOver(ctx.order.hostedCheckoutUrl);
+    return ctx.order !== null && !handedOver(ctx.order.hostedCheckoutUrl);
   },
   complete(ctx) {
     return ctx.outcome !== null;
@@ -60,13 +67,13 @@ export const pixStep: CheckoutStep = {
   },
 };
 
-/** The card form, once an order exists to charge. */
+/** The card form, once an order exists to charge. Its method is its `pane` owner. */
 export const cardStep: CheckoutStep = {
   id: CARD_PANE_STEP,
   phase: "pay",
   order: 1,
   applies(ctx) {
-    return ctx.method === "CARD" && ctx.order !== null && !handedOver(ctx.order.hostedCheckoutUrl);
+    return ctx.order !== null && !handedOver(ctx.order.hostedCheckoutUrl);
   },
   complete(ctx) {
     return ctx.outcome !== null;

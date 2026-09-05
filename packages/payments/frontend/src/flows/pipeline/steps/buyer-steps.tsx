@@ -10,6 +10,7 @@
 import { Box } from "@mui/material";
 import type { JSX } from "react";
 
+import { PaymentErrorPanel } from "../../../components/checkout/payment-error-panel";
 import { useCheckoutComponents } from "../../../components/checkout/ui";
 import type { PaymentMethod } from "../../../components/checkout/types";
 import { usePipelineActions } from "../actions";
@@ -169,7 +170,7 @@ function MethodTiles({ ctx }: { ctx: CheckoutContext }): JSX.Element {
  * that registers a method of its own gets the generic tiles, which is the only
  * shape that can draw a method this package has never heard of.
  */
-function MethodView({ ctx }: CheckoutStepRender<MethodSlice>): JSX.Element {
+function MethodView({ ctx, error }: CheckoutStepRender<MethodSlice>): JSX.Element {
   const actions = usePipelineActions();
   const MethodChoice = actions.screens.MethodChoice;
   const packageOnly = actions.offered.every((method) => isPackageMethod(method.id));
@@ -184,7 +185,44 @@ function MethodView({ ctx }: CheckoutStepRender<MethodSlice>): JSX.Element {
       ) : (
         <MethodTiles ctx={ctx} />
       )}
+      <MethodRefusal error={error} />
     </Box>
+  );
+}
+
+/**
+ * A REFUSAL THE PICKER HAS TO DRAW, because it is where the shopper is.
+ *
+ * The routing hands a step every refusal nobody more specific claimed — the
+ * unclaimed ones, and the ones whose gate is passing and therefore drawing
+ * nothing (`refusal-routing.ts`). Raising the payable fails from HERE, so this
+ * is the step those land on, and a picker that ignored the prop would leave the
+ * shopper tapping a tile that answers nothing.
+ *
+ * `PaymentErrorPanel` rather than a bare Alert: it is the same panel the flat
+ * flow's Pagamento step draws, and it carries the rule that matters most — an
+ * UNRESOLVED charge gets a warning and NO retry, because some provider may be
+ * holding the buyer's money and a retry mints a second order.
+ *
+ * `emailFlagged` is FALSE here and cannot be otherwise: the one refusal that
+ * offer answers, `EMAIL_EQUALS_MERCHANT`, is claimed by the buyer-details step
+ * (`dadosStep.answersCodes`), so the routing sends that shopper to the form
+ * holding the e-mail field instead of offering a second copy of it under a
+ * picker. `onUseEmail` is consequently unreachable, and is the buyer-details
+ * door rather than a no-op so that it stays true if the claim ever moves.
+ */
+function MethodRefusal({ error }: { error: CheckoutStepRender<MethodSlice>["error"] }): JSX.Element | null {
+  const actions = usePipelineActions();
+  const openDados = actions.editBuyer;
+  if (!error) return null;
+  return (
+    <PaymentErrorPanel
+      message={error.message}
+      emailFlagged={false}
+      code={error.code}
+      onUseEmail={() => openDados?.()}
+      onRetry={actions.place}
+    />
   );
 }
 

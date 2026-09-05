@@ -25,6 +25,7 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from "../../components/checkout/types";
+import { useCatalogExit } from "../catalog-exit";
 import type { FlowsRuntime } from "../runtime";
 
 import { applyingSteps, raisesCharge, sliceFor } from "./derive-step";
@@ -53,14 +54,30 @@ export interface PipelineWiring {
 /**
  * The `method` the WIRE carries for a settlement this package cannot name.
  *
- * The request's `method` is the package's own two, and a host's registered id
- * is not one of them — so a host method that must name itself on the wire does
- * it through its own step's `contribute`, which is what `contribute` is for.
- * Until it does, the chain's own hand-off method is what the server will
- * honour, exactly as it is for a store whose buyer was never asked.
+ * `method` is what the CHAIN can be asked to charge, so a host's registered id
+ * is never one of its values: the chain's own hand-off method is what the
+ * server will honour, exactly as it is for a store whose buyer was never asked.
+ *
+ * WHICH settlement the buyer actually chose rides {@link settlementOnWire}
+ * beside it. It has to: `method` alone makes a courier, a waiter and a Pix
+ * charge the same request, and `raisesCharge: false` is the capability this
+ * step exists for.
  */
 function wireMethod(id: string, ctx: CheckoutContext): PaymentMethod {
   return isPackageMethod(id) ? id : handOffMethod(offeredMethods(ctx.config));
+}
+
+/**
+ * The chosen id, for a settlement the two package methods do not cover.
+ *
+ * ABSENT for `PIX` and `CARD` — a host reading only `method` reads exactly the
+ * request it read before this field existed, which is the whole of the wire
+ * staying additive. A step that wants to say something else still can: its
+ * `contribute` returns `Partial<CreateOrderRequest>`, and the contributions are
+ * folded over this base.
+ */
+function settlementOnWire(id: string): Pick<CreateOrderRequest, "settlementMethod"> {
+  return isPackageMethod(id) ? {} : { settlementMethod: id };
 }
 
 /** The create request: the method, the buyer, and whatever each step contributes. */
@@ -75,6 +92,7 @@ function createRequest(input: {
     method: wireMethod(input.methodId, input.ctx),
     buyer: input.ctx.buyer,
     saveProfile: input.saveProfile,
+    ...settlementOnWire(input.methodId),
   };
   return input.applying.reduce<CreateOrderRequest>(
     (request, step) => ({
@@ -188,12 +206,7 @@ export function useEngineWriters(input: EngineWritersInput): EngineWriters {
   const { runtime, store, ctx, wiring } = input;
   const placeOrder = usePlaceOrder(input);
   const continueFromDados = useContinueFromDados(input);
-  const catalog = runtime.config.exit?.useCatalog();
-  const exitToCatalog = useCallback(() => {
-    const exit = runtime.config.exit;
-    if (exit && catalog) exit.navigate(catalog.to);
-    else runtime.config.ports.exitToCatalog();
-  }, [runtime, catalog]);
+  const exitToCatalog = useCatalogExit(runtime);
   const choose = useCallback(
     (methodId: string) => {
       // A different method means the order raised for the previous one is

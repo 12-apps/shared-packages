@@ -20,6 +20,10 @@
  * refusal. A host that wants the compile-time guarantee declares its own
  * exhaustive owner map (`REFUSAL_OWNERS satisfies Record<Code, …>`); the
  * package keeps the runtime answer for every host that has not.
+ *
+ * The same fallback carries a code whose owning GATE is not refusing — see
+ * {@link errorForStep}. Routing is about finding the screen that can change the
+ * answer; when there is no such screen up, the shopper still has to be told.
  */
 import type { CheckoutError } from "../../components/checkout/types";
 
@@ -58,9 +62,23 @@ export function refusalOwner(
 /**
  * The error THIS step should render, or `null`.
  *
- * A claimed refusal reaches its claimant and nobody else, so a step never
- * renders a complaint about a field it does not draw. An unclaimed one reaches
+ * A step-claimed refusal reaches its claimant and nobody else, so a step never
+ * renders a complaint about a field it does not draw. Everything else reaches
  * whichever step the shopper is on.
+ *
+ * ## A GATE's code reaching a step means that gate is PASSING
+ *
+ * A gate that would refuse curtains the checkout before any step renders, and
+ * its own `Screen` is handed the error there — so the walk is reached only with
+ * every gate passing, and the only gate-claimed refusal a step ever sees is one
+ * no curtain is going to draw. Dropping it here loses it completely: the
+ * shopper presses pay, the server refuses, and nothing on the screen changes or
+ * names the reason. So it falls back to the unclaimed behaviour instead, which
+ * is the one that always reaches somebody.
+ *
+ * That is not a weaker routing than "a gate's code re-renders the gate" — it is
+ * the same routing, with the case the gate cannot answer handed on rather than
+ * swallowed. A gate that DOES want the screen refuses, and then it gets it.
  */
 export function errorForStep(
   error: CheckoutError | null,
@@ -70,7 +88,6 @@ export function errorForStep(
 ): CheckoutError | null {
   if (!error) return null;
   if (owner.kind === "step") return owner.id === stepId ? error : null;
-  if (owner.kind === "gate") return null;
   return stepId === currentStepId ? error : null;
 }
 

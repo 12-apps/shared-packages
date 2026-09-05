@@ -117,6 +117,7 @@ function EngineWalk(props: {
     applying: derived.applying,
     index: derived.index,
     taxIdOnFile: ctx.taxIdOnFile,
+    terminal: ctx.outcome !== null,
     ports: writers,
   });
   const copy = runtime.config.copy.views;

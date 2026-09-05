@@ -77,10 +77,18 @@ describe("which step draws the refusal", () => {
     expect(errorForStep(error, owner, "address", "method")).toBeNull();
   });
 
-  it("shows a gate's refusal on no step at all — the gate speaks", () => {
+  it("shows a gate's refusal on the current step, because the gate is passing", () => {
+    // The fixture gate above ADMITS everyone, and that is the only shape a
+    // gate-claimed code can reach a step in: a gate that would refuse curtains
+    // the checkout before anyone can press pay, and its own `Screen` is handed
+    // the error there. So this assertion used to pin the swallow — the shopper
+    // pressed pay, the server refused, and nothing on the screen changed.
     const error = errorOf("STORE_CLOSED");
     const owner = refusalOwner(error.code, STEPS, GATES);
-    expect(errorForStep(error, owner, "method", "method")).toBeNull();
+    expect(owner).toEqual({ kind: "gate", id: "store-open" });
+    expect(errorForStep(error, owner, "method", "method")).toBe(error);
+    // Still nobody else's: a step the shopper is not on draws no complaint.
+    expect(errorForStep(error, owner, "address", "method")).toBeNull();
   });
 });
 

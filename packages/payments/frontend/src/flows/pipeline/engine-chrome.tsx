@@ -1,14 +1,27 @@
 /**
  * THE ENGINE'S OWN CHROME (FUT-1240) — the two things that are not a step.
  *
- * A back control and a progress header, both reproducing the flat flow's
- * pixels and test ids exactly: `checkout-back` and `checkout-stepper` are the
- * hooks the storefront journeys click, and a walk that renders different ones
- * would be a rewrite wearing a refactor's clothes.
+ * A back control and a progress header, at the flat flow's own TEST IDS:
+ * `checkout-back` and `checkout-stepper` are the hooks the storefront journeys
+ * click, and a walk that renders different ones would be a rewrite wearing a
+ * refactor's clothes.
  *
- * The stepper's nodes are DERIVED like everything else: the applying steps
- * that named a label, in walk order. A step with no label is an interstitial —
- * the hand-off and the resume are not places a shopper is asked to be.
+ * ## What is NOT the flat flow's, and deliberately
+ *
+ * The flat `ProgressHeader` renders three FIXED nodes — Dados, Pagamento,
+ * Confirmação — for every shopper. Here the nodes are DERIVED like everything
+ * else: the applying steps that named a label, in walk order. So a shopper with
+ * a CPF on file, whose Dados step is not part of their walk at all (FUT-465),
+ * sees the steps they will actually be asked for rather than one they will
+ * never be shown. The same derivation is what lets a host's registered step
+ * appear in the stepper without the header knowing it exists.
+ *
+ * A step with no label is an interstitial — the hand-off and the resume are not
+ * places a shopper is asked to be — so those draw no node either.
+ *
+ * The back link's wording follows the same derivation: it offers "keep
+ * shopping" on the FIRST applying step, where back leaves for the catalog,
+ * rather than on the id `dados` specifically.
  */
 import { Box } from "@mui/material";
 import type { JSX } from "react";
@@ -44,7 +57,14 @@ export function EngineChrome({
   copy: CheckoutViewCopy;
   applying: readonly AnyCheckoutStep[];
   currentId: string | null;
-  /** The shopper is on the first applying step, so back leaves for the catalog. */
+  /**
+   * The shopper is on the first applying step, which is where the link is
+   * worded "continuar comprando" rather than "voltar".
+   *
+   * It is about the WORDING only. Where back actually goes is `deriveNav`'s,
+   * and it leaves for the catalog from a settled confirmation too — where the
+   * flat flow also says "voltar" and also goes to the menu.
+   */
   first: boolean;
   onBack(): void;
 }): JSX.Element {

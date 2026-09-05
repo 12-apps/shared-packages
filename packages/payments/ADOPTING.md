@@ -505,6 +505,19 @@ catalog when there is none, so a shopper whose buyer-details step was skipped
 goes back to the catalog rather than to a form they never saw — and `editBuyer`
 (the payer block's "alterar") makes that step part of their flow from then on.
 
+**Back off the CONFIRMATION is the catalog, always** — once `ctx.outcome` is
+set there is nothing behind it a shopper should be sent into. That is not the
+"previous applying step" rule: a settled Pix or card order leaves its pane
+applying and merely COMPLETE, so the step behind the confirmation is the
+payment surface for money that already moved. Re-offering it puts a live pay
+button in front of a shopper who has paid — the hazard recorded earlier in this
+document, where one owner read a re-offered button as "it did not work" and
+paid four times.
+
+**The confirmation's own "voltar ao cardápio" takes the same door**: a
+registered `exit` when there is one, `ports.exitToCatalog` otherwise. Two ways
+out of a checkout answering differently is a defect, not a choice.
+
 **A step's slice is declared, not held.** `persist: "session"` parks it under
 `payments.checkout.<slug>.<stepId>` — scoped to the store, because one tab
 holds one slot for every store on a multi-tenant storefront. Nothing is
@@ -517,15 +530,35 @@ method pane, no polling — and placing the order IS the settlement, so the walk
 goes straight to the confirmation. The engine enforces that ONCE, over the
 phase, so no lane can forget it.
 
+**`pane` names the `pay`-phase step your method settles on**, and the engine
+reads it: a `pay` step that some method claimed as its pane applies only while
+THAT method is the chosen one. `null` — the value every no-charge method uses —
+claims none, and the walk goes to the confirmation. A charged method of your
+own either names its own step or reuses one of the package's two (`"pix"`,
+`"card"`) by naming it.
+
+**Your method's id reaches `createOrder` as `settlementMethod`.** The request's
+`method` is what the CHAIN can be asked to charge, so it is only ever `PIX` or
+`CARD`; the id you registered rides its own optional field beside it, and is
+ABSENT for the package's own two. Without it every no-charge settlement arrives
+identical — a courier, a waiter and a Pix charge as one request — which is
+exactly the fact `raisesCharge: false` exists to let you act on. A step may set
+the same field from its `contribute` when the settlement has a finer name than
+the tile does.
+
 ```tsx
 export const payOnDeliveryMethod: SettlementMethodDescriptor<TablesState | undefined> = {
-  id: "ON_DELIVERY", raisesCharge: false, pane: null,
+  id: "ON_DELIVERY", raisesCharge: false, pane: null,   // `null` ⇒ no pane, straight to the confirmation
   useFacts: () => useMenuTables(slug).data,
   offered: (ctx, tables) => tables?.delivery?.payOnDelivery === true,
   Review: ConfirmOnDelivery,       // optional: what they confirm before it is placed
   Confirmation: DeliveryPlaced,    // optional: default is the package's PaymentStatus
   tile: (copy) => ({ label: copy.…, hint: copy.… }),
 };
+
+// …and the create port is told which one it is:
+//   { method: "PIX", settlementMethod: "ON_DELIVERY", buyer, saveProfile }
+// `method` is the chain's, `settlementMethod` is yours — read the second one.
 ```
 
 **A gate is `useFacts()` + a pure `decide()`**, evaluated in array order before
@@ -537,9 +570,13 @@ that route is where money gets confirmed. The same list is exported headless as
 answer the checkout will give rather than a second one of their own.
 
 **Refusals are ROUTED.** A server refusal whose `code` a step's `answersCodes`
-names re-opens that step and renders there; a gate's code re-renders the gate.
-A code nobody claimed still reaches the shopper, on whichever step they are on
-— which is what lets a host adopt this one plugin at a time.
+names re-opens that step and renders there. A gate's code re-renders the gate
+WHEN that gate is refusing — its `Screen` is handed the error — and otherwise
+falls back to the current step, because a gate that admitted this shopper draws
+nothing and a refusal drawn nowhere is a shopper pressing pay against a screen
+that never changes. A code nobody claimed reaches the shopper the same way, on
+whichever step they are on — which is what lets a host adopt this one plugin at
+a time.
 
 **Hook order is a function of the ARRAYS.** Every plugin's `useFacts()` runs on
 every render in array order, so `steps`, `gates` and `settlementMethods` must
@@ -580,7 +617,7 @@ order CREATION never enter the package; they arrive as explicit props:
 | port | required | what the host does with it |
 | ---- | -------- | -------------------------- |
 | `cart` | yes | `{ empty, totalLabel, totalItems, discountLines?, identity? }` — read from YOUR cart; `discountLines` is your own rendered discount itemization, and `identity` is what binds a parked payment to a basket (below) |
-| `createOrder(input)` | yes | raise the order from your cart/comanda; close over tenant + comanda scope; answer `CreateOrderResult` (`{ok:true,data:CheckoutOrder}` or a structured `CheckoutError`) |
+| `createOrder(input)` | yes | raise the order from your cart/comanda; close over tenant + comanda scope; answer `CreateOrderResult` (`{ok:true,data:CheckoutOrder}` or a structured `CheckoutError`). `input.settlementMethod` is set — and only set — when a PIPELINE host's own registered settlement was chosen |
 | `onExitToMenu()` | yes | navigate to your catalog |
 | `saveBuyerContact(contact)` | no | persist name/phone/CPF on "Continuar" (LGPD-gated by the flow); the WIRE rules — e.g. a blank CPF must be omitted, never sent as `""` — are yours |
 | `onPaid()` | no | the order settled PAID — re-read your server-emptied cart |
