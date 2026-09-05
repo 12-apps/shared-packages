@@ -13,14 +13,16 @@ export const PT_BR_PAGES: AuthPagesCopy = {
   login: {
     title: "Entrar",
     subtitle: "Entre na sua conta",
-    providerDivider: "ou entre com",
+    // Just "ou": the divider sits between the provider buttons above it and
+    // the form below, so it introduces neither.
+    providerDivider: "ou",
     signupPrompt: "Não tem uma conta?",
     signupLink: "Cadastre-se",
   },
   signup: {
     title: "Criar conta",
     subtitle: "Crie sua conta",
-    providerDivider: "ou cadastre-se com",
+    providerDivider: "ou",
     loginPrompt: "Já tem uma conta?",
     loginLink: "Entrar",
   },

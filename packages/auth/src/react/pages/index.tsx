@@ -1,10 +1,6 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
-import { SocialLoginContainer } from "@12-apps/ui/social-login-button";
-import { Container } from "@12-apps/ui/layout/Container";
-import { Spacer } from "@12-apps/ui/layout/Spacer";
-import { Text } from "@12-apps/ui/typography/Text";
-
+import { AuthCard, AuthFooter, ProviderBlock, type AuthLink } from "./card";
 import type { EmailAuthScreens } from "../screens";
 
 /**
@@ -29,16 +25,11 @@ import type { EmailAuthScreens } from "../screens";
  * - **navigation** — a `Link` component and the route paths, so nothing here
  *   depends on which router the host uses.
  *
- * Everything else is here, once.
+ * Everything else is here, once — this file binds the configuration and
+ * decides what each page shows; `./card` is the shell they render inside.
  */
 
-/** Router-agnostic link. A host passes its own — `react-router`'s, or an `<a>`. */
-export type AuthLink = ComponentType<{
-  to: string;
-  children: ReactNode;
-  "data-testid"?: string;
-  style?: Record<string, string | number>;
-}>;
+export type { AuthLink } from "./card";
 
 /**
  * The route paths the footers link to.
@@ -65,7 +56,11 @@ export interface AuthPagesCopy {
     title: string;
     /** A line under the title. Optional: not every product wants one. */
     subtitle?: string;
-    /** "or continue with" — sits between the form and the providers. */
+    /**
+     * The word between the two ways in — "ou". It sits UNDER the providers and
+     * over the form, so it must read as a plain alternative rather than as an
+     * introduction to whatever follows it.
+     */
     providerDivider: string;
     /** "Don't have an account?" */
     signupPrompt: string;
@@ -169,81 +164,6 @@ export interface AuthPages {
   SignupPage: ComponentType<SignupPageProps>;
 }
 
-/** The line under the title, when a product wants one. */
-function Subtitle({ text }: { text?: string }): JSX.Element | null {
-  if (!text) return null;
-  return (
-    <Text color="secondary" size="sm" style={{ textAlign: "center", marginBottom: "1rem" }}>
-      {text}
-    </Text>
-  );
-}
-
-/**
- * The divider + provider block, identical on both pages.
- *
- * `label` is what the divider SAYS — "ou entre com", "ou cadastre-se com" —
- * and both sentences begin with "ou". They are only true when there is another
- * way to sign in directly above them. With the platform's e-mail method
- * switched off the form is not rendered, and the label then sits at the top of
- * the card offering an alternative to nothing: the screen reads as though a
- * form failed to load rather than as a Google-only sign-in.
- *
- * So the label is OPTIONAL, and the caller passes it only when it has rendered
- * something above. Omitted, the buttons still render — they are the whole
- * method now, not the alternative to one.
- */
-function Providers({
-  label,
-  children,
-}: {
-  label?: string;
-  children: ReactNode;
-}): JSX.Element | null {
-  if (!children) return null;
-  return (
-    <>
-      <Spacer size="lg" />
-      {label !== undefined && (
-        <>
-          <Text color="secondary" size="sm" style={{ textAlign: "center" }}>
-            {label}
-          </Text>
-          <Spacer size="sm" />
-        </>
-      )}
-      {children}
-    </>
-  );
-}
-
-/** The footer sentence with a link to the other page. */
-function Footer({
-  prompt,
-  linkText,
-  to,
-  Link,
-  dataTestId,
-}: {
-  prompt: string;
-  linkText: string;
-  to: string;
-  Link: AuthLink;
-  dataTestId: string;
-}): JSX.Element {
-  return (
-    <>
-      <Spacer size="lg" />
-      <Text color="secondary" size="sm" style={{ textAlign: "center" }}>
-        {prompt}{" "}
-        <Link to={to} data-testid={dataTestId} style={{ fontWeight: 600 }}>
-          {linkText}
-        </Link>
-      </Text>
-    </>
-  );
-}
-
 /** The config with its defaults resolved, as the two views below read it. */
 interface ResolvedPagesConfig extends AuthPagesConfig {
   maxWidth: number;
@@ -262,30 +182,33 @@ function LoginView({
   const { screens, copy, routes, Link, maxWidth } = cfg;
   const { EmailPasswordForm } = screens;
   return (
-    <Container variant="centered" padding="lg">
-      {branding}
-      <SocialLoginContainer title={copy.login.title} showDivider={false} maxWidth={maxWidth}>
-        <Subtitle text={copy.login.subtitle} />
-        {notice}
-        {emailEnabled && (
-          <EmailPasswordForm
-            callbackUrl={callbackUrl}
-            onSignedIn={onSignedIn}
-            onForgotPassword={onForgotPassword}
-          />
-        )}
-        <Providers label={emailEnabled ? copy.login.providerDivider : undefined}>{providers}</Providers>
-        {routes.signup !== undefined && Link !== undefined && (
-          <Footer
-            prompt={copy.login.signupPrompt}
-            linkText={copy.login.signupLink}
-            to={routes.signup}
-            Link={Link}
-            dataTestId="go-to-signup"
-          />
-        )}
-      </SocialLoginContainer>
-    </Container>
+    <AuthCard
+      title={copy.login.title}
+      {...(copy.login.subtitle === undefined ? {} : { subtitle: copy.login.subtitle })}
+      {...(branding === undefined ? {} : { branding })}
+      maxWidth={maxWidth}
+    >
+      {notice}
+      <ProviderBlock label={emailEnabled ? copy.login.providerDivider : undefined}>
+        {providers}
+      </ProviderBlock>
+      {emailEnabled && (
+        <EmailPasswordForm
+          callbackUrl={callbackUrl}
+          onSignedIn={onSignedIn}
+          onForgotPassword={onForgotPassword}
+        />
+      )}
+      {routes.signup !== undefined && Link !== undefined && (
+        <AuthFooter
+          prompt={copy.login.signupPrompt}
+          linkText={copy.login.signupLink}
+          to={routes.signup}
+          Link={Link}
+          dataTestId="go-to-signup"
+        />
+      )}
+    </AuthCard>
   );
 }
 
@@ -304,32 +227,35 @@ function SignupView({
   const { screens, copy, routes, Link, maxWidth } = cfg;
   const { EmailSignupForm } = screens;
   return (
-    <Container variant="centered" padding="lg">
-      {branding}
-      <SocialLoginContainer title={copy.signup.title} showDivider={false} maxWidth={maxWidth}>
-        <Subtitle text={copy.signup.subtitle} />
-        {notice}
-        {termsGate}
-        {emailEnabled && (
-          <EmailSignupForm
-            callbackUrl={callbackUrl}
-            onBeforeSubmit={onBeforeSubmit}
-            onSignedIn={onSignedIn}
-            disabled={disabled}
-          />
-        )}
-        <Providers label={emailEnabled ? copy.signup.providerDivider : undefined}>{providers}</Providers>
-        {Link !== undefined && (
-          <Footer
-            prompt={copy.signup.loginPrompt}
-            linkText={copy.signup.loginLink}
-            to={routes.login}
-            Link={Link}
-            dataTestId="go-to-login"
-          />
-        )}
-      </SocialLoginContainer>
-    </Container>
+    <AuthCard
+      title={copy.signup.title}
+      {...(copy.signup.subtitle === undefined ? {} : { subtitle: copy.signup.subtitle })}
+      {...(branding === undefined ? {} : { branding })}
+      maxWidth={maxWidth}
+    >
+      {notice}
+      {termsGate}
+      <ProviderBlock label={emailEnabled ? copy.signup.providerDivider : undefined}>
+        {providers}
+      </ProviderBlock>
+      {emailEnabled && (
+        <EmailSignupForm
+          callbackUrl={callbackUrl}
+          onBeforeSubmit={onBeforeSubmit}
+          onSignedIn={onSignedIn}
+          disabled={disabled}
+        />
+      )}
+      {Link !== undefined && (
+        <AuthFooter
+          prompt={copy.signup.loginPrompt}
+          linkText={copy.signup.loginLink}
+          to={routes.login}
+          Link={Link}
+          dataTestId="go-to-login"
+        />
+      )}
+    </AuthCard>
   );
 }
 
