@@ -489,10 +489,13 @@ createWebNotifications({
   something has happened, `neutral` when the only thing there has already been
   looked at. That distinction is the answer to the original objection — a number
   no amount of reading can clear — which is why the tone exists at all.
-- **Do not also send an inbox notification for a subject you report as live**,
-  or the same thing is counted twice. If you already do (the stage pushes that
-  carry `LIVE_SUBJECT_KEY` are exactly this shape), decide which surface owns
-  the count before you turn live activities on.
+- **An inbox notification about a subject you also report as live is counted
+  TWICE on the bell** — once as the unread row, once as the activity. That is
+  not a reason to stop sending them: the section below tells you to tag them
+  with `LIVE_SUBJECT_KEY` precisely so the phone collapses them, and the row is
+  still the record the reader re-reads later. It is a reason to decide which
+  surface owns the COUNT before you turn live activities on, because this
+  package does not decide it for you.
 - It leaves when your hook stops returning it. There is no dismiss, no read and
   no delete — the subject finishing is the only exit, which is what stops the
   section becoming a second inbox.

@@ -110,17 +110,17 @@ export interface LiveSectionProps {
 /**
  * ## Why this always renders its slot, even with nothing live
  *
- * React reconciles fragment children by INDEX. The section and the inbox are
- * siblings in one fragment, so a branch that stopped rendering this position
- * would move the inbox from index 1 to index 0 — a different element type at
- * that slot, which React handles by unmounting the old subtree and mounting a
- * new one. Every `NotificationRow` would be torn down and rebuilt the moment a
+ * React reconciles a fragment's children POSITIONALLY. The section and the
+ * inbox are siblings in one fragment, and the empty branch used to render the
+ * inbox ALONE — one child rather than two — so the inbox moved to a position
+ * previously held by a different element type, which React handles by
+ * unmounting the old subtree and mounting a new one. Every `NotificationRow` would be torn down and rebuilt the moment a
  * pedido started or finished, throwing keyboard focus to `<body>` inside a
  * focus-trapped drawer, for a reader who was only scrolling their inbox.
  *
  * So the empty case renders `null` INTO the slot rather than returning early.
- * `landing.e2e`-style DOM-node identity is what pins it; a test on the test id
- * alone would pass either way.
+ * Pinned by comparing the row's DOM NODE across the transition: a test on the
+ * test id alone passes either way, because a remounted row has the same id.
  */
 export function LiveSection({
   config,

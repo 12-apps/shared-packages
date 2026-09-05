@@ -215,7 +215,8 @@ createWebNotifications({
 ```
 
 `active` is whether anyone is looking — `false` while the panel is shut. Pass it
-to your query's `enabled`. It is a hint about NEED, never about correctness, and
+to your query's `enabled`. It is a hint about NEED, never about correctness.
+
 It is NOT a promise that a shut panel costs nothing: the bell calls the same
 hook, and the bell is always mounted. `active` earns its keep on the closing
 transition, where a query told to stand down does not fire one last time on the

@@ -601,6 +601,33 @@ describe('the live section', () => {
     expect(screen.getByTestId('notification-n1')).toBe(row);
   });
 
+  it('keeps the inbox MOUNTED when the live section goes away', async () => {
+    // The other direction. A pedido FINISHING crosses the same boundary as one
+    // starting, and a fix that only held one way would ship green — the section
+    // renders its slot either way, so both edges are the same claim.
+    let current: readonly LiveActivity[] = [activity()];
+    const config: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? current : []),
+    };
+    const { Panel } = createWebNotifications({
+      apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
+      transport: inboxTransport(),
+      liveActivities: config,
+    });
+    const { rerender } = render(<Panel open onClose={() => undefined} />);
+
+    const row = await screen.findByTestId('notification-n1');
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+
+    current = [];
+    rerender(<Panel open onClose={() => undefined} />);
+    await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
+
+    expect(screen.getByTestId('notification-n1')).toBe(row);
+  });
+
   it('does not claim the panel is empty while something is live', async () => {
     const config = source([activity()]);
     const { Panel } = mount(config);
