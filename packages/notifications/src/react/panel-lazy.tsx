@@ -37,6 +37,7 @@ import type { NotificationMessages } from '../messages';
 
 import type { InboxStore } from './inbox-state';
 import type { LiveActivitiesConfig } from './live-config';
+import type { LiveSeenStore } from './live-seen';
 import type { NotificationsPanelProps } from './panel';
 
 /** What the factory binds into the panel, and the host never passes. */
@@ -45,6 +46,8 @@ interface PanelParts {
   messages: NotificationMessages;
   /** Absent unless the host turned live activities on — see `./live-config`. */
   live?: LiveActivitiesConfig;
+  /** Travels with `live`: where the panel records what the reader has seen. */
+  liveSeen?: LiveSeenStore;
 }
 
 export function lazyNotificationsPanel(

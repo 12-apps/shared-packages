@@ -3,7 +3,7 @@ import { useState, type ComponentType, type JSX } from 'react';
 import { messagesOf, type NotificationMessages } from '../messages';
 
 import { createNotificationsApiClient, type NotificationsApiClient } from './api';
-import { BellButton, type BellButtonProps } from './bell-button';
+import { BellButton, LiveBellButton, type BellButtonProps } from './bell-button';
 import {
   useUnreadCount,
   type NotificationsSignalHook,
@@ -11,6 +11,7 @@ import {
 } from './hooks';
 import { createInboxStore, type InboxStore } from './inbox-state';
 import type { LiveActivitiesConfig } from './live-config';
+import { createLiveSeenStore } from './live-seen';
 import { lazyNotificationsPanel } from './panel-lazy';
 import type { NotificationsPanelProps } from './panel';
 import { lazyPreferencesPage } from './page-lazy';
@@ -117,13 +118,33 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
     ...(config.useSignal ? { useSignal: config.useSignal } : {}),
   };
 
-  const Bell: ComponentType<BellButtonProps> = (props) => (
-    <BellButton {...props} store={store} messages={messages} {...subscribeOption} />
-  );
+  // One store per factory, shared by the bell that READS it and the panel that
+  // WRITES it — the same arrangement as the inbox store above, and for the same
+  // reason: two independent copies would disagree about what the reader saw.
+  const liveSeen = createLiveSeenStore();
+
+  // Chosen ONCE, here, because `useActivities` is a hook and the choice must
+  // not be made per render: a bell that read an optional config inside itself
+  // would be calling a hook conditionally.
+  const live = config.liveActivities;
+  const Bell: ComponentType<BellButtonProps> = live
+    ? (props) => (
+        <LiveBellButton
+          {...props}
+          store={store}
+          messages={messages}
+          live={live}
+          seen={liveSeen}
+          {...subscribeOption}
+        />
+      )
+    : (props) => (
+        <BellButton {...props} store={store} messages={messages} {...subscribeOption} />
+      );
   const Panel = lazyNotificationsPanel({
     store,
     messages,
-    ...(config.liveActivities ? { live: config.liveActivities } : {}),
+    ...(live ? { live, liveSeen } : {}),
   });
 
   function useBoundUnreadCount(options: { enabled?: boolean } = {}): number {

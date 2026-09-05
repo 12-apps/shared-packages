@@ -20,7 +20,7 @@
  * - It does not fetch. `useActivities` is the host's, and `active` tells it
  *   whether anyone is looking.
  */
-import { useEffect, useId, useState, type JSX } from 'react';
+import { useEffect, useId, useState, type JSX, type ReactNode } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
 import { Text } from '@12-apps/ui/typography/Text';
@@ -30,6 +30,7 @@ import type { NotificationMessages } from '../messages';
 
 import { LiveActivityCard } from './live-card';
 import type { LiveActivitiesConfig } from './live-config';
+import type { LiveSeenStore } from './live-seen';
 
 /**
  * How often the section re-reads the clock.
@@ -75,6 +76,29 @@ export interface LiveSectionProps {
    * does nothing.
    */
   onOpen?: (activity: LiveActivity) => void;
+  /**
+   * The rest of the panel, given how many entries are live.
+   *
+   * A render prop rather than a sibling, because the count is knowable only
+   * where the host's hook is CALLED, and it cannot be called anywhere else:
+   * `live` is optional on the panel, so reading it there would mean calling a
+   * hook conditionally — the failure React reports as a crash in some unrelated
+   * component.
+   *
+   * The inbox needs the number for exactly one decision, and it is the decision
+   * this section exists to inform: whether "no notifications" is true. A live
+   * entry IS a notification, so a panel showing one under that sentence is
+   * contradicting itself.
+   */
+  children?: (liveCount: number) => ReactNode;
+  /**
+   * Where "the reader has seen these" is recorded, for the bell to read.
+   *
+   * Written HERE because this is the component that puts them on screen, and
+   * being on screen is what seen means. Optional so the section stays usable by
+   * a host that mounts it outside the panel.
+   */
+  seen?: LiveSeenStore;
 }
 
 
@@ -84,7 +108,9 @@ export function LiveSection({
   messages,
   active,
   onOpen,
-}: LiveSectionProps): JSX.Element | null {
+  children,
+  seen,
+}: LiveSectionProps): JSX.Element {
   // Unconditional, because it is a hook. `active` is how it is told nobody is
   // looking — the same arrangement `useSignal` has one seam over.
   const activities = config.useActivities({ active });
@@ -94,9 +120,19 @@ export function LiveSection({
   // regions resolve their label to whichever came first.
   const headingId = useId();
 
-  if (activities.length === 0) return null;
+  const liveCount = activities.length;
+
+  // Only while somebody is looking. The panel keeps this mounted through the
+  // closing transition, and marking there would swallow an update that arrived
+  // in the frames after the reader turned away.
+  useEffect(() => {
+    if (active && liveCount > 0) seen?.mark(activities);
+  }, [active, liveCount, activities, seen]);
+
+  if (liveCount === 0) return <>{children?.(0)}</>;
 
   return (
+    <>
     // A NAMED region. Without the label a screen-reader user meets a loose run
     // of controls ahead of the inbox with nothing saying what they are; the
     // panel's own title is the drawer's heading and cannot describe this block.
@@ -136,6 +172,8 @@ export function LiveSection({
           />
         ))}
       </Box>
-    </Box>
+      </Box>
+      {children?.(liveCount)}
+    </>
   );
 }

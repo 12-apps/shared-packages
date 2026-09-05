@@ -25,6 +25,7 @@ import { BellIcon } from './bell-icon';
 import { useInboxList } from './hooks';
 import type { InboxState, InboxStore } from './inbox-state';
 import type { LiveActivitiesConfig } from './live-config';
+import type { LiveSeenStore } from './live-seen';
 import { LiveSection } from './live-section';
 import { NotificationRow } from './row';
 
@@ -35,6 +36,14 @@ interface PanelBodyProps {
   onLoadMore: () => void;
   onOpen: (notification: InboxNotification) => void;
   onDelete: (id: string) => void;
+  /**
+   * Whether the live section above has anything in it.
+   *
+   * The empty state is a CLAIM about the whole panel — "nenhuma notificação" —
+   * and a live entry is a notification, so an inbox with no rows under a pinned
+   * pedido is not empty. Without this the panel said both things at once.
+   */
+  hasLive: boolean;
 }
 
 /** The scrollable panel body: loading / error / empty / the list + pager. */
@@ -45,6 +54,7 @@ function PanelBody({
   onLoadMore,
   onOpen,
   onDelete,
+  hasLive,
 }: PanelBodyProps): JSX.Element {
   if (state.status === 'pending' || state.status === 'idle') {
     return (
@@ -68,7 +78,7 @@ function PanelBody({
       />
     );
   }
-  if (state.items.length === 0) {
+  if (state.items.length === 0 && !hasLive) {
     return (
       <EmptyState
         variant="illustrated"
@@ -80,7 +90,12 @@ function PanelBody({
     );
   }
   return (
-    <Box>
+    // A stable anchor for the inbox half, present whether or not it has rows.
+    // The panel's claim is that what is HAPPENING sits above what has already
+    // happened, and until this existed the only thing below the live section to
+    // point at was the empty state — which is exactly what stops rendering when
+    // something is live.
+    <Box data-testid="notifications-inbox">
       {state.items.map((notification) => (
         <NotificationRow
           key={notification.id}
@@ -152,6 +167,57 @@ export interface NotificationsPanelProps {
   onNavigate?: (link: string) => void;
 }
 
+/**
+ * Everything BELOW the live section: the mark-all control and the list.
+ *
+ * Its own component rather than a block inside the panel because it is rendered
+ * from two places — through `LiveSection`, and directly when the host turned
+ * live activities off — and because the panel is at its line ceiling. "Marcar
+ * todas como lidas" belongs to the INBOX and travels with it: a live entry has
+ * nothing to mark.
+ */
+function PanelInbox({
+  state,
+  messages,
+  store,
+  onOpen,
+  hasLive,
+}: {
+  state: InboxState;
+  messages: NotificationMessages;
+  store: InboxStore;
+  onOpen: (notification: InboxNotification) => void;
+  hasLive: boolean;
+}): JSX.Element {
+  const hasUnread = state.items.some((item) => item.readAt === null);
+  return (
+    <>
+      {hasUnread ? (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 1 }}>
+          <Button
+            variant="ghost"
+            color="primary"
+            size="xs"
+            onClick={() => store.markAllRead()}
+            dataTestId="notifications-mark-all-read"
+          >
+            {messages.markAllRead}
+          </Button>
+        </Box>
+      ) : null}
+      <PanelBody
+        state={state}
+        messages={messages}
+        onRetry={() => store.invalidate()}
+        onLoadMore={() => store.loadMore()}
+        onOpen={onOpen}
+        onDelete={(id) => store.remove(id)}
+        hasLive={hasLive}
+      />
+    </>
+  );
+}
+
 export function NotificationsPanel({
   open,
   onClose,
@@ -159,10 +225,12 @@ export function NotificationsPanel({
   store,
   messages,
   live,
+  liveSeen,
 }: NotificationsPanelProps & {
   store: InboxStore;
   messages: NotificationMessages;
   live?: LiveActivitiesConfig;
+  liveSeen?: LiveSeenStore;
 }): JSX.Element {
   // `useTheme` from @mui/material/styles falls back to the DEFAULT theme when
   // no provider is mounted, where the callback form of `useMediaQuery` would
@@ -174,7 +242,18 @@ export function NotificationsPanel({
 
   const { openNotification, openLive } = usePanelOpeners(store, onClose, onNavigate);
 
-  const hasUnread = state.items.some((item) => item.readAt === null);
+  // A function rather than an element so the live count can reach it: with a
+  // live section it is called by `LiveSection` — the only place the host's hook
+  // may be called — and without one it is called here with zero.
+  const renderInbox = (liveCount: number): JSX.Element => (
+    <PanelInbox
+      state={state}
+      messages={messages}
+      store={store}
+      onOpen={openNotification}
+      hasLive={liveCount > 0}
+    />
+  );
 
   return (
     <Drawer
@@ -199,29 +278,13 @@ export function NotificationsPanel({
             messages={messages}
             active={open}
             {...(onNavigate ? { onOpen: openLive } : {})}
-          />
-        ) : null}
-        {hasUnread ? (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 1 }}>
-            <Button
-              variant="ghost"
-              color="primary"
-              size="xs"
-              onClick={() => store.markAllRead()}
-              dataTestId="notifications-mark-all-read"
-            >
-              {messages.markAllRead}
-            </Button>
-          </Box>
-        ) : null}
-        <PanelBody
-          state={state}
-          messages={messages}
-          onRetry={() => store.invalidate()}
-          onLoadMore={() => store.loadMore()}
-          onOpen={openNotification}
-          onDelete={(id) => store.remove(id)}
-        />
+            {...(liveSeen ? { seen: liveSeen } : {})}
+          >
+            {renderInbox}
+          </LiveSection>
+        ) : (
+          renderInbox(0)
+        )}
       </DrawerContent>
     </Drawer>
   );
