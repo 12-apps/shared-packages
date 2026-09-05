@@ -2,6 +2,7 @@
   "tokens": "src/tokens/index.native.ts",
   "provider": "src/provider/index.native.ts",
   "icons": "src/icons/index.native.ts",
+  "data-display/ErrorState": "src/components/data-display/ErrorState/index.native.ts",
   "data-display/LoadingState": "src/components/data-display/LoadingState/index.native.ts",
   "form/Button": "src/components/form/Button/index.native.ts",
   "layout/Box": "src/components/layout/Box/index.native.ts",

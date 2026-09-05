@@ -249,6 +249,10 @@
       "default": "./dist/data-display/AsyncStateContainer.js"
     },
     "./data-display/ErrorState": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/ErrorState/index.native.d.ts",
+        "default": "./dist/native/data-display/ErrorState.js"
+      },
       "types": "./dist/types/components/data-display/ErrorState/index.d.ts",
       "default": "./dist/data-display/ErrorState.js"
     },
