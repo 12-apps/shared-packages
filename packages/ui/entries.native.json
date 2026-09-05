@@ -4,6 +4,7 @@
   "icons": "src/icons/index.native.ts",
   "data-display/Alert": "src/components/data-display/Alert/index.native.ts",
   "data-display/Avatar": "src/components/data-display/Avatar/index.native.ts",
+  "data-display/Badge": "src/components/data-display/Badge/index.native.ts",
   "data-display/Chip": "src/components/data-display/Chip/index.native.ts",
   "data-display/EmptyState": "src/components/data-display/EmptyState/index.native.ts",
   "data-display/ErrorState": "src/components/data-display/ErrorState/index.native.ts",

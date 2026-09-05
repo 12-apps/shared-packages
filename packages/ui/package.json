@@ -157,6 +157,10 @@
       "default": "./dist/data-display/Avatar.js"
     },
     "./data-display/Badge": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Badge/index.native.d.ts",
+        "default": "./dist/native/data-display/Badge.js"
+      },
       "types": "./dist/types/components/data-display/Badge/index.d.ts",
       "default": "./dist/data-display/Badge.js"
     },
