@@ -149,6 +149,10 @@
       "default": "./dist/data-display/AlertDialog.js"
     },
     "./data-display/Avatar": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Avatar/index.native.d.ts",
+        "default": "./dist/native/data-display/Avatar.js"
+      },
       "types": "./dist/types/components/data-display/Avatar/index.d.ts",
       "default": "./dist/data-display/Avatar.js"
     },

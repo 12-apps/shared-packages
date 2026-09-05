@@ -6,9 +6,29 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { pulseAnimation, rotateAnimation, scaleInAnimation, shimmerAnimation } from './Avatar.animations';
-import type { AvatarSize, AvatarStatus } from './Avatar.types';
+import {
+  AVATAR_SIZES,
+  AVATAR_TRANSITION_EASING,
+  AVATAR_TRANSITION_MS,
+  ACTIVE_SCALE,
+  BORDER_HALO_ALPHA,
+  BORDER_WIDTH,
+  FADE_MS,
+  FOCUS_RING,
+  GLOW,
+  HOVER,
+  LOADING_OVERLAY,
+  PULSE,
+  ROUNDED_RADIUS_UNITS,
+  SCALE_IN_MS,
+  SHIMMER,
+  SPINNER,
+  STATUS_DOT,
+} from './Avatar.metrics';
+import type { AvatarSize, AvatarStatus, ContentType } from './Avatar.types';
+import { px } from '../../../tokens/theme';
 
-export type ContentType = 'children' | 'fallback' | 'icon' | 'default';
+export type { ContentType };
 
 
 interface PaletteLike {
@@ -41,20 +61,20 @@ interface SizeStyle {
   fontSize: string;
 }
 
-const getSizeStyles = (size: AvatarSize): SizeStyle => {
-  const sizeMap: Record<AvatarSize, SizeStyle> = {
-    xs: { width: 24, height: 24, fontSize: '0.75rem' },
-    sm: { width: 32, height: 32, fontSize: '0.875rem' },
-    md: { width: 40, height: 40, fontSize: '1rem' },
-    lg: { width: 48, height: 48, fontSize: '1.125rem' },
-    xl: { width: 64, height: 64, fontSize: '1.5rem' },
-    xxl: { width: 80, height: 80, fontSize: '2rem' },
-  };
+// Derived from the shared metrics, not restated: the native `Avatar` reads the
+// same table, so the two renderers cannot disagree on a box.
+const sizeMap: Record<AvatarSize, SizeStyle> = Object.fromEntries(
+  Object.entries(AVATAR_SIZES).map(([size, step]) => [
+    size,
+    { width: step.box, height: step.box, fontSize: px(step.fontSize) },
+  ]),
+) as Record<AvatarSize, SizeStyle>;
 
-  return sizeMap[size] || sizeMap.md;
-};
+const getSizeStyles = (size: AvatarSize): SizeStyle => sizeMap[size] || sizeMap.md;
 
 const getStatusColor = (status: AvatarStatus, theme: Theme): string => {
+  // The same four decisions the native half reads out of `Avatar.metrics`,
+  // against MUI's `Theme` rather than the shared one.
   const statusColorMap: Record<AvatarStatus, string> = {
     online: theme.palette.success.main,
     offline: theme.palette.grey[500],
@@ -70,12 +90,12 @@ const interactiveStyles = (interactive: boolean | undefined, main: string): CSSO
   interactive
     ? {
         '&:hover': {
-          transform: 'scale(1.1) translateY(-2px)',
-          boxShadow: `0 8px 20px ${alpha(main, 0.3)}`,
-          filter: 'brightness(1.1)',
+          transform: `scale(${HOVER.scale}) translateY(-${HOVER.lift}px)`,
+          boxShadow: `0 ${HOVER.shadowY}px ${HOVER.shadowBlur}px ${alpha(main, HOVER.shadowAlpha)}`,
+          filter: `brightness(${HOVER.brightness})`,
           zIndex: 10,
         },
-        '&:active': { transform: 'scale(1.05)' },
+        '&:active': { transform: `scale(${ACTIVE_SCALE})` },
       }
     : {};
 
@@ -85,19 +105,19 @@ const loadingStyles = (isLoading: boolean | undefined, main: string): CSSObject 
     ? {
         background: `linear-gradient(
         90deg,
-        ${alpha(main, 0.6)},
-        ${alpha(main, 0.8)},
-        ${alpha(main, 0.6)}
+        ${alpha(main, SHIMMER.fromAlpha)},
+        ${alpha(main, SHIMMER.toAlpha)},
+        ${alpha(main, SHIMMER.fromAlpha)}
       )`,
         backgroundSize: '200% 100%',
-        animation: `${shimmerAnimation} 1.5s ease-in-out infinite`,
+        animation: `${shimmerAnimation} ${SHIMMER.durationMs / 1000}s ease-in-out infinite`,
       }
     : {};
 
 /** Corner radius per shape variant (circle/status are round). */
 const variantRadius = (variant: string | undefined, theme: Theme): CSSObject => {
   if (variant === 'square') return { borderRadius: 0 };
-  if (variant === 'rounded') return { borderRadius: theme.spacing(1) };
+  if (variant === 'rounded') return { borderRadius: theme.spacing(ROUNDED_RADIUS_UNITS) };
   return { borderRadius: '50%' };
 };
 
@@ -105,8 +125,8 @@ const variantRadius = (variant: string | undefined, theme: Theme): CSSObject => 
 const borderedStyles = (bordered: boolean | undefined, theme: Theme): CSSObject =>
   bordered
     ? {
-        border: `2px solid ${theme.palette.background.paper}`,
-        boxShadow: `0 0 0 1px ${alpha(theme.palette.divider, 0.2)}`,
+        border: `${BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
+        boxShadow: `0 0 0 1px ${alpha(theme.palette.divider, BORDER_HALO_ALPHA)}`,
       }
     : {};
 
@@ -118,8 +138,8 @@ const glowPulseStyles = (
 ): CSSObject => {
   const styles: CSSObject = {};
   if (glow) {
-    styles.boxShadow = `0 0 20px 5px ${alpha(main, 0.4)} !important`;
-    styles.filter = 'brightness(1.05)';
+    styles.boxShadow = `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(main, GLOW.alpha)} !important`;
+    styles.filter = `brightness(${GLOW.brightness})`;
   }
   if (pulse) {
     styles.position = 'relative';
@@ -133,8 +153,8 @@ const glowPulseStyles = (
       borderRadius: 'inherit',
       transform: 'translate(-50%, -50%)',
       backgroundColor: main,
-      opacity: 0.3,
-      animation: `${pulseAnimation} 2s infinite`,
+      opacity: PULSE.alpha,
+      animation: `${pulseAnimation} ${PULSE.durationMs / 1000}s infinite`,
       pointerEvents: 'none',
       zIndex: -1,
     };
@@ -184,10 +204,10 @@ const StyledAvatar = styled(MuiAvatar, {
     const palette = getColorFromTheme(theme, customColor);
     return {
       ...getSizeStyles(customSize),
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: `all ${AVATAR_TRANSITION_MS / 1000}s ${AVATAR_TRANSITION_EASING}`,
       position: 'relative',
       overflow: 'visible',
-      animation: `${scaleInAnimation} 0.3s ease-out`,
+      animation: `${scaleInAnimation} ${SCALE_IN_MS / 1000}s ease-out`,
       cursor: interactive ? 'pointer' : 'default',
       backgroundColor: hasError ? theme.palette.error.main : palette.main,
       color: hasError ? theme.palette.error.contrastText : (palette.contrastText ?? '#fff'),
@@ -197,8 +217,8 @@ const StyledAvatar = styled(MuiAvatar, {
       ...borderedStyles(bordered, theme),
       ...glowPulseStyles(glow, pulse, palette.main),
       '&:focus-visible': {
-        outline: `3px solid ${alpha(palette.main, 0.5)}`,
-        outlineOffset: 2,
+        outline: `${FOCUS_RING.width}px solid ${alpha(palette.main, FOCUS_RING.alpha)}`,
+        outlineOffset: FOCUS_RING.offset,
       },
     };
   },
@@ -216,15 +236,15 @@ const LoadingOverlay = styled('div')<{ size: AvatarSize }>(({ theme, size }) => 
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: alpha(theme.palette.background.paper, 0.7),
-    backdropFilter: 'blur(2px)',
+    backgroundColor: alpha(theme.palette.background.paper, LOADING_OVERLAY.paperAlpha),
+    backdropFilter: `blur(${LOADING_OVERLAY.blur}px)`,
     '& .loading-spinner': {
-      width: sizeStyles.width * 0.4,
-      height: sizeStyles.height * 0.4,
-      border: `2px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+      width: sizeStyles.width * SPINNER.scale,
+      height: sizeStyles.height * SPINNER.scale,
+      border: `${SPINNER.ringWidth}px solid ${alpha(theme.palette.primary.main, SPINNER.trackAlpha)}`,
       borderTopColor: theme.palette.primary.main,
       borderRadius: '50%',
-      animation: `${rotateAnimation} 0.8s linear infinite`,
+      animation: `${rotateAnimation} ${SPINNER.durationMs / 1000}s linear infinite`,
     },
   };
 });
@@ -236,7 +256,7 @@ const StatusBadge = styled(Badge, {
   avatarSize?: AvatarSize;
 }>(({ theme, statusColor, avatarSize = 'md' }) => {
   const sizeStyles = getSizeStyles(avatarSize);
-  const badgeSize = Math.max(8, sizeStyles.width * 0.2);
+  const badgeSize = Math.max(STATUS_DOT.min, sizeStyles.width * STATUS_DOT.scale);
 
   return {
     '& .MuiBadge-badge': {
@@ -245,7 +265,7 @@ const StatusBadge = styled(Badge, {
       width: badgeSize,
       height: badgeSize,
       borderRadius: '50%',
-      border: `2px solid ${theme.palette.background.paper}`,
+      border: `${STATUS_DOT.borderWidth}px solid ${theme.palette.background.paper}`,
       '&::after': {
         position: 'absolute',
         top: 0,
@@ -293,7 +313,7 @@ function AvatarSurface(props: AvatarViewProps): React.JSX.Element {
     dataTestId ? `${dataTestId}-${suffix}` : undefined;
 
   return (
-    <Fade in={props.mounted} timeout={300}>
+    <Fade in={props.mounted} timeout={FADE_MS}>
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <StyledAvatar
           ref={props.forwardedRef}

@@ -68,13 +68,16 @@ export const ImageLoadingTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Check image loading', async () => {
-      const avatar = canvas.getByRole('img', { hidden: true });
+      // Awaited rather than queried outright: MUI puts the `<img>` in the first
+      // commit, react-native-web's `Image` adds its accessibility image once its
+      // own load effect has started. Same element, one tick apart.
+      const avatar = await canvas.findByRole('img', { hidden: true });
       await expect(avatar).toBeInTheDocument();
       await expect(avatar).toHaveAttribute('alt', 'Test User');
     });
 
     await step('Image should have src attribute', async () => {
-      const avatar = canvas.getByRole('img', { hidden: true });
+      const avatar = await canvas.findByRole('img', { hidden: true });
       await expect(avatar).toHaveAttribute('src');
     });
   },
@@ -317,6 +320,8 @@ export const ResponsiveDesign: Story = {
 };
 
 export const VisualStates: Story = {
+  // Asserts a `:hover` computed transform, which only the DOM renderer has.
+  tags: ['native-skip'],
   name: '👁️ Visual States Test',
   render: () => (
     <Stack spacing={2}>
@@ -431,10 +436,12 @@ export const EdgeCases: Story = {
     await step('Empty fallback handling', async () => {
       const avatar = canvas.getByTestId('empty-fallback');
       await expect(avatar).toBeInTheDocument();
-      // Should show default icon when fallback is empty (Person icon is default)
-      // The icon is rendered by MUI and has dataTestId="PersonIcon"
-      const personIcon = canvas.getByTestId('PersonIcon');
-      await expect(personIcon).toBeInTheDocument();
+      // Should show default icon when fallback is empty (Person icon is default).
+      // The avatar's own `-default` slot is what holds it on either renderer;
+      // `PersonIcon` is the id MUI's own icon module stamps, which
+      // react-native-web has no equivalent of.
+      const defaultSlot = canvas.getByTestId('empty-fallback-default');
+      await expect(defaultSlot).toBeInTheDocument();
     });
 
     await step('Long text overflow', async () => {
