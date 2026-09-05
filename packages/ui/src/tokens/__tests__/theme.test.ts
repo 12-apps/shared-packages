@@ -106,11 +106,11 @@ describe('createUiTheme derives the palette MUI derives', () => {
   });
 
   it('spacing and radius are MUI defaults', () => {
-    const ui = createUiTheme();
-    expect(ui.spacing(1)).toBe(8);
-    expect(ui.spacing(2.5)).toBe(20);
-    expect(ui.radius.md).toBe(createTheme().shape.borderRadius);
-    expect(ui.radius.lg).toBe(8);
+    const built = createUiTheme();
+    expect(built.spacing(1)).toBe(8);
+    expect(built.spacing(2.5)).toBe(20);
+    expect(built.radius.md).toBe(createTheme().shape.borderRadius);
+    expect(built.radius.lg).toBe(8);
   });
 
   it('px() writes the rem string the web components write', () => {

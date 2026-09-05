@@ -24,10 +24,10 @@ describe('the MUI bridge', () => {
 
   it('reads a host theme with its own spacing and radius', () => {
     const host = createTheme({ spacing: 4, shape: { borderRadius: 12 } });
-    const ui = uiThemeFromMui(host);
-    expect(ui.spacingUnit).toBe(4);
-    expect(ui.spacing(2)).toBe(8);
-    expect(ui.radius).toEqual({ sm: 6, md: 12, lg: 24, xl: 48, full: 9999 });
+    const read = uiThemeFromMui(host);
+    expect(read.spacingUnit).toBe(4);
+    expect(read.spacing(2)).toBe(8);
+    expect(read.radius).toEqual({ sm: 6, md: 12, lg: 24, xl: 48, full: 9999 });
   });
 
   it('reads the heading scale a host overrides', () => {

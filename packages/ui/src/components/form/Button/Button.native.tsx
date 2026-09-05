@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text as RNText,
   View,
+  type GestureResponderEvent,
   type PressableStateCallbackType,
   type StyleProp,
   type TextStyle,
@@ -208,63 +209,87 @@ function renderChildren(children: React.ReactNode, label: TextStyle): React.Reac
   );
 }
 
-export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
-  const {
-    variant,
-    color,
-    size,
-    loading,
-    icon,
-    iconPosition,
-    glow,
-    pulse,
-    ripple,
-    active,
-    children,
-    disabled,
-    onClick,
-    onPress,
-    style,
-    ...others
-  } = resolveButtonProps(rawProps);
-  const theme = useUiTheme();
+type ResolvedProps = ReturnType<typeof resolveButtonProps<ButtonProps>>;
 
-  // The shared stories pass `'data-testid'` as a plain prop; honour it here and
-  // keep all three spellings off the element (react-native-web would drop them).
-  const testId = resolveTestId(others, 'button');
-  const idFor = (suffix: string) => childTestId(others, suffix, 'button');
-  const rest = withoutTestIdProps(others);
+interface ButtonLook {
+  inactive: boolean;
+  palette: UiPaletteColor;
+  radius: number;
+  label: TextStyle;
+  container: (state: PressableStateCallbackType) => StyleProp<ViewStyle>;
+}
+
+/**
+ * Everything the button paints, decided once per render from the resolved
+ * props and the theme. Kept out of the component so the component reads as
+ * structure — what renders where — and this reads as arithmetic.
+ */
+function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
+  const { variant, color, size, loading, icon, children, glow, pulse, active, disabled, style } = props;
   const palette = buttonPalette(theme, color);
   const iconOnly = !loading && icon != null && children == null;
   const inactive = Boolean(disabled) || loading;
   const paint = inactive ? disabledPaint(theme, variant) : paintFor(theme, variant, color, palette, active);
   const radius = theme.spacing(BUTTON_RADIUS_UNITS);
   const metrics = BUTTON_SIZES[size];
-
-  const label: TextStyle = {
-    fontFamily: theme.typography.fontFamily,
-    fontSize: metrics.fontSize,
-    lineHeight: metrics.fontSize * BUTTON_LINE_HEIGHT,
-    fontWeight: String(BUTTON_FONT_WEIGHT) as TextStyle['fontWeight'],
-    textAlign: 'center',
-    ...paint.label,
-  };
-
   // The web button is `overflow: hidden` (its ripple needs it) unless the pulse
   // ring turns it visible; on native the glow's shadow needs it visible too,
   // because a view's own shadow is clipped by its own overflow there.
   const overflow: ViewStyle['overflow'] = pulse || glow ? 'visible' : 'hidden';
-  const container = (state: PressableStateCallbackType): StyleProp<ViewStyle> => [
-    styles.base,
-    { borderRadius: radius, overflow },
-    sizeStyle(theme, size, iconOnly, icon != null && !loading),
-    paint.container,
-    state.pressed && !inactive ? paint.pressed : null,
-    glow && !inactive ? glowStyle(palette) : null,
-    style,
-  ];
+  const sized = sizeStyle(theme, size, iconOnly, icon != null && !loading);
+  const glowing = glow && !inactive ? glowStyle(palette) : null;
 
-  const handlePress = (event: Parameters<NonNullable<ButtonProps['onPress']>>[0]): void => {
+  return {
+    inactive,
+    palette,
+    radius,
+    label: {
+      fontFamily: theme.typography.fontFamily,
+      fontSize: metrics.fontSize,
+      lineHeight: metrics.fontSize * BUTTON_LINE_HEIGHT,
+      fontWeight: String(BUTTON_FONT_WEIGHT) as TextStyle['fontWeight'],
+      textAlign: 'center',
+      ...paint.label,
+    },
+    container: (state) => [
+      styles.base,
+      { borderRadius: radius, overflow },
+      sized,
+      paint.container,
+      state.pressed && !inactive ? paint.pressed : null,
+      glowing,
+      style,
+    ],
+  };
+}
+
+/** The spinner that replaces the label while loading; `role` comes from react-native's ActivityIndicator. */
+function Spinner({ color, testID }: { color: string; testID: string }): React.JSX.Element {
+  return (
+    <ActivityIndicator
+      size={Platform.OS === 'ios' ? 'small' : BUTTON_SPINNER_SIZE}
+      color={color}
+      testID={testID}
+      accessibilityLabel="loading"
+    />
+  );
+}
+
+export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
+  const resolved = resolveButtonProps(rawProps);
+  const { loading, icon, iconPosition, pulse, ripple, children, onClick, onPress, ...others } = resolved;
+  const theme = useUiTheme();
+  const look = buttonLook(theme, resolved);
+
+  // The shared stories pass `'data-testid'` as a plain prop; honour it here and
+  // keep all three spellings off the element (react-native-web would drop them).
+  const testId = resolveTestId(others, 'button');
+  const idFor = (suffix: string) => childTestId(others, suffix, 'button');
+  const rest = withoutTestIdProps(others);
+  // `buttonLook` consumed these; they are not Pressable props.
+  const { variant: _v, color: _c, size: _s, glow: _g, active: _a, disabled: _d, style: _st, ...pressable } = rest;
+
+  const handlePress = (event: GestureResponderEvent): void => {
     onClick?.(event);
     onPress?.(event);
   };
@@ -280,27 +305,18 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
     <Pressable
       ref={ref}
       role="button"
-      aria-disabled={inactive}
+      aria-disabled={look.inactive}
       aria-busy={loading}
-      disabled={inactive}
+      disabled={look.inactive}
       onPress={handlePress}
-      android_ripple={ripple && !inactive ? { color: alpha(palette.main, 0.2), borderless: false } : undefined}
-      style={container}
+      android_ripple={ripple && !look.inactive ? { color: alpha(look.palette.main, 0.2), borderless: false } : undefined}
+      style={look.container}
       testID={testId}
-      {...rest}
+      {...pressable}
     >
-      {pulse && !inactive ? <Pulse color={palette.main} radius={radius} testID={idFor('pulse')} /> : null}
+      {pulse && !look.inactive ? <Pulse color={look.palette.main} radius={look.radius} testID={idFor('pulse')} /> : null}
       {iconPosition === 'left' ? iconNode : null}
-      {loading ? (
-        <ActivityIndicator
-          size={Platform.OS === 'ios' ? 'small' : BUTTON_SPINNER_SIZE}
-          color={label.color as string}
-          testID={idFor('loading')}
-          accessibilityLabel="loading"
-        />
-      ) : (
-        renderChildren(children, label)
-      )}
+      {loading ? <Spinner color={look.label.color as string} testID={idFor('loading')} /> : renderChildren(children, look.label)}
       {iconPosition === 'right' ? iconNode : null}
     </Pressable>
   );

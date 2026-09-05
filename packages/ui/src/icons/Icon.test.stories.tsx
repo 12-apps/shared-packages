@@ -59,8 +59,8 @@ export const PaletteFill: Story = {
     const fill = (id: string) => {
       const svg = canvas.getByTestId(id);
       // The web paints through `color` + `fill: currentColor`; native sets `fill`.
-      const path = svg.querySelector('path') as SVGPathElement;
-      const own = svg.getAttribute('fill') ?? path.getAttribute('fill');
+      const shape = svg.querySelector('path') as SVGPathElement;
+      const own = svg.getAttribute('fill') ?? shape.getAttribute('fill');
       return own && own !== 'currentColor' ? own : window.getComputedStyle(svg).color;
     };
     await expect(fill('danger')).toMatch(/#d32f2f|rgb\(211, 47, 47\)/);

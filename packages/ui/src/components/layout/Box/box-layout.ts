@@ -57,42 +57,58 @@ function background(theme: UiTheme, bg: NonNullable<BoxBaseProps['bg']>): string
   return theme.palette[bg].main;
 }
 
-/** The style for a box's neutral props. Unset props produce no key at all. */
-export function resolveBoxLayout(props: BoxBaseProps, theme: UiTheme): BoxLayout {
-  const units = (value: number | undefined): number | undefined =>
-    value === undefined ? undefined : theme.spacing(value);
+type SpacingKey = keyof Pick<
+  BoxLayout,
+  | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft'
+  | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft'
+>;
+
+/**
+ * Each side reads the most specific prop that is set: the side, then its axis,
+ * then the shorthand — the precedence MUI's `Box` gives `pt`/`py`/`p`.
+ */
+const SIDES: ReadonlyArray<readonly [SpacingKey, ReadonlyArray<keyof BoxBaseProps>]> = [
+  ['paddingTop', ['pt', 'py', 'p']],
+  ['paddingRight', ['pr', 'px', 'p']],
+  ['paddingBottom', ['pb', 'py', 'p']],
+  ['paddingLeft', ['pl', 'px', 'p']],
+  ['marginTop', ['mt', 'my', 'm']],
+  ['marginRight', ['mr', 'mx', 'm']],
+  ['marginBottom', ['mb', 'my', 'm']],
+  ['marginLeft', ['ml', 'mx', 'm']],
+];
+
+function spacingLayout(props: BoxBaseProps, theme: UiTheme): BoxLayout {
   const layout: BoxLayout = {};
-  const put = <K extends keyof BoxLayout>(key: K, value: BoxLayout[K] | undefined): void => {
-    if (value !== undefined) layout[key] = value;
-  };
-
-  put('paddingTop', units(props.pt ?? props.py ?? props.p));
-  put('paddingRight', units(props.pr ?? props.px ?? props.p));
-  put('paddingBottom', units(props.pb ?? props.py ?? props.p));
-  put('paddingLeft', units(props.pl ?? props.px ?? props.p));
-  put('marginTop', units(props.mt ?? props.my ?? props.m));
-  put('marginRight', units(props.mr ?? props.mx ?? props.m));
-  put('marginBottom', units(props.mb ?? props.my ?? props.m));
-  put('marginLeft', units(props.ml ?? props.mx ?? props.m));
-
-  const isFlex =
-    props.direction !== undefined ||
-    props.align !== undefined ||
-    props.justify !== undefined ||
-    props.wrap === true ||
-    props.gap !== undefined;
-  if (isFlex) {
-    layout.display = 'flex';
-    layout.flexDirection = props.direction ?? 'column';
+  for (const [key, sources] of SIDES) {
+    const units = sources.map((source) => props[source]).find((value) => value !== undefined);
+    if (typeof units === 'number') layout[key] = theme.spacing(units);
   }
-  put('gap', units(props.gap));
-  put('alignItems', props.align === undefined ? undefined : ALIGN[props.align]);
-  put('justifyContent', props.justify === undefined ? undefined : JUSTIFY[props.justify]);
-  if (props.wrap) layout.flexWrap = 'wrap';
-  put('flex', props.flex);
+  return layout;
+}
 
-  put('backgroundColor', props.bg === undefined ? undefined : background(theme, props.bg));
-  put('borderRadius', props.radius === undefined ? undefined : theme.radius[props.radius]);
+/** A flex container whenever any flex prop is set; a plain box otherwise. */
+function flexLayout(props: BoxBaseProps, theme: UiTheme): BoxLayout {
+  const layout: BoxLayout = {};
+  const isFlex =
+    [props.direction, props.align, props.justify, props.gap].some((value) => value !== undefined) ||
+    props.wrap === true;
+  if (!isFlex) return layout;
+
+  layout.display = 'flex';
+  layout.flexDirection = props.direction ?? 'column';
+  if (props.gap !== undefined) layout.gap = theme.spacing(props.gap);
+  if (props.align !== undefined) layout.alignItems = ALIGN[props.align];
+  if (props.justify !== undefined) layout.justifyContent = JUSTIFY[props.justify];
+  if (props.wrap) layout.flexWrap = 'wrap';
+  return layout;
+}
+
+function surfaceLayout(props: BoxBaseProps, theme: UiTheme): BoxLayout {
+  const layout: BoxLayout = {};
+  if (props.flex !== undefined) layout.flex = props.flex;
+  if (props.bg !== undefined) layout.backgroundColor = background(theme, props.bg);
+  if (props.radius !== undefined) layout.borderRadius = theme.radius[props.radius];
   if (props.bordered) {
     // `borderStyle` spelled out: CSS defaults it to `none`, under which a
     // border-width computes to 0 and nothing paints. React Native's default is
@@ -101,10 +117,14 @@ export function resolveBoxLayout(props: BoxBaseProps, theme: UiTheme): BoxLayout
     layout.borderStyle = 'solid';
     layout.borderColor = theme.palette.divider;
   }
-  put('width', props.width);
-  put('height', props.height);
-
+  if (props.width !== undefined) layout.width = props.width;
+  if (props.height !== undefined) layout.height = props.height;
   return layout;
+}
+
+/** The style for a box's neutral props. Unset props produce no key at all. */
+export function resolveBoxLayout(props: BoxBaseProps, theme: UiTheme): BoxLayout {
+  return { ...spacingLayout(props, theme), ...flexLayout(props, theme), ...surfaceLayout(props, theme) };
 }
 
 /** The neutral props on one side, everything else — the renderer's own — on the other. */

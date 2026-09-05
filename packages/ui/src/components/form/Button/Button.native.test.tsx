@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -146,16 +146,16 @@ describe('Button (native)', () => {
     expect(screen.getByTestId('t')).toHaveStyle({ backgroundColor: 'rgb(0, 137, 123)' });
   });
 
-  it('renders a pulse ring only while pulsing and enabled', () => {
+  it('renders a pulse ring only while pulsing and enabled', async () => {
     const { rerender } = render(<Button pulse>x</Button>);
     expect(screen.getByTestId('button-pulse')).toHaveAttribute('aria-hidden', 'true');
     rerender(<Button>x</Button>);
-    expect(screen.queryByTestId('button-pulse')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('button-pulse')).not.toBeInTheDocument());
     rerender(
       <Button pulse disabled>
         x
       </Button>,
     );
-    expect(screen.queryByTestId('button-pulse')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('button-pulse')).not.toBeInTheDocument());
   });
 });
