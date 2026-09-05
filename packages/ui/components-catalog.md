@@ -704,11 +704,12 @@ Components for text formatting and display.
 **Docs**: `src/components/typography/Heading/Heading.md`
 
 ### Paragraph
-**Purpose**: Body text paragraphs
+**Purpose**: Body text paragraphs (web AND React Native)
 **Use Cases**: Content text, descriptions, articles
 **Features**: Size variants, leading control, text alignment
 **Location**: `src/components/typography/Paragraph`
 **Docs**: `src/components/typography/Paragraph/Paragraph.md`
+**Native**: yes — `@12-apps/ui/typography/Paragraph` resolves to `Paragraph.native.tsx` under Metro, on the same metrics.
 
 ### Text
 **Purpose**: Inline text with formatting

@@ -541,6 +541,10 @@
       "default": "./dist/typography/Heading.js"
     },
     "./typography/Paragraph": {
+      "react-native": {
+        "types": "./dist/types-native/components/typography/Paragraph/index.native.d.ts",
+        "default": "./dist/native/typography/Paragraph.js"
+      },
       "types": "./dist/types/components/typography/Paragraph/index.d.ts",
       "default": "./dist/typography/Paragraph.js"
     },
