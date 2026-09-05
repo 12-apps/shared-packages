@@ -1,5 +1,5 @@
 /**
- * ARIA ATTRIBUTES REACT NATIVE DOES NOT DECLARE.
+ * WEB ATTRIBUTES REACT NATIVE DOES NOT DECLARE.
  *
  * React Native's `ViewProps` (0.83) type a dozen `aria-*` props and stop:
  * `aria-level`, `aria-atomic` and `aria-describedby` are not among them.
@@ -13,6 +13,14 @@ export interface WebAria {
   'aria-level'?: 1 | 2 | 3 | 4 | 5 | 6;
   'aria-atomic'?: 'true' | 'false';
   'aria-describedby'?: string;
+  /**
+   * A field's validity and whether it must be filled. React Native's
+   * `accessibilityState` has neither — its five flags are disabled, selected,
+   * checked, busy and expanded — so these are web-only, and a device reads the
+   * error text instead. react-native-web forwards both.
+   */
+  'aria-invalid'?: boolean;
+  'aria-required'?: boolean;
 }
 
 /**
@@ -29,4 +37,32 @@ export interface WebAria {
 export function webAria(attrs: WebAria): object {
   const { 'aria-atomic': atomic, ...rest } = attrs;
   return atomic === undefined ? rest : { ...rest, accessibilityAtomic: atomic };
+}
+
+/**
+ * `disabled` for a react-native-web form control.
+ *
+ * React Native's `TextInput` has `editable` and no `disabled`, because a
+ * device has no disabled state to speak of — an uneditable field simply does
+ * not take the keyboard. The DOM does: only a real `disabled` attribute takes
+ * an `<input>` out of the tab order, and it is what `toBeDisabled()` reads. So
+ * a native field spreads this ALONGSIDE `editable={false}` and
+ * `aria-disabled`: react-native-web puts the attribute on the input, and a
+ * device ignores a prop it does not know.
+ */
+export function webDisabled(disabled: boolean): object {
+  return disabled ? { disabled: true } : {};
+}
+
+/**
+ * `onClick` for a react-native-web element whose React Native twin has no
+ * click of its own.
+ *
+ * react-native-web's `TextInput` forwards `onClick` to the DOM input and drops
+ * `onPressIn`; a device does the opposite. A field that must answer a press on
+ * both renderers spreads this ALONGSIDE `onPressIn`, and exactly one of the two
+ * fires on each side — never both.
+ */
+export function webClick<E>(handler: ((event: E) => void) | undefined): object {
+  return handler === undefined ? {} : { onClick: handler };
 }

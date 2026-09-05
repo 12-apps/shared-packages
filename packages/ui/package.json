@@ -365,6 +365,10 @@
       "default": "./dist/form/total-form.js"
     },
     "./form/Input": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Input/index.native.d.ts",
+        "default": "./dist/native/form/Input.js"
+      },
       "types": "./dist/types/components/form/Input/index.d.ts",
       "default": "./dist/form/Input.js"
     },

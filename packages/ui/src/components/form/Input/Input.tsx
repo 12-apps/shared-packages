@@ -16,6 +16,7 @@ import {
   SIZE_MAP,
 } from './Input.styles';
 import type { InputProps } from './Input.types';
+import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 
 /**
  * `TextFieldSlim`, not `TextField` — see `text-field-slim.tsx`. MUI's own
@@ -96,12 +97,17 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onClick,
       onFocus,
       onBlur,
-      'data-testid': dataTestId,
       'aria-label': ariaLabel,
-      ...props
+      ...rest
     },
     ref,
-  ) => (
+  ) => {
+    // `testID` and `dataTestId` are the shared contract's spellings; the DOM
+    // wants `data-testid` on the `<input>`, and must not see the other two as
+    // attributes. Same three-spellings rule as `Text` and `Button`.
+    const dataTestId = resolveTestId(rest);
+    const props = withoutTestIdProps(rest);
+    return (
     <StyledTextField
       ref={ref}
       variant={muiVariantFor(variant)}
@@ -138,7 +144,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       {...SIZE_MAP[size]}
       {...props}
     />
-  ),
+    );
+  },
 );
 
 Input.displayName = 'Input';
