@@ -141,7 +141,7 @@ function packOne(dir, destination) {
  * Here rather than in seven `prepack` hooks, for three reasons:
  *
  *  1. **This is the chokepoint.** Every tarball this repo produces comes out of
- *     `packAll` — `scripts/harness-install.mjs` for both harnesses,
+ *     `packAll` — `scripts/harness-install.mjs` for the harnesses,
  *     `installConsumerFixture` for the consumer gate. One call covers all of
  *     them, and a new package with a build script is covered on arrival.
  *     Per-package hooks are a hand-kept list, and a hand-kept list failing here

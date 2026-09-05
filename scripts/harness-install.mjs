@@ -17,7 +17,30 @@ import { fileURLToPath } from "node:url";
 import { packAll, publishableDirs } from "./lib/pack-workspace.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const HARNESSES = ["harness/frontend", "harness/backend"];
+const HARNESSES = ["harness/frontend", "harness/backend", "harness/native"];
+
+// `--only harness/native` installs one harness. The native one is an Expo app
+// whose install is dominated by react-native itself, and a developer iterating
+// on the native renderer should not have to wait for the AWS SDK the backend
+// harness pulls in. Without the flag every harness installs, as CI does.
+function selectedHarnesses(argv) {
+  const index = argv.findIndex((arg) => arg === "--only" || arg.startsWith("--only="));
+  if (index === -1) return HARNESSES;
+  const inline = argv[index].includes("=") ? [argv[index].slice("--only=".length)] : [];
+  // Positional names after a bare `--only`, up to the next flag.
+  const rest = [];
+  for (const arg of argv.slice(index + 1)) {
+    if (arg.startsWith("--")) break;
+    rest.push(arg);
+  }
+  const chosen = [...inline, ...rest].flatMap((arg) => arg.split(",")).filter(Boolean);
+  if (chosen.length === 0) throw new Error(`--only needs a harness name; one of ${HARNESSES.join(", ")}`);
+  for (const harness of chosen) {
+    if (!HARNESSES.includes(harness)) throw new Error(`unknown harness ${harness}; one of ${HARNESSES.join(", ")}`);
+  }
+  return chosen;
+}
+const selected = selectedHarnesses(process.argv.slice(2));
 
 function run(cmd, args, cwd) {
   execFileSync(cmd, args, { cwd, stdio: "inherit" });
@@ -29,10 +52,34 @@ function run(cmd, args, cwd) {
  * an override npm resolves that to the PUBLISHED version — so the harness would
  * quietly test last week's backend against this branch's frontend.
  */
+/**
+ * `harnessPackages` in a base manifest narrows the tarballs a harness installs.
+ * The native harness consumes `@12-apps/ui` alone: it is an Expo app, and the
+ * other packages' peers (react-router, hono, prisma) are not what a React
+ * Native consumer has — installing them would test an app nobody would write.
+ * Absent, a harness gets every tarball, as the web and backend ones do.
+ */
 function manifestFor(harness, tarballs) {
-  const base = JSON.parse(readFileSync(join(harness, "package.base.json"), "utf8"));
-  const specs = Object.fromEntries([...tarballs].map(([name, tarball]) => [name, `file:${tarball}`]));
-  return { ...base, dependencies: specs, overrides: specs };
+  const { harnessPackages, ...base } = JSON.parse(readFileSync(join(harness, "package.base.json"), "utf8"));
+  const all = Object.fromEntries([...tarballs].map(([name, tarball]) => [name, `file:${tarball}`]));
+  const wanted = harnessPackages ? new Set(harnessPackages) : null;
+  if (wanted) {
+    for (const name of wanted) if (!(name in all)) throw new Error(`${harness} wants ${name}, which is not a publishable package`);
+  }
+  const direct = wanted ? Object.fromEntries(Object.entries(all).filter(([name]) => wanted.has(name))) : all;
+  // `overrides` stays EVERY tarball even when `dependencies` is narrowed: the
+  // one installed package's own workspace dependencies (ui -> forms-core) must
+  // come from this branch too, or the harness quietly tests the published
+  // forms-core against this branch's ui. An override for a package nothing
+  // depends on is a no-op, so the full set costs nothing.
+  //
+  // The harness's own dependencies stay; the tarballs are added beside them
+  // (the web harness lists none of its own, so this is a no-op there).
+  return {
+    ...base,
+    dependencies: { ...(base.dependencies ?? {}), ...direct },
+    overrides: { ...(base.overrides ?? {}), ...all },
+  };
 }
 
 /**
@@ -113,12 +160,14 @@ function generatePrisma(harness, dir) {
 function install(harness, tarballs) {
   const dir = join(REPO_ROOT, harness);
   if (!existsSync(join(dir, "package.base.json"))) throw new Error(`${harness} has no package.base.json`);
-  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifestFor(dir, tarballs), null, 2)}\n`);
+  const manifest = manifestFor(dir, tarballs);
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   npmInstall(dir);
-  console.log(`installed ${harness} against ${tarballs.size} tarballs`);
+  const installed = Object.keys(manifest.dependencies).filter((name) => tarballs.has(name));
+  console.log(`installed ${harness} against ${installed.length} of ${tarballs.size} tarballs: ${installed.join(", ")}`);
   generatePrisma(harness, dir);
 }
 
 const staging = mkdtempSync(join(tmpdir(), "harness-tarballs-"));
 const tarballs = packAll(publishableDirs(), staging);
-HARNESSES.forEach((harness) => install(harness, tarballs));
+selected.forEach((harness) => install(harness, tarballs));

@@ -704,6 +704,82 @@ jobs:
           path: packages/ui/storybook-native-static
           retention-days: 7
 
+  # THE NATIVE HARNESS: the PUBLISHED tarball, through real Metro.
+  #
+  # `Native (react-native-web)` above renders the SOURCE through a browser-shaped
+  # React Native. This lane is the consumer's view: `harness/native` is an Expo
+  # app outside the workspace, installed from the packed `@12-apps/ui` tarball
+  # the way `harness/frontend` is, and bundled by Metro — for android (no
+  # emulator: the bundle is read for what it must and must not contain) and
+  # for web (react-native-web in a real Chromium, where Playwright asserts the
+  # resolved numbers and takes the screenshots a reviewer looks at).
+  #
+  # It is the only lane that exercises the `react-native` export condition as
+  # a consumer's bundler sees it, which is the whole claim packages/ui/NATIVE.md
+  # makes. Same gating and browser caching as the Frontend Harness.
+  native-harness:
+    name: Native Harness (Expo)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).publishable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      - name: Build packages
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee build.log
+      # `--only`: this harness consumes `@12-apps/ui` alone (its
+      # `harnessPackages`), and installing the other two harnesses here would
+      # repeat the Frontend and Backend lanes' work.
+      - name: Install the harness against the published tarball
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/harness-install.mjs --only harness/native 2>&1 | tee harness-install.log
+      - name: Resolve the Playwright version
+        id: playwright
+        working-directory: harness/native
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        working-directory: harness/native
+        timeout-minutes: 10
+        run: npx playwright install chromium
+      # `npm test` exports the android bundle and checks it, then runs
+      # Playwright, whose webServer exports for web and serves it — so both
+      # platforms go through the one entry point a developer also uses.
+      - name: Bundle through Metro and drive the web export
+        working-directory: harness/native
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee native-harness.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-harness-report
+          path: |
+            harness/native/playwright-report
+            harness/native/test-results
+          retention-days: 7
+
   # The payments PORTABILITY gate (FUT-562). Separate from `quality` above
   # because that job is the org's reusable workflow (12-apps/ci) and knows
   # nothing about this repo's payments package.
@@ -1162,7 +1238,7 @@ jobs:
     # red run on the commit, and `release-watchdog.yml`, which compares every
     # package's newest tag against the registry daily and is the only check
     # that still fires when the release workflow cannot run at all.
-    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, native, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts]
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, native, native-harness, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts]
     steps:
       # The wiring conformance gate runs HERE, not in a filtered job: it holds
       # a COMPLETENESS property (every package answers every capability kind,

@@ -1,0 +1,35 @@
+{
+  "name": "@12-apps/native-harness",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "Consumer harness for the React Native half of @12-apps/ui: an Expo app, outside the workspace, bundled by real Metro against the PUBLISHED tarball. scripts/harness-install.mjs turns this into package.json by adding the @12-apps dependency as a file: tarball — which is why the name is absent here rather than pinned to a version nobody would remember to bump.",
+  "$comment:what-this-proves": "The web harness renders the MUI build through Vite; this one resolves the SAME import paths through Metro's `react-native` export condition. `expo export --platform android` bundles for a native platform without an emulator, and scripts/check-bundle.mjs reads that bundle for what must and must not be in it (the native renderer's own strings, no @mui, no react-dom). `expo export --platform web` renders the native build through react-native-web in a browser, where Playwright asserts test ids, the resolved numbers and screenshots — the only way a container without a device can look at the result.",
+  "harnessPackages": [
+    "@12-apps/ui"
+  ],
+  "scripts": {
+    "start": "expo start",
+    "export:web": "expo export --platform web --output-dir dist/web",
+    "export:android": "expo export --platform android --output-dir dist/android",
+    "check:bundle": "node scripts/check-bundle.mjs dist/android",
+    "test": "npm run typecheck && npm run export:android && npm run check:bundle && playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.15",
+    "expo": "~57.0.20",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-svg": "15.15.5",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/react": "~19.2.0",
+    "serve": "^14.2.6",
+    "typescript": "~5.9.0"
+  }
+}
