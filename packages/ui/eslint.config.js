@@ -15,11 +15,16 @@ export default [
       'dist/**',
       'build/**',
       'storybook-static/**',
+      'storybook-native-static/**',
+      'coverage-native/**',
       'packages/ui/scripts/**',
       'packages/ui/scripts/**/*',
       'scripts/**',
       'scripts/**/*',
       'tsup.config.ts',
+      'tsup.native.config.ts',
+      // Jest's config is CommonJS by contract (@storybook/test-runner requires it).
+      'test-runner-jest.config.cjs',
     ],
   },
   ...config,
@@ -108,6 +113,29 @@ export default [
             {
               name: '@mui/lab',
               message: "Import the module, not the barrel: `import Timeline from '@mui/lab/Timeline'`.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // The native half never sees a DOM (12-apps/ui native support).
+  //
+  // A `*.native.tsx` renders through React Native: MUI, emotion and react-dom
+  // are not merely heavy there, they throw on `document` at import. The native
+  // tsup pass fails the build on the same specifiers; this catches it in the
+  // editor first, with the rule spelled out.
+  {
+    files: ['**/*.native.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@mui/*', '@emotion/*', 'react-dom', 'react-dom/*'],
+              message:
+                'Native files render through react-native and read the shared tokens (src/tokens) — never MUI, emotion or react-dom.',
             },
           ],
         },

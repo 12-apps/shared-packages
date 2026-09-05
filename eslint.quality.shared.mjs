@@ -75,6 +75,9 @@ export const GLOBAL_IGNORES = [
   "**/.turbo/**",
   "**/coverage/**",
   "**/storybook-static/**",
+  // The native Storybook build and the native coverage report (packages/ui/NATIVE.md).
+  "**/storybook-native-static/**",
+  "**/coverage-native/**",
   "**/playwright-report/**",
   "**/test-results/**",
   "**/playwright-coverage/**",

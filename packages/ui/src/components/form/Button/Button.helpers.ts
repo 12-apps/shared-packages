@@ -1,4 +1,4 @@
-import type { ButtonProps } from './Button.types';
+import type { ButtonBaseProps } from './Button.base';
 
 type ButtonDefaultedKeys =
   | 'variant'
@@ -11,9 +11,14 @@ type ButtonDefaultedKeys =
   | 'ripple'
   | 'active';
 
-type ResolvedButtonProps = ButtonProps & Required<Pick<ButtonProps, ButtonDefaultedKeys>>;
+/**
+ * Generic over the renderer's own props: the web and the native `Button` pass
+ * different handler types through, and both come back out untouched.
+ */
+type ResolvedButtonProps<P extends ButtonBaseProps> = P &
+  Required<Pick<ButtonBaseProps, ButtonDefaultedKeys>>;
 
-const BUTTON_DEFAULTS: Pick<ButtonProps, ButtonDefaultedKeys> = {
+const BUTTON_DEFAULTS: Required<Pick<ButtonBaseProps, ButtonDefaultedKeys>> = {
   variant: 'solid',
   color: 'primary',
   size: 'md',
@@ -27,10 +32,10 @@ const BUTTON_DEFAULTS: Pick<ButtonProps, ButtonDefaultedKeys> = {
 
 // Strips explicitly-undefined props before the merge, so `size={undefined}` still
 // falls back to the default exactly as a destructuring default would.
-const definedProps = (props: ButtonProps): Partial<ButtonProps> =>
+const definedProps = <P extends ButtonBaseProps>(props: P): Partial<P> =>
   Object.fromEntries(
     Object.entries(props).filter(([, value]) => value !== undefined),
-  ) as Partial<ButtonProps>;
+  ) as Partial<P>;
 
-export const resolveButtonProps = (props: ButtonProps): ResolvedButtonProps =>
-  ({ ...BUTTON_DEFAULTS, ...definedProps(props) }) as ResolvedButtonProps;
+export const resolveButtonProps = <P extends ButtonBaseProps>(props: P): ResolvedButtonProps<P> =>
+  ({ ...BUTTON_DEFAULTS, ...definedProps(props) }) as ResolvedButtonProps<P>;

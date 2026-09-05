@@ -77,3 +77,5 @@ harness/backend/prisma/assembled.json
 
 # Storybook build output
 storybook-static/
+storybook-native-static/
+coverage-native/

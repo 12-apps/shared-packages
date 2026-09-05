@@ -340,17 +340,30 @@
       "entry": [
         "src/index.ts",
         "src/**/index.ts",
+        "// The React Native half: its barrels are the `react-native` export",
+        "// condition's targets (entries.native.json), reached by Metro and never",
+        "// by a web import knip could follow.",
+        "src/**/index.native.ts",
         "src/**/*.stories.{ts,tsx}",
         "src/components/**/*.tsx",
         "src/components/**/*.types.ts",
+        "src/components/**/*.types.native.ts",
         "src/mui/*.ts",
         "src/utils/index.ts",
-        "scripts/*.js"
+        "scripts/*.js",
+        "scripts/*.mjs",
+        "tsup.native.config.ts",
+        "vitest.native.config.ts",
+        ".storybook-native/*.{ts,tsx}",
+        "test-runner-jest.config.cjs"
       ],
       "ignoreDependencies": [
         "@playwright/test",
         "playwright",
-        "@storybook/builder-vite"
+        "@storybook/builder-vite",
+        "// Reached only through resolve.alias in vitest.native.config.ts and",
+        "// .storybook-native/main.ts, which knip does not read as an import.",
+        "react-native-web"
       ]
     }
   },

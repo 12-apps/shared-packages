@@ -1,0 +1,25 @@
+{
+  // The NATIVE half of the package: every `*.native.ts(x)` and whatever it
+  // imports. No DOM lib on purpose — a native file that reaches for `document`
+  // or `HTMLElement` is a type error here, which is the whole point of
+  // checking it separately. `skipLibCheck` keeps MUI's and React's own
+  // declaration files (which mention DOM types) from failing that rule for us.
+  "extends": "@12-apps/typescript-config/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist/types-native",
+    "rootDir": "src",
+    "jsx": "react-jsx",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2020",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "types": ["react-native"]
+  },
+  "include": ["src/**/*.native.ts", "src/**/*.native.tsx"],
+  "exclude": ["node_modules", "dist", "**/*.stories.tsx", "**/*.test.ts", "**/*.test.tsx"]
+}

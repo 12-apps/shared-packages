@@ -198,6 +198,8 @@ export const KeyboardNavigation: Story = {
 
 // Screen Reader Accessibility Tests
 export const ScreenReader: Story = {
+  // The web asserts the rendered TAG (`as="p"`) or a heap budget; react-native-web has neither.
+  tags: ['native-skip'],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -511,6 +513,8 @@ export const VisualStates: Story = {
 
 // Performance Tests
 export const Performance: Story = {
+  // The web asserts the rendered TAG (`as="p"`) or a heap budget; react-native-web has neither.
+  tags: ['native-skip'],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -625,6 +629,8 @@ export const EdgeCases: Story = {
 
 // Integration Tests
 export const Integration: Story = {
+  // The web asserts the rendered TAG (`as="p"`) or a heap budget; react-native-web has neither.
+  tags: ['native-skip'],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 

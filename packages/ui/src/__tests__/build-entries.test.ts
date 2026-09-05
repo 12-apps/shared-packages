@@ -50,6 +50,9 @@ function sourceModules(directory: string): string[] {
     if (statSync(full).isDirectory()) return sourceModules(full);
     if (!/\.tsx?$/.test(entry)) return [];
     if (/\.(stories|test)\./.test(entry) || entry.endsWith(".d.ts")) return [];
+    // The native half is the other build's (tsup.native.config.ts, from
+    // entries.native.json); the web build must not emit it.
+    if (/\.native\./.test(entry)) return [];
     return [full.slice(PACKAGE_ROOT.length)];
   });
 }
@@ -83,10 +86,14 @@ describe("the build emits one module per component", () => {
     const internal = Object.keys(entries).filter((key) => key.startsWith("_internal/"));
 
     expect(internal.length).toBeGreaterThan(0);
-    expect(Object.keys(entries).length - internal.length).toBe(136);
+    expect(Object.keys(entries).length - internal.length).toBe(140);
   });
 
   it("builds no story or spec — each would drag a test runner into dist", () => {
     expect(Object.values(entries).filter((file) => /\.(stories|test)\./.test(file))).toEqual([]);
+  });
+
+  it("builds no native module — each would drag react-native into the web bundle", () => {
+    expect(Object.values(entries).filter((file) => /\.native\./.test(file))).toEqual([]);
   });
 });

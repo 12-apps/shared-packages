@@ -40,7 +40,7 @@ Where:
 - [ ] Forwards refs where needed
 - [ ] Proper TS typing with exported interfaces
 - [ ] Accessibility attributes (aria-\*, role, etc.)
-- [ ] Theme integration via MUI
+- [ ] Theme integration via MUI (web) / `useUiTheme()` (native, when ported)
 - [ ] Responsive design considerations
 
 ### TypeScript Requirements
@@ -58,6 +58,21 @@ Where:
 - Screen reader compatibility
 - Focus management
 - WCAG compliance
+
+## React Native
+
+A component can render on React Native from the same import path. The switch
+is a `react-native` export condition, and the rules for porting one — the
+`X.base.ts` / `X.types.native.ts` split, the shared `X.metrics.ts`, the native
+Storybook that runs the SAME stories, the `native-skip` tag, the parity ledger —
+are in [NATIVE.md](./NATIVE.md). Two rules matter while building any component,
+ported or not:
+
+- **Numbers live in `X.metrics.ts`**, in px, and the web derives its `rem` from
+  them with `px()`. A size written straight into a `styled()` call is a number the
+  native renderer cannot find.
+- **A `*.native.tsx` imports no MUI, emotion or react-dom.** The lint rule and the
+  native tsup build both refuse it.
 
 ## Story Requirements
 

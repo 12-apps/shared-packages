@@ -5,8 +5,24 @@ import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import {
+  CAPTION_FONT_SIZE,
+  CAPTION_LETTER_SPACING_EM,
+  CAPTION_OPACITY,
+  CODE_BACKGROUND_ALPHA,
+  CODE_BORDER_ALPHA,
+  CODE_FONT_SIZE,
+  CODE_PADDING,
+  CODE_RADIUS_FACTOR,
+  HEADING_DEFAULT_WEIGHT,
+  HEADING_LETTER_SPACING_EM,
+  TEXT_SIZES,
+  TEXT_WEIGHTS,
+} from './Text.metrics';
 import type { TextProps } from './Text.types';
+import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type { ColorValue } from '../../../tokens/scales';
+import { px } from '../../../tokens/theme';
 
 const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
   if (color === 'neutral') {
@@ -32,21 +48,16 @@ const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
   return colorMap[color];
 };
 
-const SIZE_MAP: Record<string, { fontSize: string; lineHeight: number }> = {
-  xs: { fontSize: '0.75rem', lineHeight: 1.2 },
-  sm: { fontSize: '0.875rem', lineHeight: 1.3 },
-  md: { fontSize: '1rem', lineHeight: 1.5 },
-  lg: { fontSize: '1.125rem', lineHeight: 1.4 },
-  xl: { fontSize: '1.25rem', lineHeight: 1.3 },
-};
+// Derived from the shared metrics, not restated: the native `Text` reads the
+// same table, so the two renderers cannot disagree on a size.
+const SIZE_MAP: Record<string, { fontSize: string; lineHeight: number }> = Object.fromEntries(
+  Object.entries(TEXT_SIZES).map(([size, step]) => [
+    size,
+    { fontSize: px(step.fontSize), lineHeight: step.lineHeight },
+  ]),
+);
 
-const WEIGHT_MAP: Record<string, number> = {
-  light: 300,
-  normal: 400,
-  medium: 500,
-  semibold: 600,
-  bold: 700,
-};
+const WEIGHT_MAP: Record<string, number> = TEXT_WEIGHTS;
 
 interface TextStyleArgs {
   theme: Theme;
@@ -87,25 +98,25 @@ const textVariantStyles = (theme: Theme, a: TextStyleArgs, base: CSSObject): CSS
       return {
         ...base,
         fontFamily: theme.typography.h4.fontFamily,
-        fontWeight: weight === 'normal' ? 600 : WEIGHT_MAP[weight],
-        letterSpacing: '-0.01em',
+        fontWeight: weight === 'normal' ? HEADING_DEFAULT_WEIGHT : WEIGHT_MAP[weight],
+        letterSpacing: `${HEADING_LETTER_SPACING_EM}em`,
       };
     case 'caption':
       return {
         ...base,
-        fontSize: sizeOverride(a.customSize, '0.75rem'),
-        opacity: 0.8,
-        letterSpacing: '0.02em',
+        fontSize: sizeOverride(a.customSize, px(CAPTION_FONT_SIZE)),
+        opacity: CAPTION_OPACITY,
+        letterSpacing: `${CAPTION_LETTER_SPACING_EM}em`,
       };
     case 'code':
       return {
         ...base,
         fontFamily: 'Monaco, Menlo, "Ubuntu Mono", "Courier New", monospace',
-        fontSize: sizeOverride(a.customSize, '0.875rem'),
-        backgroundColor: alpha(theme.palette.primary.main, 0.08),
-        padding: '2px 6px',
-        borderRadius: theme.shape.borderRadius / 2,
-        border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+        fontSize: sizeOverride(a.customSize, px(CODE_FONT_SIZE)),
+        backgroundColor: alpha(theme.palette.primary.main, CODE_BACKGROUND_ALPHA),
+        padding: `${CODE_PADDING.vertical}px ${CODE_PADDING.horizontal}px`,
+        borderRadius: theme.shape.borderRadius * CODE_RADIUS_FACTOR,
+        border: `1px solid ${alpha(theme.palette.primary.main, CODE_BORDER_ALPHA)}`,
       };
     default:
       return { ...base, fontFamily: theme.typography.body1.fontFamily };
@@ -148,12 +159,18 @@ export const Text = React.forwardRef<HTMLElement, TextProps>(
       underline = false,
       strikethrough = false,
       children,
-      ...props
+      ...others
     },
     ref,
-  ) => (
+  ) => {
+    // `testID` and `dataTestId` are the shared contract's spellings; the DOM
+    // wants `data-testid`, and must not see the other two as attributes.
+    const testId = resolveTestId(others);
+    const props = withoutTestIdProps(others);
+    return (
       <StyledText
         ref={ref}
+        data-testid={testId}
         customVariant={variant}
         customColor={color}
         customSize={size}
@@ -166,7 +183,8 @@ export const Text = React.forwardRef<HTMLElement, TextProps>(
       >
         {children}
       </StyledText>
-    ),
+    );
+  },
 );
 
 Text.displayName = 'Text';

@@ -1,6 +1,9 @@
 import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
+import { px } from '../../../tokens/theme';
+
 // Define pulse animation globally
 const pulseAnimation = keyframes`
   0% {
@@ -62,16 +65,17 @@ export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => 
   };
 };
 
-/** What an unrecognised size falls back to, named so indexing can never be undefined. */
-const DEFAULT_SIZE: CSSObject = { padding: '8px 16px', fontSize: '1rem' };
+// Derived from `Button.metrics.ts`, which the native `Button` reads too — one
+// table, so a size cannot differ between the renderers.
+const SIZE_MAP: Record<string, CSSObject> = Object.fromEntries(
+  Object.entries(BUTTON_SIZES).map(([size, m]) => [
+    size,
+    { padding: `${m.paddingVertical}px ${m.paddingHorizontal}px`, fontSize: px(m.fontSize) },
+  ]),
+);
 
-const SIZE_MAP: Record<string, CSSObject> = {
-  xs: { padding: '2px 8px', fontSize: '0.75rem' },
-  sm: { padding: '6px 12px', fontSize: '0.875rem' },
-  md: DEFAULT_SIZE,
-  lg: { padding: '10px 20px', fontSize: '1.125rem' },
-  xl: { padding: '12px 24px', fontSize: '1.25rem' },
-};
+/** What an unrecognised size falls back to, named so indexing can never be undefined. */
+const DEFAULT_SIZE: CSSObject = SIZE_MAP.md as CSSObject;
 
 /**
  * A BUTTON THAT IS ONLY AN ICON IS SQUARE.
@@ -86,13 +90,9 @@ const SIZE_MAP: Record<string, CSSObject> = {
  * Derived, not declared: a button with an `icon` and no children can only be an
  * icon button, so no consumer has to opt in and none can forget to.
  */
-const ICON_ONLY_PADDING: Record<string, string> = {
-  xs: '2px',
-  sm: '5px',
-  md: '7px',
-  lg: '9px',
-  xl: '11px',
-};
+const ICON_ONLY_PADDING: Record<string, string> = Object.fromEntries(
+  Object.entries(ICON_ONLY_PADDING_PX).map(([size, padding]) => [size, `${padding}px`]),
+);
 
 const iconOnlySize = (size: string): CSSObject => ({
   minWidth: 0,

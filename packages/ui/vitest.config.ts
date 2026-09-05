@@ -12,6 +12,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/__tests__/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    // The React Native half's tests import `react-native`, which only
+    // vitest.native.config.ts aliases to react-native-web.
+    exclude: ["**/node_modules/**", "src/**/*.native.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

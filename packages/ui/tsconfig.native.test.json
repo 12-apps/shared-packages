@@ -1,0 +1,18 @@
+{
+  // The native TESTS: `*.native.test.tsx` and the setup file. They render the
+  // native components through react-native-web into a jsdom and query it with
+  // @testing-library/react, so unlike `tsconfig.native.json` this program has
+  // the DOM lib. Kept separate so the components themselves stay checked
+  // without one — this file checks the tests, that one the renderer.
+  "extends": "./tsconfig.native.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "emitDeclarationOnly": false,
+    "declaration": false,
+    "declarationMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["react-native", "vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": ["src/**/*.native.test.ts", "src/**/*.native.test.tsx", "src/__tests__/setup.native.ts"],
+  "exclude": ["node_modules", "dist"]
+}
