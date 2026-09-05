@@ -6,26 +6,38 @@ import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { makeTestId, resolveCheckboxProps } from './Checkbox.helpers';
+import {
+  CHECKBOX_GLOW,
+  CHECKBOX_HELPER,
+  CHECKBOX_HOVER_ALPHA,
+  CHECKBOX_LABEL,
+  CHECKBOX_PULSE,
+  CHECKBOX_SPINNER,
+  CHECKBOX_TRANSITION_MS,
+  CHECKBOX_VARIANT,
+  effectInk,
+} from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types';
+import { px } from '../../../tokens/theme';
 
 const pulse = keyframes`
   0% {
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7);
+    box-shadow: 0 0 0 0 ${effectInk(CHECKBOX_PULSE.alpha)};
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+    box-shadow: 0 0 0 ${CHECKBOX_PULSE.spread}px ${effectInk(0)};
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+    box-shadow: 0 0 0 0 ${effectInk(0)};
   }
 `;
 
 const glow = keyframes`
   0%, 100% {
-    box-shadow: 0 0 5px rgba(25, 118, 210, 0.5);
+    box-shadow: 0 0 ${CHECKBOX_GLOW.blur.from}px ${effectInk(CHECKBOX_GLOW.alpha.from)};
   }
   50% {
-    box-shadow: 0 0 20px rgba(25, 118, 210, 0.8);
+    box-shadow: 0 0 ${CHECKBOX_GLOW.blur.to}px ${effectInk(CHECKBOX_GLOW.alpha.to)};
   }
 `;
 
@@ -40,32 +52,32 @@ const StyledCheckbox = styled(MuiCheckbox, {
   ({ theme, customVariant, ripple, glow: glowProp, pulse: pulseProp }) => ({
     ...(customVariant === 'rounded' && {
       '& .MuiSvgIcon-root': {
-        borderRadius: '50%',
+        borderRadius: CHECKBOX_VARIANT.rounded.radius,
       },
     }),
     
     ...(customVariant === 'toggle' && {
       '& .MuiSvgIcon-root': {
-        borderRadius: '12px',
-        transform: 'scale(1.2)',
+        borderRadius: `${CHECKBOX_VARIANT.toggle.radius}px`,
+        transform: `scale(${CHECKBOX_VARIANT.toggle.scale})`,
       },
     }),
     
     '&.MuiCheckbox-root': {
-      transition: 'all 0.3s ease',
+      transition: `all ${CHECKBOX_TRANSITION_MS / 1000}s ease`,
       ...(ripple === false && {
         '& .MuiTouchRipple-root': {
           display: 'none',
         },
       }),
       ...(glowProp && {
-        animation: `${glow} 2s ease-in-out infinite`,
+        animation: `${glow} ${CHECKBOX_GLOW.ms / 1000}s ease-in-out infinite`,
       }),
       ...(pulseProp && {
-        animation: `${pulse} 2s infinite`,
+        animation: `${pulse} ${CHECKBOX_PULSE.ms / 1000}s infinite`,
       }),
       '&:hover': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+        backgroundColor: alpha(theme.palette.primary.main, CHECKBOX_HOVER_ALPHA),
       },
     },
     
@@ -83,17 +95,17 @@ const StyledFormControlLabel = styled(FormControlLabel, {
   shouldForwardProp: (prop) => prop !== 'error',
 })<{ error?: boolean }>(
   ({ theme, error }) => ({
-    marginLeft: 0,
+    marginLeft: CHECKBOX_LABEL.marginLeft,
     '& .MuiFormControlLabel-label': {
       color: error ? theme.palette.error.main : theme.palette.text.primary,
-      fontSize: '0.875rem',
+      fontSize: px(CHECKBOX_LABEL.fontSize),
     },
   })
 );
 
 const StyledFormHelperText = styled(FormHelperText)(({ theme }) => ({
-  marginLeft: theme.spacing(4),
-  marginTop: theme.spacing(0.5),
+  marginLeft: theme.spacing(CHECKBOX_HELPER.marginLeftUnits),
+  marginTop: theme.spacing(CHECKBOX_HELPER.marginTopUnits),
 }));
 
 export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
@@ -128,13 +140,13 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
         />
         {loading && (
           <CircularProgress
-            size={20}
+            size={CHECKBOX_SPINNER.size}
             sx={{
               position: 'absolute',
               top: '50%',
               left: '50%',
-              marginTop: '-10px',
-              marginLeft: '-10px',
+              marginTop: `${CHECKBOX_SPINNER.offset}px`,
+              marginLeft: `${CHECKBOX_SPINNER.offset}px`,
               color: 'primary.main',
             }}
           />

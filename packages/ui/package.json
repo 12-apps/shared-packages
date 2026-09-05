@@ -329,6 +329,10 @@
       "default": "./dist/form/CepField.js"
     },
     "./form/Checkbox": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Checkbox/index.native.d.ts",
+        "default": "./dist/native/form/Checkbox.js"
+      },
       "types": "./dist/types/components/form/Checkbox/index.d.ts",
       "default": "./dist/form/Checkbox.js"
     },
