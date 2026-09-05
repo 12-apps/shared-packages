@@ -697,11 +697,12 @@ Components for text formatting and display.
 **Docs**: `src/components/typography/Code/Code.md`
 
 ### Heading
-**Purpose**: Section headings
+**Purpose**: Section headings (web AND React Native)
 **Use Cases**: Page titles, section headers, hierarchy
 **Features**: Multiple levels (h1-h6), variants, responsive sizing
 **Location**: `src/components/typography/Heading`
 **Docs**: `src/components/typography/Heading/Heading.md`
+**Native**: yes — `@12-apps/ui/typography/Heading` resolves to `Heading.native.tsx` under Metro (`role="heading"` + `aria-level`); `gradient` paints its first stop flat.
 
 ### Paragraph
 **Purpose**: Body text paragraphs (web AND React Native)

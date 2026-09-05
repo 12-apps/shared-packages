@@ -80,7 +80,7 @@ installs them.
 ## Ledger
 
 <!-- native-parity:start -->
-Ported: **9 of 140** public subpaths carry a `react-native` condition.
+Ported: **10 of 140** public subpaths carry a `react-native` condition.
 
 | subpath | shared stories run natively | skipped (`native-skip`) | known gaps |
 |---|---|---|---|
@@ -93,4 +93,5 @@ Ported: **9 of 140** public subpaths carry a `react-native` condition.
 | `@12-apps/ui/form/Button` | 24 | 2 | — |
 | `@12-apps/ui/layout/Spacer` | 21 | 1 | — |
 | `@12-apps/ui/typography/Paragraph` | 17 | 1 | — |
+| `@12-apps/ui/typography/Heading` | 26 | 1 | `gradient` paints the gradient's first stop as a flat colour: React Native has no `background-clip: text` and no gradient fill in core. A host wanting the real thing adds a masked-gradient library. |
 <!-- native-parity:end -->

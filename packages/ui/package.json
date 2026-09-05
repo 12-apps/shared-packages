@@ -537,6 +537,10 @@
       "default": "./dist/typography/Code.js"
     },
     "./typography/Heading": {
+      "react-native": {
+        "types": "./dist/types-native/components/typography/Heading/index.native.d.ts",
+        "default": "./dist/native/typography/Heading.js"
+      },
       "types": "./dist/types/components/typography/Heading/index.d.ts",
       "default": "./dist/typography/Heading.js"
     },

@@ -1,10 +1,15 @@
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
-import type { HeadingProps } from './Heading.types';
-import { HEADING_SCALE, headingMetrics, type HeadingLevel } from '../../../tokens/typography';
+import {
+  HEADING_DEFAULT_COLOR,
+  HEADING_DEFAULT_WEIGHT,
+  NEUTRAL_GRADIENT_STEPS,
+  headingGradient,
+  headingWeight,
+  stepOf,
+} from './Heading.metrics';
+import { headingMetrics } from '../../../tokens/typography';
 import type { ColorValue } from '../../../tokens/scales';
-
-type Weight = NonNullable<HeadingProps['weight']>;
 
 // Exhaustive over ColorValue, and deliberately without a fallback. The map
 // happened to hold all seven already, but it was `Record<string, string>` with
@@ -29,14 +34,6 @@ const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
   return colorMap[color];
 };
 
-const WEIGHTS: Record<Weight, number> = {
-  light: 300,
-  normal: 400,
-  medium: 500,
-  semibold: 600,
-  bold: 700,
-};
-
 /** The two-stop gradient each colour paints its glyphs with. */
 const PRIMARY_STOPS = (theme: Theme): [string, string] => [
   theme.palette.primary.main,
@@ -47,6 +44,9 @@ const PRIMARY_STOPS = (theme: Theme): [string, string] => [
 // stops were missing — `info` and `neutral` — so a gradient heading in either
 // colour painted the PRIMARY gradient and looked deliberate while ignoring the
 // prop entirely. The fallback is what hid it, so the fallback is gone.
+//
+// The MUI-typed twin of `headingGradientStops` in `Heading.metrics.ts`, which
+// the native renderer reads off a `UiTheme`; the pairs are the same.
 const GRADIENT_STOPS: Record<ColorValue, (theme: Theme) => [string, string]> = {
   primary: PRIMARY_STOPS,
   secondary: (theme) => [theme.palette.secondary.main, theme.palette.primary.main],
@@ -56,12 +56,15 @@ const GRADIENT_STOPS: Record<ColorValue, (theme: Theme) => [string, string]> = {
   danger: (theme) => [theme.palette.error.light, theme.palette.error.dark],
   // The grey ramp has no light/dark pair, and every stop on it is
   // `string | undefined` under `noUncheckedIndexedAccess`.
-  neutral: (theme) => [theme.palette.grey[500] ?? '#9e9e9e', theme.palette.grey[900] ?? '#212121'],
+  neutral: (theme) => [
+    theme.palette.grey[NEUTRAL_GRADIENT_STEPS.from] ?? '#9e9e9e',
+    theme.palette.grey[NEUTRAL_GRADIENT_STEPS.to] ?? '#212121',
+  ],
 };
 
 const gradientFor = (theme: Theme, color: ColorValue) => {
   const [from, to] = GRADIENT_STOPS[color](theme);
-  return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
+  return headingGradient(from, to);
 };
 
 export interface HeadingFlags {
@@ -77,12 +80,8 @@ export interface HeadingFlags {
   gradient?: boolean;
 }
 
-/** A step name the scale actually has, or `h2` — the documented default. */
-const stepOf = (value: string | undefined): HeadingLevel =>
-  value !== undefined && value in HEADING_SCALE ? (value as HeadingLevel) : 'h2';
-
 export const headingSx = (theme: Theme, flags: HeadingFlags): CSSObject => {
-  const { customSize, customColor = 'neutral', customWeight = 'bold', gradient } = flags;
+  const { customSize, customColor = HEADING_DEFAULT_COLOR, customWeight = HEADING_DEFAULT_WEIGHT, gradient } = flags;
   // From the THEME, with the package default underneath — never from a table in
   // this file. A host's `createTheme({ typography: { headingScale } })` is what
   // sets the house scale now; see `tokens/typography.ts` for why it is our own
@@ -94,8 +93,7 @@ export const headingSx = (theme: Theme, flags: HeadingFlags): CSSObject => {
     margin: 0,
     transition: 'all 0.2s ease',
     ...metrics,
-    fontWeight:
-      customWeight === 'normal' ? normalWeight : (WEIGHTS[customWeight as Weight] ?? WEIGHTS.bold),
+    fontWeight: headingWeight(customWeight, normalWeight),
   };
 
   if (!gradient) {
