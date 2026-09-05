@@ -166,6 +166,13 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/Lightbox`
 **Docs**: `src/components/data-display/Lightbox/Lightbox.md`
 
+### FleetMap
+**Purpose**: Show where a set of tracked units is right now — a map beside the roster that reads it
+**Use Cases**: Delivery fleets, field-service boards, any "where is everybody" panel over named people
+**Features**: Three freshness states from two caller-set thresholds, controlled selection shared by the map and the list, roster ordered freshest first, listbox keyboard navigation, empty and loading states, every word and both formatters injected
+**Location**: `src/components/data-display/FleetMap`
+**Docs**: `src/components/data-display/FleetMap/FleetMap.md`
+
 ### MapPreview
 **Purpose**: Display interactive Google Maps
 **Use Cases**: Location displays, store locators, geographic data visualization

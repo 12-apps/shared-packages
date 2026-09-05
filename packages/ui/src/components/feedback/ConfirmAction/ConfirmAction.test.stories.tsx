@@ -4,7 +4,15 @@ import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../../form/Button';
 
 import { ConfirmAction } from './ConfirmAction';
-import { ConfirmButton } from './ConfirmButton';
+import { createConfirmButton } from './ConfirmButton';
+
+import { EN_US_CONFIRM_ACTION_COPY } from '../../../en-US.shared';
+
+/** Built here the way a host builds it — see the sibling stories file. */
+const ConfirmButton = createConfirmButton(
+  EN_US_CONFIRM_ACTION_COPY,
+  'Something went wrong. Try again.',
+);
 
 const meta: Meta<typeof ConfirmAction> = {
   title: 'Overlays/ConfirmAction/Tests',

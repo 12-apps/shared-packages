@@ -4,8 +4,24 @@ import Stack from '@mui/material/Stack/index.js';
 import { Button } from '../../form/Button';
 
 import { ConfirmAction } from './ConfirmAction';
-import { ConfirmButton } from './ConfirmButton';
+import { createConfirmButton } from './ConfirmButton';
 import { withConfirmation } from './with-confirmation';
+
+import { EN_US_CONFIRM_ACTION_COPY } from '../../../en-US.shared';
+
+/**
+ * The wrapped button, built here the way a host builds it.
+ *
+ * `ConfirmButton` used to be a ready-made export and this story still
+ * imported it after the module became a FACTORY — which took the copy port,
+ * so the words could stop being English literals baked into the package. The
+ * story was left behind and broke the whole Storybook build, silently, because
+ * a rollup resolve failure is not a type error.
+ */
+const ConfirmButton = createConfirmButton(
+  EN_US_CONFIRM_ACTION_COPY,
+  'Something went wrong. Try again.',
+);
 
 const meta: Meta<typeof ConfirmAction> = {
   title: 'Overlays/ConfirmAction',
