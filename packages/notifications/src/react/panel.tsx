@@ -17,12 +17,15 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { useMediaQuery } from '@12-apps/ui/mui/useMediaQuery';
 import { useTheme } from '@12-apps/ui/mui/styles';
 
+import type { LiveActivity } from '../live';
 import type { NotificationMessages } from '../messages';
 import type { InboxNotification } from '../wire';
 
 import { BellIcon } from './bell-icon';
 import { useInboxList } from './hooks';
 import type { InboxState, InboxStore } from './inbox-state';
+import type { LiveActivitiesConfig } from './live-config';
+import { LiveSection } from './live-section';
 import { NotificationRow } from './row';
 
 interface PanelBodyProps {
@@ -105,6 +108,44 @@ function PanelBody({
   );
 }
 
+/**
+ * The two open gestures, which are ONE deep-link path with a mark-read in front
+ * of half of it.
+ *
+ * Lifted out of the component because both kinds of entry follow a link the
+ * same way and a host with no router follows neither — a rule that is easier to
+ * keep true in one place than in two call sites that drifted apart once
+ * already.
+ */
+function usePanelOpeners(
+  store: InboxStore,
+  onClose: () => void,
+  onNavigate?: (link: string) => void,
+): {
+  openNotification: (notification: InboxNotification) => void;
+  openLive: (activity: LiveActivity) => void;
+} {
+  const follow = useCallback(
+    (link: string | null) => {
+      if (!link || !onNavigate) return;
+      onClose();
+      onNavigate(link);
+    },
+    [onClose, onNavigate],
+  );
+
+  return {
+    openNotification: useCallback(
+      (notification: InboxNotification) => {
+        if (notification.readAt === null) store.markRead([notification.id]);
+        follow(notification.link);
+      },
+      [store, follow],
+    ),
+    openLive: useCallback((activity: LiveActivity) => follow(activity.link), [follow]),
+  };
+}
+
 export interface NotificationsPanelProps {
   open: boolean;
   onClose: () => void;
@@ -118,9 +159,11 @@ export function NotificationsPanel({
   onNavigate,
   store,
   messages,
+  live,
 }: NotificationsPanelProps & {
   store: InboxStore;
   messages: NotificationMessages;
+  live?: LiveActivitiesConfig;
 }): JSX.Element {
   // `useTheme` from @mui/material/styles falls back to the DEFAULT theme when
   // no provider is mounted, where the callback form of `useMediaQuery` would
@@ -130,16 +173,7 @@ export function NotificationsPanel({
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const state = useInboxList(store, open);
 
-  const openNotification = useCallback(
-    (notification: InboxNotification) => {
-      if (notification.readAt === null) store.markRead([notification.id]);
-      if (notification.link && onNavigate) {
-        onClose();
-        onNavigate(notification.link);
-      }
-    },
-    [store, onClose, onNavigate],
-  );
+  const { openNotification, openLive } = usePanelOpeners(store, onClose, onNavigate);
 
   const hasUnread = state.items.some((item) => item.readAt === null);
 
@@ -154,6 +188,20 @@ export function NotificationsPanel({
     >
       <DrawerHeader onClose={onClose}>{messages.panelTitle}</DrawerHeader>
       <DrawerContent>
+        {/*
+          Above the mark-all control as well as above the list, deliberately:
+          "marcar todas como lidas" belongs to the INBOX, and a live entry has
+          nothing to mark. A control between the two blocks would read as
+          applying to both.
+        */}
+        {live ? (
+          <LiveSection
+            config={live}
+            messages={messages}
+            active={open}
+            onOpen={openLive}
+          />
+        ) : null}
         {hasUnread ? (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 1 }}>
             <Button

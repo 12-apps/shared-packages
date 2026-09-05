@@ -1,0 +1,281 @@
+// @vitest-environment jsdom
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { CLINIC_LIVE_MESSAGES, CLINIC_MESSAGES } from '../../__tests__/host-copy';
+import type { LiveActivity } from '../../live';
+
+import { createWebNotifications } from '../create-web-notifications';
+import type { LiveActivitiesConfig } from '../live-config';
+import type { NotificationsResult, NotificationsTransport } from '../transport';
+
+/**
+ * LIVE ACTIVITIES through the published surface — `createWebNotifications` and
+ * the `Panel` it returns, which is all a host touches.
+ *
+ * The panel is fetched on demand, so every first assertion after opening it
+ * waits for a dynamic import as well as a render. Same budget and same reason
+ * as `web-surface.test.tsx`.
+ */
+configure({ asyncUtilTimeout: 5_000 });
+
+/** Frozen: two assertions here read a relative timestamp. */
+const NOW = new Date('2026-08-13T09:10:00.000Z');
+const FIVE_MINUTES_EARLIER = '2026-08-13T09:05:00.000Z';
+
+const LANE = [
+  { id: 'placed', label: 'Recebido' },
+  { id: 'preparing', label: 'Em preparo' },
+  { id: 'ready', label: 'Pronto' },
+];
+
+function activity(overrides: Partial<LiveActivity> = {}): LiveActivity {
+  return {
+    id: 'visit-42',
+    kind: 'visit',
+    title: 'Consulta em andamento',
+    body: 'A Nina já está com a veterinária.',
+    link: '/consultas/42',
+    steps: LANE,
+    activeStepId: 'preparing',
+    updatedAt: FIVE_MINUTES_EARLIER,
+    ...overrides,
+  };
+}
+
+const EMPTY_INBOX = { items: [], nextCursor: null };
+
+/** Reads only; nothing here writes, and an unstubbed path must still fail loudly. */
+function readOnlyTransport(): NotificationsTransport {
+  const pages: Record<string, unknown> = {
+    '/api/account/notifications/unread-count': { count: 0 },
+    '/api/account/notifications?limit=20': EMPTY_INBOX,
+  };
+  return {
+    get<T>(path: string): Promise<T> {
+      if (!(path in pages)) return Promise.reject(new Error(`no stub for ${path}`));
+      return Promise.resolve(pages[path] as T);
+    },
+    send<T>(): Promise<NotificationsResult<T>> {
+      return Promise.resolve({ ok: true, data: {} as T });
+    },
+  };
+}
+
+/**
+ * The host's half: a hook that answers with these activities while anyone is
+ * looking, and with nothing when the surface says nobody is.
+ *
+ * `record` is how the one test that cares observes what it was ASKED — passed
+ * in rather than closed over here, so no two tests can ever share the array.
+ */
+function source(
+  activities: readonly LiveActivity[],
+  record?: boolean[],
+): LiveActivitiesConfig {
+  return {
+    messages: CLINIC_LIVE_MESSAGES,
+    useActivities: ({ active }) => {
+      record?.push(active);
+      return active ? activities : [];
+    },
+  };
+}
+
+function mount(live?: LiveActivitiesConfig): ReturnType<typeof createWebNotifications> {
+  return createWebNotifications({
+    apiBase: '/api/account',
+    messages: CLINIC_MESSAGES,
+    transport: readOnlyTransport(),
+    ...(live ? { liveActivities: live } : {}),
+  });
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(NOW);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  cleanup();
+});
+
+describe('the live section', () => {
+  it('pins the activity above the inbox, with the host heading and the host copy', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+    const section = screen.getByTestId('live-activities');
+    expect(section.textContent).toContain(CLINIC_LIVE_MESSAGES.sectionTitle);
+    expect(section.textContent).toContain('Consulta em andamento');
+    expect(section.textContent).toContain('A Nina já está com a veterinária.');
+    // The wording of "5 minutes ago" is the INBOX's, so one panel never carries
+    // two vocabularies for the same duration.
+    expect(section.textContent).toContain(
+      CLINIC_LIVE_MESSAGES.updated(CLINIC_MESSAGES.minutesAgo(5)),
+    );
+
+    // ABOVE, not merely present: the whole claim is that what is happening now
+    // comes before what already happened.
+    const panel = screen.getByTestId('notifications-panel');
+    expect(
+      section.compareDocumentPosition(screen.getByTestId('notifications-empty')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(panel.contains(section)).toBe(true);
+  });
+
+  it('draws the lane with the stops BEFORE the active one completed', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy());
+    const lane = screen.getByTestId('live-activity-steps-visit-42');
+    expect(lane.textContent).toContain('Em preparo');
+    // The lane is decoration and says so: `Stepper` draws real buttons, and a
+    // card that is itself a button must not contain focusable descendants.
+    const decoration = lane.closest('[aria-hidden]');
+    expect(decoration).not.toBeNull();
+    expect(decoration?.hasAttribute('inert')).toBe(true);
+  });
+
+  it('renders no lane when the host says the subject is on a stop the lane lacks', async () => {
+    const config = source([activity({ activeStepId: 'discharged' })]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-visit-42')).toBeTruthy());
+    // A row of dots with none of them lit reads as a process that has stopped.
+    await waitFor(() =>
+      expect(screen.queryByTestId('live-activity-steps-visit-42')).toBeNull(),
+    );
+    expect(screen.getByTestId('live-activity-visit-42').textContent).toContain(
+      'Consulta em andamento',
+    );
+  });
+
+  it('renders nothing at all — no heading, no empty state — when nothing is live', async () => {
+    const config = source([]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('notifications-empty')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
+    expect(screen.getByTestId('notifications-panel').textContent).not.toContain(
+      CLINIC_LIVE_MESSAGES.sectionTitle,
+    );
+  });
+
+  it('is absent entirely for a host that turned it off', async () => {
+    const { Panel } = mount();
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('notifications-empty')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
+  });
+
+  it('never touches the unread count', async () => {
+    const config = source([activity()]);
+    const { Panel, BellButton } = mount(config);
+    render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+    // A live entry is not news. Counting it would put a number on the bell that
+    // no amount of reading can clear.
+    expect(screen.getByTestId('notifications-bell').getAttribute('aria-label')).toBe(
+      CLINIC_MESSAGES.openBell,
+    );
+  });
+
+  it('follows the card link through the host router, closing the panel first', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    const gone: string[] = [];
+    const closed: string[] = [];
+    render(
+      <Panel
+        open
+        onClose={() => closed.push('closed')}
+        onNavigate={(link) => gone.push(link)}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-visit-42')).toBeTruthy());
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: CLINIC_LIVE_MESSAGES.openActivity('Consulta em andamento'),
+      }),
+    );
+    expect(gone).toEqual(['/consultas/42']);
+    expect(closed).toEqual(['closed']);
+  });
+
+  it('renders a linkless activity as plain text rather than a dead button', async () => {
+    const config = source([activity({ link: null })]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-visit-42')).toBeTruthy());
+    expect(screen.getByTestId('live-activity-visit-42').tagName).not.toBe('BUTTON');
+  });
+
+  it('tells the host nobody is looking while the panel is shut', async () => {
+    const asked: boolean[] = [];
+    const config = source([activity()], asked);
+    const { Panel } = mount(config);
+    const { rerender } = render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+    expect(asked).toContain(true);
+
+    rerender(<Panel open={false} onClose={() => undefined} />);
+    // The panel stays MOUNTED once opened (the drawer owns its exit
+    // transition), so `active` is the only thing that can tell a host-side
+    // query to stand down.
+    await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
+    expect(asked.at(-1)).toBe(false);
+  });
+
+  it('re-reads the clock every minute, so the timestamp cannot freeze', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('live-activities').textContent).toContain(
+        CLINIC_LIVE_MESSAGES.updated(CLINIC_MESSAGES.minutesAgo(5)),
+      ),
+    );
+
+    // The host's data is unchanged — a react-query poll returns the previous
+    // object whenever the response is deep-equal, which within one stage it
+    // always is. Nothing but the tick can move this line.
+    // Inside `act` because the tick is the CLOCK firing, not the user — the
+    // same rule that covers a transport callback.
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('live-activities').textContent).toContain(
+        CLINIC_LIVE_MESSAGES.updated(CLINIC_MESSAGES.minutesAgo(7)),
+      ),
+    );
+  });
+});

@@ -1,3 +1,4 @@
+import { livePushTag } from '../../live';
 import type {
   NotificationContent,
   NotificationLogger,
@@ -52,6 +53,20 @@ export interface WebPushMessage {
   body: string;
   link: string | null;
   data: Record<string, unknown>;
+  /**
+   * The OS tray tag, or `null` for an ordinary event.
+   *
+   * Present for a notification about a LIVE SUBJECT (see `../../live`), and
+   * this is the whole of the live feature's reach onto a locked phone: a tag
+   * makes the next push about the same subject REPLACE the one already in the
+   * tray — silently — instead of stacking under it. Four stages then cost one
+   * entry and one buzz, and the entry that remains is the current one.
+   *
+   * `null` rather than absent, so the key is always on the wire and a service
+   * worker reads one shape. A worker that ignores it keeps today's behaviour
+   * exactly, which is what makes this safe to ship ahead of the workers.
+   */
+  tag: string | null;
 }
 
 export interface WebPushDriverDeclaration extends DriverDeclarationBase {
@@ -120,6 +135,7 @@ export function formatWebPush(content: NotificationContent): WebPushMessage {
     body: content.body,
     link: content.link ?? null,
     data: content.data ?? {},
+    tag: livePushTag(content.data),
   };
 }
 

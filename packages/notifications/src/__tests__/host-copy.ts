@@ -1,3 +1,4 @@
+import type { LiveActivityMessages } from '../react/live-config';
 import type { NotificationMessages } from '../messages';
 
 /**
@@ -80,4 +81,18 @@ export const CLINIC_MESSAGES: NotificationMessages = {
   devicePushFailed: 'Não foi possível ativar. Tente de novo.',
   devicePushEnable: 'Ativar',
   devicePushEnabling: 'Ativando...',
+};
+
+/**
+ * The same fictional clinic's words for the LIVE section.
+ *
+ * Its own pack rather than three more keys on `NotificationMessages`, for the
+ * reason `LiveActivitiesConfig` carries it: live activities are opt-in, and
+ * making every adopter write sentences for a section it never renders is the
+ * kind of tax that gets a required-config change reverted instead of adopted.
+ */
+export const CLINIC_LIVE_MESSAGES: LiveActivityMessages = {
+  sectionTitle: 'Acontecendo agora',
+  openActivity: (title) => `Abrir: ${title}`,
+  updated: (relative) => `Atualizado ${relative}`,
 };
