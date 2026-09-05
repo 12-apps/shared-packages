@@ -169,6 +169,10 @@
       "default": "./dist/data-display/Chart.js"
     },
     "./data-display/Chip": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Chip/index.native.d.ts",
+        "default": "./dist/native/data-display/Chip.js"
+      },
       "types": "./dist/types/components/data-display/Chip/index.d.ts",
       "default": "./dist/data-display/Chip.js"
     },
