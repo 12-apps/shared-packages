@@ -100,6 +100,20 @@ Adds extra vertical padding, useful for main content areas.
 - **lg**: 32px padding
 - **xl**: 48px padding
 
+## React Native
+
+The same import renders natively (`@12-apps/ui/layout/Container` resolves to
+`Container.native.tsx` under Metro): a `View` that is `width: 100%` between
+auto margins, limited to the same MUI breakpoint widths
+(`CONTAINER_MAX_WIDTHS`), inset from the same spacing units
+(`CONTAINER_PADDING_UNITS`). The `responsive` media query becomes a
+`useWindowDimensions().width < 600` test and `centered`'s `100vh` the window
+height. `testID`, `dataTestId` and `data-testid` all name the element;
+`container` is the default. Both renderers read one `containerPaddingUnits`,
+which paints what the web paints today — including two quirks recorded in
+`NATIVE-NOTES.md` (`padding="none"` and `variant="padded"` both paint the
+default inset). See [NATIVE.md](../../../../NATIVE.md).
+
 ## Accessibility
 
 - The component maintains semantic HTML structure

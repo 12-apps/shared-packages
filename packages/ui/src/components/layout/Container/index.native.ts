@@ -1,8 +1,8 @@
-export { Container } from './Container';
+export { Container, containerStyle } from './Container.native';
 export type {
   ContainerBaseProps,
   ContainerMaxWidth,
   ContainerPadding,
   ContainerProps,
   ContainerVariant,
-} from './Container.types';
+} from './Container.types.native';

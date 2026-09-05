@@ -518,11 +518,12 @@ Components for structuring and organizing page layouts.
 **Docs**: `src/components/layout/Collapsible/Collapsible.md`
 
 ### Container
-**Purpose**: Centered content container with max-width
+**Purpose**: Centered content container with max-width (web AND React Native)
 **Use Cases**: Page layouts, content centering, responsive design
 **Features**: Multiple sizes, fluid option, padding control
 **Location**: `src/components/layout/Container`
 **Docs**: `src/components/layout/Container/Container.md`
+**Native**: yes — `@12-apps/ui/layout/Container` resolves to `Container.native.tsx` under Metro, on MUI's breakpoint widths and the same spacing units.
 
 ### ContentToolbar
 **Purpose**: Shared content-page toolbar (Select All / count / actions + Sort By / Content Type / View / Filter)

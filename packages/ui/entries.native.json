@@ -8,5 +8,6 @@
   "form/Button": "src/components/form/Button/index.native.ts",
   "layout/Spacer": "src/components/layout/Spacer/index.native.ts",
   "typography/Paragraph": "src/components/typography/Paragraph/index.native.ts",
-  "typography/Heading": "src/components/typography/Heading/index.native.ts"
+  "typography/Heading": "src/components/typography/Heading/index.native.ts",
+  "layout/Container": "src/components/layout/Container/index.native.ts"
 }

@@ -437,6 +437,10 @@
       "default": "./dist/layout/Collapsible.js"
     },
     "./layout/Container": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Container/index.native.d.ts",
+        "default": "./dist/native/layout/Container.js"
+      },
       "types": "./dist/types/components/layout/Container/index.d.ts",
       "default": "./dist/layout/Container.js"
     },
