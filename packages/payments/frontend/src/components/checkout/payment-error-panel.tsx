@@ -2,14 +2,14 @@ import { Box } from "@mui/material";
 import { useState, type JSX } from "react";
 
 import { useCheckoutCopy } from "./copy-context";
-import { UNRESOLVED_CODE } from "./failure-codes";
+import { retryMayHelp, UNRESOLVED_CODE } from "./failure-codes";
 import { useCheckoutComponents } from "./ui";
 
 /**
  * Order-creation failure shown inline on Pagamento — the buyer never leaves the
  * step. Split out of `checkout-steps.tsx` when it grew a second presentation.
  *
- * Three shapes, and which one renders is decided by the failure's CODE, never
+ * Four shapes, and which one renders is decided by the failure's CODE, never
  * by its prose:
  *
  *  - the buyer e-mail was rejected (the owner testing with the store's own
@@ -19,6 +19,10 @@ import { useCheckoutComponents } from "./ui";
  *    a new reference, outside the walk's re-probe of the old one: precisely
  *    the double payment the message forbids, offered as the panel's most
  *    prominent affordance;
+ *  - the refusal is about the WORLD rather than the payment (FUT-1182) — the
+ *    ordinary danger Alert, and no retry either. Re-sending the identical
+ *    request meets the identical shut shop; see `retryMayHelp` for the list and
+ *    for why the sentence stays while the button goes;
  *  - anything else — the ordinary danger Alert with a retry.
  */
 export function PaymentErrorPanel({
@@ -48,7 +52,9 @@ export function PaymentErrorPanel({
         showIcon
         data-testid={unresolved ? "checkout-unresolved" : "checkout-error"}
       />
-      {unresolved ? null : <RetryAffordance {...{ emailFlagged, onUseEmail, onRetry }} />}
+      {!unresolved && retryMayHelp(code) ? (
+        <RetryAffordance {...{ emailFlagged, onUseEmail, onRetry }} />
+      ) : null}
     </Box>
   );
 }

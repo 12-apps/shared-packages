@@ -111,7 +111,23 @@ export const PT_BR_CHECKOUT_COPY: CheckoutCopy = {
    */
   fieldNameOf: (field) => (field === 'taxId' ? 'cpf' : field),
 
-  /** Never a provider's own sentence — see `mapProviderError` for the mapped ones. */
+  /**
+   * Never a provider's own sentence — see `mapProviderError` for the mapped
+   * ones — and NEVER THE BUYER'S FAULT EITHER (FUT-1182).
+   *
+   * One key, three refusals, and only the first is even about a payment:
+   * `PAYMENT_DECLINED` for a provider error nothing mapped (a provider 5xx
+   * included), `BROWSER_KEY_UNAVAILABLE` when the card form cannot be equipped,
+   * and `VAULT_NOT_SAVED` when a card the provider ACCEPTED could not be stored
+   * afterwards. "Verifique seus dados" sent a buyer hunting for a mistake in
+   * details that are fine — in the second case, before they had typed any — and
+   * read an outage back to them as something they had got wrong.
+   *
+   * So it says who could not do what, and that the attempt is worth repeating.
+   * Nothing here has taken any money, which is the difference from
+   * `unresolvedCharge` beside it and the reason this one may still invite one.
+   */
   genericProviderRefusal:
-    'O provedor de pagamento recusou a cobrança. Verifique seus dados e tente novamente.',
+    'O provedor de pagamento não conseguiu concluir a solicitação agora. ' +
+    'Tente novamente em instantes.',
 };

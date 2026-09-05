@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutCopy } from "./copy-context";
-import { createPollLoop, type PollLoop, type PollingOptions } from "./poll-loop";
+import { createPollLoop, type PollLoop, type PollingOptions, type PollSink } from "./poll-loop";
 import type { OrderStatus } from "./types";
 
 /** What a consumer reads off the wait, and the one action it can take. */
@@ -22,6 +22,50 @@ interface PaymentPollingState {
    * the order has settled — there is nothing left to ask about.
    */
   checkAgain: () => void;
+}
+
+/**
+ * What one wait has learned, and WHICH order it learned it about (FUT-1170).
+ *
+ * The three facts used to be three `useState`s with no order id attached, so a
+ * consumer re-pointed at a new charge read the PREVIOUS charge's answer until
+ * the new loop's first poll returned. That is not a cosmetic flash: a terminal
+ * status is acted on, and `PixView` acts on it by handing the flow to the
+ * confirmation screen — so a fresh, unpaid PIX code was reported settled by the
+ * code it had just replaced. Regenerating an expired charge is the path that
+ * does exactly this, and it is the one FUT-1170 was reported from.
+ *
+ * Stamping the answer and comparing at READ time (rather than clearing the
+ * state in an effect) is what makes the guard hold in the render that changes
+ * the id, with no intermediate frame in which the stale answer is still live.
+ */
+interface PollAnswer {
+  orderId: string | null;
+  status: OrderStatus | null;
+  error: string | null;
+  timedOut: boolean;
+}
+
+const NO_ANSWER: PollAnswer = { orderId: null, status: null, error: null, timedOut: false };
+
+/**
+ * Where a wait for ONE order writes what it learns.
+ *
+ * Every write is stamped with the order the loop was started for, and a write
+ * arriving against a DIFFERENT stamp starts from `NO_ANSWER` rather than
+ * merging into the previous order's facts.
+ */
+function sinkFor(
+  orderId: string,
+  setAnswer: Dispatch<SetStateAction<PollAnswer>>,
+): PollSink {
+  const write = (patch: Partial<PollAnswer>): void =>
+    setAnswer((prev) => ({ ...(prev.orderId === orderId ? prev : NO_ANSWER), ...patch, orderId }));
+  return {
+    setStatus: (status) => write({ status }),
+    setError: (error) => write({ error }),
+    setTimedOut: (timedOut) => write({ timedOut }),
+  };
 }
 
 
@@ -77,9 +121,7 @@ export function usePaymentPolling(
     askTimeoutMs,
   }: PollingOptions = {},
 ): PaymentPollingState {
-  const [status, setStatus] = useState<OrderStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [timedOut, setTimedOut] = useState(false);
+  const [answer, setAnswer] = useState<PollAnswer>(NO_ANSWER);
   // Whichever mount this tree is bound to (FUT-741). Stable per provider, so it
   // belongs in the deps below rather than being read out of a ref: a checkout
   // re-pointed at another mount must re-poll against THAT one.
@@ -106,7 +148,7 @@ export function usePaymentPolling(
         askTimeoutMs,
         askTimeoutError: transportCopy.offline,
       },
-      { setStatus, setError, setTimedOut },
+      sinkFor(orderId, setAnswer),
     );
     loop.current = running;
     running.restart();
@@ -133,6 +175,15 @@ export function usePaymentPolling(
     loop.current?.restart();
   }, []);
 
-  return { status, error, timedOut, checkAgain };
+  // The answer is this order's, or there is no answer yet. Read here rather
+  // than reset in an effect: an effect runs after paint, so the render that
+  // re-points the hook would still hand a consumer the old charge's status.
+  const current = answer.orderId === orderId ? answer : NO_ANSWER;
+  return {
+    status: current.status,
+    error: current.error,
+    timedOut: current.timedOut,
+    checkAgain,
+  };
 }
 

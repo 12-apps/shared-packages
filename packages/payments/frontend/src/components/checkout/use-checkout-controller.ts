@@ -12,6 +12,7 @@ import {
   useStartPayment,
   type Step,
 } from "./checkout-actions";
+import { useConfirmationWait } from "./confirmation-wait";
 import { useCheckoutCopy } from "./copy-context";
 
 import { forgetHostedOrder } from "./hosted-return";
@@ -150,13 +151,22 @@ export function useCheckoutController(
     decline, order, clearError, setOrder, setDecline, setFinalStatus, setStep, setFreshInstrument,
   });
   const completed = useMemo(() => new Set(STEP_ORDER.slice(0, STEP_ORDER.indexOf(step))), [step]);
-  useSettledPort(finalStatus ?? resume.status, onPaid);
+  const settled = finalStatus ?? resume.status;
+  useSettledPort(settled, onPaid);
+  // The confirmation screen's own wait (FUT-1170). Live only where nothing else
+  // is polling and nothing has answered: a resumed leg brings its own wait, and
+  // every method's screen polls for itself on the payment step.
+  const confirming = useConfirmationWait({
+    orderId: order?.orderId ?? null,
+    active: step === "status" && settled === null && resume.order === null,
+    onSettled: setFinalStatus,
+  });
 
   return {
     step, setStep, method, setMethod, buyer, setBuyer, saveProfile, setSaveProfile,
-    order, finalStatus: finalStatus ?? resume.status, creating,
+    order, finalStatus: settled, creating,
     decline, freshInstrument,
-    ...resumeSurface(resume),
+    ...resumeSurface(resume, confirming),
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu, back, editBuyer,
     goToPayment, startPayment, payWithEmail, handleResolved, retry, completed,

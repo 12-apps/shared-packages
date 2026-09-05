@@ -32,8 +32,10 @@ export interface PollingOptions {
   /**
    * WALL-CLOCK bound on the whole wait (FUT-1144): stop scheduling and report
    * `timedOut` once this many milliseconds have passed since the wait began.
-   * Undefined ⇒ unbounded (the PIX consumer passes none — its charge expires
-   * server-side and comes back as a terminal EXPIRED).
+   * Undefined ⇒ unbounded, which no consumer here is any more. PIX passed none
+   * — its charge expires server-side and comes back terminal, true of a tab
+   * somebody is watching and not of one left open in a pocket, which asked a
+   * provider every 2.5 s for as long as it lived (FUT-1170).
    *
    * It used to be a count of HEALTHY polls, which measured the wrong thing in
    * the only case that matters. A wait that is failing makes no healthy polls,
@@ -126,7 +128,7 @@ function pollDelay(healthy: number, errors: number, options: PollingOptions): nu
 }
 
 /** Where a running wait writes what it has learned. */
-interface PollSink {
+export interface PollSink {
   setStatus: (status: OrderStatus) => void;
   setError: (error: string | null) => void;
   setTimedOut: (timedOut: boolean) => void;

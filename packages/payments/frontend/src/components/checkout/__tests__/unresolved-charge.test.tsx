@@ -139,11 +139,17 @@ describe("the Pagamento step's error panel", () => {
   });
 
   it("keeps the retry for every other refusal", () => {
+    // The probe was `EMPTY_CART` until FUT-1182, which is one of the refusals
+    // re-sending the identical request cannot clear — so this case was pinning
+    // the defect that ticket removes rather than the rule it means to state.
+    // The rule is unchanged and so is the assertion: a refusal about the
+    // PAYMENT keeps its retry. `PAYMENT_UNAVAILABLE` is one, and the next
+    // attempt genuinely meets a different world.
     render(
       <PaymentErrorPanel
         message="Não foi possível criar o pedido."
         emailFlagged={false}
-        code="EMPTY_CART"
+        code="PAYMENT_UNAVAILABLE"
         onUseEmail={vi.fn()}
         onRetry={vi.fn()}
       />,

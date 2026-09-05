@@ -169,8 +169,9 @@ type CardSubmit = Pick<
  * It was 36 healthy polls, which is the same 90 s at the default 2500 ms
  * interval and an unbounded wait at any other — including the one that
  * mattered, where every poll is FAILING and the healthy count never moves.
- * PIX passes no bound at all and keeps today's behavior: its charge expires
- * server-side and comes back as a terminal EXPIRED.
+ * PIX is bounded too since FUT-1170, but by the CHARGE's own expiry rather
+ * than by a constant: a code the buyer can still scan is still worth watching,
+ * and one that has died is not.
  */
 const CARD_AWAITING_WAIT_MS = 90_000;
 
