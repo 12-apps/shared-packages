@@ -1,8 +1,8 @@
-export { default, EmptyState } from './EmptyState';
+export { EmptyState } from './EmptyState.native';
 export type {
   EmptyStateAction,
   EmptyStateBaseProps,
   EmptyStateHelpLink,
   EmptyStateProps,
   EmptyStateVariant,
-} from './EmptyState.types';
+} from './EmptyState.types.native';

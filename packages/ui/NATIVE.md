@@ -80,13 +80,14 @@ installs them.
 ## Ledger
 
 <!-- native-parity:start -->
-Ported: **13 of 140** public subpaths carry a `react-native` condition.
+Ported: **14 of 140** public subpaths carry a `react-native` condition.
 
 | subpath | shared stories run natively | skipped (`native-skip`) | known gaps |
 |---|---|---|---|
 | `@12-apps/ui/tokens` | 0 | 0 | — |
 | `@12-apps/ui/provider` | 0 | 0 | — |
 | `@12-apps/ui/icons` | 8 | 0 | — |
+| `@12-apps/ui/data-display/EmptyState` | 23 | 0 | The actions are house `Button`s (solid/outline, `sm`) sized to MUI's medium contained and outlined buttons — same padding, 14px type, radius, half-alpha border, elevation-2 shadow, 20px icon and 120px floor; MUI additionally uppercases the label and sets the icon 8px from the label where the house button sets 4.; The help link opens through `Linking.openURL` on a device; `target`/`rel` are web-only and reach the DOM through react-native-web's anchor.; Title, description and link are set in MUI's default `h6`/`body2`/`body1` numbers; a host that re-themes MUI's typography variants moves the web only. |
 | `@12-apps/ui/data-display/ErrorState` | 13 | 0 | The retry is the house `Button` (outline, `sm`) sized to MUI's medium outlined button — same 5px/15px padding, 14px type, radius, 20px icon and 120px floor; MUI additionally uppercases the label, draws its border at `alpha(main, 0.5)`, and sets the icon 8px from the label where the house button sets 4.; Title and message are set in MUI's default `h6`/`body2` numbers; a host that re-themes MUI's typography variants moves the web only. |
 | `@12-apps/ui/data-display/LoadingState` | 11 | 1 | The spinner is the platform's `ActivityIndicator`, not MUI's 3.6-unit arc: same diameter and primary colour, the platform's own stroke; on iOS the two built-in sizes stand in for the five (`md` and up draw `large`).; The skeleton rows are the static tint (`alpha(text.primary, 0.13)`); MUI's `wave` sweep is a gradient pseudo-element React Native cannot draw.; The message is set in MUI's default `body2`/`body1`/`h6` numbers; a host that re-themes MUI's typography variants moves the web only. |
 | `@12-apps/ui/form/Button` | 24 | 2 | — |

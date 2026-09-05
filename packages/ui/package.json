@@ -181,6 +181,10 @@
       "default": "./dist/data-display/DescriptionItem.js"
     },
     "./data-display/EmptyState": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/EmptyState/index.native.d.ts",
+        "default": "./dist/native/data-display/EmptyState.js"
+      },
       "types": "./dist/types/components/data-display/EmptyState/index.d.ts",
       "default": "./dist/data-display/EmptyState.js"
     },
