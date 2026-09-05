@@ -417,6 +417,10 @@
       "default": "./dist/form/Slider.js"
     },
     "./form/Switch": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Switch/index.native.d.ts",
+        "default": "./dist/native/form/Switch.js"
+      },
       "types": "./dist/types/components/form/Switch/index.d.ts",
       "default": "./dist/form/Switch.js"
     },
