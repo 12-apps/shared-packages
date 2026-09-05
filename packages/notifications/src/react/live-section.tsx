@@ -107,6 +107,21 @@ export interface LiveSectionProps {
 
 
 
+/**
+ * ## Why this always renders its slot, even with nothing live
+ *
+ * React reconciles fragment children by INDEX. The section and the inbox are
+ * siblings in one fragment, so a branch that stopped rendering this position
+ * would move the inbox from index 1 to index 0 — a different element type at
+ * that slot, which React handles by unmounting the old subtree and mounting a
+ * new one. Every `NotificationRow` would be torn down and rebuilt the moment a
+ * pedido started or finished, throwing keyboard focus to `<body>` inside a
+ * focus-trapped drawer, for a reader who was only scrolling their inbox.
+ *
+ * So the empty case renders `null` INTO the slot rather than returning early.
+ * `landing.e2e`-style DOM-node identity is what pins it; a test on the test id
+ * alone would pass either way.
+ */
 export function LiveSection({
   config,
   messages,
@@ -135,18 +150,7 @@ export function LiveSection({
 
   return (
     <>
-      {/*
-        A NAMED region. Without the label a screen-reader user meets a loose run
-        of controls ahead of the inbox with nothing saying what they are; the
-        panel's own title is the drawer's heading and cannot describe this block.
-
-        `null` rather than an early return, and the inbox keeps its slot either
-        way, because React reconciles fragment children by INDEX. A branch that
-        dropped this position would move the inbox from index 1 to index 0, and
-        every `NotificationRow` would unmount and remount the moment a pedido
-        starts or finishes — throwing keyboard focus to `<body>` inside a
-        focus-trapped drawer, for a reader who was only scrolling their inbox.
-      */}
+      {/* A NAMED region, and always a SLOT — see the docblock above. */}
       {liveCount === 0 ? null : (
         <Box
       component="section"

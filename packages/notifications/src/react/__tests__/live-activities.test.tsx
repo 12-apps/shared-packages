@@ -591,7 +591,7 @@ describe('the live section', () => {
     const { rerender } = render(<Panel open onClose={() => undefined} />);
 
     const row = await screen.findByTestId('notification-n1');
-    expect(screen.queryByTestId('live-activities')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
 
     current = [activity()];
     rerender(<Panel open onClose={() => undefined} />);
