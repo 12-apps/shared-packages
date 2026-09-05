@@ -68,6 +68,12 @@ export interface LiveActivitiesConfig {
    * `ReactNode` in it would put React on that import path for a backend that
    * only ever writes rows. The host switches on `kind`, which is what `kind` is
    * for. No renderer, no mark, and the card is text — never a placeholder box.
+   *
+   * **Return something PRESENTATIONAL.** The mark is drawn inside the card's
+   * own `<button>` and inside an `aria-hidden` wrapper, so a focusable node
+   * here is a button inside a button — invalid HTML, and the exact defect the
+   * card's structure exists to prevent — as well as a control hidden from the
+   * accessibility tree. An icon or an `<svg>`; not a control.
    */
   renderIcon?: (activity: LiveActivity) => ReactNode;
 }

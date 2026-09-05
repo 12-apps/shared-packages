@@ -64,7 +64,16 @@ export interface NotificationContent {
   body: string;
   /** In-app deep link (a same-origin path such as `/orders/123`). */
   link?: string;
-  /** Structured extras for consumers that want more than text. */
+  /**
+   * Structured extras for consumers that want more than text.
+   *
+   * ONE KEY IS RESERVED: `liveSubject` (`LIVE_SUBJECT_KEY` in `./live`) ties
+   * this notification to a live activity, and the WEB_PUSH transport turns it
+   * into the tray `tag` that collapses every push about one subject onto a
+   * single entry. A host already using that name for something else acquires
+   * that behaviour without asking for it — so it is named here, on the field a
+   * generator actually writes, and not only where the feature is documented.
+   */
   data?: Record<string, unknown>;
 }
 

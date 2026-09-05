@@ -91,31 +91,47 @@ function source(
 }
 
 /**
- * The `::after` rule emitted for an element's own classes.
+ * The UNCONDITIONAL `::after` rule emitted for an element's own classes.
  *
  * Emotion writes its rules into `<style>` tags in the document, and jsdom
  * exposes those through `document.styleSheets` — which is the only way to see a
- * pseudo-element from here. Throws rather than returning empty when it finds
- * nothing, because a helper that silently answers "" makes the assertion above
- * unfailable.
+ * pseudo-element from here.
+ *
+ * Two narrowings, each for a way this could stop meaning anything:
+ *
+ *  - the EMOTION class only. `MuiBox-root` is on every Box in the document, so
+ *    matching on it would let any `::after` rule in the sheet answer for this
+ *    element's.
+ *  - rules carrying a `:` STATE in the selector are skipped. A focus indicator
+ *    (`&:focus-visible::after`) is a plausible addition to a button that has
+ *    `border: none; background: none` and no other focus affordance, and it
+ *    must not be able to satisfy — or, by merely existing, break — an assertion
+ *    about the overlay that is always there.
+ *
+ * Throws when that leaves anything but one rule, because a helper that answers
+ * "" makes the assertion unfailable and one that joins several lets a second
+ * rule cover for a broken first.
  */
 function overlayRuleFor(element: Element): string {
-  // The emotion-generated class only. `MuiBox-root` is on every Box in the
-  // document, so matching on it would let ANY `::after` rule in the sheet
-  // answer for this element's.
   const own = [...element.classList].filter((name) => name.startsWith('css-'));
   const matches: string[] = [];
   for (const sheet of document.styleSheets) {
     for (const rule of sheet.cssRules) {
       const text = rule.cssText;
-      if (text.includes('::after') && own.some((name) => text.includes(`.${name}`))) {
+      const selector = text.slice(0, text.indexOf('{'));
+      if (
+        selector.includes('::after') &&
+        !selector.replace(/::after/g, '').includes(':') &&
+        own.some((name) => selector.includes(`.${name}`))
+      ) {
         matches.push(text);
       }
     }
   }
   if (matches.length !== 1) {
     throw new Error(
-      `expected exactly one ::after rule for ${own.join(' ')}, found ${matches.length}`,
+      `expected exactly one unconditional ::after rule for ${own.join(' ')}, ` +
+        `found ${matches.length}`,
     );
   }
   return matches[0] as string;

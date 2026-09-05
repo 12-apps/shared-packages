@@ -78,11 +78,11 @@ const targetSx = {
  * ## What actually lets a click on the LANE reach it
  *
  * Not paint order. `@12-apps/ui` gives each `StepItem` `position: relative`, and
- * a positioned element with `z-index: auto` paints ABOVE a non-positioned
- * sibling's descendants whatever the document order — so every stop, and its
- * label, sits over this overlay. `clickable={false}` does not save it either:
- * the package puts `pointer-events: none` on the step CIRCLE and not on the
- * label beside it.
+ * this overlay is positioned too — so the two sit in the SAME painting layer
+ * (positioned, `z-index: auto`), where tree order decides, and the lane comes
+ * after the button. Every stop, and its label, therefore sits over this
+ * overlay. `clickable={false}` does not save it either: the package puts
+ * `pointer-events: none` on the step CIRCLE and not on the label beside it.
  *
  * It is `inert` on {@link ActivityLane} that does it: an inert subtree is
  * skipped by hit-testing, so a click on a stop falls through to the overlay
@@ -170,7 +170,15 @@ interface LiveActivityCardProps {
   onOpen?: (activity: LiveActivity) => void;
 }
 
-/** The mark on the left, when the host draws one. */
+/**
+ * The mark on the left, when the host draws one.
+ *
+ * PRESENTATIONAL ONLY. It is rendered inside the card's `<button>` and inside
+ * an `aria-hidden` wrapper, so a host returning anything focusable — an
+ * icon-button, a link — puts a button inside a button (invalid HTML, and the
+ * defect this card was restructured to remove) and hides a focusable node from
+ * the accessibility tree. An icon, an emoji, an `<svg>`: yes. A control: no.
+ */
 function ActivityIcon({ icon }: { icon: ReactNode }): JSX.Element | null {
   if (icon === undefined || icon === null) return null;
   return (
