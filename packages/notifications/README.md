@@ -221,7 +221,9 @@ drawer unmounts its content on close, so a host that ignores `active` still
 issues nothing until somebody opens the bell.
 
 One activity is `{ id, kind, title, body, link, steps, activeStepId, updatedAt }`
-(`src/live.ts`). `steps` + `activeStepId` draw a lane, because "how far along is
+— `LiveActivity`, importable from either entry (`@12-apps/notifications` or
+`@12-apps/notifications/react`, so a host wiring the surface needs one import
+line, not two). It is defined in `src/live.ts`. `steps` + `activeStepId` draw a lane, because "how far along is
 this" is the shape almost every ongoing subject has; both are optional in effect
 — an activity with no lane is a heading, a sentence and a timestamp that keeps
 moving. An `activeStepId` naming no step draws NO lane rather than a lane with
@@ -233,6 +235,8 @@ The other half is the OS notification, and it is one field. A generator whose
 event is about something also tracked live puts the activity's id in `data`:
 
 ```ts
+import { LIVE_SUBJECT_KEY } from '@12-apps/notifications';   // the root entry
+
 data: { [LIVE_SUBJECT_KEY]: `order:${orderId}` }
 ```
 

@@ -100,20 +100,25 @@ function source(
  * unfailable.
  */
 function overlayRuleFor(element: Element): string {
-  const classes = [...element.classList];
+  // The emotion-generated class only. `MuiBox-root` is on every Box in the
+  // document, so matching on it would let ANY `::after` rule in the sheet
+  // answer for this element's.
+  const own = [...element.classList].filter((name) => name.startsWith('css-'));
   const matches: string[] = [];
   for (const sheet of document.styleSheets) {
     for (const rule of sheet.cssRules) {
       const text = rule.cssText;
-      if (text.includes('::after') && classes.some((name) => text.includes(`.${name}`))) {
+      if (text.includes('::after') && own.some((name) => text.includes(`.${name}`))) {
         matches.push(text);
       }
     }
   }
-  if (matches.length === 0) {
-    throw new Error(`no ::after rule found for classes ${classes.join(' ')}`);
+  if (matches.length !== 1) {
+    throw new Error(
+      `expected exactly one ::after rule for ${own.join(' ')}, found ${matches.length}`,
+    );
   }
-  return matches.join('\n');
+  return matches[0] as string;
 }
 
 function mount(live?: LiveActivitiesConfig): ReturnType<typeof createWebNotifications> {
@@ -207,12 +212,51 @@ describe('the live section', () => {
       'relative',
     );
     // jsdom computes no pseudo-element styles and does no hit-testing, so the
-    // overlay is read off the stylesheet it was emitted into. Asserted rather
-    // than skipped: this is the whole of what makes the lane clickable, and it
-    // is one `sx` key away from being tidied out.
-    expect(overlayRuleFor(screen.getByTestId('live-activity-open-visit-42'))).toMatch(
-      /position:\s*absolute/,
-    );
+    // overlay is read off the stylesheet it was emitted into.
+    //
+    // ALL THREE declarations, because any one of them missing leaves a rule
+    // that stretches nothing and a test that still passes: a pseudo-element
+    // with no `content` generates no box at all, and an absolutely positioned
+    // box with auto offsets is 0x0.
+    const rule = overlayRuleFor(screen.getByTestId('live-activity-open-visit-42'));
+    expect(rule).toMatch(/content:/);
+    expect(rule).toMatch(/position:\s*absolute/);
+    expect(rule).toMatch(/inset:\s*0/);
+  });
+
+  it('keeps the lane INERT, which is what lets a click on it reach the card', async () => {
+    // Not paint order: `@12-apps/ui` gives each `StepItem` `position: relative`,
+    // so every stop sits ABOVE the overlay whatever the document order — and
+    // `clickable={false}` puts `pointer-events: none` on the step circle and not
+    // on the label beside it. An inert subtree is skipped by hit-testing, so
+    // this attribute is load-bearing for the card's target as well as for the
+    // tab order it was added for.
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy());
+    const lane = screen.getByTestId('live-activity-steps-visit-42').closest('[inert]');
+    expect(lane).not.toBeNull();
+    expect(lane?.contains(screen.getByTestId('live-activity-steps-visit-42'))).toBe(true);
+  });
+
+  it('announces the STAGE moving, and nothing else on the card', async () => {
+    // The one mechanism by which a screen-reader user learns the subject moved
+    // — which is the property that distinguishes a live activity from an inbox
+    // row. The timestamp beside it deliberately does NOT announce: it moves
+    // every minute for as long as the subject lasts.
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-title-visit-42')).toBeTruthy());
+    expect(
+      screen.getByTestId('live-activity-title-visit-42').getAttribute('aria-live'),
+    ).toBe('polite');
+    expect(
+      screen.getByTestId('live-activity-visit-42').querySelectorAll('[aria-live]'),
+    ).toHaveLength(1);
   });
 
   it('keeps the sentence audible even though the label replaces the contents', async () => {

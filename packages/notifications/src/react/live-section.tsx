@@ -43,7 +43,12 @@ import type { LiveActivitiesConfig } from './live-config';
  */
 const TICK_MS = 60_000;
 
-/** The current minute, re-read on a timer while `active`. */
+/**
+ * The current minute, re-read on a timer while there is something to tick.
+ *
+ * The caller passes `active && there are activities` — see {@link TICK_MS} for
+ * why both halves are in it.
+ */
 function useMinuteTick(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

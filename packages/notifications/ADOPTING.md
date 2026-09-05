@@ -491,8 +491,13 @@ createWebNotifications({
 about the same subject:
 
 ```ts
+import { LIVE_SUBJECT_KEY } from '@12-apps/notifications';   // the root entry
+
 data: { [LIVE_SUBJECT_KEY]: `order:${orderId}` }
 ```
+
+(`LiveActivity` itself comes from either entry — the root or `./react` — so the
+hook and the type it returns are one import line.)
 
 `formatWebPush` turns it into `tag` on the push payload; your service worker
 passes `tag` to `showNotification` and the tray keeps ONE entry per subject

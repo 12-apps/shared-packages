@@ -67,14 +67,28 @@ const targetSx = {
  *
  * Taking the lane out of the link fixed the markup and left the card looking
  * like one target while only its top half was one — the lane is the most
- * visually distinctive part of it, and its own step buttons carry
- * `pointer-events: none`, so aiming at the obvious thing did nothing.
+ * visually distinctive part of it, and aiming at the obvious thing did nothing.
  *
  * A stretched pseudo-element is the remedy that keeps the structure: the
  * `<button>` stays a sibling of the lane in the tree, so nothing nests, and its
- * `::after` covers the card. `z-index: 0` on the lane and the timestamp is not
- * needed — they paint after the button in document order and the overlay is the
- * button's own child, which is what puts it on top of both.
+ * `::after` covers the card. All three declarations are load-bearing — a
+ * pseudo-element with no `content` generates no box at all, and an absolutely
+ * positioned box with auto offsets is 0×0.
+ *
+ * ## What actually lets a click on the LANE reach it
+ *
+ * Not paint order. `@12-apps/ui` gives each `StepItem` `position: relative`, and
+ * a positioned element with `z-index: auto` paints ABOVE a non-positioned
+ * sibling's descendants whatever the document order — so every stop, and its
+ * label, sits over this overlay. `clickable={false}` does not save it either:
+ * the package puts `pointer-events: none` on the step CIRCLE and not on the
+ * label beside it.
+ *
+ * It is `inert` on {@link ActivityLane} that does it: an inert subtree is
+ * skipped by hit-testing, so a click on a stop falls through to the overlay
+ * underneath. That makes the attribute load-bearing for the TARGET as well as
+ * for the tab order it was added for — remove it and the lane silently swallows
+ * clicks again, which is why the two are pinned by one test.
  */
 const stretchedSx = {
   ...targetSx,
@@ -111,11 +125,15 @@ const laneSx = {
 /**
  * The lane, or nothing.
  *
- * `aria-hidden` AND `inert`: the stops are real buttons, and leaving four
- * focusable, named controls per entry in front of an inbox would cost a
- * keyboard user the list they opened the panel for. Nothing is lost by hiding
- * it — the stop the subject is at is already the card's heading, and the row of
- * dots restates it visually.
+ * `aria-hidden` AND `inert`, and each earns its place twice over. The stops are
+ * real buttons, so leaving four focusable, named controls per entry in front of
+ * an inbox would cost a keyboard user the list they opened the panel for —
+ * that is what the pair was added for. `inert` then turns out to be what makes
+ * the card's own hit area work as well, because an inert subtree is skipped by
+ * hit-testing: see {@link stretchedSx}.
+ *
+ * Nothing is lost by hiding it — the stop the subject is at is already the
+ * card's heading, and the row of dots restates it visually.
  */
 function ActivityLane({ activity }: { activity: LiveActivity }): JSX.Element | null {
   const lane = liveActivityLane(activity);
@@ -135,7 +153,7 @@ function ActivityLane({ activity }: { activity: LiveActivity }): JSX.Element | n
   );
 }
 
-/** Not exported: the card is composed by `LiveSection`, which owns the clock. */
+/** The card's props. Not part of the package's surface — see `./index`. */
 interface LiveActivityCardProps {
   activity: LiveActivity;
   messages: NotificationMessages;
