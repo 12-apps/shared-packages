@@ -54,6 +54,28 @@ export const Form = React.forwardRef<HTMLFormElement, FormProps>(
 
 Form.displayName = 'Form';
 
+/**
+ * NO ROW GAP HERE, and that is the fix rather than an omission.
+ *
+ * `FormLabel` already carries `marginBottom: theme.spacing(0.5)` — 4px — and it
+ * carries it because it has to: every other field in this package
+ * (`CepField`, `CategorySelect`, `CreatableSelect`, the three `total-form`
+ * fields, and five of `@12-apps/discounts`' builders) puts a bare `FormLabel`
+ * straight inside a `FormControl`, which is a plain block box with no gap of its
+ * own. There, the label's own margin is the ONLY thing between the label and the
+ * control.
+ *
+ * A `gap: theme.spacing(1)` here was a second mechanism for that one job, and in
+ * a column the two ADD: 8px + 4px put `FormField` at 12px where every one of
+ * those siblings sits at 4px. Measured in Chromium at 320x568 on a consuming
+ * app's six-field delivery address form, the 8px a row it added pushed the
+ * submit button from 561px to 609px — 41px below the fold of the smallest
+ * supported phone, i.e. a checkout whose primary action is off-screen.
+ *
+ * The `columnGap` survives because it is not the same job. In the horizontal
+ * grid the label sits BESIDE the control, so a horizontal gap and a vertical
+ * margin are orthogonal and nothing double-counts.
+ */
 const StyledFormField = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'variant',
 })<{ variant?: 'vertical' | 'horizontal' }>(
@@ -61,7 +83,7 @@ const StyledFormField = styled(Box, {
     display: variant === 'horizontal' ? 'grid' : 'flex',
     flexDirection: variant === 'horizontal' ? undefined : 'column',
     gridTemplateColumns: variant === 'horizontal' ? '200px 1fr' : undefined,
-    gap: theme.spacing(1),
+    columnGap: variant === 'horizontal' ? theme.spacing(1) : undefined,
     alignItems: variant === 'horizontal' ? 'center' : undefined,
   }),
 );

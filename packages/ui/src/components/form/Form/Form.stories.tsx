@@ -687,3 +687,58 @@ export const Responsive: Story = {
     ),
   },
 };
+
+/**
+ * SIX ROWS ON THE SMALLEST PHONE — the case that decides the row's spacing.
+ *
+ * A field's label sits 4px above its control, and exactly one thing puts it
+ * there: `FormLabel`'s own `marginBottom`. `FormField` briefly said it twice,
+ * adding an 8px flex `gap` on the wrapper on top of that margin, which in a
+ * column ADD to 12px.
+ *
+ * Eight pixels a row is invisible on one field and decisive on six. This story
+ * is drawn in a 320x568 frame — the smallest viewport the design system claims
+ * to support — with the fold marked, because that is the width at which the
+ * difference stops being spacing and starts being a submit button nobody can
+ * reach. `Form.test.stories.tsx` measures the same row and pins the 4px.
+ */
+export const SixRowsOnTheSmallestPhone: Story = {
+  parameters: {
+    layout: 'fullscreen',
+    viewport: {
+      viewports: { xxs: { name: '320x568', styles: { width: '320px', height: '568px' } } },
+      defaultViewport: 'xxs',
+    },
+  },
+  args: {
+    variant: 'vertical',
+    maxWidth: 'full',
+    spacing: 'md',
+    children: (
+      <>
+        <Typography variant="h6">Delivery address</Typography>
+        <FormField name="street" label="Street address" required>
+          <Input fullWidth placeholder="Street" />
+        </FormField>
+        <FormField name="number" label="Number" required>
+          <Input fullWidth placeholder="Number" />
+        </FormField>
+        <FormField name="complement" label="Complement">
+          <Input fullWidth placeholder="Flat, block…" />
+        </FormField>
+        <FormField name="neighbourhood" label="Neighbourhood" required>
+          <Input fullWidth placeholder="Neighbourhood" />
+        </FormField>
+        <FormField name="landmark" label="Landmark">
+          <Input fullWidth placeholder="Near the market…" />
+        </FormField>
+        <FormField name="phone" label="Phone" required>
+          <Input fullWidth placeholder="+00 00000-0000" />
+        </FormField>
+        <Button variant="solid" size="lg" fullWidth type="submit">
+          Continue
+        </Button>
+      </>
+    ),
+  },
+};

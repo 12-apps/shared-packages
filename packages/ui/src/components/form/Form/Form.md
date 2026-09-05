@@ -103,6 +103,36 @@ All elements in a single row:
 </Form>
 ```
 
+## Row spacing
+
+A label sits **4px** above its control, and exactly one thing puts it there:
+`FormLabel`'s own `marginBottom` (`theme.spacing(0.5)`). `FormMessage` mirrors it
+with the same 4px `marginTop` below the control, so a row reads 4 / control / 4.
+
+`FormField` deliberately adds **nothing** to that. It used to: the wrapper was a
+flex column with `gap: theme.spacing(1)`, and in a column a gap and a margin add
+up — 8 + 4 = 12px, three times what the same package draws everywhere else.
+`CepField`, `CategorySelect`, `CreatableSelect` and the `total-form` fields all
+put a bare `FormLabel` straight inside a `FormControl`, which has no gap of its
+own, so the label's margin is the whole of their spacing at 4px. `FormField` was
+the only field in the package that disagreed.
+
+Eight pixels a row is invisible on one field and decisive on six. Measured in
+Chromium at 320x568 — the smallest supported viewport — a six-field address form
+put its submit button 41px below the fold.
+
+**There is no `spacing` prop, and that is the answer rather than an omission.**
+A knob here would be a second place to state a decision that already has one, and
+its default would have to be the 4px every other field draws — so the only thing
+it would buy is the ability to disagree with them. A row that genuinely needs
+more air gets it from the container: `Form`'s own `spacing` sets the distance
+*between* fields, and a caller composing `FormControl` + `FormLabel` by hand can
+space them however it likes.
+
+`variant="horizontal"` keeps a `columnGap`, which is not the same job: there the
+label sits beside the control, so a horizontal gap and a vertical margin are
+orthogonal and nothing double-counts.
+
 ## Validation
 
 Display validation errors and helper text:

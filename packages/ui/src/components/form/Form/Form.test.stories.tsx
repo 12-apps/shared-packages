@@ -601,3 +601,82 @@ export const Integration: Story = {
     expect(submit).toBeEnabled();
   },
 };
+
+/**
+ * Test 12: the rendered distance between a label and its control.
+ *
+ * Every other case in this file reads text or a test id, which is what makes
+ * them honest in jsdom as well as in a browser. This one deliberately does not:
+ * the defect it guards was two spacings ADDING UP, and a sum is only visible
+ * where boxes are actually laid out.
+ *
+ * `FormLabel` carries a 4px `marginBottom`, and `StyledFormField` used to carry
+ * an 8px flex `gap` on top of it — 12px where every other labelled field in this
+ * package draws 4px, and 8px a row of unasked-for height at the bottom of a
+ * form. The assertion is stated as "the wrapper adds nothing to the label's own
+ * margin" rather than as a literal 4, so it survives the margin being re-tuned
+ * and still fails the moment a second mechanism appears beside it.
+ *
+ * Nothing here reads a font metric, so it is stable wherever it runs: the
+ * distance between the label's bottom edge and the control's top edge is
+ * margin plus gap, whatever glyphs the label happens to be drawn with.
+ */
+export const LabelToControlDistance: Story = {
+  args: {
+    variant: 'vertical',
+    maxWidth: 'sm',
+    spacing: 'md',
+    dataTestId: 'spacing-form',
+    children: (
+      <>
+        <FormField name="street" label="Street address" required dataTestId="street-field">
+          <TextField fullWidth defaultValue="" inputProps={{ 'data-testid': 'street-input' }} />
+        </FormField>
+        <FormField
+          name="landmark"
+          label="Landmark"
+          helperText="What the courier looks for"
+          dataTestId="landmark-field"
+        >
+          <TextField fullWidth defaultValue="" inputProps={{ 'data-testid': 'landmark-input' }} />
+        </FormField>
+      </>
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    for (const name of ['street', 'landmark']) {
+      const field = canvas.getByTestId(`${name}-field`);
+      const label = canvas.getByTestId(`${name}-field-label`);
+      // The generated `-control` wrapper, not the `<input>`: a control's own
+      // root may carry padding of its own, and this row is about the space
+      // OUTSIDE it.
+      const control = canvas.getByTestId(`${name}-field-control`);
+
+      const declaredMargin = Number.parseFloat(window.getComputedStyle(label).marginBottom);
+      const rendered =
+        control.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
+
+      // The label's own margin is the ONLY thing between the two.
+      expect(Math.round(rendered)).toBe(Math.round(declaredMargin));
+      // And that margin is the package's 4px — theme.spacing(0.5).
+      expect(Math.round(declaredMargin)).toBe(4);
+
+      // Belt and braces: no row gap on the wrapper to add to it. A browser
+      // reports an undeclared gap as `normal`, and `0px` once one is set to
+      // zero; anything with a positive length is the regression.
+      const wrapperRowGap = window.getComputedStyle(field).rowGap;
+      expect(Number.parseFloat(wrapperRowGap) || 0).toBe(0);
+    }
+
+    // The control-to-message distance is the same 4px, drawn from the other
+    // side. The two being equal is the rule the row is built on; they disagreed
+    // 12 to 4 while the wrapper carried a gap of its own.
+    const message = canvas.getByTestId('landmark-field-message');
+    const control = message.previousElementSibling as HTMLElement;
+    const belowControl =
+      message.getBoundingClientRect().top - control.getBoundingClientRect().bottom;
+    expect(Math.round(belowControl)).toBe(4);
+  },
+};
