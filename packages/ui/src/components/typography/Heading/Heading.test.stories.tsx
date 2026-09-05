@@ -460,6 +460,8 @@ export const FocusManagement: Story = {
 
 // Responsive Design Test
 export const ResponsiveDesign: Story = {
+  // Asserts MUI's Roboto font STACK and `sx` breakpoints; React Native has no fallback stacks and no `sx`.
+  tags: ['native-skip'],
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
   },

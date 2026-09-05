@@ -9,7 +9,21 @@ import { useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import {
+  ERROR_ICON_BOX,
+  ERROR_ICON_BOX_OPACITY,
+  ERROR_ICON_SIZE,
+  ERROR_MESSAGE_LINE_HEIGHT,
+  ERROR_MESSAGE_MAX_WIDTH,
+  ERROR_STATE_GAP_UNITS,
+  ERROR_STATE_MIN_HEIGHT,
+  ERROR_STATE_PADDING_UNITS,
+  ERROR_TEXT_GAP_UNITS,
+  RETRY_MARGIN_TOP_UNITS,
+  RETRY_MIN_WIDTH,
+} from './ErrorState.metrics';
 import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
+import { resolveTestId } from '../../../platform/test-id';
 
 const makeTestId =
   (dataTestId?: string) =>
@@ -35,14 +49,14 @@ const ErrorIcon: React.FC<{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: 80,
-        height: 80,
+        width: ERROR_ICON_BOX,
+        height: ERROR_ICON_BOX,
         borderRadius: '50%',
         backgroundColor: color.light,
-        opacity: 0.9,
+        opacity: ERROR_ICON_BOX_OPACITY,
       }}
     >
-      {icon || <Fallback sx={{ fontSize: 48, color: color.main }} />}
+      {icon || <Fallback sx={{ fontSize: ERROR_ICON_SIZE, color: color.main }} />}
     </Box>
   );
 };
@@ -56,7 +70,7 @@ const ErrorText: React.FC<{
   const theme = useTheme();
 
   return (
-    <Stack spacing={1} alignItems="center">
+    <Stack spacing={ERROR_TEXT_GAP_UNITS} alignItems="center">
       {title && (
         <Typography
           id={titleId}
@@ -78,8 +92,8 @@ const ErrorText: React.FC<{
         color="text.secondary"
         data-testid={testId('message')}
         sx={{
-          maxWidth: 400,
-          lineHeight: 1.6,
+          maxWidth: ERROR_MESSAGE_MAX_WIDTH,
+          lineHeight: ERROR_MESSAGE_LINE_HEIGHT,
         }}
       >
         {message}
@@ -88,8 +102,8 @@ const ErrorText: React.FC<{
   );
 };
 
-export const ErrorState: React.FC<ErrorStateProps> = React.memo(
-  ({
+export const ErrorState: React.FC<ErrorStateProps> = React.memo((props) => {
+  const {
     message,
     title,
     onRetry,
@@ -97,53 +111,54 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo(
     severity = 'error',
     icon,
     className,
-    dataTestId,
-  }) => {
-    const theme = useTheme();
-    const titleId = React.useId();
-    const testId = makeTestId(dataTestId);
+  } = props;
+  const theme = useTheme();
+  const titleId = React.useId();
+  // `dataTestId` is the documented spelling; `testID`, the shared contract's
+  // other one, resolves to the same id.
+  const dataTestId = resolveTestId(props);
+  const testId = makeTestId(dataTestId);
 
-    return (
-      <Box
-        role="alert"
-        aria-labelledby={title ? titleId : undefined}
-        aria-describedby={`${titleId}-message`}
-        className={className}
-        data-testid={dataTestId || 'error-state'}
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          padding: theme.spacing(6),
-          minHeight: 200,
-          gap: theme.spacing(2),
-        }}
-      >
-        <ErrorIcon severity={severity} icon={icon} testId={testId('icon')} />
+  return (
+    <Box
+      role="alert"
+      aria-labelledby={title ? titleId : undefined}
+      aria-describedby={`${titleId}-message`}
+      className={className}
+      data-testid={dataTestId || 'error-state'}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        padding: theme.spacing(ERROR_STATE_PADDING_UNITS),
+        minHeight: ERROR_STATE_MIN_HEIGHT,
+        gap: theme.spacing(ERROR_STATE_GAP_UNITS),
+      }}
+    >
+      <ErrorIcon severity={severity} icon={icon} testId={testId('icon')} />
 
-        <ErrorText title={title} message={message} titleId={titleId} testId={testId} />
+      <ErrorText title={title} message={message} titleId={titleId} testId={testId} />
 
-        {onRetry && (
-          <Button
-            variant="outlined"
-            color={severity}
-            onClick={onRetry}
-            startIcon={<RefreshIcon />}
-            data-testid={testId('retry-button')}
-            sx={{
-              mt: theme.spacing(1),
-              minWidth: 120,
-            }}
-          >
-            {retryLabel}
-          </Button>
-        )}
-      </Box>
-    );
-  },
-);
+      {onRetry && (
+        <Button
+          variant="outlined"
+          color={severity}
+          onClick={onRetry}
+          startIcon={<RefreshIcon />}
+          data-testid={testId('retry-button')}
+          sx={{
+            mt: theme.spacing(RETRY_MARGIN_TOP_UNITS),
+            minWidth: RETRY_MIN_WIDTH,
+          }}
+        >
+          {retryLabel}
+        </Button>
+      )}
+    </Box>
+  );
+});
 
 ErrorState.displayName = 'ErrorState';
 

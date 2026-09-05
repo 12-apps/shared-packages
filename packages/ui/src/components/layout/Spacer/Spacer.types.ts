@@ -1,13 +1,9 @@
-import type { SizeValue } from '../../../tokens/scales';
-export type SpacerSize = SizeValue;
-export type SpacerDirection = 'horizontal' | 'vertical' | 'both';
+import type { SpacerBaseProps } from './Spacer.base';
 
-export interface SpacerProps {
-  size?: SpacerSize;
-  direction?: SpacerDirection;
-  width?: number | string;
-  height?: number | string;
-  flex?: boolean;
+export type { SpacerBaseProps, SpacerDimension, SpacerDirection, SpacerSize } from './Spacer.base';
+
+/** The web `Spacer`: the shared contract, plus the DOM's class hook and its own test-id spelling. */
+export interface SpacerProps extends SpacerBaseProps {
   className?: string;
   'data-testid'?: string;
 }
