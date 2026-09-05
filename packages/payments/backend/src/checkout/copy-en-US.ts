@@ -81,7 +81,7 @@ export const EN_US_CHECKOUT_COPY: CheckoutCopy = {
   /** The same host/client contract the pt-BR half carries — see its note. */
   fieldNameOf: (field) => (field === 'taxId' ? 'cpf' : field),
 
-  /** Never a provider's own sentence — see `mapProviderError` for the mapped ones. */
+  /** The twin of the pt-BR key — see its note for the three refusals it words. */
   genericProviderRefusal:
-    'The payment provider declined the charge. Check your details and try again.',
+    'The payment provider could not complete the request right now. Try again in a moment.',
 };
