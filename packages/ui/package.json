@@ -137,6 +137,10 @@
       "default": "./dist/mui/ListItemText.js"
     },
     "./data-display/Alert": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Alert/index.native.d.ts",
+        "default": "./dist/native/data-display/Alert.js"
+      },
       "types": "./dist/types/components/data-display/Alert/index.d.ts",
       "default": "./dist/data-display/Alert.js"
     },
@@ -181,6 +185,10 @@
       "default": "./dist/data-display/DescriptionItem.js"
     },
     "./data-display/EmptyState": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/EmptyState/index.native.d.ts",
+        "default": "./dist/native/data-display/EmptyState.js"
+      },
       "types": "./dist/types/components/data-display/EmptyState/index.d.ts",
       "default": "./dist/data-display/EmptyState.js"
     },
@@ -249,10 +257,18 @@
       "default": "./dist/data-display/AsyncStateContainer.js"
     },
     "./data-display/ErrorState": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/ErrorState/index.native.d.ts",
+        "default": "./dist/native/data-display/ErrorState.js"
+      },
       "types": "./dist/types/components/data-display/ErrorState/index.d.ts",
       "default": "./dist/data-display/ErrorState.js"
     },
     "./data-display/LoadingState": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/LoadingState/index.native.d.ts",
+        "default": "./dist/native/data-display/LoadingState.js"
+      },
       "types": "./dist/types/components/data-display/LoadingState/index.d.ts",
       "default": "./dist/data-display/LoadingState.js"
     },
@@ -437,6 +453,10 @@
       "default": "./dist/layout/Collapsible.js"
     },
     "./layout/Container": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Container/index.native.d.ts",
+        "default": "./dist/native/layout/Container.js"
+      },
       "types": "./dist/types/components/layout/Container/index.d.ts",
       "default": "./dist/layout/Container.js"
     },
@@ -477,6 +497,10 @@
       "default": "./dist/layout/Skeleton.js"
     },
     "./layout/Spacer": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Spacer/index.native.d.ts",
+        "default": "./dist/native/layout/Spacer.js"
+      },
       "types": "./dist/types/components/layout/Spacer/index.d.ts",
       "default": "./dist/layout/Spacer.js"
     },
@@ -533,10 +557,18 @@
       "default": "./dist/typography/Code.js"
     },
     "./typography/Heading": {
+      "react-native": {
+        "types": "./dist/types-native/components/typography/Heading/index.native.d.ts",
+        "default": "./dist/native/typography/Heading.js"
+      },
       "types": "./dist/types/components/typography/Heading/index.d.ts",
       "default": "./dist/typography/Heading.js"
     },
     "./typography/Paragraph": {
+      "react-native": {
+        "types": "./dist/types-native/components/typography/Paragraph/index.native.d.ts",
+        "default": "./dist/native/typography/Paragraph.js"
+      },
       "types": "./dist/types/components/typography/Paragraph/index.d.ts",
       "default": "./dist/typography/Paragraph.js"
     },

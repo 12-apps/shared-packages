@@ -6,7 +6,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text as RNText,
   View,
   type GestureResponderEvent,
   type PressableStateCallbackType,
@@ -38,6 +37,7 @@ import {
   quietInk,
 } from './Button.metrics';
 import type { ButtonProps, ButtonVariant } from './Button.types.native';
+import { renderTextChildren } from '../../../platform/text-children';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import { alpha } from '../../../tokens/color';
@@ -192,22 +192,6 @@ function Pulse({ color, radius, testID }: { color: string; radius: number; testI
   );
 }
 
-/**
- * A string or number child is the label and gets the label style; anything
- * else is rendered as given. No test id of its own: the web puts none on the
- * label, and a shared story that counts `/perf-button-/` must count buttons.
- */
-function renderChildren(children: React.ReactNode, label: TextStyle): React.ReactNode {
-  return React.Children.map(children, (child) =>
-    typeof child === 'string' || typeof child === 'number' ? (
-      <RNText style={label} numberOfLines={1}>
-        {child}
-      </RNText>
-    ) : (
-      child
-    ),
-  );
-}
 
 type ResolvedProps = ReturnType<typeof resolveButtonProps<ButtonProps>>;
 
@@ -316,7 +300,7 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
     >
       {pulse && !look.inactive ? <Pulse color={look.palette.main} radius={look.radius} testID={idFor('pulse')} /> : null}
       {iconPosition === 'left' ? iconNode : null}
-      {loading ? <Spinner color={look.label.color as string} testID={idFor('loading')} /> : renderChildren(children, look.label)}
+      {loading ? <Spinner color={look.label.color as string} testID={idFor('loading')} /> : renderTextChildren(children, look.label, 1)}
       {iconPosition === 'right' ? iconNode : null}
     </Pressable>
   );

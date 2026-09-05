@@ -15,6 +15,8 @@ export type Story = StoryObj<typeof meta>;
 const sampleText = 'This is a sample paragraph text for testing purposes.';
 
 export const BasicInteraction: Story = {
+  // Asserts the rendered TAG (`<p>`); react-native-web has no tag to answer with.
+  tags: ['native-skip'],
   args: {
     children: sampleText,
   },

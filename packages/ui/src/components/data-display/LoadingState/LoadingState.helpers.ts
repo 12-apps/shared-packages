@@ -1,30 +1,27 @@
-import type { LoadingStateProps, LoadingStateSize } from './LoadingState.types';
+import type { LoadingStateBaseProps, LoadingStateSize } from './LoadingState.base';
+import { MESSAGE_TYPE, SKELETON_ROW_HEIGHT, SPINNER_SIZES } from './LoadingState.metrics';
+import type { MuiTypeVariantName } from '../../../tokens/mui-type';
+import { SIZE_VALUES } from '../../../tokens/vocabulary';
 
-export const SIZE_MAP: Record<
-  LoadingStateSize,
-  { spinner: number; text: 'body2' | 'body1' | 'h6' }
-> = {
-  xs: { spinner: 16, text: 'body2' },
-  sm: { spinner: 24, text: 'body2' },
-  md: { spinner: 40, text: 'body1' },
-  lg: { spinner: 56, text: 'h6' },
-  xl: { spinner: 64, text: 'h6' },
-};
+export { SKELETON_ROW_HEIGHT };
 
-export const SKELETON_ROW_HEIGHT: Record<LoadingStateSize, number> = {
-  xs: 14,
-  sm: 20,
-  md: 28,
-  lg: 36,
-  xl: 44,
-};
+// Derived from the shared metrics, not restated: the native `LoadingState`
+// reads the same two tables, so the renderers cannot disagree on a size.
+export const SIZE_MAP: Record<LoadingStateSize, { spinner: number; text: MuiTypeVariantName }> =
+  Object.fromEntries(
+    SIZE_VALUES.map((size) => [size, { spinner: SPINNER_SIZES[size], text: MESSAGE_TYPE[size] }]),
+  ) as Record<LoadingStateSize, { spinner: number; text: MuiTypeVariantName }>;
 
 type LoadingStateDefaultedKeys = 'variant' | 'size' | 'skeletonRows';
 
-type ResolvedLoadingStateProps = LoadingStateProps &
-  Required<Pick<LoadingStateProps, LoadingStateDefaultedKeys>>;
+/**
+ * Generic over the renderer's own props: the web and the native `LoadingState`
+ * pass different extras through, and both come back out untouched.
+ */
+type ResolvedLoadingStateProps<P extends LoadingStateBaseProps> = P &
+  Required<Pick<LoadingStateBaseProps, LoadingStateDefaultedKeys>>;
 
-const LOADING_STATE_DEFAULTS: Pick<LoadingStateProps, LoadingStateDefaultedKeys> = {
+const LOADING_STATE_DEFAULTS: Required<Pick<LoadingStateBaseProps, LoadingStateDefaultedKeys>> = {
   variant: 'spinner',
   size: 'md',
   skeletonRows: 3,
@@ -32,15 +29,15 @@ const LOADING_STATE_DEFAULTS: Pick<LoadingStateProps, LoadingStateDefaultedKeys>
 
 // Strips explicitly-undefined props before the merge, so `size={undefined}` still
 // falls back to the default exactly as a destructuring default would.
-const definedProps = (props: LoadingStateProps): Partial<LoadingStateProps> =>
+const definedProps = <P extends LoadingStateBaseProps>(props: P): Partial<P> =>
   Object.fromEntries(
     Object.entries(props).filter(([, value]) => value !== undefined),
-  ) as Partial<LoadingStateProps>;
+  ) as Partial<P>;
 
-export const resolveLoadingStateProps = (
-  props: LoadingStateProps,
-): ResolvedLoadingStateProps =>
-  ({ ...LOADING_STATE_DEFAULTS, ...definedProps(props) }) as ResolvedLoadingStateProps;
+export const resolveLoadingStateProps = <P extends LoadingStateBaseProps>(
+  props: P,
+): ResolvedLoadingStateProps<P> =>
+  ({ ...LOADING_STATE_DEFAULTS, ...definedProps(props) }) as ResolvedLoadingStateProps<P>;
 
 /**
  * Test ids come in three flavours here: the container falls back to a bare
@@ -54,3 +51,5 @@ export const makeTestIds = (dataTestId?: string) => ({
   named: (suffix: string): string =>
     dataTestId ? `${dataTestId}-${suffix}` : `loading-state-${suffix}`,
 });
+
+export type LoadingStateTestIds = ReturnType<typeof makeTestIds>;

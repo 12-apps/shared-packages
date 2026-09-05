@@ -6,13 +6,42 @@ import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import type { AlertVariant } from './Alert.base';
+import { VARIANT_ICON } from './Alert.helpers';
+import {
+  ACTION_SLOT,
+  ALERT_EASING,
+  ALERT_PADDING_UNITS,
+  ALERT_TRANSITION_MS,
+  type AlertPalette,
+  FADE_IN,
+  GLASS,
+  GLOW,
+  GRADIENT,
+  ICON_SLOT,
+  ICON_SPIN,
+  MESSAGE_BUTTON,
+  MESSAGE_FONT_SIZE,
+  MESSAGE_GAP_UNITS,
+  MESSAGE_LINE_HEIGHT,
+  NEUTRAL_GREY,
+  PULSE,
+  seconds,
+  SEMANTIC_SURFACE,
+  SEMANTIC_VARIANTS,
+} from './Alert.metrics';
+import type { IconName } from '../../../icons/Icon.types';
+import { px } from '../../../tokens/theme';
+
+export type { AlertPalette } from './Alert.metrics';
+
 export const pulseAnimation = keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 10px currentColor;
+    box-shadow: 0 0 0 ${PULSE.spread}px currentColor;
     opacity: 0;
   }
   100% {
@@ -54,17 +83,17 @@ export const pulseAnimation = keyframes`
 
 export const shimmerAnimation = keyframes`
   0% {
-    background-position: -1000px 0;
+    background-position: -${GRADIENT.shimmerTravel}px 0;
   }
   100% {
-    background-position: 1000px 0;
+    background-position: ${GRADIENT.shimmerTravel}px 0;
   }
 `;
 
 export const fadeInScale = keyframes`
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(-10px);
+    transform: scale(${FADE_IN.scale}) translateY(-${FADE_IN.lift}px);
   }
   to {
     opacity: 1;
@@ -74,18 +103,20 @@ export const fadeInScale = keyframes`
 
 export const iconRotate = keyframes`
   0% {
-    transform: rotate(0deg) scale(0.8);
+    transform: rotate(0deg) scale(${ICON_SPIN.from});
   }
   50% {
-    transform: rotate(180deg) scale(1.1);
+    transform: rotate(180deg) scale(${ICON_SPIN.mid});
   }
   100% {
     transform: rotate(360deg) scale(1);
   }
 `;
 
-export const getColorFromTheme = (theme: Theme, variant: string) => {
-  const colorMap: Record<string, { main: string; light?: string; dark?: string }> = {
+// The MUI-themed twin of `alertPalette` in `Alert.metrics.ts`: same names,
+// same three greys for `neutral`, same fallback to `info`.
+export const getColorFromTheme = (theme: Theme, variant: string): AlertPalette => {
+  const colorMap: Record<string, AlertPalette> = {
     info: theme.palette.info,
     success: theme.palette.success,
     warning: theme.palette.warning,
@@ -93,32 +124,27 @@ export const getColorFromTheme = (theme: Theme, variant: string) => {
     primary: theme.palette.primary,
     secondary: theme.palette.secondary,
     neutral: {
-      main: theme.palette.grey[500] || '#9E9E9E',
-      light: theme.palette.grey[300] || '#E0E0E0',
-      dark: theme.palette.grey[700] || '#616161',
+      main: theme.palette.grey[NEUTRAL_GREY.main] || '#9E9E9E',
+      light: theme.palette.grey[NEUTRAL_GREY.light] || '#E0E0E0',
+      dark: theme.palette.grey[NEUTRAL_GREY.dark] || '#616161',
     },
   };
 
   return colorMap[variant] || theme.palette.info;
 };
 
-export const getVariantIcon = (variant: string) => {
-  const iconMap: Record<string, React.ReactNode> = {
-    info: <Info />,
-    success: <CheckCircle />,
-    warning: <Warning />,
-    danger: <Error />,
-  };
-
-  return iconMap[variant];
+/** The shared glyph names drawn with MUI's icons; the native side draws the same names from the icon set. */
+const VARIANT_ICONS: Partial<Record<IconName, React.ReactNode>> = {
+  Info: <Info />,
+  CheckCircle: <CheckCircle />,
+  Warning: <Warning />,
+  Error: <Error />,
 };
 
-// The palette shape getColorFromTheme returns — a main plus optional light/dark,
-// which is narrower than MUI's PaletteColor.
-export type AlertPalette = { main: string; light?: string; dark?: string };
-
-/** The four semantic variants, which differ only in which palette they read. */
-const SEMANTIC_VARIANTS = new Set(['info', 'success', 'warning', 'danger']);
+export const getVariantIcon = (variant: string): React.ReactNode => {
+  const name = VARIANT_ICON[variant as AlertVariant];
+  return name ? VARIANT_ICONS[name] : undefined;
+};
 
 /**
  * The room the message is given — padding, the stack's rhythm, and where the
@@ -146,7 +172,7 @@ export const alertLayoutStyles = (
   //
   // Padding stays overridable by an `sx` (a full-bleed strip legitimately wants
   // it tight), because this is a default rather than a rule.
-  padding: theme.spacing(1.75, 2),
+  padding: theme.spacing(ALERT_PADDING_UNITS.vertical, ALERT_PADDING_UNITS.horizontal),
 
   '.MuiAlert-message': {
     display: 'flex',
@@ -156,9 +182,9 @@ export const alertLayoutStyles = (
     // margin below goes to whatever CONTROL sits at the end, because the gap
     // between prose and a thing you press has to be bigger than the gap between
     // two lines of prose or the button looks like part of the text.
-    gap: theme.spacing(1),
-    fontSize: '0.95rem',
-    lineHeight: 1.5,
+    gap: theme.spacing(MESSAGE_GAP_UNITS),
+    fontSize: px(MESSAGE_FONT_SIZE),
+    lineHeight: MESSAGE_LINE_HEIGHT,
     // No padding of its own — the root's is now doing that job, and MUI's
     // default `8px 0` on top of it would double the vertical space.
     padding: 0,
@@ -175,25 +201,28 @@ export const alertLayoutStyles = (
     // ones: a `solid` keeps its fill and its light label and gains a hairline
     // in the same hue, while a `ghost` gains the whole affordance.
     '.MuiButton-root': {
-      marginTop: theme.spacing(0.5),
-      border: `1px solid ${alpha(colorPalette.main, 0.45)}` },
+      marginTop: theme.spacing(MESSAGE_BUTTON.marginTopUnits),
+      border: `1px solid ${alpha(colorPalette.main, MESSAGE_BUTTON.borderAlpha)}`,
+    },
   },
 
   '.MuiAlert-icon': {
-    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: `transform ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`,
     alignItems: 'center',
     // Clear of the words rather than nearly touching them, and aligned to the
     // FIRST line instead of centred on the whole block — an icon floating
     // halfway down a three-line message points at nothing.
     alignSelf: 'flex-start',
-    marginRight: theme.spacing(1.75),
-    paddingTop: theme.spacing(0.25),
-    animation: animate ? `${iconRotate} 0.6s ease-out` : 'none' },
+    marginRight: theme.spacing(ICON_SLOT.marginRightUnits),
+    paddingTop: theme.spacing(ICON_SLOT.paddingTopUnits),
+    animation: animate ? `${iconRotate} ${seconds(ICON_SPIN.ms)} ease-out` : 'none',
+  },
 
   // The close button, kept off the text it sits beside.
   '.MuiAlert-action': {
     alignItems: 'flex-start',
-    paddingLeft: theme.spacing(2) },
+    paddingLeft: theme.spacing(ACTION_SLOT.paddingLeftUnits),
+  },
 });
 
 /**
@@ -228,13 +257,20 @@ export const alertLayoutStyles = (
  *
  * The border keeps an alpha — it is a hairline over the tint it belongs to, so
  * translucency there costs nothing and lets the edge follow the fill.
+ *
+ * The ratios live in `Alert.metrics.ts` (`SEMANTIC_SURFACE`), where the
+ * native renderer reads the same three through the same colour arithmetic.
  */
 const semanticSurface = (theme: Theme, colorPalette: AlertPalette): CSSObject => {
   const dark = theme.palette.mode === 'dark';
   return {
-    backgroundColor: dark ? darken(colorPalette.main, 0.8) : lighten(colorPalette.main, 0.9),
-    color: dark ? lighten(colorPalette.main, 0.6) : darken(colorPalette.main, 0.6),
-    border: `1px solid ${alpha(colorPalette.main, 0.35)}`,
+    backgroundColor: dark
+      ? darken(colorPalette.main, SEMANTIC_SURFACE.tint.dark)
+      : lighten(colorPalette.main, SEMANTIC_SURFACE.tint.light),
+    color: dark
+      ? lighten(colorPalette.main, SEMANTIC_SURFACE.ink)
+      : darken(colorPalette.main, SEMANTIC_SURFACE.ink),
+    border: `1px solid ${alpha(colorPalette.main, SEMANTIC_SURFACE.borderAlpha)}`,
     '.MuiAlert-icon': {
       color: colorPalette.main,
     },
@@ -251,112 +287,104 @@ export const alertVariantStyles = (
   customVariant: string | undefined,
   colorPalette: AlertPalette,
 ): CSSObject => ({
-...(customVariant !== undefined &&
-  SEMANTIC_VARIANTS.has(customVariant) &&
-  semanticSurface(theme, colorPalette)),
+  ...(customVariant !== undefined &&
+    SEMANTIC_VARIANTS.has(customVariant as AlertVariant) &&
+    semanticSurface(theme, colorPalette)),
 
-...(customVariant === 'glass' && {
-  // 85%, not 10%. This is the variant that is MEANT to be see-through, and it
-  // was the same mistake in a costume: at 0.1 the blur had almost nothing to
-  // sit on, so `glass` was not frosted, it was a window. A frosted pane has to
-  // be mostly pane — the backdrop should be legible AS texture behind the
-  // text, never as competition with it.
-  backgroundColor: alpha(theme.palette.background.paper, 0.85),
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-  border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
-  color: theme.palette.text.primary,
-  '.MuiAlert-icon': {
-    color: theme.palette.primary.main,
-  },
-  // Safari before 18 and Firefox with the filter disabled paint the declared
-  // alpha with nothing blurred behind it — the see-through banner this is
-  // fixing. There is no degraded frost to fall back to, so it falls back to an
-  // opaque pane: less pretty, still readable.
-  '@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))': {
-    backgroundColor: theme.palette.background.paper,
-  },
-}),
+  ...(customVariant === 'glass' && {
+    // 85%, not 10%. This is the variant that is MEANT to be see-through, and it
+    // was the same mistake in a costume: at 0.1 the blur had almost nothing to
+    // sit on, so `glass` was not frosted, it was a window. A frosted pane has to
+    // be mostly pane — the backdrop should be legible AS texture behind the
+    // text, never as competition with it.
+    backgroundColor: alpha(theme.palette.background.paper, GLASS.backgroundAlpha),
+    backdropFilter: `blur(${GLASS.blur}px) saturate(${GLASS.saturatePercent}%)`,
+    WebkitBackdropFilter: `blur(${GLASS.blur}px) saturate(${GLASS.saturatePercent}%)`,
+    border: `1px solid ${alpha(theme.palette.divider, GLASS.borderAlpha)}`,
+    color: theme.palette.text.primary,
+    '.MuiAlert-icon': {
+      color: theme.palette.primary.main,
+    },
+    // Safari before 18 and Firefox with the filter disabled paint the declared
+    // alpha with nothing blurred behind it — the see-through banner this is
+    // fixing. There is no degraded frost to fall back to, so it falls back to an
+    // opaque pane: less pretty, still readable.
+    '@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))': {
+      backgroundColor: theme.palette.background.paper,
+    },
+  }),
 
-...(customVariant === 'gradient' && {
-  background: `linear-gradient(135deg, ${alpha(colorPalette.light || colorPalette.main, 0.9)}, ${alpha(colorPalette.dark || colorPalette.main, 0.9)})`,
-  color: theme.palette.getContrastText(colorPalette.main),
-  border: 'none',
-  position: 'relative',
-  overflow: 'hidden',
-  '.MuiAlert-icon': {
+  ...(customVariant === 'gradient' && {
+    background: `linear-gradient(${GRADIENT.angleDeg}deg, ${alpha(colorPalette.light || colorPalette.main, GRADIENT.stopAlpha)}, ${alpha(colorPalette.dark || colorPalette.main, GRADIENT.stopAlpha)})`,
     color: theme.palette.getContrastText(colorPalette.main),
-  },
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    top: 0,
-    left: '-1000px',
-    width: '100%',
-    height: '100%',
-    background: `linear-gradient(90deg, transparent, ${alpha(theme.palette.common.white, 0.2)}, transparent)`,
-    animation: `${shimmerAnimation} 3s infinite`,
-  },
-  '&:hover': {
-    filter: 'brightness(1.1)',
-    transform: 'translateY(-2px) scale(1.01)',
-  },
-}),
+    border: 'none',
+    position: 'relative',
+    overflow: 'hidden',
+    '.MuiAlert-icon': {
+      color: theme.palette.getContrastText(colorPalette.main),
+    },
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: `-${GRADIENT.shimmerTravel}px`,
+      width: '100%',
+      height: '100%',
+      background: `linear-gradient(90deg, transparent, ${alpha(theme.palette.common.white, GRADIENT.shimmerAlpha)}, transparent)`,
+      animation: `${shimmerAnimation} ${seconds(GRADIENT.shimmerMs)} infinite`,
+    },
+    '&:hover': {
+      filter: `brightness(${GRADIENT.hoverBrightness})`,
+      transform: `translateY(-${GRADIENT.hoverLift}px) scale(${GRADIENT.hoverScale})`,
+    },
+  }),
+});
+
+/** The web's glow: a soft shadow of the hue and a touch of brightness. */
+const glowStyles = (colorPalette: AlertPalette): CSSObject => ({
+  boxShadow: `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)} !important`,
+  filter: `brightness(${GLOW.brightness})`,
+});
+
+/** The web's pulse: a wash of the hue over the whole card, fading out every two seconds. */
+const pulseAfter = (colorPalette: AlertPalette): CSSObject => ({
+  content: '""',
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  borderRadius: 'inherit',
+  backgroundColor: colorPalette.main,
+  opacity: PULSE.alpha,
+  animation: `${pulseAnimation} ${seconds(PULSE.ms)} infinite`,
+  pointerEvents: 'none',
+  zIndex: -1,
 });
 
 // glow and pulse combine into three distinct looks, so the combinations are
 // spelled out rather than layered — layering them would let the glow-only shadow
-// leak into the glow+pulse case.
+// leak into the glow+pulse case. Declaration ORDER is kept as it has always
+// been, because emotion hashes the serialised block into the class name.
 export const alertEmphasisStyles = (
   colorPalette: AlertPalette,
   glow: boolean,
   pulse: boolean,
 ): CSSObject => ({
-...(glow &&
-  !pulse && {
-    boxShadow: `0 0 20px 5px ${alpha(colorPalette.main, 0.3)} !important`,
-    filter: 'brightness(1.05)',
-  }),
+  ...(glow && !pulse && glowStyles(colorPalette)),
 
-// Pulse animation
-...(pulse &&
-  !glow && {
-    position: 'relative',
-    '&::after': {
-      content: '""',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      borderRadius: 'inherit',
-      backgroundColor: colorPalette.main,
-      opacity: 0.2,
-      animation: `${pulseAnimation} 2s infinite`,
-      pointerEvents: 'none',
-      zIndex: -1,
-    },
-  }),
+  // Pulse animation
+  ...(pulse &&
+    !glow && {
+      position: 'relative',
+      '&::after': pulseAfter(colorPalette),
+    }),
 
-// Both glow and pulse
-...(glow &&
-  pulse && {
-    position: 'relative',
-    boxShadow: `0 0 20px 5px ${alpha(colorPalette.main, 0.3)} !important`,
-    filter: 'brightness(1.05)',
-    '&::after': {
-      content: '""',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      borderRadius: 'inherit',
-      backgroundColor: colorPalette.main,
-      opacity: 0.2,
-      animation: `${pulseAnimation} 2s infinite`,
-      pointerEvents: 'none',
-      zIndex: -1,
-    },
-  }),
+  // Both glow and pulse
+  ...(glow &&
+    pulse && {
+      position: 'relative',
+      ...glowStyles(colorPalette),
+      '&::after': pulseAfter(colorPalette),
+    }),
 });

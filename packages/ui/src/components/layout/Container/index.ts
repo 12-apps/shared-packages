@@ -1,2 +1,8 @@
 export { Container } from './Container';
-export type { ContainerProps } from './Container.types';
+export type {
+  ContainerBaseProps,
+  ContainerMaxWidth,
+  ContainerPadding,
+  ContainerProps,
+  ContainerVariant,
+} from './Container.types';

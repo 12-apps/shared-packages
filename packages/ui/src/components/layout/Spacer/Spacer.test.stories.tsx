@@ -156,8 +156,11 @@ export const FocusManagement: Story = {
       await expect(spacer).not.toHaveAttribute('tabindex');
 
       // Clicking it is the closest a user can come to trying to focus it, and
-      // focus should stay wherever it already was.
-      await userEvent.click(spacer);
+      // focus should stay wherever it already was. The spacer is
+      // `pointer-events: none` on both renderers, which user-event refuses to
+      // click by default — bypass the check so the click reaches the element,
+      // as `Button`'s disabled story does.
+      await userEvent.click(spacer, { pointerEventsCheck: 0 });
       await waitFor(() => expect(document.activeElement).not.toBe(spacer));
     });
 
@@ -175,6 +178,8 @@ export const FocusManagement: Story = {
  * Tests spacer behavior at different viewport sizes
  */
 export const ResponsiveDesign: Story = {
+  // Asserts MUI Box's `display: block`; react-native-web's View is always flex.
+  tags: ['native-skip'],
   args: {
     size: 'lg',
   },

@@ -38,6 +38,7 @@ export const BasicInteraction: Story = {
     title: 'Interactive Alert',
     description: 'This alert tests basic interactions',
     closable: true,
+    closeLabel: 'close alert',
     onClose: fn(),
     showIcon: true,
   },
@@ -72,6 +73,8 @@ export const BasicInteraction: Story = {
 };
 
 export const HoverEffects: Story = {
+  // Asserts a CSS `transition` (cubic-bezier), which only the DOM renderer has.
+  tags: ['native-skip'],
   name: '🎨 Hover Effects Test',
   args: {
     variant: 'success',
@@ -122,6 +125,7 @@ export const KeyboardNavigation: Story = {
     title: 'Keyboard Accessible',
     description: 'Navigate with Tab and Enter keys',
     closable: true,
+    closeLabel: 'close alert',
     onClose: fn(),
   },
   play: async ({ canvasElement, step, args }) => {
@@ -155,6 +159,7 @@ export const ScreenReaderTest: Story = {
     title: 'Critical Error',
     description: 'This is an urgent alert for screen readers',
     closable: true,
+    closeLabel: 'close alert',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -462,6 +467,7 @@ export const StateManagement: Story = {
     title: 'Stateful Alert',
     description: 'This alert manages its own state',
     closable: true,
+    closeLabel: 'close alert',
     onClose: fn(),
   },
   play: async ({ canvasElement, step, args }) => {
@@ -499,6 +505,7 @@ export const FocusManagement: Story = {
     title: 'Focus Management',
     description: 'Testing focus states and trap',
     closable: true,
+    closeLabel: 'close alert',
     showIcon: true,
   },
   play: async ({ canvasElement, step }) => {
@@ -584,6 +591,8 @@ export const FormIntegration: Story = {
 
 // Custom Icon Test
 export const CustomIconTest: Story = {
+  // Queries MUI's `.MuiAlert-icon` class name, which only the MUI renderer emits.
+  tags: ['native-skip'],
   name: '🎨 Custom Icon Test',
   render: () => {
     const CustomIcon = () => (

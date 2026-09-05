@@ -7,20 +7,42 @@ import IconButton from '@mui/material/IconButton/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { defaultAriaLive, resolveAlertProps, testIdFor } from './Alert.helpers';
+import {
+  ACTIVE,
+  ALERT_EASING,
+  ALERT_RADIUS_UNITS,
+  ALERT_TRANSITION_MS,
+  CLOSE_BUTTON,
+  CLOSE_DELAY_MS,
+  COLLAPSE_MS,
+  DESCRIPTION,
+  FADE_IN,
+  FOCUS,
+  HOVER,
+  seconds,
+  TITLE,
+} from './Alert.metrics';
 import {
   alertEmphasisStyles,
   alertLayoutStyles,
   alertVariantStyles,
   fadeInScale,
   getColorFromTheme,
-  getVariantIcon } from './Alert.styles';
+  getVariantIcon,
+} from './Alert.styles';
 import type { AlertColor } from '@mui/material/Alert/index.js';
 import type { AlertProps } from './Alert.types';
+import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
+import { px } from '../../../tokens/theme';
+
+const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
 
 // Define animations
 const StyledAlert = styled(MuiAlert, {
   shouldForwardProp: (prop) =>
-    !['customVariant', 'customColor', 'glow', 'pulse', 'animate'].includes(prop as string) })<{
+    !['customVariant', 'customColor', 'glow', 'pulse', 'animate'].includes(prop as string),
+})<{
   customVariant?: string;
   customColor?: string;
   glow?: boolean;
@@ -30,70 +52,56 @@ const StyledAlert = styled(MuiAlert, {
   const colorPalette = getColorFromTheme(theme, customColor || customVariant || 'info');
 
   return {
-    borderRadius: theme.spacing(1.5),
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    borderRadius: theme.spacing(ALERT_RADIUS_UNITS),
+    transition,
     position: 'relative',
     overflow: 'hidden',
-    animation: animate ? `${fadeInScale} 0.3s ease-out` : 'none',
+    animation: animate ? `${fadeInScale} ${seconds(FADE_IN.ms)} ease-out` : 'none',
     willChange: 'transform, opacity',
 
     ...alertLayoutStyles(theme, colorPalette, animate),
 
     // Hover effects
     '&:hover': {
-      transform: 'translateY(-3px) scale(1.01)',
-      boxShadow: `0 8px 20px ${alpha(colorPalette.main, 0.2)}`,
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      transform: `translateY(-${HOVER.lift}px) scale(${HOVER.scale})`,
+      boxShadow: `0 ${HOVER.shadowY}px ${HOVER.shadowBlur}px ${alpha(colorPalette.main, HOVER.shadowAlpha)}`,
+      transition,
 
       '.MuiAlert-icon': {
-        transform: 'scale(1.15) rotate(10deg)' },
+        transform: `scale(${HOVER.iconScale}) rotate(${HOVER.iconRotateDeg}deg)`,
+      },
 
       '&::before': {
-        opacity: 1 } },
+        opacity: 1,
+      },
+    },
 
     // Active state
     '&:active': {
-      transform: 'translateY(-1px) scale(0.99)',
-      transition: 'transform 0.1s ease' },
+      transform: `translateY(-${ACTIVE.lift}px) scale(${ACTIVE.scale})`,
+      transition: `transform ${seconds(ACTIVE.ms)} ease`,
+    },
 
     // Focus styles for accessibility
     '&:focus-within': {
-      outline: `3px solid ${alpha(colorPalette.main, 0.5)}`,
-      outlineOffset: '3px',
-      boxShadow: `0 0 0 6px ${alpha(colorPalette.main, 0.1)}`,
-      transition: 'all 0.2s ease' },
+      outline: `${FOCUS.ringWidth}px solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
+      outlineOffset: `${FOCUS.offset}px`,
+      boxShadow: `0 0 0 ${FOCUS.haloSpread}px ${alpha(colorPalette.main, FOCUS.haloAlpha)}`,
+      transition: `all ${seconds(FOCUS.ms)} ease`,
+    },
 
     ...alertVariantStyles(theme, customVariant, colorPalette),
-    ...alertEmphasisStyles(colorPalette, Boolean(glow), Boolean(pulse)) };
+    ...alertEmphasisStyles(colorPalette, Boolean(glow), Boolean(pulse)),
+  };
 });
-
-const ALERT_DEFAULTS = {
-  variant: 'info',
-  glow: false,
-  pulse: false,
-  showIcon: true,
-  closable: false,
-  animate: true,
-  role: 'alert',
-  'aria-atomic': 'true',
-  'data-testid': 'alert' } satisfies Partial<AlertProps>;
-
-// Strips explicitly-undefined props before the merge so `prop={undefined}` still
-// falls back to the default, the way a destructuring default would.
-const definedProps = (props: AlertProps): Partial<AlertProps> =>
-  Object.fromEntries(
-    Object.entries(props).filter(([, value]) => value !== undefined),
-  ) as Partial<AlertProps>;
-
-const testIdFor = (base: string | undefined, suffix: string) =>
-  base ? `${base}-${suffix}` : `alert-${suffix}`;
 
 // glass and gradient are our own looks with no MUI severity of their own; both
 // borrow info's. danger is MUI's error.
 const MUI_SEVERITY: Record<string, AlertColor> = {
   danger: 'error',
   glass: 'info',
-  gradient: 'info' };
+  gradient: 'info',
+};
 
 const toMuiSeverity = (variant: string): AlertColor =>
   MUI_SEVERITY[variant] ?? (variant as AlertColor);
@@ -109,12 +117,13 @@ const AlertContent: React.FC<{
       <AlertTitle
         data-testid={testIdFor(dataTestId, 'title')}
         sx={{
-          fontWeight: 600,
-          fontSize: '1.05rem',
-          marginBottom: description ? 0.5 : 0,
+          fontWeight: TITLE.fontWeight,
+          fontSize: px(TITLE.fontSize),
+          marginBottom: description ? TITLE.marginBottomUnits : 0,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          wordBreak: 'break-word' }}
+          wordBreak: 'break-word',
+        }}
       >
         {title}
       </AlertTitle>
@@ -124,11 +133,12 @@ const AlertContent: React.FC<{
         component="div"
         data-testid={testIdFor(dataTestId, 'message')}
         sx={{
-          opacity: 0.9,
-          fontSize: '0.925rem',
+          opacity: DESCRIPTION.opacity,
+          fontSize: px(DESCRIPTION.fontSize),
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
-          wordBreak: 'break-word' }}
+          wordBreak: 'break-word',
+        }}
       >
         {description}
       </Box>
@@ -140,7 +150,8 @@ const AlertContent: React.FC<{
 const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: () => void }> = ({
   dataTestId,
   label,
-  onClose }) => (
+  onClose,
+}) => (
   <IconButton
     data-testid={testIdFor(dataTestId, 'close')}
     aria-label={label}
@@ -148,16 +159,19 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: 
     size="small"
     onClick={onClose}
     sx={(theme) => ({
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      opacity: 0.7,
+      transition,
+      opacity: CLOSE_BUTTON.opacity,
       '&:hover': {
-        transform: 'rotate(90deg) scale(1.1)',
+        transform: `rotate(${CLOSE_BUTTON.hoverRotateDeg}deg) scale(${CLOSE_BUTTON.hoverScale})`,
         opacity: 1,
-        backgroundColor: alpha(theme.palette.action.hover, 0.1) },
+        backgroundColor: alpha(theme.palette.action.hover, CLOSE_BUTTON.washAlpha),
+      },
       '&:focus': {
         opacity: 1,
         outline: 'none',
-        backgroundColor: alpha(theme.palette.action.focus, 0.1) } })}
+        backgroundColor: alpha(theme.palette.action.focus, CLOSE_BUTTON.washAlpha),
+      },
+    })}
   >
     <Close fontSize="inherit" />
   </IconButton>
@@ -181,80 +195,81 @@ function dismissButton(
   return <AlertCloseButton dataTestId={dataTestId} label={props.closeLabel} onClose={onClose} />;
 }
 
-export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  (
-    alertProps,
-    ref,
-  ) => {
-    const {
-      variant,
-      color,
-      glow,
-      pulse,
-      icon,
-      showIcon,
-      onClose,
-      title,
-      description,
-      children,
-      animate,
-      role,
-      'aria-atomic': ariaAtomic,
-      'data-testid': dataTestId,
-      ...props
-    } = { ...ALERT_DEFAULTS, ...definedProps(alertProps) };
+export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, ref) => {
+  const {
+    variant,
+    color,
+    glow,
+    pulse,
+    icon,
+    showIcon,
+    onClose,
+    title,
+    description,
+    children,
+    animate,
+    role,
+    'aria-atomic': ariaAtomic,
+    ...others
+  } = resolveAlertProps(alertProps);
 
-    // Depends on `variant`, so it cannot live in the static defaults above.
-    const ariaLive = alertProps['aria-live'] ?? (variant === 'danger' ? 'assertive' : 'polite');
-    const [open, setOpen] = React.useState(true);
-    const [isClosing, setIsClosing] = React.useState(false);
+  // Every spelling of the test id the shared contract allows, mapped to the
+  // one the DOM reads and defaulted to `alert`; the native Alert does the same.
+  const dataTestId = resolveTestId(others, 'alert');
+  const props = withoutTestIdProps(others);
 
-    const handleClose = () => {
-      setIsClosing(true);
-      window.setTimeout(() => {
-        setOpen(false);
-        onClose?.();
-      }, 200);
-    };
+  // Depends on `variant`, so it cannot live in the static defaults above.
+  const ariaLive = alertProps['aria-live'] ?? defaultAriaLive(variant);
+  const [open, setOpen] = React.useState(true);
+  const [isClosing, setIsClosing] = React.useState(false);
 
-    const severity = toMuiSeverity(variant);
+  const handleClose = () => {
+    setIsClosing(true);
+    window.setTimeout(() => {
+      setOpen(false);
+      onClose?.();
+    }, CLOSE_DELAY_MS);
+  };
 
-    const displayIcon = showIcon ? (
-      <Box component="span" data-testid={testIdFor(dataTestId, 'icon')}>
-        {icon || getVariantIcon(variant)}
-      </Box>
-    ) : false;
+  const severity = toMuiSeverity(variant);
 
-    const content = (
-      <AlertContent title={title} description={description} dataTestId={dataTestId}>
-        {children}
-      </AlertContent>
-    );
+  const displayIcon = showIcon ? (
+    <Box component="span" data-testid={testIdFor(dataTestId, 'icon')}>
+      {icon || getVariantIcon(variant)}
+    </Box>
+  ) : (
+    false
+  );
 
-    return (
-      <Collapse in={open && !isClosing} timeout={300}>
-        <StyledAlert
-          ref={ref}
-          data-testid={dataTestId || 'alert'}
-          severity={severity}
-          customVariant={variant}
-          customColor={color}
-          glow={glow}
-          pulse={pulse}
-          animate={animate}
-          icon={displayIcon}
-          role={role}
-          aria-live={ariaLive}
-          aria-atomic={ariaAtomic}
-          tabIndex={0}
-          action={dismissButton(alertProps, dataTestId, handleClose)}
-          {...props}
-        >
-          {content}
-        </StyledAlert>
-      </Collapse>
-    );
-  },
-);
+  const content = (
+    <AlertContent title={title} description={description} dataTestId={dataTestId}>
+      {children}
+    </AlertContent>
+  );
+
+  return (
+    <Collapse in={open && !isClosing} timeout={COLLAPSE_MS}>
+      <StyledAlert
+        ref={ref}
+        data-testid={dataTestId}
+        severity={severity}
+        customVariant={variant}
+        customColor={color}
+        glow={glow}
+        pulse={pulse}
+        animate={animate}
+        icon={displayIcon}
+        role={role}
+        aria-live={ariaLive}
+        aria-atomic={ariaAtomic}
+        tabIndex={0}
+        action={dismissButton(alertProps, dataTestId, handleClose)}
+        {...props}
+      >
+        {content}
+      </StyledAlert>
+    </Collapse>
+  );
+});
 
 Alert.displayName = 'Alert';

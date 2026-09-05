@@ -164,6 +164,19 @@ Gradient text uses CSS `background-clip: text` with fallback support:
 - **Danger**: Linear gradient from error.light to error.dark
 - **Default**: Primary to secondary gradient
 
+## React Native
+
+The same import renders natively (`@12-apps/ui/typography/Heading` resolves
+to `Heading.native.tsx` under Metro): a react-native `Text` with
+`role="heading"` and `aria-level` set from `level` (`display` announces 1),
+drawn at `size ?? level` from the theme's heading scale
+(`UiTheme.typography.heading`, `HEADING_SCALE` unless the host built its own)
+with the same weights and colour mapping. `gradient` paints the gradient's
+first stop as a flat colour — React Native has no `background-clip: text`
+(see `NATIVE-NOTES.md`). `testID`, `dataTestId` and `data-testid` all name the
+element; `onClick` and `onPress` both fire. See
+[NATIVE.md](../../../../NATIVE.md).
+
 ## Accessibility
 
 - Maintains proper semantic heading hierarchy

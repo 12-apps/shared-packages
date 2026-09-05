@@ -1,11 +1,10 @@
-import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type React from 'react';
 
-export type ParagraphVariant = 'default' | 'lead' | 'muted' | 'small';
+import type { ParagraphBaseProps } from './Paragraph.base';
 
-export interface ParagraphProps extends React.HTMLAttributes<globalThis.HTMLParagraphElement> {
-  variant?: ParagraphVariant;
-  color?: ColorValue;
-  size?: SizeValue;
-  children: React.ReactNode;
-}
+export type { ParagraphBaseProps, ParagraphVariant } from './Paragraph.base';
+
+/** The web `Paragraph`: the shared contract, plus everything a `<p>` accepts. */
+export interface ParagraphProps
+  extends ParagraphBaseProps,
+    Omit<React.HTMLAttributes<globalThis.HTMLParagraphElement>, 'color' | 'children'> {}

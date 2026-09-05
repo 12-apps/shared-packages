@@ -1,38 +1,10 @@
-import type { SizeValue } from '../../../tokens/scales';
-export type LoadingStateVariant = 'spinner' | 'skeleton';
-export type LoadingStateSize = SizeValue;
+import type { LoadingStateBaseProps } from './LoadingState.base';
 
-export interface LoadingStateProps {
-  /**
-   * The visual style of the loading indicator
-   * @default 'spinner'
-   */
-  variant?: LoadingStateVariant;
+export type { LoadingStateBaseProps, LoadingStateSize, LoadingStateVariant } from './LoadingState.base';
 
-  /**
-   * Optional message to display below the loading indicator
-   */
-  message?: string;
-
-  /**
-   * Size of the loading indicator
-   * @default 'md'
-   */
-  size?: LoadingStateSize;
-
-  /**
-   * Number of skeleton rows to display (only for skeleton variant)
-   * @default 3
-   */
-  skeletonRows?: number;
-
+export interface LoadingStateProps extends LoadingStateBaseProps {
   /**
    * Custom className for the container
    */
   className?: string;
-
-  /**
-   * Test ID for component testing
-   */
-  dataTestId?: string;
 }

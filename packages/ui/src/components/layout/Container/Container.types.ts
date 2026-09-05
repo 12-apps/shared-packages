@@ -1,11 +1,10 @@
 import type { ContainerProps as MuiContainerProps } from '@mui/material/Container/index.js';
-import type { ReactNode } from 'react';
 
-export interface ContainerProps extends Omit<MuiContainerProps, 'maxWidth'> {
-  children: ReactNode;
-  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false | string;
-  variant?: 'default' | 'fluid' | 'centered' | 'padded';
-  padding?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  responsive?: boolean;
-  dataTestId?: string;
-}
+import type { ContainerBaseProps } from './Container.base';
+
+export type { ContainerBaseProps, ContainerMaxWidth, ContainerPadding, ContainerVariant } from './Container.base';
+
+/** The web `Container`: the shared contract, plus whatever MUI's `Container` accepts that it does not already name. */
+export interface ContainerProps
+  extends ContainerBaseProps,
+    Omit<MuiContainerProps, keyof ContainerBaseProps> {}

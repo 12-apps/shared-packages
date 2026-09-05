@@ -62,6 +62,17 @@ A semantic paragraph component with multiple visual variants for different conte
 </Paragraph>
 ```
 
+## React Native
+
+The same import renders natively (`@12-apps/ui/typography/Paragraph` resolves
+to `Paragraph.native.tsx` under Metro): a react-native `Text` styled from the
+same `Paragraph.metrics.ts` the web derives its rem strings from — the same
+five font sizes, the same line-height ratios multiplied out, the `1em` bottom
+margin as an absolute number. `testID`, `dataTestId` and `data-testid` all
+name the element; `onClick` and `onPress` both fire. There is no `<p>` on
+native, so the element carries no paragraph semantics. See
+[NATIVE.md](../../../../NATIVE.md).
+
 ## Accessibility Notes
 
 - Uses semantic `<p>` element for proper document structure

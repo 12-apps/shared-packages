@@ -125,6 +125,119 @@ test.describe('the native build of @12-apps/ui, bundled by Metro, rendered throu
     await expect(page.getByTestId('icon-size-md')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  test('Heading draws the type scale, one step per level', async ({ page }) => {
+    await openGallery(page);
+    // The scale both renderers read (HEADING_SCALE, in rem -> px).
+    for (const [level, fontSize] of [
+      ['display', 48],
+      ['h1', 32],
+      ['h2', 28],
+      ['h3', 24],
+      ['h4', 20],
+      ['h5', 18],
+      ['h6', 16],
+    ] as const) {
+      expect(await px(page.getByTestId(`heading-${level}`), 'font-size')).toBe(fontSize);
+    }
+    // react-native-web turns role="heading" + aria-level into real h1…h6 elements.
+    await expect(page.getByTestId('heading-h2')).toHaveRole('heading');
+    await expect(page.getByTestId('heading-color-danger')).toHaveCSS('color', 'rgb(211, 47, 47)');
+    await expect(page.getByTestId('heading-weight-light')).toHaveCSS('font-weight', '300');
+    await page.getByTestId('section-heading').screenshot({ path: 'test-results/headings.png' });
+  });
+
+  test('Paragraph paints its four variants', async ({ page }) => {
+    await openGallery(page);
+    expect(await px(page.getByTestId('paragraph-default'), 'font-size')).toBe(16);
+    expect(await px(page.getByTestId('paragraph-lead'), 'font-size')).toBe(18);
+    expect(await px(page.getByTestId('paragraph-small'), 'font-size')).toBe(14);
+    await expect(page.getByTestId('paragraph-muted')).toHaveCSS('color', 'rgba(0, 0, 0, 0.6)');
+    await expect(page.getByTestId('paragraph-color-info')).toHaveCSS('color', 'rgb(2, 136, 209)');
+  });
+
+  test('Spacer reserves the spacing scale between marks', async ({ page }) => {
+    await openGallery(page);
+    const gapAfter = async (size: string): Promise<number> => {
+      const mark = await page.getByTestId(`spacer-mark-${size}`).boundingBox();
+      const spacer = await page.getByTestId(`spacer-${size}`).boundingBox();
+      expect(spacer!.y).toBeGreaterThanOrEqual(mark!.y + mark!.height - 1);
+      return Math.round(spacer!.height);
+    };
+    // 0.5, 1, 2, 3, 4 spacing units.
+    expect(await gapAfter('xs')).toBe(4);
+    expect(await gapAfter('sm')).toBe(8);
+    expect(await gapAfter('md')).toBe(16);
+    expect(await gapAfter('lg')).toBe(24);
+    expect(await gapAfter('xl')).toBe(32);
+    const horizontal = await page.getByTestId('spacer-horizontal').boundingBox();
+    expect(Math.round(horizontal!.width)).toBe(24);
+  });
+
+  test('Container bounds its width and pads on the scale', async ({ page }) => {
+    await openGallery(page);
+    expect(await px(page.getByTestId('container-sm'), 'padding-top')).toBe(24);
+    expect(await px(page.getByTestId('container-fluid'), 'padding-top')).toBe(32);
+    const sm = await page.getByTestId('container-sm').boundingBox();
+    const fluid = await page.getByTestId('container-fluid').boundingBox();
+    // The viewport is 420px, narrower than sm's 600px cap, so both fill it.
+    expect(Math.round(sm!.width)).toBe(Math.round(fluid!.width));
+  });
+
+  test('Alert paints a severity per variant and dismisses', async ({ page }) => {
+    await openGallery(page);
+    await expect(page.getByTestId('alert-info')).toBeVisible();
+    await expect(page.getByTestId('alert-danger')).toBeVisible();
+    await expect(page.getByTestId('alert-info')).toContainText('Alerta info');
+    await expect(page.getByTestId('alert-described')).toContainText('A descrição fica abaixo do título.');
+    // The severity icon is the generated glyph; suppressed when showIcon is false.
+    await expect(page.getByTestId('alert-info').locator('svg')).toHaveCount(1);
+    await expect(page.getByTestId('alert-no-icon').locator('svg')).toHaveCount(0);
+    await expect(page.getByTestId('alert-custom-icon').locator('svg')).toHaveCount(1);
+    const before = await page.getByTestId('button-counter-value').textContent();
+    await page.getByTestId('alert-closable-close').click();
+    await expect(page.getByTestId('alert-closable')).toHaveCount(0);
+    expect(await page.getByTestId('button-counter-value').textContent()).not.toBe(before);
+    await page.getByTestId('section-alert').screenshot({ path: 'test-results/alerts.png' });
+  });
+
+  test('LoadingState spins, labels and lays out skeleton rows', async ({ page }) => {
+    await openGallery(page);
+    // SPINNER_SIZES, measured on the spinner itself: the root carries a 200px
+    // minimum height, so measuring it would pass whatever the spinner drew.
+    for (const [size, diameter] of [['xs', 16], ['sm', 24], ['md', 40], ['lg', 56], ['xl', 64]] as const) {
+      const box = await page.getByTestId(`loading-${size}-spinner`).boundingBox();
+      expect(Math.round(box!.width)).toBe(diameter);
+    }
+    await expect(page.getByTestId('loading-message')).toContainText('Carregando pedidos…');
+    await expect(page.getByTestId('loading-skeleton')).toBeVisible();
+    // The root is the live region; the spinner inside it is the progressbar.
+    await expect(page.getByTestId('loading-md')).toHaveRole('status');
+    await expect(page.getByTestId('loading-md-spinner')).toHaveRole('progressbar');
+    await page.getByTestId('section-loading').screenshot({ path: 'test-results/loading-states.png' });
+  });
+
+  test('ErrorState reports and retries', async ({ page }) => {
+    await openGallery(page);
+    await expect(page.getByTestId('error-plain')).toContainText('Não foi possível carregar o cardápio.');
+    await expect(page.getByTestId('error-retry')).toContainText('Falha na conexão');
+    const before = await page.getByTestId('button-counter-value').textContent();
+    await page.getByTestId('error-retry').getByText('Tentar de novo').click();
+    expect(await page.getByTestId('button-counter-value').textContent()).not.toBe(before);
+    await expect(page.getByTestId('error-warning')).toBeVisible();
+    await page.getByTestId('section-error').screenshot({ path: 'test-results/error-states.png' });
+  });
+
+  test('EmptyState offers its actions', async ({ page }) => {
+    await openGallery(page);
+    await expect(page.getByTestId('empty-default')).toContainText('Nenhum pedido ainda');
+    await expect(page.getByTestId('empty-minimal')).toContainText('Sem resultados');
+    const before = await page.getByTestId('button-counter-value').textContent();
+    await page.getByTestId('empty-actions').getByText('Cadastrar').click();
+    expect(await page.getByTestId('button-counter-value').textContent()).not.toBe(before);
+    await expect(page.getByTestId('empty-actions')).toContainText('Importar');
+    await page.getByTestId('section-empty').screenshot({ path: 'test-results/empty-states.png' });
+  });
+
   test('nothing from the web renderer reached the bundle', async ({ page }) => {
     await openGallery(page);
     // Emotion registers a <style data-emotion> tag on first paint; MUI cannot render without it.
