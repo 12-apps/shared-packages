@@ -1,0 +1,245 @@
+import Box from '@mui/material/Box/index.js';
+import Stack from '@mui/material/Stack/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
+import React from 'react';
+
+import { Skeleton } from '../../layout/Skeleton/Skeleton';
+
+import { freshnessOf } from './FleetMap.helpers';
+import type { FleetFreshness, FleetMapCopy, FleetUnit } from './FleetMap.types';
+
+/**
+ * The roster beside the map — and the ACCESSIBLE half of this component.
+ *
+ * A map is a picture of positions and a screen reader cannot read a picture, so
+ * the panel's information is carried by this list. That is not a consolation
+ * prize: the list answers the questions a dispatcher actually asks — who is
+ * reporting, how recently, and what are they carrying — and it answers them in
+ * an order the map cannot express.
+ *
+ * The map beside it is a NAMED LANDMARK rather than an `aria-hidden` one, so a
+ * reader can skip it in one gesture — see `FleetCanvas`, which carries the
+ * reason it must not be hidden.
+ */
+
+/** Each freshness draws from the semantic palette, never a hardcoded hex. */
+function freshnessColor(freshness: FleetFreshness, theme: Theme): string {
+  if (freshness === 'live') return theme.palette.success.main;
+  if (freshness === 'lagging') return theme.palette.warning.main;
+  return theme.palette.text.disabled;
+}
+
+/**
+ * A row's two lines of text — the name, and the one-line summary under it.
+ *
+ * Split out of `FleetRow` to keep that function under the size gate, and the
+ * seam is the natural one: everything here is READ, nothing is interactive.
+ */
+function RowText({
+  unit,
+  copy,
+  freshness,
+  testId,
+}: Pick<RowProps, 'unit' | 'copy' | 'freshness' | 'testId'>): React.JSX.Element {
+  const theme = useTheme();
+
+  // Dropped rather than rendered empty: a phone that reports no accuracy radius
+  // would otherwise print a trailing separator with nothing after it.
+  const meta = [
+    copy.freshness[freshness],
+    copy.lastSeen(unit.staleSeconds),
+    unit.accuracyM == null ? null : copy.accuracy(unit.accuracyM),
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ');
+
+  return (
+    <Stack sx={{ minWidth: 0, flexGrow: 1 }}>
+      <Typography
+        variant="body2"
+        component="p"
+        data-testid={`${testId}-label`}
+        sx={{ fontWeight: theme.typography.fontWeightMedium, overflowWrap: 'anywhere' }}
+      >
+        {unit.label}
+      </Typography>
+      <Typography
+        variant="caption"
+        component="p"
+        data-testid={`${testId}-meta`}
+        sx={{ color: theme.palette.text.secondary }}
+      >
+        {meta}
+      </Typography>
+    </Stack>
+  );
+}
+
+interface RowProps {
+  unit: FleetUnit;
+  copy: FleetMapCopy;
+  freshness: FleetFreshness;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  /** The row's DOM id, which `aria-activedescendant` points at. */
+  optionId: string;
+  testId: string;
+}
+
+function FleetRow({
+  unit,
+  copy,
+  freshness,
+  selected,
+  onSelect,
+  optionId,
+  testId,
+}: RowProps): React.JSX.Element {
+  const theme = useTheme();
+  const color = freshnessColor(freshness, theme);
+  const row = React.useRef<HTMLDivElement>(null);
+
+  // Keep the active option visible. The roster caps its own height, so a
+  // dispatcher arrowing through a fleet of thirty otherwise walks the selection
+  // below the fold with nothing moving — `aria-activedescendant` follows, and a
+  // SIGHTED keyboard user sees no feedback at all. `nearest` so a selection
+  // already on screen does not jump the list under a mouse user's cursor.
+  React.useEffect(() => {
+    if (selected) row.current?.scrollIntoView({ block: 'nearest' });
+  }, [selected]);
+
+  return (
+    <Box
+      ref={row}
+      role="option"
+      aria-selected={selected}
+      id={optionId}
+      data-testid={testId}
+      data-freshness={freshness}
+      onClick={() => onSelect(unit.id)}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: theme.spacing(1.5),
+        padding: theme.spacing(1, 1.5),
+        borderRadius: theme.shape.borderRadius / 4,
+        cursor: 'pointer',
+        backgroundColor: selected ? theme.palette.action.selected : 'transparent',
+        '&:hover': { backgroundColor: theme.palette.action.hover },
+      }}
+    >
+      {/* The dot repeats what the freshness word beside it already says, so it
+          is hidden rather than read twice — and colour is never the only
+          carrier of the state. */}
+      <Box
+        aria-hidden="true"
+        data-testid={`${testId}-dot`}
+        sx={{
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          flexShrink: 0,
+          backgroundColor: color,
+        }}
+      />
+      <RowText unit={unit} copy={copy} freshness={freshness} testId={testId} />
+      {unit.badge && (
+        <Typography
+          variant="caption"
+          component="span"
+          data-testid={`${testId}-badge`}
+          sx={{ color: theme.palette.text.secondary, flexShrink: 0 }}
+        >
+          {unit.badge}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+export interface FleetRosterProps {
+  units: readonly FleetUnit[];
+  copy: FleetMapCopy;
+  selectedId: string | null | undefined;
+  onSelect: (id: string) => void;
+  laggingAfterSeconds: number;
+  staleAfterSeconds: number;
+  loading: boolean;
+  testId: string;
+  onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+}
+
+export function FleetRoster({
+  units,
+  copy,
+  selectedId,
+  onSelect,
+  laggingAfterSeconds,
+  staleAfterSeconds,
+  loading,
+  testId,
+  onKeyDown,
+}: FleetRosterProps): React.JSX.Element {
+  const theme = useTheme();
+  // Generated, not derived from `dataTestId`: two boards on one page filtered
+  // from the same fleet would otherwise emit duplicate DOM ids and an ambiguous
+  // `aria-activedescendant`. Same reason the heading uses one.
+  const rowIdPrefix = React.useId();
+  const optionId = (id: string): string => `${rowIdPrefix}-${id}`;
+
+  // The selection is CONTROLLED, so it can name a unit that has since dropped
+  // out of the freshness window — a courier ending their shift mid-poll. The
+  // attribute must then be absent rather than pointing at an element that no
+  // longer renders, which announces nothing and fails an axe audit. `mapCentre`
+  // and `nextSelection` both handle the same case; this is the third place.
+  const active = units.some((unit) => unit.id === selectedId) ? selectedId : null;
+
+  if (loading) {
+    return (
+      <Stack spacing={1} data-testid={`${testId}-skeleton`} aria-hidden="true">
+        {[0, 1, 2].map((row) => (
+          <Skeleton key={row} variant="rectangular" height={44} borderRadius={4} />
+        ))}
+      </Stack>
+    );
+  }
+
+  return (
+    <Box
+      role="listbox"
+      // A single tab stop with arrow keys inside, which is the listbox pattern:
+      // a dispatcher tabbing past a fleet of thirty should not have to press it
+      // thirty times to reach the map.
+      tabIndex={0}
+      aria-label={copy.rosterLabel}
+      aria-activedescendant={active ? optionId(active) : undefined}
+      data-testid={`${testId}-roster`}
+      onKeyDown={onKeyDown}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: theme.spacing(0.5),
+        overflowY: 'auto',
+        minWidth: 0,
+        '&:focus-visible': {
+          outline: `2px solid ${theme.palette.primary.main}`,
+          outlineOffset: 2,
+        },
+      }}
+    >
+      {units.map((unit) => (
+        <FleetRow
+          key={unit.id}
+          unit={unit}
+          copy={copy}
+          freshness={freshnessOf(unit.staleSeconds, laggingAfterSeconds, staleAfterSeconds)}
+          selected={unit.id === active}
+          onSelect={onSelect}
+          optionId={optionId(unit.id)}
+          testId={`${testId}-${unit.id}`}
+        />
+      ))}
+    </Box>
+  );
+}

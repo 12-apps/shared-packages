@@ -61,13 +61,19 @@ escape hatch for the same button in a context where the action is harmless.
 Refs are not forwarded (the HOC renders trigger + popup as a fragment, so there
 is no single node to hand back). Use `<ConfirmAction>` where a ref is needed.
 
-### `ConfirmButton` — the HOC, pre-applied
+### `createConfirmButton` — the HOC, pre-applied
 
 `withConfirmation(Button)` with the shared wording already in place. Use it when
 you just want a guarded button and have no reason to build your own wrapper.
 
+A FACTORY rather than a ready-made component, because the wording it bakes in is
+the caller's: it takes the host's `ConfirmActionCopy` and its error sentence, and
+returns the button. Build it once at module scope and use it like any other.
+
 ```tsx
-import { ConfirmButton } from '@12-apps/ui/feedback/ConfirmAction';
+import { createConfirmButton } from '@12-apps/ui/feedback/ConfirmAction';
+
+const ConfirmButton = createConfirmButton(PT_BR_CONFIRM_ACTION_COPY, 'Algo deu errado.');
 
 <ConfirmButton
   color="danger"
