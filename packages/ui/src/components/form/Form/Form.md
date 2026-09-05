@@ -85,7 +85,7 @@ Default layout with fields stacked vertically:
 ```
 
 ### Horizontal Layout
-Labels positioned horizontally beside inputs:
+Intended to put labels beside their inputs:
 ```tsx
 <Form variant="horizontal">
   <FormField name="field1" label="Field 1">
@@ -93,6 +93,13 @@ Labels positioned horizontally beside inputs:
   </FormField>
 </Form>
 ```
+
+> **Not wired up yet.** `Form` accepts the variant, but nothing carries it down
+> to `FormField` — `FormFieldProps` has no `variant` — so a horizontal form
+> currently draws ordinary vertical rows. The field's styled wrapper still
+> keeps the horizontal branch, scoped to the column axis (see
+> [Row spacing](#row-spacing)), so wiring it up later is a wiring job rather
+> than a re-derivation of the spacing.
 
 ### Inline Layout
 All elements in a single row:
@@ -102,6 +109,44 @@ All elements in a single row:
   <Button>Search</Button>
 </Form>
 ```
+
+## Row spacing
+
+A label sits **4px** above its control, and exactly one thing puts it there:
+`FormLabel`'s own `marginBottom` (`theme.spacing(0.5)`). `FormMessage` mirrors it
+with the same 4px `marginTop` below the control, so a row reads 4 / control / 4.
+
+`FormField` deliberately adds **nothing** to that. It used to: the wrapper was a
+flex column with `gap: theme.spacing(1)`, and in a column a gap and a margin add
+up — 8 + 4 = 12px, three times what every other user of `FormLabel` draws.
+`CepField`, `CategorySelect`, `CreatableSelect`, the `total-form` fields and
+`@12-apps/discounts`' builders all put a bare `FormLabel` straight inside a
+`FormControl`, which has no gap of its own, so the label's margin is the whole
+of their spacing at 4px. `FormField` was the only one of them that disagreed.
+
+That is a claim about `FormLabel`'s callers, not about every labelled control in
+the package: `Textarea` labels itself through MUI's `InputLabel` at
+`theme.spacing(1)` and draws 8px. It shares no code with `FormLabel`, so it is a
+separate inconsistency — worth settling one day, and no argument for keeping a
+second spacing mechanism here.
+
+Eight pixels a row is invisible on one field and decisive on six. Measured in
+Chromium at 320x568 — the smallest supported viewport — a six-field address form
+put its submit button 41px below the fold.
+
+**There is no `spacing` prop, and that is the answer rather than an omission.**
+A knob here would be a second place to state a decision that already has one, and
+its default would have to be the 4px every other `FormLabel` row draws — so the
+only thing it would buy is the ability to disagree with them. A row that
+genuinely needs more air gets it from the container: `Form`'s own `spacing` sets
+the distance *between* fields, and a caller composing `FormControl` +
+`FormLabel` by hand can space them however it likes.
+
+`variant="horizontal"` keeps a `columnGap` rather than a `gap`. That branch is
+unreachable today (see [Horizontal Layout](#horizontal-layout)), and the axis is
+the reason it is kept rather than deleted: with the label beside the control a
+horizontal gap and a vertical margin are orthogonal, where a `gap` shorthand
+would put the 8px straight back on the row axis as soon as a field wrapped.
 
 ## Validation
 
