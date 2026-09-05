@@ -471,8 +471,9 @@ createWebNotifications({
    subscribe — the answer almost always lives in React context (your tenant,
    your session, your query client), which is the same reason
    `NotificationsSignalHook` exists one seam over. `active` is `false` while the
-   panel is shut; pass it to your query's `enabled` and an inbox nobody has
-   opened costs nothing. Ignoring it is correct and merely costs money.
+   panel is shut; pass it to your query's `enabled`. Ignoring it is correct and
+   merely costs money — and an unopened inbox is free either way, because the
+   panel is lazy and the drawer unmounts its content on close.
 2. **Three sentences**, in their own pack rather than on
    `NotificationMessages` — live activities are opt-in, and requiring copy for a
    section you never render is the tax that gets a required-config change

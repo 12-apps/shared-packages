@@ -59,9 +59,18 @@ export interface LiveSectionProps {
   messages: NotificationMessages;
   /** Whether the panel is open — passed straight through to the host's hook. */
   active: boolean;
-  /** Follow a card's link: the host's router, through the panel. */
-  onOpen: (activity: LiveActivity) => void;
+  /**
+   * Follow a card's link.
+   *
+   * Optional, and the panel omits it for a host with no router: a card that
+   * cannot go anywhere renders as text rather than as a named control that
+   * does nothing.
+   */
+  onOpen?: (activity: LiveActivity) => void;
 }
+
+/** Ties the region to its own heading, so the block is named rather than loose. */
+const HEADING_ID = 'live-activities-heading';
 
 export function LiveSection({
   config,
@@ -77,8 +86,23 @@ export function LiveSection({
   if (activities.length === 0) return null;
 
   return (
-    <Box data-testid="live-activities" sx={{ pb: 1.5 }}>
-      <Text variant="caption" size="xs" color="secondary" weight="semibold" as="span">
+    // A NAMED region. Without the label a screen-reader user meets a loose run
+    // of controls ahead of the inbox with nothing saying what they are; the
+    // panel's own title is the drawer's heading and cannot describe this block.
+    <Box
+      component="section"
+      aria-labelledby={HEADING_ID}
+      data-testid="live-activities"
+      sx={{ pb: 1.5 }}
+    >
+      <Text
+        id={HEADING_ID}
+        variant="caption"
+        size="xs"
+        color="secondary"
+        weight="semibold"
+        as="h2"
+      >
         {config.messages.sectionTitle}
       </Text>
       <Box sx={{ pt: 0.75 }}>
@@ -89,7 +113,7 @@ export function LiveSection({
             messages={messages}
             live={config.messages}
             now={now}
-            onOpen={onOpen}
+            {...(onOpen ? { onOpen } : {})}
             {...(config.renderIcon ? { renderIcon: config.renderIcon } : {})}
           />
         ))}

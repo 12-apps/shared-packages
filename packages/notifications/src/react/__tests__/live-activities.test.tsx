@@ -144,11 +144,77 @@ describe('the live section', () => {
     await waitFor(() => expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy());
     const lane = screen.getByTestId('live-activity-steps-visit-42');
     expect(lane.textContent).toContain('Em preparo');
-    // The lane is decoration and says so: `Stepper` draws real buttons, and a
-    // card that is itself a button must not contain focusable descendants.
+    // The lane is decoration and says so — four focusable, named controls per
+    // entry in front of an inbox would cost a keyboard user the list.
     const decoration = lane.closest('[aria-hidden]');
     expect(decoration).not.toBeNull();
     expect(decoration?.hasAttribute('inert')).toBe(true);
+  });
+
+  it('never nests the lane inside the card link — a button in a button is not HTML', async () => {
+    // `Stepper` draws every stop as a real <button>, and `clickable={false}`
+    // only sets `pointer-events: none`. Wrapping the whole card in a button
+    // therefore produced BUTTON > BUTTON: the parser auto-closes the outer one,
+    // so a host that server-renders the panel open hydrates against a tree the
+    // browser rewrote. `aria-hidden` and `inert` do not fix that; structure does.
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy());
+    const card = screen.getByTestId('live-activity-visit-42');
+    expect(card.querySelectorAll('button button')).toHaveLength(0);
+    // And the lane really is outside the link, not merely un-nested by luck.
+    expect(
+      screen.getByTestId('live-activity-open-visit-42').contains(
+        screen.getByTestId('live-activity-steps-visit-42'),
+      ),
+    ).toBe(false);
+  });
+
+  it('stacks the heading and the sentence, rather than running them together', async () => {
+    // `Text` sets no `display`, so two adjacent spans in an ordinary block run
+    // together on ONE line with not even a space between them. The inbox row
+    // avoids it with a flex column; an earlier draft of this card did not.
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-title-visit-42')).toBeTruthy());
+    const title = screen.getByTestId('live-activity-title-visit-42');
+    const body = title.parentElement;
+    expect(body?.textContent).toContain('A Nina já está com a veterinária.');
+    const style = globalThis.getComputedStyle(body as Element);
+    expect(style.display).toBe('flex');
+    expect(style.flexDirection).toBe('column');
+  });
+
+  it('draws the host mark when it renders one, and nothing when it does not', async () => {
+    const withIcon: LiveActivitiesConfig = {
+      ...source([activity()]),
+      renderIcon: (item) => <span data-testid={`mark-${item.kind}`}>◆</span>,
+    };
+    const { Panel } = mount(withIcon);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('mark-visit')).toBeTruthy());
+    // Decoration beside a heading that already says it — named twice is worse
+    // than named once.
+    expect(screen.getByTestId('mark-visit').closest('[aria-hidden]')).not.toBeNull();
+  });
+
+  it('renders no mark, and no placeholder for one, when the host draws none', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-title-visit-42')).toBeTruthy());
+    // The tap target holds the mark, so ask IT rather than the whole card —
+    // the lane below is `aria-hidden` by design and full of Stepper's own.
+    const target = screen.getByTestId('live-activity-title-visit-42').closest('div')
+      ?.parentElement;
+    // A mark nobody drew must leave nothing behind, not an empty box.
+    expect(target?.querySelectorAll('[aria-hidden]') ?? []).toHaveLength(0);
   });
 
   it('renders no lane when the host says the subject is on a stop the lane lacks', async () => {
@@ -233,7 +299,28 @@ describe('the live section', () => {
     render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
 
     await waitFor(() => expect(screen.getByTestId('live-activity-visit-42')).toBeTruthy());
-    expect(screen.getByTestId('live-activity-visit-42').tagName).not.toBe('BUTTON');
+    await waitFor(() =>
+      expect(screen.queryByTestId('live-activity-open-visit-42')).toBeNull(),
+    );
+  });
+
+  it('renders text, not a dead control, in a host with no router', async () => {
+    // The panel is specified to mount in a host that has no router at all. A
+    // card that follows nothing must not still be a focusable control named
+    // "Abrir: …" — that is a promise the panel cannot keep.
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-visit-42')).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.queryByTestId('live-activity-open-visit-42')).toBeNull(),
+    );
+    expect(
+      screen.queryAllByRole('button', {
+        name: CLINIC_LIVE_MESSAGES.openActivity('Consulta em andamento'),
+      }),
+    ).toHaveLength(0);
   });
 
   it('tells the host nobody is looking while the panel is shut', async () => {
@@ -246,9 +333,9 @@ describe('the live section', () => {
     expect(asked).toContain(true);
 
     rerender(<Panel open={false} onClose={() => undefined} />);
-    // The panel stays MOUNTED once opened (the drawer owns its exit
-    // transition), so `active` is the only thing that can tell a host-side
-    // query to stand down.
+    // The drawer unmounts its content on close, so this is the CLOSING
+    // transition: `active` going false is what stops a host-side query firing
+    // one last time on the way out.
     await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
     expect(asked.at(-1)).toBe(false);
   });

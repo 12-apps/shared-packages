@@ -49,6 +49,11 @@ export interface LiveActivity {
    * tracked and not of the message: the panel keys on it so a stage change
    * re-renders one card rather than swapping two, and it is what
    * {@link livePushTag} collapses an OS notification onto.
+   *
+   * **Unique among the activities live at one moment**, for the same reason:
+   * it is the React key and the card's test id. Two activities sharing one
+   * gives a duplicate-key warning and a card that silently shows the wrong
+   * subject.
    */
   id: string;
   /**
@@ -133,7 +138,14 @@ export function liveActivityLane(activity: LiveActivity): LiveActivityLane | nul
  */
 export const LIVE_SUBJECT_KEY = 'liveSubject';
 
-/** Namespaces the tray tag, so a live tag can never collide with a host's own. */
+/**
+ * Namespaces the tray tag, so a live tag does not collide with the ones a host
+ * already uses.
+ *
+ * A convention rather than an enforcement — nothing stops a host emitting its
+ * own `live:`-prefixed tags — but it means the two id spaces have to be made to
+ * meet rather than meeting by accident.
+ */
 export const LIVE_PUSH_TAG_PREFIX = 'live:';
 
 /**

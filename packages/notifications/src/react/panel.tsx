@@ -113,9 +113,8 @@ function PanelBody({
  * of half of it.
  *
  * Lifted out of the component because both kinds of entry follow a link the
- * same way and a host with no router follows neither — a rule that is easier to
- * keep true in one place than in two call sites that drifted apart once
- * already.
+ * same way and a host with no router follows neither — one rule, stated once,
+ * rather than the same three lines written twice.
  */
 function usePanelOpeners(
   store: InboxStore,
@@ -199,7 +198,7 @@ export function NotificationsPanel({
             config={live}
             messages={messages}
             active={open}
-            onOpen={openLive}
+            {...(onNavigate ? { onOpen: openLive } : {})}
           />
         ) : null}
         {hasUnread ? (

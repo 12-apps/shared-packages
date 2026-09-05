@@ -6,8 +6,24 @@
  * — for the reason the inbox's unread row uses the same treatment: this sits at
  * the top of a list of other people's news, and a saturated block there
  * out-shouts everything it is supposed to be introducing.
+ *
+ * ## The card is a DIV, and the button is inside it
+ *
+ * The obvious shape — one `<button>` wrapping the whole card — is not
+ * available, because `Stepper` draws every stop as a real `<button>`
+ * (`@12-apps/ui`'s `StepButton` is `styled(Button)`), and `clickable={false}`
+ * only sets `pointer-events: none`. A button inside a button is invalid HTML:
+ * the parser auto-closes the outer one at the first nested one, so any host
+ * that server-renders the panel open hydrates against a tree the browser
+ * rewrote, and every adopter's dev console carries a React error besides.
+ *
+ * `aria-hidden` and `inert` on the lane fix the tab stops and the accessible
+ * name — they do NOT fix the nesting, and an earlier draft of this file claimed
+ * they did. So the tap target is the TEXT block, and the lane and the timestamp
+ * are its siblings: valid markup, and a target that still covers everything a
+ * reader would aim at.
  */
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { Stepper } from '@12-apps/ui/data-display/Stepper';
 import { Box } from '@12-apps/ui/mui/Box';
@@ -21,17 +37,26 @@ import type { LiveActivitiesConfig, LiveActivityMessages } from './live-config';
 import { relativeTime } from './relative-time';
 
 const cardSx = {
-  display: 'block',
-  width: '100%',
-  textAlign: 'left',
-  font: 'inherit',
-  color: 'inherit',
   border: '1px solid',
   borderColor: (t: Theme) => alpha(t.palette.primary.main, 0.35),
   bgcolor: (t: Theme) => alpha(t.palette.primary.main, 0.06),
   borderRadius: 1.5,
   p: 1.25,
   mb: 1,
+} as const;
+
+/** The tap target: everything a reader would aim at, and nothing focusable. */
+const targetSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1,
+  width: '100%',
+  textAlign: 'left',
+  font: 'inherit',
+  color: 'inherit',
+  border: 'none',
+  background: 'none',
+  p: 0,
 } as const;
 
 /**
@@ -63,14 +88,11 @@ const laneSx = {
 /**
  * The lane, or nothing.
  *
- * `aria-hidden` AND `inert`, because `Stepper` draws each stop as a real
- * `<button>` and `clickable={false}` only sets `pointer-events: none` — it
- * leaves them focusable and named. Inside this card's own button that is
- * invalid HTML, a handful of dead tab stops per live entry, and an accessible
- * name that absorbs "Step 1: … (completed)" once per stop. Nothing is lost by
- * hiding it, which is what makes this the fix rather than a trade: the stop the
- * subject is at is already the card's heading, and the row of dots restates it
- * visually.
+ * `aria-hidden` AND `inert`: the stops are real buttons, and leaving four
+ * focusable, named controls per entry in front of an inbox would cost a
+ * keyboard user the list they opened the panel for. Nothing is lost by hiding
+ * it — the stop the subject is at is already the card's heading, and the row of
+ * dots restates it visually.
  */
 function ActivityLane({ activity }: { activity: LiveActivity }): JSX.Element | null {
   const lane = liveActivityLane(activity);
@@ -90,85 +112,104 @@ function ActivityLane({ activity }: { activity: LiveActivity }): JSX.Element | n
   );
 }
 
-export interface LiveActivityCardProps {
+/** Not exported: the card is composed by `LiveSection`, which owns the clock. */
+interface LiveActivityCardProps {
   activity: LiveActivity;
   messages: NotificationMessages;
   live: LiveActivityMessages;
   renderIcon?: LiveActivitiesConfig['renderIcon'];
   /** The clock this render reads, so the "last moved" line can be ticked. */
   now: number;
-  /** Follow the card's link. Absent (or a `null` link) renders plain text. */
+  /**
+   * Follow the card's link.
+   *
+   * Absent — as it is for a host with no router — renders the text as text. A
+   * named, focusable control that does nothing is worse than no control.
+   */
   onOpen?: (activity: LiveActivity) => void;
 }
 
-/** The card's contents — shared by the link and the plain forms. */
-function CardBody({
+/** The mark on the left, when the host draws one. */
+function ActivityIcon({ icon }: { icon: ReactNode }): JSX.Element | null {
+  if (icon === undefined || icon === null) return null;
+  return (
+    <Box aria-hidden sx={{ display: 'flex', flex: '0 0 auto', color: 'primary.main' }}>
+      {icon}
+    </Box>
+  );
+}
+
+/** The mark, the heading and the line under it — the card's tap target. */
+function ActivityTarget({
+  activity,
+  renderIcon,
+}: Pick<LiveActivityCardProps, 'activity' | 'renderIcon'>): JSX.Element {
+  return (
+    <>
+      <ActivityIcon icon={renderIcon?.(activity)} />
+      {/* A COLUMN, not a bare block: `Text` sets no `display`, so two adjacent
+          spans in an ordinary div run together on one line with not even a
+          space between them — which is how the heading and the sentence under
+          it ended up as one word in an earlier draft. `row.tsx` gets this right
+          the same way. */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0 }}>
+        {/*
+          The live region is THIS LINE and nothing else. The card also carries a
+          relative timestamp that moves every minute for as long as the subject
+          lasts, and announcing that is a polite interruption per minute for
+          news the reader did not ask to be read. What is worth interrupting for
+          is the subject MOVING, which is what the heading says.
+        */}
+        <Text
+          variant="body"
+          size="sm"
+          weight="semibold"
+          as="span"
+          aria-live="polite"
+          data-testid={`live-activity-title-${activity.id}`}
+        >
+          {activity.title}
+        </Text>
+        {activity.body === null ? null : (
+          <Text variant="caption" size="xs" color="secondary" as="span">
+            {activity.body}
+          </Text>
+        )}
+      </Box>
+    </>
+  );
+}
+
+export function LiveActivityCard({
   activity,
   messages,
   live,
   renderIcon,
   now,
-}: Omit<LiveActivityCardProps, 'onOpen'>): JSX.Element {
-  const icon = renderIcon?.(activity);
+  onOpen,
+}: LiveActivityCardProps): JSX.Element {
+  const followable = activity.link !== null && onOpen !== undefined;
+  const target = <ActivityTarget activity={activity} {...(renderIcon ? { renderIcon } : {})} />;
   return (
-    <>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {icon === undefined || icon === null ? null : (
-          <Box aria-hidden sx={{ display: 'flex', flex: '0 0 auto', color: 'primary.main' }}>
-            {icon}
-          </Box>
-        )}
-        <Box sx={{ minWidth: 0 }}>
-          {/*
-            The live region is THIS LINE and nothing else. The card also carries
-            a relative timestamp that moves every minute for as long as the
-            subject lasts, and announcing that is a polite interruption per
-            minute for news the reader did not ask to be read. What is worth
-            interrupting for is the subject MOVING, which is what the heading
-            says.
-          */}
-          <Text
-            variant="body"
-            size="sm"
-            weight="semibold"
-            as="span"
-            aria-live="polite"
-            data-testid={`live-activity-title-${activity.id}`}
-          >
-            {activity.title}
-          </Text>
-          {activity.body === null ? null : (
-            <Text variant="caption" size="xs" color="secondary" as="span">
-              {activity.body}
-            </Text>
-          )}
+    <Box data-testid={`live-activity-${activity.id}`} sx={cardSx}>
+      {followable ? (
+        <Box
+          component="button"
+          type="button"
+          onClick={() => onOpen(activity)}
+          aria-label={live.openActivity(activity.title)}
+          data-testid={`live-activity-open-${activity.id}`}
+          sx={{ ...targetSx, cursor: 'pointer' }}
+        >
+          {target}
         </Box>
-      </Box>
+      ) : (
+        <Box sx={targetSx}>{target}</Box>
+      )}
       <ActivityLane activity={activity} />
       <Text variant="caption" size="xs" color="secondary" as="span" italic>
         {live.updated(relativeTime(activity.updatedAt, messages, now))}
       </Text>
-    </>
-  );
-}
-
-export function LiveActivityCard({ onOpen, ...body }: LiveActivityCardProps): JSX.Element {
-  const { activity, live } = body;
-  const followable = activity.link !== null && onOpen !== undefined;
-  return (
-    <Box
-      {...(followable
-        ? {
-            component: 'button' as const,
-            type: 'button' as const,
-            onClick: () => onOpen(activity),
-            'aria-label': live.openActivity(activity.title),
-          }
-        : {})}
-      data-testid={`live-activity-${activity.id}`}
-      sx={{ ...cardSx, cursor: followable ? 'pointer' : 'default' }}
-    >
-      <CardBody {...body} />
     </Box>
   );
 }

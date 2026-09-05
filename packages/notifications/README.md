@@ -214,12 +214,14 @@ createWebNotifications({
 });
 ```
 
-`active` is whether anyone is looking — `false` while the panel is shut, so a
-host backed by a query passes it straight to `enabled` and an inbox nobody has
-opened costs nothing. It is a hint about NEED, never about correctness.
+`active` is whether anyone is looking — `false` while the panel is shut. Pass it
+to your query's `enabled`. It is a hint about NEED, never about correctness, and
+it is not what makes an unopened inbox free: the panel is fetched lazily and the
+drawer unmounts its content on close, so a host that ignores `active` still
+issues nothing until somebody opens the bell.
 
 One activity is `{ id, kind, title, body, link, steps, activeStepId, updatedAt }`
-(`../live.ts`). `steps` + `activeStepId` draw a lane, because "how far along is
+(`src/live.ts`). `steps` + `activeStepId` draw a lane, because "how far along is
 this" is the shape almost every ongoing subject has; both are optional in effect
 — an activity with no lane is a heading, a sentence and a timestamp that keeps
 moving. An `activeStepId` naming no step draws NO lane rather than a lane with

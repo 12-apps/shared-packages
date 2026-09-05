@@ -44,7 +44,11 @@ export {
   type NotificationsSubscribe,
 } from './hooks';
 
-export { LiveActivityCard, type LiveActivityCardProps } from './live-card';
+// `LiveActivityCard` is deliberately NOT exported. It takes the clock as a
+// prop, and the minute tick that produces one lives in `LiveSection` — so an
+// external composer would either reimplement the tick or pass `Date.now()` once
+// and get the frozen timestamp `relative-time.ts` was changed to prevent.
+// `LiveSection` is the composable unit and carries its own clock.
 export {
   type LiveActivitiesConfig,
   type LiveActivitiesHook,

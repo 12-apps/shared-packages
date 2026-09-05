@@ -62,11 +62,17 @@ export interface WebPushMessage {
    * tray — silently — instead of stacking under it. Four stages then cost one
    * entry and one buzz, and the entry that remains is the current one.
    *
-   * `null` rather than absent, so the key is always on the wire and a service
-   * worker reads one shape. A worker that ignores it keeps today's behaviour
-   * exactly, which is what makes this safe to ship ahead of the workers.
+   * {@link formatWebPush} always sets it, `null` included, so on the WIRE the
+   * key is always there and a service worker reads one shape. A worker that
+   * ignores it keeps today's behaviour exactly, which is what makes this safe
+   * to ship ahead of the workers.
+   *
+   * OPTIONAL in the type, and only in the type: a host that hand-writes its own
+   * `NotificationTransport<WebPushMessage>` — a fixture, a second driver —
+   * would otherwise stop compiling on a field it has no way to know about and
+   * no reason to set.
    */
-  tag: string | null;
+  tag?: string | null;
 }
 
 export interface WebPushDriverDeclaration extends DriverDeclarationBase {

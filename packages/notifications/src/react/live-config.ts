@@ -20,11 +20,17 @@ import type { LiveActivity } from '../live';
  * exactly this reason one seam over, and a host in that shape had no way to
  * pass anything at all.
  *
- * `active` is whether the surface currently needs the answer — false while the
- * panel is shut. A host backed by a query passes it straight to `enabled`, so
- * an inbox nobody has opened costs nothing. It is a HINT about need, never
- * about correctness: a host that ignores it and always answers is behaving
- * correctly and merely paying for it.
+ * `active` is whether the surface currently needs the answer. It is a HINT
+ * about need, never about correctness: a host that ignores it and always
+ * answers is behaving correctly and merely paying for it.
+ *
+ * What it is NOT is the only thing standing between a shut panel and a query.
+ * The panel is fetched lazily and renders nothing until somebody first opens
+ * the bell, and the drawer unmounts its content on close — so a host that
+ * simply reads `active` and ignores it still issues nothing while the panel is
+ * away. `active` is `false` for the frames of the closing transition, which is
+ * where it earns its keep: a query told to stand down there does not fire one
+ * last time on the way out.
  *
  * Return whatever is live, newest activity first or in whatever order the host
  * means; the surface renders them in the order given. An empty array is the
