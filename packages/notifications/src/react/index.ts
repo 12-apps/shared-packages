@@ -54,6 +54,23 @@ export {
   type LiveActivitiesHook,
   type LiveActivityMessages,
 } from './live-config';
+
+/**
+ * The contract itself, re-exported from the entry a host WIRES through.
+ *
+ * It lives in the root, because both halves need it and neither owns it — but a
+ * host writing `useActivities` imports the seam from `./react` and then has to
+ * reach into a second entry for the one type that seam returns. Measured on the
+ * first adopter: a `LiveActivity` imported from here failed to compile with
+ * "declares 'LiveActivity' locally, but it is not exported", which is a
+ * confusing way to say "you wanted the other subpath".
+ */
+export {
+  liveActivityLane,
+  type LiveActivity,
+  type LiveActivityLane,
+  type LiveActivityStep,
+} from '../live';
 export { LiveSection, type LiveSectionProps } from './live-section';
 
 export { relativeTime } from './relative-time';
