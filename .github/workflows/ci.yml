@@ -590,6 +590,37 @@ jobs:
           name: auth-storybook
           path: packages/auth/storybook-static
           retention-days: 7
+      # The DESIGN SYSTEM's own Storybook — ~90 components, and the only one of
+      # the three this job never built. It did not build: `ConfirmAction`'s two
+      # story files imported a `ConfirmButton` that module never exported, so
+      # Rollup failed the preview and `pnpm --filter @12-apps/ui test:ci` could
+      # not run for the package AT ALL. Every check stayed green throughout,
+      # because nothing here opened it.
+      #
+      # This is the step that would have caught it, and the same argument the
+      # two above already make: a story that no longer compiles has to be a red
+      # check rather than something a reviewer meets by clicking.
+      #
+      # It needs no build step of its own — the `@12-apps/ui` build above is the
+      # one dist it reaches for (the `product-research-ui` stories this
+      # Storybook also mounts resolve the design system by package name; that
+      # package and its own dependencies export `src`).
+      #
+      # NOT ADDED HERE: the `test-storybook` half of `test:ci`. That needs
+      # Playwright browsers in this job and would run every `*.test.stories.tsx`
+      # in the package for the first time — an unknown number of pre-existing
+      # failures to triage, which is its own change rather than a line in this
+      # one.
+      - name: Build the design system Storybook
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @12-apps/ui storybook:build 2>&1 | tee ui-storybook.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-storybook
+          path: packages/ui/storybook-static
+          retention-days: 7
 
   # THE NATIVE LANE: the same components, the other renderer.
   #

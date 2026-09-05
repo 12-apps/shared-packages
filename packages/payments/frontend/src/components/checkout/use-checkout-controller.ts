@@ -12,6 +12,7 @@ import {
   useStartPayment,
   type Step,
 } from "./checkout-actions";
+import { useConfirmationWait } from "./confirmation-wait";
 import { useCheckoutCopy } from "./copy-context";
 
 import { forgetHostedOrder } from "./hosted-return";
@@ -27,6 +28,7 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from "./types";
+import { useResolutionActions } from "./resolution-actions";
 import { useHostedResume } from "./use-hosted-resume";
 
 const STEP_ORDER: Step[] = ["dados", "payment", "status"];
@@ -124,10 +126,14 @@ export function useCheckoutController(
   const { back, editBuyer } = useCheckoutNav(taxIdOnFile, onExitToMenu, setStep);
   const setMethod = useCallback((next: PaymentMethod) => {
     setMethodState((prev) => {
-      if (prev !== next) { setOrder(null); forgetHostedOrder(); clearError(); }
+      // SCOPED (FUT-1240): the order dropped here is THIS store's, and so is
+      // the parked entry that goes with it. Unscoped, changing method at store
+      // B threw away store A's parked hand-off — the same cross-store slot the
+      // slug closed on the read side, still open on the write side.
+      if (prev !== next) { setOrder(null); forgetHostedOrder(tenantSlug); clearError(); }
       return next;
     });
-  }, [clearError]);
+  }, [clearError, tenantSlug]);
   const goToPayment = useGoToPayment({
     buyer, buyerFields, taxIdOnFile, saveProfile, saveBuyerContact, validation, failure, setStep,
   });
@@ -135,28 +141,29 @@ export function useCheckoutController(
     buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure,
     setCreating, setDecline, setOrder, setFinalStatus,
   });
-  const payWithEmail = useCallback((email: string) => {
-    if (!method) return;
-    const next = { ...buyer, email };
-    setBuyerState(next);
-    void startPayment(method, next);
-  }, [buyer, method, startPayment]);
-  const handleResolved = useCallback((s: OrderStatus, refusal?: CheckoutDecline | null) => {
-    setDecline(refusal ?? null);
-    setFinalStatus(s);
-    setStep("status");
-  }, []);
+  const { payWithEmail, handleResolved } = useResolutionActions({
+    buyer, method, startPayment, setBuyerState, setDecline, setFinalStatus, setStep,
+  });
   const retry = useRetryAction({
     decline, order, clearError, setOrder, setDecline, setFinalStatus, setStep, setFreshInstrument,
   });
   const completed = useMemo(() => new Set(STEP_ORDER.slice(0, STEP_ORDER.indexOf(step))), [step]);
-  useSettledPort(finalStatus ?? resume.status, onPaid);
+  const settled = finalStatus ?? resume.status;
+  useSettledPort(settled, onPaid);
+  // The confirmation screen's own wait (FUT-1170). Live only where nothing else
+  // is polling and nothing has answered: a resumed leg brings its own wait, and
+  // every method's screen polls for itself on the payment step.
+  const confirming = useConfirmationWait({
+    orderId: order?.orderId ?? null,
+    active: step === "status" && settled === null && resume.order === null,
+    onSettled: setFinalStatus,
+  });
 
   return {
     step, setStep, method, setMethod, buyer, setBuyer, saveProfile, setSaveProfile,
-    order, finalStatus: finalStatus ?? resume.status, creating,
+    order, finalStatus: settled, creating,
     decline, freshInstrument,
-    ...resumeSurface(resume),
+    ...resumeSurface(resume, confirming),
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu, back, editBuyer,
     goToPayment, startPayment, payWithEmail, handleResolved, retry, completed,

@@ -22,6 +22,8 @@ import { createCheckoutClient } from "../components/checkout/transport";
 import type { CheckoutProviderConfig, SettlementCheckout } from "../components/checkout/types";
 import { useCheckoutController } from "../components/checkout/use-checkout-controller";
 
+import { buildPipeline } from "./pipeline/engine";
+import { pipelineRequested } from "./pipeline/types";
 import { FlowsProvider, useResolvedConfig, type FlowsRuntime } from "./runtime";
 import { buyerScreens } from "./screens-buyer";
 import { hostedScreens } from "./screens-hosted";
@@ -203,12 +205,21 @@ export function createPaymentFlows(config: PaymentFlowsConfig): PaymentFlows {
     );
   }
 
+  // THE ADDITIVE SWITCH (FUT-1240). A host that registered a step, a gate, a
+  // settlement method, an intent, an open payable, an exit or a settle
+  // callback gets the pipeline; a host that registered none gets the flat
+  // three-step flow, unchanged, down to its test ids. `useAdmission` is built
+  // either way — with no gates registered it passes, which is the honest
+  // answer for a host that has declared no admission rules.
+  const pipeline = buildPipeline(runtime, screens);
+
   return {
-    Checkout: buildCheckout(runtime, screens),
+    Checkout: pipelineRequested(config) ? pipeline.Checkout : buildCheckout(runtime, screens),
     Provider,
     screens,
     useCheckout: buildUseCheckout(runtime),
     useCheckoutConfig: () => useResolvedConfig(runtime),
+    useAdmission: pipeline.useAdmission,
     client: runtime.client,
   };
 }

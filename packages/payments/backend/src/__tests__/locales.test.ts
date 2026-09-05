@@ -48,6 +48,34 @@ describe('the locale packs', () => {
     }
   });
 
+  it('does not send the buyer looking for a mistake of their own (FUT-1182)', () => {
+    // ONE key words THREE refusals, and only one of them is even about a
+    // payment: `PAYMENT_DECLINED` for a provider error nothing mapped — a
+    // provider 5xx included — `BROWSER_KEY_UNAVAILABLE` when the card form
+    // cannot be equipped, and `VAULT_NOT_SAVED` when a card the provider
+    // ACCEPTED could not be stored afterwards. The buyer has typed nothing at
+    // all in the second, and has already been charged nothing in either, so
+    // "Verifique seus dados" sent them hunting a mistake that does not exist —
+    // and blamed them for an outage.
+    //
+    // A host cannot fix this from outside: an override reaches the charge path
+    // only, so the two codes above would keep the old sentence. The words are
+    // the host's by doctrine; being wrong in every host is the package's.
+    for (const copy of Object.values(CHECKOUT_COPY)) {
+      expect(copy.genericProviderRefusal).not.toMatch(/seus dados|your details/i);
+    }
+  });
+
+  it('still leaves a provider failure worth another attempt', () => {
+    // The other half of the same sentence. None of the three may have taken any
+    // money, so — unlike an unresolved charge — trying again is exactly right,
+    // and a rewrite that removed the invitation would trade one defect for a
+    // dead end.
+    for (const copy of Object.values(CHECKOUT_COPY)) {
+      expect(copy.genericProviderRefusal).toMatch(/[Tt]ente novamente|[Tt]ry again/);
+    }
+  });
+
   it('marks the field the browser has to highlight, not the one we call it', () => {
     // `fieldNameOf` is a host/client contract, not copy: a pack that
     // "translated" `cpf` back to `taxId` would leave the buyer staring at a

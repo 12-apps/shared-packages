@@ -54,6 +54,45 @@ export const Form = React.forwardRef<HTMLFormElement, FormProps>(
 
 Form.displayName = 'Form';
 
+/**
+ * NO ROW GAP HERE, and that is the fix rather than an omission.
+ *
+ * `FormLabel` already carries `marginBottom: theme.spacing(0.5)` — 4px — and it
+ * carries it because it has to: every OTHER user of it (`CepField`,
+ * `CategorySelect`, `CreatableSelect`, the three `total-form` fields, five of
+ * `@12-apps/discounts`' builders and the host's own `currency-field`) puts a
+ * bare `FormLabel` straight inside a `FormControl`, which is a plain block box
+ * with no gap of its own. There, the label's own margin is the ONLY thing
+ * between the label and the control.
+ *
+ * A `gap: theme.spacing(1)` here was a second mechanism for that one job, and in
+ * a column the two ADD: 8px + 4px put `FormField` at 12px where every one of
+ * those siblings sits at 4px. Measured in Chromium at 320x568 on a consuming
+ * app's six-field delivery address form, the 8px a row it added pushed the
+ * submit button from 561px to 609px — 41px below the fold of the smallest
+ * supported phone, i.e. a checkout whose primary action is off-screen.
+ *
+ * That claim is about `FormLabel`'s own callers, not about the whole package:
+ * `Textarea` labels its control through MUI's `InputLabel` at
+ * `theme.spacing(1)` and still draws 8px. It composes nothing out of
+ * `FormLabel`, so it is a separate inconsistency rather than a reason to keep
+ * a second spacing here.
+ *
+ * ## The `columnGap` is scaffolding, and currently unreachable
+ *
+ * `FormFieldProps` has no `variant` and `FormField` passes none, so `variant`
+ * is ALWAYS undefined and every branch below resolves to the vertical shape.
+ * `Form` accepts `variant="horizontal"` and `Form.md` documents it as "labels
+ * beside inputs", but nothing carries that variant down to the field — so a
+ * horizontal form draws vertical rows today. That gap is older than this
+ * change and fixing it is a feature, not a spacing fix.
+ *
+ * The branch is kept, scoped to the COLUMN axis, so that whoever does wire it
+ * up inherits the right answer: with the label beside the control, a horizontal
+ * gap and a vertical margin are orthogonal and nothing double-counts. A `gap`
+ * shorthand there would put the 8px back on the row axis the moment a field
+ * wrapped.
+ */
 const StyledFormField = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'variant',
 })<{ variant?: 'vertical' | 'horizontal' }>(
@@ -61,7 +100,7 @@ const StyledFormField = styled(Box, {
     display: variant === 'horizontal' ? 'grid' : 'flex',
     flexDirection: variant === 'horizontal' ? undefined : 'column',
     gridTemplateColumns: variant === 'horizontal' ? '200px 1fr' : undefined,
-    gap: theme.spacing(1),
+    columnGap: variant === 'horizontal' ? theme.spacing(1) : undefined,
     alignItems: variant === 'horizontal' ? 'center' : undefined,
   }),
 );
