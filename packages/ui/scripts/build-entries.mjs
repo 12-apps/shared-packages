@@ -70,6 +70,10 @@ export function buildEntries(packageRoot) {
       'src/**/*.test.*',
       'src/**/__tests__/**',
       'src/**/*.d.ts',
+      // The React Native half. It imports `react-native`, which the web build
+      // neither externalises nor could bundle; `tsup.native.config.ts` builds
+      // these into `dist/native/` from `entries.native.json`.
+      'src/**/*.native.*',
     ],
   });
 

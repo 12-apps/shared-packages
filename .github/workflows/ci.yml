@@ -622,6 +622,88 @@ jobs:
           path: packages/ui/storybook-static
           retention-days: 7
 
+  # THE NATIVE LANE: the same components, the other renderer.
+  #
+  # `@12-apps/ui` ships a `react-native` export condition per ported subpath
+  # (packages/ui/NATIVE.md). Nothing else in this workflow exercises it: the
+  # unit-test job runs `pnpm test`, which is the default (web) vitest config
+  # alone, and the Storybook job builds the MUI Storybook. This lane runs the
+  # native vitest config (`test:native`, owned here so it runs once), builds the
+  # native Storybook (react-native-web) and drives the SHARED stories through
+  # it with the test-runner, then checks the parity ledger and the generated
+  # icon paths have not drifted from their sources.
+  #
+  # Gated on `publishable`, like the Storybook job: a root quality script cannot
+  # reach it, a change under packages/ can.
+  native:
+    name: Native (react-native-web)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes).publishable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+      # Through turbo so the workspace dependencies the type build needs come
+      # first — the same argument the Storybook job makes for the auth stories.
+      - name: Build the design system, both halves
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm exec turbo run build --filter=@12-apps/ui 2>&1 | tee ui-build.log
+      # No separate `tsc -p tsconfig.native.json` step: the build above already
+      # ran that program with emit (`build:types:native`), so a type error is
+      # a red build step, not a second copy of the same check.
+      - name: Native unit tests (react-native-web in jsdom)
+        working-directory: packages/ui
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test:native 2>&1 | tee native-unit.log
+      - name: Parity ledger and generated icon paths
+        working-directory: packages/ui
+        run: pnpm native:check
+      # The test-runner drives Chromium through jest-playwright. Same caching
+      # argument as the Frontend Harness job, keyed on the resolved version.
+      - name: Resolve the Playwright version
+        id: playwright
+        working-directory: packages/ui
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        working-directory: packages/ui
+        timeout-minutes: 10
+        run: pnpm exec playwright install chromium
+      # `test:native:ci` builds the native Storybook, serves it and runs the
+      # test-runner under `concurrently -k -s first`, the same sequencing the
+      # web `test:ci` uses — a hand-rolled `serve & sleep 2` races the server.
+      - name: Run the shared stories against the native renderer
+        working-directory: packages/ui
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test:native:ci 2>&1 | tee native-stories.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: native-storybook
+          path: packages/ui/storybook-native-static
+          retention-days: 7
+
   # The payments PORTABILITY gate (FUT-562). Separate from `quality` above
   # because that job is the org's reusable workflow (12-apps/ci) and knows
   # nothing about this repo's payments package.
@@ -1080,7 +1162,7 @@ jobs:
     # red run on the commit, and `release-watchdog.yml`, which compares every
     # package's newest tag against the registry daily and is the only check
     # that still fires when the release workflow cannot run at all.
-    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts]
+    needs: [changes, lint, type-check, build, unit-tests, quality, storybook, native, consumers, frontend-harness, gherkin-journeys, backend-harness, portability, release-scripts]
     steps:
       # The wiring conformance gate runs HERE, not in a filtered job: it holds
       # a COMPLETENESS property (every package answers every capability kind,

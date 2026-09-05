@@ -48,6 +48,32 @@ describe("@12-apps/ui package wiring (Task 5)", () => {
   });
 
   /**
+   * THE NATIVE SWITCH IS AN EXPORT CONDITION, and its order is the contract.
+   *
+   * A subpath in `entries.native.json` carries a `react-native` condition
+   * AHEAD of `default`. Metro asserts that condition and takes `dist/native`;
+   * Vite never does and keeps the MUI build. Put `default` first and every
+   * bundler, Metro included, resolves the web file — the switch silently stops
+   * switching, and nothing else in this package would notice.
+   */
+  it("puts the react-native condition before default on a ported subpath", () => {
+    const button = readPkg().exports?.["./form/Button"] as Record<string, unknown>;
+    expect(Object.keys(button)).toEqual(["react-native", "types", "default"]);
+    expect(button["react-native"]).toEqual({
+      types: "./dist/types-native/components/form/Button/index.native.d.ts",
+      default: "./dist/native/form/Button.js",
+    });
+  });
+
+  it("gives an unported subpath no react-native condition at all", () => {
+    // Under Metro this resolves to the web build and fails on `@mui/material`
+    // at import — loudly — which is the intended behaviour for a component
+    // that has no native renderer yet.
+    const dialog = readPkg().exports?.["./feedback/Dialog"] as Record<string, unknown>;
+    expect(Object.keys(dialog)).toEqual(["types", "default"]);
+  });
+
+  /**
    * `typesVersions` is the fallback for a consumer on `moduleResolution: node`,
    * which ignores `exports`. It pointed under `./src/components/` at
    * `index.d.ts` files that have never existed, because the source is `.ts` and

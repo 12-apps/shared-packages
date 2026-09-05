@@ -1,16 +1,11 @@
-import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type React from 'react';
 
-export type TextVariant = 'body' | 'heading' | 'caption' | 'code';
+import type { TextBaseProps } from './Text.base';
 
-export interface TextProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: TextVariant;
-  color?: ColorValue;
-  size?: SizeValue;
-  weight?: 'light' | 'normal' | 'medium' | 'semibold' | 'bold';
+export type { TextBaseProps, TextVariant, TextWeight } from './Text.base';
+
+export interface TextProps
+  extends TextBaseProps,
+    Omit<React.HTMLAttributes<HTMLSpanElement>, 'color' | 'children'> {
   as?: keyof React.JSX.IntrinsicElements;
-  italic?: boolean;
-  underline?: boolean;
-  strikethrough?: boolean;
-  children: React.ReactNode;
 }
