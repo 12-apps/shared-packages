@@ -1,0 +1,13 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "moduleResolution": "bundler",
+    // TypeScript follows the same export condition Metro does, so `ButtonProps`
+    // here is the native one (`style`, `onPress`), not the MUI one (`sx`).
+    "customConditions": ["react-native"],
+    "jsx": "react-jsx",
+    "noEmit": true
+  },
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "playwright.config.ts"]
+}

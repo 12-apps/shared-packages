@@ -1,6 +1,6 @@
 # The consumer harness
 
-Two small applications built against the **published tarballs**, never against
+Three small applications built against the **published tarballs**, never against
 the workspace. `scripts/harness-install.mjs` packs every package and installs
 the results here, so what these apps import is what npm would upload — the only
 version of these packages a consumer ever sees.
@@ -8,12 +8,30 @@ version of these packages a consumer ever sees.
 ```
 harness/frontend   Vite + Playwright. A page per published surface, and per buyer flow.
 harness/backend    vitest. The published backend's own assets (schema, migrations).
+harness/native     Expo + Playwright. @12-apps/ui's React Native build, bundled by real Metro.
 ```
 
-Neither is in `pnpm-workspace.yaml`. That is the point: inside a workspace every
+None is in `pnpm-workspace.yaml`. That is the point: inside a workspace every
 sibling resolves whether or not its manifest says so, and every file is on disk
 whether or not `files` would ship it. Both are the opposite of what a consumer
 gets.
+
+## Running one
+
+```bash
+pnpm build                                          # the tarballs are packed from dist/
+node scripts/harness-install.mjs                    # every harness, as CI does
+node scripts/harness-install.mjs --only harness/native   # one of them
+```
+
+`harness/native` installs `@12-apps/ui` alone (its `harnessPackages` in
+`package.base.json`) — a React Native consumer has none of the other packages'
+peers. Then, from `harness/native`: `npm test` type-checks against the
+tarball's native declarations, exports the android bundle through Metro and
+reads it (`scripts/check-bundle.mjs`), and runs Playwright against the web
+export (react-native-web in Chromium). `HARNESS_CHROMIUM_PATH=/path/to/chrome`
+points the browser launch at a pre-installed Chromium where Playwright cannot
+download its own. The design it exercises is in `packages/ui/NATIVE.md`.
 
 ## Adding a page
 
