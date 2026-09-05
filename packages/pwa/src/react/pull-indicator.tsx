@@ -56,8 +56,11 @@ function statusFor(phase: PullIndicatorPhase, messages: PullToRefreshMessages): 
  */
 const SR_ONLY: SxProps<Theme> = {
   position: "absolute",
-  width: 1,
-  height: 1,
+  // "1px", not 1: MUI's sizing transform reads a bare number <= 1 as a RATIO
+  // and emits `width: 100%`, so this box was full-size and hidden only because
+  // `clipPath` happened to be here too.
+  width: "1px",
+  height: "1px",
   overflow: "hidden",
   clip: "rect(0 0 0 0)",
   clipPath: "inset(50%)",
@@ -145,13 +148,24 @@ export function PullIndicator({
       ref={ref}
       data-testid="pull-to-refresh-indicator"
       data-phase={phase}
-      role="status"
-      aria-live="polite"
-      aria-label={messages.label}
       sx={chipSx(offsetTop, zIndex)}
     >
       <Glyph phase={phase} />
-      <Box component="span" sx={SR_ONLY}>
+      {/*
+        The live region is the INNER span, and carries no `aria-label`.
+        Labelling the region itself gives it an accessible name, and a reader
+        that computes the announcement from the name reads that name on every
+        phase change — so all three of the strings below would go unheard.
+
+        It is also never `aria-hidden`, which an earlier revision got wrong by
+        hiding the whole chip at rest. A live region has to EXIST and be empty
+        before its content changes; hiding it means the region and its first
+        message appear in the same commit, which is the one case screen readers
+        do not announce. Dropping the chip's `aria-label` is what removed the
+        "Atualizar a tela" a reader used to meet at rest — an unnamed box around
+        an `aria-hidden` glyph and an empty span announces nothing on its own.
+      */}
+      <Box component="span" role="status" aria-live="polite" sx={SR_ONLY}>
         {statusFor(phase, messages)}
       </Box>
     </Box>

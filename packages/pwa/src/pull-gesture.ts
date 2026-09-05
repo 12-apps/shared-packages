@@ -209,6 +209,16 @@ function scrolledPastTop(element: Element): boolean {
  * scroller that is scrolled DOWN (pulling in it scrolls it back up — that is
  * its gesture, not ours), and an explicit opt-out.
  *
+ * A horizontal rail is deliberately NOT a blocker, though a revision of this
+ * file briefly made one. Testing a rail's RESTING `scrollLeft` does not
+ * describe the case worth catching — a diagonal flick along a shelf happens at
+ * `scrollLeft === 0` — and it punishes the wrong person: a rail left scrolled
+ * minutes ago would refuse every deliberate vertical pull started inside it,
+ * for good, since a vertical drag cannot scroll it back. In a storefront that
+ * is not only carousels: a legal document, a help page's code block and a plan
+ * comparison table are all `overflow-x: auto`. The diagonal flick belongs in
+ * {@link createPullTracker}'s claim angle, where the argument actually lives.
+ *
  * A nested scroller sitting AT its top is deliberately not a blocker: it has
  * nowhere to go, so the pull belongs to the page, which is what makes the
  * gesture work on a short list inside a long screen.
