@@ -23,6 +23,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useState, type JSX } from "react";
 
+import { parkedBasket, type CheckoutBasketIdentity } from "../components/checkout/basket";
 import { rememberHostedOrder, takeHostedOrder } from "../components/checkout/hosted-return";
 import type { CheckoutOrder, OrderStatus } from "../components/checkout/types";
 import { useCheckoutComponents } from "../components/checkout/ui";
@@ -31,18 +32,45 @@ import { usePaymentPolling } from "../components/checkout/use-payment-polling";
 import { FlowsShell, type FlowsRuntime } from "./runtime";
 import type { CheckoutScreens } from "./types";
 
+/** Whose store and which basket this hand-off belongs to. */
+interface HandoverScope {
+  tenantSlug?: string;
+  basket?: CheckoutBasketIdentity;
+}
+
 /** Park the order, then navigate — exactly once, even under StrictMode. */
-function useHandover(payable: CheckoutOrder, url: string, navigate: (url: string) => void): void {
+function useHandover(
+  payable: CheckoutOrder,
+  url: string,
+  navigate: (url: string) => void,
+  /**
+   * PARKED WITH THE STORE AND THE BASKET (FUT-1240).
+   *
+   * This call site named neither, and both absences are read as "no opinion"
+   * by the resume: `belongsHere` passes a slug-less entry at ANY store and the
+   * basket rule passes a basket-less entry against ANY basket. So the one
+   * hand-off screen this package ships was exempt from the multi-tenant
+   * scoping (FUT-556) and from the basket binding (FUT-1213) — it resumed over
+   * whatever checkout mounted next. The other three parks were fixed one at a
+   * time; this is the last of them.
+   */
+  scope: HandoverScope,
+): void {
   const [done, setDone] = useState(false);
   useEffect(() => {
     if (done) return;
     setDone(true);
+    const basket = parkedBasket(scope.basket);
     // `handoff: true` is what tells the return leg this order was finished on
     // ANOTHER SITE (FUT-1140): only such an order resumes onto the confirmation
     // screen, because only such an order has nothing left on our page to show.
-    rememberHostedOrder(payable, { handoff: true });
+    rememberHostedOrder(payable, {
+      ...(scope.tenantSlug === undefined ? {} : { tenantSlug: scope.tenantSlug }),
+      ...(basket === undefined ? {} : { basket }),
+      handoff: true,
+    });
     navigate(url);
-  }, [done, payable, url, navigate]);
+  }, [done, payable, url, navigate, scope.tenantSlug, scope.basket]);
 }
 
 function buildHostedHandoff(runtime: FlowsRuntime): CheckoutScreens["HostedHandoff"] {
@@ -57,7 +85,12 @@ function buildHostedHandoff(runtime: FlowsRuntime): CheckoutScreens["HostedHando
   }): JSX.Element {
     const { Button, LoadingState, Text } = useCheckoutComponents();
     const copy = runtime.copy;
-    useHandover(payable, url, runtime.navigate);
+    const tenantSlug = runtime.useTenantSlug();
+    const cart = runtime.config.useCart();
+    useHandover(payable, url, runtime.navigate, {
+      ...(tenantSlug === undefined ? {} : { tenantSlug }),
+      ...(cart.identity === undefined ? {} : { basket: cart.identity }),
+    });
     return (
       <Box
         data-testid="checkout-hosted-handoff"

@@ -259,11 +259,33 @@ export function isStale(parked: ParkedHostedOrder): boolean {
  * ask, FUT-1146's release, and the settle that ends a checkout normally), so
  * callers other than the read need a way to say "this one is finished".
  */
-export function forgetHostedOrder(): void {
+export function forgetHostedOrder(tenantSlug?: string): void {
+  // SCOPED WHEN THE CALLER KNOWS WHOSE CHECKOUT IT IS (FUT-1240). One tab
+  // holds one slot for every store on a multi-tenant storefront, so an
+  // unscoped clear is a clear of whichever store happens to be parked — the
+  // mirror image of the unscoped RESUME the slug closed, and just as quiet: a
+  // shopper who switched stores mid-hand-off loses the confirmation for a
+  // payment they made, with nothing on screen to say why.
+  //
+  // The no-argument call is unchanged and still clears whatever is there. It
+  // is what a caller with no slug in hand means, and it is the read side's
+  // own rule: an entry nobody can attribute belongs to everybody.
+  if (tenantSlug !== undefined && !parkedBelongsTo(tenantSlug)) return;
   try {
     window.sessionStorage?.removeItem(HOSTED_ORDER_STORAGE_KEY);
     window.sessionStorage?.removeItem(LEGACY_KEY);
   } catch {
     // Storage disabled — there was nothing to clear.
   }
+}
+
+/**
+ * Whether what is parked (if anything) is this store's.
+ *
+ * `true` with nothing parked, deliberately: there is no other store's entry to
+ * protect, and answering `false` would leave a stale key nobody may delete.
+ */
+function parkedBelongsTo(tenantSlug: string): boolean {
+  const parked = readParked();
+  return parked === null || belongsHere(parked, tenantSlug);
 }

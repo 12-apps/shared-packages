@@ -134,4 +134,12 @@ export const EN_US_CHECKOUT_VIEW_COPY: CheckoutViewCopy = {
     action: "See the menu",
   },
   status: EN_US_PAYMENT_STATUS_COPY,
+  pipeline: {
+    loading: "Loading…",
+    // The KEYS are the package's own settlement-method ids, never words.
+    awaitingHandover: {
+      PIX: "Opening Pix…",
+      CARD: "Opening the card payment…",
+    },
+  },
 };

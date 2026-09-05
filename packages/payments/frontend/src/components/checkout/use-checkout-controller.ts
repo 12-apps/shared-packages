@@ -125,10 +125,14 @@ export function useCheckoutController(
   const { back, editBuyer } = useCheckoutNav(taxIdOnFile, onExitToMenu, setStep);
   const setMethod = useCallback((next: PaymentMethod) => {
     setMethodState((prev) => {
-      if (prev !== next) { setOrder(null); forgetHostedOrder(); clearError(); }
+      // SCOPED (FUT-1240): the order dropped here is THIS store's, and so is
+      // the parked entry that goes with it. Unscoped, changing method at store
+      // B threw away store A's parked hand-off — the same cross-store slot the
+      // slug closed on the read side, still open on the write side.
+      if (prev !== next) { setOrder(null); forgetHostedOrder(tenantSlug); clearError(); }
       return next;
     });
-  }, [clearError]);
+  }, [clearError, tenantSlug]);
   const goToPayment = useGoToPayment({
     buyer, buyerFields, taxIdOnFile, saveProfile, saveBuyerContact, validation, failure, setStep,
   });

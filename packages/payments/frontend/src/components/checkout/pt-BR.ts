@@ -125,4 +125,13 @@ export const PT_BR_CHECKOUT_VIEW_COPY: CheckoutViewCopy = {
     action: "Ver cardápio",
   },
   status: PT_BR_PAYMENT_STATUS_COPY,
+  pipeline: {
+    loading: "Carregando…",
+    // Keyed by the settlement method's id. The package registers PIX and CARD;
+    // a host that registers another charged method adds its own line here.
+    awaitingHandover: {
+      PIX: "Abrindo o Pix…",
+      CARD: "Abrindo o pagamento com cartão…",
+    },
+  },
 };
