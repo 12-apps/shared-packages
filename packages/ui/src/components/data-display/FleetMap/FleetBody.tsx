@@ -48,10 +48,16 @@ export function FleetBody({
     >
       {/* The roster reads first on a phone and sits beside the map from md up.
           It keeps a ceiling so thirty units scroll rather than push the map off
-          the screen. */}
+          the screen.
+
+          It also WIDENS with the viewport rather than staying at its md width.
+          Held at 280px, a desktop gave the map 1600px for three pins while the
+          roster stayed too narrow for its own meta line — `Lagging · 2 min ago ·
+          ±180 m` wrapped, at 1920px of all widths. The rungs below are the ones
+          the six-width pass was taken at. */}
       <Box
         sx={{
-          flexBasis: { md: '280px' },
+          flexBasis: { md: '280px', lg: '320px', xl: '380px' },
           flexShrink: 0,
           minWidth: 0,
           maxHeight: height,

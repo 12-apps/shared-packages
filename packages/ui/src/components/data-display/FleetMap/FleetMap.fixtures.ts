@@ -20,7 +20,12 @@ export const FLEET_COPY: FleetMapCopy = {
   freshness: { live: 'Live', lagging: 'Lagging', stale: 'Stale' },
   lastSeen: (seconds) =>
     seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)} min ago`,
-  accuracy: (metres) => `±${Math.round(metres)} m`,
+  // A NON-BREAKING space between the number and its unit. The meta line is
+  // the narrowest text in the component and it wraps at spaces, so a plain
+  // space orphans the `m` onto a line of its own — measured at 900px and
+  // 1920px, where the roster column is at its tightest relative to the map.
+  // Consumers writing their own `accuracy` want the same character.
+  accuracy: (metres) => `±${Math.round(metres)}\u00A0m`,
   map: EN_US_MAP_PREVIEW_COPY,
 };
 
