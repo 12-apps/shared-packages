@@ -9,6 +9,8 @@ import { cssLengthToPx } from '../../../tokens/css-units';
 import type { BoxDimension } from '../Box/Box.base';
 
 const PERCENTAGE = /^-?\d+(\.\d+)?%$/;
+/** The lengths a 16px root can resolve. `vw`, `vh`, `ch`, `pt` and `calc()` cannot. */
+const RESOLVABLE_LENGTH = /^-?\d+(\.\d+)?(px|rem|em)$/;
 
 /**
  * A caller's dimension as React Native can take it. Numbers, percentages and
@@ -22,6 +24,9 @@ export function toNativeDimension(value: SpacerDimension | undefined): BoxDimens
   if (typeof value !== 'string') return undefined;
   if (value === 'auto') return 'auto';
   if (PERCENTAGE.test(value)) return value as `${number}%`;
+  // Matched before conversion, because `cssLengthToPx` reads any string
+  // `parseFloat` can start — `50vw` would silently become 50 px.
+  if (!RESOLVABLE_LENGTH.test(value)) return undefined;
   const px = cssLengthToPx(value, Number.NaN);
   return Number.isNaN(px) ? undefined : px;
 }

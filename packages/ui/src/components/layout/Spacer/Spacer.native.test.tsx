@@ -122,4 +122,18 @@ describe('Spacer (native)', () => {
     );
     expect(screen.getByTestId('u')).toHaveStyle({ width: '8px', height: '8px' });
   });
+
+  it('takes only the lengths a 16px root can resolve, and yields the rest to the size step', () => {
+    expect(toNativeDimension(24)).toBe(24);
+    expect(toNativeDimension('auto')).toBe('auto');
+    expect(toNativeDimension('50%')).toBe('50%');
+    expect(toNativeDimension('20px')).toBe(20);
+    expect(toNativeDimension('1.5rem')).toBe(24);
+    expect(toNativeDimension('2em')).toBe(32);
+    // `parseFloat` would read each of these as a bare number; React Native has
+    // no viewport, character or point unit, so they fall back like an unset one.
+    for (const viewportUnit of ['50vw', '10vh', '4ch', '12pt', 'calc(100% - 8px)', 'inherit']) {
+      expect(toNativeDimension(viewportUnit)).toBeUndefined();
+    }
+  });
 });

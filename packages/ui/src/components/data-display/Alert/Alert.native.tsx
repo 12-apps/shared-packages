@@ -8,7 +8,6 @@ import {
   type Role,
   StyleSheet,
   Text as RNText,
-  type TextStyle,
   View,
   type ViewStyle,
 } from 'react-native';
@@ -28,6 +27,7 @@ import { CLOSE_BUTTON, CLOSE_DELAY_MS, COLLAPSE_MS, FADE_IN, ICON_SLOT, ICON_SPI
 import type { AlertProps, AlertVariant } from './Alert.types.native';
 import { Icon } from '../../../icons/Icon.native';
 import { webAria } from '../../../platform/aria';
+import { renderTextChildren } from '../../../platform/text-children';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 
@@ -124,13 +124,6 @@ function Collapse({ open, onCollapsed, children }: { open: boolean; onCollapsed:
   );
 }
 
-/** A string or number child is a line of the message; anything else renders as given. */
-function renderChildren(children: React.ReactNode, style: TextStyle): React.ReactNode {
-  return React.Children.map(children, (child) =>
-    typeof child === 'string' || typeof child === 'number' ? <RNText style={style}>{child}</RNText> : child,
-  );
-}
-
 interface IconSlotProps {
   variant: AlertVariant;
   icon: React.ReactNode;
@@ -182,7 +175,7 @@ function AlertContent({ title, description, children, ink, testId }: ContentProp
           {description}
         </RNText>
       ) : null}
-      {renderChildren(children, messageTextStyle(theme, ink))}
+      {renderTextChildren(children, messageTextStyle(theme, ink))}
     </View>
   );
 }
