@@ -1,4 +1,5 @@
 import { darken, getContrastRatio, lighten } from './color';
+import { cssLengthToPx, cssTrackingToEm } from './css-units';
 import { HEADING_SCALE, type HeadingLevel } from './heading-scale';
 
 import type { SizeValue } from './vocabulary';
@@ -121,8 +122,10 @@ export interface UiThemeOptions {
   spacingUnit?: number;
 }
 
+const ROOT_FONT_PX = 16;
+
 /** The px value as the rem string the web components write. */
-export const px = (value: number): string => `${value / 16}rem`;
+export const px = (value: number): string => `${value / ROOT_FONT_PX}rem`;
 
 /** MUI's `createPalette` defaults, exactly. */
 const TONAL_OFFSET = 0.2;
@@ -264,19 +267,15 @@ export const FONT_WEIGHTS: Record<UiFontWeight, number> = {
   bold: 700,
 };
 
-/** `-0.02em` -> -0.02; `HEADING_SCALE` speaks CSS, this theme speaks numbers. */
-const em = (value: string | undefined): number | undefined =>
-  value === undefined ? undefined : Number.parseFloat(value);
-
-const rem = (value: string): number => Number.parseFloat(value) * 16;
-
+// `HEADING_SCALE` speaks CSS, this theme speaks numbers; `./css-units` is the
+// one place that conversion is written.
 const HEADING_STEPS = Object.fromEntries(
   Object.entries(HEADING_SCALE).map(([level, metrics]) => [
     level,
     {
-      fontSize: rem(metrics.fontSize),
+      fontSize: cssLengthToPx(metrics.fontSize, ROOT_FONT_PX),
       lineHeight: metrics.lineHeight,
-      letterSpacing: em(metrics.letterSpacing),
+      letterSpacing: cssTrackingToEm(metrics.letterSpacing),
       normalWeight: metrics.normalWeight,
     },
   ]),

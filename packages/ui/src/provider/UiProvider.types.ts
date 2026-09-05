@@ -11,6 +11,10 @@ export interface UiProviderProps {
   children: React.ReactNode;
 }
 
-/** A built theme has a `palette`; options never do. */
+/**
+ * Options may carry a `palette` too (the seeds), so the discriminant is the
+ * one thing only a BUILT theme has: `spacing` as a function. Options carry a
+ * numeric `spacingUnit` instead.
+ */
 export const isUiTheme = (theme: UiTheme | UiThemeOptions | undefined): theme is UiTheme =>
   theme !== undefined && 'palette' in theme && 'spacing' in theme && typeof theme.spacing === 'function';

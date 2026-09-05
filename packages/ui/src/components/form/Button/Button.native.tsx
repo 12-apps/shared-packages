@@ -231,7 +231,7 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
 
   // The shared stories pass `'data-testid'` as a plain prop; honour it here and
   // keep all three spellings off the element (react-native-web would drop them).
-  const testId = resolveTestId(others, 'button') ?? 'button';
+  const testId = resolveTestId(others, 'button');
   const idFor = (suffix: string) => childTestId(others, suffix, 'button');
   const rest = withoutTestIdProps(others);
   const palette = buttonPalette(theme, color);

@@ -52,11 +52,11 @@ The lint rule in `eslint.config.js` and the esbuild plugin in
 
 | lane | command | what it proves |
 |---|---|---|
-| web unit tests | `pnpm test` | unchanged, plus the MUI-parity tests for `color.ts`, `theme.ts` and the bridge |
-| native unit tests | `pnpm test:native` | `*.native.test.tsx` through react-native-web in jsdom, with `@testing-library/react` |
+| web unit tests | `pnpm test` | the default config, unchanged, plus the MUI-parity tests for `color.ts`, `theme.ts` and the bridge |
+| native unit tests | `pnpm test:native` | `*.native.test.tsx` through react-native-web in jsdom, with `@testing-library/react`; run by the `Native` CI lane, not by `pnpm test`, so it runs once |
 | native Storybook | `pnpm storybook:native` / `pnpm test:native:ci` | the shared `*.stories.tsx` and `*.test.stories.tsx` rendered through react-native-web, `play` functions included |
 | real Metro | `harness/native` | the PUBLISHED tarball bundled by Expo for web and android, driven by Playwright |
-| type checks | `pnpm check-types` | the web program (`tsconfig.json`, DOM lib) and the native program (`tsconfig.native.json`, **no** DOM lib — a native file that touches `document` is a type error) |
+| type checks | `pnpm check-types` | three programs: the web (`tsconfig.json`, DOM lib), the native renderer (`tsconfig.native.json`, **no** DOM lib — a native file that touches `document` is a type error) and the native tests (`tsconfig.native.test.json`, DOM lib again, because they query a jsdom) |
 | ledger | `pnpm native:check` | the table below matches the sources; the generated icon paths match the installed icons |
 
 react-native-web is a faithful renderer for structure, roles, test ids and

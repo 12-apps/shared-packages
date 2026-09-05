@@ -45,6 +45,7 @@ describe('Box (native)', () => {
       backgroundColor: theme.palette.background.paper,
       borderRadius: 8,
       borderWidth: 1,
+      borderStyle: 'solid',
       borderColor: theme.palette.divider,
     });
     expect(resolveBoxLayout({ bg: 'primary' }, theme).backgroundColor).toBe(theme.palette.primary.main);

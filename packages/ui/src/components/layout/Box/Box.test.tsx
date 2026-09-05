@@ -54,6 +54,7 @@ describe('Box (web)', () => {
       backgroundColor: theme.palette.primary.main,
       borderRadius: '8px',
       borderWidth: '1px',
+      borderStyle: 'solid',
       borderColor: theme.palette.divider,
     });
   });

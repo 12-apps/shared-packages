@@ -1,5 +1,6 @@
 import type { PaletteColor, Theme, ThemeOptions } from '@mui/material/styles/index.js';
 
+import { cssLengthToPx, cssTrackingToEm } from '../tokens/css-units';
 import { accentFor } from '../tokens/scales';
 import {
   FONT_WEIGHTS,
@@ -32,20 +33,6 @@ const slot = (color: PaletteColor): UiPaletteColor => ({
   contrastText: color.contrastText,
 });
 
-const rem = (value: string | number | undefined, fallback: number): number => {
-  if (typeof value === 'number') return value;
-  if (value === undefined) return fallback;
-  const parsed = Number.parseFloat(value);
-  if (Number.isNaN(parsed)) return fallback;
-  return value.endsWith('rem') || value.endsWith('em') ? parsed * 16 : parsed;
-};
-
-const em = (value: string | undefined): number | undefined => {
-  if (value === undefined) return undefined;
-  const parsed = Number.parseFloat(value);
-  return Number.isNaN(parsed) ? undefined : parsed;
-};
-
 function headingSteps(theme: Theme): Record<HeadingLevel, UiHeadingStep> {
   return Object.fromEntries(
     HEADING_LEVELS.map((level) => {
@@ -53,9 +40,9 @@ function headingSteps(theme: Theme): Record<HeadingLevel, UiHeadingStep> {
       return [
         level,
         {
-          fontSize: rem(metrics.fontSize, 16),
+          fontSize: cssLengthToPx(metrics.fontSize, 16),
           lineHeight: metrics.lineHeight,
-          letterSpacing: em(metrics.letterSpacing),
+          letterSpacing: cssTrackingToEm(metrics.letterSpacing),
           normalWeight: metrics.normalWeight,
         },
       ];
@@ -66,8 +53,8 @@ function headingSteps(theme: Theme): Record<HeadingLevel, UiHeadingStep> {
 /** The host's MUI theme in the shape the native renderer reads. */
 export function uiThemeFromMui(theme: Theme): UiTheme {
   const { palette } = theme;
-  const unit = rem(theme.spacing(1), 8);
-  const md = rem(theme.shape.borderRadius, 4);
+  const unit = cssLengthToPx(theme.spacing(1), 8);
+  const md = cssLengthToPx(theme.shape.borderRadius, 4);
 
   return {
     mode: palette.mode,

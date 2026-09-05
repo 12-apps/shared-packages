@@ -595,8 +595,9 @@ jobs:
   #
   # `@12-apps/ui` ships a `react-native` export condition per ported subpath
   # (packages/ui/NATIVE.md). Nothing else in this workflow exercises it: the
-  # unit-test job runs the default vitest config, and the Storybook job builds
-  # the MUI Storybook. This lane runs the native vitest config, builds the
+  # unit-test job runs `pnpm test`, which is the default (web) vitest config
+  # alone, and the Storybook job builds the MUI Storybook. This lane runs the
+  # native vitest config (`test:native`, owned here so it runs once), builds the
   # native Storybook (react-native-web) and drives the SHARED stories through
   # it with the test-runner, then checks the parity ledger and the generated
   # icon paths have not drifted from their sources.

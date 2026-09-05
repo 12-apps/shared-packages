@@ -30,13 +30,17 @@ const nativeEntries: Record<string, string> = JSON.parse(
   readFileSync(join(root, '../entries.native.json'), 'utf8'),
 );
 
-/** `src/components/form/Button/index.native.ts` -> `../src/components/form/Button/*.stories.@(ts|tsx)` */
-const storyGlobs = Object.values(nativeEntries)
-  .filter((source) => source.startsWith('src/components/'))
-  .map((source) => `../${dirname(source)}/*.stories.@(ts|tsx)`);
+/**
+ * `src/components/form/Button/index.native.ts` -> `../src/components/form/Button/*.stories.@(ts|tsx)`,
+ * for EVERY native entry — the same directories `scripts/native-parity.mjs`
+ * counts, so the ledger and this Storybook cannot disagree about what runs.
+ */
+const storyGlobs = [...new Set(Object.values(nativeEntries).map((source) => dirname(source)))].map(
+  (dir) => `../${dir}/*.stories.@(ts|tsx)`,
+);
 
 const config: StorybookConfig = {
-  stories: [...storyGlobs, '../src/icons/*.stories.@(ts|tsx)', '../src/**/*.native.stories.@(ts|tsx)'],
+  stories: [...storyGlobs, '../src/**/*.native.stories.@(ts|tsx)'],
   addons: ['@storybook/addon-links', '@storybook/addon-docs'],
   framework: {
     name: '@storybook/react-native-web-vite',

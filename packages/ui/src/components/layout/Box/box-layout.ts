@@ -28,6 +28,7 @@ export interface BoxLayout {
   backgroundColor?: string;
   borderRadius?: number;
   borderWidth?: number;
+  borderStyle?: 'solid';
   borderColor?: string;
   width?: BoxDimension;
   height?: BoxDimension;
@@ -93,7 +94,11 @@ export function resolveBoxLayout(props: BoxBaseProps, theme: UiTheme): BoxLayout
   put('backgroundColor', props.bg === undefined ? undefined : background(theme, props.bg));
   put('borderRadius', props.radius === undefined ? undefined : theme.radius[props.radius]);
   if (props.bordered) {
+    // `borderStyle` spelled out: CSS defaults it to `none`, under which a
+    // border-width computes to 0 and nothing paints. React Native's default is
+    // `solid`, which is how a box can pass natively and vanish on the web.
     layout.borderWidth = 1;
+    layout.borderStyle = 'solid';
     layout.borderColor = theme.palette.divider;
   }
   put('width', props.width);
