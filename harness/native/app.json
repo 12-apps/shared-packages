@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "ui-native-harness",
+    "slug": "ui-native-harness",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

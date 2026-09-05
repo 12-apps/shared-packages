@@ -59,6 +59,9 @@ harness/*/dist
 harness/*/test-results
 harness/*/playwright-report
 harness/*/package-lock.json
+# Expo's own caches and the exports the native harness's tests read.
+harness/native/.expo/
+harness/native/web-build/
 
 # Compiled Gherkin. `bddgen` rewrites it on every run of the harness suite;
 # committing it would let a scenario and its compiled spec drift apart.

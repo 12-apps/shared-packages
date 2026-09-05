@@ -17,7 +17,17 @@ import { fileURLToPath } from "node:url";
 import { packAll, publishableDirs } from "./lib/pack-workspace.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const HARNESSES = ["harness/frontend", "harness/backend"];
+const HARNESSES = ["harness/frontend", "harness/backend", "harness/native"];
+
+// `--only harness/native` installs one harness. The native one is an Expo app
+// whose install is dominated by react-native itself, and a developer iterating
+// on the native renderer should not have to wait for the AWS SDK the backend
+// harness pulls in. Without the flag every harness installs, as CI does.
+const only = process.argv.indexOf("--only");
+const selected = only === -1 ? HARNESSES : process.argv.slice(only + 1).filter((arg) => !arg.startsWith("--"));
+for (const harness of selected) {
+  if (!HARNESSES.includes(harness)) throw new Error(`unknown harness ${harness}; one of ${HARNESSES.join(", ")}`);
+}
 
 function run(cmd, args, cwd) {
   execFileSync(cmd, args, { cwd, stdio: "inherit" });
@@ -29,10 +39,25 @@ function run(cmd, args, cwd) {
  * an override npm resolves that to the PUBLISHED version — so the harness would
  * quietly test last week's backend against this branch's frontend.
  */
+/**
+ * `harnessPackages` in a base manifest narrows the tarballs a harness installs.
+ * The native harness consumes `@12-apps/ui` alone: it is an Expo app, and the
+ * other packages' peers (react-router, hono, prisma) are not what a React
+ * Native consumer has — installing them would test an app nobody would write.
+ * Absent, a harness gets every tarball, as the web and backend ones do.
+ */
 function manifestFor(harness, tarballs) {
-  const base = JSON.parse(readFileSync(join(harness, "package.base.json"), "utf8"));
-  const specs = Object.fromEntries([...tarballs].map(([name, tarball]) => [name, `file:${tarball}`]));
-  return { ...base, dependencies: specs, overrides: specs };
+  const { harnessPackages, ...base } = JSON.parse(readFileSync(join(harness, "package.base.json"), "utf8"));
+  const wanted = harnessPackages ? new Set(harnessPackages) : null;
+  const specs = Object.fromEntries(
+    [...tarballs].filter(([name]) => !wanted || wanted.has(name)).map(([name, tarball]) => [name, `file:${tarball}`]),
+  );
+  if (wanted) {
+    for (const name of wanted) if (!(name in specs)) throw new Error(`${harness} wants ${name}, which is not a publishable package`);
+  }
+  // The harness's own dependencies stay; the tarballs are added beside them
+  // (the web harness lists none of its own, so this is a no-op there).
+  return { ...base, dependencies: { ...(base.dependencies ?? {}), ...specs }, overrides: { ...(base.overrides ?? {}), ...specs } };
 }
 
 /**
@@ -121,4 +146,4 @@ function install(harness, tarballs) {
 
 const staging = mkdtempSync(join(tmpdir(), "harness-tarballs-"));
 const tarballs = packAll(publishableDirs(), staging);
-HARNESSES.forEach((harness) => install(harness, tarballs));
+selected.forEach((harness) => install(harness, tarballs));
