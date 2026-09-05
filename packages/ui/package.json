@@ -137,6 +137,10 @@
       "default": "./dist/mui/ListItemText.js"
     },
     "./data-display/Alert": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Alert/index.native.d.ts",
+        "default": "./dist/native/data-display/Alert.js"
+      },
       "types": "./dist/types/components/data-display/Alert/index.d.ts",
       "default": "./dist/data-display/Alert.js"
     },
