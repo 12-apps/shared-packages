@@ -197,12 +197,14 @@ function StatusStep({
       onRegenerate={() => { c.setStep("payment"); void c.startPayment("PIX"); }}
       onBackToMenu={c.goToMenu}
       paidExtra={confirmationExtra}
-      awaitingTimedOut={c.resumeTimedOut}
-      // The resumed leg's own trouble, and the way out of it (FUT-1144). Both
-      // are inert for a checkout that never left this tab — nothing was parked,
-      // so nothing is being polled here.
-      awaitingError={c.resumeError}
-      onCheckAgain={c.resumeCheckAgain}
+      awaitingTimedOut={c.awaitingTimedOut}
+      // How the wait behind this screen is going, and the way out of it
+      // (FUT-1144). It is the resumed leg's wait for a checkout that came back
+      // from a provider's page, and this step's own (FUT-1170) for one that
+      // never left the tab — which used to have no wait at all, and so a
+      // spinner that stood for nothing.
+      awaitingError={c.awaitingError}
+      onCheckAgain={c.awaitingCheckAgain}
       // The buyer's own way out of a hosted wait with no terminal state
       // (FUT-1146). Absent — and so unrendered — until the resumed leg has one
       // to offer, which is every checkout that never left this tab.
@@ -229,6 +231,12 @@ function StatusStep({
  * A cart still being FETCHED is empty in exactly the way a real one is not, so
  * a host that wires `identity` gets this screen when its cart is empty rather
  * than when it is late — which is also the moment the resume decision waits for.
+ *
+ * A RAISE IN FLIGHT is not "nothing to pay for" either (FUT-1170). Raising a
+ * charge now drops the one it replaces before it asks for the new one, so there
+ * is a window with no order held — and a checkout whose cart the host had
+ * already emptied would otherwise swap the buyer onto the empty-cart screen
+ * mid-regenerate, discarding the charge as it arrived.
  */
 function nothingToPayFor(
   settlement: SettlementCheckout | null | undefined,
@@ -236,7 +244,7 @@ function nothingToPayFor(
   c: ReturnType<typeof useCheckoutController>,
 ): boolean {
   if (settlement || !cart.empty || !cartLoaded(cart)) return false;
-  return !c.order && c.step !== "status";
+  return !c.order && !c.creating && c.step !== "status";
 }
 
 /** Step 2, with the controller's facts and the host's money mapped onto it. */

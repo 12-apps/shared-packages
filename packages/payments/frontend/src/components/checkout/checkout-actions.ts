@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import { buyerGateError } from "./buyer-gate";
+import type { ConfirmationWait } from "./confirmation-wait";
 import type { CheckoutDecline } from "./decline";
 import { forgetHostedOrder, rememberHostedOrder } from "./hosted-return";
 import { parkedBasket, type CheckoutBasketIdentity } from "./basket";
@@ -65,23 +66,39 @@ export function useCheckoutNav(
 }
 
 /**
- * What the resumed leg contributes to the controller's surface.
+ * WHAT THE CONFIRMATION SCREEN KNOWS ABOUT ITS WAIT, from whichever wait is
+ * live.
  *
- * All of it is inert for a checkout that never left this tab and never raised
- * anything: with nothing parked the poll is disabled, so the error stays null,
- * the bound never elapses, and neither action has a wait to act on.
+ * Two can reach that screen and they are mutually exclusive by construction: a
+ * checkout RESUMED from a parked entry polls through `useHostedResume`, and one
+ * that never left this tab polls through the confirmation wait (FUT-1170) — and
+ * that one stands down whenever a resumed order is what put the flow here. So
+ * the merge below is a choice between one live wait and one inert one, never a
+ * blend of two opinions.
+ *
+ * All of it is inert for a checkout with an answer already: with nothing to
+ * wait on both polls are disabled, so the error stays null, no bound elapses,
+ * and none of the actions has a wait to act on.
+ *
+ * `release` stays the resumed leg's alone. "Não consegui pagar" exists because
+ * a provider's own page produces no signal when a buyer abandons it (FUT-1146);
+ * a charge raised and still held on THIS page has no such gap to close.
  */
-export function resumeSurface(resume: HostedResume): {
-  resumeTimedOut: boolean;
-  resumeError: string | null;
-  resumeCheckAgain: () => void;
+export function resumeSurface(
+  resume: HostedResume,
+  confirming: ConfirmationWait,
+): {
+  awaitingTimedOut: boolean;
+  awaitingError: string | null;
+  awaitingCheckAgain: () => void;
   resumeRelease: (() => void) | undefined;
   resumeReleasing: boolean;
 } {
+  const live = resume.order === null ? confirming : resume;
   return {
-    resumeTimedOut: resume.timedOut,
-    resumeError: resume.error,
-    resumeCheckAgain: resume.checkAgain,
+    awaitingTimedOut: live.timedOut,
+    awaitingError: live.error,
+    awaitingCheckAgain: live.checkAgain,
     resumeRelease: resume.release,
     resumeReleasing: resume.releasing,
   };
@@ -316,6 +333,20 @@ export function useStartPayment(input: {
     async (chosen: PaymentMethod, override?: BuyerInfo) => {
       failure.clear();
       setDecline(null);
+      // THE CHARGE BEING REPLACED IS DROPPED FIRST (FUT-1170), before the raise
+      // rather than after it. Raising a payment means whatever was on screen is
+      // no longer the one being paid, and a provider round trip is long enough
+      // for the difference to matter: "Gerar novo código" left the expired
+      // charge mounted, so its own view polled it, got the terminal EXPIRED it
+      // was always going to get, and bounced the flow to the confirmation
+      // screen — where the new charge then landed with nothing polling it.
+      //
+      // A no-op on every other caller (the auto-raise, the alternate e-mail and
+      // the retry all run with no order held), which is the point: the clear
+      // belongs to what raising a payment MEANS, not to the one path that
+      // noticed.
+      setOrder(null);
+      setFinalStatus(null);
       setCreating(true);
       const result = await createOrder({ method: chosen, buyer: override ?? buyer, saveProfile });
       setCreating(false);
@@ -331,7 +362,6 @@ export function useStartPayment(input: {
       // the payment they just made.
       rememberHostedOrder(result.data, { tenantSlug, basket: parkedBasket(basket) });
       setOrder(result.data);
-      setFinalStatus(null);
     },
     [
       buyer, saveProfile, createOrder, failure, navigate, tenantSlug, basket,

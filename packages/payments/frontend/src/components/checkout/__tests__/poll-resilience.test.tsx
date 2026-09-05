@@ -655,8 +655,8 @@ describe("the resumed hosted return", () => {
 
     await elapse(30_000);
 
-    expect(result.current.resumeError).toBe(OFFLINE);
-    expect(result.current.resumeTimedOut).toBe(false);
+    expect(result.current.awaitingError).toBe(OFFLINE);
+    expect(result.current.awaitingTimedOut).toBe(false);
   });
 
   it("hands the buyer a way to ask again, and it works", async () => {
@@ -667,15 +667,15 @@ describe("the resumed hosted return", () => {
     });
 
     await elapse(30_000);
-    expect(result.current.resumeError).toBe(OFFLINE);
+    expect(result.current.awaitingError).toBe(OFFLINE);
 
     wait.answerWith({ ok: true, data: "PAID" });
     await act(async () => {
-      result.current.resumeCheckAgain();
+      result.current.awaitingCheckAgain();
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(result.current.resumeError).toBeNull();
+    expect(result.current.awaitingError).toBeNull();
     expect(result.current.finalStatus).toBe("PAID");
   });
 
@@ -688,7 +688,7 @@ describe("the resumed hosted return", () => {
 
     await elapse(16 * 60_000);
 
-    expect(result.current.resumeTimedOut).toBe(true);
+    expect(result.current.awaitingTimedOut).toBe(true);
     // Never restated as failed. Nothing was ever learned about this order — no
     // poll got an answer — and "we could not ask" is not "you did not pay": the
     // reconciliation sweep is what rescues a genuinely late webhook, and it does
