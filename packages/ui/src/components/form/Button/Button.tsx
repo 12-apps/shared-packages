@@ -4,6 +4,7 @@ import { styled } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';
+import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import {
   buttonEmphasisStyles,
   buttonVariantStyles,
@@ -88,11 +89,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       onClick,
       onFocus,
       onBlur,
-      dataTestId,
-      ...props
+      ...others
     } = resolveButtonProps(rawProps);
-    const testId = (suffix: string) =>
-      dataTestId ? `${dataTestId}-${suffix}` : `button-${suffix}`;
+    // Every spelling of the test id the shared contract allows, mapped to the
+    // one the DOM reads; the native Button does the same in reverse.
+    const ownTestId = resolveTestId(others, 'button');
+    const testId = (suffix: string) => childTestId(others, suffix, 'button');
+    const props = withoutTestIdProps(others);
 
     // Wrap icon with testId if provided
     const iconWithTestId =
@@ -122,7 +125,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         onFocus={onFocus}
         onBlur={onBlur}
         sx={buttonSize(size, iconOnly)}
-        data-testid={dataTestId || 'button'}
+        data-testid={ownTestId}
         {...props}
         className={mergedClassName}
       >

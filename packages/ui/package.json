@@ -41,12 +41,32 @@
       "default": "./dist/utils.js"
     },
     "./tokens": {
+      "react-native": {
+        "types": "./dist/types-native/tokens/index.native.d.ts",
+        "default": "./dist/native/tokens.js"
+      },
       "types": "./dist/types/tokens/scales.d.ts",
       "default": "./dist/tokens.js"
     },
     "./tokens/layers": {
       "types": "./dist/types/tokens/layers.d.ts",
       "default": "./dist/tokens/layers.js"
+    },
+    "./provider": {
+      "react-native": {
+        "types": "./dist/types-native/provider/index.native.d.ts",
+        "default": "./dist/native/provider.js"
+      },
+      "types": "./dist/types/provider/index.d.ts",
+      "default": "./dist/provider.js"
+    },
+    "./icons": {
+      "react-native": {
+        "types": "./dist/types-native/icons/index.native.d.ts",
+        "default": "./dist/native/icons.js"
+      },
+      "types": "./dist/types/icons/index.d.ts",
+      "default": "./dist/icons.js"
     },
     "./mui/Box": {
       "types": "./dist/types/mui/Box.d.ts",
@@ -273,6 +293,10 @@
       "default": "./dist/form/Autocomplete.js"
     },
     "./form/Button": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Button/index.native.d.ts",
+        "default": "./dist/native/form/Button.js"
+      },
       "types": "./dist/types/components/form/Button/index.d.ts",
       "default": "./dist/form/Button.js"
     },
@@ -392,6 +416,14 @@
       "types": "./dist/types/components/layout/Accordion/index.d.ts",
       "default": "./dist/layout/Accordion.js"
     },
+    "./layout/Box": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Box/index.native.d.ts",
+        "default": "./dist/native/layout/Box.js"
+      },
+      "types": "./dist/types/components/layout/Box/index.d.ts",
+      "default": "./dist/layout/Box.js"
+    },
     "./layout/Card": {
       "types": "./dist/types/components/layout/Card/index.d.ts",
       "default": "./dist/layout/Card.js"
@@ -448,6 +480,14 @@
       "types": "./dist/types/components/layout/Spacer/index.d.ts",
       "default": "./dist/layout/Spacer.js"
     },
+    "./layout/Stack": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Stack/index.native.d.ts",
+        "default": "./dist/native/layout/Stack.js"
+      },
+      "types": "./dist/types/components/layout/Stack/index.d.ts",
+      "default": "./dist/layout/Stack.js"
+    },
     "./layout/TableFilter": {
       "types": "./dist/types/components/layout/TableFilter/index.d.ts",
       "default": "./dist/layout/TableFilter.js"
@@ -501,6 +541,10 @@
       "default": "./dist/typography/Paragraph.js"
     },
     "./typography/Text": {
+      "react-native": {
+        "types": "./dist/types-native/components/typography/Text/index.native.d.ts",
+        "default": "./dist/native/typography/Text.js"
+      },
       "types": "./dist/types/components/typography/Text/index.d.ts",
       "default": "./dist/typography/Text.js"
     },
@@ -595,15 +639,15 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "storybook dev -p 6006",
-    "build": "tsup && pnpm build:types && pnpm exports:check",
+    "build": "tsup && tsup --config tsup.native.config.ts && pnpm build:types && pnpm build:types:native && pnpm exports:check",
     "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
     "exports:sync": "node scripts/sync-exports.mjs",
     "exports:check": "node scripts/sync-exports.mjs --check",
-    "clean": "rm -rf dist storybook-static",
+    "clean": "rm -rf dist storybook-static storybook-native-static coverage-native",
     "storybook:build": "storybook build",
     "storybook:serve": "http-server storybook-static -p 6008 --silent",
     "storybook:test": "test-storybook --maxWorkers=4 --url http://localhost:6008",
-    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run && node ../../scripts/vitest-with-teardown.mjs run --config vitest.native.config.ts",
     "test:watch": "vitest",
     "test:coverage": "node ../../scripts/vitest-with-teardown.mjs run --coverage",
     "test:storybook": "start-server-and-test 'storybook dev -p 6006' http://localhost:6006 'test-storybook --url http://localhost:6006 --json --outputFile test-results.json'",
@@ -611,12 +655,27 @@
     "lint:files": "bash -c 'eslint \"${@:-.}\" --max-warnings 0' _",
     "lint": "pnpm run lint:files .",
     "lint:fix": "bash -c 'eslint \"${@:-.}\" --max-warnings 0 --fix' _",
-    "typecheck": "tsc --noEmit",
-    "check-types": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.native.json --noEmit",
+    "check-types": "tsc --noEmit && tsc -p tsconfig.native.json --noEmit",
+    "build:types:native": "tsc -p tsconfig.native.json",
+    "build:native": "tsup --config tsup.native.config.ts && pnpm build:types:native",
+    "test:native": "node ../../scripts/vitest-with-teardown.mjs run --config vitest.native.config.ts",
+    "test:native:watch": "vitest --config vitest.native.config.ts",
+    "storybook:native": "storybook dev -p 6007 -c .storybook-native",
+    "storybook:native:build": "storybook build -c .storybook-native -o storybook-native-static",
+    "storybook:native:serve": "http-server storybook-native-static -p 6009 --silent",
+    "storybook:native:test": "test-storybook --maxWorkers=4 --url http://localhost:6009 --config-dir .storybook-native",
+    "test:native:ci": "pnpm storybook:native:build && (concurrently -k -s first -n 'serve,test' -c 'bgBlue.bold,bgGreen.bold' 'pnpm storybook:native:serve' 'pnpm storybook:native:test')",
+    "icons:generate": "node scripts/generate-icon-paths.mjs",
+    "icons:check": "node scripts/generate-icon-paths.mjs --check",
+    "native:ledger": "node scripts/native-parity.mjs",
+    "native:check": "node scripts/native-parity.mjs --check && pnpm icons:check"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "react-native": ">=0.79.0",
+    "react-native-svg": ">=15.0.0"
   },
   "dependencies": {
     "@12-apps/forms-core": "workspace:*",
@@ -641,6 +700,7 @@
     "@storybook/addon-docs": "^9.1.10",
     "@storybook/addon-links": "^9.1.10",
     "@storybook/builder-vite": "^9.1.10",
+    "@storybook/react-native-web-vite": "9.1.20",
     "@storybook/react-vite": "^9.1.10",
     "@storybook/test-runner": "^0.23.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -661,6 +721,9 @@
     "playwright": "^1.56.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-native": "0.83.1",
+    "react-native-svg": "15.15.5",
+    "react-native-web": "0.20.0",
     "start-server-and-test": "^2.1.2",
     "storybook": "^9.1.10",
     "tsup": "^8.0.0",
@@ -686,6 +749,7 @@
     "*.mjs",
     "*.md",
     "!eslint.config.js",
+    "!test-runner-jest.config.cjs",
     "!**/__tests__/**",
     "!**/tests/**",
     "!**/*.test.*",
@@ -693,5 +757,13 @@
     "!**/*.stories.*",
     "!**/*.test-story.*",
     "!**/test-helpers.*"
-  ]
+  ],
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    },
+    "react-native-svg": {
+      "optional": true
+    }
+  }
 }

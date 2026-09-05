@@ -1,0 +1,9 @@
+{
+  "tokens": "src/tokens/index.native.ts",
+  "provider": "src/provider/index.native.ts",
+  "icons": "src/icons/index.native.ts",
+  "layout/Box": "src/components/layout/Box/index.native.ts",
+  "layout/Stack": "src/components/layout/Stack/index.native.ts",
+  "typography/Text": "src/components/typography/Text/index.native.ts",
+  "form/Button": "src/components/form/Button/index.native.ts"
+}

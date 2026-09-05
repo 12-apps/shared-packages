@@ -6,6 +6,8 @@ This document provides a comprehensive inventory of all available UI components 
 
 **Documentation Structure**: Each component includes detailed documentation in `{Location}/{ComponentName}.md` files. For example, the Alert component's documentation is at `packages/ui/src/components/data-display/Alert/Alert.md`.
 
+> **React Native**: a component marked **Native: yes** below renders on React Native from the SAME import path. The list, the rules and the ledger are in [NATIVE.md](./NATIVE.md).
+
 ## Table of Contents
 
 - [Data Display Components](#data-display-components)
@@ -480,6 +482,20 @@ Components for user input and form interactions.
 
 Components for structuring and organizing page layouts.
 
+### Box
+**Purpose**: The layout primitive both renderers share (web AND React Native)
+**Use Cases**: Any container a screen meant for both platforms lays out — padding, gap, direction, surface, radius
+**Features**: Spacing-scale props (`p`, `px`, `gap`…), `direction`/`align`/`justify`, `bg`, `radius`, `bordered`; `sx` still accepted on the web
+**Location**: `src/components/layout/Box`
+**Native**: yes — `@12-apps/ui/layout/Box` resolves to `Box.native.tsx` under Metro. `@12-apps/ui/mui/Box` remains web-only.
+
+### Stack
+**Purpose**: A `Box` that is always a flex container, with an optional divider (web AND React Native)
+**Use Cases**: Vertical or horizontal runs of children on the spacing scale
+**Features**: `direction` (`column` default), `gap`, `divider`, every `Box` prop
+**Location**: `src/components/layout/Stack`
+**Native**: yes. `@12-apps/ui/mui/Stack` remains web-only.
+
 ### Accordion
 **Purpose**: Collapsible content sections
 **Use Cases**: FAQs, expandable content, grouped information
@@ -705,6 +721,13 @@ Components for text formatting and display.
 ## Utility Components
 
 General-purpose utility components.
+
+### Icon
+**Purpose**: One glyph name on both renderers (web AND React Native)
+**Use Cases**: Any glyph a ported component or a cross-platform screen draws
+**Features**: `name` from `src/icons/glyphs.json`, `size` on the house scale or px, `color` from the palette, `label` for accessibility; path data generated from `@mui/icons-material`
+**Location**: `src/icons` (import path `@12-apps/ui/icons`)
+**Native**: yes.
 
 ### AnimatedIcon
 **Purpose**: Icons with animations

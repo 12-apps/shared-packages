@@ -279,6 +279,8 @@ export const VisualStates: Story = {
 };
 
 export const SpecialEffectsTest: Story = {
+  // Asserts a CSS `filter: brightness()`, which only the DOM renderer has.
+  tags: ['native-skip'],
   name: '✨ Special Effects Test',
   render: () => (
     <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
@@ -323,6 +325,8 @@ export const SpecialEffectsTest: Story = {
 };
 
 export const ResponsiveDesign: Story = {
+  // Asserts MUI's `inline-flex` display, which only the DOM renderer has.
+  tags: ['native-skip'],
   name: '📱 Responsive Design Test',
   args: {
     children: 'Responsive Button',
@@ -415,9 +419,12 @@ export const EdgeCases: Story = {
       await expect(tinyButton).toBeInTheDocument();
       await expect(hugeButton).toBeInTheDocument();
 
-      // Verify size differences
-      const tinyStyle = window.getComputedStyle(tinyButton);
-      const hugeStyle = window.getComputedStyle(hugeButton);
+      // Verify size differences. The type size lives on the element that holds
+      // the text: the <button> itself on the web, the label node inside the
+      // pressable on react-native-web — so read the innermost of the two.
+      const label = (button: HTMLElement) => button.querySelector<HTMLElement>('div, span') ?? button;
+      const tinyStyle = window.getComputedStyle(label(tinyButton));
+      const hugeStyle = window.getComputedStyle(label(hugeButton));
 
       const tinyFontSize = parseFloat(tinyStyle.fontSize);
       const hugeFontSize = parseFloat(hugeStyle.fontSize);
