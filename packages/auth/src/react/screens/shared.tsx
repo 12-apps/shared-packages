@@ -1,6 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
+import { Button } from "@12-apps/ui/form/Button";
 import { Spacer } from "@12-apps/ui/layout/Spacer";
 
 import { useScreens } from "./context";
@@ -59,7 +60,23 @@ export function FailureBanner({
   );
 }
 
-/** A button that reads as a link. Shared by the two screens that need one. */
+/**
+ * The quiet action beside a form's real one — "I forgot my password", "back to
+ * sign in". Shared by the two screens that need one.
+ *
+ * The design system's `ghost` button rather than a hand-styled `<button>`. The
+ * hand-styled one carried a permanent underline in the inherited ink at
+ * `0.85rem`, which is the browser's default anchor and reads on a finished
+ * screen as a link that escaped the stylesheet. It also had `padding: 0`, so
+ * the tap target was the height of the words — around 18px against the 44px a
+ * thumb needs.
+ *
+ * `text` is the variant that exists for exactly this: quiet next to a solid
+ * button, in the theme's own ink, with a hover wash and a real hit area. Not
+ * `ghost`, which sounds like the same thing and is not — it maps onto MUI's
+ * `contained`, so it keeps that variant's elevation and renders as a raised
+ * white slab competing with the submit button directly above it.
+ */
 export function LinkButton({
   onClick,
   dataTestId,
@@ -70,23 +87,16 @@ export function LinkButton({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <button
+    <Button
       type="button"
+      variant="text"
+      color="primary"
+      size="sm"
+      fullWidth
       onClick={onClick}
-      data-testid={dataTestId}
-      style={{
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        textDecoration: "underline",
-        fontSize: "0.85rem",
-        padding: 0,
-        color: "inherit",
-        width: "100%",
-        font: "inherit",
-      }}
+      dataTestId={dataTestId}
     >
       {children}
-    </button>
+    </Button>
   );
 }

@@ -47,12 +47,15 @@ import { useEffect, useRef, useState } from "react";
 import type { PullToRefreshMessages } from "../messages";
 import {
   createPullTracker,
+  type PullTracker,
   DEFAULT_PULL_GEOMETRY,
   documentAtTop,
   pullBlockedBy,
   type PullGeometry,
 } from "../pull-gesture";
-import { needsPullToRefresh, reloadApp } from "../reload";
+import { needsPullToRefresh } from "../reload";
+import { acquireOverscrollLock } from "./overscroll-lock";
+import { paint, startRefresh } from "./refresh-runner";
 import { PullIndicator, type PullIndicatorPhase } from "./pull-indicator";
 
 export interface PullToRefreshProps {
@@ -106,28 +109,6 @@ export interface PullToRefreshProps {
 }
 
 /**
- * Writes the frame. One imperative call drives translate, opacity and rotation.
- *
- * `dragging` suppresses the chip's own transition: while the finger is down the
- * position IS the finger, and easing towards it puts the chip a frame behind.
- * Between gestures the transition is what animates the chip away, or down to
- * the spinner’s resting place.
- */
-function paint(
-  node: HTMLElement | null,
-  distance: number,
-  thresholdPx: number,
-  dragging: boolean,
-): void {
-  if (node === null) return;
-  const progress = Math.min(1, distance / thresholdPx);
-  node.dataset.dragging = String(dragging);
-  node.style.setProperty("--pwa-ptr-y", `${distance}px`);
-  node.style.setProperty("--pwa-ptr-opacity", String(progress));
-  node.style.setProperty("--pwa-ptr-progress", String(progress));
-}
-
-/**
  * Hand the top overscroll to this component while it is live.
  *
  * `contain` rather than `none`, and the difference is the whole point: it turns
@@ -155,19 +136,7 @@ function paint(
  * browser's own gesture is untouched. The failure direction is the safe one.
  */
 function useOverscrollLock(active: boolean): void {
-  useEffect(() => {
-    if (!active || typeof document === "undefined") return undefined;
-    const targets = [document.documentElement, document.body].filter(Boolean);
-    const previous = targets.map((element) => element.style.overscrollBehaviorY);
-    targets.forEach((element) => {
-      element.style.overscrollBehaviorY = "contain";
-    });
-    return () => {
-      targets.forEach((element, index) => {
-        element.style.overscrollBehaviorY = previous[index] ?? "";
-      });
-    };
-  }, [active]);
+  useEffect(() => (active ? acquireOverscrollLock() : undefined), [active]);
 }
 
 /**
@@ -213,6 +182,47 @@ interface GestureConfig {
   geometry: PullGeometry;
 }
 
+/**
+ * One move of a sequence we own.
+ *
+ * Two ways to hand it back: a second finger (a pinch, and zooming while the
+ * page is pinned by our `preventDefault` is a trap the user cannot escape), and
+ * a move the platform will not let us cancel — which means a scroll it has
+ * ALREADY started, since the first `engagePx` are deliberately not prevented
+ * and that is the window WebKit's rubber band begins in. Claiming then would
+ * paint our chip over the browser's own bounce and reload the document on a
+ * gesture the user aimed at the page.
+ */
+function handleMove(
+  event: TouchEvent,
+  context: GestureContext,
+  tracker: PullTracker,
+  standDown: () => void,
+): void {
+  if (event.touches.length !== 1) return standDown();
+  const touch = event.touches[0];
+  if (!touch) return;
+  const update = tracker.move({ x: touch.clientX, y: touch.clientY });
+  if (!update.claimed) return;
+  // Claim even when the platform will not let us cancel. Standing down here is
+  // tempting — an uncancelable move means a scroll the browser has already
+  // started, and our chip would sit over its own bounce — but it was MEASURED
+  // to kill the gesture outright: in headless Chromium driven through CDP,
+  // every touch event on a mounted gesture arrives `cancelable: false`, so the
+  // stand-down refused all of them and nothing ever refreshed. The two failure
+  // modes are not comparable. Claiming a move we cannot prevent costs one
+  // cosmetic double-bounce; refusing costs the feature. Revisit only with a
+  // measurement from a real iOS home-screen app.
+  if (event.cancelable) event.preventDefault();
+  context.setPhase(update.phase);
+  paint(
+    context.chip(),
+    update.distance,
+    context.latest.current.geometry.thresholdPx,
+    true,
+  );
+}
+
 /** The four touch handlers, bound to one host element and one tracker. */
 function createHandlers(
   host: HTMLElement,
@@ -221,64 +231,59 @@ function createHandlers(
   const { chip, latest, setPhase } = context;
   const tracker = createPullTracker(latest.current.geometry);
 
-  const settle = (): void => {
+  // A refresh in flight must survive a stray touch: `reloadApp` waits up to two
+  // seconds for the worker, the page looks frozen, and clearing the latch would
+  // hide the spinner AND re-open `start()`, so a second pull reloads again.
+  const settle = (force = false): void => {
+    if (!force && latest.current.phase === "refreshing") return;
     setPhase("idle");
     paint(chip(), 0, latest.current.geometry.thresholdPx, false);
   };
 
-  const refresh = (): void => {
-    const { thresholdPx } = latest.current.geometry;
-    setPhase("refreshing");
-    paint(chip(), thresholdPx, thresholdPx, false);
-    const handler = latest.current.onRefresh ?? ((): Promise<void> => reloadApp());
-    Promise.resolve(handler())
-      .catch((error: unknown) => {
-        latest.current.onDiagnostic?.("pwa: pull-to-refresh failed", {
-          reason: error instanceof Error ? error.message : String(error),
-        });
-      })
-      // On the default path the document is already being replaced and this
-      // never runs, which is exactly right: the spinner must not blink off a
-      // frame before the new page paints.
-      .finally(settle);
+  /**
+   * Give the sequence up: forget the claim AND put the chip away.
+   *
+   * Both halves, always. An earlier revision reset the tracker without
+   * settling, which stranded a fully-opaque chip mid-screen — with
+   * `data-dragging="true"`, so even the exit transition never ran — whenever a
+   * second finger landed during an armed pull.
+   */
+  const standDown = (): void => {
+    tracker.cancel();
+    settle();
   };
 
   return {
     start(event) {
-      if (latest.current.phase === "refreshing") return;
       const touch = event.touches.length === 1 ? event.touches[0] : undefined;
-      if (!touch || !documentAtTop() || pullBlockedBy(event.target, host)) return;
+      if (
+        latest.current.phase === "refreshing" ||
+        !touch ||
+        !documentAtTop() ||
+        pullBlockedBy(event.target, host)
+      ) {
+        // Refusing RESETS, and that is the whole fix for the stale claim: a
+        // sequence whose lift was lost leaves the tracker claimed, and without
+        // this the next refused touch's lift would release it and reload the
+        // app under a shopper who only tapped. `standDown` also settles, so a
+        // refusal cannot leave the chip on screen.
+        standDown();
+        return;
+      }
       tracker.begin({ x: touch.clientX, y: touch.clientY });
     },
 
-    move(event) {
-      // A second finger is a pinch-zoom, and zooming while the page is pinned
-      // by our `preventDefault` is a trap the user cannot get out of.
-      if (event.touches.length !== 1) {
-        tracker.cancel();
-        settle();
-        return;
-      }
-      const touch = event.touches[0];
-      if (!touch) return;
-      const update = tracker.move({ x: touch.clientX, y: touch.clientY });
-      if (!update.claimed) return;
-      if (event.cancelable) event.preventDefault();
-      setPhase(update.phase);
-      paint(chip(), update.distance, latest.current.geometry.thresholdPx, true);
-    },
+    move: (event) => handleMove(event, context, tracker, standDown),
 
     end() {
-      if (tracker.release()) refresh();
+      if (tracker.release()) startRefresh({ chip, latest, setPhase, settle });
       else settle();
     },
 
-    cancel() {
-      tracker.cancel();
-      settle();
-    },
+    cancel: standDown,
   };
 }
+
 
 /** Attaches the handlers to the host for as long as the gesture is live. */
 function useTouchListeners(active: boolean, context: GestureContext): {

@@ -10,15 +10,16 @@ export const EN_US_PAGES: AuthPagesCopy = {
   login: {
     title: "Sign in",
     subtitle: "Sign in to your account",
-    // Ends mid-phrase: the provider buttons render straight after it.
-    providerDivider: "or sign in with",
+    // Just "or": the divider sits between the provider buttons above it and
+    // the form below, so it introduces neither.
+    providerDivider: "or",
     signupPrompt: "No account yet?",
     signupLink: "Sign up",
   },
   signup: {
     title: "Create account",
     subtitle: "Create your account",
-    providerDivider: "or sign up with",
+    providerDivider: "or",
     loginPrompt: "Already have an account?",
     loginLink: "Sign in",
   },

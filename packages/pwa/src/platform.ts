@@ -63,5 +63,13 @@ export function isIosInstallable(): boolean {
  */
 export function isHandheld(): boolean {
   if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(pointer: coarse)").matches === true;
+  // No `matchMedia` at all is not "this is a desktop" — it is "this browser
+  // cannot answer". Answering false made `isInstalledHandheld` NARROWER than
+  // the iOS-only default it exists to widen. The touch count is the coherent
+  // fallback: it stays true to what this function is named for, and unlike an
+  // iOS-only fallback it still recognises an Android handheld.
+  if (typeof window.matchMedia !== "function") {
+    return typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
+  }
+  return window.matchMedia("(pointer: coarse)").matches === true;
 }

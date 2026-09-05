@@ -165,3 +165,72 @@ describe("reloadApp", () => {
     expect(mocks.reload).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("reloadApp when the platform itself refuses", () => {
+  /** A `navigator` whose `serviceWorker` getter throws, as a sandboxed frame does. */
+  const hostileNavigator = (): void => {
+    vi.stubGlobal("navigator", {
+      get serviceWorker(): never {
+        throw new Error("SecurityError");
+      },
+    });
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reloads even when reading navigator.serviceWorker throws", async () => {
+    // A SYNCHRONOUS throw is the one shape `.catch()` cannot see, so this
+    // escaped and the reload never ran — the shopper pulled, the spinner span,
+    // and nothing happened.
+    const reload = vi.fn();
+    hostileNavigator();
+    vi.stubGlobal("window", { location: { reload } });
+
+    await reloadApp();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads when getRegistration throws before returning a promise", async () => {
+    const reload = vi.fn();
+    vi.stubGlobal("navigator", {
+      serviceWorker: {
+        getRegistration: () => {
+          throw new Error("nope");
+        },
+      },
+    });
+    vi.stubGlobal("window", { location: { reload } });
+
+    await reloadApp();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("isInstalledHandheld where matchMedia is absent", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** A standalone app in a browser that cannot answer a media query. */
+  const noMatchMedia = (maxTouchPoints: number): void => {
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("navigator", { standalone: true, maxTouchPoints, userAgent: "" });
+  };
+
+  it("still recognises a touch device — the platform the widening exists for", () => {
+    // Answering `false` here made this predicate NARROWER than the iOS-only
+    // default it is meant to widen. An iOS-only fallback would have been just
+    // as wrong: it drops Android, which is the whole point of the opt-in.
+    noMatchMedia(5);
+    expect(isInstalledHandheld()).toBe(true);
+  });
+
+  it("still excludes a pointer-only device", () => {
+    noMatchMedia(0);
+    expect(isInstalledHandheld()).toBe(false);
+  });
+});

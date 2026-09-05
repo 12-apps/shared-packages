@@ -448,13 +448,72 @@ contract `EmailPreviewMessage` states. The one mistake a preview surface must be
 incapable of — putting a sample in somebody's inbox — is not reachable from that
 code at all, rather than merely not done.
 
+## Live activities (optional)
+
+The panel's second kind of entry: ONGOING STATE, pinned above the inbox list.
+Off unless you configure it, and off means *nothing rendered* — no section, no
+heading, no reserved space. `README.md` carries the argument and the full shape;
+this is the adoption contract.
+
+**You supply two things and this package owns the rest.**
+
+```ts
+createWebNotifications({
+  …,
+  liveActivities: {
+    useActivities: ({ active }) => useMyLiveThings({ enabled: active }),
+    messages: { sectionTitle, openActivity, updated },
+  },
+});
+```
+
+1. **Where they come from.** A HOOK, not a fetcher and not a factory-time
+   subscribe — the answer almost always lives in React context (your tenant,
+   your session, your query client), which is the same reason
+   `NotificationsSignalHook` exists one seam over. `active` is `false` while the
+   panel is shut; pass it to your query's `enabled`. Ignoring it is correct and
+   merely costs money — and an unopened inbox is free either way, because the
+   panel is lazy and the drawer unmounts its content on close.
+2. **Three sentences**, in their own pack rather than on
+   `NotificationMessages` — live activities are opt-in, and requiring copy for a
+   section you never render is the tax that gets a required-config change
+   reverted instead of adopted.
+
+**Two rules that are ours, not yours:**
+
+- A live activity NEVER touches `unread`. It is not news, and a number the bell
+  cannot clear is worse than no number.
+- It leaves when your hook stops returning it. There is no dismiss, no read and
+  no delete — the subject finishing is the only exit, which is what stops the
+  section becoming a second inbox.
+
+**On a phone**, put the activity's id on the notifications you already send
+about the same subject:
+
+```ts
+import { LIVE_SUBJECT_KEY } from '@12-apps/notifications';   // the root entry
+
+data: { [LIVE_SUBJECT_KEY]: `order:${orderId}` }
+```
+
+(`LiveActivity` itself comes from either entry — the root or `./react` — so the
+hook and the type it returns are one import line.)
+
+`formatWebPush` turns it into `tag` on the push payload; your service worker
+passes `tag` to `showNotification` and the tray keeps ONE entry per subject
+instead of one per stage. The worker is still yours (rule 12) — a worker that
+ignores `tag` behaves exactly as it does today.
+
 ## What does NOT come with it
 
 - **The events.** Generators are host code (see rule 6).
 - **A queue.** `scheduleDispatch` is a seam, not an implementation.
 - **A plan model.** `channelPolicy` answers; it does not decide.
 - **An authorization engine.** `audience` answers; it does not decide.
-- **A service worker.** The file is the host's (rule 12).
+- **A service worker.** The file is the host's (rule 12) — including the four
+  lines that read `tag` off a live push.
+- **Anything to BE live about.** `useActivities` is a seam; this package has no
+  idea what is happening in your product, which is the point.
 - **The mail INVENTORY.** The preview console renders what you declare as
   sources; it cannot discover what your product sends.
 - **A brand, a palette or a sentence.** The layout requires the first, defaults

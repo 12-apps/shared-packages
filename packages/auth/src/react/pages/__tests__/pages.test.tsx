@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createAuthPages, type AuthLink } from "../index";
+import { PROVIDER_DIVIDER_TEST_ID } from "../card";
 import { PT_BR_PAGES } from "../pt-BR";
 import type { EmailAuthScreens } from "../../screens";
 
@@ -98,26 +99,32 @@ describe("LoginPage", () => {
     // the form is not REMOVED here, it is never rendered, and saying so this
     // way cannot be read as a race the way a null lookup can.
     expect(container.innerHTML).not.toContain("email-password-form");
-    // …and the divider goes with it. "ou entre com" offers an ALTERNATIVE to
-    // the form above it; with no form it sits at the top of the card promising
+    // …and the divider goes with it. "ou" fences the providers off from the
+    // form BELOW them; with no form it sits at the bottom of the card promising
     // a second method that does not exist, which reads as a page that failed to
     // load rather than as a Google-only sign-in.
     //
     // This case is the one that shipped broken. The two assertions above were
     // already here and both passed, because neither of them looks at the
     // divider — the state was rendered by this very test and walked past.
-    expect(container.textContent).not.toContain(PT_BR_PAGES.login.providerDivider);
+    //
+    // Asked of the MARKUP by test id, for both reasons this file already gives
+    // for the form above: the divider is never rendered rather than removed, so
+    // a null lookup would read as a race — and the label is two letters now, so
+    // `not.toContain("ou")` would pass or fail on whether some other sentence
+    // on the page happens to contain them.
+    expect(container.innerHTML).not.toContain(PROVIDER_DIVIDER_TEST_ID);
   });
 
   it("omits the divider entirely when there are no providers", () => {
-    // A lone "ou entre com" above nothing reads as a broken page.
+    // A lone "ou" fencing off nothing reads as a broken page.
     const { LoginPage } = pages();
     const { container } = render(<LoginPage {...loginProps} />);
 
     // The title proves the page rendered; the divider's absence is then a fact
     // about this page rather than about timing.
     expect(screen.getByText(PT_BR_PAGES.login.title)).toBeTruthy();
-    expect(container.textContent).not.toContain(PT_BR_PAGES.login.providerDivider);
+    expect(container.innerHTML).not.toContain(PROVIDER_DIVIDER_TEST_ID);
   });
 
   it("links its footer at the route the host gave, not a guessed one", () => {
@@ -140,6 +147,30 @@ describe("LoginPage", () => {
 
     expect(screen.getByText(PT_BR_PAGES.login.title)).toBeTruthy();
     expect(container.innerHTML).not.toContain("go-to-signup");
+  });
+
+  it("puts the providers ABOVE the e-mail form, with the divider between them", () => {
+    // The order is the product decision this page exists to hold, and it is not
+    // visible in any other assertion here: every one of them would pass with the
+    // two methods the other way round. It reversed once already (FUT-873 put the
+    // form first), so it is worth a test that fails when it moves again.
+    const { LoginPage } = pages();
+    const { container } = render(
+      <LoginPage {...loginProps} providers={<button type="button">Continue with Google</button>} />,
+    );
+
+    const order = [...container.querySelectorAll("button, [data-testid]")];
+    const providerAt = order.findIndex((node) => /google/i.test(node.textContent ?? ""));
+    const dividerAt = order.findIndex(
+      (node) => node.getAttribute("data-testid") === PROVIDER_DIVIDER_TEST_ID,
+    );
+    const formAt = order.findIndex(
+      (node) => node.getAttribute("data-testid") === "email-password-form",
+    );
+
+    expect(providerAt).toBeGreaterThanOrEqual(0);
+    expect(dividerAt).toBeGreaterThan(providerAt);
+    expect(formAt).toBeGreaterThan(dividerAt);
   });
 
   it("renders the host's notice above the form", () => {
@@ -187,7 +218,7 @@ describe("SignupPage", () => {
     );
 
     expect(screen.getByRole("button", { name: /continue with google/i })).toBeTruthy();
-    expect(container.textContent).not.toContain(PT_BR_PAGES.signup.providerDivider);
+    expect(container.innerHTML).not.toContain(PROVIDER_DIVIDER_TEST_ID);
   });
 });
 
