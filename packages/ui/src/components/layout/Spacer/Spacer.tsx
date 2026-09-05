@@ -2,64 +2,34 @@ import Box from '@mui/material/Box/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { SPACER_FLEX_GROW, SPACER_FLEX_SHRINK, spacerDimensions } from './Spacer.metrics';
 import type { SpacerProps } from './Spacer.types';
+import { resolveTestId } from '../../../platform/test-id';
 
 export const Spacer: React.FC<SpacerProps> = ({
-  size = 'md',
-  direction = 'both',
+  size,
+  direction,
   width,
   height,
   flex = false,
   className,
-  'data-testid': dataTestId,
+  ...testIdProps
 }) => {
   const theme = useTheme();
 
-  const getSpacing = () => {
-    switch (size) {
-      case 'xs':
-        return theme.spacing(0.5);
-      case 'sm':
-        return theme.spacing(1);
-      case 'md':
-        return theme.spacing(2);
-      case 'lg':
-        return theme.spacing(3);
-      case 'xl':
-        return theme.spacing(4);
-      default:
-        return theme.spacing(2);
-    }
-  };
-
-  const getDimensions = () => {
-    const spacing = getSpacing();
-
-    let finalWidth = width;
-    let finalHeight = height;
-
-    if (direction === 'horizontal' || direction === 'both') {
-      finalWidth = width ?? spacing;
-    }
-
-    if (direction === 'vertical' || direction === 'both') {
-      finalHeight = height ?? spacing;
-    }
-
-    return { width: finalWidth, height: finalHeight };
-  };
-
-  const dimensions = getDimensions();
+  // From the shared metrics, not a table of our own: the native `Spacer` reads
+  // the same units, so the two renderers cannot disagree on a step.
+  const dimensions = spacerDimensions({ size, direction, width, height }, (units) => theme.spacing(units));
 
   return (
     <Box
       className={className}
-      data-testid={dataTestId}
+      data-testid={resolveTestId(testIdProps)}
       sx={{
         width: dimensions.width,
         height: dimensions.height,
-        flex: flex ? 1 : undefined,
-        flexShrink: 0,
+        flex: flex ? SPACER_FLEX_GROW : undefined,
+        flexShrink: SPACER_FLEX_SHRINK,
         pointerEvents: 'none',
         userSelect: 'none',
       }}

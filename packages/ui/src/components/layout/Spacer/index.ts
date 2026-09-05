@@ -1,2 +1,2 @@
 export { Spacer } from './Spacer';
-export type { SpacerProps } from './Spacer.types';
+export type { SpacerBaseProps, SpacerDimension, SpacerDirection, SpacerProps, SpacerSize } from './Spacer.types';

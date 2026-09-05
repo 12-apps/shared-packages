@@ -595,11 +595,12 @@ Components for structuring and organizing page layouts.
 **Docs**: `src/components/layout/Skeleton/Skeleton.md`
 
 ### Spacer
-**Purpose**: Add flexible spacing between elements
+**Purpose**: Add flexible spacing between elements (web AND React Native)
 **Use Cases**: Layout spacing, responsive gaps, flexible layouts
 **Features**: Horizontal/vertical, size variants
 **Location**: `src/components/layout/Spacer`
 **Docs**: `src/components/layout/Spacer/Spacer.md`
+**Native**: yes — `@12-apps/ui/layout/Spacer` resolves to `Spacer.native.tsx` under Metro, on the same spacing units.
 
 ---
 

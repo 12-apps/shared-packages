@@ -477,6 +477,10 @@
       "default": "./dist/layout/Skeleton.js"
     },
     "./layout/Spacer": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Spacer/index.native.d.ts",
+        "default": "./dist/native/layout/Spacer.js"
+      },
       "types": "./dist/types/components/layout/Spacer/index.d.ts",
       "default": "./dist/layout/Spacer.js"
     },

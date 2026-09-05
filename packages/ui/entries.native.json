@@ -5,5 +5,6 @@
   "layout/Box": "src/components/layout/Box/index.native.ts",
   "layout/Stack": "src/components/layout/Stack/index.native.ts",
   "typography/Text": "src/components/typography/Text/index.native.ts",
-  "form/Button": "src/components/form/Button/index.native.ts"
+  "form/Button": "src/components/form/Button/index.native.ts",
+  "layout/Spacer": "src/components/layout/Spacer/index.native.ts"
 }

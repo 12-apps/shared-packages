@@ -13,7 +13,8 @@ The Spacer component creates consistent spacing between elements in layouts. It'
 | width     | number \| string                     | -       | Custom width value (overrides size when provided)           |
 | height    | number \| string                     | -       | Custom height value (overrides size when provided)          |
 | flex      | boolean                              | false   | When true, spacer flexes to fill available space            |
-| className | string                               | -       | Additional CSS class for custom styling                     |
+| className | string                               | -       | Additional CSS class for custom styling (web only)          |
+| testID / dataTestId | string                     | -       | Test id, on both renderers (`data-testid` on the web)       |
 
 ## Usage Examples
 
@@ -56,6 +57,17 @@ The Spacer component creates consistent spacing between elements in layouts. It'
 // Vertical only
 <Spacer direction="vertical" size="sm" />
 ```
+
+## React Native
+
+The same import renders natively (`@12-apps/ui/layout/Spacer` resolves to
+`Spacer.native.tsx` under Metro): an empty `View` sized from the same
+`SPACER_SIZE_UNITS` the web hands to `theme.spacing`, so an `md` spacer is 16
+wide on both sides. `width`/`height` take a number, a percentage or `auto` on
+both renderers; a CSS length string (`2rem`, `20px`) is read against the 16px
+root on native, and anything else (`calc()`, `vw`) yields to the size step.
+`testID`, `dataTestId` and `data-testid` all name the element. See
+[NATIVE.md](../../../../NATIVE.md).
 
 ## Accessibility Notes
 
