@@ -1,6 +1,7 @@
+import Box from '@mui/material/Box/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
 
 import { Button } from '../Button';
 import { Checkbox } from '../Checkbox';
@@ -689,6 +690,34 @@ export const Responsive: Story = {
 };
 
 /**
+ * A 320px column with the 568px fold drawn across it.
+ *
+ * Belt and braces for the story below: the viewport parameters ask Storybook
+ * for the same frame, and this makes the answer visible whether or not the
+ * addon obliges.
+ */
+const foldAt568: Decorator = (StoryFn) => (
+  <Box sx={{ position: 'relative', width: 320, paddingBottom: '120px' }}>
+    <StoryFn />
+    <Box
+      sx={{
+        position: 'absolute',
+        top: '568px',
+        left: 0,
+        right: 0,
+        borderTop: '1px dashed',
+        borderColor: 'error.main',
+        pointerEvents: 'none',
+      }}
+    >
+      <Typography variant="caption" color="error">
+        568px — the fold
+      </Typography>
+    </Box>
+  </Box>
+);
+
+/**
  * SIX ROWS ON THE SMALLEST PHONE — the case that decides the row's spacing.
  *
  * A field's label sits 4px above its control, and exactly one thing puts it
@@ -698,18 +727,28 @@ export const Responsive: Story = {
  *
  * Eight pixels a row is invisible on one field and decisive on six. This story
  * is drawn in a 320x568 frame — the smallest viewport the design system claims
- * to support — with the fold marked, because that is the width at which the
- * difference stops being spacing and starts being a submit button nobody can
- * reach. `Form.test.stories.tsx` measures the same row and pins the 4px.
+ * to support — with the fold drawn as a line, because that is the width at
+ * which the difference stops being spacing and starts being a submit button
+ * nobody can reach. `Form.test.stories.tsx` measures the same row and pins the
+ * 4px.
+ *
+ * The frame is drawn by the story itself as well as asked of the viewport
+ * addon, and that is deliberate. Storybook 9 renamed the parameter — the old
+ * `viewport.viewports` / `viewport.defaultViewport` pair appears NOWHERE in
+ * `storybook@9.1.20`, so a story configured that way silently renders full
+ * width, which for this one would leave nothing to look at. The parameters
+ * below are the 9.x shape; the wrapper means the frame does not depend on
+ * getting them right.
  */
 export const SixRowsOnTheSmallestPhone: Story = {
   parameters: {
     layout: 'fullscreen',
     viewport: {
-      viewports: { xxs: { name: '320x568', styles: { width: '320px', height: '568px' } } },
-      defaultViewport: 'xxs',
+      options: { xxs: { name: '320x568', styles: { width: '320px', height: '568px' } } },
     },
   },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
+  decorators: [foldAt568],
   args: {
     variant: 'vertical',
     maxWidth: 'full',

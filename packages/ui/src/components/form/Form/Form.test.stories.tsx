@@ -611,15 +611,21 @@ export const Integration: Story = {
  * where boxes are actually laid out.
  *
  * `FormLabel` carries a 4px `marginBottom`, and `StyledFormField` used to carry
- * an 8px flex `gap` on top of it — 12px where every other labelled field in this
- * package draws 4px, and 8px a row of unasked-for height at the bottom of a
- * form. The assertion is stated as "the wrapper adds nothing to the label's own
+ * an 8px flex `gap` on top of it — 12px where every other user of `FormLabel`
+ * draws 4px, and 8px a row of unasked-for height at the bottom of a form. The assertion is stated as "the wrapper adds nothing to the label's own
  * margin" rather than as a literal 4, so it survives the margin being re-tuned
  * and still fails the moment a second mechanism appears beside it.
  *
  * Nothing here reads a font metric, so it is stable wherever it runs: the
  * distance between the label's bottom edge and the control's top edge is
  * margin plus gap, whatever glyphs the label happens to be drawn with.
+ *
+ * NOTHING IN CI RUNS THIS YET. `test-storybook` reaches it only through
+ * `pnpm --filter @12-apps/ui test:ci`, which no workflow invokes and no turbo
+ * task defines; this package's vitest `include` is `src/**` + `*.test.{ts,tsx}`,
+ * which `*.test.stories.tsx` does not match. So the executing guard for this
+ * defect is `form/__tests__/field-spacing.test.tsx`, and this story is the
+ * browser check a human runs — until the Storybook job covers this package.
  */
 export const LabelToControlDistance: Story = {
   args: {
