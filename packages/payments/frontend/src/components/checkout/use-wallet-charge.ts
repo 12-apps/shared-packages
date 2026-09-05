@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { parkedBasket } from "./basket";
+import type { ChallengeScope } from "./card-outcome";
 import { useCheckoutClientApi } from "./client-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
 import { rememberHostedOrder } from "./hosted-return";
@@ -62,12 +64,33 @@ export interface WalletCharge {
  */
 const WALLET_AWAITING_WAIT_MS = 90_000;
 
+/**
+ * Park the order before the tab leaves, WITH the store and the basket
+ * (FUT-1240).
+ *
+ * Both absences are read as "no opinion" by the resume — `belongsHere` passes
+ * a slug-less entry at any store and the basket rule passes a basket-less one
+ * against any basket — so a wallet's 3-D Secure hand-off that named neither
+ * resumed over whatever checkout mounted next. The card path has carried these
+ * since FUT-1213; this call site is the one that did not.
+ */
+function parkForHandover(order: CheckoutOrder, scope: ChallengeScope): void {
+  const basket = parkedBasket(scope.basket);
+  rememberHostedOrder(order, {
+    ...(scope.tenantSlug === undefined ? {} : { tenantSlug: scope.tenantSlug }),
+    ...(basket === undefined ? {} : { basket }),
+    handoff: true,
+  });
+}
+
 /** The wallet charge state machine. See the module comment. */
 export function useWalletCharge(
   order: CheckoutOrder,
   buyer: BuyerInfo,
   onResolved: (status: OrderStatus) => void,
   pollIntervalMs = 2500,
+  /** WHOSE store and WHICH basket — see {@link parkForHandover} (FUT-1240). */
+  scope: ChallengeScope = {},
 ): WalletCharge {
   const [phase, setPhase] = useState<WalletPhase>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +139,7 @@ export function useWalletCharge(
     // FUT-698): park the order and hand the buyer over, exactly as the card
     // path does. `phase` stays as-is — the tab is navigating away.
     if (charged.data.hostedCheckoutUrl) {
-      rememberHostedOrder(order);
+      parkForHandover(order, scope);
       navigate(charged.data.hostedCheckoutUrl);
       return true;
     }

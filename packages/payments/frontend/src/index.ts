@@ -61,26 +61,14 @@ export {
 } from './components/checkout/checkout-flow';
 
 // ---------------------------------------------------------------------------
-// The MOUNTED buyer checkout (FUT-741) — `createPaymentFlows` returns every
-// screen pre-bound to one transport, one scope, one slot table and one set of
-// host ports. Additive: everything above and below stays exported, and the
-// hand-composing path is unchanged.
+// The MOUNTED buyer checkout (FUT-741) and the checkout PIPELINE (FUT-1240).
+//
+// Listed in `./flows/public` rather than inline, on the `./activation/public`
+// precedent below: this barrel is at its size gate, and a surface that grows
+// with every plugin type belongs beside the plugins.
 // ---------------------------------------------------------------------------
-export { createPaymentFlows } from './flows/create-payment-flows';
-// A type and nothing else now: `DEFAULT_CHECKOUT_COPY_FE` used to sit beside it
-// and was the only value this module ever published (FUT-760).
-export type { CheckoutCopyFE } from './flows/copy';
-export {
-  type BoundCheckoutClient,
-  type BuyerDetailsProps,
-  type CheckoutAvailability,
-  type CheckoutConfigState,
-  type CheckoutController,
-  type CheckoutPorts,
-  type CheckoutScreens,
-  type PaymentFlows,
-  type PaymentFlowsConfig,
-} from './flows/types';
+export * from './flows/public';
+
 export {
   buyerFieldsFor,
   fieldSatisfied,

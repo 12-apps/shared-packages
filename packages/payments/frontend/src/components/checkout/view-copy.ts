@@ -130,12 +130,50 @@ export interface PaymentStatusCopy {
   receiptEmailLabel: string;
 }
 
+/**
+ * The pipeline engine's own two sentences (FUT-1240).
+ *
+ * REQUIRED, both of them, and stated here rather than defaulted for the reason
+ * every other string in this file is: a default in the origin host's language
+ * reads as finished right up until a shopper sees it. These two are the whole
+ * of what the ENGINE renders on its own account — everything else on screen
+ * belongs to a step, a gate or a settlement method.
+ */
+export interface CheckoutPipelineCopy {
+  /**
+   * What is on screen while the checkout has nothing to show yet: a gate still
+   * deciding, the store's protocol still in flight, or no step applying.
+   *
+   * It replaces a blank frame. A shopper who taps "pagar" and gets an empty
+   * page taps again.
+   */
+  loading: string;
+  /**
+   * PER SETTLEMENT METHOD, what the shopper reads between choosing it and the
+   * surface that takes the money arriving — the hand-off interstitial's own
+   * line. Keyed by `SettlementMethodDescriptor.id`.
+   *
+   * Per method because the sentences are not interchangeable: a Pix hand-off
+   * and a card challenge send the shopper to different places for different
+   * reasons, and one shared "aguarde" describes neither. A method with no
+   * entry falls back to {@link CheckoutPipelineCopy.loading}, which is what a
+   * host registering a new charged method gets until it writes the sentence.
+   */
+  awaitingHandover: Readonly<Record<string, string>>;
+}
+
 /** What the legacy `CheckoutFlow` itself renders and must be handed. */
 export interface CheckoutViewCopy {
   steps: CheckoutStepperCopy;
   dados: DadosStepCopy;
   emptyCart: EmptyCartCopy;
   status: PaymentStatusCopy;
+  /**
+   * The engine's own two sentences (FUT-1240). Carried here, beside the
+   * stepper labels, so a host still answers copy exactly once — the pipeline
+   * is another way of rendering this same checkout, not a second surface.
+   */
+  pipeline: CheckoutPipelineCopy;
   /**
    * The words the screens BELOW these read — the card fields, the wallet
    * panes, the buyer-details inputs (FUT-760).

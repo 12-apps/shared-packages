@@ -185,6 +185,17 @@ export interface CreateOrderRequest {
   buyer: BuyerInfo;
   /** Opt-in: save buyer name/phone (not CPF — never persisted here) for next-checkout pre-fill. */
   saveProfile: boolean;
+  /**
+   * WHICH settlement the buyer chose, when it is not one of the two above
+   * (FUT-1240).
+   *
+   * `method` is what the CHAIN can be asked to charge, so a pipeline host's own
+   * registered settlement — "pay the courier", "pay the waiter" — cannot be
+   * said there, and without this every one of them arrives as the same request.
+   * ABSENT for `PIX` and `CARD`, which is what keeps it additive; otherwise the
+   * registered `SettlementMethodDescriptor.id` verbatim (`flows/pipeline`).
+   */
+  settlementMethod?: string;
 }
 
 /** What the flow hands the host's `saveBuyerContact` port on "Continuar". */

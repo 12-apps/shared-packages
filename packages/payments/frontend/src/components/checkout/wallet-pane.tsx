@@ -150,7 +150,12 @@ export function WalletCardPane(props: WalletPaneProps): JSX.Element {
   const copy = useCheckoutCopy().screens.settling;
   const { order, buyer, config, tenantSlug, onResolved, pollIntervalMs } = props;
   const { freshInstrument, basket } = props;
-  const wallet = useWalletCharge(order, buyer, onResolved, pollIntervalMs);
+  // The same store and basket the card path already parks with (FUT-1213,
+  // FUT-1240): a wallet's 3-D Secure hand-off is a hand-off like any other.
+  const wallet = useWalletCharge(order, buyer, onResolved, pollIntervalMs, {
+    ...(tenantSlug === undefined ? {} : { tenantSlug }),
+    ...(basket === undefined ? {} : { basket }),
+  });
   // A sheet failure the wallet reported before any charge existed (pay.js
   // refused, merchant validation unavailable, the sheet errored) — shown
   // beside the form, which stays usable.
