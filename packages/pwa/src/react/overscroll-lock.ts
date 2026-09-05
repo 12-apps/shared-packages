@@ -49,7 +49,13 @@ export function acquireOverscrollLock(): () => void {
     holders.set(element, held + 1);
   });
 
+  let released = false;
   return () => {
+    // Idempotent on purpose. React's effect contract calls this once, but a
+    // second call would decrement a count another live holder is relying on and
+    // hand the document back while the gesture is still mounted.
+    if (released) return;
+    released = true;
     targets.forEach((element) => {
       const held = (holders.get(element) ?? 1) - 1;
       if (held > 0) {

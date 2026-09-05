@@ -53,8 +53,9 @@ import {
   pullBlockedBy,
   type PullGeometry,
 } from "../pull-gesture";
-import { needsPullToRefresh, reloadApp } from "../reload";
+import { needsPullToRefresh } from "../reload";
 import { acquireOverscrollLock } from "./overscroll-lock";
+import { paint, startRefresh } from "./refresh-runner";
 import { PullIndicator, type PullIndicatorPhase } from "./pull-indicator";
 
 export interface PullToRefreshProps {
@@ -105,28 +106,6 @@ export interface PullToRefreshProps {
    * be able to reach the host's own error reporting.
    */
   onDiagnostic?: (message: string, context?: Record<string, unknown>) => void;
-}
-
-/**
- * Writes the frame. One imperative call drives translate, opacity and rotation.
- *
- * `dragging` suppresses the chip's own transition: while the finger is down the
- * position IS the finger, and easing towards it puts the chip a frame behind.
- * Between gestures the transition is what animates the chip away, or down to
- * the spinner’s resting place.
- */
-function paint(
-  node: HTMLElement | null,
-  distance: number,
-  thresholdPx: number,
-  dragging: boolean,
-): void {
-  if (node === null) return;
-  const progress = Math.min(1, distance / thresholdPx);
-  node.dataset.dragging = String(dragging);
-  node.style.setProperty("--pwa-ptr-y", `${distance}px`);
-  node.style.setProperty("--pwa-ptr-opacity", String(progress));
-  node.style.setProperty("--pwa-ptr-progress", String(progress));
 }
 
 /**
@@ -203,11 +182,6 @@ interface GestureConfig {
   geometry: PullGeometry;
 }
 
-/** Mutable ownership, shared between the handlers and the module helper. */
-interface GestureOwnership {
-  owned: boolean;
-}
-
 /**
  * One move of a sequence we own.
  *
@@ -223,10 +197,8 @@ function handleMove(
   event: TouchEvent,
   context: GestureContext,
   tracker: PullTracker,
-  state: GestureOwnership,
   standDown: () => void,
 ): void {
-  if (!state.owned) return;
   if (event.touches.length !== 1) return standDown();
   const touch = event.touches[0];
   if (!touch) return;
@@ -258,7 +230,6 @@ function createHandlers(
 ): Record<"start" | "move" | "end" | "cancel", (event: TouchEvent) => void> {
   const { chip, latest, setPhase } = context;
   const tracker = createPullTracker(latest.current.geometry);
-  const state: GestureOwnership = { owned: false };
 
   // A refresh in flight must survive a stray touch: `reloadApp` waits up to two
   // seconds for the worker, the page looks frozen, and clearing the latch would
@@ -269,27 +240,17 @@ function createHandlers(
     paint(chip(), 0, latest.current.geometry.thresholdPx, false);
   };
 
+  /**
+   * Give the sequence up: forget the claim AND put the chip away.
+   *
+   * Both halves, always. An earlier revision reset the tracker without
+   * settling, which stranded a fully-opaque chip mid-screen — with
+   * `data-dragging="true"`, so even the exit transition never ran — whenever a
+   * second finger landed during an armed pull.
+   */
   const standDown = (): void => {
-    state.owned = false;
     tracker.cancel();
     settle();
-  };
-
-  const refresh = (): void => {
-    const { thresholdPx } = latest.current.geometry;
-    setPhase("refreshing");
-    paint(chip(), thresholdPx, thresholdPx, false);
-    const handler = latest.current.onRefresh ?? ((): Promise<void> => reloadApp());
-    Promise.resolve(handler())
-      .catch((error: unknown) => {
-        latest.current.onDiagnostic?.("pwa: pull-to-refresh failed", {
-          reason: error instanceof Error ? error.message : String(error),
-        });
-      })
-      // On the default path the document is already being replaced and this
-      // never runs, which is exactly right: the spinner must not blink off a
-      // frame before the new page paints.
-      .finally(() => settle(true));
   };
 
   return {
@@ -301,28 +262,28 @@ function createHandlers(
         !documentAtTop() ||
         pullBlockedBy(event.target, host)
       ) {
-        // Refusing must RESET: a claim left by a sequence whose lift was lost
-        // would otherwise be released by this one's.
-        state.owned = false;
-        tracker.cancel();
+        // Refusing RESETS, and that is the whole fix for the stale claim: a
+        // sequence whose lift was lost leaves the tracker claimed, and without
+        // this the next refused touch's lift would release it and reload the
+        // app under a shopper who only tapped. `standDown` also settles, so a
+        // refusal cannot leave the chip on screen.
+        standDown();
         return;
       }
       tracker.begin({ x: touch.clientX, y: touch.clientY });
-      state.owned = true;
     },
 
-    move: (event) => handleMove(event, context, tracker, state, standDown),
+    move: (event) => handleMove(event, context, tracker, standDown),
 
     end() {
-      if (!state.owned) return;
-      state.owned = false;
-      if (tracker.release()) refresh();
+      if (tracker.release()) startRefresh({ chip, latest, setPhase, settle });
       else settle();
     },
 
     cancel: standDown,
   };
 }
+
 
 /** Attaches the handlers to the host for as long as the gesture is live. */
 function useTouchListeners(active: boolean, context: GestureContext): {

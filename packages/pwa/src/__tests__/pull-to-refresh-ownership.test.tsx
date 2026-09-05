@@ -234,3 +234,75 @@ describe("two mounts sharing one document", () => {
     expect(root.style.overscrollBehaviorY).toBe("");
   });
 });
+
+describe("a refusal must not leave the chip on screen", () => {
+  it("puts the indicator away when a second finger lands mid-pull", async () => {
+    // A real browser delivers a second finger as its own `touchstart` carrying
+    // two touches. That is refused — and an earlier revision refused it by
+    // resetting the tracker WITHOUT settling, stranding a fully opaque chip
+    // mid-screen with `data-dragging="true"`, so even the exit transition never
+    // ran. It cleared only on a later complete gesture.
+    const onRefresh = vi.fn(async () => {});
+    const { child } = mountGesture(onRefresh);
+
+    await act(async () => {
+      pullToArmed(child);
+      fire(child, "touchstart", [
+        { x: 100, y: 340 },
+        { x: 180, y: 340 },
+      ]);
+    });
+
+    const chip = child.ownerDocument.querySelector("[data-phase]");
+    expect(chip?.getAttribute("data-phase")).toBe("idle");
+    expect((chip as HTMLElement).style.getPropertyValue("--pwa-ptr-y")).toBe("0px");
+    expect((chip as HTMLElement).dataset.dragging).toBe("false");
+  });
+});
+
+describe("a refresh that goes wrong", () => {
+  it("recovers from a handler that throws SYNCHRONOUSLY", async () => {
+    // `Promise.resolve(handler())` evaluates the handler first, so a sync throw
+    // escaped before `.finally` was attached and the "refreshing" latch stuck
+    // forever — refusing every later gesture for the life of the mount.
+    const onRefresh = vi.fn(() => {
+      throw new Error("host blew up");
+    });
+    const { child } = mountGesture(onRefresh as unknown as () => Promise<void>);
+
+    await act(async () => {
+      pullToArmed(child);
+      fire(child, "touchend", []);
+    });
+    await act(async () => {});
+
+    const chip = child.ownerDocument.querySelector("[data-phase]");
+    expect(chip?.getAttribute("data-phase")).toBe("idle");
+
+    // And the gesture still works afterwards, which is the point.
+    await act(async () => {
+      pullToArmed(child);
+      fire(child, "touchend", []);
+    });
+    expect(onRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes the spinner back from a handler that never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const onRefresh = vi.fn(() => new Promise<void>(() => {}));
+      const { child } = mountGesture(onRefresh);
+      pullToArmed(child);
+      fire(child, "touchend", []);
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        vi.advanceTimersByTime(15_000);
+      });
+      const chip = child.ownerDocument.querySelector("[data-phase]");
+      expect(chip?.getAttribute("data-phase")).toBe("idle");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

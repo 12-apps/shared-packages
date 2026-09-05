@@ -67,6 +67,15 @@ export interface PullToRefreshMessages {
   armed: string;
   /** Announced while the app is reloading. */
   refreshing: string;
-  /** The accessible name of the indicator's live region. */
+  /**
+   * RESERVED, and currently unused.
+   *
+   * It was the live region's `aria-label` until that turned out to be the bug:
+   * a reader that computes a live-region announcement from its accessible name
+   * read this string on every phase change, in place of the three that say what
+   * is happening. The region is deliberately unnamed now. The key stays so
+   * hosts and their locale packs do not break, and because a future indicator
+   * with a focusable control would want it.
+   */
   label: string;
 }

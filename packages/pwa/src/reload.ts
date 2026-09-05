@@ -151,5 +151,7 @@ export async function reloadApp(options: ReloadAppOptions = {}): Promise<void> {
   } catch {
     // Deliberately empty: whatever the worker did, the navigation still happens.
   }
-  window.location.reload();
+  // Guarded for the same reason the block above is: this is the last line that
+  // can cost the user the reload, and on a server render `window` is not there.
+  if (typeof window !== "undefined") window.location.reload();
 }
