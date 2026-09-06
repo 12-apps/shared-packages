@@ -24,7 +24,7 @@ import type {
   DialogHeaderProps,
 } from './Dialog.types.native';
 import { Icon } from '../../../icons/Icon.native';
-import { childTestId, withoutTestIdProps, type TestIdProps } from '../../../platform/test-id';
+import { childTestId, slotTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { renderTextChildren } from '../../../platform/text-children';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import { muiTypeStyle } from '../../../tokens/mui-type';
@@ -53,17 +53,6 @@ export const dialogBodyTextStyle = (theme: UiTheme): TextStyle => ({
   ...muiTypeStyle(theme, 'body1'),
   color: theme.palette.text.primary,
 });
-
-/**
- * A slot's own test id.
- *
- * The web derives one from the DIALOG's `dataTestId` (`d` -> `d-content`) and
- * lets a raw `data-testid` spread straight over it, which is what the shared
- * stories address the slots by. `testID` is React Native's spelling of that
- * same raw id, so it wins too.
- */
-const slotTestId = (props: TestIdProps, suffix: string): string =>
-  props.testID ?? props['data-testid'] ?? childTestId(props, suffix, 'dialog');
 
 /** MUI's dialog title: `h6`, in the body ink. */
 export const dialogTitleStyle = (theme: UiTheme): TextStyle => ({
@@ -110,7 +99,7 @@ export function DialogHeader({
   if (children) {
     return (
       <View
-        testID={slotTestId(others, 'header')}
+        testID={slotTestId(others, 'header', 'dialog')}
         style={[
           {
             padding: theme.spacing(DIALOG_HEADER_CHILDREN_PADDING_UNITS),
@@ -133,7 +122,7 @@ export function DialogHeader({
 
   return (
     <View
-      testID={slotTestId(others, 'title')}
+      testID={slotTestId(others, 'title', 'dialog')}
       style={[styles.header, { paddingBottom }, style]}
       {...viewProps}
     >
@@ -168,7 +157,7 @@ export function DialogContent({
 
   return (
     <ScrollView
-      testID={slotTestId(others, 'content')}
+      testID={slotTestId(others, 'content', 'dialog')}
       style={[
         styles.content,
         dividers
@@ -209,7 +198,7 @@ export function DialogActions({
 
   return (
     <View
-      testID={slotTestId(others, 'actions')}
+      testID={slotTestId(others, 'actions', 'dialog')}
       style={[
         styles.actions,
         {

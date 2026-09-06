@@ -21,6 +21,7 @@ import {
   DIALOG_TITLED_BODY_PADDING_TOP_UNITS,
 } from './Dialog.metrics';
 import { backdropSxOf, variantStylesOf } from './Dialog.styles';
+import { childTestId, resolveTestId, slotTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type {
   DialogActionsProps,
   DialogContentProps,
@@ -90,11 +91,15 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
     borderRadius,
     onClose,
     open,
-    dataTestId,
-    ...props
+    ...others
   } = withDialogDefaults(rawProps);
   const theme = useTheme();
-  const testId = dataTestId || 'dialog';
+  // Every spelling of the test id the shared contract allows, mapped to the one
+  // the DOM reads, and stripped from what is spread — `testID` is React
+  // Native's name for it and is not a DOM attribute. The native `Dialog` does
+  // the same in reverse.
+  const testId = resolveTestId(others, 'dialog');
+  const props = withoutTestIdProps(others);
   const paperSx = variantStylesOf(theme, {
     variant, size, borderRadius, glass, gradient, glow, pulse,
   });
@@ -112,7 +117,7 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
       subtitle={description}
       showCloseButton={showCloseButton}
       onClose={onClose}
-      dataTestId={dataTestId}
+      dataTestId={testId}
     />
   ) : null;
   const body = bodyOf(children, Boolean(title));
@@ -156,11 +161,14 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
   subtitle,
   showCloseButton = true,
   onClose,
-  dataTestId,
+  ...others
 }) => {
+  const props = withoutTestIdProps(others);
+
   if (children) {
     return (
       <Box
+        data-testid={slotTestId(others, 'header', 'dialog')}
         sx={{
           p: DIALOG_HEADER_CHILDREN_PADDING_UNITS,
           borderBottom: '1px solid',
@@ -174,7 +182,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
 
   return (
     <MuiDialogTitle
-      data-testid={dataTestId ? `${dataTestId}-title` : 'dialog-title'}
+      data-testid={slotTestId(others, 'title', 'dialog')}
       sx={{
         display: 'flex',
         alignItems: 'center',
@@ -183,6 +191,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
           ? DIALOG_TITLE.paddingBottomUnits.withSubtitle
           : DIALOG_TITLE.paddingBottomUnits.plain,
       }}
+      {...props}
     >
       <Box>
         <Typography variant="h6" component="div">
@@ -202,7 +211,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
         <IconButton
           aria-label="close"
           onClick={onClose}
-          data-testid={dataTestId ? `${dataTestId}-close` : 'dialog-close'}
+          data-testid={childTestId(others, 'close', 'dialog')}
           sx={{
             color: 'text.secondary',
             '&:hover': {
@@ -245,11 +254,10 @@ export const DialogContent: React.FC<DialogContentProps> = ({
   children,
   dividers = false,
   dense = false,
-  dataTestId,
-  ...props
+  ...others
 }) => (
     <MuiDialogContent
-      data-testid={dataTestId ? `${dataTestId}-content` : 'dialog-content'}
+      data-testid={slotTestId(others, 'content', 'dialog')}
       dividers={dividers}
       sx={{
         padding: dense ? DIALOG_CONTENT_PADDING_UNITS.dense : DIALOG_CONTENT_PADDING_UNITS.normal,
@@ -260,7 +268,7 @@ export const DialogContent: React.FC<DialogContentProps> = ({
           borderColor: 'divider',
         },
       }}
-      {...props}
+      {...withoutTestIdProps(others)}
     >
       {children}
     </MuiDialogContent>
@@ -270,8 +278,7 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
   children,
   alignment = 'right',
   spacing = DIALOG_ACTIONS.defaultSpacingUnits,
-  dataTestId,
-  ...props
+  ...others
 }) => {
   const getJustifyContent = () => {
     switch (alignment) {
@@ -285,13 +292,13 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
 
   return (
     <MuiDialogActions
-      data-testid={dataTestId ? `${dataTestId}-actions` : 'dialog-actions'}
+      data-testid={slotTestId(others, 'actions', 'dialog')}
       sx={{
         justifyContent: getJustifyContent(),
         gap: spacing,
         p: DIALOG_ACTIONS.paddingUnits,
       }}
-      {...props}
+      {...withoutTestIdProps(others)}
     >
       {children}
     </MuiDialogActions>

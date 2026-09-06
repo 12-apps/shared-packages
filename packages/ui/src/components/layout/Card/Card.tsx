@@ -16,6 +16,7 @@ import {
   CARD_MEDIA_HEIGHT,
 } from './Card.metrics';
 import { cardStyles } from './Card.styles';
+import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type {
   CardActionsProps,
   CardContentProps,
@@ -37,7 +38,6 @@ export const Card: React.FC<CardProps> = (rawProps) => {
     onFocus,
     onBlur,
     sx,
-    dataTestId,
     // These props are reserved for future implementation but need to be extracted
     // to prevent them from being passed to the underlying MuiCard
     expandable: _expandable,
@@ -51,6 +51,12 @@ export const Card: React.FC<CardProps> = (rawProps) => {
   } = resolveCardProps(rawProps);
 
   const theme = useTheme();
+  // Every spelling of the test id the shared contract allows, mapped to the one
+  // the DOM reads, and stripped from what is spread — `testID` is React
+  // Native's name for it and is not a DOM attribute. The native `Card` does the
+  // same in reverse.
+  const ownTestId = resolveTestId(restProps, 'card');
+  const props = withoutTestIdProps(restProps);
 
   // A loading card is inert: no handlers fire and pointer events are off, so a
   // half-rendered card cannot be clicked through.
@@ -58,7 +64,7 @@ export const Card: React.FC<CardProps> = (rawProps) => {
 
   return (
     <MuiCard
-      data-testid={dataTestId || 'card'}
+      data-testid={ownTestId}
       onClick={idle ? onClick : undefined}
       onFocus={idle ? onFocus : undefined}
       onBlur={idle ? onBlur : undefined}
@@ -69,7 +75,7 @@ export const Card: React.FC<CardProps> = (rawProps) => {
         pointerEvents: loading ? 'none' : 'auto',
         ...sx,
       }}
-      {...restProps}
+      {...props}
     >
       {loading && (
         <Box
@@ -95,15 +101,14 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   action,
   avatar,
   children,
-  dataTestId,
-  ...props
+  ...others
 }) => {
+  const ownTestId = resolveTestId(others, 'card-header');
+  const props = withoutTestIdProps(others);
+
   if (children) {
     return (
-      <Box
-        sx={{ p: CARD_HEADER_CHILDREN_PADDING_UNITS }}
-        data-testid={dataTestId || 'card-header'}
-      >
+      <Box sx={{ p: CARD_HEADER_CHILDREN_PADDING_UNITS }} data-testid={ownTestId}>
         {children}
       </Box>
     );
@@ -111,32 +116,32 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
 
   return (
     <MuiCardHeader
-      data-testid={dataTestId || 'card-header'}
+      data-testid={ownTestId}
       avatar={avatar}
       action={action}
       title={title}
       subheader={subtitle}
       titleTypographyProps={{
-        'data-testid': dataTestId ? `${dataTestId}-title` : 'card-title',
+        'data-testid': childTestId(others, 'title', 'card'),
       } as Record<string, unknown>}
       subheaderTypographyProps={{
-        'data-testid': dataTestId ? `${dataTestId}-subtitle` : 'card-subtitle',
+        'data-testid': childTestId(others, 'subtitle', 'card'),
       } as Record<string, unknown>}
       {...props}
     />
   );
 };
 
-export const CardContent: React.FC<CardContentProps> = ({ children, dense = false, dataTestId, ...props }) => (
+export const CardContent: React.FC<CardContentProps> = ({ children, dense = false, ...others }) => (
     <MuiCardContent
-      data-testid={dataTestId || 'card-content'}
+      data-testid={resolveTestId(others, 'card-content')}
       sx={{
         padding: dense ? CARD_CONTENT_PADDING_UNITS.dense : CARD_CONTENT_PADDING_UNITS.normal,
         '&:last-child': {
           paddingBottom: dense ? CARD_CONTENT_PADDING_UNITS.dense : CARD_CONTENT_PADDING_UNITS.normal,
         },
       }}
-      {...props}
+      {...withoutTestIdProps(others)}
     >
       {children}
     </MuiCardContent>
@@ -146,8 +151,7 @@ export const CardActions: React.FC<CardActionsProps> = ({
   children,
   disableSpacing = false,
   alignment = 'left',
-  dataTestId,
-  ...props
+  ...others
 }) => {
   const getJustifyContent = () => {
     switch (alignment) {
@@ -164,12 +168,12 @@ export const CardActions: React.FC<CardActionsProps> = ({
 
   return (
     <MuiCardActions
-      data-testid={dataTestId || 'card-actions'}
+      data-testid={resolveTestId(others, 'card-actions')}
       disableSpacing={disableSpacing}
       sx={{
         justifyContent: getJustifyContent(),
       }}
-      {...props}
+      {...withoutTestIdProps(others)}
     >
       {children}
     </MuiCardActions>
@@ -182,16 +186,15 @@ export const CardMedia: React.FC<CardMediaProps> = ({
   title,
   height = CARD_MEDIA_HEIGHT,
   children,
-  dataTestId,
-  ...props
+  ...others
 }) => (
     <MuiCardMedia
-      data-testid={dataTestId || 'card-media'}
+      data-testid={resolveTestId(others, 'card-media')}
       component={component}
       height={height}
       image={image}
       title={title}
-      {...props}
+      {...withoutTestIdProps(others)}
     >
       {children}
     </MuiCardMedia>
