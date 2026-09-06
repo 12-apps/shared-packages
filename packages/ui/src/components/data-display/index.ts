@@ -17,6 +17,7 @@ export * from './InteractiveTooltip';
 export * from './LazyImage';
 export * from './Lightbox';
 export * from './LoadingState';
+export * from './FleetMap';
 export * from './MapPreview';
 export * from './Popover';
 export * from './Progress';

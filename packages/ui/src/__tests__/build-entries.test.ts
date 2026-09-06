@@ -86,7 +86,7 @@ describe("the build emits one module per component", () => {
     const internal = Object.keys(entries).filter((key) => key.startsWith("_internal/"));
 
     expect(internal.length).toBeGreaterThan(0);
-    expect(Object.keys(entries).length - internal.length).toBe(140);
+    expect(Object.keys(entries).length - internal.length).toBe(141);
   });
 
   it("builds no story or spec — each would drag a test runner into dist", () => {
