@@ -20,7 +20,7 @@ sweep — endpoints and screens included.
 | **Core** | `@12-apps/notifications` | Nothing to wire — the framework-free, storage-free vocabulary both halves share: types, the generator registry, the preference policy, the phone rules, the copy table, the inbox wire shape. Safe in a browser. |
 | **Server** | `@12-apps/notifications/server` | Call `createApiNotifications({ db, contacts, transports })` and mount the `routes` it returns — the nine inbox / preferences / push-subscription endpoints, with parsing, statuses and the `{ data }` envelope inside. It also returns `notify` (the emit front door), `notifyByPermission`, `dispatchDeliveries`, `drainPending` and the three stores. |
 | **Hono** | `@12-apps/notifications/hono` | `const notifications = notificationsRouter({ ...serverConfig, resolveActor }); app.route('/api/account', notifications.router)`. A one-call mount; `hono` is an OPTIONAL peer, so importing the root, `/server` or `/react` never resolves it. |
-| **React** | `@12-apps/notifications/react` | Call `createWebNotifications({ apiBase })`. `BellWithPanel` is the whole feature as one element; `BellButton` + `Panel` are the pair for a host with its own chrome; `page` is the preferences screen you route to. pt-BR product copy and the origin host's test ids ship inside. |
+| **React** | `@12-apps/notifications/react` | Call `createWebNotifications({ apiBase })`. `BellWithPanel` is the whole feature as one element; `BellButton` + `Panel` are the pair for a host that wants the chrome around them; `useBellBadge` + `Panel` for one that draws its own trigger; `page` is the preferences screen you route to. pt-BR product copy and the origin host's test ids ship inside. |
 | **Web Push** | `@12-apps/notifications/web-push` | `sender: vapidPushSender({ subject, publicKey, privateKey })` on the `WEB_PUSH` declaration. Its own subpath because it is the only piece that needs `web-push` — an OPTIONAL peer a host that never enables the channel never installs. |
 | **Mail layout** | `@12-apps/notifications/email` | `renderEmail(document)` → `{ subject, html, text }`. Framework-free and dependency-free. Turn it on for the EMAIL transport by declaring `layout`; the copy packs are `@12-apps/notifications/email/locales`. |
 | **Previews** | `@12-apps/notifications/email/previews` | The preview catalogue and its two route descriptors. `@12-apps/notifications/email/previews/hono` is the one-call mount; `.../previews/react` is the operator screen. A SECOND wiring manifest — see "The mail layout and its preview console". |
@@ -495,7 +495,14 @@ createWebNotifications({
   with `LIVE_SUBJECT_KEY` precisely so the phone collapses them, and the row is
   still the record the reader re-reads later. It is a reason to decide which
   surface owns the COUNT before you turn live activities on, because this
-  package does not decide it for you.
+  package does not decide it for you yet.
+
+  Answering it means the server saying which unread rows name which subject.
+  That was built and pulled, on contract grounds rather than arithmetic ones:
+  the extra field breaks an adopter that publishes this response as a closed
+  schema, and every host pays the read — including one with no live activities
+  at all. The way through is an opt-in the surface asks for. See the docblock on
+  `src/react/bell-badge.ts` for the full account.
 - It leaves when your hook stops returning it. There is no dismiss, no read and
   no delete — the subject finishing is the only exit, which is what stops the
   section becoming a second inbox.
@@ -511,6 +518,28 @@ data: { [LIVE_SUBJECT_KEY]: `order:${orderId}` }
 
 (`LiveActivity` itself comes from either entry — the root or `./react` — so the
 hook and the type it returns are one import line.)
+
+**If you draw your own bell**, take `useBellBadge` from the factory rather than
+`useUnreadCount`:
+
+```ts
+const { count, hasNew } = notifications.useBellBadge({ enabled: signedIn });
+```
+
+`useUnreadCount` counts inbox rows and knows nothing about what is happening
+right now, so a host rendering it in its own chrome gets a bell showing NOTHING
+while a pinned entry sits inside the panel it opens. `useBellBadge` is the hook
+this package's own bell uses, so the two cannot disagree — `hasNew` is the
+`primary`/`neutral` decision above, said in a way your chrome can paint however
+it likes. It counts what that bell counts, double count included.
+
+It returns a new object each render, like any hook returning a literal. Reading
+`count` and `hasNew` straight into your JSX — what the bells above do — needs
+nothing; putting the object itself in a dependency array or through
+`React.memo` wants a `useMemo` on your side.
+
+Without `liveActivities` configured it is `useUnreadCount` plus
+`hasNew: count > 0`.
 
 `formatWebPush` turns it into `tag` on the push payload; your service worker
 passes `tag` to `showNotification` and the tray keeps ONE entry per subject

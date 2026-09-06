@@ -3,6 +3,7 @@ import { useState, type ComponentType, type JSX } from 'react';
 import { messagesOf, type NotificationMessages } from '../messages';
 
 import { createNotificationsApiClient, type NotificationsApiClient } from './api';
+import { useInboxBellBadge, useLiveBellBadge, type BellBadge } from './bell-badge';
 import { BellButton, LiveBellButton, type BellButtonProps } from './bell-button';
 import {
   useUnreadCount,
@@ -11,7 +12,7 @@ import {
 } from './hooks';
 import { createInboxStore, type InboxStore } from './inbox-state';
 import type { LiveActivitiesConfig } from './live-config';
-import { createLiveSeenStore } from './live-seen';
+import { createLiveSeenStore, type LiveSeenStore } from './live-seen';
 import { lazyNotificationsPanel } from './panel-lazy';
 import type { NotificationsPanelProps } from './panel';
 import { lazyPreferencesPage } from './page-lazy';
@@ -94,14 +95,64 @@ export interface WebNotifications {
     enabled?: boolean;
     onNavigate?: (link: string) => void;
   }>;
-  /** The badge number, for a host with its own trigger chrome. */
+  /**
+   * The unread INBOX count.
+   *
+   * For a host with its own trigger chrome only when that host configured no
+   * live activities — otherwise it is a bell that ignores everything happening
+   * right now, and `useBellBadge` below is the door. Still the right hook for
+   * anything that genuinely wants "how many unread rows".
+   */
   useUnreadCount: (options?: { enabled?: boolean }) => number;
+  /**
+   * The badge's NUMBER AND TONE, for a host with its own trigger chrome.
+   *
+   * What `useUnreadCount` should have been for a host that also configured live
+   * activities, and the reason it is a second door rather than a change to that
+   * one: a count alone cannot express a bell, because a live entry is present
+   * without being news (see `./bell-badge`). A host that renders
+   * `useUnreadCount` in its own chrome gets a badge that ignores everything
+   * happening right now — which is not a subtle wrongness, it is the pinned
+   * pedido on screen going uncounted.
+   *
+   * Identical to what this package's own `BellButton` draws, because it is the
+   * hook that bell uses. Without live activities configured it is
+   * `useUnreadCount` plus `hasNew: count > 0`.
+   */
+  useBellBadge: (options?: { enabled?: boolean }) => BellBadge;
   /** The shared client state, for host glue. */
   store: InboxStore;
   /** The bound wire client. */
   api: NotificationsApiClient;
   /** The copy in force, so a host's own chrome can reuse a sentence. */
   messages: NotificationMessages;
+}
+
+/** What the factory passes both badge hooks: whatever realtime wiring it has. */
+type SubscribeOption = {
+  subscribe?: NotificationsSubscribe;
+  useSignal?: NotificationsSignalHook;
+};
+
+/**
+ * The two badge hooks, bound to this factory's store.
+ *
+ * `useBellBadge` is chosen ONCE here, the same way `Bell` is below and for the
+ * same reason: `live.useActivities` is a hook, so which implementation runs
+ * must not be a per-render decision.
+ */
+function bindBadgeHooks(
+  store: InboxStore,
+  subscribeOption: SubscribeOption,
+  liveSeen: LiveSeenStore,
+  live: LiveActivitiesConfig | undefined,
+): Pick<WebNotifications, 'useUnreadCount' | 'useBellBadge'> {
+  return {
+    useUnreadCount: (options = {}) => useUnreadCount(store, { ...options, ...subscribeOption }),
+    useBellBadge: live
+      ? (options = {}) => useLiveBellBadge(store, live, liveSeen, { ...options, ...subscribeOption })
+      : (options = {}) => useInboxBellBadge(store, { ...options, ...subscribeOption }),
+  };
 }
 
 export function createWebNotifications(config: NotificationsWebConfig): WebNotifications {
@@ -147,9 +198,7 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
     ...(live ? { live, liveSeen } : {}),
   });
 
-  function useBoundUnreadCount(options: { enabled?: boolean } = {}): number {
-    return useUnreadCount(store, { ...options, ...subscribeOption });
-  }
+  const badgeHooks = bindBadgeHooks(store, subscribeOption, liveSeen, live);
 
   function BellWithPanel({
     enabled = true,
@@ -176,7 +225,7 @@ export function createWebNotifications(config: NotificationsWebConfig): WebNotif
     BellButton: Bell,
     Panel,
     BellWithPanel,
-    useUnreadCount: useBoundUnreadCount,
+    ...badgeHooks,
     store,
     api,
     messages,
