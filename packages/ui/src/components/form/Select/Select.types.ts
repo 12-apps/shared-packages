@@ -1,58 +1,21 @@
-import type { SizeValue } from '../../../tokens/scales';
 import type { SelectProps as MuiSelectProps } from '@mui/material/Select/index.js';
 
-export type SelectVariant = 'default' | 'glass' | 'gradient';
+import type { SelectBaseProps } from './Select.base';
 
-export interface SelectOption {
-  value: string | number;
-  label: string;
-  disabled?: boolean;
-}
+export type { SelectBaseProps, SelectOption, SelectValue, SelectVariant } from './Select.base';
 
-// `size` is omitted alongside `variant`: MUI declares it in its own words
-// (`small | medium`), and this component speaks the house scale.
-export interface SelectProps extends Omit<MuiSelectProps, 'variant' | 'size'> {
-  /**
-   * Visual variant of the select component
-   * @default 'default'
-   */
-  variant?: SelectVariant;
-  /**
-   * Array of options to display in the select
-   */
-  options: SelectOption[];
-  /**
-   * Label for the select field
-   */
-  label?: string;
-  /**
-   * Helper text to display below the select
-   */
-  helperText?: string;
-  /**
-   * Whether the select should take full width
-   * @default true
-   */
-  fullWidth?: boolean;
-  /**
-   * Size of the select component
-   * @default 'medium'
-   */
-  size?: SizeValue;
-  /**
-   * Placeholder text when no option is selected
-   */
-  placeholder?: string;
-  /**
-   * Whether to show a glow effect
-   * @default false
-   */
-  glow?: boolean;
-  /**
-   * Whether to show a pulse animation
-   * @default false
-   */
-  pulse?: boolean;
+/**
+ * The web `Select`: the shared contract, plus everything MUI's `Select`
+ * accepts that the contract does not already name — `value`, `onChange`,
+ * `MenuProps`, `renderValue`.
+ *
+ * `variant` and `size` are omitted from MUI's half alongside the rest of the
+ * contract: MUI declares both in its own words (`small | medium`), and this
+ * component speaks the house scale.
+ */
+export interface SelectProps
+  extends SelectBaseProps,
+    Omit<MuiSelectProps, 'variant' | 'size' | keyof SelectBaseProps> {
   /**
    * Test ID for testing purposes
    */
