@@ -293,6 +293,10 @@
       "default": "./dist/feedback/ConfirmAction.js"
     },
     "./feedback/Dialog": {
+      "react-native": {
+        "types": "./dist/types-native/components/feedback/Dialog/index.native.d.ts",
+        "default": "./dist/native/feedback/Dialog.js"
+      },
       "types": "./dist/types/components/feedback/Dialog/index.d.ts",
       "default": "./dist/feedback/Dialog.js"
     },

@@ -1,8 +1,6 @@
 import * as React from 'react';
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
   Platform,
   Pressable,
   StyleSheet,
@@ -17,6 +15,7 @@ import { resolveCardProps } from './Card.helpers';
 import { cardLook } from './Card.look.native';
 import { CARD_LOADING, CARD_PULSE } from './Card.metrics';
 import type { CardProps } from './Card.types.native';
+import { PulseRing } from '../../../platform/pulse-ring.native';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { renderTextChildren } from '../../../platform/text-children';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
@@ -26,71 +25,6 @@ import { muiTypeStyle } from '../../../tokens/mui-type';
 // under Metro and in the native Storybook; the slots live in their own file to
 // keep this one about the envelope, and are re-exported so that import works.
 export { CardActions, CardContent, CardHeader, CardMedia } from './CardParts.native';
-
-const nativeDriver = false;
-
-/**
- * The web's `::after` pulse: a ring of the primary hue that grows 15px out of
- * the card's edge and fades, every two seconds.
- *
- * Drawn as an expanding BORDER whose inner edge stays on the card's border box,
- * rather than as a filled view: the web puts its ring behind the paper
- * (`z-index: -1`) and React Native cannot paint a child behind its parent's own
- * background, so a filled ring would wash the card instead of haloing it. A
- * hollow one occupies exactly the band the box-shadow spread does.
- */
-function Pulse({
-  color,
-  radius,
-  testID,
-}: {
-  color: string;
-  radius: number | string;
-  testID: string;
-}): React.JSX.Element {
-  const progress = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: CARD_PULSE.durationMs,
-        easing: Easing.linear,
-        useNativeDriver: nativeDriver,
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [progress]);
-
-  const grow = progress.interpolate({
-    inputRange: [0, CARD_PULSE.fadeAt, 1],
-    outputRange: [0, CARD_PULSE.spread, 0],
-  });
-  const inset = Animated.multiply(grow, -1);
-
-  return (
-    <Animated.View
-      testID={testID}
-      aria-hidden
-      style={{
-        position: 'absolute',
-        pointerEvents: 'none',
-        top: inset,
-        left: inset,
-        right: inset,
-        bottom: inset,
-        borderWidth: grow,
-        borderColor: color,
-        borderRadius: radius,
-        opacity: progress.interpolate({
-          inputRange: [0, CARD_PULSE.fadeAt, 1],
-          outputRange: [CARD_PULSE.alpha, 0, 0],
-        }),
-      }}
-    />
-  );
-}
 
 /** The spinner a loading card centres over itself; `role` comes from `ActivityIndicator`. */
 function Spinner({ color, testID }: { color: string; testID: string }): React.JSX.Element {
@@ -141,7 +75,17 @@ export const Card = React.forwardRef<View, CardProps>((rawProps, ref) => {
 
   const body = (
     <>
-      {pulse ? <Pulse color={theme.palette.primary.main} radius={look.radius} testID={idFor('pulse')} /> : null}
+      {pulse ? (
+        <PulseRing
+          color={theme.palette.primary.main}
+          radius={look.radius}
+          spread={CARD_PULSE.spread}
+          durationMs={CARD_PULSE.durationMs}
+          fadeAt={CARD_PULSE.fadeAt}
+          opacity={CARD_PULSE.alpha}
+          testID={idFor('pulse')}
+        />
+      ) : null}
       {loading ? <Spinner color={theme.palette.primary.main} testID={idFor('loading')} /> : null}
       {renderTextChildren(children, { ...muiTypeStyle(theme, 'body1'), color: look.ink })}
     </>

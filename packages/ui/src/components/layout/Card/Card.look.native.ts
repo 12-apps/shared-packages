@@ -13,9 +13,9 @@ import {
   CARD_RADIUS_UNITS,
   CARD_SECTION_BACKGROUND,
   neumorphicShadows,
-  type CardShadow,
 } from './Card.metrics';
 import { alpha } from '../../../tokens/color';
+import type { UiShadow } from '../../../tokens/shadow';
 import type { UiTheme } from '../../../tokens/theme';
 
 /**
@@ -43,12 +43,12 @@ export function cardRadius(theme: UiTheme, radius: CardBorderRadius): number | s
 }
 
 /** A shadow with no offset — a halo all round, which is how `glow` reads. */
-const halo = (blurRadius: number, color: string): CardShadow[] => [
+const halo = (blurRadius: number, color: string): UiShadow[] => [
   { offsetX: 0, offsetY: 0, blurRadius, spreadDistance: 0, color },
 ];
 
 /** A dropped shadow straight down, which is how `glass` and `gradient` sit. */
-const drop = (offsetY: number, blurRadius: number, color: string): CardShadow[] => [
+const drop = (offsetY: number, blurRadius: number, color: string): UiShadow[] => [
   { offsetX: 0, offsetY, blurRadius, spreadDistance: 0, color },
 ];
 
@@ -83,7 +83,7 @@ function glassSurface(theme: UiTheme, lifted: boolean): Surface {
 
 function neumorphicSurface(theme: UiTheme, lifted: boolean): Surface {
   const { dark, light } = CARD_NEUMORPHIC.alpha;
-  const pair = (raised: boolean): CardShadow[] =>
+  const pair = (raised: boolean): UiShadow[] =>
     theme.mode === 'dark'
       ? neumorphicShadows(raised, alpha(BLACK, dark.near), alpha(WHITE, dark.far))
       : neumorphicShadows(

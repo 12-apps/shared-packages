@@ -1,4 +1,5 @@
-export { Dialog, DialogActions, DialogContent, DialogHeader } from './Dialog';
+export { Dialog } from './Dialog.native';
+export { DialogActions, DialogContent, DialogHeader } from './DialogParts.native';
 export type {
   DialogActionsAlignment,
   DialogActionsBaseProps,
@@ -12,4 +13,4 @@ export type {
   DialogProps,
   DialogSize,
   DialogVariant,
-} from './Dialog.types';
+} from './Dialog.types.native';

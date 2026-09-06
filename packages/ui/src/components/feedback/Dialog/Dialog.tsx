@@ -11,6 +11,15 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { hasSpacingSlot, withDialogDefaults } from './Dialog.helpers';
+import {
+  DIALOG_ACTIONS,
+  DIALOG_BODY_PADDING_UNITS,
+  DIALOG_CONTENT_PADDING_UNITS,
+  DIALOG_HEADER_CHILDREN_PADDING_UNITS,
+  DIALOG_TITLE,
+  DIALOG_TITLED_BODY_PADDING_TOP_UNITS,
+} from './Dialog.metrics';
 import { backdropSxOf, variantStylesOf } from './Dialog.styles';
 import type {
   DialogActionsProps,
@@ -18,24 +27,6 @@ import type {
   DialogHeaderProps,
   DialogProps,
 } from './Dialog.types';
-
-/**
- * Does this hand us a spacing slot? Fragments are transparent: `<>` is a way of
- * passing several children, not a child that owns them, and a consumer who
- * groups a `DialogContent` and a `DialogActions` in one has still passed both.
- *
- * Only the slots themselves count, and only at the top. A `DialogContent`
- * genuinely nested inside a `<div>` is that div's content, and the dialog
- * padding the div is right.
- */
-function hasSpacingSlot(children: React.ReactNode): boolean {
-  return React.Children.toArray(children).some((child) => {
-    if (!React.isValidElement(child)) return false;
-    if (child.type === DialogContent || child.type === DialogActions) return true;
-    if (child.type !== React.Fragment) return false;
-    return hasSpacingSlot((child.props as { children?: React.ReactNode }).children);
-  });
-}
 
 /**
  * The padding a dialog gives children that are not managing their own — and the
@@ -60,8 +51,8 @@ function hasSpacingSlot(children: React.ReactNode): boolean {
  * had before, not a broken one.
  */
 const BODY_SX = {
-  px: 3,
-  pb: 2.5,
+  px: DIALOG_BODY_PADDING_UNITS.horizontal,
+  pb: DIALOG_BODY_PADDING_UNITS.bottom,
   '&:has(> .MuiDialogContent-root), &:has(> .MuiDialogActions-root)': {
     display: 'contents',
   },
@@ -74,38 +65,12 @@ const BODY_SX = {
  * spacing.
  */
 function bodyOf(children: React.ReactNode, hasTitle: boolean): React.ReactNode {
-  if (hasSpacingSlot(children)) return children;
-  return <Box sx={{ ...BODY_SX, pt: hasTitle ? 0.5 : 2.5 }}>{children}</Box>;
-}
-
-const DIALOG_DEFAULTS = {
-  variant: 'default',
-  size: 'md',
-  showCloseButton: true,
-  backdrop: true,
-  persistent: false,
-  glass: false,
-  gradient: false,
-  glow: false,
-  pulse: false,
-  borderRadius: 'lg',
-} as const satisfies Partial<DialogProps>;
-
-/** DialogProps with every defaulted field guaranteed present (wide types). */
-type DialogPropsWithDefaults = DialogProps &
-  Required<Pick<DialogProps, keyof typeof DIALOG_DEFAULTS>>;
-
-/**
- * Apply {@link DIALOG_DEFAULTS} exactly like parameter defaults would: only a
- * missing/`undefined` prop falls back (a loop, so the component's cyclomatic
- * complexity doesn't pay one branch per defaulted prop).
- */
-function withDialogDefaults(props: DialogProps): DialogPropsWithDefaults {
-  const merged: Record<string, unknown> = { ...props };
-  for (const [key, value] of Object.entries(DIALOG_DEFAULTS)) {
-    if (merged[key] === undefined) merged[key] = value;
-  }
-  return merged as unknown as DialogPropsWithDefaults;
+  // Read lazily: both slots are declared below this function.
+  if (hasSpacingSlot(children, [DialogContent, DialogActions])) return children;
+  const pt = hasTitle
+    ? DIALOG_BODY_PADDING_UNITS.topUnderTitle
+    : DIALOG_BODY_PADDING_UNITS.top;
+  return <Box sx={{ ...BODY_SX, pt }}>{children}</Box>;
 }
 
 export const Dialog: React.FC<DialogProps> = (rawProps) => {
@@ -195,7 +160,13 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
 }) => {
   if (children) {
     return (
-      <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Box
+        sx={{
+          p: DIALOG_HEADER_CHILDREN_PADDING_UNITS,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
         {children}
       </Box>
     );
@@ -208,7 +179,9 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        pb: subtitle ? 1 : 2,
+        pb: subtitle
+          ? DIALOG_TITLE.paddingBottomUnits.withSubtitle
+          : DIALOG_TITLE.paddingBottomUnits.plain,
       }}
     >
       <Box>
@@ -216,7 +189,11 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
           {title}
         </Typography>
         {subtitle && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: DIALOG_TITLE.subtitleGapUnits }}
+          >
             {subtitle}
           </Typography>
         )}
@@ -254,7 +231,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
  * contributes its bottom padding, so a shrunk label's `translate(…, -9px)` is
  * all that is missing. 12px clears it and leaves the gap visually tight.
  */
-const TITLED_BODY_PADDING_TOP = 1.5;
+const TITLED_BODY_PADDING_TOP = DIALOG_TITLED_BODY_PADDING_TOP_UNITS;
 
 /**
  * `.MuiDialogTitle-root + &` is `(0,2,0)`-specific and a plain `sx` entry is
@@ -275,7 +252,7 @@ export const DialogContent: React.FC<DialogContentProps> = ({
       data-testid={dataTestId ? `${dataTestId}-content` : 'dialog-content'}
       dividers={dividers}
       sx={{
-        padding: dense ? 1.5 : 3,
+        padding: dense ? DIALOG_CONTENT_PADDING_UNITS.dense : DIALOG_CONTENT_PADDING_UNITS.normal,
         [TITLED_BODY_SELECTOR]: { paddingTop: TITLED_BODY_PADDING_TOP },
         '&.MuiDialogContent-dividers': {
           borderTop: dividers ? '1px solid' : 'none',
@@ -292,7 +269,7 @@ export const DialogContent: React.FC<DialogContentProps> = ({
 export const DialogActions: React.FC<DialogActionsProps> = ({
   children,
   alignment = 'right',
-  spacing = 1,
+  spacing = DIALOG_ACTIONS.defaultSpacingUnits,
   dataTestId,
   ...props
 }) => {
@@ -312,7 +289,7 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
       sx={{
         justifyContent: getJustifyContent(),
         gap: spacing,
-        p: 2,
+        p: DIALOG_ACTIONS.paddingUnits,
       }}
       {...props}
     >

@@ -317,6 +317,8 @@ export const ScreenReaderTest: Story = {
 
 // 4. Focus Management Test
 export const FocusManagement: Story = {
+  // Asserts focus containment against MUI's own `.MuiModal-root` element, which only the DOM renderer emits.
+  tags: ['native-skip'],
   name: '🎯 Focus Management Test',
   render: (args) => (
     <Box>
@@ -690,6 +692,8 @@ export const EdgeCases: Story = {
 
 // 8. Persistent Dialog Test
 export const PersistentDialogTest: Story = {
+  // Asserts the missing close button against MUI's `.MuiDialogTitle` class, which only the DOM renderer emits.
+  tags: ['native-skip'],
   name: '🔒 Persistent Dialog Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -888,6 +892,8 @@ export const ThemeVariations: Story = {
 
 // 11. Integration Test
 export const Integration: Story = {
+  // Counts `[role="dialog"]` elements while two dialogs are stacked; react-native-web gives that role to the top-most `Modal` only.
+  tags: ['native-skip'],
   name: '🔗 Integration Test',
   render: (args) => {
     const [nestedOpen, setNestedOpen] = useState(false);

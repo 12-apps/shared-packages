@@ -69,8 +69,19 @@ describe("@12-apps/ui package wiring (Task 5)", () => {
     // Under Metro this resolves to the web build and fails on `@mui/material`
     // at import — loudly — which is the intended behaviour for a component
     // that has no native renderer yet.
-    const dialog = readPkg().exports?.["./feedback/Dialog"] as Record<string, unknown>;
-    expect(Object.keys(dialog)).toEqual(["types", "default"]);
+    //
+    // The subject is DERIVED rather than named: this used to pin one component
+    // by hand, and porting that component turned a green test red for a reason
+    // that had nothing to do with the wiring it guards. Whichever subpath is
+    // still unported makes the same point.
+    const pkg = readPkg();
+    const native = requireJson("../../entries.native.json") as Record<string, string>;
+    const unported = Object.keys(pkg.exports ?? {}).find(
+      (subpath) => subpath.startsWith("./") && !(subpath.slice(2) in native),
+    );
+    expect(unported).toBeDefined();
+    const entry = pkg.exports?.[unported as string] as Record<string, unknown>;
+    expect(Object.keys(entry)).toEqual(["types", "default"]);
   });
 
   /**

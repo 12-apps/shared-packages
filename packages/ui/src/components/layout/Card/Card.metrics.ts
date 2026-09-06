@@ -1,13 +1,15 @@
 import type { CardBorderRadius } from './Card.base';
+import type { UiShadow } from '../../../tokens/shadow';
 
 /**
  * THE NUMBERS BOTH `Card` RENDERERS DRAW WITH.
  *
  * `Card.styles.ts` (web, emotion over MUI) and `Card.native.tsx` /
  * `Card.look.native.ts` (React Native) read this one table. The web turns the
- * radii into `theme.spacing()` and the shadows into CSS strings ({@link
- * shadowCss} writes exactly the text it always has); native hands the same
- * shadow objects to `boxShadow` and the same numbers to a `StyleSheet`.
+ * radii into `theme.spacing()` and the shadows into CSS strings (`shadowCss`
+ * in `src/tokens/shadow.ts` writes exactly the text it always has); native
+ * hands the same shadow objects to `boxShadow` and the same numbers to a
+ * `StyleSheet`.
  *
  * Nothing here imports a renderer, a theme or a colour: a shadow's COLOUR is
  * the caller's, because the two sides reach for the same arithmetic through
@@ -37,37 +39,8 @@ export const CARD_BORDER_WIDTH = 1;
 
 /* ── Shadows ──────────────────────────────────────────────────────────────── */
 
-/**
- * One shadow, as numbers and a colour.
- *
- * Structurally a React Native `BoxShadowValue`, so the native side can pass an
- * array of these straight to `boxShadow`; the web renders them through
- * {@link shadowCss}.
- */
-export interface CardShadow {
-  offsetX: number;
-  offsetY: number;
-  blurRadius: number;
-  spreadDistance: number;
-  color: string;
-}
-
-/** A length the way the web writes it: a bare `0`, otherwise px. */
-const len = (value: number): string => (value === 0 ? '0' : `${value}px`);
-
-/** One shadow as CSS. A zero spread is omitted, exactly as the web has always written it. */
-export const shadowCss = (shadow: CardShadow): string =>
-  [
-    len(shadow.offsetX),
-    len(shadow.offsetY),
-    len(shadow.blurRadius),
-    ...(shadow.spreadDistance === 0 ? [] : [len(shadow.spreadDistance)]),
-    shadow.color,
-  ].join(' ');
-
-/** Several shadows as one CSS declaration. */
-export const shadowListCss = (shadows: readonly CardShadow[]): string =>
-  shadows.map(shadowCss).join(', ');
+/** A card's shadows are `UiShadow`s; `src/tokens/shadow.ts` says why they have a shape. */
+export type CardShadow = UiShadow;
 
 /**
  * MUI's `theme.shadows[1]` — the elevation a `Paper` paints and therefore the
@@ -78,7 +51,7 @@ export const shadowListCss = (shadows: readonly CardShadow[]): string =>
  * inherit it from. (`variant="elevated"`'s own `elevation: 4` is not a CSS
  * property and paints nothing — see {@link CARD_ELEVATION}.)
  */
-export const CARD_PAPER_SHADOW: readonly CardShadow[] = [
+export const CARD_PAPER_SHADOW: readonly UiShadow[] = [
   { offsetX: 0, offsetY: 2, blurRadius: 1, spreadDistance: -1, color: 'rgba(0, 0, 0, 0.2)' },
   { offsetX: 0, offsetY: 1, blurRadius: 1, spreadDistance: 0, color: 'rgba(0, 0, 0, 0.14)' },
   { offsetX: 0, offsetY: 1, blurRadius: 3, spreadDistance: 0, color: 'rgba(0, 0, 0, 0.12)' },
@@ -124,7 +97,7 @@ export const CARD_NEUMORPHIC = {
  * The offset pair `neumorphic` paints, given the two colours the mode picked:
  * `near` down-right, `far` up-left, both blurred twice the offset.
  */
-export function neumorphicShadows(lifted: boolean, near: string, far: string): CardShadow[] {
+export function neumorphicShadows(lifted: boolean, near: string, far: string): UiShadow[] {
   const spread = lifted ? CARD_NEUMORPHIC.spread.lifted : CARD_NEUMORPHIC.spread.rest;
   const blurRadius = spread * CARD_NEUMORPHIC.blurFactor;
   return [

@@ -15,9 +15,8 @@ import {
   CARD_RADIUS_UNITS,
   CARD_SECTION_BACKGROUND,
   neumorphicShadows,
-  shadowCss,
-  shadowListCss,
 } from './Card.metrics';
+import { shadowCss, shadowListCss } from '../../../tokens/shadow';
 
 type BorderRadius = CardBorderRadius;
 
