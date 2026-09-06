@@ -12,11 +12,15 @@
  *
  * ## What it deliberately does NOT do
  *
- * - It does not touch `unread`. A live entry is not news; counting it would put
- *   a number on the bell that no amount of reading can clear.
- * - It renders nothing at all when there is nothing live — no heading, no empty
- *   state, no reserved space. A panel with one permanent empty section in it is
- *   a panel that has taught its reader to skip the top.
+ * - It does not mark anything READ. A live entry counts on the bell, but as
+ *   itself rather than as unread — the tone, not the number, is what says
+ *   whether it is news. (This once read "it does not touch `unread`", on the
+ *   argument that counting it would put a number on the bell no amount of
+ *   reading can clear. The argument stands; the tone is what answers it.)
+ * - It renders no heading, no empty state and no reserved space when there is
+ *   nothing live — but it still renders its SLOT, so the inbox below keeps its
+ *   position and is not torn down and rebuilt every time a subject starts or
+ *   finishes.
  * - It does not fetch. `useActivities` is the host's, and `active` tells it
  *   whether anyone is looking.
  */
@@ -103,6 +107,22 @@ export interface LiveSectionProps {
 
 
 
+/**
+ * ## Why this always renders its slot, even with nothing live
+ *
+ * React reconciles a fragment's children POSITIONALLY. The section and the
+ * inbox are siblings in one fragment, and the empty branch used to render the
+ * inbox ALONE — one child rather than two — so the inbox moved to a position
+ * previously held by a different element type, which React handles by
+ * unmounting the old subtree and mounting a new one. Every `NotificationRow`
+ * would be torn down and rebuilt the moment a pedido started or finished,
+ * throwing keyboard focus to `<body>` inside a focus-trapped drawer, for a
+ * reader who was only scrolling their inbox.
+ *
+ * So the empty case renders `null` INTO the slot rather than returning early.
+ * Pinned by comparing the row's DOM NODE across the transition: a test on the
+ * test id alone passes either way, because a remounted row has the same id.
+ */
 export function LiveSection({
   config,
   messages,
@@ -129,14 +149,11 @@ export function LiveSection({
     if (active && liveCount > 0) seen?.mark(activities);
   }, [active, liveCount, activities, seen]);
 
-  if (liveCount === 0) return <>{children?.(0)}</>;
-
   return (
     <>
-    // A NAMED region. Without the label a screen-reader user meets a loose run
-    // of controls ahead of the inbox with nothing saying what they are; the
-    // panel's own title is the drawer's heading and cannot describe this block.
-    <Box
+      {/* A NAMED region, and always a SLOT — see the docblock above. */}
+      {liveCount === 0 ? null : (
+        <Box
       component="section"
       aria-labelledby={headingId}
       data-testid="live-activities"
@@ -170,9 +187,10 @@ export function LiveSection({
             {...(onOpen ? { onOpen } : {})}
             {...(config.renderIcon ? { renderIcon: config.renderIcon } : {})}
           />
-        ))}
-      </Box>
-      </Box>
+            ))}
+          </Box>
+        </Box>
+      )}
       {children?.(liveCount)}
     </>
   );

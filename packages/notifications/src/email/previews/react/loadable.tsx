@@ -56,7 +56,10 @@ export function useLoadable<T>(
       // for, with the toggle disagreeing.
       live = false;
     };
-  }, [load, nonce]);
+    // `keepPrevious` belongs here: it decides whether this effect blanks the
+    // children, so a caller that flips it must get the new behaviour rather
+    // than the one captured on first render.
+  }, [load, nonce, keepPrevious]);
   return { ...state, reload: () => setNonce((n) => n + 1) };
 }
 
