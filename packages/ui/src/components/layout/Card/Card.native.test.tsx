@@ -125,8 +125,10 @@ describe('Card (native)', () => {
     expect(shadows(look({ glow: true, variant: 'glass' }).container)[0]).toMatchObject({ blurRadius: 32 });
   });
 
-  it('turns the clip off for the pulse ring only', () => {
+  it('turns the clip off for whatever has to paint outside the card', () => {
+    expect(look().container.overflow).toBe('hidden');
     expect(look({ pulse: true }).container.overflow).toBe('visible');
+    expect(look({ glow: true }).container.overflow).toBe('visible');
     render(
       <Card pulse dataTestId="pulsing">
         <CardContent>x</CardContent>

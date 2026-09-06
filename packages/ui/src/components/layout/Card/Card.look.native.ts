@@ -180,8 +180,11 @@ export interface CardLook {
 /**
  * Everything the card paints, decided once per render.
  *
- * `overflow` follows the web exactly: MUI's `Card` clips its children, and only
- * the pulse ring — which has to reach 15px past the edge — turns that off.
+ * `overflow` is the one place native needs a rule the web does not. MUI's
+ * `Card` clips its children, and the pulse ring has to reach 15px past the
+ * edge — but a view's own shadow is clipped by its own overflow on a device,
+ * so a `glow` the caller asked for would simply not paint. Both decorations
+ * therefore turn the clip off, exactly as `Button.native.tsx` does.
  */
 export function cardLook(theme: UiTheme, a: CardLookArgs): CardLook {
   const radius = cardRadius(theme, a.borderRadius);
@@ -191,7 +194,7 @@ export function cardLook(theme: UiTheme, a: CardLookArgs): CardLook {
     position: 'relative',
     borderRadius: radius,
     backgroundColor: theme.palette.background.paper,
-    overflow: a.pulse ? 'visible' : 'hidden',
+    overflow: a.pulse || a.glow ? 'visible' : 'hidden',
     opacity: a.loading ? CARD_LOADING.opacity : 1,
     pointerEvents: a.loading ? 'none' : 'auto',
   };

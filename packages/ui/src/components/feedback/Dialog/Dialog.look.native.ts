@@ -130,6 +130,10 @@ function overlayFor(theme: UiTheme, variant: DialogVariant): ViewStyle {
  * The base carries what MUI's `Paper` gives every dialog — the paper colour and
  * `shadows[24]` — because React Native has no Paper to inherit them from; a
  * `glow` or a variant shadow then overrides it exactly as the `sx` does.
+ *
+ * `overflow` clips the paper's children to its corners, as MUI's own
+ * `overflow-y: auto` does — except under `pulse` or `glow`, which have to paint
+ * OUTSIDE the paper and are clipped by the view's own overflow on a device.
  */
 export function dialogLook(theme: UiTheme, a: DialogLookArgs): DialogLook {
   const radius = dialogRadius(theme, a.borderRadius);
@@ -142,7 +146,7 @@ export function dialogLook(theme: UiTheme, a: DialogLookArgs): DialogLook {
     width: '100%',
     maxWidth: DIALOG_MAX_WIDTH[a.size] ?? DIALOG_MAX_WIDTH.md,
     maxHeight: '100%',
-    overflow: a.pulse ? 'visible' : 'hidden',
+    overflow: a.pulse || a.glow ? 'visible' : 'hidden',
   };
 
   return {
