@@ -87,6 +87,47 @@ function RowText({
  * the selected row visually DESELECTED it and made it indistinguishable from
  * any other row under the cursor.
  */
+/**
+ * Keep the selected row visible INSIDE the roster.
+ *
+ * The roster caps its own height, so a dispatcher arrowing through a fleet of
+ * thirty otherwise walks the selection below the fold with nothing moving —
+ * `aria-activedescendant` follows, and a SIGHTED keyboard user sees no feedback
+ * at all.
+ *
+ * Watches the row's POSITION as well as its selectedness, because the roster
+ * re-sorts on every poll: a rider who stays selected while their staleness
+ * moves them down the list would otherwise slide out of view with the effect
+ * never re-running.
+ *
+ * Arithmetic rather than `scrollIntoView({ block: 'nearest' })` because that
+ * walks every scrollable ancestor, the document included, and `nearest` only
+ * spares an ancestor the row is already visible in — which is exactly false
+ * when the panel is off screen. Re-running on every re-sort, it would yank the
+ * whole page back to the map on a timer, and drag it there on mount for any
+ * board rendered below the fold with a selection already set.
+ */
+function useKeptInView(
+  selected: boolean,
+  position: number,
+): React.RefObject<HTMLDivElement | null> {
+  const row = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const box = row.current;
+    const list = box?.parentElement;
+    if (!selected || !box || !list) return;
+    const top = box.offsetTop - list.offsetTop;
+    if (top < list.scrollTop) {
+      list.scrollTop = top;
+    } else if (top + box.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = top + box.offsetHeight - list.clientHeight;
+    }
+  }, [selected, position]);
+
+  return row;
+}
+
 function rowSx(theme: Theme, selected: boolean): SxProps<Theme> {
   const resting = selected ? theme.palette.action.selected : 'transparent';
   return {
@@ -128,36 +169,7 @@ function FleetRow({
 }: RowProps): React.JSX.Element {
   const theme = useTheme();
   const color = freshnessColor(freshness, theme);
-  const row = React.useRef<HTMLDivElement>(null);
-
-  // Keep the active option visible. The roster caps its own height, so a
-  // dispatcher arrowing through a fleet of thirty otherwise walks the selection
-  // below the fold with nothing moving — `aria-activedescendant` follows, and a
-  // SIGHTED keyboard user sees no feedback at all.
-  //
-  // Keyed on the ROW's position as well as its selectedness, because the roster
-  // re-sorts on every poll: a rider who stays selected while their staleness
-  // moves them down the list would otherwise scroll out of view with the effect
-  // never re-running.
-  //
-  // Scrolls the ROSTER and not the row, which is why this is arithmetic rather
-  // than `scrollIntoView({ block: 'nearest' })`. That walks every scrollable
-  // ancestor, the document included, and `nearest` only spares an ancestor the
-  // row is already visible in — which is exactly false when the panel is off
-  // screen. With the effect now re-running on every re-sort, it would yank the
-  // whole page back to the map on a timer, and drag it there on mount for any
-  // board rendered below the fold with a selection already set.
-  React.useEffect(() => {
-    const box = row.current;
-    const list = box?.parentElement;
-    if (!selected || !box || !list) return;
-    const top = box.offsetTop - list.offsetTop;
-    if (top < list.scrollTop) {
-      list.scrollTop = top;
-    } else if (top + box.offsetHeight > list.scrollTop + list.clientHeight) {
-      list.scrollTop = top + box.offsetHeight - list.clientHeight;
-    }
-  }, [selected, position]);
+  const row = useKeptInView(selected, position);
 
   return (
     <Box
