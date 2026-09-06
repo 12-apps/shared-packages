@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box/index.js';
 import React, { forwardRef } from 'react';
 
+import { splitTestId } from '../../../platform/test-id';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import {
@@ -32,10 +33,11 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>((props, ref) =>
   const {
     variant, color, size, label, description, glow, glass, gradient, labelPosition,
     onIcon, offIcon, onText, offText, error, helperText, trackWidth, trackHeight,
-    checked, onChange, animated, loading, ripple, pulse, dataTestId,
-    ...rest
+    checked, onChange, animated, loading, ripple, pulse,
+    ...others
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
 
+  const { testId: dataTestId, rest } = splitTestId(others);
   const containerTestId = dataTestId ? `${dataTestId}-container` : 'switch-container';
 
   const control = (

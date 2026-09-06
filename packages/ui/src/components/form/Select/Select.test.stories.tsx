@@ -643,6 +643,9 @@ export const ThemeVariations: Story = {
 };
 
 export const VisualStates: Story = {
+  // Asserts MUI's `Mui-error` and `Mui-disabled` class names, which only the
+  // MUI renderer emits.
+  tags: ['native-skip'],
   name: '👁️ Visual States Test',
   render: () => (
     <Stack spacing={3}>

@@ -1,24 +1,22 @@
-import type { SizeValue } from '../../../tokens/scales';
 import type { InputLabelProps as MuiInputLabelProps } from '@mui/material/InputLabel/index.js';
-import type { InputHTMLAttributes, ReactNode } from 'react';
+import type { InputHTMLAttributes } from 'react';
 import type React from 'react';
 
-export type InputVariant = 'outlined' | 'filled' | 'glass' | 'underline' | 'gradient';
-export type InputSize = SizeValue;
+import type { InputBaseProps } from './Input.base';
 
-export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'color'> {
-  variant?: InputVariant;
-  size?: InputSize;
-  label?: string;
-  error?: boolean;
-  helperText?: string;
-  startAdornment?: ReactNode;
-  endAdornment?: ReactNode;
-  fullWidth?: boolean;
-  floating?: boolean;
-  glow?: boolean;
-  pulse?: boolean;
-  loading?: boolean;
+export type { InputBaseProps, InputSize, InputVariant } from './Input.base';
+
+/**
+ * The web `Input`: the shared contract, plus everything an `<input>` accepts
+ * that the contract does not already name.
+ *
+ * `value`, `defaultValue` and `onChange` keep the DOM's own types — they are
+ * not in the base, because a web `value` is `string | number | readonly
+ * string[]` and a React Native one is a `string`.
+ */
+export interface InputProps
+  extends InputBaseProps,
+    Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'color' | keyof InputBaseProps> {
   onClick?: React.MouseEventHandler<HTMLInputElement>;
   onFocus?: React.FocusEventHandler<HTMLInputElement>;
   onBlur?: React.FocusEventHandler<HTMLInputElement>;

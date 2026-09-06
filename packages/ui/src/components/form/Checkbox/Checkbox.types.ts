@@ -1,17 +1,18 @@
 import type { CheckboxProps as MuiCheckboxProps } from '@mui/material/Checkbox/index.js';
-import type { ChangeEvent, FocusEventHandler,MouseEventHandler } from 'react';
+import type { ChangeEvent, FocusEventHandler, MouseEventHandler } from 'react';
 
-export type CheckboxVariant = 'default' | 'rounded' | 'toggle';
+import type { CheckboxBaseProps } from './Checkbox.base';
 
-export interface CheckboxProps extends Omit<MuiCheckboxProps, 'variant'> {
-  variant?: CheckboxVariant;
-  label?: string;
-  error?: boolean;
-  helperText?: string;
-  loading?: boolean;
-  ripple?: boolean;
-  glow?: boolean;
-  pulse?: boolean;
+export type { CheckboxBaseProps, CheckboxVariant } from './Checkbox.base';
+
+/**
+ * The web `Checkbox`: the shared contract, plus everything MUI's `Checkbox`
+ * accepts that the contract does not already name — `checked`,
+ * `defaultChecked`, `size`, `color`, `icon`, `inputProps`, `sx`.
+ */
+export interface CheckboxProps
+  extends CheckboxBaseProps,
+    Omit<MuiCheckboxProps, 'variant' | keyof CheckboxBaseProps> {
   'data-testid'?: string;
   onClick?: MouseEventHandler<HTMLButtonElement>;
   onFocus?: FocusEventHandler<HTMLButtonElement>;

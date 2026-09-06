@@ -325,6 +325,9 @@ export const KeyboardNavigation: Story = {
 };
 
 export const ScreenReaderTest: Story = {
+  // Reads the label through MUI's `.MuiFormControl-root` and expects MUI's own
+  // generated `-helper-text` id; only the MUI renderer emits either.
+  tags: ['native-skip'],
   name: '🔊 Screen Reader Test',
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '300px' }}>
@@ -738,6 +741,9 @@ export const VisualStates: Story = {
 // ============================================================================
 
 export const EdgeCases: Story = {
+  // Reaches for MUI's `.MuiTextField-root` wrapper class, which only the MUI
+  // renderer emits.
+  tags: ['native-skip'],
   name: '🔧 Edge Cases Test',
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '300px' }}>

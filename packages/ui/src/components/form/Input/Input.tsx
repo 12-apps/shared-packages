@@ -3,6 +3,7 @@ import InputAdornment from '@mui/material/InputAdornment/index.js';
 import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { INPUT_LOADING } from './Input.metrics';
 import { TextFieldSlim } from './text-field-slim';
 
 import {
@@ -16,6 +17,7 @@ import {
   SIZE_MAP,
 } from './Input.styles';
 import type { InputProps } from './Input.types';
+import { splitTestId } from '../../../platform/test-id';
 
 /**
  * `TextFieldSlim`, not `TextField` — see `text-field-slim.tsx`. MUI's own
@@ -35,7 +37,7 @@ const StyledTextField = styled(TextFieldSlim, {
   loading?: boolean;
 }>(({ theme, customVariant, floating, glow, pulse, loading }) => ({
   position: 'relative',
-  opacity: loading ? 0.7 : 1,
+  opacity: loading ? INPUT_LOADING.opacity : 1,
 
   ...(glow ? glowStyles(theme) : {}),
   ...(pulse ? pulseStyles(theme) : {}),
@@ -58,7 +60,7 @@ const EndAdornment: React.FC<{ loading: boolean; endAdornment?: React.ReactNode 
   if (loading) {
     return (
       <InputAdornment position="end">
-        <CircularProgress size={20} />
+        <CircularProgress size={INPUT_LOADING.spinnerSize} />
       </InputAdornment>
     );
   }
@@ -96,49 +98,51 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onClick,
       onFocus,
       onBlur,
-      'data-testid': dataTestId,
       'aria-label': ariaLabel,
-      ...props
+      ...rest
     },
     ref,
-  ) => (
-    <StyledTextField
-      ref={ref}
-      variant={muiVariantFor(variant)}
-      customVariant={variant}
-      floating={floating}
-      glow={glow}
-      pulse={pulse}
-      loading={loading}
-      label={label}
-      error={error}
-      helperText={helperText}
-      fullWidth={fullWidth}
-      {...interactionProps(loading, onClick, props.disabled)}
-      onFocus={onFocus}
-      onBlur={onBlur}
-      /*
-       * `aria-label` has to ride `inputProps` to reach the `<input>` (FUT-755).
-       * Spread with the rest it lands on the FormControl DIV that the text
-       * field renders as its root, which carries no role — so the field kept
-       * no accessible name, and a source grep saying "this input is labelled"
-       * disagreed with the DOM. The reports search box and the block-title
-       * inputs were both named in source and anonymous to a screen reader.
-       */
-      inputProps={{
-        'data-testid': dataTestId,
-        ...(ariaLabel === undefined ? {} : { 'aria-label': ariaLabel }),
-      }}
-      InputProps={{
-        startAdornment: startAdornment && (
-          <InputAdornment position="start">{startAdornment}</InputAdornment>
-        ),
-        endAdornment: <EndAdornment loading={loading} endAdornment={endAdornment} />,
-      }}
-      {...SIZE_MAP[size]}
-      {...props}
-    />
-  ),
+  ) => {
+    const { testId: dataTestId, rest: props } = splitTestId(rest);
+    return (
+      <StyledTextField
+        ref={ref}
+        variant={muiVariantFor(variant)}
+        customVariant={variant}
+        floating={floating}
+        glow={glow}
+        pulse={pulse}
+        loading={loading}
+        label={label}
+        error={error}
+        helperText={helperText}
+        fullWidth={fullWidth}
+        {...interactionProps(loading, onClick, props.disabled)}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        /*
+         * `aria-label` has to ride `inputProps` to reach the `<input>` (FUT-755).
+         * Spread with the rest it lands on the FormControl DIV that the text
+         * field renders as its root, which carries no role — so the field kept
+         * no accessible name, and a source grep saying "this input is labelled"
+         * disagreed with the DOM. The reports search box and the block-title
+         * inputs were both named in source and anonymous to a screen reader.
+         */
+        inputProps={{
+          'data-testid': dataTestId,
+          ...(ariaLabel === undefined ? {} : { 'aria-label': ariaLabel }),
+        }}
+        InputProps={{
+          startAdornment: startAdornment && (
+            <InputAdornment position="start">{startAdornment}</InputAdornment>
+          ),
+          endAdornment: <EndAdornment loading={loading} endAdornment={endAdornment} />,
+        }}
+        {...SIZE_MAP[size]}
+        {...props}
+      />
+    );
+  },
 );
 
 Input.displayName = 'Input';

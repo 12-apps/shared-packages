@@ -345,6 +345,10 @@
       "default": "./dist/form/CepField.js"
     },
     "./form/Checkbox": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Checkbox/index.native.d.ts",
+        "default": "./dist/native/form/Checkbox.js"
+      },
       "types": "./dist/types/components/form/Checkbox/index.d.ts",
       "default": "./dist/form/Checkbox.js"
     },
@@ -381,6 +385,10 @@
       "default": "./dist/form/total-form.js"
     },
     "./form/Input": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Input/index.native.d.ts",
+        "default": "./dist/native/form/Input.js"
+      },
       "types": "./dist/types/components/form/Input/index.d.ts",
       "default": "./dist/form/Input.js"
     },
@@ -417,6 +425,10 @@
       "default": "./dist/form/SearchPalette.js"
     },
     "./form/Select": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Select/index.native.d.ts",
+        "default": "./dist/native/form/Select.js"
+      },
       "types": "./dist/types/components/form/Select/index.d.ts",
       "default": "./dist/form/Select.js"
     },
@@ -425,6 +437,10 @@
       "default": "./dist/form/Slider.js"
     },
     "./form/Switch": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/Switch/index.native.d.ts",
+        "default": "./dist/native/form/Switch.js"
+      },
       "types": "./dist/types/components/form/Switch/index.d.ts",
       "default": "./dist/form/Switch.js"
     },

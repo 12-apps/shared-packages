@@ -1,0 +1,12 @@
+# Select on React Native
+
+Known rendering gaps, one bullet each; `pnpm native:ledger` reads them.
+
+- The option list is an absolutely positioned panel under the field, not a portal over the screen: React Native's `Modal` traps focus and covers the viewport, which is right for a dialog and wrong for a dropdown. So the list is clipped by any ancestor that hides its overflow, it cannot escape a `ScrollView`, and there is no backdrop — the list closes on a pick, on Escape, or when the field is pressed again, never by a tap elsewhere.
+- Arrow keys open the list and Escape closes it, through react-native-web's DOM key events; `Enter` toggles it, because react-native-web's `Pressable` already answers `Enter` as a press. None of the three exists on a device, where the list is a touch surface — so there is no highlighted option to walk.
+- The label sits above the field rather than floating into a notch in its border, and the arrow is laid out in flow rather than absolutely at `right: 7`; the 1px difference that costs is taken out of the gap before the glyph, so the value still stops 32px from the edge. Both follow from React Native having no notched outline and no `position: absolute` inside a text run.
+- `glass` paints its 0.1 paper wash without the 20px backdrop blur (React Native has no backdrop filter), and `gradient` paints the first stop of its 135° fill flat inside a 2px ring of the gradient's first hue — React Native core has no gradient fill and no masked pseudo-element border.
+- Hover has no touch equivalent: the web's hover border, its brighter glass wash and the `action.hover` wash under a menu row are not drawn. `glow` is a shadow on iOS and an elevation on Android, so its halo is not symmetrical there, and it does not brighten on focus the way the web's does.
+- `defaultValue` selects an option here and does nothing on the web, where `Select.tsx` passes `value={value ?? ''}` and MUI's controlled value wins over it. Fixing that is a web change.
+- The list is rendered in full inside a `ScrollView` capped at the window height less 96px, where MUI's `Menu` measures the anchor and flips or shifts to stay on screen; a list opened near the bottom of a device screen runs off it.
+- The display slot, the option labels, the label and the helper text are set in MUI's own numbers (`body1` at 16px on a 23px line, the 0.75 shrunk label, `caption` at 12px); a host that re-themes MUI's typography variants moves the web only.

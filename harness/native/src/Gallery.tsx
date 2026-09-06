@@ -6,6 +6,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 import * as React from 'react';
 
 import { AvatarSection, BadgeSection, ChipSection, ProgressSection, SkeletonSection } from './DataSections';
+import { InputSection, SelectSection, ToggleSection } from './FormSections';
 import { Section } from './Section';
 import { AlertSection, EmptySection, ErrorSection, LoadingSection } from './StateSections';
 import { HeadingSection, LayoutSection as SpacingSection, ParagraphSection } from './TypographySections';
@@ -167,6 +168,9 @@ export function Gallery(): React.JSX.Element {
       <BadgeSection onCount={onCount} />
       <ProgressSection />
       <SkeletonSection />
+      <InputSection />
+      <SelectSection />
+      <ToggleSection onCount={onCount} />
     </Stack>
   );
 }
