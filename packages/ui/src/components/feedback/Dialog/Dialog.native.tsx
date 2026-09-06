@@ -49,6 +49,23 @@ function bodyOf(theme: UiTheme, children: React.ReactNode, hasTitle: boolean): R
   );
 }
 
+/**
+ * Whether a `<DialogHeader>` arrived as a CHILD rather than through the `title`
+ * prop.
+ *
+ * The web tightens a body under a title with
+ * `.MuiDialogTitle-root + &.MuiDialogContent-root` — a CSS sibling selector, so
+ * it fires however the title got there. Native reads a context instead, and the
+ * context was set from the `title` prop alone, which is the composition nothing
+ * uses: every story and `Dialog.md` write the header as a child, and those
+ * bodies took the untitled 24px inset where the web gives them 12px.
+ */
+function hasHeaderChild(children: React.ReactNode): boolean {
+  return React.Children.toArray(children).some(
+    (child) => React.isValidElement(child) && child.type === DialogHeader,
+  );
+}
+
 export function Dialog(rawProps: DialogProps): React.JSX.Element {
   const {
     children,
@@ -100,7 +117,7 @@ export function Dialog(rawProps: DialogProps): React.JSX.Element {
               testID={`${testID ?? 'dialog'}-pulse`}
             />
           ) : null}
-          <DialogTitledContext.Provider value={Boolean(title)}>
+          <DialogTitledContext.Provider value={Boolean(title) || hasHeaderChild(children)}>
             {title ? (
               <DialogHeader
                 title={title}

@@ -82,9 +82,50 @@ export const BasicInteraction: Story = {
   },
 };
 
-export const VariantStatesTest: Story = {
+/**
+ * Split out of `VariantStatesTest` so its other three steps keep running on
+ * both renderers: react-native-web turns the `boxShadow` array into real CSS,
+ * so `elevated`, `outlined` and `neumorphic` are checkable there. Only these
+ * two are not — React Native styles express neither a backdrop filter nor a
+ * gradient fill.
+ */
+export const GlassAndGradientTest: Story = {
   // Asserts a CSS `backdrop-filter` blur and a `linear-gradient` background; React Native styles express neither.
   tags: ['native-skip'],
+  name: '🫧 Glass and Gradient Test',
+  render: () => (
+    <Stack spacing={2} direction="row" flexWrap="wrap">
+      <Card variant="glass" data-testid="glass-card" sx={{ width: 200 }}>
+        <CardContent>Glass</CardContent>
+      </Card>
+      <Card variant="gradient" data-testid="gradient-card" sx={{ width: 200 }}>
+        <CardContent>Gradient</CardContent>
+      </Card>
+    </Stack>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Verify glass variant', async () => {
+      const card = canvas.getByTestId('glass-card');
+      await expect(card).toBeInTheDocument();
+      const styles = window.getComputedStyle(card);
+      // Glass cards should have backdrop filter
+      await expect(styles.backdropFilter || styles.webkitBackdropFilter).toContain('blur');
+    });
+
+    await step('Verify gradient variant', async () => {
+      const card = canvas.getByTestId('gradient-card');
+      await expect(card).toBeInTheDocument();
+      const styles = window.getComputedStyle(card);
+      // Gradient cards should have background-image or background
+      await expect(styles.background || styles.backgroundImage).toContain('gradient');
+    });
+
+  },
+};
+
+export const VariantStatesTest: Story = {
   name: '🎨 Variant States Test',
   render: () => (
     <Stack spacing={2} direction="row" flexWrap="wrap">
@@ -132,22 +173,6 @@ export const VariantStatesTest: Story = {
       const styles = window.getComputedStyle(card);
       // Outlined cards should have border
       await expect(styles.borderWidth).not.toBe('0px');
-    });
-
-    await step('Verify glass variant', async () => {
-      const card = canvas.getByTestId('glass-card');
-      await expect(card).toBeInTheDocument();
-      const styles = window.getComputedStyle(card);
-      // Glass cards should have backdrop filter
-      await expect(styles.backdropFilter || styles.webkitBackdropFilter).toContain('blur');
-    });
-
-    await step('Verify gradient variant', async () => {
-      const card = canvas.getByTestId('gradient-card');
-      await expect(card).toBeInTheDocument();
-      const styles = window.getComputedStyle(card);
-      // Gradient cards should have background-image or background
-      await expect(styles.background || styles.backgroundImage).toContain('gradient');
     });
 
     await step('Verify neumorphic variant', async () => {
@@ -570,9 +595,34 @@ export const KeyboardNavigationTest: Story = {
 };
 
 // Visual States Test
-export const VisualStatesTest: Story = {
+/**
+ * Split out of `VisualStatesTest` so its other three steps keep running on both
+ * renderers — the loading step in particular is the COMPONENT's own treatment
+ * (`CARD_LOADING`), not an `sx`. Only this one asserts a style the story itself
+ * sets through `sx`, which is the web renderer's own prop.
+ */
+export const SxDisabledStateTest: Story = {
   // Asserts the opacity and pointer-events a story sets through `sx`, the web renderer's own style prop.
   tags: ['native-skip'],
+  name: '🚫 Disabled via sx Test',
+  render: () => (
+    <Card data-testid="disabled-card" sx={{ width: 300, opacity: 0.5, pointerEvents: 'none' }}>
+      <CardContent>Disabled</CardContent>
+    </Card>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Disabled state', async () => {
+      const card = canvas.getByTestId('disabled-card');
+      await expect(card).toHaveStyle({ opacity: '0.5' });
+      await expect(card).toHaveStyle({ pointerEvents: 'none' });
+    });
+
+  },
+};
+
+export const VisualStatesTest: Story = {
   name: '👁️ Visual States Test',
   render: () => (
     <Stack spacing={2}>
@@ -612,12 +662,6 @@ export const VisualStatesTest: Story = {
       // Verify the card maintains its interactive styling
       await expect(card).toHaveStyle({ cursor: 'pointer' });
       await expect(card).toBeInTheDocument();
-    });
-
-    await step('Disabled state', async () => {
-      const card = canvas.getByTestId('disabled-card');
-      await expect(card).toHaveStyle({ opacity: '0.5' });
-      await expect(card).toHaveStyle({ pointerEvents: 'none' });
     });
 
     await step('Loading state', async () => {
@@ -1067,8 +1111,6 @@ export const PerformanceTest: Story = {
 
 // Integration Test
 export const IntegrationWithOtherComponentsTest: Story = {
-  // Finds the media by its DOM `title` attribute (`getByTitle`), which React Native has no equivalent of.
-  tags: ['native-skip'],
   name: '🔗 Integration Test',
   render: () => (
     <Card sx={{ width: 400 }}>
@@ -1087,6 +1129,7 @@ export const IntegrationWithOtherComponentsTest: Story = {
         height="200"
         image="https://via.placeholder.com/400x200"
         title="Profile Banner"
+        data-testid="profile-banner"
       />
       <CardContent>
         <Stack spacing={1}>
@@ -1121,8 +1164,9 @@ export const IntegrationWithOtherComponentsTest: Story = {
       const title = canvas.getByText('John Doe');
       await expect(title).toBeInTheDocument();
 
-      // Media
-      const media = canvas.getByTitle('Profile Banner');
+      // Media, by its test id rather than its DOM `title` attribute: React
+      // Native has no `title`, and the rest of this story is not DOM-only.
+      const media = canvas.getByTestId('profile-banner');
       await expect(media).toBeInTheDocument();
 
       // Content with chips

@@ -127,7 +127,15 @@ export function DialogHeader({
       {...viewProps}
     >
       <View style={styles.headerText}>
-        <RNText style={dialogTitleStyle(theme)}>{title}</RNText>
+        {/*
+          MUI's `DialogTitle` renders `component: "h2"`, so the web dialog has a
+          heading and the native one had none. `role`/`aria-level` are what
+          react-native-web maps to an `<h2>`; a device reads the same pair
+          through `accessibilityRole="header"`, which RN derives from `role`.
+        */}
+        <RNText role="heading" aria-level={2} style={dialogTitleStyle(theme)}>
+          {title}
+        </RNText>
         {subtitle ? <RNText style={dialogSubtitleStyle(theme)}>{subtitle}</RNText> : null}
       </View>
       {showCloseButton && onClose ? (

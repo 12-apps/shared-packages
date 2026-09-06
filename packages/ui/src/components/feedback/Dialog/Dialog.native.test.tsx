@@ -61,6 +61,16 @@ describe('Dialog (native)', () => {
     expect(screen.getByTestId('d-content')).toHaveTextContent('corpo');
   });
 
+  it('sets the title as a level-2 heading, as MUI renders an h2', () => {
+    render(
+      <Dialog open title="Confirmar" dataTestId="d">
+        <DialogContent>corpo</DialogContent>
+      </Dialog>,
+    );
+    const heading = screen.getByRole('heading', { name: 'Confirmar' });
+    expect(heading).toHaveAttribute('aria-level', '2');
+  });
+
   it('titles itself, describes itself and offers a close button', () => {
     const onClose = vi.fn();
     render(
@@ -89,6 +99,31 @@ describe('Dialog (native)', () => {
       </Dialog>,
     );
     expect(screen.queryAllByTestId('d-close')).toHaveLength(0);
+  });
+
+  it('closes on Escape unless it is persistent, which the stories only half cover', () => {
+    // React Native routes Escape through `Modal`'s `onRequestClose`, which the
+    // dialog hands `undefined` when persistent. `PersistentDialogTest` covers
+    // the refusal; nothing covered the plain dialog answering it.
+    // react-native-web listens for `keyup` on the document, not `keydown`.
+    const onClose = vi.fn();
+    const { unmount } = render(
+      <Dialog open onClose={onClose} dataTestId="plain">
+        <DialogContent>corpo</DialogContent>
+      </Dialog>,
+    );
+    fireEvent.keyUp(document, { key: 'Escape', code: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    unmount();
+
+    const onCloseFirm = vi.fn();
+    render(
+      <Dialog open persistent onClose={onCloseFirm} dataTestId="firm">
+        <DialogContent>corpo</DialogContent>
+      </Dialog>,
+    );
+    fireEvent.keyUp(document, { key: 'Escape', code: 'Escape' });
+    expect(onCloseFirm).not.toHaveBeenCalled();
   });
 
   it('closes on a backdrop press unless it is persistent', () => {
@@ -172,6 +207,20 @@ describe('Dialog (native)', () => {
       </Dialog>,
     );
     expect(screen.getByTestId('slotted-content').parentElement).toBe(screen.getByTestId('slotted'));
+  });
+
+  it('tightens the body under a HEADER CHILD too, which is how every story writes it', () => {
+    // The web's rule is a CSS sibling selector, so it fires however the title
+    // arrived. Native reads a context, and it used to be set from the `title`
+    // PROP alone — the one composition nothing uses. A header child took the
+    // untitled 24px inset where the web gives 12px.
+    render(
+      <Dialog open dataTestId="d">
+        <DialogHeader title="T" />
+        <DialogContent dataTestId="d">corpo</DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByTestId('d-content').firstElementChild).toHaveStyle({ paddingTop: '12px' });
   });
 
   it('tightens the body under a title and halves it when dense', () => {
