@@ -39,9 +39,10 @@ describe('the form controls answer to every spelling of their test id', () => {
       it(`${name} is found by ${spelling}`, () => {
         const { container } = render(renderOne({ [spelling]: 'field' }));
         expect(screen.getByTestId('field')).toBeInTheDocument();
-        // The two React does not know never reach the DOM as attributes.
-        expect(container.querySelector('[testid]')).toBeNull();
-        expect(container.querySelector('[datatestid]')).toBeNull();
+        // The two React does not know never reach the DOM as attributes. Counted
+        // rather than null-checked: nothing was removed here, the render simply
+        // never writes them, and a count says that without reading as a removal.
+        expect(container.querySelectorAll('[testid], [datatestid]')).toHaveLength(0);
       });
     }
   }
