@@ -53,6 +53,38 @@ function activity(overrides: Partial<LiveActivity> = {}): LiveActivity {
 
 const EMPTY_INBOX = { items: [], nextCursor: null };
 
+/** One inbox row, so a remount of the list is something a test can SEE. */
+const ONE_ROW = {
+  items: [
+    {
+      id: 'n1',
+      title: 'Recibo disponível',
+      body: null,
+      link: null,
+      readAt: null,
+      createdAt: '2026-09-01T19:00:00.000Z',
+      data: {},
+    },
+  ],
+  nextCursor: null,
+};
+
+function inboxTransport(): NotificationsTransport {
+  const pages: Record<string, unknown> = {
+    '/api/account/notifications/unread-count': { count: 1 },
+    '/api/account/notifications?limit=20': ONE_ROW,
+  };
+  return {
+    get<T>(path: string): Promise<T> {
+      if (!(path in pages)) return Promise.reject(new Error(`no stub for ${path}`));
+      return Promise.resolve(pages[path] as T);
+    },
+    send<T>(): Promise<NotificationsResult<T>> {
+      return Promise.resolve({ ok: true, data: {} as T });
+    },
+  };
+}
+
 /** Reads only; nothing here writes, and an unstubbed path must still fail loudly. */
 function readOnlyTransport(): NotificationsTransport {
   const pages: Record<string, unknown> = {
@@ -156,6 +188,17 @@ afterEach(() => {
   cleanup();
 });
 
+beforeEach(() => {
+  // The seen record lives in `localStorage`, which one jsdom shares across
+  // every case in this file — so without this a case that opens the panel
+  // decides what the NEXT case's bell looks like.
+  try {
+    globalThis.localStorage?.clear();
+  } catch {
+    // No storage in this environment; nothing to reset.
+  }
+});
+
 describe('the live section', () => {
   it('pins the activity above the inbox, with the host heading and the host copy', async () => {
     const config = source([activity()]);
@@ -177,7 +220,7 @@ describe('the live section', () => {
     // comes before what already happened.
     const panel = screen.getByTestId('notifications-panel');
     expect(
-      section.compareDocumentPosition(screen.getByTestId('notifications-empty')) &
+      section.compareDocumentPosition(screen.getByTestId('notifications-inbox')) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(panel.contains(section)).toBe(true);
@@ -406,22 +449,196 @@ describe('the live section', () => {
     await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
   });
 
-  it('never touches the unread count', async () => {
+  it('counts a live entry on the bell, because a live entry IS a notification', async () => {
+    const config = source([activity()]);
+    const { BellButton } = mount(config);
+    render(<BellButton onClick={() => undefined} />);
+
+    // This case used to assert the OPPOSITE — that a live entry never touched
+    // the count — on the argument that it would put a number on the bell no
+    // amount of reading could clear. The argument was right; the conclusion was
+    // not. A reader with a pedido on the way has a notification, and a bell
+    // showing nothing was the complaint. What answers the original concern is
+    // the TONE below: the number is there, and it goes quiet once looked at.
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-badge').textContent).toBe('1'),
+    );
+  });
+
+  it('paints an unseen live entry as new, and a seen one as merely present', async () => {
     const config = source([activity()]);
     const { Panel, BellButton } = mount(config);
-    render(
+    const { rerender } = render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open={false} onClose={() => undefined} />
+      </>,
+    );
+
+    // Nothing has looked at it yet, so it is news.
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-badge').getAttribute('data-tone')).toBe('new'),
+    );
+
+    // Opening the panel is what "seen" means — the section puts it on screen.
+    rerender(
       <>
         <BellButton onClick={() => undefined} />
         <Panel open onClose={() => undefined} />
       </>,
     );
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+
+    // Still counted — it is still happening — but no longer shouting. This is
+    // the whole answer to "a number no amount of reading can clear".
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-badge').getAttribute('data-tone')).toBe('seen'),
+    );
+    expect(screen.getByTestId('notifications-badge').textContent).toBe('1');
+  });
+
+  it('goes back to new when the subject MOVES after being seen', async () => {
+    const first = activity();
+    const moved = activity({ updatedAt: new Date(Date.parse(first.updatedAt) + 60_000).toISOString() });
+    let current: readonly LiveActivity[] = [first];
+    const config: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? current : []),
+    };
+    const { Panel, BellButton } = mount(config);
+    const { rerender } = render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-badge').getAttribute('data-tone')).toBe('seen'),
+    );
+
+    // A stage change is the one thing that must reach a reader who already
+    // looked. `updatedAt` moves only when the SUBJECT moves, which is why the
+    // watermark is a timestamp and not a set of ids: the id never changed here.
+    current = [moved];
+    rerender(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open={false} onClose={() => undefined} />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-badge').getAttribute('data-tone')).toBe('new'),
+    );
+  });
+
+  it('treats a subject that ARRIVES as new, however old its clock says it is', async () => {
+    // The case a single newest-seen watermark gets wrong, and the reason the
+    // record is keyed by subject: a pedido placed ten minutes ago but only now
+    // reaching this client arrives BEHIND anything already seen. The reader has
+    // never laid eyes on it.
+    const seenAlready = activity();
+    const older = activity({
+      id: 'visit-7',
+      updatedAt: new Date(Date.parse(seenAlready.updatedAt) - 600_000).toISOString(),
+    });
+    let current: readonly LiveActivity[] = [seenAlready];
+    const config: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? current : []),
+    };
+    const { Panel, BellButton } = mount(config);
+    const { rerender } = render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-badge').getAttribute('data-tone')).toBe('seen'),
+    );
+
+    current = [seenAlready, older];
+    rerender(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Panel open={false} onClose={() => undefined} />
+      </>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('notifications-badge').getAttribute('data-tone')).toBe('new'),
+    );
+    expect(screen.getByTestId('notifications-badge').textContent).toBe('2');
+  });
+
+  it('keeps the inbox MOUNTED when the live section appears', async () => {
+    // React reconciles fragment children by INDEX. The live section and the
+    // inbox are siblings in one fragment, so a branch that stops rendering the
+    // section's slot moves the inbox from index 1 to index 0 — and React tears
+    // down every row and builds it again. For a reader scrolling their inbox
+    // with keyboard focus on a row, that throws focus to `<body>` inside a
+    // focus-trapped drawer, the moment a pedido happens to start or finish.
+    let current: readonly LiveActivity[] = [];
+    const config: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? current : []),
+    };
+    const { Panel } = createWebNotifications({
+      apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
+      transport: inboxTransport(),
+      liveActivities: config,
+    });
+    const { rerender } = render(<Panel open onClose={() => undefined} />);
+
+    const row = await screen.findByTestId('notification-n1');
+    await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
+
+    current = [activity()];
+    rerender(<Panel open onClose={() => undefined} />);
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+
+    // The SAME DOM node, not merely a node with the same test id.
+    expect(screen.getByTestId('notification-n1')).toBe(row);
+  });
+
+  it('keeps the inbox MOUNTED when the live section goes away', async () => {
+    // The other direction. A pedido FINISHING crosses the same boundary as one
+    // starting, and a fix that only held one way would ship green — the section
+    // renders its slot either way, so both edges are the same claim.
+    let current: readonly LiveActivity[] = [activity()];
+    const config: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? current : []),
+    };
+    const { Panel } = createWebNotifications({
+      apiBase: '/api/account',
+      messages: CLINIC_MESSAGES,
+      transport: inboxTransport(),
+      liveActivities: config,
+    });
+    const { rerender } = render(<Panel open onClose={() => undefined} />);
+
+    const row = await screen.findByTestId('notification-n1');
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+
+    current = [];
+    rerender(<Panel open onClose={() => undefined} />);
+    await waitFor(() => expect(screen.queryByTestId('live-activities')).toBeNull());
+
+    expect(screen.getByTestId('notification-n1')).toBe(row);
+  });
+
+  it('does not claim the panel is empty while something is live', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
 
     await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
-    // A live entry is not news. Counting it would put a number on the bell that
-    // no amount of reading can clear.
-    expect(screen.getByTestId('notifications-bell').getAttribute('aria-label')).toBe(
-      CLINIC_MESSAGES.openBell,
-    );
+    // "Nenhuma notificação" is a claim about the PANEL, not about the list, and
+    // the panel is visibly not empty. The inbox half still renders — it is just
+    // the sentence that has to go.
+    await waitFor(() => expect(screen.queryByTestId('notifications-empty')).toBeNull());
+    expect(screen.getByTestId('notifications-inbox')).toBeTruthy();
   });
 
   it('follows the card link through the host router, closing the panel first', async () => {

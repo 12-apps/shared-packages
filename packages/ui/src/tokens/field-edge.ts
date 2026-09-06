@@ -1,13 +1,6 @@
-import {
-  darken,
-  decomposeColor,
-  getContrastRatio,
-  getLuminance,
-  hslToRgb,
-  lighten,
-  recomposeColor,
-} from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
+
+import { resolveFieldEdge } from './field-edge.core';
 
 /**
  * THE EDGE THAT TELLS YOU WHERE A FIELD IS.
@@ -66,50 +59,17 @@ import type { Theme } from '@mui/material/styles/index.js';
  * corrected brand colour that clears the floor by construction. The resting
  * state was the only one you could not see, and it is the one that matters,
  * because it is the state a field is in before anyone has found it.
- */
-
-/**
- * WCAG 2.1 SC 1.4.11 — the contrast a control's own boundary owes the surface
- * behind it.
  *
- * 3:1 rather than the 4.5:1 the same spec asks of body text: a border is a
- * shape, not a glyph, so it stays findable at a lower ratio. It is a FLOOR and
- * not a target — {@link fieldEdge} stops at the first tone that clears it, so a
- * theme with a stronger hairline keeps the stronger one.
- */
-export const MIN_UI_CONTRAST = 3;
-
-/** How far one step of the walk moves, and how many steps before it gives up. */
-const STEP = 0.05;
-const MAX_STEPS = 20;
-
-/**
- * A colour as an opaque `rgb()`, with any translucency resolved against
- * `surface`.
+ * ## Where the walk itself lives
  *
- * Needed because `getContrastRatio` reads the channels it is given and ignores
- * the alpha, so handing it an `rgba()` measures a colour nobody sees. Every
- * failing border above was translucent, so skipping this would compute the ratio
- * of the hairline itself — 1.26:1, still a failure, but the wrong number for the
- * wrong reason.
+ * `./field-edge.core.ts`, over two colour strings and this package's own
+ * colour arithmetic. The native `Input` and `Select` draw the same border and
+ * have neither a MUI `Theme` to pass nor `@mui/material/styles` to import, so
+ * the algorithm sits one file below this one and both renderers call it. This
+ * file is the MUI-typed door onto it, and the argument above.
  */
-function flatten(colour: string, surface: string): string {
-  const decomposed = decomposeColor(colour);
-  const rgb = decomposed.type.startsWith('hsl')
-    ? decomposeColor(hslToRgb(colour))
-    : decomposed;
-  const [r, g, b] = rgb.values;
-  const alpha = rgb.values[3] ?? 1;
-  if (alpha >= 1) return recomposeColor({ type: 'rgb', values: [r, g, b] });
 
-  const behind = decomposeColor(surface);
-  const base = behind.type.startsWith('hsl') ? decomposeColor(hslToRgb(surface)) : behind;
-  const blend = (fg: number, bg: number): number => Math.round(alpha * fg + (1 - alpha) * bg);
-  return recomposeColor({
-    type: 'rgb',
-    values: [blend(r, base.values[0]), blend(g, base.values[1]), blend(b, base.values[2])],
-  });
-}
+export { MIN_UI_CONTRAST } from './field-edge.core';
 
 /**
  * The resting boundary for a form control on `surface`.
@@ -121,21 +81,5 @@ function flatten(colour: string, surface: string): string {
  * as the pair it is given.
  */
 export function fieldEdge(theme: Theme, surface?: string): string {
-  const ground = flatten(surface ?? theme.palette.background.paper, '#FFFFFF');
-  const seed = flatten(theme.palette.divider, ground);
-  if (getContrastRatio(seed, ground) >= MIN_UI_CONTRAST) return seed;
-
-  // Away from the surface, whichever way that is — so one rule serves both
-  // modes, and a dark card in a light theme is still handled by the pair rather
-  // than by `palette.mode`.
-  const away = getLuminance(ground) > 0.5 ? darken : lighten;
-  for (let step = 1; step <= MAX_STEPS; step += 1) {
-    // From the SEED each time rather than compounding the previous result, so
-    // the walk lands on the nearest passing tone instead of overshooting past it.
-    const candidate = away(seed, step * STEP);
-    if (getContrastRatio(candidate, ground) >= MIN_UI_CONTRAST) return candidate;
-  }
-  // Unreachable for any real surface — black clears 21:1 on white and white
-  // clears it on black — but a caller must never be handed `undefined`.
-  return getLuminance(ground) > 0.5 ? '#000000' : '#FFFFFF';
+  return resolveFieldEdge(theme.palette.divider, surface ?? theme.palette.background.paper);
 }

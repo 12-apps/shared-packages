@@ -3,7 +3,14 @@ import { useTheme } from '@mui/material/styles/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import {
+  CONTAINER_COMPACT_PADDING_UNITS,
+  containerPaddingUnits,
+  containerVerticalUnits,
+  resolveContainerMaxWidth,
+} from './Container.metrics';
 import type { ContainerProps } from './Container.types';
+import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 
 export const Container: React.FC<ContainerProps> = ({
   children,
@@ -11,34 +18,18 @@ export const Container: React.FC<ContainerProps> = ({
   variant = 'default',
   padding = 'md',
   responsive = true,
-  dataTestId,
   sx,
-  ...props
+  ...others
 }) => {
   const theme = useTheme();
+  // `testID` and `dataTestId` are the shared contract's spellings; the DOM
+  // wants `data-testid`, and must not see the other two as attributes.
+  const testId = resolveTestId(others, 'container');
+  const props = withoutTestIdProps(others);
 
-  const getPadding = () => {
-    const paddingMap = {
-      none: 0,
-      xs: theme.spacing(1),
-      sm: theme.spacing(2),
-      md: theme.spacing(3),
-      lg: theme.spacing(4),
-      xl: theme.spacing(6),
-    };
-    return paddingMap[padding] || theme.spacing(3);
-  };
-
-  const getMaxWidth = (): 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false => {
-    if (variant === 'fluid') return false;
-    if (variant === 'centered') return 'md';
-    if (typeof maxWidth === 'string' && ['xs', 'sm', 'md', 'lg', 'xl'].includes(maxWidth)) {
-      return maxWidth as 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-    }
-    if (maxWidth === false) return false;
-    return 'lg'; // default fallback
-  };
-
+  // From the shared metrics, not tables of our own: the native `Container`
+  // reads the same units and the same max-width rule, so the two renderers
+  // cannot disagree on an inset or a column width.
   const containerStyles: SxProps<Theme> = {
     ...(variant === 'centered' && {
       display: 'flex',
@@ -47,14 +38,20 @@ export const Container: React.FC<ContainerProps> = ({
       justifyContent: 'center',
       minHeight: '100vh',
     }),
+    // The shorthand FIRST: a `paddingTop` declared before it is overridden by
+    // it, which is how `variant="padded"` painted no vertical inset at all.
+    padding: theme.spacing(containerPaddingUnits(padding, false)),
     ...(variant === 'padded' && {
-      paddingTop: theme.spacing(8),
-      paddingBottom: theme.spacing(8),
+      paddingTop: theme.spacing(containerVerticalUnits(variant, padding, false)),
+      paddingBottom: theme.spacing(containerVerticalUnits(variant, padding, false)),
     }),
-    padding: getPadding(),
     ...(responsive && {
       [theme.breakpoints.down('sm')]: {
-        padding: theme.spacing(2),
+        padding: theme.spacing(CONTAINER_COMPACT_PADDING_UNITS),
+        ...(variant === 'padded' && {
+          paddingTop: theme.spacing(containerVerticalUnits(variant, padding, true)),
+          paddingBottom: theme.spacing(containerVerticalUnits(variant, padding, true)),
+        }),
       },
     }),
     ...(sx || {}),
@@ -62,9 +59,9 @@ export const Container: React.FC<ContainerProps> = ({
 
   return (
     <MuiContainer
-      maxWidth={getMaxWidth()}
+      maxWidth={resolveContainerMaxWidth(variant, maxWidth)}
       sx={containerStyles}
-      data-testid={dataTestId || 'container'}
+      data-testid={testId}
       {...props}
     >
       {children}

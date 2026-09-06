@@ -5,20 +5,16 @@ import { Stack } from '@12-apps/ui/layout/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 import * as React from 'react';
 
+import { AvatarSection, BadgeSection, ChipSection, ProgressSection, SkeletonSection } from './DataSections';
+import { InputSection, SelectSection, ToggleSection } from './FormSections';
+import { Section } from './Section';
+import { CardSection, DialogSection } from './SurfaceSections';
+import { AlertSection, EmptySection, ErrorSection, LoadingSection } from './StateSections';
+import { HeadingSection, LayoutSection as SpacingSection, ParagraphSection } from './TypographySections';
+
 const SIZES = ['xs', 'sm', 'md', 'lg', 'xl'] as const;
 const COLORS = ['primary', 'secondary', 'success', 'warning', 'info', 'danger', 'neutral'] as const;
 const VARIANTS = ['solid', 'outline', 'ghost', 'text', 'glass', 'gradient'] as const;
-
-function Section({ title, testID, children }: { title: string; testID: string; children: React.ReactNode }) {
-  return (
-    <Stack gap={1.5} testID={testID}>
-      <Text variant="heading" size="lg">
-        {title}
-      </Text>
-      {children}
-    </Stack>
-  );
-}
 
 function TextSection(): React.JSX.Element {
   return (
@@ -158,9 +154,26 @@ export function Gallery(): React.JSX.Element {
   return (
     <Stack gap={3} testID="gallery">
       <TextSection />
+      <HeadingSection />
+      <ParagraphSection />
       <ButtonSection onCount={onCount} presses={presses} />
       <LayoutSection />
+      <SpacingSection />
+      <AlertSection onCount={onCount} />
+      <LoadingSection />
+      <ErrorSection onCount={onCount} />
+      <EmptySection onCount={onCount} />
       <IconSection />
+      <CardSection onCount={onCount} />
+      <DialogSection />
+      <ChipSection onCount={onCount} />
+      <AvatarSection />
+      <BadgeSection onCount={onCount} />
+      <ProgressSection />
+      <SkeletonSection />
+      <InputSection />
+      <SelectSection />
+      <ToggleSection onCount={onCount} />
     </Stack>
   );
 }

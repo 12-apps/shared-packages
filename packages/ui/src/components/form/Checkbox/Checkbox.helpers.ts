@@ -1,27 +1,27 @@
-import type { CheckboxProps } from './Checkbox.types';
+import type { CheckboxBaseProps } from './Checkbox.base';
+import { withDefaults } from '../../../utils/withDefaults';
 
 type CheckboxDefaultedKeys = 'variant' | 'ripple' | 'glow' | 'pulse';
 
-type ResolvedCheckboxProps = CheckboxProps &
-  Required<Pick<CheckboxProps, CheckboxDefaultedKeys>>;
+/**
+ * Generic over the renderer's own props, as `resolveButtonProps` is: the web
+ * and the native `Checkbox` pass different handler types through, and both come
+ * back out untouched.
+ */
+export type ResolvedCheckboxProps<P extends CheckboxBaseProps = CheckboxBaseProps> = P &
+  Required<Pick<CheckboxBaseProps, CheckboxDefaultedKeys>>;
 
-const CHECKBOX_DEFAULTS: Pick<CheckboxProps, CheckboxDefaultedKeys> = {
+const CHECKBOX_DEFAULTS: Required<Pick<CheckboxBaseProps, CheckboxDefaultedKeys>> = {
   variant: 'default',
   ripple: true,
   glow: false,
   pulse: false,
 };
 
-// Strips explicitly-undefined props before the merge, so `ripple={undefined}` still
-// falls back to the default exactly as a destructuring default would.
-const definedProps = (props: CheckboxProps): Partial<CheckboxProps> =>
-  Object.fromEntries(
-    Object.entries(props).filter(([, value]) => value !== undefined),
-  ) as Partial<CheckboxProps>;
+export const resolveCheckboxProps = <P extends CheckboxBaseProps>(props: P): ResolvedCheckboxProps<P> =>
+  withDefaults(props, CHECKBOX_DEFAULTS as Partial<P>) as ResolvedCheckboxProps<P>;
 
-export const resolveCheckboxProps = (props: CheckboxProps): ResolvedCheckboxProps =>
-  ({ ...CHECKBOX_DEFAULTS, ...definedProps(props) }) as ResolvedCheckboxProps;
-
+/** `${dataTestId}-${suffix}`, or `checkbox-${suffix}` when the caller named nothing. */
 export const makeTestId =
   (dataTestId?: string) =>
   (suffix: string): string =>

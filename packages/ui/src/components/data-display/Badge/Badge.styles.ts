@@ -7,8 +7,25 @@ import {
   glowPulseAnimation,
   pulseAnimation,
   shimmerAnimation } from './Badge.animations';
+import {
+  BADGE_BORDER_WIDTH,
+  BADGE_CONTENT_GAP,
+  BADGE_FONT_WEIGHT,
+  BADGE_LETTER_SPACING_EM,
+  BADGE_SIZES,
+  BADGE_TRANSITION_EASING,
+  BADGE_TRANSITION_MS,
+  BOUNCE,
+  FADE_IN_SCALE,
+  GLOW,
+  HOVER_SCALE,
+  PULSE,
+  SHIMMER,
+  badgeAnchor,
+} from './Badge.metrics';
 import { badgeVariantStyles } from './Badge.variants';
 import type { BadgeSize, BadgeVariant } from './Badge.types';
+import { px } from '../../../tokens/theme';
 
 export type BadgePalette = {
   main: string;
@@ -37,67 +54,39 @@ const getColorFromTheme = (theme: Theme, color: string) => {
   return colorMap[color] || theme.palette.primary;
 };
 
-export const getSizeStyles = (size: BadgeSize) => {
-  const sizeMap: Record<
-    BadgeSize,
+// Derived from the shared metrics, not restated: the native `Badge` reads the
+// same table, so the two renderers cannot disagree on a chip.
+const sizeMap: Record<
+  BadgeSize,
+  {
+    minWidth: number;
+    height: number;
+    fontSize: string;
+    padding: string;
+    dotSize: number;
+    iconSize: string;
+  }
+> = Object.fromEntries(
+  Object.entries(BADGE_SIZES).map(([size, metrics]) => [
+    size,
     {
-      minWidth: number;
-      height: number;
-      fontSize: string;
-      padding: string;
-      dotSize: number;
-      iconSize: string;
-    }
-  > = {
-    xs: {
-      minWidth: 14,
-      height: 14,
-      fontSize: '0.5rem',
-      padding: '0 3px',
-      dotSize: 6,
-      iconSize: '0.625rem' },
-    sm: {
-      minWidth: 16,
-      height: 16,
-      fontSize: '0.625rem',
-      padding: '0 4px',
-      dotSize: 8,
-      iconSize: '0.75rem' },
-    md: {
-      minWidth: 20,
-      height: 20,
-      fontSize: '0.75rem',
-      padding: '0 6px',
-      dotSize: 10,
-      iconSize: '0.875rem' },
-    lg: {
-      minWidth: 24,
-      height: 24,
-      fontSize: '0.875rem',
-      padding: '0 8px',
-      dotSize: 12,
-      iconSize: '1rem' },
-    xl: {
-      minWidth: 28,
-      height: 28,
-      fontSize: '1rem',
-      padding: '0 10px',
-      dotSize: 14,
-      iconSize: '1.125rem' } };
+      minWidth: metrics.minWidth,
+      height: metrics.height,
+      fontSize: px(metrics.fontSize),
+      padding: `0 ${metrics.paddingHorizontal}px`,
+      dotSize: metrics.dotSize,
+      iconSize: px(metrics.iconSize),
+    },
+  ]),
+) as Record<
+  BadgeSize,
+  { minWidth: number; height: number; fontSize: string; padding: string; dotSize: number; iconSize: string }
+>;
 
-  return sizeMap[size] || sizeMap.md;
-};
+export const getSizeStyles = (size: BadgeSize) => sizeMap[size] || sizeMap.md;
 
-export const getAnchorOrigin = (position: string) => {
-  const positionMap: Record<string, { vertical: 'top' | 'bottom'; horizontal: 'left' | 'right' }> =
-    {
-      'top-right': { vertical: 'top', horizontal: 'right' },
-      'top-left': { vertical: 'top', horizontal: 'left' },
-      'bottom-right': { vertical: 'bottom', horizontal: 'right' },
-      'bottom-left': { vertical: 'bottom', horizontal: 'left' } };
-
-  return positionMap[position] || positionMap['top-right'];
-};
+export const getAnchorOrigin = (position: string) =>
+  badgeAnchor((position || 'top-right') as Parameters<typeof badgeAnchor>[0]);
 
 // Exactly one variant applies, so a lookup replaces ten mutually exclusive
 // spreads inside the style object.
@@ -127,21 +116,21 @@ const badgeLightingStyles = ({
       // Glow effect
       ...(glow &&
         !pulse && {
-          boxShadow: `0 0 15px 3px ${alpha(colorPalette.main, 0.5)}`,
-          filter: 'brightness(1.1)',
+          boxShadow: `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`,
+          filter: `brightness(${GLOW.brightness})`,
           '&:hover': {
-            boxShadow: `0 0 20px 4px ${alpha(colorPalette.main, 0.6)}` } }),
+            boxShadow: `0 0 ${GLOW.hoverBlur}px ${GLOW.hoverSpread}px ${alpha(colorPalette.main, GLOW.hoverAlpha)}` } }),
 
       // Pulse animation
       ...(pulse &&
         !glow && {
-          animation: `${pulseAnimation} 2s ease-in-out infinite` }),
+          animation: `${pulseAnimation} ${PULSE.durationMs / 1000}s ease-in-out infinite` }),
 
       // Both glow and pulse
       ...(glow &&
         pulse && {
-          animation: `${glowPulseAnimation} 2s ease-in-out infinite, ${pulseAnimation} 2s ease-in-out infinite`,
-          filter: 'brightness(1.1)',
+          animation: `${glowPulseAnimation} ${PULSE.durationMs / 1000}s ease-in-out infinite, ${pulseAnimation} ${PULSE.durationMs / 1000}s ease-in-out infinite`,
+          filter: `brightness(${GLOW.brightness})`,
         }),
 
 });
@@ -166,11 +155,11 @@ const badgeAnimationStyles = ({
 }): CSSObject => ({
       ...(animate &&
         !bounce && {
-          animation: `${fadeInScaleAnimation} 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)` }),
+          animation: `${fadeInScaleAnimation} ${FADE_IN_SCALE.durationMs / 1000}s cubic-bezier(0.68, -0.55, 0.265, 1.55)` }),
 
       // Bounce animation
       ...(bounce && {
-        animation: `${bounceAnimation} 1s ease-in-out` }),
+        animation: `${bounceAnimation} ${BOUNCE.durationMs / 1000}s ease-in-out` }),
 
       // Shimmer effect
       ...(shimmer && {
@@ -191,10 +180,10 @@ const badgeAnimationStyles = ({
           background: `linear-gradient(
             90deg,
             transparent,
-            ${alpha(theme.palette.common.white, 0.4)},
+            ${alpha(theme.palette.common.white, SHIMMER.alpha)},
             transparent
           )`,
-          animation: `${shimmerAnimation} 3s infinite` } }) });
+          animation: `${shimmerAnimation} ${SHIMMER.durationMs / 1000}s infinite` } }) });
 
 // The badge chip's own styling, lifted out so the styled() callback just
 // forwards its props.
@@ -228,10 +217,10 @@ export const badgeStyles = ({
   return {
     '--glow-color': rgbValuesOf(colorPalette.main),
     '& .MuiBadge-badge': {
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      fontWeight: 600,
-      border: `2px solid ${theme.palette.background.paper}`,
-      letterSpacing: '0.025em',
+      transition: `all ${BADGE_TRANSITION_MS / 1000}s ${BADGE_TRANSITION_EASING}`,
+      fontWeight: BADGE_FONT_WEIGHT,
+      border: `${BADGE_BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
+      letterSpacing: `${BADGE_LETTER_SPACING_EM}em`,
       textTransform:
         customVariant === 'gradient' || customVariant === 'glass' ? 'uppercase' : 'none',
       willChange: 'transform, opacity',
@@ -249,7 +238,7 @@ export const badgeStyles = ({
         paddingLeft: sizeStyles.padding.split(' ')[1],
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '2px',
+        gap: `${BADGE_CONTENT_GAP}px`,
       }),
 
       // Animation on mount
@@ -265,6 +254,6 @@ export const badgeStyles = ({
       ...badgeLightingStyles({ glow, pulse, colorPalette }),
 
       '&:not(.MuiBadge-dot):hover': {
-        transform: 'scale(1.1)',
+        transform: `scale(${HOVER_SCALE})`,
         zIndex: 1 } } };
 }

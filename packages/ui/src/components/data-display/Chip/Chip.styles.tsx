@@ -3,43 +3,26 @@ import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import type { KeyboardEvent, ReactElement } from 'react';
 import React from 'react';
 
+import { chipKeyAction, type ChipKeyArgs } from './Chip.helpers';
+import { CHIP_SIZES, CHIP_TRANSITION_EASING, CHIP_TRANSITION_MS, HOVER_LIFT_PX, HOVER_SHADOW } from './Chip.metrics';
 import type { ChipProps } from './Chip.types';
 
-export const makeTestId =
-  (dataTestId?: string) =>
-  (suffix: string): string =>
-    dataTestId ? `${dataTestId}-${suffix}` : `chip-${suffix}`;
-
-interface KeyHandlerArgs {
-  disabled?: boolean;
-  deletable?: boolean;
-  selectable?: boolean;
-  onClick?: () => void;
-  onDelete?: () => void;
-}
-
-const DELETE_KEYS = new Set(['Delete', 'Backspace']);
-const ACTIVATE_KEYS = new Set(['Enter', ' ']);
-
 /**
- * A chip is not a native control, so the two keyboard conventions it stands in for
- * are wired by hand: Delete/Backspace removes it, Enter/Space activates it.
+ * A chip is not a native control, so the two keyboard conventions it stands in
+ * for are wired by hand: Delete/Backspace removes it, Enter/Space activates it.
+ * The DECISION is `chipKeyAction`, which the native half reads too.
  */
 export const makeKeyDownHandler =
-  ({ disabled, deletable, selectable, onClick, onDelete }: KeyHandlerArgs) =>
+  (args: ChipKeyArgs & { onClick?: () => void; onDelete?: () => void }) =>
   (event: KeyboardEvent): void => {
-    if (disabled) return;
-
-    if (DELETE_KEYS.has(event.key) && deletable && onDelete) {
-      event.preventDefault();
-      onDelete();
+    const action = chipKeyAction(event.key, args);
+    if (action === null) return;
+    event.preventDefault();
+    if (action === 'delete') {
+      args.onDelete?.();
       return;
     }
-
-    if (ACTIVATE_KEYS.has(event.key) && (onClick || selectable)) {
-      event.preventDefault();
-      onClick?.();
-    }
+    args.onClick?.();
   };
 
 export const avatarFor = (
@@ -50,7 +33,8 @@ export const avatarFor = (
     return avatar;
   }
   if (avatarSrc) {
-    return <Avatar src={avatarSrc} sx={{ width: 24, height: 24 }} />;
+    const { avatarSize } = CHIP_SIZES.medium;
+    return <Avatar src={avatarSrc} sx={{ width: avatarSize, height: avatarSize }} />;
   }
   return undefined;
 };
@@ -61,6 +45,12 @@ interface ChipStyleArgs {
   clickable?: boolean;
   disabled?: boolean;
 }
+
+/** The lift's shadow, per mode — the same numbers the native chip reads. */
+const hoverShadow = (mode: Theme['palette']['mode']): string =>
+  `0 ${HOVER_SHADOW.offsetY}px ${HOVER_SHADOW.blur}px rgba(0, 0, 0, ${
+    mode === 'dark' ? HOVER_SHADOW.alphaDark : HOVER_SHADOW.alphaLight
+  })`;
 
 /**
  * Selection styling uses SEMANTIC palette tokens (not hardcoded rgba). A filled
@@ -89,11 +79,8 @@ export const chipStyles = ({
       }),
     '&:hover': {
       ...(lifts && {
-        transform: 'translateY(-1px)',
-        boxShadow: (theme: Theme) =>
-          theme.palette.mode === 'dark'
-            ? '0 4px 12px rgba(0, 0, 0, 0.3)'
-            : '0 4px 12px rgba(0, 0, 0, 0.15)',
+        transform: `translateY(-${HOVER_LIFT_PX}px)`,
+        boxShadow: (theme: Theme) => hoverShadow(theme.palette.mode),
       }),
     },
     '&:active': {
@@ -101,24 +88,9 @@ export const chipStyles = ({
         transform: 'translateY(0px)',
       }),
     },
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: `all ${CHIP_TRANSITION_MS / 1000}s ${CHIP_TRANSITION_EASING}`,
   };
 };
-
-/** `option` when the chip belongs to a selectable set, `button` when it merely acts. */
-export const chipRole = (
-  selectable?: boolean,
-  onClick?: () => void,
-): 'option' | 'button' | undefined => {
-  if (selectable) return 'option';
-  return onClick ? 'button' : undefined;
-};
-
-export const isClickable = (
-  disabled?: boolean,
-  onClick?: () => void,
-  selectable?: boolean,
-): boolean => !disabled && (Boolean(onClick) || Boolean(selectable));
 
 export const iconWithTestId = (
   icon: ChipProps['icon'],

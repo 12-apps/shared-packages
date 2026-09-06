@@ -8,69 +8,30 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import type { EmptyStateProps } from './EmptyState.types';
+import { type ActionIconName, type ActionSpec, actionsOf, makeTestId } from './EmptyState.helpers';
+import {
+  ACTION_MIN_WIDTH,
+  ACTIONS_GAP_UNITS,
+  ACTIONS_MARGIN_TOP_UNITS,
+  CONTENT_GAP_UNITS,
+  DESCRIPTION_LINE_HEIGHT,
+  DESCRIPTION_MAX_WIDTH,
+  EMPTY_STATE_GAP_UNITS,
+  EMPTY_STATE_MIN_HEIGHT,
+  EMPTY_STATE_PADDING_UNITS,
+  EXTERNAL_LINK_MARK,
+  HELP_LINK_MARGIN_TOP_UNITS,
+  illustrationMaxWidth,
+  illustrationOpacity,
+  TITLE_MAX_WIDTH,
+} from './EmptyState.metrics';
+import type { EmptyStateProps, EmptyStateVariant } from './EmptyState.types';
+import { resolveTestId } from '../../../platform/test-id';
 
-type EmptyStateVariant = NonNullable<EmptyStateProps['variant']>;
-
-const makeTestId =
-  (dataTestId?: string) =>
-  (suffix: string): string =>
-    dataTestId ? `${dataTestId}-${suffix}` : `empty-state-${suffix}`;
-
-interface ActionSpec {
-  key: string;
-  variant: 'contained' | 'outlined';
-  onClick: () => void;
-  label: string;
-  icon?: React.ReactNode;
-}
-
-// The four buttons are one button with different props. Listing them keeps their
-// order — primary, create, secondary, refresh — visible in one place.
-const actionsOf = (
-  props: EmptyStateProps,
-  refreshLabel: string,
-  createLabel: string,
-): ActionSpec[] => {
-  const { primaryAction, secondaryAction, onCreate, onRefresh } = props;
-  const specs: ActionSpec[] = [];
-
-  if (primaryAction) {
-    specs.push({
-      key: 'primary-action',
-      variant: 'contained',
-      onClick: primaryAction.onClick,
-      label: primaryAction.label,
-    });
-  }
-  if (onCreate) {
-    specs.push({
-      key: 'create-button',
-      variant: 'contained',
-      onClick: onCreate,
-      label: createLabel,
-      icon: <AddIcon />,
-    });
-  }
-  if (secondaryAction) {
-    specs.push({
-      key: 'secondary-action',
-      variant: 'outlined',
-      onClick: secondaryAction.onClick,
-      label: secondaryAction.label,
-    });
-  }
-  if (onRefresh) {
-    specs.push({
-      key: 'refresh-button',
-      variant: 'outlined',
-      onClick: onRefresh,
-      label: refreshLabel,
-      icon: <RefreshIcon />,
-    });
-  }
-
-  return specs;
+/** The shared action list names its glyph; the web draws it with MUI's icon. */
+const ACTION_ICONS: Record<ActionIconName, React.ReactNode> = {
+  Add: <AddIcon />,
+  Refresh: <RefreshIcon />,
 };
 
 const Illustration: React.FC<{
@@ -81,10 +42,10 @@ const Illustration: React.FC<{
   <Box
     data-testid={testId}
     sx={{
-      maxWidth: variant === 'illustrated' ? 240 : 120,
+      maxWidth: illustrationMaxWidth(variant),
       width: '100%',
       height: 'auto',
-      opacity: variant === 'minimal' ? 0.6 : 0.8,
+      opacity: illustrationOpacity(variant),
       display: variant === 'minimal' ? 'none' : 'block',
     }}
   >
@@ -101,18 +62,18 @@ const Actions: React.FC<{
   return (
     <Stack
       direction={{ xs: 'column', sm: 'row' }}
-      spacing={2}
+      spacing={ACTIONS_GAP_UNITS}
       alignItems="center"
-      sx={{ mt: theme.spacing(2) }}
+      sx={{ mt: theme.spacing(ACTIONS_MARGIN_TOP_UNITS) }}
     >
       {specs.map((spec) => (
         <Button
           key={spec.key}
           variant={spec.variant}
           onClick={spec.onClick}
-          startIcon={spec.icon}
+          startIcon={spec.icon && ACTION_ICONS[spec.icon]}
           data-testid={testId(spec.key)}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: ACTION_MIN_WIDTH }}
         >
           {spec.label}
         </Button>
@@ -134,7 +95,7 @@ const HelpLink: React.FC<{
       rel={helpLink.external ? 'noopener noreferrer' : undefined}
       data-testid={testId}
       sx={{
-        mt: theme.spacing(1),
+        mt: theme.spacing(HELP_LINK_MARGIN_TOP_UNITS),
         color: theme.palette.primary.main,
         textDecoration: 'none',
         '&:hover': {
@@ -143,7 +104,7 @@ const HelpLink: React.FC<{
       }}
     >
       {helpLink.label}
-      {helpLink.external && ' ↗'}
+      {helpLink.external && EXTERNAL_LINK_MARK}
     </Link>
   );
 };
@@ -160,7 +121,7 @@ const Content: React.FC<{
   const theme = useTheme();
 
   return (
-    <Stack spacing={2} alignItems="center">
+    <Stack spacing={CONTENT_GAP_UNITS} alignItems="center">
       <Typography
         id={titleId}
         variant="h6"
@@ -169,7 +130,7 @@ const Content: React.FC<{
         sx={{
           fontWeight: theme.typography.fontWeightMedium,
           color: theme.palette.text.primary,
-          maxWidth: 400,
+          maxWidth: TITLE_MAX_WIDTH,
         }}
       >
         {title}
@@ -181,8 +142,8 @@ const Content: React.FC<{
           color="text.secondary"
           data-testid={testId('description')}
           sx={{
-            maxWidth: 480,
-            lineHeight: 1.6,
+            maxWidth: DESCRIPTION_MAX_WIDTH,
+            lineHeight: DESCRIPTION_LINE_HEIGHT,
           }}
         >
           {description}
@@ -206,10 +167,12 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo((props) => {
     refreshLabel = 'Refresh',
     createLabel = 'Create New',
     className,
-    dataTestId,
   } = props;
   const theme = useTheme();
   const titleId = React.useId();
+  // `dataTestId` is the documented spelling; `testID`, the shared contract's
+  // other one, resolves to the same id.
+  const dataTestId = resolveTestId(props);
   const testId = makeTestId(dataTestId);
 
   const actions = actionsOf(props, refreshLabel, createLabel);
@@ -228,9 +191,9 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo((props) => {
         alignItems: 'center',
         justifyContent: 'center',
         textAlign: 'center',
-        padding: theme.spacing(6),
-        minHeight: 200,
-        gap: theme.spacing(3),
+        padding: theme.spacing(EMPTY_STATE_PADDING_UNITS),
+        minHeight: EMPTY_STATE_MIN_HEIGHT,
+        gap: theme.spacing(EMPTY_STATE_GAP_UNITS),
       }}
     >
       {/* Illustration */}

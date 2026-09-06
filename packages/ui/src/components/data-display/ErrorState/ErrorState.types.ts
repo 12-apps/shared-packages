@@ -1,45 +1,10 @@
-export type ErrorStateSeverity = 'error' | 'warning';
+import type { ErrorStateBaseProps } from './ErrorState.base';
 
-export interface ErrorStateProps {
-  /**
-   * The error message to display
-   */
-  message: string;
+export type { ErrorStateBaseProps, ErrorStateSeverity } from './ErrorState.base';
 
-  /**
-   * Optional title for the error state
-   */
-  title?: string;
-
-  /**
-   * Callback function when retry button is clicked
-   */
-  onRetry?: () => void;
-
-  /**
-   * Custom label for the retry button
-   * @default 'Retry'
-   */
-  retryLabel?: string;
-
-  /**
-   * Visual severity of the error
-   * @default 'error'
-   */
-  severity?: ErrorStateSeverity;
-
-  /**
-   * Optional custom icon to display
-   */
-  icon?: React.ReactNode;
-
+export interface ErrorStateProps extends ErrorStateBaseProps {
   /**
    * Custom className for the container
    */
   className?: string;
-
-  /**
-   * Test ID for component testing
-   */
-  dataTestId?: string;
 }

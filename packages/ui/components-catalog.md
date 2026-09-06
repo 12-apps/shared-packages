@@ -525,11 +525,12 @@ Components for structuring and organizing page layouts.
 **Docs**: `src/components/layout/Collapsible/Collapsible.md`
 
 ### Container
-**Purpose**: Centered content container with max-width
+**Purpose**: Centered content container with max-width (web AND React Native)
 **Use Cases**: Page layouts, content centering, responsive design
 **Features**: Multiple sizes, fluid option, padding control
 **Location**: `src/components/layout/Container`
 **Docs**: `src/components/layout/Container/Container.md`
+**Native**: yes — `@12-apps/ui/layout/Container` resolves to `Container.native.tsx` under Metro, on MUI's breakpoint widths and the same spacing units.
 
 ### ContentToolbar
 **Purpose**: Shared content-page toolbar (Select All / count / actions + Sort By / Content Type / View / Filter)
@@ -602,11 +603,12 @@ Components for structuring and organizing page layouts.
 **Docs**: `src/components/layout/Skeleton/Skeleton.md`
 
 ### Spacer
-**Purpose**: Add flexible spacing between elements
+**Purpose**: Add flexible spacing between elements (web AND React Native)
 **Use Cases**: Layout spacing, responsive gaps, flexible layouts
 **Features**: Horizontal/vertical, size variants
 **Location**: `src/components/layout/Spacer`
 **Docs**: `src/components/layout/Spacer/Spacer.md`
+**Native**: yes — `@12-apps/ui/layout/Spacer` resolves to `Spacer.native.tsx` under Metro, on the same spacing units.
 
 ---
 
@@ -703,18 +705,20 @@ Components for text formatting and display.
 **Docs**: `src/components/typography/Code/Code.md`
 
 ### Heading
-**Purpose**: Section headings
+**Purpose**: Section headings (web AND React Native)
 **Use Cases**: Page titles, section headers, hierarchy
 **Features**: Multiple levels (h1-h6), variants, responsive sizing
 **Location**: `src/components/typography/Heading`
 **Docs**: `src/components/typography/Heading/Heading.md`
+**Native**: yes — `@12-apps/ui/typography/Heading` resolves to `Heading.native.tsx` under Metro (`role="heading"` + `aria-level`); `gradient` paints its first stop flat.
 
 ### Paragraph
-**Purpose**: Body text paragraphs
+**Purpose**: Body text paragraphs (web AND React Native)
 **Use Cases**: Content text, descriptions, articles
 **Features**: Size variants, leading control, text alignment
 **Location**: `src/components/typography/Paragraph`
 **Docs**: `src/components/typography/Paragraph/Paragraph.md`
+**Native**: yes — `@12-apps/ui/typography/Paragraph` resolves to `Paragraph.native.tsx` under Metro, on the same metrics.
 
 ### Text
 **Purpose**: Inline text with formatting

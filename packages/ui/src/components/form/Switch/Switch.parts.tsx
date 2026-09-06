@@ -5,9 +5,11 @@ import Typography from '@mui/material/Typography/index.js';
 import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { LABEL_GAP_UNITS, SWITCH_ICON_SIZES } from './Switch.metrics';
 import { switchSx } from './Switch.styles';
 import type { SwitchFlags } from './Switch.styles';
 import type { SwitchProps } from './Switch.types';
+import type { SizeValue } from '../../../tokens/vocabulary';
 
 const StyledSwitch = styled(MuiSwitch, {
   shouldForwardProp: (prop) =>
@@ -42,7 +44,7 @@ const StyledLabelContainer = styled(Box, {
     alignItems: stacked ? 'flex-start' : 'center',
     flexDirection:
       labelPosition === 'top' ? 'column' : labelPosition === 'bottom' ? 'column-reverse' : 'row',
-    gap: theme.spacing(stacked ? 1 : 2),
+    gap: theme.spacing(stacked ? LABEL_GAP_UNITS.stacked : LABEL_GAP_UNITS.beside),
     width: '100%',
     ...(error && { '& .MuiTypography-root': { color: theme.palette.error.main } }),
   };
@@ -61,8 +63,6 @@ export const LabelContainer: React.FC<{
     {children}
   </StyledLabelContainer>
 );
-
-const ICON_SIZES: Record<string, number> = { xs: 12, sm: 14, md: 16, lg: 18, xl: 20 };
 
 export interface SwitchIconProps {
   icon: React.ReactNode;
@@ -94,7 +94,7 @@ export const SwitchIcon: React.FC<SwitchIconProps> = ({ icon, shown, animated, s
         pointerEvents: 'none',
         zIndex: 2,
         color: isOn ? '#fff' : 'text.secondary',
-        fontSize: ICON_SIZES[size] ?? ICON_SIZES.md,
+        fontSize: SWITCH_ICON_SIZES[size as SizeValue] ?? SWITCH_ICON_SIZES.md,
       }}
     >
       {icon}
