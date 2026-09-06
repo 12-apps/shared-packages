@@ -838,6 +838,38 @@ describe('useBellBadge', () => {
     expect(screen.getByTestId('signed-out').textContent).toBe('0');
   });
 
+  it('keeps ONE object while the numbers hold still, though the host rebuilds', async () => {
+    // The badge returns a literal, so without a memo a host putting it in a
+    // dependency array — or a `React.memo` on its trigger — re-fires on every
+    // render: `useSyncExternalStore` re-renders on each `patch`, and `patch`
+    // always allocates. `useUnreadCount` had neither problem, returning a
+    // number.
+    //
+    // Memoising on `activities` would have bought NOTHING, which is why this
+    // case exists: a host's hook returns a fresh array every render, exactly as
+    // the one below does. The memo is on the two results instead.
+    const rebuildsEveryRender: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? [activity()] : []),
+    };
+    const { useBellBadge } = mount(rebuildsEveryRender, badgeTransport({ count: 1 }));
+    const seenObjects = new Set<unknown>();
+    function Host(): JSX.Element {
+      const badge = useBellBadge();
+      seenObjects.add(badge);
+      return <HostChrome badge={badge} />;
+    }
+    const { rerender } = render(<Host />);
+    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('2'));
+
+    const settled = seenObjects.size;
+    rerender(<Host />);
+    rerender(<Host />);
+
+    // Two more renders, the same numbers, and no new object.
+    expect(seenObjects.size).toBe(settled);
+  });
+
   it('is unread rows and nothing else for a host with no live activities', async () => {
     const { useBellBadge } = mount(undefined, badgeTransport({ count: 3 }));
     function Host(): JSX.Element {

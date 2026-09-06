@@ -129,19 +129,19 @@ export function useLiveBellBadge(
   const { unread } = useBadgeState(store, options);
   const activities = live.useActivities({ active: enabled });
   const seenAt = useSyncExternalStore(seen.subscribe, seen.read, seen.read);
-  // The store's own half is already blanked by `useBadgeState`; this is the
-  // ACTIVITIES half, which comes from a host hook that may have ignored the
-  // hint. Memoised for the reason given on the hook above.
-  return useMemo(
-    () =>
-      enabled
-        ? {
-            // A live entry counts. It is a notification — it is the one the
-            // reader most wants to know about — and the panel it opens lists it.
-            count: unread + activities.length,
-            hasNew: unread > 0 || hasUnseenActivity(activities, seenAt),
-          }
-        : { count: 0, hasNew: false },
-    [enabled, unread, activities, seenAt],
-  );
+  // The store's own half is already blanked by `useBadgeState`; the `enabled`
+  // guard here is for the ACTIVITIES half, which comes from a host hook that
+  // may have ignored the hint.
+  //
+  // A live entry COUNTS. It is a notification — it is the one the reader most
+  // wants to know about — and the panel it opens lists it.
+  const count = enabled ? unread + activities.length : 0;
+  const hasNew = enabled && (unread > 0 || hasUnseenActivity(activities, seenAt));
+  // Memoised on the two RESULTS, not on `activities`. A host's hook returns a
+  // fresh array every render — the storefront's maps its query's rows, so
+  // structural sharing keeps the DATA identical and the array new — so an
+  // `activities` dependency would invalidate on every render and the memo would
+  // buy nothing at all. `hasUnseenActivity` runs unmemoised in front of it,
+  // which is a `.some()` over the handful of things happening at once.
+  return useMemo(() => ({ count, hasNew }), [count, hasNew]);
 }
