@@ -74,7 +74,7 @@ function outlinedPaint(theme: UiTheme, color: ChipColor): ChipPaint {
 /**
  * What MUI's chip paints, as React Native styles. `selected` tints an OUTLINED
  * chip with `action.selected` — a filled one is already solid, which is what
- * `Chip.styles.ts` decided for the web.
+ * `Chip.styles.tsx` decided for the web.
  */
 export function chipPaint(
   theme: UiTheme,

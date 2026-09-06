@@ -303,9 +303,33 @@ export const ThemeVariations: Story = {
   },
 };
 
-export const VisualStates: Story = {
-  // Asserts the `MuiSkeleton-root` class and a computed CSS `animationName`, which only the DOM renderer emits.
+/**
+ * Split out of `VisualStates` so the rest of it — the default box, the custom
+ * radius and the static skeleton's dimensions — keeps running on both
+ * renderers. Only the MUI class is DOM-only.
+ */
+export const MuiSkeletonClass: Story = {
+  // Asserts the `MuiSkeleton-root` class, which only the DOM renderer emits.
   tags: ['native-skip'],
+  name: '🏷️ MUI Skeleton Class Test',
+  render: () => (
+    <Stack spacing={2}>
+      <Skeleton variant="rectangular" height={60} animation={false} data-testid="static-skeleton" />
+      <Skeleton variant="wave" height={60} data-testid="wave-skeleton" />
+    </Stack>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Both skeletons are MUI Skeletons', async () => {
+      for (const id of ['static-skeleton', 'wave-skeleton']) {
+        await expect(canvas.getByTestId(id).classList.contains('MuiSkeleton-root')).toBeTruthy();
+      }
+    });
+  },
+};
+
+export const VisualStates: Story = {
   name: '👁️ Visual States Test',
   render: () => (
     <Stack spacing={4}>
@@ -366,10 +390,6 @@ export const VisualStates: Story = {
       const staticSkeleton = canvas.getByTestId('static-skeleton');
       await expect(staticSkeleton).toBeVisible();
 
-      // Verify it's a proper MUI Skeleton component
-      const hasMuiSkeletonClass = staticSkeleton.classList.contains('MuiSkeleton-root');
-      await expect(hasMuiSkeletonClass).toBeTruthy();
-
       // Verify the element has the expected dimensions
       const rect = staticSkeleton.getBoundingClientRect();
       await expect(rect.height).toBeGreaterThan(0);
@@ -379,10 +399,6 @@ export const VisualStates: Story = {
     await step('Wave animation is applied', async () => {
       const waveSkeleton = canvas.getByTestId('wave-skeleton');
       await expect(waveSkeleton).toBeVisible();
-
-      // Verify it's a proper MUI Skeleton component
-      const hasMuiSkeletonClass = waveSkeleton.classList.contains('MuiSkeleton-root');
-      await expect(hasMuiSkeletonClass).toBeTruthy();
 
       // For wave variant, just ensure the element renders correctly
       const rect = waveSkeleton.getBoundingClientRect();

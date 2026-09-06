@@ -113,7 +113,7 @@ export function skeletonBoxStyle(theme: UiTheme, a: SkeletonBoxStyleArgs): ViewS
   const style: ViewStyle = {
     width: dimension(a.width ?? box.width),
     height: a.variant === 'text' ? textBoxHeight(theme, height) : dimension(height),
-    borderRadius: a.borderRadius ?? radiusFor(theme, a.variant),
+    borderRadius: dimension(a.borderRadius) ?? radiusFor(theme, a.variant),
     backgroundColor: skeletonTint(theme, a.intensity),
   };
   if (a.clipped) style.overflow = 'hidden';

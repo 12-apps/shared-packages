@@ -928,6 +928,9 @@ export const ResponsiveDesign: Story = {
 
 // Theme Variations Test
 export const ThemeVariations: Story = {
+  // Asserts a CSS `animation` on the bar, which only the DOM renderer emits: the
+  // native progress drives its pulse and its indeterminate sweep with `Animated`.
+  tags: ['native-skip'],
   name: '🎨 Theme Variations Test',
   parameters: {
     backgrounds: {
@@ -1115,6 +1118,9 @@ export const ThemeVariations: Story = {
 
 // Visual States Test
 export const VisualStates: Story = {
+  // Asserts a CSS `animation` on the bar, which only the DOM renderer emits: the
+  // native progress drives its pulse and its indeterminate sweep with `Animated`.
+  tags: ['native-skip'],
   name: '👁️ Visual States Test',
   render: () => (
     <Box sx={{ p: 3, width: 700 }}>

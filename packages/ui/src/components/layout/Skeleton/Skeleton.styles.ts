@@ -45,12 +45,12 @@ export const muiAnimationFor = (
 export const defaultDimensions = (
   variant: SkeletonVariant,
 ): { width: number | string; height: number | undefined } =>
-  SKELETON_DEFAULT_DIMENSIONS[variant];
-
-const INTENSITY_OPACITY: Record<SkeletonIntensity, number> = SKELETON_INTENSITY_OPACITY;
+  // The `default:` arm the old switch had: an unrecognised variant used to fall
+  // back rather than hand `undefined` to a caller that then reads `.width`.
+  SKELETON_DEFAULT_DIMENSIONS[variant] ?? SKELETON_DEFAULT_DIMENSIONS.rectangular;
 
 const intensityOpacity = (intensity: SkeletonIntensity): number =>
-  INTENSITY_OPACITY[intensity] ?? INTENSITY_OPACITY.medium;
+  SKELETON_INTENSITY_OPACITY[intensity] ?? SKELETON_INTENSITY_OPACITY.medium;
 
 const glassmorphismStyles = (theme: Theme): CSSObject => ({
   background: `linear-gradient(135deg,

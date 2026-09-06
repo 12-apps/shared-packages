@@ -320,8 +320,6 @@ export const ResponsiveDesign: Story = {
 };
 
 export const VisualStates: Story = {
-  // Asserts a `:hover` computed transform, which only the DOM renderer has.
-  tags: ['native-skip'],
   name: '👁️ Visual States Test',
   render: () => (
     <Stack spacing={2}>
@@ -352,6 +350,30 @@ export const VisualStates: Story = {
       await expect(computedStyle.boxShadow).not.toBe('none');
     });
 
+    await step('Loading state', async () => {
+      const _loadingAvatar = canvas.getByTestId('loading-avatar');
+      // Check for loading overlay and spinner by testid
+      const loadingOverlay = canvas.getByTestId('loading-avatar-loading');
+      await expect(loadingOverlay).toBeInTheDocument();
+      const spinner = canvas.getByTestId('loading-avatar-loading-spinner');
+      await expect(spinner).toBeInTheDocument();
+    });
+  },
+};
+
+/**
+ * Split out of `VisualStates` so the rest of it — the glow's shadow and the
+ * loading overlay and its spinner, which are the shared contract — keeps
+ * running on both renderers. Only the hover is DOM-only.
+ */
+export const InteractiveHover: Story = {
+  // Asserts a `:hover` computed transform, which only the DOM renderer has.
+  tags: ['native-skip'],
+  name: '🖱️ Interactive Hover Test',
+  render: () => <Avatar fallback="IN" interactive dataTestId="interactive-avatar" />,
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
     await step('Hover state on interactive', async () => {
       const avatar = canvas.getByTestId('interactive-avatar');
       await userEvent.hover(avatar);
@@ -360,15 +382,6 @@ export const VisualStates: Story = {
         const computedStyle = window.getComputedStyle(avatar);
         expect(computedStyle.transform).not.toBe('none');
       });
-    });
-
-    await step('Loading state', async () => {
-      const _loadingAvatar = canvas.getByTestId('loading-avatar');
-      // Check for loading overlay and spinner by testid
-      const loadingOverlay = canvas.getByTestId('loading-avatar-loading');
-      await expect(loadingOverlay).toBeInTheDocument();
-      const spinner = canvas.getByTestId('loading-avatar-loading-spinner');
-      await expect(spinner).toBeInTheDocument();
     });
   },
 };

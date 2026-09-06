@@ -117,12 +117,18 @@ interface ChipContent {
 
 /** What the chip shows, and whether there is anything to show at all. */
 function chipContent(resolved: ResolvedBadgeProps<BadgeProps>): ChipContent {
-  const { variant, max, showZero, invisible } = resolved;
+  const { variant, max, showZero, invisible, icon, closable } = resolved;
   const raw = badgeContentOf(resolved);
   const content = variant === 'count' ? formatCount(raw, { max, showZero }) : raw;
+  // The web hides the chip only when the whole run assembles to nothing
+  // (`buildBadgeContent` returns null on an empty `parts`), so a zero count
+  // still draws while an icon or a close button is left to draw with it.
+  const hasOtherParts = Boolean(icon) || Boolean(closable);
   return {
     content,
-    hidden: Boolean(invisible) || (variant === 'count' && content === null && !showZero),
+    hidden:
+      Boolean(invisible) ||
+      (variant === 'count' && content === null && !showZero && !hasOtherParts),
   };
 }
 

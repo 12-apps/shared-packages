@@ -201,6 +201,27 @@ describe('Progress (native)', () => {
     expect(fill('d')).toBe(paint(theme.palette.danger.main));
   });
 
+  /**
+   * What `ThemeVariations`' "Status state colors" step asserts on the web. That
+   * story is `native-skip`ped because it also reads a CSS `animation` off the
+   * bar, which only the DOM renderer emits — the colours are not DOM-only, so
+   * they are checked here instead of being lost with it.
+   */
+  it('fills the bar from every colour slot the house vocabulary names', () => {
+    const colors = ['primary', 'secondary', 'success', 'warning', 'info', 'danger'] as const;
+    render(
+      <>
+        {colors.map((color) => (
+          <Progress key={color} value={50} color={color} dataTestId={color} />
+        ))}
+      </>,
+    );
+    for (const color of colors) {
+      const fill = (screen.getByTestId(`${color}-linear`).firstElementChild as HTMLElement).style;
+      expect(fill.backgroundColor, color).toBe(paint(theme.palette[color].main));
+    }
+  });
+
   it('takes the glass hairline and the gradient\'s first stop', () => {
     render(
       <>

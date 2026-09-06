@@ -7,7 +7,7 @@ import type { ChipSize } from './Chip.base';
  * writes — the 32px pill, the 13px label, the 5px/-6px icon tuck — because the
  * web half hands the drawing to `MuiChip` and the native half has to draw it.
  * Restated here once, read by both, so the two cannot disagree about a chip's
- * height. What THIS package adds (`Chip.helpers.tsx`'s hover lift, its shadow
+ * height. What THIS package adds (`Chip.styles.tsx`'s hover lift, its shadow
  * and its transition) is at the bottom, and the web derives its CSS from it.
  */
 

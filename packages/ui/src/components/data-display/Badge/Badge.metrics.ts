@@ -83,10 +83,20 @@ export interface BadgeAnchor {
   horizontal: 'left' | 'right';
 }
 
-export const badgeAnchor = (position: BadgePosition): BadgeAnchor => {
-  const [vertical, horizontal] = position.split('-') as ['top' | 'bottom', 'left' | 'right'];
-  return { vertical, horizontal };
+const BADGE_ANCHORS: Record<BadgePosition, BadgeAnchor> = {
+  'top-right': { vertical: 'top', horizontal: 'right' },
+  'top-left': { vertical: 'top', horizontal: 'left' },
+  'bottom-right': { vertical: 'bottom', horizontal: 'right' },
+  'bottom-left': { vertical: 'bottom', horizontal: 'left' },
 };
+
+/**
+ * Falls back to `top-right` for anything outside the union, as the web's own
+ * `positionMap[position] || positionMap['top-right']` did. Splitting on `-`
+ * instead would hand MUI a half-undefined `anchorOrigin` for, say, `middle`.
+ */
+export const badgeAnchor = (position: BadgePosition): BadgeAnchor =>
+  BADGE_ANCHORS[position] ?? BADGE_ANCHORS['top-right'];
 
 /**
  * `neutral` has no palette slot of its own in MUI, so `Badge.styles.ts` draws

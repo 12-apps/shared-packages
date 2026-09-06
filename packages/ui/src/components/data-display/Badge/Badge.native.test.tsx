@@ -23,6 +23,22 @@ const paint = (color: string): string => (color.startsWith('#') ? hexToRgb(color
 const chip = (id = 'badge'): HTMLElement => screen.getByTestId(`${id}-content-wrapper`);
 
 describe('Badge (native)', () => {
+  /*
+   * On `pulse`, and why nothing below asserts it.
+   *
+   * `AnimationTest` is the only story that turns `pulse` on, and it is
+   * `native-skip`ped because it reads a CSS `animation-duration` off the chip.
+   * The motion cannot be asserted here either: react-native-web writes
+   * `opacity: 1; transform: scale(1)` on EVERY `Animated.View`, pulsing or
+   * not, so there is no discriminator at rest — and the loop runs on
+   * `requestAnimationFrame`, which this runner's fake timers do not advance.
+   * Any assertion would be vacuous or flaky.
+   *
+   * What the story guarded against — the two renderers drifting apart — cannot
+   * happen: `Badge.animations.ts` interpolates `PULSE.scale` and
+   * `PULSE.opacity` at its 70% keyframe stop, and `usePulseStyle` interpolates
+   * the same two constants at the same 0.7 input, out of the same table.
+   */
   it('anchors a 20px chip off the top-right of what it is attached to', () => {
     render(
       <Badge badgeContent={5}>
