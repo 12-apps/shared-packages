@@ -18,6 +18,7 @@ import {
   effectInk,
 } from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types';
+import { splitTestId } from '../../../platform/test-id';
 import { px } from '../../../tokens/theme';
 
 const pulse = keyframes`
@@ -120,10 +121,10 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
       glow,
       pulse,
       disabled,
-      'data-testid': dataTestId,
-      ...props
+      ...others
     } = resolveCheckboxProps(rawProps);
     const isDisabled = disabled || loading;
+    const { testId: dataTestId, rest: props } = splitTestId(others);
     const testId = makeTestId(dataTestId);
 
     const checkbox = (

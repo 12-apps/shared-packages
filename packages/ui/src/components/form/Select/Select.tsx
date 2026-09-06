@@ -16,6 +16,7 @@ import {
 } from './Select.metrics';
 import type { SelectProps } from './Select.types';
 
+import { splitTestId } from '../../../platform/test-id';
 import { fieldEdge } from '../../../tokens/field-edge';
 
 // Define pulse animation
@@ -207,13 +208,13 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
       placeholder,
       glow,
       pulse,
-      'data-testid': dataTestId,
       value,
       'aria-label': ariaLabel,
-      ...props
+      ...rest
     },
     ref,
   ) => {
+    const { testId: dataTestId, rest: props } = splitTestId(rest);
     const labelId = React.useId();
     const helperTextId = React.useId();
     const selectId = React.useId();

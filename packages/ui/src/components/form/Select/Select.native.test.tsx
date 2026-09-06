@@ -166,6 +166,43 @@ describe('Select (native)', () => {
     expect(document.getElementById(helperId as string)).toHaveTextContent('Onde você mora');
   });
 
+  it('announces what it pops open, whether it is invalid, and leaves the tab order when disabled', () => {
+    render(
+      <>
+        <Select dataTestId="plain" options={OPTIONS} />
+        <Select dataTestId="bad" options={OPTIONS} error />
+        <Select dataTestId="off" options={OPTIONS} disabled />
+      </>,
+    );
+    // The web trigger carries all three; the native one used to carry none.
+    expect(screen.getByTestId('plain-select')).toHaveAttribute('aria-haspopup', 'listbox');
+    expect(screen.getByTestId('bad-select')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('plain-select')).not.toHaveAttribute('aria-invalid', 'true');
+    // A disabled field is not a tab stop on either renderer.
+    expect(screen.getByTestId('off-select')).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByTestId('plain-select')).toHaveAttribute('tabindex', '0');
+  });
+
+  it('pads the trigger at the two densities its size scale maps onto', () => {
+    render(
+      <>
+        <Select dataTestId="small" options={OPTIONS} size="sm" />
+        <Select dataTestId="medium" options={OPTIONS} size="md" />
+      </>,
+    );
+    // `selectInputSize` sends `sm` to MUI's small box and everything else to
+    // medium. The inset sits on the DISPLAY, which is the trigger's own child —
+    // the trigger carries only the horizontal padding, equal at both densities.
+    const display = (id: string): HTMLElement =>
+      screen.getByTestId(`${id}-select`).firstElementChild as HTMLElement;
+    expect(display('small').style.paddingTop).toBe(
+      `${MUI_INPUT_PADDING.outlined.small.top - INPUT_BORDER.rest}px`,
+    );
+    expect(display('medium').style.paddingTop).toBe(
+      `${MUI_INPUT_PADDING.outlined.medium.top - INPUT_BORDER.rest}px`,
+    );
+  });
+
   it('is a tab stop with the arrow MUI draws, turned over while open', () => {
     render(<Select dataTestId="s" options={OPTIONS} />);
     expect(screen.getByTestId('s-select')).toHaveAttribute('tabindex', '0');

@@ -18,6 +18,19 @@ export function resolveTestId(props: TestIdProps, fallback?: string): string | u
   return props.testID ?? props.dataTestId ?? props['data-testid'] ?? fallback;
 }
 
+/**
+ * The id under whichever of the three spellings the caller used, together with
+ * the props stripped of all three — so a web component can put `data-testid`
+ * where the DOM wants it without React seeing `testID` or `dataTestId` and
+ * warning that it does not recognise them.
+ */
+export function splitTestId<T extends TestIdProps>(
+  props: T,
+  fallback?: string,
+): { testId: string | undefined; rest: Omit<T, keyof TestIdProps> } {
+  return { testId: resolveTestId(props, fallback), rest: withoutTestIdProps(props) };
+}
+
 /** `${id}-${suffix}` for a sub-element, or `${fallback}-${suffix}` when unnamed. */
 export function childTestId(
   props: TestIdProps,

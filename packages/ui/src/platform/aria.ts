@@ -21,6 +21,12 @@ export interface WebAria {
    */
   'aria-invalid'?: boolean;
   'aria-required'?: boolean;
+  /**
+   * What a control pops open. React Native has `aria-expanded` and no
+   * `aria-haspopup`, so a `combobox` needs this one from here to say the thing
+   * it expands is a listbox — which is what the web's own trigger carries.
+   */
+  'aria-haspopup'?: 'listbox' | 'menu' | 'dialog' | 'true';
 }
 
 /**

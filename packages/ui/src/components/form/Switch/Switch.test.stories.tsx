@@ -145,10 +145,30 @@ export const StateChangeTest: Story = {
 
 // ===== ACCESSIBILITY TESTS =====
 
-export const AccessibilityTest: Story = {
+/**
+ * Split out of `AccessibilityTest` so its other two steps — the `aria-label`
+ * reaching the control, and the label text sitting beside it — keep running on
+ * both renderers. `type="checkbox"` is the one thing only the DOM has.
+ */
+export const ControlTypeTest: Story = {
   // Asserts `type="checkbox"` on the control: only the DOM renderer has MUI's
   // hidden `<input>` to carry it.
   tags: ['native-skip'],
+  name: '🏷️ Control Type Test',
+  args: {
+    'data-testid': 'typed-switch',
+    label: 'Typed switch',
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Verify role attributes', async () => {
+      await expect(canvas.getByRole('checkbox')).toHaveAttribute('type', 'checkbox');
+    });
+  },
+};
+
+export const AccessibilityTest: Story = {
   name: '♿ Accessibility Test',
   args: {
     'data-testid': 'accessible-switch',
@@ -184,11 +204,6 @@ export const AccessibilityTest: Story = {
       const switchElement = canvas.getByRole('checkbox');
       await expect(switchElement).toBeInTheDocument();
       await expect(switchElement).toHaveAttribute('aria-label', 'Toggle notifications');
-    });
-
-    await step('Verify role attributes', async () => {
-      const switchElement = canvas.getByRole('checkbox');
-      await expect(switchElement).toHaveAttribute('type', 'checkbox');
     });
 
     await step('Verify label association', async () => {

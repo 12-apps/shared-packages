@@ -4,6 +4,7 @@ import type { InputVariant } from './Input.base';
 import {
   FILLED_WASH,
   HELPER_TEXT,
+  INPUT_MUI_SIZE,
   INPUT_BORDER,
   INPUT_FONT_SIZE,
   INPUT_GLASS,
@@ -218,8 +219,18 @@ export function labelStyle(theme: UiTheme, variant: InputVariant, size: SizeValu
   };
 }
 
-/** `FormHelperText`: caption type, 3px below the field, inset 14px when contained. */
-export function helperStyle(theme: UiTheme, variant: InputVariant, state: FieldState): TextStyle {
+/**
+ * `FormHelperText`: caption type, 3px below the field, inset 14px when
+ * contained — and 4px below at MUI's `small` density, which `INPUT_MUI_SIZE`
+ * selects for `xs` and `sm` (`FormHelperText.js`: `marginTop: 3`, then a
+ * `size: 'small'` variant raising it to 4).
+ */
+export function helperStyle(
+  theme: UiTheme,
+  variant: InputVariant,
+  size: SizeValue,
+  state: FieldState,
+): TextStyle {
   return {
     color: state.disabled
       ? theme.palette.text.disabled
@@ -229,7 +240,7 @@ export function helperStyle(theme: UiTheme, variant: InputVariant, state: FieldS
     fontFamily: theme.typography.fontFamily,
     fontSize: HELPER_TEXT.fontSize,
     lineHeight: HELPER_TEXT.fontSize * HELPER_TEXT.lineHeight,
-    marginTop: HELPER_TEXT.marginTop,
+    marginTop: INPUT_MUI_SIZE[size] === 'small' ? HELPER_TEXT.marginTopSmall : HELPER_TEXT.marginTop,
     marginHorizontal: variant === 'underline' ? 0 : HELPER_TEXT.marginHorizontal,
   };
 }

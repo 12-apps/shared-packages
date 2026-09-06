@@ -212,7 +212,7 @@ export const Input = React.forwardRef<RNTextInput, InputProps>((rawProps, ref) =
           {loading ? <Spinner color={theme.palette.primary.main} testID={idFor('loading')} /> : endAdornment}
         </Slot>
       </View>
-      <Line text={helperText} style={helperStyle(theme, variant, state)} />
+      <Line text={helperText} style={helperStyle(theme, variant, size, state)} />
     </View>
   );
 });

@@ -24,6 +24,7 @@ import {
   SELECT_MENU,
   SELECT_PULSE,
   inputVariantFor,
+  selectInputSize,
 } from './Select.metrics';
 import type { SelectProps, SelectValue } from './Select.types.native';
 import { Icon } from '../../../icons/Icon.native';
@@ -89,6 +90,7 @@ interface TriggerProps {
   look: SelectLook;
   open: boolean;
   disabled: boolean;
+  error: boolean;
   glow: boolean;
   display: string;
   labelId?: string;
@@ -102,23 +104,26 @@ interface TriggerProps {
  *
  * `tabIndex` is spelled out because react-native-web only makes a handful of
  * roles focusable on its own, and `combobox` is not one of them — without it
- * the control would not be a tab stop.
+ * the control would not be a tab stop. It goes to -1 when disabled, which is
+ * what the web does by leaving the attribute off a disabled field entirely.
  */
 function SelectTrigger(props: TriggerProps): React.JSX.Element {
   const theme = useUiTheme();
-  const { testID, look, open, disabled, glow, display, labelId, helperId } = props;
+  const { testID, look, open, disabled, error, glow, display, labelId, helperId } = props;
 
   return (
     <Pressable
       testID={testID}
       role="combobox"
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
       aria-expanded={open}
       aria-disabled={disabled}
       disabled={disabled}
       onPress={props.onToggle}
       style={[look.box, glow ? glowStyle(theme.palette.primary.main) : null]}
       {...webAria({
+        'aria-haspopup': 'listbox',
+        'aria-invalid': error,
         ...(labelId === undefined ? {} : { 'aria-labelledby': labelId }),
         ...(helperId === undefined ? {} : { 'aria-describedby': helperId }),
       })}
@@ -219,6 +224,7 @@ export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
           look={look}
           open={open}
           disabled={disabled}
+          error={error}
           glow={glow}
           display={displayLabel(items, current)}
           labelId={label === undefined ? undefined : labelId}
@@ -231,7 +237,7 @@ export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
         ) : null}
       </View>
       {helperText === undefined ? null : (
-        <RNText id={helperId} style={helperStyle(theme, inputVariantFor(variant), state)}>
+        <RNText id={helperId} style={helperStyle(theme, inputVariantFor(variant), selectInputSize(size), state)}>
           {helperText}
         </RNText>
       )}
