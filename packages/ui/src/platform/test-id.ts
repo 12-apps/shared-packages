@@ -45,3 +45,20 @@ export function withoutTestIdProps<P extends TestIdProps>(props: P): Omit<P, key
   const { testID: _testID, dataTestId: _dataTestId, 'data-testid': _dataTestid, ...rest } = props;
   return rest;
 }
+
+/**
+ * A SLOT's own test id, where a raw id means "this element" and `dataTestId`
+ * means "the surface I belong to".
+ *
+ * `Dialog` names its parts by derivation — `d` gives `d-title`, `d-content`,
+ * `d-actions` — and a slot receives the DIALOG's id in `dataTestId` to derive
+ * from. A raw `data-testid` (or React Native's `testID`) is something else: it
+ * is the id the caller wants ON THIS ELEMENT, which is how the shared stories
+ * address a `DialogContent`, so it is taken verbatim and no suffix is added.
+ *
+ * Both renderers read this one function, which is the only way the web and the
+ * native slot can agree about what `<DialogContent data-testid="x">` is called.
+ */
+export function slotTestId(props: TestIdProps, suffix: string, fallback: string): string {
+  return props.testID ?? props['data-testid'] ?? childTestId(props, suffix, fallback);
+}

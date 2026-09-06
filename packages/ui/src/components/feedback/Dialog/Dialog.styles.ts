@@ -1,12 +1,28 @@
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 
+import type { DialogBorderRadius, DialogSize, DialogVariant } from './Dialog.base';
+import {
+  DIALOG_BACKDROP,
+  DIALOG_BORDER_WIDTH,
+  DIALOG_GLASS,
+  DIALOG_GLOW,
+  DIALOG_GRADIENT,
+  DIALOG_MARGIN_UNITS,
+  DIALOG_MAX_WIDTH,
+  DIALOG_PULSE,
+  DIALOG_RADIUS_UNITS,
+  DIALOG_WIDTH_PERCENT,
+} from './Dialog.metrics';
+import { shadowCss } from '../../../tokens/shadow';
 import { dynamicViewportHeight } from '../../../utils/viewport';
-import type { DialogProps } from './Dialog.types';
 
 /**
  * Paper/backdrop styling for the Dialog component (FUT-181 gate cleanup):
  * pure helpers so `Dialog.tsx` stays within the size/complexity budget.
+ *
+ * Every number comes from `Dialog.metrics.ts`, which the native renderer reads
+ * too — so a paper cannot be 800px wide on one side and 780 on the other.
  */
 
 // Define pulse animation
@@ -16,7 +32,7 @@ const pulseAnimation = keyframes`
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 20px currentColor;
+    box-shadow: 0 0 0 ${DIALOG_PULSE.spread}px currentColor;
     opacity: 0;
   }
   100% {
@@ -27,9 +43,9 @@ const pulseAnimation = keyframes`
 
 /** Style toggles that shape the dialog paper (extracted so each fn stays small). */
 interface VariantStyleOptions {
-  variant: NonNullable<DialogProps['variant']>;
-  size: NonNullable<DialogProps['size']>;
-  borderRadius: NonNullable<DialogProps['borderRadius']>;
+  variant: DialogVariant;
+  size: DialogSize;
+  borderRadius: DialogBorderRadius;
   glass: boolean;
   gradient: boolean;
   glow: boolean;
@@ -37,33 +53,21 @@ interface VariantStyleOptions {
 }
 
 function borderRadiusOf(theme: Theme, borderRadius: VariantStyleOptions['borderRadius']) {
-  switch (borderRadius) {
-    case 'none': return 0;
-    case 'sm': return theme.spacing(0.5);
-    case 'md': return theme.spacing(1);
-    case 'xl': return theme.spacing(3);
-    case 'lg':
-    default: return theme.spacing(2);
-  }
+  const units = DIALOG_RADIUS_UNITS[borderRadius] ?? DIALOG_RADIUS_UNITS.lg;
+  // `none` is a bare 0 rather than `spacing(0)`, as this has always written it.
+  return units === 0 ? 0 : theme.spacing(units);
 }
 
 function maxWidthOf(size: VariantStyleOptions['size']): number {
-  switch (size) {
-    case 'xs': return 400;
-    case 'sm': return 600;
-    case 'lg': return 1000;
-    case 'xl': return 1200;
-    case 'md':
-    default: return 800;
-  }
+  return DIALOG_MAX_WIDTH[size] ?? DIALOG_MAX_WIDTH.md;
 }
 
 function baseStylesOf(theme: Theme, opts: VariantStyleOptions) {
   return {
     borderRadius: borderRadiusOf(theme, opts.borderRadius),
     maxWidth: maxWidthOf(opts.size),
-    width: '90vw',
-    margin: theme.spacing(2),
+    width: `${DIALOG_WIDTH_PERCENT}vw`,
+    margin: theme.spacing(DIALOG_MARGIN_UNITS),
     transition: theme.transitions.create(
       ['box-shadow', 'background-color', 'backdrop-filter'],
       { duration: theme.transitions.duration.standard },
@@ -72,7 +76,17 @@ function baseStylesOf(theme: Theme, opts: VariantStyleOptions) {
 }
 
 function glowStylesOf(theme: Theme, glow: boolean) {
-  return glow ? { boxShadow: `0 0 40px ${alpha(theme.palette.primary.main, 0.3)}` } : {};
+  return glow
+    ? {
+        boxShadow: shadowCss({
+          offsetX: 0,
+          offsetY: 0,
+          blurRadius: DIALOG_GLOW.blurRadius,
+          spreadDistance: 0,
+          color: alpha(theme.palette.primary.main, DIALOG_GLOW.alpha),
+        }),
+      }
+    : {};
 }
 
 function pulseStylesOf(theme: Theme, pulse: boolean) {
@@ -88,10 +102,10 @@ function pulseStylesOf(theme: Theme, pulse: boolean) {
       bottom: 0,
       borderRadius: 'inherit',
       backgroundColor: theme.palette.primary.main,
-      opacity: 0.3,
-      animation: `${pulseAnimation} 2s infinite`,
+      opacity: DIALOG_PULSE.alpha,
+      animation: `${pulseAnimation} ${DIALOG_PULSE.durationMs / 1000}s infinite`,
       pointerEvents: 'none' as const,
-      zIndex: -1,
+      zIndex: DIALOG_PULSE.zIndex,
     },
   };
 }
@@ -100,17 +114,19 @@ function pulseStylesOf(theme: Theme, pulse: boolean) {
 function defaultVariantStyles(theme: Theme, opts: VariantStyleOptions) {
   const gradientStyles = opts.gradient
     ? {
-        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)}, ${alpha(theme.palette.secondary.main, 0.1)})`,
-        backdropFilter: 'blur(10px)',
+        background: `linear-gradient(${DIALOG_GRADIENT.angleDeg}deg, ${alpha(theme.palette.primary.main, DIALOG_GRADIENT.stopAlpha)}, ${alpha(theme.palette.secondary.main, DIALOG_GRADIENT.stopAlpha)})`,
+        backdropFilter: `blur(${DIALOG_GRADIENT.blurPx}px)`,
       }
     : {};
   return {
     ...gradientStyles,
     backgroundColor: opts.glass
-      ? alpha(theme.palette.background.paper, 0.1)
+      ? alpha(theme.palette.background.paper, DIALOG_GLASS.backgroundAlpha)
       : theme.palette.background.paper,
-    backdropFilter: opts.glass ? 'blur(20px)' : 'none',
-    border: opts.glass ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
+    backdropFilter: opts.glass ? `blur(${DIALOG_GLASS.blurPx}px)` : 'none',
+    border: opts.glass
+      ? `${DIALOG_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, DIALOG_GLASS.borderAlpha)}`
+      : 'none',
   };
 }
 
@@ -124,10 +140,16 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
       return {
         ...baseStylesOf(theme, opts),
         ...decorations,
-        backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+        backgroundColor: alpha(theme.palette.background.paper, DIALOG_GLASS.backgroundAlpha),
+        backdropFilter: `blur(${DIALOG_GLASS.blurPx}px)`,
+        border: `${DIALOG_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, DIALOG_GLASS.borderAlpha)}`,
+        boxShadow: shadowCss({
+          offsetX: 0,
+          offsetY: DIALOG_GLASS.shadow.offsetY,
+          blurRadius: DIALOG_GLASS.shadow.blurRadius,
+          spreadDistance: 0,
+          color: alpha(theme.palette.common.black, DIALOG_GLASS.shadow.alpha),
+        }),
       };
     case 'fullscreen':
       return {
@@ -164,10 +186,10 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
 
 export function backdropSxOf(theme: Theme, glass: boolean) {
   return {
-    backgroundColor: glass
-      ? alpha(theme.palette.common.black, 0.2)
-      : alpha(theme.palette.common.black, 0.5),
-    backdropFilter: glass ? 'blur(8px)' : 'none',
+    backgroundColor: alpha(
+      theme.palette.common.black,
+      glass ? DIALOG_BACKDROP.alpha.glass : DIALOG_BACKDROP.alpha.plain,
+    ),
+    backdropFilter: glass ? `blur(${DIALOG_BACKDROP.blurPx}px)` : 'none',
   };
 }
-

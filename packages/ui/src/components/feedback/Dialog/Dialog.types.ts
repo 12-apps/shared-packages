@@ -1,47 +1,30 @@
-import type { SizeValue } from '../../../tokens/scales';
 import type { DialogProps as MuiDialogProps } from '@mui/material/Dialog/index.js';
-import type { ReactNode } from 'react';
 
-export type DialogVariant = 'default' | 'glass' | 'fullscreen' | 'drawer';
-export type DialogSize = SizeValue;
+import type {
+  DialogActionsBaseProps,
+  DialogBaseProps,
+  DialogContentBaseProps,
+  DialogHeaderBaseProps,
+} from './Dialog.base';
 
-export interface DialogProps extends Omit<MuiDialogProps, 'variant' | 'title'> {
-  children: ReactNode;
-  variant?: DialogVariant;
-  size?: DialogSize;
-  title?: ReactNode;
-  description?: string;
-  showCloseButton?: boolean;
-  backdrop?: boolean;
-  persistent?: boolean;
-  glass?: boolean;
-  gradient?: boolean;
-  glow?: boolean;
-  pulse?: boolean;
-  borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
-  onClose?: () => void;
-  dataTestId?: string;
-}
+export type {
+  DialogActionsAlignment,
+  DialogActionsBaseProps,
+  DialogBaseProps,
+  DialogBorderRadius,
+  DialogContentBaseProps,
+  DialogHeaderBaseProps,
+  DialogSize,
+  DialogVariant,
+} from './Dialog.base';
 
-export interface DialogHeaderProps {
-  children?: ReactNode;
-  title?: ReactNode;
-  subtitle?: ReactNode;
-  showCloseButton?: boolean;
-  onClose?: () => void;
-  dataTestId?: string;
-}
+/** The web `Dialog`: the shared contract, plus everything MUI's own `Dialog` takes. */
+export interface DialogProps
+  extends DialogBaseProps,
+    Omit<MuiDialogProps, 'variant' | 'title' | keyof DialogBaseProps> {}
 
-export interface DialogContentProps {
-  children: ReactNode;
-  dividers?: boolean;
-  dense?: boolean;
-  dataTestId?: string;
-}
+export type DialogHeaderProps = DialogHeaderBaseProps;
 
-export interface DialogActionsProps {
-  children: ReactNode;
-  alignment?: 'left' | 'center' | 'right' | 'space-between';
-  spacing?: number;
-  dataTestId?: string;
-}
+export type DialogContentProps = DialogContentBaseProps;
+
+export type DialogActionsProps = DialogActionsBaseProps;

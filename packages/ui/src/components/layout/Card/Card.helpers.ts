@@ -1,4 +1,4 @@
-import type { CardProps } from './Card.types';
+import type { CardBaseProps } from './Card.base';
 
 type CardDefaultedKeys =
   | 'variant'
@@ -8,9 +8,15 @@ type CardDefaultedKeys =
   | 'borderRadius'
   | 'loading';
 
-type ResolvedCardProps = CardProps & Required<Pick<CardProps, CardDefaultedKeys>>;
+/**
+ * Generic over the renderer's own props: the web and the native `Card` pass
+ * different handler types (and different style props) through, and both come
+ * back out untouched.
+ */
+type ResolvedCardProps<P extends CardBaseProps> = P &
+  Required<Pick<CardBaseProps, CardDefaultedKeys>>;
 
-const CARD_DEFAULTS: Pick<CardProps, CardDefaultedKeys> = {
+const CARD_DEFAULTS: Required<Pick<CardBaseProps, CardDefaultedKeys>> = {
   variant: 'elevated',
   interactive: false,
   glow: false,
@@ -21,10 +27,10 @@ const CARD_DEFAULTS: Pick<CardProps, CardDefaultedKeys> = {
 
 // Strips explicitly-undefined props before the merge, so `glow={undefined}` still
 // falls back to the default exactly as a destructuring default would.
-const definedProps = (props: CardProps): Partial<CardProps> =>
+const definedProps = <P extends CardBaseProps>(props: P): Partial<P> =>
   Object.fromEntries(
     Object.entries(props).filter(([, value]) => value !== undefined),
-  ) as Partial<CardProps>;
+  ) as Partial<P>;
 
-export const resolveCardProps = (props: CardProps): ResolvedCardProps =>
-  ({ ...CARD_DEFAULTS, ...definedProps(props) }) as ResolvedCardProps;
+export const resolveCardProps = <P extends CardBaseProps>(props: P): ResolvedCardProps<P> =>
+  ({ ...CARD_DEFAULTS, ...definedProps(props) }) as ResolvedCardProps<P>;
