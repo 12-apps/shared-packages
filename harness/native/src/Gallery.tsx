@@ -5,6 +5,7 @@ import { Stack } from '@12-apps/ui/layout/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 import * as React from 'react';
 
+import { AvatarSection, BadgeSection, ChipSection, ProgressSection, SkeletonSection } from './DataSections';
 import { InputSection, SelectSection, ToggleSection } from './FormSections';
 import { Section } from './Section';
 import { AlertSection, EmptySection, ErrorSection, LoadingSection } from './StateSections';
@@ -162,6 +163,11 @@ export function Gallery(): React.JSX.Element {
       <ErrorSection onCount={onCount} />
       <EmptySection onCount={onCount} />
       <IconSection />
+      <ChipSection onCount={onCount} />
+      <AvatarSection />
+      <BadgeSection onCount={onCount} />
+      <ProgressSection />
+      <SkeletonSection />
       <InputSection />
       <SelectSection />
       <ToggleSection onCount={onCount} />

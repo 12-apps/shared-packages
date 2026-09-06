@@ -1,6 +1,17 @@
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { alpha } from '@mui/material/styles/index.js';
 
+import {
+  BADGE_DESTRUCTIVE_FONT_WEIGHT,
+  GLASS_BACKGROUND_ALPHA,
+  GLASS_BLUR_PX,
+  GLASS_BORDER_ALPHA,
+  GLASS_INSET_HIGHLIGHT_ALPHA,
+  GLASS_SATURATE,
+  OUTLINE_BORDER_WIDTH,
+  SECONDARY_BACKGROUND_ALPHA,
+  SECONDARY_BORDER_ALPHA,
+} from './Badge.metrics';
 import type { BadgePalette, BadgeSizeStyles } from './Badge.styles';
 
 const BADGE_VARIANTS: Record<
@@ -41,20 +52,20 @@ const BADGE_VARIANTS: Record<
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }),
   glass: (theme, colorPalette, sizeStyles) => ({
-        backgroundColor: alpha(colorPalette.main, 0.1),
-        backdropFilter: 'blur(10px) saturate(200%)',
-        WebkitBackdropFilter: 'blur(10px) saturate(200%)',
-        border: `1px solid ${alpha(colorPalette.main, 0.2)}`,
+        backgroundColor: alpha(colorPalette.main, GLASS_BACKGROUND_ALPHA),
+        backdropFilter: `blur(${GLASS_BLUR_PX}px) saturate(${GLASS_SATURATE * 100}%)`,
+        WebkitBackdropFilter: `blur(${GLASS_BLUR_PX}px) saturate(${GLASS_SATURATE * 100}%)`,
+        border: `1px solid ${alpha(colorPalette.main, GLASS_BORDER_ALPHA)}`,
         color: colorPalette.main,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
         fontSize: sizeStyles.fontSize,
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2,
-        boxShadow: `inset 0 1px 1px ${alpha(theme.palette.common.white, 0.1)}` }),
+        boxShadow: `inset 0 1px 1px ${alpha(theme.palette.common.white, GLASS_INSET_HIGHLIGHT_ALPHA)}` }),
   outline: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: 'transparent',
-        border: `2px solid ${colorPalette.main}`,
+        border: `${OUTLINE_BORDER_WIDTH}px solid ${colorPalette.main}`,
         color: colorPalette.main,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
@@ -62,9 +73,9 @@ const BADGE_VARIANTS: Record<
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }),
   secondary: (theme, colorPalette, sizeStyles) => ({
-        backgroundColor: alpha(colorPalette.main, 0.15),
+        backgroundColor: alpha(colorPalette.main, SECONDARY_BACKGROUND_ALPHA),
         color: colorPalette.main,
-        border: `1px solid ${alpha(colorPalette.main, 0.3)}`,
+        border: `1px solid ${alpha(colorPalette.main, SECONDARY_BORDER_ALPHA)}`,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
         fontSize: sizeStyles.fontSize,
@@ -78,7 +89,7 @@ const BADGE_VARIANTS: Record<
         fontSize: sizeStyles.fontSize,
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2,
-        fontWeight: 700 }),
+        fontWeight: BADGE_DESTRUCTIVE_FONT_WEIGHT }),
   success: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: theme.palette.success.main,
         color: theme.palette.success.contrastText,

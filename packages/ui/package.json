@@ -149,10 +149,18 @@
       "default": "./dist/data-display/AlertDialog.js"
     },
     "./data-display/Avatar": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Avatar/index.native.d.ts",
+        "default": "./dist/native/data-display/Avatar.js"
+      },
       "types": "./dist/types/components/data-display/Avatar/index.d.ts",
       "default": "./dist/data-display/Avatar.js"
     },
     "./data-display/Badge": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Badge/index.native.d.ts",
+        "default": "./dist/native/data-display/Badge.js"
+      },
       "types": "./dist/types/components/data-display/Badge/index.d.ts",
       "default": "./dist/data-display/Badge.js"
     },
@@ -169,6 +177,10 @@
       "default": "./dist/data-display/Chart.js"
     },
     "./data-display/Chip": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Chip/index.native.d.ts",
+        "default": "./dist/native/data-display/Chip.js"
+      },
       "types": "./dist/types/components/data-display/Chip/index.d.ts",
       "default": "./dist/data-display/Chip.js"
     },
@@ -225,6 +237,10 @@
       "default": "./dist/data-display/Popover.js"
     },
     "./data-display/Progress": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/Progress/index.native.d.ts",
+        "default": "./dist/native/data-display/Progress.js"
+      },
       "types": "./dist/types/components/data-display/Progress/index.d.ts",
       "default": "./dist/data-display/Progress.js"
     },
@@ -509,6 +525,10 @@
       "default": "./dist/layout/Sidebar.js"
     },
     "./layout/Skeleton": {
+      "react-native": {
+        "types": "./dist/types-native/components/layout/Skeleton/index.native.d.ts",
+        "default": "./dist/native/layout/Skeleton.js"
+      },
       "types": "./dist/types/components/layout/Skeleton/index.d.ts",
       "default": "./dist/layout/Skeleton.js"
     },
