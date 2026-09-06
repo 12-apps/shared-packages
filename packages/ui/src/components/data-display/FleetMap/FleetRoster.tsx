@@ -77,17 +77,6 @@ function RowText({
 }
 
 /**
- * A row's own box, selected or not.
- *
- * Out of line because the hover rule needs the explanation more than the JSX
- * has room for: hover must never WEAKEN the selection. Written flat as
- * `'&:hover': { backgroundColor: action.hover }`, the pseudo-class wins on
- * specificity and repaints the selected row with the hover tint — measured at
- * `rgba(0,0,0,0.08)` idle against `rgba(0,0,0,0.04)` hovered, so pointing at
- * the selected row visually DESELECTED it and made it indistinguishable from
- * any other row under the cursor.
- */
-/**
  * Keep the selected row visible INSIDE the roster.
  *
  * The roster caps its own height, so a dispatcher arrowing through a fleet of
@@ -128,6 +117,17 @@ function useKeptInView(
   return row;
 }
 
+/**
+ * A row's own box, selected or not.
+ *
+ * Out of line because the hover rule needs the explanation more than the JSX
+ * has room for: hover must never WEAKEN the selection. Written flat as
+ * `'&:hover': { backgroundColor: action.hover }`, the pseudo-class wins on
+ * specificity and repaints the selected row with the hover tint — measured at
+ * `rgba(0,0,0,0.08)` idle against `rgba(0,0,0,0.04)` hovered, so pointing at
+ * the selected row visually DESELECTED it and made it indistinguishable from
+ * any other row under the cursor.
+ */
 function rowSx(theme: Theme, selected: boolean): SxProps<Theme> {
   const resting = selected ? theme.palette.action.selected : 'transparent';
   return {

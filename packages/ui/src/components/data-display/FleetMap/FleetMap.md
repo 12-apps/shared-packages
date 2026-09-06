@@ -120,8 +120,11 @@ picking it for every consumer.
 - Freshness is stated in words on every row; the coloured dot is `aria-hidden`
   so the state is not read twice, and colour is never the only carrier.
 - The map region is a named landmark rather than hidden — see above.
-- The active option is scrolled into view (`block: 'nearest'`) as the selection
-  moves, so a keyboard user is not walking it below the fold unseen.
+- The active option is kept in view as the selection moves, so a keyboard user
+  is not walking it below the fold unseen. The ROSTER's own container is
+  scrolled, never the page: `scrollIntoView` walks every scrollable ancestor
+  including the document, which would drag a dispatcher back to this panel on
+  every poll.
 - `aria-activedescendant` is emitted only when the selected id names a row that
   is actually rendered: a controlled selection can outlive the unit it names.
 - The active option's scroll effect also watches its POSITION, because the
@@ -154,11 +157,12 @@ picking it for every consumer.
 
 ## Known limits
 
-- **Not ported to React Native.** `@12-apps/ui` ships a native build for seven
-  subpaths; this is not one, and neither is the `MapPreview` it wraps. That is
-  the ordinary state (26 of 141 at the time of writing) and it fails LOUDLY under Metro — an unported
-  subpath resolves to the web file and errors on `@mui/material` at import
-  rather than rendering a blank view. It is also the right call for this
+- **Not ported to React Native.** `@12-apps/ui` ships a native build for 26 of
+  its 141 subpaths; this is not one, and neither is the `MapPreview` it wraps.
+  Being unported is the ordinary state — 115 subpaths are, at the time of
+  writing — and it fails LOUDLY under Metro: an unported subpath resolves to the
+  web file and errors on `@mui/material` at import rather than rendering a blank
+  view. It is also the right call for this
   component: a fleet board is a dispatcher's screen, and the tracked unit's own
   device reports a position rather than drawing the fleet.
 - **The map's own `aria-label` is English**, and comes from `MapPreview` rather

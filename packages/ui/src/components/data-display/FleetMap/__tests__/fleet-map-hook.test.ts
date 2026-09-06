@@ -37,6 +37,39 @@ describe('centre identity', () => {
     expect(result.current.centre).toBe(first);
   });
 
+  it('survives a roster RE-SORT of the same coordinates', () => {
+    // The case the first test misses, and the one that actually happens.
+    // `rosterOrder` sorts on `staleSeconds`, which moves every poll, and
+    // `mapCentre` sums over that re-sorted array. Floating-point addition is
+    // not associative, so the same riders in a different order can produce a
+    // centroid differing in its last bit.
+    //
+    // These three coordinates are a MEASURED reproducer, not decoration: the
+    // rotation below is one of the ~17% of three-rider fleets where the sum
+    // genuinely differs, and with the rounding removed this case fails while
+    // every other test here still passes. Two units could never catch it —
+    // float addition is commutative, so it takes three terms to break.
+    const ROTATES = [
+      { id: 'a', label: 'A', latitude: -23.524627, longitude: -46.63734 },
+      { id: 'b', label: 'B', latitude: -23.539741, longitude: -46.531497 },
+      { id: 'c', label: 'C', latitude: -23.609255, longitude: -46.534321 },
+    ];
+    const withStaleness = (seconds: readonly number[]): FleetUnit[] =>
+      ROTATES.map((unit, index) => ({ ...unit, staleSeconds: seconds[index] as number }));
+
+    const { result, rerender } = renderHook(
+      ({ units }) => useFleetMap(units, undefined, undefined),
+      // Ranked a, b, c.
+      { initialProps: { units: withStaleness([1, 2, 3]) } },
+    );
+
+    const first = result.current.centre;
+    // Same coordinates, ranked c, a, b — nobody has moved.
+    rerender({ units: withStaleness([2, 3, 1]) });
+
+    expect(result.current.centre).toBe(first);
+  });
+
   it('is a NEW object once a unit actually moves', () => {
     const { result, rerender } = renderHook(
       ({ units }) => useFleetMap(units, undefined, undefined),

@@ -138,6 +138,46 @@ export const KeyboardNavigationTest: Story = {
       await userEvent.keyboard('{ArrowUp}');
       await waitFor(() => expect(args.onSelect).toHaveBeenCalledWith('ale'));
     });
+
+    await step('A MODIFIED arrow belongs to the page, not the roster', async () => {
+      // Cmd+Down is "scroll to the end of the document" on macOS, and
+      // Shift+Arrow extends a selection. Capturing them takes a browser
+      // gesture away from the user.
+      const before = (args.onSelect as ReturnType<typeof fn>).mock.calls.length;
+      await userEvent.keyboard('{Shift>}{ArrowDown}{/Shift}');
+      await expect((args.onSelect as ReturnType<typeof fn>).mock.calls.length).toBe(before);
+    });
+  },
+};
+
+export const ControlledWithoutHandlerTest: Story = {
+  name: '🧪 A controlled board with no handler leaves the keys to the page',
+  // `selectedId` without `onSelect` is a selection nothing can move. Swallowing
+  // the keypress there left a keyboard user unable to move the selection AND
+  // unable to scroll past the roster — so the event must come back
+  // un-prevented rather than consumed for nothing.
+  args: { selectedId: 'ana', onSelect: undefined },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const roster = canvas.getByTestId('fleet-roster');
+
+    await step('The arrow key is not consumed', async () => {
+      const seen: boolean[] = [];
+      const listener = (event: KeyboardEvent): void => {
+        seen.push(event.defaultPrevented);
+      };
+      canvasElement.ownerDocument.addEventListener('keydown', listener);
+      await userEvent.tab();
+      await waitFor(() => expect(roster).toHaveFocus());
+      await userEvent.keyboard('{ArrowDown}');
+      canvasElement.ownerDocument.removeEventListener('keydown', listener);
+
+      await expect(seen).toContain(false);
+    });
+
+    await step('And the selection has not moved', async () => {
+      await expect(canvas.getByTestId('fleet-ana')).toHaveAttribute('aria-selected', 'true');
+    });
   },
 };
 
@@ -249,7 +289,10 @@ export const LoadingStateTest: Story = {
     const canvas = within(canvasElement);
 
     await step('The panel is busy and the roster is a skeleton', async () => {
-      await expect(canvas.getByTestId('fleet')).toHaveAttribute('aria-busy', 'true');
+      // On the BODY, not the panel root: the live region announcing the reload
+      // is a sibling up there, and a live region inside a busy subtree is what
+      // `aria-busy` tells assistive tech to hold back.
+      await expect(canvas.getByTestId('fleet-body')).toHaveAttribute('aria-busy', 'true');
       await expect(canvas.getByTestId('fleet-skeleton')).toBeInTheDocument();
     });
 
@@ -292,6 +335,34 @@ export const LoadingAnnouncementTest: Story = {
   },
 };
 
+export const IdleAnnouncementRegionTest: Story = {
+  name: '🧪 The live region exists BEFORE it has anything to say',
+  // The distinguishing case, and the one the fix actually turns on. A screen
+  // reader watches an EXISTING region for mutations; one that appears already
+  // populated announces nothing. So the region must be present and EMPTY while
+  // idle — an assertion that only renders `loading: true` cannot tell the two
+  // implementations apart.
+  args: { loading: false, copy: { ...FLEET_COPY, loading: 'Atualizando a frota' } },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('It is mounted, and it is silent', async () => {
+      const status = canvas.getByTestId('fleet-status');
+      await expect(status).toHaveAttribute('role', 'status');
+      await expect(status).toHaveTextContent('');
+    });
+
+    await step('And it is NOT inside the busy subtree', async () => {
+      // `aria-busy` tells assistive tech to hold back changes within it, so a
+      // live region nested under the busy element is silent in exactly the
+      // window it exists for.
+      await expect(canvas.getByTestId('fleet-body')).not.toContainElement(
+        canvas.getByTestId('fleet-status'),
+      );
+    });
+  },
+};
+
 export const LoadingKeepsThePopulatedRosterTest: Story = {
   name: '🧪 A poll over a populated roster does not unmount it',
   args: { loading: true },
@@ -307,7 +378,10 @@ export const LoadingKeepsThePopulatedRosterTest: Story = {
     });
 
     await step('And the panel still reports itself busy', async () => {
-      await expect(canvas.getByTestId('fleet')).toHaveAttribute('aria-busy', 'true');
+      // On the BODY, not the panel root: the live region announcing the reload
+      // is a sibling up there, and a live region inside a busy subtree is what
+      // `aria-busy` tells assistive tech to hold back.
+      await expect(canvas.getByTestId('fleet-body')).toHaveAttribute('aria-busy', 'true');
     });
 
     await step('Skeletons are for the FIRST load only', async () => {

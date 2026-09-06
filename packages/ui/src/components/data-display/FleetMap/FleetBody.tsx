@@ -44,6 +44,14 @@ export function FleetBody({
     <Stack
       direction={{ xs: 'column', md: 'row' }}
       spacing={2}
+      // `aria-busy` belongs on the halves that are actually reloading, NOT on
+      // the panel root — the live region announcing the reload is a sibling up
+      // there, and a live region inside a busy subtree is exactly what
+      // `aria-busy` tells assistive tech to hold back. Marking the root busy
+      // would have silenced the announcement for the whole of the only window
+      // in which it has anything to say. `CepField` splits them the same way.
+      aria-busy={loading || undefined}
+      data-testid={`${testId}-body`}
       sx={{ alignItems: 'stretch', minWidth: 0 }}
     >
       {/* The roster reads first on a phone and sits beside the map from md up.
