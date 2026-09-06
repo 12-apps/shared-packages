@@ -95,11 +95,14 @@ function variantPaper(theme: UiTheme, a: DialogLookArgs, radius: number): ViewSt
       return { borderRadius: 0, width: '100%', height: '100%', maxWidth: undefined };
     case 'drawer':
       return {
-        // The web means `${radius}px 0 0 ${radius}px` here and builds it out of
-        // `theme.spacing()`, which is already a px STRING — so the declaration
-        // is invalid and the paper keeps MUI's own `shape.borderRadius`. Same
-        // radius here, so the two renderers agree; see NATIVE-NOTES.md.
-        borderRadius: theme.radius.md,
+        // SQUARE, because that is what the web paints. Two things have to fail
+        // for a drawer to have a corner there and both do: the `sx` builds
+        // `${radius}px 0 0 ${radius}px` out of `theme.spacing()`, which already
+        // returns a px string, so the declaration reads `16pxpx 0 0 16pxpx` and
+        // the browser drops it; and that `sx` lands on a plain `Box` INSIDE the
+        // Drawer, whose own Paper MUI renders with `square: true`. Nothing is
+        // left to round the corners. See NATIVE-NOTES.md.
+        borderRadius: 0,
         width: DIALOG_MAX_WIDTH[a.size] ?? DIALOG_MAX_WIDTH.md,
         maxWidth: '100%',
         height: '100%',

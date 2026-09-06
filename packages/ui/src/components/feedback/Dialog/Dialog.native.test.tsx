@@ -151,7 +151,9 @@ describe('Dialog (native)', () => {
 
     const drawer = look({ variant: 'drawer', size: 'sm' });
     expect(drawer.overlay.alignItems).toBe('flex-end');
-    expect(drawer.paper).toMatchObject({ width: 600, height: '100%', borderRadius: theme.radius.md });
+    // Square, because the web's own `${radius}px 0 0 ${radius}px` is invalid CSS
+    // and MUI's Drawer paper is `square`. See NATIVE-NOTES.md.
+    expect(drawer.paper).toMatchObject({ width: 600, height: '100%', borderRadius: 0 });
   });
 
   it('pads raw children itself and stands back for the spacing slots', () => {
