@@ -84,7 +84,7 @@ Mounted under whatever prefix the host chooses (the origin host: `/api/account`)
 | | |
 |---|---|
 | `GET /notifications` | the owner's inbox — newest first, cursor-paginated, `filter=unread` |
-| `GET /notifications/unread-count` | the badge number, a single indexed COUNT |
+| `GET /notifications/unread-count` | the inbox half of the badge number, a single indexed COUNT |
 | `POST /notifications/mark-read` | `{ ids }` or `{ all: true }`; idempotent, reports what moved |
 | `POST /notifications/delete` | soft delete, 1..100 ids; the delivery trail survives |
 | `GET` / `PUT /notification-preferences` | the category × channel matrix, plus per-channel AVAILABILITY (destination on file + channel declared) so dead toggles render disabled with a hint |
@@ -215,10 +215,12 @@ createWebNotifications({
 ```
 
 `active` is whether anyone is looking — `false` while the panel is shut. Pass it
-to your query's `enabled`. It is a hint about NEED, never about correctness, and
-it is not what makes an unopened inbox free: the panel is fetched lazily and the
-drawer unmounts its content on close, so a host that ignores `active` still
-issues nothing until somebody opens the bell.
+to your query's `enabled`. It is a hint about NEED, never about correctness.
+
+It is NOT a promise that a shut panel costs nothing: the bell calls the same
+hook, and the bell is always mounted. `active` earns its keep on the closing
+transition, where a query told to stand down does not fire one last time on the
+way out.
 
 One activity is `{ id, kind, title, body, link, steps, activeStepId, updatedAt }`
 — `LiveActivity`, importable from either entry (`@12-apps/notifications` or

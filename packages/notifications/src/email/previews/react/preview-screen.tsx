@@ -295,10 +295,10 @@ export function createEmailPreviewScreen(config: EmailPreviewScreenConfig): {
     // list whose contents cannot have changed. What the click actually needs is
     // a re-RENDER, so `selectedId` is re-read, and `setUrlNonce` already does
     // that on its own.
-    const load = useCallback(
-      () => fetchEmailPreviewIndex(apiBase, locale),
-      [apiBase, locale],
-    );
+    // Not `apiBase`: it comes from the FACTORY's config, not from this
+    // component, so it is constant for the component's whole life and listing
+    // it says this callback can change when it cannot.
+    const load = useCallback(() => fetchEmailPreviewIndex(apiBase, locale), [locale]);
     const index = useLoadable(load, { keepPrevious: true });
 
     const patch = (next: Record<string, string>): void => {
