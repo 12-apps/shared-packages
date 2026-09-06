@@ -50,11 +50,52 @@ const DEFAULT_HEIGHT = '420px';
  * indistinguishable from a map that failed to load, and the difference is the
  * whole question a dispatcher is asking.
  */
+/**
+ * The reload announcement, and nothing else.
+ *
+ * `aria-busy` marks the region stale for assistive technology but UTTERS
+ * nothing, and the skeletons beside it are `aria-hidden` — so a screen-reader
+ * user got silence while the roster reloaded. This is the utterance.
+ *
+ * Optional by design: the sentence is in the reader's language, which only the
+ * caller knows, and inventing an English one in a component whose whole premise
+ * is that every word arrives through `copy` would be the bug it exists to
+ * avoid. No `copy.loading`, no announcement.
+ */
+function FleetStatus({
+  announcement,
+  testId,
+}: {
+  announcement: string | undefined;
+  testId: string;
+}): React.JSX.Element | null {
+  if (!announcement) return null;
+  return (
+    <Box
+      role="status"
+      data-testid={`${testId}-status`}
+      sx={{
+        position: 'absolute',
+        width: 1,
+        height: 1,
+        overflow: 'hidden',
+        clip: 'rect(0 0 0 0)',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {announcement}
+    </Box>
+  );
+}
+
 export const FleetMap: React.FC<FleetMapProps> = React.memo(
   ({
     units,
     copy,
-    selectedId = null,
+    // NO default. `undefined` is what tells the hook the caller does not own
+    // the selection; defaulting it to `null` here made every render look
+    // controlled and the uncontrolled path unreachable.
+    selectedId,
     onSelect,
     laggingAfterSeconds = DEFAULT_LAGGING_AFTER_SECONDS,
     staleAfterSeconds = DEFAULT_STALE_AFTER_SECONDS,
@@ -66,7 +107,11 @@ export const FleetMap: React.FC<FleetMapProps> = React.memo(
     const theme = useTheme();
     const testId = dataTestId || 'fleet-map';
     const headingId = React.useId();
-    const { ordered, centre, select, markers, onKeyDown } = useFleetMap(units, selectedId, onSelect);
+    const { ordered, active, centre, select, markers, onKeyDown } = useFleetMap(
+      units,
+      selectedId,
+      onSelect,
+    );
 
     return (
       <Box
@@ -87,6 +132,8 @@ export const FleetMap: React.FC<FleetMapProps> = React.memo(
           {copy.title}
         </Typography>
 
+        <FleetStatus announcement={loading ? copy.loading : undefined} testId={testId} />
+
         {!loading && ordered.length === 0 ? (
           <EmptyState
             variant="minimal"
@@ -102,7 +149,7 @@ export const FleetMap: React.FC<FleetMapProps> = React.memo(
             select={select}
             onKeyDown={onKeyDown}
             copy={copy}
-            selectedId={selectedId}
+            selectedId={active}
             laggingAfterSeconds={laggingAfterSeconds}
             staleAfterSeconds={staleAfterSeconds}
             height={height}

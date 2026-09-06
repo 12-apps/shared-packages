@@ -54,12 +54,12 @@ telling those two apart is the entire question a dispatcher is asking.
 |---|---|---|---|
 | `units` | `readonly FleetUnit[]` | — | everyone currently reporting; empty renders the empty state |
 | `copy` | `FleetMapCopy` | — | every word, plus the two formatters |
-| `selectedId` | `string \| null` | `null` | controlled; the map centres on it and the roster marks it |
+| `selectedId` | `string \| null` | — | pass it to CONTROL the selection; omit it and the component keeps its own |
 | `onSelect` | `(id: string) => void` | — | a click on a row or a pin, and each arrow-key move |
 | `laggingAfterSeconds` | `number` | `90` | when a unit stops reading as `live` |
 | `staleAfterSeconds` | `number` | `300` | when it stops reading as `lagging` |
 | `height` | `string` | `'420px'` | the map's height, any CSS length |
-| `loading` | `boolean` | `false` | roster skeletons; the panel announces busy |
+| `loading` | `boolean` | `false` | skeletons only before the first units land; `aria-busy` either way |
 | `className` | `string` | — | on the panel root |
 | `dataTestId` | `string` | `'fleet-map'` | every child TEST id derives from it; DOM ids are generated |
 
@@ -124,15 +124,32 @@ picking it for every consumer.
   moves, so a keyboard user is not walking it below the fold unseen.
 - `aria-activedescendant` is emitted only when the selected id names a row that
   is actually rendered: a controlled selection can outlive the unit it names.
+- The active option's scroll effect also watches its POSITION, because the
+  roster re-sorts on every poll and a still-selected row can move under it.
 - While `loading`, the panel is `aria-busy` and the heading stays, so the layout
-  does not reflow when the data lands.
+  does not reflow when the data lands. `aria-busy` is a state and utters
+  nothing, so set `copy.loading` if the reload should be ANNOUNCED — that string
+  goes into a visually hidden `role="status"`. Left unset, the reload is silent.
+- Skeletons replace the roster only while there are no units yet. A poll that
+  refreshes a populated list keeps the listbox mounted, because unmounting it
+  throws away the focus inside it.
+- The map is a named landmark, so a reader can jump past it — but it is not
+  silent. `MapPreview` carries its own `aria-live="polite"` and announces its
+  centre coordinates, in English, on every re-centre. That string is the one
+  piece of user-facing text here that does not come through `copy`; fixing it
+  means changing `MapPreview`, which every consumer shares.
 
 ## Best practices
 
 - Sort nothing before passing `units`. The component orders freshest first and
   breaks ties on the label, so a poll does not reshuffle the list.
-- Keep `selectedId` in the consumer's state. Selection is controlled precisely
-  so that a click on the map and a click on the row are the same event.
+- Keep `selectedId` in the consumer's state when something ELSE needs to know
+  the selection — a detail panel beside the board, a URL, a second map. That is
+  what controlling it buys; a click on the map and a click on the row are the
+  same event either way.
+- Otherwise pass neither `selectedId` nor `onSelect` and let the component hold
+  it. Passing `selectedId` alone with no `onSelect` is a selection nothing can
+  move, and the arrow keys then belong to the page rather than the roster.
 - Pre-format `badge`. It is rendered, never parsed.
 
 ## Known limits

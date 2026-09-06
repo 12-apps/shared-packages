@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme, type Theme } from '@mui/material/styles/index.js';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { Skeleton } from '../../layout/Skeleton/Skeleton';
@@ -76,6 +76,33 @@ function RowText({
   );
 }
 
+/**
+ * A row's own box, selected or not.
+ *
+ * Out of line because the hover rule needs the explanation more than the JSX
+ * has room for: hover must never WEAKEN the selection. Written flat as
+ * `'&:hover': { backgroundColor: action.hover }`, the pseudo-class wins on
+ * specificity and repaints the selected row with the hover tint — measured at
+ * `rgba(0,0,0,0.08)` idle against `rgba(0,0,0,0.04)` hovered, so pointing at
+ * the selected row visually DESELECTED it and made it indistinguishable from
+ * any other row under the cursor.
+ */
+function rowSx(theme: Theme, selected: boolean): SxProps<Theme> {
+  const resting = selected ? theme.palette.action.selected : 'transparent';
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1.5),
+    padding: theme.spacing(1, 1.5),
+    borderRadius: theme.shape.borderRadius / 4,
+    cursor: 'pointer',
+    backgroundColor: resting,
+    '&:hover': {
+      backgroundColor: selected ? theme.palette.action.selected : theme.palette.action.hover,
+    },
+  };
+}
+
 interface RowProps {
   unit: FleetUnit;
   copy: FleetMapCopy;
@@ -84,6 +111,8 @@ interface RowProps {
   onSelect: (id: string) => void;
   /** The row's DOM id, which `aria-activedescendant` points at. */
   optionId: string;
+  /** Where the row sits in the re-sorted roster — see the scroll effect. */
+  position: number;
   testId: string;
 }
 
@@ -94,6 +123,7 @@ function FleetRow({
   selected,
   onSelect,
   optionId,
+  position,
   testId,
 }: RowProps): React.JSX.Element {
   const theme = useTheme();
@@ -105,9 +135,14 @@ function FleetRow({
   // below the fold with nothing moving — `aria-activedescendant` follows, and a
   // SIGHTED keyboard user sees no feedback at all. `nearest` so a selection
   // already on screen does not jump the list under a mouse user's cursor.
+  //
+  // Keyed on the ROW's position as well as its selectedness, because the roster
+  // re-sorts on every poll: a rider who stays selected while their staleness
+  // moves them down the list would otherwise scroll out of view with the effect
+  // never re-running.
   React.useEffect(() => {
     if (selected) row.current?.scrollIntoView({ block: 'nearest' });
-  }, [selected]);
+  }, [selected, position]);
 
   return (
     <Box
@@ -118,16 +153,7 @@ function FleetRow({
       data-testid={testId}
       data-freshness={freshness}
       onClick={() => onSelect(unit.id)}
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: theme.spacing(1.5),
-        padding: theme.spacing(1, 1.5),
-        borderRadius: theme.shape.borderRadius / 4,
-        cursor: 'pointer',
-        backgroundColor: selected ? theme.palette.action.selected : 'transparent',
-        '&:hover': { backgroundColor: theme.palette.action.hover },
-      }}
+      sx={rowSx(theme, selected)}
     >
       {/* The dot repeats what the freshness word beside it already says, so it
           is hidden rather than read twice — and colour is never the only
@@ -195,7 +221,11 @@ export function FleetRoster({
   // and `nextSelection` both handle the same case; this is the third place.
   const active = units.some((unit) => unit.id === selectedId) ? selectedId : null;
 
-  if (loading) {
+  // Only when there is nothing to show yet. Unmounting a populated listbox on
+  // every poll destroys the focus inside it, so a dispatcher arrowing through
+  // the roster is thrown back to the top of the page each time the data
+  // refreshes — and the rows they were reading vanish and return.
+  if (loading && units.length === 0) {
     return (
       <Stack spacing={1} data-testid={`${testId}-skeleton`} aria-hidden="true">
         {[0, 1, 2].map((row) => (
@@ -228,7 +258,7 @@ export function FleetRoster({
         },
       }}
     >
-      {units.map((unit) => (
+      {units.map((unit, index) => (
         <FleetRow
           key={unit.id}
           unit={unit}
@@ -237,6 +267,7 @@ export function FleetRoster({
           selected={unit.id === active}
           onSelect={onSelect}
           optionId={optionId(unit.id)}
+          position={index}
           testId={`${testId}-${unit.id}`}
         />
       ))}

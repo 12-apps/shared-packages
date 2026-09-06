@@ -22,8 +22,25 @@ export interface FleetCanvasProps {
  * Its controls are focusable, and `aria-hidden` over a focusable subtree is the
  * `aria-hidden-focus` violation: a keyboard user tabs into something a screen
  * reader insists is not there. `role="region"` with a name is what puts it in a
- * screen reader's landmark rotor, which is the "skip it in one gesture" the
- * roster's note promises; `role="group"` is not a landmark and would not.
+ * screen reader's landmark rotor, so it can be jumped PAST in one gesture;
+ * `role="group"` is not a landmark and would not.
+ *
+ * ## Skipping it does not silence it, and that is not ours to fix here
+ *
+ * `MapPreview` puts `aria-live="polite"` on its own root, with an English
+ * `aria-label` naming the centre coordinates and zoom. So re-centring the map —
+ * which every selection change does — announces something like "Map preview
+ * centered at -23.5505, -46.6333 with zoom level 15", in English, however
+ * thoroughly a reader has skipped the landmark. Two things follow, and neither
+ * is solved by anything this file can do:
+ *
+ *   * a live region announces from wherever the reader is, so the landmark's
+ *     skippability does not suppress it;
+ *   * that string is the one piece of user-facing text in this component that
+ *     does NOT come through `copy`.
+ *
+ * Fixing it means changing `MapPreview`, which every other consumer shares, so
+ * it is stated here rather than quietly claimed away.
  *
  * ## No centre, no map
  *

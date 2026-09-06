@@ -184,6 +184,10 @@
       "types": "./dist/types/components/data-display/EmptyState/index.d.ts",
       "default": "./dist/data-display/EmptyState.js"
     },
+    "./data-display/FleetMap": {
+      "types": "./dist/types/components/data-display/FleetMap/index.d.ts",
+      "default": "./dist/data-display/FleetMap.js"
+    },
     "./data-display/SectionOnboarding": {
       "types": "./dist/types/components/data-display/SectionOnboarding/index.d.ts",
       "default": "./dist/data-display/SectionOnboarding.js"

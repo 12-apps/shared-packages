@@ -54,6 +54,14 @@ export interface FleetMapCopy {
   /** The roster list's accessible name — it is the map's readable half. */
   rosterLabel: string;
   /**
+   * What a screen reader hears while the roster reloads, e.g. "Atualizando a
+   * frota". OPTIONAL, and silence is the honest default: `aria-busy` marks the
+   * region stale without uttering anything, the skeletons are `aria-hidden`,
+   * and this component cannot invent the sentence in the reader's language.
+   * Set it and the panel announces politely; leave it and it stays quiet.
+   */
+  loading?: string;
+  /**
    * The map region's accessible name.
    *
    * The map is NOT `aria-hidden`, and that is deliberate rather than an
@@ -62,6 +70,10 @@ export interface FleetMapCopy {
    * violation — a keyboard user tabs into a region a screen reader insists is
    * not there. So it is a NAMED region a reader can skip past instead, and the
    * roster beside it carries every fact a pin does.
+   *
+   * Skipping it does not silence it: `MapPreview` carries its own
+   * `aria-live="polite"` and announces its centre in English on every
+   * re-centre. See `FleetCanvas` for why that is stated rather than fixed here.
    */
   mapLabel: string;
   /** The three freshness words, as a reader sees them on a row. */
@@ -97,7 +109,11 @@ export interface FleetMapProps {
   staleAfterSeconds?: number;
   /** Map height, any CSS length. */
   height?: string;
-  /** While true the roster renders skeletons and the panel announces busy. */
+  /**
+   * While true the roster renders skeletons and the panel is marked `aria-busy`.
+   * It only ANNOUNCES if {@link FleetMapCopy.loading} is set — `aria-busy` is a
+   * state, not an utterance.
+   */
   loading?: boolean;
   className?: string;
   /** Test id for the panel root; every child id is derived from it. */

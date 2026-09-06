@@ -243,7 +243,7 @@ export const EmptyStateTest: Story = {
 };
 
 export const LoadingStateTest: Story = {
-  name: '🧪 Loading — skeletons, and the panel announces busy',
+  name: '🧪 Loading — skeletons before the first units land',
   args: { loading: true, units: [] },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -268,6 +268,93 @@ export const LoadingStateTest: Story = {
       // and rendering the empty one while a request is in flight tells a
       // dispatcher the road is clear when nobody has looked.
       await waitFor(() => expect(canvas.queryByTestId('fleet-empty')).not.toBeInTheDocument());
+    });
+
+    await step('And it stays SILENT, because this copy set names no loading word', async () => {
+      // `aria-busy` is a state, not an utterance, and the skeletons are
+      // aria-hidden. Announcing requires a sentence only the caller can write.
+      await waitFor(() => expect(canvas.queryByTestId('fleet-status')).not.toBeInTheDocument());
+    });
+  },
+};
+
+export const LoadingAnnouncementTest: Story = {
+  name: '🧪 Loading — announced only when the copy names it',
+  args: { loading: true, units: [], copy: { ...FLEET_COPY, loading: 'Atualizando a frota' } },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('The word the caller gave is in a live region', async () => {
+      const status = canvas.getByTestId('fleet-status');
+      await expect(status).toHaveAttribute('role', 'status');
+      await expect(status).toHaveTextContent('Atualizando a frota');
+    });
+  },
+};
+
+export const LoadingKeepsThePopulatedRosterTest: Story = {
+  name: '🧪 A poll over a populated roster does not unmount it',
+  args: { loading: true },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('The listbox survives the refresh', async () => {
+      // Swapping a populated list for skeletons on every poll throws away the
+      // focus inside it, so a dispatcher arrowing the roster is thrown back to
+      // the top of the page each time the data lands.
+      await expect(canvas.getByTestId('fleet-roster')).toBeInTheDocument();
+      await expect(canvas.getAllByRole('option')).toHaveLength(3);
+    });
+
+    await step('And the panel still reports itself busy', async () => {
+      await expect(canvas.getByTestId('fleet')).toHaveAttribute('aria-busy', 'true');
+    });
+
+    await step('Skeletons are for the FIRST load only', async () => {
+      await waitFor(() =>
+        expect(canvas.queryByTestId('fleet-skeleton')).not.toBeInTheDocument(),
+      );
+    });
+  },
+};
+
+export const UncontrolledSelectionTest: Story = {
+  name: '🧪 With no selection props at all, the roster still works',
+  // Neither `selectedId` nor `onSelect`. Left purely controlled this rendered a
+  // listbox that answered nothing AND swallowed the arrow keys, so a keyboard
+  // user could neither move the selection nor scroll past the roster.
+  args: { selectedId: undefined, onSelect: undefined },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    // The keyboard first, from an untouched panel: tabbing in has to reach the
+    // roster, and a click inside it would move focus past there.
+    await step('Arrowing in selects, with no handler anywhere', async () => {
+      const roster = canvas.getByTestId('fleet-roster');
+      await userEvent.tab();
+      await waitFor(() => expect(roster).toHaveFocus());
+      // Nothing is selected yet, so Down opens at the top of the roster.
+      await userEvent.keyboard('{ArrowDown}');
+      await waitFor(() =>
+        expect(canvas.getByTestId('fleet-ana')).toHaveAttribute('aria-selected', 'true'),
+      );
+    });
+
+    await step('The arrow keys were NOT swallowed on the way', async () => {
+      // The regression this pins: `preventDefault` used to fire before a no-op
+      // `select`, so a keyboard user could neither move the selection nor
+      // scroll the page. A moved selection proves the first half.
+      await expect(canvas.getByTestId('fleet-roster')).toHaveAttribute(
+        'aria-activedescendant',
+      );
+    });
+
+    await step('And clicking a row moves it too', async () => {
+      await userEvent.click(canvas.getByTestId('fleet-caio'));
+      await waitFor(() =>
+        expect(canvas.getByTestId('fleet-caio')).toHaveAttribute('aria-selected', 'true'),
+      );
+      await expect(canvas.getByTestId('fleet-ana')).toHaveAttribute('aria-selected', 'false');
     });
   },
 };

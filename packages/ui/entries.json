@@ -38,6 +38,7 @@
   "data-display/DataViews": "src/components/data-display/DataViews/index.ts",
   "data-display/DescriptionItem": "src/components/data-display/DescriptionItem/index.ts",
   "data-display/EmptyState": "src/components/data-display/EmptyState/index.ts",
+  "data-display/FleetMap": "src/components/data-display/FleetMap/index.ts",
   "data-display/SectionOnboarding": "src/components/data-display/SectionOnboarding/index.ts",
   "data-display/StatCard": "src/components/data-display/StatCard/index.ts",
   "data-display/HoverCard": "src/components/data-display/HoverCard/index.ts",
