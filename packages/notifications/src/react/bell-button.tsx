@@ -1,7 +1,13 @@
 /**
  * Bare bell trigger with the live unread badge — for hosts that do not already
- * have a styled icon-button slot. A host with its own trigger chrome uses
- * `useUnreadCount` + `Panel` directly.
+ * have a styled icon-button slot.
+ *
+ * A host with its own trigger chrome uses `useBellBadge` + `Panel` directly,
+ * and NOT `useUnreadCount`, which is what this sentence used to say. That
+ * advice was taken, verbatim and by name, by a storefront whose header needed
+ * its own trigger — and it gave that storefront a bell showing nothing at all
+ * while a live pedido sat in the panel it opens, because `useUnreadCount`
+ * counts inbox rows and knows nothing about what is happening right now.
  */
 import type { JSX } from 'react';
 

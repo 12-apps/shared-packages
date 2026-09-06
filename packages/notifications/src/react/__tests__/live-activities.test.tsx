@@ -182,14 +182,11 @@ function mount(
   });
 }
 
-/** A transport whose unread count is the test's own. */
-function badgeTransport(
-  badge: { count: number },
-  list: unknown = EMPTY_INBOX,
-): NotificationsTransport {
+/** A transport whose unread count is the test's own. The list stays empty. */
+function badgeTransport(badge: { count: number }): NotificationsTransport {
   const pages: Record<string, unknown> = {
     '/api/account/notifications/unread-count': badge,
-    '/api/account/notifications?limit=20': list,
+    '/api/account/notifications?limit=20': EMPTY_INBOX,
   };
   return {
     get<T>(path: string): Promise<T> {
@@ -813,6 +810,34 @@ describe('useBellBadge', () => {
     });
   });
 
+  it('hands a signed-out `useUnreadCount` a zero, not the last count', async () => {
+    // The same invariant one layer down, and the one that actually needs its
+    // own case: `useLiveBellBadge` zeroes itself, so the gate inside
+    // `useBadgeState` is invisible through the badge. It is NOT invisible
+    // through `useUnreadCount`, which returns that state's `unread` directly —
+    // and which the admin chrome calls with `enabled` flipped on sign-out.
+    //
+    // The store is per FACTORY and a host builds one for the whole app, so
+    // signing out does not empty it: `refreshBadge` swallows the 401 and leaves
+    // the last number. Both consumers below share this one, and the enabled one
+    // fills it first.
+    const { useUnreadCount: useBoundCount } = mount(undefined, badgeTransport({ count: 7 }));
+    function Pair(): JSX.Element {
+      const signedIn = useBoundCount();
+      const signedOut = useBoundCount({ enabled: false });
+      return (
+        <>
+          <span data-testid="signed-in">{signedIn}</span>
+          <span data-testid="signed-out">{signedOut}</span>
+        </>
+      );
+    }
+    render(<Pair />);
+
+    await waitFor(() => expect(screen.getByTestId('signed-in').textContent).toBe('7'));
+    expect(screen.getByTestId('signed-out').textContent).toBe('0');
+  });
+
   it('is unread rows and nothing else for a host with no live activities', async () => {
     const { useBellBadge } = mount(undefined, badgeTransport({ count: 3 }));
     function Host(): JSX.Element {
@@ -825,28 +850,42 @@ describe('useBellBadge', () => {
     expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('new');
   });
 
-  it('says nothing while signed out, even when the host ignores `active`', async () => {
-    // A signed-out header still MOUNTS the bell — there is simply nothing of
-    // this reader's to count, and a stale number would be somebody else's.
+  it('says nothing while signed out, even beside a bell that is signed in', async () => {
+    // A signed-out header still MOUNTS the bell, and the number it must not
+    // show is the PREVIOUS reader's. The store lives on the factory, which a
+    // host builds once at module scope for the whole app — so signing out does
+    // not empty it, and `refreshBadge` swallows the 401 and leaves the last
+    // count in place. Whatever `enabled: false` reads, it reads from a store
+    // that is still full.
     //
-    // The host here IGNORES the `active` hint, which is the only way to reach
-    // the guard that enforces this. `live-config.ts` blesses that explicitly —
-    // "behaving correctly and merely paying for it" — and a real adopter does
-    // it. Through the stock `source()` helper, which answers `[]` when
-    // inactive, the guard is unreachable and DELETING it leaves the whole suite
-    // green. The server count is non-zero for the same reason: zero is what a
-    // missing guard would also produce.
+    // So the store is deliberately FILLED here, by an enabled sibling on the
+    // same factory, before the disabled one is asked. Rendered alone, this case
+    // passed against a hook that ignored `enabled` entirely, because there was
+    // nothing in the store for it to leak.
+    //
+    // The host also IGNORES the `active` hint — `live-config.ts` blesses that
+    // ("behaving correctly and merely paying for it") — which is the only way
+    // to reach the activities half of the guard. Through the stock `source()`
+    // helper, which answers `[]` when inactive, it is unreachable.
     const alwaysAnswers: LiveActivitiesConfig = {
       messages: CLINIC_LIVE_MESSAGES,
       useActivities: () => [activity()],
     };
     const { useBellBadge } = mount(alwaysAnswers, badgeTransport({ count: 4 }));
-    function Host(): JSX.Element {
-      return <HostChrome badge={useBellBadge({ enabled: false })} />;
+    function Pair(): JSX.Element {
+      const signedIn = useBellBadge();
+      const signedOut = useBellBadge({ enabled: false });
+      return (
+        <>
+          <span data-testid="signed-in">{signedIn.count}</span>
+          <HostChrome badge={signedOut} />
+        </>
+      );
     }
-    render(<Host />);
+    render(<Pair />);
 
-    await vi.advanceTimersByTimeAsync(100);
+    // 4 unread + 1 live: the store is populated, so there is something to leak.
+    await waitFor(() => expect(screen.getByTestId('signed-in').textContent).toBe('5'));
     expect(screen.getByTestId('host-badge').textContent).toBe('0');
     expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('seen');
   });

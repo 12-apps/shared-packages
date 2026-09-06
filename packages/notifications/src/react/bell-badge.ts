@@ -26,16 +26,30 @@
  * ## What it does NOT yet do
  *
  * A live subject usually also writes inbox rows as it moves, and this counts
- * both: a pedido with one unread row about it reads `2`. Answering that needs
- * the server to say which unread rows name which subject, and the query that
- * would do it has no index behind it — `notifications.prisma` carries
- * `[userId, deletedAt, readAt]` and `[userId, deletedAt, createdAt]`, neither of
- * which serves the ordered scan over unread rows. So it is a schema change with
- * a migration rather than a line of arithmetic, and it is deliberately not this
- * one: shipping the arithmetic first would put an unindexed read on the badge
- * poll, which runs every 60 s per open tab.
+ * both: a pedido with one unread row about it reads `2`. Subtracting the double
+ * needs the server to say which unread rows name which subject, and that was
+ * built, reviewed and pulled — for reasons about the CONTRACT rather than the
+ * arithmetic, and worth recording so the next attempt starts past them:
+ *
+ *  - it added a field to `GET /notifications/unread-count`, and at least one
+ *    adopter publishes that response as a closed schema to LLM clients. An
+ *    additive field is a breaking change against `additionalProperties: false`.
+ *  - the scan is per READER, so every host paid it — including the two SPAs in
+ *    that adopter that share one factory and configure no live activities at
+ *    all, and read the count through `useUnreadCount`, which never sees the
+ *    breakdown.
+ *  - it narrowed `NotificationsApiClient.unreadCount()` from `Promise<number>`,
+ *    which is a breaking change on a commit the release rules cut as a minor.
+ *
+ * The way through is an opt-in the surface asks for — a host with no live
+ * activities then sends nothing different and receives nothing different.
+ *
+ * (An earlier revision of this docblock blamed a missing index instead. That
+ * was wrong: `[userId, deletedAt, readAt]` is a full equality prefix over the
+ * filter, and the `ORDER BY` the scan carried was not load-bearing, since a
+ * tally does not care what order it counts in.)
  */
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 
 import { useBadgeState, type BadgeSyncOptions } from './hooks';
 import type { InboxStore } from './inbox-state';
@@ -63,9 +77,15 @@ export interface BellBadge {
  * the same fact.
  */
 export function useInboxBellBadge(store: InboxStore, options: BadgeSyncOptions = {}): BellBadge {
+  // `useBadgeState` already blanks itself when disabled — the gate lives there,
+  // once, rather than at each of the three hooks that layer on it.
   const { unread } = useBadgeState(store, options);
-  const count = (options.enabled ?? true) ? unread : 0;
-  return { count, hasNew: count > 0 };
+  // MEMOISED, unlike the number `useUnreadCount` returns. `useSyncExternalStore`
+  // re-renders on every `patch` and `patch` always allocates, so a poll that
+  // comes back with an unchanged count would otherwise hand a host a new object
+  // every 60 s — enough to re-fire a `useEffect` keyed on it, or defeat a
+  // `React.memo` on the trigger, forever.
+  return useMemo(() => ({ count: unread, hasNew: unread > 0 }), [unread]);
 }
 
 /**
@@ -79,10 +99,16 @@ export function useInboxBellBadge(store: InboxStore, options: BadgeSyncOptions =
  *
  * ## `enabled` is enforced HERE, not taken on trust
  *
- * A host is explicitly allowed to ignore the `active` hint and always answer
- * (`./live-config`), and at least one real adopter does. So a signed-out header
- * — which still MOUNTS the bell — can be handed a list of somebody's pedidos,
- * and the guard below is the only thing between that and a badge counting them.
+ * A host is explicitly allowed to ignore the `active` hint and always answer —
+ * `./live-config` calls that "behaving correctly and merely paying for it" — so
+ * a signed-out header, which still MOUNTS the bell, can be handed a list of
+ * somebody's pedidos. The guard below is the only thing between that and a
+ * badge counting them.
+ *
+ * Defensive against the CONTRACT, not against an observed adopter: today's one
+ * honours the hint on every lever it has. That is exactly why the guard needs
+ * saying — nothing about the current tree would fail if it went, and the case
+ * that covers it has to build the ignoring host itself.
  *
  * ## What it costs the host, stated plainly
  *
@@ -103,11 +129,19 @@ export function useLiveBellBadge(
   const { unread } = useBadgeState(store, options);
   const activities = live.useActivities({ active: enabled });
   const seenAt = useSyncExternalStore(seen.subscribe, seen.read, seen.read);
-  if (!enabled) return { count: 0, hasNew: false };
-  return {
-    // A live entry counts. It is a notification — it is the one the reader most
-    // wants to know about — and the panel it opens lists it.
-    count: unread + activities.length,
-    hasNew: unread > 0 || hasUnseenActivity(activities, seenAt),
-  };
+  // The store's own half is already blanked by `useBadgeState`; this is the
+  // ACTIVITIES half, which comes from a host hook that may have ignored the
+  // hint. Memoised for the reason given on the hook above.
+  return useMemo(
+    () =>
+      enabled
+        ? {
+            // A live entry counts. It is a notification — it is the one the
+            // reader most wants to know about — and the panel it opens lists it.
+            count: unread + activities.length,
+            hasNew: unread > 0 || hasUnseenActivity(activities, seenAt),
+          }
+        : { count: 0, hasNew: false },
+    [enabled, unread, activities, seenAt],
+  );
 }

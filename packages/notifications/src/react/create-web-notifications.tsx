@@ -95,7 +95,14 @@ export interface WebNotifications {
     enabled?: boolean;
     onNavigate?: (link: string) => void;
   }>;
-  /** The badge number, for a host with its own trigger chrome. */
+  /**
+   * The unread INBOX count.
+   *
+   * For a host with its own trigger chrome only when that host configured no
+   * live activities — otherwise it is a bell that ignores everything happening
+   * right now, and `useBellBadge` below is the door. Still the right hook for
+   * anything that genuinely wants "how many unread rows".
+   */
   useUnreadCount: (options?: { enabled?: boolean }) => number;
   /**
    * The badge's NUMBER AND TONE, for a host with its own trigger chrome.

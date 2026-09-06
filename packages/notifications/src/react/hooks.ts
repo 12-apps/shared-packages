@@ -56,21 +56,52 @@ export interface BadgeSyncOptions {
 }
 
 /**
+ * What a disabled badge reads, instead of whatever the store happens to hold.
+ *
+ * A CONSTANT, so `useSyncExternalStore`'s identity comparison sees no change
+ * across the renders of a signed-out session.
+ */
+const NOTHING_TO_SHOW: InboxState = {
+  unread: 0,
+  items: [],
+  status: 'idle',
+  nextCursor: null,
+  loadingMore: false,
+};
+
+/**
  * The badge's server state, kept fresh: pushed while a subscription is live,
  * polled otherwise.
  *
- * `enabled` gates the poll AND the subscription. A signed-out header still
- * mounts the bell, and there is nothing for it to hear.
+ * The whole state rather than the count, because every badge hook that layers
+ * on top of it needs the poll and the subscription mounted exactly ONCE per
+ * bell — read through two hooks, a bell that showed both a number and a tone
+ * would open two of everything.
  *
- * The whole state rather than the count, because a bell that shows live
- * activities needs the live-subject breakdown alongside it — see
- * `bell-badge.ts`. The two must come from ONE hook: read through two, the poll
- * and the subscription would be mounted twice per bell.
+ * ## `enabled` gates the ANSWER, not only the fetching
+ *
+ * It gates the poll and the subscription, which is the obvious half. It also
+ * blanks the returned state, which is the half that was missing and matters
+ * more: the store is per FACTORY and a host builds one at module scope for the
+ * whole app, so signing out does not empty it — `refreshBadge` swallows the 401
+ * and leaves the last number in place. Without this, a hook told there is
+ * nobody signed in hands back the PREVIOUS reader's unread count and their
+ * inbox rows.
+ *
+ * Deliberately here rather than at each caller. It was at each caller, three
+ * times, in three shapes, and two of them were dead weight no test could reach
+ * — which is what an invariant looks like just before one copy of it goes
+ * missing.
+ *
+ * INTERNAL. Not exported from `./index`: it hands back rows as well as a count,
+ * and a host wanting a number has `useUnreadCount` or the factory's
+ * `useBellBadge`.
  */
 export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {}): InboxState {
   const enabled = options.enabled ?? true;
   const subscribe = options.subscribe;
-  const state = useInboxState(store);
+  const live = useInboxState(store);
+  const state = enabled ? live : NOTHING_TO_SHOW;
 
   // Called unconditionally — it is a hook, so it cannot sit behind `enabled`.
   // The host's own hook decides what to do when there is nothing to hear.
@@ -108,8 +139,7 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
  * happening right now.
  */
 export function useUnreadCount(store: InboxStore, options: BadgeSyncOptions = {}): number {
-  const { unread } = useBadgeState(store, options);
-  return (options.enabled ?? true) ? unread : 0;
+  return useBadgeState(store, options).unread;
 }
 
 /** The panel's list — only fetches while the panel is open. */

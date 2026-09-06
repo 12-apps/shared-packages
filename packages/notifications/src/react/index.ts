@@ -45,8 +45,10 @@ export {
   type InboxStore,
 } from './inbox-state';
 
+// `useBadgeState` is NOT here, for the reason the raw badge hooks above are
+// not: it hands back the inbox ROWS as well as the count, and a host wanting a
+// number already has `useUnreadCount` and the factory's `useBellBadge`.
 export {
-  useBadgeState,
   useInboxList,
   useInboxState,
   useUnreadCount,
