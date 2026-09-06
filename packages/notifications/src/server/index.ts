@@ -41,7 +41,11 @@ export type {
   PushSubscriptionRow,
 } from './db';
 
-export type { ListNotificationsInput, NotificationInboxStore } from './inbox';
+export type {
+  ListNotificationsInput,
+  NotificationInboxStore,
+  UnreadSummary,
+} from './inbox';
 export type { NotificationPreferenceStore } from './preferences';
 export type { PushSubscriptionInput, PushSubscriptionStore } from './push-subscriptions';
 

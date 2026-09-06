@@ -489,13 +489,19 @@ createWebNotifications({
   something has happened, `neutral` when the only thing there has already been
   looked at. That distinction is the answer to the original objection — a number
   no amount of reading can clear — which is why the tone exists at all.
-- **An inbox notification about a subject you also report as live is counted
-  TWICE on the bell** — once as the unread row, once as the activity. That is
-  not a reason to stop sending them: the section below tells you to tag them
-  with `LIVE_SUBJECT_KEY` precisely so the phone collapses them, and the row is
-  still the record the reader re-reads later. It is a reason to decide which
-  surface owns the COUNT before you turn live activities on, because this
-  package does not decide it for you.
+- **One happening thing is counted ONCE.** A subject that is live usually also
+  writes inbox rows as it moves, and adding both would say `3` about one dinner.
+  So while the subject is on screen its unread rows do not count again; they
+  start counting the moment your hook stops returning it, which is exactly when
+  they become the only record of what happened. Nothing is hidden from the
+  LIST — the rows are all there — and nothing is marked read on the reader's
+  behalf.
+
+  **This costs you one thing: the ids have to match.** The join is
+  `LiveActivity.id === data[LIVE_SUBJECT_KEY]`, string for string, so the same
+  `order:${id}` that goes on the notification goes on the activity. Get it
+  wrong and nothing breaks — you simply get the double count back, silently,
+  which is worth a test in your host.
 - It leaves when your hook stops returning it. There is no dismiss, no read and
   no delete — the subject finishing is the only exit, which is what stops the
   section becoming a second inbox.
@@ -511,6 +517,21 @@ data: { [LIVE_SUBJECT_KEY]: `order:${orderId}` }
 
 (`LiveActivity` itself comes from either entry — the root or `./react` — so the
 hook and the type it returns are one import line.)
+
+**If you draw your own bell**, take `useBellBadge` from the factory rather than
+`useUnreadCount`:
+
+```ts
+const { count, hasNew } = notifications.useBellBadge({ enabled: signedIn });
+```
+
+`useUnreadCount` counts inbox rows and knows nothing about what is happening
+right now, so a host rendering it in its own chrome gets a bell showing NOTHING
+while a pinned entry sits inside the panel it opens. `useBellBadge` is the hook
+this package's own bell uses, exclusion and tone included — `hasNew` is the
+`primary`/`neutral` decision above, said in a way your chrome can paint however
+it likes. Without `liveActivities` configured it is `useUnreadCount` plus
+`hasNew: count > 0`.
 
 `formatWebPush` turns it into `tag` on the push payload; your service worker
 passes `tag` to `showNotification` and the tray keeps ONE entry per subject

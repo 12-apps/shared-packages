@@ -3,17 +3,18 @@
  * have a styled icon-button slot. A host with its own trigger chrome uses
  * `useUnreadCount` + `Panel` directly.
  */
-import { useSyncExternalStore, type JSX } from 'react';
+import type { JSX } from 'react';
 
 import { Badge } from '@12-apps/ui/data-display/Badge';
 import { Box } from '@12-apps/ui/mui/Box';
 
 import type { NotificationMessages } from '../messages';
 
+import { useInboxBellBadge, useLiveBellBadge } from './bell-badge';
 import { BellIcon } from './bell-icon';
-import { useUnreadCount, type NotificationsSignalHook, type NotificationsSubscribe } from './hooks';
+import type { NotificationsSignalHook, NotificationsSubscribe } from './hooks';
 import type { LiveActivitiesConfig } from './live-config';
-import { hasUnseenActivity, type LiveSeenStore } from './live-seen';
+import type { LiveSeenStore } from './live-seen';
 import type { InboxStore } from './inbox-state';
 
 const triggerSx = {
@@ -111,14 +112,12 @@ export function BellButton({
   subscribe?: NotificationsSubscribe;
   useSignal?: NotificationsSignalHook;
 }): JSX.Element {
-  const count = useUnreadCount(store, {
+  const badge = useInboxBellBadge(store, {
     enabled,
     ...(subscribe ? { subscribe } : {}),
     ...(useSignal ? { useSignal } : {}),
   });
-  // No live config on this host: unread IS the whole count, and an unread row
-  // is by definition something the reader has not seen.
-  return <BellTrigger onClick={onClick} count={count} hasNew={count > 0} messages={messages} />;
+  return <BellTrigger onClick={onClick} {...badge} messages={messages} />;
 }
 
 /**
@@ -130,14 +129,9 @@ export function BellButton({
  * unrelated component rather than here. The factory knows statically which host
  * it is building for and picks one.
  *
- * ## What it costs the host, stated plainly
- *
- * The bell is mounted for as long as the app is, so unlike the panel's copy of
- * this hook there is no "nobody is looking" state to stand down in — `active`
- * is simply `enabled`. A host that answers by polling therefore polls for every
- * signed-in reader whether or not they ever open the centre. That is the price
- * of a badge that knows about live activities at all, and the reason to answer
- * this hook from a pushed cache rather than from an interval.
+ * What the number MEANS, and what it costs the host, is `bell-badge.ts` — the
+ * same hook a host with its own trigger chrome reaches through the factory's
+ * `useBellBadge`, so the two bells can never disagree about the count.
  */
 export function LiveBellButton({
   onClick,
@@ -156,22 +150,10 @@ export function LiveBellButton({
   live: LiveActivitiesConfig;
   seen: LiveSeenStore;
 }): JSX.Element {
-  const unread = useUnreadCount(store, {
+  const badge = useLiveBellBadge(store, live, seen, {
     enabled,
     ...(subscribe ? { subscribe } : {}),
     ...(useSignal ? { useSignal } : {}),
   });
-  const activities = live.useActivities({ active: enabled });
-  const seenIso = useSyncExternalStore(seen.subscribe, seen.read, seen.read);
-  const liveCount = enabled ? activities.length : 0;
-  return (
-    <BellTrigger
-      onClick={onClick}
-      // A live entry counts. It is a notification — it is the one the reader
-      // most wants to know about — and the panel it opens lists it.
-      count={unread + liveCount}
-      hasNew={unread > 0 || (enabled && hasUnseenActivity(activities, seenIso))}
-      messages={messages}
-    />
-  );
+  return <BellTrigger onClick={onClick} {...badge} messages={messages} />;
 }

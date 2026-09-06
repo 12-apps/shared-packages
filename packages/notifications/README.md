@@ -84,7 +84,7 @@ Mounted under whatever prefix the host chooses (the origin host: `/api/account`)
 | | |
 |---|---|
 | `GET /notifications` | the owner's inbox — newest first, cursor-paginated, `filter=unread` |
-| `GET /notifications/unread-count` | the inbox half of the badge number, a single indexed COUNT |
+| `GET /notifications/unread-count` | the inbox half of the badge number: an indexed COUNT, plus `liveSubjects` — how many of those rows are about each ongoing subject, so the bell can count one happening thing once |
 | `POST /notifications/mark-read` | `{ ids }` or `{ all: true }`; idempotent, reports what moved |
 | `POST /notifications/delete` | soft delete, 1..100 ids; the delivery trail survives |
 | `GET` / `PUT /notification-preferences` | the category × channel matrix, plus per-channel AVAILABILITY (destination on file + channel declared) so dead toggles render disabled with a hint |

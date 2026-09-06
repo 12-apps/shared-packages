@@ -24,7 +24,14 @@ export {
   type NotificationsApiClient,
   type PreferencesPayload,
   type PushRegistrationPayload,
+  type UnreadCount,
 } from './api';
+
+export {
+  useInboxBellBadge,
+  useLiveBellBadge,
+  type BellBadge,
+} from './bell-badge';
 
 export {
   BADGE_POLL_MS,
@@ -37,9 +44,11 @@ export {
 } from './inbox-state';
 
 export {
+  useBadgeState,
   useInboxList,
   useInboxState,
   useUnreadCount,
+  type BadgeSyncOptions,
   type NotificationsSignalHook,
   type NotificationsSubscribe,
 } from './hooks';

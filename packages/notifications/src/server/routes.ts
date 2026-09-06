@@ -118,10 +118,14 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'GET',
       path: '/notifications/unread-count',
-      handle: guarded(async ({ actor }) =>
-        // Polled by the SPAs, so it stays a single indexed COUNT.
-        ok({ count: await deps.inbox.unreadCount(actor.userId) }),
-      ),
+      handle: guarded(async ({ actor }) => {
+        // Polled by the SPAs, so it stays an indexed COUNT — plus, only when
+        // that count is not zero, one bounded read for the live breakdown.
+        const summary = await deps.inbox.unreadSummary(actor.userId);
+        // `count` keeps its name and its meaning: a client from before the
+        // breakdown existed reads this response and behaves exactly as it did.
+        return ok({ count: summary.total, liveSubjects: summary.byLiveSubject });
+      }),
     },
     {
       method: 'POST',

@@ -70,6 +70,7 @@ export {
   LIVE_SUBJECT_KEY,
   liveActivityLane,
   livePushTag,
+  liveSubjectOf,
   type LiveActivity,
   type LiveActivityLane,
   type LiveActivityStep,

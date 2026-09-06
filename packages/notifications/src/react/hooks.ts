@@ -48,23 +48,29 @@ export function useInboxState(store: InboxStore): InboxState {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
 }
 
+/** What both badge hooks below take, and what the bell passes them. */
+export interface BadgeSyncOptions {
+  enabled?: boolean;
+  subscribe?: NotificationsSubscribe;
+  useSignal?: NotificationsSignalHook;
+}
+
 /**
- * The bell badge number: pushed while a subscription is live, polled otherwise.
+ * The badge's server state, kept fresh: pushed while a subscription is live,
+ * polled otherwise.
  *
  * `enabled` gates the poll AND the subscription. A signed-out header still
  * mounts the bell, and there is nothing for it to hear.
+ *
+ * The whole state rather than the count, because a bell that shows live
+ * activities needs the live-subject breakdown alongside it — see
+ * `bell-badge.ts`. The two must come from ONE hook: read through two, the poll
+ * and the subscription would be mounted twice per bell.
  */
-export function useUnreadCount(
-  store: InboxStore,
-  options: {
-    enabled?: boolean;
-    subscribe?: NotificationsSubscribe;
-    useSignal?: NotificationsSignalHook;
-  } = {},
-): number {
+export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {}): InboxState {
   const enabled = options.enabled ?? true;
   const subscribe = options.subscribe;
-  const { unread } = useInboxState(store);
+  const state = useInboxState(store);
 
   // Called unconditionally — it is a hook, so it cannot sit behind `enabled`.
   // The host's own hook decides what to do when there is nothing to hear.
@@ -91,7 +97,19 @@ export function useUnreadCount(
     };
   }, [store, enabled, subscribe]);
 
-  return enabled ? unread : 0;
+  return state;
+}
+
+/**
+ * The bell badge number, for a host with its own trigger chrome.
+ *
+ * A host that also publishes live activities wants `useBellBadge` from the
+ * factory instead — this one counts inbox rows and knows nothing about what is
+ * happening right now.
+ */
+export function useUnreadCount(store: InboxStore, options: BadgeSyncOptions = {}): number {
+  const { unread } = useBadgeState(store, options);
+  return (options.enabled ?? true) ? unread : 0;
 }
 
 /** The panel's list — only fetches while the panel is open. */
