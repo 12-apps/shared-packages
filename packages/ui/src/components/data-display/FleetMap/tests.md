@@ -9,6 +9,12 @@
 - [x] `__tests__/fleet-map-hook.test.ts` created — the two decisions the DOM
       cannot show: `centre`'s IDENTITY across a poll, and who owns the
       selection across a re-render
+- [x] `__tests__/fleet-map-guards.test.tsx` created — the behaviours the review
+      rounds added guards for, in the suite CI actually runs (`test-storybook`
+      is deliberately not wired into this repo's CI)
+- [x] `__tests__/fleet-map-theme.test.tsx` created — the row and its first-load
+      skeleton under two host themes, because a radius that looks right on the
+      default one is not evidence in a package built to be re-themed
 - [x] All applicable test categories implemented
 
 ## Storybook Tests Status
@@ -70,4 +76,4 @@ measure the fixture rather than the component.
 - [x] Lint clean
 - [x] TypeCheck clean
 - [x] Stories working
-- [x] Unit tests passing (24: 16 helpers + 8 hook)
+- [x] Unit tests passing (35: 16 helpers + 8 hook + 9 guards + 2 theme)

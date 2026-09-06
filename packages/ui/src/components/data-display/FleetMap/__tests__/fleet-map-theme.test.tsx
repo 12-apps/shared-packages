@@ -27,10 +27,32 @@ function radiusAt(shapeRadius: number): string {
   return radius;
 }
 
+/** The same reading, for the bars that stand in before any unit lands. */
+function skeletonRadiusAt(shapeRadius: number): string {
+  const { unmount } = render(
+    <ThemeProvider theme={createTheme({ shape: { borderRadius: shapeRadius } })}>
+      <FleetMap units={[]} copy={FLEET_COPY} loading dataTestId={`load-${shapeRadius}`} />
+    </ThemeProvider>,
+  );
+  const bar = screen.getByTestId(`load-${shapeRadius}-skeleton`).firstElementChild;
+  const radius = getComputedStyle(bar as Element).borderRadius;
+  unmount();
+  return radius;
+}
+
 describe('a roster row under a host theme', () => {
   it('scales with the theme radius rather than squaring it', () => {
     // One step of the theme's own scale, whatever the host set it to.
     expect(radiusAt(4)).toBe('4px');
     expect(radiusAt(12)).toBe('12px');
+  });
+
+  it('is matched by the first-load skeleton standing in for it', () => {
+    // `Skeleton` forwards its `borderRadius` into `sx` as well, so a literal
+    // number there is the same trap one layer down: `4` drew 16px against the
+    // rows' 4px, and 48px against 12px. Asserted rather than assumed, because
+    // reverting only the skeleton left every other test in this suite green.
+    expect(skeletonRadiusAt(4)).toBe('4px');
+    expect(skeletonRadiusAt(12)).toBe('12px');
   });
 });
