@@ -26,6 +26,15 @@ export {
   type PushRegistrationPayload,
 } from './api';
 
+// `useInboxBellBadge` and `useLiveBellBadge` are deliberately NOT exported, and
+// the live one is why: it takes a `LiveSeenStore`, and the only store that
+// works is the factory's own — the panel writes "seen" into THAT one. A host
+// handed the hook and no way to build the store would either hand-roll a
+// `{read, mark, subscribe}` nothing ever writes to, and get a badge that is
+// permanently `new`, or reach for `createLiveSeenStore` and find it unexported
+// too. `useBellBadge` off the factory is the door, already bound to both.
+export type { BellBadge } from './bell-badge';
+
 export {
   BADGE_POLL_MS,
   BADGE_RECONCILE_MS,
@@ -36,10 +45,14 @@ export {
   type InboxStore,
 } from './inbox-state';
 
+// `useBadgeState` is NOT here, for the reason the raw badge hooks above are
+// not: it hands back the inbox ROWS as well as the count, and a host wanting a
+// number already has `useUnreadCount` and the factory's `useBellBadge`.
 export {
   useInboxList,
   useInboxState,
   useUnreadCount,
+  type BadgeSyncOptions,
   type NotificationsSignalHook,
   type NotificationsSubscribe,
 } from './hooks';

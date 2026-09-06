@@ -8,6 +8,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CLINIC_LIVE_MESSAGES, CLINIC_MESSAGES } from '../../__tests__/host-copy';
@@ -169,13 +170,33 @@ function overlayRuleFor(element: Element): string {
   return matches[0] as string;
 }
 
-function mount(live?: LiveActivitiesConfig): ReturnType<typeof createWebNotifications> {
+function mount(
+  live?: LiveActivitiesConfig,
+  transport: NotificationsTransport = readOnlyTransport(),
+): ReturnType<typeof createWebNotifications> {
   return createWebNotifications({
     apiBase: '/api/account',
     messages: CLINIC_MESSAGES,
-    transport: readOnlyTransport(),
+    transport,
     ...(live ? { liveActivities: live } : {}),
   });
+}
+
+/** A transport whose unread count is the test's own. The list stays empty. */
+function badgeTransport(badge: { count: number }): NotificationsTransport {
+  const pages: Record<string, unknown> = {
+    '/api/account/notifications/unread-count': badge,
+    '/api/account/notifications?limit=20': EMPTY_INBOX,
+  };
+  return {
+    get<T>(path: string): Promise<T> {
+      if (!(path in pages)) return Promise.reject(new Error(`no stub for ${path}`));
+      return Promise.resolve(pages[path] as T);
+    },
+    send<T>(): Promise<NotificationsResult<T>> {
+      return Promise.resolve({ ok: true, data: {} as T });
+    },
+  };
 }
 
 beforeEach(() => {
@@ -735,5 +756,198 @@ describe('the live section', () => {
         CLINIC_LIVE_MESSAGES.updated(CLINIC_MESSAGES.minutesAgo(7)),
       ),
     );
+  });
+});
+
+/**
+ * `useBellBadge` — the door for a host that draws its OWN trigger.
+ *
+ * Not every host can take this package's bell. A storefront header whose cart
+ * and search buttons are one styled icon-button would be importing a second
+ * trigger style into a row built to hold one, so it renders its own chrome and
+ * asks for the number. Before this hook the only number on offer was
+ * `useUnreadCount`, which counts inbox rows and knows nothing about what is
+ * happening right now — so such a host had a bell showing NOTHING while a
+ * pinned pedido sat inside the panel it opens. That was a real defect on a
+ * shipped storefront, not a hypothetical.
+ */
+describe('useBellBadge', () => {
+  /** A host's own trigger, built from the hook and nothing else. */
+  function HostChrome({ badge }: { badge: { count: number; hasNew: boolean } }): JSX.Element {
+    return (
+      <span data-testid="host-badge" data-tone={badge.hasNew ? 'new' : 'seen'}>
+        {badge.count}
+      </span>
+    );
+  }
+
+  it('gives a host chrome the same count and tone the package\'s own bell draws', async () => {
+    const config = source([activity()]);
+    // TWO unread rows and one live visit, so the live-aware answer (3) and the
+    // inbox-only one (2) DIFFER. With numbers that happen to coincide, a
+    // factory wired to the wrong hook passes this test — which is exactly what
+    // an earlier revision of this case did.
+    const { BellButton, useBellBadge } = mount(config, badgeTransport({ count: 2 }));
+    function Host(): JSX.Element {
+      return <HostChrome badge={useBellBadge()} />;
+    }
+    render(
+      <>
+        <BellButton onClick={() => undefined} />
+        <Host />
+      </>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('3'));
+    // And asserted against the PACKAGE'S bell as well as against the literal:
+    // the claim is that a host cannot drift from it, which a literal alone —
+    // changed on one side only — would go on satisfying.
+    const bell = screen.getByTestId('notifications-badge');
+    const host = screen.getByTestId('host-badge');
+    expect({ count: host.textContent, tone: host.getAttribute('data-tone') }).toEqual({
+      count: bell.textContent,
+      tone: bell.getAttribute('data-tone'),
+    });
+  });
+
+  it('hands a signed-out `useUnreadCount` a zero, not the last count', async () => {
+    // The same invariant one layer down, and the one that actually needs its
+    // own case: `useLiveBellBadge` zeroes itself, so the gate inside
+    // `useBadgeState` is invisible through the badge. It is NOT invisible
+    // through `useUnreadCount`, which returns that state's `unread` directly —
+    // and which the admin chrome calls with `enabled` flipped on sign-out.
+    //
+    // The store is per FACTORY and a host builds one for the whole app, so
+    // signing out does not empty it: `refreshBadge` swallows the 401 and leaves
+    // the last number. Both consumers below share this one, and the enabled one
+    // fills it first.
+    const { useUnreadCount: useBoundCount } = mount(undefined, badgeTransport({ count: 7 }));
+    function Pair(): JSX.Element {
+      const signedIn = useBoundCount();
+      const signedOut = useBoundCount({ enabled: false });
+      return (
+        <>
+          <span data-testid="signed-in">{signedIn}</span>
+          <span data-testid="signed-out">{signedOut}</span>
+        </>
+      );
+    }
+    render(<Pair />);
+
+    await waitFor(() => expect(screen.getByTestId('signed-in').textContent).toBe('7'));
+    expect(screen.getByTestId('signed-out').textContent).toBe('0');
+  });
+
+  it('keeps ONE object while the numbers hold still, though the host rebuilds', async () => {
+    // The badge returns a literal, so without a memo a host putting it in a
+    // dependency array — or a `React.memo` on its trigger — re-fires on every
+    // render: `useSyncExternalStore` re-renders on each `patch`, and `patch`
+    // always allocates. `useUnreadCount` had neither problem, returning a
+    // number.
+    //
+    // Memoising on `activities` would have bought NOTHING, which is why this
+    // case exists: a host's hook returns a fresh array every render, exactly as
+    // the one below does. The memo is on the two results instead.
+    const rebuildsEveryRender: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: ({ active }) => (active ? [activity()] : []),
+    };
+    const { useBellBadge } = mount(rebuildsEveryRender, badgeTransport({ count: 1 }));
+    const seenObjects = new Set<unknown>();
+    function Host(): JSX.Element {
+      const badge = useBellBadge();
+      seenObjects.add(badge);
+      return <HostChrome badge={badge} />;
+    }
+    const { rerender } = render(<Host />);
+    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('2'));
+
+    const settled = seenObjects.size;
+    rerender(<Host />);
+    rerender(<Host />);
+
+    // Two more renders, the same numbers, and no new object.
+    expect(seenObjects.size).toBe(settled);
+  });
+
+  it('is unread rows and nothing else for a host with no live activities', async () => {
+    const { useBellBadge } = mount(undefined, badgeTransport({ count: 3 }));
+    function Host(): JSX.Element {
+      return <HostChrome badge={useBellBadge()} />;
+    }
+    render(<Host />);
+    // An unread row is by definition one the reader has not seen, so presence
+    // and novelty really are the same fact here.
+    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('3'));
+    expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('new');
+  });
+
+  it('says nothing while signed out, even beside a bell that is signed in', async () => {
+    // A signed-out header still MOUNTS the bell, and the number it must not
+    // show is the PREVIOUS reader's. The store lives on the factory, which a
+    // host builds once at module scope for the whole app — so signing out does
+    // not empty it, and `refreshBadge` swallows the 401 and leaves the last
+    // count in place. Whatever `enabled: false` reads, it reads from a store
+    // that is still full.
+    //
+    // So the store is deliberately FILLED here, by an enabled sibling on the
+    // same factory, before the disabled one is asked. Rendered alone, this case
+    // passed against a hook that ignored `enabled` entirely, because there was
+    // nothing in the store for it to leak.
+    //
+    // The host also IGNORES the `active` hint — `live-config.ts` blesses that
+    // ("behaving correctly and merely paying for it") — which is the only way
+    // to reach the activities half of the guard. Through the stock `source()`
+    // helper, which answers `[]` when inactive, it is unreachable.
+    const alwaysAnswers: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: () => [activity()],
+    };
+    const { useBellBadge } = mount(alwaysAnswers, badgeTransport({ count: 4 }));
+    function Pair(): JSX.Element {
+      const signedIn = useBellBadge();
+      const signedOut = useBellBadge({ enabled: false });
+      return (
+        <>
+          <span data-testid="signed-in">{signedIn.count}</span>
+          <HostChrome badge={signedOut} />
+        </>
+      );
+    }
+    render(<Pair />);
+
+    // 4 unread + 1 live: the store is populated, so there is something to leak.
+    await waitFor(() => expect(screen.getByTestId('signed-in').textContent).toBe('5'));
+    expect(screen.getByTestId('host-badge').textContent).toBe('0');
+    expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('seen');
+  });
+
+  it('still shouts for an unread ROW once the live entry has been looked at', async () => {
+    // The two halves of `hasNew` are an OR, and this is the arm the live cases
+    // cannot reach: they all run on an empty inbox, so a bell that had dropped
+    // `unread > 0` altogether would pass every one of them. Here the activity
+    // is seen — on its own that is `neutral` — and a row arrived anyway.
+    const config = source([activity()]);
+    const { Panel, useBellBadge } = mount(config, badgeTransport({ count: 1 }));
+    function Host(): JSX.Element {
+      return <HostChrome badge={useBellBadge()} />;
+    }
+    const { rerender } = render(
+      <>
+        <Host />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+    // Opening the panel is what "seen" means for the activity.
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+    rerender(
+      <>
+        <Host />
+        <Panel open={false} onClose={() => undefined} />
+      </>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('2'));
+    expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('new');
   });
 });
