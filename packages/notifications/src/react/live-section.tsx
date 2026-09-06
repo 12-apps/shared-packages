@@ -114,9 +114,10 @@ export interface LiveSectionProps {
  * inbox are siblings in one fragment, and the empty branch used to render the
  * inbox ALONE — one child rather than two — so the inbox moved to a position
  * previously held by a different element type, which React handles by
- * unmounting the old subtree and mounting a new one. Every `NotificationRow` would be torn down and rebuilt the moment a
- * pedido started or finished, throwing keyboard focus to `<body>` inside a
- * focus-trapped drawer, for a reader who was only scrolling their inbox.
+ * unmounting the old subtree and mounting a new one. Every `NotificationRow`
+ * would be torn down and rebuilt the moment a pedido started or finished,
+ * throwing keyboard focus to `<body>` inside a focus-trapped drawer, for a
+ * reader who was only scrolling their inbox.
  *
  * So the empty case renders `null` INTO the slot rather than returning early.
  * Pinned by comparing the row's DOM NODE across the transition: a test on the
