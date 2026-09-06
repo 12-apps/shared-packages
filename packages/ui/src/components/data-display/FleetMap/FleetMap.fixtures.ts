@@ -32,14 +32,18 @@ export const FLEET_COPY: FleetMapCopy = {
 /**
  * Three riders around São Paulo, one in each freshness state.
  *
- * Deliberately NOT in staleness order. A fixture that is already sorted makes
- * the roster's ordering assertion pass against an identity sort, which is the
- * shape of test that reports coverage it does not have.
+ * Deliberately NOT in staleness order, and the labels deliberately do not agree
+ * with it either. `rosterOrder` sorts on staleness and breaks ties on the
+ * label, so a fixture whose two orders coincide lets the roster's ordering
+ * assertion pass against a LABEL-only sort as readily as the real one — a test
+ * reporting coverage it does not have. Here the three orders are all different:
+ * declared is [ale, ana, bruno], alphabetical is the same, and the correct
+ * answer is [ana, bruno, ale].
  */
 export const FLEET: FleetUnit[] = [
   {
-    id: 'caio',
-    label: 'Caio Souza',
+    id: 'ale',
+    label: 'Alessandra Nunes',
     latitude: -23.5405,
     longitude: -46.6133,
     accuracyM: null,

@@ -38,8 +38,10 @@ against the loading state, which are opposite messages.
 ## Storybook Tests List
 
 `BasicInteraction`, `FreshnessTest`, `ThresholdsAreProps`, `SelectionTest`,
-`KeyboardNavigationTest`, `ScreenReaderTest`, `EmptyStateTest`,
-`LoadingStateTest`, `EdgeCaseTest`.
+`KeyboardNavigationTest`, `ScreenReaderTest`, `ActiveDescendantTest`,
+`StaleSelectionTest`, `EmptyStateTest`, `LoadingStateTest`,
+`LoadingAnnouncementTest`, `LoadingKeepsThePopulatedRosterTest`,
+`UncontrolledSelectionTest`, `EdgeCaseTest`.
 
 ## Current
 

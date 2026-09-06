@@ -6,6 +6,9 @@
 - [x] `__tests__/fleet-map-helpers.test.ts` created — the four pure decisions,
       at their boundaries, where a story is expensive to stage and an
       off-by-one reads identically on screen
+- [x] `__tests__/fleet-map-hook.test.ts` created — the two decisions the DOM
+      cannot show: `centre`'s IDENTITY across a poll, and who owns the
+      selection across a re-render
 - [x] All applicable test categories implemented
 
 ## Storybook Tests Status
@@ -21,8 +24,13 @@
 | Keyboard Navigation | Running | PASS | one tab stop, arrows move and wrap |
 | Screen Reader | Running | PASS | region, named listbox, map named not hidden |
 | Empty State | Running | PASS | empty state renders, no map canvas |
-| Loading State | Running | PASS | busy, skeletons, and NOT the empty state |
+| Loading State | Running | PASS | busy, skeletons, NOT the empty state, and silent |
 | Edge Cases | Running | PASS | one unit, long name, no badge, zero seconds |
+| Active Descendant | Running | PASS | points at a row that exists, id is generated |
+| Stale Selection | Running | PASS | a selection that left the fleet dangles nothing |
+| Loading Announcement | Running | PASS | `role="status"` carries `copy.loading` |
+| Loading Keeps Roster | Running | PASS | a poll over a populated roster keeps the listbox |
+| Uncontrolled Selection | Running | PASS | works with neither selection prop passed |
 
 Legend: Pending | Running | PASS | FAIL
 
@@ -60,4 +68,4 @@ measure the fixture rather than the component.
 - [x] Lint clean
 - [x] TypeCheck clean
 - [x] Stories working
-- [x] Unit tests passing (16)
+- [x] Unit tests passing (23: 16 helpers + 7 hook)

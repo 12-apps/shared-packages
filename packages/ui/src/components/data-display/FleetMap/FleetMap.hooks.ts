@@ -62,11 +62,24 @@ export function useFleetMap(
 ): FleetMapState {
   const ordered = React.useMemo(() => rosterOrder(units), [units]);
 
-  // `undefined` means "you own this"; `null` is a caller explicitly selecting
-  // nobody, and is controlled like any other value.
-  const controlled = selectedId !== undefined;
+  // Decided ONCE, on the first render, exactly as React decides it for an
+  // `<input>` — and for the same reason. `selectedId` is typed
+  // `string | null | undefined`, so `useState<string>()`, the natural shape for
+  // a caller, hands us `undefined` on the first render and again on every
+  // reset. Re-deriving the mode from the prop each time would make the
+  // component change its own semantics mid-life: it starts uncontrolled,
+  // silently becomes controlled the moment the caller's `onSelect` writes a
+  // value back, and then silently un-becomes it when they clear — resurrecting
+  // whatever was selected before the hand-off.
+  //
+  // Latched, `undefined` is unambiguous within each mode: to a controlled board
+  // it is "nobody is selected", so clearing the caller's state clears the
+  // roster; to an uncontrolled one it is simply the prop staying absent. A
+  // caller who wants control passes `string | null` from the first render.
+  const controlledRef = React.useRef(selectedId !== undefined);
+  const controlled = controlledRef.current;
   const [own, setOwn] = React.useState<string | null>(null);
-  const active = controlled ? selectedId : own;
+  const active = controlled ? (selectedId ?? null) : own;
 
   const select = React.useCallback(
     (id: string) => {
@@ -91,6 +104,10 @@ export function useFleetMap(
 
   const onKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
+      // A modified arrow is the PAGE's shortcut, not the roster's: Cmd+Down is
+      // "scroll to the end of the document" on macOS, and Shift+Arrow extends a
+      // selection. Capturing them would take a browser gesture away.
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
       if (step === 0) return;
       // Nothing can move a CONTROLLED selection without a handler, so the keys

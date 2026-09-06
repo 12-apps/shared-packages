@@ -156,7 +156,7 @@ picking it for every consumer.
 
 - **Not ported to React Native.** `@12-apps/ui` ships a native build for seven
   subpaths; this is not one, and neither is the `MapPreview` it wraps. That is
-  the ordinary state (7 of 140) and it fails LOUDLY under Metro — an unported
+  the ordinary state (26 of 141 at the time of writing) and it fails LOUDLY under Metro — an unported
   subpath resolves to the web file and errors on `@mui/material` at import
   rather than rendering a blank view. It is also the right call for this
   component: a fleet board is a dispatcher's screen, and the tracked unit's own

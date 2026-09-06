@@ -76,8 +76,9 @@ export const TightThresholds: Story = {
     docs: {
       description: {
         story:
-          'The thresholds are props with no domain default because the answer belongs entirely ' +
-          'to the fleet’s own ping cadence. The same three units read differently here.',
+          'The thresholds default to 90s and 300s — sized for a twenty-second cadence, not for any ' +
+          'one product — and are props because the answer belongs to the fleet’s own ping ' +
+          'cadence. The same three units read differently here.',
       },
     },
   },

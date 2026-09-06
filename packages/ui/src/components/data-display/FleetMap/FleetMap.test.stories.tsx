@@ -35,15 +35,15 @@ export const BasicInteraction: Story = {
     });
 
     await step('The roster is ordered freshest first, not by the array', async () => {
-      // The fixture is authored caio, ana, bruno — so this fails against an
+      // The fixture is authored ale, ana, bruno — so this fails against an
       // identity sort, which is what makes it an assertion about `rosterOrder`
       // rather than about the fixture.
-      await expect(FLEET.map((unit) => unit.id)).toEqual(['caio', 'ana', 'bruno']);
+      await expect(FLEET.map((unit) => unit.id)).toEqual(['ale', 'ana', 'bruno']);
       const roster = canvas.getByTestId('fleet-roster');
       const labels = within(roster)
         .getAllByRole('option')
         .map((row) => row.getAttribute('data-testid'));
-      await expect(labels).toEqual(['fleet-ana', 'fleet-bruno', 'fleet-caio']);
+      await expect(labels).toEqual(['fleet-ana', 'fleet-bruno', 'fleet-ale']);
     });
   },
 };
@@ -56,13 +56,13 @@ export const FreshnessTest: Story = {
     await step('Each row carries its own freshness', async () => {
       await expect(canvas.getByTestId('fleet-ana')).toHaveAttribute('data-freshness', 'live');
       await expect(canvas.getByTestId('fleet-bruno')).toHaveAttribute('data-freshness', 'lagging');
-      await expect(canvas.getByTestId('fleet-caio')).toHaveAttribute('data-freshness', 'stale');
+      await expect(canvas.getByTestId('fleet-ale')).toHaveAttribute('data-freshness', 'stale');
     });
 
     await step('The state is spelled out, never carried by colour alone', async () => {
       await expect(canvas.getByTestId('fleet-ana-meta')).toHaveTextContent('Live');
       await expect(canvas.getByTestId('fleet-bruno-meta')).toHaveTextContent('Lagging');
-      await expect(canvas.getByTestId('fleet-caio-meta')).toHaveTextContent('Stale');
+      await expect(canvas.getByTestId('fleet-ale-meta')).toHaveTextContent('Stale');
     });
 
     await step('The caller formats the duration; the component never does', async () => {
@@ -72,7 +72,7 @@ export const FreshnessTest: Story = {
 
     await step('Accuracy renders only when the platform reported one', async () => {
       await expect(canvas.getByTestId('fleet-ana-meta')).toHaveTextContent('±12 m');
-      await expect(canvas.getByTestId('fleet-caio-meta')).not.toHaveTextContent('±');
+      await expect(canvas.getByTestId('fleet-ale-meta')).not.toHaveTextContent('±');
     });
   },
 };
@@ -105,8 +105,8 @@ export const SelectionTest: Story = {
     });
 
     await step('Clicking another row reports it', async () => {
-      await userEvent.click(canvas.getByTestId('fleet-caio'));
-      await waitFor(() => expect(args.onSelect).toHaveBeenCalledWith('caio'));
+      await userEvent.click(canvas.getByTestId('fleet-ale'));
+      await waitFor(() => expect(args.onSelect).toHaveBeenCalledWith('ale'));
     });
   },
 };
@@ -136,7 +136,7 @@ export const KeyboardNavigationTest: Story = {
 
     await step('ArrowUp from the first wraps to the last', async () => {
       await userEvent.keyboard('{ArrowUp}');
-      await waitFor(() => expect(args.onSelect).toHaveBeenCalledWith('caio'));
+      await waitFor(() => expect(args.onSelect).toHaveBeenCalledWith('ale'));
     });
   },
 };
@@ -350,9 +350,9 @@ export const UncontrolledSelectionTest: Story = {
     });
 
     await step('And clicking a row moves it too', async () => {
-      await userEvent.click(canvas.getByTestId('fleet-caio'));
+      await userEvent.click(canvas.getByTestId('fleet-ale'));
       await waitFor(() =>
-        expect(canvas.getByTestId('fleet-caio')).toHaveAttribute('aria-selected', 'true'),
+        expect(canvas.getByTestId('fleet-ale')).toHaveAttribute('aria-selected', 'true'),
       );
       await expect(canvas.getByTestId('fleet-ana')).toHaveAttribute('aria-selected', 'false');
     });

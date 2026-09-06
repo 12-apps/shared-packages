@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { SR_ONLY_SX } from '../../form/Label/Label.styles';
 import { EmptyState } from '../EmptyState/EmptyState';
 
 import { FleetBody } from './FleetBody';
@@ -60,30 +61,32 @@ const DEFAULT_HEIGHT = '420px';
  * Optional by design: the sentence is in the reader's language, which only the
  * caller knows, and inventing an English one in a component whose whole premise
  * is that every word arrives through `copy` would be the bug it exists to
- * avoid. No `copy.loading`, no announcement.
+ * avoid. No `copy.loading`, no region.
+ *
+ * ## The node outlives the text, and that is the whole trick
+ *
+ * A live region has to be in the DOM BEFORE its content changes; a screen
+ * reader watches an existing region for mutations rather than announcing one
+ * that appears already populated. Mounting region-and-text together in a single
+ * commit is the classic silent case — it satisfies a DOM assertion while
+ * announcing nothing. So the region mounts as soon as the caller offers the
+ * copy and merely EMPTIES when idle, which is what `CepField`, `UploadButton`
+ * and `DateRangePickerFields` all do.
  */
 function FleetStatus({
   announcement,
+  loading,
   testId,
 }: {
   announcement: string | undefined;
+  loading: boolean;
   testId: string;
 }): React.JSX.Element | null {
-  if (!announcement) return null;
+  // No copy, no region at all — the caller has not asked for an announcement.
+  if (announcement === undefined) return null;
   return (
-    <Box
-      role="status"
-      data-testid={`${testId}-status`}
-      sx={{
-        position: 'absolute',
-        width: 1,
-        height: 1,
-        overflow: 'hidden',
-        clip: 'rect(0 0 0 0)',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {announcement}
+    <Box role="status" aria-live="polite" data-testid={`${testId}-status`} sx={SR_ONLY_SX}>
+      {loading ? announcement : ''}
     </Box>
   );
 }
@@ -132,7 +135,7 @@ export const FleetMap: React.FC<FleetMapProps> = React.memo(
           {copy.title}
         </Typography>
 
-        <FleetStatus announcement={loading ? copy.loading : undefined} testId={testId} />
+        <FleetStatus announcement={copy.loading} loading={loading} testId={testId} />
 
         {!loading && ordered.length === 0 ? (
           <EmptyState

@@ -92,15 +92,34 @@ export interface FleetMapProps {
   units: readonly FleetUnit[];
   copy: FleetMapCopy;
   /**
-   * Which unit is highlighted. Controlled: the map centres on it and the roster
-   * marks it selected. `null` centres on the whole fleet.
+   * Which unit is highlighted: the map centres on it and the roster marks it
+   * selected. `null` selects nobody and centres on the whole fleet.
+   *
+   * PASSING IT AT ALL IS THE DECISION. Present on the first render — `null`
+   * included — and the board is controlled for life: it renders what you pass
+   * and never moves the selection itself. Absent on the first render and it
+   * keeps its own, reporting each change through {@link onSelect}. The mode is
+   * latched on that first render, the way React latches an `<input>`, so the
+   * component cannot change its own semantics halfway through a session.
+   *
+   * A controlled board reads `undefined` as "nobody is selected", so
+   * `useState<string>()` in the caller behaves: clearing it clears the roster.
    */
   selectedId?: string | null;
+  /**
+   * A click on a row or a pin, and each arrow-key move. Fires in both modes, so
+   * an uncontrolled board can still be observed.
+   *
+   * Passing {@link selectedId} WITHOUT this is a selection nothing can move:
+   * the arrow keys then decline to act and leave the page to scroll, rather
+   * than swallowing a keypress that would do nothing.
+   */
   onSelect?: (id: string) => void;
   /**
    * Seconds after which a unit stops reading as `live`, and then as `lagging`.
    *
-   * Both are props with no domain default, because the answer is entirely a
+   * Both carry a GENERIC default (90s and 300s, sized for a phone reporting
+   * every twenty seconds) and no domain one, because the answer is entirely a
    * property of the fleet's own ping cadence: a phone reporting every twenty
    * seconds is late at ninety, and a tracker reporting every five minutes is
    * not. A component that picked one would be picking it for every consumer.

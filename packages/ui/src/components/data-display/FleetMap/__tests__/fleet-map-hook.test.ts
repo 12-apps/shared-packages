@@ -78,6 +78,42 @@ describe('selection ownership', () => {
     expect(onSelect).toHaveBeenCalledWith('bruno');
   });
 
+  it('clears when a CONTROLLED caller passes undefined', () => {
+    // `useState<string>()` is the natural shape for a caller, so a controlled
+    // board is handed `undefined` on every reset. It must mean "nobody is
+    // selected" rather than "take the selection back", or clearing the caller's
+    // own state would leave a row highlighted.
+    const { result, rerender } = renderHook(
+      ({ selectedId }: { selectedId: string | null | undefined }) =>
+        useFleetMap(poll(), selectedId, undefined),
+      { initialProps: { selectedId: 'ana' as string | null | undefined } },
+    );
+
+    expect(result.current.active).toBe('ana');
+    rerender({ selectedId: undefined });
+
+    expect(result.current.active).toBeNull();
+  });
+
+  it('does not switch modes mid-life when the caller writes a value back', () => {
+    // The silent flip this latch exists to stop: an uncontrolled board whose
+    // `onSelect` feeds the caller's state would otherwise become controlled on
+    // the first click, and un-become it on the first clear — resurrecting
+    // whatever was selected before the hand-off.
+    const { result, rerender } = renderHook(
+      ({ selectedId }: { selectedId: string | null | undefined }) =>
+        useFleetMap(poll(), selectedId, undefined),
+      { initialProps: { selectedId: undefined as string | null | undefined } },
+    );
+
+    act(() => result.current.select('bruno'));
+    expect(result.current.active).toBe('bruno');
+
+    // A late `selectedId` is ignored, the way a late `value` is on an input.
+    rerender({ selectedId: 'ana' });
+    expect(result.current.active).toBe('bruno');
+  });
+
   it('treats an explicit null as controlled, not as absent', () => {
     const { result } = renderHook(() => useFleetMap(poll(), null, undefined));
 

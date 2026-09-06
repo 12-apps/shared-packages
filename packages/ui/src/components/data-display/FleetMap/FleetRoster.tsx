@@ -133,15 +133,30 @@ function FleetRow({
   // Keep the active option visible. The roster caps its own height, so a
   // dispatcher arrowing through a fleet of thirty otherwise walks the selection
   // below the fold with nothing moving — `aria-activedescendant` follows, and a
-  // SIGHTED keyboard user sees no feedback at all. `nearest` so a selection
-  // already on screen does not jump the list under a mouse user's cursor.
+  // SIGHTED keyboard user sees no feedback at all.
   //
   // Keyed on the ROW's position as well as its selectedness, because the roster
   // re-sorts on every poll: a rider who stays selected while their staleness
   // moves them down the list would otherwise scroll out of view with the effect
   // never re-running.
+  //
+  // Scrolls the ROSTER and not the row, which is why this is arithmetic rather
+  // than `scrollIntoView({ block: 'nearest' })`. That walks every scrollable
+  // ancestor, the document included, and `nearest` only spares an ancestor the
+  // row is already visible in — which is exactly false when the panel is off
+  // screen. With the effect now re-running on every re-sort, it would yank the
+  // whole page back to the map on a timer, and drag it there on mount for any
+  // board rendered below the fold with a selection already set.
   React.useEffect(() => {
-    if (selected) row.current?.scrollIntoView({ block: 'nearest' });
+    const box = row.current;
+    const list = box?.parentElement;
+    if (!selected || !box || !list) return;
+    const top = box.offsetTop - list.offsetTop;
+    if (top < list.scrollTop) {
+      list.scrollTop = top;
+    } else if (top + box.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = top + box.offsetHeight - list.clientHeight;
+    }
   }, [selected, position]);
 
   return (

@@ -63,8 +63,8 @@ is no single node to hand back). Use `<ConfirmAction>` where a ref is needed.
 
 ### `createConfirmButton` — the HOC, pre-applied
 
-`withConfirmation(Button)` with the shared wording already in place. Use it when
-you just want a guarded button and have no reason to build your own wrapper.
+`withConfirmation(Button)`, wrapped up for you. Use it when you just want a
+guarded button and have no reason to build your own wrapper.
 
 A FACTORY rather than a ready-made component, because the wording it bakes in is
 the caller's: it takes the host's `ConfirmActionCopy` and its error sentence, and
