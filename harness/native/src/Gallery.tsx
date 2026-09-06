@@ -8,6 +8,7 @@ import * as React from 'react';
 import { AvatarSection, BadgeSection, ChipSection, ProgressSection, SkeletonSection } from './DataSections';
 import { InputSection, SelectSection, ToggleSection } from './FormSections';
 import { Section } from './Section';
+import { CardSection, DialogSection } from './SurfaceSections';
 import { AlertSection, EmptySection, ErrorSection, LoadingSection } from './StateSections';
 import { HeadingSection, LayoutSection as SpacingSection, ParagraphSection } from './TypographySections';
 
@@ -163,6 +164,8 @@ export function Gallery(): React.JSX.Element {
       <ErrorSection onCount={onCount} />
       <EmptySection onCount={onCount} />
       <IconSection />
+      <CardSection onCount={onCount} />
+      <DialogSection />
       <ChipSection onCount={onCount} />
       <AvatarSection />
       <BadgeSection onCount={onCount} />

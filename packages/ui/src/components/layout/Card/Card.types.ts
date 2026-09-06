@@ -1,57 +1,42 @@
 import type { CardProps as MuiCardProps } from '@mui/material/Card/index.js';
-import type { ReactNode } from 'react';
+import type React from 'react';
 
-export type CardVariant = 'elevated' | 'outlined' | 'glass' | 'gradient' | 'neumorphic' | 'section';
-export type CardEntranceAnimation = 'fade' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right' | 'zoom' | 'grow' | 'none';
+import type {
+  CardActionsBaseProps,
+  CardBaseProps,
+  CardContentBaseProps,
+  CardHeaderBaseProps,
+  CardMediaBaseProps,
+} from './Card.base';
 
-export interface CardProps extends Omit<MuiCardProps, 'variant'> {
-  children: ReactNode;
-  variant?: CardVariant;
-  interactive?: boolean;
-  glow?: boolean;
-  pulse?: boolean;
-  borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  loading?: boolean;
-  expandable?: boolean;
-  expanded?: boolean;
-  onExpandToggle?: (expanded: boolean) => void;
-  entranceAnimation?: CardEntranceAnimation;
-  animationDelay?: number;
-  skeleton?: boolean;
-  hoverScale?: number;
+export type {
+  CardActionsAlignment,
+  CardActionsBaseProps,
+  CardBaseProps,
+  CardBorderRadius,
+  CardContentBaseProps,
+  CardEntranceAnimation,
+  CardHeaderBaseProps,
+  CardMediaBaseProps,
+  CardVariant,
+} from './Card.base';
+
+/** The web `Card`: the shared contract, plus everything MUI's own `Card` takes. */
+export interface CardProps
+  extends CardBaseProps,
+    Omit<MuiCardProps, 'variant' | keyof CardBaseProps> {
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   onFocus?: React.FocusEventHandler<HTMLDivElement>;
   onBlur?: React.FocusEventHandler<HTMLDivElement>;
-  dataTestId?: string;
 }
 
-export interface CardHeaderProps {
-  title?: ReactNode;
-  subtitle?: ReactNode;
-  action?: ReactNode;
-  avatar?: ReactNode;
-  children?: ReactNode;
-  dataTestId?: string;
-}
+export type CardHeaderProps = CardHeaderBaseProps;
 
-export interface CardContentProps {
-  children: ReactNode;
-  dense?: boolean;
-  dataTestId?: string;
-}
+export type CardContentProps = CardContentBaseProps;
 
-export interface CardActionsProps {
-  children: ReactNode;
-  disableSpacing?: boolean;
-  alignment?: 'left' | 'center' | 'right' | 'space-between';
-  dataTestId?: string;
-}
+export type CardActionsProps = CardActionsBaseProps;
 
-export interface CardMediaProps {
+/** `component` is the DOM element MUI renders the media as — web only. */
+export interface CardMediaProps extends CardMediaBaseProps {
   component?: React.ElementType;
-  image?: string;
-  title?: string;
-  height?: number | string;
-  children?: ReactNode;
-  dataTestId?: string;
 }
