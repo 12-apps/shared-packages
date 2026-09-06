@@ -129,10 +129,18 @@ picking it for every consumer.
   is actually rendered: a controlled selection can outlive the unit it names.
 - The active option's scroll effect also watches its POSITION, because the
   roster re-sorts on every poll and a still-selected row can move under it.
-- While `loading`, the panel is `aria-busy` and the heading stays, so the layout
-  does not reflow when the data lands. `aria-busy` is a state and utters
-  nothing, so set `copy.loading` if the reload should be ANNOUNCED — that string
-  goes into a visually hidden `role="status"`. Left unset, the reload is silent.
+- While `loading`, the MAP AND ROSTER are marked `aria-busy` and the heading
+  stays, so the layout does not reflow when the data lands. The panel root is
+  deliberately not the busy element: `aria-busy` tells assistive tech to hold
+  back changes inside it, and the announcement region below is a sibling of the
+  busy half rather than a descendant of it.
+- `aria-busy` is a state and utters nothing, so set `copy.loading` if the reload
+  should be ANNOUNCED — that string goes into a visually hidden `role="status"`.
+  Left unset, the reload is silent. The region is mounted as soon as
+  `copy.loading` is given and only its TEXT changes, because a screen reader
+  watches an existing region rather than announcing one that arrives already
+  populated. That covers a board that starts idle and reloads; a board MOUNTED
+  already loading is silent, as any live region is at mount.
 - Skeletons replace the roster only while there are no units yet. A poll that
   refreshes a populated list keeps the listbox mounted, because unmounting it
   throws away the focus inside it.

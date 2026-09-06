@@ -16,7 +16,7 @@ deliberately not named after one.
 | `laggingAfterSeconds` | when a unit stops reading as `live` |
 | `staleAfterSeconds` | when it stops reading as `lagging` |
 | `height` | the map's height |
-| `loading` | roster skeletons, panel `aria-busy` |
+| `loading` | first-load skeletons, map and roster `aria-busy` |
 | `className` | on the panel root |
 | `dataTestId` | root TEST id; DOM ids are generated separately |
 
@@ -38,10 +38,11 @@ against the loading state, which are opposite messages.
 ## Storybook Tests List
 
 `BasicInteraction`, `FreshnessTest`, `ThresholdsAreProps`, `SelectionTest`,
-`KeyboardNavigationTest`, `ScreenReaderTest`, `ActiveDescendantTest`,
-`StaleSelectionTest`, `EmptyStateTest`, `LoadingStateTest`,
-`LoadingAnnouncementTest`, `LoadingKeepsThePopulatedRosterTest`,
-`UncontrolledSelectionTest`, `EdgeCaseTest`.
+`KeyboardNavigationTest`, `ControlledWithoutHandlerTest`, `ScreenReaderTest`,
+`ActiveDescendantTest`, `StaleSelectionTest`, `EmptyStateTest`,
+`LoadingStateTest`, `IdleAnnouncementRegionTest`, `LoadingAnnouncementTest`,
+`LoadingKeepsThePopulatedRosterTest`, `UncontrolledSelectionTest`,
+`EdgeCaseTest`.
 
 ## Current
 

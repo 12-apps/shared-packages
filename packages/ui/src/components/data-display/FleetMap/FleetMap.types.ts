@@ -59,6 +59,10 @@ export interface FleetMapCopy {
    * region stale without uttering anything, the skeletons are `aria-hidden`,
    * and this component cannot invent the sentence in the reader's language.
    * Set it and the panel announces politely; leave it and it stays quiet.
+   *
+   * Announced on a TRANSITION into loading. A board mounted already loading is
+   * silent — as any live region is at mount, since there is no change for a
+   * reader to observe.
    */
   loading?: string;
   /**
@@ -129,9 +133,13 @@ export interface FleetMapProps {
   /** Map height, any CSS length. */
   height?: string;
   /**
-   * While true the roster renders skeletons and the panel is marked `aria-busy`.
+   * While true the map and roster are marked `aria-busy`, and the roster renders
+   * skeletons IF no units have landed yet — a poll over a populated roster keeps
+   * the list, because unmounting it throws away the focus inside it.
+   *
    * It only ANNOUNCES if {@link FleetMapCopy.loading} is set — `aria-busy` is a
-   * state, not an utterance.
+   * state, not an utterance. The panel root is deliberately not the busy
+   * element, so that announcement sits outside the busy subtree.
    */
   loading?: boolean;
   className?: string;

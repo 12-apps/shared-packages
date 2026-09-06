@@ -31,6 +31,8 @@
 | Loading Announcement | Running | PASS | `role="status"` carries `copy.loading` |
 | Loading Keeps Roster | Running | PASS | a poll over a populated roster keeps the listbox |
 | Uncontrolled Selection | Running | PASS | works with neither selection prop passed |
+| Controlled Without Handler | Running | PASS | arrows left un-prevented for the page |
+| Idle Announcement Region | Running | PASS | the live region exists, and is empty, while idle |
 
 Legend: Pending | Running | PASS | FAIL
 
@@ -68,4 +70,4 @@ measure the fixture rather than the component.
 - [x] Lint clean
 - [x] TypeCheck clean
 - [x] Stories working
-- [x] Unit tests passing (23: 16 helpers + 7 hook)
+- [x] Unit tests passing (24: 16 helpers + 8 hook)

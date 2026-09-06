@@ -162,9 +162,13 @@ export const ControlledWithoutHandlerTest: Story = {
     const roster = canvas.getByTestId('fleet-roster');
 
     await step('The arrow key is not consumed', async () => {
-      const seen: boolean[] = [];
+      // ONLY the arrow. Recording every keydown let the `Tab` that focuses the
+      // roster satisfy the assertion on its own — `user-event` reports a
+      // handled key as un-prevented — so the case passed with the guard it
+      // names deleted, which is the exact defect this story exists to catch.
+      const arrows: boolean[] = [];
       const listener = (event: KeyboardEvent): void => {
-        seen.push(event.defaultPrevented);
+        if (event.key === 'ArrowDown') arrows.push(event.defaultPrevented);
       };
       canvasElement.ownerDocument.addEventListener('keydown', listener);
       await userEvent.tab();
@@ -172,7 +176,7 @@ export const ControlledWithoutHandlerTest: Story = {
       await userEvent.keyboard('{ArrowDown}');
       canvasElement.ownerDocument.removeEventListener('keydown', listener);
 
-      await expect(seen).toContain(false);
+      await expect(arrows).toEqual([false]);
     });
 
     await step('And the selection has not moved', async () => {
@@ -332,6 +336,18 @@ export const LoadingAnnouncementTest: Story = {
       await expect(status).toHaveAttribute('role', 'status');
       await expect(status).toHaveTextContent('Atualizando a frota');
     });
+
+    await step('And that region is OUTSIDE the busy subtree', async () => {
+      // Asserted here, where something is actually busy — in an idle render the
+      // claim is vacuous, because the region is a sibling by construction
+      // whatever `aria-busy` is attached to. `aria-busy` tells assistive tech
+      // to hold back changes within it, so a live region under the busy element
+      // is silent in exactly the window it exists for.
+      const body = canvas.getByTestId('fleet-body');
+      await expect(body).toHaveAttribute('aria-busy', 'true');
+      await expect(canvas.getByTestId('fleet')).not.toHaveAttribute('aria-busy');
+      await expect(body).not.toContainElement(canvas.getByTestId('fleet-status'));
+    });
   },
 };
 
@@ -352,14 +368,6 @@ export const IdleAnnouncementRegionTest: Story = {
       await expect(status).toHaveTextContent('');
     });
 
-    await step('And it is NOT inside the busy subtree', async () => {
-      // `aria-busy` tells assistive tech to hold back changes within it, so a
-      // live region nested under the busy element is silent in exactly the
-      // window it exists for.
-      await expect(canvas.getByTestId('fleet-body')).not.toContainElement(
-        canvas.getByTestId('fleet-status'),
-      );
-    });
   },
 };
 
