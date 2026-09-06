@@ -38,19 +38,41 @@ import type { UiTheme } from '../../../tokens/theme';
  * come from MUI and are restated in `Card.metrics.ts` rather than re-invented.
  */
 
+/**
+ * THE INK A CARD PUBLISHES TO ITS SLOTS.
+ *
+ * `Card.styles.ts` puts `color: primary.contrastText` on the gradient card
+ * ITSELF and lets CSS inheritance carry it into the header and the body. React
+ * Native inherits nothing across views, so the card publishes its ink here and
+ * every slot reads it — which is the difference between a legible gradient card
+ * and near-black text on indigo.
+ *
+ * `null` is "no card above me": a slot rendered on its own falls back to the
+ * body ink, exactly as it would on the web.
+ */
+export const CardInkContext = React.createContext<string | null>(null);
+
 /** The body text of a slot, in MUI's `body1`, so a bare string is not unstyled. */
-const slotTextStyle = (theme: UiTheme): TextStyle => ({
+const slotTextStyle = (theme: UiTheme, ink: string | null): TextStyle => ({
   ...muiTypeStyle(theme, 'body1'),
-  color: theme.palette.text.primary,
+  color: ink ?? theme.palette.text.primary,
 });
 
 /** MUI's header title: `h5`, or `body2` when an avatar shares the row. */
-export const cardTitleStyle = (theme: UiTheme, hasAvatar: boolean): TextStyle => ({
+export const cardTitleStyle = (
+  theme: UiTheme,
+  hasAvatar: boolean,
+  ink: string | null = null,
+): TextStyle => ({
   ...muiTypeStyle(theme, hasAvatar ? 'body2' : 'h5'),
-  color: theme.palette.text.primary,
+  color: ink ?? theme.palette.text.primary,
 });
 
-/** MUI's header subheader: `body1` (or `body2` beside an avatar), in the muted ink. */
+/**
+ * MUI's header subheader: `body1` (or `body2` beside an avatar), in the muted
+ * ink — which does NOT follow the card's own ink, because MUI's `CardHeader`
+ * pins the subheader to `textSecondary` explicitly rather than inheriting.
+ */
 export const cardSubtitleStyle = (theme: UiTheme, hasAvatar: boolean): TextStyle => ({
   ...muiTypeStyle(theme, hasAvatar ? 'body2' : 'body1'),
   color: theme.palette.text.secondary,
@@ -65,6 +87,7 @@ export function CardHeader({
   ...others
 }: CardHeaderProps): React.JSX.Element {
   const theme = useUiTheme();
+  const ink = React.useContext(CardInkContext);
   const testID = resolveTestId(others, 'card-header');
   const { style, ...viewProps } = withoutTestIdProps(others);
 
@@ -75,7 +98,7 @@ export function CardHeader({
         style={[{ padding: theme.spacing(CARD_HEADER_CHILDREN_PADDING_UNITS) }, style]}
         {...viewProps}
       >
-        {renderTextChildren(children, slotTextStyle(theme))}
+        {renderTextChildren(children, slotTextStyle(theme, ink))}
       </View>
     );
   }
@@ -86,7 +109,7 @@ export function CardHeader({
       {hasAvatar ? <View style={styles.headerAvatar}>{avatar}</View> : null}
       <View style={styles.headerContent}>
         {title != null ? (
-          <RNText testID={childTestId(others, 'title', 'card')} style={cardTitleStyle(theme, hasAvatar)}>
+          <RNText testID={childTestId(others, 'title', 'card')} style={cardTitleStyle(theme, hasAvatar, ink)}>
             {title}
           </RNText>
         ) : null}
@@ -112,6 +135,7 @@ export function CardContent({
   ...others
 }: CardContentProps): React.JSX.Element {
   const theme = useUiTheme();
+  const ink = React.useContext(CardInkContext);
   const testID = resolveTestId(others, 'card-content');
   const { style, ...viewProps } = withoutTestIdProps(others);
   const padding = theme.spacing(
@@ -120,7 +144,7 @@ export function CardContent({
 
   return (
     <View testID={testID} style={[{ padding }, style]} {...viewProps}>
-      {renderTextChildren(children, slotTextStyle(theme))}
+      {renderTextChildren(children, slotTextStyle(theme, ink))}
     </View>
   );
 }
@@ -141,6 +165,7 @@ export function CardActions({
   ...others
 }: CardActionsProps): React.JSX.Element {
   const theme = useUiTheme();
+  const ink = React.useContext(CardInkContext);
   const testID = resolveTestId(others, 'card-actions');
   const { style, ...viewProps } = withoutTestIdProps(others);
 
@@ -154,7 +179,7 @@ export function CardActions({
       ]}
       {...viewProps}
     >
-      {renderTextChildren(children, slotTextStyle(theme))}
+      {renderTextChildren(children, slotTextStyle(theme, ink))}
     </View>
   );
 }

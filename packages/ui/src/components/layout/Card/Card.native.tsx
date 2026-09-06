@@ -14,6 +14,7 @@ import {
 import { resolveCardProps } from './Card.helpers';
 import { cardLook } from './Card.look.native';
 import { CARD_LOADING, CARD_PULSE } from './Card.metrics';
+import { CardInkContext } from './CardParts.native';
 import type { CardProps } from './Card.types.native';
 import { PulseRing } from '../../../platform/pulse-ring.native';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
@@ -73,8 +74,11 @@ export const Card = React.forwardRef<View, CardProps>((rawProps, ref) => {
     onPress?.(event);
   };
 
+  // The ink goes to the SLOTS through context and to bare text children
+  // directly: on the web one `color` on the card covers both, because CSS
+  // inherits and React Native does not.
   const body = (
-    <>
+    <CardInkContext.Provider value={look.ink}>
       {pulse ? (
         <PulseRing
           color={theme.palette.primary.main}
@@ -88,7 +92,7 @@ export const Card = React.forwardRef<View, CardProps>((rawProps, ref) => {
       ) : null}
       {loading ? <Spinner color={theme.palette.primary.main} testID={idFor('loading')} /> : null}
       {renderTextChildren(children, { ...muiTypeStyle(theme, 'body1'), color: look.ink })}
-    </>
+    </CardInkContext.Provider>
   );
 
   const shared = { testID, onFocus: idle ? onFocus : undefined, onBlur: idle ? onBlur : undefined };

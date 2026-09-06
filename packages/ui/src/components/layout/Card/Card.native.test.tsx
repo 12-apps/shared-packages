@@ -180,6 +180,46 @@ describe('Card (native)', () => {
     expect(cardSubtitleStyle(theme, false).color).toBe(theme.palette.text.secondary);
   });
 
+  it('carries a gradient card\u2019s ink into its slots, as CSS inheritance does', () => {
+    render(
+      <Card variant="gradient" dataTestId="grad">
+        solto
+        <CardHeader dataTestId="hdr" title="T\u00edtulo" subtitle="Sub" />
+        <CardContent>dentro</CardContent>
+      </Card>,
+    );
+
+    const ink = cardInk(theme, 'gradient');
+    // The bare text child, the header title and the body all paint in
+    // `primary.contrastText` \u2014 one `color` on the card on the web, a context here.
+    expect(screen.getByText('solto')).toHaveStyle({ color: ink });
+    expect(screen.getByTestId('hdr-title')).toHaveStyle({ color: ink });
+    expect(screen.getByText('dentro')).toHaveStyle({ color: ink });
+    // MUI pins the subheader to `textSecondary`, so it does NOT follow the ink.
+    expect(screen.getByTestId('hdr-subtitle')).toHaveStyle({
+      color: theme.palette.text.secondary,
+    });
+  });
+
+  it('leaves the slots on the body ink under a card that does not flip it', () => {
+    render(
+      <>
+        <Card dataTestId="plain">
+          <CardHeader dataTestId="plainHdr" title="T\u00edtulo" />
+          <CardContent>dentro</CardContent>
+        </Card>
+        <CardContent>solto</CardContent>
+      </>,
+    );
+
+    expect(screen.getByTestId('plainHdr-title')).toHaveStyle({
+      color: theme.palette.text.primary,
+    });
+    expect(screen.getByText('dentro')).toHaveStyle({ color: theme.palette.text.primary });
+    // And a slot with no card above it falls back to the same ink.
+    expect(screen.getByText('solto')).toHaveStyle({ color: theme.palette.text.primary });
+  });
+
   it('halves the content padding when dense and aligns the actions', () => {
     render(
       <>
