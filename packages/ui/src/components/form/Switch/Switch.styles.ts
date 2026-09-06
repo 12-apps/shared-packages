@@ -9,7 +9,44 @@ import {
   shimmerAnimation,
   spinAnimation,
 } from './Switch.animations';
+import {
+  DISABLED,
+  IOS_BASE_OFFSET,
+  IOS_THUMB_SHADOW,
+  IOS_TRAVEL_INSET,
+  SWITCH_GLASS,
+  SWITCH_GLOW,
+  NEUTRAL_CONTRAST,
+  NEUTRAL_FALLBACK,
+  NEUTRAL_GREY,
+  SWITCH_FOCUS_RING,
+  SWITCH_GRADIENT,
+  SWITCH_HOVER,
+  SWITCH_PULSE,
+  SWITCH_RIPPLE,
+  SWITCH_SPINNER,
+  SWITCH_TRANSITION,
+  THUMB_ELEVATION,
+  THUMB_RADIUS,
+  TRACK_LABEL,
+  TRACK_RADIUS,
+  geometryOf,
+  iosTrackShadow,
+  lookOf,
+  seconds,
+  showsTrackLabels,
+  trackColor,
+  type SwitchGeometry,
+  type SwitchLook,
+} from './Switch.metrics';
+import type { SwitchVariant } from './Switch.base';
 
+import { px } from '../../../tokens/theme';
+import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
+
+// Every number below comes from `./Switch.metrics`, which the native renderer
+// reads too — see its header. The palette and the shadows stay on the MUI
+// theme so a host that re-themes either keeps moving the web.
 interface ColorPalette {
   main: string;
   dark?: string;
@@ -17,20 +54,25 @@ interface ColorPalette {
   contrastText?: string;
 }
 
-/**
- * `neutral` is not a MUI palette entry, so it is built from the grey ramp. The
- * literal fallbacks cover a theme whose grey ramp omits these steps.
- */
+/** `neutral` is not a MUI palette entry, so it is built from the grey ramp. */
 const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey?.[700] || '#616161',
-  dark: theme.palette.grey?.[800] || '#424242',
-  light: theme.palette.grey?.[500] || '#9e9e9e',
-  contrastText: '#fff',
+  main: theme.palette.grey?.[NEUTRAL_GREY.main] || NEUTRAL_FALLBACK.main,
+  dark: theme.palette.grey?.[NEUTRAL_GREY.dark] || NEUTRAL_FALLBACK.dark,
+  light: theme.palette.grey?.[NEUTRAL_GREY.light] || NEUTRAL_FALLBACK.light,
+  contrastText: NEUTRAL_CONTRAST,
 });
 
-/** `danger` is this component's name for the error palette; the rest map straight through. */
-const namedPalette = (theme: Theme, color: string): ColorPalette => {
-  const colorMap: Record<string, ColorPalette> = {
+/**
+ * Resolves a colour name to a full palette, filling any step the theme leaves
+ * out from `main` and then from the primary palette. `danger` is this
+ * component's name for the error palette; the rest map straight through.
+ */
+const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
+  if (color === 'neutral') {
+    return neutralPalette(theme);
+  }
+
+  const colorMap: Record<string, ColorPalette | undefined> = {
     primary: theme.palette.primary,
     secondary: theme.palette.secondary,
     success: theme.palette.success,
@@ -38,51 +80,21 @@ const namedPalette = (theme: Theme, color: string): ColorPalette => {
     info: theme.palette.info,
     danger: theme.palette.error,
   };
-
-  return colorMap[color] || theme.palette.primary;
-};
-
-/**
- * Resolves a colour name to a full palette, filling any step the theme leaves
- * out from `main` and then from the primary palette.
- */
-const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
-  if (color === 'neutral') {
-    return neutralPalette(theme);
-  }
-
-  const palette = namedPalette(theme, color);
+  const palette = colorMap[color] ?? theme.palette.primary;
   const { primary } = theme.palette;
 
   return {
     main: palette.main || primary.main,
     dark: palette.dark || palette.main || primary.dark,
     light: palette.light || palette.main || primary.light,
-    contrastText: palette.contrastText || '#fff',
+    contrastText: palette.contrastText || NEUTRAL_CONTRAST,
   };
 };
 
-type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-
-interface SwitchGeometry {
-  width: number;
-  height: number;
-  padding: number;
-  thumbSize: number;
-}
-
-const SIZES: Record<SizeKey, SwitchGeometry> = {
-  xs: { width: 34, height: 18, padding: 1, thumbSize: 14 },
-  sm: { width: 42, height: 22, padding: 1, thumbSize: 18 },
-  md: { width: 50, height: 26, padding: 1, thumbSize: 22 },
-  lg: { width: 58, height: 30, padding: 2, thumbSize: 24 },
-  xl: { width: 66, height: 34, padding: 2, thumbSize: 28 },
-};
-
 export interface SwitchFlags {
-  customVariant?: string;
-  customColor?: string;
-  customSize?: string;
+  customVariant?: SwitchVariant;
+  customColor?: ColorValue;
+  customSize?: SizeValue;
   glow?: boolean;
   glass?: boolean;
   gradient?: boolean;
@@ -95,57 +107,8 @@ export interface SwitchFlags {
   pulse?: boolean;
 }
 
-/**
- * The four platform looks. Each names one row of the tables below, so the
- * borderRadius/shadow/colour choices stop being nested ternaries repeated per
- * DOM part.
- */
-type Look = 'ios' | 'android' | 'material' | 'default';
-
-const lookOf = (customVariant?: string): Look => {
-  if (customVariant === 'ios') return 'ios';
-  if (customVariant === 'android') return 'android';
-  if (customVariant === 'material') return 'material';
-  return 'default';
-};
-
-/** Track geometry once the caller's overrides and the size preset are combined. */
-const geometryOf = (flags: SwitchFlags) => {
-  const preset = SIZES[flags.customSize as SizeKey] ?? SIZES.md;
-
-  return {
-    ...preset,
-    width: flags.trackWidth || preset.width,
-    height: flags.trackHeight || preset.height,
-  };
-};
-
-const THUMB_RADIUS: Record<Look, (thumbSize: number) => number | string> = {
-  ios: () => '50%',
-  android: () => 4,
-  material: (thumbSize) => thumbSize / 3,
-  default: () => '50%',
-};
-
-const TRACK_RADIUS: Record<Look, (height: number) => number> = {
-  ios: (height) => height / 2,
-  android: (height) => height / 3,
-  material: (height) => height / 2.5,
-  default: (height) => height / 2,
-};
-
-const thumbShadow = (theme: Theme, look: Look) => {
-  if (look === 'ios') {
-    return `0 3px 1px 0 ${alpha('#000', 0.04)}, 0 3px 8px 0 ${alpha('#000', 0.12)}, 0 1px 0 0 ${alpha('#000', 0.08)}`;
-  }
-  return look === 'android' ? theme.shadows[3] : theme.shadows[2];
-};
-
-const trackColor = (theme: Theme, look: Look) => {
-  if (look === 'ios') return alpha(theme.palette.common.black, 0.1);
-  if (look === 'android') return alpha(theme.palette.action.disabled, 0.2);
-  return alpha(theme.palette.action.disabled, 0.3);
-};
+const thumbShadow = (theme: Theme, look: SwitchLook): string =>
+  look === 'ios' ? IOS_THUMB_SHADOW : (theme.shadows[THUMB_ELEVATION[look]] ?? 'none');
 
 /** The ripple that expands from the thumb on hover. */
 const rippleOverlay = (palette: ColorPalette): CSSObject => ({
@@ -156,8 +119,8 @@ const rippleOverlay = (palette: ColorPalette): CSSObject => ({
   width: '100%',
   height: '100%',
   borderRadius: '50%',
-  background: alpha(palette.main, 0.2),
-  animation: `${rippleAnimation} 0.6s ease-out`,
+  background: alpha(palette.main, SWITCH_RIPPLE.alpha),
+  animation: `${rippleAnimation} ${seconds(SWITCH_RIPPLE.ms)} ease-out`,
   transform: 'translate(-50%, -50%)',
   pointerEvents: 'none',
 });
@@ -170,13 +133,13 @@ const checkedTrack = (flags: SwitchFlags, palette: ColorPalette): CSSObject => (
   position: 'relative',
   overflow: 'hidden',
   ...(flags.glow && {
-    animation: `${glowAnimation} 2s ease-in-out infinite`,
-    boxShadow: `0 0 10px ${alpha(palette.main, 0.6)}, inset 0 0 10px ${alpha(palette.main, 0.2)}`,
+    animation: `${glowAnimation} ${seconds(SWITCH_GLOW.ms)} ease-in-out infinite`,
+    boxShadow: `0 0 ${SWITCH_GLOW.blur}px ${alpha(palette.main, SWITCH_GLOW.alpha)}, inset 0 0 ${SWITCH_GLOW.insetBlur}px ${alpha(palette.main, SWITCH_GLOW.insetAlpha)}`,
   }),
   ...(flags.gradient && {
-    background: `linear-gradient(90deg, ${palette.light || palette.main} 0%, ${palette.main} 50%, ${palette.dark || palette.main} 100%)`,
+    background: `linear-gradient(${SWITCH_GRADIENT.checked.angleDeg}deg, ${palette.light || palette.main} ${SWITCH_GRADIENT.checked.stops[0]}%, ${palette.main} ${SWITCH_GRADIENT.checked.stops[1]}%, ${palette.dark || palette.main} ${SWITCH_GRADIENT.checked.stops[2]}%)`,
     backgroundSize: '200% 100%',
-    animation: `${shimmerAnimation} 3s ease infinite`,
+    animation: `${shimmerAnimation} ${seconds(SWITCH_GRADIENT.shimmerMs)} ease infinite`,
   }),
 });
 
@@ -185,7 +148,7 @@ const switchBaseSx = (
   flags: SwitchFlags,
   palette: ColorPalette,
   geometry: SwitchGeometry,
-  look: Look,
+  look: SwitchLook,
 ): CSSObject => {
   const { width, thumbSize, padding } = geometry;
   const isIos = look === 'ios';
@@ -193,13 +156,13 @@ const switchBaseSx = (
   return {
     padding,
     margin: 0,
-    transitionDuration: '300ms',
-    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
-    ...(isIos && { transform: 'translateX(2px)' }),
+    transitionDuration: `${SWITCH_TRANSITION.ms}ms`,
+    transitionTimingFunction: SWITCH_TRANSITION.easing,
+    ...(isIos && { transform: `translateX(${IOS_BASE_OFFSET}px)` }),
     '&:hover': {
       '& .MuiSwitch-thumb': {
-        transform: flags.loading ? 'none' : 'scale(1.05)',
-        boxShadow: `${theme.shadows[4]}, 0 0 12px ${alpha(palette.main, 0.2)}`,
+        transform: flags.loading ? 'none' : `scale(${SWITCH_HOVER.thumbScale})`,
+        boxShadow: `${theme.shadows[SWITCH_HOVER.elevation]}, 0 0 ${SWITCH_HOVER.blur}px ${alpha(palette.main, SWITCH_HOVER.alpha)}`,
       },
       ...(flags.ripple && { '&::after': rippleOverlay(palette) }),
     },
@@ -209,18 +172,18 @@ const switchBaseSx = (
       transform: `translateX(${width - thumbSize - padding * 2}px)`,
       color: '#fff',
       '& .MuiSwitch-thumb': {
-        animation: flags.loading ? 'none' : `${bounceAnimation} 0.3s ease-out`,
+        animation: flags.loading ? 'none' : `${bounceAnimation} ${seconds(SWITCH_TRANSITION.ms)} ease-out`,
       },
       '& + .MuiSwitch-track': checkedTrack(flags, palette),
-      '&.Mui-disabled + .MuiSwitch-track': { opacity: 0.5 },
-      ...(isIos && { transform: `translateX(${width - thumbSize - 4}px)` }),
+      '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.checkedTrackOpacity },
+      ...(isIos && { transform: `translateX(${width - thumbSize - IOS_TRAVEL_INSET}px)` }),
     },
     '&.Mui-focusVisible .MuiSwitch-thumb': {
       color: palette.main,
-      border: `6px solid ${alpha(palette.main, 0.2)}`,
+      border: `${SWITCH_FOCUS_RING.width}px solid ${alpha(palette.main, SWITCH_FOCUS_RING.alpha)}`,
     },
-    '&.Mui-disabled .MuiSwitch-thumb': { color: theme.palette.grey[100] },
-    '&.Mui-disabled + .MuiSwitch-track': { opacity: 0.3 },
+    '&.Mui-disabled .MuiSwitch-thumb': { color: theme.palette.grey[DISABLED.thumbGrey] },
+    '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.trackOpacity },
   };
 };
 
@@ -229,35 +192,35 @@ const thumbSx = (
   flags: SwitchFlags,
   palette: ColorPalette,
   thumbSize: number,
-  look: Look,
+  look: SwitchLook,
 ): CSSObject => ({
   width: thumbSize,
   height: thumbSize,
   borderRadius: THUMB_RADIUS[look](thumbSize),
   backgroundColor: '#fff',
   boxShadow: thumbShadow(theme, look),
-  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  transition: `all ${seconds(SWITCH_TRANSITION.ms)} ${SWITCH_TRANSITION.easing}`,
   position: 'relative',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   ...(flags.glass && {
-    backgroundColor: alpha(theme.palette.background.paper, 0.9),
-    backdropFilter: 'blur(10px)',
-    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+    backgroundColor: alpha(theme.palette.background.paper, SWITCH_GLASS.thumbAlpha),
+    backdropFilter: `blur(${SWITCH_GLASS.thumbBlur}px)`,
+    border: `1px solid ${alpha(theme.palette.divider, SWITCH_GLASS.borderAlpha)}`,
   }),
-  ...(flags.pulse && { animation: `${pulseAnimation} 2s ease-in-out infinite` }),
+  ...(flags.pulse && { animation: `${pulseAnimation} ${seconds(SWITCH_PULSE.ms)} ease-in-out infinite` }),
   ...(flags.loading && {
     // A spinner drawn inside the thumb rather than over the whole control.
     '&::after': {
       content: '""',
       position: 'absolute',
-      width: thumbSize * 0.6,
-      height: thumbSize * 0.6,
-      border: `2px solid ${palette.main}`,
-      borderTop: `2px solid transparent`,
+      width: thumbSize * SWITCH_SPINNER.sizeRatio,
+      height: thumbSize * SWITCH_SPINNER.sizeRatio,
+      border: `${SWITCH_SPINNER.borderWidth}px solid ${palette.main}`,
+      borderTop: `${SWITCH_SPINNER.borderWidth}px solid transparent`,
       borderRadius: '50%',
-      animation: `${spinAnimation} 1s linear infinite`,
+      animation: `${spinAnimation} ${seconds(SWITCH_SPINNER.ms)} linear infinite`,
     },
   }),
   ...(look === 'material' && {
@@ -280,27 +243,27 @@ const trackLabels = (theme: Theme, onText?: string, offText?: string): CSSObject
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  paddingLeft: theme.spacing(1),
-  paddingRight: theme.spacing(1),
-  fontSize: '0.75rem',
-  fontWeight: 500,
+  paddingLeft: theme.spacing(TRACK_LABEL.insetUnits),
+  paddingRight: theme.spacing(TRACK_LABEL.insetUnits),
+  fontSize: px(TRACK_LABEL.fontSize),
+  fontWeight: TRACK_LABEL.fontWeight,
   color: theme.palette.text.secondary,
   '&::before, &::after': {
     content: '""',
     position: 'absolute',
-    fontSize: '0.75rem',
-    fontWeight: 500,
+    fontSize: px(TRACK_LABEL.fontSize),
+    fontWeight: TRACK_LABEL.fontWeight,
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: 1,
   },
   ...(onText && {
-    '&::before': { content: `"${onText}"`, left: theme.spacing(1), color: '#fff' },
+    '&::before': { content: `"${onText}"`, left: theme.spacing(TRACK_LABEL.insetUnits), color: '#fff' },
   }),
   ...(offText && {
     '&::after': {
       content: `"${offText}"`,
-      right: theme.spacing(1),
+      right: theme.spacing(TRACK_LABEL.insetUnits),
       color: theme.palette.text.secondary,
     },
   }),
@@ -311,37 +274,36 @@ const trackSx = (
   flags: SwitchFlags,
   palette: ColorPalette,
   height: number,
-  look: Look,
+  look: SwitchLook,
 ): CSSObject => {
   const { glass, gradient, onText, offText, customVariant } = flags;
-  const showsLabels = customVariant === 'label' && (onText || offText);
 
   return {
     borderRadius: TRACK_RADIUS[look](height),
-    backgroundColor: trackColor(theme, look),
+    backgroundColor: trackColor(
+      { black: theme.palette.common.black, disabled: theme.palette.action.disabled },
+      look,
+    ),
     opacity: 1,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: `all ${seconds(SWITCH_TRANSITION.ms)} ${SWITCH_TRANSITION.easing}`,
     position: 'relative',
-    boxShadow:
-      look === 'ios'
-        ? `inset 0 0 0 0.5px ${alpha('#000', 0.1)}, inset 0 2px 3px ${alpha('#000', 0.12)}`
-        : 'none',
+    boxShadow: look === 'ios' ? iosTrackShadow() : 'none',
     ...(glass && {
-      backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
-      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+      backgroundColor: alpha(theme.palette.background.paper, SWITCH_GLASS.trackAlpha),
+      backdropFilter: `blur(${SWITCH_GLASS.trackBlur}px)`,
+      border: `1px solid ${alpha(theme.palette.divider, SWITCH_GLASS.borderAlpha)}`,
     }),
     ...(gradient &&
       !glass && {
-        background: `linear-gradient(135deg, ${alpha(palette.light || palette.main, 0.3)}, ${alpha(palette.main, 0.2)})`,
+        background: `linear-gradient(${SWITCH_GRADIENT.resting.angleDeg}deg, ${alpha(palette.light || palette.main, SWITCH_GRADIENT.resting.lightAlpha)}, ${alpha(palette.main, SWITCH_GRADIENT.resting.mainAlpha)})`,
       }),
-    ...(showsLabels && trackLabels(theme, onText, offText)),
+    ...(showsTrackLabels(customVariant, onText, offText) && trackLabels(theme, onText, offText)),
   };
 };
 
 export const switchSx = (theme: Theme, flags: SwitchFlags): CSSObject => {
   const palette = getColorFromTheme(theme, flags.customColor ?? 'primary');
-  const geometry = geometryOf(flags);
+  const geometry = geometryOf(flags.customSize, flags.trackWidth, flags.trackHeight);
   const look = lookOf(flags.customVariant);
 
   return {
