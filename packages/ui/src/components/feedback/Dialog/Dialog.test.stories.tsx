@@ -692,8 +692,6 @@ export const EdgeCases: Story = {
 
 // 8. Persistent Dialog Test
 export const PersistentDialogTest: Story = {
-  // Asserts the missing close button against MUI's `.MuiDialogTitle` class, which only the DOM renderer emits.
-  tags: ['native-skip'],
   name: '🔒 Persistent Dialog Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -762,7 +760,7 @@ export const PersistentDialogTest: Story = {
       // The header has to be there for its lack of a close button to mean
       // anything — otherwise this passes just as well when the dialog failed to
       // render at all.
-      const dialogHeader = document.querySelector('[class*="MuiDialogTitle"]');
+      const dialogHeader = document.querySelector('[data-testid="dialog-title"]');
       await expect(dialogHeader).toBeInTheDocument();
       await expect(dialogHeader?.querySelector('[aria-label="close"]')).toBeNull();
     });
