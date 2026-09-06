@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
+import { Text as RNText } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Dialog } from './Dialog.native';
@@ -189,6 +190,52 @@ describe('Dialog (native)', () => {
     // Square, because the web's own `${radius}px 0 0 ${radius}px` is invalid CSS
     // and MUI's Drawer paper is `square`. See NATIVE-NOTES.md.
     expect(drawer.paper).toMatchObject({ width: 600, height: '100%', borderRadius: 0 });
+  });
+
+  it('lets a raw body scroll, as MUI\'s overflow-y: auto paper does', () => {
+    // The paper is `maxHeight: '100%'` with its overflow hidden, so a plain
+    // wrapper clipped overlong raw children with no way to reach the rest.
+    // `DialogContent` already scrolled; raw children were the one path left.
+    const raw = render(
+      <Dialog open dataTestId="raw">
+        <RNText>corpo muito longo</RNText>
+      </Dialog>,
+    );
+    const rawBody = screen.getByTestId('raw').firstElementChild as HTMLElement;
+    raw.unmount();
+
+    // Compared against the slot that already scrolled rather than against
+    // react-native-web's own class names, so a rename moves both together.
+    render(
+      <Dialog open dataTestId="slot">
+        <DialogContent dataTestId="slot">corpo</DialogContent>
+      </Dialog>,
+    );
+    expect(rawBody.className).toBe(screen.getByTestId('slot-content').className);
+  });
+
+  it('draws the pulse ring only when asked, and fills the screen for fullscreen', () => {
+    const { unmount } = render(
+      <Dialog open pulse dataTestId="p">
+        <DialogContent>corpo</DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByTestId('p-pulse')).toBeInTheDocument();
+    unmount();
+
+    render(
+      <>
+        <Dialog open dataTestId="plain">
+          <DialogContent>corpo</DialogContent>
+        </Dialog>
+        <Dialog open variant="fullscreen" dataTestId="full">
+          <DialogContent>corpo</DialogContent>
+        </Dialog>
+      </>,
+    );
+    expect(screen.queryAllByTestId('plain-pulse')).toHaveLength(0);
+    // `fullscreen` gives up the max width and the rounded corners entirely.
+    expect(screen.getByTestId('full')).toHaveStyle({ width: '100%', height: '100%' });
   });
 
   it('pads raw children itself and stands back for the spacing slots', () => {

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { hasSpacingSlot, withDialogDefaults } from './Dialog.helpers';
 import { dialogBackdrop, dialogLook } from './Dialog.look.native';
@@ -33,19 +33,30 @@ export { DialogActions, DialogContent, DialogHeader } from './DialogParts.native
  * has no such selector, so only the element-type check runs here — see
  * NATIVE-NOTES.md.
  */
+const styles = StyleSheet.create({
+  /** Same sizing `DialogParts`' content slot uses, so a raw body behaves like one. */
+  rawBody: { flexGrow: 1, flexShrink: 1 },
+});
+
 function bodyOf(theme: UiTheme, children: React.ReactNode, hasTitle: boolean): React.ReactNode {
   if (hasSpacingSlot(children, [DialogContent, DialogActions])) return children;
   const top = hasTitle ? DIALOG_BODY_PADDING_UNITS.topUnderTitle : DIALOG_BODY_PADDING_UNITS.top;
+  // A `ScrollView`, not a `View`: MUI's paper is `overflow-y: auto`, so
+  // overlong raw children scroll on the web. The native paper is `maxHeight:
+  // '100%'` with its overflow hidden, so a plain wrapper clipped them with no
+  // way to reach the rest. `DialogContent` already gets this treatment; raw
+  // children were the one path that did not.
   return (
-    <View
-      style={{
+    <ScrollView
+      style={styles.rawBody}
+      contentContainerStyle={{
         paddingHorizontal: theme.spacing(DIALOG_BODY_PADDING_UNITS.horizontal),
         paddingBottom: theme.spacing(DIALOG_BODY_PADDING_UNITS.bottom),
         paddingTop: theme.spacing(top),
       }}
     >
       {renderTextChildren(children, dialogBodyTextStyle(theme))}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -101,7 +112,7 @@ export function Dialog(rawProps: DialogProps): React.JSX.Element {
         <Pressable
           aria-hidden
           tabIndex={-1}
-          testID={`${testID ?? 'dialog'}-backdrop`}
+          testID={`${testID}-backdrop`}
           onPress={dismiss}
           style={[StyleSheet.absoluteFill, dialogBackdrop(glass)]}
         />
@@ -114,7 +125,7 @@ export function Dialog(rawProps: DialogProps): React.JSX.Element {
               durationMs={DIALOG_PULSE.durationMs}
               fadeAt={DIALOG_PULSE.fadeAt}
               opacity={DIALOG_PULSE.alpha}
-              testID={`${testID ?? 'dialog'}-pulse`}
+              testID={`${testID}-pulse`}
             />
           ) : null}
           <DialogTitledContext.Provider value={Boolean(title) || hasHeaderChild(children)}>
