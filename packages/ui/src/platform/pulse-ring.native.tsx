@@ -4,10 +4,12 @@ import { Animated, Easing } from 'react-native';
 /**
  * THE `::after` PULSE, AS A REACT NATIVE VIEW.
  *
- * Several surfaces in this package pulse the same way on the web: an `::after`
- * that fills the element, carries `box-shadow: 0 0 0 <spread>px currentColor`
- * and animates that spread out and back while fading, once every two seconds,
- * from BEHIND the element (`z-index: -1`).
+ * `Card` and `Dialog` pulse the same way on the web: an `::after` that fills
+ * the element, carries `box-shadow: 0 0 0 <spread>px currentColor` and animates
+ * that spread out and back while fading, once every two seconds, from BEHIND
+ * the element (`z-index: -1`). Those two read this; `Button.native.tsx` still
+ * carries its own `Pulse`, a filled overlay that scales and fades rather than a
+ * ring, and folding it onto this is a `form/Button` change.
  *
  * React Native cannot paint a child behind its parent's own background, so a
  * filled overlay would wash the surface instead of haloing it. This draws a

@@ -15,7 +15,7 @@ import {
   neumorphicShadows,
 } from './Card.metrics';
 import { alpha } from '../../../tokens/color';
-import type { UiShadow } from '../../../tokens/shadow';
+import { BLACK, WHITE, drop, halo, type UiShadow } from '../../../tokens/shadow';
 import type { UiTheme } from '../../../tokens/theme';
 
 /**
@@ -29,28 +29,11 @@ import type { UiTheme } from '../../../tokens/theme';
  * does) on both renderers.
  */
 
-/**
- * MUI's `palette.common`, which `UiTheme` has no slot for: the neumorphic and
- * glass shadows are mixed from these two and nothing else reads them.
- */
-const BLACK = '#000';
-const WHITE = '#fff';
-
 /** The named radius as a length. `full` stays a percentage of the box. */
 export function cardRadius(theme: UiTheme, radius: CardBorderRadius): number | string {
   if (radius === 'full') return CARD_RADIUS_FULL;
   return theme.spacing(CARD_RADIUS_UNITS[radius] ?? CARD_RADIUS_UNITS.md);
 }
-
-/** A shadow with no offset — a halo all round, which is how `glow` reads. */
-const halo = (blurRadius: number, color: string): UiShadow[] => [
-  { offsetX: 0, offsetY: 0, blurRadius, spreadDistance: 0, color },
-];
-
-/** A dropped shadow straight down, which is how `glass` and `gradient` sit. */
-const drop = (offsetY: number, blurRadius: number, color: string): UiShadow[] => [
-  { offsetX: 0, offsetY, blurRadius, spreadDistance: 0, color },
-];
 
 interface Surface {
   surface: ViewStyle;

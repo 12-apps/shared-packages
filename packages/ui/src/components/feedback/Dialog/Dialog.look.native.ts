@@ -12,7 +12,7 @@ import {
   DIALOG_RADIUS_UNITS,
 } from './Dialog.metrics';
 import { alpha } from '../../../tokens/color';
-import type { UiShadow } from '../../../tokens/shadow';
+import { BLACK, halo } from '../../../tokens/shadow';
 import type { UiTheme } from '../../../tokens/theme';
 
 /**
@@ -25,9 +25,6 @@ import type { UiTheme } from '../../../tokens/theme';
  * buried by a `glass` one, on both renderers.
  */
 
-/** MUI's `palette.common.black`, which `UiTheme` has no slot for. */
-const BLACK = '#000';
-
 /** The named radius as a length. */
 export function dialogRadius(theme: UiTheme, radius: DialogBorderRadius): number {
   return theme.spacing(DIALOG_RADIUS_UNITS[radius] ?? DIALOG_RADIUS_UNITS.lg);
@@ -39,10 +36,6 @@ export function dialogBackdrop(glass: boolean): ViewStyle {
     backgroundColor: alpha(BLACK, glass ? DIALOG_BACKDROP.alpha.glass : DIALOG_BACKDROP.alpha.plain),
   };
 }
-
-const halo = (blurRadius: number, color: string): UiShadow[] => [
-  { offsetX: 0, offsetY: 0, blurRadius, spreadDistance: 0, color },
-];
 
 /** The glass surface, shared by `variant="glass"` and the `glass` flag. */
 function glassSurface(theme: UiTheme): ViewStyle {

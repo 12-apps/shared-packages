@@ -37,3 +37,23 @@ export const shadowCss = (shadow: UiShadow): string =>
 /** Several shadows as one CSS declaration. */
 export const shadowListCss = (shadows: readonly UiShadow[]): string =>
   shadows.map(shadowCss).join(', ');
+
+/**
+ * MUI's `palette.common`, which `UiTheme` has no slot for.
+ *
+ * Here rather than beside each caller because the neumorphic, glass and scrim
+ * arithmetic in more than one component mixes from exactly these two, and a
+ * per-component copy is a per-component chance to write `#000000`.
+ */
+export const BLACK = '#000';
+export const WHITE = '#fff';
+
+/** A shadow with no offset — a halo all round, which is how `glow` reads. */
+export const halo = (blurRadius: number, color: string): UiShadow[] => [
+  { offsetX: 0, offsetY: 0, blurRadius, spreadDistance: 0, color },
+];
+
+/** A dropped shadow straight down, which is how a lifted surface sits. */
+export const drop = (offsetY: number, blurRadius: number, color: string): UiShadow[] => [
+  { offsetX: 0, offsetY, blurRadius, spreadDistance: 0, color },
+];
