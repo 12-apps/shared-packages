@@ -135,7 +135,13 @@ function rowSx(theme: Theme, selected: boolean): SxProps<Theme> {
     alignItems: 'center',
     gap: theme.spacing(1.5),
     padding: theme.spacing(1, 1.5),
-    borderRadius: theme.shape.borderRadius / 4,
+    // `1`, not `theme.shape.borderRadius / 4`. MUI's `sx` reads a NUMBER here as
+    // a multiple of `theme.shape.borderRadius`, so dividing the theme value out
+    // and letting `sx` multiply it back in is quadratic: measured 4px on the
+    // default theme — which is why this looked right — and 36px on a host that
+    // sets its own radius to 12. In a package whose whole premise is being
+    // re-themed, only the multiple is portable.
+    borderRadius: 1,
     cursor: 'pointer',
     backgroundColor: resting,
     '&:hover': {
@@ -211,6 +217,26 @@ function FleetRow({
   );
 }
 
+/**
+ * What stands in for the roster before any unit has landed.
+ *
+ * `aria-hidden`, because three grey bars are not information — the panel's
+ * `aria-busy` and its optional announcement carry that. The radius is the same
+ * MULTIPLE a real row uses rather than a raw pixel count: `Skeleton` forwards
+ * the number into `sx`, where it scales with `theme.shape.borderRadius`, so a
+ * literal `4` drew 16px against the rows' 4px on the default theme and 48px
+ * against 12px on a re-themed host.
+ */
+function FirstLoad({ testId }: { testId: string }): React.JSX.Element {
+  return (
+    <Stack spacing={1} data-testid={`${testId}-skeleton`} aria-hidden="true">
+      {[0, 1, 2].map((row) => (
+        <Skeleton key={row} variant="rectangular" height={44} borderRadius={1} />
+      ))}
+    </Stack>
+  );
+}
+
 export interface FleetRosterProps {
   units: readonly FleetUnit[];
   copy: FleetMapCopy;
@@ -252,15 +278,7 @@ export function FleetRoster({
   // every poll destroys the focus inside it, so a dispatcher arrowing through
   // the roster is thrown back to the top of the page each time the data
   // refreshes — and the rows they were reading vanish and return.
-  if (loading && units.length === 0) {
-    return (
-      <Stack spacing={1} data-testid={`${testId}-skeleton`} aria-hidden="true">
-        {[0, 1, 2].map((row) => (
-          <Skeleton key={row} variant="rectangular" height={44} borderRadius={4} />
-        ))}
-      </Stack>
-    );
-  }
+  if (loading && units.length === 0) return <FirstLoad testId={testId} />;
 
   return (
     <Box

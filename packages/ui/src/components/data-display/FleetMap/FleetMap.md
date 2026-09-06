@@ -132,8 +132,8 @@ picking it for every consumer.
 - While `loading`, the MAP AND ROSTER are marked `aria-busy` and the heading
   stays, so the layout does not reflow when the data lands. The panel root is
   deliberately not the busy element: `aria-busy` tells assistive tech to hold
-  back changes inside it, and the announcement region below is a sibling of the
-  busy half rather than a descendant of it.
+  back changes inside it, and the announcement region is a SIBLING of the busy
+  half rather than a descendant of it.
 - `aria-busy` is a state and utters nothing, so set `copy.loading` if the reload
   should be ANNOUNCED — that string goes into a visually hidden `role="status"`.
   Left unset, the reload is silent. The region is mounted as soon as

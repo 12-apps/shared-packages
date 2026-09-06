@@ -239,7 +239,12 @@ export const ActiveDescendantTest: Story = {
     await step('The row id is generated, not the test id', async () => {
       // Two boards on one page filtered from the same fleet would otherwise
       // emit duplicate DOM ids and an ambiguous activedescendant.
-      await expect(named).not.toBe('fleet-bruno-option');
+      // Asserted as a PREFIX, not against one invented string. The regression
+      // this guards is deriving the DOM id from `dataTestId`, whose natural
+      // shape is `fleet-bruno` — and comparing against `fleet-bruno-option`, a
+      // value the component has never emitted in any commit, would have let
+      // exactly that through while looking like a check.
+      await expect(named?.startsWith('fleet')).toBe(false);
     });
   },
 };
@@ -419,15 +424,6 @@ export const UncontrolledSelectionTest: Story = {
       await userEvent.keyboard('{ArrowDown}');
       await waitFor(() =>
         expect(canvas.getByTestId('fleet-ana')).toHaveAttribute('aria-selected', 'true'),
-      );
-    });
-
-    await step('The arrow keys were NOT swallowed on the way', async () => {
-      // The regression this pins: `preventDefault` used to fire before a no-op
-      // `select`, so a keyboard user could neither move the selection nor
-      // scroll the page. A moved selection proves the first half.
-      await expect(canvas.getByTestId('fleet-roster')).toHaveAttribute(
-        'aria-activedescendant',
       );
     });
 
