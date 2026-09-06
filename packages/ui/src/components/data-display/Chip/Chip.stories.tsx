@@ -3,7 +3,7 @@ import Star from '@mui/icons-material/Star';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Chip } from './Chip';
-import { COLOR_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Chip> = {
   title: 'Indicators/Chip',

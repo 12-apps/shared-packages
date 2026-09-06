@@ -2,6 +2,17 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { SkeletonProps } from './Skeleton.types';
+import {
+  GLASS_BACKGROUND_ALPHA_FROM,
+  GLASS_BACKGROUND_ALPHA_TO,
+  GLASS_BLUR_PX,
+  GLASS_BORDER_ALPHA,
+  GLASS_SHADOW,
+  SHIMMER_ALPHA,
+  SHIMMER_DURATION_MS,
+  SKELETON_DEFAULT_DIMENSIONS,
+  SKELETON_INTENSITY_OPACITY,
+} from './Skeleton.metrics';
 
 type SkeletonVariant = NonNullable<SkeletonProps['variant']>;
 type SkeletonIntensity = NonNullable<SkeletonProps['intensity']>;
@@ -29,36 +40,25 @@ export const muiAnimationFor = (
   return animation;
 };
 
+// Derived from the shared metrics, not restated: the native `Skeleton` reads
+// the same table, so the two renderers cannot disagree on a default box.
 export const defaultDimensions = (
   variant: SkeletonVariant,
-): { width: number | string; height: number | undefined } => {
-  switch (variant) {
-    case 'circular':
-      return { width: 40, height: 40 };
-    case 'rectangular':
-    case 'wave':
-      return { width: '100%', height: 40 };
-    default:
-      return { width: '100%', height: undefined };
-  }
-};
-
-const INTENSITY_OPACITY: Record<SkeletonIntensity, number> = {
-  low: 0.11,
-  medium: 0.13,
-  high: 0.15,
-};
+): { width: number | string; height: number | undefined } =>
+  // The `default:` arm the old switch had: an unrecognised variant used to fall
+  // back rather than hand `undefined` to a caller that then reads `.width`.
+  SKELETON_DEFAULT_DIMENSIONS[variant] ?? SKELETON_DEFAULT_DIMENSIONS.rectangular;
 
 const intensityOpacity = (intensity: SkeletonIntensity): number =>
-  INTENSITY_OPACITY[intensity] ?? INTENSITY_OPACITY.medium;
+  SKELETON_INTENSITY_OPACITY[intensity] ?? SKELETON_INTENSITY_OPACITY.medium;
 
 const glassmorphismStyles = (theme: Theme): CSSObject => ({
   background: `linear-gradient(135deg,
-        ${alpha(theme.palette.background.paper, 0.8)} 0%,
-        ${alpha(theme.palette.background.paper, 0.4)} 100%)`,
-  backdropFilter: 'blur(20px)',
-  border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-  boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+        ${alpha(theme.palette.background.paper, GLASS_BACKGROUND_ALPHA_FROM)} 0%,
+        ${alpha(theme.palette.background.paper, GLASS_BACKGROUND_ALPHA_TO)} 100%)`,
+  backdropFilter: `blur(${GLASS_BLUR_PX}px)`,
+  border: `1px solid ${alpha(theme.palette.divider, GLASS_BORDER_ALPHA)}`,
+  boxShadow: `0 ${GLASS_SHADOW.offsetY}px ${GLASS_SHADOW.blur}px 0 ${alpha(theme.palette.common.black, GLASS_SHADOW.alpha)}`,
 });
 
 // The sweep is a pseudo-element sliding across the box, so the box has to clip it
@@ -74,11 +74,11 @@ const shimmerStyles = (theme: Theme): CSSObject => ({
     background: `linear-gradient(
           90deg,
           transparent,
-          ${alpha(theme.palette.common.white, 0.3)},
+          ${alpha(theme.palette.common.white, SHIMMER_ALPHA)},
           transparent
         )`,
     transform: 'translateX(-100%)',
-    animation: 'shimmer 2s infinite',
+    animation: `shimmer ${SHIMMER_DURATION_MS / 1000}s infinite`,
   },
   '@keyframes shimmer': {
     '100%': {

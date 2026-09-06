@@ -13,7 +13,9 @@ import {
   resolveBadgeProps } from './Badge.helpers';
 import type { ResolvedBadgeProps } from './Badge.helpers';
 import { buildBadgeContent } from './BadgeContent';
+import { CLOSE_DELAY_MS, MOUNT_ANIMATION_MS } from './Badge.metrics';
 import type { BadgeProps, BadgeSize, BadgeVariant } from './Badge.types';
+import { resolveTestId } from '../../../platform/test-id';
 export type { BadgeProps } from './Badge.types';
 
 // Define pulse animation
@@ -63,8 +65,6 @@ const StyledBadge = styled(MuiBadge, {
     hasIcon });
 });
 
-const CLOSE_DELAY_MS = 300;
-const ANIMATION_MS = 1000;
 
 // A one-shot flag so bounce/animate run on mount and then stop.
 const useMountAnimation = (enabled: boolean) => {
@@ -74,7 +74,7 @@ const useMountAnimation = (enabled: boolean) => {
     if (!enabled) return;
 
     setIsAnimating(true);
-    const timer = window.setTimeout(() => setIsAnimating(false), ANIMATION_MS);
+    const timer = window.setTimeout(() => setIsAnimating(false), MOUNT_ANIMATION_MS);
     return () => window.clearTimeout(timer);
   }, [enabled]);
 
@@ -84,7 +84,7 @@ const useMountAnimation = (enabled: boolean) => {
 // The chip itself. Local because StyledBadge cannot cross a module boundary
 // (TS2742).
 const BadgeSurface: React.FC<
-  ResolvedBadgeProps & {
+  ResolvedBadgeProps<BadgeProps> & {
     innerRef: React.Ref<HTMLSpanElement>;
     isVisible: boolean;
     isAnimating: boolean;
@@ -150,7 +150,11 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>((componentPro
     'aria-label': ariaLabel,
     'aria-live': ariaLive = 'polite',
     'aria-atomic': ariaAtomic = true,
-    'data-testid': dataTestId,
+    'data-testid': _domTestId,
+    // The house and React Native spellings of the same id; they name the
+    // component on both sides and must not reach the DOM as attributes.
+    testID: _testID,
+    dataTestId: _dataTestId,
     className: _className,
     content: _content,
     badgeContent: _badgeContent,
@@ -167,13 +171,14 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>((componentPro
     window.setTimeout(() => onClose?.(), CLOSE_DELAY_MS);
   };
 
+  const badgeId = resolveTestId(resolved);
   const rawContent = badgeContentOf(resolved);
   const finalBadgeContent = buildBadgeContent({
     variant,
     size,
     icon,
     closable,
-    dataTestId,
+    dataTestId: badgeId,
     baseContent: variant === 'count' ? formatCount(rawContent, { max, showZero }) : rawContent,
     onClose: handleClose });
 
@@ -184,6 +189,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>((componentPro
   return (
     <BadgeSurface
       {...resolved}
+      data-testid={badgeId}
       innerRef={ref}
       isVisible={isVisible}
       isAnimating={isAnimating}

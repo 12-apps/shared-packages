@@ -68,13 +68,16 @@ export const ImageLoadingTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Check image loading', async () => {
-      const avatar = canvas.getByRole('img', { hidden: true });
+      // Awaited rather than queried outright: MUI puts the `<img>` in the first
+      // commit, react-native-web's `Image` adds its accessibility image once its
+      // own load effect has started. Same element, one tick apart.
+      const avatar = await canvas.findByRole('img', { hidden: true });
       await expect(avatar).toBeInTheDocument();
       await expect(avatar).toHaveAttribute('alt', 'Test User');
     });
 
     await step('Image should have src attribute', async () => {
-      const avatar = canvas.getByRole('img', { hidden: true });
+      const avatar = await canvas.findByRole('img', { hidden: true });
       await expect(avatar).toHaveAttribute('src');
     });
   },
@@ -347,6 +350,30 @@ export const VisualStates: Story = {
       await expect(computedStyle.boxShadow).not.toBe('none');
     });
 
+    await step('Loading state', async () => {
+      const _loadingAvatar = canvas.getByTestId('loading-avatar');
+      // Check for loading overlay and spinner by testid
+      const loadingOverlay = canvas.getByTestId('loading-avatar-loading');
+      await expect(loadingOverlay).toBeInTheDocument();
+      const spinner = canvas.getByTestId('loading-avatar-loading-spinner');
+      await expect(spinner).toBeInTheDocument();
+    });
+  },
+};
+
+/**
+ * Split out of `VisualStates` so the rest of it — the glow's shadow and the
+ * loading overlay and its spinner, which are the shared contract — keeps
+ * running on both renderers. Only the hover is DOM-only.
+ */
+export const InteractiveHover: Story = {
+  // Asserts a `:hover` computed transform, which only the DOM renderer has.
+  tags: ['native-skip'],
+  name: '🖱️ Interactive Hover Test',
+  render: () => <Avatar fallback="IN" interactive dataTestId="interactive-avatar" />,
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
     await step('Hover state on interactive', async () => {
       const avatar = canvas.getByTestId('interactive-avatar');
       await userEvent.hover(avatar);
@@ -355,15 +382,6 @@ export const VisualStates: Story = {
         const computedStyle = window.getComputedStyle(avatar);
         expect(computedStyle.transform).not.toBe('none');
       });
-    });
-
-    await step('Loading state', async () => {
-      const _loadingAvatar = canvas.getByTestId('loading-avatar');
-      // Check for loading overlay and spinner by testid
-      const loadingOverlay = canvas.getByTestId('loading-avatar-loading');
-      await expect(loadingOverlay).toBeInTheDocument();
-      const spinner = canvas.getByTestId('loading-avatar-loading-spinner');
-      await expect(spinner).toBeInTheDocument();
     });
   },
 };
@@ -431,10 +449,12 @@ export const EdgeCases: Story = {
     await step('Empty fallback handling', async () => {
       const avatar = canvas.getByTestId('empty-fallback');
       await expect(avatar).toBeInTheDocument();
-      // Should show default icon when fallback is empty (Person icon is default)
-      // The icon is rendered by MUI and has dataTestId="PersonIcon"
-      const personIcon = canvas.getByTestId('PersonIcon');
-      await expect(personIcon).toBeInTheDocument();
+      // Should show default icon when fallback is empty (Person icon is default).
+      // The avatar's own `-default` slot is what holds it on either renderer;
+      // `PersonIcon` is the id MUI's own icon module stamps, which
+      // react-native-web has no equivalent of.
+      const defaultSlot = canvas.getByTestId('empty-fallback-default');
+      await expect(defaultSlot).toBeInTheDocument();
     });
 
     await step('Long text overflow', async () => {

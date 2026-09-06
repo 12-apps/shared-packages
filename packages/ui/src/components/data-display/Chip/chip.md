@@ -6,7 +6,7 @@
 interface ChipProps {
   label: string;
   variant?: 'filled' | 'outlined';
-  size?: SizeValue narrowed to 'sm' | 'md';
+  size?: SizeValue; // all five stops; MUI's two heights, xs/sm small and md up medium
   /**
    * The house vocabulary, identical to Button's. `danger` and `neutral` are
    * ours and are translated at the MUI boundary. See `ColorValue`.

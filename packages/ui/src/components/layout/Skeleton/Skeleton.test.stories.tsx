@@ -21,7 +21,18 @@ const meta: Meta<typeof Skeleton> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Every skeleton box under `root`, whichever renderer drew it. `Skeleton` marks
+ * itself `aria-hidden` on both sides; the `.MuiSkeleton-root` class the DOM
+ * renderer also stamps has no react-native-web equivalent, so the count and
+ * visibility checks below read the shared attribute instead of the class.
+ */
+const skeletons = (root: Element): HTMLElement[] =>
+  Array.from(root.querySelectorAll<HTMLElement>('[aria-hidden="true"]'));
+
 export const BasicInteraction: Story = {
+  // Asserts MUI's own `MuiSkeleton-root` class and a CSS keyframe animation, which only the DOM renderer emits.
+  tags: ['native-skip'],
   name: '🧪 Basic Interaction Test',
   args: {
     variant: 'rectangular',
@@ -60,6 +71,8 @@ export const BasicInteraction: Story = {
 };
 
 export const VariantTests: Story = {
+  // Asserts MUI's `MuiSkeleton-text|circular|rectangular` class taxonomy, which only the DOM renderer emits.
+  tags: ['native-skip'],
   name: '🔄 Variant Tests',
   render: () => (
     <Stack spacing={3}>
@@ -123,13 +136,15 @@ export const MultipleSkeletonTest: Story = {
 
     await step('Verify multiple skeletons are rendered', async () => {
       const container = canvas.getByTestId('multiple-skeleton-container');
-      const skeletons = container.querySelectorAll('.MuiSkeleton-root');
-      await expect(skeletons).toHaveLength(3);
+      await expect(skeletons(container)).toHaveLength(3);
     });
 
     await step('Verify proper spacing between skeletons', async () => {
       const container = canvas.getByTestId('multiple-skeleton-container');
-      const stackElement = container.querySelector('.MuiStack-root');
+      // The instances share one spacing wrapper two levels up — MUI's `Stack`
+      // over a `Box` each on the web, a gapped `View` over a row `View` on
+      // native — so read the common grandparent rather than its class.
+      const stackElement = skeletons(container)[0]?.parentElement?.parentElement;
       await expect(stackElement).toBeInTheDocument();
     });
   },
@@ -238,7 +253,7 @@ export const ResponsiveDesign: Story = {
       const container = canvas.getByTestId('responsive-container');
       await expect(container).toBeInTheDocument();
 
-      const textSkeletons = container.querySelectorAll('.MuiSkeleton-text');
+      const textSkeletons = skeletons(container);
       await expect(textSkeletons.length).toBeGreaterThan(0);
 
       textSkeletons.forEach((skeleton) => {
@@ -276,14 +291,40 @@ export const ThemeVariations: Story = {
 
     await step('Verify theme colors are applied', async () => {
       const card = canvas.getByTestId('themed-card');
-      const skeletons = card.querySelectorAll('.MuiSkeleton-root');
+      const boxes = skeletons(card);
 
-      await expect(skeletons.length).toBeGreaterThan(0);
+      await expect(boxes.length).toBeGreaterThan(0);
 
-      skeletons.forEach((skeleton) => {
+      boxes.forEach((skeleton) => {
         const computedStyle = window.getComputedStyle(skeleton);
         expect(computedStyle.backgroundColor).toMatch(/rgb/);
       });
+    });
+  },
+};
+
+/**
+ * Split out of `VisualStates` so the rest of it — the default box, the custom
+ * radius and the static skeleton's dimensions — keeps running on both
+ * renderers. Only the MUI class is DOM-only.
+ */
+export const MuiSkeletonClass: Story = {
+  // Asserts the `MuiSkeleton-root` class, which only the DOM renderer emits.
+  tags: ['native-skip'],
+  name: '🏷️ MUI Skeleton Class Test',
+  render: () => (
+    <Stack spacing={2}>
+      <Skeleton variant="rectangular" height={60} animation={false} data-testid="static-skeleton" />
+      <Skeleton variant="wave" height={60} data-testid="wave-skeleton" />
+    </Stack>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Both skeletons are MUI Skeletons', async () => {
+      for (const id of ['static-skeleton', 'wave-skeleton']) {
+        await expect(canvas.getByTestId(id).classList.contains('MuiSkeleton-root')).toBeTruthy();
+      }
     });
   },
 };
@@ -349,10 +390,6 @@ export const VisualStates: Story = {
       const staticSkeleton = canvas.getByTestId('static-skeleton');
       await expect(staticSkeleton).toBeVisible();
 
-      // Verify it's a proper MUI Skeleton component
-      const hasMuiSkeletonClass = staticSkeleton.classList.contains('MuiSkeleton-root');
-      await expect(hasMuiSkeletonClass).toBeTruthy();
-
       // Verify the element has the expected dimensions
       const rect = staticSkeleton.getBoundingClientRect();
       await expect(rect.height).toBeGreaterThan(0);
@@ -362,10 +399,6 @@ export const VisualStates: Story = {
     await step('Wave animation is applied', async () => {
       const waveSkeleton = canvas.getByTestId('wave-skeleton');
       await expect(waveSkeleton).toBeVisible();
-
-      // Verify it's a proper MUI Skeleton component
-      const hasMuiSkeletonClass = waveSkeleton.classList.contains('MuiSkeleton-root');
-      await expect(hasMuiSkeletonClass).toBeTruthy();
 
       // For wave variant, just ensure the element renders correctly
       const rect = waveSkeleton.getBoundingClientRect();
@@ -401,9 +434,8 @@ export const PerformanceTest: Story = {
 
     await step('Measure render time for multiple skeletons', async () => {
       const container = canvas.getByTestId('performance-container');
-      const skeletons = container.querySelectorAll('.MuiSkeleton-root');
 
-      await expect(skeletons.length).toBe(200); // 50 rows * 4 skeletons each
+      await expect(skeletons(container).length).toBe(200); // 50 rows * 4 skeletons each
       await expect(container).toBeInTheDocument();
     });
 
@@ -449,14 +481,12 @@ export const EdgeCases: Story = {
 
     await step('Zero count renders nothing', async () => {
       const zeroCountContainer = canvas.getByTestId('zero-count-container');
-      const skeletons = zeroCountContainer.querySelectorAll('.MuiSkeleton-root');
-      await expect(skeletons.length).toBe(0);
+      await expect(skeletons(zeroCountContainer).length).toBe(0);
     });
 
     await step('Large count handles gracefully', async () => {
       const largeCountContainer = canvas.getByTestId('large-count-container');
-      const skeletons = largeCountContainer.querySelectorAll('.MuiSkeleton-root');
-      await expect(skeletons.length).toBe(100);
+      await expect(skeletons(largeCountContainer).length).toBe(100);
       await expect(largeCountContainer).toBeInTheDocument();
     });
 
@@ -470,6 +500,8 @@ export const EdgeCases: Story = {
 };
 
 export const IntegrationTest: Story = {
+  // Counts MUI's per-variant `MuiSkeleton-*` classes, which only the DOM renderer emits.
+  tags: ['native-skip'],
   name: '🔗 Integration Test',
   render: () => (
     <Box>

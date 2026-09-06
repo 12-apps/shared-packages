@@ -1,119 +1,33 @@
-import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { BadgeProps as MuiBadgeProps } from '@mui/material/Badge/index.js';
-import type React from 'react';
 
-export type BadgeVariant = 
-  | 'default' 
-  | 'dot' 
-  | 'count' 
-  | 'gradient' 
-  | 'glass'
-  | 'outline'
-  | 'secondary'
-  | 'destructive'
-  | 'success'
-  | 'warning';
+import type { BadgeBaseProps } from './Badge.base';
 
-export type BadgeSize = SizeValue;
+export type {
+  BadgeBaseProps,
+  BadgePosition,
+  BadgeSize,
+  BadgeVariant,
+} from './Badge.base';
 
-export interface BadgeProps extends Omit<MuiBadgeProps, 'variant' | 'color' | 'content'> {
-  /**
-   * The variant of the badge
-   */
-  variant?: BadgeVariant;
-  
-  /**
-   * The size of the badge
-   */
-  size?: BadgeSize;
-  
-  /**
-   * The color of the badge
-   */
-  color?: ColorValue;
-  
-  /**
-   * Whether the badge should have a glow effect
-   */
-  glow?: boolean;
-  
-  /**
-   * Whether the badge should have a pulse animation
-   */
-  pulse?: boolean;
-  
-  /**
-   * Whether to animate the badge on mount
-   */
-  animate?: boolean;
-  
-  /**
-   * Maximum count to display (shows "max+" when exceeded)
-   */
-  max?: number;
-  
-  /**
-   * Whether to show zero count
-   */
-  showZero?: boolean;
-  
-  /**
-   * Custom content for the badge
-   */
-  content?: React.ReactNode;
-  
-  /**
-   * Position of the badge
-   */
-  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
-  
-  /**
-   * Accessibility label for screen readers
-   */
-  'aria-label'?: string;
-  
-  /**
-   * ARIA live region behavior
-   */
-  'aria-live'?: 'off' | 'polite' | 'assertive';
-  
-  /**
-   * Whether the live region should be atomic
-   */
-  'aria-atomic'?: boolean;
-  
+/** The web `Badge`: the shared contract, plus MUI's own badge props. */
+export interface BadgeProps
+  extends BadgeBaseProps,
+    Omit<
+      MuiBadgeProps,
+      | 'variant'
+      | 'color'
+      | 'content'
+      | 'badgeContent'
+      | 'children'
+      | 'invisible'
+      // MUI types these as `Booleanish`/its own unions through `AriaAttributes`;
+      // the shared contract narrows them, and the narrower one is the contract.
+      | 'aria-atomic'
+      | 'aria-live'
+      | 'aria-label'
+    > {
   /**
    * Additional CSS class name
    */
   className?: string;
-
-  /**
-   * Whether the badge should be closable
-   */
-  closable?: boolean;
-
-  /**
-   * Callback when badge is closed
-   */
-  onClose?: () => void;
-
-  /**
-   * Whether to show a shimmer effect
-   */
-  shimmer?: boolean;
-
-  /**
-   * Whether to bounce on mount
-   */
-  bounce?: boolean;
-
-  /**
-   * Custom icon element to display in the badge
-   */
-  icon?: React.ReactNode;
-
-  /**
-   * Custom test ID for testing
-   */
-  'data-testid'?: string;
 }

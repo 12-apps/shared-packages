@@ -27,6 +27,13 @@ const meta: Meta<typeof Badge> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * The badge chip, whichever renderer drew it. MUI stamps `.MuiBadge-badge` (and
+ * `.MuiBadge-dot`) on its span; both renderers put the component's own
+ * `-content-wrapper` id on that same element, which is what these queries want.
+ */
+const CHIP = '[data-testid$="content-wrapper"]';
+
 // Interaction Tests
 export const BasicInteraction: Story = {
   name: '🧪 Basic Interaction Test',
@@ -140,7 +147,7 @@ export const DotVariantTest: Story = {
     });
 
     await step('Verify dot badge is rendered', async () => {
-      const badge = canvasElement.querySelector('.MuiBadge-dot');
+      const badge = canvasElement.querySelector(CHIP);
       await expect(badge).toBeInTheDocument();
       // Dot badge should have the success color applied
       if (badge) {
@@ -486,6 +493,8 @@ export const EdgeCases: Story = {
 
 // Animation Tests
 export const AnimationTest: Story = {
+  // Asserts a CSS `animation-duration`, which only the DOM renderer has.
+  tags: ['native-skip'],
   name: '🎬 Animation Test',
   args: {
     variant: 'dot',
@@ -689,7 +698,7 @@ export const NewVariantsTest: Story = {
 
     await step('Verify all new variants render correctly', async () => {
       // Use more specific selectors to avoid ambiguity
-      const badges = canvasElement.querySelectorAll('.MuiBadge-badge');
+      const badges = canvasElement.querySelectorAll(CHIP);
 
       // Check that we have the expected number of badges
       expect(badges).toHaveLength(5);
@@ -728,19 +737,15 @@ export const ClosableBadgeTest: Story = {
       const badge = canvas.getByText('Close Me');
       await expect(badge).toBeInTheDocument();
 
-      // Check for close button
-      const closeButtons = canvasElement.querySelectorAll('button');
-      const closeButton = Array.from(closeButtons).find((btn) =>
-        btn.querySelector('svg[data-testid="CloseIcon"]'),
-      );
+      // Check for close button. It is addressed by the id the badge derives for
+      // it — MUI's `CloseIcon` data-testid is the icon MODULE's own, which
+      // react-native-web has no equivalent of.
+      const closeButton = canvas.getByTestId('badge-close');
       await expect(closeButton).toBeTruthy();
     });
 
     await step('Click close button', async () => {
-      const closeButtons = canvasElement.querySelectorAll('button');
-      const closeButton = Array.from(closeButtons).find((btn) =>
-        btn.querySelector('svg[data-testid="CloseIcon"]'),
-      ) as HTMLButtonElement | undefined;
+      const closeButton = canvas.getByTestId('badge-close');
 
       if (closeButton) {
         await userEvent.click(closeButton);
@@ -798,7 +803,7 @@ export const ShimmerEffectTest: Story = {
       await expect(badge).toBeInTheDocument();
 
       // Check for shimmer animation (pseudo-element will have animation)
-      const badgeElement = badge.closest('.MuiBadge-badge');
+      const badgeElement = badge.closest(CHIP);
       await expect(badgeElement).toBeTruthy();
     });
   },

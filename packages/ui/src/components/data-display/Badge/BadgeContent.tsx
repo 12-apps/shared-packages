@@ -3,16 +3,16 @@ import IconButton from '@mui/material/IconButton/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 
+import { BADGE_CONTENT_GAP, BADGE_SIZES } from './Badge.metrics';
 import { getSizeStyles } from './Badge.styles';
 import type { BadgeSize } from './Badge.types';
+import { px } from '../../../tokens/theme';
 
-// CLOSE_ICON_SIZES already exists in Badge.tsx; the size lookup lives here now.
-const CLOSE_ICON_SIZES: Record<string, string> = {
-  xs: '0.5rem',
-  sm: '0.625rem',
-  md: '0.75rem',
-  lg: '0.875rem',
-};
+// Derived from the shared metrics: `xl` takes `lg`'s glyph, which is what the
+// hand-written map did through its `?? CLOSE_ICON_SIZES.lg` fallback.
+const CLOSE_ICON_SIZES: Record<string, string> = Object.fromEntries(
+  Object.entries(BADGE_SIZES).map(([size, metrics]) => [size, px(metrics.closeIconSize)]),
+);
 
 const makeTestId =
   (dataTestId?: string) =>
@@ -102,6 +102,6 @@ export const buildBadgeContent = ({
   if (parts.length === 0) return null;
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>{parts}</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: `${BADGE_CONTENT_GAP}px` }}>{parts}</span>
   );
 };

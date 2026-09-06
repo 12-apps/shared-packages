@@ -1,15 +1,27 @@
 import type { PaletteColor, CSSObject, Theme } from '@mui/material/styles/index.js';
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 
+import {
+  BAR_GLOW,
+  CIRCULAR_GLOW,
+  GLASS_BAR_ALPHA,
+  GLASS_BAR_BORDER_ALPHA,
+  GLASS_BLUR_PX,
+  GLOW_BRIGHTNESS,
+  PROGRESS_SIZES,
+  PULSE,
+} from './Progress.metrics';
 import type { ProgressSize, ProgressVariant } from './Progress.types';
+import { px } from '../../../tokens/theme';
 
-// Define pulse animation
+// Define pulse animation. The stops and the two seconds are the shared metrics'
+// (`PULSE`), so the native `Progress` breathes on the same cadence.
 export const pulseAnimation = keyframes`
   0% {
     opacity: 1;
   }
   50% {
-    opacity: 0.7;
+    opacity: ${PULSE.dip};
   }
   100% {
     opacity: 1;
@@ -41,13 +53,15 @@ export const getColorFromTheme = (theme: Theme, color: string): PaletteColor => 
   return colorMap[color] || theme.palette.primary;
 };
 
-const SIZE_MAP: Record<ProgressSize, { height: number; circularSize: number; fontSize: string }> = {
-  xs: { height: 2, circularSize: 24, fontSize: '0.625rem' },
-  sm: { height: 4, circularSize: 32, fontSize: '0.75rem' },
-  md: { height: 6, circularSize: 40, fontSize: '0.875rem' },
-  lg: { height: 8, circularSize: 48, fontSize: '1rem' },
-  xl: { height: 10, circularSize: 56, fontSize: '1.125rem' },
-};
+// Derived from the shared metrics, not restated: the native `Progress` reads
+// the same table, so the two renderers cannot disagree on a size.
+const SIZE_MAP: Record<ProgressSize, { height: number; circularSize: number; fontSize: string }> =
+  Object.fromEntries(
+    Object.entries(PROGRESS_SIZES).map(([size, step]) => [
+      size,
+      { height: step.height, circularSize: step.circularSize, fontSize: px(step.fontSize) },
+    ]),
+  ) as Record<ProgressSize, { height: number; circularSize: number; fontSize: string }>;
 
 export const getSizeStyles = (size?: ProgressSize) => SIZE_MAP[size as ProgressSize] || SIZE_MAP.md;
 
@@ -64,9 +78,9 @@ export const barVariantStyles = (
       };
     case 'glass':
       return {
-        backgroundColor: alpha(colorPalette.main, 0.8),
-        backdropFilter: 'blur(10px)',
-        border: `1px solid ${alpha(colorPalette.main, 0.3)}`,
+        backgroundColor: alpha(colorPalette.main, GLASS_BAR_ALPHA),
+        backdropFilter: `blur(${GLASS_BLUR_PX}px)`,
+        border: `1px solid ${alpha(colorPalette.main, GLASS_BAR_BORDER_ALPHA)}`,
       };
     default:
       return {};
@@ -81,11 +95,11 @@ export const barEmphasisStyles = (
   pulse?: boolean,
 ): CSSObject => ({
   ...(glow && {
-    boxShadow: `0 0 10px 2px ${alpha(colorPalette.main, 0.4)}`,
-    filter: 'brightness(1.1)',
+    boxShadow: `0 0 ${BAR_GLOW.blur}px ${BAR_GLOW.spread}px ${alpha(colorPalette.main, BAR_GLOW.alpha)}`,
+    filter: `brightness(${GLOW_BRIGHTNESS})`,
   }),
   ...(pulse && {
-    animation: `${pulseAnimation} 2s infinite`,
+    animation: `${pulseAnimation} ${PULSE.durationMs / 1000}s infinite`,
   }),
 });
 
@@ -95,9 +109,9 @@ export const circularEmphasisStyles = (
   pulse?: boolean,
 ): CSSObject => ({
   ...(glow && {
-    filter: `drop-shadow(0 0 8px ${alpha(colorPalette.main, 0.6)})`,
+    filter: `drop-shadow(0 0 ${CIRCULAR_GLOW.blur}px ${alpha(colorPalette.main, CIRCULAR_GLOW.alpha)})`,
   }),
   ...(pulse && {
-    animation: `${pulseAnimation} 2s infinite`,
+    animation: `${pulseAnimation} ${PULSE.durationMs / 1000}s infinite`,
   }),
 });

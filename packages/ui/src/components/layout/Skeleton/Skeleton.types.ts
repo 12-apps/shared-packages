@@ -1,19 +1,16 @@
-export type SkeletonVariant = 'text' | 'circular' | 'rectangular' | 'wave';
-export type SkeletonAnimation = 'pulse' | 'wave' | false;
-export type SkeletonIntensity = 'low' | 'medium' | 'high';
+import type React from 'react';
 
-export interface SkeletonProps {
-  variant?: SkeletonVariant;
-  animation?: SkeletonAnimation;
-  width?: number | string;
-  height?: number | string;
-  count?: number;
-  spacing?: number;
-  borderRadius?: number | string;
+import type { SkeletonBaseProps } from './Skeleton.base';
+
+export type {
+  SkeletonAnimation,
+  SkeletonBaseProps,
+  SkeletonIntensity,
+  SkeletonVariant,
+} from './Skeleton.base';
+
+/** The web `Skeleton`: the shared contract, plus the DOM's own two styling hooks. */
+export interface SkeletonProps extends SkeletonBaseProps {
   className?: string;
-  intensity?: SkeletonIntensity;
-  glassmorphism?: boolean;
-  shimmer?: boolean;
-  'data-testid'?: string;
   style?: React.CSSProperties;
 }
