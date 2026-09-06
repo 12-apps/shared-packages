@@ -80,7 +80,7 @@ installs them.
 ## Ledger
 
 <!-- native-parity:start -->
-Ported: **7 of 140** public subpaths carry a `react-native` condition.
+Ported: **7 of 141** public subpaths carry a `react-native` condition.
 
 | subpath | shared stories run natively | skipped (`native-skip`) | known gaps |
 |---|---|---|---|
