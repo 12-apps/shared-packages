@@ -3,28 +3,17 @@ import Person from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles/index.js';
 import React, { useCallback, useEffect, useState } from 'react';
 
-import type { AvatarProps } from './Avatar.types';
-import { AvatarView, type AvatarViewProps, type ContentType } from './Avatar.view';
+import {
+  AVATAR_DEFAULTS,
+  contentTypeOf,
+  pickAvatarContent,
+  type AvatarContentPick,
+} from './Avatar.helpers';
+import { GROUP_MAX, GROUP_OVERLAP, GROUP_HOVER, BORDER_WIDTH } from './Avatar.metrics';
+import type { AvatarProps, ContentType } from './Avatar.types';
+import { AvatarView, type AvatarViewProps } from './Avatar.view';
 
-/** Applied via a single spread so no per-field default inflates cyclomatic complexity. */
-const AVATAR_DEFAULTS = {
-  variant: 'circle',
-  size: 'md',
-  glow: false,
-  pulse: false,
-  bordered: false,
-  color: 'primary',
-  loading: false,
-  interactive: false,
-  showFallbackOnError: true,
-  animationDelay: 0,
-} satisfies Partial<AvatarProps>;
-
-/**
- * Pick what renders inside the avatar. On an image error (with fallback enabled)
- * the fallback/icon/broken-image wins; otherwise children → fallback → icon → the
- * default person glyph.
- */
+/** The node behind the winning content slot; the pick itself is shared. */
 function resolveContent(args: {
   children?: React.ReactNode;
   fallback?: React.ReactNode;
@@ -33,15 +22,21 @@ function resolveContent(args: {
   showFallbackOnError: boolean;
 }): { content: React.ReactNode; contentType: ContentType } {
   const { children, fallback, icon, imageError, showFallbackOnError } = args;
-  if (imageError && showFallbackOnError) {
-    if (fallback) return { content: fallback, contentType: 'fallback' };
-    if (icon) return { content: icon, contentType: 'icon' };
-    return { content: <BrokenImage />, contentType: 'icon' };
-  }
-  if (children) return { content: children, contentType: 'children' };
-  if (fallback) return { content: fallback, contentType: 'fallback' };
-  if (icon) return { content: icon, contentType: 'icon' };
-  return { content: <Person />, contentType: 'default' };
+  const pick = pickAvatarContent({
+    hasChildren: Boolean(children),
+    hasFallback: Boolean(fallback),
+    hasIcon: Boolean(icon),
+    imageError,
+    showFallbackOnError,
+  });
+  const NODES: Record<AvatarContentPick, React.ReactNode> = {
+    children,
+    fallback,
+    icon,
+    broken: <BrokenImage />,
+    default: <Person />,
+  };
+  return { content: NODES[pick], contentType: contentTypeOf(pick) };
 }
 
 /** Fades the avatar in after `animationDelay`ms. */
@@ -112,6 +107,9 @@ function useAvatarModel(raw: AvatarProps, ref: React.Ref<HTMLDivElement>): Avata
     animationDelay,
     className,
     dataTestId,
+    // React Native's spelling of the same id; it names the component on both
+    // sides and must not reach the DOM as an attribute.
+    testID,
     ...rest
   } = { ...AVATAR_DEFAULTS, ...raw };
 
@@ -146,7 +144,7 @@ function useAvatarModel(raw: AvatarProps, ref: React.Ref<HTMLDivElement>): Avata
     content,
     contentType,
     className,
-    dataTestId,
+    dataTestId: testID ?? dataTestId,
     status,
     forwardedRef: ref,
     onClick: handleClick,
@@ -162,17 +160,17 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>((props, ref)
 
 Avatar.displayName = 'Avatar';
 
-const AvatarGroupContainer = styled('div')<{ overlap?: number }>(({ theme, overlap = 8 }) => ({
+const AvatarGroupContainer = styled('div')<{ overlap?: number }>(({ theme, overlap = GROUP_OVERLAP }) => ({
   display: 'flex',
   alignItems: 'center',
   '& > *': {
     marginLeft: -overlap,
     transition: 'all 0.3s ease',
     position: 'relative',
-    border: `2px solid ${theme.palette.background.paper}`,
+    border: `${BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
     '&:hover': {
       zIndex: 100,
-      transform: 'scale(1.1) translateY(-4px)',
+      transform: `scale(${GROUP_HOVER.scale}) translateY(-${GROUP_HOVER.lift}px)`,
     },
     '&:first-of-type': {
       marginLeft: 0,
@@ -187,7 +185,7 @@ export const AvatarGroup: React.FC<{
   overlap?: number;
   className?: string;
   dataTestId?: string;
-}> = ({ children, max = 4, overlap = 8, className, dataTestId }) => {
+}> = ({ children, max = GROUP_MAX, overlap = GROUP_OVERLAP, className, dataTestId }) => {
   const childrenArray = React.Children.toArray(children);
   const visibleChildren = max ? childrenArray.slice(0, max) : childrenArray;
   const remainingCount = childrenArray.length - visibleChildren.length;

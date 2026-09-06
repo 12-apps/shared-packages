@@ -2,20 +2,15 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import MuiChip from '@mui/material/Chip/index.js';
 import { forwardRef } from 'react';
 
+import { chipRole, isClickable, makeTestId } from './Chip.helpers';
+import { chipMuiSize } from './Chip.metrics';
 import {
   avatarFor,
-  chipRole,
   chipStyles,
   iconWithTestId,
-  isClickable,
   makeKeyDownHandler,
-  makeTestId,
-} from './Chip.helpers';
+} from './Chip.styles';
 import type { ChipProps } from './Chip.types';
-
-/** MUI draws two chip sizes; ours are the house abbreviations for them. */
-const muiSizeFor = (size: NonNullable<ChipProps['size']>): 'small' | 'medium' =>
-  size === 'xs' || size === 'sm' ? 'small' : 'medium';
 
 type MuiChipColor =
   | 'primary'
@@ -58,9 +53,13 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
   onDelete,
   className,
   dataTestId,
+  // React Native's spelling of the same id; it names the component on both
+  // sides and must not reach the DOM as an attribute.
+  testID,
   ...props
 }, ref) => {
-  const testId = makeTestId(dataTestId);
+  const chipId = testID ?? dataTestId;
+  const testId = makeTestId(chipId);
   const clickable = isClickable(disabled, onClick, selectable);
 
   return (
@@ -68,7 +67,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
       ref={ref}
       label={<span data-testid={testId('label')}>{label}</span>}
       variant={variant}
-      size={muiSizeFor(size)}
+      size={chipMuiSize(size)}
       color={muiColorFor(color)}
       avatar={avatarFor(avatar, avatarSrc)}
       icon={iconWithTestId(icon, testId('icon'))}
@@ -81,7 +80,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
       className={className}
       role={chipRole(selectable, onClick)}
       aria-selected={selectable ? selected : undefined}
-      data-testid={dataTestId || 'chip'}
+      data-testid={chipId || 'chip'}
       sx={chipStyles({ variant, selected, clickable, disabled })}
       {...props}
     />

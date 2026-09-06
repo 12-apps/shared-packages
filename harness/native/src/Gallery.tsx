@@ -5,6 +5,7 @@ import { Stack } from '@12-apps/ui/layout/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 import * as React from 'react';
 
+import { AvatarSection, BadgeSection, ChipSection, ProgressSection, SkeletonSection } from './DataSections';
 import { Section } from './Section';
 import { AlertSection, EmptySection, ErrorSection, LoadingSection } from './StateSections';
 import { HeadingSection, LayoutSection as SpacingSection, ParagraphSection } from './TypographySections';
@@ -161,6 +162,11 @@ export function Gallery(): React.JSX.Element {
       <ErrorSection onCount={onCount} />
       <EmptySection onCount={onCount} />
       <IconSection />
+      <ChipSection onCount={onCount} />
+      <AvatarSection />
+      <BadgeSection onCount={onCount} />
+      <ProgressSection />
+      <SkeletonSection />
     </Stack>
   );
 }

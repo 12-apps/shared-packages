@@ -1,13 +1,15 @@
 import { keyframes } from '@mui/material/styles/index.js';
 
+import { BOUNCE, FADE_IN_SCALE, GLOW_PULSE, PULSE } from './Badge.metrics';
+
 export const pulseAnimation = keyframes`
   0% {
     transform: scale(1);
     opacity: 1;
   }
   70% {
-    transform: scale(1.2);
-    opacity: 0.7;
+    transform: scale(${PULSE.scale});
+    opacity: ${PULSE.opacity};
   }
   100% {
     transform: scale(1);
@@ -21,10 +23,10 @@ export const bounceAnimation = keyframes`
     transform: translateY(0) scale(1);
   }
   40% {
-    transform: translateY(-8px) scale(1.05);
+    transform: translateY(-${BOUNCE.lift}px) scale(${BOUNCE.scale});
   }
   60% {
-    transform: translateY(-4px) scale(1.02);
+    transform: translateY(-${BOUNCE.secondLift}px) scale(${BOUNCE.secondScale});
   }
 `;
 
@@ -42,10 +44,10 @@ export const shimmerAnimation = keyframes`
 export const fadeInScaleAnimation = keyframes`
   0% {
     opacity: 0;
-    transform: scale(0.5);
+    transform: scale(${FADE_IN_SCALE.from});
   }
   50% {
-    transform: scale(1.1);
+    transform: scale(${FADE_IN_SCALE.overshoot});
   }
   100% {
     opacity: 1;
@@ -56,12 +58,12 @@ export const fadeInScaleAnimation = keyframes`
 // Define glow pulse animation
 export const glowPulseAnimation = keyframes`
   0% {
-    box-shadow: 0 0 5px 2px rgba(var(--glow-color), 0.4);
+    box-shadow: 0 0 ${GLOW_PULSE.fromBlur}px ${GLOW_PULSE.fromSpread}px rgba(var(--glow-color), ${GLOW_PULSE.fromAlpha});
   }
   50% {
-    box-shadow: 0 0 20px 4px rgba(var(--glow-color), 0.8);
+    box-shadow: 0 0 ${GLOW_PULSE.toBlur}px ${GLOW_PULSE.toSpread}px rgba(var(--glow-color), ${GLOW_PULSE.toAlpha});
   }
   100% {
-    box-shadow: 0 0 5px 2px rgba(var(--glow-color), 0.4);
+    box-shadow: 0 0 ${GLOW_PULSE.fromBlur}px ${GLOW_PULSE.fromSpread}px rgba(var(--glow-color), ${GLOW_PULSE.fromAlpha});
   }
 `;

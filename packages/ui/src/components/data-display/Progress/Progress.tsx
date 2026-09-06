@@ -5,7 +5,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { resolveProgressProps } from './Progress.helpers';
+import { progressLabelText, resolveProgressProps } from './Progress.helpers';
 import {
   barEmphasisStyles,
   barVariantStyles,
@@ -265,9 +265,7 @@ export const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
       circularSize,
       value,
       dataTestId,
-      // LinearProgressProps carries a `ref` typed for its own element; the
-      // forwarded one below is the ref that matters.
-      ref: _ref,
+      testID,
       ...props
     } = resolveProgressProps(rawProps);
     const displayValue = value || 0;
@@ -278,9 +276,12 @@ export const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
       pulse,
       showLabel,
       displayValue,
-      displayLabel: label || (showLabel ? `${Math.round(displayValue)}%` : ''),
+      displayLabel: progressLabelText(label, showLabel, displayValue),
       value,
-      dataTestId,
+      // `testID` is React Native's spelling of the same id and names the
+      // component too; `data-testid` is left in `props`, on its way to the
+      // element the caller means to address, where it has always landed.
+      dataTestId: testID ?? dataTestId,
       ...props,
     };
 

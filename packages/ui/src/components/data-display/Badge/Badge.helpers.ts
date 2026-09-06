@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { BadgeProps } from './Badge.types';
+import type { BadgeBaseProps } from './Badge.base';
 
 type BadgeDefaultedKeys =
   | 'variant'
@@ -16,9 +16,14 @@ type BadgeDefaultedKeys =
   | 'position'
   | 'closable';
 
-export type ResolvedBadgeProps = BadgeProps & Required<Pick<BadgeProps, BadgeDefaultedKeys>>;
+/**
+ * Generic over the renderer's own props: the web and the native `Badge` carry
+ * different extras, and both come back out untouched.
+ */
+export type ResolvedBadgeProps<P extends BadgeBaseProps = BadgeBaseProps> = P &
+  Required<Pick<BadgeBaseProps, BadgeDefaultedKeys>>;
 
-const BADGE_DEFAULTS: Pick<BadgeProps, BadgeDefaultedKeys> = {
+const BADGE_DEFAULTS: Required<Pick<BadgeBaseProps, BadgeDefaultedKeys>> = {
   variant: 'default',
   size: 'md',
   color: 'primary',
@@ -37,16 +42,16 @@ const BADGE_DEFAULTS: Pick<BadgeProps, BadgeDefaultedKeys> = {
 // falls back to the default exactly as a destructuring default would. Applied as
 // a merge rather than destructuring defaults, which would otherwise put twelve
 // branches into the component's own complexity budget.
-export const resolveBadgeProps = (props: BadgeProps): ResolvedBadgeProps =>
+export const resolveBadgeProps = <P extends BadgeBaseProps>(props: P): ResolvedBadgeProps<P> =>
   ({
     ...BADGE_DEFAULTS,
     ...(Object.fromEntries(
       Object.entries(props).filter(([, value]) => value !== undefined),
-    ) as Partial<BadgeProps>),
-  }) as ResolvedBadgeProps;
+    ) as Partial<P>),
+  }) as ResolvedBadgeProps<P>;
 
 // `content` supersedes the older `badgeContent` prop.
-export const badgeContentOf = (props: Pick<BadgeProps, 'content' | 'badgeContent'>): ReactNode => {
+export const badgeContentOf = (props: Pick<BadgeBaseProps, 'content' | 'badgeContent'>): ReactNode => {
   if (props.content !== undefined) return props.content;
   if (props.badgeContent !== undefined) return props.badgeContent;
   return null;
@@ -72,3 +77,9 @@ export const definedAria = (
     string,
     string | boolean
   >;
+
+/** `${dataTestId}-content`, or `badge-content` when the caller named nothing. */
+export const makeBadgeTestId =
+  (dataTestId?: string) =>
+  (suffix: string): string =>
+    dataTestId ? `${dataTestId}-${suffix}` : `badge-${suffix}`;
