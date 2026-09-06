@@ -182,16 +182,9 @@ function mount(
   });
 }
 
-/**
- * A transport whose badge answer is the test's own — including the live-subject
- * breakdown the real route sends beside the count.
- *
- * `send` reports success and the LIST is not re-fetched from it, so what the
- * optimistic path does to the store is visible rather than papered over by a
- * reload. That is the point of the mark-read case below.
- */
+/** A transport whose unread count is the test's own. */
 function badgeTransport(
-  badge: { count: number; liveSubjects?: Record<string, number> },
+  badge: { count: number },
   list: unknown = EMPTY_INBOX,
 ): NotificationsTransport {
   const pages: Record<string, unknown> = {
@@ -770,128 +763,6 @@ describe('the live section', () => {
 });
 
 /**
- * ONE HAPPENING THING IS COUNTED ONCE.
- *
- * A live pedido also writes inbox rows as it moves — "Seu pedido está pronto"
- * is a real notification, and it is the only record of the evening once the
- * pedido is delivered and the pinned entry is gone. But while the entry IS
- * pinned, the row underneath it is the same news said twice, and a bell that
- * added them says `2` about one dinner.
- *
- * The server sends which unread rows name which subject; the host says what is
- * live; `bell-badge.ts` is where the two meet. These cases are that join.
- */
-describe('the badge, when a live subject also has unread rows', () => {
-  /** One unread row about `visit-42`, and one about nothing in particular. */
-  const MIXED_INBOX = {
-    items: [
-      {
-        id: 'n-live',
-        title: 'Sua consulta terminou',
-        body: null,
-        link: null,
-        readAt: null,
-        createdAt: '2026-08-13T09:06:00.000Z',
-        data: { liveSubject: 'visit-42' },
-      },
-      {
-        id: 'n-plain',
-        title: 'Recibo disponível',
-        body: null,
-        link: null,
-        readAt: null,
-        createdAt: '2026-08-13T09:00:00.000Z',
-        data: {},
-      },
-    ],
-    nextCursor: null,
-  };
-
-  it('counts the live entry instead of its rows, not as well as them', async () => {
-    const config = source([activity()]);
-    const { BellButton } = mount(
-      config,
-      badgeTransport({ count: 2, liveSubjects: { 'visit-42': 1 } }),
-    );
-    render(<BellButton onClick={() => undefined} />);
-
-    // Two unread rows, one of which is about the pinned visit — so: the visit
-    // (1) plus the row that is about something else (1). Three would be the
-    // defect this whole seam exists to prevent.
-    await waitFor(() =>
-      expect(screen.getByTestId('notifications-badge').textContent).toBe('2'),
-    );
-  });
-
-  it('starts counting those rows once the subject FINISHES', async () => {
-    // Same server answer, nothing live. The rows are now the only record of
-    // what happened, which is exactly when they have to count.
-    const { BellButton } = mount(
-      source([]),
-      badgeTransport({ count: 2, liveSubjects: { 'visit-42': 1 } }),
-    );
-    render(<BellButton onClick={() => undefined} />);
-    await waitFor(() =>
-      expect(screen.getByTestId('notifications-badge').textContent).toBe('2'),
-    );
-  });
-
-  it('subtracts only for subjects that are actually live', async () => {
-    // The tally names a subject nothing is showing — a pedido from yesterday.
-    // Its rows are ordinary unread rows and must not be quietly discounted.
-    const { BellButton } = mount(
-      source([activity()]),
-      badgeTransport({ count: 2, liveSubjects: { 'visit-99': 2 } }),
-    );
-    render(<BellButton onClick={() => undefined} />);
-    await waitFor(() =>
-      expect(screen.getByTestId('notifications-badge').textContent).toBe('3'),
-    );
-  });
-
-  it('keeps counting the visit alone when its rows are read', async () => {
-    const config = source([activity()]);
-    const { Panel, BellButton } = mount(
-      config,
-      badgeTransport({ count: 2, liveSubjects: { 'visit-42': 1 } }, MIXED_INBOX),
-    );
-    render(
-      <>
-        <BellButton onClick={() => undefined} />
-        <Panel open onClose={() => undefined} />
-      </>,
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId('notifications-badge').textContent).toBe('2'),
-    );
-
-    // Reading the row ABOUT the visit takes one off the count — and must take
-    // the same one off the tally, or the badge subtracts a row it is no longer
-    // counting and drops to 1 with a pinned visit and an unread recibo on
-    // screen.
-    const unread = `Sua consulta terminou (${CLINIC_MESSAGES.unreadSuffix})`;
-    await waitFor(() => expect(screen.getByLabelText(unread)).toBeTruthy());
-    fireEvent.click(screen.getByLabelText(unread));
-    // The accessible name loses the suffix exactly when the row becomes read,
-    // which is the store's optimistic write landing.
-    await waitFor(() => expect(screen.getByLabelText('Sua consulta terminou')).toBeTruthy());
-    expect(screen.getByTestId('notifications-badge').textContent).toBe('2');
-  });
-
-  it('degrades to the count alone when the server does not send a breakdown', async () => {
-    // A bundle loaded during a rollout talks to the previous release for the
-    // length of a healthcheck. No breakdown means no subtraction, which is the
-    // behaviour this badge had before the breakdown existed — never a crash and
-    // never a count that reads as zero.
-    const { BellButton } = mount(source([activity()]), badgeTransport({ count: 2 }));
-    render(<BellButton onClick={() => undefined} />);
-    await waitFor(() =>
-      expect(screen.getByTestId('notifications-badge').textContent).toBe('3'),
-    );
-  });
-});
-
-/**
  * `useBellBadge` — the door for a host that draws its OWN trigger.
  *
  * Not every host can take this package's bell. A storefront header whose cart
@@ -915,14 +786,11 @@ describe('useBellBadge', () => {
 
   it('gives a host chrome the same count and tone the package\'s own bell draws', async () => {
     const config = source([activity()]);
-    // TWO unread rows, both about the one visit that is live — "confirmada" and
-    // "terminou", say. Chosen so the live-aware answer (1) and the inbox-only
-    // one (2) DIFFER: with numbers that happen to coincide, a factory wired to
-    // the wrong hook passes this test.
-    const { BellButton, useBellBadge } = mount(
-      config,
-      badgeTransport({ count: 2, liveSubjects: { 'visit-42': 2 } }),
-    );
+    // TWO unread rows and one live visit, so the live-aware answer (3) and the
+    // inbox-only one (2) DIFFER. With numbers that happen to coincide, a
+    // factory wired to the wrong hook passes this test — which is exactly what
+    // an earlier revision of this case did.
+    const { BellButton, useBellBadge } = mount(config, badgeTransport({ count: 2 }));
     function Host(): JSX.Element {
       return <HostChrome badge={useBellBadge()} />;
     }
@@ -933,7 +801,7 @@ describe('useBellBadge', () => {
       </>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('1'));
+    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('3'));
     // And asserted against the PACKAGE'S bell as well as against the literal:
     // the claim is that a host cannot drift from it, which a literal alone —
     // changed on one side only — would go on satisfying.
@@ -957,16 +825,58 @@ describe('useBellBadge', () => {
     expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('new');
   });
 
-  it('says nothing at all while the host is signed out', async () => {
-    const config = source([activity()]);
-    const { useBellBadge } = mount(config, badgeTransport({ count: 4 }));
+  it('says nothing while signed out, even when the host ignores `active`', async () => {
+    // A signed-out header still MOUNTS the bell — there is simply nothing of
+    // this reader's to count, and a stale number would be somebody else's.
+    //
+    // The host here IGNORES the `active` hint, which is the only way to reach
+    // the guard that enforces this. `live-config.ts` blesses that explicitly —
+    // "behaving correctly and merely paying for it" — and a real adopter does
+    // it. Through the stock `source()` helper, which answers `[]` when
+    // inactive, the guard is unreachable and DELETING it leaves the whole suite
+    // green. The server count is non-zero for the same reason: zero is what a
+    // missing guard would also produce.
+    const alwaysAnswers: LiveActivitiesConfig = {
+      messages: CLINIC_LIVE_MESSAGES,
+      useActivities: () => [activity()],
+    };
+    const { useBellBadge } = mount(alwaysAnswers, badgeTransport({ count: 4 }));
     function Host(): JSX.Element {
       return <HostChrome badge={useBellBadge({ enabled: false })} />;
     }
     render(<Host />);
-    // A signed-out header still MOUNTS the bell — there is simply nothing of
-    // this reader's to count, and a stale number would be somebody else's.
-    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('0'));
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(screen.getByTestId('host-badge').textContent).toBe('0');
     expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('seen');
+  });
+
+  it('still shouts for an unread ROW once the live entry has been looked at', async () => {
+    // The two halves of `hasNew` are an OR, and this is the arm the live cases
+    // cannot reach: they all run on an empty inbox, so a bell that had dropped
+    // `unread > 0` altogether would pass every one of them. Here the activity
+    // is seen — on its own that is `neutral` — and a row arrived anyway.
+    const config = source([activity()]);
+    const { Panel, useBellBadge } = mount(config, badgeTransport({ count: 1 }));
+    function Host(): JSX.Element {
+      return <HostChrome badge={useBellBadge()} />;
+    }
+    const { rerender } = render(
+      <>
+        <Host />
+        <Panel open onClose={() => undefined} />
+      </>,
+    );
+    // Opening the panel is what "seen" means for the activity.
+    await waitFor(() => expect(screen.getByTestId('live-activities')).toBeTruthy());
+    rerender(
+      <>
+        <Host />
+        <Panel open={false} onClose={() => undefined} />
+      </>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('host-badge').textContent).toBe('2'));
+    expect(screen.getByTestId('host-badge').getAttribute('data-tone')).toBe('new');
   });
 });

@@ -1,4 +1,3 @@
-import { liveSubjectOf } from '../live';
 import type { InboxNotification } from '../wire';
 
 import type { NotificationsApiClient } from './api';
@@ -41,16 +40,6 @@ export type InboxListStatus = 'idle' | 'pending' | 'ready' | 'error';
 
 export interface InboxState {
   unread: number;
-  /**
-   * How many of `unread` are about each ongoing subject — the server's
-   * breakdown, kept in step by the optimistic writes below.
-   *
-   * Here rather than in the bell because the panel is what makes rows read, and
-   * the two share this store precisely so a read moves the badge in the same
-   * tick. What USES it is `bell-badge.ts`: a row about a subject the reader can
-   * already watch happening is not a second thing to be told about.
-   */
-  unreadLiveSubjects: Readonly<Record<string, number>>;
   items: InboxNotification[];
   status: InboxListStatus;
   /** A cursor means there is another page. */
@@ -75,7 +64,6 @@ export interface InboxStore {
 
 const EMPTY: InboxState = {
   unread: 0,
-  unreadLiveSubjects: {},
   items: [],
   status: 'idle',
   nextCursor: null,
@@ -99,9 +87,7 @@ function patch(cell: Cell, next: Partial<InboxState>): void {
 function refreshBadge(cell: Cell, api: NotificationsApiClient): void {
   void api
     .unreadCount()
-    .then(({ count, liveSubjects }) =>
-      patch(cell, { unread: count, unreadLiveSubjects: liveSubjects }),
-    )
+    .then((unread) => patch(cell, { unread }))
     .catch(() => undefined);
 }
 
@@ -145,25 +131,8 @@ function write(
     .catch(() => invalidate(cell, api));
 }
 
-/**
- * Optimistically stop counting these rows: they have just been read or deleted.
- *
- * The breakdown moves WITH the count, in one patch, because they are two views
- * of the same number and a badge that subtracts one from the other cannot be
- * handed a moment where only one has landed. A subject the tally does not carry
- * — an old row, below the server's scan bound — simply has nothing to subtract.
- */
-function dropUnread(cell: Cell, rows: readonly InboxNotification[]): void {
-  if (rows.length === 0) return;
-  const unreadLiveSubjects: Record<string, number> = { ...cell.state.unreadLiveSubjects };
-  for (const row of rows) {
-    const subject = liveSubjectOf(row.data);
-    if (subject === null) continue;
-    const left = (unreadLiveSubjects[subject] ?? 0) - 1;
-    if (left > 0) unreadLiveSubjects[subject] = left;
-    else delete unreadLiveSubjects[subject];
-  }
-  patch(cell, { unread: Math.max(0, cell.state.unread - rows.length), unreadLiveSubjects });
+function bumpUnread(cell: Cell, delta: number): void {
+  patch(cell, { unread: Math.max(0, cell.state.unread + delta) });
 }
 
 function loadMore(cell: Cell, api: NotificationsApiClient): void {
@@ -184,21 +153,19 @@ function loadMore(cell: Cell, api: NotificationsApiClient): void {
 
 function markRead(cell: Cell, api: NotificationsApiClient, ids: readonly string[]): void {
   const readAt = new Date().toISOString();
-  // The ROWS, not a tally of them: which subjects stop counting is a question
-  // only the rows themselves answer.
-  const flipped: InboxNotification[] = [];
+  let flipped = 0;
   const items = cell.state.items.map((item) => {
     if (!ids.includes(item.id) || item.readAt !== null) return item;
-    flipped.push(item);
+    flipped += 1;
     return { ...item, readAt };
   });
-  if (flipped.length === 0) return;
+  if (flipped === 0) return;
   write(
     cell,
     api,
     () => {
       patch(cell, { items });
-      dropUnread(cell, flipped);
+      bumpUnread(cell, -flipped);
     },
     () => api.markRead(ids),
   );
@@ -213,7 +180,7 @@ function remove(cell: Cell, api: NotificationsApiClient, id: string): void {
     api,
     () => {
       patch(cell, { items });
-      if (target.readAt === null) dropUnread(cell, [target]);
+      if (target.readAt === null) bumpUnread(cell, -1);
     },
     () => api.remove([id]),
   );
@@ -240,7 +207,7 @@ export function createInboxStore(api: NotificationsApiClient): InboxStore {
       write(
         cell,
         api,
-        () => patch(cell, { items, unread: 0, unreadLiveSubjects: {} }),
+        () => patch(cell, { items, unread: 0 }),
         () => api.markAllRead(),
       );
     },

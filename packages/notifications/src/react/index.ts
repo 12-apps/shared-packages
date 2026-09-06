@@ -24,14 +24,16 @@ export {
   type NotificationsApiClient,
   type PreferencesPayload,
   type PushRegistrationPayload,
-  type UnreadCount,
 } from './api';
 
-export {
-  useInboxBellBadge,
-  useLiveBellBadge,
-  type BellBadge,
-} from './bell-badge';
+// `useInboxBellBadge` and `useLiveBellBadge` are deliberately NOT exported, and
+// the live one is why: it takes a `LiveSeenStore`, and the only store that
+// works is the factory's own — the panel writes "seen" into THAT one. A host
+// handed the hook and no way to build the store would either hand-roll a
+// `{read, mark, subscribe}` nothing ever writes to, and get a badge that is
+// permanently `new`, or reach for `createLiveSeenStore` and find it unexported
+// too. `useBellBadge` off the factory is the door, already bound to both.
+export type { BellBadge } from './bell-badge';
 
 export {
   BADGE_POLL_MS,

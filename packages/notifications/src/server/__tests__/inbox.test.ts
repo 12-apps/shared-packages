@@ -20,17 +20,6 @@ const ORDER_PAID = {
   }),
 };
 
-/** A generator that ties its row to an ongoing subject, the way a stage does. */
-const ORDER_MOVED = {
-  type: 'order.moved',
-  category: 'orders',
-  generate: (payload: { code: string; subject?: unknown }) => ({
-    title: 'Seu pedido está pronto',
-    body: `Pedido ${payload.code}.`,
-    ...(payload.subject === undefined ? {} : { data: { liveSubject: payload.subject } }),
-  }),
-};
-
 let db: MemoryDb;
 let api: ApiNotifications;
 
@@ -44,19 +33,10 @@ beforeEach(() => {
       u1: { email: 'buyer@example.com', phone: null },
       u2: { email: 'other@example.com', phone: null },
     }),
-    generators: [ORDER_PAID as never, ORDER_MOVED as never],
+    generators: [ORDER_PAID as never],
     logger: { info: () => undefined, error: () => undefined },
   });
 });
-
-/** One row about an ongoing subject. `subject` of `undefined` writes no key. */
-async function seedLiveRow(userId: string, subject: unknown): Promise<string> {
-  const { notificationId } = await api.notify(
-    { type: 'order.moved', recipient: { userId }, payload: { code: 'P9', subject } },
-    { sync: true },
-  );
-  return notificationId;
-}
 
 async function seedInbox(userId: string, count: number): Promise<string[]> {
   const ids: string[] = [];
@@ -178,73 +158,5 @@ describe('soft delete', () => {
     expect(
       db.rows.deliveries.filter((row) => row.notificationId === removed).length,
     ).toBeGreaterThan(0);
-  });
-});
-
-/**
- * The badge's second number: which of the unread rows are about something the
- * reader may already be watching happen.
- *
- * The count alone cannot say. A pedido that moves through four stages writes
- * four inbox rows AND is one live activity, and a bell that added them would
- * say `5` about one dinner. The server cannot do the subtraction — only the
- * client knows what is live right now — so it answers the breakdown and the
- * surface joins the two (`react/bell-badge.ts`).
- */
-describe('the unread summary', () => {
-  it('counts every unread row, and tallies the ones naming a live subject', async () => {
-    await seedInbox('u1', 2);
-    await seedLiveRow('u1', 'order:42');
-    await seedLiveRow('u1', 'order:42');
-    await seedLiveRow('u1', 'order:7');
-
-    expect(await api.inbox.unreadSummary('u1')).toEqual({
-      total: 5,
-      // Counts and not a set: two unread stages of one pedido must subtract two,
-      // or the bell keeps a number for news the reader has already been shown.
-      byLiveSubject: { 'order:42': 2, 'order:7': 1 },
-    });
-  });
-
-  it('leaves the tally empty when nothing names a subject', async () => {
-    await seedInbox('u1', 3);
-    expect(await api.inbox.unreadSummary('u1')).toEqual({ total: 3, byLiveSubject: {} });
-  });
-
-  it('ignores a `data` that does not NAME a subject', async () => {
-    // `data` is stored verbatim, so anything can be in that key — and a number,
-    // an empty string or an absent key all mean "this is an ordinary event".
-    // Counted in `total` (they are unread rows); absent from the tally.
-    await seedLiveRow('u1', 42);
-    await seedLiveRow('u1', '');
-    await seedLiveRow('u1', undefined);
-    expect(await api.inbox.unreadSummary('u1')).toEqual({ total: 3, byLiveSubject: {} });
-  });
-
-  it('drops a row from the tally once it is read, deleted, or another user asks', async () => {
-    const read = await seedLiveRow('u1', 'order:42');
-    const removed = await seedLiveRow('u1', 'order:42');
-    await seedLiveRow('u1', 'order:42');
-    await seedLiveRow('u2', 'order:99');
-
-    expect(await api.inbox.markRead('u1', [read])).toBe(1);
-    expect(await api.inbox.softDelete('u1', [removed])).toBe(1);
-
-    expect(await api.inbox.unreadSummary('u1')).toEqual({
-      total: 1,
-      byLiveSubject: { 'order:42': 1 },
-    });
-    // Owner-scoped like every other read here: u2's row is u2's alone.
-    expect(await api.inbox.unreadSummary('u2')).toEqual({
-      total: 1,
-      byLiveSubject: { 'order:99': 1 },
-    });
-  });
-
-  it('agrees with `unreadCount`, which is the number the badge still shows', async () => {
-    await seedInbox('u1', 2);
-    await seedLiveRow('u1', 'order:42');
-    const summary = await api.inbox.unreadSummary('u1');
-    expect(summary.total).toBe(await api.inbox.unreadCount('u1'));
   });
 });

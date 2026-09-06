@@ -74,12 +74,7 @@ describe('the wire', () => {
       headers: signedIn,
     });
     expect(response.status).toBe(200);
-    // `count` is still `count` — that half is the wire contract a client from
-    // before the live breakdown existed reads. `liveSubjects` rides alongside.
-    expect((await json<{ data: { count: number } }>(response)).data).toEqual({
-      count: 0,
-      liveSubjects: {},
-    });
+    expect((await json<{ data: { count: number } }>(response)).data).toEqual({ count: 0 });
   });
 
   it('round-trips an inbox write through the real HTTP surface', async () => {

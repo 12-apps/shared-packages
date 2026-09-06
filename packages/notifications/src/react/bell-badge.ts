@@ -13,22 +13,29 @@
  * `Preparo` for ten minutes is still worth a `1`, and shouting about it every
  * render is how a badge teaches people to stop reading it.
  *
- * ## One thing happening is counted once
+ * ## This is here so a host can DRAW it
  *
- * A live pedido also writes inbox rows as it moves — "Seu pedido está pronto"
- * is a notification, and it is still there tomorrow when the pedido is not. So
- * while the subject is on screen its unread rows are NOT added again: the live
- * entry is the same news, said better and in the place the reader is looking.
- * They start counting the moment it finishes and the pinned entry goes away,
- * which is exactly when they become the only record of it.
+ * The numbers were already correct inside this package's own `BellButton`, and
+ * unreachable from a host that cannot take that component — a header whose cart
+ * and search buttons are one styled icon-button is importing a second trigger
+ * style the moment it does. Such a host had `useUnreadCount` and nothing else,
+ * so its bell showed NOTHING while a pinned pedido sat inside the panel it
+ * opens. Both bells now read these hooks, so a host cannot drift from what this
+ * package renders.
  *
- * That subtraction is possible because the server sends the breakdown next to
- * the count (`UnreadSummary`) and the host publishes what is live. Neither half
- * can do it alone, and this is the one place they meet.
+ * ## What it does NOT yet do
+ *
+ * A live subject usually also writes inbox rows as it moves, and this counts
+ * both: a pedido with one unread row about it reads `2`. Answering that needs
+ * the server to say which unread rows name which subject, and the query that
+ * would do it has no index behind it — `notifications.prisma` carries
+ * `[userId, deletedAt, readAt]` and `[userId, deletedAt, createdAt]`, neither of
+ * which serves the ordered scan over unread rows. So it is a schema change with
+ * a migration rather than a line of arithmetic, and it is deliberately not this
+ * one: shipping the arithmetic first would put an unindexed read on the badge
+ * poll, which runs every 60 s per open tab.
  */
 import { useSyncExternalStore } from 'react';
-
-import type { LiveActivity } from '../live';
 
 import { useBadgeState, type BadgeSyncOptions } from './hooks';
 import type { InboxStore } from './inbox-state';
@@ -70,6 +77,13 @@ export function useInboxBellBadge(store: InboxStore, options: BadgeSyncOptions =
  * reports as a crash somewhere else entirely. The factory knows statically
  * which host it is building for and binds one.
  *
+ * ## `enabled` is enforced HERE, not taken on trust
+ *
+ * A host is explicitly allowed to ignore the `active` hint and always answer
+ * (`./live-config`), and at least one real adopter does. So a signed-out header
+ * — which still MOUNTS the bell — can be handed a list of somebody's pedidos,
+ * and the guard below is the only thing between that and a badge counting them.
+ *
  * ## What it costs the host, stated plainly
  *
  * The bell is mounted for as long as the app is, so unlike the panel's copy of
@@ -86,31 +100,14 @@ export function useLiveBellBadge(
   options: BadgeSyncOptions = {},
 ): BellBadge {
   const enabled = options.enabled ?? true;
-  const { unread, unreadLiveSubjects } = useBadgeState(store, options);
+  const { unread } = useBadgeState(store, options);
   const activities = live.useActivities({ active: enabled });
   const seenAt = useSyncExternalStore(seen.subscribe, seen.read, seen.read);
   if (!enabled) return { count: 0, hasNew: false };
-  const rows = Math.max(0, unread - pinnedUnread(activities, unreadLiveSubjects));
   return {
-    count: rows + activities.length,
-    hasNew: rows > 0 || hasUnseenActivity(activities, seenAt),
+    // A live entry counts. It is a notification — it is the one the reader most
+    // wants to know about — and the panel it opens lists it.
+    count: unread + activities.length,
+    hasNew: unread > 0 || hasUnseenActivity(activities, seenAt),
   };
-}
-
-/**
- * How many unread rows are about something already pinned above the list.
- *
- * Clamped at zero per subject rather than trusted: the breakdown is a bounded
- * scan of the newest unread rows and the optimistic path edits it locally, so a
- * negative here would mean subtracting rows that were never counted.
- */
-function pinnedUnread(
-  activities: readonly LiveActivity[],
-  unreadLiveSubjects: Readonly<Record<string, number>>,
-): number {
-  let pinned = 0;
-  for (const activity of activities) {
-    pinned += Math.max(0, unreadLiveSubjects[activity.id] ?? 0);
-  }
-  return pinned;
 }

@@ -173,23 +173,7 @@ export const LIVE_PUSH_TAG_PREFIX = 'live:';
 export function livePushTag(
   data: Readonly<Record<string, unknown>> | null | undefined,
 ): string | null {
-  const subject = liveSubjectOf(data);
-  return subject === null ? null : `${LIVE_PUSH_TAG_PREFIX}${subject}`;
-}
-
-/**
- * The live subject a stored notification is ABOUT, or `null` for an ordinary
- * event.
- *
- * `data` is a column this package stores verbatim, so everything in it is a
- * client value as far as a reader is concerned: a number, an object or an empty
- * string are all things that can be in there, and none of them names a subject.
- * One guard, used by both the tray tag above and the badge's tally, so the two
- * can never disagree about what counts as a live row.
- */
-export function liveSubjectOf(
-  data: Readonly<Record<string, unknown>> | null | undefined,
-): string | null {
   const subject = data?.[LIVE_SUBJECT_KEY];
-  return typeof subject === 'string' && subject !== '' ? subject : null;
+  if (typeof subject !== 'string' || subject === '') return null;
+  return `${LIVE_PUSH_TAG_PREFIX}${subject}`;
 }

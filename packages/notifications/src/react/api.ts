@@ -32,25 +32,13 @@ export interface PushRegistrationPayload {
   registered?: boolean;
 }
 
-/**
- * What `/notifications/unread-count` answers.
- *
- * `liveSubjects` is how many unread rows are ABOUT each ongoing subject — see
- * `UnreadSummary` on the server half, which owns the reasoning. The surface
- * needs both halves to count one happening thing once.
- */
-export interface UnreadCount {
-  count: number;
-  liveSubjects: Readonly<Record<string, number>>;
-}
-
 export interface NotificationsApiClient {
   listNotifications(input: {
     cursor?: string | null;
     limit?: number;
     filter?: 'all' | 'unread';
   }): Promise<ListNotificationsResult>;
-  unreadCount(): Promise<UnreadCount>;
+  unreadCount(): Promise<number>;
   markRead(ids: readonly string[]): Promise<NotificationsResult<{ updated: number }>>;
   markAllRead(): Promise<NotificationsResult<{ updated: number }>>;
   remove(ids: readonly string[]): Promise<NotificationsResult<{ deleted: number }>>;
@@ -94,15 +82,10 @@ export function createNotificationsApiClient(
       );
     },
     async unreadCount() {
-      const body = await transport.get<{
-        count: number;
-        liveSubjects?: Readonly<Record<string, number>>;
-      }>(url('/notifications/unread-count'));
-      // Absent, not empty, is what a server from before the breakdown answers —
-      // and for the length of a rollout that server is the one a freshly loaded
-      // bundle is talking to. Defaulting degrades to the count alone, which is
-      // what the badge did before this existed.
-      return { count: body.count, liveSubjects: body.liveSubjects ?? {} };
+      const { count } = await transport.get<{ count: number }>(
+        url('/notifications/unread-count'),
+      );
+      return count;
     },
     markRead: (ids) =>
       transport.send(url('/notifications/mark-read'), 'POST', { ids: [...ids] }),
