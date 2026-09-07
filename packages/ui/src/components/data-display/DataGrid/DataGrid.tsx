@@ -112,8 +112,11 @@ export const DataGrid = <T extends Record<string, unknown> = Record<string, unkn
  * `DataGridProps` extends `HTMLAttributes`, so the rest-spread carries the
  * grid's own configuration too. React would warn (or worse, serialize an array
  * of rows into an attribute) if any of it reached the DOM.
+ *
+ * Exported so a test can render a grid carrying every name on it and assert
+ * none reaches the DOM — the check that would have caught `emptyText` missing.
  */
-const GRID_ONLY_PROPS = [
+export const GRID_ONLY_PROPS = [
   'rows',
   'columns',
   'getRowId',
@@ -135,6 +138,7 @@ const GRID_ONLY_PROPS = [
   'loading',
   'error',
   'emptyState',
+  'emptyText',
   'onRequestData',
   'ariaLabel',
   'ariaDescription',
