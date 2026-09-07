@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { DataViewsGrid } from "../DataViewsGrid";
 import type { DataViewColumn, DataViewQuery, DataViewServer } from "../data-views-types";
+import type { DisplayPanelView } from "../data-views-display-panel";
 
 /**
  * THE "EXIBIR" PANEL — sort, columns and format in one control.
@@ -213,5 +214,41 @@ describe("the Exibir panel", () => {
     await waitFor(() => expect(screen.queryByTestId("lista-layout-cards")).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByTestId("lista-layout-list")).not.toBeInTheDocument());
     await waitFor(() => expect(screen.queryByTestId("lista-layout-board")).not.toBeInTheDocument());
+  });
+});
+
+/**
+ * THE "VISÃO" HEADER — the name of the view the panel is showing.
+ *
+ * The built-in view has no name of its own, so the header falls back to the
+ * host's copy. That fallback once shipped as the literal `"{copy.nav.mainView}"`
+ * — a template placeholder that reached the screen because it is a string and
+ * not an expression, which is exactly the shape the literal-copy gate skips.
+ * Reading the rendered word is the only assertion that catches it.
+ */
+describe("the VISÃO header", () => {
+  function displayView(overrides: Partial<DisplayPanelView> = {}): DisplayPanelView {
+    return {
+      dirty: false,
+      onReset: () => {},
+      onSaveAs: () => {},
+      ...overrides,
+    };
+  }
+
+  it("names the built-in view with the host's copy, not a placeholder", async () => {
+    renderGrid({ displayView: displayView() });
+
+    fireEvent.click(screen.getByTestId("lista-display-trigger"));
+
+    expect(await screen.findByTestId("lista-display-view-name")).toHaveTextContent("Visão principal");
+  });
+
+  it("names the applied view when one is applied", async () => {
+    renderGrid({ displayView: displayView({ activeViewName: "Pedidos de hoje" }) });
+
+    fireEvent.click(screen.getByTestId("lista-display-trigger"));
+
+    expect(await screen.findByTestId("lista-display-view-name")).toHaveTextContent("Pedidos de hoje");
   });
 });
