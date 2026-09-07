@@ -76,4 +76,9 @@ measure the fixture rather than the component.
 - [x] Lint clean
 - [x] TypeCheck clean
 - [x] Stories working
-- [x] Unit tests passing (35: 16 helpers + 8 hook + 9 guards + 2 theme)
+- [x] Unit tests passing — web 35 (16 helpers + 8 hook + 9 guards + 2 theme),
+      native 14 (`FleetMap.native.test.tsx`, run by the `Native` lane rather
+      than by `pnpm test`, so each runs once)
+- [x] React Native build shipped — `@12-apps/ui/data-display/FleetMap` carries a
+      `react-native` export condition; the rendering gaps, the map's absence
+      among them, are in `NATIVE-NOTES.md` and counted by `pnpm native:ledger`

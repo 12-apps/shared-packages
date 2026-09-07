@@ -8,18 +8,12 @@ import { EmptyState } from '../EmptyState/EmptyState';
 
 import { FleetBody } from './FleetBody';
 import { useFleetMap } from './FleetMap.hooks';
+import {
+  FLEET_DEFAULT_LAGGING_AFTER_SECONDS,
+  FLEET_DEFAULT_STALE_AFTER_SECONDS,
+  FLEET_PANEL,
+} from './FleetMap.metrics';
 import type { FleetMapProps } from './FleetMap.types';
-
-/**
- * How long a fix stays `live`, and then `lagging`, when the caller says nothing.
- *
- * Ninety seconds and five minutes: sized for a phone reporting every twenty
- * seconds, which is the densest cadence a battery tolerates all day. They are
- * DEFAULTS and not a rule — a fleet on five-minute trackers passes its own, and
- * the props exist so it can.
- */
-const DEFAULT_LAGGING_AFTER_SECONDS = 90;
-const DEFAULT_STALE_AFTER_SECONDS = 300;
 
 /** The map's own default height. Overridable, and never a hardcoded viewport. */
 const DEFAULT_HEIGHT = '420px';
@@ -100,8 +94,8 @@ export const FleetMap: React.FC<FleetMapProps> = React.memo(
     // controlled and the uncontrolled path unreachable.
     selectedId,
     onSelect,
-    laggingAfterSeconds = DEFAULT_LAGGING_AFTER_SECONDS,
-    staleAfterSeconds = DEFAULT_STALE_AFTER_SECONDS,
+    laggingAfterSeconds = FLEET_DEFAULT_LAGGING_AFTER_SECONDS,
+    staleAfterSeconds = FLEET_DEFAULT_STALE_AFTER_SECONDS,
     height = DEFAULT_HEIGHT,
     loading = false,
     className,
@@ -122,7 +116,7 @@ export const FleetMap: React.FC<FleetMapProps> = React.memo(
         aria-labelledby={headingId}
         className={className}
         data-testid={testId}
-        sx={{ display: 'flex', flexDirection: 'column', gap: theme.spacing(1.5), minWidth: 0 }}
+        sx={{ display: 'flex', flexDirection: 'column', gap: theme.spacing(FLEET_PANEL.gapUnits), minWidth: 0 }}
       >
         <Typography
           id={headingId}

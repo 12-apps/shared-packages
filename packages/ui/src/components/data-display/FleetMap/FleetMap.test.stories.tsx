@@ -186,6 +186,11 @@ export const ControlledWithoutHandlerTest: Story = {
 };
 
 export const ScreenReaderTest: Story = {
+  // Asserts the map region beside the roster, and the native build has no map:
+  // `MapPreview` is unported, so `fleet-canvas` never renders there. The half
+  // this story is really about — the roster carrying every fact a pin does —
+  // is covered on both renderers by `FleetMap.native.test.tsx`.
+  tags: ['native-skip'],
   name: '🧪 Screen Reader — the roster is the map',
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -438,6 +443,10 @@ export const UncontrolledSelectionTest: Story = {
 };
 
 export const EdgeCaseTest: Story = {
+  // Reaches for `fleet-canvas` to prove a single unit still centres the map.
+  // There is no map on the native renderer; the row-level edge cases it also
+  // covers are asserted natively in `FleetMap.native.test.tsx`.
+  tags: ['native-skip'],
   name: '🧪 Edge cases — one unit, long name, no badge',
   args: {
     units: [

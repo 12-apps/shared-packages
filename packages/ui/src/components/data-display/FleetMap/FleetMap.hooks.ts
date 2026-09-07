@@ -1,7 +1,26 @@
 import React from 'react';
 
 import { mapCentre, nextSelection, rosterOrder, type LatLng } from './FleetMap.helpers';
-import type { FleetUnit } from './FleetMap.types';
+import type { FleetUnit } from './FleetMap.base';
+
+/**
+ * The half of a key event this hook reads, spelled structurally.
+ *
+ * NOT `React.KeyboardEvent<HTMLDivElement>`: the native type program is checked
+ * without the DOM lib (`tsconfig.native.json`), so a DOM type here would put
+ * the whole hook out of reach of the React Native renderer that shares it. A
+ * DOM event satisfies this shape, and a handler taking the wider type is
+ * assignable wherever the narrower one is expected — so the web passes its own
+ * `onKeyDown` unchanged.
+ */
+export interface FleetKeyEvent {
+  key: string;
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+  preventDefault: () => void;
+}
 
 /**
  * Everything the board derives from its props, in one hook.
@@ -52,11 +71,11 @@ export interface FleetMapState {
   centre: LatLng | null;
   select: (id: string) => void;
   markers: FleetMarker[];
-  onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onKeyDown: (event: FleetKeyEvent) => void;
 }
 
 /** Which way an arrow moves the selection, or `0` when it is not ours. */
-function stepFor(event: React.KeyboardEvent<HTMLDivElement>): 1 | -1 | 0 {
+function stepFor(event: FleetKeyEvent): 1 | -1 | 0 {
   // A modified arrow is the PAGE's shortcut, not the roster's: Cmd+Down is
   // "scroll to the end of the document" on macOS, and Shift+Arrow extends a
   // selection. Capturing them would take a browser gesture away.
@@ -133,7 +152,7 @@ export function useFleetMap(
   );
 
   const onKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
+    (event: FleetKeyEvent) => {
       const step = stepFor(event);
       if (step === 0) return;
       // Nothing can move a CONTROLLED selection without a handler, so the keys

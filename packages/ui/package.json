@@ -205,6 +205,10 @@
       "default": "./dist/data-display/EmptyState.js"
     },
     "./data-display/FleetMap": {
+      "react-native": {
+        "types": "./dist/types-native/components/data-display/FleetMap/index.native.d.ts",
+        "default": "./dist/native/data-display/FleetMap.js"
+      },
       "types": "./dist/types/components/data-display/FleetMap/index.d.ts",
       "default": "./dist/data-display/FleetMap.js"
     },

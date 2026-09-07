@@ -165,14 +165,21 @@ picking it for every consumer.
 
 ## Known limits
 
-- **Not ported to React Native.** `@12-apps/ui` ships a native build for 26 of
-  its 141 subpaths; this is not one, and neither is the `MapPreview` it wraps.
-  Being unported is the ordinary state — 115 subpaths are, at the time of
-  writing — and it fails LOUDLY under Metro: an unported subpath resolves to the
-  web file and errors on `@mui/material` at import rather than rendering a blank
-  view. It is also the right call for this
-  component: a fleet board is a dispatcher's screen, and the tracked unit's own
-  device reports a position rather than drawing the fleet.
+- **The React Native build has no MAP.** This subpath now carries a
+  `react-native` export condition, and what it renders there is the roster: the
+  heading, the rows with their freshness, the empty state, the skeletons and the
+  reload announcement. `MapPreview` — ~2,200 lines that project, tile and
+  decorate their own surface — is still unported, so the native copy interface
+  has neither `map` nor `mapLabel` and a native board draws no canvas. That is a
+  smaller loss than it sounds for this component in particular, because the
+  roster is already its accessible representation rather than a sidebar: every
+  fact a pin carries is on a row. `NATIVE-NOTES.md` holds the full list of
+  rendering gaps, and `pnpm native:ledger` counts them.
+- **On a device the roster is touch-only.** The arrow keys, the single tab stop
+  and `aria-activedescendant` all reach the list through react-native-web, so a
+  browser still walks it exactly as the web build does; React Native delivers no
+  key events to a `View`, so on a phone the selection is made by touch and every
+  row is its own tab stop.
 - **The map's own `aria-label` is English**, and comes from `MapPreview` rather
   than from `copy`. Everything `FleetMap` itself renders is injected; that one
   sentence is not, and a pt-BR consumer's screen reader will read it in English

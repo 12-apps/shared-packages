@@ -7,6 +7,7 @@ import React from 'react';
 import { Skeleton } from '../../layout/Skeleton/Skeleton';
 
 import { freshnessOf } from './FleetMap.helpers';
+import { FLEET_DOT, FLEET_ROSTER, FLEET_ROW, FLEET_SKELETON } from './FleetMap.metrics';
 import type { FleetFreshness, FleetMapCopy, FleetUnit } from './FleetMap.types';
 
 /**
@@ -133,15 +134,15 @@ function rowSx(theme: Theme, selected: boolean): SxProps<Theme> {
   return {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(1.5),
-    padding: theme.spacing(1, 1.5),
+    gap: theme.spacing(FLEET_ROW.gapUnits),
+    padding: theme.spacing(FLEET_ROW.paddingYUnits, FLEET_ROW.paddingXUnits),
     // `1`, not `theme.shape.borderRadius / 4`. MUI's `sx` reads a NUMBER here as
     // a multiple of `theme.shape.borderRadius`, so dividing the theme value out
     // and letting `sx` multiply it back in is quadratic: measured 4px on the
     // default theme — which is why this looked right — and 36px on a host that
     // sets its own radius to 12. In a package whose whole premise is being
     // re-themed, only the multiple is portable.
-    borderRadius: 1,
+    borderRadius: FLEET_ROW.radiusMultiple,
     cursor: 'pointer',
     backgroundColor: resting,
     '&:hover': {
@@ -195,8 +196,8 @@ function FleetRow({
         aria-hidden="true"
         data-testid={`${testId}-dot`}
         sx={{
-          width: 10,
-          height: 10,
+          width: FLEET_DOT.size,
+          height: FLEET_DOT.size,
           borderRadius: '50%',
           flexShrink: 0,
           backgroundColor: color,
@@ -229,9 +230,14 @@ function FleetRow({
  */
 function FirstLoad({ testId }: { testId: string }): React.JSX.Element {
   return (
-    <Stack spacing={1} data-testid={`${testId}-skeleton`} aria-hidden="true">
-      {[0, 1, 2].map((row) => (
-        <Skeleton key={row} variant="rectangular" height={44} borderRadius={1} />
+    <Stack spacing={FLEET_SKELETON.gapUnits} data-testid={`${testId}-skeleton`} aria-hidden="true">
+      {Array.from({ length: FLEET_SKELETON.rows }, (_, row) => (
+        <Skeleton
+          key={row}
+          variant="rectangular"
+          height={FLEET_SKELETON.height}
+          borderRadius={FLEET_SKELETON.radiusMultiple}
+        />
       ))}
     </Stack>
   );
@@ -294,12 +300,12 @@ export function FleetRoster({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: theme.spacing(0.5),
+        gap: theme.spacing(FLEET_ROSTER.gapUnits),
         overflowY: 'auto',
         minWidth: 0,
         '&:focus-visible': {
-          outline: `2px solid ${theme.palette.primary.main}`,
-          outlineOffset: 2,
+          outline: `${FLEET_ROSTER.focusRingWidth}px solid ${theme.palette.primary.main}`,
+          outlineOffset: FLEET_ROSTER.focusRingOffset,
         },
       }}
     >
