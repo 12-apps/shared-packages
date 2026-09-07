@@ -61,25 +61,23 @@ const StyledAlert = styled(MuiAlert, {
 
     ...alertLayoutStyles(theme, colorPalette, animate),
 
-    // Hover effects
+    // Hover: one brightness step, and nothing that moves. An alert is a
+    // surface rather than a control, so the pointer only needs telling it is
+    // here. The icon keeps its own place for the same reason — it is the
+    // variant's meaning, not an affordance to animate.
     '&:hover': {
-      transform: `translateY(-${HOVER.lift}px) scale(${HOVER.scale})`,
-      boxShadow: `0 ${HOVER.shadowY}px ${HOVER.shadowBlur}px ${alpha(colorPalette.main, HOVER.shadowAlpha)}`,
+      filter: `brightness(${HOVER.brightness})`,
       transition,
-
-      '.MuiAlert-icon': {
-        transform: `scale(${HOVER.iconScale}) rotate(${HOVER.iconRotateDeg}deg)`,
-      },
 
       '&::before': {
         opacity: 1,
       },
     },
 
-    // Active state
+    // Active: the same step, one shade further.
     '&:active': {
-      transform: `translateY(-${ACTIVE.lift}px) scale(${ACTIVE.scale})`,
-      transition: `transform ${seconds(ACTIVE.ms)} ease`,
+      filter: `brightness(${ACTIVE.brightness})`,
+      transition: `filter ${seconds(ACTIVE.ms)} ease`,
     },
 
     // Focus styles for accessibility
@@ -161,8 +159,9 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: 
     sx={(theme) => ({
       transition,
       opacity: CLOSE_BUTTON.opacity,
+      // Opacity and a wash only: the button used to spin 90deg and grow 1.1,
+      // which drew the eye to the dismiss rather than to the message.
       '&:hover': {
-        transform: `rotate(${CLOSE_BUTTON.hoverRotateDeg}deg) scale(${CLOSE_BUTTON.hoverScale})`,
         opacity: 1,
         backgroundColor: alpha(theme.palette.action.hover, CLOSE_BUTTON.washAlpha),
       },
@@ -216,7 +215,11 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
   // Every spelling of the test id the shared contract allows, mapped to the
   // one the DOM reads and defaulted to `alert`; the native Alert does the same.
   const dataTestId = resolveTestId(others, 'alert');
-  const props = withoutTestIdProps(others);
+  // Then the dismiss union, which `dismissButton` reads off `alertProps` rather
+  // than through this destructure — so without this strip it rides `...props`
+  // onto the DOM. `ALERT_DEFAULTS` supplies `closable: false`, so that happened
+  // on EVERY alert, not only the closable ones.
+  const props = withoutAlertOnlyProps(withoutTestIdProps(others));
 
   // Depends on `variant`, so it cannot live in the static defaults above.
   const ariaLive = alertProps['aria-live'] ?? defaultAriaLive(variant);
@@ -271,5 +274,26 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
     </Collapse>
   );
 });
+
+/**
+ * The props `Alert` OWNS, which must never reach the DOM.
+ *
+ * `AlertProps` extends MUI's, whose rest-spread is how a host's real HTML
+ * attributes get onto the root — so the same spread carries the alert's own
+ * configuration unless it is named here. Everything else the component consumes
+ * leaves through the destructure above; these two do not, because
+ * `dismissButton` reads them off the original props to keep the dismiss union's
+ * narrowing intact.
+ *
+ * Exported so a test can render an alert carrying every name on it and assert
+ * none reaches the DOM — the check that would have caught `closable`.
+ */
+export const ALERT_ONLY_PROPS = ['closable', 'closeLabel'] as const;
+
+function withoutAlertOnlyProps<P extends object>(rest: P): P {
+  const html = { ...rest } as Record<string, unknown>;
+  for (const key of ALERT_ONLY_PROPS) delete html[key];
+  return html as P;
+}
 
 Alert.displayName = 'Alert';

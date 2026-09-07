@@ -333,9 +333,10 @@ export const alertVariantStyles = (
       background: `linear-gradient(90deg, transparent, ${alpha(theme.palette.common.white, GRADIENT.shimmerAlpha)}, transparent)`,
       animation: `${shimmerAnimation} ${seconds(GRADIENT.shimmerMs)} infinite`,
     },
+    // Brightness only — the shared root hover already says the pointer is here,
+    // and this variant adds nothing that moves either.
     '&:hover': {
       filter: `brightness(${GRADIENT.hoverBrightness})`,
-      transform: `translateY(-${GRADIENT.hoverLift}px) scale(${GRADIENT.hoverScale})`,
     },
   }),
 });

@@ -44,7 +44,7 @@ export const ICON_SLOT = { size: 22, opacity: 0.9, marginRightUnits: 1.75, paddi
 /** The action slot: MUI's `4px 0 0 16px` with the 16px ours, pushed right, 8px into the padding. */
 export const ACTION_SLOT = { paddingLeftUnits: 2, paddingTop: 4, marginRight: -8 } as const;
 /** The close button: MUI's small `IconButton` (5px padding, 18px glyph) at 0.7. */
-export const CLOSE_BUTTON = { padding: 5, iconSize: 18, opacity: 0.7, hoverRotateDeg: 90, hoverScale: 1.1, washAlpha: 0.1 } as const;
+export const CLOSE_BUTTON = { padding: 5, iconSize: 18, opacity: 0.7, washAlpha: 0.1 } as const;
 
 /**
  * A semantic Alert's surface and ink: an OPAQUE tint of the hue with a dark
@@ -61,18 +61,30 @@ export const GRADIENT = {
   shimmerAlpha: 0.2,
   shimmerMs: 3000,
   shimmerTravel: 1000,
-  hoverBrightness: 1.1,
-  hoverLift: 2,
-  hoverScale: 1.01,
+  hoverBrightness: 1.04,
 } as const;
 
 /** Emphasis: the glow's shadow and brightness, the pulse's wash. */
 export const GLOW = { blur: 20, spread: 5, alpha: 0.3, brightness: 1.05 } as const;
 export const PULSE = { alpha: 0.2, ms: 2000, spread: 10 } as const;
 
-/** Pointer states — DOM only, kept so the web derives them. */
-export const HOVER = { lift: 3, scale: 1.01, shadowY: 8, shadowBlur: 20, shadowAlpha: 0.2, iconScale: 1.15, iconRotateDeg: 10 } as const;
-export const ACTIVE = { lift: 1, scale: 0.99, ms: 100 } as const;
+/**
+ * Pointer states — DOM only, kept so the web derives them.
+ *
+ * HOVER and ACTIVE carry NO geometry, and that is the point rather than an
+ * omission. They used to lift the card 3px, scale it 1.01, grow a 20px shadow
+ * and spin the icon 10deg at 1.15 — four things moving at once on a surface
+ * that is not a control, which made a page of alerts twitch under the pointer
+ * and reflowed nothing but read as though it had.
+ *
+ * A hover on a non-interactive surface only has to say "the pointer is here",
+ * so one brightness step says it. Brightness rather than a background override
+ * because every variant paints its own surface — standard a tint, `glass` a
+ * blur, `gradient` a linear-gradient — and a colour written here would erase
+ * whichever one is underneath.
+ */
+export const HOVER = { brightness: 0.98 } as const;
+export const ACTIVE = { brightness: 0.96, ms: 100 } as const;
 export const FOCUS = { ringWidth: 3, ringAlpha: 0.5, offset: 3, haloSpread: 6, haloAlpha: 0.1, ms: 200 } as const;
 
 /** `neutral` has no palette slot; the web has always drawn it from three greys. */
