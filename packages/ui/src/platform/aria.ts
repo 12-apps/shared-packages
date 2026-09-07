@@ -27,6 +27,19 @@ export interface WebAria {
    * it expands is a listbox — which is what the web's own trigger carries.
    */
   'aria-haspopup'?: 'listbox' | 'menu' | 'dialog' | 'true';
+  /**
+   * Which option a composite widget's single tab stop is currently on — the
+   * listbox pattern, where the LIST holds focus and the selection moves inside
+   * it. React Native has no equivalent because it has no roving focus to
+   * describe: a device selects by touching the row.
+   *
+   * Note the interaction with `aria-atomic` documented on {@link webAria}:
+   * react-native-web reads THIS value when it means the atomic flag, so a
+   * component that sets both gets the descendant id emitted as `aria-atomic`.
+   * Nothing here sets both, and a component that needs to should pass its own
+   * atomic flag directly rather than through this helper.
+   */
+  'aria-activedescendant'?: string;
 }
 
 /**

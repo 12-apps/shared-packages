@@ -5,6 +5,7 @@
   "data-display/Chip": "src/components/data-display/Chip/index.native.ts",
   "data-display/EmptyState": "src/components/data-display/EmptyState/index.native.ts",
   "data-display/ErrorState": "src/components/data-display/ErrorState/index.native.ts",
+  "data-display/FleetMap": "src/components/data-display/FleetMap/index.native.ts",
   "data-display/LoadingState": "src/components/data-display/LoadingState/index.native.ts",
   "data-display/Progress": "src/components/data-display/Progress/index.native.ts",
   "feedback/Dialog": "src/components/feedback/Dialog/index.native.ts",
