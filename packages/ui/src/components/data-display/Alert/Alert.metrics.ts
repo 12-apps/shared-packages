@@ -82,10 +82,16 @@ export const PULSE = { alpha: 0.2, ms: 2000, spread: 10 } as const;
  * because every variant paints its own surface — standard a tint, `glass` a
  * blur, `gradient` a linear-gradient — and a colour written here would erase
  * whichever one is underneath.
+ *
+ * The step goes in OPPOSITE DIRECTIONS per mode, which is why this is a pair
+ * and not a number. A single value has to pick one: darkening reads on the
+ * light tints these alerts are, and on a dark surface the same multiplier
+ * makes it recede — the pointer lands and the alert dims, which is the wrong
+ * sentence. Each mode moves AWAY from its own background instead.
  */
-export const HOVER = { brightness: 0.98 } as const;
-export const ACTIVE = { brightness: 0.96, ms: 100 } as const;
-export const FOCUS = { ringWidth: 3, ringAlpha: 0.5, offset: 3, haloSpread: 6, haloAlpha: 0.1, ms: 200 } as const;
+export const HOVER = { brightness: { light: 0.93, dark: 1.14 } } as const;
+export const ACTIVE = { opacity: 0.8, ms: 1000 } as const;
+export const FOCUS = { ringWidth: 2, ringAlpha: 0.7, offset: 2, ms: 150 } as const;
 
 /** `neutral` has no palette slot; the web has always drawn it from three greys. */
 export const NEUTRAL_GREY: Record<'main' | 'light' | 'dark', UiGreyStep> = { main: 500, light: 300, dark: 700 };

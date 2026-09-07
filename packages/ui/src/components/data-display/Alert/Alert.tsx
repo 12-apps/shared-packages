@@ -53,7 +53,7 @@ const StyledAlert = styled(MuiAlert, {
 
   return {
     borderRadius: theme.spacing(ALERT_RADIUS_UNITS),
-    transition,
+    transition: `${transition}, opacity ${seconds(ACTIVE.ms)} ${ALERT_EASING}`,
     position: 'relative',
     overflow: 'hidden',
     animation: animate ? `${fadeInScale} ${seconds(FADE_IN.ms)} ease-out` : 'none',
@@ -64,9 +64,10 @@ const StyledAlert = styled(MuiAlert, {
     // Hover: one brightness step, and nothing that moves. An alert is a
     // surface rather than a control, so the pointer only needs telling it is
     // here. The icon keeps its own place for the same reason — it is the
-    // variant's meaning, not an affordance to animate.
+    // variant's meaning, not an affordance to animate. The step darkens a
+    // light theme and lightens a dark one, so it reads as arriving in both.
     '&:hover': {
-      filter: `brightness(${HOVER.brightness})`,
+      filter: `brightness(${HOVER.brightness[theme.palette.mode]})`,
       transition,
 
       '&::before': {
@@ -74,18 +75,33 @@ const StyledAlert = styled(MuiAlert, {
       },
     },
 
-    // Active: the same step, one shade further.
+    // Press: a 20% opacity dip over a full second, and still no geometry.
+    //
+    // The second is the FADE, not the dip. A click's `:active` lasts about as
+    // long as the finger is down, so a 1000ms ease INTO 0.8 would be cut off at
+    // the first tenth of itself and read as a flicker. The dip lands at once
+    // and the second is what the alert takes coming back — which is the part a
+    // person actually watches, and the part that reads as deliberate.
     '&:active': {
-      filter: `brightness(${ACTIVE.brightness})`,
-      transition: `filter ${seconds(ACTIVE.ms)} ease`,
+      opacity: ACTIVE.opacity,
+      transition: 'none',
     },
 
-    // Focus styles for accessibility
-    '&:focus-within': {
+    // Focus: `:focus-visible`, not `:focus-within`.
+    //
+    // The alert carries `tabIndex={0}`, so a MOUSE CLICK focused it and painted
+    // the ring — a keyboard affordance answering a pointer, which is what made
+    // clicking one look like an error state. `:focus-visible` is the browser's
+    // own answer to "did this focus come from the keyboard": the ring stays for
+    // whoever tabs here and never fires on a click.
+    //
+    // One ring, not three. It was a 3px outline at 3px offset UNDER a 6px halo,
+    // and stacking two rings on one edge is what read as unfinished rather than
+    // as emphasis.
+    '&:focus-visible': {
       outline: `${FOCUS.ringWidth}px solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
       outlineOffset: `${FOCUS.offset}px`,
-      boxShadow: `0 0 0 ${FOCUS.haloSpread}px ${alpha(colorPalette.main, FOCUS.haloAlpha)}`,
-      transition: `all ${seconds(FOCUS.ms)} ease`,
+      transition: `outline-color ${seconds(FOCUS.ms)} ease`,
     },
 
     ...alertVariantStyles(theme, customVariant, colorPalette),
