@@ -37,7 +37,7 @@ import type { SavedViewSummary } from "./data-views-types";
 export interface ViewNavHandlers {
   views: SavedViewSummary[];
   activeViewId?: string | null;
-  /** `null` selects the built-in "{copy.nav.mainView}". */
+  /** `null` selects the built-in view named by `copy.nav.mainView`. */
   onSelectView: (id: string | null) => void;
   onEditView: (view: SavedViewSummary) => void;
   onPatchView: (
@@ -224,7 +224,7 @@ function ToggleContents({
   return (
     <>
       <Box component="span" sx={{ fontWeight: 600 }} data-testid={`${testIdPrefix}-display-view-name`}>
-        {view.activeViewName ?? "{copy.nav.mainView}"}
+        {view.activeViewName ?? copy.nav.mainView}
       </Box>
       {view.dirty && (
         <Box
@@ -345,7 +345,7 @@ export function ViewFooter({
         {copy.nav.reset}
       </Button>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        {/* Only meaningful with a view APPLIED: on {copy.nav.mainView} the single
+        {/* Only meaningful with a view APPLIED: on the main view the single
             "Salvar visão" already is "save as new". */}
         {view.onUpdate && (
           <Button
