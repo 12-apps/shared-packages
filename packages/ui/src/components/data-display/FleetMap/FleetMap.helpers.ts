@@ -1,4 +1,4 @@
-import type { FleetFreshness, FleetUnit } from './FleetMap.types';
+import type { FleetFreshness, FleetUnit } from './FleetMap.base';
 
 /**
  * How current a fix is, on the two thresholds the caller supplied.
