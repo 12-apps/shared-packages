@@ -44,7 +44,7 @@ export const ICON_SLOT = { size: 22, opacity: 0.9, marginRightUnits: 1.75, paddi
 /** The action slot: MUI's `4px 0 0 16px` with the 16px ours, pushed right, 8px into the padding. */
 export const ACTION_SLOT = { paddingLeftUnits: 2, paddingTop: 4, marginRight: -8 } as const;
 /** The close button: MUI's small `IconButton` (5px padding, 18px glyph) at 0.7. */
-export const CLOSE_BUTTON = { padding: 5, iconSize: 18, opacity: 0.7, hoverRotateDeg: 90, hoverScale: 1.1, washAlpha: 0.1 } as const;
+export const CLOSE_BUTTON = { padding: 5, iconSize: 18, opacity: 0.7, washAlpha: 0.1 } as const;
 
 /**
  * A semantic Alert's surface and ink: an OPAQUE tint of the hue with a dark
@@ -54,26 +54,83 @@ export const CLOSE_BUTTON = { padding: 5, iconSize: 18, opacity: 0.7, hoverRotat
 export const SEMANTIC_SURFACE = { tint: { light: 0.9, dark: 0.8 }, ink: 0.6, borderAlpha: 0.35 } as const;
 /** `glass`: 85% paper under a 20px blur, a 0.4 divider hairline. */
 export const GLASS = { backgroundAlpha: 0.85, borderAlpha: 0.4, blur: 20, saturatePercent: 180 } as const;
-/** `gradient`: light→dark at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s. */
+/**
+ * `gradient`: light→dark at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s.
+ *
+ * It carries no hover of its own, and that is load-bearing rather than an
+ * omission. `alertVariantStyles` is spread AFTER the root's `'&:hover'` in the
+ * same object literal, so a second `'&:hover'` key does not merge with it — it
+ * REPLACES it. While this variant had one, `gradient` was the only alert that
+ * brightened on hover while every other variant darkened, and the only one to
+ * lose the shimmer reveal the root's hover performs.
+ */
 export const GRADIENT = {
   angleDeg: 135,
   stopAlpha: 0.9,
   shimmerAlpha: 0.2,
   shimmerMs: 3000,
   shimmerTravel: 1000,
-  hoverBrightness: 1.1,
-  hoverLift: 2,
-  hoverScale: 1.01,
 } as const;
 
 /** Emphasis: the glow's shadow and brightness, the pulse's wash. */
 export const GLOW = { blur: 20, spread: 5, alpha: 0.3, brightness: 1.05 } as const;
 export const PULSE = { alpha: 0.2, ms: 2000, spread: 10 } as const;
 
-/** Pointer states — DOM only, kept so the web derives them. */
-export const HOVER = { lift: 3, scale: 1.01, shadowY: 8, shadowBlur: 20, shadowAlpha: 0.2, iconScale: 1.15, iconRotateDeg: 10 } as const;
-export const ACTIVE = { lift: 1, scale: 0.99, ms: 100 } as const;
-export const FOCUS = { ringWidth: 3, ringAlpha: 0.5, offset: 3, haloSpread: 6, haloAlpha: 0.1, ms: 200 } as const;
+/**
+ * Pointer states — DOM only, kept so the web derives them.
+ *
+ * HOVER and ACTIVE carry NO geometry, and that is the point rather than an
+ * omission. They used to lift the card 3px, scale it 1.01, grow a 20px shadow
+ * and spin the icon 10deg at 1.15 — four things moving at once on a surface
+ * that is not a control, which made a page of alerts twitch under the pointer.
+ *
+ * Both are a TINT now: a flat inset layer over the surface. Two mechanisms
+ * came before it and each failed on a case the next had to fix. Dropping the
+ * element's `opacity` composites toward the PAGE, so it inverted the hover on
+ * a light tint (L* 95.0 idle, 89.1 hovered, 91.1 pressed) and vanished on a
+ * dark one. A `filter: brightness()` fixed the direction but is MULTIPLICATIVE,
+ * so it moved a near-black `glass` by four counts (ΔE76 1.71, under the JND)
+ * and Banner's 10%-alpha wash by ΔE76 0.44. A layer is additive: it reads the
+ * same on an opaque tint, a translucent wash and a gradient, and because it
+ * paints above the background and below the content the ink keeps its own
+ * contrast.
+ */
+export const HOVER = { tintAlpha: 0.06 } as const;
+
+/**
+ * The press: a 20% tint LAYER, eased back fast.
+ *
+ * The layer is the point. The first attempt dropped the whole element's
+ * opacity, which composites toward the PAGE and so behaves differently on
+ * every surface it is asked about. Measured: over a light page it made a light
+ * tint LIGHTER (L* 95.0 idle, 89.1 hovered, 91.1 pressed), so pushing the
+ * surface looked like the pointer leaving; over a dark page it landed back on
+ * the idle surface (ΔE76 0.82 on `glass`); on `gradient` it washed white body
+ * copy to 2.31:1, under AA; and it diluted the ink during a text-selection
+ * drag. A `brightness()` step instead of it fixed the direction but not the
+ * reach — a multiplier does nothing to a near-black `glass` in dark mode
+ * (ΔE76 1.71) and nothing to Banner's 10%-alpha wash (ΔE76 0.44), because it
+ * scales only what the element already paints.
+ *
+ * An inset shadow at 100vmax is a flat tint over the whole surface: ADDITIVE,
+ * so it reads the same on an opaque tint, a translucent wash and a gradient;
+ * painted above the background and below the content, so the ink keeps its
+ * own contrast; and animatable, which `background-image` is not.
+ *
+ * `ms` is 250 and not the 1000 first asked for, and the reason is that ONE
+ * property carries both states. CSS runs a transition from the DESTINATION
+ * state's declaration, and entering hover and releasing a press share that
+ * destination — so they cannot have different durations without a second
+ * animatable property, and both free pseudo-elements are already spent on the
+ * `gradient` shimmer and the `pulse` wash. At 1000ms the hover inherited the
+ * second: crossing an alert in 300ms peaked at a ≈ 0.024, under the JND, and
+ * for ~360ms the alert you had just LEFT was darker than the one under the
+ * pointer. A fast press-return is the smaller loss, and it is the call the
+ * product owner made when shown both.
+ */
+export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
+
+export const FOCUS = { ringWidth: 2, ringAlpha: 1, offset: 2 } as const;
 
 /** `neutral` has no palette slot; the web has always drawn it from three greys. */
 export const NEUTRAL_GREY: Record<'main' | 'light' | 'dark', UiGreyStep> = { main: 500, light: 300, dark: 700 };
