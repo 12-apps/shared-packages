@@ -16,10 +16,14 @@
  * These assert the resolved `sx` rather than a rendered box because that is
  * where the rule lives: `panelSx` is a pure function of the props, so every
  * preset and both axes can be pinned without a browser, and jsdom would not
- * resolve `min()` or a flex ceiling anyway. What jsdom CANNOT check —
- * that a long sheet scrolls inside the ceiling instead of overflowing it — is
- * the reason `minHeight: 0` is asserted here too: it is the whole mechanism,
- * and it is invisible in every other test.
+ * resolve `min()` or a flex ceiling anyway.
+ *
+ * This file covers the PANEL only, which is not the whole mechanism: the
+ * ceiling also needs `SheetBody` to be a shrinkable flex item, and that lives
+ * on a rendered element rather than in this style object. `sheet-scroll-
+ * plumbing.test.tsx` is where it is pinned — reverting `Sheet.body.tsx` leaves
+ * every assertion below green and the sheet painting its footer 6549px outside
+ * the panel.
  */
 import { createTheme } from '@mui/material/styles/index.js';
 import { describe, expect, it } from 'vitest';
@@ -107,8 +111,17 @@ describe('`size` is a ceiling for a vertical sheet', () => {
     expect(panel.height).toBe('auto');
   });
 
-  it('still fills the viewport at `full`', () => {
-    expect(sx({ position: 'bottom', size: 'full' }).maxHeight).toBe('100%');
+  it('still fills the viewport at `full`, on BOTH axes', () => {
+    // `full` is not a stop on the scale, it is the whole viewport, and it has
+    // to stay a real height rather than becoming a ceiling: a consumer using it
+    // for a phone takeover would otherwise get a content-hugging 640px card out
+    // of a version bump, with nothing left in the API to ask for what they had.
+    const panel = sx({ position: 'bottom', size: 'full' });
+    expect(panel.height).toBe('100%');
+    expect(panel.width).toBe('100%');
+    expect(panel.maxHeight).toBeUndefined();
+    // And it is not centred, because there is nothing to centre it in.
+    expect(panel.marginInline).toBeUndefined();
   });
 
   it('is a column, so the ceiling can be one', () => {
@@ -131,6 +144,23 @@ describe('`size` is a ceiling for a vertical sheet', () => {
     expect(panel.height).toBe(320);
     expect(panel.maxHeight).toBeUndefined();
     expect(panel.width).toBe('min(100%, 640px)');
+  });
+});
+
+describe('overflow is a default, not a rule nothing can override', () => {
+  it('leaves the panel unclipped by default', () => {
+    // The glow and the elevated shadow hang off the panel's edge; clipping is
+    // the wrong default for them.
+    expect(sx({ position: 'bottom' }).overflow).toBe('visible');
+  });
+
+  it('lets the gradient variant keep its shimmer inside the panel', () => {
+    // `SURFACES.gradient` asks for `overflow: hidden` because its `::before`
+    // sweep starts at `left: -100%`. That was stated and then overridden, which
+    // nothing noticed while a vertical sheet was full-bleed — at that width the
+    // sweep began off-screen. At 640px it begins ON the backdrop beside the
+    // sheet, so the clip has to survive.
+    expect(sx({ position: 'bottom', variant: 'gradient', gradient: true }).overflow).toBe('hidden');
   });
 });
 

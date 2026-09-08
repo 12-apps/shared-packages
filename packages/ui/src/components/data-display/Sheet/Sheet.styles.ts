@@ -37,14 +37,16 @@ const HORIZONTAL_SIZES: Record<Size, string> = {
  * preset as dead space — a `md` sheet holding three lines and a button drew a
  * 400px panel and floated them in it. `min(…, 100%)` keeps the ceiling under
  * the viewport, which is also what MUI's own bottom paper asks for.
+ *
+ * `full` is absent on purpose: it is not a ceiling, it is the whole viewport,
+ * and `sizeStyles` answers it before it gets here.
  */
-const VERTICAL_SIZES: Record<Size, number | string> = {
+const VERTICAL_SIZES: Record<Exclude<Size, 'full'>, string> = {
   xs: 'min(200px, 100%)',
   sm: 'min(300px, 100%)',
   md: 'min(400px, 100%)',
   lg: 'min(500px, 100%)',
   xl: 'min(600px, 100%)',
-  full: '100%',
 };
 
 /**
@@ -79,6 +81,13 @@ const sizeStyles = ({
   if (isHorizontalPosition(position)) {
     return { width: HORIZONTAL_SIZES[size] ?? HORIZONTAL_SIZES.md };
   }
+
+  // `full` is not a size on the scale — it is THE WHOLE VIEWPORT, on both axes,
+  // and it has to stay that: a consumer using it for a phone takeover would
+  // otherwise get a content-hugging 640px card out of a catalog bump, with
+  // nothing in the API left to ask for what they had. So it is answered before
+  // either rule below touches it.
+  if (size === 'full') return { width: '100%', height: '100%' };
 
   // The cross axis is the same rule whatever the preset, and the draggable
   // variant needs it too — dragging moves the panel's height, never its width.
@@ -283,6 +292,14 @@ export const panelSx = (input: PanelSxInput): CSSObject => {
     input;
 
   return {
+    // The DEFAULT, so the glow and the elevated shadow are not clipped by the
+    // panel they hang off. It used to be stated last, which made it a rule
+    // nothing could override — including `gradient`, whose own `overflow:
+    // hidden` is what keeps its shimmer inside the panel. That was invisible
+    // while every vertical sheet was full-bleed, because the sweep starts at
+    // `left: -100%` and a full-width panel put it off-screen; a 640px one puts
+    // it on the backdrop beside the sheet.
+    overflow: 'visible',
     ...sizeStyles({ position, size, isDraggableVariant, currentHeight }),
     // A COLUMN, so `maxHeight` above can be a ceiling rather than a height: the
     // body is then a flex item that shrinks against it, and the scrolling falls
@@ -291,7 +308,6 @@ export const panelSx = (input: PanelSxInput): CSSObject => {
     ...(isVerticalSheet ? { display: 'flex', flexDirection: 'column' } : {}),
     ...variantStyles(input),
     ...style,
-    overflow: 'visible',
     // Expand only the cross axis so the chosen `size` still governs the main
     // axis: side sheets keep their (responsive) width and go full-height;
     // top/bottom sheets keep their height and go full-width.
