@@ -98,4 +98,35 @@ export function itAnswersAPointerLikeASurface(
       expect({ state, moved }).toEqual({ state, moved: [] });
     }
   });
+
+  /**
+   * The one-token edit that already shipped once on this branch.
+   *
+   * The root declares `opacity <ACTIVE.ms>` alongside its `all 0.3s`. A bare
+   * `transition` shorthand inside a pointer block outranks it — `.css-x:hover`
+   * is (0,2,0) against the root's (0,1,0) — and a mouse `:active` ALWAYS
+   * implies `:hover`, so re-adding one silently cuts the press's fade back to
+   * 300ms. That is the whole mechanism the press is built on, it was invisible
+   * to all 1530 tests, and until this case existed the only thing defending it
+   * was a comment asking the next editor not to.
+   */
+  it('declares no transition on a pointer state, which would outrank the root', () => {
+    const css = cssAfterMount();
+
+    for (const state of [':hover', ':focus-visible']) {
+      const timed = blocksFor(css, state).filter((block) => /transition\s*:/.test(block));
+      expect({ state, timed }).toEqual({ state, timed: [] });
+    }
+  });
+
+  /**
+   * A surface that answers a pointer with NOTHING passes every case above.
+   *
+   * Banner shipped exactly that — measured ΔE76 0.00 on every variant, in both
+   * modes — and the guard forbade movement without ever requiring feedback, so
+   * deleting the states again would have stayed green.
+   */
+  it('answers a hover with a colour step rather than with nothing', () => {
+    expect(blocksFor(cssAfterMount(), ':hover').join('\n')).toMatch(/filter\s*:\s*brightness/);
+  });
 }

@@ -12,15 +12,10 @@ import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { BANNER_OPACITY_S, bannerPartStyles, bannerPointerStates, fadeInSlide, getVariantColor } from './Banner.styles';
+import { FOCUS } from '../Alert/Alert.metrics';
 import type { BannerProps, BannerVariant } from './Banner.types';
 
-/**
- * The keyboard focus ring: ONE ring, not a ring under a halo.
- *
- * Matches `Alert`'s, because the two are the same kind of surface and a
- * reader who tabs between them should not be told they are different things.
- */
-const BANNER_FOCUS = { ringWidth: 2, ringAlpha: 0.7, offset: 2 } as const;
+
 
 const StyledBanner = styled(Box, {
   shouldForwardProp: (prop) => !['variant', 'sticky', 'fullWidth'].includes(prop as string),
@@ -61,8 +56,8 @@ const StyledBanner = styled(Box, {
     // ring stays for whoever tabs here and never fires on a click. Same defect
     // and same fix as `Alert`, which is the sibling surface (FUT-1458).
     '&:focus-visible': {
-      outline: `${BANNER_FOCUS.ringWidth}px solid ${alpha(colorPalette.main, BANNER_FOCUS.ringAlpha)}`,
-      outlineOffset: `${BANNER_FOCUS.offset}px`,
+      outline: `${FOCUS.ringWidth}px solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
+      outlineOffset: `${FOCUS.offset}px`,
     },
 
     ...bannerPartStyles(theme, colorPalette),
