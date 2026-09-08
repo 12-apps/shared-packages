@@ -58,8 +58,18 @@ function pointerShadow(
   theme: Theme,
   colorPalette: AlertPalette,
   glow: boolean,
+  variant: string | undefined,
 ): (alpha_: number) => string {
-  const ink = theme.palette.mode === 'light' ? '#000000' : '#ffffff';
+  // The tint moves the surface AWAY from its own ink, which is why this reads
+  // the variant and not only the mode.
+  //
+  // `gradient` is the one variant where the two disagree: it paints a
+  // mid-lightness sweep (L* 42–61) under WHITE ink in BOTH modes, so the
+  // mode-keyed answer tinted it white in dark mode — toward the text. Measured:
+  // white-on-gradient fell to 2.90:1 on hover and 2.41:1 pressed, under the 3:1
+  // floor and below its own idle. Every other variant's surface tracks the mode,
+  // so for them the two rules agree.
+  const ink = variant === 'gradient' || theme.palette.mode === 'light' ? '#000000' : '#ffffff';
   const glowShadow = glow
     ? `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`
     : null;
@@ -79,7 +89,7 @@ const StyledAlert = styled(MuiAlert, {
 }>(({ theme, customVariant, customColor, glow, pulse, animate }) => {
   const colorPalette = getColorFromTheme(theme, customColor || customVariant || 'info');
 
-  const withTint = pointerShadow(theme, colorPalette, Boolean(glow));
+  const withTint = pointerShadow(theme, colorPalette, Boolean(glow), customVariant);
 
   return {
     borderRadius: theme.spacing(ALERT_RADIUS_UNITS),
