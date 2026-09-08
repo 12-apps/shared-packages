@@ -1,0 +1,83 @@
+/**
+ * Shared by `Alert`'s and `Banner`'s pointer-state guards.
+ *
+ * The two live in separate FILES on purpose. Emotion emits its rules under its
+ * own hash — an element carries `css-10q5rg1-MuiPaper-root-MuiAlert-root`
+ * while the rule is written as `.css-1q9rkac:focus-visible` — so a guard
+ * cannot find "this element's rules" by reading its className, and a file that
+ * renders two components can only ask the sheet a question one of them
+ * answers. Vitest gives each FILE its own jsdom, so one component per file
+ * makes the whole sheet that component's.
+ *
+ * Emotion also keeps its own record of what it has inserted, so clearing
+ * `document.head` between cases does NOT make it re-emit: the sheet comes back
+ * empty and every assertion over it passes vacuously. That is how the first
+ * draft of this guard shipped cases that stayed green with the defect
+ * restored. Nothing here clears it.
+ */
+import type { JSX } from 'react';
+import { expect, it } from 'vitest';
+import { render } from '@testing-library/react';
+
+import { ThemeProvider, createTheme } from '../../../mui/styles';
+
+/** Every rule Emotion has injected in this file's jsdom. */
+const emittedCss = (): string =>
+  Array.from(document.querySelectorAll('style'))
+    .map((el) => el.textContent ?? '')
+    .join('\n');
+
+/** The declarations inside each block whose selector carries `pseudo`. */
+export const blocksFor = (css: string, pseudo: string): string[] => {
+  const out: string[] = [];
+  let from = 0;
+  for (;;) {
+    const at = css.indexOf(pseudo, from);
+    if (at === -1) return out;
+    const open = css.indexOf('{', at);
+    const close = css.indexOf('}', open);
+    if (open === -1 || close === -1) return out;
+    out.push(css.slice(open + 1, close));
+    from = close;
+  }
+};
+
+/**
+ * The three claims both surfaces make about a pointer.
+ *
+ * `Alert` and `Banner` are the same kind of thing — a message you read, not a
+ * control you operate — and both answered a mouse with a keyboard's
+ * affordance: `tabIndex={0}` plus a `:focus-within` ring meant a plain CLICK
+ * painted a focus outline, which reads as an error state rather than as "you
+ * clicked something" (FUT-1458).
+ *
+ * jsdom resolves neither `:focus-visible` nor an Emotion pseudo-class through
+ * `getComputedStyle`, so there is no rendered ring to measure here — that
+ * measurement belongs in a browser and was made in one. What a unit test can
+ * hold is the RULE: the ring is attached to the keyboard-only selector, and no
+ * pointer state moves the element. Both flip the moment someone restores
+ * `:focus-within` or a `transform`, which is the whole job.
+ */
+export function itAnswersAPointerLikeASurface(mount: () => JSX.Element): void {
+  const cssAfterMount = (): string => {
+    render(<ThemeProvider theme={createTheme()}>{mount()}</ThemeProvider>);
+    return emittedCss();
+  };
+
+  it('attaches its focus ring to :focus-visible', () => {
+    expect(blocksFor(cssAfterMount(), ':focus-visible').join('\n')).toContain('outline');
+  });
+
+  it('attaches no ring to :focus-within, which a mouse click would satisfy', () => {
+    expect(blocksFor(cssAfterMount(), ':focus-within').join('\n')).not.toContain('outline');
+  });
+
+  it('moves nothing while hovered or pressed', () => {
+    const css = cssAfterMount();
+
+    for (const state of [':hover', ':active']) {
+      const moved = blocksFor(css, state).filter((block) => /transform\s*:/.test(block));
+      expect({ state, moved }).toEqual({ state, moved: [] });
+    }
+  });
+}

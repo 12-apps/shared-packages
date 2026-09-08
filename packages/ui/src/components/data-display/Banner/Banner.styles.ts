@@ -105,10 +105,12 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
     marginLeft: theme.spacing(1),
     flexShrink: 0,
 
+    // Opacity and a wash only: the dismiss used to spin 90deg, which drew the
+    // eye to the way out rather than to the message. Same fix as `Alert`'s
+    // close button, which is the sibling surface (FUT-1458).
     '&:hover': {
       opacity: 1,
       backgroundColor: alpha(colorPalette.main, 0.1),
-      transform: 'rotate(90deg)',
     },
 
     '&:focus': {

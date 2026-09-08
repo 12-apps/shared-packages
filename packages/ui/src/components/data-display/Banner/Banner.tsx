@@ -14,6 +14,14 @@ import React from 'react';
 import { bannerPartStyles, fadeInSlide, getVariantColor } from './Banner.styles';
 import type { BannerProps, BannerVariant } from './Banner.types';
 
+/**
+ * The keyboard focus ring: ONE ring, not a ring under a halo.
+ *
+ * Matches `Alert`'s, because the two are the same kind of surface and a
+ * reader who tabs between them should not be told they are different things.
+ */
+const BANNER_FOCUS = { ringWidth: 2, ringAlpha: 0.7, offset: 2 } as const;
+
 const StyledBanner = styled(Box, {
   shouldForwardProp: (prop) => !['variant', 'sticky', 'fullWidth'].includes(prop as string),
 })<{
@@ -42,10 +50,17 @@ const StyledBanner = styled(Box, {
     animation: `${fadeInSlide} 0.3s ease-out`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
 
-    // Enhanced accessibility and focus styles
-    '&:focus-within': {
-      outline: `3px solid ${alpha(colorPalette.main, 0.5)}`,
-      outlineOffset: '2px',
+    // Focus: `:focus-visible`, not `:focus-within`.
+    //
+    // The banner carries `tabIndex={0}`, so a MOUSE CLICK focused it and
+    // painted this ring — a keyboard affordance answering a pointer, which is
+    // what made clicking one look like an error state. `:focus-visible` is the
+    // browser's own answer to whether the focus came from the keyboard: the
+    // ring stays for whoever tabs here and never fires on a click. Same defect
+    // and same fix as `Alert`, which is the sibling surface (FUT-1458).
+    '&:focus-visible': {
+      outline: `${BANNER_FOCUS.ringWidth}px solid ${alpha(colorPalette.main, BANNER_FOCUS.ringAlpha)}`,
+      outlineOffset: `${BANNER_FOCUS.offset}px`,
     },
 
     ...bannerPartStyles(theme, colorPalette),
@@ -125,9 +140,11 @@ const buildActionSx = (
       backgroundColor: palette.main,
       color: theme.palette.getContrastText(palette.main),
 
+      // Colour only. The banner itself moves nothing under a pointer, and an
+      // action that lifts inside one that does not is the inconsistency a
+      // reader notices without being able to name it (FUT-1458).
       '&:hover': {
         backgroundColor: palette.dark || palette.main,
-        transform: 'translateY(-1px)',
       },
     }),
 
@@ -138,7 +155,6 @@ const buildActionSx = (
       '&:hover': {
         backgroundColor: alpha(palette.main, 0.1),
         borderColor: palette.main,
-        transform: 'translateY(-1px)',
       },
     }),
   };
