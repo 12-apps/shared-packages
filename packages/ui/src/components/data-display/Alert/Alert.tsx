@@ -212,10 +212,18 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: 
       // same thing.
       '&:focus-visible': {
         opacity: 1,
-        // `currentColor` is the alert's own ink, which the button inherits
-        // through `color="inherit"` — and `alert-contrast.test.tsx` already
-        // holds that ink readable against every variant's surface, so the ring
-        // inherits a contrast guarantee instead of asserting a new one.
+        // `currentColor` is the alert's own ink, inherited through
+        // `color="inherit"`, so the ring is drawn in whatever colour was
+        // already chosen to be READ on this surface. Measured 11.2:1 on the
+        // semantic variants and 5.7:1 on `gradient`.
+        //
+        // That is a reasoned choice, not a test-backed one, and the difference
+        // matters: `alert-contrast.test.tsx` covers the ink of the four
+        // semantic variants only — its `glass` case asserts the pane's alpha
+        // rather than its ink, and `gradient` it does not render at all. A
+        // translucent surface's contrast depends on what sits behind it, which
+        // is why that test stops where it does and why this comment does not
+        // borrow a guarantee it never made.
         outline: `${FOCUS.ringWidth}px solid currentColor`,
         outlineOffset: `${FOCUS.offset}px`,
         backgroundColor: alpha(theme.palette.action.focus, CLOSE_BUTTON.washAlpha),
