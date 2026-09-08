@@ -118,11 +118,18 @@ throwing.
 
 - The mark is `role="img"` labelled with the name, so a screen reader says
   "Future Drink" rather than spelling out "F D".
-- With `onDisclose`, the whole identity block is one `<button>` with
-  `aria-haspopup="dialog"` and a live `aria-expanded`. The button wraps
-  everything rather than sitting beside the title: on a phone the chevron alone
-  is a 20px target next to a 40px one that does nothing, and a shopper aiming at
-  the store's name expects the store's details.
+- With `onDisclose`, the identity's **name row** is a `<button>` with
+  `aria-haspopup="dialog"` and a live `aria-expanded`. It is the full-width row,
+  chevron included, rather than the chevron alone — on a phone that would be a
+  20px target next to a 40px mark that does nothing, and a reader aiming at the
+  store's name expects the store's details.
+- **`status` and `subtitle` render OUTSIDE that button, and must** (12-63). Both
+  are `ReactNode`, and `AppHeaderStatus.items` is a `ReactNode[]`, so a segment
+  of the state line is free to be a control — a mesa chip, a mode picker — and
+  consumers do exactly that. The disclosure used to wrap the whole block, which
+  made those `<button>`s inside a `<button>`: invalid HTML, and one tap firing
+  two handlers. Put controls in the state line freely; put nothing interactive
+  in `title`, which is a `string` and belongs to the button.
 - The state line separates its segments with real whitespace, not CSS margin —
   a screen reader reads `textContent`, and a margin-only gap runs "Aberto agora"
   straight into "Retirada no balcão" as one word. The separator glyph itself is

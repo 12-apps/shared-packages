@@ -192,6 +192,43 @@ export const LongName: Story = {
   ),
 };
 
+/**
+ * A state line that carries CONTROLS of its own (12-63).
+ *
+ * The arrangement every storefront ends up in: a chip naming where the shopper
+ * is, and a picker for changing it, both inside the line under the title. It is
+ * a story rather than only a test because the thing to look at is that tapping
+ * either one does its own job and leaves the details panel shut — the
+ * disclosure stops at the name row above them.
+ */
+export const StatusLineWithControls: Story = {
+  render: function StatusLineWithControlsStory() {
+    const [seat, setSeat] = React.useState('Geladeira');
+    return (
+      <DisclosingHeader
+        title="Future Drink"
+        cart
+        status={
+          <AppHeaderStatus
+            tone="success"
+            items={[
+              <Button
+                key="seat"
+                variant="ghost"
+                size="xs"
+                onClick={() => setSeat(seat === 'Geladeira' ? 'Balcão' : 'Geladeira')}
+              >
+                {seat}
+              </Button>,
+              'Aberto agora',
+            ]}
+          />
+        }
+      />
+    );
+  },
+};
+
 /** Open the panel and let the viewport decide which surface it takes. */
 export const WithDetails: Story = {
   render: () => <DisclosingHeader title="Future Drink" status={<StoreStatus />} cart />,

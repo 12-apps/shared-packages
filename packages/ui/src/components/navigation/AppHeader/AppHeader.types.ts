@@ -62,20 +62,28 @@ export interface AppHeaderStatusProps {
  * the consumer's own router in the `leading` slot, whereas an `href` prop would
  * have to guess whose link component it is being handed — `to` for one router,
  * `href` for another — and would half-work for everybody. `onDisclose` is the
- * only interaction the block owns: with it the block is a button and a chevron
- * appears, without it the block is static text.
+ * only interaction the block owns: with it the NAME ROW is a button and a
+ * chevron appears, without it the row is static text.
+ *
+ * The button stops at that row (12-63). `status` and `subtitle` render as its
+ * SIBLINGS, so a consumer may put controls in the state line — which they do,
+ * and which used to nest a `<button>` inside a `<button>`.
  */
 export interface AppHeaderIdentityProps
   extends Pick<AppHeaderBrandProps, 'logoUrl' | 'seedColor'> {
   /** The name shown, and the one the mark derives its initials from. */
   title: string;
-  /** A quieter line under the title — use `status` for the dotted state line. */
+  /**
+   * A quieter line under the title — use `status` for the dotted state line.
+   *
+   * Rendered OUTSIDE the disclosure, like `status`, so it may hold a control.
+   */
   subtitle?: ReactNode;
   /** The state line, usually an {@link AppHeaderStatusProps} element. */
   status?: ReactNode;
   /** Replaces the derived mark entirely (an icon, an `<img>`, nothing). */
   mark?: ReactNode;
-  /** Opens the details panel. Renders the block as a button with a chevron. */
+  /** Opens the details panel. Renders the NAME ROW as a button with a chevron. */
   onDisclose?: () => void;
   /** Whether the panel `onDisclose` opens is currently open (`aria-expanded`). */
   disclosed?: boolean;
