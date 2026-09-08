@@ -68,7 +68,6 @@ const StyledAlert = styled(MuiAlert, {
     // light theme and lightens a dark one, so it reads as arriving in both.
     '&:hover': {
       filter: `brightness(${HOVER.brightness[theme.palette.mode]})`,
-      transition,
 
       '&::before': {
         opacity: 1,
@@ -82,8 +81,23 @@ const StyledAlert = styled(MuiAlert, {
     // the first tenth of itself and read as a flicker. The dip lands at once
     // and the second is what the alert takes coming back — which is the part a
     // person actually watches, and the part that reads as deliberate.
-    '&:active': {
+    //
+    // Neither `:hover` nor `:focus-visible` may declare `transition` for the
+    // same reason, and that is not a style preference. `:active` under a mouse
+    // ALWAYS implies `:hover`, so a bare `transition` shorthand in the hover
+    // block outranks the root's (0,2,0 beats 0,1,0) and resets opacity to the
+    // 300ms `all` — the second this whole state is built around never ran.
+    //
+    // The `:not(:has(…))` names CONTROLS, not any descendant. `:active`
+    // matches an ancestor of whatever is pressed, so dismissing an alert
+    // dimmed the alert being dismissed and pressing a call to action dimmed
+    // the message explaining it. Excluding `:has(:active)` wholesale does not
+    // work and was the first attempt: pressing the TEXT makes that text
+    // `:active` too, so the guard matched on every press and the state never
+    // fired at all.
+    '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
       opacity: ACTIVE.opacity,
+      filter: `brightness(${ACTIVE.brightness[theme.palette.mode]})`,
       transition: 'none',
     },
 
@@ -98,10 +112,14 @@ const StyledAlert = styled(MuiAlert, {
     // One ring, not three. It was a 3px outline at 3px offset UNDER a 6px halo,
     // and stacking two rings on one edge is what read as unfinished rather than
     // as emphasis.
+    // It declares no `transition`: `outline-style` is discrete, so the ring
+    // arrives at full width with only its COLOUR easing — from `currentcolor`,
+    // the near-black alert ink, to the blue. That is a visible dark flash on
+    // every keyboard focus, and it would also outrank the root's opacity
+    // transition the way the hover block did.
     '&:focus-visible': {
       outline: `${FOCUS.ringWidth}px solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
       outlineOffset: `${FOCUS.offset}px`,
-      transition: `outline-color ${seconds(FOCUS.ms)} ease`,
     },
 
     ...alertVariantStyles(theme, customVariant, colorPalette),
@@ -181,9 +199,25 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: 
         opacity: 1,
         backgroundColor: alpha(theme.palette.action.hover, CLOSE_BUTTON.washAlpha),
       },
-      '&:focus': {
+      // A REAL ring, on the keyboard-only selector.
+      //
+      // This used to be `&:focus` setting `outline: 'none'` over a
+      // `rgba(0,0,0,0.1)` wash — 1.25:1 against the info surface, and MUI's
+      // ButtonBase already sets `outline: 0`, so there was no UA fallback
+      // either. It went unnoticed while the ROOT still matched `:focus-within`
+      // and drew a ring around the whole alert; moving the root to
+      // `:focus-visible` took that away and left this button with no visible
+      // focus at all. `Banner`'s dismiss already draws its own outline, so
+      // this is also what keeps the two surfaces telling a keyboard user the
+      // same thing.
+      '&:focus-visible': {
         opacity: 1,
-        outline: 'none',
+        // `currentColor` is the alert's own ink, which the button inherits
+        // through `color="inherit"` — and `alert-contrast.test.tsx` already
+        // holds that ink readable against every variant's surface, so the ring
+        // inherits a contrast guarantee instead of asserting a new one.
+        outline: `${FOCUS.ringWidth}px solid currentColor`,
+        outlineOffset: `${FOCUS.offset}px`,
         backgroundColor: alpha(theme.palette.action.focus, CLOSE_BUTTON.washAlpha),
       },
     })}

@@ -2,6 +2,7 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.js';
 
 import type { BannerVariant } from './Banner.types';
+import { ACTIVE, HOVER } from '../Alert/Alert.metrics';
 
 // Animations
 export const fadeInSlide = keyframes`
@@ -113,10 +114,42 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
       backgroundColor: alpha(colorPalette.main, 0.1),
     },
 
-    '&:focus': {
+    '&:focus-visible': {
       opacity: 1,
       outline: `2px solid ${colorPalette.main}`,
       outlineOffset: '2px',
     },
   },
 });
+
+/**
+ * The pointer states, from `Alert`'s own table.
+ *
+ * Banner had NO hover at all — measured ΔE76 0.00 on every variant in both
+ * modes — so moving between the two surfaces gave feedback on one and silence
+ * on the other. They are the same kind of thing and now answer a pointer the
+ * same way.
+ *
+ * Neither block may declare `transition`: `:active` under a mouse always
+ * implies `:hover`, so a shorthand here would outrank the root's and reset the
+ * opacity fade the press is built on.
+ */
+export const bannerPointerStates = (theme: Theme) => ({
+  '&:hover': {
+    filter: `brightness(${HOVER.brightness[theme.palette.mode]})`,
+  },
+
+  // The `:not(:has(…))` names CONTROLS, not any descendant: `:active` matches
+  // an ancestor of whatever is pressed, so without it pressing the dismiss or
+  // an action dimmed the message that owns it. Excluding `:has(:active)`
+  // wholesale does not work — pressing the TEXT makes that text `:active` too,
+  // so the guard matched on every press and the state never fired.
+  '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
+    opacity: ACTIVE.opacity,
+    filter: `brightness(${ACTIVE.brightness[theme.palette.mode]})`,
+    transition: 'none',
+  },
+});
+
+/** The seconds the press takes easing back, shared with `Alert`. */
+export const BANNER_OPACITY_S = ACTIVE.ms / 1000;

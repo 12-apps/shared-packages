@@ -54,14 +54,22 @@ export const CLOSE_BUTTON = { padding: 5, iconSize: 18, opacity: 0.7, washAlpha:
 export const SEMANTIC_SURFACE = { tint: { light: 0.9, dark: 0.8 }, ink: 0.6, borderAlpha: 0.35 } as const;
 /** `glass`: 85% paper under a 20px blur, a 0.4 divider hairline. */
 export const GLASS = { backgroundAlpha: 0.85, borderAlpha: 0.4, blur: 20, saturatePercent: 180 } as const;
-/** `gradient`: light→dark at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s. */
+/**
+ * `gradient`: light→dark at 0.9 along 135°, a 0.2 white shimmer sweeping 1000px every 3s.
+ *
+ * It carries no hover of its own, and that is load-bearing rather than an
+ * omission. `alertVariantStyles` is spread AFTER the root's `'&:hover'` in the
+ * same object literal, so a second `'&:hover'` key does not merge with it — it
+ * REPLACES it. While this variant had one, `gradient` was the only alert that
+ * brightened on hover while every other variant darkened, and the only one to
+ * lose the shimmer reveal the root's hover performs.
+ */
 export const GRADIENT = {
   angleDeg: 135,
   stopAlpha: 0.9,
   shimmerAlpha: 0.2,
   shimmerMs: 3000,
   shimmerTravel: 1000,
-  hoverBrightness: 1.04,
 } as const;
 
 /** Emphasis: the glow's shadow and brightness, the pulse's wash. */
@@ -89,9 +97,31 @@ export const PULSE = { alpha: 0.2, ms: 2000, spread: 10 } as const;
  * makes it recede — the pointer lands and the alert dims, which is the wrong
  * sentence. Each mode moves AWAY from its own background instead.
  */
-export const HOVER = { brightness: { light: 0.93, dark: 1.14 } } as const;
-export const ACTIVE = { opacity: 0.8, ms: 1000 } as const;
-export const FOCUS = { ringWidth: 2, ringAlpha: 0.7, offset: 2, ms: 150 } as const;
+export const HOVER = { brightness: { light: 0.93, dark: 1.22 } } as const;
+
+/**
+ * The press: a 20% opacity dip that carries a brightness step WITH it.
+ *
+ * The opacity alone inverts the hover, which is why the pair exists. Composited
+ * over a light page, 0.8 makes a light tint LIGHTER — measured L* 95.0 idle,
+ * 89.1 hovered, 91.1 pressed — so pushing the surface looked like the pointer
+ * leaving it. Over a dark page it lands back on the idle surface instead:
+ * ΔE76 0.82 on `glass`, under the threshold at which anything is visible at
+ * all. The step deepens the hover's own direction so a press reads as more of
+ * what hovering already said, in both modes.
+ */
+export const ACTIVE = { opacity: 0.8, brightness: { light: 0.84, dark: 1.42 }, ms: 1000 } as const;
+
+/**
+ * The focus ring: FULL colour, not a wash.
+ *
+ * At 0.7 over a white page the ring measured 2.24:1 on `warning` and 2.56:1 on
+ * `info` — under the 3:1 that WCAG 2.2 SC 1.4.11 asks of a non-text indicator.
+ * The 2px offset puts the page, not the alert, on both sides of the outline, so
+ * the alpha was being composited against white rather than against the tint it
+ * was chosen for.
+ */
+export const FOCUS = { ringWidth: 2, ringAlpha: 1, offset: 2 } as const;
 
 /** `neutral` has no palette slot; the web has always drawn it from three greys. */
 export const NEUTRAL_GREY: Record<'main' | 'light' | 'dark', UiGreyStep> = { main: 500, light: 300, dark: 700 };

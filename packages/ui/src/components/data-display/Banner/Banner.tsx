@@ -11,7 +11,7 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { bannerPartStyles, fadeInSlide, getVariantColor } from './Banner.styles';
+import { BANNER_OPACITY_S, bannerPartStyles, bannerPointerStates, fadeInSlide, getVariantColor } from './Banner.styles';
 import type { BannerProps, BannerVariant } from './Banner.types';
 
 /**
@@ -48,7 +48,9 @@ const StyledBanner = styled(Box, {
     marginLeft: fullWidth ? '50%' : 0,
     transform: fullWidth ? 'translateX(-50%)' : 'none',
     animation: `${fadeInSlide} 0.3s ease-out`,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: `all 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity ${BANNER_OPACITY_S}s cubic-bezier(0.4, 0, 0.2, 1)`,
+
+    ...bannerPointerStates(theme),
 
     // Focus: `:focus-visible`, not `:focus-within`.
     //

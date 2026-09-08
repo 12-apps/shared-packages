@@ -57,9 +57,28 @@ export const blocksFor = (css: string, pseudo: string): string[] =>
  * pointer state moves the element. Both flip the moment someone restores
  * `:focus-within` or a `transform`, which is the whole job.
  */
-export function itAnswersAPointerLikeASurface(mount: () => JSX.Element): void {
+export function itAnswersAPointerLikeASurface(
+  variants: readonly string[],
+  mount: (variant: string) => JSX.Element,
+): void {
+  /**
+   * Every mount, so the sheet holds every variant's rules.
+   *
+   * Rendering one variant is what made the first version of the "moves
+   * nothing" case unfailable: a variant that declares its own `'&:hover'` is
+   * never SERIALISED unless something renders it, and `alertVariantStyles` is
+   * spread after the root's hover, so such a key replaces the shared block
+   * rather than merging into it. `gradient` did exactly that, and re-adding a
+   * `transform` to it left this file green.
+   *
+   * The list is the CALLER's because the two surfaces do not share one:
+   * `glass` and `gradient` are Alert's alone, and a Banner asked for either
+   * resolves no palette and throws.
+   */
   const cssAfterMount = (): string => {
-    render(<ThemeProvider theme={createTheme()}>{mount()}</ThemeProvider>);
+    for (const variant of variants) {
+      render(<ThemeProvider theme={createTheme()}>{mount(variant)}</ThemeProvider>);
+    }
     return emittedCss();
   };
 
