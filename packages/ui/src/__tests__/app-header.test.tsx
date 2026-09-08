@@ -235,6 +235,70 @@ describe("AppHeaderIdentity", () => {
     });
   });
 
+  it("keeps the state line's own controls OUT of the disclosure (12-63)", () => {
+    // `status` takes a `ReactNode`, and `AppHeaderStatus.items` is a
+    // `ReactNode[]` — so a segment of the state line is free to be a control,
+    // and consumers put controls there. While the whole block was one
+    // `<button>` those were `<button>`s inside a `<button>`: invalid HTML, and
+    // one tap fired two handlers. An adopting storefront opened its store panel
+    // on every tap of the two controls in its own state line because of it.
+    const onDisclose = vi.fn();
+    const onSegment = vi.fn();
+    render(
+      <AppHeaderIdentity
+        title="Future Drink"
+        onDisclose={onDisclose}
+        status={
+          <AppHeaderStatus
+            tone="success"
+            items={[
+              <button key="chip" type="button" onClick={onSegment}>
+                Geladeira
+              </button>,
+              "Aberto agora",
+            ]}
+          />
+        }
+      />,
+    );
+
+    const disclosure = screen.getByTestId("app-header-identity");
+    const segment = screen.getByRole("button", { name: "Geladeira" });
+    expect(disclosure).not.toContainElement(segment);
+
+    fireEvent.click(segment);
+    expect(onSegment).toHaveBeenCalledTimes(1);
+    // The whole of the defect: this used to be 1.
+    expect(onDisclose).not.toHaveBeenCalled();
+  });
+
+  it("keeps a subtitle out of the disclosure for the same reason", () => {
+    render(
+      <AppHeaderIdentity
+        title="Future Drink"
+        onDisclose={vi.fn()}
+        subtitle={<span data-testid="tagline">Mercado de autoatendimento</span>}
+      />,
+    );
+
+    expect(screen.getByTestId("app-header-identity")).not.toContainElement(
+      screen.getByTestId("tagline"),
+    );
+  });
+
+  it("still gives the disclosure the whole name row to aim at", () => {
+    // What the block gave up is the MARK, not the target: the button is the
+    // full-width title row, chevron included, so a reader aiming at the store's
+    // name still gets the store's details.
+    render(<AppHeaderIdentity title="Future Drink" onDisclose={vi.fn()} />);
+
+    const disclosure = screen.getByTestId("app-header-identity");
+    expect(disclosure.tagName).toBe("BUTTON");
+    expect(disclosure).toContainElement(screen.getByTestId("app-header-identity-title"));
+    expect(disclosure).toContainElement(screen.getByTestId("app-header-identity-chevron"));
+    expect(disclosure).not.toContainElement(screen.getByTestId("app-header-identity-brand"));
+  });
+
   it("holds a skeleton while the identity resolves, showing no title", async () => {
     // An app that paints a fallback name flashes the wrong brand for a frame on
     // every load — on a white-label storefront, the platform's name on a page a
