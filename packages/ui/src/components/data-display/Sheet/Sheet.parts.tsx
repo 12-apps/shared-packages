@@ -159,6 +159,10 @@ export const SheetContent: React.FC<SheetContentProps> = (props) => {
     <Box
       className={className}
       data-testid={dataTestId}
+      // No `minHeight: 0` here, deliberately: a flex item's automatic minimum
+      // size only applies while its main-axis `overflow` is `visible`, and this
+      // one is `auto`, so it already shrinks. `SheetBody` above is the item that
+      // needs it stated.
       sx={{ flex: 1, overflow: 'auto', p: padded ? 2 : 0, ...style }}
     >
       {children}
