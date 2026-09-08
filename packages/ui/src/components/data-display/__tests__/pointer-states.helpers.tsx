@@ -27,20 +27,19 @@ const emittedCss = (): string =>
     .map((el) => el.textContent ?? '')
     .join('\n');
 
-/** The declarations inside each block whose selector carries `pseudo`. */
-export const blocksFor = (css: string, pseudo: string): string[] => {
-  const out: string[] = [];
-  let from = 0;
-  for (;;) {
-    const at = css.indexOf(pseudo, from);
-    if (at === -1) return out;
-    const open = css.indexOf('{', at);
-    const close = css.indexOf('}', open);
-    if (open === -1 || close === -1) return out;
-    out.push(css.slice(open + 1, close));
-    from = close;
-  }
-};
+/**
+ * The declarations inside each block whose selector carries `pseudo`.
+ *
+ * Written as a split rather than an index walk because the flakiness lane
+ * rejects reassigning a binding from inside a loop — `no-global-state-mutation`
+ * — and that lane runs only in CI, so the walk this replaced was green on a
+ * laptop and red on the runner.
+ */
+export const blocksFor = (css: string, pseudo: string): string[] =>
+  css
+    .split('}')
+    .filter((chunk) => chunk.includes(pseudo) && chunk.includes('{'))
+    .map((chunk) => chunk.slice(chunk.indexOf('{') + 1));
 
 /**
  * The three claims both surfaces make about a pointer.
