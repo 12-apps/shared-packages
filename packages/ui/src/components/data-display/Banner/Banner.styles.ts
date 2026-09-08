@@ -154,5 +154,5 @@ export const bannerPointerStates = (theme: Theme): CSSObject => ({
   },
 });
 
-/** The seconds the press takes easing back, shared with `Alert`. */
-export const BANNER_OPACITY_S = ACTIVE.ms / 1000;
+/** The seconds the tint takes easing back, shared with `Alert`. */
+export const BANNER_TINT_S = ACTIVE.ms / 1000;

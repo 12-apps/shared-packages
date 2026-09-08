@@ -82,25 +82,23 @@ export const PULSE = { alpha: 0.2, ms: 2000, spread: 10 } as const;
  * HOVER and ACTIVE carry NO geometry, and that is the point rather than an
  * omission. They used to lift the card 3px, scale it 1.01, grow a 20px shadow
  * and spin the icon 10deg at 1.15 — four things moving at once on a surface
- * that is not a control, which made a page of alerts twitch under the pointer
- * and reflowed nothing but read as though it had.
+ * that is not a control, which made a page of alerts twitch under the pointer.
  *
- * A hover on a non-interactive surface only has to say "the pointer is here",
- * so one brightness step says it. Brightness rather than a background override
- * because every variant paints its own surface — standard a tint, `glass` a
- * blur, `gradient` a linear-gradient — and a colour written here would erase
- * whichever one is underneath.
- *
- * The step goes in OPPOSITE DIRECTIONS per mode, which is why this is a pair
- * and not a number. A single value has to pick one: darkening reads on the
- * light tints these alerts are, and on a dark surface the same multiplier
- * makes it recede — the pointer lands and the alert dims, which is the wrong
- * sentence. Each mode moves AWAY from its own background instead.
+ * Both are a TINT now: a flat inset layer over the surface. Two mechanisms
+ * came before it and each failed on a case the next had to fix. Dropping the
+ * element's `opacity` composites toward the PAGE, so it inverted the hover on
+ * a light tint (L* 95.0 idle, 89.1 hovered, 91.1 pressed) and vanished on a
+ * dark one. A `filter: brightness()` fixed the direction but is MULTIPLICATIVE,
+ * so it moved a near-black `glass` by four counts (ΔE76 1.71, under the JND)
+ * and Banner's 10%-alpha wash by ΔE76 0.44. A layer is additive: it reads the
+ * same on an opaque tint, a translucent wash and a gradient, and because it
+ * paints above the background and below the content the ink keeps its own
+ * contrast.
  */
 export const HOVER = { tintAlpha: 0.06 } as const;
 
 /**
- * The press: a 20% tint LAYER, eased back over a second.
+ * The press: a 20% tint LAYER, eased back fast.
  *
  * The layer is the point. The first attempt dropped the whole element's
  * opacity, which composites toward the PAGE and so behaves differently on
@@ -118,8 +116,19 @@ export const HOVER = { tintAlpha: 0.06 } as const;
  * so it reads the same on an opaque tint, a translucent wash and a gradient;
  * painted above the background and below the content, so the ink keeps its
  * own contrast; and animatable, which `background-image` is not.
+ *
+ * `ms` is 250 and not the 1000 first asked for, and the reason is that ONE
+ * property carries both states. CSS runs a transition from the DESTINATION
+ * state's declaration, and entering hover and releasing a press share that
+ * destination — so they cannot have different durations without a second
+ * animatable property, and both free pseudo-elements are already spent on the
+ * `gradient` shimmer and the `pulse` wash. At 1000ms the hover inherited the
+ * second: crossing an alert in 300ms peaked at a ≈ 0.024, under the JND, and
+ * for ~360ms the alert you had just LEFT was darker than the one under the
+ * pointer. A fast press-return is the smaller loss, and it is the call the
+ * product owner made when shown both.
  */
-export const ACTIVE = { tintAlpha: 0.2, ms: 1000 } as const;
+export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
 
 export const FOCUS = { ringWidth: 2, ringAlpha: 1, offset: 2 } as const;
 

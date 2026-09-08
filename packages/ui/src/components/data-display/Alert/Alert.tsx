@@ -101,11 +101,10 @@ const StyledAlert = styled(MuiAlert, {
 
     ...alertLayoutStyles(theme, colorPalette, animate),
 
-    // Hover: one brightness step, and nothing that moves. An alert is a
-    // surface rather than a control, so the pointer only needs telling it is
-    // here. The icon keeps its own place for the same reason — it is the
-    // variant's meaning, not an affordance to animate. The step darkens a
-    // light theme and lightens a dark one, so it reads as arriving in both.
+    // Hover: one tint step, and nothing that moves. An alert is a surface
+    // rather than a control, so the pointer only needs telling it is here. The
+    // icon keeps its own place for the same reason — it is the variant's
+    // meaning, not an affordance to animate.
     '&:hover': {
       boxShadow: withTint(HOVER.tintAlpha),
 
@@ -114,19 +113,17 @@ const StyledAlert = styled(MuiAlert, {
       },
     },
 
-    // Press: a 20% opacity dip over a full second, and still no geometry.
+    // Press: a 20% tint, landing at once and easing back. Still no geometry.
     //
-    // The second is the FADE, not the dip. A click's `:active` lasts about as
-    // long as the finger is down, so a 1000ms ease INTO 0.8 would be cut off at
-    // the first tenth of itself and read as a flicker. The dip lands at once
-    // and the second is what the alert takes coming back — which is the part a
-    // person actually watches, and the part that reads as deliberate.
+    // `transition: none` here is what makes the dip INSTANT: a click's
+    // `:active` lasts about as long as the finger is down, so easing into it
+    // would be cut off in its first tenth and read as a flicker. The ease is on
+    // the way back, governed by the root.
     //
-    // Neither `:hover` nor `:focus-visible` may declare `transition` for the
-    // same reason, and that is not a style preference. `:active` under a mouse
-    // ALWAYS implies `:hover`, so a bare `transition` shorthand in the hover
-    // block outranks the root's (0,2,0 beats 0,1,0) and resets opacity to the
-    // 300ms `all` — the second this whole state is built around never ran.
+    // Neither `:hover` nor `:focus-visible` may declare `transition`, and that
+    // is not a style preference. `:active` under a mouse ALWAYS implies
+    // `:hover`, so a bare shorthand in the hover block outranks the root's
+    // (0,2,0 beats 0,1,0) and silently resets the timing this state rests on.
     //
     // The `:not(:has(…))` names CONTROLS, not any descendant. `:active`
     // matches an ancestor of whatever is pressed, so dismissing an alert
