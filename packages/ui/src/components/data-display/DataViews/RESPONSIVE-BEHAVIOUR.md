@@ -46,6 +46,49 @@ Everything below exists to keep that true. When a change breaks it, the fix is
 another rung on the ladder — never a scrollbar, and never letting controls paint
 outside the toolbar.
 
+**"One line" is a rule about BROWSING.** Everything in this document describes
+the row an operator reads a list from, and the ladder measures that row. The
+selection row is a different row with different contents and no ladder at all —
+see below.
+
+---
+
+## The selection row
+
+Tick a checkbox and `exclusiveSelection` hands the whole toolbar to the
+selection cluster: the search, the filters, Exibir and Exportar all stand down,
+and what is left is "Limpar filtros", the count, whatever the host puts in
+`selectionExtra`, and the actions menu.
+
+That cluster is not on the ladder, and it must not be. The ladder sheds controls
+because each one it sheds has somewhere else to be — a filter into "Mais", a
+label into an icon, "Limpar" into a panel footer. Nothing here does. Dropping
+the count loses the only statement of what is about to be written to; dropping
+"Ações" loses the reason the operator ticked anything.
+
+**So below `md` it WRAPS instead**, which is the one thing the browsing row may
+never do:
+
+| | small mobile | large mobile | tablet | desktop |
+| --- | --- | --- | --- | --- |
+| checkbox + "Limpar filtros" + count | line 1 | line 1 | line 1 | line 1 |
+| `selectionExtra` + "Ações" | line 2 | line 2 | line 2 | line 1 |
+
+The break before `selectionExtra` is deliberate rather than wherever the row ran
+out of room. What follows it is one thought — what the selection IS ("Seleção:
+48 produtos — todas as páginas" and its "Limpar seleção") plus the control that
+acts on it — and a natural wrap split that thought mid-phrase.
+
+Before this, the cluster was pinned at content width with every child
+`flex-shrink: 0`. On Produtos with the scope armed that is ~766px of controls,
+so at 320 the row painted 446px past the toolbar's own edge and "Ações" sat
+off-screen behind a sideways scroll of the document. The button the whole
+selection exists to reach was the one you could not see.
+
+`ContentToolbar.stories.tsx` → **NarrowSelectionOverflow** is that exact row.
+Open it at 320 and 390; jsdom cannot see this failure, so no unit test can
+guard it.
+
 ---
 
 ## The ladder

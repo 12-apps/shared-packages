@@ -129,3 +129,55 @@ export const Default: Story = {
 export const WithSelection: Story = {
   render: () => <ToolbarHarness withSelection />,
 };
+
+/**
+ * The heaviest selection row there is, at the width it has to survive.
+ *
+ * Everything the bar can carry at once: "Limpar filtros", the count, the
+ * `selectionExtra` widening ("Seleção: 48 produtos — todas as páginas" plus its
+ * own "Limpar seleção") and an "Ações (20)" button. That is the Produtos
+ * catalogue with a page ticked and the scope armed, and on a 320px phone it is
+ * ~180px more than one line holds.
+ *
+ * Pinned as a story because the failure is a LAYOUT one and jsdom has no layout
+ * engine: the row used to overflow the toolbar and take "Ações" off-screen
+ * behind a sideways scroll, which no assertion in `__tests__` can see. Open it
+ * at 320 and 390 — the widening and the actions button belong on their own
+ * line, and the document must not scroll sideways.
+ */
+export const NarrowSelectionOverflow: Story = {
+  parameters: { viewport: { defaultViewport: 'mobile1' }, layout: 'fullscreen' },
+  render: () => (
+    <Box sx={{ px: 2, py: 1.25, borderTop: 1, borderBottom: 1, borderColor: 'divider' }}>
+      <ContentToolbar
+        selectAllLabel="Selecionar todos"
+        selectAllText="Selecionar todos nesta página"
+        clearAllText="Limpar filtros"
+        hasSelection
+        selectedCount={20}
+        selectAll={() => {}}
+        clearSelection={() => {}}
+        selectAllTestId="produtos-select-all"
+        clearAllTestId="produtos-clear-all"
+        exclusiveSelection
+        selectionExtra={
+          <>
+            <Typography component="span" sx={{ fontSize: '0.75rem' }}>
+              Seleção: 48 produtos — todas as páginas
+            </Typography>
+            <Button variant="text" size="small" sx={{ textTransform: 'none' }}>
+              Limpar seleção
+            </Button>
+          </>
+        }
+        actions={
+          <Button variant="outlined" size="small" sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}>
+            Ações (20) ▾
+          </Button>
+        }
+        leadingControls={<Box />}
+        rightControls={<Box />}
+      />
+    </Box>
+  ),
+};
