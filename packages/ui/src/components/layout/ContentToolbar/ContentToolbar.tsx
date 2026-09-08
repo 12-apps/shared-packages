@@ -60,11 +60,24 @@ function SelectionCluster({
       sx={{
         display: 'flex',
         minWidth: 0,
-        // Mobile: don't grow, so the controls sit on the SAME line as the checkbox
-        // (no orphaned selection row). Desktop: grow to push controls right.
-        flex: { xs: '0 0 auto', md: 1 },
+        // Browsing (mobile): don't grow, so the controls sit on the SAME line as
+        // the checkbox (no orphaned selection row). Desktop: grow to push
+        // controls right.
+        //
+        // SELECTING (mobile) it must be able to shrink instead. Its children are
+        // all `flex-shrink: 0`, so a cluster pinned at content width cannot wrap
+        // and the row painted past the toolbar's own edge — on Produtos at 390px
+        // that took "Ações" off-screen behind a sideways scroll, which is the
+        // one control the selection exists to reach.
+        flex: { xs: hasSelection ? '1 1 auto' : '0 0 auto', md: 1 },
         alignItems: 'center',
-        gap: 1.5,
+        // Wrapping is the phone's answer, and only the phone's: below `md` the
+        // cluster carries the count, the scope control and "Ações" at once, and
+        // no combination of those fits 320px on one line. From `md` up it stays
+        // a single line, where it always fitted.
+        flexWrap: { xs: 'wrap', md: 'nowrap' },
+        columnGap: 1.5,
+        rowGap: 1,
         ml: edgeAlign ? -1.5 : 0,
       }}
     >
@@ -89,32 +102,75 @@ function SelectionCluster({
         sx={{ p: 0.5, display: { xs: 'inline-flex', md: 'none' } }}
       />
       {hasSelection ? (
-        <>
-          <Button
-            variant="text"
-            size="small"
-            color="inherit"
-            onClick={clearSelection}
-            data-testid={clearAllTestId}
-            sx={selectionButtonSx}
-          >
-            {clearAllText}
-          </Button>
-          <Divider orientation="vertical" flexItem sx={{ height: 16, alignSelf: 'center' }} />
-          <Typography
-            component="span"
-            data-testid="selected-count-indicator"
-            sx={{ fontSize: '0.875rem', color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
-          >
-            {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
-          </Typography>
-          {selectionExtra}
-          {actionsSlot}
-        </>
-      ) : (
-        actionsSlot
-      )}
+        <SelectionState
+          selectedCount={selectedCount}
+          clearSelection={clearSelection}
+          clearAllTestId={clearAllTestId}
+          clearAllText={clearAllText}
+          selectionExtra={selectionExtra}
+        />
+      ) : null}
+      {actionsSlot}
     </Box>
+  );
+}
+
+/**
+ * What the cluster shows once something IS ticked: Clear All, the count, and
+ * the host's own `selectionExtra`.
+ *
+ * Its own component only because the cluster around it is at the complexity
+ * gate's line ceiling — but the split falls where the meaning does. Everything
+ * here exists only while a selection does, and the `actions` slot deliberately
+ * stays OUTSIDE it: a toolbar may carry actions while browsing too.
+ */
+function SelectionState({
+  selectedCount,
+  clearSelection,
+  clearAllTestId,
+  clearAllText,
+  selectionExtra,
+}: Pick<
+  ContentToolbarProps,
+  'selectedCount' | 'clearSelection' | 'clearAllTestId' | 'clearAllText' | 'selectionExtra'
+>): React.JSX.Element {
+  return (
+    <>
+      <Button
+        variant="text"
+        size="small"
+        color="inherit"
+        onClick={clearSelection}
+        data-testid={clearAllTestId}
+        sx={selectionButtonSx}
+      >
+        {clearAllText}
+      </Button>
+      <Divider orientation="vertical" flexItem sx={{ height: 16, alignSelf: 'center' }} />
+      <Typography
+        component="span"
+        data-testid="selected-count-indicator"
+        sx={{ fontSize: '0.875rem', color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
+      >
+        {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
+      </Typography>
+      {selectionExtra !== undefined && (
+        <>
+          {/* A DELIBERATE break, not a wrap that happened to land here. What
+              follows — "Seleção: 48 produtos — todas as páginas", its "Limpar
+              seleção", and "Ações" — is a sentence about the selection plus the
+              control that acts on it, and letting the phone break it wherever it
+              ran out of room split that sentence mid-phrase. Zero height so it
+              costs nothing but the row gap, and `display:none` from `md` up,
+              where the line still fits. */}
+          <Box
+            aria-hidden
+            sx={{ flexBasis: '100%', height: 0, display: { xs: 'block', md: 'none' } }}
+          />
+          {selectionExtra}
+        </>
+      )}
+    </>
   );
 }
 
