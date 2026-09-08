@@ -159,7 +159,10 @@ export const SheetContent: React.FC<SheetContentProps> = (props) => {
     <Box
       className={className}
       data-testid={dataTestId}
-      sx={{ flex: 1, overflow: 'auto', p: padded ? 2 : 0, ...style }}
+      // `minHeight: 0`, or a flex item refuses to shrink below its content and
+      // `overflow: auto` never engages — the sheet grows past its ceiling
+      // instead of scrolling inside it.
+      sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: padded ? 2 : 0, ...style }}
     >
       {children}
     </Box>

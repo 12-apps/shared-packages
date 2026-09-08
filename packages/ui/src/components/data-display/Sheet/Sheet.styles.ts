@@ -17,7 +17,7 @@ const isHorizontalPosition = (position: Position) => position === 'left' || posi
  * Horizontal (left/right) sheets are viewport-aware: a px floor keeps the panel
  * usable, `…vw` lets the larger presets grow on wide screens (lg ≥32%, xl ≥40%
  * of the viewport), and the outer `min(92vw, …)` guarantees the panel never
- * overflows a small screen. Vertical presets stay fixed-height.
+ * overflows a small screen.
  */
 const HORIZONTAL_SIZES: Record<Size, string> = {
   xs: 'min(92vw, 240px)',
@@ -28,20 +28,45 @@ const HORIZONTAL_SIZES: Record<Size, string> = {
   full: '100%',
 };
 
+/**
+ * `size` governs a vertical sheet's MAIN axis, and it is a CEILING rather than
+ * a height: the panel is as tall as what it holds, and starts scrolling only
+ * once that would pass the preset.
+ *
+ * It was a fixed `height`, which meant a short sheet reserved the rest of the
+ * preset as dead space — a `md` sheet holding three lines and a button drew a
+ * 400px panel and floated them in it. `min(…, 100%)` keeps the ceiling under
+ * the viewport, which is also what MUI's own bottom paper asks for.
+ */
 const VERTICAL_SIZES: Record<Size, number | string> = {
-  xs: 200,
-  sm: 300,
-  md: 400,
-  lg: 500,
-  xl: 600,
+  xs: 'min(200px, 100%)',
+  sm: 'min(300px, 100%)',
+  md: 'min(400px, 100%)',
+  lg: 'min(500px, 100%)',
+  xl: 'min(600px, 100%)',
   full: '100%',
 };
+
+/**
+ * How wide a top/bottom sheet is allowed to get — its CROSS axis, so it is one
+ * rule rather than one per `size` preset.
+ *
+ * A bottom sheet spanning the full width is a phone layout, and it was the only
+ * layout this component had: on a desktop a panel holding a sentence and one
+ * button was drawn 1900px wide, with the content stranded in the middle of it.
+ * 640px is Material's own ceiling for a bottom sheet above the handset
+ * breakpoint, and below it `100%` gives the phone back exactly what it had.
+ *
+ * `fullHeight` is the documented opt-out — it expands a vertical sheet along
+ * this axis — and it becomes meaningful here for the first time: it used to
+ * name the behaviour every bottom sheet already had.
+ */
+const VERTICAL_MAX_WIDTH = 'min(100%, 640px)';
 
 interface SizeStyleInput {
   position: Position;
   size: Size;
   isDraggableVariant: boolean;
-  isVerticalSheet: boolean;
   currentHeight: number | null;
 }
 
@@ -49,18 +74,32 @@ const sizeStyles = ({
   position,
   size,
   isDraggableVariant,
-  isVerticalSheet,
   currentHeight,
 }: SizeStyleInput) => {
-  // The draggable variant owns its own height: the snap point decides it, so a
-  // preset would fight the drag.
-  if (isDraggableVariant && isVerticalSheet && currentHeight !== null) {
-    return { height: currentHeight };
+  if (isHorizontalPosition(position)) {
+    return { width: HORIZONTAL_SIZES[size] ?? HORIZONTAL_SIZES.md };
   }
 
-  return isHorizontalPosition(position)
-    ? { width: HORIZONTAL_SIZES[size] ?? HORIZONTAL_SIZES.md }
-    : { height: VERTICAL_SIZES[size] ?? VERTICAL_SIZES.md };
+  // The cross axis is the same rule whatever the preset, and the draggable
+  // variant needs it too — dragging moves the panel's height, never its width.
+  // `marginInline` is what centres it: MUI pins the bottom paper `left: 0;
+  // right: 0`, so a definite width plus auto margins resolves to the middle.
+  const cross = { width: VERTICAL_MAX_WIDTH, marginInline: 'auto' };
+
+  // The draggable variant owns its own height: the snap point decides it, so a
+  // preset would fight the drag.
+  if (isDraggableVariant && currentHeight !== null) {
+    return { ...cross, height: currentHeight };
+  }
+
+  return {
+    ...cross,
+    // A CEILING, not a height — see `VERTICAL_SIZES`. `height: auto` is stated
+    // rather than left off so the rule survives a caller who set a height on a
+    // previous render, and it is what lets the panel hug what it holds.
+    height: 'auto',
+    maxHeight: VERTICAL_SIZES[size] ?? VERTICAL_SIZES.md,
+  };
 };
 
 /** `r, g, b` for a hex colour, so it can feed an `rgba(var(--x), a)` custom property. */
@@ -244,7 +283,12 @@ export const panelSx = (input: PanelSxInput): CSSObject => {
     input;
 
   return {
-    ...sizeStyles({ position, size, isDraggableVariant, isVerticalSheet, currentHeight }),
+    ...sizeStyles({ position, size, isDraggableVariant, currentHeight }),
+    // A COLUMN, so `maxHeight` above can be a ceiling rather than a height: the
+    // body is then a flex item that shrinks against it, and the scrolling falls
+    // to `SheetContent` where it belongs. Without this the panel would clip a
+    // long sheet instead of scrolling it.
+    ...(isVerticalSheet ? { display: 'flex', flexDirection: 'column' } : {}),
     ...variantStyles(input),
     ...style,
     overflow: 'visible',

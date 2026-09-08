@@ -26,8 +26,10 @@ The Sheet component is ideal for:
 ### Positioning and Sizing
 
 - **position** ('top' | 'right' | 'bottom' | 'left'): Edge from which the sheet slides (default: 'bottom')
-- **size** ('xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'): Predefined size options (default: 'md'). For **side sheets** (`left`/`right`) the width is **viewport-aware**: a pixel floor keeps the panel usable while the larger presets grow with the screen — `lg` occupies ≥32% and `xl` ≥40% of the viewport on wide screens — and every preset is capped at `92vw` so it never overflows a small screen. `full` is always 100%. Vertical sheets (`top`/`bottom`) use fixed heights.
+- **size** ('xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'): Predefined size options (default: 'md'). For **side sheets** (`left`/`right`) the width is **viewport-aware**: a pixel floor keeps the panel usable while the larger presets grow with the screen — `lg` occupies ≥32% and `xl` ≥40% of the viewport on wide screens — and every preset is capped at `92vw` so it never overflows a small screen. `full` is always 100%. For **vertical sheets** (`top`/`bottom`) the preset is a **height ceiling, not a height**: the panel is as tall as its content and starts scrolling only once that would pass the preset, so a short sheet no longer reserves the rest of it as dead space.
 - **fullHeight** (boolean): Expand the sheet along its **cross axis** — side sheets become full-height (keeping the `size` width); top/bottom sheets become full-width (keeping the `size` height)
+
+A vertical sheet's **width** is one rule rather than one per preset: `min(100%, 640px)`, centred. Full-bleed is a handset layout, and on a desktop it stranded a sentence and a button in a 1900px panel; 640px is Material's own ceiling for a bottom sheet above the handset breakpoint, and below it `100%` gives the phone back exactly what it had. `fullHeight` is the opt-out where a top/bottom sheet really does want the whole width.
 
 ### Visual Variants
 

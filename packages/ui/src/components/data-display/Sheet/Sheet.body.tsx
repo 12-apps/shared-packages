@@ -90,7 +90,12 @@ export const SheetBody: React.FC<SheetBodyProps> = (props) => {
       onBlur={onBlur}
       data-testid={testId}
       sx={{
-        height: '100%',
+        // A vertical sheet's panel is a column whose height is its CONTENT, up
+        // to the `size` ceiling — so this fills what the panel has rather than
+        // asking for a percentage of it, and `minHeight: 0` is what lets it
+        // shrink past its content so `SheetContent` scrolls instead of the
+        // panel overflowing. A side sheet's panel is full-height already.
+        ...(isVerticalSheet ? { flex: '1 1 auto', minHeight: 0 } : { height: '100%' }),
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
