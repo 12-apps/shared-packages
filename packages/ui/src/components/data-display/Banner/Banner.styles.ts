@@ -134,9 +134,13 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
  * implies `:hover`, so a shorthand here would outrank the root's and reset the
  * opacity fade the press is built on.
  */
-export const bannerPointerStates = (theme: Theme) => ({
+/** The same flat inset tint `Alert` paints; see `ACTIVE` for why it is a layer. */
+const tint = (theme: Theme, a: number): string =>
+  `inset 0 0 0 100vmax ${alpha(theme.palette.mode === 'light' ? '#000000' : '#ffffff', a)}`;
+
+export const bannerPointerStates = (theme: Theme): CSSObject => ({
   '&:hover': {
-    filter: `brightness(${HOVER.brightness[theme.palette.mode]})`,
+    boxShadow: tint(theme, HOVER.tintAlpha),
   },
 
   // The `:not(:has(…))` names CONTROLS, not any descendant: `:active` matches
@@ -145,8 +149,7 @@ export const bannerPointerStates = (theme: Theme) => ({
   // wholesale does not work — pressing the TEXT makes that text `:active` too,
   // so the guard matched on every press and the state never fired.
   '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
-    opacity: ACTIVE.opacity,
-    filter: `brightness(${ACTIVE.brightness[theme.palette.mode]})`,
+    boxShadow: tint(theme, ACTIVE.tintAlpha),
     transition: 'none',
   },
 });

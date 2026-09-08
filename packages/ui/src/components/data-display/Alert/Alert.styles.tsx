@@ -338,7 +338,10 @@ export const alertVariantStyles = (
 
 /** The web's glow: a soft shadow of the hue and a touch of brightness. */
 const glowStyles = (colorPalette: AlertPalette): CSSObject => ({
-  boxShadow: `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)} !important`,
+  // No `!important`: the pointer states paint their tint as an INSET shadow on
+  // the same property, and compose this one alongside it rather than fighting
+  // it. `glowShadow` in `Alert.tsx` is the other half of that pair.
+  boxShadow: `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`,
   filter: `brightness(${GLOW.brightness})`,
 });
 

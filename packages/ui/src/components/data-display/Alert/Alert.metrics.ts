@@ -97,30 +97,30 @@ export const PULSE = { alpha: 0.2, ms: 2000, spread: 10 } as const;
  * makes it recede — the pointer lands and the alert dims, which is the wrong
  * sentence. Each mode moves AWAY from its own background instead.
  */
-export const HOVER = { brightness: { light: 0.93, dark: 1.22 } } as const;
+export const HOVER = { tintAlpha: 0.06 } as const;
 
 /**
- * The press: a 20% opacity dip that carries a brightness step WITH it.
+ * The press: a 20% tint LAYER, eased back over a second.
  *
- * The opacity alone inverts the hover, which is why the pair exists. Composited
- * over a light page, 0.8 makes a light tint LIGHTER — measured L* 95.0 idle,
- * 89.1 hovered, 91.1 pressed — so pushing the surface looked like the pointer
- * leaving it. Over a dark page it lands back on the idle surface instead:
- * ΔE76 0.82 on `glass`, under the threshold at which anything is visible at
- * all. The step deepens the hover's own direction so a press reads as more of
- * what hovering already said, in both modes.
+ * The layer is the point. The first attempt dropped the whole element's
+ * opacity, which composites toward the PAGE and so behaves differently on
+ * every surface it is asked about. Measured: over a light page it made a light
+ * tint LIGHTER (L* 95.0 idle, 89.1 hovered, 91.1 pressed), so pushing the
+ * surface looked like the pointer leaving; over a dark page it landed back on
+ * the idle surface (ΔE76 0.82 on `glass`); on `gradient` it washed white body
+ * copy to 2.31:1, under AA; and it diluted the ink during a text-selection
+ * drag. A `brightness()` step instead of it fixed the direction but not the
+ * reach — a multiplier does nothing to a near-black `glass` in dark mode
+ * (ΔE76 1.71) and nothing to Banner's 10%-alpha wash (ΔE76 0.44), because it
+ * scales only what the element already paints.
+ *
+ * An inset shadow at 100vmax is a flat tint over the whole surface: ADDITIVE,
+ * so it reads the same on an opaque tint, a translucent wash and a gradient;
+ * painted above the background and below the content, so the ink keeps its
+ * own contrast; and animatable, which `background-image` is not.
  */
-export const ACTIVE = { opacity: 0.8, brightness: { light: 0.84, dark: 1.42 }, ms: 1000 } as const;
+export const ACTIVE = { tintAlpha: 0.2, ms: 1000 } as const;
 
-/**
- * The focus ring: FULL colour, not a wash.
- *
- * At 0.7 over a white page the ring measured 2.24:1 on `warning` and 2.56:1 on
- * `info` — under the 3:1 that WCAG 2.2 SC 1.4.11 asks of a non-text indicator.
- * The 2px offset puts the page, not the alert, on both sides of the outline, so
- * the alpha was being composited against white rather than against the tint it
- * was chosen for.
- */
 export const FOCUS = { ringWidth: 2, ringAlpha: 1, offset: 2 } as const;
 
 /** `neutral` has no palette slot; the web has always drawn it from three greys. */

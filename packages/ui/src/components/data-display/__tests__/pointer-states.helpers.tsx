@@ -126,7 +126,12 @@ export function itAnswersAPointerLikeASurface(
    * modes — and the guard forbade movement without ever requiring feedback, so
    * deleting the states again would have stayed green.
    */
-  it('answers a hover with a colour step rather than with nothing', () => {
-    expect(blocksFor(cssAfterMount(), ':hover').join('\n')).toMatch(/filter\s*:\s*brightness/);
+  it('answers a hover with a tint layer rather than with nothing', () => {
+    // An INSET shadow, which is the tint spread edge to edge. Asserting the
+    // mechanism and not merely "some declaration" is deliberate: the tint is
+    // additive, and that is the whole reason it replaced a `brightness()`
+    // multiplier — which did nothing to a near-black `glass` in dark mode or
+    // to Banner's 10%-alpha wash.
+    expect(blocksFor(cssAfterMount(), ':hover').join('\n')).toMatch(/box-shadow\s*:[^;]*inset/);
   });
 }

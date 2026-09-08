@@ -5,11 +5,14 @@ import Box from '@mui/material/Box/index.js';
 import Collapse from '@mui/material/Collapse/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { defaultAriaLive, resolveAlertProps, testIdFor } from './Alert.helpers';
+import type { AlertPalette } from './Alert.metrics';
 import {
   ACTIVE,
+  GLOW,
   ALERT_EASING,
   ALERT_RADIUS_UNITS,
   ALERT_TRANSITION_MS,
@@ -39,6 +42,31 @@ import { px } from '../../../tokens/theme';
 const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
 
 // Define animations
+/**
+ * The pointer states' shadow: a flat tint, plus the glow when the alert has one.
+ *
+ * The tint is an inset spread at 100vmax, which always exceeds the element, so
+ * it covers the surface edge to edge. It paints ABOVE the background and BELOW
+ * the content, which is what keeps the ink's own contrast out of these states
+ * entirely — see `ACTIVE` in `Alert.metrics.ts` for why a layer replaced the
+ * opacity dip and the brightness multiplier that each preceded it.
+ *
+ * The glow is COMPOSED rather than replaced, so hovering a glowing alert keeps
+ * its glow; `glowStyles` gave up its `!important` for this.
+ */
+function pointerShadow(
+  theme: Theme,
+  colorPalette: AlertPalette,
+  glow: boolean,
+): (alpha_: number) => string {
+  const ink = theme.palette.mode === 'light' ? '#000000' : '#ffffff';
+  const glowShadow = glow
+    ? `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`
+    : null;
+  return (alpha_) =>
+    [`inset 0 0 0 100vmax ${alpha(ink, alpha_)}`, glowShadow].filter(Boolean).join(', ');
+}
+
 const StyledAlert = styled(MuiAlert, {
   shouldForwardProp: (prop) =>
     !['customVariant', 'customColor', 'glow', 'pulse', 'animate'].includes(prop as string),
@@ -51,9 +79,11 @@ const StyledAlert = styled(MuiAlert, {
 }>(({ theme, customVariant, customColor, glow, pulse, animate }) => {
   const colorPalette = getColorFromTheme(theme, customColor || customVariant || 'info');
 
+  const withTint = pointerShadow(theme, colorPalette, Boolean(glow));
+
   return {
     borderRadius: theme.spacing(ALERT_RADIUS_UNITS),
-    transition: `${transition}, opacity ${seconds(ACTIVE.ms)} ${ALERT_EASING}`,
+    transition: `${transition}, box-shadow ${seconds(ACTIVE.ms)} ${ALERT_EASING}`,
     position: 'relative',
     overflow: 'hidden',
     animation: animate ? `${fadeInScale} ${seconds(FADE_IN.ms)} ease-out` : 'none',
@@ -67,7 +97,7 @@ const StyledAlert = styled(MuiAlert, {
     // variant's meaning, not an affordance to animate. The step darkens a
     // light theme and lightens a dark one, so it reads as arriving in both.
     '&:hover': {
-      filter: `brightness(${HOVER.brightness[theme.palette.mode]})`,
+      boxShadow: withTint(HOVER.tintAlpha),
 
       '&::before': {
         opacity: 1,
@@ -96,8 +126,7 @@ const StyledAlert = styled(MuiAlert, {
     // `:active` too, so the guard matched on every press and the state never
     // fired at all.
     '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
-      opacity: ACTIVE.opacity,
-      filter: `brightness(${ACTIVE.brightness[theme.palette.mode]})`,
+      boxShadow: withTint(ACTIVE.tintAlpha),
       transition: 'none',
     },
 
