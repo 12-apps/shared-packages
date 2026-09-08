@@ -64,6 +64,17 @@ describe('one action list, two surfaces', () => {
     expect(items.map((item) => item.id)).toEqual(['edit']);
   });
 
+  it('K4b: leaves the selection-only actions out of a single row’s kebab', () => {
+    const items = rowActionsToMenuItems<Row>(
+      [
+        { id: 'deactivate', label: 'Inativar', onSelect: vi.fn() },
+        { id: 'deactivate-all', label: 'Inativar todos', row: false, onSelect: vi.fn() },
+      ],
+      ROW,
+    );
+    expect(items.map((item) => item.id)).toEqual(['deactivate']);
+  });
+
   it('K5: prefers a per-row label over the collective one', () => {
     const items = rowActionsToMenuItems<Row>(
       [{ id: 'toggle', label: 'Toggle', rowLabel: (row) => `Disable ${row.name}`, onSelect: vi.fn() }],
