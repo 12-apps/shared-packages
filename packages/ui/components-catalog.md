@@ -316,7 +316,7 @@ Components for user input and form interactions.
 ### Button
 **Purpose**: Clickable button component
 **Use Cases**: Actions, form submissions, navigation, active state indicators
-**Features**: Multiple variants (solid, outline, ghost, text, glass, gradient), sizes (xs-xl), colors (primary, secondary, success, warning, info, danger, neutral), icons, loading states, disabled states, glow/pulse effects, active state support
+**Features**: Multiple variants (solid, outline, ghost, text, glass, gradient), sizes (xs-xl), colors (primary, secondary, success, warning, info, danger, neutral), icons, loading states, disabled states, glow/pulse effects, active state support, renders as another element or component via `component` (a router link painted as a button keeps that link's own typed props)
 **Location**: `src/components/form/Button`
 **Docs**: `src/components/form/Button/Button.md`
 

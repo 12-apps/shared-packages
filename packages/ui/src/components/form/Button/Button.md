@@ -12,6 +12,8 @@ The Button component is a versatile and highly customizable interactive element 
 - **Special Effects**: glow, pulse animations
 - **Loading States**: Built-in loading spinner
 - **Icon Support**: Leading icons with automatic loading state handling
+- **Renders As Anything**: `component` swaps the element, carrying that
+  component's own props through the types (a router link, an `<a>`, a label)
 - **Accessibility**: Full ARIA support, keyboard navigation
 - **Responsive Design**: Adapts to different screen sizes
 
@@ -37,6 +39,14 @@ import { Button } from '@procurement/ui';
 <Button variant="gradient" glow pulse>
   Special Button
 </Button>
+
+// As a navigation, painted as a button
+<Button component={Link} to="/orders/42">
+  Track my order
+</Button>
+
+// Or a plain anchor, when there is no router in the tree
+<Button href="/orders/42">Track my order</Button>
 ```
 
 ## Props
@@ -60,6 +70,35 @@ import { Button } from '@procurement/ui';
 | `onBlur`     | `(event: FocusEvent) => void`                                                 | -           | Blur event handler                        |
 | `children`   | `ReactNode`                                                                   | -           | Button content                            |
 | `className`  | `string`                                                                      | -           | Additional CSS classes                    |
+| `component`  | `ElementType`                                                                 | `'button'`  | Render as this element/component instead  |
+| `href`       | `string`                                                                      | -           | Renders an `<a>` (MUI's own behaviour)    |
+
+## Rendering as something else
+
+`component` swaps the element the button renders as, and the button's props are
+typed against it — so the target's own props are checked at the call site rather
+than silently dropped:
+
+```tsx
+import { Link } from 'react-router-dom';
+
+<Button component={Link} to="/orders/42" variant="solid" size="lg">
+  Track my order
+</Button>;
+```
+
+Three things are worth knowing:
+
+- **`to` is typed.** `Button` is an `OverridableComponent`, so the generic
+  carries the target's props through. Misspell `to` and it fails to compile.
+- **The paint does not change.** Measured against the same button rendered as a
+  `<button>`: identical box, background, padding, radius and type; hover still
+  darkens; the class still names the size.
+- **`href` alone is enough** when there is no router involved — MUI renders an
+  `<a>` for it without a `component`.
+
+The event handlers are typed on `HTMLElement` rather than `HTMLButtonElement`
+for this reason: the element under the pointer is not always a button.
 
 ## Variants
 
