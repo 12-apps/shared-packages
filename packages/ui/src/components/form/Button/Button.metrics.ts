@@ -34,6 +34,32 @@ export const ICON_ONLY_PADDING: Record<SizeValue, number> = {
   xl: 11,
 };
 
+/**
+ * The start/end icon slot's font-size, in px — MUI's `medium` value, pinned
+ * (12-74).
+ *
+ * MUI sizes that slot off its OWN `size` prop, writing 18/20/22 onto the first
+ * child of `.MuiButton-startIcon`. We never passed a `size`, so every button in
+ * every size has always drawn medium's 20px; now that `size` IS forwarded — so
+ * the rendered class finally names the size the button actually is — the number
+ * would start moving with it.
+ *
+ * WHAT THAT ACTUALLY REACHES, measured in a browser rather than assumed: this
+ * Button renders its own wrapper span around the icon (it carries the child
+ * test id), so MUI's rule lands on the WRAPPER and reaches the glyph only when
+ * the glyph takes its size by inheritance — `fontSize="inherit"`, an em-sized
+ * SVG, a text or emoji glyph. With the pin removed, such a glyph measured 18px
+ * at `xs`/`sm` and 22px at `lg`/`xl` against the 20px it has always been. An
+ * icon carrying an absolute size of its own does not move at all: a default
+ * `SvgIcon` stayed 24×24 across all five.
+ *
+ * A silent resize of the inherited case is still a design decision arriving as
+ * a side effect of a class-name fix, so it is pinned to what shipped before —
+ * `Button.tsx` puts it on that same wrapper. Scaling the glyph with the button
+ * is a ticket of its own.
+ */
+export const BUTTON_ICON_GLYPH_SIZE = 20;
+
 export const BUTTON_FONT_WEIGHT = 500;
 /** `theme.spacing(1)`. */
 export const BUTTON_RADIUS_UNITS = 1;
