@@ -71,11 +71,23 @@ export function InlineKeyword({
     prev.current = value;
     if (draft !== value) setDraft(value);
   }
+  // The commit is read through a ref so the debounce is NOT keyed on the
+  // handler's identity. Every caller builds `onChange` inline — the grid's own
+  // bar passes `(value) => c.patch({ search: value })`, rebuilt on each render
+  // — so keying the effect on it re-armed the timer on every render, and a busy
+  // admin page re-renders more often than every 350ms as its queries land. The
+  // timer was cleared and re-armed indefinitely and the term was NEVER
+  // committed: measured in `future-pay` as a dead `?q=` on the Estoque grid,
+  // where a 15-second loop pressed Enter over and over and the URL never moved.
+  const commit = useRef(onChange);
+  useEffect(() => {
+    commit.current = onChange;
+  });
   useEffect(() => {
     if (draft === value) return undefined;
-    const timer = setTimeout(() => onChange(draft), SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(() => commit.current(draft), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [draft, value, onChange]);
+  }, [draft, value]);
 
   return (
     <TextField
@@ -94,7 +106,15 @@ export function InlineKeyword({
         // presses it has decided, and waiting out the timer reads as a stall.
         if (event.key !== "Enter") return;
         event.preventDefault();
-        if (draft !== value) onChange(draft);
+        // Read the BOX, not `draft`. A keystroke can land before React has
+        // processed the edit before it — a fast typist, and every Playwright
+        // `fill()` followed by `press('Enter')` — and `draft` is then still the
+        // value from before the edit. Comparing that to `value` said "nothing
+        // changed" and dropped the keystroke, leaving the term on screen with
+        // an unfiltered list behind it.
+        const typed = event.target instanceof HTMLInputElement ? event.target.value : draft;
+        if (typed !== draft) setDraft(typed);
+        if (typed !== value) onChange(typed);
       }}
       placeholder={copy.search.placeholder}
       inputProps={{ "aria-label": copy.search.allColumnsLabel, "data-testid": testId }}
