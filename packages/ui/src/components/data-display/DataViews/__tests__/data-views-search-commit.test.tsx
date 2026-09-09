@@ -3,7 +3,7 @@
  *
  * Both cases below are the search silently doing nothing: the term sits in the
  * box, the list behind it is unfiltered, and pressing Enter again changes
- * nothing. Measured in `future-pay` as a dead `?q=` on the Estoque grid — a
+ * nothing. Measured in one adopter as a dead `?q=` on a server-mode grid — a
  * 15-second retry loop pressed Enter over and over and the URL never moved.
  */
 import { fireEvent, render, screen } from "./test-utils";

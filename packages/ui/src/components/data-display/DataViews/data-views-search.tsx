@@ -77,7 +77,7 @@ export function InlineKeyword({
   // — so keying the effect on it re-armed the timer on every render, and a busy
   // admin page re-renders more often than every 350ms as its queries land. The
   // timer was cleared and re-armed indefinitely and the term was NEVER
-  // committed: measured in `future-pay` as a dead `?q=` on the Estoque grid,
+  // committed: measured in one adopter as a dead `?q=` on a server-mode grid,
   // where a 15-second loop pressed Enter over and over and the URL never moved.
   const commit = useRef(onChange);
   useEffect(() => {
