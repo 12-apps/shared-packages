@@ -10,7 +10,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import IconButton from "@mui/material/IconButton/index.js";
 import InputAdornment from "@mui/material/InputAdornment/index.js";
 import TextField from "@mui/material/TextField/index.js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Box } from "../../../mui/Box";
 import { useDataViewsCopy } from "./data-views-copy-context";
@@ -31,6 +31,64 @@ const SEARCH_DEBOUNCE_MS = 350;
  */
 function boxWidth(fill: boolean): { flex: number; minWidth: number; maxWidth: number | "none" } {
   return { flex: 1, minWidth: fill ? 0 : 200, maxWidth: fill ? "none" : 384 };
+}
+
+/**
+ * The box's own draft, and the two ways it reaches `onChange`.
+ *
+ * Extracted from {@link InlineKeyword} so the commit policy reads in one place
+ * rather than split across a render body — and because it is where both halves
+ * of a defect that lost searches outright had to be fixed.
+ *
+ * ## The debounce must not be keyed on the handler's identity
+ *
+ * Every caller builds `onChange` inline — the grid's own bar passes
+ * `(value) => c.patch({ search: value })`, rebuilt on each render. Keying the
+ * effect on it re-armed the timer on every render, and a busy admin page
+ * re-renders more often than every 350ms as its queries land, so the timer
+ * never survived to fire and the term was NEVER committed: measured in one
+ * adopter as a dead `?q=` on a server-mode grid, where a 15-second loop pressed
+ * Enter over and over and the URL never moved. So the handler is read through a
+ * ref and the effect depends on `[draft, value]` alone.
+ *
+ * ## An immediate commit must read the BOX, not the draft
+ *
+ * A keystroke can land before React has processed the edit before it — a fast
+ * typist, and every Playwright `fill()` followed by `press('Enter')`. `draft` is
+ * then still the value from before the edit, and comparing THAT to `value` said
+ * "nothing changed" and dropped the keystroke, leaving the term on screen with
+ * an unfiltered list behind it. `commitNow` takes what the caller read off the
+ * element and syncs the draft to it, which also keeps the box from being reset
+ * to a stale draft by the next render when a host ignores the commit.
+ */
+function useKeywordDraft(
+  value: string,
+  onChange: (next: string) => void,
+): { draft: string; setDraft: (next: string) => void; commitNow: (typed: string) => void } {
+  const [draft, setDraft] = useState(value);
+  const prev = useRef(value);
+  // An external change (a saved view, the URL, "Limpar") wins over the draft.
+  if (prev.current !== value) {
+    prev.current = value;
+    if (draft !== value) setDraft(value);
+  }
+  const commit = useRef(onChange);
+  useEffect(() => {
+    commit.current = onChange;
+  });
+  useEffect(() => {
+    if (draft === value) return undefined;
+    const timer = setTimeout(() => commit.current(draft), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [draft, value]);
+  const commitNow = useCallback(
+    (typed: string) => {
+      setDraft(typed);
+      if (typed !== value) commit.current(typed);
+    },
+    [value],
+  );
+  return { draft, setDraft, commitNow };
 }
 
 /**
@@ -64,18 +122,7 @@ export function InlineKeyword({
   fill?: boolean;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
-  const [draft, setDraft] = useState(value);
-  const prev = useRef(value);
-  // An external change (a saved view, the URL, "Limpar") wins over the draft.
-  if (prev.current !== value) {
-    prev.current = value;
-    if (draft !== value) setDraft(value);
-  }
-  useEffect(() => {
-    if (draft === value) return undefined;
-    const timer = setTimeout(() => onChange(draft), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [draft, value, onChange]);
+  const { draft, setDraft, commitNow } = useKeywordDraft(value, onChange);
 
   return (
     <TextField
@@ -94,7 +141,8 @@ export function InlineKeyword({
         // presses it has decided, and waiting out the timer reads as a stall.
         if (event.key !== "Enter") return;
         event.preventDefault();
-        if (draft !== value) onChange(draft);
+        // The BOX, not `draft` — see {@link useKeywordDraft}.
+        commitNow(event.target instanceof HTMLInputElement ? event.target.value : draft);
       }}
       placeholder={copy.search.placeholder}
       inputProps={{ "aria-label": copy.search.allColumnsLabel, "data-testid": testId }}
