@@ -1,0 +1,37 @@
+-- @12-apps/mcp: the sealed successor that makes refresh rotation RETRYABLE.
+--
+-- `oauth_refresh_tokens.grace_seal` holds a token's own plaintext, encrypted
+-- (AES-256-GCM) under a key derived by HKDF from the plaintext of the token it
+-- was rotated FROM, with its grace deadline sealed inside the same blob.
+--
+-- WHY THE COLUMN EXISTS. Rotation-on-use with replay revocation cannot tell a
+-- thief from a client that used one token twice for an innocent reason, and
+-- there are two routine innocent reasons: a response lost to a proxy timeout,
+-- and two of the client's own sessions refreshing at the same moment. Both were
+-- punished as theft — the whole lineage revoked, including the successor just
+-- handed to whoever won — which killed a live connection and sent a human back
+-- through the full authorization flow. With this column, re-presenting a
+-- just-consumed token inside the window returns THAT SAME successor instead, so
+-- one successor is still all that ever exists and no second family is created.
+--
+-- WHY IT IS NOT A PLAINTEXT COLUMN. The key is never stored: it is derived from
+-- the parent, which is itself only ever stored hashed. A dump of this table
+-- therefore yields ciphertext and nothing that opens it, so the package's
+-- "hashed, never plaintext" invariant is unchanged. The only party that can open
+-- a seal is one presenting the parent — which is the party being served, and
+-- which already held the token that mints the successor.
+--
+-- The seal is CLEARED whenever a token is consumed or revoked, and that is the
+-- bound on what it costs: a seal opens only under the plaintext it was rotated
+-- from, so spent seals left in place would chain — one historical plaintext plus
+-- a copy of this table would walk forward to the live token offline, with no
+-- server call and therefore no replay detection.
+--
+-- Nullable, but NOT optional: the package writes this field on every rotation,
+-- so a deployment that raises the package version without applying this
+-- migration gets a runtime failure on every refresh, not a quietly disabled
+-- window. Apply it in the same change as the version raise. Guarded with
+-- IF NOT EXISTS like every other statement this package ships, so a host that
+-- already added the column adopts the migration as a no-op.
+ALTER TABLE "oauth_refresh_tokens"
+  ADD COLUMN IF NOT EXISTS "grace_seal" TEXT;

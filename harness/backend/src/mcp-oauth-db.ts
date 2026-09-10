@@ -88,6 +88,7 @@ interface TokenRaw {
   expires_at: Date;
   rotated_from: string | null;
   revoked_at: Date | null;
+  grace_seal: string | null;
 }
 
 function toToken(raw: TokenRaw): StoredRefreshToken {
@@ -100,17 +101,18 @@ function toToken(raw: TokenRaw): StoredRefreshToken {
     expiresAt: new Date(raw.expires_at),
     rotatedFrom: raw.rotated_from,
     revokedAt: raw.revoked_at ? new Date(raw.revoked_at) : null,
+    graceSeal: raw.grace_seal,
   };
 }
 
 const TOKEN_COLUMNS =
-  'token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, revoked_at';
+  'token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, revoked_at, grace_seal';
 
 async function insertToken(pg: PGlite, token: NewRefreshToken): Promise<void> {
   await pg.query(
     `INSERT INTO oauth_refresh_tokens
-       (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, created_at)
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW())`,
+       (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, grace_seal, created_at)
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
     [
       token.tokenHash,
       token.userEmail,
@@ -119,6 +121,7 @@ async function insertToken(pg: PGlite, token: NewRefreshToken): Promise<void> {
       token.scopes,
       token.expiresAt,
       token.rotatedFrom,
+      token.graceSeal ?? null,
     ],
   );
 }
@@ -154,8 +157,11 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
 
     async revokeHashes(tokenHashes, at) {
       if (tokenHashes.length === 0) return;
+      // The seal goes with the revocation — the port requires it, because a
+      // revoked row that keeps an openable seal leaves the chain readable.
       await pg.query(
-        `UPDATE oauth_refresh_tokens SET revoked_at = $1 WHERE token_hash = ANY($2)`,
+        `UPDATE oauth_refresh_tokens SET revoked_at = $1, grace_seal = NULL
+         WHERE token_hash = ANY($2)`,
         [at, [...tokenHashes]],
       );
     },
@@ -167,8 +173,11 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
       // being live, and the successor is inserted only when that claim took effect;
       // one transaction covers the crash case as before.
       return pg.transaction(async (tx) => {
+        // Clearing the parent's seal is PART of the claim, not tidying after it:
+        // an uncleared seal is openable by the plaintext it was sealed under, so
+        // a chain of them walks offline from any historical token to the live one.
         const claim = await tx.query(
-          `UPDATE oauth_refresh_tokens SET revoked_at = $1
+          `UPDATE oauth_refresh_tokens SET revoked_at = $1, grace_seal = NULL
              WHERE token_hash = $2 AND revoked_at IS NULL`,
           [at, parentHash],
         );
@@ -177,8 +186,8 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
         if ((claim.affectedRows ?? 0) !== 1) return false;
         await tx.query(
           `INSERT INTO oauth_refresh_tokens
-             (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, created_at)
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW())`,
+             (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, grace_seal, created_at)
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
           [
             successor.tokenHash,
             successor.userEmail,
@@ -187,6 +196,7 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
             successor.scopes,
             successor.expiresAt,
             successor.rotatedFrom,
+            successor.graceSeal ?? null,
           ],
         );
         return true;
@@ -195,7 +205,7 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
 
     async revokeLiveForClient(userEmail, clientId) {
       const result = await pg.query(
-        `UPDATE oauth_refresh_tokens SET revoked_at = NOW()
+        `UPDATE oauth_refresh_tokens SET revoked_at = NOW(), grace_seal = NULL
          WHERE user_email = $1 AND client_id = $2 AND revoked_at IS NULL`,
         [userEmail, clientId],
       );
