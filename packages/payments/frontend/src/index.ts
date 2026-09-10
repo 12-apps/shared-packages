@@ -59,6 +59,7 @@ export {
   type CheckoutCartView,
   type CheckoutFlowProps,
 } from './components/checkout/checkout-flow';
+export type { BackActionEmphasis } from './components/checkout/payment-status-parts';
 
 // ---------------------------------------------------------------------------
 // The MOUNTED buyer checkout (FUT-741) and the checkout PIPELINE (FUT-1240).
