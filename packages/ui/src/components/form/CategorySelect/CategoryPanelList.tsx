@@ -5,12 +5,8 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import Skeleton from '@mui/material/Skeleton/index.js';
 
-import { categoryCheckState, isLeafCategory } from './category-tree';
-import {
-  CategoryHeadRow,
-  CategorySectionHeading,
-  SubcategoryRow,
-} from './CategoryRows';
+import { categoryCheckState, isLeafCategory, leavesOf } from './category-tree';
+import { CategorySectionHeading, CategoryTreeRow } from './CategoryRows';
 import { emptySx, listSx, skeletonSx } from './CategorySelect.styles';
 import type { CategoryGroup } from './CategorySelect.types';
 
@@ -33,6 +29,12 @@ interface PanelListProps {
   loading: boolean;
   showCounts: boolean;
   allowParentSelection: boolean;
+  /**
+   * True when the tree has a level BELOW the subcategories. It turns the
+   * section-heading treatment off — see {@link CategoryNodeRows}. Derived from
+   * the options the panel state already holds, never a caller's decision.
+   */
+  deepTree: boolean;
   isExpanded: (categoryId: string) => boolean;
   onToggleExpanded: (categoryId: string) => void;
   onActivateCategory: (group: CategoryGroup) => void;
@@ -114,60 +116,66 @@ function NoResults({
   );
 }
 
-/** One group: its heading or head row, then whichever children are visible. */
-function CategoryGroupRows({
-  group,
+/**
+ * One node: its heading or its row, then whichever children are visible.
+ *
+ * The SECTION-HEADING treatment — an inert uppercase label with its children
+ * always on show — belongs to a two-level tree and only there. It is what makes
+ * the "mover para…" picker read as "category, then the subcategory you pick",
+ * and it works because a two-level category has nothing to fold TO: everything
+ * under it is already the thing you came for. A third level breaks both halves
+ * at once — the heading has no chevron, so the panel opens onto every item in
+ * the catalogue, which is the flat list this component exists to replace. So a
+ * deep tree drops the treatment and every frame becomes a foldable row instead.
+ */
+function CategoryNodeRows({
+  node,
+  depth,
   props,
 }: {
-  group: CategoryGroup;
+  node: CategoryGroup;
+  depth: number;
   props: PanelListProps;
 }): React.JSX.Element {
   const { draft, query, single, allowParentSelection, rowIds, activeIndex, sheet } = props;
-  const categoryId = group.category.id;
+  const categoryId = node.category.id;
+  const leaf = isLeafCategory(node);
   const expanded = props.isExpanded(categoryId);
   // A childless category is the leaf, so it is selectable whatever the mode says
   // — the heading reading has no subcategory to point at, and would leave the
   // row inert.
-  const selectable = allowParentSelection || isLeafCategory(group);
-  const asHeading = single && !selectable;
-  const selectedCount = group.subcategories.filter((sub) => draft.has(sub.id)).length;
+  const selectable = allowParentSelection || leaf;
+  const asHeading = single && !selectable && !props.deepTree;
+  const selectedCount = leaf ? 0 : leavesOf(node).filter((id) => draft.has(id)).length;
 
   return (
     <>
       {asHeading ? (
-        <CategorySectionHeading option={group.category} query={query} />
+        <CategorySectionHeading option={node.category} query={query} />
       ) : (
-        <CategoryHeadRow
-          option={group.category}
+        <CategoryTreeRow
+          option={node.category}
           query={query}
+          depth={depth}
+          branch={!leaf}
           expanded={expanded}
           active={rowIds[activeIndex] === categoryId}
           sheet={sheet}
-          checkState={selectable ? categoryCheckState(group, draft) : undefined}
+          {...(selectable ? { checkState: categoryCheckState(node, draft) } : {})}
           single={single}
-          expandable={!isLeafCategory(group)}
           selectedCount={selectedCount}
           showCounts={props.showCounts}
           onToggleExpanded={() => props.onToggleExpanded(categoryId)}
-          onActivate={() => props.onActivateCategory(group)}
+          onActivate={() =>
+            leaf ? props.onActivateSubcategory(categoryId) : props.onActivateCategory(node)
+          }
           dataTestId={props.dataTestId}
           copy={props.copy}
         />
       )}
       {(expanded || asHeading) &&
-        group.subcategories.map((sub) => (
-          <SubcategoryRow
-            key={sub.id}
-            option={sub}
-            query={query}
-            selected={draft.has(sub.id)}
-            active={rowIds[activeIndex] === sub.id}
-            sheet={sheet}
-            single={single}
-            showCounts={props.showCounts}
-            onActivate={() => props.onActivateSubcategory(sub.id)}
-            dataTestId={props.dataTestId}
-          />
+        node.subcategories.map((sub) => (
+          <CategoryNodeRows key={sub.category.id} node={sub} depth={depth + 1} props={props} />
         ))}
     </>
   );
@@ -200,7 +208,7 @@ export function CategoryPanelList(props: PanelListProps): React.JSX.Element {
     return (
       <>
         {groups.map((group) => (
-          <CategoryGroupRows key={group.category.id} group={group} props={props} />
+          <CategoryNodeRows key={group.category.id} node={group} depth={0} props={props} />
         ))}
       </>
     );

@@ -2,10 +2,12 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import {
   buildCategoryGroups,
+  collectBranchIds,
   filterCategoryGroups,
   flattenRows,
   toggleCategoryLeaves,
   toggleLeaf,
+  treeDepth,
   type CategoryRowRef,
 } from './category-tree';
 import type { CategoryGroup, CategorySelectOption } from './CategorySelect.types';
@@ -44,13 +46,20 @@ function useExpandedCategories(
     });
   }, []);
 
+  // Every foldable node at EVERY depth, so "Expandir tudo" opens the tree rather
+  // than only its first storey.
   const setAllExpanded = useCallback(
     (shouldExpand: boolean) => {
-      setExpanded(shouldExpand ? new Set(allGroups.map((g) => g.category.id)) : new Set());
+      setExpanded(shouldExpand ? new Set(collectBranchIds(allGroups)) : new Set());
     },
     [allGroups],
   );
 
+  // Opening unfolds the TOP level only. On a two-level tree that is the whole
+  // thing on show, which is what the panel has always done; on a deeper one it
+  // is the categories and their subcategories, with the items behind one more
+  // click — the alternative being the flat list the tree replaces. A search
+  // still reveals every hit: `searching` short-circuits the lookup above.
   const expandAll = useCallback((groups: CategoryGroup[]) => {
     setExpanded(new Set(groups.map((group) => group.category.id)));
   }, []);
@@ -90,6 +99,8 @@ export interface CategorySelectState extends ExpansionState, DraftState {
   visibleGroups: CategoryGroup[];
   /** All groups, unfiltered — the basis for chips and "select all". */
   allGroups: CategoryGroup[];
+  /** True when the tree runs deeper than category/subcategory. */
+  deepTree: boolean;
   rows: CategoryRowRef[];
   activeIndex: number;
   setQuery: (next: string) => void;
@@ -128,6 +139,8 @@ export function useCategorySelect({
     [allGroups, query],
   );
 
+  const deepTree = useMemo(() => treeDepth(allGroups) > 2, [allGroups]);
+
   const expansion = useExpandedCategories(allGroups, query.trim().length > 0);
   const selection = useDraftSelection(selected);
   const rows = useMemo(
@@ -161,6 +174,7 @@ export function useCategorySelect({
     query,
     visibleGroups,
     allGroups,
+    deepTree,
     rows,
     activeIndex,
     setQuery,
