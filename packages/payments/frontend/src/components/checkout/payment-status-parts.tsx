@@ -234,6 +234,38 @@ function retryable(decline: CheckoutDecline | null): boolean {
   return decline?.retriable !== false;
 }
 
+/**
+ * How much of the eye the way out asks for on a PAID confirmation.
+ *
+ * `"primary"` is the default and the historical look: back-to-menu is the only
+ * control a settled screen carries, so it wears the solid fill. A host that
+ * renders an action of its OWN in {@link PaymentStatusProps.paidExtra} — a
+ * route to the order it just raised, say — has two controls on one screen, and
+ * only one of them may lead. `"secondary"` is how such a host says which.
+ *
+ * A prop rather than a guess, because the package cannot make it: whether the
+ * buyer's next move is "look at the pedido" or "buy something else" is a fact
+ * about the way this shop serves people, and nothing in a payment knows it.
+ * Every other status is unaffected — an unsettled screen already paints this
+ * button as the quiet way out, and the retry beside it is the lead.
+ */
+export type BackActionEmphasis = "primary" | "secondary";
+
+/**
+ * The back-to-menu button's look, from the outcome and the host's emphasis.
+ *
+ * Its own function so the two attributes cannot disagree: they moved together
+ * as a pair of inline ternaries, and a third condition would have made that
+ * four places to keep in step.
+ */
+function backLook(
+  status: OrderStatus,
+  emphasis: BackActionEmphasis,
+): { variant: "solid" | "outline"; color: "primary" | "neutral" } {
+  const leads = status === "PAID" && emphasis === "primary";
+  return leads ? { variant: "solid", color: "primary" } : { variant: "outline", color: "neutral" };
+}
+
 /** The next-action row: retry / regenerate / check-again, always back-to-menu. */
 export function StatusActions({
   copy,
@@ -244,6 +276,7 @@ export function StatusActions({
   onCheckAgain,
   onNotPaid,
   onBackToMenu,
+  backActionEmphasis = "primary",
 }: {
   copy: PaymentStatusCopy;
   status: OrderStatus;
@@ -259,8 +292,11 @@ export function StatusActions({
   /** The buyer's "I did not pay" (FUT-1146) — present only while it applies. */
   onNotPaid?: () => void;
   onBackToMenu: () => void;
+  /** Whether back-to-menu leads a PAID screen. See {@link BackActionEmphasis}. */
+  backActionEmphasis?: BackActionEmphasis;
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
+  const back = backLook(status, backActionEmphasis);
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {onCheckAgain ? (
@@ -298,8 +334,8 @@ export function StatusActions({
       <Button
         // Full width and last, so the thumb lands on the same place in every
         // outcome instead of hunting a button that moves with the state.
-        variant={status === "PAID" ? "solid" : "outline"}
-        color={status === "PAID" ? "primary" : "neutral"}
+        variant={back.variant}
+        color={back.color}
         size="lg"
         onClick={onBackToMenu}
         dataTestId="payment-back-to-menu"

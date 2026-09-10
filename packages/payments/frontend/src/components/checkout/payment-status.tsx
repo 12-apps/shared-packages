@@ -2,7 +2,13 @@ import { Box } from "@mui/material";
 import type { JSX, ReactNode } from "react";
 
 import type { CheckoutDecline } from "./decline";
-import { OutcomeHero, PaidFacts, StatusActions, type WaitState } from "./payment-status-parts";
+import {
+  OutcomeHero,
+  PaidFacts,
+  StatusActions,
+  type BackActionEmphasis,
+  type WaitState,
+} from "./payment-status-parts";
 import type { OrderStatus } from "./types";
 import { useCheckoutComponents } from "./ui";
 import type { PaymentStatusCopy } from "./view-copy";
@@ -50,6 +56,23 @@ interface PaymentStatusProps {
    * is the difference between an offer and an interruption.
    */
   paidExtra?: ReactNode;
+  /**
+   * Host content rendered AFTER the action row, and ONLY on PAID.
+   *
+   * The other half of {@link paidExtra}, and the difference between them is the
+   * actions. What a buyer has to DO next belongs beside the way out, in one
+   * block: a panel dropped between two controls splits the only decision on the
+   * screen in half. What is merely OFFERED — an install invite, an ask to turn
+   * on alerts — belongs after that block, because it is about everything that
+   * happens once this screen is closed and must not come between a shopper and
+   * the order they just paid for.
+   */
+  paidFooter?: ReactNode;
+  /**
+   * Whether back-to-menu leads a PAID screen (default) or stands down for an
+   * action the host renders in {@link paidExtra}. See {@link BackActionEmphasis}.
+   */
+  backActionEmphasis?: BackActionEmphasis;
   /**
    * The wait has been given up on. Only meaningful while AWAITING_PAYMENT;
    * every other status has already resolved, so a stale flag cannot change what
@@ -180,7 +203,10 @@ export function PaymentStatus(props: PaymentStatusProps): JSX.Element {
         onCheckAgain={view.checkAgain}
         onNotPaid={view.notPaid}
         onBackToMenu={onBackToMenu}
+        backActionEmphasis={props.backActionEmphasis}
       />
+
+      {view.paid ? props.paidFooter : null}
     </Box>
   );
 }
