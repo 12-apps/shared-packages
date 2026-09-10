@@ -69,6 +69,38 @@ library updates, every host updates with **no app changes**. Same contract
    adapter does it with `updateMany({ where: { tokenHash, revokedAt: null } })`
    inside an interactive `$transaction`; the harness does the same in raw SQL, on
    purpose, as the worked example of a non-Prisma host meeting the contract.
+
+   **The claim still decides; what changed is what the LOSER is told.** For
+   `refreshRotationGraceMs` after a rotation, re-presenting the consumed parent is
+   a RETRY and answers with the successor that rotation already minted, recovered
+   from the sealed `graceSeal` column. Exactly one successor is still ever
+   written, so no second family exists. Before this, a lost response or two of a
+   client's own sessions refreshing at once revoked the whole lineage — including
+   the token just handed to the winner — and cost a connected user their session.
+
+   **Two things this obliges you to do, and one it obliges you to accept.**
+
+   - **`graceSeal` is a REQUIRED column from this version on**, and the migration
+     has to land in the SAME change that raises the pin. `rotate` writes the
+     field on every successor and clears it on every parent it consumes, so a
+     PRISMA host missing the column does not quietly lose the window — the
+     delegate rejects the unknown key and every rotation throws, which is a dead
+     token endpoint. If your client is duck-typed into `McpOauthPrisma`,
+     type-checking will not catch that for you. A hand-written store gets no such
+     backstop at all: omit the field there and the window silently never applies,
+     so writing and clearing it is part of meeting the port.
+   - **`rotate` and every revoke must CLEAR the seal** (`revokedAt` alone is not
+     enough). A seal is openable only by the plaintext of the token it was
+     rotated from — so spent seals left in place CHAIN: one historical plaintext
+     plus a copy of the table walks forward hop by hop to the live token,
+     offline, with no server call and therefore no replay detection. Cleared on
+     consumption, at most one hop is ever open.
+   - **Accept that detection narrows.** It is not a one-rotation deferral: two
+     parties holding one successor take the retry path again at every rotation
+     and stay in lockstep while their uses keep landing inside the window. The
+     guarantee is that a collision is detected once two uses fall more than
+     `refreshRotationGraceMs` apart. `0` buys the strict rule back, at the price
+     the window was added to stop paying.
 8. **`codeReplay` is REQUIRED, and that is the point.** Single-use codes are only as
    strong as the replay store, and the in-process one remembers redeemed `jti`s IN
    THIS PROCESS: exact on one instance, and on several a code can be replayed
@@ -124,6 +156,14 @@ library updates, every host updates with **no app changes**. Same contract
     specification, and `Cache-Control: no-store` is on every credential-bearing
     response. Wrapping any of it would break every client. That is why the adapters
     are one line and hand the `Response` straight back.
+13. **Tell `handleMcpJsonRpc` WHY the bearer failed.** Its `failure` parameter is
+    optional so an existing caller keeps compiling, and omitting it is a real
+    cost: every refusal then reads as "no token", and an agent cannot tell a
+    lapsed connection from a token minted for another deployment or a surface the
+    operator never switched on. Catch the `AccessTokenError` your verifier throws,
+    map its `reason` through, and the tool call comes back with a sentence a model
+    can relay and a `data` payload a client can act on — `refresh`, `reconnect` or
+    `contact_operator`. See `src/server/auth-failure.ts`.
 
 ## The config, field by field
 
@@ -140,6 +180,7 @@ library updates, every host updates with **no app changes**. Same contract
 | `loginPath` / `loginCallbackParam` | no | `/login` / `callbackUrl` | Auth.js's names |
 | `accessTokenTtlSeconds` | no | 900 | 15 minutes |
 | `refreshTokenTtlMs` | no | 30 days | |
+| `refreshRotationGraceMs` | no | 30 s | how long a just-rotated refresh token keeps answering with the successor it minted, instead of being treated as a replay. `0` restores the strict single-use rule — see rule 7 |
 | `codeReplay` | **yes** | — (no default, on purpose) | a shared atomic store, or `'in-process'` to acknowledge one pod — rule 8 |
 | `resolveApproval` | no | refuse unapproved clients | the consent seam — rule 9 |
 | `preApprovedClientIds` | no | `[]` | first-party client ids exempt from the approval gate — rule 9 |

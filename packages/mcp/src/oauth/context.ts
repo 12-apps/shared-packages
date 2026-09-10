@@ -9,6 +9,7 @@ import {
 } from "./code-replay";
 import { ACCESS_TOKEN_TTL_SECONDS } from "./access-token";
 import { REFRESH_TOKEN_TTL_MS } from "./refresh";
+import { DEFAULT_ROTATION_GRACE_MS } from "./rotation-grace";
 import { loadSigningKeyFromEnv, type McpSigningKeyProvider } from "./keys";
 import type { ProviderAttributionRule } from "./clients";
 import type { McpOauthStores, StoredOAuthClient } from "./stores";
@@ -110,6 +111,22 @@ export interface McpOauthConfig {
   accessTokenTtlSeconds?: number;
   refreshTokenTtlMs?: number;
   /**
+   * How long a just-rotated refresh token keeps answering with the successor it
+   * minted, instead of being treated as a replay. Default
+   * {@link DEFAULT_ROTATION_GRACE_MS}; `0` restores the strict single-use rule.
+   *
+   * It exists because one client using one token twice is routine — a response
+   * lost to a proxy timeout, or two of its own sessions refreshing at once — and
+   * the strict rule cannot tell either from theft, so it revoked the lineage and
+   * cost a connected user their session. Inside the window the retry is answered
+   * with the SAME successor, so no second family is ever created. It does NOT
+   * merely defer detection by one rotation: two parties left holding one
+   * successor take the retry path again at every rotation, so a collision is
+   * detected only once two uses fall more than this window apart. That trade is
+   * argued in full in `./rotation-grace.ts`.
+   */
+  refreshRotationGraceMs?: number;
+  /**
    * The single-use guard for authorization codes — REQUIRED, and required on
    * purpose. Pass a shared atomic store, or the literal `'in-process'` to accept
    * the single-instance limitation explicitly.
@@ -169,6 +186,7 @@ export interface McpOauthContext {
   loginCallbackParam: string;
   accessTokenTtlSeconds: number;
   refreshTokenTtlMs: number;
+  refreshRotationGraceMs: number;
   codeReplay: CodeReplayStore;
   /**
    * The resolved consent decision for one authorize request. Always present: with
@@ -197,6 +215,7 @@ function resolveSurface(
   | "loginCallbackParam"
   | "accessTokenTtlSeconds"
   | "refreshTokenTtlMs"
+  | "refreshRotationGraceMs"
 > {
   return {
     scopes: config.scopes ?? [...MCP_SUPPORTED_SCOPES],
@@ -206,6 +225,7 @@ function resolveSurface(
     loginCallbackParam: config.loginCallbackParam ?? "callbackUrl",
     accessTokenTtlSeconds: config.accessTokenTtlSeconds ?? ACCESS_TOKEN_TTL_SECONDS,
     refreshTokenTtlMs: config.refreshTokenTtlMs ?? REFRESH_TOKEN_TTL_MS,
+    refreshRotationGraceMs: config.refreshRotationGraceMs ?? DEFAULT_ROTATION_GRACE_MS,
   };
 }
 

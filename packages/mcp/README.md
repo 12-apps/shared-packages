@@ -44,7 +44,7 @@ contract, so it lives here now:
 
 | Entry | Export | Role |
 |---|---|---|
-| `./oauth` | `createApiMcpOauth({ stores, resolveSession })` | OAuth 2.1 authorization server: `register` (RFC 7591) / `authorize` (code + mandatory PKCE S256) / `token` (code + refresh), the JWKS, and BOTH `.well-known` documents. Also the primitives — stateless signed codes, ES256 access tokens, hashed rotating refresh tokens with lineage revocation, the `verifyBearer` resource-server half. |
+| `./oauth` | `createApiMcpOauth({ stores, resolveSession })` | OAuth 2.1 authorization server: `register` (RFC 7591) / `authorize` (code + mandatory PKCE S256) / `token` (code + refresh), the JWKS, and BOTH `.well-known` documents. Also the primitives — stateless signed codes, ES256 access tokens, hashed rotating refresh tokens with lineage revocation and a retry grace window, the `verifyBearer` resource-server half. |
 | `./hono` | `mcpOauthRouter(config)` | The same surface as a router, mounted at the **origin root** (a connector reads `.well-known` from the origin, never from a prefix). `hono` is an OPTIONAL peer. |
 | `./generate` | `mcpGenerateCli(options)` | `mcp:generate` / `mcp:check` — the committed manifest and its drift gate. |
 | `./coverage` | `mcpCoverageCli(options)` | `mcp:coverage` — every route method and server action either exposed as a tool or excluded with a reason. |

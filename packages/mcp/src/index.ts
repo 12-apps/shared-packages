@@ -73,6 +73,17 @@ export {
   type McpJsonRpcOptions,
   type McpServerInfo,
 } from "./server/jsonrpc";
+// WHY a call was refused, and what a client should do about it. The RFC gives a
+// resource server three challenge codes, which is not enough to tell a lapsed
+// connection from a misconfigured deployment — so the reason travels alongside.
+export {
+  authFailureData,
+  describeAuthFailure,
+  type McpAuthFailure,
+  type McpAuthFailureData,
+  type McpAuthFailureReason,
+  type McpAuthRecovery,
+} from "./server/auth-failure";
 export {
   buildManifest,
   serializeManifest,

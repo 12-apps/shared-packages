@@ -88,6 +88,7 @@ interface TokenRaw {
   expires_at: Date;
   rotated_from: string | null;
   revoked_at: Date | null;
+  grace_seal: string | null;
 }
 
 function toToken(raw: TokenRaw): StoredRefreshToken {
@@ -100,17 +101,18 @@ function toToken(raw: TokenRaw): StoredRefreshToken {
     expiresAt: new Date(raw.expires_at),
     rotatedFrom: raw.rotated_from,
     revokedAt: raw.revoked_at ? new Date(raw.revoked_at) : null,
+    graceSeal: raw.grace_seal,
   };
 }
 
 const TOKEN_COLUMNS =
-  'token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, revoked_at';
+  'token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, revoked_at, grace_seal';
 
 async function insertToken(pg: PGlite, token: NewRefreshToken): Promise<void> {
   await pg.query(
     `INSERT INTO oauth_refresh_tokens
-       (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, created_at)
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW())`,
+       (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, grace_seal, created_at)
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
     [
       token.tokenHash,
       token.userEmail,
@@ -119,10 +121,65 @@ async function insertToken(pg: PGlite, token: NewRefreshToken): Promise<void> {
       token.scopes,
       token.expiresAt,
       token.rotatedFrom,
+      token.graceSeal ?? null,
     ],
   );
 }
 
+/**
+ * The port's CLAIM-ONCE contract, in SQL rather than Prisma — a non-Prisma host
+ * satisfying the same requirement by hand, which is why the harness fills these
+ * ports itself. The parent revoke is CONDITIONAL on the row still being live,
+ * and the successor is inserted only when that claim took effect; one
+ * transaction covers the crash case too. Clearing the parent's seal is PART of
+ * the claim rather than tidying after it — see SEAL_RULE below.
+ */
+async function claimAndInsert(
+  pg: PGlite,
+  successor: NewRefreshToken,
+  parentHash: string,
+  at: Date,
+): Promise<boolean> {
+  return pg.transaction(async (tx) => {
+    const claim = await tx.query(
+      `UPDATE oauth_refresh_tokens SET revoked_at = $1, grace_seal = NULL
+         WHERE token_hash = $2 AND revoked_at IS NULL`,
+      [at, parentHash],
+    );
+    // Lost the claim (a concurrent rotation got there, or the parent was already
+    // revoked): write NOTHING and say so.
+    if ((claim.affectedRows ?? 0) !== 1) return false;
+    await tx.query(
+      `INSERT INTO oauth_refresh_tokens
+         (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, grace_seal, created_at)
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      [
+        successor.tokenHash,
+        successor.userEmail,
+        successor.userSub,
+        successor.clientId,
+        successor.scopes,
+        successor.expiresAt,
+        successor.rotatedFrom,
+        successor.graceSeal ?? null,
+      ],
+    );
+    return true;
+  });
+}
+
+/**
+ * SEAL_RULE — why `grace_seal` is written on every insert and cleared on every
+ * consume and every revoke, in all three of this store's write paths.
+ *
+ * A seal holds a token's own plaintext encrypted under a key derived from the
+ * plaintext of the token it was rotated FROM. Left in place once its token is
+ * spent, seals CHAIN: one historical plaintext plus a copy of this table walks
+ * forward hop by hop to the live token, entirely offline, with no server call
+ * and therefore no replay detection. Cleared as each token is consumed, at most
+ * one hop is ever open. `RefreshTokenStore` in `@12-apps/mcp` states the same
+ * contract; this is the raw-SQL host meeting it.
+ */
 function refreshTokenStore(pg: PGlite): RefreshTokenStore {
   return {
     create: (token) => insertToken(pg, token),
@@ -154,48 +211,19 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
 
     async revokeHashes(tokenHashes, at) {
       if (tokenHashes.length === 0) return;
+      // The seal goes with the revocation — see SEAL_RULE.
       await pg.query(
-        `UPDATE oauth_refresh_tokens SET revoked_at = $1 WHERE token_hash = ANY($2)`,
+        `UPDATE oauth_refresh_tokens SET revoked_at = $1, grace_seal = NULL
+         WHERE token_hash = ANY($2)`,
         [at, [...tokenHashes]],
       );
     },
 
-    async rotate(successor, parentHash, at) {
-      // The port's CLAIM-ONCE contract, in SQL rather than Prisma — a non-Prisma
-      // host satisfying the same requirement by hand, which is why the harness
-      // fills these ports itself. The parent revoke is CONDITIONAL on the row still
-      // being live, and the successor is inserted only when that claim took effect;
-      // one transaction covers the crash case as before.
-      return pg.transaction(async (tx) => {
-        const claim = await tx.query(
-          `UPDATE oauth_refresh_tokens SET revoked_at = $1
-             WHERE token_hash = $2 AND revoked_at IS NULL`,
-          [at, parentHash],
-        );
-        // Lost the claim (a concurrent rotation got there, or the parent was already
-        // revoked): write NOTHING and say so.
-        if ((claim.affectedRows ?? 0) !== 1) return false;
-        await tx.query(
-          `INSERT INTO oauth_refresh_tokens
-             (id, token_hash, user_email, user_sub, client_id, scopes, expires_at, rotated_from, created_at)
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW())`,
-          [
-            successor.tokenHash,
-            successor.userEmail,
-            successor.userSub,
-            successor.clientId,
-            successor.scopes,
-            successor.expiresAt,
-            successor.rotatedFrom,
-          ],
-        );
-        return true;
-      });
-    },
+    rotate: (successor, parentHash, at) => claimAndInsert(pg, successor, parentHash, at),
 
     async revokeLiveForClient(userEmail, clientId) {
       const result = await pg.query(
-        `UPDATE oauth_refresh_tokens SET revoked_at = NOW()
+        `UPDATE oauth_refresh_tokens SET revoked_at = NOW(), grace_seal = NULL
          WHERE user_email = $1 AND client_id = $2 AND revoked_at IS NULL`,
         [userEmail, clientId],
       );
