@@ -7,6 +7,7 @@ import { EmptyCart, PaymentStep } from "./checkout-steps";
 import { DadosStep } from "./dados-step";
 import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
+import type { BackActionEmphasis } from "./payment-status-parts";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
 import { CheckoutCopyProvider } from "./copy-context";
 import { OneClickProvider, useOneClick } from "./one-click";
@@ -94,6 +95,10 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** Host content shown on the paid confirmation (the storefront's install invite). */
   confirmationExtra?: ReactNode;
+  /** Host content shown AFTER the confirmation's actions — `PaymentStatusProps.paidFooter`. */
+  confirmationFooter?: ReactNode;
+  /** Whether the way out leads the paid screen — see {@link BackActionEmphasis}. */
+  backActionEmphasis?: BackActionEmphasis;
   /** Design-system slots; unfilled slots render the raw-MUI defaults. */
   components?: Partial<CheckoutComponents>;
 }
@@ -180,12 +185,16 @@ function StatusStep({
   settlement,
   cart,
   confirmationExtra,
+  confirmationFooter,
+  backActionEmphasis,
 }: {
   copy: CheckoutViewCopy;
   c: ReturnType<typeof useCheckoutController>;
   settlement: SettlementCheckout | null | undefined;
   cart: CheckoutCartView;
   confirmationExtra: ReactNode;
+  confirmationFooter: ReactNode;
+  backActionEmphasis: BackActionEmphasis | undefined;
 }): JSX.Element {
   return (
     <PaymentStatus
@@ -197,6 +206,8 @@ function StatusStep({
       onRegenerate={() => { c.setStep("payment"); void c.startPayment("PIX"); }}
       onBackToMenu={c.goToMenu}
       paidExtra={confirmationExtra}
+      paidFooter={confirmationFooter}
+      backActionEmphasis={backActionEmphasis}
       awaitingTimedOut={c.awaitingTimedOut}
       // How the wait behind this screen is going, and the way out of it
       // (FUT-1144). It is the resumed leg's wait for a checkout that came back
@@ -297,7 +308,7 @@ function PagamentoStep({
 }
 
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
-  const { copy, cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, validateApplePayMerchant, oneClick = false, ...ports } = props;
+  const { copy, cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, confirmationFooter, backActionEmphasis, validateApplePayMerchant, oneClick = false, ...ports } = props;
   // Resolved for NO method on purpose (FUT-595): the Dados step opens before
   // the picker, and the form is filled once — so it asks for the union of what
   // any chain member may need rather than re-opening after the choice. A chain
@@ -354,7 +365,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
       ) : null}
 
       {c.step === "status" ? (
-        <StatusStep copy={copy} c={c} settlement={settlement} cart={cart} confirmationExtra={confirmationExtra} />
+        <StatusStep copy={copy} c={c} settlement={settlement} cart={cart} confirmationExtra={confirmationExtra} confirmationFooter={confirmationFooter} backActionEmphasis={backActionEmphasis} />
       ) : null}
     </Box>
   );
