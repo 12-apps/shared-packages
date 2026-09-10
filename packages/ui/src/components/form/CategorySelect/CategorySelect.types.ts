@@ -22,10 +22,18 @@ export interface CategorySelectOption {
   count?: number;
 }
 
-/** A top-level category together with the subcategories nested under it. */
+/**
+ * One node of the category tree: an option together with whatever sits under it.
+ *
+ * Recursive rather than "a category and its flat subcategories" because the tree
+ * a caller hands over is not always two deep — a picker can file ITEMS under a
+ * subcategory, and the level below still has to nest, fold and search like the
+ * one above it. A node with an empty `subcategories` is the leaf.
+ */
 export interface CategoryGroup {
   category: CategorySelectOption;
-  subcategories: CategorySelectOption[];
+  /** The nodes directly below it, each a group in its own right. */
+  subcategories: CategoryGroup[];
 }
 
 /** One entry in the "selected" summary: a whole category, or a single leaf. */

@@ -103,6 +103,28 @@ const MATRIX: CategorySelectOption[] = [
   { id: 'pad', name: 'Padaria', count: 31 },
 ];
 
+/**
+ * Three storeys: a ficha-técnica picker, where the ITEM is what you choose and
+ * the categories exist only to keep the list navigable. Whatever is filed
+ * nowhere gets a trailing group of its own rather than disappearing.
+ */
+const COMPONENTES: CategorySelectOption[] = [
+  { id: 'beb', name: 'Bebidas' },
+  { id: 'beb.refri', name: 'Refrigerantes', parentId: 'beb' },
+  { id: 'i.coca', name: 'Coca-Cola 350ml', parentId: 'beb.refri' },
+  { id: 'i.guarana', name: 'Guaraná 350ml', parentId: 'beb.refri' },
+  { id: 'beb.suco', name: 'Sucos', parentId: 'beb' },
+  { id: 'i.laranja', name: 'Suco de laranja 300ml', parentId: 'beb.suco' },
+  { id: 'merc', name: 'Mercearia' },
+  { id: 'merc.graos', name: 'Grãos e farináceos', parentId: 'merc' },
+  { id: 'i.arroz', name: 'Arroz Agulhinha · Insumo', parentId: 'merc.graos' },
+  { id: 'i.feijao', name: 'Feijão Carioca · Insumo', parentId: 'merc.graos' },
+  { id: 'merc.molho', name: 'Molhos', parentId: 'merc' },
+  { id: 'i.tomate', name: 'Molho de tomate · Insumo', parentId: 'merc.molho' },
+  { id: 'sem', name: 'Sem categoria' },
+  { id: 'i.gelo', name: 'Gelo · Insumo', parentId: 'sem' },
+];
+
 const meta = {
   title: 'Form/CategorySelect',
   component: CategorySelect,
@@ -156,6 +178,32 @@ export const SingleSelect: Story = {
           {...args}
           mode="single"
           label="Categoria"
+          value={value}
+          onChange={setValue}
+        />
+      </Box>
+    );
+  },
+};
+
+/**
+ * A tree one level deeper: category › subcategory › item.
+ *
+ * Opening unfolds the top level only, so the items stay one click away instead
+ * of arriving as the flat list the component replaces. The frames get chevrons
+ * rather than the uppercase heading treatment — a heading has nothing to fold.
+ */
+export const NestedItems: Story = {
+  args: { options: COMPONENTES, value: [], onChange: () => {} },
+  render: function Render(args) {
+    const [value, setValue] = useState<string | null>(null);
+    return (
+      <Box sx={{ minHeight: 460 }}>
+        <CategorySelect
+          {...args}
+          mode="single"
+          label="Componente"
+          placeholder="Buscar componente…"
           value={value}
           onChange={setValue}
         />

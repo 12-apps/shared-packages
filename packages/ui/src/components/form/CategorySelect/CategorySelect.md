@@ -1,7 +1,7 @@
 # CategorySelect
 
-A hierarchical category picker: **categories are the frame, subcategories are what
-you pick.**
+A hierarchical picker: **the categories are the frame, whatever is filed at the
+bottom is what you pick.** Two levels by default; as many as the payload has.
 
 ```tsx
 import { CategorySelect } from '@12-apps/ui/form/CategorySelect';
@@ -33,7 +33,32 @@ Never pre-indent `name` (`"— Águas"`). The row draws the nesting; a baked-in 
 travels everywhere the label goes, including the closed trigger.
 
 An option whose `parentId` matches nothing is promoted to top level rather than
-dropped, so a partial payload never makes a category invisible.
+dropped, so a partial payload never makes a category invisible. So is an option
+on a `parentId` RING — two rows naming each other would otherwise build a loop
+every walk of the tree follows until the stack gives out.
+
+### Depth
+
+**Nothing caps it at two.** Point a `parentId` at a subcategory and you get a
+third storey; the row indents one more step, folds, searches and reports its
+path like every level above it.
+
+```tsx
+const options = [
+  { id: 'beb', name: 'Bebidas' },
+  { id: 'beb.refri', name: 'Refrigerantes', parentId: 'beb' },
+  { id: 'p.coca', name: 'Coca-Cola', parentId: 'beb.refri' }, // an ITEM
+];
+```
+
+Two things follow from a deeper tree, and both are the component's own doing:
+
+- **A category stands for the leaves at the BOTTOM of it**, never for the
+  subcategories in between. `Bebidas` ticked means every drink under every one of
+  its subcategories, so the value a caller receives is uniformly leaves.
+- **The section-heading treatment switches off** (see below), because a heading
+  has no chevron and a three-level tree drawn flat is the list this component is
+  adopted to replace.
 
 ## Which rows are selectable
 
@@ -42,14 +67,14 @@ parent that HAS children can be ticked in its own right.
 
 | `allowParentSelection` | has children | the row |
 | --- | --- | --- |
-| `false` (default) | yes | a **heading** — no control; its subcategories are what you tick |
+| `false` (default) | yes | a **frame** — no control; what is filed under it is what you tick |
 | `false` | no | **selectable** — it is itself the leaf |
-| `true` | yes | **selectable** — ticking it selects **every subcategory under it** |
+| `true` | yes | **selectable** — ticking it selects **every leaf under it** |
 | `true` | no | **selectable** |
 
 Two of those deserve their reasons written down.
 
-**A parent with children, flag on, selects its CHILDREN** — not an id of its own.
+**A parent with children, flag on, selects its LEAVES** — not an id of its own.
 That is what makes the value a caller receives uniform: always leaves, never a
 mix of leaves and groups that every consumer would have to re-expand. The chip
 tray collapses a fully-selected category back to one chip bearing the category's
@@ -80,7 +105,8 @@ const [categories, setCategories] = useState<string[]>([]);
 ### `single` — the "move to…" picker
 
 Choosing a row commits immediately; there is nothing to batch. The trigger then
-reads `Pai › Filha`, so the chosen leaf keeps its context.
+reads the whole path — `Pai › Filha`, or `Pai › Filha › Item` on a deeper tree —
+so the chosen leaf keeps its context once the panel has closed over it.
 
 ```tsx
 <CategorySelect
@@ -94,8 +120,16 @@ reads `Pai › Filha`, so the chosen leaf keeps its context.
 
 ## Behaviour worth knowing
 
-- **Opens fully expanded.** Nothing a search could match hides behind a
-  disclosure.
+- **Opens with the top level unfolded.** On a two-level tree that is everything.
+  On a deeper one the items stay one click away, which is the whole point of
+  filing them under something. A **search reveals every hit regardless** — folded
+  or not — and clearing it restores exactly what you had folded.
+- **A frame you cannot tick is still a foldable ROW in a deep tree.** In a
+  two-level tree, single-select draws it as an inert uppercase heading with its
+  subcategories always on show: there is nothing to fold to, since everything
+  under it is already the thing you came for. Add a third level and that reading
+  breaks twice over — the heading has no chevron, so the panel opens onto the
+  whole catalogue — so the treatment is dropped and every frame gets a chevron.
 - **Selected categories pin above the list.** They survive scrolling and
   searching — a tick made at the bottom of a ten-category tree does not vanish
   the moment you look for the next one.
@@ -112,9 +146,9 @@ reads `Pai › Filha`, so the chosen leaf keeps its context.
 | Key | Does |
 | --- | --- |
 | `↑` `↓` | Move the cursor |
-| `→` | Expand the category |
-| `←` | Collapse it, or jump from a subcategory to its parent |
-| `Space` | Mark the row (single-select: pick it) — a heading category expands |
+| `→` | Expand the row, at any depth |
+| `←` | Collapse it, or jump from a leaf to its parent |
+| `Space` | Mark the row (single-select: pick it) — a frame expands instead |
 | `Enter` | Apply (single-select: pick, and expand on a heading, as `Space` does) |
 | `Esc` | Cancel, returning focus to the trigger |
 
@@ -126,7 +160,7 @@ the field.
 ## Styling
 
 Geometry is the design's absolute pixels — 38px trigger, 340px panel, 36px rows,
-1.5px checkbox borders. Those are deliberately not derived from `theme.spacing`,
+14px of indent per level, 1.5px checkbox borders. Those are deliberately not derived from `theme.spacing`,
 which is an 8px grid and would round the design away.
 
 **Colours come from the theme.** A tenant can white-label the palette, and the

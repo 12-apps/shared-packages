@@ -15,40 +15,64 @@ import type {
 export function foldText(text: string): string {
   return text
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase();
 }
 
 /**
- * Group a flat `parentId` list into top level + children, preserving input order.
+ * Whether following `parentId` up from `startId` ever comes back to a node it
+ * already passed.
  *
- * An option whose `parentId` names no top-level row is promoted to top level
- * rather than dropped — a category is never invisible just because its parent
- * was filtered out of the payload, or because the tree is deeper than two levels.
+ * Two levels made a cycle impossible by construction: a child was attached to a
+ * ROOT or promoted, so nothing could ever point back down. An arbitrary depth
+ * attaches every node to whichever node its `parentId` names, and a payload
+ * where two rows name each other would build a ring that every walk below —
+ * flattening, filtering, counting leaves — follows until the stack gives out. So
+ * the chain is checked rather than trusted, and a node on a ring is promoted to
+ * top level, which is what {@link buildCategoryGroups} already does with a
+ * parent it cannot resolve.
  */
-export function buildCategoryGroups(options: CategorySelectOption[]): CategoryGroup[] {
-  const roots = options.filter((option) => !option.parentId);
-  const rootIds = new Set(roots.map((root) => root.id));
-  const groups = new Map<string, CategoryGroup>(
-    roots.map((root) => [root.id, { category: root, subcategories: [] }]),
-  );
-  const orphans: CategoryGroup[] = [];
-
-  options.forEach((option) => {
-    if (!option.parentId) return;
-    const parent = groups.get(option.parentId);
-    if (parent) {
-      parent.subcategories.push(option);
-      return;
-    }
-    if (!rootIds.has(option.id)) orphans.push({ category: option, subcategories: [] });
-  });
-
-  return [...groups.values(), ...orphans];
+function onParentCycle(startId: string, parents: ReadonlyMap<string, string>): boolean {
+  const seen = new Set<string>([startId]);
+  let current = parents.get(startId);
+  while (current !== undefined) {
+    if (seen.has(current)) return true;
+    seen.add(current);
+    current = parents.get(current);
+  }
+  return false;
 }
 
 /**
- * Whether this category IS the leaf, because nothing sits under it.
+ * Nest a flat `parentId` list into a tree of ANY depth, preserving input order
+ * at every level.
+ *
+ * An option whose `parentId` names nothing in the payload is promoted to top
+ * level rather than dropped — a category is never invisible just because its
+ * parent was filtered out of the response. A duplicate id keeps its first row,
+ * so a repeated payload cannot place the same node twice.
+ */
+export function buildCategoryGroups(options: CategorySelectOption[]): CategoryGroup[] {
+  const nodes = new Map<string, CategoryGroup>();
+  const parents = new Map<string, string>();
+  options.forEach((option) => {
+    if (nodes.has(option.id)) return;
+    nodes.set(option.id, { category: option, subcategories: [] });
+    if (option.parentId && option.parentId !== option.id) parents.set(option.id, option.parentId);
+  });
+
+  const roots: CategoryGroup[] = [];
+  nodes.forEach((node, id) => {
+    const parentId = parents.get(id);
+    const parent = parentId === undefined ? undefined : nodes.get(parentId);
+    if (parent && !onParentCycle(id, parents)) parent.subcategories.push(node);
+    else roots.push(node);
+  });
+  return roots;
+}
+
+/**
+ * Whether this node IS the leaf, because nothing sits under it.
  *
  * The leaf-only default makes a category a heading and the subcategory the thing
  * you pick — but a childless category has no subcategory to offer instead, so
@@ -62,14 +86,66 @@ export function isLeafCategory(group: CategoryGroup): boolean {
   return group.subcategories.length === 0;
 }
 
-/** Every selectable leaf id across all groups, in display order. */
+/** Every selectable leaf id across the whole tree, in display order. */
 export function collectLeafIds(groups: CategoryGroup[]): string[] {
   return groups.flatMap((group) => leavesOf(group));
 }
 
-/** The leaves a category stands for — its subcategories, or itself when childless. */
+/**
+ * The leaves a node stands for — every leaf BELOW it, or itself when childless.
+ *
+ * Recursive rather than one level down, so a category three levels deep still
+ * stands for the items at the bottom of it and not for the subcategories in
+ * between: the value a caller receives stays uniformly leaves, which is the
+ * property that lets a chip, a tri-state checkbox and `Marcar tudo` agree.
+ */
 export function leavesOf(group: CategoryGroup): string[] {
-  return isLeafCategory(group) ? [group.category.id] : group.subcategories.map((sub) => sub.id);
+  if (isLeafCategory(group)) return [group.category.id];
+  return group.subcategories.flatMap((sub) => leavesOf(sub));
+}
+
+/** Every node that can be unfolded, at any depth — what "Expandir tudo" opens. */
+export function collectBranchIds(groups: CategoryGroup[]): string[] {
+  return groups.flatMap((group) =>
+    isLeafCategory(group) ? [] : [group.category.id, ...collectBranchIds(group.subcategories)],
+  );
+}
+
+/** The node carrying `id`, searched at every depth. */
+export function findGroup(groups: CategoryGroup[], id: string): CategoryGroup | undefined {
+  for (const group of groups) {
+    if (group.category.id === id) return group;
+    const found = findGroup(group.subcategories, id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * The names from the top-level category down to `id`, or `null` when absent.
+ *
+ * The single-select trigger reads this back as `Pai › Filha › Item`, so a chosen
+ * row keeps the context that tells `Massas` (mercearia) from `Massas` (pratos
+ * principais) once the panel has closed over it.
+ */
+export function categoryPath(groups: CategoryGroup[], id: string): string[] | null {
+  for (const group of groups) {
+    if (group.category.id === id) return [group.category.name];
+    const below = categoryPath(group.subcategories, id);
+    if (below) return [group.category.name, ...below];
+  }
+  return null;
+}
+
+/**
+ * How many levels the deepest branch has. A flat list is 1, the classic
+ * category/subcategory tree is 2, anything more is a tree with items in it.
+ */
+export function treeDepth(groups: CategoryGroup[]): number {
+  return groups.reduce(
+    (deepest, group) => Math.max(deepest, 1 + treeDepth(group.subcategories)),
+    0,
+  );
 }
 
 export type CategoryCheckState = 'off' | 'partial' | 'on';
@@ -105,9 +181,12 @@ export function toggleLeaf(id: string, selected: ReadonlySet<string>): Set<strin
 }
 
 /**
- * Collapse a raw id set into the chips a human reads: a category that is fully
- * selected becomes ONE chip bearing the category's name, rather than one chip
- * per subcategory — "Bebidas" instead of six drinks.
+ * Collapse a raw id set into the chips a human reads: a node that is fully
+ * selected becomes ONE chip bearing its name, rather than one chip per leaf —
+ * "Bebidas" instead of six drinks.
+ *
+ * A partly-selected node hands the question down to its own children, so the
+ * chip that appears is always the DEEPEST node that is completely selected.
  */
 export function summarizeSelection(
   groups: CategoryGroup[],
@@ -117,17 +196,20 @@ export function summarizeSelection(
     const state = categoryCheckState(group, selected);
     if (state === 'off') return [];
     if (state === 'on') {
-      return [{ id: group.category.id, label: group.category.name, whole: true }];
+      // `whole` says the chip stands for MORE than itself, so it is the node
+      // having children that decides it — not the node being fully selected,
+      // which a leaf always is the moment it is picked at all.
+      return [
+        { id: group.category.id, label: group.category.name, whole: !isLeafCategory(group) },
+      ];
     }
-    return group.subcategories
-      .filter((sub) => selected.has(sub.id))
-      .map((sub) => ({ id: sub.id, label: sub.name, whole: false }));
+    return summarizeSelection(group.subcategories, selected);
   });
 }
 
 /**
- * Drop the leaves a chip stands for. A `whole` chip removes the whole category;
- * any other chip removes just that leaf.
+ * Drop the leaves a chip stands for. A chip naming a node removes everything
+ * under it; a chip naming nothing in the tree removes just that id.
  */
 export function removeChip(
   groups: CategoryGroup[],
@@ -135,7 +217,7 @@ export function removeChip(
   selected: ReadonlySet<string>,
 ): Set<string> {
   const next = new Set(selected);
-  const group = groups.find((candidate) => candidate.category.id === chipId);
+  const group = findGroup(groups, chipId);
   if (group) {
     leavesOf(group).forEach((id) => next.delete(id));
     return next;
@@ -145,23 +227,23 @@ export function removeChip(
 }
 
 /**
- * Search across BOTH levels, keeping every hit under its parent.
+ * Search every level, keeping each hit under its parents.
  *
- * A category that matches keeps all of its subcategories, so "Bebidas" shows the
- * whole group. A category that does not match keeps only the subcategories that
- * do — the hit still arrives with its parent visible above it, which is the
- * context that tells "Massas" (mercearia) from "Massas" (pratos principais).
+ * A node that matches keeps its whole subtree, so "Bebidas" shows the entire
+ * group. A node that does not match keeps only the descendants that do — the hit
+ * still arrives with its parents visible above it, which is the context that
+ * tells "Massas" (mercearia) from "Massas" (pratos principais).
  */
 export function filterCategoryGroups(groups: CategoryGroup[], query: string): CategoryGroup[] {
   const needle = foldText(query.trim());
   if (!needle) return groups;
-  return groups.flatMap((group) => {
-    if (foldText(group.category.name).includes(needle)) return [group];
-    const subcategories = group.subcategories.filter((sub) =>
-      foldText(sub.name).includes(needle),
-    );
-    return subcategories.length > 0 ? [{ category: group.category, subcategories }] : [];
-  });
+  const walk = (nodes: CategoryGroup[]): CategoryGroup[] =>
+    nodes.flatMap((node) => {
+      if (foldText(node.category.name).includes(needle)) return [node];
+      const subcategories = walk(node.subcategories);
+      return subcategories.length > 0 ? [{ category: node.category, subcategories }] : [];
+    });
+  return walk(groups);
 }
 
 /** A run of text, flagged when it is the part that matched the query. */
@@ -191,29 +273,27 @@ export function highlightSegments(text: string, query: string): HighlightSegment
 
 /** A flattened row, so keyboard navigation can walk what is actually on screen. */
 export interface CategoryRowRef {
-  kind: 'category' | 'subcategory';
   id: string;
-  /** Owning category id — lets ← jump from a subcategory back to its parent. */
+  /** 0 for a top-level category, one more for each level below it. */
+  depth: number;
+  /** True when the row has children to unfold — what → and ← act on. */
+  branch: boolean;
+  /** Owning node id — lets ← jump from a child back to its parent. */
   parentId?: string;
 }
 
-/** The visible rows, in order, honouring which categories are expanded. */
+/** The visible rows, in order, honouring which nodes are expanded. */
 export function flattenRows(
   groups: CategoryGroup[],
   isExpanded: (categoryId: string) => boolean,
 ): CategoryRowRef[] {
-  return groups.flatMap((group) => {
-    const head: CategoryRowRef = { kind: 'category', id: group.category.id };
-    if (!isExpanded(group.category.id)) return [head];
-    return [
-      head,
-      ...group.subcategories.map(
-        (sub): CategoryRowRef => ({
-          kind: 'subcategory',
-          id: sub.id,
-          parentId: group.category.id,
-        }),
-      ),
-    ];
-  });
+  const walk = (nodes: CategoryGroup[], depth: number, parentId?: string): CategoryRowRef[] =>
+    nodes.flatMap((node) => {
+      const id = node.category.id;
+      const branch = !isLeafCategory(node);
+      const row: CategoryRowRef = { id, depth, branch, ...(parentId ? { parentId } : {}) };
+      if (!branch || !isExpanded(id)) return [row];
+      return [row, ...walk(node.subcategories, depth + 1, id)];
+    });
+  return walk(groups, 0);
 }

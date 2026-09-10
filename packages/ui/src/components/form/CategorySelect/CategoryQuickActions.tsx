@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import type { CategorySelectCopy } from '../../../copy';
 
-import { collectLeafIds } from './category-tree';
+import { collectBranchIds, collectLeafIds } from './category-tree';
 import type { CategorySelectState } from './useCategorySelect';
 
 /** The panel's text-button treatment. */
@@ -41,9 +41,11 @@ export function CategoryQuickActions({
 }): React.JSX.Element {
   const allLeafIds = useMemo(() => collectLeafIds(state.allGroups), [state.allGroups]);
   const everythingPicked = allLeafIds.length > 0 && state.draft.size >= allLeafIds.length;
-  const allExpanded =
-    state.allGroups.length > 0 &&
-    state.allGroups.every((group) => state.isExpanded(group.category.id));
+  // Measured over every foldable node at every depth: on a deep tree the top
+  // storey can be open while the items under it are not, and a label reading
+  // "Recolher tudo" there would be describing a state the list is not in.
+  const branchIds = useMemo(() => collectBranchIds(state.allGroups), [state.allGroups]);
+  const allExpanded = branchIds.length > 0 && branchIds.every((id) => state.isExpanded(id));
 
   return (
     <>

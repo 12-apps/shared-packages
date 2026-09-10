@@ -13,9 +13,9 @@ const OPTIONS: CategorySelectOption[] = [
 const GROUPS = buildCategoryGroups(OPTIONS);
 
 const ROWS: CategoryKeyContext['rows'] = [
-  { kind: 'category', id: 'beb' },
-  { kind: 'subcategory', id: 'beb.agua', parentId: 'beb' },
-  { kind: 'subcategory', id: 'beb.refri', parentId: 'beb' },
+  { id: 'beb', depth: 0, branch: true },
+  { id: 'beb.agua', depth: 1, branch: false, parentId: 'beb' },
+  { id: 'beb.refri', depth: 1, branch: false, parentId: 'beb' },
 ];
 
 function makeContext(overrides: Partial<CategoryKeyContext> = {}): CategoryKeyContext {
@@ -191,16 +191,21 @@ describe('a category with no children', () => {
 
   const leafContext = (overrides: Partial<CategoryKeyContext> = {}): CategoryKeyContext =>
     makeContext({
-      rows: [{ kind: 'category', id: 'combo' }],
+      rows: [{ id: 'combo', depth: 0, branch: false }],
       groups: LEAF_GROUPS,
       activeIndex: 0,
       ...overrides,
     });
 
+  // Asserted on `toggleSubcategory` rather than on `toggleCategory`, which is
+  // what it used to call: rows are typed by BRANCH-or-LEAF now, not by which
+  // storey they sit on, so a childless category marks down the same path any
+  // other leaf does. Both paths land on `toggleLeaf` with the same id — the
+  // behaviour this describes, marking rather than folding, is unchanged.
   it('marks with Space instead of folding, in the leaf-only default', () => {
     const context = leafContext();
     handleCategoryKeyDown(' ', false, context);
-    expect(context.toggleCategory).toHaveBeenCalledWith(LEAF_GROUPS[0]);
+    expect(context.toggleSubcategory).toHaveBeenCalledWith('combo');
     expect(context.toggleExpanded).not.toHaveBeenCalled();
   });
 

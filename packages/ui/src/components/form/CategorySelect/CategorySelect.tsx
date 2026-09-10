@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 
-import { summarizeSelection } from './category-tree';
+import { categoryPath, summarizeSelection } from './category-tree';
 import { CategoryPanel } from './CategoryPanel';
 import { CategoryPanelSurface } from './CategoryPanelSurface';
 import { CategoryTrigger } from './CategoryTrigger';
@@ -26,14 +26,13 @@ function draftChanged(draft: ReadonlySet<string>, applied: readonly string[]): b
   return draft.size !== applied.length || applied.some((id) => !draft.has(id));
 }
 
-/** "Pai › Filha" for a chosen id, so the trigger carries its context. */
+/**
+ * "Pai › Filha" for a chosen id, so the trigger carries its context once the
+ * panel has closed over it. The whole path, at whatever depth the row sits.
+ */
 function singleLabel(groups: CategoryGroup[], value: string | null): string | undefined {
   if (!value) return undefined;
-  const asCategory = groups.find((group) => group.category.id === value);
-  if (asCategory) return asCategory.category.name;
-  const owner = groups.find((group) => group.subcategories.some((sub) => sub.id === value));
-  const sub = owner?.subcategories.find((candidate) => candidate.id === value);
-  return sub && owner ? `${owner.category.name} › ${sub.name}` : undefined;
+  return categoryPath(groups, value)?.join(' › ');
 }
 
 /** The optional props, resolved once so the component body stays branch-free. */
@@ -85,19 +84,22 @@ function usePanelFocus(
 }
 
 /**
- * A hierarchical category picker: categories as the frame, subcategories as the
- * thing you choose.
+ * A hierarchical category picker: categories as the frame, whatever is filed
+ * under them as the thing you choose.
  *
  * Two modes off one component. `multi` is the FILTER — ticks accumulate in a
  * draft and reach `onChange` only on Apply, so the list behind the panel does not
  * reload on every click. `single` is the "move to…" picker, where choosing a row
  * commits immediately because there is nothing to batch.
  *
- * The tree opens fully expanded: nothing a search could match is hidden behind a
- * disclosure. Selected categories pin above the list so they survive scrolling
- * and searching, search is accent-insensitive (`agua` finds `Águas`), and the
- * whole tree is keyboard-drivable — ↑↓ to move, → to open, ← to close, Space to
- * mark, Enter to apply, Esc to cancel.
+ * The tree nests as deep as the payload does — a picker can file ITEMS under a
+ * subcategory and get a third storey with no extra configuration. Opening
+ * unfolds the top level, and a search reveals every hit whatever is folded.
+ *
+ * Selected categories pin above the list so they survive scrolling and
+ * searching, search is accent-insensitive (`agua` finds `Águas`), and the whole
+ * tree is keyboard-drivable — ↑↓ to move, → to open, ← to close, Space to mark,
+ * Enter to apply, Esc to cancel.
  *
  * Under {@link METRICS.sheetBreakpoint} the panel becomes a bottom sheet, which
  * is the only way a 290px-tall list stays usable one-handed.

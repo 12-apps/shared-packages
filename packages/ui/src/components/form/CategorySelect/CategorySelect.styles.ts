@@ -28,6 +28,8 @@ export const METRICS = {
   rowRadius: 8,
   boxSize: 18,
   chevronButton: 22,
+  /** Extra left padding per level of nesting. */
+  rowIndentStep: 14,
   footerButton: 32,
   sheetFooterButton: 38,
   /** Below this width the panel becomes a bottom sheet. */
@@ -238,6 +240,17 @@ export const rowSx = (theme: Theme, active: boolean, sheet: boolean): CSSObject 
   },
   '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 1 },
 });
+
+/**
+ * How far a row sits in from the panel edge, by depth.
+ *
+ * One step per level, on top of {@link rowSx}'s own 8px gutter — depth 0 keeps
+ * that gutter, and every level below it adds `METRICS.rowIndentStep`. Absolute
+ * like the rest of this file: the step is the design's own 14px, not a spacing
+ * multiple that would round it.
+ */
+export const rowIndent = (depth: number): CSSObject =>
+  depth === 0 ? {} : { paddingLeft: `${depth * METRICS.rowIndentStep}px` };
 
 export const rowNameSx = (theme: Theme, isCategory: boolean): CSSObject => ({
   flex: 1,

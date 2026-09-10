@@ -12,6 +12,7 @@ import {
   markSx,
   METRICS,
   radioSx,
+  rowIndent,
   rowMetaSx,
   rowNameSx,
   rowSx,
@@ -57,18 +58,20 @@ export function CategoryRadio({ on }: { on: boolean }): React.JSX.Element {
   return <Box sx={(theme) => radioSx(theme, on)} aria-hidden="true" />;
 }
 
-interface CategoryHeadRowProps {
+interface CategoryTreeRowProps {
   option: CategorySelectOption;
   query: string;
+  /** 0 for a top-level category; each level below indents one more step. */
+  depth: number;
+  /** True when there is something under this row to fold. */
+  branch: boolean;
   expanded: boolean;
   active: boolean;
   sheet: boolean;
-  /** Absent in leaf-only mode, where the category is a heading with no checkbox. */
+  /** Absent where the row cannot be picked — a category acting as a frame. */
   checkState?: CategoryCheckState;
   /** Single-select draws a radio for the control: choosing a row is exclusive. */
   single: boolean;
-  /** False for a childless category — there is nothing under it to disclose. */
-  expandable: boolean;
   selectedCount: number;
   showCounts: boolean;
   onToggleExpanded: () => void;
@@ -77,7 +80,7 @@ interface CategoryHeadRowProps {
   copy: CategorySelectCopy;
 }
 
-/** The trailing number: how many children are picked, else the item count. */
+/** The trailing number: how many leaves are picked below, else the item count. */
 function rowMeta(
   selectedCount: number,
   showCounts: boolean,
@@ -88,19 +91,19 @@ function rowMeta(
   return null;
 }
 
-/** The disclosure chevron, or the space it would have taken on a childless row. */
-function HeadRowDisclosure({
+/** The disclosure chevron, or the space it would have taken on a leaf row. */
+function RowDisclosure({
   option,
   expanded,
-  expandable,
+  branch,
   onToggleExpanded,
   dataTestId,
   copy,
 }: Pick<
-  CategoryHeadRowProps,
-  'option' | 'expanded' | 'expandable' | 'onToggleExpanded' | 'dataTestId' | 'copy'
+  CategoryTreeRowProps,
+  'option' | 'expanded' | 'branch' | 'onToggleExpanded' | 'dataTestId' | 'copy'
 >): React.JSX.Element {
-  if (!expandable) {
+  if (!branch) {
     return <Box sx={{ width: METRICS.chevronButton, flex: '0 0 auto' }} />;
   }
   return (
@@ -121,11 +124,11 @@ function HeadRowDisclosure({
   );
 }
 
-/** The row's selection control, or the space it would have taken on a heading. */
-function HeadRowControl({
+/** The row's selection control, or the space it would have taken on a frame. */
+function RowControl({
   checkState,
   single,
-}: Pick<CategoryHeadRowProps, 'checkState' | 'single'>): React.JSX.Element {
+}: Pick<CategoryTreeRowProps, 'checkState' | 'single'>): React.JSX.Element {
   if (!checkState) return <Box sx={{ width: METRICS.boxSize, flex: '0 0 auto' }} />;
   // Single-select commits the moment a row is chosen, so the control is a radio
   // there: a checkbox would promise the accumulation this mode does not do.
@@ -134,107 +137,68 @@ function HeadRowControl({
 }
 
 /**
- * A top-level category row: disclosure chevron, optional checkbox, name, meta.
+ * The test id a row answers to.
  *
- * The chevron is its OWN button inside the row button — clicking it only folds,
- * while clicking the row does the row's job (expand as a heading, or tick when
- * the category is selectable). A CHILDLESS category has neither a fold nor a
- * heading to be: it draws no chevron, and it carries the control, because it is
- * itself the leaf.
+ * Keyed on DEPTH rather than on whether the row has children, because that is
+ * what the ids meant when the tree was two levels and specs were written against
+ * them: `-category-<id>` is a top-level row — childless or not — and `-option-`
+ * is anything filed under one.
  */
-export function CategoryHeadRow({
+function rowTestId(dataTestId: string, depth: number, id: string): string {
+  return depth === 0 ? `${dataTestId}-category-${id}` : `${dataTestId}-option-${id}`;
+}
+
+/**
+ * One row of the tree: disclosure chevron, optional control, name, meta.
+ *
+ * The chevron is its OWN button inside the row — clicking it only folds, while
+ * clicking the row does the row's job (expand as a frame, or mark when the row
+ * is selectable). A LEAF has neither a fold nor a frame to be: it draws no
+ * chevron, and it always carries the control, because it is what you pick.
+ */
+export function CategoryTreeRow({
   option,
   query,
+  depth,
+  branch,
   expanded,
   active,
   sheet,
   checkState,
   single,
-  expandable,
   selectedCount,
   showCounts,
   onToggleExpanded,
   onActivate,
   dataTestId,
   copy,
-}: CategoryHeadRowProps): React.JSX.Element {
+}: CategoryTreeRowProps): React.JSX.Element {
   const meta = rowMeta(selectedCount, showCounts, option.count);
   return (
     <Box
       component="div"
       role={checkState ? 'option' : 'button'}
       aria-selected={checkState ? checkState === 'on' : undefined}
-      aria-expanded={expandable ? expanded : undefined}
-      data-testid={`${dataTestId}-category-${option.id}`}
-      sx={(theme) => rowSx(theme, active, sheet)}
+      aria-expanded={branch ? expanded : undefined}
+      data-testid={rowTestId(dataTestId, depth, option.id)}
+      sx={(theme) => ({ ...rowSx(theme, active, sheet), ...rowIndent(depth) })}
       onClick={onActivate}
     >
-      <HeadRowDisclosure
+      <RowDisclosure
         option={option}
         expanded={expanded}
-        expandable={expandable}
+        branch={branch}
         onToggleExpanded={onToggleExpanded}
         dataTestId={dataTestId}
         copy={copy}
       />
-      <HeadRowControl checkState={checkState} single={single} />
-      <Box component="span" sx={(theme) => rowNameSx(theme, true)}>
+      <RowControl checkState={checkState} single={single} />
+      <Box component="span" sx={(theme) => rowNameSx(theme, depth === 0)}>
         <HighlightedName text={option.name} query={query} />
       </Box>
       {meta && (
         <Box component="span" sx={(theme) => rowMetaSx(theme, meta.selected)}>
           {meta.text}
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-interface SubcategoryRowProps {
-  option: CategorySelectOption;
-  query: string;
-  selected: boolean;
-  active: boolean;
-  sheet: boolean;
-  /** Single-select mode draws a radio; multi-select draws a checkbox. */
-  single: boolean;
-  showCounts: boolean;
-  onActivate: () => void;
-  dataTestId: string;
-}
-
-export function SubcategoryRow({
-  option,
-  query,
-  selected,
-  active,
-  sheet,
-  single,
-  showCounts,
-  onActivate,
-  dataTestId,
-}: SubcategoryRowProps): React.JSX.Element {
-  return (
-    <Box
-      component="div"
-      role="option"
-      aria-selected={selected}
-      data-testid={`${dataTestId}-option-${option.id}`}
-      sx={(theme) => ({ ...rowSx(theme, active, sheet), paddingLeft: '14px' })}
-      onClick={onActivate}
-    >
-      <Box sx={{ width: METRICS.chevronButton, flex: '0 0 auto' }} />
-      {single ? (
-        <CategoryRadio on={selected} />
-      ) : (
-        <CategoryCheckbox state={selected ? 'on' : 'off'} />
-      )}
-      <Box component="span" sx={(theme) => rowNameSx(theme, false)}>
-        <HighlightedName text={option.name} query={query} />
-      </Box>
-      {showCounts && option.count !== undefined && (
-        <Box component="span" sx={(theme) => rowMetaSx(theme, false)}>
-          {option.count}
         </Box>
       )}
     </Box>

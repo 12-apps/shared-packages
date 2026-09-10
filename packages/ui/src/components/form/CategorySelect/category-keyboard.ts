@@ -1,4 +1,4 @@
-import { isLeafCategory, type CategoryRowRef } from './category-tree';
+import { findGroup, type CategoryRowRef } from './category-tree';
 import type { CategoryGroup } from './CategorySelect.types';
 
 /** What a key handler is allowed to do to the panel. */
@@ -27,7 +27,7 @@ function activeRow(context: CategoryKeyContext): CategoryRowRef | undefined {
 }
 
 function groupOf(context: CategoryKeyContext, id: string): CategoryGroup | undefined {
-  return context.groups.find((group) => group.category.id === id);
+  return findGroup(context.groups, id);
 }
 
 function moveCursor(context: CategoryKeyContext, delta: number): void {
@@ -40,41 +40,37 @@ function moveCursor(context: CategoryKeyContext, delta: number): void {
   context.setActiveIndex(next);
 }
 
-/** → opens a category. On a subcategory it is a no-op: there is nothing deeper. */
+/** → opens a row that folds. On a leaf it is a no-op: there is nothing deeper. */
 function handleRight(context: CategoryKeyContext): void {
   const row = activeRow(context);
-  if (row?.kind === 'category') context.expand(row.id);
+  if (row?.branch) context.expand(row.id);
 }
 
-/** ← collapses a category, or walks a subcategory back up to its parent. */
+/** ← collapses a foldable row, or walks a leaf back up to its parent. */
 function handleLeft(context: CategoryKeyContext): void {
   const row = activeRow(context);
   if (!row) return;
-  if (row.kind === 'category') {
+  if (row.branch) {
     context.collapse(row.id);
     return;
   }
   if (!row.parentId) return;
   context.collapse(row.parentId);
-  const parentIndex = context.rows.findIndex(
-    (candidate) => candidate.kind === 'category' && candidate.id === row.parentId,
-  );
+  const parentIndex = context.rows.findIndex((candidate) => candidate.id === row.parentId);
   if (parentIndex >= 0) context.setActiveIndex(parentIndex);
 }
 
 /**
- * What a category row does when it is activated — the one answer the click, the
+ * What a FOLDABLE row does when it is activated — the one answer the click, the
  * Space key and (in single-select) Enter all take, so the three cannot disagree
  * about a row the way they did over a childless category.
  *
- * A category that is only a HEADING expands instead of marking: the row has no
- * control, so "mark" has nothing to mean there. A childless category is not a
- * heading — it is the leaf — so it marks.
+ * A row that is only a frame expands instead of marking: it has no control, so
+ * "mark" has nothing to mean there. A childless category is not a frame — it is
+ * the leaf — so it never reaches here.
  */
-function activateCategoryRow(context: CategoryKeyContext, categoryId: string): void {
-  const group = groupOf(context, categoryId);
-  if (!group) return;
-  if (!context.allowParentSelection && !isLeafCategory(group)) {
+function activateBranchRow(context: CategoryKeyContext, categoryId: string): void {
+  if (!context.allowParentSelection) {
     context.toggleExpanded(categoryId);
     return;
   }
@@ -82,19 +78,24 @@ function activateCategoryRow(context: CategoryKeyContext, categoryId: string): v
     context.pick(categoryId);
     return;
   }
-  context.toggleCategory(group);
+  const group = groupOf(context, categoryId);
+  if (group) context.toggleCategory(group);
+}
+
+/** Mark the row under the cursor — or fold it, when it is only a frame. */
+function activateRow(context: CategoryKeyContext, row: CategoryRowRef): void {
+  if (row.branch) {
+    activateBranchRow(context, row.id);
+    return;
+  }
+  if (context.single) context.pick(row.id);
+  else context.toggleSubcategory(row.id);
 }
 
 /** Space marks the row under the cursor. */
 function handleSpace(context: CategoryKeyContext): void {
   const row = activeRow(context);
-  if (!row) return;
-  if (row.kind === 'subcategory') {
-    if (context.single) context.pick(row.id);
-    else context.toggleSubcategory(row.id);
-    return;
-  }
-  activateCategoryRow(context, row.id);
+  if (row) activateRow(context, row);
 }
 
 function handleEnter(context: CategoryKeyContext): void {
@@ -103,12 +104,7 @@ function handleEnter(context: CategoryKeyContext): void {
     context.commit();
     return;
   }
-  if (!row) return;
-  if (row.kind === 'subcategory') {
-    context.pick(row.id);
-    return;
-  }
-  activateCategoryRow(context, row.id);
+  if (row) activateRow(context, row);
 }
 
 /** Key → behaviour. A map keeps this dispatch flat instead of a long if-chain. */
