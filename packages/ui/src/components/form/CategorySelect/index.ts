@@ -11,9 +11,13 @@ export type {
 export {
   buildCategoryGroups,
   categoryCheckState,
+  categoryPath,
+  collectBranchIds,
   collectLeafIds,
   filterCategoryGroups,
+  findGroup,
   foldText,
   leavesOf,
   summarizeSelection,
+  treeDepth,
 } from './category-tree';

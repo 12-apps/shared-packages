@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCategoryGroups,
   categoryCheckState,
+  categoryPath,
+  collectBranchIds,
   collectLeafIds,
   filterCategoryGroups,
+  findGroup,
   flattenRows,
   isLeafCategory,
   foldText,
@@ -14,6 +17,7 @@ import {
   summarizeSelection,
   toggleCategoryLeaves,
   toggleLeaf,
+  treeDepth,
 } from '../category-tree';
 import type { CategorySelectOption } from '../CategorySelect.types';
 
@@ -33,7 +37,10 @@ const makeGroups = (): ReturnType<typeof buildCategoryGroups> =>
 describe('buildCategoryGroups', () => {
   it('nests children under their parent, preserving input order', () => {
     expect(makeGroups().map((group) => group.category.id)).toEqual(['beb', 'merc', 'combo']);
-    expect(makeGroups()[0]?.subcategories.map((sub) => sub.id)).toEqual(['beb.agua', 'beb.refri']);
+    expect(makeGroups()[0]?.subcategories.map((sub) => sub.category.id)).toEqual([
+      'beb.agua',
+      'beb.refri',
+    ]);
   });
 
   it('keeps a childless category as its own group', () => {
@@ -138,7 +145,7 @@ describe('filterCategoryGroups', () => {
     const found = filterCategoryGroups(makeGroups(), 'agua');
     expect(found).toHaveLength(1);
     expect(found[0]?.category.id).toBe('beb');
-    expect(found[0]?.subcategories.map((sub) => sub.id)).toEqual(['beb.agua']);
+    expect(found[0]?.subcategories.map((sub) => sub.category.id)).toEqual(['beb.agua']);
   });
 
   it('keeps every child when the category itself matches', () => {
@@ -189,8 +196,133 @@ describe('isLeafCategory', () => {
     const groups = makeGroups();
     groups.forEach((group) => {
       expect(leavesOf(group)).toEqual(
-        isLeafCategory(group) ? [group.category.id] : group.subcategories.map((sub) => sub.id),
+        isLeafCategory(group)
+          ? [group.category.id]
+          : group.subcategories.map((sub) => sub.category.id),
       );
     });
+  });
+});
+
+/**
+ * The third storey: ITEMS filed under a subcategory.
+ *
+ * The tree used to stop at two levels — anything deeper was promoted to top
+ * level as an orphan, which put every product next to the categories instead of
+ * inside one. These describe the level below the subcategories: it nests, it
+ * folds, it searches, and a category still stands for the leaves at the BOTTOM
+ * of it rather than for the subcategories in between.
+ */
+describe('a tree deeper than two levels', () => {
+  const DEEP: CategorySelectOption[] = [
+    { id: 'beb', name: 'Bebidas' },
+    { id: 'beb.refri', name: 'Refrigerantes', parentId: 'beb' },
+    { id: 'p.coca', name: 'Coca-Cola', parentId: 'beb.refri' },
+    { id: 'p.guarana', name: 'Guaraná', parentId: 'beb.refri' },
+    { id: 'sem', name: 'Sem categoria' },
+    { id: 'p.gelo', name: 'Gelo', parentId: 'sem' },
+  ];
+  const deepGroups = (): ReturnType<typeof buildCategoryGroups> => buildCategoryGroups(DEEP);
+
+  it('nests the item under its subcategory instead of promoting it', () => {
+    const [bebidas] = deepGroups();
+    expect(bebidas?.subcategories.map((sub) => sub.category.id)).toEqual(['beb.refri']);
+    expect(bebidas?.subcategories[0]?.subcategories.map((sub) => sub.category.id)).toEqual([
+      'p.coca',
+      'p.guarana',
+    ]);
+  });
+
+  it('keeps the top level in the order it was given, uncategorised last', () => {
+    expect(deepGroups().map((group) => group.category.id)).toEqual(['beb', 'sem']);
+  });
+
+  it('makes a category stand for the items at the bottom, not the subcategory', () => {
+    expect(leavesOf(deepGroups()[0]!)).toEqual(['p.coca', 'p.guarana']);
+    expect(collectLeafIds(deepGroups())).toEqual(['p.coca', 'p.guarana', 'p.gelo']);
+  });
+
+  it('counts every foldable node, at every depth', () => {
+    expect(collectBranchIds(deepGroups())).toEqual(['beb', 'beb.refri', 'sem']);
+    expect(treeDepth(deepGroups())).toBe(3);
+  });
+
+  it('reports a two-level tree as two, so the flat case can tell itself apart', () => {
+    expect(treeDepth(makeGroups())).toBe(2);
+  });
+
+  it('finds a node at any depth, and reads back the path to it', () => {
+    expect(findGroup(deepGroups(), 'p.coca')?.category.name).toBe('Coca-Cola');
+    expect(categoryPath(deepGroups(), 'p.coca')).toEqual([
+      'Bebidas',
+      'Refrigerantes',
+      'Coca-Cola',
+    ]);
+    expect(categoryPath(deepGroups(), 'nope')).toBeNull();
+  });
+
+  it('hides an item behind its subcategory until that is unfolded too', () => {
+    const topOnly = flattenRows(deepGroups(), (id) => id === 'beb');
+    expect(topOnly.map((row) => row.id)).toEqual(['beb', 'beb.refri', 'sem']);
+
+    const all = flattenRows(deepGroups(), () => true);
+    expect(all.map((row) => row.id)).toEqual([
+      'beb',
+      'beb.refri',
+      'p.coca',
+      'p.guarana',
+      'sem',
+      'p.gelo',
+    ]);
+    expect(all.find((row) => row.id === 'p.coca')).toEqual({
+      id: 'p.coca',
+      depth: 2,
+      branch: false,
+      parentId: 'beb.refri',
+    });
+  });
+
+  it('keeps a matched item under both of its parents', () => {
+    const found = filterCategoryGroups(deepGroups(), 'guarana');
+    expect(found.map((group) => group.category.id)).toEqual(['beb']);
+    expect(found[0]?.subcategories[0]?.subcategories.map((sub) => sub.category.id)).toEqual([
+      'p.guarana',
+    ]);
+  });
+
+  it('chips the DEEPEST node that is completely selected', () => {
+    expect(summarizeSelection(deepGroups(), new Set(['p.coca']))).toEqual([
+      { id: 'p.coca', label: 'Coca-Cola', whole: false },
+    ]);
+    expect(summarizeSelection(deepGroups(), new Set(['p.coca', 'p.guarana']))).toEqual([
+      { id: 'beb', label: 'Bebidas', whole: true },
+    ]);
+  });
+
+  it('removes every item under a chip naming a category', () => {
+    const next = removeChip(deepGroups(), 'beb', new Set(['p.coca', 'p.guarana', 'p.gelo']));
+    expect([...next]).toEqual(['p.gelo']);
+  });
+
+  it('promotes a node on a parent ring rather than looping forever', () => {
+    // A payload naming two rows as each other's parent used to be impossible:
+    // a child was attached to a ROOT or promoted, so nothing could point back
+    // down. Attaching at any depth makes it expressible, and a ring would be
+    // walked until the stack gave out.
+    const ringed = buildCategoryGroups([
+      { id: 'a', name: 'A', parentId: 'b' },
+      { id: 'b', name: 'B', parentId: 'a' },
+    ]);
+    expect(ringed.map((group) => group.category.id)).toEqual(['a', 'b']);
+    expect(ringed.every((group) => group.subcategories.length === 0)).toBe(true);
+  });
+
+  it('keeps the first row of a duplicated id, and places it once', () => {
+    const doubled = buildCategoryGroups([
+      { id: 'beb', name: 'Bebidas' },
+      { id: 'beb', name: 'Bebidas (again)' },
+    ]);
+    expect(doubled).toHaveLength(1);
+    expect(doubled[0]?.category.name).toBe('Bebidas');
   });
 });

@@ -94,6 +94,7 @@ export function CategoryPanel({
         loading={loading}
         showCounts={showCounts}
         allowParentSelection={allowParentSelection}
+        deepTree={state.deepTree}
         isExpanded={state.isExpanded}
         onToggleExpanded={state.toggleExpanded}
         onActivateCategory={onActivateCategory}
