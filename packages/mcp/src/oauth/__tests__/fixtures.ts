@@ -90,7 +90,8 @@ function memoryRefreshTokenStore(): RefreshTokenStore & {
     async revokeHashes(tokenHashes, at) {
       for (const hash of tokenHashes) {
         const row = rows.get(hash);
-        if (row) rows.set(hash, { ...row, revokedAt: at });
+        // The seal goes with the revocation — see `RefreshTokenStore`.
+        if (row) rows.set(hash, { ...row, revokedAt: at, graceSeal: null });
       }
     },
     async rotate(successor, parentHash, at) {
@@ -101,7 +102,9 @@ function memoryRefreshTokenStore(): RefreshTokenStore & {
       // and the loser writes nothing.
       const parent = rows.get(parentHash);
       if (!parent || parent.revokedAt) return false;
-      rows.set(parentHash, { ...parent, revokedAt: at });
+      // Clearing the parent's seal is part of the claim, not tidying: it is what
+      // stops a chain of spent seals being walkable offline.
+      rows.set(parentHash, { ...parent, revokedAt: at, graceSeal: null });
       put(successor);
       return true;
     },
@@ -111,7 +114,7 @@ function memoryRefreshTokenStore(): RefreshTokenStore & {
       const revoked = { count: 0 };
       for (const [hash, row] of rows) {
         if (row.userEmail === userEmail && row.clientId === clientId && !row.revokedAt) {
-          rows.set(hash, { ...row, revokedAt: tick() });
+          rows.set(hash, { ...row, revokedAt: tick(), graceSeal: null });
           revoked.count += 1;
         }
       }

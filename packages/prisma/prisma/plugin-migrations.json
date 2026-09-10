@@ -38,6 +38,7 @@
     "20260821140000_discounts_package_owned",
     "20260824120000_payments_pending_verification",
     "20260826170000_locale_preferences",
-    "20260830120000_discount_weekly_schedule"
+    "20260830120000_discount_weekly_schedule",
+    "20260910120000_add_refresh_grace_seal"
   ]
 }

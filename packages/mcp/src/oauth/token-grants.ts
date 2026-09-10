@@ -32,7 +32,9 @@ import {
  *     the stored hash, else `invalid_client` (401).
  *   - **Bound `redirect_uri`:** it must equal the one the code was minted with
  *     (RFC 6749 §4.1.3).
- *   - **Refresh rotation:** client-bound, replay-revoking, narrow-only scope.
+ *   - **Refresh rotation:** client-bound, replay-revoking, narrow-only scope —
+ *     with a grace window in which re-presenting a just-consumed token is a
+ *     RETRY answered with the same successor, not a replay (`./rotation-grace.ts`).
  */
 
 /** Throttle default: don't rewrite liveness on every grant. */
@@ -247,6 +249,7 @@ async function handleRefreshToken(
   const refreshContext = {
     store: context.stores.refreshTokens,
     ttlMs: context.refreshTokenTtlMs,
+    graceMs: context.refreshRotationGraceMs,
   };
 
   // Rotation enforces client binding (the token's stored clientId must equal the

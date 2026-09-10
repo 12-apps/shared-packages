@@ -1,5 +1,10 @@
 import type { RequestAuth } from "../types";
 
+import {
+  authFailureData,
+  describeAuthFailure,
+  type McpAuthFailureReason,
+} from "./auth-failure";
 import type { ToolRegistry } from "./registry";
 
 /**
@@ -52,7 +57,12 @@ export interface JsonRpcResponse {
   jsonrpc: "2.0";
   id: string | number | null;
   result?: unknown;
-  error?: { code: number; message: string };
+  /**
+   * `data` is the JSON-RPC 2.0 optional member, and it is what carries the
+   * machine-readable half of a refusal ({@link McpAuthFailureData}) while
+   * `message` carries the half a model relays to a person.
+   */
+  error?: { code: number; message: string; data?: unknown };
 }
 
 /** What a client is told it connected to, in `initialize`'s `serverInfo`. */
@@ -91,8 +101,17 @@ function ok(id: JsonRpcRequest["id"], result: unknown): JsonRpcResponse {
   return { jsonrpc: "2.0", id: id ?? null, result };
 }
 
-function fail(id: JsonRpcRequest["id"], code: number, message: string): JsonRpcResponse {
-  return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
+function fail(
+  id: JsonRpcRequest["id"],
+  code: number,
+  message: string,
+  data?: unknown,
+): JsonRpcResponse {
+  return {
+    jsonrpc: "2.0",
+    id: id ?? null,
+    error: { code, message, ...(data === undefined ? {} : { data }) },
+  };
 }
 
 /** A parsed body is a usable request only if it's an object carrying a string `method`. */
@@ -104,8 +123,22 @@ async function handleToolsCall(
   request: JsonRpcRequest,
   registry: ToolRegistry,
   auth: RequestAuth | null,
+  failure?: McpAuthFailureReason,
 ): Promise<JsonRpcResponse> {
-  if (!auth) return fail(request.id, UNAUTHORIZED_CODE, "Authentication required");
+  if (!auth) {
+    // It used to be the bare string "Authentication required", which is true of
+    // every refusal and useful for none of them: an agent reading it cannot tell
+    // a lapsed connection from a misconfigured server, so it cannot tell the user
+    // to reconnect. The host resolves WHY and passes it in; `no_token` is the
+    // honest default when it says nothing.
+    const described = describeAuthFailure(failure ?? "no_token");
+    return fail(
+      request.id,
+      UNAUTHORIZED_CODE,
+      described.message,
+      authFailureData(described),
+    );
+  }
   const params = (request.params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
   if (!params.name) return fail(request.id, INVALID_PARAMS_CODE, "Missing tool name");
   const result = await registry.callTool(params.name, params.arguments ?? {}, auth);
@@ -135,12 +168,18 @@ function handleInitialize(
  * `tools/call` then returns {@link UNAUTHORIZED_CODE}, which the host surfaces as
  * HTTP 401. Discovery (`initialize`, `ping`, `tools/list`) stays open, so a client
  * can read the surface before it has a token.
+ *
+ * `failure` is WHY `auth` is null, which only the host's verifier knows. It is
+ * optional so an existing caller keeps compiling, and passing it is what turns a
+ * refusal an agent can only report into one it can act on — see
+ * `./auth-failure.ts`.
  */
 export async function handleMcpJsonRpc(
   request: JsonRpcRequest,
   registry: ToolRegistry,
   auth: RequestAuth | null,
   options: McpJsonRpcOptions,
+  failure?: McpAuthFailureReason,
 ): Promise<JsonRpcResponse | null> {
   // A host casts the parsed body to JsonRpcRequest without validating it, so a
   // malformed payload can arrive here: a `null` body/batch element, a non-object,
@@ -157,7 +196,7 @@ export async function handleMcpJsonRpc(
     case "tools/list":
       return ok(request.id, { tools: registry.listTools(auth ?? undefined) });
     case "tools/call":
-      return handleToolsCall(request, registry, auth);
+      return handleToolsCall(request, registry, auth, failure);
     default:
       // JSON-RPC notifications (`notifications/*`) expect no reply — silently
       // ignore any we don't explicitly handle, rather than returning an error.

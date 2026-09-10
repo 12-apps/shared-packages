@@ -186,6 +186,55 @@ describe("handleMcpJsonRpc", () => {
     expect(dispatched).toEqual([]);
   });
 
+  it("tells the agent WHY the call was refused, and what would fix it", async () => {
+    // The host's verifier is the only thing that knows a token lapsed rather than
+    // never existing, so it passes the reason in. Without it every refusal reads
+    // the same and an agent cannot tell the user to reconnect.
+    const res = await handleMcpJsonRpc(
+      { jsonrpc: "2.0", id: 51, method: "tools/call", params: { name: "getThing" } },
+      registry(),
+      null,
+      OPTIONS,
+      "expired",
+    );
+
+    expect(res?.error?.code).toBe(UNAUTHORIZED_CODE);
+    expect(res?.error?.message).toContain("expired");
+    expect(res?.error?.data).toEqual({
+      reason: "expired",
+      action: "refresh",
+      recoverable: true,
+    });
+  });
+
+  it("marks a deployment problem as NOT recoverable, so a client stops retrying", async () => {
+    // Reconnecting cannot fix a surface the operator never switched on. A client
+    // that treats every 401 as "re-run OAuth" would loop through the consent
+    // screen forever and tell the user nothing true.
+    const res = await handleMcpJsonRpc(
+      { jsonrpc: "2.0", id: 52, method: "tools/call", params: { name: "getThing" } },
+      registry(),
+      null,
+      OPTIONS,
+      "surface_disabled",
+    );
+
+    expect(res?.error?.data).toMatchObject({ action: "contact_operator", recoverable: false });
+  });
+
+  it("falls back to the no-token reason when the host passes none", async () => {
+    // The parameter is optional so existing callers keep compiling; the default
+    // has to be the honest one rather than a guess at expiry.
+    const res = await handleMcpJsonRpc(
+      { jsonrpc: "2.0", id: 53, method: "tools/call", params: { name: "getThing" } },
+      registry(),
+      null,
+      OPTIONS,
+    );
+
+    expect(res?.error?.data).toMatchObject({ reason: "no_token", action: "reconnect" });
+  });
+
   it("tools/call with no tool name is Invalid params", async () => {
     const res = await handleMcpJsonRpc(
       { jsonrpc: "2.0", id: 6, method: "tools/call", params: {} },

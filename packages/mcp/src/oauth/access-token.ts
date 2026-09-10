@@ -35,14 +35,48 @@ export interface VerifiedAccessToken {
 /** Distinct verification failure reasons the caller maps to OAuth challenges. */
 export type AccessTokenErrorCode = "invalid_token" | "insufficient_scope";
 
-/** A typed verification failure — `code` drives the `WWW-Authenticate` challenge. */
+/**
+ * WHY verification failed, at the granularity an operator and an agent can act on.
+ *
+ * `code` above is the RFC 6750 challenge and there are only three of those, so it
+ * cannot tell "your connection lapsed, refresh it" from "this token is not for
+ * this server". That distinction is the whole difference between an assistant
+ * that tells its user to reconnect this server and one that reports a generic
+ * failure on every tool call, so it is carried alongside rather than folded
+ * into `code`.
+ *
+ * `unverified` stays deliberately COARSE. Signature, issuer and audience collapse
+ * into it because naming which one failed is an oracle for the next attempt.
+ * Expiry is the documented exception — RFC 6750 names it in `error_description`
+ * precisely because a client must be told to refresh — and it leaks nothing: a
+ * token's `exp` is readable by whoever holds the token.
+ */
+export type AccessTokenFailureReason =
+  /** Valid in every other respect, but `exp` has passed. Refresh, do not re-consent. */
+  | "expired"
+  /** Signature, issuer or audience did not hold. Deliberately not narrowed further. */
+  | "unverified"
+  /** Verified, but missing the `sub`/`email` the identity is built from. */
+  | "incomplete"
+  /** No signing key is provisioned, so nothing can verify. An operator problem. */
+  | "not_provisioned"
+  /** A valid token that simply lacks the scope this call needs. */
+  | "insufficient_scope";
+
+/**
+ * A typed verification failure — `code` drives the `WWW-Authenticate` challenge,
+ * {@link AccessTokenError.reason} drives what the caller is actually told.
+ */
 export class AccessTokenError extends Error {
   readonly code: AccessTokenErrorCode;
 
-  constructor(code: AccessTokenErrorCode, message?: string) {
-    super(message ?? code);
+  readonly reason: AccessTokenFailureReason;
+
+  constructor(code: AccessTokenErrorCode, reason: AccessTokenFailureReason, message?: string) {
+    super(message ?? reason);
     this.name = "AccessTokenError";
     this.code = code;
+    this.reason = reason;
   }
 }
 
@@ -131,12 +165,30 @@ function parseScopes(scope: unknown): string[] {
  * signature / wrong issuer / wrong audience / expired / malformed / unconfigured
  * key) from `insufficient_scope` (a valid token lacking the required scope).
  */
+/** jose's code for a token that parsed and verified but whose `exp` has passed. */
+const JWT_EXPIRED_CODE = "ERR_JWT_EXPIRED";
+
+/** Whether a thrown value is jose's expiry error, by its stable `code`. */
+function isExpiry(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === JWT_EXPIRED_CODE
+  );
+}
+
 /**
  * The cryptographic half: signature, `iss`, `aud`, `exp`.
  *
- * Every jose failure — bad signature, wrong issuer, wrong audience, expiry,
- * malformed token, unknown key — collapses into ONE opaque `invalid_token`. A
- * message naming the failed claim would be an oracle for the next attempt.
+ * Bad signature, wrong issuer, wrong audience, malformed token and unknown key
+ * all collapse into ONE opaque `unverified`. A message naming the failed claim
+ * would be an oracle for the next attempt.
+ *
+ * EXPIRY is separated out, and only expiry. It is the one failure a
+ * well-behaved client is supposed to act on — refresh and retry — and it is the
+ * one the RFC gives a description for, so collapsing it left every lapsed
+ * connection indistinguishable from a broken one. It is not an oracle either:
+ * `exp` is a readable claim of a token the caller already holds.
  */
 async function verifiedPayload(
   loadSigningKey: McpSigningKeyProvider,
@@ -145,7 +197,9 @@ async function verifiedPayload(
 ): Promise<JWTPayload> {
   const key = await loadSigningKey();
   // No signing key configured → nothing can verify (safe-by-default).
-  if (!key) throw new AccessTokenError("invalid_token", "no signing key configured");
+  if (!key) {
+    throw new AccessTokenError("invalid_token", "not_provisioned", "no signing key configured");
+  }
 
   try {
     const { payload } = await jwtVerify(token, await importJWK(key.publicJwk, SIGNING_ALG), {
@@ -156,8 +210,11 @@ async function verifiedPayload(
       currentDate: options.now === undefined ? undefined : new Date(options.now),
     });
     return payload;
-  } catch {
-    throw new AccessTokenError("invalid_token", "token verification failed");
+  } catch (error) {
+    if (isExpiry(error)) {
+      throw new AccessTokenError("invalid_token", "expired", "access token expired");
+    }
+    throw new AccessTokenError("invalid_token", "unverified", "token verification failed");
   }
 }
 
@@ -171,12 +228,17 @@ export async function verifyAccessToken(
   const email = typeof payload.email === "string" ? payload.email : null;
   const subject = typeof payload.sub === "string" ? payload.sub : null;
   if (!email || !subject) {
-    throw new AccessTokenError("invalid_token", "missing subject or email claim");
+    throw new AccessTokenError(
+      "invalid_token",
+      "incomplete",
+      "missing subject or email claim",
+    );
   }
 
   const scopes = parseScopes(payload.scope);
   if (options.requiredScope && !scopes.includes(options.requiredScope)) {
     throw new AccessTokenError(
+      "insufficient_scope",
       "insufficient_scope",
       `token lacks required scope '${options.requiredScope}'`,
     );

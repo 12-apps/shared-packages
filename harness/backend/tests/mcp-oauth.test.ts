@@ -8,7 +8,7 @@
    reset in beforeEach. */
 import { createHash, randomBytes } from 'node:crypto';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import {
@@ -49,6 +49,8 @@ interface StateRow {
   scopes: string[];
   rotated_from: string | null;
   revoked: boolean;
+  /** The sealed successor; cleared whenever a token is consumed or revoked. */
+  grace_seal: string | null;
 }
 
 interface HarnessState {
@@ -86,6 +88,11 @@ afterAll(async () => {
 beforeEach(async () => {
   const reset = await backend.app.request('/__harness/reset', { method: 'POST' });
   expect(reset.status).toBe(204);
+});
+
+afterEach(() => {
+  // Only the grace-window cases fake the clock; every other case must not inherit it.
+  vi.useRealTimers();
 });
 
 function base64url(buffer: Buffer): string {
@@ -171,6 +178,16 @@ function token(form: Record<string, string>, headers: Record<string, string> = {
     body: new URLSearchParams(form).toString(),
   });
 }
+
+/** A fixed clock for the cases that step over the rotation grace window. */
+const FIXED_NOW = Date.parse('2026-09-10T12:00:00.000Z');
+
+/**
+ * Just past the default window. Written as a literal rather than imported: the
+ * harness consumes the PUBLISHED tarball, so reaching for the package's own
+ * constant here would prove the two agree by construction instead of testing it.
+ */
+const AFTER_GRACE_WINDOW = FIXED_NOW + 31_000;
 
 async function state(): Promise<HarnessState> {
   const response = await backend.app.request('/__harness/mcp/state');
@@ -521,19 +538,54 @@ describe('the refresh_token grant', () => {
         client_id: clientId,
       });
 
-    const statuses = (await Promise.all([refresh(), refresh()]))
-      .map((response) => response.status)
-      .sort();
-    expect(statuses).toEqual([200, 400]);
+    const responses = await Promise.all([refresh(), refresh()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 200]);
 
-    // Exactly ONE successor row was written — two would mean the claim leaked — and
-    // the loser is treated as the replay it is, so the whole lineage is revoked.
+    // Exactly ONE successor row was written — two would mean the claim leaked, which
+    // is the invariant this case has always existed to protect and is unchanged.
+    // What changed is what the LOSER is told: it used to get the replay answer, which
+    // revoked the lineage including the winner's brand-new token, so one client
+    // refreshing from two of its own sessions destroyed its own connection. It now
+    // takes the grace path and receives the winner's token.
+    const bodies = (await Promise.all(responses.map((r) => r.json()))) as TokenResponse[];
+    expect(bodies[0]?.refresh_token).toBe(bodies[1]?.refresh_token);
+
     const rows = (await state()).tokens;
     expect(rows.filter((row) => row.rotated_from !== null)).toHaveLength(1);
-    expect(rows.every((row) => row.revoked)).toBe(true);
+    expect(rows.some((row) => !row.revoked)).toBe(true);
   });
 
-  it('treats reuse as a replay and revokes the WHOLE lineage', async () => {
+  it('answers a retry inside the grace window with the very same successor', async () => {
+    const { clientId, tokens } = await grant();
+    const rotated = (await (
+      await token({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refresh_token,
+        client_id: clientId,
+      })
+    ).json()) as TokenResponse;
+
+    // The 200 never reached the client — a proxy timeout, a dropped connection — so
+    // it retries with the only token it still holds: the consumed one. Against a real
+    // Postgres, which is what makes this the proof the package's own suite is not.
+    const retry = await token({
+      grant_type: 'refresh_token',
+      refresh_token: tokens.refresh_token,
+      client_id: clientId,
+    });
+    expect(retry.status).toBe(200);
+    expect(((await retry.json()) as TokenResponse).refresh_token).toBe(rotated.refresh_token);
+
+    // One successor, not two: a second would be a second rotating family, which is
+    // the state replay protection exists to prevent.
+    expect((await state()).tokens.filter((row) => row.rotated_from !== null)).toHaveLength(1);
+  });
+
+  it('treats reuse AFTER the grace window as a replay and revokes the WHOLE lineage', async () => {
+    // Only `Date` is faked: the app runs in-process here, and nothing in this path
+    // awaits a timer. Past the window the retry excuse is gone and reuse is what it
+    // looks like.
+    vi.useFakeTimers({ toFake: ['Date'], now: FIXED_NOW });
     const { clientId, tokens } = await grant();
     const first = (await (
       await token({
@@ -542,6 +594,8 @@ describe('the refresh_token grant', () => {
         client_id: clientId,
       })
     ).json()) as TokenResponse;
+
+    vi.setSystemTime(AFTER_GRACE_WINDOW);
 
     // The leaked ancestor, presented again.
     const replay = await token({
@@ -558,7 +612,11 @@ describe('the refresh_token grant', () => {
       client_id: clientId,
     });
     expect(afterReplay.status).toBe(400);
-    expect((await state()).tokens.every((row) => row.revoked)).toBe(true);
+    const rows = (await state()).tokens;
+    expect(rows.every((row) => row.revoked)).toBe(true);
+    // A revoked lineage must leave nothing openable behind it, or the revocation is
+    // cosmetic: a seal opens under the plaintext it was rotated from.
+    expect(rows.every((row) => !row.grace_seal)).toBe(true);
   });
 
   it("refuses another client's refresh token and leaves it usable by its owner", async () => {

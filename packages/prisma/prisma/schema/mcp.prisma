@@ -71,6 +71,16 @@ model OAuthRefreshToken {
   revokedAt   DateTime? @map("revoked_at")
   createdAt   DateTime  @default(now()) @map("created_at")
 
+  // This token's own plaintext, SEALED under a key derived from the plaintext of
+  // the token it was rotated from, with its grace deadline inside the sealed
+  // blob. It is what lets a rotation be RETRIED: re-presenting the consumed
+  // parent within the window returns this same successor instead of revoking the
+  // lineage, so a lost response or two concurrent refreshes no longer end the
+  // connection. Only a caller holding the parent can open it, so the "never store
+  // a token in the clear" rule is intact — a dump of this table yields ciphertext
+  // and no key. Null on a root token, and whenever the window is turned off.
+  graceSeal   String?   @map("grace_seal")
+
   // `tokenHash` is already indexed by its `@unique` constraint — the
   // lookup-on-presentation path — so no separate `@@index([tokenHash])` is added
   // (it would be redundant). The composite index serves per-user/per-client

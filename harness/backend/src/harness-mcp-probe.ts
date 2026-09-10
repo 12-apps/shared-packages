@@ -46,7 +46,7 @@ export function mcpProbeRouter(pg: PGlite, mcpOauth: HarnessMcpOauth): Hono {
   router.get('/__harness/mcp/state', async (c) => {
     const { rows: tokens } = await pg.query<Record<string, unknown>>(
       `SELECT token_hash, user_email, user_sub, client_id, scopes, rotated_from,
-              revoked_at IS NOT NULL AS revoked
+              grace_seal, revoked_at IS NOT NULL AS revoked
          FROM oauth_refresh_tokens ORDER BY created_at`,
     );
     const { rows: clients } = await pg.query<Record<string, unknown>>(

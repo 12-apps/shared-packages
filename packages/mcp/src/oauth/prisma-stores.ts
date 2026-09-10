@@ -50,7 +50,9 @@ export interface McpOauthPrisma {
       where:
         | { tokenHash: { in: string[] } }
         | { userEmail: string; clientId: string; revokedAt: null };
-      data: { revokedAt: Date };
+      // `graceSeal` rides on every revoke: a revoked row must not keep an
+      // openable seal behind it (see `RefreshTokenStore.revokeHashes`).
+      data: { revokedAt: Date; graceSeal?: null };
     }): Promise<{ count: number }>;
   };
   mcpConnection: {
@@ -98,7 +100,7 @@ interface McpOauthTx {
     create(args: { data: NewRefreshToken }): Promise<unknown>;
     updateMany(args: {
       where: { tokenHash: string; revokedAt: null };
-      data: { revokedAt: Date };
+      data: { revokedAt: Date; graceSeal?: null };
     }): Promise<{ count: number }>;
   };
 }
@@ -145,7 +147,10 @@ function refreshTokenStore(getPrisma: McpOauthPrismaProvider): RefreshTokenStore
       const prisma = await getPrisma();
       await prisma.oAuthRefreshToken.updateMany({
         where: { tokenHash: { in: [...tokenHashes] } },
-        data: { revokedAt: at },
+        // The seals go with the revocation. A dead lineage that still carries
+        // openable seals is a chain anyone holding one of its plaintexts can
+        // still walk offline, which would make the revocation cosmetic.
+        data: { revokedAt: at, graceSeal: null },
       });
     },
     async rotate(successor, parentHash, at) {
@@ -162,7 +167,12 @@ function refreshTokenStore(getPrisma: McpOauthPrismaProvider): RefreshTokenStore
         // use of the parent that now never comes).
         const { count } = await tx.oAuthRefreshToken.updateMany({
           where: { tokenHash: parentHash, revokedAt: null },
-          data: { revokedAt: at },
+          // `graceSeal: null` is part of the claim, not a cleanup. The parent's
+          // seal is openable by the plaintext it was rotated from, so leaving it
+          // behind would chain: one historical plaintext plus a copy of this
+          // table walks forward to the live token offline, hop by hop, with no
+          // server call to detect. Cleared here, at most one hop is ever open.
+          data: { revokedAt: at, graceSeal: null },
         });
         // Lost the claim: write NOTHING. The zero-row update commits as the no-op
         // it is, so there is nothing to roll back.
@@ -177,7 +187,8 @@ function refreshTokenStore(getPrisma: McpOauthPrismaProvider): RefreshTokenStore
       const prisma = await getPrisma();
       const { count } = await prisma.oAuthRefreshToken.updateMany({
         where: { userEmail, clientId, revokedAt: null },
-        data: { revokedAt: new Date() },
+        // Disconnecting a host must leave nothing openable behind either.
+        data: { revokedAt: new Date(), graceSeal: null },
       });
       return count;
     },

@@ -40,6 +40,7 @@ export {
   signAccessToken,
   verifyAccessToken,
   type AccessTokenErrorCode,
+  type AccessTokenFailureReason,
   type SignAccessTokenInput,
   type VerifiedAccessToken,
   type VerifyAccessTokenOptions,
@@ -94,6 +95,7 @@ export {
   type RefreshTokenErrorCode,
   type RefreshTokenIdentity,
 } from "./refresh";
+export { DEFAULT_ROTATION_GRACE_MS } from "./rotation-grace";
 export {
   inProcessCodeReplayStore,
   type CodeReplayStore,
