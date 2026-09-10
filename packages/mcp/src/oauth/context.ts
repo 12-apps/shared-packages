@@ -119,8 +119,11 @@ export interface McpOauthConfig {
    * lost to a proxy timeout, or two of its own sessions refreshing at once — and
    * the strict rule cannot tell either from theft, so it revoked the lineage and
    * cost a connected user their session. Inside the window the retry is answered
-   * with the SAME successor, so no second family is ever created and detection is
-   * deferred by one rotation rather than lost. See `./rotation-grace.ts`.
+   * with the SAME successor, so no second family is ever created. It does NOT
+   * merely defer detection by one rotation: two parties left holding one
+   * successor take the retry path again at every rotation, so a collision is
+   * detected only once two uses fall more than this window apart. That trade is
+   * argued in full in `./rotation-grace.ts`.
    */
   refreshRotationGraceMs?: number;
   /**

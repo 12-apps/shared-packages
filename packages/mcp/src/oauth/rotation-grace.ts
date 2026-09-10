@@ -69,6 +69,15 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:cr
  *   - the grace deadline is sealed INSIDE the blob rather than kept in a column,
  *     so an attacker with write access to the row cannot extend the window
  *     without also being able to forge the AES-GCM tag.
+ *
+ * One honest limit on that last point. The deadline is enforced by the server
+ * when it opens a seal, not by the ciphertext, and a seal is cleared when its
+ * token is consumed or revoked — not when its window lapses. So the ONE hop an
+ * attacker holding a spent parent plaintext plus a table read can take is bounded
+ * by when the successor is next used, which for an idle connection is the refresh
+ * token's TTL rather than `graceMs`. Bounded to one hop either way, because every
+ * consume and every revoke clears the parent's seal; sweeping lapsed seals would
+ * tighten it to the window itself.
  */
 
 /** AEAD, so a tampered blob fails to open rather than decrypting to garbage. */
@@ -131,7 +140,15 @@ function encode(value: Buffer): string {
 
 /**
  * Seal `successorPlaintext` so that only a caller holding `parentPlaintext` can
- * recover it, and only until `graceUntil`.
+ * recover it, carrying `graceUntil` inside the sealed blob.
+ *
+ * The deadline is DATA here, not enforcement: {@link openSuccessor} returns it
+ * rather than acting on it, and the caller (`refresh.ts`) is what refuses a
+ * lapsed one. Sealing it inside the AEAD blob is what stops it being edited in
+ * the row; it is not a claim that the ciphertext stops opening on its own. A
+ * seal therefore stays openable-by-its-parent until the row is consumed or
+ * revoked, which for an idle connection is the token's TTL rather than the
+ * window — see the note in the module docblock.
  */
 export function sealSuccessor(
   parentPlaintext: string,

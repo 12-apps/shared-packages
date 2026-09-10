@@ -5,6 +5,7 @@ import {
   openSuccessor,
   sealSuccessor,
 } from "./rotation-grace";
+import { revokeLineage } from "./refresh-lineage";
 import type { NewRefreshToken, RefreshTokenStore, StoredRefreshToken } from "./stores";
 
 /**
@@ -136,71 +137,6 @@ export async function issueRefreshToken(
   return { refreshToken, scopes: binding.scopes };
 }
 
-/**
- * A pre-built O(1)-lookup index of one `(userEmail, clientId)` token family:
- * `byHash` resolves a hash to its row (to walk ancestors via `rotatedFrom`), and
- * `childrenOf` is the reverse index mapping a parent hash to its direct successor
- * hashes (to walk descendants). Both are built in a single pass so the lineage
- * traversal never re-scans the family (no O(n²) inner loop).
- */
-interface LineageIndex {
-  byHash: Map<string, StoredRefreshToken>;
-  childrenOf: Map<string, string[]>;
-}
-
-function buildLineageIndex(family: StoredRefreshToken[]): LineageIndex {
-  const byHash = new Map<string, StoredRefreshToken>();
-  const childrenOf = new Map<string, string[]>();
-  for (const row of family) {
-    byHash.set(row.tokenHash, row);
-    if (!row.rotatedFrom) continue;
-    const siblings = childrenOf.get(row.rotatedFrom) ?? [];
-    siblings.push(row.tokenHash);
-    childrenOf.set(row.rotatedFrom, siblings);
-  }
-  return { byHash, childrenOf };
-}
-
-/**
- * Collect every token hash reachable from `seedHash` — its ancestors (via
- * `rotatedFrom`) and its descendants (via the reverse index) — by a BFS over the
- * pre-built index. Each neighbour lookup is O(1), so the walk is linear in the
- * family size.
- */
-function collectLineage(index: LineageIndex, seedHash: string): Set<string> {
-  const lineage = new Set<string>();
-  const queue = [seedHash];
-  while (queue.length > 0) {
-    const hash = queue.shift();
-    if (!hash || lineage.has(hash)) continue;
-    lineage.add(hash);
-
-    const parent = index.byHash.get(hash)?.rotatedFrom ?? null;
-    if (parent && !lineage.has(parent)) queue.push(parent);
-
-    const children = (index.childrenOf.get(hash) ?? []).filter((child) => !lineage.has(child));
-    queue.push(...children);
-  }
-  return lineage;
-}
-
-/**
- * Walk a token's rotation lineage (both directions) and revoke every token in it.
- * Called on replay detection, so a leaked refresh token — once reused —
- * invalidates the entire chain it belongs to.
- */
-async function revokeLineage(
-  context: RefreshTokenContext,
-  scopedTo: Pick<StoredRefreshToken, "userEmail" | "clientId">,
-  seedHash: string,
-): Promise<void> {
-  // The lineage is confined to one (userEmail, clientId) pair, so load that set
-  // once and walk the `rotatedFrom` links in memory — a small, bounded chain.
-  const family = await context.store.listFamily(scopedTo.userEmail, scopedTo.clientId);
-  const lineage = collectLineage(buildLineageIndex(family), seedHash);
-  await context.store.revokeHashes([...lineage], new Date());
-}
-
 /** Reject any requested scope not already on the token (narrow-only). */
 function narrowedScopes(current: StoredRefreshToken, requested?: string[]): string[] {
   const scopes = requested ?? current.scopes;
@@ -227,6 +163,39 @@ function sameScopes(left: readonly string[], right: readonly string[]): boolean 
   return true;
 }
 
+/** The one successor a retry may be answered with: its seal and what it grants. */
+interface RetryTarget {
+  seal: string;
+  scopes: string[];
+}
+
+/**
+ * Pick the successor a retry is entitled to, or `null` to fall through to the
+ * replay rule.
+ *
+ * FILTER, not find. Two rows sharing one `rotatedFrom` cannot happen while
+ * `rotate` honours its claim-once contract — but the lineage walk in
+ * `./refresh-lineage.ts` already treats multiple children as possible, and
+ * serving an arbitrary one of them would be the quiet half of a broken store, so
+ * an ambiguous family fails closed.
+ *
+ * A REVOKED successor means the lineage already died to a real replay, and grace
+ * must never resurrect it; an expired one is past its own TTL. Neither is a
+ * retry the window was opened to forgive.
+ */
+function retryableSuccessor(
+  family: StoredRefreshToken[],
+  tokenHash: string,
+  now: number,
+): RetryTarget | null {
+  const successors = family.filter((row) => row.rotatedFrom === tokenHash);
+  if (successors.length !== 1) return null;
+  const [successor] = successors;
+  if (!successor?.graceSeal || successor.revokedAt) return null;
+  if (successor.expiresAt.getTime() <= now) return null;
+  return { seal: successor.graceSeal, scopes: successor.scopes };
+}
+
 /**
  * The grace path: a token that was already consumed is being presented again.
  *
@@ -238,9 +207,7 @@ function sameScopes(left: readonly string[], right: readonly string[]): boolean 
  * The conditions are the security argument, so each is checked rather than
  * assumed:
  *
- *   - the successor still exists and is NOT revoked. A revoked one means the
- *     lineage already died to a real replay, and grace must never resurrect it;
- *   - it has not expired on its own TTL;
+ *   - exactly one unrevoked, unexpired successor exists ({@link retryableSuccessor});
  *   - the seal opens with THIS parent, which is what proves the caller held the
  *     token it claims to be retrying rather than merely knowing its hash;
  *   - the sealed deadline has not passed. It rides inside the AEAD blob, so it
@@ -258,18 +225,27 @@ async function graceReissue(
 ): Promise<IssuedRefreshToken | null> {
   if (graceWindowMs(context) <= 0) return null;
 
-  const family = await context.store.listFamily(current.userEmail, current.clientId);
-  const successor = family.find((row) => row.rotatedFrom === tokenHash);
-  if (!successor?.graceSeal || successor.revokedAt) return null;
-
   const now = Date.now();
-  if (successor.expiresAt.getTime() <= now) return null;
-  if (requestedScopes && !sameScopes(requestedScopes, successor.scopes)) return null;
+  const family = await context.store.listFamily(current.userEmail, current.clientId);
+  const target = retryableSuccessor(family, tokenHash, now);
+  if (!target) return null;
 
-  const opened = openSuccessor(parentPlaintext, successor.graceSeal);
+  const opened = openSuccessor(parentPlaintext, target.seal);
   if (!opened || opened.graceUntil <= now) return null;
 
-  return { refreshToken: opened.successor, scopes: successor.scopes };
+  // Inside the window and the seal opened, so this IS the retry it looks like —
+  // but it asks for something else. Refusing is right; refusing as a REPLAY is
+  // not, because that revokes the whole lineage and destroys a live session for
+  // the innocent double-use this window exists to forgive. Say `invalid_scope`
+  // and leave the family alone.
+  if (requestedScopes && !sameScopes(requestedScopes, target.scopes)) {
+    throw new RefreshTokenError(
+      "invalid_scope",
+      "a retry inside the rotation grace window cannot change scope",
+    );
+  }
+
+  return { refreshToken: opened.successor, scopes: target.scopes };
 }
 
 /**
@@ -367,7 +343,7 @@ async function replay(
   current: StoredRefreshToken,
   tokenHash: string,
 ): Promise<never> {
-  await revokeLineage(context, current, tokenHash);
+  await revokeLineage(context.store, current, tokenHash);
   throw new RefreshTokenError(
     "invalid_grant",
     "refresh token already used (replay) — lineage revoked",

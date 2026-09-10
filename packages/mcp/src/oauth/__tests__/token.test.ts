@@ -366,15 +366,27 @@ describe("refresh_token grant", () => {
     expect((await token(api, refreshForm(clientId, first.refresh_token))).status).toBe(400);
   });
 
-  it("refuses grace to a retry that asks for different scopes", async () => {
-    const { api, clientId, first } = await withRefreshToken();
-    await token(api, refreshForm(clientId, first.refresh_token));
+  it("refuses a retry that asks for different scopes WITHOUT killing the lineage", async () => {
+    const { api, stores, clientId, first } = await withRefreshToken();
+    const rotated = (await (
+      await token(api, refreshForm(clientId, first.refresh_token))
+    ).json()) as TokenBody;
 
     // A retry repeats its original request. A different scope set is a NEW
     // decision, and answering it with the token minted for the old one would
-    // silently ignore what was asked — so it falls through to the replay rule.
+    // silently ignore what was asked. So it is refused —
     const narrowed = await token(api, refreshForm(clientId, first.refresh_token, "mcp:read"));
     expect(narrowed.status).toBe(400);
+    expect((await narrowed.json()) as { error: string }).toMatchObject({
+      error: "invalid_scope",
+    });
+
+    // — but NOT as a replay. Revoking the family here would destroy a live
+    // session over exactly the innocent double-use this window exists to
+    // forgive, which is the bug wearing a different hat.
+    expect(successors(stores.refreshTokens.rows())[0]?.revokedAt).toBeNull();
+    const still = await token(api, refreshForm(clientId, rotated.refresh_token));
+    expect(still.status).toBe(200);
   });
 
   it("stores no token plaintext, sealed or otherwise", async () => {

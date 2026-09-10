@@ -70,10 +70,15 @@ export interface StoredRefreshToken {
    *
    * REQUIRED of a store from this version on, even though the type is optional
    * for the root token that has no parent to seal under. `rotate` writes it on
-   * every successor and CLEARS it on every parent it consumes, so a store that
-   * silently drops the field does not "just lose the window" — it throws on
-   * every rotation, which is a dead token endpoint rather than a degraded one.
-   * Adopt the column in the SAME change that raises the package version.
+   * every successor and CLEARS it on every parent it consumes.
+   *
+   * A PRISMA host that raises the version without the column fails loudly, on
+   * every rotation, because the delegate rejects the unknown key — a dead token
+   * endpoint rather than a degraded one, and the reason to land the migration in
+   * the SAME change as the version raise. A hand-written store has no such
+   * backstop: drop the field there and the window silently never applies, so
+   * implementing this field and its clearing is part of meeting the port, not an
+   * optional extra. `harness/backend/src/mcp-oauth-db.ts` is the worked example.
    *
    * Clearing it on consumption is what bounds the exposure, and it is the whole
    * reason the field is safe to store at all: a seal is openable only by the

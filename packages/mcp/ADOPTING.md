@@ -83,9 +83,12 @@ library updates, every host updates with **no app changes**. Same contract
    - **`graceSeal` is a REQUIRED column from this version on**, and the migration
      has to land in the SAME change that raises the pin. `rotate` writes the
      field on every successor and clears it on every parent it consumes, so a
-     store missing it does not quietly lose the window — it throws on every
-     rotation, which is a dead token endpoint. If your ORM client is duck-typed
-     into `McpOauthPrisma`, type-checking will not catch this for you.
+     PRISMA host missing the column does not quietly lose the window — the
+     delegate rejects the unknown key and every rotation throws, which is a dead
+     token endpoint. If your client is duck-typed into `McpOauthPrisma`,
+     type-checking will not catch that for you. A hand-written store gets no such
+     backstop at all: omit the field there and the window silently never applies,
+     so writing and clearing it is part of meeting the port.
    - **`rotate` and every revoke must CLEAR the seal** (`revokedAt` alone is not
      enough). A seal is openable only by the plaintext of the token it was
      rotated from — so spent seals left in place CHAIN: one historical plaintext
