@@ -27,7 +27,7 @@ import type { RbacInviteRoles } from './invites';
  * disable/removal-invariant `ownerRoles` knob: this layer exists to refuse
  * BEFORE governance, so its default must exclude everything governance would.
  */
-export function assignableBaseRoles<P extends string>(
+function assignableBaseRoles<P extends string>(
   config: RbacServerConfig<P>,
 ): readonly string[] {
   return (
