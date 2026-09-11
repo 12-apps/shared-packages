@@ -89,10 +89,9 @@ for (const required of ["pagesDir", "featuresFile", "exceptionsFile"]) {
 // route tree across modules — the natural answer to a per-file line cap — used
 // to take every page in the split-off modules out of this gate's sight, and
 // nothing said so: the anti-vacuity guard only fires at ZERO, so a PARTIAL
-// parse passed while proving less than it claimed. Measured on future-pay
-// FUT-1506, where moving Configuração's routes into `routes-config.tsx`
-// removed seventeen sections plus three pages from the gate and the run stayed
-// green.
+// parse passed while proving less than it claimed. Measured on an adopter that
+// had moved one section's routes into a second module: seventeen sections plus
+// three pages left the gate's sight and the run stayed green.
 const routesFiles = Array.isArray(config.routesFile) ? config.routesFile : [config.routesFile];
 if (
   routesFiles.length === 0 ||

@@ -72,9 +72,11 @@ function fixture({ pagesDir = 'src/screens', wrapped = false, config = {} }: Fix
 
 /**
  * A host whose route tree is SPLIT: the entry file routes one page and imports
- * a second module that routes another. This is future-pay's shape (12-77) —
- * `routes.tsx` at its line ceiling, Configuração's routes moved into
- * `routes-config.tsx`.
+ * a second module that routes another (12-77).
+ *
+ * This is the shape an adopter reaches when its routes file hits a per-file
+ * line cap and one section's routes move out into a sibling — which is exactly
+ * when the gate stops seeing them.
  */
 function splitFixture({ listBoth = false }: { listBoth?: boolean } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'entitlements-coverage-split-'));
