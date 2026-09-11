@@ -33,6 +33,7 @@ export { RBAC_WEB_COPY } from './locales';
 export {
   createRbacApiClient,
   type InviteResultWire,
+  type InviteRoles,
   type MemberDetailWire,
   type PaginationWire,
   type RbacApiClient,
@@ -50,6 +51,11 @@ export {
   type RbacLabels,
 } from './labels';
 export { RoleForm, type RoleFormProps, type RoleFormValue } from './role-form';
+export {
+  TeamInviteForm,
+  type InviteFormValues,
+  type InviteSelection,
+} from './team-invite-form';
 export { splitRoleSelection } from './team-role-dialog';
 
 // The screens themselves, for a host routing them rather than taking the

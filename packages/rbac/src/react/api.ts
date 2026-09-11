@@ -65,13 +65,26 @@ export interface MemberDetailWire {
  * What `POST /team` answers.
  *
  * `granted` means the address already had an account and the membership exists
- * NOW; `invited` means it does not, and the grant is deferred to the person's
- * signup. The roster refreshes into a new row for the first and does not for
+ * NOW; `invited` means it does not, and the grant is deferred until the person
+ * accepts. The roster refreshes into a new row for the first and does not for
  * the second, which is why the screen has to tell them apart rather than
  * reporting "done" either way.
  */
 export interface InviteResultWire {
   status: 'granted' | 'invited';
+}
+
+/**
+ * The roles ONE invite grants — the base the membership takes, plus any of the
+ * tenant's own roles on top.
+ *
+ * Both optional on the wire: a host that has not adopted the picker still calls
+ * `inviteMember(email)` and its invites port keeps deciding, which is the only
+ * reason this could ship as a minor.
+ */
+export interface InviteRoles {
+  role?: string;
+  customRoles?: readonly string[];
 }
 
 export interface RbacApiClient {
@@ -106,7 +119,7 @@ export interface RbacApiClient {
   /** The member behind the profile screen. Rejects (404) for a non-member id. */
   getMember(userId: string): Promise<MemberDetailWire>;
   /** Grant or defer access for an e-mail address (`POST /team`). */
-  inviteMember(email: string): Promise<RbacResult<InviteResultWire>>;
+  inviteMember(email: string, roles?: InviteRoles): Promise<RbacResult<InviteResultWire>>;
   /** Burn a pending accountless invite. Idempotent — a stale id is a no-op. */
   cancelInvite(inviteId: string): Promise<RbacResult<{ status: string }>>;
   setMemberRole(userId: string, role: string): Promise<RbacResult<{ status: string }>>;
@@ -161,7 +174,15 @@ export function createRbacApiClient(
       );
       return payload.data;
     },
-    inviteMember: (email) => transport.send(`${base}/team`, 'POST', { email }),
+    inviteMember: (email, roles) =>
+      transport.send(`${base}/team`, 'POST', {
+        email,
+        // Spread rather than sent as `undefined`: the body schema treats the
+        // keys as absent-or-valid, and a literal `undefined` survives neither
+        // `JSON.stringify` nor a strict parse the same way on both sides.
+        ...(roles?.role ? { role: roles.role } : {}),
+        ...(roles?.customRoles?.length ? { customRoles: [...roles.customRoles] } : {}),
+      }),
     cancelInvite: (inviteId) =>
       transport.send(`${base}/team/invites/${seg(inviteId)}`, 'DELETE'),
     setMemberRole: (userId, role) =>
