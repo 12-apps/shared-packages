@@ -22,8 +22,22 @@ import type { RolesTableCopy } from './copy';
 /** A role as shown in the catalog grid. `permissions` is the EFFECTIVE set. */
 export interface RoleRow extends Record<string, unknown> {
   id: string;
+  /**
+   * The role's IDENTITY — what the override, reset and roster links are built
+   * from, and what a seeded row is keyed on. Never the thing on screen: read
+   * {@link RoleRow.displayName} for that.
+   */
   name: string;
+  /**
+   * The STORED description. Read by {@link driftedFromSeed}, which is the whole
+   * reason it stays beside the displayed one rather than being replaced by it:
+   * whether a seeded row has been edited is a question about what is stored.
+   */
   description: string | null;
+  /** The role's name in the reader's language — every layout renders this. */
+  displayName: string;
+  /** The sentence the row reads as: the tenant's own words, or the catalog's. */
+  displayDescription: string | null;
   permissions: readonly string[] | '*';
   /** `template` = a seeded system role; `custom` = tenant-composed. */
   kind: 'template' | 'custom';
@@ -67,6 +81,11 @@ export function toRoleRow(
     id: record.id,
     name: record.name,
     description: record.description,
+    // The endpoint resolves these for the reader it answered. Falling back to
+    // the stored pair keeps a host serving `GET /roles` itself — or one whose
+    // catalog contributes no role words — rendering exactly as it did before.
+    displayName: record.displayName ?? record.name,
+    displayDescription: record.displayDescription ?? record.description,
     permissions: record.permissions,
     kind: system ? 'template' : 'custom',
     system,
@@ -111,13 +130,22 @@ export function roleFields(copy: RolesTableCopy): FilterFieldConfig<RoleRow>[] {
   ];
 }
 
+/**
+ * The catalog's columns.
+ *
+ * Both word columns read the DISPLAYED pair, never the stored one. The grid is
+ * server-driven, so the `q` and the `sort` behind these two headers are resolved
+ * by `GET /roles` over the same pair — which is what makes typing the word on
+ * screen find the row it is on, and the Nome sort put "Proprietário" where a
+ * pt-BR reader looks for it rather than where `OWNER` falls.
+ */
 export function roleColumns(copy: RolesTableCopy): DataViewColumn<RoleRow>[] {
   return [
-    { id: 'name', header: copy.headers.name, accessor: 'name', searchable: true },
+    { id: 'name', header: copy.headers.name, accessor: (row) => row.displayName, searchable: true },
     {
       id: 'description',
       header: copy.headers.description,
-      accessor: (row) => row.description ?? copy.emptyValue,
+      accessor: (row) => row.displayDescription ?? copy.emptyValue,
       searchable: true,
     },
     {

@@ -123,11 +123,21 @@ export function roleSchemaOf(catalogPermissions: readonly string[]) {
   }) satisfies z.ZodType<RoleRecord>;
 }
 
-/** A roster row for the roles list — the role plus its kind and lock state. */
+/**
+ * A roster row for the roles list — the role, its kind and lock state, and the
+ * words this caller is answered in.
+ *
+ * `name` and `description` are the STORED values and are what a write is keyed
+ * on; the display pair is what a person would read, resolved from the host's
+ * catalog for the request's own locale. An agent reading this list gets both, so
+ * it can quote the sentence a store owner sees while still acting on the name.
+ */
 export function roleListRowSchemaOf(catalogPermissions: readonly string[]) {
   return roleSchemaOf(catalogPermissions).extend({
     kind: z.string(),
     locked: z.boolean(),
+    displayName: z.string(),
+    displayDescription: z.string().nullable(),
   }) satisfies z.ZodType<RoleListRecord>;
 }
 

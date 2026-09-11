@@ -99,6 +99,21 @@ export interface RbacRolePolicy<P extends string = string> {
    * seeded rows are keyed on.
    */
   readonly roleLabels?: RbacCopySource<Readonly<Record<string, string>>>;
+  /**
+   * What each seeded role DOES, in the reader's words — a table, or a RESOLVER
+   * over a tag-keyed pack, exactly like {@link RolePolicy.roleLabels}.
+   *
+   * A role already carries a `description` in {@link RoleDef}, and this does not
+   * replace it. That one is seeded into every tenant's row and is therefore
+   * frozen at tenant-creation time in whichever language the matrix was written
+   * in; it is also the string a tenant overwrites when they override the role.
+   * So it cannot follow a reader, and it must not be thrown away either — a
+   * tenant's own words are theirs.
+   *
+   * Optional, and omitting it changes nothing: the roles screen falls back to
+   * the stored description, which is what every host got before this existed.
+   */
+  readonly roleDescriptions?: RbacCopySource<Readonly<Record<string, string>>>;
 }
 
 /**
@@ -323,6 +338,7 @@ function composeUntyped(
         labels: (context) =>
           mergeLabelVocabulary(labels(context), {
             roles: resolveRbacCopy(policy.roleLabels ?? {}, context.locale),
+            roleDescriptions: resolveRbacCopy(policy.roleDescriptions ?? {}, context.locale),
           }),
         sourceOf,
       };

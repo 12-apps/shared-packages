@@ -61,10 +61,16 @@ function listRolesRoute<P extends string>(deps: RoleRouteDeps<P>): RbacRoute {
   return {
     method: 'GET',
     path: '/roles',
-    async handle({ actor, query }) {
+    async handle({ actor, query, locale }) {
       try {
         await requireManageRoles(deps, actor);
-        const page = await deps.roles.listRolesPage(actor.tenantId, parseRoleListQuery(query));
+        // The reader's tag, for the same reason every write below passes it: the
+        // rows carry words, and the `q` and `sort` are applied to those words.
+        const page = await deps.roles.listRolesPage(
+          actor.tenantId,
+          parseRoleListQuery(query),
+          locale,
+        );
         return pageResponse(page.data, page.pagination);
       } catch (error) {
         return foldApiError(error);
