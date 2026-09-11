@@ -70,6 +70,56 @@ function fixture({ pagesDir = 'src/screens', wrapped = false, config = {} }: Fix
   return join(root, 'coverage.config.json');
 }
 
+/**
+ * A host whose route tree is SPLIT: the entry file routes one page and imports
+ * a second module that routes another. This is future-pay's shape (12-77) —
+ * `routes.tsx` at its line ceiling, Configuração's routes moved into
+ * `routes-config.tsx`.
+ */
+function splitFixture({ listBoth = false }: { listBoth?: boolean } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'entitlements-coverage-split-'));
+  mkdirSync(join(root, 'src/pages/orders'), { recursive: true });
+  mkdirSync(join(root, 'src/pages/billing'), { recursive: true });
+
+  writeFileSync(
+    join(root, 'src/routes.tsx'),
+    `import { ConfigRoutes } from "./routes-config";\n` +
+      `const OrdersPage = lazyRoute(() =>\n` +
+      `  import("./pages/orders").then((m) => ({ default: m.OrdersPage })),\n` +
+      `);\n`,
+  );
+  // The SPLIT-OFF module, and the page only it routes. Unwrapped and not
+  // allowlisted, so a gate that could see it would fail.
+  writeFileSync(
+    join(root, 'src/routes-config.tsx'),
+    `const BillingPage = lazyRoute(() =>\n` +
+      `  import("./pages/billing").then((m) => ({ default: m.BillingPage })),\n` +
+      `);\n`,
+  );
+  writeFileSync(
+    join(root, 'src/pages/orders/index.tsx'),
+    `export const OrdersPage = withEntitlement("orders.core", Page);\n`,
+  );
+  writeFileSync(join(root, 'src/pages/billing/index.tsx'), `export function BillingPage() { return null; }\n`);
+  writeFileSync(
+    join(root, 'features.ts'),
+    `export const FEATURES = defineFeatures({\n  "orders.core": { onRevoke: "hide" },\n} as const);\n`,
+  );
+  writeFileSync(join(root, 'exceptions.json'), '{}\n');
+  writeFileSync(
+    join(root, 'coverage.config.json'),
+    JSON.stringify({
+      routesFile: listBoth ? ['src/routes.tsx', 'src/routes-config.tsx'] : 'src/routes.tsx',
+      pagesDir: 'src/pages',
+      featuresFile: 'features.ts',
+      exceptionsFile: 'exceptions.json',
+      navFile: null,
+      tenantSwitchFile: null,
+    }),
+  );
+  return join(root, 'coverage.config.json');
+}
+
 function runGate(configPath: string) {
   const result = spawnSync(process.execPath, [SCRIPT, '--config', configPath], {
     encoding: 'utf8',
@@ -109,5 +159,53 @@ describe('the coverage gate against a real host tree', () => {
     const { status, output } = runGate(fixture({ wrapped: true, config: { navFile: undefined } }));
     expect(status).toBe(1);
     expect(output).toContain('navFile');
+  });
+});
+
+describe('a route tree split across modules (12-77)', () => {
+  it('refuses to run against a tree whose other routes module is unlisted', () => {
+    // The defect, stated as a failure. `routes-config.tsx` routes BillingPage,
+    // which is unwrapped and un-allowlisted — a gap this gate exists to catch.
+    // Listing only the entry file, the gate used to parse OrdersPage, find it
+    // wrapped, and exit 0: a complete parse of an incomplete input, reporting
+    // a smaller number and passing. It now names the module it cannot see.
+    const { status, output } = runGate(splitFixture());
+
+    expect(status).toBe(1);
+    expect(output).toContain('routes-config');
+    expect(output).toContain('does not list');
+  });
+
+  it('sees every page once both modules are listed, and fails on the one that is ungated', () => {
+    // The fix applied: `routesFile` takes the array, the split-off page comes
+    // into view, and the gap it was hiding is what fails.
+    const { status, output } = runGate(splitFixture({ listBoth: true }));
+
+    expect(status).toBe(1);
+    expect(output).toContain('BillingPage');
+    expect(output).toContain('neither wrapped');
+  });
+
+  it('still accepts a single path, so every existing host config keeps working', () => {
+    // `routesFile` as a string is the shape every host ships today. The array
+    // is additive; this is the case that says so.
+    const { status, output } = runGate(fixture({ wrapped: true }));
+
+    expect(status).toBe(0);
+    expect(output).toContain('1 gated page(s)');
+  });
+
+  it('rejects an empty array rather than passing over an unreadable config', () => {
+    // The error path. An empty list parses zero routes, which the vacuity
+    // guard would also catch — but it should be refused as a CONFIG error,
+    // before any check runs, where the message can name the field.
+    //
+    // Asserting on the NEW sentence on purpose: the old validator rejected any
+    // non-string, so a looser assertion passed against the unfixed script and
+    // proved nothing about the array contract.
+    const { status, output } = runGate(fixture({ wrapped: true, config: { routesFile: [] } }));
+
+    expect(status).toBe(1);
+    expect(output).toContain('non-empty array');
   });
 });
