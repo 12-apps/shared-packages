@@ -139,12 +139,12 @@ function routesSource() {
 function unlistedRouteModules() {
   const listed = new Set(routesFiles.map((file) => basename(file).replace(/\.[jt]sx?$/, "")));
   const found = new Set();
-  for (const file of routesFiles) {
-    for (const match of read(at(file)).matchAll(/from\s+"(\.[^"]*)"|import\("(\.[^"]*)"\)/g)) {
-      const specifier = match[1] ?? match[2];
-      const name = basename(specifier).replace(/\.[jt]sx?$/, "");
-      if (/routes/i.test(name) && !listed.has(name)) found.add(specifier);
-    }
+  // Over the concatenation rather than file-by-file: this asks WHICH modules
+  // are imported, not which file imports them, so one pass answers it.
+  for (const match of routesSource().matchAll(/from\s+"(\.[^"]*)"|import\("(\.[^"]*)"\)/g)) {
+    const specifier = match[1] ?? match[2];
+    const name = basename(specifier).replace(/\.[jt]sx?$/, "");
+    if (/routes/i.test(name) && !listed.has(name)) found.add(specifier);
   }
   return [...found];
 }
@@ -229,16 +229,20 @@ function declaredConfigRoutes(prefix) {
   // tree is split across modules a concatenation can hold several such blocks
   // — of which only the earliest would be read, silently dropping the rest.
   // Reading each file on its own and unioning keeps the slice unambiguous.
-  const paths = new Set();
-  for (const file of routesFiles) {
+  // Each file's block is EXTRACTED first, then the extracted blocks are scanned
+  // together. Slicing per file is what keeps `indexOf` unambiguous; scanning
+  // the joined blocks afterwards is safe, because the ambiguity was only ever
+  // about where a block starts and ends.
+  const bodies = routesFiles.map((file) => {
     const source = read(at(file));
     const start = source.indexOf(`<Route path="${prefix}"`);
-    if (start === -1) continue;
+    if (start === -1) return "";
     const block = source.slice(start);
-    const body = block.slice(0, block.indexOf("</Route>"));
-    for (const match of body.matchAll(/<Route path="([\w-]+)" element=\{<(\w+)/g)) {
-      if (match[2] !== "Navigate") paths.add(`${prefix}/${match[1]}`);
-    }
+    return block.slice(0, block.indexOf("</Route>"));
+  });
+  const paths = new Set();
+  for (const match of bodies.join("\n").matchAll(/<Route path="([\w-]+)" element=\{<(\w+)/g)) {
+    if (match[2] !== "Navigate") paths.add(`${prefix}/${match[1]}`);
   }
   return paths;
 }
