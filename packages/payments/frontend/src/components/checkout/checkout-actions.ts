@@ -3,9 +3,7 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import { buyerGateError } from "./buyer-gate";
 import type { ConfirmationWait } from "./confirmation-wait";
 import type { CheckoutDecline } from "./decline";
-import { forgetHostedOrder, rememberHostedOrder } from "./hosted-return";
-import { parkedBasket, type CheckoutBasketIdentity } from "./basket";
-import type { CheckoutNavigate } from "./navigate-context";
+import { forgetHostedOrder } from "./hosted-return";
 import type { CheckoutScreensCopy } from "./screens-copy";
 import type {
   BuyerContact,
@@ -13,8 +11,6 @@ import type {
   BuyerInfo,
   CheckoutCustomerField,
   CheckoutOrder,
-  CreateOrderRequest,
-  CreateOrderResult,
   OrderStatus,
   PaymentMethod,
 } from "./types";
