@@ -17,6 +17,18 @@ export interface RoleWire {
 export interface RoleListRowWire extends RoleWire {
   kind: string;
   locked: boolean;
+  /**
+   * The role's name in the reader's language. OPTIONAL, and the grid falls back
+   * to `name` when it is absent.
+   *
+   * Sent by the packaged `GET /roles`, which resolves it from the host's catalog
+   * for the request's own locale — beside, not instead of, `name`: the name is
+   * the identity the override, reset and roster links are built from. A host
+   * serving this endpoint itself simply omits both and gets what it had.
+   */
+  displayName?: string;
+  /** The sentence this row reads as — the tenant's own, or the catalog's. */
+  displayDescription?: string | null;
 }
 
 export interface PaginationWire {

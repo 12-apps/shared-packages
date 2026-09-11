@@ -87,6 +87,21 @@ export interface RbacLabelVocabulary extends PermissionLabelVocabulary {
   readonly permissions?: Readonly<Record<string, string>>;
   /** Role-name labels, contributed by the host's role policy. */
   readonly roles?: Readonly<Record<string, string>>;
+  /**
+   * The SENTENCE a seeded role reads as, keyed by role name — the twin of
+   * {@link RbacLabelVocabulary.roles} and contributed the same way.
+   *
+   * Separate from the role's seeded `description` on purpose. That string is
+   * DATA: it is copied into every tenant's row when the tenant is created, so
+   * it is fixed at seed time in whatever language the host wrote its matrix in,
+   * and a tenant may replace it with words of their own. This map is COPY, read
+   * per reader, and it answers for a seeded role the tenant has not touched.
+   *
+   * Which of the two a screen shows is not this file's decision — the roles
+   * store makes it per row, and a tenant's own words always win. See
+   * `server/role-display.ts`.
+   */
+  readonly roleDescriptions?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -194,5 +209,6 @@ export function mergeLabelVocabulary(
     scopes: { ...base.scopes, ...extra.scopes },
     permissions: { ...base.permissions, ...extra.permissions },
     roles: { ...base.roles, ...extra.roles },
+    roleDescriptions: { ...base.roleDescriptions, ...extra.roleDescriptions },
   };
 }
