@@ -53,10 +53,34 @@ function listWhere(tenantId: string, query: RoleListQuery): RoleWhere {
  * A role catalog is small by construction and by hand: every tenant gets the
  * host's seeded templates and adds custom roles one at a time through a dialog.
  * A thousand is far past any real catalog and still one cheap indexed read on a
- * per-tenant column. A tenant beyond it would see the first thousand by stored
- * name; nothing in the product can produce one.
+ * per-tenant column. A tenant beyond it would see the thousand the database's
+ * own order reaches first — the FIRST by stored name ascending, the LAST
+ * descending, since the direction rides into the `take` below.
  */
 const ROLE_LIST_SCAN_LIMIT = 1000;
+
+/**
+ * A collator for this reader, or the runtime's default when the tag is not one.
+ *
+ * `locale` is whatever the transport handed the host — `RbacRequest.locale` is
+ * documented as an unnarrowed language tag, and `Intl` THROWS a `RangeError` on
+ * a malformed one (`''`, `en_US`, a raw `Accept-Language` list). Sorting a list
+ * is not a place to refuse a request over that: an adopter honouring the
+ * documented contract would get a 500 from `GET /roles` for a tag every other
+ * consumer of the field merely falls back on. So a bad tag sorts in the
+ * runtime's default order instead, which is the same answer passing nothing
+ * gives.
+ *
+ * Built ONCE per call rather than per comparison — an `Intl.Collator` is
+ * expensive to construct and a sort calls this O(n log n) times.
+ */
+function collatorFor(locale: string | undefined): Intl.Collator {
+  try {
+    return new Intl.Collator(locale);
+  } catch {
+    return new Intl.Collator();
+  }
+}
 
 /** Case-insensitive `contains`, on the words a reader can actually see. */
 function matchesTerm(record: RoleListRecord, term: string): boolean {
@@ -84,8 +108,9 @@ function sortForReader(
 ): RoleListRecord[] {
   if (query.sort && query.sort.field === 'createdAt') return records;
   const direction = query.sort?.direction === 'desc' ? -1 : 1;
+  const collator = collatorFor(locale);
   return [...records].sort((left, right) => {
-    const byName = left.displayName.localeCompare(right.displayName, locale);
+    const byName = collator.compare(left.displayName, right.displayName);
     return (byName !== 0 ? byName : left.id.localeCompare(right.id)) * direction;
   });
 }

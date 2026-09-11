@@ -197,6 +197,17 @@ describe('the roles list, in the reader language', () => {
     expect(second.data.map((role) => role.name)).toEqual(['DIRECTOR']);
   });
 
+  it('sorts on a malformed locale tag instead of refusing the request', async () => {
+    // `RbacRequest.locale` is an unnarrowed tag as some transport handed it
+    // over, and `Intl` throws a RangeError on these three. A list must not be
+    // the place a bad tag becomes a 500.
+    for (const tag of ['', 'en_US', 'pt-BR,pt;q=0.9']) {
+      const page = await list({ sort: { field: 'name', direction: 'asc' } }, tag);
+      expect(page.data).toHaveLength(3);
+      expect(page.pagination.total).toBe(3);
+    }
+  });
+
   it('keeps the Tipo pill a database filter — it names a column, not a word', async () => {
     const custom = await list({ kindIn: ['CUSTOM'] }, 'pt-BR');
     expect(custom.data.map((role) => role.name)).toEqual(['Caixa']);

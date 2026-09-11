@@ -374,11 +374,28 @@ default exactly as before.
 
 ### If your readers do not share a language
 
-Both of those fields — a contribution's `labels` and the policy's `roleLabels`
-— take a vocabulary **or a resolver**: `localeCopy(MY_LABELS)` from
-`@12-apps/i18n`, or any `(ctx) => vocabulary`. The words are wholly yours, so
-the pt-BR/en-US pair lives beside them; this package ships a pack only for the
-two segments it owns, and those ride `RbacWebCopy.permissionLabels`.
+All three of those fields — a contribution's `labels`, the policy's
+`roleLabels`, and the policy's `roleDescriptions` — take a vocabulary **or a
+resolver**: `localeCopy(MY_LABELS)` from `@12-apps/i18n`, or any
+`(ctx) => vocabulary`. The words are wholly yours, so the pt-BR/en-US pair lives
+beside them; this package ships a pack only for the two segments it owns, and
+those ride `RbacWebCopy.permissionLabels`.
+
+`roleDescriptions` is the newest and the one that needs a word of its own,
+because a `RoleDef` already carries a `description`. That one is what
+`tenantRoleSeeds` WRITES into each tenant's row, so it is fixed at seed time in
+whichever language your matrix is written in, and it is what a tenant replaces
+when they override a seeded role. `roleDescriptions` is read per reader instead,
+and the roles list prefers it only while the stored row still says what the seed
+said — so a store that wrote its own sentence keeps it, in every language.
+Omitting the field changes nothing: the list falls back to the stored
+description.
+
+That is why `GET /roles` answers with two pairs. `name`/`description` are the
+STORED values and stay what a write is keyed on; `displayName`/`displayDescription`
+are the same row resolved for the request's own locale, and are what the grid,
+its search box and its name sort all operate on. A host serving that endpoint
+itself may omit the display pair, and the screens fall back to the stored one.
 
 The resolver is **not** called when you compose. It travels through the merge
 and is asked where a label is about to be rendered, because a catalog is
