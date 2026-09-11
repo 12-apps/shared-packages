@@ -145,7 +145,7 @@ export interface RbacUserDirectory {
 }
 
 /** The invites seam lives in `./invites`; re-exported so its import path is unchanged. */
-export type { RbacInvitesPort, RbacPendingInvite } from './invites';
+export type { RbacInviteRoles, RbacInvitesPort, RbacPendingInvite } from './invites';
 
 /** Every user-facing string this surface emits — REQUIRED host config; pt-BR ships as `./pt-BR`. */
 export interface RbacMessages {

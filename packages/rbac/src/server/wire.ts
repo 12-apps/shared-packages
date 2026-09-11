@@ -58,8 +58,15 @@ export interface RoleWireSchemas {
   grantMemberRoleBody: z.ZodType<{ role: string }>;
   /** Body for enabling/disabling a member. */
   setMemberActiveBody: z.ZodType<{ active: boolean }>;
-  /** Body for inviting by e-mail (only served when the invites port exists). */
-  inviteBody: z.ZodType<{ email: string }>;
+  /**
+   * Body for inviting by e-mail (only served when the invites port exists).
+   *
+   * `role` and `customRoles` are OPTIONAL: they arrived with the roster's role
+   * picker, and a host whose screen predates it still posts `{ email }` and
+   * still gets whatever its invites port decides. That is what let the picker
+   * ship without a breaking change to every adopter's port at once.
+   */
+  inviteBody: z.ZodType<{ email: string; role?: string; customRoles?: string[] }>;
 }
 
 export function buildWireSchemas<P extends string>(
@@ -84,7 +91,26 @@ export function buildWireSchemas<P extends string>(
     setMemberRoleBody: z.object({ role: z.string().trim().min(1) }),
     grantMemberRoleBody: z.object({ role: z.string().trim().min(1) }),
     setMemberActiveBody: z.object({ active: z.boolean() }),
-    inviteBody: z.object({ email: z.string().trim().min(3) }),
+    inviteBody: z.object({
+      email: z.string().trim().min(3),
+      role: z.string().trim().min(1).optional(),
+      // Deduplicated at the wire rather than downstream: a repeated name would
+      // otherwise become a repeated grant, and the grant path is idempotent
+      // only because nothing has yet asked it not to be.
+      customRoles: z
+        .array(z.string().trim().min(1))
+        .transform((names) => [...new Set(names)])
+        .optional(),
+    })
+      // Custom roles are ADDITIVE to a base role, so naming them without one is
+      // a selection the screen cannot produce and the port could not apply: the
+      // membership row needs a `role`. Refused here rather than defaulted,
+      // because guessing the base role of a grant is exactly the decision that
+      // made every invited address an administrator in the first place.
+      .refine(
+        (input) => input.role !== undefined || (input.customRoles ?? []).length === 0,
+        { path: ['role'] },
+      ) as RoleWireSchemas['inviteBody'],
   };
 }
 

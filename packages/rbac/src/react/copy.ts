@@ -130,6 +130,13 @@ export interface TeamScreenCopy {
   /** The e-mail field's label, and the sentence under it. */
   inviteEmailLabel: string;
   inviteHint: string;
+  /**
+   * The base-role picker's label, and the heading over the custom roles the
+   * tenant has built. An invite grants a role now; leaving it implicit made
+   * every address added through this dialog an administrator.
+   */
+  inviteRoleLabel: string;
+  inviteCustomRolesTitle: string;
   /** The success banner shown when a grant was DEFERRED to the person's signup. */
   inviteDeferredTitle: string;
   inviteDeferredBody: string;

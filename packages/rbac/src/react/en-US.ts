@@ -108,13 +108,16 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     aboutTitle: 'About the team',
     aboutBody:
       'Manage this store\u2019s administrators. You can invite by e-mail even somebody with no account yet — access is granted automatically when they sign up.',
-    inviteAction: 'Add administrator',
-    inviteDialogTitle: 'Add administrator',
-    inviteEmailLabel: 'E-mail of the new administrator',
+    inviteAction: 'Add to the team',
+    inviteDialogTitle: 'Add to the team',
+    inviteEmailLabel: 'Their e-mail address',
+    inviteRoleLabel: 'Role',
+    inviteCustomRolesTitle: 'Additional roles',
     inviteHint:
-      'If they already have an account, access is granted right away. Otherwise the invitation stays pending and access is granted automatically when they sign up with that address.',
-    inviteDeferredTitle: 'Invitation recorded',
-    inviteDeferredBody: 'Access will be granted automatically when they create their account.',
+      'If they already have an account, access is granted right away. Otherwise we e-mail them an invitation with a link to accept.',
+    inviteDeferredTitle: 'Invitation sent',
+    inviteDeferredBody:
+      'We e-mailed them a link to accept the invitation. Access starts the moment they accept.',
     errorTitle: 'Could not update the team',
     emptyState: 'No administrators yet.',
     exportFileName: 'team',

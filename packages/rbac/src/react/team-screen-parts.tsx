@@ -112,13 +112,37 @@ export function TeamBanners({ actions, copy }: { actions: TeamActions; copy: Rba
 }
 
 /** The invite popup, opened from the header action. */
+/**
+ * What the invite form may hand out — ONE prop rather than three.
+ *
+ * Grouped because the three travel together everywhere and because the screen
+ * that passes them sits on an 80-line ceiling: spreading them cost six lines of
+ * its budget on plumbing that carries no decision.
+ */
+export interface InviteRoleOptions {
+  system: readonly string[];
+  custom: readonly string[];
+  /**
+   * The host's stated opening role. The fallback to the first system role
+   * resolves HERE rather than in the screen: it is a property of this form, and
+   * leaving it upstream spent two branches of the screen's complexity budget on
+   * a default nothing else reads.
+   */
+  opening?: string;
+}
+
 export function InviteDialog({
   actions,
   copy,
+  labels,
+  roles,
 }: {
   actions: TeamActions;
   copy: RbacWebCopy;
+  labels: RbacLabels;
+  roles: InviteRoleOptions;
 }): JSX.Element {
+  const opening = roles.opening ?? roles.system[0] ?? '';
   return (
     <Dialog
       open={actions.showForm}
@@ -133,6 +157,10 @@ export function InviteDialog({
           <TeamInviteForm
             formKey={actions.formKey}
             copy={copy.teamScreen}
+            labels={labels}
+            systemRoles={roles.system}
+            customRoles={roles.custom}
+            defaultRole={opening}
             onSubmit={actions.invite}
           />
         </DialogContent>

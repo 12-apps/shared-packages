@@ -15,6 +15,22 @@ export interface RbacPendingInvite {
 }
 
 /**
+ * The roles ONE invite grants.
+ *
+ * The shape the roster's picker produces, and deliberately the same division
+ * the member-role endpoints already make: exactly one BASE role the membership
+ * takes, and any number of the tenant's own roles ON TOP. An invite that could
+ * name two base roles would be expressing something `PATCH /team/:userId`
+ * cannot apply, so the wire refuses it before the port ever sees it.
+ */
+export interface RbacInviteRoles {
+  /** The system role the membership takes. */
+  role: string;
+  /** Additive tenant roles, already deduplicated by the wire. */
+  customRoles: readonly string[];
+}
+
+/**
  * OPTIONAL invite seam. Accountless invites need a table and a signup hook
  * this package does not own, so a host that wants the roster's invite surface
  * plugs its own storage in; without it the two invite routes answer 501 and
@@ -34,6 +50,7 @@ export interface RbacInvitesPort {
   invite(
     tenantId: string,
     email: string,
+    roles?: RbacInviteRoles,
   ): Promise<{ status: 'added' | 'invited'; userId?: string }>;
   listPending(tenantId: string): Promise<RbacPendingInvite[]>;
   /** Cancel a pending invite by id. Idempotent. */
