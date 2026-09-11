@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
+import { buildWireSchemas } from '../../server/wire';
 import { rbacMcpEndpoints } from '../endpoints';
+import { inviteBody as mcpInviteBody } from '../schemas';
 import type { RbacMcpOperation, RbacMcpVocabulary } from '../vocabulary';
 
 /**
@@ -135,5 +138,51 @@ describe('rbacMcpEndpoints', () => {
     for (const endpoint of byId().values()) {
       expect(endpoint.annotations?.title).toBeUndefined();
     }
+  });
+});
+
+/**
+ * The two invite bodies must stay one shape.
+ *
+ * A host mounts its `POST /team` with the MCP schema — that is what makes the
+ * advertised tool and runtime validation the same object — and hands the parsed
+ * result to `../server`'s descriptor, which parses again with its own. A zod
+ * object STRIPS what it does not declare, so a field the MCP copy omits never
+ * reaches the descriptor: the form posts it, both layers report success, and the
+ * grant quietly uses a default.
+ *
+ * That is not hypothetical. It is how the roster's role picker first shipped —
+ * compile, lint and every unit test passed, and the invite still granted ADMIN.
+ * These cases are the tripwire that would have failed instead.
+ */
+describe('the invite body, on both sides of the mount', () => {
+  it('keeps role and customRoles rather than stripping them', () => {
+    const parsed = mcpInviteBody.parse({
+      email: 'nova@example.com',
+      role: 'WAITER',
+      customRoles: ['Caixa noturno'],
+    });
+
+    expect(parsed).toEqual({
+      email: 'nova@example.com',
+      role: 'WAITER',
+      customRoles: ['Caixa noturno'],
+    });
+  });
+
+  it('still accepts a bare address, as a caller predating the picker sends', () => {
+    expect(mcpInviteBody.parse({ email: 'nova@example.com' })).toEqual({
+      email: 'nova@example.com',
+    });
+  });
+
+  it('declares every key the server-side schema declares', () => {
+    const server = buildWireSchemas(DEMO_CATALOG.permissions).inviteBody;
+    const full = { email: 'nova@example.com', role: 'WAITER', customRoles: ['Caixa noturno'] };
+
+    // Parsed through BOTH, in the order a real request meets them. Equal output
+    // is the property that matters: it is what proves nothing is dropped in
+    // between, whichever schema gains a field next.
+    expect(server.parse(mcpInviteBody.parse(full))).toEqual(full);
   });
 });
