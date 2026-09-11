@@ -133,6 +133,10 @@ function mountTeam(api: RbacApiClient, permissions: string[]): void {
           systemRoles={SYSTEM_ROLES}
           ownerRoles={DEMO_CATALOG.governance.ownerRoles}
           managePermission="team:manage"
+          // Deliberately NOT `SYSTEM_ROLES[0]`: the fallback would pick
+          // HEAD_LIBRARIAN, so asserting on BRANCH_LEAD below is what proves the
+          // stated default wins over the catalog's array order.
+          defaultInviteRole="BRANCH_LEAD"
           copy={COPY}
         />
       </RbacProvider>
@@ -330,12 +334,63 @@ describe('the invite flow', () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(api.inviteMember).toHaveBeenCalledWith('nova@example.com');
+      // The roles ride with the address now. Nothing was touched in the
+      // picker, so this is the DEFAULT the host stated — which is the whole
+      // point of the assertion: an untouched form must still grant what the
+      // host said it grants, not whatever the catalog happens to list first.
+      expect(api.inviteMember).toHaveBeenCalledWith('nova@example.com', {
+        role: 'BRANCH_LEAD',
+        customRoles: [],
+      });
     });
     // There is no membership yet, so nothing appears in the table — and a
     // dialog closing over an unchanged roster reads as having done nothing.
     await waitFor(() => {
       expect(screen.getByTestId('team-invite-notice')).toBeTruthy();
+    });
+  });
+
+  it('sends the roles the inviter picked, base and custom together', async () => {
+    const api = apiStub({
+      teamContext: vi.fn(async () => ({
+        customRolesByMember: [],
+        // `Voluntário` is the tenant's OWN role — the screen derives the custom
+        // group by subtracting `systemRoles`, so a name that is also a system
+        // role would never reach the picker's second group.
+        assignableRoles: ['CLERK', 'Voluntário'],
+        pendingInvites: [],
+        invitesEnabled: true,
+      })),
+    });
+    mountTeam(api, ['team:manage']);
+    fireEvent.click(await screen.findByTestId('add-admin-button'));
+
+    const form = await screen.findByTestId('invite-form');
+    fireEvent.change(within(form).getByRole('textbox'), {
+      target: { value: 'garcom@example.com' },
+    });
+    // The base role is a SELECT — one value by construction, so an invite can
+    // never name zero or two system roles the way the edit dialog can.
+    const select = screen.getByTestId('total-form-field-role');
+    fireEvent.mouseDown(within(select).getByRole('combobox'));
+    // The demo catalog's own word for CLERK, spelled out rather than resolved
+    // through the shared `LABELS` — the picker renders a LABEL and posts an id,
+    // and a test that derived the label from the same map would pass even if
+    // the two came apart.
+    const clerk = 'Atendente de balcão';
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: clerk })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('option', { name: clerk }));
+    // ...and the tenant's own roles ride on top, from `teamContext`.
+    fireEvent.click(screen.getByTestId('invite-role-opt-Voluntário'));
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(api.inviteMember).toHaveBeenCalledWith('garcom@example.com', {
+        role: 'CLERK',
+        customRoles: ['Voluntário'],
+      });
     });
   });
 
@@ -355,7 +410,10 @@ describe('the invite flow', () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(api.inviteMember).toHaveBeenCalledWith('ja@example.com');
+      expect(api.inviteMember).toHaveBeenCalledWith('ja@example.com', {
+        role: 'BRANCH_LEAD',
+        customRoles: [],
+      });
     });
     // The new member is simply in the roster; a banner would be noise.
     await waitFor(() => {

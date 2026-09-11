@@ -15,6 +15,7 @@ import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
 import type { MemberDetailPayload } from './payloads';
 import { announceInvite } from './invite-announce';
+import { assertAssignableBaseRole, resolveInviteRoles } from './invite-roles';
 import type { RolesStore } from './roles-store';
 import type { TeamStore } from './team-store';
 import { parseBody, parseTeamListQuery, requireParam, type RoleWireSchemas } from './wire';
@@ -115,7 +116,9 @@ function inviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
         if (!EMAIL_RE.test(email)) {
           throw new RbacApiError(400, messages.invalidEmail);
         }
-        const result = await deps.config.invites.invite(actor.tenantId, email);
+        // Judged BEFORE the port runs, so a refused role writes nothing.
+        const roles = await resolveInviteRoles(deps, actor, input, messages);
+        const result = await deps.config.invites.invite(actor.tenantId, email, roles);
         // The invite is a membership-granting write (the "already has an
         // account" branch grants immediately inside the port), so it reports
         // like one. The port owns any richer trail of its own storage.
@@ -124,7 +127,13 @@ function inviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
           action: 'team.invite',
           resourceType: 'membership',
           resourceId: email,
-          after: { status: result.status },
+          after: {
+            status: result.status,
+            // The trail says WHAT was granted, not merely that something was.
+            // An invite is the one roster write whose role used to be invisible
+            // to the audit log, because the port decided it after the entry.
+            ...(roles ? { role: roles.role, customRoles: [...roles.customRoles] } : {}),
+          },
         });
         await announceInvite(deps, actor, email, result);
         return ok({ status: result.status });
@@ -244,25 +253,10 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
         const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.setMemberRoleBody, body, messages);
         const userId = requireParam(params, 'userId', messages);
-        // The BASE role is a closed set — the non-owner template names, or
-        // whatever `assignableBaseRoles` narrows it to. Enforced BEFORE
-        // governance so a custom role (additive by design, and refused by the
-        // host schema's CHECK constraint on the origin host) is the wire's 400
-        // here rather than a 500 there. Custom roles ride
-        // POST /team/:userId/roles instead.
-        //
-        // The exclusion reads `governance.ownerRoles` (grant protection:
-        // OWNER + SUPERADMIN), not the disable/removal-invariant `ownerRoles`
-        // knob — the two sets differ, and this layer exists to refuse BEFORE
-        // governance, so its default must exclude everything governance would.
-        const assignable =
-          deps.config.assignableBaseRoles ??
-          deps.config.catalog.roleTemplates
-            .filter((role) => !deps.config.catalog.governance.ownerRoles.includes(role.name))
-            .map((role) => role.name);
-        if (!assignable.includes(input.role)) {
-          throw new RbacApiError(400, messages.baseRoleNotAssignable);
-        }
+        // The BASE role is a closed set, enforced BEFORE governance — the rule
+        // and its argument live in `./invite-roles`, which `POST /team` applies
+        // to the same column. Custom roles ride POST /team/:userId/roles.
+        assertAssignableBaseRole(deps.config, input.role, messages);
         // The shared governance (escalation / scope-ceiling / SoD /
         // owner-protected) runs BEFORE the write.
         await deps.governance.assertCanGrantRole(actor, input.role, userId);

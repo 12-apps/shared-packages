@@ -6,7 +6,7 @@ import { useRowConfirm, type RowConfirm } from '@12-apps/ui/data-display/CardKit
 
 import type { RbacApiClient } from './api';
 import type { RbacWebCopy } from './copy';
-import type { InviteFormValues } from './team-invite-form';
+import type { InviteSelection } from './team-invite-form';
 import type { TeamRow } from './team-grid-config';
 import {
   applyRoleChanges,
@@ -30,7 +30,7 @@ export interface TeamActions {
   showForm: boolean;
   toggleForm: () => void;
   formKey: number;
-  invite: (values: InviteFormValues) => Promise<void>;
+  invite: (selection: InviteSelection) => Promise<void>;
   remove: (userId: string) => Promise<void>;
   toggleActive: (row: TeamRow) => Promise<void>;
   cancelInvite: (inviteId: string) => Promise<void>;
@@ -46,10 +46,13 @@ export function useTeamActions(
   const [showForm, setShowForm] = useState(false);
   const [formKey, setFormKey] = useState(0);
 
-  async function invite(values: InviteFormValues): Promise<void> {
+  async function invite(selection: InviteSelection): Promise<void> {
     setError(null);
     setNotice(false);
-    const result = await api.inviteMember(values.email);
+    const result = await api.inviteMember(selection.email, {
+      role: selection.role,
+      customRoles: selection.customRoles,
+    });
     if (!result.ok) {
       setError(result.error);
       return;

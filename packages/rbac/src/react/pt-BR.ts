@@ -96,14 +96,16 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     aboutTitle: 'Sobre a equipe',
     aboutBody:
       'Gerencie os administradores desta loja. Você pode convidar por e-mail mesmo quem ainda não tem conta — o acesso é atribuído automaticamente quando a pessoa se cadastra.',
-    inviteAction: 'Adicionar administrador',
-    inviteDialogTitle: 'Adicionar administrador',
-    inviteEmailLabel: 'E-mail do novo administrador',
+    inviteAction: 'Adicionar à equipe',
+    inviteDialogTitle: 'Adicionar à equipe',
+    inviteEmailLabel: 'E-mail da pessoa',
+    inviteRoleLabel: 'Papel',
+    inviteCustomRolesTitle: 'Papéis adicionais',
     inviteHint:
-      'Se a pessoa já tiver uma conta, o acesso é concedido na hora. Caso contrário, o convite fica pendente e o acesso é atribuído automaticamente quando ela criar a conta com esse e-mail.',
-    inviteDeferredTitle: 'Convite registrado',
+      'Se a pessoa já tiver uma conta, o acesso é concedido na hora. Caso contrário, enviamos um convite por e-mail com um link para aceitar.',
+    inviteDeferredTitle: 'Convite enviado',
     inviteDeferredBody:
-      'O acesso será concedido automaticamente quando a pessoa criar a conta.',
+      'Enviamos um e-mail com o link para aceitar o convite. O acesso vale assim que a pessoa aceitar.',
     errorTitle: 'Não foi possível atualizar a equipe',
     emptyState: 'Nenhum administrador cadastrado.',
     exportFileName: 'equipe',

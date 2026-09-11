@@ -94,8 +94,26 @@ export const teamMemberDetailSchema = z.object({
   lastLoginAt: z.string().nullable(),
 }) satisfies z.ZodType<MemberDetailPayload>;
 
-/** Body for granting tenant admin by e-mail. */
-export const inviteBody = z.object({ email: z.string().trim().min(3) });
+/**
+ * Body for granting tenant access by e-mail.
+ *
+ * It MUST admit every field `../server/wire.ts`'s `inviteBody` admits, and that
+ * is not a style preference. A host mounts its route with THIS schema (it is
+ * what the MCP surface advertises, so runtime validation and the advertised
+ * tool cannot drift) and hands the parsed result to the server descriptor —
+ * and a zod object STRIPS what it does not declare. So a field this one omits
+ * never reaches the descriptor at all: it is silently dropped between two
+ * layers that both look correct, which is exactly how the roster's new role
+ * picker shipped a form that posted `role` and an invite that ignored it.
+ *
+ * `role` and `customRoles` stay optional here for the same reason they are
+ * optional there — a caller that names neither keeps the host port's default.
+ */
+export const inviteBody = z.object({
+  email: z.string().trim().min(3),
+  role: z.string().trim().min(1).optional(),
+  customRoles: z.array(z.string().trim().min(1)).optional(),
+});
 
 /** Body for the soft enable/disable. */
 export const setMemberActiveBody = z.object({ active: z.boolean() });

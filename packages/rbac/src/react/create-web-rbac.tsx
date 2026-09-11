@@ -77,6 +77,8 @@ export interface RbacWebConfig<P extends string = string> {
   labels?: RbacCopySource<RbacLabelVocabulary>;
   /** Gate permission ids, when the host's catalog spells them differently. */
   gatePermissions?: { manageRoles?: string; manageTeam?: string };
+  /** See {@link TeamScreenProps.defaultInviteRole}. */
+  defaultInviteRole?: string;
   /**
    * The seed defaults a seeded role is compared against to decide whether it has
    * been EDITED away from the catalog. Absent, no row ever reads as edited and
@@ -296,6 +298,7 @@ function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       systemRoles={parts.systemRoles}
       ownerRoles={parts.ownerRoles}
       managePermission={parts.manageTeam}
+      defaultInviteRole={parts.config.defaultInviteRole}
       copy={parts.copy}
       breadcrumb={parts.config.breadcrumbs?.team}
       onOpenMember={parts.config.navigate?.member}

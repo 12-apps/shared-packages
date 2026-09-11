@@ -21,7 +21,13 @@ import {
   type TeamRow,
 } from './team-grid-config';
 import { RoleEditDialog } from './team-role-dialog';
-import { HeaderControls, InviteDialog, TeamBanners, TeamBody } from './team-screen-parts';
+import {
+  HeaderControls,
+  InviteDialog,
+  TeamBanners,
+  TeamBody,
+  type InviteRoleOptions,
+} from './team-screen-parts';
 import {
   useCancelInviteConfirm,
   useRemoveConfirm,
@@ -58,6 +64,16 @@ export interface TeamScreenProps {
    */
   ownerRoles: readonly string[];
   managePermission: string;
+  /**
+   * The base role the invite dialog opens on.
+   *
+   * STATED rather than derived from `systemRoles[0]`, because this default
+   * decides what access somebody gets when the inviter does not touch the
+   * picker — and inferring that from the catalog's array order would move it
+   * silently the day a template is reordered. Falls back to the first system
+   * role only so a host that has not answered still renders a valid form.
+   */
+  defaultInviteRole?: string;
   copy: RbacWebCopy;
   /** The crumbs above the title. The host owns its own information hierarchy. */
   breadcrumb?: readonly { label: string; href?: string }[];
@@ -80,6 +96,7 @@ function useRosterControls(
   actions: ReturnType<typeof useTeamActions>,
 ): {
   customRoles: string[];
+  inviteRoles: InviteRoleOptions;
   editor: ReturnType<typeof useRoleEditor>;
   removeConfirm: ReturnType<typeof useRemoveConfirm>;
   cancelInviteConfirm: ReturnType<typeof useCancelInviteConfirm>;
@@ -108,7 +125,18 @@ function useRosterControls(
     ownerSet,
     copy.teamRowMenu,
   );
-  return { customRoles, editor, removeConfirm, cancelInviteConfirm, rowActions };
+  return {
+    customRoles,
+    inviteRoles: {
+      system: props.systemRoles,
+      custom: customRoles,
+      ...(props.defaultInviteRole ? { opening: props.defaultInviteRole } : {}),
+    },
+    editor,
+    removeConfirm,
+    cancelInviteConfirm,
+    rowActions,
+  };
 }
 
 /** What the screen renders INSTEAD of the roster, or null when it is ready. */
@@ -139,7 +167,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
   const actions = useTeamActions(api, copy, data.refresh);
   const [visibleRows, setVisibleRows] = useState<TeamRow[]>([]);
 
-  const { customRoles, editor, removeConfirm, cancelInviteConfirm, rowActions } =
+  const { customRoles, inviteRoles, editor, removeConfirm, cancelInviteConfirm, rowActions } =
     useRosterControls(props, data, actions);
 
   // The URL-driven controls, re-derived on every address-bar change so browser
@@ -171,7 +199,9 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
             onInvite={actions.toggleForm}
           />
         </Dashboard.Header>
-        {canManage && <InviteDialog actions={actions} copy={copy} />}
+        {canManage && (
+          <InviteDialog actions={actions} copy={copy} labels={labels} roles={inviteRoles} />
+        )}
         <Dashboard.Body>
           <TeamBanners actions={actions} copy={copy} />
           <TeamBody
