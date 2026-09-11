@@ -31,7 +31,12 @@
  *
  * All paths are resolved relative to the CONFIG FILE. Fields:
  *
- *   routesFile        (required)  the SPA's routes .tsx
+ *   routesFile        (required)  the SPA's routes .tsx, or an ARRAY of them
+ *                                 when the route tree is split across modules.
+ *                                 A split tree that lists only its entry file
+ *                                 hides every page in the others (12-77), so
+ *                                 an unlisted routes module is itself a
+ *                                 failure — see `unlistedRouteModules`.
  *   pagesDir          (required)  the pages directory the routes import from
  *   featuresFile      (required)  the file whose `defineFeatures(` call
  *                                 declares the app catalog
@@ -75,10 +80,24 @@ const configPath = resolve(process.argv[configFlag + 1]);
 const configDir = dirname(configPath);
 const config = JSON.parse(readFileSync(configPath, "utf8"));
 
-for (const required of ["routesFile", "pagesDir", "featuresFile", "exceptionsFile"]) {
+for (const required of ["pagesDir", "featuresFile", "exceptionsFile"]) {
   if (typeof config[required] !== "string" || config[required] === "") {
     fail(`config is missing required field "${required}".`);
   }
+}
+// `routesFile` takes a LIST as well as a path (12-77). A repo that splits its
+// route tree across modules — the natural answer to a per-file line cap — used
+// to take every page in the split-off modules out of this gate's sight, and
+// nothing said so: the anti-vacuity guard only fires at ZERO, so a PARTIAL
+// parse passed while proving less than it claimed. Measured on an adopter that
+// had moved one section's routes into a second module: seventeen sections plus
+// three pages left the gate's sight and the run stayed green.
+const routesFiles = Array.isArray(config.routesFile) ? config.routesFile : [config.routesFile];
+if (
+  routesFiles.length === 0 ||
+  routesFiles.some((entry) => typeof entry !== "string" || entry === "")
+) {
+  fail(`config field "routesFile" must be a path, or a non-empty array of paths.`);
 }
 // The optional checks may be opted OUT of, never forgotten: an absent key
 // silently skipping a completeness check is how a gate rots. `null` is the
@@ -99,6 +118,37 @@ for (const nullable of ["navFile", "tenantSwitchFile"]) {
 const at = (relativePath) => join(configDir, relativePath);
 const read = (path) => readFileSync(path, "utf8");
 
+/** Every configured routes file, concatenated — see `routesFile` above. */
+function routesSource() {
+  return routesFiles.map((file) => read(at(file))).join("\n");
+}
+
+/**
+ * A routes module the tree imports but the config does not list (12-77).
+ *
+ * The failure this gate could not see was not a bad parse — it was a COMPLETE
+ * parse of an INCOMPLETE input. Listing the files is what fixes it, and this is
+ * what stops the list going stale the next time somebody splits the tree
+ * further: any relative import whose module name reads as routes and is not
+ * among the configured files fails, naming it.
+ *
+ * Deliberately narrow. It matches on the module NAME carrying "routes", so a
+ * page or a component import cannot trip it, and the fix it asks for is one
+ * line of config.
+ */
+function unlistedRouteModules() {
+  const listed = new Set(routesFiles.map((file) => basename(file).replace(/\.[jt]sx?$/, "")));
+  const found = new Set();
+  // Over the concatenation rather than file-by-file: this asks WHICH modules
+  // are imported, not which file imports them, so one pass answers it.
+  for (const match of routesSource().matchAll(/from\s+"(\.[^"]*)"|import\("(\.[^"]*)"\)/g)) {
+    const specifier = match[1] ?? match[2];
+    const name = basename(specifier).replace(/\.[jt]sx?$/, "");
+    if (/routes/i.test(name) && !listed.has(name)) found.add(specifier);
+  }
+  return [...found];
+}
+
 /** Regex-escape a literal path fragment. */
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -114,7 +164,7 @@ function escapeRegExp(text) {
  * parse zero exports and pass the whole gate vacuously.
  */
 function routedExports() {
-  const source = read(at(config.routesFile));
+  const source = routesSource();
   const prefix = config.routesImportPrefix ?? `./${basename(config.pagesDir)}/`;
   const pattern = new RegExp(
     `import\\("${escapeRegExp(prefix)}([^"]+)"\\)\\s*\\.then\\(\\(m\\) => \\(\\{ default: m\\.(\\w+) \\}\\)\\)`,
@@ -174,11 +224,24 @@ function navFeatureKeys() {
  * proving nothing about where a switch actually lives.
  */
 function declaredConfigRoutes(prefix) {
-  const source = read(at(config.routesFile));
-  const block = source.slice(source.indexOf(`<Route path="${prefix}"`));
-  const body = block.slice(0, block.indexOf("</Route>"));
+  // PER FILE, not over the concatenation (12-77). This slices from the first
+  // `<Route path="<prefix>">` to the first `</Route>` after it, and once the
+  // tree is split across modules a concatenation can hold several such blocks
+  // — of which only the earliest would be read, silently dropping the rest.
+  // Reading each file on its own and unioning keeps the slice unambiguous.
+  // Each file's block is EXTRACTED first, then the extracted blocks are scanned
+  // together. Slicing per file is what keeps `indexOf` unambiguous; scanning
+  // the joined blocks afterwards is safe, because the ambiguity was only ever
+  // about where a block starts and ends.
+  const bodies = routesFiles.map((file) => {
+    const source = read(at(file));
+    const start = source.indexOf(`<Route path="${prefix}"`);
+    if (start === -1) return "";
+    const block = source.slice(start);
+    return block.slice(0, block.indexOf("</Route>"));
+  });
   const paths = new Set();
-  for (const match of body.matchAll(/<Route path="([\w-]+)" element=\{<(\w+)/g)) {
+  for (const match of bodies.join("\n").matchAll(/<Route path="([\w-]+)" element=\{<(\w+)/g)) {
     if (match[2] !== "Navigate") paths.add(`${prefix}/${match[1]}`);
   }
   return paths;
@@ -211,8 +274,17 @@ const routes = routedExports();
 // the primary parse too: a gate that found NOTHING routed proved nothing.
 if (routes.size === 0) {
   fail(
-    `parsed no routed page exports out of ${config.routesFile} — this gate would be vacuous. ` +
+    `parsed no routed page exports out of ${routesFiles.join(", ")} — this gate would be vacuous. ` +
       `Check routesImportPrefix/pagesDir against the routes file; do not ignore this.`,
+  );
+}
+const unlisted = unlistedRouteModules();
+if (unlisted.length > 0) {
+  fail(
+    `${unlisted.join(", ")} ${unlisted.length === 1 ? "is a routes module" : "are routes modules"} ` +
+      `the tree imports but "routesFile" does not list, so every page reached only through ` +
+      `${unlisted.length === 1 ? "it" : "them"} is invisible to this gate. Add ` +
+      `${unlisted.length === 1 ? "it" : "them"} to "routesFile" — it takes an array.`,
   );
 }
 const exceptions = JSON.parse(read(at(config.exceptionsFile)));
