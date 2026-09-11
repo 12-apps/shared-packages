@@ -4,7 +4,6 @@ import {
   RbacApiError,
   fencedAudit,
   messagesOf,
-  paginationMeta,
   type PaginationMeta,
   type RbacAuditSink,
   type RbacMessages,
@@ -15,11 +14,11 @@ import {
   isUniqueViolation,
   type RbacDbClient,
   type RbacDbProvider,
-  type RoleOrderBy,
   type RoleRow,
-  type RoleWhere,
 } from './db';
 import { parseRolePermissions, serializeRolePermissions } from './permissions-format';
+import { createRoleDisplay, type RoleDisplay, type RoleDisplayWords } from './role-display';
+import { listRolesPage } from './roles-list';
 import { resetTemplateRole, templateSeedFor, upsertTemplateOverride } from './template-store';
 
 /**
@@ -39,8 +38,17 @@ export interface RoleRecord {
   permissions: readonly string[] | '*';
 }
 
-/** One role row for the admin grid — plus the SYSTEM/lock markers. */
-export interface RoleListRecord extends RoleRecord {
+/**
+ * One role row for the admin grid — the stored fields, the SYSTEM/lock markers,
+ * and the words this reader sees.
+ *
+ * `name` and `description` stay the STORED values: the row menus act on the
+ * name, and the grid compares the description against the host's seed to decide
+ * whether a seeded row reads as edited. The display pair is what a person
+ * reads, and what the `q` and `sort` below are applied to. See
+ * `./role-display.ts` for which is which and why both travel.
+ */
+export interface RoleListRecord extends RoleRecord, RoleDisplayWords {
   kind: string;
   locked: boolean;
 }
@@ -67,6 +75,10 @@ export interface RolesStoreCtx {
   messages: RbacMessages;
   templateNames: ReadonlySet<string>;
   tenantRoleSeeds: readonly TenantRoleSeed[];
+  /** This reader's words for a row — resolved per call, never per store. */
+  display: RoleDisplay;
+  /** The reader's tag, for the collation the name sort orders by. */
+  locale: string | undefined;
 }
 
 export function toRoleRecord(row: RoleRow): RoleRecord {
@@ -113,50 +125,6 @@ async function getById(
     select: ROLE_SELECT,
   });
   return row ? toRoleRecord(row) : null;
-}
-
-function listWhere(tenantId: string, query: RoleListQuery): RoleWhere {
-  return {
-    clientId: tenantId,
-    archivedAt: null,
-    ...(query.kindIn && query.kindIn.length > 0 ? { kind: { in: [...query.kindIn] } } : {}),
-    ...(query.q
-      ? {
-          OR: [
-            { name: { contains: query.q, mode: 'insensitive' } },
-            { description: { contains: query.q, mode: 'insensitive' } },
-          ],
-        }
-      : {}),
-  };
-}
-
-async function listRolesPage(
-  ctx: RolesStoreCtx,
-  tenantId: string,
-  query: RoleListQuery,
-): Promise<{ data: RoleListRecord[]; pagination: PaginationMeta }> {
-  const db = await ctx.db();
-  const where = listWhere(tenantId, query);
-  const orderBy: RoleOrderBy = query.sort
-    ? query.sort.field === 'createdAt'
-      ? { createdAt: query.sort.direction }
-      : { name: query.sort.direction }
-    : { name: 'asc' };
-  const [rows, total] = await Promise.all([
-    db.role.findMany({
-      where,
-      orderBy,
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-      select: ROLE_SELECT,
-    }),
-    db.role.count({ where }),
-  ]);
-  return {
-    data: rows.map((row) => ({ ...toRoleRecord(row), kind: row.kind, locked: row.locked })),
-    pagination: paginationMeta(total, query.page, query.pageSize),
-  };
 }
 
 async function createTenantRole(
@@ -285,9 +253,15 @@ async function deleteTenantRole(
  * take one.
  */
 export interface RolesStore {
+  /**
+   * @param locale The reader's tag. It picks the role words on every row AND
+   * the collation the name sort uses, so a caller that omits it gets the
+   * catalog's own words — which is exactly what a single-audience host wants.
+   */
   listRolesPage(
     tenantId: string,
     query: RoleListQuery,
+    locale?: string,
   ): Promise<{ data: RoleListRecord[]; pagination: PaginationMeta }>;
   getTenantRoleById(id: string, tenantId: string): Promise<RoleRecord | null>;
   listAssignableRoleNames(tenantId: string): Promise<string[]>;
@@ -338,10 +312,14 @@ export function createRolesStore<P extends string>(config: RolesStoreConfig<P>):
   const ctxFor = (locale?: string): RolesStoreCtx => ({
     ...base,
     messages: messagesOf(config, locale),
+    // Resolved here for the same reason `messages` is: the catalog's label
+    // merge is lazy precisely so it can be asked once per reader.
+    display: createRoleDisplay(config.catalog, base.tenantRoleSeeds, locale),
+    locale,
   });
   const ctx = ctxFor();
   return {
-    listRolesPage: (tenantId, query) => listRolesPage(ctx, tenantId, query),
+    listRolesPage: (tenantId, query, locale) => listRolesPage(ctxFor(locale), tenantId, query),
     getTenantRoleById: async (id, tenantId) => getById(await ctx.db(), id, tenantId),
     listAssignableRoleNames: async (tenantId) => {
       const db = await ctx.db();

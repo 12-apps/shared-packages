@@ -29,8 +29,8 @@ export function roleCells(copy: RolesTableCopy): ListCardCellConfig<RoleRow>[] {
   return [
     {
       id: 'role',
-      primary: (row) => row.name,
-      secondary: (row) => row.description ?? copy.noDescription,
+      primary: (row) => row.displayName,
+      secondary: (row) => row.displayDescription ?? copy.noDescription,
     },
     { id: 'kind', align: 'center', primary: (row) => roleKindLabel(row, copy) },
     {
@@ -89,7 +89,10 @@ export function RoleListCard({
                 )
               }
             />
-            <Fact label={copy.headers.description} value={row.description ?? copy.emptyValue} />
+            <Fact
+              label={copy.headers.description}
+              value={row.displayDescription ?? copy.emptyValue}
+            />
           </>
         }
         right={

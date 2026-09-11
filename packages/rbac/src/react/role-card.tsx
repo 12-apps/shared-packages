@@ -29,8 +29,8 @@ export function RoleCard({
       selected={selection.selected}
       onToggleSelect={selection.onToggleSelect}
       testId={`role-card-${row.id}`}
-      title={row.name}
-      subtitle={row.description ?? copy.emptyValue}
+      title={row.displayName}
+      subtitle={row.displayDescription ?? copy.emptyValue}
       imageFallback={<BadgeOutlinedIcon sx={{ fontSize: 40, opacity: 0.35 }} />}
       menu={<RoleActionsMenu row={row} context={context} />}
     >

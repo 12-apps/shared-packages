@@ -112,7 +112,9 @@ function useRoleConfirm(
     },
     describe: () => ({
       title: words.title,
-      entityName: row.name,
+      // What the person is looking at, not what the request above is keyed on —
+      // `api.resetTemplate(row.name)` a few lines up still sends the identity.
+      entityName: row.displayName,
       description: words.body,
       confirmText: words.confirmLabel,
     }),
@@ -120,6 +122,33 @@ function useRoleConfirm(
     copy: copy.confirmAction,
     dataTestId: `role-${kind}-confirm`,
   });
+}
+
+/**
+ * What the edit dialog opens on — the STORED pair, never the displayed one.
+ *
+ * The difference matters exactly once, and it is the whole reason this is a
+ * function with a docblock rather than an object literal. A seeded role whose
+ * description is still the catalog's reads in the READER's language on the grid
+ * beside this menu. Seeding the field with those words would turn "open the
+ * dialog and save" into a tenant override written in one language — which every
+ * other reader of that store would then be shown, in a language they did not
+ * choose. The field edits what is stored, so it shows what is stored; whatever
+ * the tenant types replaces it and, being theirs, is shown to everybody.
+ *
+ * `name` is stored for the older reason: it is the key `overrideTemplate` and
+ * `resetTemplate` are called with.
+ */
+function formDefaults(row: RoleRow): {
+  name: string;
+  description: string | null;
+  permissions: string[];
+} {
+  return {
+    name: row.name,
+    description: row.description,
+    permissions: row.permissions === '*' ? [] : [...row.permissions],
+  };
 }
 
 export function RoleActionsMenu({
@@ -175,15 +204,11 @@ export function RoleActionsMenu({
         // are different acts — the title says which one this is.
         title={
           row.system
-            ? copy.rolesList.dialogTitles.override(row.name)
-            : copy.rolesList.dialogTitles.edit(row.name)
+            ? copy.rolesList.dialogTitles.override(row.displayName)
+            : copy.rolesList.dialogTitles.edit(row.displayName)
         }
         context={context}
-        initial={{
-          name: row.name,
-          description: row.description,
-          permissions: row.permissions === '*' ? [] : [...row.permissions],
-        }}
+        initial={formDefaults(row)}
         template={row.system}
         busy={edit.busy}
         error={edit.error}
