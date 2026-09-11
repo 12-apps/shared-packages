@@ -9,9 +9,9 @@ import {
   useResumedCheckout,
   useRetryAction,
   useSettledPort,
-  useStartPayment,
   type Step,
 } from "./checkout-actions";
+import { useStartPayment } from "./start-payment";
 import { useConfirmationWait } from "./confirmation-wait";
 import { useCheckoutCopy } from "./copy-context";
 
@@ -139,7 +139,7 @@ export function useCheckoutController(
   });
   const startPayment = useStartPayment({
     buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure,
-    setCreating, setDecline, setOrder, setFinalStatus,
+    setCreating, setDecline, setOrder, setFinalStatus, setStep,
   });
   const { payWithEmail, handleResolved } = useResolutionActions({
     buyer, method, startPayment, setBuyerState, setDecline, setFinalStatus, setStep,
