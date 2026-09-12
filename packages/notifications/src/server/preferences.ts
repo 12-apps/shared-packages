@@ -1,6 +1,6 @@
 import {
   DEFAULT_CHANNEL_ROW,
-  mergeChoices,
+  explicitChoicesOf,
   mergeStoredRow,
   resolveTypeChannels,
   type ChannelMatrix,
@@ -83,6 +83,14 @@ export function createPreferenceStore(
      * A category outside the taxonomy is IGNORED rather than stored: the DB
      * CHECK would reject it anyway, and a 500 from a stale client's extra key
      * would fail the whole save including the toggle the user did flip.
+     *
+     * What is written is the user's EXPLICIT choices only, never their
+     * effective row. Merging onto the effective row wrote a boolean for all
+     * four channels the moment anyone touched any switch, so the row could
+     * never again say "no opinion" about a channel — which silently disabled
+     * every per-type and per-host default for that user, and defeated the
+     * missing-key fallback that lets a new channel ship without a data
+     * migration.
      */
     async save(userId, input) {
       const client = await db();
@@ -91,8 +99,7 @@ export function createPreferenceStore(
         const existing = await client.notificationPreference.findUnique({
           where: { userId_category: { userId, category } },
         });
-        const current = existing ? mergeStoredRow(existing.channels, defaultRow) : defaultRow;
-        const channels = mergeChoices(current, choices);
+        const channels = { ...explicitChoicesOf(existing?.channels), ...choices };
         await client.notificationPreference.upsert({
           where: { userId_category: { userId, category } },
           create: { userId, category, channels },

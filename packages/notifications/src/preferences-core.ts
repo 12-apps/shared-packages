@@ -137,9 +137,9 @@ export function capToAvailable(
  *      because it was never on offer for this message.
  *
  * Step 3 overriding a stored `true` is the one place a user's saved choice is
- * discarded, and it is the point of the field: a diner sitting at the mesa who
- * once ticked "e-mail" for `orders` was answering a question about delivery
- * receipts, not about the kitchen three metres away.
+ * discarded, and it is the point of the field: the answer they gave was about
+ * the CATEGORY, and a category can hold messages this channel was never right
+ * for. Step 2 beating step 1 is what keeps the other field a default.
  */
 export function resolveTypeChannels(input: {
   /** The stored `channels` JSON for this (user, category), if any. */
@@ -158,6 +158,28 @@ export function resolveTypeChannels(input: {
 /** The channels enabled by one effective row — the router's gate. */
 export function enabledChannelsOf(row: ChannelRow): NotificationChannel[] {
   return NOTIFICATION_CHANNELS.filter((channel) => row[channel]);
+}
+
+/**
+ * The channels a stored row states an EXPLICIT choice for, dropping everything
+ * else — the inverse of {@link mergeStoredRow}, which fills the gaps in.
+ *
+ * The package's storage model is "only explicit choices are stored; a missing
+ * key falls back to the default", and this is what lets a writer keep that
+ * promise. Merging a save onto the user's EFFECTIVE row instead turns every
+ * defaulted channel into an explicit one the moment they touch any switch, and
+ * the row can never say "no opinion" about a channel again.
+ */
+export function explicitChoicesOf(stored: unknown): Partial<ChannelRow> {
+  const choices: Partial<ChannelRow> = {};
+  if (stored && typeof stored === 'object') {
+    const record = stored as Record<string, unknown>;
+    for (const channel of NOTIFICATION_CHANNELS) {
+      const value = record[channel];
+      if (typeof value === 'boolean') choices[channel] = value;
+    }
+  }
+  return choices;
 }
 
 /**

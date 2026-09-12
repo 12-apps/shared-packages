@@ -790,8 +790,10 @@ describe('notify — a type that declares its own channels', () => {
   });
 
   it('does not let the plan gate hand back a channel the type refused', async () => {
-    // A policy may legitimately return more than it was given; availability is
-    // applied after it, so the e-mail cannot come back that way.
+    // THE case the final cap exists for. `channelPolicy` is host code that
+    // returns an array; nothing constrains it to a subset of its argument, and
+    // a host reading its plan's entitlement list rather than filtering the
+    // argument returns exactly this. Delete the cap and this test goes red.
     const api = mesa({
       channelPolicy: () => Promise.resolve(['EMAIL', 'WEB_PUSH'] as NotificationChannel[]),
     });
@@ -811,9 +813,11 @@ describe('notify — a type that declares its own channels', () => {
     expect(email.sent).toEqual([]);
   });
 
-  it('does not let the plan gate ERROR fallback resurrect the e-mail', async () => {
-    // The error path degrades to the FREE channels (e-mail + web push), which
-    // is exactly the channel this type had just refused.
+  it('withholds it through the plan gate ERROR path too', async () => {
+    // Not a test of the final cap — `policyFallback` filters its own already
+    // capped input and could not reintroduce a channel if the cap were gone.
+    // It pins the end-to-end claim: an entitlements outage is not a way for
+    // the mesa diner to start receiving e-mail.
     const api = mesa({
       channelPolicy: () => Promise.reject(new Error('entitlements unreachable')),
     });
@@ -833,29 +837,30 @@ describe('notify — a type that declares its own channels', () => {
     expect(email.sent).toEqual([]);
   });
 
-  it('caps a host preference store that ignores the rules argument', async () => {
-    // A store written before `rules` existed answers the old question. The
-    // router must not depend on it to enforce availability.
-    const api = mesa();
-    const legacy = {
-      get: api.preferences.get.bind(api.preferences),
-      save: api.preferences.save.bind(api.preferences),
-      enabledChannels: () => Promise.resolve(['EMAIL', 'WEB_PUSH'] as NotificationChannel[]),
+  it('keeps a per-type DEFAULT alive after the user saves an UNRELATED toggle', async () => {
+    // The regression this pins: `save` used to merge onto the user's EFFECTIVE
+    // row, so flipping any one switch wrote a boolean for all four channels.
+    // The row could then never say "no opinion" again, and every per-type
+    // default silently died for anyone who had ever opened the settings screen
+    // — which is most users.
+    const SMS_BY_DEFAULT = {
+      type: 'order.shipped',
+      category: 'orders',
+      channelDefaults: { SMS: true },
+      generate: () => ({ title: 'A caminho', body: 'Saiu para entrega.', link: null, data: {} }),
     };
-    const blind = mount({
-      generators: [ORDER_PAID, MESA_READY] as never,
-      preferences: legacy,
-    } as never);
-    const email = fakeTransport('EMAIL');
-    withTransports(blind, email, fakeTransport('WEB_PUSH'));
+    const api = mount({ generators: [SMS_BY_DEFAULT] as never });
+    withTransports(api, fakeTransport('EMAIL'), fakeTransport('SMS'), fakeTransport('WEB_PUSH'));
 
-    const result = await blind.notify(
-      { type: 'comanda.ready', recipient: { userId: 'u1' }, payload: { item: 'Bolinho' } },
+    // The settings screen saves one toggle at a time; this one is not SMS.
+    await api.preferences.save('u1', { orders: { WHATSAPP: true } });
+
+    const result = await api.notify(
+      { type: 'order.shipped', recipient: { userId: 'u1' }, payload: {} },
       { sync: true },
     );
 
-    expect(result.channels).toEqual(['WEB_PUSH']);
-    expect(email.sent).toEqual([]);
+    expect(result.channels).toContain('SMS');
   });
 
   it('lets a per-type DEFAULT be overridden by the user, unlike availability', async () => {

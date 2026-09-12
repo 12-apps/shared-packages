@@ -183,13 +183,17 @@ function announce(deps: NotificationRouterDeps, notification: CommittedNotificat
  * The channels one emit will actually enqueue:
  * preference ∩ transport ∩ plan ∩ the TYPE's own availability.
  *
- * Availability is applied LAST, and applied here rather than trusted to the
- * preference store, because neither of the two stages after the store can be
- * relied on to preserve it. A host may inject its own
- * {@link NotificationPreferenceStore}, and one written before `rules` existed
- * ignores the argument entirely; and {@link applyPolicy}'s error path degrades
- * to the FREE channels, which would hand back the very e-mail a type had just
- * declared it does not offer. One filter at the end closes both.
+ * Availability is applied LAST rather than left to the preference store,
+ * because {@link NotificationChannelPolicy} is a HOST function returning an
+ * array and nothing constrains it to a subset of what it was handed. A policy
+ * that returns a channel it was not given — a host reading the plan's own
+ * entitlement list rather than filtering the argument — would otherwise put
+ * back a channel this type had just declared it does not offer. The final
+ * filter makes availability independent of what any host code returns.
+ *
+ * {@link policyFallback}, by contrast, cannot reintroduce anything: it filters
+ * its own already-capped input. It is not a reason for this filter, and the
+ * cost of the filter is one pass over at most four strings.
  *
  * The inbox record is NOT gated by any of this — `commit` writes it whatever
  * this returns, including the empty array — because the inbox is the record of
