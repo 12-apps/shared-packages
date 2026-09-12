@@ -686,3 +686,200 @@ describe('the recipient decides the language', () => {
     expect(seen.rendered).toBe(0);
   });
 });
+
+/**
+ * Per-TYPE channel rules (FUT-1949) at the ROUTER, where the gates compose.
+ *
+ * The pure policy is covered in `../../__tests__/preferences-core.test.ts`;
+ * what only this suite can show is that availability survives every stage
+ * AFTER the preference store — the transport filter, the host's plan gate, and
+ * that gate's error fallback — and that the inbox record is written anyway.
+ *
+ * This is also where the CHANNEL SELECTION assertion lives for the package
+ * half of FUT-1949. The host's own comanda suite stubs the notification mount
+ * on purpose, so it can assert emission but never the channel.
+ */
+describe('notify — a type that declares its own channels', () => {
+  /** A mesa kitchen nudge: the phone is in the diner\'s hand, not the inbox. */
+  const MESA_READY = {
+    type: 'comanda.ready',
+    category: 'orders',
+    channels: ['WEB_PUSH'] as NotificationChannel[],
+    generate: (payload: { item: string }) => ({
+      title: 'Seu pedido está pronto',
+      body: `${payload.item} saiu da cozinha.`,
+      link: '/comanda',
+      data: {},
+    }),
+  };
+
+  /** A type that offers no transport channel at all — inbox only. */
+  const INBOX_ONLY = {
+    type: 'audit.recorded',
+    category: 'orders',
+    channels: [] as NotificationChannel[],
+    generate: () => ({ title: 'Registrado', body: 'Registrado.', link: null, data: {} }),
+  };
+
+  function mesa(overrides: Partial<Parameters<typeof createApiNotifications>[0]> = {}) {
+    return mount({ generators: [ORDER_PAID, MESA_READY, INBOX_ONLY] as never, ...overrides });
+  }
+
+  it('withholds a channel it does not offer, at the default preference', async () => {
+    const api = mesa();
+    const email = fakeTransport('EMAIL');
+    const push = fakeTransport('WEB_PUSH');
+    withTransports(api, email, push);
+
+    const result = await api.notify(
+      { type: 'comanda.ready', recipient: { userId: 'u1' }, payload: { item: 'Pastel' } },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual(['WEB_PUSH']);
+    expect(email.sent).toEqual([]);
+    expect(push.sent).toHaveLength(1);
+  });
+
+  it('withholds it even from a user who explicitly saved that channel ON', async () => {
+    const api = mesa();
+    const email = fakeTransport('EMAIL');
+    const push = fakeTransport('WEB_PUSH');
+    withTransports(api, email, push);
+    await api.preferences.save('u1', { orders: { EMAIL: true } });
+
+    const result = await api.notify(
+      { type: 'comanda.ready', recipient: { userId: 'u1' }, payload: { item: 'Coxinha' } },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual(['WEB_PUSH']);
+    expect(email.sent).toEqual([]);
+  });
+
+  it('leaves the OTHER types in the same category untouched', async () => {
+    // The regression this whole design exists to avoid: `order.paid` shares
+    // `orders` with the mesa messages and must keep its e-mail.
+    const api = mesa();
+    const email = fakeTransport('EMAIL');
+    withTransports(api, email, fakeTransport('WEB_PUSH'));
+
+    const paid = await api.notify(
+      { type: 'order.paid', recipient: { userId: 'u1' }, payload: { code: 'C1' } },
+      { sync: true },
+    );
+
+    expect(paid.channels).toContain('EMAIL');
+    expect(email.sent).toHaveLength(1);
+  });
+
+  it('writes the inbox record for a type that offers NO channel', async () => {
+    const api = mesa();
+    withTransports(api, fakeTransport('EMAIL'), fakeTransport('WEB_PUSH'));
+    await api.preferences.save('u1', { orders: { EMAIL: true, WEB_PUSH: true } });
+
+    const result = await api.notify(
+      { type: 'audit.recorded', recipient: { userId: 'u1' }, payload: {} },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual([]);
+    expect(db.rows.deliveries).toHaveLength(0);
+    expect(db.rows.notifications).toHaveLength(1);
+    expect(db.rows.notifications[0]).toMatchObject({ type: 'audit.recorded', userId: 'u1' });
+  });
+
+  it('does not let the plan gate hand back a channel the type refused', async () => {
+    // A policy may legitimately return more than it was given; availability is
+    // applied after it, so the e-mail cannot come back that way.
+    const api = mesa({
+      channelPolicy: () => Promise.resolve(['EMAIL', 'WEB_PUSH'] as NotificationChannel[]),
+    });
+    const email = fakeTransport('EMAIL');
+    withTransports(api, email, fakeTransport('WEB_PUSH'));
+
+    const result = await api.notify(
+      {
+        type: 'comanda.ready',
+        recipient: { userId: 'u1', clientId: 'c1' },
+        payload: { item: 'Pão de queijo' },
+      },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual(['WEB_PUSH']);
+    expect(email.sent).toEqual([]);
+  });
+
+  it('does not let the plan gate ERROR fallback resurrect the e-mail', async () => {
+    // The error path degrades to the FREE channels (e-mail + web push), which
+    // is exactly the channel this type had just refused.
+    const api = mesa({
+      channelPolicy: () => Promise.reject(new Error('entitlements unreachable')),
+    });
+    const email = fakeTransport('EMAIL');
+    withTransports(api, email, fakeTransport('WEB_PUSH'));
+
+    const result = await api.notify(
+      {
+        type: 'comanda.ready',
+        recipient: { userId: 'u1', clientId: 'c1' },
+        payload: { item: 'Empada' },
+      },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual(['WEB_PUSH']);
+    expect(email.sent).toEqual([]);
+  });
+
+  it('caps a host preference store that ignores the rules argument', async () => {
+    // A store written before `rules` existed answers the old question. The
+    // router must not depend on it to enforce availability.
+    const api = mesa();
+    const legacy = {
+      get: api.preferences.get.bind(api.preferences),
+      save: api.preferences.save.bind(api.preferences),
+      enabledChannels: () => Promise.resolve(['EMAIL', 'WEB_PUSH'] as NotificationChannel[]),
+    };
+    const blind = mount({
+      generators: [ORDER_PAID, MESA_READY] as never,
+      preferences: legacy,
+    } as never);
+    const email = fakeTransport('EMAIL');
+    withTransports(blind, email, fakeTransport('WEB_PUSH'));
+
+    const result = await blind.notify(
+      { type: 'comanda.ready', recipient: { userId: 'u1' }, payload: { item: 'Bolinho' } },
+      { sync: true },
+    );
+
+    expect(result.channels).toEqual(['WEB_PUSH']);
+    expect(email.sent).toEqual([]);
+  });
+
+  it('lets a per-type DEFAULT be overridden by the user, unlike availability', async () => {
+    const SMS_BY_DEFAULT = {
+      type: 'order.shipped',
+      category: 'orders',
+      channelDefaults: { SMS: true, EMAIL: false },
+      generate: () => ({ title: 'A caminho', body: 'Saiu para entrega.', link: null, data: {} }),
+    };
+    const api = mount({ generators: [SMS_BY_DEFAULT] as never });
+    const sms = fakeTransport('SMS');
+    withTransports(api, fakeTransport('EMAIL'), sms, fakeTransport('WEB_PUSH'));
+
+    const fresh = await api.notify(
+      { type: 'order.shipped', recipient: { userId: 'u1' }, payload: {} },
+      { sync: true },
+    );
+    expect(fresh.channels).toEqual(['SMS', 'WEB_PUSH']);
+
+    await api.preferences.save('u1', { orders: { SMS: false, EMAIL: true } });
+    const chosen = await api.notify(
+      { type: 'order.shipped', recipient: { userId: 'u1' }, payload: {} },
+      { sync: true },
+    );
+    expect(chosen.channels).toEqual(['EMAIL', 'WEB_PUSH']);
+  });
+});
