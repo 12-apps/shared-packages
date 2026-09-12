@@ -602,7 +602,32 @@ describe('preferences and push subscriptions over real rows', () => {
     );
     // ONE row, for the one category that was touched.
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.channels).toEqual({
+    // EDITED ASSERTION (FUT-1949), and the rest of this comment is the argument.
+    //
+    // It used to demand all four channels. That contradicted this test's own
+    // NAME and the storage model in `preferences-core.ts` — "only EXPLICIT
+    // choices are stored; a missing key falls back to the default". `save`
+    // merged onto the user's EFFECTIVE row, so touching one switch wrote a
+    // boolean for every channel and the row could never again say "no opinion".
+    //
+    // That is not cosmetic: it silently disabled every per-type and per-host
+    // default for anyone who had opened the settings screen, and it defeats the
+    // missing-key fallback that lets a NEW channel ship without a data
+    // migration — a channel added later reads as an explicit `false` for every
+    // one of these rows instead of taking its default.
+    //
+    // Two explicit saves, so two keys. The effective matrix below shows nothing
+    // a user can see has changed.
+    expect(rows[0]?.channels).toEqual({ EMAIL: false, SMS: true });
+
+    // The gaps still resolve to the defaults, so the reader sees a full row.
+    const effective = await backend.app.request('/api/account/notification-preferences', {
+      headers: headers('owner-1'),
+    });
+    const { preferences } = (
+      await json<{ data: { preferences: Record<string, Record<string, boolean>> } }>(effective)
+    ).data;
+    expect(preferences.orders).toEqual({
       EMAIL: false,
       SMS: true,
       WHATSAPP: false,

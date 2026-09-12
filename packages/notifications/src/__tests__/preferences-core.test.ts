@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  availableChannelsOf,
+  capToAvailable,
   DEFAULT_CHANNEL_ROW,
   defaultChannelMatrix,
   enabledChannelsOf,
   mergeChoices,
   mergeStoredRow,
+  resolveTypeChannels,
 } from '../preferences-core';
 
 /**
@@ -99,5 +102,125 @@ describe('the router gate and the save merge', () => {
       WHATSAPP: false,
       WEB_PUSH: true,
     });
+  });
+});
+
+/**
+ * Per-TYPE channel rules (FUT-1949): availability, which is a hard cap, and
+ * per-type defaults, which are not. The distinction is the whole feature, so
+ * the cases that separate them are the ones worth writing down.
+ */
+describe('availableChannelsOf', () => {
+  it('offers every channel to a type that declared nothing', () => {
+    expect(availableChannelsOf(undefined)).toEqual(['EMAIL', 'SMS', 'WHATSAPP', 'WEB_PUSH']);
+  });
+
+  it('offers nothing for an EMPTY declaration, which is legal', () => {
+    expect(availableChannelsOf([])).toEqual([]);
+  });
+
+  it('drops a value that is not a channel rather than carrying it', () => {
+    // A typo, or a channel removed from the set since the generator was
+    // written. Carrying it into an intersection would match nothing anyway;
+    // dropping it here is what makes the result comparable.
+    expect(availableChannelsOf(['WEB_PUSH', 'CARRIER_PIGEON' as never])).toEqual(['WEB_PUSH']);
+  });
+
+  it('fixes the order, so two spellings of one set compare equal', () => {
+    expect(availableChannelsOf(['WEB_PUSH', 'EMAIL'])).toEqual(
+      availableChannelsOf(['EMAIL', 'WEB_PUSH']),
+    );
+  });
+});
+
+describe('capToAvailable', () => {
+  it('leaves the list alone when the type declared nothing', () => {
+    expect(capToAvailable(['EMAIL', 'SMS'], undefined)).toEqual(['EMAIL', 'SMS']);
+  });
+
+  it('drops the channels the type does not offer', () => {
+    expect(capToAvailable(['EMAIL', 'WEB_PUSH'], ['WEB_PUSH'])).toEqual(['WEB_PUSH']);
+  });
+
+  it('returns nothing for an empty declaration, whatever came in', () => {
+    expect(capToAvailable(['EMAIL', 'SMS', 'WEB_PUSH'], [])).toEqual([]);
+  });
+});
+
+describe('resolveTypeChannels', () => {
+  const categoryDefaults = { ...DEFAULT_CHANNEL_ROW };
+
+  it('falls back to the category defaults for a type that declared nothing', () => {
+    expect(resolveTypeChannels({ categoryDefaults })).toEqual(['EMAIL', 'WEB_PUSH']);
+  });
+
+  it('drops an unavailable channel even from the defaults', () => {
+    // The mesa case: `orders` defaults to e-mail, the message does not offer it.
+    expect(
+      resolveTypeChannels({ categoryDefaults, rules: { channels: ['WEB_PUSH'] } }),
+    ).toEqual(['WEB_PUSH']);
+  });
+
+  it('DISCARDS a stored choice for a channel the type does not offer', () => {
+    // The point of availability, and the one place a saved choice loses: the
+    // diner ticked "e-mail" for `orders` while answering a question about
+    // delivery receipts, not about the kitchen three metres away.
+    expect(
+      resolveTypeChannels({
+        stored: { EMAIL: true, WEB_PUSH: true },
+        categoryDefaults,
+        rules: { channels: ['WEB_PUSH'] },
+      }),
+    ).toEqual(['WEB_PUSH']);
+  });
+
+  it('lets a stored choice BEAT a per-type default, which is what makes it a default', () => {
+    expect(
+      resolveTypeChannels({
+        stored: { SMS: true },
+        categoryDefaults,
+        rules: { channelDefaults: { SMS: false } },
+      }),
+    ).toContain('SMS');
+  });
+
+  it('moves the starting point where the user has made no choice', () => {
+    expect(
+      resolveTypeChannels({ categoryDefaults, rules: { channelDefaults: { EMAIL: false } } }),
+    ).toEqual(['WEB_PUSH']);
+  });
+
+  it('still honours a stored OFF for a channel the type does offer', () => {
+    expect(
+      resolveTypeChannels({
+        stored: { WEB_PUSH: false },
+        categoryDefaults,
+        rules: { channels: ['EMAIL', 'WEB_PUSH'] },
+      }),
+    ).toEqual(['EMAIL']);
+  });
+
+  it('resolves to nothing for a type that offers no channel at all', () => {
+    // Legal, and not an error: the router writes the inbox record regardless.
+    expect(
+      resolveTypeChannels({
+        stored: { EMAIL: true, SMS: true, WHATSAPP: true, WEB_PUSH: true },
+        categoryDefaults,
+        rules: { channels: [] },
+      }),
+    ).toEqual([]);
+  });
+
+  it('treats a null stored row as no row rather than as every channel off', () => {
+    expect(resolveTypeChannels({ stored: null, categoryDefaults })).toEqual(['EMAIL', 'WEB_PUSH']);
+  });
+
+  it('survives a stored row that is not an object', () => {
+    // The column is JSON and nothing stops a bad write; a garbage row must
+    // read as "no explicit choice", never throw on the emit path.
+    expect(resolveTypeChannels({ stored: 'corrupted', categoryDefaults })).toEqual([
+      'EMAIL',
+      'WEB_PUSH',
+    ]);
   });
 });
