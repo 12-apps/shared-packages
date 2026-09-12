@@ -30,12 +30,43 @@ import { tenantRoleKey } from './permissions-format';
  * blocked escalation is exactly the event an owner most wants surfaced).
  */
 
-/** Map `validateGrant.reason` ("<CODE>: <detail>") onto the user-safe copy. */
-function governanceMessage(messages: RbacMessages, reason: string): string {
-  const code = reason.split(':')[0];
+/**
+ * Map a refusal onto the user-safe copy.
+ *
+ * Takes the VERDICT rather than its `reason` string, because the escalation
+ * case has something to add to the sentence and reading it back out of the
+ * machine line would mean parsing a message this function's whole job is to
+ * replace.
+ *
+ * ## Why escalation names the ids and the other codes do not
+ *
+ * The copy is deliberately vague — a refusal that explains itself teaches a
+ * caller how to probe the grant surface. Escalation is the one code where that
+ * trade is wrong: the ids it names are the granter's OWN permission set
+ * subtracted from a role they can already see in the picker, so it discloses
+ * nothing they could not compute, and withholding it makes the refusal
+ * unactionable. An admin told only "you lack permissions you do not hold" has
+ * no way to learn WHICH, and the store cannot fix its own roles.
+ *
+ * Every other code stays a flat sentence: a scope ceiling, an SoD clash or an
+ * owner marker would each disclose something about the CATALOG rather than
+ * about the caller.
+ */
+function governanceMessage(
+  messages: RbacMessages,
+  verdict: { reason: string; missingPermissions?: readonly string[] },
+): string {
+  const code = verdict.reason.split(':')[0];
   switch (code) {
-    case 'ESCALATION':
-      return messages.governance.escalation;
+    case 'ESCALATION': {
+      const missing = verdict.missingPermissions ?? [];
+      // Falls back to the bare sentence when the set is somehow empty, so a
+      // future refusal path that forgets to carry it degrades to today's
+      // wording rather than to an empty parenthesis.
+      return missing.length === 0
+        ? messages.governance.escalation
+        : `${messages.governance.escalation} (${missing.join(', ')})`;
+    }
     case 'SCOPE_CEILING':
       return messages.governance.scopeCeiling;
     case 'SEPARATION_OF_DUTIES':
@@ -97,18 +128,24 @@ interface GovernanceCtx<P extends string> {
 async function recordRejection<P extends string>(
   ctx: GovernanceCtx<P>,
   tenantId: string,
-  reason: string,
+  verdict: { reason: string; missingPermissions?: readonly string[] },
   roleName: string,
   targetUserId?: string,
 ): Promise<void> {
+  const missing = verdict.missingPermissions ?? [];
   await ctx.audit?.({
     clientId: tenantId,
     action: 'governance.reject',
     resourceType: 'governance',
     resourceId: roleName,
     after: {
-      code: reason.split(':')[0] ?? reason,
+      code: verdict.reason.split(':')[0] ?? verdict.reason,
       roleName,
+      // The ids an ESCALATION turned on. The entry used to carry the code
+      // alone, which told an owner reviewing the trail that a grant was
+      // refused and nothing about what would have allowed it — and a blocked
+      // escalation is the entry they are most likely to be reading.
+      ...(missing.length > 0 ? { missingPermissions: [...missing] } : {}),
       ...(targetUserId ? { targetUserId } : {}),
     },
   });
@@ -156,8 +193,8 @@ async function judge<P extends string>(
     ...(curatedTemplate ? { curatedTemplate: true } : {}),
   });
   if (!verdict.ok) {
-    await recordRejection(ctx, actor.tenantId, verdict.reason, roleName, targetUserId);
-    throw new RbacApiError(400, governanceMessage(ctx.messages, verdict.reason));
+    await recordRejection(ctx, actor.tenantId, verdict, roleName, targetUserId);
+    throw new RbacApiError(400, governanceMessage(ctx.messages, verdict));
   }
 }
 

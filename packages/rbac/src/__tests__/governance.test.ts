@@ -69,6 +69,69 @@ describe('validateGrant — escalation guard', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/^ESCALATION/);
   });
+
+  /**
+   * The refusal names EVERY id the granter is missing.
+   *
+   * It used to name the first one `find` reached, which made fixing a grant a
+   * sequence of refusals: hold that id, be refused on the next, repeat. A host
+   * surfacing this to a person — the only thing the refusal is for — needs the
+   * whole set to say what the grant would actually cost.
+   */
+  it('names every missing permission, not the first one found', () => {
+    const r = validateGrant({
+      granterPermissions: ['a:write'],
+      roleBeingGranted: 'A_BOTH',
+      targetScope: leaf,
+      catalog,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.missingPermissions).toEqual(['a:approve']);
+    expect(r.reason).toBe(
+      'ESCALATION: granter does not hold "a:approve" and cannot grant it',
+    );
+  });
+
+  it('lists several missing ids in the role\'s own order, and pluralises', () => {
+    const r = validateGrant({
+      granterPermissions: [],
+      roleBeingGranted: { name: 'INLINE', permissions: ['a:write', 'y:write'] },
+      targetScope: leaf,
+      catalog,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.missingPermissions).toEqual(['a:write', 'y:write']);
+    expect(r.reason).toBe(
+      'ESCALATION: granter does not hold "a:write", "y:write" and cannot grant them',
+    );
+  });
+
+  it('reports a duplicated id once', () => {
+    const r = validateGrant({
+      granterPermissions: [],
+      roleBeingGranted: { name: 'INLINE', permissions: ['y:write', 'y:write'] },
+      targetScope: leaf,
+      catalog,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.missingPermissions).toEqual(['y:write']);
+  });
+
+  it('carries no missingPermissions on a refusal that is not an escalation', () => {
+    const r = validateGrant({
+      granterPermissions: ['*'],
+      roleBeingGranted: 'DIRECTOR',
+      targetScope: leaf,
+      catalog,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toMatch(/^OWNER_PROTECTED/);
+    expect(r.missingPermissions).toBeUndefined();
+  });
 });
 
 describe('validateGrant — owner-protection', () => {

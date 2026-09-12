@@ -68,10 +68,27 @@ export interface ValidateGrantInput {
 /** The verdict. `reason` is a stable machine code plus a human message. */
 export type ValidateGrantResult =
   | { ok: true }
-  | { ok: false; reason: string };
+  | {
+      ok: false;
+      reason: string;
+      /**
+       * Every permission the granter would have had to hold, on an ESCALATION
+       * refusal — structured, so a caller naming them to a human does not have
+       * to parse them back out of `reason`.
+       *
+       * Absent on every other refusal code. See {@link checkEscalation} for why
+       * it is the WHOLE set rather than the first one found.
+       */
+      missingPermissions?: readonly string[];
+    };
 
-function fail(reason: string): ValidateGrantResult {
-  return { ok: false, reason };
+function fail(
+  reason: string,
+  missingPermissions?: readonly string[],
+): ValidateGrantResult {
+  return missingPermissions === undefined
+    ? { ok: false, reason }
+    : { ok: false, reason, missingPermissions };
 }
 
 /**
@@ -193,17 +210,36 @@ function checkOwnerProtected(
   return { ok: true };
 }
 
-/** 2. Escalation guard — the granter may only grant permissions they hold. */
+/**
+ * 2. Escalation guard — the granter may only grant permissions they hold.
+ *
+ * Reports EVERY id the granter is missing, not the first one found.
+ *
+ * `find` was cheaper and made the refusal a guessing game: the caller is told
+ * one id, holds none of the other nine, fixes that one and is refused again on
+ * the next. A host that surfaces this to a person — which is the only thing
+ * the refusal is for — needs the whole set to say what the grant would cost.
+ * The extra work is one pass over a permission list that is tens of entries
+ * long, on a path that has already made a database round trip.
+ *
+ * The ids travel BOTH ways: interpolated into `reason` for the machine-readable
+ * line and an audit trail, and structured on `missingPermissions` so a caller
+ * rendering them never parses the sentence.
+ */
 function checkEscalation(
   granterPermissions: Iterable<string>,
   perms: readonly string[],
 ): ValidateGrantResult {
   const held = new Set(granterPermissions);
   if (held.has('*')) return { ok: true };
-  const missing = perms.find((p) => !held.has(p));
-  if (missing !== undefined) {
+  const missing = [...new Set(perms.filter((p) => !held.has(p)))];
+  if (missing.length > 0) {
+    const quoted = missing.map((p) => `"${p}"`).join(', ');
     return fail(
-      `ESCALATION: granter does not hold "${missing}" and cannot grant it`,
+      missing.length === 1
+        ? `ESCALATION: granter does not hold ${quoted} and cannot grant it`
+        : `ESCALATION: granter does not hold ${quoted} and cannot grant them`,
+      missing,
     );
   }
   return { ok: true };
