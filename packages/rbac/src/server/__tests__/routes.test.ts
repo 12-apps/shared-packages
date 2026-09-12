@@ -272,6 +272,52 @@ describe('roles routes', () => {
     expect([...perms].sort()).toEqual(['config:read', 'roles:manage', 'team:read']);
   });
 
+  it('names the missing permissions in the refusal, capped with a count', async () => {
+    // The whole point of the message: an admin refused a grant must be able to
+    // learn WHICH ids would have allowed it. The cap is asserted alongside,
+    // because the set is unbounded and sixty ids in a parenthesis is the same
+    // unactionable refusal in a longer coat.
+    const h = await host();
+    enrolMember(h.state, TENANT, 'owner-1', 'DIRECTOR');
+    enrolMember(h.state, TENANT, 'admin-1', 'HEAD_LIBRARIAN');
+    await withheldPayouts(h);
+
+    const reset = await call(h, 'DELETE', '/roles/templates/:name', {
+      actor: memberActor(TENANT, 'admin-1'),
+      params: { name: 'HEAD_LIBRARIAN' },
+    });
+    expect(reset.status).toBe(400);
+    const message = String((reset.body as { error?: string } | undefined)?.error ?? '');
+
+    // It names ids at all — the whole complaint was that it did not.
+    expect(message).toMatch(/\(.+\)$/);
+    const named = message.slice(message.lastIndexOf('(') + 1, -1).split(', ');
+
+    // This actor is missing EIGHTEEN ids, which is what makes the case worth
+    // having: ten are named and the rest are counted, so the sentence stays
+    // readable and nothing is silently dropped.
+    const overflow = named.filter((part) => /^\+\d+$/.test(part));
+    const ids = named.filter((part) => !/^\+\d+$/.test(part));
+    expect(ids).toHaveLength(10);
+    expect(overflow).toEqual(['+8']);
+    // Every named part is a real permission id, not a truncated fragment.
+    // The segment class excludes ':' deliberately — with ':' inside it AND the
+    // group quantified, 'a::::::' splits exponentially many ways and the match
+    // backtracks forever (CodeQL flags it, correctly). Making ':' a fixed
+    // delimiter leaves exactly one way to parse any input.
+    for (const id of ids) expect(id).toMatch(/^[a-z][a-z-]*(?::[a-z-]+)+$/);
+    // And the full set is still on the verdict for a caller that wants it —
+    // the cap is on the SENTENCE, never on the data.
+    const rejected = h.audits.find(
+      (entry) =>
+        entry.action === 'governance.reject' &&
+        (entry.after as { code?: string } | undefined)?.code === 'ESCALATION',
+    );
+    expect(
+      (rejected?.after as { missingPermissions?: string[] } | undefined)?.missingPermissions,
+    ).toHaveLength(18);
+  });
+
   it('still lets a DIRECTOR reset a narrowed template back to the seed', async () => {
     // The legitimate path: DIRECTOR/NETWORK_OPS hold '*', so escalation is
     // satisfied and the governed reset behaves exactly as it always did.
