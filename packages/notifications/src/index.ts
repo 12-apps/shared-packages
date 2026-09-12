@@ -48,13 +48,17 @@ export {
 } from './generators';
 
 export {
+  availableChannelsOf,
+  capToAvailable,
   DEFAULT_CHANNEL_ROW,
   defaultChannelMatrix,
   enabledChannelsOf,
   mergeChoices,
   mergeStoredRow,
+  resolveTypeChannels,
   type ChannelMatrix,
   type ChannelRow,
+  type TypeChannelRules,
 } from './preferences-core';
 
 export { normalizePhoneE164, type PhoneNormalizeOptions } from './phone';

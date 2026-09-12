@@ -1,10 +1,11 @@
 import {
   DEFAULT_CHANNEL_ROW,
-  enabledChannelsOf,
-  mergeChoices,
+  explicitChoicesOf,
   mergeStoredRow,
+  resolveTypeChannels,
   type ChannelMatrix,
   type ChannelRow,
+  type TypeChannelRules,
 } from '../preferences-core';
 import type {
   NotificationCategory,
@@ -32,10 +33,20 @@ export interface NotificationPreferenceStore {
     userId: string,
     input: Partial<Record<NotificationCategory, Partial<ChannelRow>>>,
   ): Promise<void>;
-  /** The channels enabled for one (user, category) — the router's gate. */
+  /**
+   * The channels enabled for one (user, category) — the router's gate.
+   *
+   * `rules` carries the emitting TYPE's own declarations (availability and
+   * per-type defaults). It is OPTIONAL, and that is what keeps a host store
+   * written before it working: a two-parameter implementation is assignable to
+   * this signature unchanged, and omitting the argument asks the same question
+   * the store has always answered. The router does not rely on a store
+   * honouring it — it caps the result by availability itself.
+   */
   enabledChannels(
     userId: string,
     category: NotificationCategory,
+    rules?: TypeChannelRules,
   ): Promise<NotificationChannel[]>;
 }
 
@@ -72,6 +83,14 @@ export function createPreferenceStore(
      * A category outside the taxonomy is IGNORED rather than stored: the DB
      * CHECK would reject it anyway, and a 500 from a stale client's extra key
      * would fail the whole save including the toggle the user did flip.
+     *
+     * What is written is the user's EXPLICIT choices only, never their
+     * effective row. Merging onto the effective row wrote a boolean for all
+     * four channels the moment anyone touched any switch, so the row could
+     * never again say "no opinion" about a channel — which silently disabled
+     * every per-type and per-host default for that user, and defeated the
+     * missing-key fallback that lets a new channel ship without a data
+     * migration.
      */
     async save(userId, input) {
       const client = await db();
@@ -80,8 +99,7 @@ export function createPreferenceStore(
         const existing = await client.notificationPreference.findUnique({
           where: { userId_category: { userId, category } },
         });
-        const current = existing ? mergeStoredRow(existing.channels, defaultRow) : defaultRow;
-        const channels = mergeChoices(current, choices);
+        const channels = { ...explicitChoicesOf(existing?.channels), ...choices };
         await client.notificationPreference.upsert({
           where: { userId_category: { userId, category } },
           create: { userId, category, channels },
@@ -90,14 +108,16 @@ export function createPreferenceStore(
       }
     },
 
-    async enabledChannels(userId, category) {
+    async enabledChannels(userId, category, rules) {
       const client = await db();
       const row = await client.notificationPreference.findUnique({
         where: { userId_category: { userId, category } },
       });
-      return enabledChannelsOf(
-        row ? mergeStoredRow(row.channels, defaultRow) : defaultRow,
-      );
+      return resolveTypeChannels({
+        stored: row?.channels,
+        categoryDefaults: defaultRow,
+        rules,
+      });
     },
   };
 }
