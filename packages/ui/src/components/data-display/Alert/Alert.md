@@ -33,6 +33,7 @@ A beautiful and versatile Alert component with multiple variants, animations, an
 | `glow` | `boolean` | `false` | Add a glowing shadow effect |
 | `pulse` | `boolean` | `false` | Add a pulsing animation effect |
 | `animate` | `boolean` | `true` | Whether to animate the alert on mount |
+| `announce` | `'polite' \| 'assertive'` | - | Sets `role` and `aria-live` together — see [Accessibility](#accessibility) |
 | `className` | `string` | - | Additional CSS classes |
 
 ## Usage Examples
@@ -136,11 +137,38 @@ import Star from '@mui/icons-material/Star';
 The Alert component implements comprehensive accessibility features:
 
 - Uses `role="alert"` for immediate screen reader announcement
-- Implements `aria-live` regions (polite for info/success, assertive for warning/danger)
+- Derives `aria-live` from the variant: **assertive for `danger`, polite for
+  every other variant** (`defaultAriaLive`)
 - Proper focus management for closable alerts
 - Keyboard navigation support (Enter/Space to close)
 - High contrast colors meeting WCAG guidelines
 - Screen reader compatible content structure
+
+### `announce` — whether the alert interrupts
+
+`role` and `aria-live` are two attributes with one meaning between them, and by
+default they disagree. Every alert gets `role="alert"`, whatever its variant,
+and `role="alert"` is **implicitly an assertive live region** — so an `info`
+alert ships `aria-live="polite"` and an implicitly-assertive role together, and
+a reader that honours the role interrupts anyway. The escape is that
+`role="status"` is implicitly polite, which is knowledge a call site should not
+have to carry.
+
+`announce` carries it:
+
+| `announce` | `role` | `aria-live` |
+|---|---|---|
+| `'assertive'` | `alert` | `assertive` |
+| `'polite'` | `status` | `polite` |
+| unset | `alert` | from the variant, as above |
+
+```tsx
+// A sentence worth hearing, that is not worth interrupting for.
+<Alert variant="info" announce="polite" description="Mais 1 pessoa está nesta mesa agora." showIcon={false} />
+```
+
+An explicit `role` or `aria-live` still wins over `announce`, so a call site
+that already spells either by hand keeps exactly what it spelled.
 
 ## Best Practices
 

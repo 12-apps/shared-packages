@@ -76,12 +76,39 @@ export interface AlertBaseFields {
   animate?: boolean;
 
   /**
-   * ARIA role for the alert
+   * Whether this alert INTERRUPTS a screen reader, or waits its turn.
+   *
+   * Sets `role` and `aria-live` together, which is the whole point of it:
+   * those two disagree by default and the disagreement is invisible. An alert
+   * gets `role="alert"` from {@link ALERT_DEFAULTS} whatever its variant, and
+   * `role="alert"` is IMPLICITLY an assertive live region — so a `polite`
+   * `aria-live` beside it is contradicted rather than honoured, and several
+   * screen readers interrupt anyway. A caller who wants a quiet announcement
+   * has to know that the trick is `role="status"`, which is implicitly polite.
+   *
+   * `announce` is that knowledge, spelled once:
+   *
+   * | value | `role` | `aria-live` |
+   * |---|---|---|
+   * | `'assertive'` | `alert` | `assertive` |
+   * | `'polite'` | `status` | `polite` |
+   *
+   * Unset, nothing changes: the role stays `alert` and the live setting is
+   * still derived from the variant ({@link defaultAriaLive}). An explicit
+   * `role` or `aria-live` still wins over both, so an existing call site that
+   * spells either by hand keeps exactly what it spelled.
+   */
+  announce?: 'polite' | 'assertive';
+
+  /**
+   * ARIA role for the alert. Prefer {@link AlertBaseFields.announce}, which
+   * keeps this and `aria-live` consistent; this overrides it.
    */
   role?: string;
 
   /**
-   * ARIA live region setting
+   * ARIA live region setting. Prefer {@link AlertBaseFields.announce}, which
+   * keeps this and `role` consistent; this overrides it.
    */
   'aria-live'?: 'polite' | 'assertive' | 'off';
 
