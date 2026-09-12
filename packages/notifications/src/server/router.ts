@@ -1,7 +1,12 @@
 import { UnknownNotificationRecipientError } from '../errors';
 import type { NotificationGeneratorRegistry } from '../generators';
-import { DEFAULT_CHANNEL_ROW, enabledChannelsOf } from '../preferences-core';
-import type { NotificationChannel, NotificationEvent, TransportRecipient } from '../types';
+import { capToAvailable, DEFAULT_CHANNEL_ROW, enabledChannelsOf } from '../preferences-core';
+import type {
+  NotificationChannel,
+  NotificationEvent,
+  NotificationGenerator,
+  TransportRecipient,
+} from '../types';
 
 import {
   dispatchOne,
@@ -174,14 +179,34 @@ function announce(deps: NotificationRouterDeps, notification: CommittedNotificat
   }
 }
 
-/** The channels one emit will actually enqueue: preference ∩ transport ∩ plan. */
+/**
+ * The channels one emit will actually enqueue:
+ * preference ∩ transport ∩ plan ∩ the TYPE's own availability.
+ *
+ * Availability is applied LAST, and applied here rather than trusted to the
+ * preference store, because neither of the two stages after the store can be
+ * relied on to preserve it. A host may inject its own
+ * {@link NotificationPreferenceStore}, and one written before `rules` existed
+ * ignores the argument entirely; and {@link applyPolicy}'s error path degrades
+ * to the FREE channels, which would hand back the very e-mail a type had just
+ * declared it does not offer. One filter at the end closes both.
+ *
+ * The inbox record is NOT gated by any of this — `commit` writes it whatever
+ * this returns, including the empty array — because the inbox is the record of
+ * what happened rather than a channel a user opts out of.
+ */
 async function resolveChannels(
   deps: NotificationRouterDeps,
   event: NotificationEvent<unknown>,
-  category: string,
+  generator: Pick<NotificationGenerator<never>, 'category' | 'channels' | 'channelDefaults'>,
   recipient: TransportRecipient,
 ): Promise<NotificationChannel[]> {
-  const enabled = await deps.preferences.enabledChannels(event.recipient.userId, category);
+  const rules = { channels: generator.channels, channelDefaults: generator.channelDefaults };
+  const enabled = await deps.preferences.enabledChannels(
+    event.recipient.userId,
+    generator.category,
+    rules,
+  );
   const supported = enabled.filter((channel) => {
     const transport = deps.transports.get(channel);
     return transport !== null && transport.supports(recipient);
@@ -189,7 +214,8 @@ async function resolveChannels(
   // The host's plan gate: a tenant-scoped emit keeps only the channels the
   // tenant's plan covers, so a revoked transport DEGRADES to the remaining ones
   // rather than dropping the notification silently.
-  return applyPolicy(deps, event.recipient.clientId, supported);
+  const permitted = await applyPolicy(deps, event.recipient.clientId, supported);
+  return capToAvailable(permitted, generator.channels);
 }
 
 /** Commit the inbox record and its delivery rows together, in one transaction. */
@@ -256,7 +282,7 @@ export function createNotificationRouter(deps: NotificationRouterDeps): Notifica
       // generator owns the fallback, in one place a reader can find.
       const content = generator.generate(event.payload as never, { locale: recipient.locale });
 
-      const channels = await resolveChannels(deps, event, generator.category, recipient);
+      const channels = await resolveChannels(deps, event, generator, recipient);
       const notification = await commit(deps, event, generator.category, content, channels);
 
       // AFTER the transaction, never inside it: a subscriber woken by an event

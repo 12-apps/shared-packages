@@ -131,6 +131,39 @@ export interface NotificationGenerator<TPayload = unknown> {
   /** The preference category the router gates this type's fan-out on. */
   category: NotificationCategory;
   /**
+   * The channels this type may EVER use — AVAILABILITY, not preference.
+   *
+   * Absent (the default) means every channel, which is what every generator
+   * written before this field keeps doing. A declared list is a hard cap the
+   * router applies AFTER preferences: a user whose stored row explicitly
+   * enables a channel this type does not offer still does not get it, because
+   * the channel was never on offer for this message. That is the difference
+   * from {@link channelDefaults} — a default is a starting point a user can
+   * move, availability is the set of starting points that exist.
+   *
+   * It is per TYPE because the category is too coarse to say it: the three
+   * comanda kitchen messages sit in `orders` next to `order.paid`, and a diner
+   * three metres from the food wants a push, not correspondence, while the
+   * buyer of a delivery order still wants the e-mail. Declaring `["WEB_PUSH"]`
+   * on the mesa messages says that without splitting the category or taking
+   * `order.paid`'s e-mail away with it.
+   *
+   * Unknown entries are ignored and order is irrelevant — the list is coerced
+   * onto {@link NOTIFICATION_CHANNELS}. An EMPTY list is legal and means no
+   * transport channel at all; the inbox record is written regardless, because
+   * the inbox is not a channel a user opts out of.
+   */
+  channels?: readonly NotificationChannel[];
+  /**
+   * This type's starting toggles, overriding the category's defaults for the
+   * channels it names and only where the user has made NO explicit choice.
+   *
+   * Stored preferences still win over it — that is what makes it a default.
+   * To take a channel away from a user who asked for it, declare
+   * {@link channels} instead.
+   */
+  channelDefaults?: Partial<Record<NotificationChannel, boolean>>;
+  /**
    * Render this event's content for ONE recipient.
    *
    * `context` is OPTIONAL, and that is what keeps every generator written

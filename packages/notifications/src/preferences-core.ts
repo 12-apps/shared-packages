@@ -70,6 +70,91 @@ export function mergeStoredRow(stored: unknown, base: ChannelRow): ChannelRow {
   return row;
 }
 
+/**
+ * What ONE notification type says about its own channels, independent of the
+ * user's category preferences: {@link NotificationGenerator.channels} (the hard
+ * availability cap) and {@link NotificationGenerator.channelDefaults} (a
+ * starting point the user can still move).
+ *
+ * Structurally what a generator already is, rather than the generator itself,
+ * so the policy here stays free of the registry and the router.
+ */
+export interface TypeChannelRules {
+  channels?: readonly NotificationChannel[];
+  channelDefaults?: Partial<ChannelRow>;
+}
+
+/**
+ * The channels a type may EVER use, coerced onto the closed channel set.
+ *
+ * `undefined` — a generator that never declared a list — means every channel,
+ * which is what keeps every generator written before the field working. An
+ * EMPTY list means no transport channel at all and is legal: the inbox record
+ * is written by the router regardless, and the inbox is not a channel a user
+ * opts out of.
+ *
+ * Filtering through {@link NOTIFICATION_CHANNELS} rather than returning the
+ * declaration is deliberate: it drops a value that is not a channel (a typo, a
+ * channel removed from the set since) instead of carrying it into an
+ * intersection where it would silently match nothing anyway, and it fixes the
+ * order so two declarations of the same set compare equal.
+ */
+export function availableChannelsOf(
+  declared: readonly NotificationChannel[] | undefined,
+): NotificationChannel[] {
+  if (!declared) return [...NOTIFICATION_CHANNELS];
+  const offered = new Set<string>(declared);
+  return NOTIFICATION_CHANNELS.filter((channel) => offered.has(channel));
+}
+
+/**
+ * Drop the channels a type does not offer. Applied by the router AFTER every
+ * other gate, so no later stage can hand back a channel the type never offered
+ * — including the plan gate's own error fallback, which degrades to the free
+ * channels and would otherwise restore an e-mail this type had just refused.
+ */
+export function capToAvailable(
+  channels: readonly NotificationChannel[],
+  declared: readonly NotificationChannel[] | undefined,
+): NotificationChannel[] {
+  if (!declared) return [...channels];
+  const offered = new Set(availableChannelsOf(declared));
+  return channels.filter((channel) => offered.has(channel));
+}
+
+/**
+ * The channels one (user, category, TYPE) actually enables — the whole policy
+ * in one pure function, so the router's gate can be argued about without a
+ * database.
+ *
+ * The order is the meaning:
+ *   1. the category's defaults, with the TYPE's defaults over them — a type
+ *      moves the starting point;
+ *   2. the user's stored row over that — an explicit choice beats any default,
+ *      which is what makes step 1 a default rather than a rule;
+ *   3. the type's AVAILABILITY over everything — a channel this type does not
+ *      offer is gone even when the user's stored row explicitly asked for it,
+ *      because it was never on offer for this message.
+ *
+ * Step 3 overriding a stored `true` is the one place a user's saved choice is
+ * discarded, and it is the point of the field: a diner sitting at the mesa who
+ * once ticked "e-mail" for `orders` was answering a question about delivery
+ * receipts, not about the kitchen three metres away.
+ */
+export function resolveTypeChannels(input: {
+  /** The stored `channels` JSON for this (user, category), if any. */
+  stored?: unknown;
+  /** The category's effective default row (host defaults already merged). */
+  categoryDefaults: ChannelRow;
+  /** The type's own declarations. */
+  rules?: TypeChannelRules;
+}): NotificationChannel[] {
+  const { stored, categoryDefaults, rules } = input;
+  const base: ChannelRow = { ...categoryDefaults, ...rules?.channelDefaults };
+  const row = stored === undefined || stored === null ? base : mergeStoredRow(stored, base);
+  return capToAvailable(enabledChannelsOf(row), rules?.channels);
+}
+
 /** The channels enabled by one effective row — the router's gate. */
 export function enabledChannelsOf(row: ChannelRow): NotificationChannel[] {
   return NOTIFICATION_CHANNELS.filter((channel) => row[channel]);

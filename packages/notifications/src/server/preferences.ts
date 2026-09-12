@@ -1,10 +1,11 @@
 import {
   DEFAULT_CHANNEL_ROW,
-  enabledChannelsOf,
   mergeChoices,
   mergeStoredRow,
+  resolveTypeChannels,
   type ChannelMatrix,
   type ChannelRow,
+  type TypeChannelRules,
 } from '../preferences-core';
 import type {
   NotificationCategory,
@@ -32,10 +33,20 @@ export interface NotificationPreferenceStore {
     userId: string,
     input: Partial<Record<NotificationCategory, Partial<ChannelRow>>>,
   ): Promise<void>;
-  /** The channels enabled for one (user, category) — the router's gate. */
+  /**
+   * The channels enabled for one (user, category) — the router's gate.
+   *
+   * `rules` carries the emitting TYPE's own declarations (availability and
+   * per-type defaults). It is OPTIONAL, and that is what keeps a host store
+   * written before it working: a two-parameter implementation is assignable to
+   * this signature unchanged, and omitting the argument asks the same question
+   * the store has always answered. The router does not rely on a store
+   * honouring it — it caps the result by availability itself.
+   */
   enabledChannels(
     userId: string,
     category: NotificationCategory,
+    rules?: TypeChannelRules,
   ): Promise<NotificationChannel[]>;
 }
 
@@ -90,14 +101,16 @@ export function createPreferenceStore(
       }
     },
 
-    async enabledChannels(userId, category) {
+    async enabledChannels(userId, category, rules) {
       const client = await db();
       const row = await client.notificationPreference.findUnique({
         where: { userId_category: { userId, category } },
       });
-      return enabledChannelsOf(
-        row ? mergeStoredRow(row.channels, defaultRow) : defaultRow,
-      );
+      return resolveTypeChannels({
+        stored: row?.channels,
+        categoryDefaults: defaultRow,
+        rules,
+      });
     },
   };
 }
