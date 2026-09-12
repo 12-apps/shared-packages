@@ -56,6 +56,11 @@ export const ANNOUNCE_ROLE: Record<NonNullable<AlertBaseFields['announce']>, str
 /**
  * The two attributes that decide whether an alert interrupts, resolved TOGETHER.
  *
+ * Both renderers therefore let `role` and `announce` leave their destructure
+ * unused (`_role`, `_announce`) and call this instead — the first because the
+ * defaults have already answered it, the second because it must never reach
+ * the DOM.
+ *
  * Reads the caller's own props rather than the defaulted ones, because the
  * whole question is which of them the caller actually spelled:
  * {@link ALERT_DEFAULTS} supplies `role: 'alert'` for everything, so after the

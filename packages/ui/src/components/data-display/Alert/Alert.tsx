@@ -301,11 +301,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
     description,
     children,
     animate,
-    // Both are resolved from `alertProps` below instead: `role` because
-    // `ALERT_DEFAULTS` has already erased whether the caller named it, and
-    // `announce` because it must never reach the DOM.
-    role: _role,
-    announce: _announce,
+    role: _role, announce: _announce, // resolved from `alertProps` — see `resolveAnnouncement`
     'aria-atomic': ariaAtomic,
     ...others
   } = resolveAlertProps(alertProps);
@@ -319,9 +315,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
   // on EVERY alert, not only the closable ones.
   const props = withoutAlertOnlyProps(withoutTestIdProps(others));
 
-  // Depends on `variant` AND on which of the two attributes the caller spelled,
-  // so it cannot live in the static defaults above — and it reads `alertProps`
-  // rather than the resolved ones for exactly that reason.
+  // Depends on `variant`, so it cannot live in the static defaults above.
   const announcement = resolveAnnouncement(alertProps, variant);
   const [open, setOpen] = React.useState(true);
   const [isClosing, setIsClosing] = React.useState(false);
