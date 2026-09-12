@@ -12,7 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { defaultAriaLive, resolveAlertProps, testIdFor, VARIANT_ICON } from './Alert.helpers';
+import { resolveAlertProps, resolveAnnouncement, testIdFor, VARIANT_ICON } from './Alert.helpers';
 import {
   actionSlotStyle,
   alertLook,
@@ -198,7 +198,10 @@ function useDismiss(onClose: (() => void) | undefined): { open: boolean; gone: b
 
 export const Alert = React.forwardRef<View, AlertProps>((alertProps, ref) => {
   const {
-    variant, color, glow, pulse, icon, showIcon, onClose, title, description, children, animate, role,
+    variant, color, glow, pulse, icon, showIcon, onClose, title, description, children, animate,
+    // `role`, `announce` and `aria-live` all leave here and are resolved
+    // TOGETHER below, off `alertProps` — see `resolveAnnouncement`.
+    role: _role, announce: _announce,
     'aria-atomic': ariaAtomic, 'aria-live': _ariaLive, closable, closeLabel, style, ...others
   } = resolveAlertProps(alertProps);
   const theme = useUiTheme();
@@ -207,14 +210,15 @@ export const Alert = React.forwardRef<View, AlertProps>((alertProps, ref) => {
   const look = alertLook(theme, { variant, color, glow, pulse });
   const fadeIn = useFadeIn(animate);
   const dismiss = useDismiss(onClose);
+  const announcement = resolveAnnouncement(alertProps, variant);
 
   if (dismiss.gone) return null;
   return (
     <Collapse open={dismiss.open} onCollapsed={dismiss.onCollapsed}>
       <Animated.View
         ref={ref}
-        role={role as Role}
-        aria-live={alertProps['aria-live'] ?? defaultAriaLive(variant)}
+        role={announcement.role as Role}
+        aria-live={announcement['aria-live']}
         {...webAria({ 'aria-atomic': ariaAtomic })}
         tabIndex={0}
         testID={testId}

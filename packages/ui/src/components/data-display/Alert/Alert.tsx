@@ -8,7 +8,7 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { defaultAriaLive, resolveAlertProps, testIdFor } from './Alert.helpers';
+import { resolveAlertProps, resolveAnnouncement, testIdFor } from './Alert.helpers';
 import type { AlertPalette } from './Alert.metrics';
 import {
   ACTIVE,
@@ -301,7 +301,11 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
     description,
     children,
     animate,
-    role,
+    // Both are resolved from `alertProps` below instead: `role` because
+    // `ALERT_DEFAULTS` has already erased whether the caller named it, and
+    // `announce` because it must never reach the DOM.
+    role: _role,
+    announce: _announce,
     'aria-atomic': ariaAtomic,
     ...others
   } = resolveAlertProps(alertProps);
@@ -315,8 +319,10 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
   // on EVERY alert, not only the closable ones.
   const props = withoutAlertOnlyProps(withoutTestIdProps(others));
 
-  // Depends on `variant`, so it cannot live in the static defaults above.
-  const ariaLive = alertProps['aria-live'] ?? defaultAriaLive(variant);
+  // Depends on `variant` AND on which of the two attributes the caller spelled,
+  // so it cannot live in the static defaults above — and it reads `alertProps`
+  // rather than the resolved ones for exactly that reason.
+  const announcement = resolveAnnouncement(alertProps, variant);
   const [open, setOpen] = React.useState(true);
   const [isClosing, setIsClosing] = React.useState(false);
 
@@ -356,8 +362,8 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
         pulse={pulse}
         animate={animate}
         icon={displayIcon}
-        role={role}
-        aria-live={ariaLive}
+        role={announcement.role}
+        aria-live={announcement['aria-live']}
         aria-atomic={ariaAtomic}
         tabIndex={0}
         action={dismissButton(alertProps, dataTestId, handleClose)}

@@ -38,6 +38,51 @@ export const resolveAlertProps = <P extends AlertBaseFields>(props: P): Resolved
 export const defaultAriaLive = (variant: AlertVariant): 'polite' | 'assertive' =>
   variant === 'danger' ? 'assertive' : 'polite';
 
+/**
+ * The ARIA role each `announce` level is spelled with.
+ *
+ * Both roles carry an IMPLICIT live setting, and that implicit one is what
+ * assistive tech acts on — `alert` is assertive, `status` is polite. Pairing
+ * them here is what stops `role` and `aria-live` from contradicting each
+ * other, which they do by default: every alert is `role="alert"` regardless of
+ * variant, so an `info` alert asks to be polite in one attribute and to
+ * interrupt in the other.
+ */
+export const ANNOUNCE_ROLE: Record<NonNullable<AlertBaseFields['announce']>, string> = {
+  assertive: 'alert',
+  polite: 'status',
+};
+
+/**
+ * The two attributes that decide whether an alert interrupts, resolved TOGETHER.
+ *
+ * Reads the caller's own props rather than the defaulted ones, because the
+ * whole question is which of them the caller actually spelled:
+ * {@link ALERT_DEFAULTS} supplies `role: 'alert'` for everything, so after the
+ * merge there is no longer any difference between an alert that asked to
+ * interrupt and one that never mentioned it.
+ *
+ * Precedence, most specific first — an explicit `role` or `aria-live` beats
+ * `announce`, so a call site that already spells either by hand is untouched:
+ *
+ *  1. `role` / `aria-live` as given;
+ *  2. {@link AlertBaseFields.announce}, which supplies both;
+ *  3. today's behaviour — `ALERT_DEFAULTS.role` and {@link defaultAriaLive}.
+ *
+ * With none of the three named, the result is byte-for-byte what it was before
+ * `announce` existed.
+ */
+export const resolveAnnouncement = (
+  props: Pick<AlertBaseFields, 'announce' | 'role' | 'aria-live'>,
+  variant: AlertVariant,
+): { role: string; 'aria-live': 'polite' | 'assertive' | 'off' } => {
+  const announce = props.announce;
+  return {
+    role: props.role ?? (announce === undefined ? ALERT_DEFAULTS.role : ANNOUNCE_ROLE[announce]),
+    'aria-live': props['aria-live'] ?? announce ?? defaultAriaLive(variant),
+  };
+};
+
 export const testIdFor = (base: string | undefined, suffix: string): string =>
   base ? `${base}-${suffix}` : `alert-${suffix}`;
 
