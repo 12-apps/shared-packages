@@ -301,7 +301,11 @@ describe('roles routes', () => {
     expect(ids).toHaveLength(10);
     expect(overflow).toEqual(['+8']);
     // Every named part is a real permission id, not a truncated fragment.
-    for (const id of ids) expect(id).toMatch(/^[a-z][a-z-]*(:[a-z:]+)+$/);
+    // The segment class excludes ':' deliberately — with ':' inside it AND the
+    // group quantified, 'a::::::' splits exponentially many ways and the match
+    // backtracks forever (CodeQL flags it, correctly). Making ':' a fixed
+    // delimiter leaves exactly one way to parse any input.
+    for (const id of ids) expect(id).toMatch(/^[a-z][a-z-]*(?::[a-z-]+)+$/);
     // And the full set is still on the verdict for a caller that wants it —
     // the cap is on the SENTENCE, never on the data.
     const rejected = h.audits.find(
