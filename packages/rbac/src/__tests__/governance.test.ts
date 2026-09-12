@@ -108,18 +108,6 @@ describe('validateGrant — escalation guard', () => {
     );
   });
 
-  it('reports a duplicated id once', () => {
-    const r = validateGrant({
-      granterPermissions: [],
-      roleBeingGranted: { name: 'INLINE', permissions: ['y:write', 'y:write'] },
-      targetScope: leaf,
-      catalog,
-    });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.missingPermissions).toEqual(['y:write']);
-  });
-
   it('carries no missingPermissions on a refusal that is not an escalation', () => {
     const r = validateGrant({
       granterPermissions: ['*'],

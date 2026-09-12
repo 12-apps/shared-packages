@@ -232,6 +232,9 @@ function checkEscalation(
 ): ValidateGrantResult {
   const held = new Set(granterPermissions);
   if (held.has('*')) return { ok: true };
+  // `rolePermissions` folds a role's entries through a Set before this runs, so
+  // the de-dupe here is only for the WILDCARD branch, which spreads
+  // `catalog.permissions.list` verbatim and `createPermissions` does not dedupe.
   const missing = [...new Set(perms.filter((p) => !held.has(p)))];
   if (missing.length > 0) {
     const quoted = missing.map((p) => `"${p}"`).join(', ');

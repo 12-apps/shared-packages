@@ -31,6 +31,16 @@ import { tenantRoleKey } from './permissions-format';
  */
 
 /**
+ * How many missing ids the escalation copy names before it counts the rest.
+ *
+ * Ten is above every realistic case a human is meant to act on — the incident
+ * this came from had four — and far below the ~60 a MANAGER refused ADMIN
+ * would produce. `missingPermissions` carries the complete set for any caller
+ * that wants it; this bound is on the SENTENCE, not on the data.
+ */
+const MAX_NAMED_PERMISSIONS = 10;
+
+/**
  * Map a refusal onto the user-safe copy.
  *
  * Takes the VERDICT rather than its `reason` string, because the escalation
@@ -63,9 +73,17 @@ function governanceMessage(
       // Falls back to the bare sentence when the set is somehow empty, so a
       // future refusal path that forgets to carry it degrades to today's
       // wording rather than to an empty parenthesis.
-      return missing.length === 0
-        ? messages.governance.escalation
-        : `${messages.governance.escalation} (${missing.join(', ')})`;
+      if (missing.length === 0) return messages.governance.escalation;
+      // CAPPED, because the set is unbounded: the reported case had four ids,
+      // but a low-tier actor refused an administrator role is missing most of
+      // the catalog, and sixty raw ids in a parenthesis is not a sentence a
+      // person reads — it is the same unactionable refusal in a longer coat.
+      // The overflow is a bare count rather than a word, so this stays correct
+      // in every locale without the host supplying another string.
+      const shown = missing.slice(0, MAX_NAMED_PERMISSIONS);
+      const rest = missing.length - shown.length;
+      const named = rest > 0 ? `${shown.join(', ')}, +${rest}` : shown.join(', ');
+      return `${messages.governance.escalation} (${named})`;
     }
     case 'SCOPE_CEILING':
       return messages.governance.scopeCeiling;
