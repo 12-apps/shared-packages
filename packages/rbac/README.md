@@ -192,14 +192,25 @@ const verdict = validateGrant({
   targetScope: { isLeaf: true },      // leaf (a single site) vs org/parent
   catalog: CATALOG.governance,        // from your composed catalog (see above)
 });
-// { ok: true } | { ok: false, reason: 'ESCALATION: ...' }
+// { ok: true }
+// | { ok: false, reason: 'ESCALATION: ...', missingPermissions: ['a:write', …] }
+// | { ok: false, reason: 'SCOPE_CEILING: ...' }
 ```
+
+`missingPermissions` is present on **`ESCALATION` only** — every id the granter
+would have had to hold, not just the first one found. It is there so a host
+naming them to a person does not have to parse them back out of `reason`; the
+server surface already appends them to the refusal copy (capped at ten, with a
+count for the remainder).
 
 Enforced rules (stable `reason` prefixes):
 
 - **`OWNER_PROTECTED`** — owner roles / owner-marker permissions / wildcard roles
   are never grantable via a custom role.
-- **`ESCALATION`** — the granter may only grant permissions they hold.
+- **`ESCALATION`** — the granter may only grant permissions they hold. The only
+  code that carries `missingPermissions`, and the only one whose user-facing
+  copy names ids: the set is the caller's own permissions subtracted from a role
+  they can already see, so it discloses nothing they could not compute.
 - **`SCOPE_CEILING`** — leaf-only roles and instance permissions may only be
   assigned at a leaf scope, never at an org/parent scope.
 - **`SEPARATION_OF_DUTIES`** — no single role may hold both halves of a
