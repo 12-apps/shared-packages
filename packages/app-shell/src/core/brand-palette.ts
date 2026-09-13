@@ -33,13 +33,51 @@ const HEX = /^#[0-9a-fA-F]{6}$/u;
 /** WCAG 2.1 AA for normal-size text. */
 export const MIN_TEXT_CONTRAST = 4.5;
 
-/** The surface a light-mode page body and its cards are painted on. */
-export const DEFAULT_SURFACE = '#FFFFFF';
+/**
+ * The page a tenant's text is read against, PER MODE.
+ *
+ * It used to be one white constant, `DEFAULT_SURFACE`, and it was the default
+ * of {@link readableInk}'s second argument. That is precisely how the
+ * storefront's dark-mode failure happened: `readableInk(seed)` with no surface
+ * corrects a tenant's colour against WHITE, and all six tenant seeds then land
+ * between 1.11:1 and 2.97:1 on a dark page. Legible-looking code, illegible
+ * screen, nothing red anywhere — because the omission was spelled exactly like
+ * the correct light-mode call.
+ *
+ * So there is no longer a surface to omit: the argument is required, and this
+ * is a record a caller has to index by the mode it is in. A forgotten mode is
+ * now a type error rather than a white page's answer painted on a dark one.
+ *
+ * These are DEFAULTS, not rules — a host whose page is a tinted card must pass
+ * its own, or the ≥4.5:1 guarantee is computed against a background nobody is
+ * looking at.
+ */
+export const DEFAULT_SURFACES = { light: '#FFFFFF', dark: '#121212' } as const;
 
-/** How finely the lightness axis is walked. 1% is below the JND for a hue. */
-const LIGHTNESS_STEP = 0.01;
+/** The two modes a surface is chosen for. */
+export type SurfaceMode = keyof typeof DEFAULT_SURFACES;
 
-function toRgb(hex: string): Rgb {
+/**
+ * The default surface for a mode, so a caller states the mode rather than
+ * remembering a colour.
+ *
+ * Pass a store's own ground where it has one — this is the floor, not a
+ * replacement for the real surface.
+ */
+export function surfaceFor(mode: SurfaceMode): string {
+  return DEFAULT_SURFACES[mode];
+}
+
+/**
+ * How finely the lightness axis is walked. 1% is below the JND for a hue.
+ *
+ * This and the three colour-space helpers below are exported for `band-tone.ts`,
+ * which walks the same axis for a different floor. They are deliberately NOT in
+ * the package's public surface — `src/index.ts` re-exports neither.
+ */
+export const LIGHTNESS_STEP = 0.01;
+
+export function toRgb(hex: string): Rgb {
   return [
     Number.parseInt(hex.slice(1, 3), 16),
     Number.parseInt(hex.slice(3, 5), 16),
@@ -72,7 +110,7 @@ export function contrastRatio(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-function rgbToHsl(rgb: Rgb): { h: number; s: number; l: number } {
+export function rgbToHsl(rgb: Rgb): { h: number; s: number; l: number } {
   const [r, g, b] = [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255];
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -93,7 +131,7 @@ function hueOf(r: number, g: number, b: number, max: number, delta: number): num
   return (h + 360) % 360;
 }
 
-function hslToHex(h: number, s: number, l: number): string {
+export function hslToHex(h: number, s: number, l: number): string {
   const a = s * Math.min(l, 1 - l);
   const channel = (n: number): number => {
     const k = (n + h / 30) % 12;
@@ -150,6 +188,8 @@ export const TINT_LIGHTNESS = 0.955;
 /** The same band's edge: one step down, so the border reads as the tint's own. */
 export const EDGE_LIGHTNESS = 0.86;
 
+
+
 /**
  * The seed, in the lightest tone of its own hue that is still legible AS TEXT
  * on `surface`.
@@ -169,7 +209,7 @@ export const EDGE_LIGHTNESS = 0.86;
  */
 export function readableInk(
   seed: string,
-  surface: string = DEFAULT_SURFACE,
+  surface: string,
   min: number = MIN_TEXT_CONTRAST,
 ): string {
   const hex = brandHex(seed);
@@ -235,6 +275,16 @@ export function hueOfHex(value: string): number | null {
  *
  * A greyscale brand collides with nothing and a greyscale semantic has no hue to
  * turn, so both are returned unchanged.
+ *
+ * **What this does NOT promise: one answer per store.** The rotation is computed
+ * against the brand hue it is handed, and a host with two independent brand
+ * pairs — one per mode, which is what a store gets the day it configures its own
+ * dark palette — calls this twice against two different hues. The same store's
+ * `error` can then be one red in light and another in dark, legitimately: each
+ * is the nearest red that survives the brand it sits beside. What is guaranteed
+ * is separation FROM THE GROUND IT WAS COMPUTED FOR, never that the two agree.
+ * A caller that needs them identical must rotate once and pass the result to
+ * both.
  */
 export function separateFromBrand(semantic: string, brandSeed: string | null | undefined): string {
   const brandHue = brandSeed ? hueOfHex(brandSeed) : null;
