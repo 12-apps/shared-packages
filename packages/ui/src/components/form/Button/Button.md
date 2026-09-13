@@ -151,6 +151,14 @@ Gradient background with smooth color transitions.
 <Button variant="gradient">Gradient Button</Button>
 ```
 
+Its label takes the ink the palette implies, judged across BOTH ends of the
+gradient rather than against `main` — `primary` runs `primary.main →
+secondary.main`, and an ink that reads on the first says nothing about the
+second. So a pale brand gets dark ink here exactly as it does on `solid`, and
+a palette whose two ends disagree gets whichever ink survives the worse of
+them. It used to be a stated `#fff`, which made this the one button in the
+library a pale-branded store could not read.
+
 ## Accessibility
 
 The Button component follows WCAG 2.1 AA guidelines:

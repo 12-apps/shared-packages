@@ -1,15 +1,11 @@
 import Box from '@mui/material/Box/index.js';
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 
 import { splitTestId } from '../../../platform/test-id';
 import { withDefaults } from '../../../utils/withDefaults';
 
-import {
-  LabelContainer,
-  SwitchControl,
-  SwitchHelper,
-  SwitchLabel,
-} from './Switch.parts';
+import { switchIds } from './Switch.ids';
+import { SwitchControl, SwitchHelper, SwitchRow } from './Switch.parts';
 import type { SwitchProps } from './Switch.types';
 
 const DEFAULTS = {
@@ -34,11 +30,23 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>((props, ref) =>
     variant, color, size, label, description, glow, glass, gradient, labelPosition,
     onIcon, offIcon, onText, offText, error, helperText, trackWidth, trackHeight,
     checked, onChange, animated, loading, ripple, pulse,
+    id, inputProps,
     ...others
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
 
   const { testId: dataTestId, rest } = splitTestId(others);
   const containerTestId = dataTestId ? `${dataTestId}-container` : 'switch-container';
+
+  // The input needs an id for the label to point at, and the caller usually has
+  // no reason to invent one — see {@link switchIds} for the precedence.
+  const { inputId, descriptionId, helperId, describedBy } = switchIds({
+    generated: useId(),
+    id,
+    inputProps,
+    description,
+    helperText,
+    callerDescribedBy: rest['aria-describedby'],
+  });
 
   const control = (
     <SwitchControl
@@ -63,36 +71,29 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>((props, ref) =>
       size={size}
       dataTestId={dataTestId}
       switchRef={ref}
+      inputId={inputId}
+      inputProps={inputProps}
+      describedBy={describedBy}
       rest={rest}
     />
   );
 
-  const helper = <SwitchHelper helperText={helperText} error={error} dataTestId={dataTestId} />;
-
-  if (!label) {
-    return (
-      <Box data-testid={containerTestId}>
-        {control}
-        {helper}
-      </Box>
-    );
-  }
+  const helper = (
+    <SwitchHelper helperText={helperText} error={error} dataTestId={dataTestId} id={helperId} />
+  );
 
   return (
     <Box data-testid={containerTestId}>
-      <LabelContainer labelPosition={labelPosition} error={error}>
-        {labelPosition === 'start' && control}
-
-        <SwitchLabel
-          label={label}
-          description={description}
-          error={error}
-          dataTestId={dataTestId}
-        />
-
-        {labelPosition !== 'start' && control}
-      </LabelContainer>
-
+      <SwitchRow
+        label={label}
+        description={description}
+        labelPosition={labelPosition}
+        error={error}
+        dataTestId={dataTestId}
+        htmlFor={inputId}
+        descriptionId={descriptionId}
+        control={control}
+      />
       {helper}
     </Box>
   );

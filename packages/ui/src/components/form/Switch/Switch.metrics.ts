@@ -169,6 +169,15 @@ export const SWITCH_HELPER = { fontSize: 12, lineHeight: 1.66, marginTopUnits: 1
 export const LABEL_GAP_UNITS = { beside: 2, stacked: 1 } as const;
 
 /**
+ * The minimum height of a touch target, in px (FUT-1905).
+ *
+ * No entry in {@link SWITCH_SIZES} reaches it — `xl`, the largest, is 34px tall
+ * and `md` is 26 — so a consumer cannot buy a legal target by passing a bigger
+ * `size`. The label is what clears it: see `SwitchLabel` in `Switch.parts.tsx`.
+ */
+export const TAP_TARGET_MIN = 40;
+
+/**
  * `neutral`'s three greys, and the literals the web falls back to for a theme
  * whose grey ramp omits a step. Same three steps `Button` draws its neutral
  * from.
@@ -176,6 +185,18 @@ export const LABEL_GAP_UNITS = { beside: 2, stacked: 1 } as const;
 export const NEUTRAL_GREY = { main: 700, dark: 800, light: 500 } as const;
 export const NEUTRAL_FALLBACK = { main: '#616161', dark: '#424242', light: '#9e9e9e' } as const;
 export const NEUTRAL_CONTRAST = '#fff';
+
+/**
+ * The RESTING thumb — the knob while the switch is off (FUT-1924).
+ *
+ * It stays white, and the reason is worth stating because the checked thumb no
+ * longer is: the resting track is `theme.palette.action.disabled` washed over
+ * the page, which no tenant picks, and a white knob on it is the conventional
+ * look in both modes. The CHECKED track is `palette.main`, a colour the tenant
+ * does pick, and that is where a stated white was a defect. See `checkedInk`
+ * in `Switch.styles.ts` and its native twin.
+ */
+export const RESTING_THUMB = '#fff';
 
 /** Hover: the thumb lifts a shade and takes a halo of the hue. */
 export const SWITCH_HOVER = { thumbScale: 1.05, elevation: 4, blur: 12, alpha: 0.2 } as const;

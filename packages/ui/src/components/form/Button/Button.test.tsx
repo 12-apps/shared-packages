@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -144,5 +145,71 @@ describe('Button (web)', () => {
       </Button>,
     );
     expect(screen.getByTestId('b')).toBeDisabled();
+  });
+});
+
+/**
+ * THE ONE BUTTON A PALE-BRANDED STORE COULD NOT READ (FUT-1924).
+ *
+ * `gradient` stated `color: '#fff'` outright while every other filled variant
+ * read `palette.contrastText`. A white-labelled host handing the library a pale
+ * brand therefore got dark ink on its solid buttons and white ink on its
+ * gradient one — in LIGHT mode, before dark mode existed anywhere.
+ *
+ * The gradient is also not one colour, which is why the fix is not simply
+ * `contrastText`: `primary` runs `primary.main → secondary.main`, and an ink
+ * chosen against the first says nothing about the second.
+ */
+describe('Button — the gradient variant takes its ink from the palette', () => {
+  const brand = (main: string, secondary: string) =>
+    createTheme({ palette: { primary: { main }, secondary: { main: secondary } } });
+
+  it('stops writing white over a pale brand', () => {
+    // A real seeded tenant's hex: white on it is 1.76:1.
+    render(
+      <ThemeProvider theme={brand('#7ED957', '#B2FF59')}>
+        <Button variant="gradient" dataTestId="pale">
+          Pagar
+        </Button>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('pale')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+  });
+
+  it('leaves a dark brand white, which is what it always was', () => {
+    render(
+      <ThemeProvider theme={brand('#1A237E', '#311B92')}>
+        <Button variant="gradient" dataTestId="dark">
+          Pagar
+        </Button>
+      </ThemeProvider>,
+    );
+
+    // The half that proves this is a correction rather than a repaint.
+    expect(screen.getByTestId('dark')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
+  });
+
+  it('is decided by the stop the gradient REACHES, not only where it starts', () => {
+    /*
+      A store's deep green running into its own lighter one. `primary.main`
+      alone takes white and is right to — 5.12:1, against 4.10:1 for dark ink.
+      The bar ends on `#4caf50`, where that white is 2.78:1, and dark ink's
+      worst across the pair is still 4.10:1. The `solid` button in this palette
+      keeps its white label; the gradient one cannot.
+    */
+    render(
+      <ThemeProvider theme={brand('#2E7D32', '#4caf50')}>
+        <Button variant="gradient" dataTestId="mixed">
+          Pagar
+        </Button>
+        <Button variant="solid" dataTestId="solid">
+          Pagar
+        </Button>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('mixed')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+    expect(screen.getByTestId('solid')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
   });
 });

@@ -165,6 +165,20 @@ export const ControlTypeTest: Story = {
     await step('Verify role attributes', async () => {
       await expect(canvas.getByRole('checkbox')).toHaveAttribute('type', 'checkbox');
     });
+
+    await step('Verify the label points at that input (FUT-1905)', async () => {
+      // The words used to be a `<p>` beside the control: no `for`, no `id`, and
+      // clicking them did nothing. In a real browser this step also proves the
+      // toggle, which jsdom cannot claim on its own.
+      const control = canvas.getByRole('checkbox');
+      const label = canvas.getByText('Typed switch');
+
+      await expect(label.tagName).toBe('LABEL');
+      await expect(label).toHaveAttribute('for', control.getAttribute('id'));
+
+      await userEvent.click(label);
+      await waitFor(() => expect(control).toBeChecked());
+    });
   },
 };
 
@@ -207,12 +221,12 @@ export const AccessibilityTest: Story = {
     });
 
     await step('Verify label association', async () => {
-      // Since the label is rendered as text, not a proper label element,
-      // we verify the label text is present alongside the switch
+      // Renderer-agnostic on purpose: the web draws a real `<label for>`
+      // (asserted in `ControlTypeTest`, which is DOM-only), while the native
+      // half has no such element to point with.
       const labelText = canvas.getByText('Accessible switch');
       await expect(labelText).toBeInTheDocument();
 
-      // Verify the switch is in the same container
       const switchElement = canvas.getByRole('checkbox');
       await expect(switchElement).toBeInTheDocument();
     });

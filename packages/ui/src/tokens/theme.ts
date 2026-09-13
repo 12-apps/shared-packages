@@ -219,6 +219,56 @@ export function contrastText(background: string): string {
 }
 
 /**
+ * The ink that reads on EVERY one of these fills (FUT-1924).
+ *
+ * {@link contrastText} answers for one fill, which is all MUI's `augmentColor`
+ * ever needs: a solid button is a single flat colour. Two components paint the
+ * label over something that is not one colour — `Button`'s `gradient` variant
+ * runs between two stops, and `Switch`'s thumb travels the whole length of a
+ * checked track — and both of them stated `#fff` outright instead, which is
+ * white-on-pale the moment a white-labelled host hands the library a pale
+ * brand. Audited across the library, those two were the only places a hardcoded
+ * white sat over a surface the TENANT chooses.
+ *
+ * **This deliberately does not follow `contrastText`'s rule.** MUI's is a
+ * threshold that PREFERS white — white wherever white clears 3:1 — which is a
+ * brand-feel decision, and it is kept for every existing caller so nothing
+ * already legible moves. Here the fills can disagree: over MUI's own success
+ * pair white is 2.78:1 on `#4caf50` and dark ink 2.66:1 on `#1b5e20`, so
+ * neither meets any threshold and asking whether one does is the wrong
+ * question. The answer is whichever ink has the better WORST case across the
+ * fills — which is also not what either fill says on its own, since
+ * `contrastText('#4caf50')` is dark ink.
+ *
+ * A gradient wide enough that neither ink clears 4.5:1 anywhere is a palette
+ * problem this cannot fix — it returns the less bad ink and does not pretend
+ * otherwise.
+ *
+ * `Math.min` is the claim, and it is worth knowing that no test can prove it
+ * against `Math.max` today: the two candidate inks sit at opposite ends of the
+ * luminance range, so ranking them by their best fill and by their worst gives
+ * the same winner for every possible pair (checked exhaustively). Worst case is
+ * still what this MEANS, and the moment a third ink or one that is not an
+ * extreme is offered, the two stop agreeing.
+ *
+ * `fallback` is returned when a fill cannot be decomposed: {@link getContrastRatio}
+ * throws on a format it does not know, and a throw inside an emotion style
+ * function takes the render down with it.
+ */
+export function inkOver(fills: readonly string[], fallback: string): string {
+  try {
+    const worstCase = (ink: string): number =>
+      Math.min(...fills.map((fill) => getContrastRatio(ink, fill)));
+
+    return worstCase(LIGHT_TEXT_PRIMARY) >= worstCase(DARK_TEXT_PRIMARY)
+      ? LIGHT_TEXT_PRIMARY
+      : DARK_TEXT_PRIMARY;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * MUI's `augmentColor` for a custom colour: derive whatever shade the seed
  * left out. `light` is one tonal offset up, `dark` one and a half down.
  */

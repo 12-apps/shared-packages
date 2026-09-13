@@ -17,6 +17,7 @@ import {
   descriptionTextStyle,
   helperTextStyle,
   labelTextStyle,
+  checkedInk,
   switchPalette,
   thumbStyle,
   trackStyle,
@@ -44,9 +45,6 @@ import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import type { UiTheme } from '../../../tokens/theme';
 
 const nativeDriver = Platform.OS !== 'web';
-
-/** The web writes the `on` wording in white, whatever the hue behind it. */
-const TRACK_LABEL_ON_INK = '#fff';
 
 /** A 0→1 value that follows `on`, over MUI's 300ms curve unless animation is off. */
 function useProgress(on: boolean, animated: boolean): Animated.Value {
@@ -196,7 +194,12 @@ function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID
     >
       <View style={trackStyle(theme, paint, palette, geometry, look, state)} />
       {showsTrackLabels(variant, onText, offText) ? (
-        <TrackLabels theme={theme} onText={onText} offText={offText} contrastText={TRACK_LABEL_ON_INK} />
+        <TrackLabels
+          theme={theme}
+          onText={onText}
+          offText={offText}
+          contrastText={checkedInk(paint, palette)}
+        />
       ) : null}
       {onIcon == null ? null : (
         <SwitchIcon icon={onIcon} shown={checked} animated={animated} size={iconSize} side="on" width={geometry.width} />
@@ -206,7 +209,7 @@ function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID
       )}
       <Animated.View
         style={[
-          thumbStyle(theme, paint, geometry, look, state),
+          thumbStyle(theme, paint, palette, geometry, look, state),
           { top: geometry.padding, left: restX, opacity: pulse.opacity },
           {
             transform: [
