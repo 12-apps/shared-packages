@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type JSX, type SyntheticEvent } from 'react';
+import { useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
 import { Avatar } from '@12-apps/ui/data-display/Avatar';
 import { Chip } from '@12-apps/ui/data-display/Chip';
@@ -61,9 +61,12 @@ function initials(name: string | null, email: string): string {
 function DetailsTab({
   member,
   copy,
+  extra,
 }: {
   member: MemberProfileView;
   copy: MemberProfileCopy;
+  /** The host's own section, under the packaged metadata. */
+  extra?: ReactNode;
 }): JSX.Element {
   return (
     <Card sx={{ p: 3 }} data-testid="member-details-tab">
@@ -120,6 +123,10 @@ function DetailsTab({
             data-testid="member-last-login"
           />
         </Box>
+        {/* The host's own section, LAST: a reader arrives looking for the
+            identity and the access metadata, and whatever a particular host
+            adds is additional to that rather than instead of it. */}
+        {extra !== undefined && <Box data-testid="member-extra">{extra}</Box>}
       </Stack>
     </Card>
   );
@@ -149,9 +156,12 @@ export function MemberProfile({
   copy,
   initialTab,
   breadcrumb,
+  extra,
 }: {
   member: MemberProfileView;
   copy: RbacWebCopy;
+  /** The host's own section on the details tab. */
+  extra?: ReactNode;
   /** The tab to open on first render, resolved from `?tab=` by the container. */
   initialTab: ProfileTab;
   breadcrumb?: readonly { label: string; href?: string }[];
@@ -170,7 +180,11 @@ export function MemberProfile({
   }
 
   const items = [
-    { id: 'details', label: words.tabs.details, content: <DetailsTab member={member} copy={words} /> },
+    {
+      id: 'details',
+      label: words.tabs.details,
+      content: <DetailsTab member={member} copy={words} extra={extra} />,
+    },
     {
       id: 'actions',
       label: words.tabs.actions,

@@ -55,6 +55,15 @@ export interface RolesListCopy {
     create: string;
     edit: (name: string) => string;
     override: (name: string) => string;
+    /**
+     * The READ-ONLY inspector's title.
+     *
+     * Optional, and its absence turns the affordance off rather than falling
+     * back to a sentence this package invented — the same contract
+     * `gatePermissions.readRoles` follows. A host that never opens the catalog
+     * to a non-manager has no reader to name it for.
+     */
+    view?: (name: string) => string;
   };
   deleteConfirm: { title: string; body: string; confirmLabel: string };
   resetConfirm: { title: string; body: string; confirmLabel: string };
@@ -63,6 +72,15 @@ export interface RolesListCopy {
 }
 
 export interface RolesTableCopy {
+  /**
+   * The row menu's read-only entry — what a reader who may not manage roles
+   * opens to see the permissions the row only COUNTS.
+   *
+   * Optional for the same reason {@link RolesListCopy.dialogTitles.view} is,
+   * and the two travel together: without both, a read-only caller gets no
+   * kebab, which is exactly what they got before this entry existed.
+   */
+  viewAction?: string;
   headers: { name: string; description: string; kind: string; permissions: string; actions: string };
   /**
    * The chip naming a row's kind. `systemEdited` is a seeded role whose
@@ -212,6 +230,14 @@ export interface TeamRoleDialogCopy {
   customGroupTitle: string;
   /** The warning while the selection has zero or two system roles. */
   exactlyOneSystemRole: string;
+  /**
+   * The warning while a SET-model selection is empty.
+   *
+   * Optional: a host on the base+custom model never shows it, and absent it
+   * falls back to {@link TeamRoleDialogCopy.exactlyOneSystemRole} rather than
+   * to a sentence this package invented.
+   */
+  atLeastOneRole?: string;
   cancelAction: string;
   saveAction: string;
 }

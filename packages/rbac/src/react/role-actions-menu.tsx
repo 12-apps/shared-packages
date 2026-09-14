@@ -151,6 +151,51 @@ function formDefaults(row: RoleRow): {
   };
 }
 
+/**
+ * The reader's menu: one entry, opening the role form locked.
+ *
+ * Its own component because what a role CARRIES is the question the catalog
+ * grid cannot answer — it shows a count — so a caller who may see the catalog
+ * but not edit it still needs somewhere to read the permissions. Both words
+ * are optional config, and without them this renders nothing at all, which is
+ * exactly what a reader got before this existed.
+ */
+function ReadOnlyRoleMenu({
+  row,
+  context,
+}: {
+  row: RoleRow;
+  context: RoleMenuContext;
+}): JSX.Element | null {
+  const { copy } = context;
+  const [open, setOpen] = useState(false);
+  const label = copy.rolesTable.viewAction;
+  const title = copy.rolesList.dialogTitles.view;
+  if (label === undefined || title === undefined) return null;
+  return (
+    <>
+      <CardKebab
+        menuLabel={copy.menuLabel}
+        items={[
+          { id: 'view', label, onClick: () => setOpen(true), dataTestId: 'role-action-view' },
+        ]}
+        dataTestId={`role-actions-${row.id}`}
+      />
+      <RoleFormDialog
+        open={open}
+        readOnly
+        title={title(row.displayName)}
+        context={context}
+        initial={formDefaults(row)}
+        template={row.system}
+        busy={false}
+        error={null}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  );
+}
+
 export function RoleActionsMenu({
   row,
   context,
@@ -179,7 +224,7 @@ export function RoleActionsMenu({
     onRefresh,
   );
 
-  if (!canManage) return null;
+  if (!canManage) return <ReadOnlyRoleMenu row={row} context={context} />;
 
   const items = roleMenuItems(row, copy, Boolean(context.renderVersionHistory), {
     edit: edit.start,

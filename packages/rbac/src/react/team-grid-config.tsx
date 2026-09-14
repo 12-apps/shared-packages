@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { Chip } from '@12-apps/ui/data-display/Chip';
 import type {
@@ -39,11 +39,21 @@ export type MemberRowStatus = 'ENABLED' | 'DISABLED' | 'PENDING';
  */
 export interface TeamRow extends Record<string, unknown> {
   userId: string;
+  /** The base role, or the empty string for a host whose model has none. */
   role: string;
   email: string;
   name: string | null;
   /** Tenant custom roles this member holds, additive to their base role. */
   customRoles: string[];
+  /**
+   * EVERY role this person holds — the m:n, base included.
+   *
+   * This is the field to READ. `role` and `customRoles` describe how a
+   * particular host's model is SHAPED, and a host whose people simply hold a
+   * set of roles has no honest value for either: reducing two equal roles to
+   * "one base plus a bag" picks a winner the model never named.
+   */
+  roles: string[];
   status: MemberRowStatus;
   /** The pending-invite id for a PENDING row; null for real members. */
   inviteId: string | null;
@@ -87,7 +97,7 @@ export function teamFields(
       label: copy.filters.roles,
       control: 'multiselect',
       searchEnabled: true,
-      accessor: (row) => [row.role, ...row.customRoles],
+      accessor: (row) => row.roles,
       options: [
         ...systemRoles.map((name) => ({ value: name, label: labels.roleLabel(name) })),
         ...customRoles.map((name) => ({ value: name, label: name })),
@@ -180,27 +190,42 @@ export function teamExportColumns(
     { header: copy.exportHeaders.name, value: (row) => row.name ?? row.email },
     { header: copy.exportHeaders.email, value: (row) => row.email },
     { header: copy.exportHeaders.role, value: (row) => labels.roleLabel(row.role) },
-    { header: copy.exportHeaders.customRoles, value: (row) => row.customRoles.join(', ') },
+    {
+      header: copy.exportHeaders.customRoles,
+      // Every role BUT the base, so a host with no base exports all of them
+      // here rather than silently dropping the ones the bag never held.
+      value: (row) => row.roles.filter((name) => name !== row.role).join(', '),
+    },
     { header: copy.exportHeaders.status, value: (row) => status[row.status] },
   ];
 }
 
 /**
- * The unified roles cell: the base role as a filled chip plus each additive
- * custom role outlined. A PENDING invite shows only the role it WILL grant on
- * signup, outlined — it is not active yet, and a filled chip would say it was.
+ * The unified roles cell.
+ *
+ * Where the host's model HAS a base role, it is the filled chip and the
+ * additive ones are outlined beside it — the hierarchy is real and the cell
+ * shows it. Where it has none, every role is drawn the same, because inventing
+ * a primary among equals would state a rank the model does not have.
+ *
+ * A PENDING invite shows only the role it WILL grant on signup, outlined — it
+ * is not active yet, and a filled chip would say it was.
  */
 function RolesCell({ row, labels }: { row: TeamRow; labels: RbacLabels }): JSX.Element {
   const pending = row.status === 'PENDING';
+  const base = row.role === '' ? null : row.role;
+  const rest = row.roles.filter((name) => name !== base);
   return (
     <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-      <Chip
-        label={labels.roleLabel(row.role)}
-        size="sm"
-        variant={pending ? 'outlined' : 'filled'}
-        color={pending ? 'neutral' : 'primary'}
-      />
-      {row.customRoles.map((role) => (
+      {base !== null && (
+        <Chip
+          label={labels.roleLabel(base)}
+          size="sm"
+          variant={pending ? 'outlined' : 'filled'}
+          color={pending ? 'neutral' : 'primary'}
+        />
+      )}
+      {rest.map((role) => (
         <Chip key={role} label={role} size="sm" variant="outlined" color="neutral" />
       ))}
     </Stack>
@@ -221,7 +246,35 @@ function StatusCell({ row, copy }: { row: TeamRow; copy: TeamTableCopy }): JSX.E
 }
 
 /** The read-only roster columns; every mutation lives in the ⋮ kebab. */
-export function teamColumns(labels: RbacLabels, copy: TeamTableCopy): DataViewColumn<TeamRow>[] {
+/**
+ * A column this package does not know how to build.
+ *
+ * The roster shows identity, roles and status because every adopter has those.
+ * A host may hold a fact about a person that is just as load-bearing and
+ * entirely its own — who granted each of their roles, say — and without a seam
+ * its only options are to lose it or to stop using this screen.
+ */
+export interface TeamExtraColumn {
+  id: string;
+  header: string;
+  /** The text the grid sorts, searches and exports on. */
+  accessor: (row: TeamRow) => string;
+  /** How the cell draws, when text is not enough. */
+  cell?: (row: TeamRow) => ReactNode;
+}
+
+export function teamColumns(
+  labels: RbacLabels,
+  copy: TeamTableCopy,
+  extra: readonly TeamExtraColumn[] = [],
+): DataViewColumn<TeamRow>[] {
+  const host: DataViewColumn<TeamRow>[] = extra.map((column) => ({
+    id: column.id,
+    header: column.header,
+    enableSort: false,
+    accessor: column.accessor,
+    ...(column.cell ? { cell: ({ row }: { row: TeamRow }) => column.cell?.(row) } : {}),
+  }));
   return [
     {
       id: 'name',
@@ -234,7 +287,11 @@ export function teamColumns(labels: RbacLabels, copy: TeamTableCopy): DataViewCo
       id: 'customRoles',
       header: copy.headers.roles,
       enableSort: false,
-      accessor: (row) => [labels.roleLabel(row.role), ...row.customRoles].join(', '),
+      accessor: (row) =>
+        [
+          ...(row.role === '' ? [] : [labels.roleLabel(row.role)]),
+          ...row.roles.filter((name) => name !== row.role),
+        ].join(', '),
       cell: ({ row }) => <RolesCell row={row} labels={labels} />,
     },
     {
@@ -244,6 +301,9 @@ export function teamColumns(labels: RbacLabels, copy: TeamTableCopy): DataViewCo
       accessor: (row) => statusLabels(copy)[row.status],
       cell: ({ row }) => <StatusCell row={row} copy={copy} />,
     },
+    // After the package's own, so a host column never displaces the identity
+    // and status a reader scans for first.
+    ...host,
   ];
 }
 
@@ -274,10 +334,25 @@ export function buildTeamRowActions(
   handlers: TeamRowActionHandlers,
   ownerRoles: ReadonlySet<string>,
   copy: TeamRowMenuCopy,
+  /**
+   * Which entries this host offers, by id. Absent, all of them — every adopter
+   * before this existed.
+   *
+   * A host whose model has no equivalent for an action must be able to withhold
+   * it: `toggle-active` writes `PATCH /team/:userId/status`, and a host with no
+   * status column has nothing to toggle. Rendering it anyway offers a control
+   * whose only outcome is an error on screen.
+   */
+  allowed?: readonly string[],
 ): RowAction<TeamRow>[] {
+  const offered = allowed === undefined ? null : new Set(allowed);
   const isMember = (row: TeamRow): boolean => row.status !== 'PENDING';
-  const editable = (row: TeamRow): boolean => isMember(row) && !ownerRoles.has(row.role);
-  return [
+  // Set-aware: ANY owner role the person holds protects the row. Reading the
+  // base field alone would hand an env superadmin its destructive entries back
+  // the moment that field stops being where the owner role lives.
+  const editable = (row: TeamRow): boolean =>
+    isMember(row) && !row.roles.some((name) => ownerRoles.has(name));
+  const entries: RowAction<TeamRow>[] = [
     {
       id: 'edit-roles',
       label: copy.editRoles,
@@ -310,4 +385,5 @@ export function buildTeamRowActions(
       onSelect: (rows) => rows.forEach((row) => row.inviteId && handlers.cancelInvite(row)),
     },
   ];
+  return entries.filter((action) => offered === null || offered.has(action.id));
 }

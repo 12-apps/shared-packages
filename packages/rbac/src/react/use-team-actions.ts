@@ -10,8 +10,10 @@ import type { InviteSelection } from './team-invite-form';
 import type { TeamRow } from './team-grid-config';
 import {
   applyRoleChanges,
+  applyRoleSet,
   splitRoleSelection,
   type MemberWithRoles,
+  type RoleModel,
 } from './team-role-dialog';
 
 /**
@@ -165,6 +167,7 @@ export function useRoleEditor(
   systemSet: ReadonlySet<string>,
   refresh: () => void,
   onError: (message: string | null) => void,
+  roleModel: RoleModel = 'base+custom',
 ): {
   editing: MemberWithRoles | null;
   busy: boolean;
@@ -187,16 +190,21 @@ export function useRoleEditor(
         active: row.status !== 'DISABLED',
         status: row.status === 'DISABLED' ? 'DISABLED' : 'ENABLED',
         customRoles: row.customRoles,
+        roles: row.roles,
       }),
     close: () => setEditing(null),
     async save(roleNames) {
       if (!editing) return;
       const { base, customRoles } = splitRoleSelection(roleNames, systemSet);
-      // The dialog blocks a save without exactly one system role.
-      if (!base) return;
+      // The base model's dialog blocks a save without exactly one system role;
+      // the set model has no base to be missing.
+      if (roleModel !== 'set' && !base) return;
       setBusy(true);
       onError(null);
-      const failure = await applyRoleChanges(api, editing, base, customRoles);
+      const failure =
+        roleModel === 'set'
+          ? await applyRoleSet(api, editing, roleNames)
+          : await applyRoleChanges(api, editing, base as string, customRoles);
       setBusy(false);
       onError(failure);
       if (!failure) {
