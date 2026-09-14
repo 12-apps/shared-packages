@@ -18,7 +18,8 @@ import {
   readableInk,
   SEMANTIC_HUE_GUARD,
   separateFromBrand,
-  DEFAULT_SURFACE,
+  surfaceFor,
+  DEFAULT_SURFACES,
   SURFACE_SATURATION,
   TINT_LIGHTNESS,
 } from '../brand-palette';
@@ -60,41 +61,50 @@ describe('contrastRatio', () => {
   it('measures the real-world failure this module exists for', () => {
     // A live tenant's primary. As price text on a white card it is 1.76:1 — the
     // number that made this necessary, kept here so the regression has a name.
-    expect(contrastRatio('#7ED957', DEFAULT_SURFACE)).toBeLessThan(2);
+    expect(contrastRatio('#7ED957', PAPER)).toBeLessThan(2);
   });
 });
+
+/**
+ * The light page these cases were always measured against.
+ *
+ * Spelled at each call now that `readableInk` requires it: the argument used to
+ * default to this exact value, and the default was the defect — a caller in
+ * dark mode wrote the same line and got a correction for a page it was not on.
+ */
+const PAPER = surfaceFor('light');
 
 describe('readableInk', () => {
   it('leaves a colour that is already legible completely alone', () => {
     // A near-black navy clears 17:1. Touching it would move a brand for nothing.
-    expect(readableInk('#071A2C')).toBe('#071A2C');
+    expect(readableInk('#071A2C', PAPER)).toBe('#071A2C');
   });
 
   it('darkens a too-light colour until it clears the floor', () => {
-    const ink = readableInk('#7ED957');
+    const ink = readableInk('#7ED957', PAPER);
     expect(ink).not.toBe('#7ED957');
-    expect(contrastRatio(ink, DEFAULT_SURFACE)).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+    expect(contrastRatio(ink, PAPER)).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
   });
 
   it('keeps the hue — the tenant stays the colour it chose', () => {
     // The whole promise: a darker GREEN, never a different colour.
-    expect(hueOf(readableInk('#7ED957'))).toBeCloseTo(hueOf('#7ED957'), 0);
-    expect(hueOf(readableInk('#FFD400'))).toBeCloseTo(hueOf('#FFD400'), 0);
+    expect(hueOf(readableInk('#7ED957', PAPER))).toBeCloseTo(hueOf('#7ED957'), 0);
+    expect(hueOf(readableInk('#FFD400', PAPER))).toBeCloseTo(hueOf('#FFD400'), 0);
   });
 
   it('moves the colour as little as it can', () => {
     // 'First tone that clears' — so one step lighter must still FAIL. Without
     // this the test would pass on an implementation that always returned black,
     // which is legible and useless.
-    const ink = readableInk('#7ED957');
-    expect(contrastRatio(ink, DEFAULT_SURFACE)).toBeLessThan(MIN_TEXT_CONTRAST + 1);
+    const ink = readableInk('#7ED957', PAPER);
+    expect(contrastRatio(ink, PAPER)).toBeLessThan(MIN_TEXT_CONTRAST + 1);
   });
 
   it('clears the floor for colours across the wheel, including the hard ones', () => {
     // Yellow and cyan are the traps: they are perceptually bright at full
     // saturation, so they fail on white by a wide margin.
     for (const seed of ['#FFFF00', '#00FFFF', '#FF00FF', '#7ED957', '#FFFFFF', '#FF8800']) {
-      expect(contrastRatio(readableInk(seed), DEFAULT_SURFACE)).toBeGreaterThanOrEqual(
+      expect(contrastRatio(readableInk(seed, PAPER), PAPER)).toBeGreaterThanOrEqual(
         MIN_TEXT_CONTRAST,
       );
     }
@@ -108,7 +118,43 @@ describe('readableInk', () => {
   });
 
   it('hands back a garbage seed untouched rather than inventing a colour', () => {
-    expect(readableInk('not-a-colour')).toBe('not-a-colour');
+    expect(readableInk('not-a-colour', PAPER)).toBe('not-a-colour');
+  });
+
+  it('has no surface to omit, which is the whole of the second fix', () => {
+    /*
+      Asserted at the TYPE level because that is where the defect lived: the
+      omission was never a runtime error, it was a correct-looking call that
+      returned the light answer. `@ts-expect-error` is the gate — put the
+      default back and this line stops erroring, which tsc reports as an unused
+      suppression and fails on.
+    */
+    // @ts-expect-error - `surface` is required; a caller in dark mode used to
+    // write exactly this and get a correction computed against white.
+    const omitted = (): string => readableInk('#7ED957');
+
+    expect(omitted).toBeTypeOf('function');
+  });
+});
+
+describe('the surface a correction is measured against', () => {
+  it('offers one per mode, and nothing to default to', () => {
+    expect(surfaceFor('light')).toBe(DEFAULT_SURFACES.light);
+    expect(surfaceFor('dark')).toBe(DEFAULT_SURFACES.dark);
+    expect(surfaceFor('dark')).not.toBe(surfaceFor('light'));
+  });
+
+  it('corrects the SAME seed differently on each of them', () => {
+    // The measurement the second fix exists for: one seed, two grounds, two
+    // answers — and the old default silently picked the first one for both.
+    const onPaper = readableInk('#7ED957', surfaceFor('light'));
+    const onNight = readableInk('#7ED957', surfaceFor('dark'));
+
+    expect(onPaper).not.toBe(onNight);
+    expect(contrastRatio(onNight, surfaceFor('dark'))).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+    // And the light answer really is illegible there — 1.11:1 to 2.97:1 was the
+    // range measured across the tenant seeds when this shipped.
+    expect(contrastRatio(onPaper, surfaceFor('dark'))).toBeLessThan(MIN_TEXT_CONTRAST);
   });
 });
 
@@ -211,8 +257,8 @@ describe('separateFromBrand (FUT-810 rule 10)', () => {
   });
 
   it('keeps the rotated colour as readable as the one it replaces', () => {
-    const before = contrastRatio('#d32f2f', DEFAULT_SURFACE);
-    const after = contrastRatio(separateFromBrand('#d32f2f', '#D92D20'), DEFAULT_SURFACE);
+    const before = contrastRatio('#d32f2f', PAPER);
+    const after = contrastRatio(separateFromBrand('#d32f2f', '#D92D20'), PAPER);
     // Lightness and saturation are carried through, so the ratio moves only by
     // what the hue itself contributes to luminance.
     expect(Math.abs(after - before)).toBeLessThan(1.2);

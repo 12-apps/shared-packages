@@ -28,6 +28,8 @@ export { restResult, type Result } from './core/rest-result';
 
 export { formatBRL, formatMinutesLabel, formatMoney, type MoneyFormat } from './core/format';
 
+export { bandTone, bandToneSeparates, MIN_SURFACE_SEPARATION } from './core/band-tone';
+
 export {
   brandHex,
   brandTone,
@@ -36,7 +38,9 @@ export {
   hueOfHex,
   readableInk,
   separateFromBrand,
-  DEFAULT_SURFACE,
+  surfaceFor,
+  type SurfaceMode,
+  DEFAULT_SURFACES,
   EDGE_LIGHTNESS,
   MIN_TEXT_CONTRAST,
   SEMANTIC_HUE_GUARD,

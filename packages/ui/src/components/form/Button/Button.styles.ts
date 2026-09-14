@@ -2,7 +2,7 @@ import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
-import { px } from '../../../tokens/theme';
+import { inkOver, px } from '../../../tokens/theme';
 
 // Define pulse animation globally
 const pulseAnimation = keyframes`
@@ -141,10 +141,31 @@ const GRADIENT_PAIRS: Record<string, (theme: Theme) => [string, string]> = {
   danger: (theme) => [theme.palette.error.light, theme.palette.error.dark],
 };
 
+const gradientStops = (theme: Theme, color: string, palette: ColorPalette): [string, string] =>
+  GRADIENT_PAIRS[color]?.(theme) ?? [palette.main, palette.dark];
+
 const gradientFor = (theme: Theme, color: string, palette: ColorPalette): string => {
-  const [from, to] = GRADIENT_PAIRS[color]?.(theme) ?? [palette.main, palette.dark];
+  const [from, to] = gradientStops(theme, color, palette);
   return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
 };
+
+/**
+ * The label colour for `gradient`, which used to be `#fff` outright (FUT-1924).
+ *
+ * Every other filled variant reads `palette.contrastText`, derived from `main`
+ * — so a white-labelled host handing the library a pale brand got dark ink on
+ * its solid buttons and white ink on its gradient one. That store had exactly
+ * one button in the library whose label it could not read, in LIGHT mode,
+ * before dark mode existed anywhere.
+ *
+ * `contrastText` is still not the right thing to read, and that is why this
+ * goes through {@link inkOver}: a gradient is TWO fills, the named pairs run
+ * light-to-dark, and an ink chosen against `main` says nothing about the end
+ * the gradient actually reaches. Both stops go in, and the ink has to survive
+ * the worse of them.
+ */
+const gradientInk = (theme: Theme, color: string, palette: ColorPalette): string =>
+  inkOver(gradientStops(theme, color, palette), palette.contrastText || '#fff');
 
 /**
  * The label colour for the two variants that paint no background of their own.
@@ -218,7 +239,7 @@ const VARIANT_STYLES: Record<
   }),
   gradient: (theme, palette, color) => ({
     background: gradientFor(theme, color, palette),
-    color: '#fff',
+    color: gradientInk(theme, color, palette),
     '&:hover': {
       filter: 'brightness(1.1)',
       transform: 'translateY(-2px)',

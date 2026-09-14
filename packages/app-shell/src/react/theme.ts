@@ -1,6 +1,6 @@
 import { createTheme, type Theme } from '@12-apps/ui/mui/styles';
 
-import { brandHex, DEFAULT_SURFACE, readableInk, separateFromBrand } from '../core/brand-palette';
+import { brandHex, DEFAULT_SURFACES as CORE_SURFACES, readableInk, separateFromBrand } from '../core/brand-palette';
 
 /**
  * What `createTheme` accepts under `components`, derived from the function
@@ -52,14 +52,11 @@ export interface PaletteOverride {
  * correction in `brandRole` is computed against this hex, so a host whose page is a
  * tinted card gets a tenant seed corrected to ≥4.5:1 against a background it does not
  * use — and the guarantee `brandRole` advertises as structural quietly stops holding.
- * The core already parameterizes it (`readableInk(hex, surface, min)`), so hardcoding
- * it here was also a second spelling of a constant that already has an owner: the light
- * value IS `DEFAULT_SURFACE`, imported rather than retyped.
+ * The core already parameterizes it (`readableInk(hex, surface, min)`), and it owns
+ * both values now — this is the same record under the name the react entry has always
+ * published, not a second spelling of it.
  */
-export const DEFAULT_SURFACES: Record<ThemeMode, string> = {
-  light: DEFAULT_SURFACE,
-  dark: '#121212',
-};
+export const DEFAULT_SURFACES: Record<ThemeMode, string> = { ...CORE_SURFACES };
 
 /**
  * One palette role, from a tenant seed or the platform token.

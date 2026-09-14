@@ -6,6 +6,7 @@ import {
   IOS_THUMB_SHADOW,
   MUI_SHADOWS,
   NEUTRAL_CONTRAST,
+  RESTING_THUMB,
   NEUTRAL_FALLBACK,
   NEUTRAL_GREY,
   SWITCH_BLACK,
@@ -23,6 +24,7 @@ import {
   type SwitchLook,
 } from './Switch.metrics';
 import { alpha } from '../../../tokens/color';
+import { inkOver } from '../../../tokens/theme';
 import type { UiTheme } from '../../../tokens/theme';
 import type { ColorValue } from '../../../tokens/vocabulary';
 
@@ -111,6 +113,31 @@ export function trackStyle(
   return base;
 }
 
+/**
+ * The ink on the CHECKED track — the thumb, and the `on` wording (FUT-1924).
+ *
+ * Both halves of the component had a stated `#fff` here, and the checked track
+ * is the one surface a tenant chooses: a pale brand got a white knob on a pale
+ * bar, which reads as OFF while it is on.
+ *
+ * **The fills are THIS renderer's, not the web's, and they differ.** The web
+ * paints a real three-stop gradient and hands `checkedInk` all three
+ * (`Switch.styles.ts`); React Native has no gradient without a dependency, so
+ * `trackStyle` shows `gradientFirstStop` — `palette.light`, FLAT — and
+ * `NATIVE-NOTES.md` records that as a known divergence. Passing the web's set
+ * here would judge the ink against two fills native never draws, and the two
+ * renderers then disagree on the same palette: measured on `#00897b`, the web
+ * answers white and this answered dark ink, because `main` and `dark` were in
+ * the list and only `light` is on screen.
+ *
+ * So the gradient case is ONE fill, which is the one it paints.
+ */
+export function checkedInk(paint: SwitchPaint, palette: SwitchPalette): string {
+  const fills = [paint.gradient ? palette.light || palette.main : palette.main];
+
+  return inkOver(fills, palette.contrastText || NEUTRAL_CONTRAST);
+}
+
 /** The web's two gradients, at the stop a flat fill can show. */
 function gradientFirstStop(palette: SwitchPalette, checked: boolean): string {
   if (checked) return palette.light || palette.main;
@@ -125,10 +152,26 @@ const disabledTrackOpacity = (state: SwitchState): number => {
 /** React Native has no `StyleSheet.absoluteFillObject` constant worth importing for four keys. */
 const StyleSheetAbsoluteFill = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
-/** The knob: white, round for iOS and the default, squarer for Android and Material. */
+/** Disabled greys out; checked takes the track's ink; resting stays white. */
+function thumbFill(
+  paint: SwitchPaint,
+  palette: SwitchPalette,
+  state: SwitchState,
+  theme: UiTheme,
+): string {
+  if (state.disabled) return theme.palette.grey[DISABLED.thumbGrey] ?? RESTING_THUMB;
+  return state.checked ? checkedInk(paint, palette) : RESTING_THUMB;
+}
+
+/**
+ * The knob: round for iOS and the default, squarer for Android and Material.
+ * White while resting, the checked track's own ink once on — see
+ * {@link RESTING_THUMB} and {@link checkedInk}.
+ */
 export function thumbStyle(
   theme: UiTheme,
   paint: SwitchPaint,
+  palette: SwitchPalette,
   geometry: SwitchGeometry,
   look: SwitchLook,
   state: SwitchState,
@@ -138,7 +181,7 @@ export function thumbStyle(
     width: geometry.thumbSize,
     height: geometry.thumbSize,
     borderRadius: thumbRadius(look, geometry.thumbSize),
-    backgroundColor: state.disabled ? theme.palette.grey[DISABLED.thumbGrey] : '#fff',
+    backgroundColor: thumbFill(paint, palette, state, theme),
     boxShadow: look === 'ios' ? IOS_THUMB_SHADOW : (MUI_SHADOWS[THUMB_ELEVATION[look]] ?? 'none'),
     alignItems: 'center',
     justifyContent: 'center',
