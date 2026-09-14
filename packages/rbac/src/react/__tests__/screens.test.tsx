@@ -302,6 +302,79 @@ describe('a refused write surfaces its error', () => {
   });
 });
 
+/**
+ * A person holds 1..n roles. The tenant model names one of them the base and
+ * treats the rest as additive; a host whose people simply hold a SET has no
+ * base to name, and the roster must not invent one.
+ *
+ * The first test below is the regression guard for every existing adopter: the
+ * base-plus-custom shape still renders and still protects exactly as it did.
+ */
+describe('a person holds a SET of roles', () => {
+  /** A roster whose members carry `roles` and no base — the m:n shape. */
+  function setModelApi(roles: string[], overrides = {}) {
+    return apiStub({
+      listTeam: vi.fn(async () => ({
+        data: [
+          {
+            userId: 'op-1',
+            role: '',
+            roles,
+            email: 'ana@paladira.com',
+            name: 'Ana',
+            image: null,
+            active: true,
+            status: 'ENABLED' as const,
+          },
+        ],
+        pagination: PAGINATION,
+      })),
+      ...overrides,
+    });
+  }
+
+  it('still derives base + custom for a host that sends no set', async () => {
+    const api = apiStub({
+      teamContext: vi.fn(async () => ({
+        customRolesByMember: [{ userId: 'chef-1', roles: ['CLERK'] }],
+        assignableRoles: ['CLERK'],
+        pendingInvites: [],
+        invitesEnabled: true,
+      })),
+    });
+    mountTeam(api, ['team:manage']);
+    // The row rendered, and the additive role came from the CONTEXT read — so
+    // the set was derived from base + customs, exactly as before it existed.
+    await waitFor(() => {
+      expect(screen.getByTestId('status-chef-1')).toBeTruthy();
+      expect(screen.getByText('CLERK')).toBeTruthy();
+    });
+  });
+
+  it('renders every role a person holds when there is no base', async () => {
+    mountTeam(setModelApi(['HEAD_LIBRARIAN', 'CONSERVATOR']), ['team:manage']);
+    // Two roles, neither promoted over the other — the model named no winner,
+    // so both are drawn the same way the additive ones always were.
+    await waitFor(() => {
+      expect(screen.getByText('HEAD_LIBRARIAN')).toBeTruthy();
+      expect(screen.getByText('CONSERVATOR')).toBeTruthy();
+    });
+  });
+
+  it('protects a row whose owner role is not the first one held', async () => {
+    // CLERK first, the owner tier second. Reading a single base field would
+    // miss it and hand this row its destructive entries back.
+    const ownerSecond = [...DEMO_CATALOG.governance.ownerRoles];
+    mountTeam(setModelApi(['CLERK', ownerSecond[0] as string]), ['team:manage']);
+    // No kebab at all: TeamActionsMenu renders nothing when every action is
+    // withheld, which is what owner protection does to this row.
+    await waitFor(() => {
+      expect(screen.getByText('CLERK')).toBeTruthy();
+      expect(screen.queryByTestId('team-actions-op-1')).toBeNull();
+    });
+  });
+});
+
 describe('the roster composes what two reads say', () => {
   it('renders a pending accountless invite as a roster row', async () => {
     const api = apiStub({

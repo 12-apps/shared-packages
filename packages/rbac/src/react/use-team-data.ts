@@ -64,6 +64,7 @@ export function composeTeamRows(
   members: readonly {
     userId: string;
     role: string;
+    roles?: readonly string[];
     email: string;
     name: string | null;
     status: string;
@@ -72,15 +73,21 @@ export function composeTeamRows(
   params: URLSearchParams,
 ): TeamRow[] {
   const custom = new Map(context.customRolesByMember.map((e) => [e.userId, e.roles]));
-  const rows: TeamRow[] = members.map((member) => ({
-    userId: member.userId,
-    role: member.role,
-    email: member.email,
-    name: member.name,
-    customRoles: custom.get(member.userId) ?? [],
-    status: toRowStatus(member.status),
-    inviteId: null,
-  }));
+  const rows: TeamRow[] = members.map((member) => {
+    const customRoles = custom.get(member.userId) ?? [];
+    return {
+      userId: member.userId,
+      role: member.role,
+      email: member.email,
+      name: member.name,
+      customRoles,
+      // Stated by the host, or derived as it always was. The empty base is
+      // dropped rather than rendered as a nameless role.
+      roles: [...new Set((member.roles ?? [member.role, ...customRoles]).filter((n) => n !== ''))],
+      status: toRowStatus(member.status),
+      inviteId: null,
+    };
+  });
 
   const pastFirstPage = Number(params.get('page') ?? '1') > 1;
   if (pastFirstPage) return rows;
@@ -90,6 +97,7 @@ export function composeTeamRows(
     email: invite.email,
     name: null,
     customRoles: [],
+    roles: invite.role === '' ? [] : [invite.role],
     status: 'PENDING' as const,
     inviteId: invite.id,
   }));
@@ -107,7 +115,14 @@ export function useTeamData(
   loadFailed: string,
 ): TeamData {
   const [page, setPage] = useState<{
-    data: { userId: string; role: string; email: string; name: string | null; status: string }[];
+    data: {
+      userId: string;
+      role: string;
+      roles?: readonly string[];
+      email: string;
+      name: string | null;
+      status: string;
+    }[];
     pagination: PaginationWire;
   } | null>(null);
   const [context, setContext] = useState<TeamContextWire | null>(null);

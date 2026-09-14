@@ -39,11 +39,21 @@ export type MemberRowStatus = 'ENABLED' | 'DISABLED' | 'PENDING';
  */
 export interface TeamRow extends Record<string, unknown> {
   userId: string;
+  /** The base role, or the empty string for a host whose model has none. */
   role: string;
   email: string;
   name: string | null;
   /** Tenant custom roles this member holds, additive to their base role. */
   customRoles: string[];
+  /**
+   * EVERY role this person holds — the m:n, base included.
+   *
+   * This is the field to READ. `role` and `customRoles` describe how a
+   * particular host's model is SHAPED, and a host whose people simply hold a
+   * set of roles has no honest value for either: reducing two equal roles to
+   * "one base plus a bag" picks a winner the model never named.
+   */
+  roles: string[];
   status: MemberRowStatus;
   /** The pending-invite id for a PENDING row; null for real members. */
   inviteId: string | null;
@@ -87,7 +97,7 @@ export function teamFields(
       label: copy.filters.roles,
       control: 'multiselect',
       searchEnabled: true,
-      accessor: (row) => [row.role, ...row.customRoles],
+      accessor: (row) => row.roles,
       options: [
         ...systemRoles.map((name) => ({ value: name, label: labels.roleLabel(name) })),
         ...customRoles.map((name) => ({ value: name, label: name })),
@@ -180,27 +190,42 @@ export function teamExportColumns(
     { header: copy.exportHeaders.name, value: (row) => row.name ?? row.email },
     { header: copy.exportHeaders.email, value: (row) => row.email },
     { header: copy.exportHeaders.role, value: (row) => labels.roleLabel(row.role) },
-    { header: copy.exportHeaders.customRoles, value: (row) => row.customRoles.join(', ') },
+    {
+      header: copy.exportHeaders.customRoles,
+      // Every role BUT the base, so a host with no base exports all of them
+      // here rather than silently dropping the ones the bag never held.
+      value: (row) => row.roles.filter((name) => name !== row.role).join(', '),
+    },
     { header: copy.exportHeaders.status, value: (row) => status[row.status] },
   ];
 }
 
 /**
- * The unified roles cell: the base role as a filled chip plus each additive
- * custom role outlined. A PENDING invite shows only the role it WILL grant on
- * signup, outlined — it is not active yet, and a filled chip would say it was.
+ * The unified roles cell.
+ *
+ * Where the host's model HAS a base role, it is the filled chip and the
+ * additive ones are outlined beside it — the hierarchy is real and the cell
+ * shows it. Where it has none, every role is drawn the same, because inventing
+ * a primary among equals would state a rank the model does not have.
+ *
+ * A PENDING invite shows only the role it WILL grant on signup, outlined — it
+ * is not active yet, and a filled chip would say it was.
  */
 function RolesCell({ row, labels }: { row: TeamRow; labels: RbacLabels }): JSX.Element {
   const pending = row.status === 'PENDING';
+  const base = row.role === '' ? null : row.role;
+  const rest = row.roles.filter((name) => name !== base);
   return (
     <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-      <Chip
-        label={labels.roleLabel(row.role)}
-        size="sm"
-        variant={pending ? 'outlined' : 'filled'}
-        color={pending ? 'neutral' : 'primary'}
-      />
-      {row.customRoles.map((role) => (
+      {base !== null && (
+        <Chip
+          label={labels.roleLabel(base)}
+          size="sm"
+          variant={pending ? 'outlined' : 'filled'}
+          color={pending ? 'neutral' : 'primary'}
+        />
+      )}
+      {rest.map((role) => (
         <Chip key={role} label={role} size="sm" variant="outlined" color="neutral" />
       ))}
     </Stack>
@@ -234,7 +259,11 @@ export function teamColumns(labels: RbacLabels, copy: TeamTableCopy): DataViewCo
       id: 'customRoles',
       header: copy.headers.roles,
       enableSort: false,
-      accessor: (row) => [labels.roleLabel(row.role), ...row.customRoles].join(', '),
+      accessor: (row) =>
+        [
+          ...(row.role === '' ? [] : [labels.roleLabel(row.role)]),
+          ...row.roles.filter((name) => name !== row.role),
+        ].join(', '),
       cell: ({ row }) => <RolesCell row={row} labels={labels} />,
     },
     {
@@ -276,7 +305,11 @@ export function buildTeamRowActions(
   copy: TeamRowMenuCopy,
 ): RowAction<TeamRow>[] {
   const isMember = (row: TeamRow): boolean => row.status !== 'PENDING';
-  const editable = (row: TeamRow): boolean => isMember(row) && !ownerRoles.has(row.role);
+  // Set-aware: ANY owner role the person holds protects the row. Reading the
+  // base field alone would hand an env superadmin its destructive entries back
+  // the moment that field stops being where the owner role lives.
+  const editable = (row: TeamRow): boolean =>
+    isMember(row) && !row.roles.some((name) => ownerRoles.has(name));
   return [
     {
       id: 'edit-roles',
