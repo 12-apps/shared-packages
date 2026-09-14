@@ -136,6 +136,22 @@ function pageWhere(
   };
 }
 
+/**
+ * The unread rows this scope can see — READ by the badge and WRITTEN by "mark
+ * all". One filter for both on purpose: the count and the write have to agree
+ * about which rows are in scope, and two copies of the same object literal is
+ * how a badge ends up saying 3 over a list of 2.
+ */
+function unreadWhere(userId: string, scope: NotificationScope): NotificationWhere {
+  const scoped = scopeBranch(scope);
+  return {
+    userId,
+    deletedAt: null,
+    readAt: null,
+    ...(scoped.length > 0 ? { AND: scoped } : {}),
+  };
+}
+
 export function createInboxStore(db: NotificationsDbProvider): NotificationInboxStore {
   return {
     /** The owner's inbox, newest first, keyset-paginated, deleted excluded. */
@@ -162,15 +178,7 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
     /** Unread badge count (non-deleted, unread). */
     async unreadCount(userId, scope) {
       const client = await db();
-      const scoped = scopeBranch(scope);
-      return client.notification.count({
-        where: {
-          userId,
-          deletedAt: null,
-          readAt: null,
-          ...(scoped.length > 0 ? { AND: scoped } : {}),
-        },
-      });
+      return client.notification.count({ where: unreadWhere(userId, scope) });
     },
 
     /**
@@ -191,14 +199,8 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
     /** Mark every unread notification of the owner read ("mark all"). */
     async markAllRead(userId, scope) {
       const client = await db();
-      const scoped = scopeBranch(scope);
       const result = await client.notification.updateMany({
-        where: {
-          userId,
-          deletedAt: null,
-          readAt: null,
-          ...(scoped.length > 0 ? { AND: scoped } : {}),
-        },
+        where: unreadWhere(userId, scope),
         data: { readAt: new Date() },
       });
       return result.count;

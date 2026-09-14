@@ -79,6 +79,45 @@ const notificationRow = (row: NotificationSqlRow): NotificationRow => ({
   createdAt: row.created_at,
 });
 
+/** One field, one condition — `null` for "this field says nothing". */
+function clientIdCondition(
+  clientId: NotificationWhereBranch['clientId'],
+  params: Params,
+): string | null {
+  if (clientId === undefined) return null;
+  // `null` is a VALUE here and never a wildcard: it is what the platform-wide
+  // rows carry, and they travel with every store scope.
+  return clientId === null ? 'client_id IS NULL' : `client_id = ${params.add(clientId)}`;
+}
+
+function idCondition(id: NotificationWhereBranch['id'], params: Params): string | null {
+  if (id === undefined) return null;
+  if (typeof id === 'string') return `id = ${params.add(id)}`;
+  if ('in' in id) {
+    // An empty set matches nothing. `FALSE` AND-ed with this branch's other
+    // conditions is that, and says it in the SQL rather than in control flow.
+    if (id.in.length === 0) return 'FALSE';
+    return `id IN (${id.in.map((value) => params.add(value)).join(', ')})`;
+  }
+  return `id < ${params.add(id.lt)}`;
+}
+
+function createdAtCondition(
+  createdAt: NotificationWhereBranch['createdAt'],
+  params: Params,
+): string | null {
+  if (createdAt === undefined) return null;
+  return createdAt instanceof Date
+    ? `created_at = ${params.add(createdAt)}`
+    : `created_at < ${params.add(createdAt.lt)}`;
+}
+
+/** The `OR` arms, parenthesised. No arms matches nothing, as an empty `IN` does. */
+function disjunction(branches: NotificationWhereBranch[], params: Params): string {
+  const arms = branches.map((branch) => `(${branchWhere(branch, params)})`);
+  return arms.length > 0 ? `(${arms.join(' OR ')})` : 'FALSE';
+}
+
 /**
  * One filter BRANCH, translated — recursively, and that is what changed.
  *
@@ -95,32 +134,18 @@ const notificationRow = (row: NotificationSqlRow): NotificationRow => ({
  * index, which is the only part that moved.
  */
 function branchWhere(where: NotificationWhereBranch, params: Params): string {
-  const conditions: string[] = [];
-  if (where.userId !== undefined) conditions.push(`user_id = ${params.add(where.userId)}`);
-  if (where.readAt === null) conditions.push('read_at IS NULL');
-  if (where.clientId === null) conditions.push('client_id IS NULL');
-  else if (where.clientId !== undefined) {
-    conditions.push(`client_id = ${params.add(where.clientId)}`);
-  }
-  if (typeof where.id === 'string') conditions.push(`id = ${params.add(where.id)}`);
-  else if (where.id !== undefined) {
-    if ('in' in where.id) {
-      if (where.id.in.length === 0) return 'FALSE';
-      conditions.push(`id IN (${where.id.in.map((value) => params.add(value)).join(', ')})`);
-    } else {
-      conditions.push(`id < ${params.add(where.id.lt)}`);
-    }
-  }
-  if (where.createdAt instanceof Date) {
-    conditions.push(`created_at = ${params.add(where.createdAt)}`);
-  } else if (where.createdAt !== undefined) {
-    conditions.push(`created_at < ${params.add(where.createdAt.lt)}`);
-  }
-  for (const branch of where.AND ?? []) conditions.push(`(${branchWhere(branch, params)})`);
-  if (where.OR !== undefined) {
-    const arms = where.OR.map((branch) => `(${branchWhere(branch, params)})`);
-    conditions.push(arms.length > 0 ? `(${arms.join(' OR ')})` : 'FALSE');
-  }
+  // Built in one ordered pass, because `params.add` NUMBERS the placeholders as
+  // it goes: the order these arms are evaluated in is the order the values bind
+  // in, and a reordering here is a silently mis-bound query.
+  const conditions = [
+    where.userId !== undefined ? `user_id = ${params.add(where.userId)}` : null,
+    where.readAt === null ? 'read_at IS NULL' : null,
+    clientIdCondition(where.clientId, params),
+    idCondition(where.id, params),
+    createdAtCondition(where.createdAt, params),
+    ...(where.AND ?? []).map((branch) => `(${branchWhere(branch, params)})`),
+    where.OR !== undefined ? disjunction(where.OR, params) : null,
+  ].filter((condition): condition is string => condition !== null);
   return conditions.length > 0 ? conditions.join(' AND ') : 'TRUE';
 }
 
