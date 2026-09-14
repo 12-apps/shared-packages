@@ -18,7 +18,7 @@
  * call site is written the way anyone would write it, and it is the library that
  * had to stop punishing the refactor.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { JSX } from 'react';
 
@@ -30,6 +30,7 @@ import type { MemberWithRoles } from '../team-role-dialog';
 const MEMBER: MemberWithRoles = {
   userId: 'u-1',
   role: 'MANAGER',
+  roles: ['MANAGER'],
   email: 'alguem@example.com',
   name: 'Alguém',
   image: null,
@@ -38,7 +39,9 @@ const MEMBER: MemberWithRoles = {
   customRoles: [],
 };
 
-function open(): JSX.Element {
+function open(
+  overrides: Partial<React.ComponentProps<typeof RoleEditDialog>> = {},
+): JSX.Element {
   return (
     <RoleEditDialog
       member={MEMBER}
@@ -50,9 +53,57 @@ function open(): JSX.Element {
       error={null}
       onClose={vi.fn()}
       onSave={vi.fn()}
+      {...overrides}
     />
   );
 }
+
+/**
+ * The two role models the editor serves.
+ *
+ * `base+custom` refuses any selection that is not exactly one system role —
+ * correct for a host whose model names a base, and fatal for one whose people
+ * hold two equal roles. `set` asks only for a non-empty selection.
+ */
+describe('the editor serves both role models', () => {
+  it('refuses two system roles under the base model', async () => {
+    const onSave = vi.fn();
+    render(open({ onSave }));
+    // MANAGER is already held; adding WAITER makes two bases, which the model
+    // cannot express.
+    fireEvent.click(screen.getByTestId('role-opt-WAITER'));
+    await waitFor(() => {
+      expect(screen.getByTestId('role-edit-invalid')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByTestId('role-edit-save'));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('accepts two system roles under the set model', async () => {
+    const onSave = vi.fn();
+    render(open({ roleModel: 'set', onSave }));
+    fireEvent.click(screen.getByTestId('role-opt-WAITER'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('role-edit-invalid')).toBeNull();
+    });
+    fireEvent.click(screen.getByTestId('role-edit-save'));
+    // Both roles go over, neither promoted to a base.
+    expect(onSave).toHaveBeenCalledWith(expect.arrayContaining(['MANAGER', 'WAITER']));
+  });
+
+  it('still refuses an EMPTY selection under the set model', async () => {
+    const onSave = vi.fn();
+    render(open({ roleModel: 'set', onSave }));
+    // Clearing the only role held leaves a person with no access at all, which
+    // is a removal, not a role edit.
+    fireEvent.click(screen.getByTestId('role-opt-MANAGER'));
+    await waitFor(() => {
+      expect(screen.getByTestId('role-edit-invalid')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByTestId('role-edit-save'));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
 
 describe('role-edit dialog layout', () => {
   it('leaves the body in the paper column, with one lot of padding', () => {

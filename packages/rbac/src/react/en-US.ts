@@ -47,6 +47,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
       create: 'New role',
       edit: (name) => `Edit ${name}`,
       override: (name) => `Edit the system role ${name}`,
+      view: (name) => `${name} permissions`,
     },
     deleteConfirm: {
       title: 'Delete this role?',
@@ -79,6 +80,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     lockedLabel: 'Locked',
     noPermissions: 'No permissions',
     emptyValue: '\u2014',
+    viewAction: 'View permissions',
     editAction: 'Edit',
     resetAction: 'Restore default',
     deleteAction: 'Delete',
@@ -155,6 +157,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     systemGroupTitle: 'System role (pick one)',
     customGroupTitle: 'Custom roles (optional)',
     exactlyOneSystemRole: 'Select exactly one system role.',
+      atLeastOneRole: 'Pick at least one role.',
     cancelAction: 'Cancel',
     saveAction: 'Save',
   },

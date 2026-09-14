@@ -104,7 +104,11 @@ function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
   };
 }
 
-function mountRoles(api: RbacApiClient, permissions: string[]): void {
+function mountRoles(
+  api: RbacApiClient,
+  permissions: string[],
+  readPermission?: string,
+): void {
   render(
     <MemoryRouter>
       <RbacProvider permissions={permissions}>
@@ -115,6 +119,7 @@ function mountRoles(api: RbacApiClient, permissions: string[]): void {
           governance={DEMO_CATALOG.governance}
           labels={LABELS}
           managePermission="roles:manage"
+          readPermission={readPermission}
           copy={COPY}
           seeds={new Map()}
         />
@@ -123,7 +128,11 @@ function mountRoles(api: RbacApiClient, permissions: string[]): void {
   );
 }
 
-function mountTeam(api: RbacApiClient, permissions: string[]): void {
+function mountTeam(
+  api: RbacApiClient,
+  permissions: string[],
+  extra: Partial<React.ComponentProps<typeof TeamScreen>> = {},
+): void {
   render(
     <MemoryRouter>
       <RbacProvider permissions={permissions}>
@@ -138,6 +147,7 @@ function mountTeam(api: RbacApiClient, permissions: string[]): void {
           // stated default wins over the catalog's array order.
           defaultInviteRole="BRANCH_LEAD"
           copy={COPY}
+          {...extra}
         />
       </RbacProvider>
     </MemoryRouter>,
@@ -185,6 +195,71 @@ describe('affordance hiding (useCan)', () => {
   });
 });
 
+/**
+ * The READ tier: seeing the catalog and editing it are two questions, and a
+ * host whose roles are code-defined can only answer yes to the first.
+ *
+ * The compatibility case is the one that matters most here. `readPermission`
+ * is optional, and every adopter that predates it passes nothing — so the
+ * fourth test below is not decoration: it pins that an unset gate leaves the
+ * screen behaving exactly as the two tests above it describe.
+ */
+describe('the roles read tier', () => {
+  it('opens the catalog read-only to a caller holding the read gate alone', async () => {
+    const api = apiStub();
+    mountRoles(api, ['catalog:roles:read'], 'catalog:roles:read');
+    // The grid is the point; the writes are what must be ABSENT rather than
+    // rendered-and-refused.
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-grid')).toBeTruthy();
+      expect(screen.queryByTestId('add-role-button')).toBeNull();
+    });
+    // The kebab IS there, carrying exactly one entry: the permissions the grid
+    // only counts. Opening it is the whole reason the tier exists.
+    fireEvent.click(screen.getByTestId('role-actions-r1'));
+    await waitFor(() => {
+      expect(screen.getByTestId('role-action-view')).toBeTruthy();
+      expect(screen.queryByTestId('role-action-edit')).toBeNull();
+      expect(screen.queryByTestId('role-action-delete')).toBeNull();
+    });
+    // Keyed on VIEW: the old gate skipped this read for anyone without manage,
+    // which would have left exactly this caller staring at an empty grid.
+    expect(api.listRoles).toHaveBeenCalled();
+  });
+
+  it('keeps every write affordance for a caller holding both gates', async () => {
+    const api = apiStub();
+    mountRoles(api, ['roles:manage', 'catalog:roles:read'], 'catalog:roles:read');
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-grid')).toBeTruthy();
+    });
+    expect(screen.getByTestId('add-role-button')).toBeTruthy();
+    expect(screen.getByTestId('role-actions-r1')).toBeTruthy();
+  });
+
+  it('still refuses a caller holding neither gate, and reads nothing', async () => {
+    const api = apiStub();
+    mountRoles(api, ['titles:read:all'], 'catalog:roles:read');
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-not-found')).toBeTruthy();
+      expect(screen.queryByTestId('roles-grid')).toBeNull();
+    });
+    // Refused means refused: no request is sent just to be rejected.
+    expect(api.listRoles).not.toHaveBeenCalled();
+  });
+
+  it('leaves an adopter that names no read gate exactly as it was', async () => {
+    const api = apiStub();
+    // No third argument — the shape every caller had before this tier existed.
+    mountRoles(api, ['titles:read:all']);
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-not-found')).toBeTruthy();
+      expect(screen.queryByTestId('roles-grid')).toBeNull();
+    });
+    expect(api.listRoles).not.toHaveBeenCalled();
+  });
+});
+
 describe('destructive writes sit behind a confirm step', () => {
   it('deleting a role asks first, and backing out writes nothing', async () => {
     const api = apiStub();
@@ -229,6 +304,145 @@ describe('a refused write surfaces its error', () => {
       expect(screen.getByTestId('team-error')).toBeTruthy();
     });
     expect(screen.getByText(refusal)).toBeTruthy();
+  });
+});
+
+/**
+ * A person holds 1..n roles. The tenant model names one of them the base and
+ * treats the rest as additive; a host whose people simply hold a SET has no
+ * base to name, and the roster must not invent one.
+ *
+ * The first test below is the regression guard for every existing adopter: the
+ * base-plus-custom shape still renders and still protects exactly as it did.
+ */
+/**
+ * A host may hold a fact about a person that this package cannot build a column
+ * for — who granted each of their roles, say. Without a seam its only options
+ * are to lose that fact or to stop using this screen.
+ */
+describe('the host can contribute a roster column', () => {
+  it('renders nothing extra for a host that contributes none', async () => {
+    mountTeam(apiStub(), ['team:manage']);
+    await waitFor(() => {
+      expect(screen.getByTestId('status-chef-1')).toBeTruthy();
+      expect(screen.queryByText('Concedido por')).toBeNull();
+    });
+  });
+
+  it('renders the column a host contributes', async () => {
+    mountTeam(apiStub(), ['team:manage'], {
+      extraColumns: [
+        {
+          id: 'grantedBy',
+          header: 'Concedido por',
+          accessor: (row) => `por ${row.email}`,
+        },
+      ],
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Concedido por')).toBeTruthy();
+      expect(screen.getByText('por camila@example.com')).toBeTruthy();
+    });
+  });
+
+  it('carries a host WIRE field into the row the column reads', async () => {
+    // The seam is useless if it can only read what this package already knows:
+    // a host adds a column for the fact the package does NOT carry.
+    const api = apiStub({
+      listTeam: vi.fn(async () => ({
+        data: [
+          {
+            userId: 'chef-1',
+            role: 'CONSERVATOR',
+            email: 'camila@example.com',
+            name: 'Camila Barbosa',
+            image: null,
+            active: true,
+            status: 'ENABLED' as const,
+            grantedBy: { CONSERVATOR: 'ana@example.com' },
+          },
+        ],
+        pagination: PAGINATION,
+      })),
+    });
+    mountTeam(api, ['team:manage'], {
+      extraColumns: [
+        {
+          id: 'grantedBy',
+          header: 'Concedido por',
+          accessor: (row) =>
+            String((row as { grantedBy?: Record<string, string> }).grantedBy?.CONSERVATOR ?? '—'),
+        },
+      ],
+    });
+    await waitFor(() => {
+      expect(screen.getByText('ana@example.com')).toBeTruthy();
+    });
+  });
+});
+
+describe('a person holds a SET of roles', () => {
+  /** A roster whose members carry `roles` and no base — the m:n shape. */
+  function setModelApi(roles: string[], overrides = {}) {
+    return apiStub({
+      listTeam: vi.fn(async () => ({
+        data: [
+          {
+            userId: 'op-1',
+            role: '',
+            roles,
+            email: 'ana@paladira.com',
+            name: 'Ana',
+            image: null,
+            active: true,
+            status: 'ENABLED' as const,
+          },
+        ],
+        pagination: PAGINATION,
+      })),
+      ...overrides,
+    });
+  }
+
+  it('still derives base + custom for a host that sends no set', async () => {
+    const api = apiStub({
+      teamContext: vi.fn(async () => ({
+        customRolesByMember: [{ userId: 'chef-1', roles: ['CLERK'] }],
+        assignableRoles: ['CLERK'],
+        pendingInvites: [],
+        invitesEnabled: true,
+      })),
+    });
+    mountTeam(api, ['team:manage']);
+    // The row rendered, and the additive role came from the CONTEXT read — so
+    // the set was derived from base + customs, exactly as before it existed.
+    await waitFor(() => {
+      expect(screen.getByTestId('status-chef-1')).toBeTruthy();
+      expect(screen.getByText('CLERK')).toBeTruthy();
+    });
+  });
+
+  it('renders every role a person holds when there is no base', async () => {
+    mountTeam(setModelApi(['HEAD_LIBRARIAN', 'CONSERVATOR']), ['team:manage']);
+    // Two roles, neither promoted over the other — the model named no winner,
+    // so both are drawn the same way the additive ones always were.
+    await waitFor(() => {
+      expect(screen.getByText('HEAD_LIBRARIAN')).toBeTruthy();
+      expect(screen.getByText('CONSERVATOR')).toBeTruthy();
+    });
+  });
+
+  it('protects a row whose owner role is not the first one held', async () => {
+    // CLERK first, the owner tier second. Reading a single base field would
+    // miss it and hand this row its destructive entries back.
+    const ownerSecond = [...DEMO_CATALOG.governance.ownerRoles];
+    mountTeam(setModelApi(['CLERK', ownerSecond[0] as string]), ['team:manage']);
+    // No kebab at all: TeamActionsMenu renders nothing when every action is
+    // withheld, which is what owner protection does to this row.
+    await waitFor(() => {
+      expect(screen.getByText('CLERK')).toBeTruthy();
+      expect(screen.queryByTestId('team-actions-op-1')).toBeNull();
+    });
   });
 });
 

@@ -40,6 +40,7 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
       create: 'Novo papel',
       edit: (name) => `Editar ${name}`,
       override: (name) => `Editar papel do sistema ${name}`,
+      view: (name) => `Permissões de ${name}`,
     },
     deleteConfirm: {
       title: 'Excluir o papel?',
@@ -71,6 +72,7 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     lockedLabel: 'Bloqueado',
     noPermissions: 'Nenhuma permissão',
     emptyValue: '—',
+    viewAction: 'Ver permissões',
     editAction: 'Editar',
     resetAction: 'Restaurar padrão',
     deleteAction: 'Excluir',
@@ -142,6 +144,7 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     systemGroupTitle: 'Papel do sistema (escolha um)',
     customGroupTitle: 'Papéis personalizados (opcional)',
     exactlyOneSystemRole: 'Selecione exatamente um papel do sistema.',
+      atLeastOneRole: 'Escolha ao menos um papel.',
     cancelAction: 'Cancelar',
     saveAction: 'Salvar',
   },

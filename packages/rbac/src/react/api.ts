@@ -41,7 +41,23 @@ export interface PaginationWire {
 
 export interface TeamMemberWire {
   userId: string;
+  /**
+   * The person's BASE role, where the host's model has one.
+   *
+   * The empty string is a legal answer, and it is what a host whose
+   * person↔role is a plain m:n sends: there is no base, only
+   * {@link TeamMemberWire.roles}. Every host that has a base keeps sending it
+   * here and is unaffected.
+   */
   role: string;
+  /**
+   * EVERY role this person holds, base included.
+   *
+   * Optional, and absent the roster derives it as base + the context read's
+   * custom roles — which is exactly what it has always rendered. A host states
+   * it when its model has no base role to derive from.
+   */
+  roles?: readonly string[];
   email: string;
   name: string | null;
   image: string | null;

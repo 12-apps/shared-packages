@@ -43,6 +43,16 @@ export interface RoleFormProps {
   template?: boolean;
   busy: boolean;
   error: string | null;
+  /**
+   * Render the role as a DOCUMENT rather than a form: every control disabled,
+   * and the footer offering only the way out.
+   *
+   * The grid one level up shows a permission COUNT, so this form is the only
+   * place the package ever states what a role actually carries. A host whose
+   * roles are code-defined can answer "what may this role do" no other way,
+   * and `onSubmit` is unreachable here — nothing to save.
+   */
+  readOnly?: boolean;
   onSubmit(value: RoleFormValue): void;
   onCancel(): void;
 }
@@ -204,15 +214,28 @@ function RoleFormFields(props: {
   );
 }
 
-/** The cancel / submit row. */
+/** The cancel / submit row — or, read-only, just the way out. */
 function RoleFormFooter(props: {
   copy: RoleFormCopy;
   editing: boolean;
   busy: boolean;
   submittable: boolean;
+  readOnly: boolean;
   onSubmit: () => void;
   onCancel: () => void;
 }): JSX.Element {
+  // No disabled Save beside it: an affordance that can never become usable
+  // reads as something the reader is failing to satisfy, rather than as
+  // something that was never theirs to do.
+  if (props.readOnly) {
+    return (
+      <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Button variant="text" onClick={props.onCancel} dataTestId="role-cancel">
+          {props.copy.cancelAction}
+        </Button>
+      </Stack>
+    );
+  }
   return (
     <Stack direction="row" spacing={1} justifyContent="flex-end">
       <Button variant="text" onClick={props.onCancel} disabled={props.busy} dataTestId="role-cancel">
@@ -245,7 +268,11 @@ function toValue(name: string, description: string, selected: ReadonlySet<string
 }
 
 export function RoleForm(props: RoleFormProps): JSX.Element {
-  const { copy, initial, template = false, busy, error } = props;
+  const { copy, initial, template = false, busy, error, readOnly = false } = props;
+  // Folded into `busy` on the way down: "in flight" and "not yours to change"
+  // disable the same controls, and the two never overlap — a read-only form
+  // sends nothing, so it is never in flight.
+  const locked = busy || readOnly;
   const defaults = formDefaults(initial);
   const [name, setName] = useState(defaults.name);
   const [description, setDescription] = useState(defaults.description ?? '');
@@ -258,7 +285,7 @@ export function RoleForm(props: RoleFormProps): JSX.Element {
         name={name}
         description={description}
         copy={copy}
-        busy={busy}
+        busy={locked}
         template={template}
         onName={setName}
         onDescription={setDescription}
@@ -279,7 +306,7 @@ export function RoleForm(props: RoleFormProps): JSX.Element {
             selected={selected}
             ownerMarkers={ownerMarkers}
             template={template}
-            busy={busy}
+            busy={locked}
             onToggle={toggle}
             onToggleMany={toggleMany}
           />
@@ -290,6 +317,7 @@ export function RoleForm(props: RoleFormProps): JSX.Element {
         copy={copy}
         editing={initial !== null}
         busy={busy}
+        readOnly={readOnly}
         submittable={name.trim().length > 0 && selected.size > 0 && !busy}
         onSubmit={() => props.onSubmit(toValue(name, description, selected))}
         onCancel={props.onCancel}

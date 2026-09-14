@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { EmptyState } from '@12-apps/ui/data-display/EmptyState';
@@ -38,6 +38,14 @@ export interface MemberScreenProps {
     dateTime: (iso: string) => string;
   };
   breadcrumb?: readonly { label: string; href?: string }[];
+  /**
+   * The host's own section on the details tab, given the loaded member.
+   *
+   * What a person may actually DO is the obvious example: this package knows
+   * the roles they hold and nothing about what those roles carry, because the
+   * catalog is the host's. Absent, the tab renders exactly as it always has.
+   */
+  renderExtra?: (member: MemberDetailWire) => ReactNode;
   /**
    * The member to show. Omitted, it is read from the route's `userId` param —
    * the shape `manifest/web` declares. A host routing the screen some other way
@@ -160,6 +168,7 @@ export function MemberScreen(props: MemberScreenProps): JSX.Element {
       copy={copy}
       initialTab={resolveProfileTab(searchParams.get('tab'))}
       breadcrumb={props.breadcrumb}
+      extra={props.renderExtra?.(state.member)}
     />
   );
 }

@@ -23,6 +23,7 @@ import {
   teamFields,
   teamSyncState,
   type TeamRow,
+  type TeamExtraColumn,
 } from './team-grid-config';
 import { TeamInviteForm } from './team-invite-form';
 import type { TeamActions } from './use-team-actions';
@@ -182,6 +183,7 @@ export function TeamBody(props: {
   syncState: ReturnType<typeof teamSyncState>;
   onVisibleRowsChange: (rows: TeamRow[]) => void;
   onOpenMember?: (userId: string) => void;
+  extraColumns?: readonly TeamExtraColumn[];
 }): JSX.Element {
   const { copy, labels, canManage, rowActions } = props;
   const openProfile = props.onOpenMember
@@ -193,7 +195,7 @@ export function TeamBody(props: {
     <DataViewsGrid<TeamRow>
       inlineFilters
       rows={props.rows}
-      columns={teamColumns(labels, copy.teamTable)}
+      columns={teamColumns(labels, copy.teamTable, props.extraColumns)}
       fields={teamFields(props.systemRoles, props.customRoles, labels, copy.teamTable)}
       syncState={props.syncState}
       getRowId={(row) => row.userId}

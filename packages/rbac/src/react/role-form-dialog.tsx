@@ -30,6 +30,7 @@ export function RoleFormDialog({
   error,
   onClose,
   onSubmit,
+  readOnly = false,
 }: {
   open: boolean;
   title: string;
@@ -41,8 +42,11 @@ export function RoleFormDialog({
   template: boolean;
   busy: boolean;
   error: string | null;
+  /** Inspect rather than edit. See {@link RoleFormProps.readOnly}. */
+  readOnly?: boolean;
   onClose: () => void;
-  onSubmit: (value: RoleFormValue) => void;
+  /** Absent is legal only when {@link readOnly} — there is nothing to save. */
+  onSubmit?: (value: RoleFormValue) => void;
 }): JSX.Element {
   return (
     <Dialog
@@ -66,7 +70,9 @@ export function RoleFormDialog({
             template={template}
             busy={busy}
             error={error}
-            onSubmit={onSubmit}
+            readOnly={readOnly}
+            // Unreachable while `readOnly`: the footer renders no submit.
+            onSubmit={onSubmit ?? (() => undefined)}
             onCancel={onClose}
           />
         </DialogContent>
