@@ -59,6 +59,47 @@ const TABS_DEFAULTS: Partial<TabsProps> = {
   disabled: false,
   loading: false };
 
+/**
+ * The props this component OWNS and MUI's `Tabs` does not understand (12-86).
+ *
+ * `rest` below is spread onto the DOM node, so anything left in it that React
+ * cannot place on an element is reported — five `does not recognize the … prop`
+ * warnings and three `Received false for a non-boolean attribute`, on every
+ * render, in the browser console and in every host's jsdom output.
+ *
+ * An explicit list rather than `Object.keys(TABS_DEFAULTS)`, because the two
+ * sets differ in both directions: `items`, `closeTabLabel`, `tabPanelProps` and
+ * `loadingComponent` have no default and still must not reach the DOM, while
+ * `orientation`, `centered` and `indicatorColor` are real MUI props that must.
+ * An omission rather than more destructuring, so a prop added to `TabsProps`
+ * costs a line here instead of an unused `_name` binding.
+ *
+ * Deliberately NOT here: `onFocus` and `onBlur`. They are ordinary DOM handlers
+ * that reach the element through `rest` and nowhere else, so listing them would
+ * silently stop them working.
+ */
+const OWN_PROPS = new Set<string>([
+  'items',
+  'closeTabLabel',
+  'color',
+  'size',
+  'fullWidth',
+  'scrollable',
+  'scrollButtons',
+  'sticky',
+  'stickyOffset',
+  'animateContent',
+  'animationDuration',
+  'persistContent',
+  'tabPanelProps',
+  'loading',
+  'loadingComponent',
+]);
+
+/** `props` with every {@link OWN_PROPS} key dropped — what is left is passthrough. */
+const domPassthrough = (props: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(props).filter(([key]) => !OWN_PROPS.has(key)));
+
 // Strips explicitly-undefined props before the merge, so `prop={undefined}`
 // still falls back to the default as a destructuring default would.
 const definedProps = (props: TabsProps): Partial<TabsProps> =>
@@ -251,7 +292,11 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
       <Box className={className} ref={ref} data-testid={dataTestId || 'tabs'}>
         <TabsBar
           {...resolved}
-          rest={rest as unknown as Record<string, unknown>}
+          // The destructuring above drops the props this component USES;
+          // `domPassthrough` drops the ones it merely OWNS. Both have to go:
+          // `rest` is spread onto the DOM node, and the second group is where
+          // 12-86's warnings came from.
+          rest={domPassthrough(rest as unknown as Record<string, unknown>)}
           onChange={handleChange}
           onCloseTab={handleTabClose}
         />
