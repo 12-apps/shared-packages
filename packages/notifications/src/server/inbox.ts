@@ -5,6 +5,7 @@ import type {
   NotificationPageAfter,
   NotificationsDbProvider,
   NotificationWhere,
+  NotificationWhereBranch,
 } from './db';
 
 /**
@@ -14,6 +15,29 @@ import type {
  * Soft-deleted rows (`deletedAt` set) are excluded from every read and can
  * never be resurrected by mark-read.
  */
+
+/**
+ * The store whose ORIGIN the caller is reading from, or absent for the platform
+ * origin.
+ *
+ * A host that installs one storefront per store as its own PWA reads this from
+ * the request's hostname; a host with one origin never sets it and every read
+ * below is exactly what it was. Set, it narrows to that store's rows PLUS the
+ * platform-wide ones (`clientId IS NULL`) — a password reset or a security
+ * notice is about the person and not about a store, so hiding it inside the
+ * only app a customer opens would be a worse failure than the leak this fixes.
+ */
+export type NotificationScope = string | undefined;
+
+/**
+ * `clientId IN (<scope>, NULL)`, as a filter branch — or nothing at all.
+ *
+ * A disjunction rather than an `in`, because SQL `IN` never matches NULL and
+ * the NULL rows are precisely the ones that must survive every scope.
+ */
+function scopeBranch(scope: NotificationScope): NotificationWhereBranch[] {
+  return scope === undefined ? [] : [{ OR: [{ clientId: scope }, { clientId: null }] }];
+}
 
 export interface ListNotificationsInput {
   /** `unread` narrows to unread rows; default lists all non-deleted. */
@@ -34,10 +58,27 @@ const DEFAULT_PAGE = 20;
 const MAX_PAGE = 100;
 
 export interface NotificationInboxStore {
-  list(userId: string, input?: ListNotificationsInput): Promise<ListNotificationsResult>;
-  unreadCount(userId: string): Promise<number>;
+  list(
+    userId: string,
+    input?: ListNotificationsInput,
+    scope?: NotificationScope,
+  ): Promise<ListNotificationsResult>;
+  /** Scoped with `list`, or the badge and the list it sits over disagree. */
+  unreadCount(userId: string, scope?: NotificationScope): Promise<number>;
   markRead(userId: string, ids: readonly string[]): Promise<number>;
-  markAllRead(userId: string): Promise<number>;
+  /**
+   * Scoped too, and this one is a WRITE.
+   *
+   * Unscoped, "mark all as read" pressed inside store A's app clears store B's
+   * unread rows everywhere — a cross-store write from the app that exists to be
+   * isolated, and strictly worse than the read leak. `markRead(ids)` and
+   * `softDelete(ids)` need nothing: their ids come from the already-scoped list.
+   *
+   * The platform-wide rows ARE cleared from any origin, and that follows from
+   * the scope rule rather than contradicting it — those rows are one person's,
+   * not one store's.
+   */
+  markAllRead(userId: string, scope?: NotificationScope): Promise<number>;
   softDelete(userId: string, ids: readonly string[]): Promise<number>;
 }
 
@@ -66,27 +107,39 @@ function pageWhere(
   userId: string,
   filter: ListNotificationsInput['filter'],
   anchor: NotificationPageAfter | undefined,
+  scope: NotificationScope,
 ): NotificationWhere {
+  // Two DISJUNCTIONS have to hold at once — the page boundary and the store
+  // scope — so they are AND-ed rather than merged. A second `OR` key on this
+  // object literal would overwrite the first, dropping either the scope or the
+  // anchor; the anchor only from page TWO onward, which is the case a cursor
+  // exists for and the case a single-page test never reaches.
+  const clauses: NotificationWhereBranch[] = [
+    // `(createdAt, id) < (anchor.createdAt, anchor.id)`, as a portable `where`.
+    ...(anchor
+      ? [
+          {
+            OR: [
+              { createdAt: { lt: anchor.createdAt } },
+              { createdAt: anchor.createdAt, id: { lt: anchor.id } },
+            ],
+          },
+        ]
+      : []),
+    ...scopeBranch(scope),
+  ];
   return {
     userId,
     deletedAt: null,
     ...(filter === 'unread' ? { readAt: null } : {}),
-    // `(createdAt, id) < (anchor.createdAt, anchor.id)`, as a portable `where`.
-    ...(anchor
-      ? {
-          OR: [
-            { createdAt: { lt: anchor.createdAt } },
-            { createdAt: anchor.createdAt, id: { lt: anchor.id } },
-          ] as NonNullable<NotificationWhere['OR']>,
-        }
-      : {}),
+    ...(clauses.length > 0 ? { AND: clauses } : {}),
   };
 }
 
 export function createInboxStore(db: NotificationsDbProvider): NotificationInboxStore {
   return {
     /** The owner's inbox, newest first, keyset-paginated, deleted excluded. */
-    async list(userId, input = {}) {
+    async list(userId, input = {}, scope) {
       const client = await db();
       const limit = Math.min(Math.max(input.limit ?? DEFAULT_PAGE, 1), MAX_PAGE);
       const anchor = input.cursor
@@ -94,7 +147,7 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
         : undefined;
       if (input.cursor && !anchor) return { items: [], nextCursor: null };
       const rows = await client.notification.findMany({
-        where: pageWhere(userId, input.filter, anchor),
+        where: pageWhere(userId, input.filter, anchor, scope),
         // `id` tie-breaks equal timestamps so pages never skip/repeat.
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit + 1,
@@ -107,9 +160,17 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
     },
 
     /** Unread badge count (non-deleted, unread). */
-    async unreadCount(userId) {
+    async unreadCount(userId, scope) {
       const client = await db();
-      return client.notification.count({ where: { userId, deletedAt: null, readAt: null } });
+      const scoped = scopeBranch(scope);
+      return client.notification.count({
+        where: {
+          userId,
+          deletedAt: null,
+          readAt: null,
+          ...(scoped.length > 0 ? { AND: scoped } : {}),
+        },
+      });
     },
 
     /**
@@ -128,10 +189,16 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
     },
 
     /** Mark every unread notification of the owner read ("mark all"). */
-    async markAllRead(userId) {
+    async markAllRead(userId, scope) {
       const client = await db();
+      const scoped = scopeBranch(scope);
       const result = await client.notification.updateMany({
-        where: { userId, deletedAt: null, readAt: null },
+        where: {
+          userId,
+          deletedAt: null,
+          readAt: null,
+          ...(scoped.length > 0 ? { AND: scoped } : {}),
+        },
         data: { readAt: new Date() },
       });
       return result.count;

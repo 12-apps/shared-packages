@@ -92,6 +92,7 @@ export interface NotificationDispatchDeps {
 export async function loadRecipient(
   deps: NotificationDispatchDeps,
   userId: string,
+  clientId: string | null,
 ): Promise<TransportRecipient | null> {
   const contact = await deps.contacts.getContact(userId);
   if (!contact) return null;
@@ -103,7 +104,11 @@ export async function loadRecipient(
     // absent case has to stay distinguishable from a stated language, because
     // that is what lets a generator apply its own default in one place.
     ...(contact.locale === undefined ? {} : { locale: contact.locale }),
-    pushSubscriptionCount: await deps.pushSubscriptions.count(userId),
+    clientId,
+    // SCOPED, and this is what keeps `supports()` honest: it gates on this
+    // number, so an unscoped count would enqueue a WEB_PUSH delivery for a
+    // notification no reachable subscription exists for.
+    pushSubscriptionCount: await deps.pushSubscriptions.count(userId, clientId),
   };
 }
 
@@ -223,7 +228,9 @@ export async function dispatchOne(
   });
   if (queued.length === 0) return 0;
 
-  const recipient = await loadRecipient(deps, notification.userId);
+  // The STORED column, so the retry sweep scopes identically to the first
+  // attempt — anything less would let a retry leak what the first send withheld.
+  const recipient = await loadRecipient(deps, notification.userId, notification.clientId);
   if (!recipient) {
     await abandonUnreachable(deps, client, queued, notification.userId);
     return 0;

@@ -90,7 +90,20 @@ export interface WebPushDriverDeclaration extends DriverDeclarationBase {
 
 /** The subscriptions the transport reads and prunes (db-backed by the mount). */
 export interface WebPushSubscriptionSource {
-  list(userId: string): Promise<{ id: string; endpoint: string; p256dh: string; auth: string }[]>;
+  /**
+   * The subscriptions one notification may reach.
+   *
+   * `notificationClientId` is the notification's tenant — `null` for a
+   * platform-wide one, which every subscription receives. An ADOPTER with a
+   * hand-written source must honour it: a function declared with fewer
+   * parameters still type-checks, so an un-updated implementation silently
+   * ignores the scope and keeps fanning out to every origin, with nothing
+   * failing to compile to say so.
+   */
+  list(
+    userId: string,
+    notificationClientId?: string | null,
+  ): Promise<{ id: string; endpoint: string; p256dh: string; auth: string }[]>;
   prune(id: string): Promise<void>;
 }
 
@@ -159,7 +172,7 @@ export function webPushTransport(
     supports: (recipient: TransportRecipient) => recipient.pushSubscriptionCount > 0,
     format: formatWebPush,
     async send(message, recipient) {
-      const rows = await subscriptions.list(recipient.userId);
+      const rows = await subscriptions.list(recipient.userId, recipient.clientId);
       if (rows.length === 0) throw new Error('Recipient no longer has push subscriptions.');
       const payload = JSON.stringify(message);
       let delivered = 0;

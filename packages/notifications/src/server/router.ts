@@ -279,7 +279,11 @@ export function createNotificationRouter(deps: NotificationRouterDeps): Notifica
         Loading first also means a notification addressed to nobody now throws
         before any content is built, which is the cheaper order anyway.
       */
-      const recipient = await loadRecipient(deps, event.recipient.userId);
+      const recipient = await loadRecipient(
+        deps,
+        event.recipient.userId,
+        event.recipient.clientId ?? null,
+      );
       if (!recipient) throw new UnknownNotificationRecipientError(event.recipient.userId);
 
       // Forwarded exactly as the directory stated it, `undefined` included: the

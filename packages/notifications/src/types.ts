@@ -190,8 +190,26 @@ export interface TransportRecipient {
   locale?: string | null;
   /** Phone as the host stores it (transports normalize per provider rules). */
   phone: string | null;
-  /** How many active browser push subscriptions the user holds. */
+  /**
+   * How many push subscriptions this NOTIFICATION can actually reach — not how
+   * many the user holds. Scoped by {@link TransportRecipient.clientId}.
+   */
   pushSubscriptionCount: number;
+  /**
+   * The store this notification belongs to, or `null` for a platform-wide one
+   *.
+   *
+   * REQUIRED, and deliberately so where optional is the tempting answer. An
+   * optional field fails OPEN: a construction site that forgets it yields
+   * `undefined`, which the push scope reads as "platform notification -> every
+   * subscription" — precisely the cross-store fan-out this exists to stop.
+   * Three construction sites is the argument FOR requiring it, not against; the
+   * compiler then names them.
+   *
+   * Not a breaking change for adopters: every external use CONSUMES a recipient
+   * through `supports`/`send` below, and the only constructors are in-package.
+   */
+  clientId: string | null;
 }
 
 /**

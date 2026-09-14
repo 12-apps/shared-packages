@@ -27,6 +27,7 @@ import type {
   NotificationsDb,
   NotificationsDbClient,
   NotificationWhere,
+  NotificationWhereBranch,
 } from '@12-apps/notifications/server';
 import type { NotificationRow } from '@12-apps/notifications';
 
@@ -78,29 +79,54 @@ const notificationRow = (row: NotificationSqlRow): NotificationRow => ({
   createdAt: row.created_at,
 });
 
-/** The inbox filter, translated. `deleted_at IS NULL` is on every read. */
-function notificationWhere(where: NotificationWhere, params: Params): string {
-  const conditions = ['deleted_at IS NULL'];
+/**
+ * One filter BRANCH, translated — recursively, and that is what changed.
+ *
+ * This used to identify the page boundary by its POSITION (`const [older,
+ * sameInstant] = where.OR`). There is a second disjunction now — the store
+ * scope — so position says nothing: an `AND` key was dropped silently, and a
+ * non-keyset `OR` would have read `older.createdAt.lt` off a branch that has no
+ * `createdAt` at all.
+ *
+ * The keyset still becomes a row-value comparison rather than an OFFSET, for
+ * the reason it always did: `cursor` + `skip: 1` is applied AFTER the filter,
+ * so this suite's SQL had to diverge from Prisma to avoid skipping a row once
+ * the anchor stopped matching. It is recognised by SHAPE now instead of by
+ * index, which is the only part that moved.
+ */
+function branchWhere(where: NotificationWhereBranch, params: Params): string {
+  const conditions: string[] = [];
   if (where.userId !== undefined) conditions.push(`user_id = ${params.add(where.userId)}`);
   if (where.readAt === null) conditions.push('read_at IS NULL');
+  if (where.clientId === null) conditions.push('client_id IS NULL');
+  else if (where.clientId !== undefined) {
+    conditions.push(`client_id = ${params.add(where.clientId)}`);
+  }
   if (typeof where.id === 'string') conditions.push(`id = ${params.add(where.id)}`);
   else if (where.id !== undefined) {
-    if (where.id.in.length === 0) return 'FALSE';
-    conditions.push(`id IN (${where.id.in.map((value) => params.add(value)).join(', ')})`);
+    if ('in' in where.id) {
+      if (where.id.in.length === 0) return 'FALSE';
+      conditions.push(`id IN (${where.id.in.map((value) => params.add(value)).join(', ')})`);
+    } else {
+      conditions.push(`id < ${params.add(where.id.lt)}`);
+    }
   }
+  if (where.createdAt instanceof Date) {
+    conditions.push(`created_at = ${params.add(where.createdAt)}`);
+  } else if (where.createdAt !== undefined) {
+    conditions.push(`created_at < ${params.add(where.createdAt.lt)}`);
+  }
+  for (const branch of where.AND ?? []) conditions.push(`(${branchWhere(branch, params)})`);
   if (where.OR !== undefined) {
-    // The package hands over the page boundary as a KEYSET, so this is a literal
-    // row-value comparison rather than a translation of a positional cursor.
-    // That is the whole reason it changed: `cursor` + `skip: 1` is an OFFSET
-    // applied after the filter, and this suite's SQL had to diverge from Prisma
-    // deliberately to avoid skipping a row once the anchor stopped matching. Now
-    // there is nothing to diverge from.
-    const [older, sameInstant] = where.OR;
-    conditions.push(
-      `(created_at, id) < (${params.add(older.createdAt.lt)}, ${params.add(sameInstant.id.lt)})`,
-    );
+    const arms = where.OR.map((branch) => `(${branchWhere(branch, params)})`);
+    conditions.push(arms.length > 0 ? `(${arms.join(' OR ')})` : 'FALSE');
   }
-  return conditions.join(' AND ');
+  return conditions.length > 0 ? conditions.join(' AND ') : 'TRUE';
+}
+
+/** The inbox filter, translated. `deleted_at IS NULL` is on every read. */
+function notificationWhere(where: NotificationWhere, params: Params): string {
+  return `deleted_at IS NULL AND (${branchWhere(where, params)})`;
 }
 
 function notificationDelegate(sql: SqlRunner): NotificationDelegate {

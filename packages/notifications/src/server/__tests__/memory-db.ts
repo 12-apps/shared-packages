@@ -12,7 +12,9 @@ import type {
   NotificationsDb,
   NotificationsDbClient,
   NotificationWhere,
+  NotificationWhereBranch,
   PushSubscriptionRow,
+  PushSubscriptionWhere,
 } from '../db';
 
 /**
@@ -48,28 +50,60 @@ export interface MemoryDb extends NotificationsDb {
  */
 const snapshot = <T extends object>(row: T): T => ({ ...row });
 
-/** `(createdAt, id) < (anchor.createdAt, anchor.id)` — the keyset half. */
-function afterAnchor(row: NotificationRow, or: NonNullable<NotificationWhere['OR']>): boolean {
-  const [older, sameInstant] = or;
-  if (row.createdAt.getTime() < older.createdAt.lt.getTime()) return true;
-  return (
-    row.createdAt.getTime() === sameInstant.createdAt.getTime() &&
-    row.id < sameInstant.id.lt
-  );
+/**
+ * One filter BRANCH, evaluated structurally.
+ *
+ * Structural, not positional, and that is the point of the rewrite.
+ * The version this replaced read `where.OR` and destructured it as `[older,
+ * sameInstant]` — it identified the keyset by its POSITION in the array. Once a
+ * second disjunction exists (the store scope), that assumption is wrong twice
+ * over: an `AND` key was ignored entirely, so rows came back unscoped AND
+ * unpaged, and a non-keyset `OR` threw on `older.createdAt.lt`.
+ *
+ * `deletedAt` is hard-coded excluded here rather than read off the branch, as
+ * it always was: every read of this table excludes soft-deleted rows, and the
+ * double must not be able to answer otherwise even if a caller forgets it.
+ */
+function matches(row: NotificationRow, where: NotificationWhereBranch): boolean {
+  if (where.userId !== undefined && row.userId !== where.userId) return false;
+  if (where.readAt === null && row.readAt !== null) return false;
+  if (where.clientId !== undefined && row.clientId !== where.clientId) return false;
+  if (typeof where.id === 'string' && row.id !== where.id) return false;
+  if (where.id !== undefined && typeof where.id !== 'string') {
+    if ('in' in where.id && !where.id.in.includes(row.id)) return false;
+    if ('lt' in where.id && !(row.id < where.id.lt)) return false;
+  }
+  if (where.createdAt instanceof Date && row.createdAt.getTime() !== where.createdAt.getTime()) {
+    return false;
+  }
+  if (
+    where.createdAt !== undefined &&
+    !(where.createdAt instanceof Date) &&
+    !(row.createdAt.getTime() < where.createdAt.lt.getTime())
+  ) {
+    return false;
+  }
+  if (where.AND !== undefined && !where.AND.every((branch) => matches(row, branch))) return false;
+  if (where.OR !== undefined && !where.OR.some((branch) => matches(row, branch))) return false;
+  return true;
 }
 
 function live(rows: NotificationRow[], where: NotificationWhere): NotificationRow[] {
-  return rows.filter((row) => {
-    if (row.deletedAt !== null) return false;
-    if (where.userId !== undefined && row.userId !== where.userId) return false;
-    if (where.readAt === null && row.readAt !== null) return false;
-    if (typeof where.id === 'string' && row.id !== where.id) return false;
-    if (where.id !== undefined && typeof where.id !== 'string' && !where.id.in.includes(row.id)) {
-      return false;
-    }
-    if (where.OR !== undefined && !afterAnchor(row, where.OR)) return false;
-    return true;
-  });
+  return rows.filter((row) => row.deletedAt === null && matches(row, where));
+}
+
+/**
+ * Which subscriptions one notification reaches — the same rule
+ * `push-subscriptions.ts` states, evaluated here rather than assumed.
+ *
+ * No `OR` means nobody narrowed, so every row of the owner's. With one, a row
+ * qualifies when its origin matches either arm — the store's, or the platform's
+ * `null`, which is why an `in` could not stand in for it.
+ */
+function reachable(row: PushSubscriptionRow, where: PushSubscriptionWhere): boolean {
+  if (row.userId !== where.userId) return false;
+  if (where.OR === undefined) return true;
+  return where.OR.some((arm) => row.clientId === arm.clientId);
 }
 
 /**
@@ -219,12 +253,10 @@ export function createMemoryDb(): MemoryDb {
 
     pushSubscription: {
       count({ where }) {
-        return Promise.resolve(
-          subscriptions.filter((row) => row.userId === where.userId).length,
-        );
+        return Promise.resolve(subscriptions.filter((row) => reachable(row, where)).length);
       },
       findMany({ where }) {
-        return Promise.resolve(subscriptions.filter((row) => row.userId === where.userId));
+        return Promise.resolve(subscriptions.filter((row) => reachable(row, where)));
       },
       findUnique({ where }) {
         return Promise.resolve(

@@ -54,14 +54,40 @@ export interface NotificationPageAfter {
   id: string;
 }
 
-/** The inbox read filter. `deletedAt: null` is on every read, always. */
-export interface NotificationWhere {
+/**
+ * One BRANCH of an inbox filter — a member of `AND`/`OR`, never a whole read.
+ *
+ * Split out when the store scope arrived, and the split is what keeps `deletedAt: null`
+ * REQUIRED on the read itself (see {@link NotificationWhere}). Widening `OR`
+ * from the old fixed keyset tuple to a general array needed its members to be
+ * valid filters, and the tempting move — relaxing `deletedAt` on the one type —
+ * would have removed the only thing that makes a Prisma-backed host exclude
+ * soft-deleted rows. Both in-package doubles hard-code that filter regardless,
+ * so Prisma is precisely the implementation the requirement was protecting.
+ *
+ * `createdAt` and `id: { lt }` are here because the keyset boundary is built
+ * from them (`../inbox.ts`'s `pageWhere`); without them the branch type cannot
+ * express the very thing the widening exists to preserve.
+ */
+export interface NotificationWhereBranch {
   userId?: string;
-  id?: string | { in: string[] };
-  deletedAt: null;
+  id?: string | { in: string[] } | { lt: string };
+  createdAt?: Date | { lt: Date };
+  deletedAt?: null;
   readAt?: null;
-  /** The keyset half of `(createdAt, id) < (anchor.createdAt, anchor.id)`. */
-  OR?: [{ createdAt: { lt: Date } }, { createdAt: Date; id: { lt: string } }];
+  /** `null` matches the platform-wide rows that travel with every store scope. */
+  clientId?: string | null;
+  OR?: NotificationWhereBranch[];
+  AND?: NotificationWhereBranch[];
+}
+
+/**
+ * The inbox read filter. `deletedAt: null` is on every read, always — and it
+ * stays REQUIRED here, which is the whole reason {@link NotificationWhereBranch}
+ * is a separate type.
+ */
+export interface NotificationWhere extends NotificationWhereBranch {
+  deletedAt: null;
 }
 
 export interface NotificationDelegate {
@@ -180,11 +206,25 @@ export interface PushSubscriptionRow {
   endpoint: string;
   p256dh: string;
   auth: string;
+  /** The origin this browser registered on; `null` = the platform origin. */
+  clientId: string | null;
   userAgent: string | null;
 }
 
+/**
+ * Which of a user's subscriptions one send may reach.
+ *
+ * The disjunction is load-bearing and `clientId: { in: [x, null] }` is NOT a
+ * shortcut for it: SQL `IN` never matches NULL, so the platform-wide rows that
+ * must travel with every store scope would silently vanish.
+ */
+export interface PushSubscriptionWhere {
+  userId: string;
+  OR?: [{ clientId: null }, { clientId: string }];
+}
+
 export interface PushSubscriptionDelegate {
-  count(args: { where: { userId: string } }): Promise<number>;
+  count(args: { where: PushSubscriptionWhere }): Promise<number>;
   /**
    * The row holding one endpoint, whoever owns it. Read BEFORE an upsert so a
    * re-own (the same browser profile, a different signed-in user) is a logged
@@ -192,7 +232,7 @@ export interface PushSubscriptionDelegate {
    * whether THIS browser's subscription is still the caller's.
    */
   findUnique(args: { where: { endpoint: string } }): Promise<PushSubscriptionRow | null>;
-  findMany(args: { where: { userId: string } }): Promise<PushSubscriptionRow[]>;
+  findMany(args: { where: PushSubscriptionWhere }): Promise<PushSubscriptionRow[]>;
   upsert(args: {
     where: { endpoint: string };
     create: {
@@ -200,12 +240,14 @@ export interface PushSubscriptionDelegate {
       endpoint: string;
       p256dh: string;
       auth: string;
+      clientId: string | null;
       userAgent: string | null;
     };
     update: {
       userId: string;
       p256dh: string;
       auth: string;
+      clientId: string | null;
       userAgent: string | null;
     };
   }): Promise<PushSubscriptionRow>;
