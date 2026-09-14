@@ -20,7 +20,7 @@ import {
   teamSyncState,
   type TeamRow,
 } from './team-grid-config';
-import { RoleEditDialog } from './team-role-dialog';
+import { RoleEditDialog, type RoleModel } from './team-role-dialog';
 import {
   HeaderControls,
   InviteDialog,
@@ -52,6 +52,11 @@ export { splitRoleSelection } from './team-role-dialog';
 export interface TeamScreenProps {
   api: RbacApiClient;
   labels: RbacLabels;
+  /**
+   * How this host relates people to roles. Defaults to `base+custom`, which is
+   * every adopter before the set model existed. See {@link RoleModel}.
+   */
+  roleModel?: RoleModel;
   /** The SYSTEM roles assignable as a member's base (owner tier excluded). */
   systemRoles: readonly string[];
   /**
@@ -109,7 +114,13 @@ function useRosterControls(
     () => (data.context?.assignableRoles ?? []).filter((name) => !systemSet.has(name)),
     [data.context, systemSet],
   );
-  const editor = useRoleEditor(props.api, systemSet, data.refresh, actions.setError);
+  const editor = useRoleEditor(
+    props.api,
+    systemSet,
+    data.refresh,
+    actions.setError,
+    props.roleModel,
+  );
   const removeConfirm = useRemoveConfirm(actions, copy);
   const cancelInviteConfirm = useCancelInviteConfirm(actions, copy);
   // Rebuilt per render rather than memoised on identity: the handlers close
@@ -222,6 +233,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
         {cancelInviteConfirm.dialog}
         <RoleEditDialog
           member={editor.editing}
+          roleModel={props.roleModel}
           systemRoles={props.systemRoles}
           availableCustomRoles={customRoles}
           labels={labels}

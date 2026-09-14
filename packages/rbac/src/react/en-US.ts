@@ -157,6 +157,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     systemGroupTitle: 'System role (pick one)',
     customGroupTitle: 'Custom roles (optional)',
     exactlyOneSystemRole: 'Select exactly one system role.',
+      atLeastOneRole: 'Pick at least one role.',
     cancelAction: 'Cancel',
     saveAction: 'Save',
   },

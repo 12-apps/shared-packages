@@ -230,6 +230,14 @@ export interface TeamRoleDialogCopy {
   customGroupTitle: string;
   /** The warning while the selection has zero or two system roles. */
   exactlyOneSystemRole: string;
+  /**
+   * The warning while a SET-model selection is empty.
+   *
+   * Optional: a host on the base+custom model never shows it, and absent it
+   * falls back to {@link TeamRoleDialogCopy.exactlyOneSystemRole} rather than
+   * to a sentence this package invented.
+   */
+  atLeastOneRole?: string;
   cancelAction: string;
   saveAction: string;
 }

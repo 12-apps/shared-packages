@@ -144,6 +144,7 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     systemGroupTitle: 'Papel do sistema (escolha um)',
     customGroupTitle: 'Papéis personalizados (opcional)',
     exactlyOneSystemRole: 'Selecione exatamente um papel do sistema.',
+      atLeastOneRole: 'Escolha ao menos um papel.',
     cancelAction: 'Cancelar',
     saveAction: 'Salvar',
   },
