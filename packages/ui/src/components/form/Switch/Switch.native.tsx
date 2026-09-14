@@ -17,6 +17,7 @@ import {
   descriptionTextStyle,
   helperTextStyle,
   labelTextStyle,
+  checkedInk,
   switchPalette,
   thumbStyle,
   trackStyle,
@@ -44,9 +45,6 @@ import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import type { UiTheme } from '../../../tokens/theme';
 
 const nativeDriver = Platform.OS !== 'web';
-
-/** The web writes the `on` wording in white, whatever the hue behind it. */
-const TRACK_LABEL_ON_INK = '#fff';
 
 /** A 0→1 value that follows `on`, over MUI's 300ms curve unless animation is off. */
 function useProgress(on: boolean, animated: boolean): Animated.Value {
@@ -167,7 +165,16 @@ interface ControlProps {
   testID: string;
 }
 
-/** The track, the thumb, and everything overlaid on them. */
+/**
+ * The track, the thumb, and everything overlaid on them.
+ *
+ * The control carries its own NAME (FUT-1905). React Native has no `<label
+ * for>` to wire the words beside it with, so the name has to be stated on the
+ * pressable itself or the control announces as "checkbox, checked" and nothing
+ * else — which is the defect the web half of this ticket fixed, still live
+ * here. A caller's own `aria-label` wins, because a caller that wrote one meant
+ * it to differ from the visible words.
+ */
 function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID }: ControlProps): React.JSX.Element {
   const { variant, color, size, animated, loading, onIcon, offIcon, onText, offText } = props;
   const geometry: SwitchGeometry = geometryOf(size, props.trackWidth, props.trackHeight);
@@ -184,6 +191,7 @@ function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID
     <Pressable
       testID={testID}
       role="checkbox"
+      aria-label={(rest['aria-label'] as string | undefined) ?? props.label}
       aria-checked={checked}
       aria-disabled={inactive}
       disabled={inactive}
@@ -196,7 +204,12 @@ function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID
     >
       <View style={trackStyle(theme, paint, palette, geometry, look, state)} />
       {showsTrackLabels(variant, onText, offText) ? (
-        <TrackLabels theme={theme} onText={onText} offText={offText} contrastText={TRACK_LABEL_ON_INK} />
+        <TrackLabels
+          theme={theme}
+          onText={onText}
+          offText={offText}
+          contrastText={checkedInk(paint, palette)}
+        />
       ) : null}
       {onIcon == null ? null : (
         <SwitchIcon icon={onIcon} shown={checked} animated={animated} size={iconSize} side="on" width={geometry.width} />
@@ -206,7 +219,7 @@ function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID
       )}
       <Animated.View
         style={[
-          thumbStyle(theme, paint, geometry, look, state),
+          thumbStyle(theme, paint, palette, geometry, look, state),
           { top: geometry.padding, left: restX, opacity: pulse.opacity },
           {
             transform: [

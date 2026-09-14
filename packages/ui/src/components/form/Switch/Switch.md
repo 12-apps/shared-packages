@@ -273,15 +273,28 @@ import Close from '@mui/icons-material/Close';
 
 ## Accessibility
 
-The Switch component follows WCAG 2.1 AA guidelines:
-
-- **Keyboard Navigation**: Supports Tab and Space key activation
-- **Focus Management**: Clear focus indicators with visible outline
-- **ARIA Attributes**: Supports aria-label, aria-describedby, role="switch"
-- **Screen Reader**: Properly announces switch state (on/off)
-- **Disabled State**: Communicates disabled state to assistive technologies
-- **Error State**: Associates error messages with the switch
-- **Helper Text**: Properly linked via aria-describedby
+- **The label names the control.** `label` renders a real `<label for>` pointing
+  at the input, so the switch announces by its visible words and clicking those
+  words toggles it. Pass `aria-label` only where there is no visible label —
+  with one, it would override the text on screen.
+- **The id is minted for you.** An explicit `id` (or `inputProps.id`) wins;
+  otherwise each instance gets its own from `useId`. Do not derive one from a
+  test id: two call sites sharing a test id would share a `for`, and the second
+  label would toggle the first control.
+- **`description` and `helperText` are described, not named.** Both are linked
+  by `aria-describedby` and stay out of the accessible name — a two-line
+  explanation read as the control's NAME is worse than no description at all. A
+  caller's own `aria-describedby` is kept alongside them, not replaced.
+- **Keyboard:** `Tab` to reach it, `Space` to toggle, with a visible focus ring.
+- **It announces as a checkbox, not as a switch.** MUI's `SwitchBase` renders an
+  `<input type="checkbox">` and this component does not override the role.
+  Earlier revisions of this document claimed `role="switch"`; that was never
+  true. Announcing as a checkbox is correct and understood — do not "fix" it by
+  hand-setting the role without also handling `aria-checked`.
+- **The tap target is the LABEL.** `SWITCH_SIZES.xl`, the largest, is 34px tall
+  against the 40px floor, so no `size` clears it. The label carries the floor
+  instead (`TAP_TARGET_MIN`), which is why an unlabelled `Switch` at a phone
+  width still wants a target around it drawn by the caller.
 
 ### Keyboard Shortcuts
 
@@ -372,6 +385,18 @@ The Switch component follows WCAG 2.1 AA guidelines:
   onChange={handleAutoSaveToggle}
 />
 ```
+
+## Ink on the track
+
+The thumb, the `on` wording of the `label` variant and the on-icon all take
+their colour from the palette, NOT from a stated white. The checked track is
+`palette.main` — the one surface a white-labelled host picks — so a pale brand
+gets dark ink and reads as ON, where a white knob on a pale bar reads as OFF.
+Under `gradient` the whole bar (`light → main → dark`) is considered, not just
+the colour in the middle of it.
+
+The RESTING thumb stays white by design: that track is `action.disabled` washed
+over the page, which no tenant chooses.
 
 ## Theming
 

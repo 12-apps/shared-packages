@@ -34,6 +34,28 @@ describe('Switch (native)', () => {
     expect(screen.getByTestId('switch-helper')).toHaveTextContent('Aviso');
   });
 
+  it('announces by its label, which native has no <label for> to do for it', () => {
+    /*
+      The same defect FUT-1905 fixed on the web, which was still live here: the
+      pressable carried `role="checkbox"` and `aria-checked` and no NAME, so it
+      announced as "checkbox, checked" with the words beside it invisible to the
+      screen reader. React Native has no `for`, so the name is stated on the
+      control.
+    */
+    render(<Switch label="Notificações" />);
+
+    expect(screen.getByRole('checkbox', { name: 'Notificações' })).toBeInTheDocument();
+  });
+
+  it('lets a caller name it something other than the visible words', () => {
+    // A caller that wrote `aria-label` meant it to differ from the label.
+    render(<Switch label="Notificações" aria-label="Ativar notificações do pedido" />);
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Ativar notificações do pedido' }),
+    ).toBeInTheDocument();
+  });
+
   it('derives the container, label and helper ids from the caller id', () => {
     render(<Switch dataTestId="alerts" label="Alertas" helperText="Aviso" />);
     expect(screen.getByTestId('alerts')).toHaveAttribute('role', 'checkbox');

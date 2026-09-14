@@ -1,7 +1,16 @@
 import { createTheme } from '@mui/material/styles/index.js';
 import { describe, expect, it } from 'vitest';
 
-import { augmentColor, contrastText, createUiTheme, DEFAULT_BRAND, px, type UiThemeMode } from '../theme';
+import {
+  augmentColor,
+  contrastText,
+  createUiTheme,
+  DEFAULT_BRAND,
+  inkOver,
+  px,
+  type UiThemeMode,
+} from '../theme';
+import { getContrastRatio } from '../color';
 
 /**
  * The theme's whole purpose is to hand the native renderer the palette MUI
@@ -127,5 +136,59 @@ describe('createUiTheme derives the palette MUI derives', () => {
     expect(ui.palette.primary.main).toBe('#00897b');
     expect(ui.palette.background.default).toBe('#0b0b0b');
     expect(ui.palette.background.paper).toBe('#121212');
+  });
+});
+
+describe('inkOver — the ink for a fill that is not one colour (FUT-1924)', () => {
+  const WHITE = '#fff';
+  const DARK = 'rgba(0, 0, 0, 0.87)';
+
+  it('stops labelling a pale tenant brand in white', () => {
+    // A real seeded tenant's hex. White on it is 1.76:1, which is the defect
+    // this exists for; MUI's own rule already refuses it, and agrees here.
+    expect(inkOver(['#7ED957'], WHITE)).toBe(DARK);
+    expect(inkOver(['#7ED957'], WHITE)).toBe(contrastText('#7ED957'));
+  });
+
+  it('takes whichever ink survives the WORSE of the fills', () => {
+    // MUI's own success pair, which is as far apart as a gradient gets: white
+    // is 2.78:1 on `light` and dark ink 2.66:1 on `dark`. Neither is good, and
+    // white is the one that is less bad — which is not the answer either fill
+    // gives on its own (`contrastText('#4caf50')` is dark ink).
+    expect(inkOver(['#4caf50', '#1b5e20'], WHITE)).toBe(WHITE);
+    expect(contrastText('#4caf50')).toBe(DARK);
+  });
+
+  it('does NOT follow contrastText\'s preference for white', () => {
+    // The deliberate divergence, and the reason this is not just
+    // `contrastText(lightest)`: MUI takes white wherever white clears 3:1,
+    // which is a brand-feel threshold. Here white clears it at 3.86:1 and dark
+    // ink is still better, at 5.44:1.
+    const fill = '#0288d1';
+
+    expect(contrastText(fill)).toBe(WHITE);
+    expect(getContrastRatio(DARK, fill)).toBeGreaterThan(getContrastRatio(WHITE, fill));
+    expect(inkOver([fill], WHITE)).toBe(DARK);
+  });
+
+  it('returns the better of two bad inks rather than throwing', () => {
+    /*
+      White to black is the widest a gradient gets: both inks bottom out at
+      1.00 against one end, so there is no better answer and the only thing
+      worth asserting is that a caller still gets a colour. The version of this
+      case that read `expect([WHITE, DARK]).toContain(…)` asserted nothing at
+      all — `inkOver` can return nothing else, for any input.
+    */
+    expect(inkOver(['#ffffff', '#000000'], WHITE)).toMatch(/^(#fff|rgba\(0, 0, 0, 0\.87\))$/u);
+
+    // The case that DOES have a less bad ink, asserted as such: white is
+    // 2.78:1 on the light end where dark ink is 2.66:1 on the dark one.
+    expect(inkOver(['#4caf50', '#1b5e20'], DARK)).toBe(WHITE);
+  });
+
+  it('falls back rather than throwing on a colour it cannot decompose', () => {
+    // `getContrastRatio` throws on a format it does not know, and a throw
+    // inside an emotion style function takes the render down with it.
+    expect(inkOver(['rebeccapurple'], '#123456')).toBe('#123456');
   });
 });

@@ -26,6 +26,7 @@ import {
   SWITCH_RIPPLE,
   SWITCH_SPINNER,
   SWITCH_TRANSITION,
+  RESTING_THUMB,
   THUMB_ELEVATION,
   THUMB_RADIUS,
   TRACK_LABEL,
@@ -41,7 +42,7 @@ import {
 } from './Switch.metrics';
 import type { SwitchVariant } from './Switch.base';
 
-import { px } from '../../../tokens/theme';
+import { inkOver, px } from '../../../tokens/theme';
 import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
 
 // Every number below comes from `./Switch.metrics`, which the native renderer
@@ -125,6 +126,32 @@ const rippleOverlay = (palette: ColorPalette): CSSObject => ({
   pointerEvents: 'none',
 });
 
+/**
+ * The ink on the CHECKED track — the thumb, the `on` wording and any on-icon
+ * (FUT-1924).
+ *
+ * All three stated `#fff`, and the checked track is `palette.main`: the one
+ * surface in this component the TENANT picks. A store with a pale brand got a
+ * white thumb on a pale green bar, which does not read as a knob at all — the
+ * switch looks OFF while it is on, so this is a state a user misreads rather
+ * than a colour they dislike.
+ *
+ * The `gradient` flag paints the track `light → main → dark`, so the fills the
+ * thumb travels over are handed over together and {@link inkOver} takes the
+ * worst of them.
+ *
+ * The RESTING track is not here on purpose: it is `theme.palette.action.disabled`
+ * washed over the page, which no tenant chooses, and a white thumb on it is the
+ * conventional look in both modes.
+ */
+const checkedInk = (flags: SwitchFlags, palette: ColorPalette): string => {
+  const fills = flags.gradient
+    ? [palette.light || palette.main, palette.main, palette.dark || palette.main]
+    : [palette.main];
+
+  return inkOver(fills, palette.contrastText || NEUTRAL_CONTRAST);
+};
+
 /** The checked track: the filled bar behind the thumb once the switch is on. */
 const checkedTrack = (flags: SwitchFlags, palette: ColorPalette): CSSObject => ({
   backgroundColor: palette.main,
@@ -170,9 +197,12 @@ const switchBaseSx = (
       // The thumb travels the track minus its own width and both paddings; the
       // iOS look insets differently, so it gets its own distance.
       transform: `translateX(${width - thumbSize - padding * 2}px)`,
-      color: '#fff',
+      color: checkedInk(flags, palette),
       '& .MuiSwitch-thumb': {
         animation: flags.loading ? 'none' : `${bounceAnimation} ${seconds(SWITCH_TRANSITION.ms)} ease-out`,
+        // `glass` draws its own translucent thumb and means to show the track
+        // through it, so it keeps the fill it chose.
+        ...(flags.glass ? {} : { backgroundColor: checkedInk(flags, palette) }),
       },
       '& + .MuiSwitch-track': checkedTrack(flags, palette),
       '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.checkedTrackOpacity },
@@ -197,7 +227,9 @@ const thumbSx = (
   width: thumbSize,
   height: thumbSize,
   borderRadius: THUMB_RADIUS[look](thumbSize),
-  backgroundColor: '#fff',
+  // `.Mui-checked` above replaces this for the brand-filled track; see
+  // {@link RESTING_THUMB} for why the resting one stays white.
+  backgroundColor: RESTING_THUMB,
   boxShadow: thumbShadow(theme, look),
   transition: `all ${seconds(SWITCH_TRANSITION.ms)} ${SWITCH_TRANSITION.easing}`,
   position: 'relative',
@@ -239,7 +271,13 @@ const thumbSx = (
 });
 
 /** The on/off wording the `label` variant prints inside the track. */
-const trackLabels = (theme: Theme, onText?: string, offText?: string): CSSObject => ({
+const trackLabels = (
+  theme: Theme,
+  flags: SwitchFlags,
+  palette: ColorPalette,
+  onText?: string,
+  offText?: string,
+): CSSObject => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -258,7 +296,13 @@ const trackLabels = (theme: Theme, onText?: string, offText?: string): CSSObject
     zIndex: 1,
   },
   ...(onText && {
-    '&::before': { content: `"${onText}"`, left: theme.spacing(TRACK_LABEL.insetUnits), color: '#fff' },
+    '&::before': {
+      content: `"${onText}"`,
+      left: theme.spacing(TRACK_LABEL.insetUnits),
+      // The `on` word sits at the end the thumb travels TO, which is the
+      // filled half of the track once checked.
+      color: checkedInk(flags, palette),
+    },
   }),
   ...(offText && {
     '&::after': {
@@ -297,9 +341,18 @@ const trackSx = (
       !glass && {
         background: `linear-gradient(${SWITCH_GRADIENT.resting.angleDeg}deg, ${alpha(palette.light || palette.main, SWITCH_GRADIENT.resting.lightAlpha)}, ${alpha(palette.main, SWITCH_GRADIENT.resting.mainAlpha)})`,
       }),
-    ...(showsTrackLabels(customVariant, onText, offText) && trackLabels(theme, onText, offText)),
+    ...(showsTrackLabels(customVariant, onText, offText) &&
+      trackLabels(theme, flags, palette, onText, offText)),
   };
 };
+
+/**
+ * The same checked-track ink, for the two ICONS the control overlays on the
+ * track — which are drawn as components rather than styles, so they cannot
+ * reach {@link checkedInk} directly.
+ */
+export const onTrackInk = (theme: Theme, flags: SwitchFlags): string =>
+  checkedInk(flags, getColorFromTheme(theme, flags.customColor ?? 'primary'));
 
 export const switchSx = (theme: Theme, flags: SwitchFlags): CSSObject => {
   const palette = getColorFromTheme(theme, flags.customColor ?? 'primary');

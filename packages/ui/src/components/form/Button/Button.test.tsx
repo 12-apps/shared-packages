@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -144,5 +145,102 @@ describe('Button (web)', () => {
       </Button>,
     );
     expect(screen.getByTestId('b')).toBeDisabled();
+  });
+});
+
+/**
+ * THE ONE BUTTON A PALE-BRANDED STORE COULD NOT READ (FUT-1924).
+ *
+ * `gradient` stated `color: '#fff'` outright while every other filled variant
+ * read `palette.contrastText`. A white-labelled host handing the library a pale
+ * brand therefore got dark ink on its solid buttons and white ink on its
+ * gradient one — in LIGHT mode, before dark mode existed anywhere.
+ *
+ * The gradient is also not one colour, which is why the fix is not simply
+ * `contrastText`: `primary` runs `primary.main → secondary.main`, and an ink
+ * chosen against the first says nothing about the second.
+ */
+describe('Button — the gradient variant takes its ink from the palette', () => {
+  const brand = (main: string, secondary: string) =>
+    createTheme({ palette: { primary: { main }, secondary: { main: secondary } } });
+
+  it('stops writing white over a pale brand', () => {
+    // A real seeded tenant's hex: white on it is 1.76:1.
+    render(
+      <ThemeProvider theme={brand('#7ED957', '#B2FF59')}>
+        <Button variant="gradient" dataTestId="pale">
+          Pagar
+        </Button>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('pale')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+  });
+
+  it('leaves a dark brand white, which is what it always was', () => {
+    render(
+      <ThemeProvider theme={brand('#1A237E', '#311B92')}>
+        <Button variant="gradient" dataTestId="dark">
+          Pagar
+        </Button>
+      </ThemeProvider>,
+    );
+
+    // The half that proves this is a correction rather than a repaint.
+    expect(screen.getByTestId('dark')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
+  });
+
+  it('pins what the DEFAULT palette gets, because two of five change', () => {
+    /*
+      Every other case here builds a theme by hand, which is how a library
+      changes its own stock appearance without anybody noticing. Measured on
+      MUI's `createTheme()`:
+
+        primary   #1976d2 → #9c27b0   white 4.61  dark 3.34   white  (unchanged)
+        secondary #9c27b0 → #1976d2   white 4.61  dark 3.34   white  (unchanged)
+        success   #4caf50 → #1b5e20   white 2.78  dark 2.66   white  (unchanged)
+        warning   #ff9800 → #e65100   white 2.16  dark 5.54   DARK   (was white)
+        danger    #ef5350 → #c62828   white 3.49  dark 3.74   DARK   (was white)
+
+      `warning` is the fix doing its job: white at 2.16:1 on an orange was the
+      defect. `danger` is bought for 0.25 of a contrast point with NEITHER ink
+      clearing AA, and it repaints a destructive button — that one is a
+      recorded decision rather than a good one, and FUT-2066 carries the
+      question of whether a margin belongs in `inkOver`.
+    */
+    render(
+      <>
+        <Button variant="gradient" color="danger" dataTestId="danger">x</Button>
+        <Button variant="gradient" color="warning" dataTestId="warning">x</Button>
+        <Button variant="gradient" color="primary" dataTestId="primary">x</Button>
+      </>,
+    );
+
+    expect(screen.getByTestId('danger')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+    expect(screen.getByTestId('warning')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+    expect(screen.getByTestId('primary')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
+  });
+
+  it('is decided by the stop the gradient REACHES, not only where it starts', () => {
+    /*
+      A store's deep green running into its own lighter one. `primary.main`
+      alone takes white and is right to — 5.12:1, against 4.10:1 for dark ink.
+      The bar ends on `#4caf50`, where that white is 2.78:1, and dark ink's
+      worst across the pair is still 4.10:1. The `solid` button in this palette
+      keeps its white label; the gradient one cannot.
+    */
+    render(
+      <ThemeProvider theme={brand('#2E7D32', '#4caf50')}>
+        <Button variant="gradient" dataTestId="mixed">
+          Pagar
+        </Button>
+        <Button variant="solid" dataTestId="solid">
+          Pagar
+        </Button>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('mixed')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+    expect(screen.getByTestId('solid')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
   });
 });
