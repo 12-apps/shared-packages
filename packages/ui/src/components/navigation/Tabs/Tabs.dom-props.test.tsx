@@ -12,9 +12,18 @@
  * React reports each one, so a storefront cardápio — which renders this
  * component for its category strip — logged a run of warnings on every load,
  * and every jsdom test that mounted the page printed them too. **Measured at
- * eight** on a bare `<Tabs items value onChange />`: five `React does not
- * recognize the … prop on a DOM element` and three `Received false for a
- * non-boolean attribute`. The ticket said six; it undercounted.
+ * eight** on a bare `<Tabs items value onChange closeTabLabel />`, reading the
+ * prop name out of React's own `console.error` arguments rather than off a
+ * console by eye:
+ *
+ *   `React does not recognize the … prop`  — fullWidth, stickyOffset,
+ *                                            animateContent, animationDuration,
+ *                                            persistContent
+ *   `Received false for a non-boolean …`   — scrollable, sticky, loading
+ *
+ * The ticket said six and named them by eye. It undercounted, and `fullWidth`
+ * and `scrollable` were not on its list at all — which is the argument for
+ * asserting the console rather than a list of names.
  *
  * All eight are THIS component's. The ticket attributed the `loading` one to
  * `Button`, which is wrong and worth recording so nobody re-opens that file:
