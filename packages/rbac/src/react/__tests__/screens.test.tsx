@@ -203,18 +203,20 @@ describe('the roles read tier', () => {
   it('opens the catalog read-only to a caller holding the read gate alone', async () => {
     const api = apiStub();
     mountRoles(api, ['catalog:roles:read'], 'catalog:roles:read');
-    await waitFor(() => {
-      expect(screen.getByTestId('roles-grid')).toBeTruthy();
-    });
     // The grid is the point; the writes are what must be ABSENT rather than
     // rendered-and-refused.
-    expect(screen.queryByTestId('add-role-button')).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-grid')).toBeTruthy();
+      expect(screen.queryByTestId('add-role-button')).toBeNull();
+    });
     // The kebab IS there, carrying exactly one entry: the permissions the grid
     // only counts. Opening it is the whole reason the tier exists.
     fireEvent.click(screen.getByTestId('role-actions-r1'));
-    expect(await screen.findByTestId('role-action-view')).toBeTruthy();
-    expect(screen.queryByTestId('role-action-edit')).toBeNull();
-    expect(screen.queryByTestId('role-action-delete')).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId('role-action-view')).toBeTruthy();
+      expect(screen.queryByTestId('role-action-edit')).toBeNull();
+      expect(screen.queryByTestId('role-action-delete')).toBeNull();
+    });
     // Keyed on VIEW: the old gate skipped this read for anyone without manage,
     // which would have left exactly this caller staring at an empty grid.
     expect(api.listRoles).toHaveBeenCalled();
@@ -235,8 +237,8 @@ describe('the roles read tier', () => {
     mountRoles(api, ['titles:read:all'], 'catalog:roles:read');
     await waitFor(() => {
       expect(screen.getByTestId('roles-not-found')).toBeTruthy();
+      expect(screen.queryByTestId('roles-grid')).toBeNull();
     });
-    expect(screen.queryByTestId('roles-grid')).toBeNull();
     // Refused means refused: no request is sent just to be rejected.
     expect(api.listRoles).not.toHaveBeenCalled();
   });
@@ -247,8 +249,8 @@ describe('the roles read tier', () => {
     mountRoles(api, ['titles:read:all']);
     await waitFor(() => {
       expect(screen.getByTestId('roles-not-found')).toBeTruthy();
+      expect(screen.queryByTestId('roles-grid')).toBeNull();
     });
-    expect(screen.queryByTestId('roles-grid')).toBeNull();
     expect(api.listRoles).not.toHaveBeenCalled();
   });
 });

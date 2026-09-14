@@ -253,14 +253,55 @@ function rolesGate({
   return null;
 }
 
-export function RolesScreen(props: RolesScreenProps): JSX.Element {
-  const { api, copy } = props;
+/**
+ * The two tiers this screen resolves.
+ *
+ * Read is SATISFIED BY manage, so a host that names no `readPermission`
+ * resolves `canView === canManage` and behaves exactly as it did before the
+ * tier existed. That equivalence is the whole compatibility guarantee.
+ */
+function useRolesGates(props: RolesScreenProps): { canManage: boolean; canView: boolean } {
   const can = useCan();
   const canManage = can(props.managePermission);
-  // Read is SATISFIED BY manage, so a host that names no `readPermission`
-  // resolves `canView === canManage` and behaves exactly as it did before the
-  // tier existed. That equivalence is the whole compatibility guarantee.
-  const canView = canManage || (props.readPermission !== undefined && can(props.readPermission));
+  const readable = props.readPermission !== undefined && can(props.readPermission);
+  return { canManage, canView: canManage || readable };
+}
+
+/** The title, its explainer, and the one write affordance in the header. */
+function RolesHeader({
+  copy,
+  canManage,
+  onCreate,
+}: {
+  copy: RbacWebCopy;
+  canManage: boolean;
+  onCreate: () => void;
+}): JSX.Element {
+  return (
+    <Dashboard.Header title={copy.rolesList.title}>
+      <Dashboard.Info title={copy.rolesList.aboutTitle}>{copy.rolesList.aboutBody}</Dashboard.Info>
+      <Dashboard.Spacer />
+      {/* Gated like the row menu and the batch actions. It never needed to be
+          before: `rolesGate` refused the whole screen to anyone without
+          `managePermission`, so this could not render for a caller who may not
+          use it. A read-only caller reaches this line now. */}
+      {canManage && (
+        <Dashboard.Action>
+          <HeaderButton
+            text={copy.rolesList.newRoleAction}
+            icon={<AddIcon fontSize="small" />}
+            onClick={onCreate}
+            dataTestId="add-role-button"
+          />
+        </Dashboard.Action>
+      )}
+    </Dashboard.Header>
+  );
+}
+
+export function RolesScreen(props: RolesScreenProps): JSX.Element {
+  const { api, copy } = props;
+  const { canManage, canView } = useRolesGates(props);
   const [searchParams] = useSearchParams();
   const search = rolesSearch(searchParams);
   // Keyed on VIEW, not on manage: the endpoint refuses an actor who may not
@@ -285,26 +326,7 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
     <DataViewsCopyProvider copy={copy.dataViews}>
       <Dashboard testIdPrefix="roles-dashboard">
         {props.breadcrumb && <Dashboard.Breadcrumb items={[...props.breadcrumb]} />}
-        <Dashboard.Header title={copy.rolesList.title}>
-          <Dashboard.Info title={copy.rolesList.aboutTitle}>
-            {copy.rolesList.aboutBody}
-          </Dashboard.Info>
-          <Dashboard.Spacer />
-          {/* Gated like the row menu and the batch actions. It never needed to
-              be before: `rolesGate` refused the whole screen to anyone without
-              `managePermission`, so this button could not render for a caller
-              who may not use it. A read-only caller reaches this line now. */}
-          {canManage && (
-            <Dashboard.Action>
-              <HeaderButton
-                text={copy.rolesList.newRoleAction}
-                icon={<AddIcon fontSize="small" />}
-                onClick={create.start}
-                dataTestId="add-role-button"
-              />
-            </Dashboard.Action>
-          )}
-        </Dashboard.Header>
+        <RolesHeader copy={copy} canManage={canManage} onCreate={create.start} />
         <Dashboard.Body>
           <CardActionsProvider
             errorDismissLabel={copy.closeLabel}
