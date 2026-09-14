@@ -76,6 +76,12 @@ export function composeTeamRows(
   const rows: TeamRow[] = members.map((member) => {
     const customRoles = custom.get(member.userId) ?? [];
     return {
+      // The member's OWN fields first, so anything a host puts on the wire
+      // beside the contract survives into the row. Without this a host column
+      // (`TeamExtraColumn`) can only ever read fields this package already
+      // knows about, which makes the seam useless for the facts a host adds it
+      // for — who granted each role, say. Every known field below overrides.
+      ...member,
       userId: member.userId,
       role: member.role,
       email: member.email,

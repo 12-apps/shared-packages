@@ -60,6 +60,12 @@ export interface TeamScreenProps {
   roleModel?: RoleModel;
   /** Columns this package cannot build. See {@link TeamExtraColumn}. */
   extraColumns?: readonly TeamExtraColumn[];
+  /**
+   * Which ⋮ entries this host offers, by id. Absent, all of them.
+   *
+   * Ids: `edit-roles`, `toggle-active`, `remove`, `cancel-invite`.
+   */
+  rowActionIds?: readonly string[];
   /** The SYSTEM roles assignable as a member's base (owner tier excluded). */
   systemRoles: readonly string[];
   /**
@@ -138,6 +144,7 @@ function useRosterControls(
     },
     ownerSet,
     copy.teamRowMenu,
+    props.rowActionIds,
   );
   return {
     customRoles,

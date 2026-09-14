@@ -344,6 +344,41 @@ describe('the host can contribute a roster column', () => {
       expect(screen.getByText('por camila@example.com')).toBeTruthy();
     });
   });
+
+  it('carries a host WIRE field into the row the column reads', async () => {
+    // The seam is useless if it can only read what this package already knows:
+    // a host adds a column for the fact the package does NOT carry.
+    const api = apiStub({
+      listTeam: vi.fn(async () => ({
+        data: [
+          {
+            userId: 'chef-1',
+            role: 'CONSERVATOR',
+            email: 'camila@example.com',
+            name: 'Camila Barbosa',
+            image: null,
+            active: true,
+            status: 'ENABLED' as const,
+            grantedBy: { CONSERVATOR: 'ana@example.com' },
+          },
+        ],
+        pagination: PAGINATION,
+      })),
+    });
+    mountTeam(api, ['team:manage'], {
+      extraColumns: [
+        {
+          id: 'grantedBy',
+          header: 'Concedido por',
+          accessor: (row) =>
+            String((row as { grantedBy?: Record<string, string> }).grantedBy?.CONSERVATOR ?? '—'),
+        },
+      ],
+    });
+    await waitFor(() => {
+      expect(screen.getByText('ana@example.com')).toBeTruthy();
+    });
+  });
 });
 
 describe('a person holds a SET of roles', () => {

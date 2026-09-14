@@ -206,6 +206,7 @@ function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       onOpenMember={parts.config.navigate?.member}
       roleModel={parts.config.roleModel}
       extraColumns={parts.config.teamExtraColumns}
+      rowActionIds={parts.config.teamRowActionIds}
     />
   );
 }

@@ -334,14 +334,25 @@ export function buildTeamRowActions(
   handlers: TeamRowActionHandlers,
   ownerRoles: ReadonlySet<string>,
   copy: TeamRowMenuCopy,
+  /**
+   * Which entries this host offers, by id. Absent, all of them — every adopter
+   * before this existed.
+   *
+   * A host whose model has no equivalent for an action must be able to withhold
+   * it: `toggle-active` writes `PATCH /team/:userId/status`, and a host with no
+   * status column has nothing to toggle. Rendering it anyway offers a control
+   * whose only outcome is an error on screen.
+   */
+  allowed?: readonly string[],
 ): RowAction<TeamRow>[] {
+  const offered = allowed === undefined ? null : new Set(allowed);
   const isMember = (row: TeamRow): boolean => row.status !== 'PENDING';
   // Set-aware: ANY owner role the person holds protects the row. Reading the
   // base field alone would hand an env superadmin its destructive entries back
   // the moment that field stops being where the owner role lives.
   const editable = (row: TeamRow): boolean =>
     isMember(row) && !row.roles.some((name) => ownerRoles.has(name));
-  return [
+  const entries: RowAction<TeamRow>[] = [
     {
       id: 'edit-roles',
       label: copy.editRoles,
@@ -374,4 +385,5 @@ export function buildTeamRowActions(
       onSelect: (rows) => rows.forEach((row) => row.inviteId && handlers.cancelInvite(row)),
     },
   ];
+  return entries.filter((action) => offered === null || offered.has(action.id));
 }

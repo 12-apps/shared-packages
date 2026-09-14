@@ -77,6 +77,8 @@ export interface RbacWebConfig<P extends string = string> {
   roleModel?: RoleModel;
   /** Roster columns this package cannot build — {@link TeamExtraColumn}. */
   teamExtraColumns?: readonly TeamExtraColumn[];
+  /** Which ⋮ entries the roster offers, by id. Absent, all of them. */
+  teamRowActionIds?: readonly string[];
   /** The host's own section on a member's details tab. */
   renderMemberExtra?: MemberScreenProps['renderExtra'];
   /**
