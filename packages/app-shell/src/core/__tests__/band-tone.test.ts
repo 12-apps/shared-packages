@@ -192,11 +192,31 @@ describe('bandTone derives one that works on either', () => {
   });
 
   it('works on a LIGHT page, where the cards are the same white', () => {
-    // No side to move away from, so it descends — which is what
-    // `TINT_LIGHTNESS` has always done, reached by derivation instead.
     const band = bandTone(SEEDS.pink, '#FFFFFF', '#FFFFFF');
 
     expect(bandToneSeparates(band, '#FFFFFF', '#FFFFFF')).toBe(true);
+    // It descends, which is what `TINT_LIGHTNESS` has always done, reached by
+    // derivation instead. ASSERTED rather than asserted-in-a-comment: this
+    // case said "so it descends" while checking only that it separated, and
+    // the reason it descends is not the reason the comment gave (below).
+    expect(lightnessOf(band)).toBeLessThan(1);
+  });
+
+  it('breaks a tie UP, and the light page only looks like the opposite', () => {
+    /*
+      `cardL > groundL ? -1 : 1` — so a card level with its ground starts the
+      walk UPWARD. On a white page that is invisible: up leaves the gamut at
+      once and the fallback direction delivers the descent above. On a MID grey
+      page the same tie is visible, and the band lands just above the ground.
+
+      Pinned because the docblock used to explain the light page by "there is
+      no side to move away from, so the band goes down", which is an outcome
+      rather than the rule, and is false anywhere there is room on both sides.
+    */
+    const grey = bandTone(SEEDS.lime, '#808080', '#808080');
+
+    expect(lightnessOf(grey)).toBeGreaterThan(lightnessOf('#808080'));
+    expect(bandToneSeparates(grey, '#808080', '#808080')).toBe(true);
   });
 });
 

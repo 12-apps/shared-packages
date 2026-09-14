@@ -34,6 +34,12 @@ export interface SwitchIdSource {
  * line are the component's own, but a consumer that passed `aria-describedby`
  * meant it, and dropping it to make room would trade one silent omission for
  * another.
+ *
+ * It has TWO spellings and both count — top-level and inside `inputProps` —
+ * because that is a consumer's choice of spelling, not a choice of meaning.
+ * Reading only the first is how this shipped for one round: a caller writing
+ * `inputProps={{ 'aria-describedby': … }}` had it silently dropped, which is the
+ * omission the paragraph above says it must not trade for.
  */
 export function switchIds({
   generated,
@@ -46,12 +52,12 @@ export function switchIds({
   const inputId = inputProps?.id ?? id ?? `switch-${generated}`;
   const descriptionId = description ? `${inputId}-description` : undefined;
   const helperId = helperText ? `${inputId}-helper` : undefined;
+  const described = [callerDescribedBy, inputProps?.['aria-describedby'], descriptionId, helperId];
 
   return {
     inputId,
     descriptionId,
     helperId,
-    describedBy:
-      [callerDescribedBy, descriptionId, helperId].filter(Boolean).join(' ') || undefined,
+    describedBy: described.filter(Boolean).join(' ') || undefined,
   };
 }

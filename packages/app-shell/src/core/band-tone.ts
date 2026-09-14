@@ -37,7 +37,7 @@ export const MIN_SURFACE_SEPARATION = 1.12;
  * across six hues, requiring the band to separate from BOTH the page and the
  * cards on it:
  *
- * | band lightness | a deep-red page at 21.8% (card 29.8%) | a navy page at 12% (card ~19%) |
+ * | band lightness | a deep-red page at 21.8% (card 30.4%) | a navy page at 12.2% (card 20.4%) |
  * | --- | --- | --- |
  * | 8%  | every hue clears both | all six vanish into the page |
  * | 26% | grey vanishes into the card | every hue clears both |
@@ -50,9 +50,16 @@ export const MIN_SURFACE_SEPARATION = 1.12;
  * **The direction is away from the card.** Cards are the thing a band must not
  * be confused with, and they sit on one side of the page — raised on a dark
  * ground, usually the same white on a light one. Walking away from them
- * separates from both at once: on the red page the card is above it, so the
- * band descends; on a 12% page there is no room below, so it ascends, and the
- * card being only 7 points up still leaves it reachable.
+ * separates from both at once.
+ *
+ * Both dark grounds above have their card ABOVE the page, so on both the band
+ * descends — measured, every one of the six seeds lands between 2.2% and 6.1%
+ * on the navy page. An earlier draft of this paragraph claimed the navy ground
+ * ascends "because there is no room below", and that was wrong twice over:
+ * there is room, and the walk does not take it upward. The direction only
+ * FLIPS where the preferred side is genuinely exhausted, which needs a ground
+ * near the floor — `__tests__/band-tone.test.ts` uses `#050608` for exactly
+ * that, and says why the navy page is the wrong probe for it.
  *
  * Returns the ground itself when no tone in either direction can separate —
  * a caller gets a band that is invisible rather than one that is wrong, and
@@ -93,11 +100,18 @@ function surfaceSaturation(s: number, [floor, ceiling]: readonly [number, number
 /**
  * Away from the card first, then past it.
  *
- * When the card IS the ground — a light page whose cards are the same white —
- * there is no side to move away from, so the band goes down, which is what
- * {@link TINT_LIGHTNESS} has always done. The second direction is for a ground
- * with no room on the first: past the cards rather than away from them, which
- * still separates from both.
+ * When the card IS the ground there is no side to move away from, and the tie
+ * goes UP — `cardL > groundL` is false, so the walk starts at +1. On the light
+ * page that motivates this case the distinction is invisible, because up from
+ * white leaves the gamut immediately and the fallback direction delivers the
+ * descent {@link TINT_LIGHTNESS} has always produced; on a MID grey page it is
+ * visible, and `bandTone('#8BC34A', '#808080', '#808080')` lands at 51.2%,
+ * just above the ground. Both separate, which is the guarantee this makes —
+ * the tie is not a third rule, and a caller that needs a side must state a
+ * card on that side.
+ *
+ * The second direction is for a ground with no room on the first: past the
+ * cards rather than away from them, which still separates from both.
  */
 function directionsFrom(groundL: number, cardL: number): readonly (1 | -1)[] {
   const away: 1 | -1 = cardL > groundL ? -1 : 1;

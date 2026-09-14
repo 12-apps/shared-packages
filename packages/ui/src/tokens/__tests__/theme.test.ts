@@ -171,13 +171,19 @@ describe('inkOver — the ink for a fill that is not one colour (FUT-1924)', () 
     expect(inkOver([fill], WHITE)).toBe(DARK);
   });
 
-  it('picks the less bad ink where a gradient is too wide for either', () => {
-    // Nothing reads on both ends of this, and that is a palette problem. The
-    // honest answer is the better of two bad ones, not a thrown error inside a
-    // style function.
-    const impossible = ['#ffffff', '#000000'];
+  it('returns the better of two bad inks rather than throwing', () => {
+    /*
+      White to black is the widest a gradient gets: both inks bottom out at
+      1.00 against one end, so there is no better answer and the only thing
+      worth asserting is that a caller still gets a colour. The version of this
+      case that read `expect([WHITE, DARK]).toContain(…)` asserted nothing at
+      all — `inkOver` can return nothing else, for any input.
+    */
+    expect(inkOver(['#ffffff', '#000000'], WHITE)).toMatch(/^(#fff|rgba\(0, 0, 0, 0\.87\))$/u);
 
-    expect([WHITE, DARK]).toContain(inkOver(impossible, WHITE));
+    // The case that DOES have a less bad ink, asserted as such: white is
+    // 2.78:1 on the light end where dark ink is 2.66:1 on the dark one.
+    expect(inkOver(['#4caf50', '#1b5e20'], DARK)).toBe(WHITE);
   });
 
   it('falls back rather than throwing on a colour it cannot decompose', () => {

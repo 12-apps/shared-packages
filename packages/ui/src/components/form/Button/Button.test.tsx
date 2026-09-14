@@ -190,6 +190,37 @@ describe('Button — the gradient variant takes its ink from the palette', () =>
     expect(screen.getByTestId('dark')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
   });
 
+  it('pins what the DEFAULT palette gets, because two of five change', () => {
+    /*
+      Every other case here builds a theme by hand, which is how a library
+      changes its own stock appearance without anybody noticing. Measured on
+      MUI's `createTheme()`:
+
+        primary   #1976d2 → #9c27b0   white 4.61  dark 3.34   white  (unchanged)
+        secondary #9c27b0 → #1976d2   white 4.61  dark 3.34   white  (unchanged)
+        success   #4caf50 → #1b5e20   white 2.78  dark 2.66   white  (unchanged)
+        warning   #ff9800 → #e65100   white 2.16  dark 5.54   DARK   (was white)
+        danger    #ef5350 → #c62828   white 3.49  dark 3.74   DARK   (was white)
+
+      `warning` is the fix doing its job: white at 2.16:1 on an orange was the
+      defect. `danger` is bought for 0.25 of a contrast point with NEITHER ink
+      clearing AA, and it repaints a destructive button — that one is a
+      recorded decision rather than a good one, and FUT-2066 carries the
+      question of whether a margin belongs in `inkOver`.
+    */
+    render(
+      <>
+        <Button variant="gradient" color="danger" dataTestId="danger">x</Button>
+        <Button variant="gradient" color="warning" dataTestId="warning">x</Button>
+        <Button variant="gradient" color="primary" dataTestId="primary">x</Button>
+      </>,
+    );
+
+    expect(screen.getByTestId('danger')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+    expect(screen.getByTestId('warning')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+    expect(screen.getByTestId('primary')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
+  });
+
   it('is decided by the stop the gradient REACHES, not only where it starts', () => {
     /*
       A store's deep green running into its own lighter one. `primary.main`

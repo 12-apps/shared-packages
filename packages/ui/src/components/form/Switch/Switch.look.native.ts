@@ -116,14 +116,24 @@ export function trackStyle(
 /**
  * The ink on the CHECKED track — the thumb, and the `on` wording (FUT-1924).
  *
- * The web's `checkedInk`, over the fills THIS renderer paints: the checked
- * track is `palette.main`, or `light → main` under `gradient`. Both halves of
- * the component had a stated `#fff` here, and the checked track is the one
- * surface a tenant chooses — a pale brand got a white knob on a pale bar, which
- * reads as OFF while it is on.
+ * Both halves of the component had a stated `#fff` here, and the checked track
+ * is the one surface a tenant chooses: a pale brand got a white knob on a pale
+ * bar, which reads as OFF while it is on.
+ *
+ * **The fills are THIS renderer's, not the web's, and they differ.** The web
+ * paints a real three-stop gradient and hands `checkedInk` all three
+ * (`Switch.styles.ts`); React Native has no gradient without a dependency, so
+ * `trackStyle` shows `gradientFirstStop` — `palette.light`, FLAT — and
+ * `NATIVE-NOTES.md` records that as a known divergence. Passing the web's set
+ * here would judge the ink against two fills native never draws, and the two
+ * renderers then disagree on the same palette: measured on `#00897b`, the web
+ * answers white and this answered dark ink, because `main` and `dark` were in
+ * the list and only `light` is on screen.
+ *
+ * So the gradient case is ONE fill, which is the one it paints.
  */
 export function checkedInk(paint: SwitchPaint, palette: SwitchPalette): string {
-  const fills = paint.gradient ? [palette.light || palette.main, palette.main] : [palette.main];
+  const fills = [paint.gradient ? palette.light || palette.main : palette.main];
 
   return inkOver(fills, palette.contrastText || NEUTRAL_CONTRAST);
 }

@@ -188,8 +188,6 @@ export const TINT_LIGHTNESS = 0.955;
 /** The same band's edge: one step down, so the border reads as the tint's own. */
 export const EDGE_LIGHTNESS = 0.86;
 
-
-
 /**
  * The seed, in the lightest tone of its own hue that is still legible AS TEXT
  * on `surface`.

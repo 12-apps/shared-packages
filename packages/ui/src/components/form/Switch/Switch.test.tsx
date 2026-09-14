@@ -171,6 +171,41 @@ describe('the description, which is not part of the name', () => {
     expect(document.getElementById(described)).toHaveTextContent('Indisponível nesta loja');
   });
 
+  it("keeps a caller's aria-describedby in EITHER spelling", () => {
+    /*
+      Top-level and inside `inputProps` are a choice of spelling, not of
+      meaning. The first round of this fix read only the top-level one, so a
+      caller writing it in `inputProps` had it silently dropped — trading the
+      omission this component was being fixed for, for a different one.
+    */
+    render(
+      <Switch
+        label="Modo escuro"
+        description="Segue o tema do seu sistema"
+        inputProps={{ 'aria-describedby': 'caller-hint' }}
+        dataTestId="dark"
+      />,
+    );
+
+    expect(screen.getByTestId('dark').getAttribute('aria-describedby')).toMatch(/^caller-hint /u);
+  });
+
+  it("lets a caller's own inputProps keys win, which is what they did before", () => {
+    // The fix for a clobber must not become a clobber the other way: every key
+    // the component merely DEFAULTS stays overridable.
+    render(
+      <Switch
+        label="Modo escuro"
+        dataTestId="dark"
+        // `data-testid` is not on `InputHTMLAttributes`, which is exactly why a
+        // caller reaches for `inputProps` to set it.
+        inputProps={{ 'data-testid': 'mine' } as React.InputHTMLAttributes<HTMLInputElement>}
+      />,
+    );
+
+    expect(screen.getByTestId('mine')).toBeInTheDocument();
+  });
+
   it("keeps a caller's own aria-describedby alongside it", () => {
     render(
       <Switch
@@ -182,6 +217,22 @@ describe('the description, which is not part of the name', () => {
     );
 
     expect(screen.getByTestId('dark').getAttribute('aria-describedby')).toMatch(/^hint /u);
+  });
+});
+
+describe('the disabled control', () => {
+  it('does not dress its label as clickable', () => {
+    // The label toggles nothing while the control is disabled, so the cursor
+    // that promises otherwise is a lie the pointer tells before the click.
+    render(<Switch label="Modo escuro" disabled dataTestId="dark" />);
+
+    expect(screen.getByTestId('dark-label')).not.toHaveStyle({ cursor: 'pointer' });
+  });
+
+  it('still dresses an enabled one', () => {
+    render(<Switch label="Modo escuro" dataTestId="live" />);
+
+    expect(screen.getByTestId('live-label')).toHaveStyle({ cursor: 'pointer' });
   });
 });
 

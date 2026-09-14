@@ -162,17 +162,24 @@ export const SwitchControl: React.FC<SwitchControlProps> = ({
           AFTER `props`, not before it (FUT-1905). `inputProps` used to be
           written first and `{...props}` spread over it, so a caller passing
           `inputProps` of its own silently replaced the whole object — losing
-          the `data-testid` every spec finds this control by, and now the `id`
-          the label points at. The caller's keys are merged INTO it instead,
-          and the two the component owns are stated last.
+          the `data-testid` every spec finds this control by, and the `id` the
+          label points at.
+
+          The order inside is the contract. Everything the component DEFAULTS
+          goes first, so a caller's own key still wins — that is what it could
+          do before, and a fix for a clobber must not become a clobber the
+          other way. Only the two the component OWNS come last: the `id`, which
+          already resolved the caller's spelling of it (`switchIds`), and
+          `aria-describedby`, which by then already CONTAINS whatever the
+          caller passed, in either spelling.
         */
         inputProps={
           {
             'aria-label': props['aria-label'],
+            'data-testid': dataTestId || 'switch',
             ...inputProps,
             id: inputId,
             'aria-describedby': describedBy,
-            'data-testid': dataTestId || 'switch',
           } as React.InputHTMLAttributes<HTMLInputElement>
         }
       />
@@ -255,7 +262,8 @@ const SwitchLabel: React.FC<{
   /** The input's id. Omitted only where there is no input to point at. */
   htmlFor?: string;
   descriptionId?: string;
-}> = ({ label, description, error, dataTestId, htmlFor, descriptionId }) => (
+  disabled?: boolean;
+}> = ({ label, description, error, dataTestId, htmlFor, descriptionId, disabled }) => (
   <Box sx={{ flex: 1, minWidth: 0 }}>
     <Typography
       component="label"
@@ -270,7 +278,9 @@ const SwitchLabel: React.FC<{
         // description already makes the row taller than 40px, so forcing it
         // there would only add blank space.
         ...(description ? {} : { minHeight: TAP_TARGET_MIN }),
-        ...(htmlFor ? { cursor: 'pointer' } : {}),
+        // A disabled control's label toggles nothing, so it must not wear the
+        // cursor that says it does.
+        ...(htmlFor && !disabled ? { cursor: 'pointer' } : {}),
       }}
       data-testid={dataTestId ? `${dataTestId}-label` : 'switch-label'}
     >
@@ -304,6 +314,7 @@ export const SwitchRow: React.FC<{
   dataTestId?: string;
   htmlFor: string;
   descriptionId?: string;
+  disabled?: boolean;
   control: React.ReactNode;
 }> = ({
   label,
@@ -313,6 +324,7 @@ export const SwitchRow: React.FC<{
   dataTestId,
   htmlFor,
   descriptionId,
+  disabled,
   control,
 }) => {
   if (!label) return <>{control}</>;
@@ -328,6 +340,7 @@ export const SwitchRow: React.FC<{
         dataTestId={dataTestId}
         htmlFor={htmlFor}
         descriptionId={descriptionId}
+        disabled={disabled}
       />
 
       {labelPosition !== 'start' && control}

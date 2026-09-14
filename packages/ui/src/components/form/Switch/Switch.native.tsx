@@ -165,7 +165,16 @@ interface ControlProps {
   testID: string;
 }
 
-/** The track, the thumb, and everything overlaid on them. */
+/**
+ * The track, the thumb, and everything overlaid on them.
+ *
+ * The control carries its own NAME (FUT-1905). React Native has no `<label
+ * for>` to wire the words beside it with, so the name has to be stated on the
+ * pressable itself or the control announces as "checkbox, checked" and nothing
+ * else — which is the defect the web half of this ticket fixed, still live
+ * here. A caller's own `aria-label` wins, because a caller that wrote one meant
+ * it to differ from the visible words.
+ */
 function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID }: ControlProps): React.JSX.Element {
   const { variant, color, size, animated, loading, onIcon, offIcon, onText, offText } = props;
   const geometry: SwitchGeometry = geometryOf(size, props.trackWidth, props.trackHeight);
@@ -182,6 +191,7 @@ function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID
     <Pressable
       testID={testID}
       role="checkbox"
+      aria-label={(rest['aria-label'] as string | undefined) ?? props.label}
       aria-checked={checked}
       aria-disabled={inactive}
       disabled={inactive}

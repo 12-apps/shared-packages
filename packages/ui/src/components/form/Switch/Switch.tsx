@@ -92,6 +92,7 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>((props, ref) =>
         dataTestId={dataTestId}
         htmlFor={inputId}
         descriptionId={descriptionId}
+        disabled={Boolean(rest.disabled) || loading}
         control={control}
       />
       {helper}
