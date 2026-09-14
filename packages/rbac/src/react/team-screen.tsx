@@ -21,6 +21,7 @@ import {
   type TeamRow,
 } from './team-grid-config';
 import { RoleEditDialog, type RoleModel } from './team-role-dialog';
+import type { TeamExtraColumn } from './team-grid-config';
 import {
   HeaderControls,
   InviteDialog,
@@ -57,6 +58,8 @@ export interface TeamScreenProps {
    * every adopter before the set model existed. See {@link RoleModel}.
    */
   roleModel?: RoleModel;
+  /** Columns this package cannot build. See {@link TeamExtraColumn}. */
+  extraColumns?: readonly TeamExtraColumn[];
   /** The SYSTEM roles assignable as a member's base (owner tier excluded). */
   systemRoles: readonly string[];
   /**
@@ -227,6 +230,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
             syncState={syncState}
             onVisibleRowsChange={setVisibleRows}
             onOpenMember={props.onOpenMember}
+            extraColumns={props.extraColumns}
           />
         </Dashboard.Body>
         {removeConfirm.dialog}

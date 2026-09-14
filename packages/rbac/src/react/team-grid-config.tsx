@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { Chip } from '@12-apps/ui/data-display/Chip';
 import type {
@@ -246,7 +246,35 @@ function StatusCell({ row, copy }: { row: TeamRow; copy: TeamTableCopy }): JSX.E
 }
 
 /** The read-only roster columns; every mutation lives in the ⋮ kebab. */
-export function teamColumns(labels: RbacLabels, copy: TeamTableCopy): DataViewColumn<TeamRow>[] {
+/**
+ * A column this package does not know how to build.
+ *
+ * The roster shows identity, roles and status because every adopter has those.
+ * A host may hold a fact about a person that is just as load-bearing and
+ * entirely its own — who granted each of their roles, say — and without a seam
+ * its only options are to lose it or to stop using this screen.
+ */
+export interface TeamExtraColumn {
+  id: string;
+  header: string;
+  /** The text the grid sorts, searches and exports on. */
+  accessor: (row: TeamRow) => string;
+  /** How the cell draws, when text is not enough. */
+  cell?: (row: TeamRow) => ReactNode;
+}
+
+export function teamColumns(
+  labels: RbacLabels,
+  copy: TeamTableCopy,
+  extra: readonly TeamExtraColumn[] = [],
+): DataViewColumn<TeamRow>[] {
+  const host: DataViewColumn<TeamRow>[] = extra.map((column) => ({
+    id: column.id,
+    header: column.header,
+    enableSort: false,
+    accessor: column.accessor,
+    ...(column.cell ? { cell: ({ row }: { row: TeamRow }) => column.cell?.(row) } : {}),
+  }));
   return [
     {
       id: 'name',
@@ -273,6 +301,9 @@ export function teamColumns(labels: RbacLabels, copy: TeamTableCopy): DataViewCo
       accessor: (row) => statusLabels(copy)[row.status],
       cell: ({ row }) => <StatusCell row={row} copy={copy} />,
     },
+    // After the package's own, so a host column never displaces the identity
+    // and status a reader scans for first.
+    ...host,
   ];
 }
 

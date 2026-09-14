@@ -128,7 +128,11 @@ function mountRoles(
   );
 }
 
-function mountTeam(api: RbacApiClient, permissions: string[]): void {
+function mountTeam(
+  api: RbacApiClient,
+  permissions: string[],
+  extra: Partial<React.ComponentProps<typeof TeamScreen>> = {},
+): void {
   render(
     <MemoryRouter>
       <RbacProvider permissions={permissions}>
@@ -143,6 +147,7 @@ function mountTeam(api: RbacApiClient, permissions: string[]): void {
           // stated default wins over the catalog's array order.
           defaultInviteRole="BRANCH_LEAD"
           copy={COPY}
+          {...extra}
         />
       </RbacProvider>
     </MemoryRouter>,
@@ -310,6 +315,37 @@ describe('a refused write surfaces its error', () => {
  * The first test below is the regression guard for every existing adopter: the
  * base-plus-custom shape still renders and still protects exactly as it did.
  */
+/**
+ * A host may hold a fact about a person that this package cannot build a column
+ * for — who granted each of their roles, say. Without a seam its only options
+ * are to lose that fact or to stop using this screen.
+ */
+describe('the host can contribute a roster column', () => {
+  it('renders nothing extra for a host that contributes none', async () => {
+    mountTeam(apiStub(), ['team:manage']);
+    await waitFor(() => {
+      expect(screen.getByTestId('status-chef-1')).toBeTruthy();
+      expect(screen.queryByText('Concedido por')).toBeNull();
+    });
+  });
+
+  it('renders the column a host contributes', async () => {
+    mountTeam(apiStub(), ['team:manage'], {
+      extraColumns: [
+        {
+          id: 'grantedBy',
+          header: 'Concedido por',
+          accessor: (row) => `por ${row.email}`,
+        },
+      ],
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Concedido por')).toBeTruthy();
+      expect(screen.getByText('por camila@example.com')).toBeTruthy();
+    });
+  });
+});
+
 describe('a person holds a SET of roles', () => {
   /** A roster whose members carry `roles` and no base — the m:n shape. */
   function setModelApi(roles: string[], overrides = {}) {
