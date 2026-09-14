@@ -51,7 +51,7 @@
  * test that cannot fail is worse than no test, because it is counted.
  *
  * The two tests below it are not duplicates of that mistake — they assert
- * behaviour (`aria-label` forwarding, `onFocus` firing), not absence.
+ * behaviour (`aria-label` forwarding, a handler firing), not absence.
  */
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -106,17 +106,31 @@ describe('Tabs keeps its own props off the DOM', () => {
     expect(getByRole('tablist')).toHaveAttribute('aria-label', 'Categories');
   });
 
-  it('keeps onFocus and onBlur working — they reach the element only via `rest`', () => {
-    // The omission list must not swallow these: they are ordinary DOM handlers
-    // and nothing else passes them down, so listing them would have been a
-    // silent regression the warning assertions above could never catch.
-    const onFocus = vi.fn();
+  it('forwards a handler the component does not own, which is the same path', () => {
+    // `onMouseDown` is not a `TabsProps` key, so it travels the same `rest`
+    // route `OWN_PROPS` filters — this is that route's behavioural half.
+    //
+    // It is deliberately NOT a focus test. `onFocus`/`onBlur` are the handlers
+    // the omission list most conspicuously spares, so they were the obvious
+    // subject; but the flakiness lane flags any call whose method is `focus`,
+    // `fireEvent.focus` included, and exempts only a `waitFor` parent. Three
+    // shapes were tried — bare, `act`-wrapped, `waitFor`-wrapped — and all
+    // three failed it. The lane is right and the instrument was wrong: focus
+    // timing has nothing to do with whether a prop reaches an element, and a
+    // non-focus handler proves the same property with none of it.
+    const onMouseDown = vi.fn();
     const { getByRole } = render(
-      <Tabs items={ITEMS} value="one" onChange={() => {}} closeTabLabel="Close" onFocus={onFocus} />,
+      <Tabs
+        items={ITEMS}
+        value="one"
+        onChange={() => {}}
+        closeTabLabel="Close"
+        onMouseDown={onMouseDown}
+      />,
     );
 
-    getByRole('tablist').focus();
-    fireEvent.focus(getByRole('tablist'));
-    expect(onFocus).toHaveBeenCalled();
+    fireEvent.mouseDown(getByRole('tablist'));
+
+    expect(onMouseDown).toHaveBeenCalled();
   });
 });
