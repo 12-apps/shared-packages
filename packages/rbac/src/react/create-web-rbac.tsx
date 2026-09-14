@@ -75,8 +75,18 @@ export interface RbacWebConfig<P extends string = string> {
    * reads as a bug rather than as a setting.
    */
   labels?: RbacCopySource<RbacLabelVocabulary>;
-  /** Gate permission ids, when the host's catalog spells them differently. */
-  gatePermissions?: { manageRoles?: string; manageTeam?: string };
+  /**
+   * Gate permission ids, when the host's catalog spells them differently.
+   *
+   * `readRoles` is the odd one out: it has no default, because its absence is
+   * a meaningful answer rather than a missing value. Unset — every adopter
+   * before it existed — `manageRoles` decides both whether the catalog can be
+   * SEEN and whether it can be edited, which is the right coupling for a host
+   * whose roles are editable rows. Set, it opens the catalog read-only to a
+   * caller who holds it without `manageRoles`. See
+   * {@link RolesScreenProps.readPermission}.
+   */
+  gatePermissions?: { manageRoles?: string; manageTeam?: string; readRoles?: string };
   /** See {@link TeamScreenProps.defaultInviteRole}. */
   defaultInviteRole?: string;
   /**
@@ -176,6 +186,8 @@ interface SurfaceParts {
   ownerRoles: string[];
   manageRoles: string;
   manageTeam: string;
+  /** Undefined when the host named no read gate — see the config field. */
+  readRoles: string | undefined;
   seeds: ReadonlyMap<string, RoleSeedDefault>;
   config: RbacWebConfig;
 }
@@ -233,6 +245,8 @@ function surfaceParts(config: RbacWebConfig): SurfaceParts {
     ownerRoles: [...governance.ownerRoles],
     manageRoles: config.gatePermissions?.manageRoles ?? 'roles:manage',
     manageTeam: config.gatePermissions?.manageTeam ?? 'team:manage',
+    // Deliberately NOT defaulted — see the field's own note.
+    readRoles: config.gatePermissions?.readRoles,
     seeds: config.roleSeeds ?? new Map(),
     config: config as RbacWebConfig,
   };
@@ -278,6 +292,7 @@ function BoundRolesScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       governance={parts.governance}
       labels={labels}
       managePermission={parts.manageRoles}
+      readPermission={parts.readRoles}
       tenantSlug={parts.config.tenantSlug}
       copy={parts.copy}
       seeds={parts.seeds}

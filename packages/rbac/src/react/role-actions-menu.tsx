@@ -162,6 +162,7 @@ export function RoleActionsMenu({
   const { onRefresh } = useCardActions();
   const canManage = useCan()(context.managePermission);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   // Declared above the `canManage` gate: a hook cannot sit behind a return.
   const remove = useRoleConfirm(row, context, 'delete');
   const reset = useRoleConfirm(row, context, 'reset');
@@ -179,7 +180,43 @@ export function RoleActionsMenu({
     onRefresh,
   );
 
-  if (!canManage) return null;
+  // The reader's branch. What a role CARRIES is the question the catalog grid
+  // cannot answer — it shows a count — so a caller who may see the catalog but
+  // not edit it gets one entry, opening the same form the manager edits in,
+  // locked. Both words are optional config, and without them this is exactly
+  // what it always was: no kebab at all.
+  if (!canManage) {
+    const viewLabel = copy.rolesTable.viewAction;
+    const viewTitle = copy.rolesList.dialogTitles.view;
+    if (viewLabel === undefined || viewTitle === undefined) return null;
+    return (
+      <>
+        <CardKebab
+          menuLabel={copy.menuLabel}
+          items={[
+            {
+              id: 'view',
+              label: viewLabel,
+              onClick: () => setViewOpen(true),
+              dataTestId: 'role-action-view',
+            },
+          ]}
+          dataTestId={`role-actions-${row.id}`}
+        />
+        <RoleFormDialog
+          open={viewOpen}
+          readOnly
+          title={viewTitle(row.displayName)}
+          context={context}
+          initial={formDefaults(row)}
+          template={row.system}
+          busy={false}
+          error={null}
+          onClose={() => setViewOpen(false)}
+        />
+      </>
+    );
+  }
 
   const items = roleMenuItems(row, copy, Boolean(context.renderVersionHistory), {
     edit: edit.start,

@@ -104,7 +104,11 @@ function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
   };
 }
 
-function mountRoles(api: RbacApiClient, permissions: string[]): void {
+function mountRoles(
+  api: RbacApiClient,
+  permissions: string[],
+  readPermission?: string,
+): void {
   render(
     <MemoryRouter>
       <RbacProvider permissions={permissions}>
@@ -115,6 +119,7 @@ function mountRoles(api: RbacApiClient, permissions: string[]): void {
           governance={DEMO_CATALOG.governance}
           labels={LABELS}
           managePermission="roles:manage"
+          readPermission={readPermission}
           copy={COPY}
           seeds={new Map()}
         />
@@ -182,6 +187,69 @@ describe('affordance hiding (useCan)', () => {
       expect(screen.queryByTestId('team-actions-chef-1')).toBeNull();
       expect(screen.queryByTestId('add-admin-button')).toBeNull();
     });
+  });
+});
+
+/**
+ * The READ tier: seeing the catalog and editing it are two questions, and a
+ * host whose roles are code-defined can only answer yes to the first.
+ *
+ * The compatibility case is the one that matters most here. `readPermission`
+ * is optional, and every adopter that predates it passes nothing — so the
+ * fourth test below is not decoration: it pins that an unset gate leaves the
+ * screen behaving exactly as the two tests above it describe.
+ */
+describe('the roles read tier', () => {
+  it('opens the catalog read-only to a caller holding the read gate alone', async () => {
+    const api = apiStub();
+    mountRoles(api, ['catalog:roles:read'], 'catalog:roles:read');
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-grid')).toBeTruthy();
+    });
+    // The grid is the point; the writes are what must be ABSENT rather than
+    // rendered-and-refused.
+    expect(screen.queryByTestId('add-role-button')).toBeNull();
+    // The kebab IS there, carrying exactly one entry: the permissions the grid
+    // only counts. Opening it is the whole reason the tier exists.
+    fireEvent.click(screen.getByTestId('role-actions-r1'));
+    expect(await screen.findByTestId('role-action-view')).toBeTruthy();
+    expect(screen.queryByTestId('role-action-edit')).toBeNull();
+    expect(screen.queryByTestId('role-action-delete')).toBeNull();
+    // Keyed on VIEW: the old gate skipped this read for anyone without manage,
+    // which would have left exactly this caller staring at an empty grid.
+    expect(api.listRoles).toHaveBeenCalled();
+  });
+
+  it('keeps every write affordance for a caller holding both gates', async () => {
+    const api = apiStub();
+    mountRoles(api, ['roles:manage', 'catalog:roles:read'], 'catalog:roles:read');
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-grid')).toBeTruthy();
+    });
+    expect(screen.getByTestId('add-role-button')).toBeTruthy();
+    expect(screen.getByTestId('role-actions-r1')).toBeTruthy();
+  });
+
+  it('still refuses a caller holding neither gate, and reads nothing', async () => {
+    const api = apiStub();
+    mountRoles(api, ['titles:read:all'], 'catalog:roles:read');
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-not-found')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('roles-grid')).toBeNull();
+    // Refused means refused: no request is sent just to be rejected.
+    expect(api.listRoles).not.toHaveBeenCalled();
+  });
+
+  it('leaves an adopter that names no read gate exactly as it was', async () => {
+    const api = apiStub();
+    // No third argument — the shape every caller had before this tier existed.
+    mountRoles(api, ['titles:read:all']);
+    await waitFor(() => {
+      expect(screen.getByTestId('roles-not-found')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('roles-grid')).toBeNull();
+    expect(api.listRoles).not.toHaveBeenCalled();
   });
 });
 

@@ -72,8 +72,30 @@ export interface RolesScreenProps {
   permissions: Pick<PermissionRegistry<string>, 'list' | 'kind'>;
   governance: Pick<GovernanceCatalog, 'ownerPermissions' | 'sodPairs'>;
   labels: RbacLabels;
-  /** The gate permission for the write affordances AND for the screen itself. */
+  /** The gate permission for this screen's write affordances. */
   managePermission: string;
+  /**
+   * The gate permission that opens this screen READ-ONLY.
+   *
+   * Absent — the default, and every adopter before this field existed —
+   * {@link RolesScreenProps.managePermission} decides both questions at once:
+   * a caller who may not manage roles does not see the catalog either.
+   *
+   * That conflation is wrong for a host whose roles are not editable AT ALL.
+   * Where the catalog is code-defined and changing it is a deploy, there is
+   * nothing to create, edit or delete, and yet "which permissions does this
+   * role carry" is exactly the question the screen exists to answer. Such a
+   * host has no honest value to pass as `managePermission`: an id nobody
+   * holds hides the catalog, and an id somebody holds offers writes the server
+   * will refuse.
+   *
+   * Naming this one splits the two. A caller holding it sees the grid, the
+   * cards and the permission viewer, with every write affordance ABSENT rather
+   * than disabled — the row menu, the batch actions and the new-role button
+   * all already read {@link RolesScreenProps.managePermission}, so read-only
+   * is what they render on their own once the screen is allowed to open.
+   */
+  readPermission?: string;
   copy: RbacWebCopy;
   /**
    * The catalog seed defaults, keyed by role name — what a seeded row is
@@ -150,7 +172,12 @@ function RolesBody({
       // manage roles must not be offered a batch that would be refused.
       rowActions={canManage && bulkActions?.length ? [...bulkActions] : undefined}
       onRowClick={onOpenMembers ? (row) => onOpenMembers(row.name) : undefined}
-      renderRowMenu={canManage ? (row) => <RoleActionsMenu row={row} context={context} /> : undefined}
+      // Always mounted, because the menu now answers for BOTH tiers: it
+      // returns null for a manager with nothing to offer on this row, and a
+      // single read-only entry for a reader whose host named the words for it.
+      // Gating here instead would hide the reader's entry before the menu
+      // could ever offer it.
+      renderRowMenu={(row) => <RoleActionsMenu row={row} context={context} />}
       renderCard={(row, selection) => (
         <RoleCard row={row} selection={selection} context={context} />
       )}
@@ -193,15 +220,16 @@ function useMenuContext(props: RolesScreenProps): RoleMenuContext {
  * are deliberately the same sentence there, so the screen may not reveal more.
  */
 function rolesGate({
-  canManage,
+  canView,
   data,
   copy,
 }: {
-  canManage: boolean;
+  /** May this caller SEE the catalog — by managing it, or by reading it. */
+  canView: boolean;
   data: ReturnType<typeof useRolesData>;
   copy: RbacWebCopy;
 }): JSX.Element | null {
-  if (!canManage) {
+  if (!canView) {
     return (
       <EmptyState
         variant="minimal"
@@ -227,10 +255,18 @@ function rolesGate({
 
 export function RolesScreen(props: RolesScreenProps): JSX.Element {
   const { api, copy } = props;
-  const canManage = useCan()(props.managePermission);
+  const can = useCan();
+  const canManage = can(props.managePermission);
+  // Read is SATISFIED BY manage, so a host that names no `readPermission`
+  // resolves `canView === canManage` and behaves exactly as it did before the
+  // tier existed. That equivalence is the whole compatibility guarantee.
+  const canView = canManage || (props.readPermission !== undefined && can(props.readPermission));
   const [searchParams] = useSearchParams();
   const search = rolesSearch(searchParams);
-  const data = useRolesData(api, search, props.seeds, copy.rolesList.loadFailed, canManage);
+  // Keyed on VIEW, not on manage: the endpoint refuses an actor who may not
+  // read, and a read-only caller may. Fetching on `canManage` would leave the
+  // reader this tier exists for staring at an empty grid.
+  const data = useRolesData(api, search, props.seeds, copy.rolesList.loadFailed, canView);
   const create = useRoleWrite((value) => api.createRole(value), data.refresh);
 
   const syncState = useMemo(() => rolesSyncState(searchParams), [searchParams]);
@@ -242,7 +278,7 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
   });
   const context = useMenuContext(props);
 
-  const blocked = rolesGate({ canManage, data, copy });
+  const blocked = rolesGate({ canView, data, copy });
   if (blocked) return blocked;
 
   return (
@@ -254,14 +290,20 @@ export function RolesScreen(props: RolesScreenProps): JSX.Element {
             {copy.rolesList.aboutBody}
           </Dashboard.Info>
           <Dashboard.Spacer />
-          <Dashboard.Action>
-            <HeaderButton
-              text={copy.rolesList.newRoleAction}
-              icon={<AddIcon fontSize="small" />}
-              onClick={create.start}
-              dataTestId="add-role-button"
-            />
-          </Dashboard.Action>
+          {/* Gated like the row menu and the batch actions. It never needed to
+              be before: `rolesGate` refused the whole screen to anyone without
+              `managePermission`, so this button could not render for a caller
+              who may not use it. A read-only caller reaches this line now. */}
+          {canManage && (
+            <Dashboard.Action>
+              <HeaderButton
+                text={copy.rolesList.newRoleAction}
+                icon={<AddIcon fontSize="small" />}
+                onClick={create.start}
+                dataTestId="add-role-button"
+              />
+            </Dashboard.Action>
+          )}
         </Dashboard.Header>
         <Dashboard.Body>
           <CardActionsProvider
