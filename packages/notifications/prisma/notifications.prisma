@@ -131,11 +131,23 @@ model PushSubscription {
   endpoint  String   @unique
   p256dh    String
   auth      String
+  /// Which ORIGIN this browser registered on.
+  ///
+  /// NULL is the PLATFORM origin — the host itself, or any adopter serving one
+  /// origin. A subscription stamped with a store receives that store's
+  /// notifications plus platform-wide ones (`clientId IS NULL`) and NEVER
+  /// another store's; a platform-origin subscription receives everything, which
+  /// is what keeps a marketplace host's behaviour identical to before.
+  ///
+  /// Nullable so every pre-existing row reads as "platform" with no backfill.
+  clientId  String?  @map("client_id")
   // Free-form browser/device hint ("Chrome · Linux") for a device list.
   userAgent String?  @map("user_agent")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId])
+  // The send path's one query: owner, then the origin rule above.
+  @@index([userId, clientId])
   @@map("push_subscriptions")
 }

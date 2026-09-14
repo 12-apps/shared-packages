@@ -66,12 +66,14 @@ interface NotificationRoutesDeps {
 async function channelAvailability(
   deps: NotificationRoutesDeps,
   userId: string,
+  scopeClientId: string | null,
 ): Promise<Record<NotificationChannel, boolean>> {
   const contact = await deps.contacts.getContact(userId);
   const recipient = {
     userId,
     email: contact?.email ?? null,
     phone: contact?.phone ?? null,
+    clientId: scopeClientId,
     pushSubscriptionCount: 1,
   };
   return Object.fromEntries(
@@ -86,6 +88,7 @@ async function channelAvailability(
 async function preferencesPayload(
   deps: NotificationRoutesDeps,
   userId: string,
+  scopeClientId: string | null,
 ): Promise<{
   preferences: Record<string, Record<string, boolean>>;
   availability: Record<NotificationChannel, boolean>;
@@ -93,7 +96,7 @@ async function preferencesPayload(
 }> {
   const [preferences, availability] = await Promise.all([
     deps.preferences.get(userId),
-    channelAvailability(deps, userId),
+    channelAvailability(deps, userId, scopeClientId),
   ]);
   // `categories` travels with the matrix so the settings screen renders the
   // HOST's taxonomy without being told it twice (once in the api config, once
@@ -111,6 +114,7 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
           await deps.inbox.list(
             actor.userId,
             parseListQuery(query, messagesOf(deps, locale)),
+            actor.scopeClientId,
           ),
         ),
       ),
@@ -120,7 +124,7 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
       path: '/notifications/unread-count',
       handle: guarded(async ({ actor }) =>
         // Polled by the SPAs, so it stays a single indexed COUNT.
-        ok({ count: await deps.inbox.unreadCount(actor.userId) }),
+        ok({ count: await deps.inbox.unreadCount(actor.userId, actor.scopeClientId) }),
       ),
     },
     {
@@ -130,7 +134,7 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
         const target = parseMarkReadBody(body, messagesOf(deps, locale));
         const updated =
           'all' in target
-            ? await deps.inbox.markAllRead(actor.userId)
+            ? await deps.inbox.markAllRead(actor.userId, actor.scopeClientId)
             : await deps.inbox.markRead(actor.userId, target.ids);
         // Only when something actually flipped. This endpoint is idempotent, so
         // a re-send of an already-read id reports `updated: 0` and has changed
@@ -163,7 +167,9 @@ function preferenceRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
     {
       method: 'GET',
       path: '/notification-preferences',
-      handle: guarded(async ({ actor }) => ok(await preferencesPayload(deps, actor.userId))),
+      handle: guarded(async ({ actor }) =>
+        ok(await preferencesPayload(deps, actor.userId, actor.scopeClientId ?? null)),
+      ),
     },
     {
       method: 'PUT',
@@ -175,7 +181,7 @@ function preferenceRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
           actor.userId,
           parsePreferencesBody(body, messagesOf(deps, locale)),
         );
-        return ok(await preferencesPayload(deps, actor.userId));
+        return ok(await preferencesPayload(deps, actor.userId, actor.scopeClientId ?? null));
       }),
     },
   ];
@@ -208,6 +214,9 @@ function pushRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
         const input = parsePushSubscriptionBody(body, messagesOf(deps, locale));
         const userAgent = headers?.['user-agent'];
         await deps.pushSubscriptions.save(actor.userId, {
+          // The HOST's resolved origin, never the body's — a caller cannot
+          // choose which store's app their browser counts as.
+          clientId: actor.scopeClientId ?? null,
           ...input,
           ...(userAgent ? { userAgent } : {}),
         });

@@ -22,6 +22,21 @@ import { NOTIFICATION_CHANNELS, type NotificationChannel } from '../types';
  */
 export interface NotificationsActor {
   userId: string;
+  /**
+   * The store whose ORIGIN this request arrived on, resolved by the
+   * HOST from the hostname — never read from the body or the query.
+   *
+   * The paragraph above still holds: this is not a tenant the surface
+   * authorizes against, it is a NARROWING of a read that is already the
+   * caller's own, and it can never widen one. A host with a single origin never
+   * sets it and every endpoint answers exactly what it answered before.
+   *
+   * It exists because a multi-tenant host installs one storefront per store as
+   * its own PWA, and a PWA's identity is its ORIGIN — so an inbox answering a
+   * store's own app with a neighbour's notifications is one store reporting on
+   * another.
+   */
+  scopeClientId?: string;
 }
 
 /** One request, already authenticated and routed by the host. */

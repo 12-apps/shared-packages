@@ -34,11 +34,13 @@ export type {
   NotificationPreferenceDelegate,
   NotificationPreferenceRow,
   NotificationWhere,
+  NotificationWhereBranch,
   NotificationsDb,
   NotificationsDbClient,
   NotificationsDbProvider,
   PushSubscriptionDelegate,
   PushSubscriptionRow,
+  PushSubscriptionWhere,
 } from './db';
 
 export type { ListNotificationsInput, NotificationInboxStore } from './inbox';

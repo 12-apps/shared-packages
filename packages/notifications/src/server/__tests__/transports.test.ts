@@ -28,6 +28,8 @@ const reachable: TransportRecipient = {
   userId: 'u1',
   email: 'buyer@example.com',
   phone: '+5531999998888',
+  // A platform-wide notification: every subscription of the user reaches it.
+  clientId: null,
   pushSubscriptionCount: 2,
 };
 

@@ -13,6 +13,7 @@ import type {
   NotificationPreferenceRow,
   PushSubscriptionDelegate,
   PushSubscriptionRow,
+  PushSubscriptionWhere,
 } from '@12-apps/notifications/server';
 
 import { Params, type SqlRunner } from './rbac-db-shared';
@@ -76,6 +77,7 @@ interface SubscriptionSqlRow {
   endpoint: string;
   p256dh: string;
   auth: string;
+  client_id: string | null;
   user_agent: string | null;
 }
 
@@ -85,8 +87,26 @@ const subscriptionRow = (row: SubscriptionSqlRow): PushSubscriptionRow => ({
   endpoint: row.endpoint,
   p256dh: row.p256dh,
   auth: row.auth,
+  clientId: row.client_id,
   userAgent: row.user_agent,
 });
+
+/**
+ * Which subscriptions one notification may reach, as SQL.
+ *
+ * A disjunction and NOT an `IN`: the platform-origin rows carry
+ * `client_id IS NULL`, and SQL `IN` never matches NULL, so they would drop out
+ * of every store scope — which is the one thing the rule exists to prevent. No
+ * `OR` on the filter means nobody narrowed, and every row of the owner's counts.
+ */
+function reachWhere(where: PushSubscriptionWhere, params: Params): string {
+  const owner = `user_id = ${params.add(where.userId)}`;
+  if (where.OR === undefined) return owner;
+  const arms = where.OR.map((arm) =>
+    arm.clientId === null ? 'client_id IS NULL' : `client_id = ${params.add(arm.clientId)}`,
+  );
+  return `${owner} AND (${arms.join(' OR ')})`;
+}
 
 export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
   return {
@@ -94,7 +114,7 @@ export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
       const params = new Params();
       const { rows } = await sql.query<{ count: string }>(
         `SELECT COUNT(*)::text AS count FROM push_subscriptions
-         WHERE user_id = ${params.add(where.userId)}`,
+         WHERE ${reachWhere(where, params)}`,
         params.values,
       );
       return Number(rows[0]?.count ?? 0);
@@ -111,7 +131,7 @@ export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
     async findMany({ where }) {
       const params = new Params();
       const { rows } = await sql.query<SubscriptionSqlRow>(
-        `SELECT * FROM push_subscriptions WHERE user_id = ${params.add(where.userId)}
+        `SELECT * FROM push_subscriptions WHERE ${reachWhere(where, params)}
          ORDER BY created_at, id`,
         params.values,
       );
@@ -120,15 +140,20 @@ export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
     async upsert({ where, create, update }) {
       const params = new Params();
       const { rows } = await sql.query<SubscriptionSqlRow>(
+        // `client_id` is listed on BOTH halves. The column list here is
+        // literal, so a new column that is added to the seam and forgotten in
+        // this statement writes NULL for ever with nothing failing to compile.
         `INSERT INTO push_subscriptions
-           (id, user_id, endpoint, p256dh, auth, user_agent, updated_at)
+           (id, user_id, endpoint, p256dh, auth, client_id, user_agent, updated_at)
          VALUES (${params.add(randomUUID())}, ${params.add(create.userId)},
                  ${params.add(where.endpoint)}, ${params.add(create.p256dh)},
-                 ${params.add(create.auth)}, ${params.add(create.userAgent)}, NOW())
+                 ${params.add(create.auth)}, ${params.add(create.clientId)},
+                 ${params.add(create.userAgent)}, NOW())
          ON CONFLICT (endpoint) DO UPDATE
            SET user_id = ${params.add(update.userId)},
                p256dh = ${params.add(update.p256dh)},
                auth = ${params.add(update.auth)},
+               client_id = ${params.add(update.clientId)},
                user_agent = ${params.add(update.userAgent)},
                updated_at = NOW()
          RETURNING *`,
