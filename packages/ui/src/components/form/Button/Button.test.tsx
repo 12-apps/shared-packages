@@ -190,23 +190,31 @@ describe('Button — the gradient variant takes its ink from the palette', () =>
     expect(screen.getByTestId('dark')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
   });
 
-  it('pins what the DEFAULT palette gets, because two of five change', () => {
+  it('pins what the DEFAULT palette gets, because ONE of five changes', () => {
     /*
       Every other case here builds a theme by hand, which is how a library
       changes its own stock appearance without anybody noticing. Measured on
-      MUI's `createTheme()`:
+      MUI's `createTheme()`, whose `contrastText` is white for all five:
 
         primary   #1976d2 → #9c27b0   white 4.61  dark 3.34   white  (unchanged)
         secondary #9c27b0 → #1976d2   white 4.61  dark 3.34   white  (unchanged)
         success   #4caf50 → #1b5e20   white 2.78  dark 2.66   white  (unchanged)
         warning   #ff9800 → #e65100   white 2.16  dark 5.54   DARK   (was white)
-        danger    #ef5350 → #c62828   white 3.49  dark 3.74   DARK   (was white)
+        danger    #ef5350 → #c62828   white 3.49  dark 3.74   white  (unchanged)
 
-      `warning` is the fix doing its job: white at 2.16:1 on an orange was the
-      defect. `danger` is bought for 0.25 of a contrast point with NEITHER ink
-      clearing AA, and it repaints a destructive button — that one is a
-      recorded decision rather than a good one, and FUT-2066 carries the
-      question of whether a margin belongs in `inkOver`.
+      TWO used to change here, and `danger` was the one that should not have
+      (FUT-2066). It is bought for **0.25 of a contrast point**, with neither
+      ink clearing AA either way, and what it buys is a destructive button
+      repainted from white-on-red to black-on-red for every consumer on the
+      stock palette. `INK_CHANGE_MARGIN` is what tells that apart from
+      `warning`, where white sits at 2.16:1 on an orange and the 3.38-point
+      gain is the defect FUT-1924 exists for.
+
+      `success` is the row the ticket thought a margin would break, and it is
+      worth keeping the correction: the table's `#4caf50` is `success.LIGHT`,
+      where the gradient starts. `contrastText` answers for `success.main`,
+      `#2e7d32`, where white is 5.7:1 — so the incumbent is white, this row
+      never had a margin to lose, and it reads `white` under both rules.
     */
     render(
       <>
@@ -216,9 +224,31 @@ describe('Button — the gradient variant takes its ink from the palette', () =>
       </>,
     );
 
-    expect(screen.getByTestId('danger')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
+    expect(screen.getByTestId('danger')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
     expect(screen.getByTestId('warning')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
     expect(screen.getByTestId('primary')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
+  });
+
+  it('holds a pale brand to the floor, margin or no margin (FUT-1924)', () => {
+    /*
+      THE CASE THE MARGIN MUST NOT WEAKEN.
+
+      FUT-1924's defect was a stated `#fff` over a surface the tenant picks. A
+      margin that let an unreadable incumbent stand would reintroduce it from
+      the other side — so `INK_CHANGE_FLOOR` is not decoration: this palette
+      states `contrastText: '#fff'` outright over a pale lime, which is 1.4:1
+      and under any margin's radar, and the ink still has to move.
+    */
+    const pale = createTheme({
+      palette: { primary: { main: '#D9F99D', light: '#ECFCCB', dark: '#BEF264', contrastText: '#fff' } },
+    });
+    render(
+      <ThemeProvider theme={pale}>
+        <Button variant="gradient" color="primary" dataTestId="pale">x</Button>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('pale')).toHaveStyle({ color: 'rgba(0, 0, 0, 0.87)' });
   });
 
   it('is decided by the stop the gradient REACHES, not only where it starts', () => {

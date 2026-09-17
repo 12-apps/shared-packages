@@ -52,11 +52,30 @@ export interface PaletteOverride {
  * correction in `brandRole` is computed against this hex, so a host whose page is a
  * tinted card gets a tenant seed corrected to ≥4.5:1 against a background it does not
  * use — and the guarantee `brandRole` advertises as structural quietly stops holding.
- * The core already parameterizes it (`readableInk(hex, surface, min)`), and it owns
- * both values now — this is the same record under the name the react entry has always
- * published, not a second spelling of it.
+ *
+ * ## THE CORE'S BINDING, not a copy of it
+ *
+ * The core owns both values and this entry has always published the name, so
+ * an earlier change re-exported it here — as `{ ...CORE_SURFACES }`, and then said in
+ * this docblock that it was "the same record". A spread is not the same record.
+ * `import { DEFAULT_SURFACES } from '@12-apps/app-shell'` and the same name
+ * `from '@12-apps/app-shell/react'` were never `===`, and their TYPES differed
+ * too: the core's is `as const`, this one was widened to
+ * `Record<ThemeMode, string>`.
+ *
+ * Harmless while every consumer only indexes it, which every consumer audited
+ * for this change does. It is the kind of thing that is only ever
+ * noticed by the person it breaks — an identity check, a `Map` keyed by the
+ * record, a test asserting one against the other — so the copy is gone rather
+ * than documented.
+ *
+ * The widened type went with it, and nothing wanted it: the core's readonly
+ * literal indexes by {@link ThemeMode} exactly as well, because `SurfaceMode`
+ * IS `'light' | 'dark'`. What it stops allowing is a write, which was never a
+ * thing to allow — a host replaces the surface through
+ * {@link AppThemeOptions.surface}, not by assigning into the default.
  */
-export const DEFAULT_SURFACES: Record<ThemeMode, string> = { ...CORE_SURFACES };
+export { DEFAULT_SURFACES } from '../core/brand-palette';
 
 /**
  * One palette role, from a tenant seed or the platform token.
@@ -273,7 +292,7 @@ function readingSurface(
   options: AppThemeOptions,
   background: ModeSurfaces | undefined,
 ): string {
-  return options.surface?.[mode] ?? background?.default ?? DEFAULT_SURFACES[mode];
+  return options.surface?.[mode] ?? background?.default ?? CORE_SURFACES[mode];
 }
 
 /** One role pair, as {@link brandRole} resolves it. */

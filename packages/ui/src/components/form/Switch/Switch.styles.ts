@@ -200,9 +200,35 @@ const switchBaseSx = (
       color: checkedInk(flags, palette),
       '& .MuiSwitch-thumb': {
         animation: flags.loading ? 'none' : `${bounceAnimation} ${seconds(SWITCH_TRANSITION.ms)} ease-out`,
-        // `glass` draws its own translucent thumb and means to show the track
-        // through it, so it keeps the fill it chose.
-        ...(flags.glass ? {} : { backgroundColor: checkedInk(flags, palette) }),
+        /*
+          GLASS KEEPS ITS WASH AND GAINS AN OUTLINE (FUT-2067).
+
+          It used to keep the wash and nothing else, on the argument that a
+          translucent thumb MEANS to show the track through itself, so painting
+          it opaque would be repainting the variant rather than fixing it. The
+          first half of that is still true and this still does not touch the
+          fill. The second half was doing more work than the number supports:
+          `SWITCH_GLASS.thumbAlpha` is **0.9**, so nine parts in ten of the knob
+          are `background.paper` and one part is the track. On a pale brand that
+          composites to within about 1.1:1 of the bar it is sitting on — the
+          same "reads as OFF while it is on" state FUT-1924 exists for, in the
+          one variant whose own argument points AT the tenant-controlled
+          surface.
+
+          So the separation moves to the EDGE, which is the thing a glass
+          surface is allowed to have. The colour is {@link checkedInk} — the
+          same derivation the opaque thumb gets, so there is one rule for "what
+          reads on this track" rather than two — at full strength rather than
+          the `divider` hairline at `borderAlpha` 0.2 the resting thumb wears,
+          which on a pale track is not an outline at all.
+
+          Checked only. The resting track is `action.disabled` washed over the
+          page, which no tenant chooses, so the quiet hairline stays right
+          there — the same split {@link checkedInk}'s own docblock makes.
+        */
+        ...(flags.glass
+          ? { borderColor: checkedInk(flags, palette) }
+          : { backgroundColor: checkedInk(flags, palette) }),
       },
       '& + .MuiSwitch-track': checkedTrack(flags, palette),
       '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.checkedTrackOpacity },

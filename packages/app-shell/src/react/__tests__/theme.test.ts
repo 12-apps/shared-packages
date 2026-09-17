@@ -7,7 +7,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { contrastRatio, MIN_TEXT_CONTRAST, surfaceFor } from '../../core/brand-palette';
+import {
+  contrastRatio,
+  DEFAULT_SURFACES as CORE_SURFACES,
+  MIN_TEXT_CONTRAST,
+  surfaceFor,
+} from '../../core/brand-palette';
 import { createAppTheme, DEFAULT_SURFACES, DEFAULT_THEME_TOKENS } from '../theme';
 
 describe('createAppTheme semantics (FUT-810 rule 9)', () => {
@@ -88,6 +93,22 @@ describe('createAppTheme palette', () => {
    * not on screen. Both values are the core's own, not a second copy
    * of the same white.
    */
+  /**
+   * ONE BINDING, not two spellings of one value.
+   *
+   * `toBe` rather than `toEqual`, and that is the whole case: the entries were
+   * always equal, and the react entry's own docblock called it "the same
+   * record" while publishing `{ ...CORE_SURFACES }` — a spread, so never `===`
+   * and with a widened type besides. Nothing broke, because every consumer only
+   * indexes it; the defect was reserved for whoever first compared the two.
+   *
+   * An equality assertion would go on passing through a re-introduced copy, so
+   * it would pin the claim that was already true and not the one that was not.
+   */
+  it('publishes the core binding itself, from both entry points', () => {
+    expect(DEFAULT_SURFACES).toBe(CORE_SURFACES);
+  });
+
   it('corrects the seed against the surface the host says it paints', () => {
     expect(DEFAULT_SURFACES.light).toBe(surfaceFor('light'));
 

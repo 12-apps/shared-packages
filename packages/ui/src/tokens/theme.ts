@@ -1,4 +1,12 @@
-import { darken, getContrastRatio, lighten } from './color';
+import { darken, lighten } from './color';
+import { contrastText, DARK_TEXT_PRIMARY, inkOver } from './ink-over';
+
+/*
+  RE-EXPORTED rather than moved out of the public surface. Both were published
+  from here, and `ink-over.ts` exists because this file reached the 400-line cap
+  — a caller should not have to learn that.
+*/
+export { contrastText, inkOver };
 import { cssLengthToPx, cssTrackingToEm } from './css-units';
 import { HEADING_SCALE, type HeadingLevel } from './heading-scale';
 
@@ -127,11 +135,8 @@ const ROOT_FONT_PX = 16;
 /** The px value as the rem string the web components write. */
 export const px = (value: number): string => `${value / ROOT_FONT_PX}rem`;
 
-/** MUI's `createPalette` defaults, exactly. */
+/** MUI's `createPalette` default tonal offset, exactly. */
 const TONAL_OFFSET = 0.2;
-const CONTRAST_THRESHOLD = 3;
-const DARK_TEXT_PRIMARY = 'rgba(0, 0, 0, 0.87)';
-const LIGHT_TEXT_PRIMARY = '#fff';
 
 export const GREY: Record<UiGreyStep, string> = {
   50: '#fafafa',
@@ -207,66 +212,6 @@ const MODE_DEFAULTS: Record<
   },
 };
 
-/**
- * MUI's `getContrastText`: white where white reads at 3:1 on the colour, the
- * light mode's dark ink otherwise. (MUI's source spells the white as the DARK
- * palette's `text.primary`, which is what made it easy to read backwards.)
- */
-export function contrastText(background: string): string {
-  return getContrastRatio(background, LIGHT_TEXT_PRIMARY) >= CONTRAST_THRESHOLD
-    ? LIGHT_TEXT_PRIMARY
-    : DARK_TEXT_PRIMARY;
-}
-
-/**
- * The ink that reads on EVERY one of these fills (FUT-1924).
- *
- * {@link contrastText} answers for one fill, which is all MUI's `augmentColor`
- * ever needs: a solid button is a single flat colour. Two components paint the
- * label over something that is not one colour — `Button`'s `gradient` variant
- * runs between two stops, and `Switch`'s thumb travels the whole length of a
- * checked track — and both of them stated `#fff` outright instead, which is
- * white-on-pale the moment a white-labelled host hands the library a pale
- * brand. Audited across the library, those two were the only places a hardcoded
- * white sat over a surface the TENANT chooses.
- *
- * **This deliberately does not follow `contrastText`'s rule.** MUI's is a
- * threshold that PREFERS white — white wherever white clears 3:1 — which is a
- * brand-feel decision, and it is kept for every existing caller so nothing
- * already legible moves. Here the fills can disagree: over MUI's own success
- * pair white is 2.78:1 on `#4caf50` and dark ink 2.66:1 on `#1b5e20`, so
- * neither meets any threshold and asking whether one does is the wrong
- * question. The answer is whichever ink has the better WORST case across the
- * fills — which is also not what either fill says on its own, since
- * `contrastText('#4caf50')` is dark ink.
- *
- * A gradient wide enough that neither ink clears 4.5:1 anywhere is a palette
- * problem this cannot fix — it returns the less bad ink and does not pretend
- * otherwise.
- *
- * `Math.min` is the claim, and it is worth knowing that no test can prove it
- * against `Math.max` today: the two candidate inks sit at opposite ends of the
- * luminance range, so ranking them by their best fill and by their worst gives
- * the same winner for every possible pair (checked exhaustively). Worst case is
- * still what this MEANS, and the moment a third ink or one that is not an
- * extreme is offered, the two stop agreeing.
- *
- * `fallback` is returned when a fill cannot be decomposed: {@link getContrastRatio}
- * throws on a format it does not know, and a throw inside an emotion style
- * function takes the render down with it.
- */
-export function inkOver(fills: readonly string[], fallback: string): string {
-  try {
-    const worstCase = (ink: string): number =>
-      Math.min(...fills.map((fill) => getContrastRatio(ink, fill)));
-
-    return worstCase(LIGHT_TEXT_PRIMARY) >= worstCase(DARK_TEXT_PRIMARY)
-      ? LIGHT_TEXT_PRIMARY
-      : DARK_TEXT_PRIMARY;
-  } catch {
-    return fallback;
-  }
-}
 
 /**
  * MUI's `augmentColor` for a custom colour: derive whatever shade the seed
