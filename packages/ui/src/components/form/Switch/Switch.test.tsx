@@ -86,6 +86,28 @@ function checkedThumbFill(paint: () => void): string | undefined {
   return thumbFill(rulesAddedBy(paint), 'checked');
 }
 
+/**
+ * The `border-color` the added rules give the CHECKED thumb.
+ *
+ * `glass` is the one variant that keeps its fill, so its separation from the
+ * track lives on the edge and the fill helper above reports `undefined` for it
+ * — a case written against `checkedThumbFill` would pass on a component
+ * painting nothing at all.
+ */
+function checkedThumbBorder(paint: () => void): string | undefined {
+  const rule = rulesAddedBy(paint).find((candidate) => {
+    const [selector = ''] = candidate.split('{');
+
+    return (
+      candidate.includes('.MuiSwitch-thumb{') &&
+      candidate.includes('border-color') &&
+      selector.includes('.Mui-checked')
+    );
+  });
+
+  return rule?.match(/border-color:([^;]+)/u)?.[1];
+}
+
 describe('the label names the control (FUT-1905)', () => {
   it('gives the checkbox its accessible name from the visible words', () => {
     render(<Switch label="Modo escuro" />);
@@ -249,6 +271,73 @@ describe('the tap target (FUT-1905 §2)', () => {
     render(<Switch label="Modo escuro" description="uma explicação" dataTestId="dark" />);
 
     expect(screen.getByTestId('dark-label')).not.toHaveStyle({ minHeight: `${TAP_TARGET_MIN}px` });
+  });
+});
+
+describe('the glass thumb separates from a tenant track (FUT-2067)', () => {
+  /*
+    THE EXEMPTION THAT DID NOT HOLD.
+
+    FUT-1924 left `glass` alone on the argument that a translucent thumb MEANS
+    to show the track through itself, so painting it opaque would repaint the
+    variant. The fill is still not touched — but `SWITCH_GLASS.thumbAlpha` is
+    0.9, so the knob is nine parts paper to one part track, and on a pale brand
+    that composites to within about 1.1:1 of the bar it sits on. "You can see
+    the track through it" was a claim about a number that does not say it.
+
+    So the edge does the separating, at the same ink the opaque thumb gets.
+  */
+  it('outlines a PALE brand in the ink that reads on it', () => {
+    const border = checkedThumbBorder(() => {
+      render(
+        <ThemeProvider theme={themed(PALE_BRAND)}>
+          <Switch checked glass />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(border).toBe(DARK_INK);
+  });
+
+  it('leaves a DARK brand white, so this is a correction and not a repaint', () => {
+    const border = checkedThumbBorder(() => {
+      render(
+        <ThemeProvider theme={themed(DARK_BRAND)}>
+          <Switch checked glass />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(border).toBe('#fff');
+  });
+
+  it('still does not repaint the glass fill', () => {
+    // The half the exemption was right about. If this ever reports a colour,
+    // the variant has been turned into the opaque one under a different name.
+    const fill = checkedThumbFill(() => {
+      render(
+        <ThemeProvider theme={themed(PALE_BRAND)}>
+          <Switch checked glass />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(fill).toBeUndefined();
+  });
+
+  it('keeps the quiet hairline at REST, where no tenant colour is involved', () => {
+    // The resting track is `action.disabled` washed over the page. Deriving an
+    // outline from a colour the tenant did not choose would be a repaint with
+    // nothing to fix, which is the same split `checkedInk` makes for the fill.
+    const border = checkedThumbBorder(() => {
+      render(
+        <ThemeProvider theme={themed(PALE_BRAND)}>
+          <Switch glass />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(border).toBeUndefined();
   });
 });
 
