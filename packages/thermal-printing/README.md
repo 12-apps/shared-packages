@@ -64,6 +64,7 @@ mount.
 | `…/routing` | `printerRoute(printers)` / `printerFor(route, destinationId)` — per-destination with a default, generic over your own printer rows. |
 | `…/discovery` | `scanForPrinters(options?)` / `probePrinter(host, port?)` — find the address nobody wrote down. Node-only. |
 | `…/discovery/bridge` | `startDiscoveryBridge({ allowedOrigins })` — a loopback server an HTTPS page may call to run that scan. Node-only. |
+| `…/discovery/cli` | `runFinder({ allowedOrigins })` / `main(argv, env)` — the helper a merchant downloads, as a function to bundle. Node-only. |
 
 `./net` and `./discovery` sit behind their own subpaths so that importing the
 encoders into a browser bundle never drags `node:net` in.
@@ -97,7 +98,27 @@ loopback only, answers **only the origins it was started with**, and exits on a
 TTL. The origin allowlist is the real control — browsers set `Origin`
 themselves and a page cannot forge it — and the TTL bounds the window it has to
 be wrong in. Without both, this is a port scanner any website could aim at a
-shop's network.
+shop's network. `runFinder` therefore **refuses to start with no origin**:
+there is no safe default, so there is no default.
+
+### Packaging the helper
+
+`./discovery/cli` is a function, not a binary, because this package publishes
+TypeScript source and a host's distribution is its own. A branded build bundles
+`main()` with esbuild and wraps it for each platform, baking its own origin in
+through `PRINTER_FINDER_ORIGINS` so a merchant double-clicks an icon rather than
+typing a flag:
+
+```bash
+esbuild --bundle --platform=node --format=cjs --outfile=finder.cjs \
+  --banner:js='process.env.PRINTER_FINDER_ORIGINS ||= "https://admin.example.com"' \
+  your-entry.cjs
+```
+
+**A binary needs signing to be usable by the people it is for.** An unsigned
+`.exe` meets Windows SmartScreen's "unrecognized app" wall and an unnotarized
+`.app` is refused outright by Gatekeeper — for a shop owner, either is where
+this feature ends. That is a certificate and a release pipeline, not code.
 
 ## The three things that are easy to get wrong
 

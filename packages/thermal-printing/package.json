@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./discovery": "./src/discovery/index.ts",
+    "./discovery/cli": "./src/discovery/cli.ts",
     "./discovery/bridge": "./src/discovery/bridge.ts",
     "./escpos": "./src/escpos/index.ts",
     "./html": "./src/html/index.ts",
