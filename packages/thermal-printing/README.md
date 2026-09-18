@@ -62,9 +62,42 @@ mount.
 | `…/html` | `renderTicketHtml(lines, paperWidthMm, lang?)` → a standalone document sized in `ch`, with `@page { margin: 0 }`. |
 | `…/net` | `sendToNetworkPrinter(host, port, bytes, options?)`. Node-only (`node:net`), never throws, structured failures. |
 | `…/routing` | `printerRoute(printers)` / `printerFor(route, destinationId)` — per-destination with a default, generic over your own printer rows. |
+| `…/discovery` | `scanForPrinters(options?)` / `probePrinter(host, port?)` — find the address nobody wrote down. Node-only. |
+| `…/discovery/bridge` | `startDiscoveryBridge({ allowedOrigins })` — a loopback server an HTTPS page may call to run that scan. Node-only. |
 
-`./net` sits behind its own subpath so that importing the encoders into a
-browser bundle never drags `node:net` in.
+`./net` and `./discovery` sit behind their own subpaths so that importing the
+encoders into a browser bundle never drags `node:net` in.
+
+## Finding a printer nobody wrote the address of down
+
+A settings screen asking a shop owner for an IP address is asking a fair
+question of a network engineer and an unfair one of somebody selling lunch: the
+address was handed out by a router they have never logged into, to a device with
+no screen. `./discovery` sweeps the local network for devices listening on the
+printing port and grades what it finds.
+
+**An open port proves nothing about the device.** A print spooler, a second
+server or an unrelated appliance may all answer on 9100. So the probe asks a
+real ESC/POS question once connected — `DLE EOT 1`, real-time status, which
+prints nothing and is safe to send to a non-printer — and grades a device that
+answers `confirmed` against one that merely opened the port, `candidate`.
+Silence is never taken as evidence AGAINST a printer, because a good deal of
+this hardware does not implement status at all. Nothing picks for the operator:
+every candidate is returned, and the test page is still the only proof.
+
+**A browser cannot do any of this**, which is what `./discovery/bridge` is for.
+An HTTPS page may not fetch `http://192.168.0.50` — mixed content — and even
+over plaintext Chrome's Private Network Access rules demand a preflight that a
+printer on :9100 could never answer. Loopback is the one exemption: `127.0.0.1`
+is *potentially trustworthy*, so a helper running on the merchant's own machine
+can hold the scan and hand the answer to the tab.
+
+That server is reachable by every page the merchant has open, so it binds
+loopback only, answers **only the origins it was started with**, and exits on a
+TTL. The origin allowlist is the real control — browsers set `Origin`
+themselves and a page cannot forge it — and the TTL bounds the window it has to
+be wrong in. Without both, this is a port scanner any website could aim at a
+shop's network.
 
 ## The three things that are easy to get wrong
 
