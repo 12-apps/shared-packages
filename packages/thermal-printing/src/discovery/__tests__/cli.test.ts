@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { parseOrigins, runFinder } from "../cli";
-import type { BridgeHandle } from "../bridge";
+import type { FinderOptions } from "../cli";
 
 /**
  * The helper's own half, and mostly the one thing it must refuse.
@@ -12,13 +12,21 @@ import type { BridgeHandle } from "../bridge";
  * asserted as one.
  */
 
-const harness: { bridge: BridgeHandle | null } = { bridge: null };
-
-afterEach(async () => {
-  const running = harness.bridge;
-  harness.bridge = null;
-  if (running !== null) await running.close();
-});
+/** TEST-NET-1 is routed nowhere, so the startup sweep is quick and identical
+ *  on every machine — never the CI runner's own network. */
+const DEAD_RANGE: FinderOptions["scanOptions"] = {
+  probeTimeoutMs: 80,
+  statusTimeoutMs: 80,
+  interfaces: [
+    {
+      name: "test0",
+      address: "192.0.2.2",
+      netmask: "255.255.255.252",
+      family: "IPv4",
+      internal: false,
+    },
+  ],
+};
 
 describe("parseOrigins", () => {
   it("takes repeated flags", () => {
@@ -56,33 +64,27 @@ describe("runFinder", () => {
   });
 
   it("serves the bridge and says where, without the startup sweep stopping it", async () => {
-    const lines: string[] = [];
+    // Everything the assertion reads is declared and consumed inside this test:
+    // nothing survives it, so no other test can be affected by what it collects
+    // and no hook has to reach in to tidy up.
+    const written: string[] = [];
     const bridge = await runFinder({
       allowedOrigins: ["https://admin.test"],
       port: 0,
       ttlMs: 60_000,
-      log: (line) => lines.push(line),
-      // Never the runner's own network: TEST-NET-1 is routed nowhere, so the
-      // startup sweep is quick and the same on every machine.
-      scanOptions: {
-        probeTimeoutMs: 80,
-        statusTimeoutMs: 80,
-        interfaces: [
-          {
-            name: "test0",
-            address: "192.0.2.2",
-            netmask: "255.255.255.252",
-            family: "IPv4",
-            internal: false,
-          },
-        ],
+      scanOptions: DEAD_RANGE,
+      log: (line) => {
+        written.push(line);
       },
     });
-    harness.bridge = bridge;
 
-    expect(lines[0]).toContain(`127.0.0.1:${bridge.port}`);
-    // The merchant's real interface is the browser, so the console points back
-    // at it rather than trying to be one.
-    expect(lines.join("\n")).toContain("browser");
+    try {
+      expect(written[0]).toContain(`127.0.0.1:${bridge.port}`);
+      // The merchant's real interface is the browser, so the console points
+      // back at it rather than trying to be one.
+      expect(written.join("\n")).toContain("browser");
+    } finally {
+      await bridge.close();
+    }
   });
 });

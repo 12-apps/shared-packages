@@ -136,14 +136,44 @@ async function readJson(request: IncomingMessage, limitBytes = 64 * 1024): Promi
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
 }
 
+function isPort(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65_535;
+}
+
 function parseTestPrint(body: unknown): TestPrintRequest | null {
   if (typeof body !== "object" || body === null) return null;
   const candidate = body as Partial<TestPrintRequest>;
-  if (typeof candidate.host !== "string" || candidate.host.length === 0) return null;
-  if (typeof candidate.port !== "number" || !Number.isInteger(candidate.port)) return null;
-  if (candidate.port < 1 || candidate.port > 65_535) return null;
-  if (!Array.isArray(candidate.lines) || candidate.lines.length === 0) return null;
-  return { host: candidate.host, port: candidate.port, lines: candidate.lines };
+  const hostOk = typeof candidate.host === "string" && candidate.host.length > 0;
+  const linesOk = Array.isArray(candidate.lines) && candidate.lines.length > 0;
+  if (!hostOk || !isPort(candidate.port) || !linesOk) return null;
+  return {
+    host: candidate.host as string,
+    port: candidate.port,
+    lines: candidate.lines as TicketLine[],
+  };
+}
+
+/** A test page, printed from inside the shop rather than from the server. */
+async function handleTestPrint(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  let parsed: TestPrintRequest | null;
+  try {
+    parsed = parseTestPrint(await readJson(request));
+  } catch (error) {
+    sendJson(response, 400, {
+      error: "invalid-request",
+      detail: error instanceof Error ? error.message : undefined,
+    });
+    return;
+  }
+  if (parsed === null) {
+    sendJson(response, 400, { error: "invalid-request" });
+    return;
+  }
+  const result = await sendToNetworkPrinter(parsed.host, parsed.port, encodeTicket(parsed.lines));
+  sendJson(response, result.ok ? 200 : 502, result);
 }
 
 /**
@@ -155,6 +185,32 @@ function parseTestPrint(body: unknown): TestPrintRequest | null {
 export function startDiscoveryBridge(options: BridgeOptions): Promise<BridgeHandle> {
   const port = options.port ?? BRIDGE_PORT;
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+
+  const routes = (request: IncomingMessage, response: ServerResponse, path: string): void => {
+    if (request.method === "GET" && path === "/health") {
+      sendJson(response, 200, { ok: true, protocol: 1 });
+      return;
+    }
+    if (request.method === "GET" && path === "/discover") {
+      void scanForPrinters(options.scanOptions ?? {})
+        .then((result) => sendJson(response, 200, { ...result, protocol: 1 } as DiscoverResponse))
+        .catch((error: unknown) =>
+          sendJson(response, 500, {
+            error: "scan-failed",
+            detail: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      return;
+    }
+    // Printing the test page from HERE rather than from the server is the whole
+    // point for a shop whose printer the server cannot reach: it proves the
+    // address is right, on paper, without anything outside the building.
+    if (request.method === "POST" && path === "/test-print") {
+      void handleTestPrint(request, response);
+      return;
+    }
+    sendJson(response, 404, { error: "not-found" });
+  };
 
   const server = createServer((request, response) => {
     const origin = request.headers.origin;
@@ -171,54 +227,7 @@ export function startDiscoveryBridge(options: BridgeOptions): Promise<BridgeHand
       response.end();
       return;
     }
-
-    const path = (request.url ?? "/").split("?")[0];
-
-    if (request.method === "GET" && path === "/health") {
-      sendJson(response, 200, { ok: true, protocol: 1 });
-      return;
-    }
-
-    if (request.method === "GET" && path === "/discover") {
-      void scanForPrinters(options.scanOptions ?? {})
-        .then((result) => {
-          const body: DiscoverResponse = { ...result, protocol: 1 };
-          sendJson(response, 200, body);
-        })
-        .catch((error: unknown) => {
-          sendJson(response, 500, {
-            error: "scan-failed",
-            detail: error instanceof Error ? error.message : String(error),
-          });
-        });
-      return;
-    }
-
-    // Printing the test page from HERE rather than from the server is the
-    // whole point for a shop whose printer the server cannot reach: it proves
-    // the address is right, on paper, without anything outside the building.
-    if (request.method === "POST" && path === "/test-print") {
-      void readJson(request)
-        .then(async (body) => {
-          const parsed = parseTestPrint(body);
-          if (!parsed) {
-            sendJson(response, 400, { error: "invalid-request" });
-            return;
-          }
-          const bytes = encodeTicket(parsed.lines);
-          const result = await sendToNetworkPrinter(parsed.host, parsed.port, bytes);
-          sendJson(response, result.ok ? 200 : 502, result);
-        })
-        .catch((error: unknown) => {
-          sendJson(response, 400, {
-            error: "invalid-request",
-            detail: error instanceof Error ? error.message : String(error),
-          });
-        });
-      return;
-    }
-
-    sendJson(response, 404, { error: "not-found" });
+    routes(request, response, (request.url ?? "/").split("?")[0] as string);
   });
 
   const expiry = setTimeout(() => {

@@ -115,14 +115,21 @@ function isIPv4(family: InterfaceAddress["family"]): boolean {
  * machine — on Windows that is a real risk, where a print spooler may well be
  * listening on 9100 and would be reported as the shop's printer.
  */
-export function rangeFor(entry: InterfaceAddress): ScanRange | null {
+function usableNetwork(entry: InterfaceAddress): { address: number; prefix: number } | null {
   if (!isIPv4(entry.family) || entry.internal) return null;
   const address = toInt(entry.address);
   const mask = toInt(entry.netmask);
   if (address === null || mask === null) return null;
+  const prefix = prefixOf(mask);
+  // A /31 or /32 has no room for a neighbour, so there is nothing to sweep.
+  if (prefix === null || prefix > 30) return null;
+  return { address, prefix };
+}
 
-  const declared = prefixOf(mask);
-  if (declared === null || declared > 30) return null;
+export function rangeFor(entry: InterfaceAddress): ScanRange | null {
+  const usable = usableNetwork(entry);
+  if (usable === null) return null;
+  const { address, prefix: declared } = usable;
 
   // Narrowing is governed by the probe ceiling rather than by the prefix
   // directly, so a /22 that fits is swept whole and only a genuinely

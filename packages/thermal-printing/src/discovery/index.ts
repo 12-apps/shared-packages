@@ -131,19 +131,15 @@ export interface ScanResult {
 
 /** `os.networkInterfaces()` flattened into the shape {@link rangesFor} takes. */
 export function localInterfaces(): InterfaceAddress[] {
-  const flattened: InterfaceAddress[] = [];
-  for (const [name, entries] of Object.entries(networkInterfaces())) {
-    for (const entry of entries ?? []) {
-      flattened.push({
-        name,
-        address: entry.address,
-        netmask: entry.netmask,
-        family: entry.family as InterfaceAddress["family"],
-        internal: entry.internal,
-      });
-    }
-  }
-  return flattened;
+  return Object.entries(networkInterfaces()).flatMap(([name, entries]) =>
+    (entries ?? []).map((entry) => ({
+      name,
+      address: entry.address,
+      netmask: entry.netmask,
+      family: entry.family as InterfaceAddress["family"],
+      internal: entry.internal,
+    })),
+  );
 }
 
 /**
@@ -244,32 +240,41 @@ async function mapWithLimit<T, R>(
  * printer per setor has several, and showing one of them would send somebody
  * back to this screen for each of the others.
  */
+async function sweepRange(
+  range: ScanRange,
+  port: number,
+  options: ScanOptions,
+): Promise<DiscoveredPrinter[]> {
+  const found = await mapWithLimit(
+    range.hosts,
+    options.concurrency ?? PROBE_CONCURRENCY,
+    (host) =>
+      options.signal?.aborted ? Promise.resolve(null) : probePrinter(host, port, options),
+  );
+  return found.filter((printer): printer is DiscoveredPrinter => printer !== null);
+}
+
+/**
+ * Confirmed first, so the one device that proved it speaks ESC/POS is the one a
+ * UI offers by default. Ties hold the sweep's own order, which is ascending by
+ * address — stable across runs, which matters for a screen somebody reads twice.
+ */
+function gradedFirst(a: DiscoveredPrinter, b: DiscoveredPrinter): number {
+  if (a.confidence === b.confidence) return 0;
+  return a.confidence === "confirmed" ? -1 : 1;
+}
+
 export async function scanForPrinters(options: ScanOptions = {}): Promise<ScanResult> {
   const port = options.port ?? DEFAULT_PRINTER_PORT;
-  const concurrency = options.concurrency ?? PROBE_CONCURRENCY;
   const ranges = rangesFor(options.interfaces ?? localInterfaces());
   const printers: DiscoveredPrinter[] = [];
 
   for (const [index, range] of ranges.entries()) {
     if (options.signal?.aborted) return { printers, ranges, aborted: true };
     options.onRangeStart?.(range, index, ranges.length);
-    const found = await mapWithLimit(range.hosts, concurrency, (host) =>
-      options.signal?.aborted
-        ? Promise.resolve(null)
-        : probePrinter(host, port, options),
-    );
-    for (const printer of found) {
-      if (printer) printers.push(printer);
-    }
+    printers.push(...(await sweepRange(range, port, options)));
   }
 
-  // Confirmed first, so the one device that proved it speaks ESC/POS is the one
-  // a UI offers by default. Ties hold the sweep's own order, which is ascending
-  // by address — stable across runs, which matters for a screen somebody reads
-  // twice.
-  printers.sort((a, b) => {
-    if (a.confidence === b.confidence) return 0;
-    return a.confidence === "confirmed" ? -1 : 1;
-  });
+  printers.sort(gradedFirst);
   return { printers, ranges, aborted: options.signal?.aborted ?? false };
 }

@@ -92,25 +92,36 @@ export async function runFinder(options: FinderOptions): Promise<BridgeHandle> {
   log("Go back to your browser and press the button again.");
   log(`This closes on its own in ${Math.round(ttlMs / 60_000)} minutes.`);
 
-  // The startup sweep. Its value is entirely in the failure case, so it must
-  // never be what stops the bridge from serving: a throw here would take the
-  // helper down over a diagnostic.
+  await reportStartupSweep(options.scanOptions ?? {}, log);
+  return bridge;
+}
+
+/**
+ * Sweep once and print what turned up.
+ *
+ * The value is entirely in the failure case — a browser handshake that fails
+ * for a reason nobody can diagnose from a shop floor — so it must never be what
+ * stops the bridge from serving. A throw here would take the helper down over
+ * a diagnostic, hence the bare catch.
+ */
+async function reportStartupSweep(
+  scanOptions: ScanOptions,
+  log: (line: string) => void,
+): Promise<void> {
   try {
-    const result = await scanForPrinters(options.scanOptions ?? {});
+    const result = await scanForPrinters(scanOptions);
     if (result.printers.length === 0) {
       log("No printer answered yet. The browser button will search again.");
-    } else {
-      log("Printers found:");
-      for (const printer of result.printers) {
-        const grade = printer.confidence === "confirmed" ? "printer" : "maybe";
-        log(`  ${printer.host}:${printer.port}  (${grade})`);
-      }
+      return;
+    }
+    log("Printers found:");
+    for (const printer of result.printers) {
+      const grade = printer.confidence === "confirmed" ? "printer" : "maybe";
+      log(`  ${printer.host}:${printer.port}  (${grade})`);
     }
   } catch {
     log("Could not search the network from here. Use the browser button.");
   }
-
-  return bridge;
 }
 
 /** The packaged binary's entry point. */
