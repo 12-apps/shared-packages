@@ -12,6 +12,7 @@
     "./jobs": "./src/jobs.ts",
     "./hono": "./src/hono/index.ts",
     "./gateway": "./src/gateway/index.ts",
+    "./node": "./src/node/index.ts",
     "./react": "./src/react/index.ts",
     "./worker": "./src/react/worker/entry.ts",
     "./parity": "./src/parity/index.ts",
