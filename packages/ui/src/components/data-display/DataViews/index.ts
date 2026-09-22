@@ -95,3 +95,4 @@ export type {
   DataViewsNavCopy,
   DataViewsSearchCopy,
 } from "./data-views-copy";
+export type { DataViewRowDetail } from "./data-views-row-detail";

@@ -34,6 +34,7 @@ import type {
   RangeValue,
   RowAction,
 } from "./data-views-types";
+import type { DataViewRowDetail } from "./data-views-row-detail";
 import type { DataViewsController } from "./use-data-views-state";
 
 /* ── Layout ⇄ view-state mirror ──────────────────────────────────────────── */
@@ -197,6 +198,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   renderListRow?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   /** The Lista's shared columns, so its rows line up by construction. */
   listGroup?: ListGroupConfig<T>;
+  /** Opt-in expandable rows, drawn by the table layout only. */
+  rowDetail?: DataViewRowDetail<T>;
   /** The page-level partition rendered as tabs under the toolbar. */
   scopes?: ScopeConfig[];
   /**
@@ -300,6 +303,7 @@ function ShellStack<T extends Record<string, unknown>>({
               renderListRow={props.renderListRow}
               listGroup={props.listGroup}
               board={props.board}
+              rowDetail={props.rowDetail}
               dataTestId={dataTestId}
               testIdPrefix={testIdPrefix}
               emptyState={body}

@@ -166,6 +166,7 @@ export interface GridRowProps<T extends Record<string, unknown>> {
 
 /** The leading checkbox / chevron cells, which exist only for enabled features. */
 function RowControls<T extends Record<string, unknown>>({
+  row,
   index,
   rowId,
   isSelected,
@@ -187,13 +188,26 @@ function RowControls<T extends Record<string, unknown>>({
       )}
       {expansion && (
         <TableCell padding="checkbox">
-          <IconButton
-            size="small"
-            onClick={() => model.onToggleExpansion(rowId)}
-            aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
-          >
-            {isExpanded ? <ExpandLess /> : <ExpandMore />}
-          </IconButton>
+          {expansion.isRowExpandable?.(row) === false ? null : (
+            <IconButton
+              size="small"
+              // Stopped so a host that opens the record on a row click does not
+              // ALSO open it here: the chevron is its own control.
+              onClick={(event) => {
+                event.stopPropagation();
+                model.onToggleExpansion(rowId);
+              }}
+              aria-expanded={isExpanded}
+              aria-label={
+                isExpanded
+                  ? (expansion.collapseLabel ?? 'Collapse row')
+                  : (expansion.expandLabel ?? 'Expand row')
+              }
+              data-slot="expand-toggle"
+            >
+              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+            </IconButton>
+          )}
         </TableCell>
       )}
     </>
@@ -234,8 +248,8 @@ export function GridRow<T extends Record<string, unknown>>(
           />
         ))}
       </TableRow>
-      {expansion && isExpanded && (
-        <TableRow>
+      {expansion && isExpanded && expansion.isRowExpandable?.(row) !== false && (
+        <TableRow data-slot="row-detail">
           <TableCell colSpan={totalColumns}>{expansion.render(row, index)}</TableCell>
         </TableRow>
       )}

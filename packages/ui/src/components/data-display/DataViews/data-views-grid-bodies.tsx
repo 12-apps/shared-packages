@@ -18,6 +18,7 @@ import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
 import { SelectAllStrip } from "./data-views-select-all-strip";
 import { ListCardGroup, type ListGroupConfig } from "./list-card-rails";
 import type { DataViewCardSelection } from "./data-views-types";
+import { toGridExpansion, type DataViewRowDetail } from "./data-views-row-detail";
 import type { DataViewsController } from "./use-data-views-state";
 import { useDataViewsCopy } from "./data-views-copy-context";
 
@@ -35,6 +36,7 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   sortMode: "client" | "server";
   /** Vertical cell padding, from the density preference. */
   rowPadding: number;
+  rowDetail?: DataViewRowDetail<T>;
   dataTestId?: string;
   emptyState?: React.ReactNode;
 }
@@ -50,6 +52,7 @@ function GridBody<T extends Record<string, unknown>>({
   onChangeSortBy,
   sortMode,
   rowPadding,
+  rowDetail,
   dataTestId,
   emptyState,
 }: GridBodyProps<T>): React.JSX.Element {
@@ -77,6 +80,7 @@ function GridBody<T extends Record<string, unknown>>({
         headerHeight={36}
         selection={{ mode: "multi", selectedRowIds: selectedIds, onChangeSelected }}
         sorting={{ mode: sortMode, sortBy, onChangeSortBy }}
+        expansion={toGridExpansion(rowDetail, copy)}
         data-testid={dataTestId}
         emptyState={emptyState}
         emptyText={copy.grid.emptyFilteredTitle}
@@ -260,6 +264,8 @@ interface GridMainProps<T extends Record<string, unknown>> {
   listGroup?: ListGroupConfig<T>;
   /** Opt-in "Quadro" (board) layout — needs `renderCard`, since it reuses the card. */
   board?: BoardConfig<T>;
+  /** Opt-in expandable rows — the TABLE only; the headerless layouts ignore it. */
+  rowDetail?: DataViewRowDetail<T>;
   dataTestId?: string;
   emptyState?: React.ReactNode;
   testIdPrefix: string;
@@ -382,6 +388,7 @@ export function GridMain<T extends Record<string, unknown>>(props: GridMainProps
       onChangeSortBy={(next: GridSort[]) => c.patch({ sortBy: next })}
       sortMode={c.serverMode ? "server" : "client"}
       rowPadding={DENSITY_ROW_PADDING[layoutState.density]}
+      rowDetail={props.rowDetail}
       dataTestId={dataTestId}
       emptyState={emptyState}
     />
