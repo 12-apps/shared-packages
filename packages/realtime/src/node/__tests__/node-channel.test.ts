@@ -66,6 +66,30 @@ describe("createWebSocketSource outside a browser", () => {
   it("still refuses when nothing can say where the gateway is", () => {
     expect(createWebSocketSource("http://host/api/realtime")).toBeNull();
   });
+
+  it("takes a WebSocket the host supplies, for a runtime that has none", async () => {
+    // The case that matters in practice. "A recent Node has the global" is not
+    // the same question as "this process does": Electron 33 bundles Node 20,
+    // where it is still behind a flag. Measured on 33.4.11 — node 20.18.3,
+    // `typeof WebSocket` is "undefined" — so an agent there has no socket at
+    // all and silently runs on the demotion unless it can pass one in.
+    vi.stubGlobal("WebSocket", undefined);
+    const opened: string[] = [];
+    const source = createWebSocketSource("http://host/api/realtime", {
+      socketUrl: "ws://host/ws",
+      fetchTicket: () => Promise.resolve("T"),
+      webSocket: fakeSocket(opened),
+    });
+    expect(source).not.toBeNull();
+    await vi.waitFor(() => expect(opened).toEqual(["ws://host/ws?ticket=T"]));
+  });
+
+  it("refuses when the runtime has none and the host supplied none", () => {
+    vi.stubGlobal("WebSocket", undefined);
+    expect(
+      createWebSocketSource("http://host/api/realtime", { socketUrl: "ws://host/ws" }),
+    ).toBeNull();
+  });
 });
 
 describe("createNodeChannel", () => {
