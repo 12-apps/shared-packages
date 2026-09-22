@@ -1,4 +1,4 @@
-import { net, type Session } from "electron";
+import type { Session } from "electron";
 
 import { createSessionWatch, guardSession, type SessionWatch } from "../session";
 import {
@@ -58,7 +58,7 @@ export function createShellCore(options: ShellCoreOptions): ShellCore {
   }
 
   const context: ShellContext = {
-    fetch: guardSession(shellFetch(), () => {
+    fetch: guardSession(shellFetch(options.shellSession), () => {
       // The server has the last word on a session, ahead of any cookie we can
       // see: re-reading the jar is what turns its refusal into the tray state
       // and stops the work.
@@ -100,20 +100,30 @@ export function createShellCore(options: ShellCoreOptions): ShellCore {
 }
 
 /**
- * `net.fetch`, bound to the shell's partition by Electron itself.
+ * The SHELL SESSION's own fetch — `shellSession.fetch`, never `net.fetch`.
  *
  * That binding is the whole point: the cookie the sign-in window obtained
- * rides every request with nothing to copy, where a plain `globalThis.fetch`
- * would share nothing with the window and be permanently signed out.
+ * rides every request with nothing to copy, where a fetch bound to anything
+ * else shares nothing with that window and is permanently signed out.
  *
- * A `URL` is normalised to a string first. `net.fetch` takes the web signature
- * minus that one member, and passing one through reaches it as an object with
- * no `url` — a request to the process's own base rather than an error anybody
- * would notice.
+ * **It has to be the session object's method.** `net.fetch` is bound to the
+ * DEFAULT session, and the sign-in window writes its cookies into
+ * `persist:<appId>` — so a shell built on `net.fetch` signs in successfully,
+ * reports `signed-in` from the jar it watches, and then 401s on every request
+ * it makes. Measured in one process, same URL, cookie planted in the
+ * partition: `net.fetch` 401 with an empty default jar, `shellSession.fetch`
+ * 200. Nothing in the shell notices, because `guardSession` reads that 401 as
+ * "the session went away" and asks the watch to re-read a jar that still holds
+ * a live cookie.
+ *
+ * A `URL` is normalised to a string first. The session's fetch takes the web
+ * signature minus that one member, and passing one through reaches it as an
+ * object with no `url` — a request to the process's own base rather than an
+ * error anybody would notice.
  */
-function shellFetch(): typeof globalThis.fetch {
+function shellFetch(shellSession: Session): typeof globalThis.fetch {
   return (input, init) =>
-    net.fetch(
+    shellSession.fetch(
       (input instanceof URL ? input.toString() : input) as never,
       init as never,
     ) as unknown as Promise<Response>;

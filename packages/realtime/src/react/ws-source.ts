@@ -203,8 +203,18 @@ export function createWebSocketSource(
   subscribeUrl: string,
   transport?: RealtimeTransportConfig,
 ): WireSource | null {
-  // `location` rather than `window`: true in a page AND in a worker, false under SSR
-  // — see `defaultSocketUrl` for why the difference matters.
-  if (typeof WebSocket === "undefined" || typeof location === "undefined") return null;
+  if (typeof WebSocket === "undefined") return null;
+  // `location` is needed to DERIVE the endpoint and for nothing else, so it is
+  // required only when the host has not named one. `location` rather than
+  // `window`: true in a page AND in a worker, false under SSR — see
+  // `defaultSocketUrl` for why that difference matters.
+  //
+  // The separation is what lets a runtime with no DOM take the socket. Node has
+  // had a global `WebSocket` since 21 and has never had `location`, so the
+  // combined check refused a connection that would have worked, and every
+  // non-browser consumer silently ran on the SSE demotion instead — which reads
+  // as "realtime is on" while costing a round trip per reconnect and the
+  // gateway's client→server half entirely.
+  if (transport?.socketUrl === undefined && typeof location === "undefined") return null;
   return new WebSocketWireSource(subscribeUrl, transport);
 }
