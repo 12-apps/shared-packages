@@ -73,6 +73,16 @@ export interface GridRowExpansion<T = Record<string, unknown>> {
   defaultExpandedRowIds?: Array<string | number>;
   /** Row id equality uses `getRowId` */
   onChangeExpanded?: (ids: Array<string | number>) => void;
+  /**
+   * Which rows HAVE a detail. Omitted, every row does. A row it refuses keeps
+   * the (empty) chevron cell, so the columns still line up, but offers no
+   * toggle — a chevron that opens onto nothing is a promise the row cannot keep.
+   */
+  isRowExpandable?: (row: T) => boolean;
+  /** The chevron's accessible name while the row is collapsed. Default "Expand row". */
+  expandLabel?: string;
+  /** The chevron's accessible name while the row is expanded. Default "Collapse row". */
+  collapseLabel?: string;
 }
 
 export interface GridSelection {

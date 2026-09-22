@@ -105,6 +105,11 @@ export interface GridRowExpansion<T = any> {
   defaultExpandedRowIds?: Array<string | number>;
   /** Row id equality uses `getRowId` */
   onChangeExpanded?: (ids: Array<string | number>) => void;
+  /** Which rows have a detail; omitted, every row does. Refused rows keep an empty cell. */
+  isRowExpandable?: (row: T) => boolean;
+  /** Accessible names for the chevron (defaults "Expand row" / "Collapse row"). */
+  expandLabel?: string;
+  collapseLabel?: string;
 }
 
 export interface GridSelection {
@@ -254,6 +259,9 @@ export interface DataGridProps<T = any> extends React.HTMLAttributes<HTMLElement
 
 - **Expansion**:
   - Row expand/collapse before/after row; expanded region must be focusable and labelled.
+  - `isRowExpandable` withholds the chevron per row (the cell stays, so columns align).
+  - The chevron's click does not reach the row's cells, so it never also fires a cell's
+    `onClick` (a row-click that opens the record).
 
 ## 6) Styling Contract (data attributes & slots)
 

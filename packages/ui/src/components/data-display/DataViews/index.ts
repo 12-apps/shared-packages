@@ -55,6 +55,7 @@ export {
 export type {
   RowAction,
   DataViewCardSelection,
+  DataViewRowDetail,
   CardAspectRatio,
   SavedViewSummary,
   DataViewState,

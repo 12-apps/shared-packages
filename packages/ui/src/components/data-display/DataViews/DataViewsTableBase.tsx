@@ -19,6 +19,7 @@ import {
 } from "./use-saved-views-controller";
 import {
   type DataViewColumn,
+  type DataViewRowDetail,
   type DataViewsLayout,
   type DataViewServer,
   type DataViewState,
@@ -81,6 +82,8 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   selectionExtra?: SelectionExtraRender<T>;
   /** Bespoke per-row menu (an entity's self-contained 3-dots menu) instead of the auto kebab. */
   renderRowMenu?: (row: T) => React.ReactNode;
+  /** Opt-in expandable rows (table layout only) — see {@link DataViewRowDetail}. */
+  rowDetail?: DataViewRowDetail<T>;
   /** Opt-in "Grade" (cards) layout — a card renderer per row; adds a Grade/Tabela toggle. */
   renderCard?: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   /** Opt-in "Quadro" (board) layout — the loaded page as columns of one field. Needs `renderCard`. */
