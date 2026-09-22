@@ -1,0 +1,141 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  autostartFilePath,
+  createAutostart,
+  desktopEntryFile,
+  quoteExecArgument,
+  type FilePort,
+  type LoginItemPort,
+} from "../index";
+
+describe("desktopEntryFile", () => {
+  it("quotes a path with a space, which is the case that breaks a session", () => {
+    // Unquoted, the desktop environment starts `/home/maria` and reports
+    // nothing at all.
+    expect(quoteExecArgument("/home/maria da silva/agent")).toBe('"/home/maria da silva/agent"');
+  });
+
+  it("escapes the characters the spec reserves inside quotes", () => {
+    expect(quoteExecArgument('a"b$c`d\\e')).toBe('"a\\"b\\$c\\`d\\\\e"');
+  });
+
+  it("switches the entry ON — Hidden=true would mean the opposite", () => {
+    const file = desktopEntryFile({ name: "Agent", exec: "/opt/agent" });
+    expect(file).toContain("Hidden=false");
+    expect(file).toContain("X-GNOME-Autostart-enabled=true");
+    expect(file).toContain("Terminal=false");
+  });
+
+  it("carries the background argument into Exec", () => {
+    expect(desktopEntryFile({ name: "Agent", exec: "/opt/agent", args: ["--background"] })).toContain(
+      'Exec="/opt/agent" "--background"',
+    );
+  });
+
+  it("refuses to let a host's string append keys of its own", () => {
+    // The name is host copy, and a host that interpolates something somebody
+    // typed has handed this function a newline.
+    const file = desktopEntryFile({ name: "Agent\nExec=/bin/sh", exec: "/opt/agent" });
+    expect(file).toContain("Name=Agent Exec=/bin/sh");
+    expect(file.match(/^Exec=/gm)).toHaveLength(1);
+  });
+});
+
+describe("autostartFilePath", () => {
+  it("honours XDG_CONFIG_HOME when the machine sets one", () => {
+    expect(autostartFilePath("app.agent", { XDG_CONFIG_HOME: "/cfg", HOME: "/home/x" })).toBe(
+      "/cfg/autostart/app.agent.desktop",
+    );
+  });
+
+  it("falls back to ~/.config, the spec's default", () => {
+    expect(autostartFilePath("app.agent", { HOME: "/home/x" })).toBe(
+      "/home/x/.config/autostart/app.agent.desktop",
+    );
+  });
+});
+
+/** An in-memory stand-in for the Linux half's file system. */
+function memoryFiles(): FilePort & { readonly written: Map<string, string> } {
+  const written = new Map<string, string>();
+  return {
+    written,
+    exists: (path) => Promise.resolve(written.has(path)),
+    write: (path, content) => {
+      written.set(path, content);
+      return Promise.resolve();
+    },
+    remove: (path) => {
+      written.delete(path);
+      return Promise.resolve();
+    },
+  };
+}
+
+describe("createAutostart", () => {
+  it("writes and removes the desktop file on linux", async () => {
+    const files = memoryFiles();
+    const autostart = createAutostart({
+      platform: "linux",
+      id: "app.agent",
+      entry: { name: "Agent", exec: "/opt/agent" },
+      backgroundArgs: ["--background"],
+      files,
+      env: { HOME: "/home/x" },
+    });
+
+    expect(await autostart.isEnabled()).toBe(false);
+    await autostart.enable();
+    expect(await autostart.isEnabled()).toBe(true);
+    expect(files.written.get("/home/x/.config/autostart/app.agent.desktop")).toContain(
+      'Exec="/opt/agent" "--background"',
+    );
+
+    await autostart.disable();
+    expect(await autostart.isEnabled()).toBe(false);
+  });
+
+  it("uses the login item on macOS and Windows, hidden and with the flag", async () => {
+    const calls: unknown[] = [];
+    const loginItem: LoginItemPort = {
+      getLoginItemSettings: () => ({ openAtLogin: calls.length % 2 === 1 }),
+      setLoginItemSettings: (settings) => calls.push(settings),
+    };
+    const autostart = createAutostart({
+      platform: "darwin",
+      id: "app.agent",
+      entry: { name: "Agent", exec: "/Applications/Agent.app" },
+      backgroundArgs: ["--background"],
+      loginItem,
+    });
+
+    await autostart.enable();
+    expect(calls[0]).toEqual({ openAtLogin: true, openAsHidden: true, args: ["--background"] });
+    expect(await autostart.isEnabled()).toBe(true);
+  });
+
+  it("clears the arguments when disabling, so nothing points at a replaced build", async () => {
+    const setSettings = vi.fn();
+    const autostart = createAutostart({
+      platform: "win32",
+      id: "app.agent",
+      entry: { name: "Agent", exec: "C:/agent.exe" },
+      backgroundArgs: ["--background"],
+      loginItem: { getLoginItemSettings: () => ({ openAtLogin: false }), setLoginItemSettings: setSettings },
+    });
+
+    await autostart.disable();
+    expect(setSettings).toHaveBeenCalledWith({ openAtLogin: false, args: [] });
+  });
+
+  it("answers off and changes nothing when the platform's port was not supplied", async () => {
+    const autostart = createAutostart({
+      platform: "linux",
+      id: "app.agent",
+      entry: { name: "Agent", exec: "/opt/agent" },
+    });
+    await autostart.enable();
+    expect(await autostart.isEnabled()).toBe(false);
+  });
+});
