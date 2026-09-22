@@ -182,12 +182,22 @@ check(
   /no further\s+version/i.test(eneedauth.output),
   "the output does not say the package is wedged, only that it failed",
 );
+// The workflow is named EXACTLY, and `ci.yml` is asserted absent: the two are
+// what a Trusted Publisher is keyed on, so a remedy naming the wrong one sends
+// whoever reads it to a settings form that will not fix anything. The release
+// moved out of ci.yml into cd.yml and this hint did not follow — which cost a
+// cycle, and went unnoticed because the old name was pinned right here.
 check(
   "the diagnosis gives the remedy's coordinates",
-  [/trusted publisher/i, /npmjs\.com/i, /12-apps\/shared-packages/, /ci\.yml/].every((part) =>
+  [/trusted publisher/i, /npmjs\.com/i, /12-apps\/shared-packages/, /cd\.yml/].every((part) =>
     part.test(eneedauth.output),
   ),
   "the remedy does not name the Trusted Publisher setting, npmjs.com, the repo and the workflow",
+);
+check(
+  "the remedy does not name a workflow that does not publish",
+  !/\bci\.yml\b/.test(eneedauth.output),
+  "the remedy still points at ci.yml, which has not published since the release moved to cd.yml",
 );
 check(
   "ENEEDAUTH with no retryable marker is NOT retried",
