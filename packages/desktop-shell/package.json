@@ -1,0 +1,63 @@
+{
+  "name": "@12-apps/desktop-shell",
+  "version": "1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "The reusable half of a desktop AGENT: a background Electron app that signs in against the host's own web sign-in page (no second credential path), keeps working from the tray with every window closed, and starts with the machine on Windows, macOS and Linux. Framework-free core (the status a tray draws, the supervisor that keeps background work alive) plus an injected-port Electron adapter, so everything but the adapter is testable with no Electron and no display.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./autostart": "./src/autostart/index.ts",
+    "./session": "./src/session/index.ts",
+    "./electron": "./src/electron/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage dist",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "electron": "^33.2.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "electron": ">=30.0.0"
+  },
+  "peerDependenciesMeta": {
+    "electron": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/desktop-shell"
+  },
+  "files": [
+    "src",
+    "dist",
+    "*.js",
+    "*.mjs",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/*.test.*"
+  ]
+}

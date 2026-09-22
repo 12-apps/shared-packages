@@ -50,6 +50,15 @@ export type { IssuedToken, IssueTokenOptions } from "./tokens";
  */
 export { CREDENTIALS_PROVIDER_ID } from "./credentials-provider-id";
 
+/**
+ * The session cookie's NAME — plain string work over the base URL's protocol.
+ *
+ * Here rather than in `./server` because a browser checking for a session, and
+ * a desktop agent watching a cookie jar for one, both need the string and
+ * neither should take `@auth/core/jwt` to get it.
+ */
+export { sessionCookieNameFor } from "./session-cookie";
+
 /** Admin allowlist helpers. Plain string work. */
 export { isAdminEmail, parseAdminEmails } from "./admin";
 
