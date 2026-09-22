@@ -250,7 +250,7 @@ function noCredentialDiagnosis(name, version, output, evidence) {
     "version until a Trusted Publisher is configured.",
     "",
     `Configure one by hand: npmjs.com → ${name} → Settings → Trusted Publisher →`,
-    "GitHub Actions, repository `12-apps/shared-packages`, workflow `ci.yml`.",
+    "GitHub Actions, repository `12-apps/shared-packages`, workflow `cd.yml`.",
     `(https://www.npmjs.com/package/${name}/access)`,
     "",
     "npm said:",
@@ -387,7 +387,7 @@ summarize([
           `to help — the annotation above carries what npm reported about the OIDC ` +
           `exchange, and the commonest answer is a package with no Trusted ` +
           `Publisher (npmjs.com → package → Settings → Trusted Publisher → GitHub ` +
-          `Actions, 12-apps/shared-packages, ci.yml): ${wedged.join(", ")}`,
+          `Actions, 12-apps/shared-packages, cd.yml): ${wedged.join(", ")}`,
       ]
     : []),
   ...(blocked.length > 0 ? [`not attempted, dependency failed: ${blocked.join(", ")}`] : []),

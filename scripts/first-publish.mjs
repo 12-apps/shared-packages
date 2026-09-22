@@ -5,7 +5,7 @@
 // page exists only once the package does, so a name nobody has published has
 // nowhere to point the trust at and the tokenless publish 404s (npm/cli#8544).
 // Exactly one token-authenticated publish per package is the way in; from the
-// next release onward the tokenless loop in ci.yml handles it as usual.
+// next release onward the tokenless loop in cd.yml handles it as usual.
 //
 // This runs before that loop and leaves it alone. Packages already on the
 // registry are never touched here, and with no NPM_TOKEN secret set the whole
@@ -37,9 +37,42 @@ function accessUrl(name) {
   return `https://www.npmjs.com/package/${name}/access`;
 }
 
+// Who the token says we are — established BEFORE anything else, because every
+// reading below depends on it and none of them can tell that it went wrong.
+//
+// A token that is expired, revoked, or scoped to another org reads the registry
+// exactly like no token at all. `npm view` then 404s on every RESTRICTED
+// package, `isOnRegistry` reads that as "the name is free", `firstPublish`
+// attempts a publish it cannot authenticate, and npm reports THAT as a 404 on
+// the PUT — a message with nothing in it about credentials, pointing instead at
+// the one explanation that is not the cause. This step has actually failed that
+// way, and the day it cost went entirely on the wrong explanations. One extra
+// call turns the whole chain into the sentence it should have been.
+function whoami() {
+  const { ok, output } = npm(["whoami", `--registry=${REGISTRY}`]);
+  if (ok) return output.trim();
+  throw new Error(
+    [
+      "NPM_TOKEN did not authenticate against the registry, so nothing below",
+      "this line could be trusted: an unauthenticated read cannot tell a name",
+      "that is free from one that is merely private, and a publish made with it",
+      "fails as a 404 on the PUT rather than as the auth error it is.",
+      "",
+      "The likeliest cause by a distance is an EXPIRED token. Granular tokens",
+      "carry an expiry date and npm does not warn before it passes — check the",
+      "dates at https://www.npmjs.com/settings/~/tokens. Issue a replacement",
+      "with read+write on the @12-apps scope and update the NPM_TOKEN secret.",
+      "",
+      "npm said:",
+      tail(output),
+    ].join("\n"),
+  );
+}
+
 // A 404 means the name is free. That reading needs the step to run with
-// NODE_AUTH_TOKEN set: the seven packages published before this repo went
-// public are still RESTRICTED on npm, and an unauthenticated read 404s on those
+// NODE_AUTH_TOKEN set AND that token to be live — whoami() above establishes
+// the second half: the seven packages published before this repo went public
+// are still RESTRICTED on npm, and an unauthenticated read 404s on those
 // exactly as it does on a package that was never published. Anything other than
 // a 404 is left to the caller rather than guessed at.
 function isOnRegistry(name) {
@@ -55,10 +88,17 @@ function firstPublish(dir) {
   const { name, version } = JSON.parse(readFileSync(manifest, "utf8"));
   if (isOnRegistry(name)) return null;
   console.log(`::group::first publish ${name}@${version}`);
-  const { ok, output } = npm(["publish", "--access", "public"], resolve(dir));
+  // `--loglevel verbose` because a failure here arrives as a 404 on a PUT, and
+  // a 404 on a PUT is three unrelated faults wearing one status code: no
+  // credential, no write on the scope, or a name that is genuinely taken. The
+  // quiet output distinguishes none of them; the verbose output names the
+  // request npm made and what came back. It sits inside the group, so it costs
+  // a collapsed section on the runs that pass. npm redacts the auth header.
+  const publishArgs = ["publish", "--access", "public", "--loglevel", "verbose"];
+  const { ok, output } = npm(publishArgs, resolve(dir));
   console.log(tail(output, 40));
   console.log("::endgroup::");
-  if (!ok) throw new Error(`first publish of ${name} failed:\n${tail(output)}`);
+  if (!ok) throw new Error(`first publish of ${name} failed:\n${tail(output, 40)}`);
   console.log(`published ${name}@${version} (first publish)`);
   return name;
 }
@@ -83,7 +123,7 @@ function reportPublished(names) {
   console.log(
     [
       `${names.length} package(s) published for the first time. Add a Trusted`,
-      "Publisher to each (GitHub Actions, 12-apps/shared-packages, ci.yml) so the",
+      "Publisher to each (GitHub Actions, 12-apps/shared-packages, cd.yml) so the",
       "next release publishes tokenlessly:",
       ...lines,
     ].join("\n"),
@@ -105,6 +145,8 @@ if (!process.env.NODE_AUTH_TOKEN) {
 }
 
 if (DIRS.length === 0) throw new Error("PUBLISH_DIRS is empty — nothing to check");
+
+console.log(`npm authenticated as ${whoami()}`);
 
 const failures = [];
 const published = DIRS.map((dir) => attempt(dir, failures)).filter(Boolean);
