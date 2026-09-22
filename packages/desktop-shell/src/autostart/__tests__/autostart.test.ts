@@ -54,7 +54,38 @@ describe("autostartFilePath", () => {
       "/home/x/.config/autostart/app.agent.desktop",
     );
   });
+
+  it("takes `process.env` itself — the call every host actually makes", () => {
+    const path = autostartFilePath("app.agent", process.env);
+    expect(path).toMatch(/\/autostart\/app\.agent\.desktop$/);
+  });
+
+  it("takes an environment that declares a key of its own", () => {
+    // A compile-time assertion wearing a runtime test, and the one that
+    // matters. `AutostartEnv` was once spelled
+    // `{ XDG_CONFIG_HOME?: string; HOME?: string }` — a WEAK type, which
+    // TypeScript refuses an argument that shares none of its properties. An
+    // index signature alone is forgiven; an index signature plus ONE declared
+    // key is not, and that is exactly `@types/node`'s `ProcessEnv` up to
+    // 22.19.x, where it carried `TZ?: string`. So 1.0.0 typechecked here, on
+    // 22.20.1 where `ProcessEnv extends Dict<string> {}` and declares
+    // nothing, and failed in the first host that had the older types.
+    //
+    // Hence the local shape rather than `process.env` above: this case fails
+    // `check-types` if the parameter is ever narrowed again, on any version
+    // of `@types/node` that happens to be installed.
+    const env: WeakTypeTrap = { HOME: "/home/x" };
+    expect(autostartFilePath("app.agent", env)).toBe(
+      "/home/x/.config/autostart/app.agent.desktop",
+    );
+  });
 });
+
+/** `@types/node` 22.19.x's `ProcessEnv`, reduced to what makes it a trap. */
+interface WeakTypeTrap {
+  [key: string]: string | undefined;
+  TZ?: string;
+}
 
 /** An in-memory stand-in for the Linux half's file system. */
 function memoryFiles(): FilePort & { readonly written: Map<string, string> } {

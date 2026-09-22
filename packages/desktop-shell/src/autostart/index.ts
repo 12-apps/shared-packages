@@ -1,6 +1,7 @@
 import {
   autostartFilePath,
   desktopEntryFile,
+  type AutostartEnv,
   type DesktopEntry,
 } from "./desktop-entry";
 
@@ -26,6 +27,7 @@ export {
   autostartFilePath,
   desktopEntryFile,
   quoteExecArgument,
+  type AutostartEnv,
   type DesktopEntry,
 } from "./desktop-entry";
 
@@ -64,7 +66,7 @@ export interface AutostartOptions {
   backgroundArgs?: readonly string[];
   loginItem?: LoginItemPort;
   files?: FilePort;
-  env?: { XDG_CONFIG_HOME?: string; HOME?: string };
+  env?: AutostartEnv;
 }
 
 export interface Autostart {

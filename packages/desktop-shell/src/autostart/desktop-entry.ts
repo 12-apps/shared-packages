@@ -60,15 +60,29 @@ export function desktopEntryFile(entry: DesktopEntry): string {
 }
 
 /**
+ * The environment, in the shape `process.env` actually has.
+ *
+ * Deliberately the WHOLE map rather than the two keys that are read. A type
+ * whose properties are all optional is a *weak type*, and TypeScript refuses
+ * an argument that shares none of its properties — an index signature alone
+ * is forgiven, an index signature plus one declared key is not. That is
+ * exactly `@types/node`'s `ProcessEnv` up to 22.19.x, where it carries
+ * `TZ?: string`, so the narrow shape compiled here and then failed in the
+ * first strict host that had the older types. Naming the two keys bought a
+ * doc comment and cost every caller a hand-written destructure.
+ *
+ * The keys read are `XDG_CONFIG_HOME` and `HOME`; `autostartFilePath` below
+ * is the only thing that reads them.
+ */
+export type AutostartEnv = Readonly<Record<string, string | undefined>>;
+
+/**
  * Where that file goes.
  *
  * `XDG_CONFIG_HOME` first, because a machine that sets it means it, and
  * `~/.config` otherwise — the default the spec states.
  */
-export function autostartFilePath(
-  id: string,
-  env: { XDG_CONFIG_HOME?: string; HOME?: string },
-): string {
+export function autostartFilePath(id: string, env: AutostartEnv): string {
   const base = env.XDG_CONFIG_HOME ?? `${env.HOME ?? ""}/.config`;
   return `${base}/autostart/${id}.desktop`;
 }
