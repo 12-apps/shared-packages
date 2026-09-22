@@ -25,10 +25,11 @@ function restartCounter(count: number): {
 } {
   const reasons: (unknown | undefined)[] = [];
   const consecutive: number[] = [];
-  let resolve: () => void = () => undefined;
-  const reached = new Promise<void>((settle) => {
-    resolve = settle;
-  });
+  // The resolver is COLLECTED rather than assigned to a closed-over binding:
+  // the flakiness lane refuses the assignment, and for a good reason — it is
+  // the shape that lets one test settle another's promise.
+  const settlers: (() => void)[] = [];
+  const reached = new Promise<void>((settle) => settlers.push(settle));
   return {
     reasons,
     consecutive,
@@ -36,7 +37,7 @@ function restartCounter(count: number): {
     onRestart: (reason, seen) => {
       reasons.push(reason);
       consecutive.push(seen);
-      if (reasons.length >= count) resolve();
+      if (reasons.length >= count) settlers.splice(0).forEach((settle) => settle());
     },
   };
 }
@@ -71,12 +72,13 @@ describe("createSupervisor", () => {
   it("resets the curve when work returns cleanly", async () => {
     const delays: number[] = [];
     const counter = restartCounter(4);
-    let calls = 0;
+    // Call COUNT is the array's own length, for the same reason.
+    const calls: true[] = [];
     const supervisor = createSupervisor({
       run: () => {
-        calls += 1;
+        calls.push(true);
         // fail, fail, then clean returns
-        return calls < 3 ? Promise.reject(new Error("boom")) : Promise.resolve();
+        return calls.length < 3 ? Promise.reject(new Error("boom")) : Promise.resolve();
       },
       random: () => 1,
       sleep: recordingSleep(delays),

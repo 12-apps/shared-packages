@@ -35,6 +35,7 @@ env:
     packages/i18n
     packages/thermal-printing
     packages/qr
+    packages/desktop-shell
     packages/feature-flags
     packages/request-scope
     packages/observability-backend

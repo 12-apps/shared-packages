@@ -25,3 +25,6 @@ export {
   type DesktopShellOptions,
   type ShellContext,
 } from "./shell";
+
+/** What `ShellContext.openWindow` takes — part of the public surface. */
+export type { WindowSpec } from "./windows";

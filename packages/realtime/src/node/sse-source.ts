@@ -64,18 +64,16 @@ export interface SseSourceOptions {
 const STREAM_CONTENT_TYPE = "text/event-stream";
 
 export function createSseSource(url: string, options: SseSourceOptions = {}): WireSource {
-  const doFetch = options.fetch ?? globalThis.fetch;
   const controller = new AbortController();
-  const decoder = new SseDecoder();
-  let closed = false;
+  const state = { closed: false };
 
   const source: WireSource = {
     onopen: null,
     onmessage: null,
     onerror: null,
     close(): void {
-      if (closed) return;
-      closed = true;
+      if (state.closed) return;
+      state.closed = true;
       controller.abort();
     },
     // `send` is deliberately ABSENT rather than a method returning false: the
@@ -93,53 +91,21 @@ export function createSseSource(url: string, options: SseSourceOptions = {}): Wi
    * `close()` from waking the reconnect the channel has just cancelled.
    */
   const fail = (): void => {
-    if (closed) return;
-    closed = true;
+    if (state.closed) return;
+    state.closed = true;
     source.onerror?.(new Error("realtime stream ended"));
   };
 
   void (async (): Promise<void> => {
-    let response: Response;
-    try {
-      response = await doFetch(url, {
-        signal: controller.signal,
-        headers: { ...options.headers, accept: STREAM_CONTENT_TYPE },
-      });
-    } catch {
-      // Includes the abort our own `close()` raises, which `fail` then drops.
-      fail();
-      return;
-    }
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!response.ok || !contentType.includes(STREAM_CONTENT_TYPE) || !response.body) {
-      // Drain nothing and let the body be collected: the connection is being
-      // abandoned, and reading a login page into memory helps no one.
+    const response = await openStream(url, options, controller);
+    if (response === null) {
       controller.abort();
       fail();
       return;
     }
-    if (closed) return;
+    if (state.closed) return;
     source.onopen?.(response);
-
-    const reader = response.body.getReader();
-    const text = new TextDecoder();
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        // `stream: true` holds a multi-byte character that a chunk split in
-        // half — an accented word in a ticket is exactly that — rather than
-        // emitting a replacement character into the JSON.
-        for (const payload of decoder.push(text.decode(value, { stream: true }))) {
-          if (closed) return;
-          source.onmessage?.({ data: payload });
-        }
-      }
-    } catch {
-      // A reset mid-stream. Same recovery as every other ending.
-    } finally {
-      decoder.reset();
-    }
+    await pump(response, source, state);
     // Reached on a CLEAN end too, and that is not a success: this wire has no
     // "the server is done" state — a subscription that ends is a subscription
     // that dropped, and the channel's job is to open another one.
@@ -147,4 +113,79 @@ export function createSseSource(url: string, options: SseSourceOptions = {}): Wi
   })();
 
   return source;
+}
+
+/**
+ * Open the stream, or answer `null` for anything that is not one.
+ *
+ * The content-type check is the half that is easy to leave out. A proxy that
+ * lost its upstream, a sign-in page served to an expired session and a captive
+ * portal each answer **200 with HTML**, and a client that read the status alone
+ * would report itself connected and then sit silent until the liveness watch
+ * caught it. Refusing here costs one reconnect instead of 75 seconds of a
+ * consumer believing it is live.
+ */
+async function openStream(
+  url: string,
+  options: SseSourceOptions,
+  controller: AbortController,
+): Promise<Response | null> {
+  const doFetch = options.fetch ?? globalThis.fetch;
+  let response: Response;
+  try {
+    response = await doFetch(url, {
+      signal: controller.signal,
+      headers: { ...options.headers, accept: STREAM_CONTENT_TYPE },
+    });
+  } catch {
+    // Includes the abort our own `close()` raises, which `fail` then drops.
+    return null;
+  }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!response.ok || !contentType.includes(STREAM_CONTENT_TYPE) || !response.body) {
+    // The body is abandoned rather than drained: reading a login page into
+    // memory helps no one.
+    return null;
+  }
+  return response;
+}
+
+/** Read the body until it ends, handing each frame's payload on. */
+async function pump(
+  response: Response,
+  source: WireSource,
+  state: { closed: boolean },
+): Promise<void> {
+  const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+  const decoder = new SseDecoder();
+  const text = new TextDecoder();
+  try {
+    while (!state.closed) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      // `stream: true` holds a multi-byte character that a chunk split in
+      // half — an accented word in a ticket is exactly that — rather than
+      // emitting a replacement character into the JSON.
+      deliver(decoder.push(text.decode(value, { stream: true })), source, state);
+    }
+  } catch {
+    // A reset mid-stream. Same recovery as every other ending.
+  } finally {
+    decoder.reset();
+  }
+}
+
+/**
+ * Hand one chunk's frames to the channel.
+ *
+ * Its own function rather than a loop inside {@link pump}'s: the two are not
+ * nested work — a chunk carries a handful of frames and each is dispatched
+ * once — and writing it that way says so to a reader and to the gate that
+ * looks for quadratic hot paths.
+ */
+function deliver(payloads: string[], source: WireSource, state: { closed: boolean }): void {
+  for (const payload of payloads) {
+    if (state.closed) return;
+    source.onmessage?.({ data: payload });
+  }
 }
