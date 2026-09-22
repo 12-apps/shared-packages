@@ -3,7 +3,8 @@ import { fireEvent, render, screen, within } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { DataViewsGrid } from "../DataViewsGrid";
-import type { DataViewColumn, DataViewRowDetail } from "../data-views-types";
+import type { DataViewColumn } from "../data-views-types";
+import type { DataViewRowDetail } from "../data-views-row-detail";
 
 interface Row extends Record<string, unknown> {
   id: string;

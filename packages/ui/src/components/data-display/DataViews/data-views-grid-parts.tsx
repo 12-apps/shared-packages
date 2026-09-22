@@ -29,12 +29,12 @@ import { ScopeTabsSlot } from "./data-views-scope-tabs";
 import { togglePillValues } from "./data-views-grid-helpers";
 import type {
   DataViewCardSelection,
-  DataViewRowDetail,
   FilterFieldConfig,
   RangeFieldConfig,
   RangeValue,
   RowAction,
 } from "./data-views-types";
+import type { DataViewRowDetail } from "./data-views-row-detail";
 import type { DataViewsController } from "./use-data-views-state";
 
 /* ── Layout ⇄ view-state mirror ──────────────────────────────────────────── */

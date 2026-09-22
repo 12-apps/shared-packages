@@ -14,7 +14,6 @@ import type { ScopeConfig } from "./data-views-scopes";
 import type { DataViewCardSelection } from "./data-views-types";
 import {
   type DataViewColumn,
-  type DataViewRowDetail,
   type DataViewsLayout,
   type DataViewServer,
   type DataViewState,
@@ -23,6 +22,7 @@ import {
   type RangeFieldConfig,
   type RowAction,
 } from "./data-views-types";
+import type { DataViewRowDetail } from "./data-views-row-detail";
 import { useDataViewsState } from "./use-data-views-state";
 
 interface DataViewsGridProps<T extends Record<string, unknown>> {

@@ -45,24 +45,6 @@ export interface RowAction<T extends Record<string, unknown>> {
   isVisible?: (row: T) => boolean;
 }
 
-/**
- * A detail that opens UNDER a table row — a sub-table, say — behind a chevron
- * in its own leading column.
- *
- * TABLE layout only. The cards, the list and the board draw no chevron: each is
- * an entity-rendered surface with its own way of showing more, and a second
- * disclosure beside that one would compete with it.
- */
-export interface DataViewRowDetail<T> {
-  /** The detail for one row. Rendered only while that row is expanded. */
-  render: (row: T) => React.ReactNode;
-  /**
-   * Which rows HAVE a detail. Omitted, every row does. A refused row keeps an
-   * empty chevron cell, so the columns stay aligned, but offers nothing to open.
-   */
-  isExpandable?: (row: T) => boolean;
-}
-
 /** Selection state handed to a card renderer so it can drive its own checkbox. */
 export interface DataViewCardSelection {
   selected: boolean;

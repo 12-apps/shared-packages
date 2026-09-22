@@ -55,7 +55,6 @@ export {
 export type {
   RowAction,
   DataViewCardSelection,
-  DataViewRowDetail,
   CardAspectRatio,
   SavedViewSummary,
   DataViewState,
@@ -96,3 +95,4 @@ export type {
   DataViewsNavCopy,
   DataViewsSearchCopy,
 } from "./data-views-copy";
+export type { DataViewRowDetail } from "./data-views-row-detail";

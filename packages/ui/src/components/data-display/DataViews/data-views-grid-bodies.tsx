@@ -17,7 +17,8 @@ import { cardGridTracks } from "./data-views-grid-helpers";
 import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
 import { SelectAllStrip } from "./data-views-select-all-strip";
 import { ListCardGroup, type ListGroupConfig } from "./list-card-rails";
-import type { DataViewCardSelection, DataViewRowDetail } from "./data-views-types";
+import type { DataViewCardSelection } from "./data-views-types";
+import { toGridExpansion, type DataViewRowDetail } from "./data-views-row-detail";
 import type { DataViewsController } from "./use-data-views-state";
 import { useDataViewsCopy } from "./data-views-copy-context";
 
@@ -35,7 +36,6 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   sortMode: "client" | "server";
   /** Vertical cell padding, from the density preference. */
   rowPadding: number;
-  /** Opt-in expandable rows: a chevron column and a detail row under each. */
   rowDetail?: DataViewRowDetail<T>;
   dataTestId?: string;
   emptyState?: React.ReactNode;
@@ -57,16 +57,6 @@ function GridBody<T extends Record<string, unknown>>({
   emptyState,
 }: GridBodyProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
-  // The chevron speaks the SAME words the list card's disclosure does, so the
-  // two layouts name the one gesture identically in every locale.
-  const expansion = rowDetail
-    ? {
-        render: (row: T) => rowDetail.render(row),
-        isRowExpandable: rowDetail.isExpandable,
-        expandLabel: copy.selection.expandRow,
-        collapseLabel: copy.selection.collapseRow,
-      }
-    : undefined;
   return (
     <Box
       sx={{
@@ -90,7 +80,7 @@ function GridBody<T extends Record<string, unknown>>({
         headerHeight={36}
         selection={{ mode: "multi", selectedRowIds: selectedIds, onChangeSelected }}
         sorting={{ mode: sortMode, sortBy, onChangeSortBy }}
-        expansion={expansion}
+        expansion={toGridExpansion(rowDetail, copy)}
         data-testid={dataTestId}
         emptyState={emptyState}
         emptyText={copy.grid.emptyFilteredTitle}

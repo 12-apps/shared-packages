@@ -12,6 +12,7 @@ import { DeleteViewDialog } from "./DeleteViewDialog";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
+import type { DataViewRowDetail } from "./data-views-row-detail";
 import { ViewDialogs, ViewMutationErrorAlert } from "./data-views-table-parts";
 import {
   useSavedViewsController,
@@ -19,7 +20,6 @@ import {
 } from "./use-saved-views-controller";
 import {
   type DataViewColumn,
-  type DataViewRowDetail,
   type DataViewsLayout,
   type DataViewServer,
   type DataViewState,
