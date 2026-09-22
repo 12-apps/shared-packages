@@ -27,6 +27,12 @@ export { createSseSource, type SseSourceOptions } from "./sse-source";
 export { SseDecoder } from "./sse-decoder";
 
 export type { RealtimeMessage, RealtimeStatus } from "../react/types";
+
+/**
+ * The polling seams, which bind a node consumer exactly as they bind a tab:
+ * realtime RELAXES a poll and never replaces it.
+ */
+export { fallbackRefetchInterval, reconcileRefetchInterval } from "../core/polling";
 export { RealtimeChannel, type RealtimeChannelOptions } from "../react/connection";
 
 /** A node channel: {@link RealtimeChannelOptions} minus the seam we fill. */

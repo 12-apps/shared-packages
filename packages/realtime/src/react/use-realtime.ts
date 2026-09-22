@@ -17,43 +17,12 @@ import type {
  */
 
 /**
- * The query-client seam: pass the result straight to `refetchInterval`.
- *
- * Polling PAUSES only while the stream is live (events arrive pushed and each one
- * should invalidate the matching query); any other state keeps today's polling exactly
- * as it is — that is the no-regression contract.
- *
- * Only correct where a missed event cannot MISLEAD. Prefer
- * {@link reconcileRefetchInterval} otherwise.
+ * The two polling seams moved to `../core/polling` so the node half can reach
+ * them without importing React (12-89). Re-exported here because they are part
+ * of this module's published surface and every existing consumer imports them
+ * from it.
  */
-export function fallbackRefetchInterval(
-  status: RealtimeStatus,
-  pollMs: number,
-): number | false {
-  return status === "connected" ? false : pollMs;
-}
-
-/**
- * The OTHER query-client seam, and the default choice (FUT-440): a poll that keeps
- * RECONCILING while the stream is live instead of pausing outright.
- *
- * {@link fallbackRefetchInterval} suits a surface that can prove it heard everything. A
- * board cannot: delivery is best-effort and there is no replay, so a screen that stops
- * polling the moment it stops hearing has no route back to the truth until something
- * else happens to move. Hence a SLOW poll while connected — `reconcileMs` is the ceiling
- * on how long one dropped hint may leave a screen wrong — and the surface's existing
- * fast poll (`fallbackMs`) on every other status, which is the no-regression contract
- * unchanged.
- *
- * Never `false`: the whole point is that the poll never stops.
- */
-export function reconcileRefetchInterval(
-  status: RealtimeStatus,
-  fallbackMs: number,
-  reconcileMs: number,
-): number {
-  return status === "connected" ? reconcileMs : fallbackMs;
-}
+export { fallbackRefetchInterval, reconcileRefetchInterval } from "../core/polling";
 
 export interface UseRealtimeOptions {
   /**
