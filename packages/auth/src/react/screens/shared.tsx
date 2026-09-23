@@ -1,4 +1,4 @@
-import type { JSX, ReactNode } from "react";
+import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
@@ -15,6 +15,32 @@ import { failureMessage, type EmailAuthScreenReason } from "./copy";
  * and `LinkButton` from the sign-in form, so four files imported a component
  * from a screen they had nothing else to do with.
  */
+
+/**
+ * Bring a refusal into view when it appears, if it appeared off screen.
+ *
+ * A form's refusal renders at the TOP of the form and the button that caused it
+ * is at the bottom. On a phone the two are a screen apart: measured at 360×640
+ * on sign-up, the page was scrolled to the submit when "Criar conta" was
+ * tapped, the banner rendered above the window, and nothing on screen changed
+ * except the button going back to enabled. Centred rather than scrolled to the
+ * top edge, because the host's header may be pinned there. Already on screen,
+ * it is left where it is — a banner that jumped the page every time would be its
+ * own problem. The Alert inside carries `role="alert"`, so a screen reader hears
+ * it wherever it is.
+ */
+export function RevealOnAppear({ children }: { children: ReactNode }): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    // jsdom has no `scrollIntoView`; there is no screen to bring it onto there.
+    if (!el || typeof el.scrollIntoView !== "function") return;
+    const { top, bottom } = el.getBoundingClientRect();
+    if (top >= 0 && bottom <= window.innerHeight) return;
+    el.scrollIntoView({ block: "center" });
+  }, []);
+  return <div ref={ref}>{children}</div>;
+}
 
 /**
  * The refusal banner.
@@ -45,16 +71,18 @@ export function FailureBanner({
         in a pt-BR app, which is exactly what stops these scenarios shipping
         with the library. The reason code is the same in every consumer.
       */}
-      <Alert
-        variant="danger"
-        title={title}
-        description={failureMessage(copy, reason, violations)}
-        closable
-        closeLabel={copy.dismissFailure}
-        onClose={onDismiss}
-        data-testid="auth-failure"
-        data-reason={reason}
-      />
+      <RevealOnAppear>
+        <Alert
+          variant="danger"
+          title={title}
+          description={failureMessage(copy, reason, violations)}
+          closable
+          closeLabel={copy.dismissFailure}
+          onClose={onDismiss}
+          data-testid="auth-failure"
+          data-reason={reason}
+        />
+      </RevealOnAppear>
       <Spacer size="sm" />
     </>
   );

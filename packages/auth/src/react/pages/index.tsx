@@ -2,6 +2,7 @@ import type { ComponentType, JSX, ReactNode } from "react";
 
 import { AuthCard, AuthFooter, ProviderBlock, SignupActions, type AuthLink } from "./card";
 import type { EmailAuthScreens } from "../screens";
+import { RevealOnAppear } from "../screens/shared";
 
 /**
  * `@12-apps/auth/react` — whole login and sign-up PAGES, not fragments.
@@ -231,8 +232,13 @@ export const TERMS_GATE_TEST_ID = "signup-terms-gate";
  * the gap once. An absent gate renders nothing, so it leaves no gap either.
  */
 function TermsGateBlock({ gate }: { gate: ReactNode }): JSX.Element | null {
-  if (gate === undefined || gate === null || gate === false) return null;
+  if (!present(gate)) return null;
   return <div data-testid={TERMS_GATE_TEST_ID}>{gate}</div>;
+}
+
+/** Whether a host slot has anything in it to render. */
+function present(node: ReactNode): boolean {
+  return node !== undefined && node !== null && node !== false;
 }
 
 function SignupView({
@@ -257,7 +263,13 @@ function SignupView({
       {...(branding === undefined ? {} : { branding })}
       maxWidth={maxWidth}
     >
-      {notice}
+      {/*
+        The host's notice renders at the top of the card, and on this page the
+        provider buttons whose failures it reports are at the bottom — so it is
+        brought into view when it appears off screen, like the form's own
+        refusals.
+      */}
+      {present(notice) && <RevealOnAppear>{notice}</RevealOnAppear>}
       {/*
         With the form, the gate and the providers go DOWN to its submit, as one
         pinned block — `SignupActions` says why. Without it there is nothing to
