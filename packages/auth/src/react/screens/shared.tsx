@@ -32,14 +32,21 @@ import { failureMessage, type EmailAuthScreenReason } from "./copy";
 export function RevealOnAppear({ children }: { children: ReactNode }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = ref.current;
+    // The refusal itself, not this wrapper: the wrapper has no box of its own.
+    const target = ref.current?.firstElementChild;
     // jsdom has no `scrollIntoView`; there is no screen to bring it onto there.
-    if (!el || typeof el.scrollIntoView !== "function") return;
-    const { top, bottom } = el.getBoundingClientRect();
+    if (!(target instanceof HTMLElement) || typeof target.scrollIntoView !== "function") return;
+    const { top, bottom } = target.getBoundingClientRect();
     if (top >= 0 && bottom <= window.innerHeight) return;
-    el.scrollIntoView({ block: "center" });
+    target.scrollIntoView({ block: "center" });
   }, []);
-  return <div ref={ref}>{children}</div>;
+  // `contents`, so the wrapper is never a flex item of its own: a notice that
+  // renders nothing (a dismissed one) must not leave a gap in the card's column.
+  return (
+    <div ref={ref} style={{ display: "contents" }}>
+      {children}
+    </div>
+  );
 }
 
 /**

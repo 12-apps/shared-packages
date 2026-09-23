@@ -1,8 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, ComponentType, JSX, ReactNode, RefObject } from "react";
+import type { CSSProperties, ComponentType, JSX, ReactNode } from "react";
 
-import { Box } from "@12-apps/ui/mui/Box";
-import { alpha, type Theme } from "@12-apps/ui/mui/styles";
 import { Card, CardContent } from "@12-apps/ui/layout/Card";
 import { Container } from "@12-apps/ui/layout/Container";
 import { Separator } from "@12-apps/ui/layout/Separator";
@@ -108,7 +105,7 @@ interface AuthCardProps {
  * The card lets a descendant stick to the WINDOW.
  *
  * MUI's card clips with `overflow: hidden`, and a clipping box is a scroll
- * container: {@link SignupActions} would then stick inside a card that never
+ * container: `SignupActions`, `./signup-actions` would then stick inside a card that never
  * scrolls, which is to say never. Nothing in the card needs the clip — the
  * content sits inside its padding, well clear of the rounded corners.
  */
@@ -180,7 +177,7 @@ export function AuthCard({
  *
  * `dividerFirst` turns the block over, for the one page where the providers
  * come AFTER the form: sign-up, where they sit under its submit (see
- * {@link SignupActions}). The rule then says "ou" between the two buttons, in
+ * `SignupActions`, `./signup-actions`). The rule then says "ou" between the two buttons, in
  * the same place relative to both methods as on the login page.
  */
 export function ProviderBlock({
@@ -206,135 +203,6 @@ export function ProviderBlock({
     </div>
   );
 }
-
-/** The sign-up page's action block — the test hook for "is it together, and is it pinned". */
-export const SIGNUP_ACTIONS_TEST_ID = "signup-actions";
-
-/**
- * Whether a bottom-sticky element is pinned to the window right now.
- *
- * It sticks at `bottom: -1px`, so while pinned its last pixel hangs below the
- * window and it is never wholly inside it; in its own place it is. That one
- * pixel is what an `IntersectionObserver` can see, and it spares a scroll
- * listener. jsdom has no observer, so there the answer is simply "not pinned".
- */
-function usePinnedToWindow(): [RefObject<HTMLDivElement | null>, boolean] {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [pinned, setPinned] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") return undefined;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry) return;
-        const floor = entry.rootBounds?.bottom ?? window.innerHeight;
-        // Below the floor, not merely clipped: scrolled PAST, the block leaves
-        // through the top of the window and is not pinned to anything.
-        setPinned(entry.intersectionRatio < 1 && entry.boundingClientRect.bottom > floor);
-      },
-      { threshold: [1] },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return [ref, pinned];
-}
-
-/**
- * Keep the field that has focus out from under the pinned block.
- *
- * A browser scrolls a focused element into view only when it is outside the
- * window, and a field covered by a sticky block is not: measured at 320×568,
- * tabbing from the e-mail to the password left the password under the block,
- * where a keyboard user types into a field they cannot see (WCAG 2.4.11).
- * `scroll-padding-bottom` on the page's scroller is the platform's answer — it
- * shrinks the area focus scrolling treats as "in view" by the block's height —
- * so the block publishes its height there while it is mounted, and puts back
- * whatever was there before when it goes.
- */
-function useReserveFocusRoom(ref: RefObject<HTMLDivElement | null>): void {
-  useEffect(() => {
-    const el = ref.current;
-    const root = document.documentElement;
-    if (!el) return undefined;
-    const before = root.style.scrollPaddingBottom;
-    const publish = (): void => {
-      root.style.scrollPaddingBottom = `${el.offsetHeight}px`;
-    };
-    publish();
-    // jsdom has no ResizeObserver; losing it costs the resize case only.
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
-    observer?.observe(el);
-    return () => {
-      observer?.disconnect();
-      root.style.scrollPaddingBottom = before;
-    };
-  }, [ref]);
-}
-
-/**
- * The consent, the submit and the other ways in, as ONE block that stays in
- * view.
- *
- * ## Why they are together
- *
- * The consent gate enables BOTH ways of signing up, and it used to sit at the
- * top of the card while the submit sat at the bottom, under a name, an e-mail
- * and a password. On a phone that is a screen apart: somebody who filled the
- * form reached a greyed-out "Criar conta" with the checkbox that would enable it
- * scrolled away. Moving the gate down to the submit alone would only move the
- * problem, since the provider buttons it ALSO enables sat at the top — so they
- * come down too, under the submit, and the gate sits directly beside both
- * controls it governs.
- *
- * ## Why it is pinned
- *
- * A provider button is one tap where the form is four fields and a keyboard, and
- * at the top of the card it was the first thing anybody saw. Under the form it
- * would fall below the fold of a short window. So the block is sticky at the
- * bottom: while the form is taller than the window the block rides its lower
- * edge, and once the form fits it sits in its own place. No breakpoint decides
- * it — the window's height does, the only thing that actually matters, and a
- * desktop that fits the card sees nothing move.
- *
- * Pinned, it paints the card's own paper so the fields scroll UNDER it rather
- * than through it, and a shadow on its top edge marks that the page continues
- * behind. The shadow is only there while pinned: in place, an edge above the
- * gate would cut the form in two.
- *
- * With the keyboard up, the pinned block stays at the bottom of the layout
- * viewport — behind the keyboard in every browser that overlays it, which is
- * the default in both Safari and Chrome — so it does not cover the field being
- * typed into.
- */
-export function SignupActions({ children }: { children: ReactNode }): JSX.Element {
-  const [ref, pinned] = usePinnedToWindow();
-  useReserveFocusRoom(ref);
-  return (
-    <Box
-      ref={ref}
-      data-testid={SIGNUP_ACTIONS_TEST_ID}
-      data-pinned={pinned ? "true" : "false"}
-      sx={{
-        ...COLUMN,
-        gap: PROVIDER_GAP,
-        position: "sticky",
-        bottom: "-1px",
-        zIndex: 1,
-        bgcolor: "background.paper",
-        pt: 2,
-        pb: 1.5,
-        boxShadow: pinned ? PINNED_EDGE : "none",
-      }}
-    >
-      {children}
-    </Box>
-  );
-}
-
-/** A soft rule cast UP from the block onto the fields scrolling under it. */
-const PINNED_EDGE = (theme: Theme): string =>
-  `0 -12px 16px -12px ${alpha(theme.palette.common.black, 0.28)}`;
 
 /** The footer sentence with a link to the other page. */
 export function AuthFooter({

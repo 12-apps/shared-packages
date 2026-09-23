@@ -1,6 +1,7 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
-import { AuthCard, AuthFooter, ProviderBlock, SignupActions, type AuthLink } from "./card";
+import { AuthCard, AuthFooter, ProviderBlock, type AuthLink } from "./card";
+import { SignupActions } from "./signup-actions";
 import type { EmailAuthScreens } from "../screens";
 import { RevealOnAppear } from "../screens/shared";
 
@@ -152,6 +153,10 @@ export interface SignupPageProps {
    * The host's provider buttons. With the e-mail form they render UNDER its
    * submit, after the divider, inside the pinned action block; without it,
    * under the gate.
+   *
+   * With the form, that block is INSIDE the `<form>`: a button here must say
+   * `type="button"` or it submits the e-mail form, and it must not bring a
+   * form of its own.
    */
   providers?: ReactNode;
   branding?: ReactNode;

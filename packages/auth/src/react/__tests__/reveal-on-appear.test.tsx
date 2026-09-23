@@ -45,22 +45,42 @@ function placeAt(top: number, height = 120): void {
 describe("RevealOnAppear", () => {
   it("centres a refusal that appeared above the window", () => {
     placeAt(-300);
-    render(<RevealOnAppear>Não foi possível criar a conta</RevealOnAppear>);
+    render(
+      <RevealOnAppear>
+        <p role="alert">Não foi possível criar a conta</p>
+      </RevealOnAppear>,
+    );
 
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
   });
 
   it("centres a refusal that appeared below the window", () => {
     placeAt(100_000);
-    render(<RevealOnAppear>Não foi possível entrar</RevealOnAppear>);
+    render(
+      <RevealOnAppear>
+        <p role="alert">Não foi possível entrar</p>
+      </RevealOnAppear>,
+    );
 
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
   });
 
   it("leaves the page alone when the refusal is already on screen", () => {
     placeAt(100);
-    render(<RevealOnAppear>Não foi possível entrar</RevealOnAppear>);
+    render(
+      <RevealOnAppear>
+        <p role="alert">Não foi possível entrar</p>
+      </RevealOnAppear>,
+    );
 
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("adds no box of its own, so a notice that renders nothing leaves no gap", () => {
+    placeAt(100);
+    const { container } = render(<RevealOnAppear>{null}</RevealOnAppear>);
+
+    expect((container.firstElementChild as HTMLElement).style.display).toBe("contents");
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 });

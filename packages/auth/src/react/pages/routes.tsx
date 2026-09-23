@@ -77,7 +77,7 @@ export interface AuthProvidersContext {
  *
  * Terms of service, an age check, an invite code — the CONTENT is the product's
  * and the package never inspects it. What is generic is the shape: something
- * rendered above the form, a boolean the form and the provider buttons both
+ * rendered beside what it enables, a boolean the form and the provider buttons both
  * respect, and a side effect that must run BEFORE either path proceeds.
  *
  * That last part is why this is not simply a `disabled` prop. The consent stamp
@@ -86,7 +86,10 @@ export interface AuthProvidersContext {
  * consented, and the record of it cannot depend on them making it back.
  */
 export interface AuthSignupGate {
-  /** Rendered above the form, handed the state it is meant to drive. */
+  /**
+   * Rendered directly above what it enables — the form's submit when e-mail is
+   * on, the provider buttons when it is off — and handed the state it drives.
+   */
   render: (state: {
     satisfied: boolean;
     setSatisfied: (next: boolean) => void;
@@ -331,7 +334,11 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
           <Alert variant="danger" description={gate.failureMessage} />
         </div>
     ) : (
-      <FailureNotice failure={state.failure} errors={config.errors} />
+      // Nothing when there is nothing to say, so the notice mounts WHEN a
+      // failure arrives — which is when it is brought into view.
+      state.failure === null ? null : (
+        <FailureNotice failure={state.failure} errors={config.errors} />
+      )
     );
 
   return (

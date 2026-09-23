@@ -1,7 +1,7 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EmailAuthScreens } from "../../screens";
 import { createAuthRoutes } from "../routes";
@@ -190,6 +190,22 @@ describe("createAuthRoutes — the sign-up page waits for the settings", () => {
     expect(screen.getByTestId("signup-actions").contains(google)).toBe(true);
   });
 
+  it("releases the spinner into the e-mail-off layout when the read fails", async () => {
+    const { config } = harness({
+      getSettings: () => Promise.reject(new Error("offline")),
+      renderProviders: () => (
+        <button type="button" data-testid="google">
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    const { container } = render(<SignupRoute />);
+
+    expect(await screen.findByTestId("google")).toBeTruthy();
+    expect(container.innerHTML).not.toContain('data-testid="signup-actions"');
+  });
+
   it("does not hold the login page: its providers are usable while the read is in flight", () => {
     const { config } = harness({
       getSettings: () => new Promise(() => {}),
@@ -342,6 +358,69 @@ describe("createAuthRoutes — the sign-up gate", () => {
       await screen.findByText("Não foi possível registrar o consentimento."),
     ).toBeTruthy();
     expect(signIn).not.toHaveBeenCalled();
+  });
+});
+
+describe("createAuthRoutes — a failure that arrives after the page painted", () => {
+  // The notice sits at the top of the card and, on sign-up, the button whose
+  // failure it reports sits in the pinned block at the bottom. It mounts when
+  // the failure arrives, so that is when it is brought into view.
+  const scrollIntoView = vi.fn();
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: scrollIntoView,
+      configurable: true,
+      writable: true,
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      top: -400,
+      bottom: -300,
+      left: 0,
+      right: 320,
+      width: 320,
+      height: 100,
+      x: 0,
+      y: -400,
+      toJSON: () => ({}),
+    } as DOMRect);
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    scrollIntoView.mockReset();
+    vi.restoreAllMocks();
+  });
+
+  it("brings the consent failure into view when the stamp is refused", async () => {
+    const { config } = harness({
+      signupGate: {
+        render: ({ satisfied, setSatisfied }) => (
+          <input
+            type="checkbox"
+            data-testid="accept"
+            checked={satisfied}
+            onChange={(event) => setSatisfied(event.target.checked)}
+          />
+        ),
+        onBeforeProceed: () => Promise.reject(new Error("offline")),
+        failureMessage: "Não foi possível registrar o consentimento.",
+      },
+      renderProviders: ({ start }) => (
+        <button type="button" data-testid="google" onClick={() => start("google")}>
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    render(<SignupRoute />);
+    fireEvent.click(await screen.findByTestId("accept"));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByTestId("google"));
+
+    await screen.findByText("Não foi possível registrar o consentimento.");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
   });
 });
 

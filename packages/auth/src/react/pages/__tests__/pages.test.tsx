@@ -4,7 +4,8 @@ import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAuthPages, TERMS_GATE_TEST_ID, type AuthLink } from "../index";
-import { PROVIDER_DIVIDER_TEST_ID, SIGNUP_ACTIONS_TEST_ID } from "../card";
+import { PROVIDER_DIVIDER_TEST_ID } from "../card";
+import { SIGNUP_ACTIONS_TEST_ID } from "../signup-actions";
 import { PT_BR_PAGES } from "../pt-BR";
 import type { EmailAuthScreens } from "../../screens";
 
@@ -265,6 +266,7 @@ const google = <button type="button">Continue with Google</button>;
 describe("SignupPage — the gate sits beside what it enables", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("puts the gate directly above the submit, and the providers under it past the divider", () => {
@@ -326,14 +328,48 @@ describe("SignupPage — the gate sits beside what it enables", () => {
       Observer.mock.calls[0]?.[0]([entry]);
     const floor = { bottom: 640 } as DOMRectReadOnly;
 
+    // The theme's rule marks the edge only while pinned, and is a border
+    // either way, so pinning never shifts the layout by its width.
+    const unpinnedEdge = getComputedStyle(block).borderTopColor;
+    expect(["transparent", "rgba(0, 0, 0, 0)"]).toContain(unpinnedEdge);
+
     act(() => report({ intersectionRatio: 0.99, boundingClientRect: { bottom: 641 } as DOMRectReadOnly, rootBounds: floor }));
     expect(block.getAttribute("data-pinned")).toBe("true");
+    expect(getComputedStyle(block).borderTopColor).not.toBe(unpinnedEdge);
 
     act(() => report({ intersectionRatio: 1, boundingClientRect: { bottom: 600 } as DOMRectReadOnly, rootBounds: floor }));
     expect(block.getAttribute("data-pinned")).toBe("false");
 
     // Scrolled PAST: clipped at the top of the window, pinned to nothing.
     act(() => report({ intersectionRatio: 0.5, boundingClientRect: { bottom: 40 } as DOMRectReadOnly, rootBounds: floor }));
+    expect(block.getAttribute("data-pinned")).toBe("false");
+  });
+
+  it("stays in its own place when pinning it would cover more than half the window", () => {
+    // Measured at 320×256 (400% zoom): pinned, the block covered every field
+    // at every scroll position and the form could not be filled in.
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(100_000);
+    const Observer = vi.fn(function observer(
+      _report: (entries: Partial<IntersectionObserverEntry>[]) => void,
+    ) {
+      return { observe: vi.fn(), disconnect: vi.fn() };
+    });
+    vi.stubGlobal("IntersectionObserver", Observer);
+    const { SignupPage } = pages();
+    render(<SignupPage {...signupProps} providers={google} />);
+    const block = screen.getByTestId(SIGNUP_ACTIONS_TEST_ID);
+
+    expect(getComputedStyle(block).position).toBe("static");
+    // Its own place is below the window, which is not the same as pinned.
+    act(() =>
+      Observer.mock.calls[0]?.[0]([
+        {
+          intersectionRatio: 0.2,
+          boundingClientRect: { bottom: 900 } as DOMRectReadOnly,
+          rootBounds: { bottom: 256 } as DOMRectReadOnly,
+        },
+      ]),
+    );
     expect(block.getAttribute("data-pinned")).toBe("false");
   });
 
@@ -383,6 +419,15 @@ describe("SignupPage — a focused field is never left under the pinned block", 
 
   afterEach(() => {
     document.documentElement.style.removeProperty("scroll-padding-bottom");
+    vi.restoreAllMocks();
+  });
+
+  it("reserves nothing when it is too tall to pin, since it then covers nothing", () => {
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(100_000);
+    const { SignupPage } = pages();
+    render(<SignupPage {...signupProps} providers={google} />);
+
+    expect(getComputedStyle(document.documentElement).scrollPaddingBottom).toBe("7px");
   });
 
   it("reserves its height as the page's scroll padding while mounted, and puts it back", () => {
