@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useState, type FocusEvent, type JSX } from "react";
 
 import { Input } from "@12-apps/ui/form/Input";
 
@@ -18,6 +18,11 @@ import { useScreens } from "./context";
  * told `current-password` on a sign-up form offers the old password and
  * silently fills it, and told `new-password` on a login form offers to generate
  * one. There is no value that is right everywhere, so there is no default.
+ *
+ * The input and its toggle are ONE field for `onBlur`: moving between them is
+ * not leaving it. Pressing the toggle does not take focus at all — the caret
+ * stays in the input and a phone keeps its keyboard up — and tabbing onto it is
+ * still inside. Only focus going somewhere else counts.
  */
 export function PasswordField({
   id,
@@ -40,13 +45,18 @@ export function PasswordField({
   helperText?: string;
   dataTestId: string;
   autoFocus?: boolean;
-  /** Called when the field loses focus — the moment a typed password can be judged. */
+  /** Called when focus leaves the field — the moment a typed password can be judged. */
   onBlur?: () => void;
 }): JSX.Element {
   const { copy } = useScreens();
   const [visible, setVisible] = useState(false);
+  const leave = (event: FocusEvent<HTMLDivElement>): void => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    onBlur?.();
+  };
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative" }} onBlur={leave}>
       <Input
         id={id}
         name={id}
@@ -59,11 +69,11 @@ export function PasswordField({
         fullWidth
         {...(error === undefined ? {} : { error })}
         {...(helperText === undefined ? {} : { helperText })}
-        {...(onBlur === undefined ? {} : { onBlur })}
         data-testid={dataTestId}
       />
       <button
         type="button"
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => setVisible((current) => !current)}
         data-testid={`${dataTestId}-toggle`}
         aria-label={visible ? copy.passwordField.hideAria : copy.passwordField.showAria}

@@ -78,22 +78,39 @@ function meetsPasswordHint(password: string): boolean {
   return password.length >= 8 && /\p{L}/u.test(password) && /\d/u.test(password);
 }
 
+/** A typed password the hint's rule refuses. An empty field has broken nothing yet. */
+function breaksHint(password: string): boolean {
+  return password !== "" && !meetsPasswordHint(password);
+}
+
 /**
  * Whether the password has FAILED — refused by the server as weak, or left
  * with a value that breaks the stated rule. Before either the hint stays in
  * the secondary ink: a rule nobody has broken yet is not an error.
+ *
+ * Judged late and cleared early. Leaving the field is what judges it, never a
+ * keystroke — so passing through it empty judges nothing. Once the password
+ * keeps the rule again (or is cleared), the failure is spent, and a later slip
+ * waits for the next time the field is left.
  */
-function usePasswordFailure(password: string): {
+function usePasswordFailure(
+  password: string,
+  setPassword: (value: string) => void,
+): {
   failed: boolean;
+  change: (value: string) => void;
   leave: () => void;
   refuse: (password: string) => void;
 } {
   const [left, setLeft] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
-  const breaksHint = password !== "" && !meetsPasswordHint(password);
   return {
-    failed: password === refused || (left && breaksHint),
-    leave: () => setLeft(true),
+    failed: password === refused || (left && breaksHint(password)),
+    change: (value) => {
+      setPassword(value);
+      if (!breaksHint(value)) setLeft(false);
+    },
+    leave: () => setLeft(breaksHint(password)),
     refuse: setRefused,
   };
 }
@@ -108,7 +125,7 @@ function useSignup(config: SignupConfig): SignupState {
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
   const [sent, setSent] = useState(false);
-  const passwordCheck = usePasswordFailure(password);
+  const passwordCheck = usePasswordFailure(password, setPassword);
 
   /** Register, then take whichever of the two paths the server reports. */
   async function register(): Promise<void> {
@@ -166,7 +183,7 @@ function useSignup(config: SignupConfig): SignupState {
     sent,
     setName,
     setEmail,
-    setPassword,
+    setPassword: passwordCheck.change,
     dismiss: () => setReason(null),
     submit,
   };
