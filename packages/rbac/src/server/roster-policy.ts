@@ -1,4 +1,4 @@
-import type { RbacServerConfig } from './context';
+import type { RbacActor, RbacServerConfig } from './context';
 
 /**
  * The two ROLE-NAME questions the roster asks that the permission engine
@@ -39,8 +39,29 @@ export function ownerRolesOf<P extends string>(
  * meaning.
  */
 export interface RbacActorTier {
-  /** The caller's real membership role, or `null` for a platform operator. */
+  /**
+   * The caller's real membership role, or `null` when the tier was not read
+   * (a revoke, gated on a permission alone) or for a platform operator.
+   */
   readonly role: string | null;
-  /** The host resolved this caller as a platform operator (`isSuper`). */
+  /** The caller is the platform operator: {@link platformActorOf}. */
   readonly isPlatformActor: boolean;
+  /**
+   * The caller's user id, for the ownership rules to re-read the caller inside
+   * the write's own transaction (`./owner-guard`). Absent: the rules judge
+   * `role` instead, as before this field existed. `null` on a caller who is
+   * not the platform operator: nobody to re-read, so the rules refuse.
+   */
+  readonly userId?: string | null;
+}
+
+/**
+ * Whether the host resolved this caller as the PLATFORM operator: `isSuper`
+ * with no permission ceiling. A ceiling (an impersonation preview) and
+ * platform authority are never both meaningful, and the permission guards
+ * already drop `isSuper` whenever one is present (`./guards`); the roster
+ * tiers read the caller the same way, so the three can never disagree.
+ */
+export function platformActorOf(actor: Pick<RbacActor, 'isSuper' | 'permissionCeiling'>): boolean {
+  return actor.isSuper && !actor.permissionCeiling;
 }

@@ -2,9 +2,15 @@ import { DEMO_CATALOG, type DemoPermission } from '../../__tests__/demo-catalog'
 
 import type { RbacAuditEntry, RbacServerConfig, RbacUserIdentity } from '../context';
 import { createApiRbac, type ApiRbac } from '../create-api-rbac';
+import type { RbacDb } from '../db';
 import { PT_BR_RBAC_MESSAGES } from '../pt-BR';
 
-import { createFakeRbacDb, type FakeRbacState } from './fake-db';
+import {
+  createFakeRbacDb,
+  type FakeRbacCall,
+  type FakeRbacDbOptions,
+  type FakeRbacState,
+} from './fake-db';
 
 /**
  * The shared test host (12-13): `createApiRbac` over the in-memory seam with
@@ -14,15 +20,20 @@ import { createFakeRbacDb, type FakeRbacState } from './fake-db';
 
 export interface TestHost {
   api: ApiRbac<DemoPermission>;
+  /** The seam itself, for a suite that plays a HOST writing beside the package. */
+  db: RbacDb;
   state: FakeRbacState;
+  /** Every statement the fake served, in order (see `FakeRbacCall`). */
+  calls: FakeRbacCall[];
   audits: RbacAuditEntry[];
   directory: Map<string, RbacUserIdentity>;
 }
 
 export function createTestHost(
   overrides: Partial<RbacServerConfig<DemoPermission>> = {},
+  fake: FakeRbacDbOptions = {},
 ): TestHost {
-  const { db, state } = createFakeRbacDb();
+  const { db, state, calls } = createFakeRbacDb(fake);
   const audits: RbacAuditEntry[] = [];
   const directory = new Map<string, RbacUserIdentity>();
   const api = createApiRbac<DemoPermission>({
@@ -58,7 +69,7 @@ export function createTestHost(
     },
     ...overrides,
   });
-  return { api, state, audits, directory };
+  return { api, db, state, calls, audits, directory };
 }
 
 /** A member actor at a tenant. */

@@ -10,6 +10,7 @@ import {
 import { createDbEngine } from './engine';
 import { createGrantGovernance, type GrantGovernance } from './grant-governance';
 import { createRbacGuards, type RbacGuards } from './guards';
+import { platformActorOf } from './roster-policy';
 import { roleRoutes } from './routes-roles';
 import { teamRoutes } from './routes-team';
 import { createRolesStore, type RolesStore } from './roles-store';
@@ -73,7 +74,7 @@ export function createApiRbac<P extends string>(config: RbacServerConfig<P>): Ap
 
   /** Any non-customer membership, or a platform admin — the shell's tier. */
   const requireStaffTier = async (actor: RbacActor): Promise<void> => {
-    if (actor.isSuper) return;
+    if (platformActorOf(actor)) return;
     if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
     // Resolved from the membership row (the tier reader refuses a
     // soft-disabled membership) — never from the actor object.

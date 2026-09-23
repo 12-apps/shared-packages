@@ -102,12 +102,18 @@ export {
   type TeamStore,
 } from './team-store';
 
-// The roster's two ROLE-NAME questions. `RbacActorTier` is part of
-// `TeamStore.removeTenantMemberGuarded`'s signature, so a host calling the
-// store directly needs it; `ownerRolesOf` answers "which roles does this
-// config protect" for a host wiring its own removal path beside the packaged
-// one.
+// The roster's two ROLE-NAME questions. `RbacActorTier` is part of the
+// signatures of the three `TeamStore` writes that can take ownership, so a
+// host calling the store directly needs it; `ownerRolesOf` answers "which
+// roles does this config protect" for a host wiring its own removal path
+// beside the packaged one.
 export { ownerRolesOf, type RbacActorTier } from './roster-policy';
+
+// The ownership lock, for a HOST path that moves ownership on its own (a
+// transfer, a platform removal): taken inside that path's transaction, it
+// serialises the path with the package's own owner writes. ADOPTING.md, host
+// wiring rule 10, says what that transaction may not do afterwards.
+export { lockTenantOwnership } from './owner-guard';
 
 export {
   getTenantRolesByName,

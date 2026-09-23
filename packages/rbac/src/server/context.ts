@@ -157,6 +157,12 @@ export interface RbacMessages {
   reservedRoleName: string;
   lastOwner: string;
   onlyOwnerRemovesOwner: string;
+  /**
+   * The refusal when a caller who is not an owner changes an owner's base
+   * role. Optional: absent, `onlyOwnerRemovesOwner` answers, the one owner
+   * sentence there was before a demotion had a rule of its own.
+   */
+  onlyOwnerDemotesOwner?: string;
   ownerNotDisableable: string;
   templateNotEditable: string;
   invalidEmail: string;

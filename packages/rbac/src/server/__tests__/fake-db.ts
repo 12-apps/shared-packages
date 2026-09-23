@@ -21,6 +21,11 @@ interface RoleRecord extends RoleRow {
   isTemplate: boolean;
   archivedAt: Date | null;
   createdAt: Date;
+  /**
+   * Moved by every update, as Prisma's `@updatedAt` moves it. Optional so a
+   * suite that pushes a row by hand need not invent one.
+   */
+  updatedAt?: Date;
 }
 
 type MembershipRecord = MembershipRow;
@@ -55,6 +60,58 @@ export interface FakeRbacState {
   roleAssignments: RoleAssignmentRecord[];
   resourceAssignments: ResourceAssignmentRecord[];
 }
+
+/**
+ * What a test can ask of the fake beyond storing rows: enough of a database's
+ * CONCURRENCY to replay two writes interleaved, and a host that derives the
+ * membership's role column instead of writing it verbatim.
+ */
+export interface FakeRbacDbOptions {
+  /**
+   * Postgres' row lock, emulated: inside a transaction, `role.updateMany`
+   * waits for and takes an exclusive lock on every row its WHERE matches (no
+   * match, no lock, as Postgres), re-entrant within one transaction and held
+   * until the transaction's callback settles. On by default; `false` is the
+   * control run that shows the race the lock closes.
+   */
+  rowLocks?: boolean;
+  /**
+   * Awaited before every WRITE a transaction issues — never before the lock
+   * statement itself. A test holds a transaction here, between its reads and
+   * its write.
+   */
+  beforeWrite?: (op: string, txId: number) => Promise<void> | void;
+  /** Called when a transaction STARTS waiting on a lock another one holds. */
+  onLockWait?: (txId: number, rowId: string) => void;
+  /**
+   * A host whose `memberships.role` is derived from the links: called after
+   * `membership.update` and after every link write, once per membership the
+   * statement touched.
+   */
+  deriveMembershipRole?: (state: FakeRbacState, membershipId: string) => void;
+}
+
+/** One statement the fake served, in the order it was issued. */
+export interface FakeRbacCall {
+  /** The transaction it ran in; `null` for the root client. */
+  txId: number | null;
+  /** `model.method`, e.g. `role.updateMany`. */
+  op: string;
+}
+
+/** The statements `beforeWrite` holds. The lock (`role.updateMany`) is not one. */
+const WRITES = new Set([
+  'role.create',
+  'role.createMany',
+  'role.upsert',
+  'role.deleteMany',
+  'membership.update',
+  'membership.updateMany',
+  'membership.deleteMany',
+  'membershipRole.createMany',
+  'membershipRole.deleteMany',
+  'roleAssignment.deleteMany',
+]);
 
 // A container property, not a reassigned binding, and a FIXED epoch instead
 // of the wall clock — the flakiness gate's rules, and the right ones for a
@@ -113,7 +170,11 @@ function matchMembership(row: MembershipRecord, where: MembershipWhere): boolean
   return true;
 }
 
-export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
+export function createFakeRbacDb(options: FakeRbacDbOptions = {}): {
+  db: RbacDb;
+  state: FakeRbacState;
+  calls: FakeRbacCall[];
+} {
   const state: FakeRbacState = {
     roles: [],
     memberships: [],
@@ -163,7 +224,7 @@ export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
     return true;
   };
 
-  const client: RbacDbClient = {
+  const base: RbacDbClient = {
     role: {
       async findMany({ where, orderBy, skip, take }) {
         const matched = state.roles.filter((row) => matchRole(row, where));
@@ -203,6 +264,7 @@ export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
           locked: data.locked ?? false,
           archivedAt: null,
           createdAt: nextTimestamp(),
+          updatedAt: nextTimestamp(),
         };
         state.roles.push(row);
         return roleView(row);
@@ -231,6 +293,7 @@ export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
             locked: item.locked ?? false,
             archivedAt: null,
             createdAt: nextTimestamp(),
+            updatedAt: nextTimestamp(),
           });
           created.push(rowId);
         }
@@ -247,6 +310,7 @@ export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
           if (update.description !== undefined) existing.description = update.description;
           if (update.permissions !== undefined) existing.permissions = update.permissions;
           if (update.kind !== undefined) existing.kind = update.kind;
+          existing.updatedAt = nextTimestamp();
           return roleView(existing);
         }
         return this.create({ data: create, select: undefined as never });
@@ -259,6 +323,7 @@ export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
           if (data.permissions !== undefined) row.permissions = data.permissions;
           if (data.kind !== undefined) row.kind = data.kind;
           if (data.archivedAt !== undefined) row.archivedAt = data.archivedAt;
+          row.updatedAt = nextTimestamp();
         }
         return { count: rows.length };
       },
@@ -408,14 +473,106 @@ export function createFakeRbacDb(): { db: RbacDb; state: FakeRbacState } {
     },
   };
 
+  const calls: FakeRbacCall[] = [];
+  const locks = new Map<string, { holder: number; wake: (() => void)[] }>();
+  const transactions = { next: 0 };
+
+  async function acquire(rowId: string, txId: number): Promise<void> {
+    for (;;) {
+      const held = locks.get(rowId);
+      if (!held) {
+        locks.set(rowId, { holder: txId, wake: [] });
+        return;
+      }
+      if (held.holder === txId) return;
+      options.onLockWait?.(txId, rowId);
+      await new Promise<void>((resolve) => held.wake.push(resolve));
+    }
+  }
+
+  function releaseAll(txId: number): void {
+    for (const [rowId, held] of [...locks]) {
+      if (held.holder !== txId) continue;
+      locks.delete(rowId);
+      held.wake.forEach((wake) => wake());
+    }
+  }
+
+  /** What runs before a statement inside a transaction: its lock, or the hook. */
+  async function beforeStatement(op: string, args: unknown, txId: number): Promise<void> {
+    if (op === 'role.updateMany') {
+      if (options.rowLocks === false) return;
+      const { where } = args as { where: RoleWhere };
+      const matched = state.roles.filter((row) => matchRole(row, where));
+      for (const row of matched) await acquire(row.id, txId);
+      return;
+    }
+    if (WRITES.has(op)) await options.beforeWrite?.(op, txId);
+  }
+
+  /** The memberships a statement touches, for the deriving host's hook. */
+  function derivedTargets(op: string, args: unknown): string[] {
+    if (!options.deriveMembershipRole) return [];
+    if (op === 'membership.update') return [(args as { where: { id: string } }).where.id];
+    if (op === 'membershipRole.createMany') {
+      return (args as { data: { membershipId: string }[] }).data.map((row) => row.membershipId);
+    }
+    if (op === 'membershipRole.deleteMany') {
+      const { where } = args as { where: MembershipRoleWhere };
+      return state.membershipRoles
+        .filter((row) => membershipRoleMatches(row, where))
+        .map((row) => row.membershipId);
+    }
+    return [];
+  }
+
+  /** The delegates as one transaction (or the root client) sees them. */
+  function clientFor(txId: number | null): RbacDbClient {
+    const wrap = <D extends object>(model: string, delegate: D): D =>
+      Object.fromEntries(
+        Object.entries(delegate).map(([method, fn]) => [
+          method,
+          async (args: unknown) => {
+            const op = `${model}.${method}`;
+            calls.push({ txId, op });
+            if (txId !== null) await beforeStatement(op, args, txId);
+            const touched = derivedTargets(op, args);
+            const result: unknown = await (fn as (input: unknown) => Promise<unknown>).call(
+              delegate,
+              args,
+            );
+            touched.forEach((membershipId) => options.deriveMembershipRole?.(state, membershipId));
+            return result;
+          },
+        ]),
+      ) as D;
+    return {
+      role: wrap('role', base.role),
+      membership: wrap('membership', base.membership),
+      membershipRole: wrap('membershipRole', base.membershipRole),
+      roleAssignment: wrap('roleAssignment', base.roleAssignment),
+      resourceAssignment: wrap('resourceAssignment', base.resourceAssignment),
+    };
+  }
+
   const db: RbacDb = {
-    ...client,
-    // No isolation in a fake — the transaction is the same client, which is
-    // exactly what the stores may assume of the seam (Prisma's is stronger).
-    $transaction: async (fn) => fn(client),
+    ...clientFor(null),
+    // No isolation and no rollback in a fake: a transaction reads and writes
+    // the same state as the root client, which is exactly what the stores may
+    // assume of the seam (Prisma's is stronger). What it adds is the row
+    // locks above, released when the callback settles, as a commit or a
+    // rollback releases them.
+    $transaction: async (fn) => {
+      const txId = (transactions.next += 1);
+      try {
+        return await fn(clientFor(txId));
+      } finally {
+        releaseAll(txId);
+      }
+    },
   };
 
-  return { db, state };
+  return { db, state, calls };
 }
 
 /** Test helper: seed a tenant custom role row directly. */
@@ -442,6 +599,7 @@ export function seedRole(
     locked: input.locked ?? false,
     archivedAt: input.archivedAt ?? null,
     createdAt: nextTimestamp(),
+    updatedAt: nextTimestamp(),
   });
   return rowId;
 }

@@ -20,6 +20,7 @@ export const EN_US_RBAC_MESSAGES: RbacMessages = {
   reservedRoleName: 'That name is reserved for a system role. Edit the system role instead.',
   lastOwner: 'At least one owner must remain.',
   onlyOwnerRemovesOwner: 'Only an owner can remove another owner.',
+  onlyOwnerDemotesOwner: "Only an owner can change another owner's role.",
   ownerNotDisableable: 'An owner cannot be disabled.',
   templateNotEditable: 'This system role cannot be edited.',
   invalidEmail: 'Enter a valid e-mail address.',

@@ -10,7 +10,7 @@ import {
   type RbacRoute,
   type RbacServerConfig,
 } from './context';
-import type { RbacActorTier } from './roster-policy';
+import { platformActorOf, type RbacActorTier } from './roster-policy';
 import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
 import type { MemberDetailPayload } from './payloads';
@@ -57,7 +57,7 @@ async function requireAdminTier<P extends string>(
 ): Promise<RbacActorTier> {
   const messages = messagesOf(deps.config, locale);
   const adminRoles = new Set(deps.config.adminRoles);
-  if (actor.isSuper) return { role: null, isPlatformActor: true };
+  if (platformActorOf(actor)) return { role: null, isPlatformActor: true, userId: actor.userId };
   if (!actor.userId) throw new RbacApiError(403, messages.forbidden);
   // Always resolved from the membership row — never from the actor object.
   // The store's tier reader refuses a soft-disabled membership, so a
@@ -67,7 +67,7 @@ async function requireAdminTier<P extends string>(
   if (!role || !adminRoles.has(role)) {
     throw new RbacApiError(403, messages.forbidden);
   }
-  return { role, isPlatformActor: false };
+  return { role, isPlatformActor: false, userId: actor.userId };
 }
 
 function requirePermission<P extends string>(
@@ -248,7 +248,7 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
     path: '/team/:userId',
     async handle({ actor, params, body, locale }) {
       try {
-        await requireAdminTier(deps, actor, locale);
+        const tier = await requireAdminTier(deps, actor, locale);
         await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
         const messages = messagesOf(deps.config, locale);
         const input = parseBody(deps.wire.setMemberRoleBody, body, messages);
@@ -258,10 +258,17 @@ function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute
         // to the same column. Custom roles ride POST /team/:userId/roles.
         assertAssignableBaseRole(deps.config, input.role, messages);
         // The shared governance (escalation / scope-ceiling / SoD /
-        // owner-protected) runs BEFORE the write.
+        // owner-protected) runs BEFORE the write; the ownership rules run
+        // inside it. The answer is the role the row holds afterwards.
         await deps.governance.assertCanGrantRole(actor, input.role, userId);
-        await deps.team.setMemberRole(actor.tenantId, userId, input.role, locale);
-        return ok({ status: 'updated' as const, role: input.role });
+        const role = await deps.team.setMemberRole(
+          actor.tenantId,
+          userId,
+          input.role,
+          locale,
+          tier,
+        );
+        return ok({ status: 'updated' as const, role });
       } catch (error) {
         return foldApiError(error);
       }
@@ -343,11 +350,14 @@ function revokeMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRo
         await requirePermission(deps, actor, gatesOf(deps.config).manageRoles);
         const messages = messagesOf(deps.config, locale);
         // Idempotent — revoking a role the member doesn't hold is a no-op.
+        // Gated on the permission alone, so the tier is not read: an owner
+        // role's revoke re-reads the caller inside the write.
         await deps.team.revokeCustomRoleFromMember(
           actor.tenantId,
           requireParam(params, 'userId', messages),
           requireParam(params, 'role', messages),
           locale,
+          { role: null, isPlatformActor: platformActorOf(actor), userId: actor.userId },
         );
         return ok({ status: 'revoked' as const });
       } catch (error) {
