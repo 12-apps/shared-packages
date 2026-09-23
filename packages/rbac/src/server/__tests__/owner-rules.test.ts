@@ -6,6 +6,7 @@ import { lockTenantOwnership } from '../owner-guard';
 import { PT_BR_RBAC_MESSAGES } from '../pt-BR';
 import {
   enrolMember,
+  seedRole,
   type FakeRbacCall,
   type FakeRbacDbOptions,
   type FakeRbacState,
@@ -221,7 +222,7 @@ describe('revoking an owner role', () => {
     expect(response.status).toBe(200);
     expect(h.calls.some((c) => c.op === 'role.updateMany')).toBe(false);
     expect(h.calls.filter((c) => c.op === 'membershipRole.deleteMany')).toEqual([
-      { txId: null, op: 'membershipRole.deleteMany' },
+      expect.objectContaining({ txId: null, op: 'membershipRole.deleteMany' }),
     ]);
   });
 
@@ -278,6 +279,7 @@ describe('revoking an owner role', () => {
       params: { userId: 'owner-1' },
     });
     expect(removal.status).toBe(403);
+    expect(refusal(removal)).toBe(PT_BR_RBAC_MESSAGES.onlyOwnerRemovesOwner);
     const demotion = await call(h, PATCH, {
       actor: memberActor(TENANT, 'owner-2'),
       params: { userId: 'owner-1' },
@@ -467,7 +469,7 @@ describe('removing an owner (DELETE /team/:userId)', () => {
 
 /**
  * A host whose role column is DERIVED from the links, ranked by the demo
- * catalog's own order — the shape Future Pay has had since FUT-2446.
+ * catalog's own order — the shape the origin host has had since FUT-2446.
  */
 const RANK = ['DIRECTOR', 'HEAD_LIBRARIAN', 'BRANCH_LEAD', 'CLERK', 'CONSERVATOR', 'TREASURER', 'SELECTOR'];
 
@@ -589,6 +591,18 @@ describe('direct store calls', () => {
     expect(countedOwners(paired.state)).toEqual(['owner-2']);
   });
 
+  it('s5: a caller who is not the platform operator and names no user is refused', async () => {
+    const h = await host(TWO_OWNERS);
+    const nobody = { role: null, isPlatformActor: false, userId: null };
+    await expect(
+      h.api.team.removeTenantMemberGuarded(TENANT, 'owner-1', nobody),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      h.api.team.revokeCustomRoleFromMember(TENANT, 'owner-1', 'DIRECTOR', undefined, nobody),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(countedOwners(h.state)).toEqual(['owner-1', 'owner-2']);
+  });
+
   it('s3: setMemberRole resolves to the role read back', async () => {
     const h = await host(ONE_OWNER, { deriveMembershipRole: deriveByRank });
     addLink(h.state, 'admin-1', 'BRANCH_LEAD');
@@ -597,6 +611,13 @@ describe('direct store calls', () => {
     );
   });
 });
+
+/** The row ids the lock statements named, in the order they ran. */
+function lockedIds(calls: readonly FakeRbacCall[]): string[] {
+  return calls
+    .filter((c) => c.op === 'role.updateMany')
+    .map((c) => (c.args as { where: { id: string } }).where.id);
+}
 
 /** The statements one transaction issued, in order. */
 function opsOf(calls: readonly FakeRbacCall[]): string[] {
@@ -643,6 +664,7 @@ describe('the ownership lock', () => {
     expectLockedBeforeDeciding(patch, 'membership.update');
     // The target is read after the lock, and the stored role after the write.
     expect(patch.indexOf('membership.findUnique')).toBeGreaterThan(1);
+    expect(patch.indexOf('membership.findUnique')).toBeLessThan(patch.indexOf('membership.update'));
     expect(patch.at(-1)).toBe('membership.findUnique');
 
     const third = await host(TWO_OWNERS);
@@ -650,6 +672,8 @@ describe('the ownership lock', () => {
     await call(third, REMOVE, { actor: owner1, params: { userId: 'owner-2' } });
     const removal = opsOf(third.calls);
     expectLockedBeforeDeciding(removal, 'membership.deleteMany');
+    // The target itself is read inside the transaction, after the lock.
+    expect(removal.indexOf('membership.findUnique')).toBeGreaterThan(1);
     expect(removal.at(-1)).toBe('roleAssignment.deleteMany');
 
     // A removal locks whoever it removes: the target is only known to own
@@ -727,6 +751,39 @@ describe('the ownership lock', () => {
     const response = await demotion;
     expect(response.status).toBe(403);
     expect(countedOwners(h.state)).toEqual(['heir']);
+  });
+
+  it('l7: with several owner-role rows, the lock takes them in id order', async () => {
+    const h = await host(TWO_OWNERS);
+    // A second live owner row whose id sorts BEFORE the DIRECTOR row's and
+    // whose name sorts after it, so neither the read order nor chance can pass.
+    seedRole(h.state, { clientId: TENANT, name: 'NETWORK_OPS', permissions: '*', kind: 'SYSTEM', locked: true });
+    h.calls.splice(0);
+    await call(h, REVOKE, {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { userId: 'owner-2', role: 'DIRECTOR' },
+    });
+    const locked = lockedIds(h.calls);
+    expect(locked).toHaveLength(2);
+    expect(locked).toEqual([...locked].sort());
+  });
+
+  it('l8: an archived owner-role row is not locked', async () => {
+    const h = await host(TWO_OWNERS);
+    seedRole(h.state, {
+      clientId: TENANT,
+      name: 'NETWORK_OPS',
+      permissions: '*',
+      kind: 'SYSTEM',
+      locked: true,
+      archivedAt: new Date(Date.UTC(2026, 0, 2)),
+    });
+    h.calls.splice(0);
+    await call(h, REVOKE, {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { userId: 'owner-2', role: 'DIRECTOR' },
+    });
+    expect(lockedIds(h.calls)).toEqual([roleIdOf(h.state, 'DIRECTOR')]);
   });
 
   it('l4: a lock statement that matched nothing is an error, not a silent pass', async () => {

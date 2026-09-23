@@ -106,34 +106,40 @@ reusable across repositories, exposing standardized surfaces. A host repo only
    passes `scopeParent` (synchronous) and `warmScope` (the async pre-load the
    sync walk reads from) — the origin host's client→org cache is the reference.
 10. **Ownership moves under one lock.** Every `PATCH /team/:userId`, every
-   `DELETE /team/:userId` and every revoke of an owner role decides INSIDE its
-   own transaction, after a no-op UPDATE of the tenant's live owner-role rows
-   (`kind` rewritten with its own value) that is the transaction's first
-   statement. Under READ COMMITTED a second such write waits for the first to
-   commit, then reads what it wrote. An owner, for these rules, is an ACTIVE
-   member whose `role` column names an owner role AND who holds a link to a
-   live owner-role row (the active column owners where the tenant has no such
-   row). What that asks of the host:
-   - The owner rows' `updated_at` moves on every one of those writes; nothing
-     in the package reads it.
-   - A host path that moves ownership (a promotion is a move of ownership, and
-     so is a transfer or a platform removal) calls
-     `lockTenantOwnership(tx, tenantId, ownerRolesOf(config))` from `/server`
-     as the FIRST write of its own transaction. Later, a package write holding
-     the lock and waiting on a row the host already touched would deadlock.
-   - That transaction then calls NO package store method: the store opens its
-     own transaction on another connection and waits on the host's lock,
-     failing at the interactive-transaction timeout (Prisma's P2028), or
-     hanging on a single-connection database such as PGlite.
-   - A waiting write is bounded by that same timeout (5 s by default in
-     Prisma), so a host transaction that holds the lock for longer turns the
-     waiter into a 500. At REPEATABLE READ or SERIALIZABLE every PATCH or
-     removal that waits fails with a serialization error (40001) instead; these
-     writes expect READ COMMITTED.
-   - An invites port that grants an EXISTING account (`POST /team`) must never
-     lower that member's owner role, and must decide that after
-     `lockTenantOwnership` in the transaction that writes; or it runs the same
-     rules itself.
+    `DELETE /team/:userId` and every revoke of an owner role decides INSIDE
+    its own transaction, which opens with `lockTenantOwnership`: a read of the
+    tenant's live owner-role rows, then a no-op UPDATE of each of them in id
+    order (`kind` rewritten with its own value). Under READ COMMITTED a second
+    such write waits for the first to commit, then reads what it wrote. An
+    owner, for these rules, is an ACTIVE member whose `role` column names an
+    owner role AND who holds a link to a live owner-role row. What that asks
+    of the host:
+    - A tenant with NO live owner-role row has nothing to lock: its writes run
+      unserialised and the active column owners decide, as before this rule.
+      Seed the owner roles per tenant (rule 8) to get the guarantee.
+    - Each of those writes updates the owner rows, so their `updated_at` moves
+      and any host trigger on `roles` fires. Nothing in the package reads
+      `updated_at`; a host trigger should skip a row whose values did not
+      change.
+    - A host path that moves ownership (a promotion is a move of ownership,
+      and so is a transfer or a platform removal) calls
+      `lockTenantOwnership(tx, tenantId, ownerRolesOf(config))` from `/server`
+      as the FIRST write of its own transaction. Taken after the host has
+      written a row, the lock can deadlock with a package write that holds it
+      and waits on that row.
+    - That transaction then calls NO package store method: the store opens its
+      own transaction on another connection and waits on the host's lock,
+      failing at the interactive-transaction timeout (Prisma's P2028), or
+      hanging on a single-connection database such as PGlite.
+    - A waiting write is bounded by that same timeout (5 s by default in
+      Prisma), so a host transaction that holds the lock for longer turns the
+      waiter into a 500. At REPEATABLE READ or SERIALIZABLE every PATCH or
+      removal that waits fails with a serialization error (40001) instead;
+      these writes expect READ COMMITTED.
+    - An invites port that grants an EXISTING account (`POST /team`) must
+      never lower that member's owner role, and must decide that after
+      `lockTenantOwnership` in the transaction that writes; or it runs the
+      same rules itself.
 
 ## The config, field by field
 
@@ -184,10 +190,11 @@ that passed its own registry to the server and said nothing to the browser got
 a screen governed by a different application's policy. There is nothing to fall
 back to now, and `catalog` is required on both halves.
 
-**There is no platform-actor ROLE NAME.** A host resolving `isSuper: true` is
-recognised by that flag alone; the package never compares a membership role
-against a magic string, so a host may have a role literally called
-`SUPERADMIN` meaning whatever it likes.
+**There is no platform-actor ROLE NAME.** The platform operator is an actor
+the host resolved as `isSuper: true` with no `permissionCeiling`
+(`platformActorOf`), and the flag alone is what recognises it: the package never
+compares a membership role against a magic string, so a host may have a role
+literally called `SUPERADMIN` meaning whatever it likes.
 
 ## Phase B — adopting into a host that ALREADY has these tables (the origin host)
 
@@ -320,9 +327,9 @@ enforce, and one assembly is the only arrangement in which they cannot drift.
 - **Seat quotas and plan entitlements** — billing (host).
 - **Invite storage and the signup hook** — the optional invites port.
 - **The impersonation machinery** — 12-24; the ceiling seam here is its
-  attachment point. The guards treat a `permissionCeiling` as authoritative:
-  an actor carrying one is never `isSuper`, even if the host forgot to force
-  the flag off.
+  attachment point. A `permissionCeiling` is authoritative: an actor carrying
+  one is never the platform operator, in the guards, the admin and staff tiers
+  and the owner rules alike, even if the host forgot to force `isSuper` off.
 - **The member PROFILE page** (`member-details-tab`, `member-role`,
   `member-since`, `member-last-login`, `member-custom-roles` in the origin host
   admin). `GET /team/:userId` returns all of its data; the screen itself did

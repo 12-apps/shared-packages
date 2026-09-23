@@ -121,6 +121,9 @@ describe('revoking an owner role, over real SQL', () => {
     // admin tier admits owner-2 and only the owner rule refuses.
     const removal = await asUser('owner-2').send('DELETE', '/team/owner-1');
     expect(removal.status).toBe(403);
+    expect((await json<{ error: string }>(removal)).error).toBe(
+      PT_BR_RBAC_MESSAGES.onlyOwnerRemovesOwner,
+    );
     expect(await holdsDirector('owner-1')).toBe(true);
   });
 });
