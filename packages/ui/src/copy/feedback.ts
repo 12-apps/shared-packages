@@ -37,3 +37,31 @@ export interface ChromeCopy {
   /** The share affordance in the install prompt. */
   share: string;
 }
+
+/** One ordered list of steps a reader follows in their browser. */
+type Steps = readonly string[];
+
+/**
+ * How to lift a notification block, per browser — the steps
+ * `NotificationStatusNotice` shows in its `blocked` state.
+ *
+ * Keyed the way `detectNotificationBrowser` answers, and read through
+ * `notificationUnblockSteps`, which falls back to `other` for anything a pack
+ * does not name. Menu labels move between browser versions; these follow the
+ * current ones and say where to look rather than promising an exact word.
+ */
+export interface NotificationUnblockCopy {
+  /**
+   * Every browser on iOS. Web push there belongs to a Home Screen app, so the
+   * switch lives in the device's Settings rather than in any browser.
+   */
+  ios: Steps;
+  chrome: { desktop: Steps; android: Steps };
+  edge: { desktop: Steps; android: Steps };
+  firefox: { desktop: Steps; android: Steps };
+  opera: { desktop: Steps; android: Steps };
+  safari: { desktop: Steps };
+  samsung: { android: Steps };
+  /** Anything unrecognised — general enough to be true everywhere. */
+  other: Steps;
+}

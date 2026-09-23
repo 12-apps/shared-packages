@@ -265,6 +265,13 @@ Components for providing feedback to users about system state and actions.
 **Location**: `src/components/feedback/Modal`
 **Docs**: `src/components/feedback/Modal/Modal.md`
 
+### NotificationStatusNotice
+**Purpose**: Tell a reader whether this browser will notify them, and offer the one thing they can do about it
+**Use Cases**: A "we will call you" surface (a queue, an order, a delivery) that depends on web push; an account's notification settings
+**Features**: Four statuses — `enabled`, `disabled` (an action that asks for permission), `blocked` ("turn back on" disclosure over the browser-specific steps), `unavailable` (no action); polite live region; `detectNotificationBrowser` + `notificationUnblockSteps` pick the steps from the pt-BR/en-US `NotificationUnblockCopy` packs; every other sentence is the host's
+**Location**: `src/components/feedback/NotificationStatusNotice`
+**Docs**: `src/components/feedback/NotificationStatusNotice/NotificationStatusNotice.md`
+
 ### Sonner
 **Purpose**: Display toast notifications with Sonner library
 **Use Cases**: Success messages, error notifications, quick feedback
