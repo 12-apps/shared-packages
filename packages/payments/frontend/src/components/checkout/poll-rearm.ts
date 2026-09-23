@@ -28,7 +28,7 @@ interface RearmState {
  * per trip. This collapses a burst into one request without delaying it: the
  * first re-arm of a burst polls immediately, the rest fall inside the gap.
  */
-const REARM_QUIET_MS = 1_000;
+export const REARM_QUIET_MS = 1_000;
 
 /**
  * How many live asks a re-arm may abandon before it has to let one finish.
