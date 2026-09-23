@@ -16,7 +16,12 @@ type(scope): imperative summary
 Optional body, wrapped at 100 characters.
 ```
 
-The `Commit messages` check enforces this on every pull request. The contract:
+The `Commit messages` check enforces this on every pull request. A pre-push hook
+enforces it before that, on your machine: `.githooks/pre-push` lints the commits
+you are pushing with `commitlint.config.mjs`, the file the check itself reads.
+It covers commits no commit hook sees, such as a merge made with `git merge -m`.
+`pnpm install` turns it on (the `prepare` script sets `core.hooksPath`), and
+`SKIP_PREPUSH=1` skips it for one push. The contract:
 
 | Rule | |
 |---|---|
