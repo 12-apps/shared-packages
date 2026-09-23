@@ -75,7 +75,7 @@ async function mintAccessToken(credentials: ResolvedCredentials): Promise<string
   const clientId = credentials.fields['clientId'];
   const clientSecret = credentials.fields['clientSecret'];
   if (!clientId || !clientSecret) {
-    throw new ProviderRequestError(NAME, 'Itaú credentials missing clientId/clientSecret.');
+    throw new ProviderRequestError(NAME, 'Itau credentials missing clientId/clientSecret.');
   }
   const body = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`;
   const token = await providerFetch<AccessToken>(NAME, 'oauth/token', `${API_BASE}/api/oauth/jwt`, {
@@ -172,7 +172,7 @@ async function refundLive(input: RefundInput, credentials: ResolvedCredentials):
   });
   const endToEndId = cob.pix?.[0]?.endToEndId;
   if (!endToEndId) {
-    throw new ProviderRequestError(NAME, 'Itaú charge has no settled Pix to refund yet.', { retriable: false });
+    throw new ProviderRequestError(NAME, 'Itau charge has no settled Pix to refund yet.', { retriable: false });
   }
   const refundId = `${input.providerChargeId}-r1`;
   const amountCents = input.amount?.amountCents ?? centsFrom(cob.pix?.[0]?.valor) ?? 0;
@@ -200,7 +200,7 @@ function parseItauWebhook(delivery: WebhookDelivery): NormalizedWebhookEvent[] {
   try {
     body = JSON.parse(delivery.rawBody) as ItauWebhookBody;
   } catch (cause) {
-    throw new ProviderRequestError(NAME, 'Itaú webhook body is not valid JSON.', { retriable: false, cause });
+    throw new ProviderRequestError(NAME, 'Itau webhook body is not valid JSON.', { retriable: false, cause });
   }
   const entries = body.pix ?? [];
   if (entries.length === 0) {
@@ -238,7 +238,7 @@ export function itauProvider(source: PaymentsCopySource<ItauCopy>): PaymentProvi
 
   return {
     name: NAME,
-    displayName: 'Itaú',
+    displayName: 'Itau',
     authMode: 'credentials',
     capabilities: {
       methods: ['PIX'],
