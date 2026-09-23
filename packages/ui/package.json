@@ -312,6 +312,10 @@
       "types": "./dist/types/components/feedback/Modal/index.d.ts",
       "default": "./dist/feedback/Modal.js"
     },
+    "./feedback/NotificationStatusNotice": {
+      "types": "./dist/types/components/feedback/NotificationStatusNotice/index.d.ts",
+      "default": "./dist/feedback/NotificationStatusNotice.js"
+    },
     "./feedback/Sonner": {
       "types": "./dist/types/components/feedback/Sonner/index.d.ts",
       "default": "./dist/feedback/Sonner.js"

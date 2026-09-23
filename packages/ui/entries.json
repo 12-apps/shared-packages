@@ -60,6 +60,7 @@
   "feedback/ConfirmAction": "src/components/feedback/ConfirmAction/index.ts",
   "feedback/Dialog": "src/components/feedback/Dialog/index.ts",
   "feedback/Modal": "src/components/feedback/Modal/index.ts",
+  "feedback/NotificationStatusNotice": "src/components/feedback/NotificationStatusNotice/index.ts",
   "feedback/Sonner": "src/components/feedback/Sonner/index.ts",
   "feedback/StackedModal": "src/components/feedback/StackedModal/index.ts",
   "feedback/Toast": "src/components/feedback/Toast/index.ts",
