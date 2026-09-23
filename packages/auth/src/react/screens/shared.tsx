@@ -129,25 +129,53 @@ function useReserveFocusRoomBelow(ref: RefObject<HTMLDivElement | null>): void {
 }
 
 /**
- * Close the refusal when focus lands on a control whose middle it covers.
+ * Whether the refusal hides `control`: whether it is what shows at the
+ * control's middle, where the control's label is. A sliver showing past the
+ * refusal's edge does not show what has focus.
  *
- * The scroll padding clears every control the page can scroll to below the
- * refusal. It cannot help at the top of the page: at a scroll of 0 there is no
- * room left above, and a field the refusal sits on stays under it. Measured:
- * the sign-up name field at 320×568 and 360×640, and the Google button on a
- * login with no header above it (at 1280×800 all but its bottom 10px, none of
- * its label). Somebody who has gone back up there to fix the form is past the
- * refusal's message, so it closes, as if they had closed it.
- *
- * The middle, because that is where a control's label is: a sliver showing
- * past the refusal's edge does not show what has focus. Measured a frame after
- * the focus, so after the browser's own focus scrolling. A control whose middle
- * shows is left as it is.
+ * `elementFromPoint` settles it where the boxes overlap, so a layer opened OVER
+ * the refusal (the account menu, still scaled mid-animation when it takes
+ * focus) is not counted as under it. jsdom has no `elementFromPoint`; there the
+ * boxes alone decide.
  */
-function useCloseWhenItHidesFocus(
-  ref: RefObject<HTMLDivElement | null>,
-  onClose: () => void,
-): void {
+function hidesMiddleOf(layer: HTMLElement, control: HTMLElement): boolean {
+  const box = control.getBoundingClientRect();
+  const over = layer.getBoundingClientRect();
+  const x = (box.left + box.right) / 2;
+  const y = (box.top + box.bottom) / 2;
+  if (x < over.left || x > over.right || y < over.top || y > over.bottom) return false;
+  if (typeof document.elementFromPoint !== "function") return true;
+  const top = document.elementFromPoint(x, y);
+  return top !== null && layer.contains(top);
+}
+
+/** The control that holds focus, unless it is in the refusal or nowhere. */
+function focusedOutside(layer: HTMLElement): HTMLElement | null {
+  const focused = document.activeElement;
+  if (!(focused instanceof HTMLElement) || focused === document.body) return null;
+  return layer.contains(focused) ? null : focused;
+}
+
+/**
+ * Keep the control with focus in sight while the refusal is up — the half the
+ * scroll padding cannot do on its own (WCAG 2.4.11).
+ *
+ * The padding clears every control the page can scroll to below the refusal.
+ * It does nothing at the top of the page, where a scroll of 0 leaves no room
+ * above: the sign-up name field at 320×568 and 360×640, and the Google button
+ * of a login with no header (at 1280×800 all of it but its bottom 10px). And it
+ * only steers focus that MOVES. So, each a frame late, after the browser's own
+ * scrolling:
+ *
+ * - **Focus moves onto a control the refusal hides.** Whoever went back up to
+ *   fix the form is past the refusal's message, so it closes, as if they had
+ *   closed it.
+ * - **The refusal opens (or grows) over the control that has focus** — Enter
+ *   pressed in the name field. The control is scrolled clear if the page can.
+ *   Where it cannot, focus goes to the refusal, which is what there is to read,
+ *   and comes back to the control when the refusal closes.
+ */
+function useKeepFocusInSight(ref: RefObject<HTMLDivElement | null>, onClose: () => void): void {
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
@@ -155,24 +183,49 @@ function useCloseWhenItHidesFocus(
   useEffect(() => {
     const layer = ref.current;
     if (!layer) return undefined;
-    let frame = 0;
-    const check = (): void => {
-      const focused = document.activeElement;
-      if (!(focused instanceof HTMLElement) || layer.contains(focused)) return;
-      const field = focused.getBoundingClientRect();
-      const over = layer.getBoundingClientRect();
-      const x = (field.left + field.right) / 2;
-      const y = (field.top + field.bottom) / 2;
-      if (x >= over.left && x <= over.right && y >= over.top && y <= over.bottom) close.current();
-    };
+    let moved = 0;
+    let opened = 0;
+    let returnTo: HTMLElement | null = null;
     const onFocusIn = (): void => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(check);
+      // Focus went somewhere else by itself: nothing is owed back.
+      if (!layer.contains(document.activeElement)) returnTo = null;
+      cancelAnimationFrame(moved);
+      moved = requestAnimationFrame(() => {
+        const focused = focusedOutside(layer);
+        if (focused && hidesMiddleOf(layer, focused)) close.current();
+      });
+    };
+    // The control that held focus as the refusal opened. Only that one, and only
+    // while it still holds focus: once focus moves, the rule above decides.
+    const heldAtOpen = focusedOutside(layer);
+    const onOpen = (): void => {
+      cancelAnimationFrame(opened);
+      opened = requestAnimationFrame(() => {
+        const held = heldAtOpen;
+        if (!held || document.activeElement !== held || !hidesMiddleOf(layer, held)) return;
+        // jsdom has no `scrollIntoView`; there is no page to scroll there.
+        if (typeof held.scrollIntoView === "function") held.scrollIntoView({ block: "nearest" });
+        if (!hidesMiddleOf(layer, held)) return;
+        // The Alert is focusable (`tabIndex=0`) and is the layer's first stop.
+        const refusal = layer.querySelector<HTMLElement>('[tabindex="0"]');
+        if (!refusal) return;
+        refusal.focus({ preventScroll: true });
+        returnTo = held;
+      });
     };
     document.addEventListener("focusin", onFocusIn);
+    // It opens by growing (the Alert's collapse), so its size is what to watch.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onOpen);
+    observer?.observe(layer);
+    onOpen();
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(moved);
+      cancelAnimationFrame(opened);
+      observer?.disconnect();
       document.removeEventListener("focusin", onFocusIn);
+      // Closed while holding the focus it took: give focus back where it was.
+      const lost = document.activeElement === null || document.activeElement === document.body;
+      if (returnTo?.isConnected && lost) returnTo.focus();
     };
   }, [ref]);
 }
@@ -197,10 +250,12 @@ function FloatingLayer({
 }: {
   children: ReactNode;
   onClose: () => void;
-}): JSX.Element {
+}): JSX.Element | null {
   const ref = useRef<HTMLDivElement | null>(null);
   useReserveFocusRoomBelow(ref);
-  useCloseWhenItHidesFocus(ref, onClose);
+  useKeepFocusInSight(ref, onClose);
+  // The server has no window for it to float in, and a refusal is a client's answer.
+  if (typeof document === "undefined") return null;
   return (
     <Portal container={document.body}>
       <Box ref={ref} sx={FLOATING} data-testid="auth-failure-layer">
@@ -221,8 +276,8 @@ function FloatingLayer({
  * the form moves when it appears or goes. What it costs: it covers the part of
  * the page under it until it is closed. That is why it is closable and opaque,
  * why focus scrolling keeps clear of it ({@link useReserveFocusRoomBelow}), and
- * why it closes when focus lands where scrolling cannot clear it
- * ({@link useCloseWhenItHidesFocus}).
+ * why what has focus is kept in sight where scrolling cannot do it
+ * ({@link useKeepFocusInSight}).
  *
  * Renders nothing for `null`, so a caller can drop it in unconditionally.
  */

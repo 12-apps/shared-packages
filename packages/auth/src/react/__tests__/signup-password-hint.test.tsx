@@ -289,4 +289,103 @@ describe("the refusal banner and keyboard focus", () => {
       vi.useRealTimers();
     }
   });
+
+  it("stays up when what takes focus sits over it, like a menu opened on top", async () => {
+    // Where the boxes overlap the browser says what is on top; here, the
+    // focused control itself.
+    place({ "auth-failure-layer": LAYER, "signup-name": { top: 100, bottom: 156, left: 24, right: 296 } });
+    renderSignup();
+    await submitWith("abc12345");
+    const field = screen.getByLabelText(SCREEN_COPY.signUp.nameLabel);
+    Object.defineProperty(document, "elementFromPoint", { value: () => field, configurable: true });
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    try {
+      await focusName();
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+
+      expect(screen.getByTestId("auth-failure-layer").isConnected).toBe(true);
+    } finally {
+      vi.useRealTimers();
+      Reflect.deleteProperty(document, "elementFromPoint");
+    }
+  });
+});
+
+describe("the refusal opening over the control that has focus", () => {
+  // Enter pressed in a field submits from that field: the refusal opens with
+  // focus already under it, and no focus moves for the scroll padding to steer.
+
+  /**
+   * jsdom lays nothing out and has no `scrollIntoView`. Put the name field
+   * under the refusal, at the top of the page, and give the page a scroll that
+   * moves the field to `scrolledTo`, or nowhere when the page cannot scroll.
+   */
+  function stage(scrolledTo?: { top: number; bottom: number }): ReturnType<typeof vi.fn> {
+    const boxes: Record<string, { top: number; bottom: number; left: number; right: number }> = {
+      "auth-failure-layer": { top: 76, bottom: 196, left: 16, right: 304 },
+      "signup-name": { top: 100, bottom: 156, left: 24, right: 296 },
+    };
+    const measure = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const box = boxes[this.dataset.testid ?? this.id];
+      if (!box) return measure.call(this);
+      const { top, bottom, left, right } = box;
+      return { top, bottom, left, right, x: left, y: top, width: right - left, height: bottom - top } as DOMRect;
+    });
+    const scrollIntoView = vi.fn(() => {
+      if (scrolledTo) boxes["signup-name"] = { ...scrolledTo, left: 24, right: 296 };
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { value: scrollIntoView, configurable: true });
+    return scrollIntoView;
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  });
+
+  /** Type in the name field and submit from it, as Enter there does. */
+  async function submitFromName(): Promise<HTMLElement> {
+    const name = screen.getByLabelText(SCREEN_COPY.signUp.nameLabel);
+    await act(async () => {
+      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- not a check: the refusal reads the control that holds focus when it opens, so the field has to hold it for real.
+      name.focus();
+    });
+    await submitWith("abc12345");
+    return name;
+  }
+
+  it("scrolls that control clear when the page can, and leaves focus on it", async () => {
+    // The page had room: scrolling brings the field below the refusal.
+    const scrollIntoView = stage({ top: 260, bottom: 316 });
+    renderSignup();
+
+    const name = await submitFromName();
+
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+    });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(name);
+    });
+  });
+
+  it("takes focus onto itself where nothing scrolls, and gives it back when it closes", async () => {
+    stage();
+    renderSignup();
+
+    const name = await submitFromName();
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByTestId("auth-failure"));
+    });
+    fireEvent.click(screen.getByRole("button", { name: SCREEN_COPY.dismissFailure }));
+    await waitForElementToBeRemoved(() => screen.queryByTestId("auth-failure-layer"));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(name);
+    });
+  });
 });
