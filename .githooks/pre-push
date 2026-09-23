@@ -8,13 +8,28 @@
 # push, so this checks there. #606 is the case it exists for: a merge commit
 # whose body line ran past 100 characters reached the remote and failed CI.
 #
-# The rules are `commitlint.config.mjs`, the same file CI reads through
-# `config-path`, so this hook cannot pass what CI would refuse or refuse what
-# CI would pass.
+# The rules are `commitlint.config.mjs`, the file CI reads through
+# `config-path`, and REQUIRE_ISSUE_REF is pinned to the `false` CI runs them
+# with, so a value left in a shell cannot refuse a message CI passes.
 #
-# The range is CI's: from the merge base with `origin/main` to the pushed
-# commit. So commits already on main are never linted again. It reads the LOCAL
-# remote-tracking ref and never fetches.
+# What it lints: a pushed BRANCH, from its merge base with `origin/main` to the
+# pushed commit, in one `commitlint --from --to` run, as CI lints a pull
+# request. It reads the LOCAL remote-tracking ref and never fetches, so a stale
+# `origin/main` can put commits main already has in the range. Without
+# `origin/main` (a single-branch clone) it lints, one by one, every pushed
+# commit that no remote-tracking ref holds, and with no remote-tracking ref at
+# all, the pushed commit alone.
+#
+# What it lets through, and why each is safe:
+#   - a deletion, which pushes no commits;
+#   - a tag or a notes ref. Neither belongs to a pull request, so CI never lints
+#     them, and the release job pushes both: semantic-release tags the release
+#     commit and pushes `refs/notes/semantic-release-*`. `prepare` does not
+#     turn this hook on under CI either;
+#   - a branch holding nothing main does not already have.
+#
+# What it cannot see: the pull request's TITLE, which CI lints too and a squash
+# merge lands as the commit on main.
 #
 # SKIP_PREPUSH=1 opts out, as the other 12-apps repositories' hooks do.
 set -u
@@ -27,38 +42,62 @@ COMMITLINT=node_modules/.bin/commitlint
 ZERO=0000000000000000000000000000000000000000
 failed=0
 
-while read -r _local_ref local_sha _remote_ref _remote_sha; do
-  # A deletion pushes no commits, so there is nothing to lint.
-  [ "$local_sha" = "$ZERO" ] && continue
+commitlint() {
+  REQUIRE_ISSUE_REF=false "$COMMITLINT" --config commitlint.config.mjs "$@"
+}
 
+require_commitlint() {
   if [ ! -x "$COMMITLINT" ]; then
     echo "[pre-push] commitlint is not installed. Run pnpm install, or push with SKIP_PREPUSH=1."
     exit 1
   fi
+}
+
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue
+  case "$remote_ref" in
+    refs/heads/*) ;;
+    *) continue ;;
+  esac
 
   base="$(git merge-base "$local_sha" origin/main 2>/dev/null || true)"
-  printf '[pre-push] commit messages… '
   if [ -n "$base" ]; then
-    output="$("$COMMITLINT" --config commitlint.config.mjs --from "$base" --to "$local_sha" 2>&1)"
-    status=$?
+    [ "$(git rev-list --count "$base..$local_sha")" -eq 0 ] && continue
+    require_commitlint
+    printf '[pre-push] commit messages on %s… ' "${remote_ref#refs/heads/}"
+    if report="$(commitlint --from "$base" --to "$local_sha" 2>&1)"; then
+      report=""
+    fi
   else
-    # No origin/main to anchor on (a fresh single-branch clone): lint the tip,
-    # which beats skipping in silence.
-    output="$(git log -1 --format=%B "$local_sha" | "$COMMITLINT" --config commitlint.config.mjs 2>&1)"
-    status=$?
+    if [ -n "$(git for-each-ref --count=1 refs/remotes)" ]; then
+      commits="$(git rev-list --reverse "$local_sha" --not --remotes)"
+    else
+      commits="$local_sha"
+    fi
+    [ -z "$commits" ] && continue
+    require_commitlint
+    printf '[pre-push] commit messages on %s… ' "${remote_ref#refs/heads/}"
+    report=""
+    for sha in $commits; do
+      if ! output="$(git log -1 --format=%B "$sha" | commitlint 2>&1)"; then
+        report="$report
+$(git log -1 --format='%h %s' "$sha")
+$output
+"
+      fi
+    done
   fi
-  if [ "$status" -eq 0 ]; then
+
+  if [ -z "$report" ]; then
     echo 'ok'
   else
     echo 'FAILED'
-    echo
-    printf '%s\n' "$output"
+    printf '%s\n' "$report"
     failed=1
   fi
 done
 
 if [ "$failed" -ne 0 ]; then
-  echo
   echo "[pre-push] CI would refuse these messages. Reword them, or push with SKIP_PREPUSH=1 if you know better."
   exit 1
 fi

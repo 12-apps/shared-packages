@@ -16,8 +16,14 @@
  * cannot.
  *
  * `REQUIRE_ISSUE_REF` is still read from the environment, as the shared
- * workflow reads it. This repository leaves it off, so a local run without it
- * matches CI.
+ * workflow reads it. This repository leaves it off, and the hook and
+ * `pnpm lint:commits` pin it to that `false`, so a value left in a shell cannot
+ * refuse a message CI passes.
+ *
+ * The cost of one file in the repository: a pull request that edits it is
+ * judged by its own edited rules, so a change here is a change to the gate and
+ * is reviewed as one. It also stops following `12-apps/ci`. A rule changed
+ * there reaches this repository only when it is copied here.
  */
 /**
  * The 12-apps commit contract. Mirrors the rules the internal commit

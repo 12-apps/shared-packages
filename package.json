@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Shared packages for 12-apps",
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks || true",
+    "prepare": "[ -n \"$CI\" ] || git config core.hooksPath .githooks || true",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "lint:commits": "commitlint --config commitlint.config.mjs --from origin/main",
+    "lint:commits": "REQUIRE_ISSUE_REF=false commitlint --config commitlint.config.mjs --from origin/main",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",

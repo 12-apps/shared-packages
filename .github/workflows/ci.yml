@@ -137,6 +137,10 @@ jobs:
           # file skipped 14 jobs and still reported CI Success, because a
           # skipped job counts as a passing one.
           - 'release-packages.txt'
+          # The pre-push hook, for the same reason: its selftest runs in the
+          # Release Scripts gate, and no glob above names `.githooks/`, so a PR
+          # changing only the hook ran none of CI.
+          - '.githooks/**'
         # The lanes that exercise the PUBLISHED surface (tarballs, storybook,
         # both harnesses). They cannot be reached by a change to a root quality
         # script, which is the one useful thing this separates from `code`.
