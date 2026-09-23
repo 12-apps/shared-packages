@@ -51,7 +51,7 @@ const passwordInput = (): HTMLElement => screen.getByLabelText(SCREEN_COPY.signU
 
 /** Fill the e-mail and the password, and send the form. */
 async function submitWith(password: string): Promise<void> {
-  fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: "ana@futurepay.test" } });
+  fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: "ana@example.test" } });
   fireEvent.change(passwordInput(), { target: { value: password } });
   fireEvent.submit(screen.getByTestId("email-signup-form"));
   await screen.findByTestId("auth-failure");
