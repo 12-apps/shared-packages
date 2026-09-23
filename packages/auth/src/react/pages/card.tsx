@@ -105,9 +105,10 @@ interface AuthCardProps {
  * The card lets a descendant stick to the WINDOW.
  *
  * MUI's card clips with `overflow: hidden`, and a clipping box is a scroll
- * container: `SignupActions`, `./signup-actions` would then stick inside a card that never
- * scrolls, which is to say never. Nothing in the card needs the clip — the
- * content sits inside its padding, well clear of the rounded corners.
+ * container: the sign-up page's `SignupActions` (`./signup-actions`) would then
+ * stick inside a card that never scrolls, which is to say never. Nothing in the
+ * card needs the clip — the content sits inside its padding, well clear of the
+ * rounded corners.
  */
 const LET_ACTIONS_PIN = { overflow: "visible" } as const;
 
@@ -177,8 +178,8 @@ export function AuthCard({
  *
  * `dividerFirst` turns the block over, for the one page where the providers
  * come AFTER the form: sign-up, where they sit under its submit (see
- * `SignupActions`, `./signup-actions`). The rule then says "ou" between the two buttons, in
- * the same place relative to both methods as on the login page.
+ * `SignupActions` in `./signup-actions`). The rule then says "ou" between the
+ * two buttons, in the same place relative to both methods as on the login page.
  */
 export function ProviderBlock({
   label,

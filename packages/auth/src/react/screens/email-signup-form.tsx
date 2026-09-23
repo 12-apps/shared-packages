@@ -57,8 +57,8 @@ export interface SignupConfig {
    * Handed the button and returns what renders in its place, inside the form.
    * The sign-up PAGE uses this to put the consent that enables the button
    * directly above it, and the other ways in directly below it (see
-   * `pages/card.tsx`, `SignupActions`). Omitted, the button renders on its own,
-   * as it always has.
+   * `SignupActions` in `pages/signup-actions.tsx`). Omitted, the button renders
+   * on its own, as it always has.
    */
   renderActions?: (submit: ReactNode) => ReactNode;
 }
