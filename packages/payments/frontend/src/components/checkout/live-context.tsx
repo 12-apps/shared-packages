@@ -51,7 +51,7 @@ export function CheckoutLiveProvider({
 }
 
 /** What one wait reads off the provider, for `createPollLoop`. */
-export interface LiveWait {
+interface LiveWait {
   isLive: () => boolean;
   liveIntervalMs: number;
 }
