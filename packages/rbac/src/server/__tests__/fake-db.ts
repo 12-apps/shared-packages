@@ -97,6 +97,8 @@ export interface FakeRbacCall {
   txId: number | null;
   /** `model.method`, e.g. `role.updateMany`. */
   op: string;
+  /** The statement's argument object, as the store passed it. */
+  args: unknown;
 }
 
 /** The statements `beforeWrite` holds. The lock (`role.updateMany`) is not one. */
@@ -534,7 +536,7 @@ export function createFakeRbacDb(options: FakeRbacDbOptions = {}): {
           method,
           async (args: unknown) => {
             const op = `${model}.${method}`;
-            calls.push({ txId, op });
+            calls.push({ txId, op, args });
             if (txId !== null) await beforeStatement(op, args, txId);
             const touched = derivedTargets(op, args);
             const result: unknown = await (fn as (input: unknown) => Promise<unknown>).call(
