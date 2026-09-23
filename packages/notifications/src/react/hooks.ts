@@ -53,6 +53,23 @@ export interface BadgeSyncOptions {
   enabled?: boolean;
   subscribe?: NotificationsSubscribe;
   useSignal?: NotificationsSignalHook;
+  /**
+   * The host's own word that its realtime channel is up RIGHT NOW.
+   *
+   * `subscribe` relaxes the poll because a live subscription is implied by its
+   * presence. `useSignal` cannot say the same — a hook handed a callback knows
+   * nothing about whether its connection opened — and neither can a host that
+   * wires the invalidate itself, outside this package, because its connection
+   * is session-scoped and must stay behind `enabled` (which `useSignal` is
+   * called in front of). Such a host had no way to relax the badge at all, and
+   * every signed-in reader polled once a minute on top of a working stream.
+   *
+   * `true` relaxes the poll to {@link BADGE_RECONCILE_MS}, exactly as a
+   * `subscribe` does; anything else keeps {@link BADGE_POLL_MS}. It is a STATUS,
+   * so pass it live — a stream that drops takes the badge straight back to the
+   * fast poll on the next render.
+   */
+  live?: boolean;
 }
 
 /**
@@ -100,6 +117,9 @@ const NOTHING_TO_SHOW: InboxState = {
 export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {}): InboxState {
   const enabled = options.enabled ?? true;
   const subscribe = options.subscribe;
+  // Pushed to by a subscription this package holds, or by one the host holds
+  // and says is up — see `BadgeSyncOptions.live`.
+  const relaxed = subscribe !== undefined || options.live === true;
   const live = useInboxState(store);
   const state = enabled ? live : NOTHING_TO_SHOW;
 
@@ -113,11 +133,11 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
     if (!enabled) return;
     store.refreshBadge();
     const unsubscribe = subscribe?.(() => store.invalidate());
-    // A live subscription relaxes the poll to the reconcile interval; without
-    // one it stays the 60 s poll.
+    // A live channel relaxes the poll to the reconcile interval; without one it
+    // stays the 60 s poll.
     const interval = setInterval(
       () => store.refreshBadge(),
-      subscribe ? BADGE_RECONCILE_MS : BADGE_POLL_MS,
+      relaxed ? BADGE_RECONCILE_MS : BADGE_POLL_MS,
     );
     const onFocus = (): void => store.refreshBadge();
     globalThis.addEventListener?.('focus', onFocus);
@@ -126,7 +146,7 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
       globalThis.removeEventListener?.('focus', onFocus);
       unsubscribe?.();
     };
-  }, [store, enabled, subscribe]);
+  }, [store, enabled, subscribe, relaxed]);
 
   return state;
 }
