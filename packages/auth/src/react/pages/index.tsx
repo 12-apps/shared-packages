@@ -168,6 +168,10 @@ export interface SignupPageProps {
    * on, the provider buttons when it is off. While it is unsatisfied the
    * providers are the host's to disable — this package does not reach into a
    * node it was handed.
+   *
+   * With the form it is in the same block as the providers, INSIDE the
+   * `<form>`: a button in the gate (a "read the terms" toggle, say) must say
+   * `type="button"` or it submits the e-mail form.
    */
   termsGate?: ReactNode;
 }

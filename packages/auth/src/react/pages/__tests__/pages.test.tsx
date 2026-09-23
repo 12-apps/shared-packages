@@ -373,6 +373,83 @@ describe("SignupPage — the gate sits beside what it enables", () => {
     expect(block.getAttribute("data-pinned")).toBe("false");
   });
 
+  /** A ResizeObserver whose callbacks the test fires itself. */
+  function stubResizeObserver(): { resized: () => void } {
+    // A plain function, not an arrow: the page calls it with `new`.
+    const Resize = vi.fn(function resizeObserver(_changed: ResizeObserverCallback) {
+      return { observe: vi.fn(), disconnect: vi.fn() };
+    });
+    vi.stubGlobal("ResizeObserver", Resize);
+    return {
+      resized: () =>
+        act(() => {
+          for (const [changed] of Resize.mock.calls) changed([], {} as ResizeObserver);
+        }),
+    };
+  }
+
+  /** The window becomes `height` tall, and says so. */
+  function resizeWindowTo(height: number): void {
+    vi.stubGlobal("innerHeight", height);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+  }
+
+  it("does not pin because its own content got shorter under the finger", () => {
+    // Measured at 320×460: ticking the terms removed the host's hint, the block
+    // fell under half the window and jumped to the bottom of it, which put the
+    // now-enabled Google button where the checkbox had been.
+    vi.stubGlobal("innerHeight", 460);
+    const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(262);
+    const observer = stubResizeObserver();
+    const { SignupPage } = pages();
+    render(<SignupPage {...signupProps} providers={google} />);
+    const block = screen.getByTestId(SIGNUP_ACTIONS_TEST_ID);
+    expect(getComputedStyle(block).position).toBe("static");
+
+    height.mockReturnValue(221);
+    observer.resized();
+
+    expect(getComputedStyle(block).position).toBe("static");
+  });
+
+  it("still lets go when its own content grows past the line", () => {
+    vi.stubGlobal("innerHeight", 548);
+    const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(262);
+    const observer = stubResizeObserver();
+    const { SignupPage } = pages();
+    render(<SignupPage {...signupProps} providers={google} />);
+    const block = screen.getByTestId(SIGNUP_ACTIONS_TEST_ID);
+    expect(getComputedStyle(block).position).toBe("sticky");
+
+    height.mockReturnValue(340);
+    observer.resized();
+
+    expect(getComputedStyle(block).position).toBe("static");
+  });
+
+  it("lets go of the window only well past half of it, so a sliding toolbar does not toggle it", () => {
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(262);
+    vi.stubGlobal("innerHeight", 548);
+    const { SignupPage } = pages();
+    render(<SignupPage {...signupProps} providers={google} />);
+    const block = screen.getByTestId(SIGNUP_ACTIONS_TEST_ID);
+    const position = (): string => getComputedStyle(block).position;
+    expect(position()).toBe("sticky");
+
+    // 57%: past half, short of the release line, so a pinned block stays.
+    resizeWindowTo(460);
+    expect(position()).toBe("sticky");
+    resizeWindowTo(400);
+    expect(position()).toBe("static");
+    // Back at 57% it stays in place: it pins again only under half.
+    resizeWindowTo(460);
+    expect(position()).toBe("static");
+    resizeWindowTo(548);
+    expect(position()).toBe("sticky");
+  });
+
   it("takes a gate handed over as a fragment as one block, not one per part", () => {
     const { SignupPage } = pages();
     render(

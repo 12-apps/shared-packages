@@ -30,23 +30,54 @@ export const SIGNUP_ACTIONS_TEST_ID = "signup-actions";
  */
 const MAX_PINNED_SHARE = 0.5;
 
-/** Whether the block is short enough, against this window, to be pinned at all. */
+/**
+ * How much of the window a block already pinned may cover before it lets go.
+ *
+ * Above {@link MAX_PINNED_SHARE} on purpose. A phone's window changes height as
+ * the page scrolls — Safari's toolbars slide away and back — and a single line
+ * would switch the block between its own place and the bottom of the window at
+ * every crossing, under a thumb that is mid-scroll. With the gap between the two
+ * shares, a window has to shrink well past the line before a pinned block lets
+ * go, and grow back under it before the block pins again.
+ */
+const RELEASE_SHARE = 0.6;
+
+/**
+ * Whether the block is short enough, against this window, to be pinned at all.
+ *
+ * Decided on the TALLEST the block has been, never on its height of the moment.
+ * Its own content changes height under the person using it: ticking the terms
+ * removes the host's hint (262px to 221px at 320 wide), and a submit in flight
+ * shortens its button. Decided on the height of the moment, a window between the
+ * two heights moved the block from its own place to the bottom of the window
+ * under the finger that ticked the box. Measured at 320×460 (an iPhone SE's
+ * Safari window with its toolbars shown), the checkbox jumped 170px up, and the
+ * now-enabled "Continuar com o Google" took its place: a second tap there started
+ * a Google sign-up instead of the e-mail one being filled in. So only the WINDOW
+ * can pin the block; its content can only ever release it, by growing.
+ */
 function useRoomToPin(ref: RefObject<HTMLDivElement | null>): boolean {
   const [room, setRoom] = useState(true);
   // Before paint, so a block too tall to pin never shows pinned for a frame.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
-    const measure = (): void =>
-      setRoom(el.offsetHeight <= window.innerHeight * MAX_PINNED_SHARE);
-    measure();
-    window.addEventListener("resize", measure);
-    // The block's own height moves too: the host's hint disappears once the
-    // terms are ticked. jsdom has no ResizeObserver; losing it costs that case.
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    const seen = { tallest: 0, room: false };
+    const decide = (): void => {
+      seen.tallest = Math.max(seen.tallest, el.offsetHeight);
+      const share = seen.tallest / window.innerHeight;
+      seen.room = share <= (seen.room ? RELEASE_SHARE : MAX_PINNED_SHARE);
+      setRoom(seen.room);
+    };
+    decide();
+    window.addEventListener("resize", decide);
+    // The block's own height is watched so that it can GROW past the line. A
+    // shorter block changes nothing (see above). jsdom has no ResizeObserver;
+    // losing it costs the growing case only.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(decide);
     observer?.observe(el);
     return () => {
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", decide);
       observer?.disconnect();
     };
   }, [ref]);
@@ -144,7 +175,9 @@ function useReserveFocusRoom(ref: RefObject<HTMLDivElement | null>, pinnable: bo
  * it — the window's height does, the only thing that actually matters, and a
  * desktop that fits the card sees nothing move. Only a block that would cover
  * more than half the window stays in place instead ({@link MAX_PINNED_SHARE}):
- * there, pinning it would hide the very fields it sits under.
+ * there, pinning it would hide the very fields it sits under. That is decided
+ * by the window alone, never by the block's own content changing height under a
+ * tap ({@link useRoomToPin}).
  *
  * Pinned, it paints the card's own paper so the fields scroll UNDER it rather
  * than through it, and the theme's divider marks its top edge to say the page
