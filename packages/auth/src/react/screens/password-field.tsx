@@ -29,6 +29,7 @@ export function PasswordField({
   helperText,
   dataTestId,
   autoFocus,
+  onBlur,
 }: {
   id: string;
   label: string;
@@ -39,6 +40,8 @@ export function PasswordField({
   helperText?: string;
   dataTestId: string;
   autoFocus?: boolean;
+  /** Called when the field loses focus — the moment a typed password can be judged. */
+  onBlur?: () => void;
 }): JSX.Element {
   const { copy } = useScreens();
   const [visible, setVisible] = useState(false);
@@ -56,6 +59,7 @@ export function PasswordField({
         fullWidth
         {...(error === undefined ? {} : { error })}
         {...(helperText === undefined ? {} : { helperText })}
+        {...(onBlur === undefined ? {} : { onBlur })}
         data-testid={dataTestId}
       />
       <button
