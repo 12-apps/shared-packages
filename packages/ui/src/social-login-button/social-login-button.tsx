@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Box from '@mui/material/Box/index.js';
 import Stack from '@mui/material/Stack/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import { Button } from '../components/form/Button';
 import { Card, CardContent } from '../components/layout/Card';
 import { Heading } from '../components/typography/Heading';
@@ -52,6 +53,46 @@ const AppleIcon = (): React.ReactElement => (
   </svg>
 );
 
+/**
+ * Google's logo on a disabled button: one flat grey, faded (FUT-2393).
+ *
+ * The G is drawn in Google's four colours, hard-coded in its SVG, so MUI
+ * greying a disabled button's label left a full-colour G beside it. The grey
+ * label still said the button could not be pressed; an icon-only button has no
+ * label, and read as ready to tap.
+ *
+ * `brightness(0)` draws the G in one flat colour, as Google's own disabled
+ * button does, and the theme's `disabledOpacity` fades it, the step MUI dims a
+ * disabled control by. `grayscale` would not do: it turns the four colours four
+ * different greys, and the yellow arc all but vanished (1.26:1 against white).
+ *
+ * Google's alone: Facebook's and Apple's logos are drawn in the button's
+ * `currentColor`, so they grey with the label by themselves, and fading them
+ * again would all but erase them. Keyed on `.Mui-disabled`, the class MUI greys
+ * the label by, so the logo and the label always agree. A loading button
+ * carries it too, but its spinner replaces the logo slot.
+ */
+const GOOGLE_LOGO_WHEN_DISABLED_SX = {
+  '&.Mui-disabled .MuiButton-startIcon': {
+    filter: 'brightness(0)',
+    opacity: (theme: Theme) => theme.palette.action.disabledOpacity,
+  },
+} as const;
+
+/**
+ * Facebook's logo in its button's own colour (FUT-2393).
+ *
+ * `FacebookIcon` is the blue roundel, drawn in #1877F2 with the "f" cut out of
+ * it. On the button's own #1877F2 the roundel vanished: a label beside nothing,
+ * and an icon-only button an empty blue slab. In `currentColor` it is the white
+ * roundel Facebook's own button carries, and a disabled button greys it with
+ * the label. Set on the button rather than in `FacebookIcon`, which a host may
+ * draw on a white page.
+ */
+const FACEBOOK_LOGO_IN_BUTTON_COLOUR_SX = {
+  '& .MuiButton-startIcon path': { fill: 'currentColor' },
+} as const;
+
 interface ProviderConfig {
   Icon: () => React.ReactElement;
   variant: 'solid' | 'outline' | 'ghost';
@@ -72,6 +113,7 @@ const providerConfig: Record<SocialProvider, ProviderConfig> = {
         backgroundColor: '#f5f5f5',
         borderColor: '#dadce0',
       },
+      ...GOOGLE_LOGO_WHEN_DISABLED_SX,
     },
   },
   facebook: {
@@ -84,6 +126,7 @@ const providerConfig: Record<SocialProvider, ProviderConfig> = {
       '&:hover': {
         backgroundColor: '#166fe5',
       },
+      ...FACEBOOK_LOGO_IN_BUTTON_COLOUR_SX,
     },
   },
   apple: {
