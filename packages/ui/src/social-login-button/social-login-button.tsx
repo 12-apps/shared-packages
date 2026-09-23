@@ -129,7 +129,27 @@ export interface SocialLoginButtonProps {
    * exactly the text a host is now expected to translate.
    */
   dataTestId?: string;
+  /**
+   * The provider's logo alone, centred (FUT-2393).
+   *
+   * For a row of providers in a narrow block, where "Continuar com o Google"
+   * wraps to two lines at 320px and two providers cannot share a line. The
+   * label is not dropped: it stays the button's accessible name, so a screen
+   * reader still announces the provider, and its `title`, so a pointer
+   * hovering the logo reads it too.
+   */
+  iconOnly?: boolean;
 }
+
+/**
+ * What an icon-only social button changes: the logo centred, with no gap
+ * reserved for a label and no margin MUI keeps beside a start icon.
+ */
+const ICON_ONLY_SX = {
+  justifyContent: 'center',
+  gap: 0,
+  '& .MuiButton-startIcon': { margin: 0 },
+} as const;
 
 /**
  * Social login button using UI package Button component
@@ -144,10 +164,12 @@ export const SocialLoginButton = React.forwardRef<HTMLButtonElement, SocialLogin
       fullWidth = true,
       copy = EN_US_SOCIAL_LOGIN_COPY,
       dataTestId,
+      iconOnly = false,
     },
     ref,
   ) => {
     const config = providerConfig[provider];
+    const label = copy[provider];
 
     return (
       <Button
@@ -161,14 +183,16 @@ export const SocialLoginButton = React.forwardRef<HTMLButtonElement, SocialLogin
         icon={<config.Icon />}
         dataTestId={dataTestId}
         fullWidth={fullWidth}
+        {...(iconOnly ? { 'aria-label': label, title: label } : {})}
         sx={{
           minHeight: 48,
           justifyContent: 'flex-start',
           gap: 2,
+          ...(iconOnly ? ICON_ONLY_SX : {}),
           ...config.sx,
         }}
       >
-        {copy[provider]}
+        {iconOnly ? undefined : label}
       </Button>
     );
   }

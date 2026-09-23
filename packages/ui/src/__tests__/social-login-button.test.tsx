@@ -126,6 +126,43 @@ describe("SocialLoginButton", () => {
   });
 });
 
+describe("SocialLoginButton with iconOnly (FUT-2393)", () => {
+  const providers: SocialProvider[] = ["google", "facebook", "apple"];
+
+  it.each(providers)("keeps %s's label as the accessible name and drops it from view", (provider) => {
+    // The logo alone is for a narrow row of providers; a screen reader must
+    // still hear which provider the button signs in with, in the host's words.
+    render(<SocialLoginButton provider={provider} copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly />);
+
+    const label = PT_BR_SOCIAL_LOGIN_COPY[provider];
+    const button = screen.getByRole("button", { name: label });
+    expect(button).not.toHaveTextContent(label);
+    // Named by aria-label, not only by the title's fallback: a title is not
+    // exposed on a touch screen, where this row is meant to be used.
+    expect(button).toHaveAttribute("aria-label", label);
+    expect(button).toHaveAttribute("title", label);
+    expect(button.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("still writes the label beside the logo when iconOnly is not set", () => {
+    render(<SocialLoginButton provider="google" copy={PT_BR_SOCIAL_LOGIN_COPY} />);
+
+    const button = screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.google });
+    expect(button).toHaveTextContent(PT_BR_SOCIAL_LOGIN_COPY.google);
+    expect(button).not.toHaveAttribute("aria-label");
+    expect(button).not.toHaveAttribute("title");
+  });
+
+  it("spins in place of the logo while its provider hands off, and keeps its name", () => {
+    const { container } = render(
+      <SocialLoginButton provider="google" copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly loading />,
+    );
+
+    expect(container.querySelector(".MuiCircularProgress-root")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.google })).toBeDisabled();
+  });
+});
+
 describe("SocialLoginContainer", () => {
   it("should render children", () => {
     render(
