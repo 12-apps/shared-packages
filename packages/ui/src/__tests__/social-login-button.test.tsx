@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { createTheme, ThemeProvider } from "@mui/material/styles/index.js";
 import { EN_US_SOCIAL_LOGIN_COPY } from "../en-US";
 import { PT_BR_SOCIAL_LOGIN_COPY } from "../pt-BR";
 import {
@@ -160,6 +161,92 @@ describe("SocialLoginButton with iconOnly (FUT-2393)", () => {
 
     expect(container.querySelector(".MuiCircularProgress-root")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.google })).toBeDisabled();
+  });
+});
+
+describe("SocialLoginButton's logo, pressable or not (FUT-2393)", () => {
+  const providers: SocialProvider[] = ["google", "facebook", "apple"];
+
+  /** The slot MUI renders the logo in, beside or instead of the label. */
+  const logoSlot = (socialButton: HTMLElement): HTMLElement => {
+    const slot = socialButton.querySelector<HTMLElement>(".MuiButton-startIcon");
+    if (!slot) throw new Error("the button rendered no logo slot");
+    return slot;
+  };
+
+  /** Nothing from `root` down is faded or filtered, however it is spelled. */
+  const expectUnfaded = (root: Element): void => {
+    for (const drawn of [root, ...root.querySelectorAll("*")]) {
+      expect(["", "1"]).toContain(getComputedStyle(drawn).opacity);
+      expect(["", "none"]).toContain(getComputedStyle(drawn).filter);
+    }
+  };
+
+  it.each([true, false])("draws Google's G in one faded grey on a disabled button (iconOnly: %s)", (iconOnly) => {
+    // The G is drawn in Google's own colours, so MUI greying the label left a
+    // full-colour G on a disabled button. With the logo alone there is no
+    // label left to say the button cannot be pressed.
+    render(<SocialLoginButton provider="google" copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly={iconOnly} disabled />);
+
+    const logo = getComputedStyle(logoSlot(screen.getByRole("button")));
+    expect(logo.filter).toBe("brightness(0)");
+    expect(logo.opacity).toBe("0.38");
+  });
+
+  it("fades the G by the theme's disabledOpacity, not a copy of MUI's default", () => {
+    render(
+      <ThemeProvider theme={createTheme({ palette: { action: { disabledOpacity: 0.5 } } })}>
+        <SocialLoginButton provider="google" copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly disabled />
+      </ThemeProvider>,
+    );
+
+    expect(getComputedStyle(logoSlot(screen.getByRole("button"))).opacity).toBe("0.5");
+  });
+
+  it.each(["facebook", "apple"] as const)("lets %s's logo grey with its label rather than fading it twice", (provider) => {
+    // Drawn in the button's own colour, this logo is already MUI's disabled
+    // grey on a disabled button; fading it again would all but erase it.
+    render(<SocialLoginButton provider={provider} copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly disabled />);
+
+    expectUnfaded(logoSlot(screen.getByRole("button")));
+  });
+
+  it("draws Facebook's logo in the button's own colour, so it shows on the blue", () => {
+    // The icon is a #1877F2 roundel with the f cut out of it, on a #1877F2
+    // button: drawn in its own colour it vanished, and an icon-only button was
+    // an empty blue slab.
+    render(<SocialLoginButton provider="facebook" copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly />);
+
+    const facebook = screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.facebook });
+    const roundel = logoSlot(facebook).querySelector("path");
+    if (!roundel) throw new Error("the Facebook logo drew no path");
+    expect(getComputedStyle(roundel).fill.toLowerCase()).toBe("currentcolor");
+    expect(getComputedStyle(roundel).color).toBe(getComputedStyle(facebook).color);
+    expect(getComputedStyle(roundel).color).not.toBe(getComputedStyle(facebook).backgroundColor);
+  });
+
+  it("draws Apple's logo in the button's own colour", () => {
+    render(<SocialLoginButton provider="apple" copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly />);
+
+    const apple = screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.apple });
+    expect(logoSlot(apple).querySelector("svg")).toHaveAttribute("fill", "currentColor");
+  });
+
+  it.each(providers)("keeps %s's logo unfaded while the button can be pressed", (provider) => {
+    render(<SocialLoginButton provider={provider} copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly />);
+
+    expectUnfaded(logoSlot(screen.getByRole("button")));
+  });
+
+  it("does not fade the spinner of a provider handing off", () => {
+    // Loading disables the button too, but the spinner replaces the logo and
+    // is the one sign that something is happening: nothing in the button is
+    // faded further than MUI's disabled colour already draws it.
+    render(<SocialLoginButton provider="google" copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly loading />);
+
+    const handingOff = screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.google });
+    expect(within(handingOff).getByRole("progressbar")).toBeInTheDocument();
+    expectUnfaded(handingOff);
   });
 });
 
