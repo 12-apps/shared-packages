@@ -1,7 +1,7 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EmailAuthScreens } from "../../screens";
 import { createAuthRoutes } from "../routes";
@@ -23,10 +23,28 @@ const Stub = (name: string): ComponentType<Record<string, unknown>> =>
     return <div data-testid={name} />;
   };
 
+/**
+ * The sign-up form, stubbed down to the one thing the page hands it: where its
+ * submit goes. The gate and the providers render THROUGH it when e-mail is on,
+ * so a stub that dropped `renderActions` would drop them too.
+ */
+function SignupFormStub({
+  renderActions,
+}: {
+  renderActions?: (submit: ReactNode) => ReactNode;
+}): JSX.Element {
+  const submit = (
+    <button type="submit" data-testid="signup-submit">
+      Criar conta
+    </button>
+  );
+  return <form data-testid="email-signup-form">{renderActions ? renderActions(submit) : submit}</form>;
+}
+
 function screensStub(): EmailAuthScreens {
   return {
     EmailPasswordForm: Stub("email-password-form"),
-    EmailSignupForm: Stub("email-signup-form"),
+    EmailSignupForm: SignupFormStub,
     ForgotPasswordScreen: Stub("forgot"),
     ResetPasswordScreen: Stub("reset"),
     VerifyEmailScreen: Stub("verify"),
@@ -146,6 +164,61 @@ describe("createAuthRoutes — the redirect and the settings read", () => {
     render(<LoginRoute />);
     expect(await screen.findByTestId("providers")).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId("email-password-form")).toBeNull());
+  });
+});
+
+describe("createAuthRoutes — the sign-up page waits for the settings", () => {
+  it("holds its spinner until the answer, so nothing moves after it paints", async () => {
+    // With e-mail on, the gate and the providers render under the form's
+    // submit; with it off, at the top. Painting the "off" layout while the
+    // read is in flight would move the Google button a moment later.
+    const { config } = harness({
+      renderProviders: () => (
+        <button type="button" data-testid="google">
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    const { container } = render(<SignupRoute />);
+
+    // The first paint, before the settings promise has settled.
+    expect(screen.getByTestId("signup-loading")).toBeTruthy();
+    expect(container.innerHTML).not.toContain('data-testid="google"');
+
+    const google = await screen.findByTestId("google");
+    expect(screen.getByTestId("signup-actions").contains(google)).toBe(true);
+  });
+
+  it("releases the spinner into the e-mail-off layout when the read fails", async () => {
+    const { config } = harness({
+      getSettings: () => Promise.reject(new Error("offline")),
+      renderProviders: () => (
+        <button type="button" data-testid="google">
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    const { container } = render(<SignupRoute />);
+
+    expect(await screen.findByTestId("google")).toBeTruthy();
+    expect(container.innerHTML).not.toContain('data-testid="signup-actions"');
+  });
+
+  it("does not hold the login page: its providers are usable while the read is in flight", () => {
+    const { config } = harness({
+      getSettings: () => new Promise(() => {}),
+      renderProviders: () => (
+        <button type="button" data-testid="google">
+          google
+        </button>
+      ),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+
+    expect(screen.getByTestId("google")).toBeTruthy();
   });
 });
 
@@ -285,6 +358,69 @@ describe("createAuthRoutes — the sign-up gate", () => {
       await screen.findByText("Não foi possível registrar o consentimento."),
     ).toBeTruthy();
     expect(signIn).not.toHaveBeenCalled();
+  });
+});
+
+describe("createAuthRoutes — a failure that arrives after the page painted", () => {
+  // The notice sits at the top of the card and, on sign-up, the button whose
+  // failure it reports sits in the pinned block at the bottom. It mounts when
+  // the failure arrives, so that is when it is brought into view.
+  const scrollIntoView = vi.fn();
+
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      value: scrollIntoView,
+      configurable: true,
+      writable: true,
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      top: -400,
+      bottom: -300,
+      left: 0,
+      right: 320,
+      width: 320,
+      height: 100,
+      x: 0,
+      y: -400,
+      toJSON: () => ({}),
+    } as DOMRect);
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    scrollIntoView.mockReset();
+    vi.restoreAllMocks();
+  });
+
+  it("brings the consent failure into view when the stamp is refused", async () => {
+    const { config } = harness({
+      signupGate: {
+        render: ({ satisfied, setSatisfied }) => (
+          <input
+            type="checkbox"
+            data-testid="accept"
+            checked={satisfied}
+            onChange={(event) => setSatisfied(event.target.checked)}
+          />
+        ),
+        onBeforeProceed: () => Promise.reject(new Error("offline")),
+        failureMessage: "Não foi possível registrar o consentimento.",
+      },
+      renderProviders: ({ start }) => (
+        <button type="button" data-testid="google" onClick={() => start("google")}>
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    render(<SignupRoute />);
+    fireEvent.click(await screen.findByTestId("accept"));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByTestId("google"));
+
+    await screen.findByText("Não foi possível registrar o consentimento.");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
   });
 });
 

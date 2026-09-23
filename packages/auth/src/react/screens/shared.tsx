@@ -1,4 +1,4 @@
-import type { JSX, ReactNode } from "react";
+import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
@@ -15,6 +15,39 @@ import { failureMessage, type EmailAuthScreenReason } from "./copy";
  * and `LinkButton` from the sign-in form, so four files imported a component
  * from a screen they had nothing else to do with.
  */
+
+/**
+ * Bring a refusal into view when it appears, if it appeared off screen.
+ *
+ * A form's refusal renders at the TOP of the form and the button that caused it
+ * is at the bottom. On a phone the two are a screen apart: measured at 360×640
+ * on sign-up, the page was scrolled to the submit when "Criar conta" was
+ * tapped, the banner rendered above the window, and nothing on screen changed
+ * except the button going back to enabled. Centred rather than scrolled to the
+ * top edge, because the host's header may be pinned there. Already on screen,
+ * it is left where it is — a banner that jumped the page every time would be its
+ * own problem. The Alert inside carries `role="alert"`, so a screen reader hears
+ * it wherever it is.
+ */
+export function RevealOnAppear({ children }: { children: ReactNode }): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // The refusal itself, not this wrapper: the wrapper has no box of its own.
+    const target = ref.current?.firstElementChild;
+    // jsdom has no `scrollIntoView`; there is no screen to bring it onto there.
+    if (!(target instanceof HTMLElement) || typeof target.scrollIntoView !== "function") return;
+    const { top, bottom } = target.getBoundingClientRect();
+    if (top >= 0 && bottom <= window.innerHeight) return;
+    target.scrollIntoView({ block: "center" });
+  }, []);
+  // `contents`, so the wrapper is never a flex item of its own: a notice that
+  // renders nothing (a dismissed one) must not leave a gap in the card's column.
+  return (
+    <div ref={ref} style={{ display: "contents" }}>
+      {children}
+    </div>
+  );
+}
 
 /**
  * The refusal banner.
@@ -45,16 +78,18 @@ export function FailureBanner({
         in a pt-BR app, which is exactly what stops these scenarios shipping
         with the library. The reason code is the same in every consumer.
       */}
-      <Alert
-        variant="danger"
-        title={title}
-        description={failureMessage(copy, reason, violations)}
-        closable
-        closeLabel={copy.dismissFailure}
-        onClose={onDismiss}
-        data-testid="auth-failure"
-        data-reason={reason}
-      />
+      <RevealOnAppear>
+        <Alert
+          variant="danger"
+          title={title}
+          description={failureMessage(copy, reason, violations)}
+          closable
+          closeLabel={copy.dismissFailure}
+          onClose={onDismiss}
+          data-testid="auth-failure"
+          data-reason={reason}
+        />
+      </RevealOnAppear>
       <Spacer size="sm" />
     </>
   );

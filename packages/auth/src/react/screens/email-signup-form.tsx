@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type JSX } from "react";
+import { useState, type FormEvent, type JSX, type ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
@@ -51,6 +51,16 @@ export interface SignupConfig {
   onBeforeSubmit: () => Promise<void>;
   onSignedIn: () => void;
   disabled?: boolean;
+  /**
+   * Where the submit button goes, and what sits beside it.
+   *
+   * Handed the button and returns what renders in its place, inside the form.
+   * The sign-up PAGE uses this to put the consent that enables the button
+   * directly above it, and the other ways in directly below it (see
+   * `SignupActions` in `pages/signup-actions.tsx`). Omitted, the button renders
+   * on its own, as it always has.
+   */
+  renderActions?: (submit: ReactNode) => ReactNode;
 }
 
 function useSignup(config: SignupConfig): SignupState {
@@ -123,6 +133,27 @@ function useSignup(config: SignupConfig): SignupState {
   };
 }
 
+/**
+ * The form's one submit. Its own component because the page may place it
+ * (`renderActions`) somewhere other than straight under the fields.
+ */
+function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boolean }): JSX.Element {
+  const { copy } = useScreens();
+  return (
+    <Button
+      type="submit"
+      variant="solid"
+      color="primary"
+      fullWidth
+      loading={form.pending}
+      disabled={gateClosed || form.pending || form.email.length === 0 || form.password.length === 0}
+      dataTestId="signup-submit"
+    >
+      {copy.signUp.submit}
+    </Button>
+  );
+}
+
 export function EmailSignupForm(props: SignupConfig): JSX.Element {
   const { copy } = useScreens();
   const form = useSignup(props);
@@ -137,6 +168,8 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
       />
     );
   }
+
+  const submit = <SubmitButton form={form} gateClosed={props.disabled === true} />;
 
   return (
     <form onSubmit={(event) => void form.submit(event)} data-testid="email-signup-form">
@@ -183,20 +216,14 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
       <Text color="secondary" size="sm">
         {copy.signUp.passwordHint}
       </Text>
-      <Spacer size="md" />
-      <Button
-        type="submit"
-        variant="solid"
-        color="primary"
-        fullWidth
-        loading={form.pending}
-        disabled={
-          props.disabled || form.pending || form.email.length === 0 || form.password.length === 0
-        }
-        dataTestId="signup-submit"
-      >
-        {copy.signUp.submit}
-      </Button>
+      {props.renderActions ? (
+        props.renderActions(submit)
+      ) : (
+        <>
+          <Spacer size="md" />
+          {submit}
+        </>
+      )}
     </form>
   );
 }

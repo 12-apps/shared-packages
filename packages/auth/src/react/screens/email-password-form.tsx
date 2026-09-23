@@ -8,7 +8,7 @@ import { Spacer } from "@12-apps/ui/layout/Spacer";
 import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { PasswordField } from "./password-field";
-import { FailureBanner, LinkButton } from "./shared";
+import { FailureBanner, LinkButton, RevealOnAppear } from "./shared";
 
 /**
  * Sign in with an e-mail and a password.
@@ -134,15 +134,17 @@ function UnverifiedNotice({
         unconfirmed address — was the only one no test could read, and it went
         unnoticed until a second host ran the packaged journeys.
       */}
-      <Alert
-        variant="warning"
-        title={copy.signIn.unverifiedTitle}
-        description={
-          resent ? copy.signIn.resentDescription : copy.signIn.unverifiedDescription
-        }
-        data-testid="auth-failure"
-        data-reason="email-not-verified"
-      />
+      <RevealOnAppear>
+        <Alert
+          variant="warning"
+          title={copy.signIn.unverifiedTitle}
+          description={
+            resent ? copy.signIn.resentDescription : copy.signIn.unverifiedDescription
+          }
+          data-testid="auth-failure"
+          data-reason="email-not-verified"
+        />
+      </RevealOnAppear>
       <Spacer size="sm" />
       {!resent && (
         <>
