@@ -434,7 +434,7 @@ describe('charge-walk enforcement (server-side, before the adapter is called)', 
     for (const adapter of LIVE_ADAPTERS) {
       if (adapter.capabilities.tokenization !== 'NONE') continue;
       const required = (adapter.customerSchema ?? []).filter((field) => field.required);
-      expect(required, `${adapter.name} declares NONE with a required field — confirm the gate enforcing it (no hosted page exists to instead) is intended`).toEqual([]);
+      expect(required, `${adapter.name}: NONE must declare no required field`).toEqual([]);
       for (const method of adapter.capabilities.methods) {
         const snapshot = await adapter.createCharge(
           { ...pixInput(`none-${method}`), method, customer: {} },

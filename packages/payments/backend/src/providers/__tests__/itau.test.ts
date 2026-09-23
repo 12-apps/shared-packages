@@ -6,25 +6,27 @@ import { PT_BR_ITAU_COPY } from '../pt-BR';
 import { itauProvider, itauTxId, NAME } from '../itau';
 import { cardInput, pixInput, STUB_CREDS } from '../../__tests__/fixtures';
 
-const adapter = itauProvider(PT_BR_ITAU_COPY);
-
 describe('itau (stub mode)', () => {
   it('creates a normalized PENDING PIX charge', async () => {
+    const adapter = itauProvider(PT_BR_ITAU_COPY);
     const snapshot = await adapter.createCharge(pixInput(), STUB_CREDS);
     expect(snapshot).toMatchObject({ provider: NAME, status: 'PENDING', method: 'PIX' });
     expect(snapshot.pix?.qrText).toBeTruthy();
   });
 
   it('verifies stub credentials as ok with no network call', async () => {
+    const adapter = itauProvider(PT_BR_ITAU_COPY);
     await expect(adapter.verifyCredentials(STUB_CREDS)).resolves.toMatchObject({ ok: true });
   });
 
   it('declares PIX-only capabilities — no card, on purpose', () => {
+    const adapter = itauProvider(PT_BR_ITAU_COPY);
     expect(adapter.capabilities.methods).toEqual(['PIX']);
     expect(adapter.authMode).toBe('credentials');
   });
 
   it('refuses a CARD charge rather than silently accepting one this bank product cannot take', async () => {
+    const adapter = itauProvider(PT_BR_ITAU_COPY);
     await expect(adapter.createCharge(cardInput(), STUB_CREDS)).rejects.toBeInstanceOf(UnsupportedOperationError);
   });
 
@@ -32,11 +34,13 @@ describe('itau (stub mode)', () => {
     const secretCreds = { environment: 'SANDBOX' as const, fields: { webhookSecret: 'whsec_itau_1' } };
 
     it('accepts a stub delivery with no secret configured', async () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       const delivery: WebhookDelivery = { provider: NAME, rawBody: '{}', headers: {} };
       await expect(adapter.webhook.verify(delivery, STUB_CREDS)).resolves.toBe(true);
     });
 
     it('rejects a live delivery when no secret is configured (fail closed)', async () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       const delivery: WebhookDelivery = { provider: NAME, rawBody: '{}', headers: {} };
       await expect(
         adapter.webhook.verify(delivery, { environment: 'PRODUCTION', fields: {} }),
@@ -44,16 +48,19 @@ describe('itau (stub mode)', () => {
     });
 
     it('accepts a live delivery whose header matches the configured secret', async () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       const delivery: WebhookDelivery = { provider: NAME, rawBody: '{}', headers: { 'x-webhook-secret': 'whsec_itau_1' } };
       await expect(adapter.webhook.verify(delivery, secretCreds)).resolves.toBe(true);
     });
 
     it('rejects a live delivery whose header does not match', async () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       const delivery: WebhookDelivery = { provider: NAME, rawBody: '{}', headers: { 'x-webhook-secret': 'wrong' } };
       await expect(adapter.webhook.verify(delivery, secretCreds)).resolves.toBe(false);
     });
 
     it('parses a real Itaú pix[] delivery into a normalized CHARGE_UPDATED/PAID event', async () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       const delivery: WebhookDelivery = {
         provider: NAME,
         rawBody: JSON.stringify({
@@ -71,17 +78,20 @@ describe('itau (stub mode)', () => {
     });
 
     it('reads back the txid a delivery names, for reconciliation correlation', () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       expect(adapter.referenceOfDelivery?.(JSON.stringify({ pix: [{ txid: 'ABC123' }] }))).toBe('ABC123');
       expect(adapter.referenceOfDelivery?.('not json')).toBeNull();
     });
 
     it('answers UNKNOWN for a delivery with no pix entries, rather than throwing', async () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       const delivery: WebhookDelivery = { provider: NAME, rawBody: JSON.stringify({}), headers: {} };
       const [event] = await adapter.webhook.parse(delivery, STUB_CREDS);
       expect(event?.type).toBe('UNKNOWN');
     });
 
     it('declares that its own verified delivery IS proof of payment', () => {
+      const adapter = itauProvider(PT_BR_ITAU_COPY);
       expect(adapter.verifyConfirmsPayment).toBe(true);
     });
   });

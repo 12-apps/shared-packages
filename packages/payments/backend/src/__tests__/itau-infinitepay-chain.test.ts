@@ -51,8 +51,8 @@ async function storeWithItauFirstAndInfinitePaySecond() {
 
 describe('itau-first + infinitepay-second store: the exact task scenario', () => {
   it('step 2 "Pix": a PIX charge with no explicit provider settles at Itaú, QR carried locally on the snapshot (no redirect)', async () => {
-    const { gateway } = await storeWithItauFirstAndInfinitePaySecond();
-    const stored = await gateway.charge(TENANT, pixInput('order-pix-1'));
+    const { gateway: pixGateway } = await storeWithItauFirstAndInfinitePaySecond();
+    const stored = await pixGateway.charge(TENANT, pixInput('order-pix-1'));
     expect(stored.snapshot.provider).toBe('itau');
     expect(stored.snapshot.method).toBe('PIX');
     // The QR is DATA on the snapshot, not a place to send the buyer — this is
@@ -63,8 +63,8 @@ describe('itau-first + infinitepay-second store: the exact task scenario', () =>
   });
 
   it('step 2 "Cartão": a CARD charge with no explicit provider SKIPS Itaú (cannot do cards) and settles at InfinitePay', async () => {
-    const { gateway } = await storeWithItauFirstAndInfinitePaySecond();
-    const stored = await gateway.charge(TENANT, cardInput('order-card-1'));
+    const { gateway: cardGateway } = await storeWithItauFirstAndInfinitePaySecond();
+    const stored = await cardGateway.charge(TENANT, cardInput('order-card-1'));
     // This is the "se cartão então navega para o infinity pay" half — proven
     // by the ACTUAL routing decision the real gateway made walking the real
     // chain, not by a mock told to return this answer.
@@ -73,9 +73,9 @@ describe('itau-first + infinitepay-second store: the exact task scenario', () =>
   });
 
   it('the walk really TRIED Itaú first and skipped it for the card charge — not a coincidence of provider order elsewhere', async () => {
-    const { gateway, attempts } = await storeWithItauFirstAndInfinitePaySecond();
-    await gateway.charge(TENANT, cardInput('order-card-2'));
-    const forThisCharge = attempts
+    const { gateway: walkGateway, attempts: attemptLedger } = await storeWithItauFirstAndInfinitePaySecond();
+    await walkGateway.charge(TENANT, cardInput('order-card-2'));
+    const forThisCharge = attemptLedger
       .all()
       .filter((a) => a.reference === 'order-card-2')
       .map((a) => [a.provider, a.outcome]);

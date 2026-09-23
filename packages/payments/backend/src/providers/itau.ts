@@ -233,6 +233,34 @@ function itauDeliveryReference(payload: string): string | null {
   }
 }
 
+function itauCredentialSchema(fields: ItauCopy['fields']) {
+  return [
+    { key: 'clientId', label: fields.clientId, secret: false, required: true },
+    { key: 'clientSecret', label: fields.clientSecret, secret: true, required: true },
+    { key: 'certificate', label: fields.certificate, secret: true, required: true },
+    { key: 'pixKey', label: fields.pixKey, secret: false, required: true },
+    { key: 'webhookSecret', label: fields.webhookSecret, secret: true, required: true },
+  ];
+}
+
+async function verifyItauCredentials(
+  credentials: ResolvedCredentials,
+  locale: string | undefined,
+  copy: (locale?: string) => ItauCopy,
+): Promise<ProbeOutcome> {
+  if (credentials.stub) return { ok: true, message: 'stub mode' };
+  try {
+    await mintAccessToken(credentials);
+    return { ok: true };
+  } catch (error) {
+    const c = copy(locale);
+    if (error instanceof ProviderRequestError && (error.options.httpStatus === 401 || error.options.httpStatus === 403)) {
+      return { ok: false, message: c.refused, fault: 'REFUSED' };
+    }
+    return { ok: false, message: c.unreachable, fault: 'UNREACHABLE' };
+  }
+}
+
 export function itauProvider(source: PaymentsCopySource<ItauCopy>): PaymentProviderAdapter {
   const copy = (locale?: string): ItauCopy => resolvePaymentsCopy(source, locale);
 
@@ -250,34 +278,13 @@ export function itauProvider(source: PaymentsCopySource<ItauCopy>): PaymentProvi
       tokenization: 'NONE',
       activationCharge: true,
     },
-    credentialSchema: ({ locale }) => {
-      const { fields } = copy(locale ?? undefined);
-      return [
-        { key: 'clientId', label: fields.clientId, secret: false, required: true },
-        { key: 'clientSecret', label: fields.clientSecret, secret: true, required: true },
-        { key: 'certificate', label: fields.certificate, secret: true, required: true },
-        { key: 'pixKey', label: fields.pixKey, secret: false, required: true },
-        { key: 'webhookSecret', label: fields.webhookSecret, secret: true, required: true },
-      ];
-    },
+    credentialSchema: ({ locale }) => itauCredentialSchema(copy(locale ?? undefined).fields),
     customerSchema: [
       { key: 'name', type: 'NAME', required: false },
       { key: 'taxId', type: 'CPF', required: false },
     ],
 
-    async verifyCredentials(credentials, locale): Promise<ProbeOutcome> {
-      if (credentials.stub) return { ok: true, message: 'stub mode' };
-      try {
-        await mintAccessToken(credentials);
-        return { ok: true };
-      } catch (error) {
-        const c = copy(locale);
-        if (error instanceof ProviderRequestError && (error.options.httpStatus === 401 || error.options.httpStatus === 403)) {
-          return { ok: false, message: c.refused, fault: 'REFUSED' };
-        }
-        return { ok: false, message: c.unreachable, fault: 'UNREACHABLE' };
-      }
-    },
+    verifyCredentials: (credentials, locale) => verifyItauCredentials(credentials, locale, copy),
 
     async createCharge(input, credentials) {
       if (input.method !== 'PIX') throw new UnsupportedOperationError(NAME, `createCharge(${input.method})`);
