@@ -22,33 +22,33 @@ import { BADGE_POLL_MS, BADGE_RECONCILE_MS, createInboxStore } from '../inbox-st
 const UNREAD_PATH = '/api/account/notifications/unread-count';
 const API_BASE = '/api/account';
 
-/** Counts the badge's reads; everything else it is asked is empty. */
-function countingTransport(): { transport: NotificationsTransport; reads: () => number } {
-  let reads = 0;
-  return {
-    reads: () => reads,
-    transport: {
-      get<T>(path: string): Promise<T> {
-        if (path === UNREAD_PATH) {
-          reads += 1;
-          return Promise.resolve({ count: 0 } as T);
-        }
-        return Promise.resolve({ items: [], nextCursor: null } as T);
-      },
-      send<T>(): Promise<NotificationsResult<T>> {
-        return Promise.resolve({ ok: true, data: {} as T });
-      },
-    },
+/** A transport whose every read is recorded; the count is always zero. */
+function recordingTransport() {
+  const get = vi.fn((path: string) =>
+    Promise.resolve(path === UNREAD_PATH ? { count: 0 } : { items: [], nextCursor: null }),
+  );
+  const transport: NotificationsTransport = {
+    get: <T,>(path: string): Promise<T> => get(path) as Promise<T>,
+    send: <T,>(): Promise<NotificationsResult<T>> =>
+      Promise.resolve({ ok: true, data: {} as T }),
   };
+  return { transport, get };
 }
 
+/**
+ * The badge, mounted on a store of its own, and the two things a case does
+ * with it: count the reads it made, and tell it the channel dropped.
+ */
 function mountBadge(options: { live?: boolean }) {
-  const { transport, reads } = countingTransport();
+  const { transport, get } = recordingTransport();
   const store = createInboxStore(createNotificationsApiClient(API_BASE, transport));
-  const hook = renderHook((props: { live?: boolean }) => useUnreadCount(store, props), {
+  const { rerender } = renderHook((props: { live?: boolean }) => useUnreadCount(store, props), {
     initialProps: options,
   });
-  return { hook, reads };
+  return {
+    reads: (): number => get.mock.calls.filter(([path]) => path === UNREAD_PATH).length,
+    dropChannel: (): void => rerender({ live: false }),
+  };
 }
 
 /** Let the clock run, and every read it schedules settle. */
@@ -92,10 +92,10 @@ describe('the badge cadence', () => {
   });
 
   it('goes back to the minute the moment the channel drops', async () => {
-    const { hook, reads } = mountBadge({ live: true });
+    const { dropChannel, reads } = mountBadge({ live: true });
     await elapse(0);
 
-    hook.rerender({ live: false });
+    dropChannel();
     await elapse(0);
     const afterDrop = reads();
 
