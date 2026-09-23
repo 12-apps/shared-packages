@@ -26,7 +26,10 @@ import {
 /** The host's connect steps split across the Configurar / Conectar stages. */
 const CONFIGURE_STEP_COUNT = 3;
 
-/** How often the Confirmar step re-checks the live connection while waiting. */
+/**
+ * How often the Confirmar step re-checks the live connection while waiting,
+ * unless the host passes `pollIntervalMs`.
+ */
 const POLL_INTERVAL_MS = 3000;
 
 /** A step's continue/back controls (Voltar left, primary next right). */
@@ -245,12 +248,15 @@ export function ConfirmStep({
   connections,
   hosts,
   onRetest,
+  pollIntervalMs = POLL_INTERVAL_MS,
   copy,
 }: {
   nav: GuidedNav;
   connections: readonly AiConnection[];
   hosts: readonly AiHostGuide[];
   onRetest: () => void;
+  /** The wait's re-check interval — see `AiIntegrationOnboardingProps.pollIntervalMs`. */
+  pollIntervalMs?: number | undefined;
   copy: McpAiCopy;
 }): React.JSX.Element {
   const selectedHostId = nav.data.selectedHost as string | undefined;
@@ -261,9 +267,9 @@ export function ConfirmStep({
   // interval is cleared as soon as `connection` is non-null (and on unmount).
   useEffect(() => {
     if (connection) return undefined;
-    const id = setInterval(() => onRetest(), POLL_INTERVAL_MS);
+    const id = setInterval(() => onRetest(), pollIntervalMs);
     return () => clearInterval(id);
-  }, [connection, onRetest]);
+  }, [connection, onRetest, pollIntervalMs]);
 
   if (connection) {
     return (
