@@ -1,4 +1,5 @@
 import type { Result } from "../../result";
+import { waitsForDeadline, withLive, type LiveCadence } from "./poll-live";
 import { claimRearm } from "./poll-rearm";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 
@@ -11,7 +12,7 @@ import { TERMINAL_STATUSES, type OrderStatus } from "./types";
  * attempt counter that lets a hung request be abandoned rather than waited on.
  */
 
-export interface PollingOptions {
+export interface PollingOptions extends LiveCadence {
   /** Delay between successful polls (ms). */
   intervalMs?: number;
   /**
@@ -106,7 +107,7 @@ function healthyDelay(healthy: number, options: PollingOptions): number {
   const { intervalMs = 2500, slowAfterPolls, slowIntervalMs } = options;
   const backingOff =
     slowAfterPolls !== undefined && slowIntervalMs !== undefined && healthy >= slowAfterPolls;
-  return backingOff ? slowIntervalMs : intervalMs;
+  return withLive(backingOff ? slowIntervalMs : intervalMs, options);
 }
 
 /**
@@ -281,7 +282,8 @@ async function askOnce(
 
 /** Whether sleeping `delay` would carry the wait past its wall-clock bound. */
 function outOfTime(run: PollRun, options: PollingOptions, delay: number): boolean {
-  return options.maxWaitMs !== undefined && Date.now() - run.startedAt + delay >= options.maxWaitMs;
+  if (options.maxWaitMs === undefined || waitsForDeadline(options)) return false;
+  return Date.now() - run.startedAt + delay >= options.maxWaitMs;
 }
 
 /**
@@ -316,8 +318,8 @@ function scheduleNext(
 export interface PollLoop {
   /** Reset the clock and the counters, then ask immediately. */
   restart: () => void;
-  /** Ask immediately, keeping the clock — the re-arm events' entry point. */
-  poke: () => void;
+  /** Ask immediately, keeping the clock — the re-arm events' entry point. Whether it asked. */
+  poke: () => boolean;
   /** Tear down: nothing further is scheduled and nothing further is written. */
   stop: () => void;
 }
@@ -336,8 +338,6 @@ export function createPollLoop(
   sink: PollSink,
 ): PollLoop {
   const run = newRun();
-
-
   const tick = async (): Promise<void> => {
     if (run.cancelled || run.settled || run.inFlight) return;
     run.inFlight = true;
@@ -364,9 +364,8 @@ export function createPollLoop(
     restart: (): void => {
       if (run.cancelled || run.settled) return;
       clearPending(run);
-      // Same reasoning as `poke`, and this one is the buyer pressing a button:
-      // "Verificar de novo" that cleared the panel and sent nothing — because
-      // an ask was still notionally in flight — is the exact complaint.
+      // Same reasoning as `poke`, and this one is the buyer pressing a button: "Verificar
+      // de novo" that cleared the panel and sent nothing (an ask was in flight) is the complaint.
       run.attempt += 1;
       run.inFlight = false;
       run.stopped = false;
@@ -379,17 +378,18 @@ export function createPollLoop(
       sink.setError(null);
       void tick();
     },
-    poke: (): void => {
-      if (run.cancelled || run.stopped) return;
+    poke: (): boolean => {
+      if (run.cancelled || run.stopped) return false;
       // Deliberately NOT gated on `inFlight`: the shopper who just came back
       // from their bank app is exactly the case where the previous ask is a
       // socket that died while the screen was hidden. Abandon it and ask now —
       // but `claimRearm` bounds how many live asks that may abandon in a row.
-      if (!claimRearm(run)) return;
+      if (!claimRearm(run)) return false;
       run.attempt += 1;
       run.inFlight = false;
       clearPending(run);
       void tick();
+      return true;
     },
     stop: (): void => {
       run.cancelled = true;
