@@ -16,7 +16,19 @@ type(scope): imperative summary
 Optional body, wrapped at 100 characters.
 ```
 
-The `Commit messages` check enforces this on every pull request. The contract:
+The `Commit messages` check enforces this on every pull request. A pre-push hook
+enforces it before that, on your machine. `.githooks/pre-push` lints the commits
+of the branch you are pushing, from where it left `main`, the same range the
+check lints, with `commitlint.config.mjs`, the file the check itself reads. It
+covers commits no commit hook sees, such as a merge made with `git merge -m`. It
+cannot see the pull request title, which the check also lints and a squash merge
+lands on `main`. `pnpm lint:commits` runs the same rules on demand.
+
+`pnpm install` turns the hook on: the `prepare` script points `core.hooksPath` at
+`.githooks`, which replaces any hooks path you set globally, for this repository
+only. It stays off under CI, and tags and notes refs pass it untouched, so the
+release job's own pushes never meet it. Without `node_modules` it refuses any
+push with commits to lint, and `SKIP_PREPUSH=1` skips it for one push. The contract:
 
 | Rule | |
 |---|---|
