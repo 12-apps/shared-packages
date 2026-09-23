@@ -5,6 +5,7 @@ import {
 } from './setup-guide-en-US';
 import type {
   InfinitePayCopy,
+  ItauCopy,
   PagbankCopy,
   ProviderCopyPacks,
   StoneCopy,
@@ -109,6 +110,20 @@ export const EN_US_STONE_COPY: StoneCopy = {
   payer: { boletoInstructions: 'Pay by the due date', statementDescriptor: 'ORDER' },
 };
 
+export const EN_US_ITAU_COPY: ItauCopy = {
+  unreachable: 'We could not reach Itaú just now. Your credentials were saved — test the connection again shortly.',
+  credentialsMissing: 'Itaú credentials not configured.',
+  refused: 'Credentials refused by Itaú.',
+  fields: {
+    clientId: 'Client ID',
+    clientSecret: 'Client Secret',
+    certificate: 'Certificate (.pem)',
+    pixKey: 'Pix key registered with Itaú',
+    webhookSecret: 'Webhook secret',
+  },
+  payer: { chargeDescription: 'ORDER' },
+};
+
 export const EN_US_PAGBANK_COPY: PagbankCopy = {
   unreachable:
     'We could not reach PagBank just now. ' +
@@ -150,4 +165,5 @@ export const EN_US_PROVIDER_COPY: ProviderCopyPacks = {
   stone: EN_US_STONE_COPY,
   infinitepay: EN_US_INFINITEPAY_COPY,
   stripe: EN_US_STRIPE_COPY,
+  itau: EN_US_ITAU_COPY,
 };
