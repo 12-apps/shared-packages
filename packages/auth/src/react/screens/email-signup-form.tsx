@@ -35,6 +35,9 @@ interface SignupState {
   name: string;
   email: string;
   password: string;
+  /** The password broke the rule its hint states, so the field and hint say so in red. */
+  passwordFailed: boolean;
+  leavePassword: () => void;
   pending: boolean;
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
@@ -63,6 +66,38 @@ export interface SignupConfig {
   renderActions?: (submit: ReactNode) => ReactNode;
 }
 
+/**
+ * The rule the sign-up hint states: at least 8 characters, a letter and a number.
+ *
+ * A mirror of `checkPasswordPolicy`'s defaults (`../../password.ts`), which the
+ * browser cannot import (it hashes with `node:crypto`). The server stays the
+ * judge: this only decides when the hint turns red before a submit, and the
+ * common-password list is caught by the server's refusal instead.
+ */
+function meetsPasswordHint(password: string): boolean {
+  return password.length >= 8 && /\p{L}/u.test(password) && /\d/u.test(password);
+}
+
+/**
+ * Whether the password has FAILED — refused by the server as weak, or left
+ * with a value that breaks the stated rule. Before either the hint stays in
+ * the secondary ink: a rule nobody has broken yet is not an error.
+ */
+function usePasswordFailure(password: string): {
+  failed: boolean;
+  leave: () => void;
+  refuse: (password: string) => void;
+} {
+  const [left, setLeft] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
+  const breaksHint = password !== "" && !meetsPasswordHint(password);
+  return {
+    failed: password === refused || (left && breaksHint),
+    leave: () => setLeft(true),
+    refuse: setRefused,
+  };
+}
+
 function useSignup(config: SignupConfig): SignupState {
   const { client } = useScreens();
   const { signInWithPassword } = useScreens().useSession();
@@ -73,6 +108,7 @@ function useSignup(config: SignupConfig): SignupState {
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
   const [sent, setSent] = useState(false);
+  const passwordCheck = usePasswordFailure(password);
 
   /** Register, then take whichever of the two paths the server reports. */
   async function register(): Promise<void> {
@@ -80,6 +116,7 @@ function useSignup(config: SignupConfig): SignupState {
     if (!result.ok) {
       setReason(result.reason);
       setViolations(result.violations ?? null);
+      if (result.reason === "weak-password") passwordCheck.refuse(password);
       return;
     }
     if (result.data.status === "verification-sent") {
@@ -121,6 +158,8 @@ function useSignup(config: SignupConfig): SignupState {
     name,
     email,
     password,
+    passwordFailed: passwordCheck.failed,
+    leavePassword: passwordCheck.leave,
     pending,
     reason,
     violations,
@@ -211,9 +250,15 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
         onChange={form.setPassword}
         autoComplete="new-password"
         dataTestId="signup-password"
+        error={form.passwordFailed}
+        onBlur={form.leavePassword}
       />
       <Spacer size="xs" />
-      <Text color="secondary" size="sm">
+      <Text
+        color={form.passwordFailed ? "danger" : "secondary"}
+        size="sm"
+        data-testid="signup-password-hint"
+      >
         {copy.signUp.passwordHint}
       </Text>
       {props.renderActions ? (
