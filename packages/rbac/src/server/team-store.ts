@@ -9,7 +9,24 @@ import {
   type RbacUserDirectory,
 } from './context';
 import { ownerRolesOf, type RbacActorTier } from './roster-policy';
-import { MEMBERSHIP_SELECT, ROLE_SELECT, type RbacDbClient, type RbacDbProvider } from './db';
+import {
+  MEMBERSHIP_SELECT,
+  type MembershipRow,
+  type RbacDbClient,
+  type RbacDbProvider,
+  type RoleRow,
+} from './db';
+import {
+  assertOwnershipMayMove,
+  holdsOwnerLink,
+  lockTenantOwnership,
+  readOwnership,
+} from './owner-guard';
+import {
+  grantCustomRoleToMember,
+  revokeCustomRoleFromMember,
+  swapPrimaryRoleLink,
+} from './team-links';
 import {
   extraRolesOf,
   getTenantMemberDetail,
@@ -44,13 +61,19 @@ export interface TeamStoreCtx {
 /**
  * The team roster's write and read paths.
  *
- * Every method that can REFUSE takes a trailing optional `locale` — the caller's
- * language, forwarded by whatever holds the request. It is last and optional
- * because it is not part of what the method DOES: omit it and the refusal takes
- * the default rendering of the host's `messages`, which is a single-audience
+ * Every method that can REFUSE takes an optional `locale` — the caller's
+ * language, forwarded by whatever holds the request. It is optional because it
+ * is not part of what the method DOES: omit it and the refusal takes the
+ * default rendering of the host's `messages`, which is a single-audience
  * host's whole behaviour. The reads that answer no sentence of their own
  * (`listTenantMemberExtraRoles`, `getMemberRole`) do not take one, because a
  * parameter they never read would be a claim they do something they do not.
+ *
+ * The two writes that can take ownership WITHOUT a removal, `setMemberRole`
+ * and `revokeCustomRoleFromMember`, take the caller after it, optional for the
+ * same reason: a host calling the store with nobody to name keeps the rule
+ * that somebody else must remain an owner, and skips the one about who may
+ * take it (`./owner-guard`).
  */
 export interface TeamStore {
   listTeamPage(
@@ -62,7 +85,14 @@ export interface TeamStore {
   listTenantMemberExtraRoles(tenantId: string): Promise<Map<string, string[]>>;
   /** The actor's own base role at the tenant, or null (not a member). */
   getMemberRole(tenantId: string, userId: string): Promise<string | null>;
-  setMemberRole(tenantId: string, userId: string, role: string, locale?: string): Promise<void>;
+  /** Resolves to the role the row holds after the write, read back (FUT-2441). */
+  setMemberRole(
+    tenantId: string,
+    userId: string,
+    role: string,
+    locale?: string,
+    actor?: RbacActorTier,
+  ): Promise<string>;
   grantCustomRoleToMember(
     tenantId: string,
     userId: string,
@@ -74,6 +104,7 @@ export interface TeamStore {
     userId: string,
     roleName: string,
     locale?: string,
+    actor?: RbacActorTier,
   ): Promise<void>;
   setMembershipActive(
     tenantId: string,
@@ -89,44 +120,6 @@ export interface TeamStore {
   ): Promise<void>;
 }
 
-/**
- * Move a membership's PRIMARY role link from `oldRoleName` to `newRoleName`
- * in the n:m join, PRESERVING every other role the member holds — only the
- * OUTGOING primary's own link is removed, so changing the primary can never
- * silently drop a separately-granted role.
- */
-async function swapPrimaryRoleLink(
-  tx: RbacDbClient,
-  membership: { id: string; clientId: string },
-  oldRoleName: string | null,
-  newRoleName: string,
-): Promise<void> {
-  if (oldRoleName && oldRoleName !== newRoleName) {
-    // `archivedAt: null` on both lookups, like every role read that grants:
-    // an archived outgoing primary has no live link worth unlinking, and an
-    // archived incoming name must never gain a fresh join row.
-    const old = await tx.role.findFirst({
-      where: { clientId: membership.clientId, name: oldRoleName, archivedAt: null },
-      select: ROLE_SELECT,
-    });
-    if (old) {
-      await tx.membershipRole.deleteMany({
-        where: { membershipId: membership.id, roleId: old.id },
-      });
-    }
-  }
-  const next = await tx.role.findFirst({
-    where: { clientId: membership.clientId, name: newRoleName, archivedAt: null },
-    select: ROLE_SELECT,
-  });
-  if (next) {
-    await tx.membershipRole.createMany({
-      data: [{ membershipId: membership.id, roleId: next.id }],
-      skipDuplicates: true,
-    });
-  }
-}
-
 async function membershipOf(db: RbacDbClient, tenantId: string, userId: string) {
   return db.membership.findUnique({
     where: { userId_clientId: { userId, clientId: tenantId } },
@@ -134,113 +127,91 @@ async function membershipOf(db: RbacDbClient, tenantId: string, userId: string) 
   });
 }
 
+/**
+ * Whether moving a base role from `from` to `to` takes an owner role away.
+ *
+ * A move between two owner roles keeps ownership only when `to` has a live row
+ * in the tenant to link: the swap unlinks `from` and links nothing otherwise
+ * (a platform-only owner role is never seeded per tenant). With no live owner
+ * row at all the column alone decides, and it still names an owner.
+ */
+function demotesOwner(
+  ctx: TeamStoreCtx,
+  move: { from: string; to: string },
+  ownerRows: readonly RoleRow[],
+): boolean {
+  if (!ctx.ownerRoles.has(move.from)) return false;
+  if (!ctx.ownerRoles.has(move.to)) return true;
+  return ownerRows.length > 0 && !ownerRows.some((row) => row.name === move.to);
+}
+
+/**
+ * The membership a base-role write starts from, read AFTER the ownership lock.
+ *
+ * Every PATCH locks, not only one whose target owns: a host may promote a
+ * member under the same lock (ADOPTING.md, rule 10), and a PATCH that read
+ * the member before that promotion committed would demote the new owner with
+ * no rule run. After the lock, the rules, what the swap unlinks and the
+ * audit's `before` all come from what the lock holder committed.
+ */
+async function roleSetTarget(
+  ctx: TeamStoreCtx,
+  tx: RbacDbClient,
+  target: { tenantId: string; userId: string; role: string },
+  actor: RbacActorTier | undefined,
+): Promise<MembershipRow> {
+  const { tenantId, userId, role } = target;
+  const ownerRows = await lockTenantOwnership(tx, tenantId, ctx.ownerRoles);
+  const existing = await membershipOf(tx, tenantId, userId);
+  if (!existing) throw new RbacApiError(404, ctx.messages.notAMember);
+  if (demotesOwner(ctx, { from: existing.role, to: role }, ownerRows)) {
+    const ownership = await readOwnership(tx, tenantId, ctx.ownerRoles, ownerRows);
+    assertOwnershipMayMove(ownership, userId, actor, ctx.ownerRoles, {
+      forbidden: ctx.messages.onlyOwnerDemotesOwner ?? ctx.messages.onlyOwnerRemovesOwner,
+      lastOwner: ctx.messages.lastOwner,
+    });
+  }
+  return existing;
+}
+
 async function setMemberRole(
   ctx: TeamStoreCtx,
-  tenantId: string,
-  userId: string,
-  role: string,
-): Promise<void> {
+  target: { tenantId: string; userId: string; role: string },
+  actor: RbacActorTier | undefined,
+): Promise<string> {
+  const { tenantId, userId, role } = target;
   const db = await ctx.db();
   // The read, the guards, the write and the join swap share ONE transaction
   // so a concurrent role change can't slip between them.
-  const previousRole = await db.$transaction(async (tx) => {
-    const existing = await tx.membership.findUnique({
-      where: { userId_clientId: { userId, clientId: tenantId } },
-      select: MEMBERSHIP_SELECT,
-    });
-    if (!existing) throw new RbacApiError(404, ctx.messages.notAMember);
+  const { previousRole, stored } = await db.$transaction(async (tx) => {
+    const existing = await roleSetTarget(ctx, tx, target, actor);
     // Captured BEFORE the write: the outgoing primary is what the join swap
     // must unlink, whatever the row object does afterwards.
     const outgoing = existing.role;
-    // Never demote the tenant's last OWNER.
-    if (ctx.ownerRoles.has(outgoing) && !ctx.ownerRoles.has(role)) {
-      const owners = await tx.membership.count({
-        where: { clientId: tenantId, role: { in: [...ctx.ownerRoles] } },
-      });
-      if (owners <= 1) throw new RbacApiError(409, ctx.messages.lastOwner);
-    }
     await tx.membership.update({
       where: { id: existing.id },
       data: { role },
       select: MEMBERSHIP_SELECT,
     });
     await swapPrimaryRoleLink(tx, { id: existing.id, clientId: tenantId }, outgoing, role);
-    return outgoing;
+    // Read back rather than echoed: a host that derives the column from the
+    // links stores something other than `role`, and the answer and the audit
+    // must say what the row holds (FUT-2441).
+    const after = await membershipOf(tx, tenantId, userId);
+    return { previousRole: outgoing, stored: after?.role ?? role };
   });
-  // A no-op re-set (same role) is not a grant worth an audit entry.
-  if (previousRole !== role) {
+  // A write that changed nothing is not a grant worth an audit entry.
+  if (previousRole !== stored) {
     await ctx.audit?.({
       clientId: tenantId,
       action: 'team.role_set',
       resourceType: 'membership',
       resourceId: userId,
       before: { role: previousRole },
-      after: { role },
+      after: { role: stored },
     });
   }
-}
-
-async function grantCustomRoleToMember(
-  ctx: TeamStoreCtx,
-  tenantId: string,
-  userId: string,
-  roleName: string,
-): Promise<void> {
-  const db = await ctx.db();
-  const isNewGrant = await db.$transaction(async (tx) => {
-    const member = await tx.membership.findUnique({
-      where: { userId_clientId: { userId, clientId: tenantId } },
-      select: MEMBERSHIP_SELECT,
-    });
-    if (!member) throw new RbacApiError(404, ctx.messages.notAMember);
-    // Only THIS tenant's own LIVE role — never a clientId-NULL template (404).
-    const role = await tx.role.findFirst({
-      where: { clientId: tenantId, name: roleName, archivedAt: null },
-      select: ROLE_SELECT,
-    });
-    if (!role) throw new RbacApiError(404, ctx.messages.roleNotFound);
-    // Newness from the link's own atomic affected-count (INSERT … ON CONFLICT
-    // DO NOTHING), so two concurrent first-grants can't both log.
-    const created = await tx.membershipRole.createMany({
-      data: [{ membershipId: member.id, roleId: role.id }],
-      skipDuplicates: true,
-    });
-    return created.count > 0;
-  });
-  if (isNewGrant) {
-    await ctx.audit?.({
-      clientId: tenantId,
-      action: 'team.role_grant',
-      resourceType: 'membership',
-      resourceId: userId,
-      after: { roleName },
-    });
-  }
-}
-
-async function revokeCustomRoleFromMember(
-  ctx: TeamStoreCtx,
-  tenantId: string,
-  userId: string,
-  roleName: string,
-): Promise<void> {
-  const db = await ctx.db();
-  const removed = await db.membershipRole.deleteMany({
-    where: {
-      membership: { userId, clientId: tenantId },
-      role: { clientId: tenantId, name: roleName },
-    },
-  });
-  // Only an ACTUAL revocation gets an entry — the idempotent no-op does not.
-  if (removed.count > 0) {
-    await ctx.audit?.({
-      clientId: tenantId,
-      action: 'team.role_revoke',
-      resourceType: 'membership',
-      resourceId: userId,
-      before: { roleName },
-    });
-  }
+  return stored;
 }
 
 async function setMembershipActive(
@@ -277,6 +248,34 @@ async function setMembershipActive(
   }
 }
 
+/**
+ * The member a removal deletes, judged inside its transaction and after the
+ * ownership lock, for every removal, for the reason {@link roleSetTarget}
+ * gives. Only an owner removes an owner, or the host's platform operator,
+ * recognised by the DISCRIMINATOR and never by a role name; and never the
+ * last owner who counts. The target takes ownership when its column names an
+ * owner role or it holds a live owner link (a transfer's residue).
+ */
+async function removalTarget(
+  ctx: TeamStoreCtx,
+  tx: RbacDbClient,
+  target: { tenantId: string; userId: string },
+  actor: RbacActorTier,
+): Promise<MembershipRow> {
+  const { tenantId, userId } = target;
+  const ownerRows = await lockTenantOwnership(tx, tenantId, ctx.ownerRoles);
+  const member = await membershipOf(tx, tenantId, userId);
+  if (!member) throw new RbacApiError(404, ctx.messages.notAMember);
+  const ownership = await readOwnership(tx, tenantId, ctx.ownerRoles, ownerRows);
+  if (ctx.ownerRoles.has(member.role) || holdsOwnerLink(ownership, userId)) {
+    assertOwnershipMayMove(ownership, userId, actor, ctx.ownerRoles, {
+      forbidden: ctx.messages.onlyOwnerRemovesOwner,
+      lastOwner: ctx.messages.lastOwner,
+    });
+  }
+  return member;
+}
+
 async function removeTenantMemberGuarded(
   ctx: TeamStoreCtx,
   tenantId: string,
@@ -284,30 +283,16 @@ async function removeTenantMemberGuarded(
   actor: RbacActorTier,
 ): Promise<void> {
   const db = await ctx.db();
-  const target = await membershipOf(db, tenantId, userId);
-  if (!target) throw new RbacApiError(404, ctx.messages.notAMember);
-
-  if (ctx.ownerRoles.has(target.role)) {
-    // Only an owner removes an owner — or the host's platform operator, who is
-    // recognized by the DISCRIMINATOR and never by a role name. Comparing
-    // against the literal `'SUPERADMIN'` here read a host's own vocabulary as
-    // a platform grant.
-    const actorIsOwner = actor.role !== null && ctx.ownerRoles.has(actor.role);
-    if (!actorIsOwner && !actor.isPlatformActor) {
-      throw new RbacApiError(403, ctx.messages.onlyOwnerRemovesOwner);
-    }
-    const owners = await db.membership.count({
-      where: { clientId: tenantId, role: { in: [...ctx.ownerRoles] } },
-    });
-    if (owners <= 1) throw new RbacApiError(409, ctx.messages.lastOwner);
-  }
-
-  await db.$transaction(async (tx) => {
+  // The target read, the rules and both deletes share ONE transaction, so
+  // what was judged is what is deleted.
+  const target = await db.$transaction(async (tx) => {
+    const removed = await removalTarget(ctx, tx, { tenantId, userId }, actor);
     await tx.membership.deleteMany({ where: { userId, clientId: tenantId } });
     // Clears the member's tenant-scoped grants in the SAME transaction, so a
     // removed member leaves nothing that silently re-activates on a later
     // re-invite.
     await tx.roleAssignment.deleteMany({ where: { userId, scope: tenantId } });
+    return removed;
   });
   await ctx.audit?.({
     clientId: tenantId,
@@ -370,12 +355,12 @@ export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): T
       if (!row || !row.active) return null;
       return row.role;
     },
-    setMemberRole: (tenantId, userId, role, locale) =>
-      setMemberRole(ctxFor(locale), tenantId, userId, role),
+    setMemberRole: (tenantId, userId, role, locale, actor) =>
+      setMemberRole(ctxFor(locale), { tenantId, userId, role }, actor),
     grantCustomRoleToMember: (tenantId, userId, roleName, locale) =>
       grantCustomRoleToMember(ctxFor(locale), tenantId, userId, roleName),
-    revokeCustomRoleFromMember: (tenantId, userId, roleName, locale) =>
-      revokeCustomRoleFromMember(ctxFor(locale), tenantId, userId, roleName),
+    revokeCustomRoleFromMember: (tenantId, userId, roleName, locale, actor) =>
+      revokeCustomRoleFromMember(ctxFor(locale), tenantId, userId, roleName, actor),
     setMembershipActive: (tenantId, userId, active, locale) =>
       setMembershipActive(ctxFor(locale), tenantId, userId, active),
     removeTenantMemberGuarded: (tenantId, userId, actor, locale) =>
