@@ -71,6 +71,18 @@ export function socketUrlWithTicket(base: string, ticket: string): string {
 /** `WebSocket.OPEN`, named so this module reads without the magic number. */
 const WS_OPEN = 1;
 
+/**
+ * The `WebSocket` constructor to build with — the host's, or the global.
+ *
+ * `undefined` means this runtime has none, which is a real answer rather than
+ * an error: the channel's "no transport here" path takes over and the stream
+ * carries the subscription.
+ */
+function socketImpl(transport: RealtimeTransportConfig | undefined): typeof WebSocket | undefined {
+  if (transport?.webSocket !== undefined) return transport.webSocket;
+  return typeof WebSocket === "undefined" ? undefined : WebSocket;
+}
+
 /** The ticket endpoint's response envelope (the `{ data }` success wrapper). */
 interface TicketResponse {
   data?: { ticket?: string };
@@ -148,7 +160,12 @@ class WebSocketWireSource implements WireSource {
     if (this.closed) return;
 
     try {
-      const socket = new WebSocket(socketUrlWithTicket(socketBase(this.transport), ticket));
+      const Impl = socketImpl(this.transport);
+      if (Impl === undefined) {
+        this.fail(new Error("no WebSocket implementation in this runtime"));
+        return;
+      }
+      const socket = new Impl(socketUrlWithTicket(socketBase(this.transport), ticket));
       this.socket = socket;
       socket.onopen = (event) => {
         if (!this.closed) this.onopen?.(event);
@@ -203,8 +220,18 @@ export function createWebSocketSource(
   subscribeUrl: string,
   transport?: RealtimeTransportConfig,
 ): WireSource | null {
-  // `location` rather than `window`: true in a page AND in a worker, false under SSR
-  // — see `defaultSocketUrl` for why the difference matters.
-  if (typeof WebSocket === "undefined" || typeof location === "undefined") return null;
+  if (socketImpl(transport) === undefined) return null;
+  // `location` is needed to DERIVE the endpoint and for nothing else, so it is
+  // required only when the host has not named one. `location` rather than
+  // `window`: true in a page AND in a worker, false under SSR — see
+  // `defaultSocketUrl` for why that difference matters.
+  //
+  // The separation is what lets a runtime with no DOM take the socket. Node has
+  // had a global `WebSocket` since 21 and has never had `location`, so the
+  // combined check refused a connection that would have worked, and every
+  // non-browser consumer silently ran on the SSE demotion instead — which reads
+  // as "realtime is on" while costing a round trip per reconnect and the
+  // gateway's client→server half entirely.
+  if (transport?.socketUrl === undefined && typeof location === "undefined") return null;
   return new WebSocketWireSource(subscribeUrl, transport);
 }
