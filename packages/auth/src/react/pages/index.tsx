@@ -1,6 +1,6 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
-import { AuthCard, AuthFooter, ProviderBlock, type AuthLink } from "./card";
+import { AuthCard, AuthFooter, ProviderBlock, SignupActions, type AuthLink } from "./card";
 import type { EmailAuthScreens } from "../screens";
 
 /**
@@ -147,14 +147,21 @@ export interface SignupPageProps {
   /** Disable the form while the host's own gate is unsatisfied. */
   disabled?: boolean;
   emailEnabled: boolean;
+  /**
+   * The host's provider buttons. With the e-mail form they render UNDER its
+   * submit, after the divider, inside the pinned action block; without it,
+   * under the gate.
+   */
   providers?: ReactNode;
   branding?: ReactNode;
   notice?: ReactNode;
   /**
    * Gate the whole page behind the host's own terms acceptance.
    *
-   * Rendered above the form; while `accepted` is false the providers are the
-   * host's to disable — this package does not reach into a node it was handed.
+   * Rendered directly above what it enables: the form's submit when e-mail is
+   * on, the provider buttons when it is off. While it is unsatisfied the
+   * providers are the host's to disable — this package does not reach into a
+   * node it was handed.
    */
   termsGate?: ReactNode;
 }
@@ -212,6 +219,22 @@ function LoginView({
   );
 }
 
+/** The terms gate's test hook, on the one block it is rendered as. */
+export const TERMS_GATE_TEST_ID = "signup-terms-gate";
+
+/**
+ * The host's terms gate as ONE block of whichever column it lands in.
+ *
+ * Both columns it can land in space their children with a `gap` (see
+ * `./card`), and a gate handed over as a fragment — a checkbox, a hint, a
+ * spacer — would take that gap between each of its own parts. Wrapped, it takes
+ * the gap once. An absent gate renders nothing, so it leaves no gap either.
+ */
+function TermsGateBlock({ gate }: { gate: ReactNode }): JSX.Element | null {
+  if (gate === undefined || gate === null || gate === false) return null;
+  return <div data-testid={TERMS_GATE_TEST_ID}>{gate}</div>;
+}
+
 function SignupView({
   cfg,
   callbackUrl,
@@ -226,6 +249,7 @@ function SignupView({
 }: SignupPageProps & { cfg: ResolvedPagesConfig }): JSX.Element {
   const { screens, copy, routes, Link, maxWidth } = cfg;
   const { EmailSignupForm } = screens;
+  const gate = <TermsGateBlock gate={termsGate} />;
   return (
     <AuthCard
       title={copy.signup.title}
@@ -234,17 +258,33 @@ function SignupView({
       maxWidth={maxWidth}
     >
       {notice}
-      {termsGate}
-      <ProviderBlock label={emailEnabled ? copy.signup.providerDivider : undefined}>
-        {providers}
-      </ProviderBlock>
-      {emailEnabled && (
+      {/*
+        With the form, the gate and the providers go DOWN to its submit, as one
+        pinned block — `SignupActions` says why. Without it there is nothing to
+        come down to: the gate sits over the buttons it enables, and the card is
+        short enough that nothing needs pinning.
+      */}
+      {emailEnabled ? (
         <EmailSignupForm
           callbackUrl={callbackUrl}
           onBeforeSubmit={onBeforeSubmit}
           onSignedIn={onSignedIn}
           disabled={disabled}
+          renderActions={(submit) => (
+            <SignupActions>
+              {gate}
+              {submit}
+              <ProviderBlock label={copy.signup.providerDivider} dividerFirst>
+                {providers}
+              </ProviderBlock>
+            </SignupActions>
+          )}
         />
+      ) : (
+        <>
+          {gate}
+          <ProviderBlock>{providers}</ProviderBlock>
+        </>
       )}
       {Link !== undefined && (
         <AuthFooter

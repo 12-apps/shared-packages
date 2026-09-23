@@ -1,10 +1,10 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createAuthPages, type AuthLink } from "../index";
-import { PROVIDER_DIVIDER_TEST_ID } from "../card";
+import { createAuthPages, TERMS_GATE_TEST_ID, type AuthLink } from "../index";
+import { PROVIDER_DIVIDER_TEST_ID, SIGNUP_ACTIONS_TEST_ID } from "../card";
 import { PT_BR_PAGES } from "../pt-BR";
 import type { EmailAuthScreens } from "../../screens";
 
@@ -21,10 +21,28 @@ const Stub = (name: string): ComponentType<Record<string, unknown>> =>
     return <div data-testid={name} />;
   };
 
+/**
+ * The sign-up form, stubbed down to the one thing the page hands it: where its
+ * submit goes. The gate and the providers render THROUGH it when e-mail is on,
+ * so a stub that dropped `renderActions` would drop them too.
+ */
+function SignupFormStub({
+  renderActions,
+}: {
+  renderActions?: (submit: ReactNode) => ReactNode;
+}): JSX.Element {
+  const submit = (
+    <button type="submit" data-testid="signup-submit">
+      Criar conta
+    </button>
+  );
+  return <form data-testid="email-signup-form">{renderActions ? renderActions(submit) : submit}</form>;
+}
+
 function screensStub(): EmailAuthScreens {
   return {
     EmailPasswordForm: Stub("email-password-form"),
-    EmailSignupForm: Stub("email-signup-form"),
+    EmailSignupForm: SignupFormStub,
     ForgotPasswordScreen: Stub("forgot"),
     ResetPasswordScreen: Stub("reset"),
     VerifyEmailScreen: Stub("verify"),
@@ -219,6 +237,164 @@ describe("SignupPage", () => {
 
     expect(screen.getByRole("button", { name: /continue with google/i })).toBeTruthy();
     expect(container.innerHTML).not.toContain(PROVIDER_DIVIDER_TEST_ID);
+  });
+});
+
+/** Where each marked node sits in document order, by test id or by its words. */
+interface Positions {
+  gate: number;
+  submit: number;
+  divider: number;
+  provider: number;
+}
+
+function positions(container: HTMLElement): Positions {
+  const order = [...container.querySelectorAll("button, [data-testid]")];
+  const at = (match: (node: Element) => boolean): number => order.findIndex(match);
+  const byId = (id: string) => (node: Element) => node.getAttribute("data-testid") === id;
+  return {
+    gate: at(byId(TERMS_GATE_TEST_ID)),
+    submit: at(byId("signup-submit")),
+    divider: at(byId(PROVIDER_DIVIDER_TEST_ID)),
+    provider: at((node) => node.tagName === "BUTTON" && /google/i.test(node.textContent ?? "")),
+  };
+}
+
+const google = <button type="button">Continue with Google</button>;
+
+describe("SignupPage — the gate sits beside what it enables", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("puts the gate directly above the submit, and the providers under it past the divider", () => {
+    // The gate enables BOTH the submit and the providers. It used to sit at the
+    // top of the card with the submit at the bottom, a screen apart on a phone,
+    // so the order is the thing this page now exists to hold.
+    const { SignupPage } = pages();
+    const { container } = render(
+      <SignupPage {...signupProps} termsGate={<label>Aceito os termos</label>} providers={google} />,
+    );
+
+    const at = positions(container);
+    expect(at.gate).toBeGreaterThanOrEqual(0);
+    expect(at.submit).toBe(at.gate + 1);
+    expect(at.divider).toBeGreaterThan(at.submit);
+    expect(at.provider).toBeGreaterThan(at.divider);
+  });
+
+  it("keeps the gate, the submit and the providers in ONE block", () => {
+    const { SignupPage } = pages();
+    render(
+      <SignupPage {...signupProps} termsGate={<label>Aceito os termos</label>} providers={google} />,
+    );
+
+    const block = screen.getByTestId(SIGNUP_ACTIONS_TEST_ID);
+    expect(block.contains(screen.getByText("Aceito os termos"))).toBe(true);
+    expect(block.contains(screen.getByTestId("signup-submit"))).toBe(true);
+    expect(block.contains(screen.getByRole("button", { name: /continue with google/i }))).toBe(true);
+  });
+
+  it("pins that block to the bottom of the window, and lets the card allow it", () => {
+    // Sticky rather than fixed: it rides the window's lower edge only while the
+    // form is taller than the window, and sits in its own place otherwise. A
+    // card that clipped (MUI's default) would be the scroll container it stuck
+    // to — one that never scrolls.
+    const { SignupPage } = pages();
+    const { container } = render(<SignupPage {...signupProps} providers={google} />);
+
+    const block = getComputedStyle(screen.getByTestId(SIGNUP_ACTIONS_TEST_ID));
+    expect(block.position).toBe("sticky");
+    expect(block.bottom).toBe("-1px");
+    const card = container.querySelector(".MuiPaper-root");
+    expect(card).toBeTruthy();
+    expect(getComputedStyle(card as Element).overflow).toBe("visible");
+  });
+
+  it("says it is pinned only while it hangs below the window", () => {
+    // A plain function, not an arrow: the page calls it with `new`.
+    const Observer = vi.fn(function observer(
+      _report: (entries: Partial<IntersectionObserverEntry>[]) => void,
+    ) {
+      return { observe: vi.fn(), disconnect: vi.fn() };
+    });
+    vi.stubGlobal("IntersectionObserver", Observer);
+    const { SignupPage } = pages();
+    render(<SignupPage {...signupProps} providers={google} />);
+    const block = screen.getByTestId(SIGNUP_ACTIONS_TEST_ID);
+    const report = (entry: Partial<IntersectionObserverEntry>): void =>
+      Observer.mock.calls[0]?.[0]([entry]);
+    const floor = { bottom: 640 } as DOMRectReadOnly;
+
+    act(() => report({ intersectionRatio: 0.99, boundingClientRect: { bottom: 641 } as DOMRectReadOnly, rootBounds: floor }));
+    expect(block.getAttribute("data-pinned")).toBe("true");
+
+    act(() => report({ intersectionRatio: 1, boundingClientRect: { bottom: 600 } as DOMRectReadOnly, rootBounds: floor }));
+    expect(block.getAttribute("data-pinned")).toBe("false");
+
+    // Scrolled PAST: clipped at the top of the window, pinned to nothing.
+    act(() => report({ intersectionRatio: 0.5, boundingClientRect: { bottom: 40 } as DOMRectReadOnly, rootBounds: floor }));
+    expect(block.getAttribute("data-pinned")).toBe("false");
+  });
+
+  it("takes a gate handed over as a fragment as one block, not one per part", () => {
+    const { SignupPage } = pages();
+    render(
+      <SignupPage
+        {...signupProps}
+        termsGate={
+          <>
+            <label>Aceito os termos</label>
+            <p>Aceite para continuar.</p>
+          </>
+        }
+      />,
+    );
+
+    const gate = screen.getByTestId(TERMS_GATE_TEST_ID);
+    expect(gate.contains(screen.getByText("Aceito os termos"))).toBe(true);
+    expect(gate.contains(screen.getByText("Aceite para continuar."))).toBe(true);
+  });
+
+  it("with e-mail off, keeps the gate directly above the providers and pins nothing", () => {
+    const { SignupPage } = pages();
+    const { container } = render(
+      <SignupPage
+        {...signupProps}
+        emailEnabled={false}
+        termsGate={<label>Aceito os termos</label>}
+        providers={google}
+      />,
+    );
+
+    const at = positions(container);
+    expect(at.provider).toBe(at.gate + 1);
+    expect(container.innerHTML).not.toContain(SIGNUP_ACTIONS_TEST_ID);
+  });
+});
+
+describe("SignupPage — a focused field is never left under the pinned block", () => {
+  // Focus scrolling treats a field under a sticky block as "in view" and leaves
+  // it there; the page's scroll padding is what tells it otherwise (WCAG
+  // 2.4.11). Whatever the host had there before must come back.
+  beforeEach(() => {
+    document.documentElement.style.setProperty("scroll-padding-bottom", "7px");
+  });
+
+  afterEach(() => {
+    document.documentElement.style.removeProperty("scroll-padding-bottom");
+  });
+
+  it("reserves its height as the page's scroll padding while mounted, and puts it back", () => {
+    const { SignupPage } = pages();
+    const { unmount } = render(<SignupPage {...signupProps} providers={google} />);
+
+    const reserved = getComputedStyle(document.documentElement).scrollPaddingBottom;
+    expect(reserved).toMatch(/^\d+px$/);
+    expect(reserved).not.toBe("7px");
+
+    unmount();
+    expect(getComputedStyle(document.documentElement).scrollPaddingBottom).toBe("7px");
   });
 });
 

@@ -23,10 +23,28 @@ const Stub = (name: string): ComponentType<Record<string, unknown>> =>
     return <div data-testid={name} />;
   };
 
+/**
+ * The sign-up form, stubbed down to the one thing the page hands it: where its
+ * submit goes. The gate and the providers render THROUGH it when e-mail is on,
+ * so a stub that dropped `renderActions` would drop them too.
+ */
+function SignupFormStub({
+  renderActions,
+}: {
+  renderActions?: (submit: ReactNode) => ReactNode;
+}): JSX.Element {
+  const submit = (
+    <button type="submit" data-testid="signup-submit">
+      Criar conta
+    </button>
+  );
+  return <form data-testid="email-signup-form">{renderActions ? renderActions(submit) : submit}</form>;
+}
+
 function screensStub(): EmailAuthScreens {
   return {
     EmailPasswordForm: Stub("email-password-form"),
-    EmailSignupForm: Stub("email-signup-form"),
+    EmailSignupForm: SignupFormStub,
     ForgotPasswordScreen: Stub("forgot"),
     ResetPasswordScreen: Stub("reset"),
     VerifyEmailScreen: Stub("verify"),
@@ -146,6 +164,45 @@ describe("createAuthRoutes — the redirect and the settings read", () => {
     render(<LoginRoute />);
     expect(await screen.findByTestId("providers")).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId("email-password-form")).toBeNull());
+  });
+});
+
+describe("createAuthRoutes — the sign-up page waits for the settings", () => {
+  it("holds its spinner until the answer, so nothing moves after it paints", async () => {
+    // With e-mail on, the gate and the providers render under the form's
+    // submit; with it off, at the top. Painting the "off" layout while the
+    // read is in flight would move the Google button a moment later.
+    const { config } = harness({
+      renderProviders: () => (
+        <button type="button" data-testid="google">
+          google
+        </button>
+      ),
+    });
+    const { SignupRoute } = createAuthRoutes(config);
+    const { container } = render(<SignupRoute />);
+
+    // The first paint, before the settings promise has settled.
+    expect(screen.getByTestId("signup-loading")).toBeTruthy();
+    expect(container.innerHTML).not.toContain('data-testid="google"');
+
+    const google = await screen.findByTestId("google");
+    expect(screen.getByTestId("signup-actions").contains(google)).toBe(true);
+  });
+
+  it("does not hold the login page: its providers are usable while the read is in flight", () => {
+    const { config } = harness({
+      getSettings: () => new Promise(() => {}),
+      renderProviders: () => (
+        <button type="button" data-testid="google">
+          google
+        </button>
+      ),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+
+    expect(screen.getByTestId("google")).toBeTruthy();
   });
 });
 

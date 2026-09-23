@@ -155,9 +155,18 @@ export interface AuthRouteComponents {
   pages: AuthPages;
 }
 
-/** Ask the server whether e-mail sign-in is offered. */
-function useEmailEnabled(getSettings: () => Promise<EmailAuthSettings>): boolean {
-  const [enabled, setEnabled] = useState(false);
+/**
+ * Ask the server whether e-mail sign-in is offered — `null` until it answers.
+ *
+ * The two routes read the wait differently. Login treats it as "off": its
+ * providers sit above the form either way, so they are usable while the answer
+ * is in flight and the form simply arrives under them. Sign-up cannot, because
+ * the answer MOVES things there — with the form, the gate and the providers go
+ * down to its submit — and a Google button that jumped to the bottom of the
+ * card a moment after the page painted is one a thumb was already reaching for.
+ */
+function useEmailEnabled(getSettings: () => Promise<EmailAuthSettings>): boolean | null {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     let live = true;
     void getSettings()
@@ -260,7 +269,7 @@ interface RouteViewProps {
 function LoginView({ config, pages }: RouteViewProps): JSX.Element {
   const state = useRouteState(config);
   const navigate = config.useNavigate();
-  const emailEnabled = useEmailEnabled(config.getSettings);
+  const emailEnabled = useEmailEnabled(config.getSettings) ?? false;
   const denied = config.renderDenied?.();
 
   if (denied !== undefined && denied !== null) return <>{denied}</>;
@@ -290,7 +299,11 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
   const [satisfied, setSatisfied] = useState(gate === undefined);
   const [gateFailed, setGateFailed] = useState(false);
 
-  if (state.status === "loading" || state.status === "authenticated") {
+  if (
+    state.status === "loading" ||
+    state.status === "authenticated" ||
+    emailEnabled === null
+  ) {
     return <RouteSpinner testId="signup-loading" />;
   }
 
