@@ -1,5 +1,5 @@
 import type { Result } from "../../result";
-import { withLive, type LiveCadence } from "./poll-live";
+import { waitsForDeadline, withLive, type LiveCadence } from "./poll-live";
 import { claimRearm } from "./poll-rearm";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 
@@ -282,7 +282,8 @@ async function askOnce(
 
 /** Whether sleeping `delay` would carry the wait past its wall-clock bound. */
 function outOfTime(run: PollRun, options: PollingOptions, delay: number): boolean {
-  return options.maxWaitMs !== undefined && Date.now() - run.startedAt + delay >= options.maxWaitMs;
+  if (options.maxWaitMs === undefined || waitsForDeadline(options)) return false;
+  return Date.now() - run.startedAt + delay >= options.maxWaitMs;
 }
 
 /**
@@ -363,9 +364,8 @@ export function createPollLoop(
     restart: (): void => {
       if (run.cancelled || run.settled) return;
       clearPending(run);
-      // Same reasoning as `poke`, and this one is the buyer pressing a button:
-      // "Verificar de novo" that cleared the panel and sent nothing — because
-      // an ask was still notionally in flight — is the exact complaint.
+      // Same reasoning as `poke`, and this one is the buyer pressing a button: "Verificar
+      // de novo" that cleared the panel and sent nothing (an ask was in flight) is the complaint.
       run.attempt += 1;
       run.inFlight = false;
       run.stopped = false;

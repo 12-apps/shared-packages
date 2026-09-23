@@ -202,6 +202,38 @@ describe("the payment wait and the host's channel", () => {
     expect(calls()).toBe(3);
   });
 
+  it("stays open to its last second while live, so a late hint still lands", async () => {
+    // Ending a sleep early when it would cross the deadline is right with no
+    // channel. Live, it handed a 90 s wait over at 75 s and refused the hint
+    // that arrived at 80 s.
+    const { client, answerWith } = countingClient();
+    const { subscribe, hint } = channel();
+    const view = render(
+      <Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={90_000} />,
+    );
+    await elapse(80_000);
+    expect(view.container.querySelector("output")?.getAttribute("data-timed-out")).toBe("false");
+    answerWith(PAID);
+
+    await deliver(hint);
+
+    expect(view.container.querySelector("output")?.getAttribute("data-status")).toBe("PAID");
+  });
+
+  it("still times out at the wall clock while live", async () => {
+    const { client } = countingClient();
+    const { subscribe } = channel();
+    const view = render(
+      <Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={90_000} />,
+    );
+    await elapse(89_000);
+    expect(view.container.querySelector("output")?.getAttribute("data-timed-out")).toBe("false");
+
+    await elapse(1_000);
+
+    expect(view.container.querySelector("output")?.getAttribute("data-timed-out")).toBe("true");
+  });
+
   it("keeps the wall clock across a flapping channel", async () => {
     const { client } = countingClient();
     const { subscribe } = channel();

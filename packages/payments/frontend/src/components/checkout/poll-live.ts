@@ -32,3 +32,15 @@ export function withLive(delay: number, options: LiveCadence): number {
   if (options.liveIntervalMs === undefined || options.isLive?.() !== true) return delay;
   return Math.max(delay, options.liveIntervalMs);
 }
+
+/**
+ * Whether the wait must stay open until its wall clock actually strikes.
+ *
+ * The loop normally ends one sleep EARLY when that sleep would cross
+ * `maxWaitMs` — nothing could land in it. While live, something can: the hint.
+ * Ending early there would hand a 90 s card wait over at 75 s and then refuse
+ * the hint that arrives at 80 s, so the armed deadline ends it instead.
+ */
+export function waitsForDeadline(options: LiveCadence): boolean {
+  return options.isLive?.() === true;
+}
