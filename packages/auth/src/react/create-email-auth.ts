@@ -89,20 +89,31 @@ export interface EmailAuth {
   getSecurity(): Promise<EmailAuthClientResult<AccountSecurityData>>;
 }
 
-/** The refusal vocabulary, as strings, for narrowing an untrusted body. */
-const FAILURES: readonly string[] = [
-  "method-disabled",
-  "invalid-email",
-  "weak-password",
-  "email-taken",
-  "invalid-credentials",
-  "email-not-verified",
-  "token-invalid",
-  "rate-limited",
-  "current-password-required",
-  "current-password-invalid",
-  "no-account",
-];
+/**
+ * The refusal vocabulary, as strings, for narrowing an untrusted body.
+ *
+ * Keyed by {@link EmailAuthFailure} rather than listed, so a code the type
+ * gains is a compile error here until it is added. The hand-kept list this
+ * replaced had already missed one: `verification-unavailable` — the 503 a
+ * sign-up gets when verification is required and no mail can be sent — was
+ * narrowed to `unknown`, so the screen threw away the sentence written for it
+ * and told the person to "try again", which fails every time.
+ */
+const FAILURE_CODES: Record<EmailAuthFailure, true> = {
+  "method-disabled": true,
+  "invalid-email": true,
+  "weak-password": true,
+  "email-taken": true,
+  "invalid-credentials": true,
+  "email-not-verified": true,
+  "token-invalid": true,
+  "rate-limited": true,
+  "current-password-required": true,
+  "current-password-invalid": true,
+  "no-account": true,
+  "verification-unavailable": true,
+};
+const FAILURES: readonly string[] = Object.keys(FAILURE_CODES);
 
 interface ErrorBody {
   error?: unknown;
