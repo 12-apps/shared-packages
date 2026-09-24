@@ -27,6 +27,26 @@ export interface AppShellMessages {
   /** Route error boundary. */
   routeErrorTitle: string;
   routeErrorRetry: string;
+  /**
+   * The crashed-page screen when the page is merely from an OLDER BUILD — a
+   * chunk the last deploy removed, which the one recovery reload did not get
+   * past. OPTIONAL, and whole when present: three sentences or none.
+   *
+   * Optional because it refines `routeError*` rather than adding a surface: a
+   * host without it still has a complete screen (the generic title and the raw
+   * message). Whole because the object is the unit — a title in the host's
+   * words above a body in nobody's is the partial default this interface
+   * exists to rule out.
+   *
+   * Say what happened and what the button does ("there is a new version —
+   * reload"). The raw chunk URL reaches the reporter either way; the reader has
+   * no use for it.
+   */
+  routeUpdate?: {
+    title: string;
+    body: string;
+    retry: string;
+  };
   /** The consent gate. */
   consentTitle: string;
   consentBody: string;

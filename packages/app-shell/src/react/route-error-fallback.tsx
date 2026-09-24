@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 
+import { isChunkLoadError, reloadOntoCurrentBuild } from '../core/chunk-recovery';
 import type { AppShellCopySource } from '../core/copy';
 
 import {
@@ -23,6 +24,19 @@ import {
  * The message is usually the only actionable thing there is (a chunk name, a
  * failed field), and hiding it behind "algo deu errado" is how a support call
  * starts with nothing to go on.
+ *
+ * ## Except when the page is simply from an older build
+ *
+ * A chunk that stopped existing at a deploy is not a bug the reader can report
+ * or act on — "Failed to fetch dynamically imported module: /assets/menu-Ab12.js"
+ * is noise to a shopper, and the reporter already has it. What IS actionable is
+ * "there is a newer version, load it". So a stale chunk renders the host's
+ * {@link AppShellMessages.routeUpdate} screen when the host wrote one, and its
+ * button loads the page again past every cache ({@link reloadOntoCurrentBuild}),
+ * not the plain reload the recovery already tried and the stale document won.
+ *
+ * A host that has not written `routeUpdate` keeps the generic screen with the
+ * raw message, as before — only the button's reload changes for it.
  */
 function errorStateFallback({
   error,
@@ -33,6 +47,21 @@ function errorStateFallback({
   reload: () => void;
   messages: AppShellMessages;
 }): JSX.Element {
+  if (isChunkLoadError(error)) {
+    const update = messages.routeUpdate;
+    return (
+      <ErrorState
+        title={update?.title ?? messages.routeErrorTitle}
+        message={update?.body ?? error.message}
+        retryLabel={update?.retry ?? messages.routeErrorRetry}
+        onRetry={reloadOntoCurrentBuild}
+        // Not an error the reader caused or can fix beyond one tap — the amber
+        // notice rather than the red failure, once the host has said so in words.
+        severity={update ? 'warning' : 'error'}
+        dataTestId="route-error"
+      />
+    );
+  }
   return (
     <ErrorState
       title={messages.routeErrorTitle}
