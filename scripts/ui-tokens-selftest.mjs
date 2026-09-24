@@ -91,6 +91,7 @@ const d = (theme) => ({ width: '100%', maxWidth: rem(theme, theme.breakpoints.va
 const e = <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" /></svg>;
 const f = { color: 'inherit', background: 'transparent', lineHeight: 1.5, zIndex: 10, opacity: 0.5 };
 const hair = (divider) => <Box sx={{ borderBottom: divider ? 1 : 0 }} />;
+const glow = { boxShadow: '0 0 0 0 rgba(var(--glow-color), 0.4)' };
 const g = { margin: 0, top: 0, flex: 1, borderWidth: 1, border: '1px solid transparent', outline: '1px dashed transparent' };
 const i = <Grid size={6}><CircularProgress thickness={4} /><Box width={1} height={0.5} /></Grid>;
 const HOVER_OFFSET_MS = 300;

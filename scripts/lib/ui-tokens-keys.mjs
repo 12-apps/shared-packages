@@ -10,7 +10,8 @@ export const NAMED_COLORS = new Set([
 ]);
 export const COLOR_KEY = /(color|colour|background|^bg$|bgcolor|fill|stroke|border|outline|shadow|caret|accent)/i;
 export const HEX = /(^|[^\w&])#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})(?![\w-])/;
-export const COLOR_FN = /\b(?:rgba?|hsla?)\(/;
+/** `rgb[a]()`/`hsl[a]()` with literal channels — not `rgba(var(--glow-color), 0.3)`, whose channels are the theme's. */
+export const COLOR_FN = /\b(?:rgba?|hsla?)\((?!\s*var\()/;
 /** `sx`'s palette strings: `bgcolor: 'grey.100'`, `color: 'common.white'`. */
 export const RAMP_STRING = /^(grey|common)\.\w+$/;
 export const LENGTH = /(^|[^\w.$#-])(-?\d*\.?\d+)(px|rem|pt)\b/g;
