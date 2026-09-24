@@ -72,6 +72,7 @@ const LABEL = "[ui-tokens]";
 export const LEDGER_PATH = ".ui-tokens-exceptions.json";
 const SCANNER_FILES = [
   "scripts/ui-tokens-gate.mjs", "scripts/lib/ui-tokens-scan.mjs", "scripts/lib/ui-tokens-keys.mjs", "scripts/lib/ui-tokens-collect.mjs",
+  "scripts/lib/ui-tokens-relative.mjs",
 ];
 const DEFAULT_REASON = "grandfathered: raw value that predates the gate (FUT-2585)";
 

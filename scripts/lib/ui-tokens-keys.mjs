@@ -45,5 +45,4 @@ export const COLUMN_SIZED_TAGS = /^(Grid|Grid2|MuiGrid)$/;
 /** The vocabulary: a call to one of these IS theme-relative. */
 export const VOCAB_CALL = /^(rem|rems|sxRem|remPx|fieldHeight|fieldHeightPx|fieldHeightRem|fieldRadius|fieldRadiusPx|pxToRem|spacing)$/;
 export const THEME_RELATIVE_MEMBER = /^(theme|t)\.(shape\.borderRadius|spacing)\b/;
-/** Already right in px: the vocabulary's own `remPx(…)`, or the named hairline. */
-export const PX_SAFE_EXPR = /\b(remPx|fieldHeightPx)\s*\(|\b[A-Z_]*(BORDER_WIDTH|HAIRLINE)[A-Z_]*\b/;
+

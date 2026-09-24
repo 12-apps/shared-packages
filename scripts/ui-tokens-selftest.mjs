@@ -119,13 +119,23 @@ function typedFindings(files, entry) {
   return scanSource(entry, files[entry], program.getTypeChecker(), program.getSourceFile(entry)).map((f) => f.rule);
 }
 const TYPED = {
-  "/v/Sel.metrics.ts": "export const SIZES = { sm: { height: 32, font: 14 } } as const; export const MAX_W: number = 400;",
+  "/v/Sel.metrics.ts": [
+    "export const SIZES = { sm: { height: 32, font: 14 } } as const; export const MAX_W: number = 400;",
+    "export const BORDERS = { rest: 1, focused: 2 } as const; export const FIELD_BORDER_WIDTH = 1;",
+  ].join("\n"),
   "/v/Sel.tsx": [
-    "import { SIZES, MAX_W } from './Sel.metrics';",
+    "import { SIZES, MAX_W, BORDERS, FIELD_BORDER_WIDTH } from './Sel.metrics';",
     "declare const rem: (t: unknown, n: number) => string; declare const theme: unknown;",
     "const a = { height: SIZES.sm.height, maxWidth: MAX_W };",
     "const b = { fontSize: SIZES.sm.font };",
     "const c = { height: rem(theme, SIZES.sm.height) };",
+    // Traced to the vocabulary: clean.
+    "declare const remPx: (t: unknown, n: number) => number; declare const i: number;",
+    "const pitch = remPx(theme, 52); const geometry = { row: remPx(theme, 40) };",
+    "const d = { height: pitch, top: i * pitch, width: Math.max(pitch, geometry.row), minHeight: -pitch };",
+    "const e = { rootMargin: `${pitch}px`, border: `${FIELD_BORDER_WIDTH}px solid`, borderWidth: FIELD_BORDER_WIDTH };",
+    // Raw riding along: flagged.
+    "const f = { height: remPx(theme, 52) + 40, borderWidth: BORDERS.focused };",
   ].join("\n"),
 };
 
@@ -139,7 +149,10 @@ for (const { rule, src } of cases) {
 for (const rule of RULES.filter((r) => !(r in VIOLATIONS))) failures.push(`${rule} has no violating fixture`);
 
 const typed = typedFindings(TYPED, "/v/Sel.tsx");
-if (typed.filter((r) => r === "raw-number-length").length !== 2) failures.push(`type-aware: expected 2 raw-number-length (height, maxWidth through a name), got ${JSON.stringify(typed)}`);
+if (typed.filter((r) => r === "raw-number-length").length !== 4) {
+  failures.push(`type-aware: expected 4 raw-number-length (height and maxWidth through a name, remPx()+40, a typed 2px border), got ${JSON.stringify(typed)}`);
+}
+if (typed.some((r) => r === "raw-length")) failures.push(`type-aware: a px glued onto a remPx-traced value was flagged: ${JSON.stringify(typed)}`);
 if (typed.filter((r) => r === "raw-font-size").length !== 1) failures.push(`type-aware: expected 1 raw-font-size (fontSize through a name), got ${JSON.stringify(typed)}`);
 
 const cleanHits = scanSource(AS, CLEAN);

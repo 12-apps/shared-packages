@@ -29,10 +29,8 @@ import {
   SVG_SHAPES,
   JSX_SIZE_ATTRS,
   COLUMN_SIZED_TAGS,
-  VOCAB_CALL,
-  THEME_RELATIVE_MEMBER,
-  PX_SAFE_EXPR,
 } from "./ui-tokens-keys.mjs";
+import { isHairlineName, isPxSafe, isRelative, unwrap } from "./ui-tokens-relative.mjs";
 
 
 export const RULES = [
@@ -45,15 +43,6 @@ function propName(node) {
   if (!n) return null;
   if (ts.isIdentifier(n) || ts.isStringLiteral(n) || ts.isNumericLiteral(n)) return n.text;
   return null;
-}
-
-/** Strip parentheses and `as`/`satisfies`/`<T>` wrappers. */
-function unwrap(expr) {
-  let e = expr;
-  while (e && (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isSatisfiesExpression(e) || ts.isTypeAssertionExpression(e))) {
-    e = e.expression;
-  }
-  return e;
 }
 
 /** A numeric literal (negative included, through any wrapper), or null. */
@@ -151,18 +140,6 @@ function isRawNumber(key, value, node) {
   return true;
 }
 
-/** An expression that is theme-relative by construction. */
-function isRelativeExpr(expr, sf) {
-  const e = unwrap(expr);
-  if (ts.isCallExpression(e)) {
-    const callee = e.expression;
-    const name = ts.isPropertyAccessExpression(callee) ? callee.name.text : callee.getText(sf);
-    return VOCAB_CALL.test(name);
-  }
-  if (ts.isConditionalExpression(e)) return isRelativeExpr(e.whenTrue, sf) && isRelativeExpr(e.whenFalse, sf);
-  return THEME_RELATIVE_MEMBER.test(e.getText(sf));
-}
-
 /** Whether a non-literal expression is a NUMBER — needs the type checker. */
 function isNumberTyped(checker, expr) {
   if (!checker) return false;
@@ -177,8 +154,9 @@ const isStringy = (e) => ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLit
 
 /** A value on a length key that is a NAME holding a number (metrics constant, size map, prop default). */
 function isTypedRawValue(ctx, key, expr, node) {
-  if (!ctx.checker || HAIRLINE_KEY.test(key) || isStringy(expr) || ts.isObjectLiteralExpression(expr)) return false;
-  if (isRelativeExpr(expr, ctx.sf) || !isNumberTyped(ctx.checker, expr)) return false;
+  if (!ctx.checker || isStringy(expr) || ts.isObjectLiteralExpression(expr)) return false;
+  if (HAIRLINE_KEY.test(key) && isHairlineName(expr, ctx.sf)) return false;
+  if (isRelative(expr, ctx) || !isNumberTyped(ctx.checker, expr)) return false;
   const sx = inSxContext(node);
   return !(sx && (SPACING_KEYS.has(key) || key === "borderRadius"));
 }
@@ -238,7 +216,7 @@ function checkTemplateSpan(ctx, node, span) {
   const text = span.literal.text;
   const expr = span.expression.getText(ctx.sf);
   if (/^[0-9a-fA-F]{2}(?!\w)/.test(text) && /palette|\.main|\.light|\.dark|color/i.test(expr)) ctx.add("raw-color", node);
-  const gluesUnit = /^(px|rem)\b/.test(text) && !(text.startsWith("px") && PX_SAFE_EXPR.test(expr));
+  const gluesUnit = /^(px|rem)\b/.test(text) && !(text.startsWith("px") && isPxSafe(span.expression, ctx));
   if (!ctx.isMetrics && gluesUnit) ctx.add(ruleForKey(styleKeyOf(node), "raw-length"), node);
 }
 
@@ -256,7 +234,7 @@ function checkConcat(node, ctx) {
   if (ctx.isMetrics || !ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.PlusToken) return;
   const right = node.right;
   if (!(ts.isStringLiteral(right) || ts.isNoSubstitutionTemplateLiteral(right)) || !/^(px|rem)\b/.test(right.text)) return;
-  if (right.text.startsWith("px") && PX_SAFE_EXPR.test(node.left.getText(ctx.sf))) return;
+  if (right.text.startsWith("px") && isPxSafe(node.left, ctx)) return;
   ctx.add(ruleForKey(styleKeyOf(node), "raw-length"), node);
 }
 
@@ -280,7 +258,7 @@ function isRawJsxValue(ctx, init) {
   if (!ts.isJsxExpression(init) || !init.expression) return false;
   const num = numericValue(init.expression);
   if (num !== null) return Math.abs(num) > 1;
-  return !isRelativeExpr(init.expression, ctx.sf) && isNumberTyped(ctx.checker, init.expression);
+  return !isRelative(init.expression, ctx) && isNumberTyped(ctx.checker, init.expression);
 }
 
 function checkJsxSize(node, ctx) {
