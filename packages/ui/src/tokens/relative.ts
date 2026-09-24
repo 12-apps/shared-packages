@@ -13,7 +13,7 @@ import type { Theme } from '@mui/material/styles/index.js';
  *
  * So there is one vocabulary: the px a design was drawn at, handed to the
  * theme's own type scale. `rem(theme, 14)` is `theme.typography.pxToRem(14)` —
- * `0.875rem` at MUI's defaults, which is what future-pay's `createAppTheme`
+ * `0.875rem` at MUI's defaults, which is what the origin host's theme
  * runs on, so converting a literal changes nothing on screen. A host that sets
  * `typography.fontSize` scales every size written through it (MUI multiplies
  * by `fontSize / 14`), and so does a reader who raises the browser's base font
