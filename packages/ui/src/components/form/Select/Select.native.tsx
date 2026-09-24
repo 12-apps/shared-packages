@@ -7,6 +7,7 @@ import {
   Text as RNText,
   View,
   useWindowDimensions,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
@@ -177,6 +178,15 @@ function SelectPulse({
 }
 
 /**
+ * The field's own box. Raised while open: react-native-web gives every View
+ * `z-index: 0`, so the anchor's z-index stays inside this root, and the next
+ * field down would paint over the list and take its taps.
+ */
+function rootStyle(theme: UiTheme, fullWidth: boolean | undefined, open: boolean): StyleProp<ViewStyle> {
+  return [styles.root, fullWidth ? styles.fullWidth : styles.auto, open ? { zIndex: theme.zIndex.modal } : null];
+}
+
+/**
  * The native `Select`.
  *
  * The list is an absolutely positioned panel under the field rather than a
@@ -224,10 +234,7 @@ export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
     <View
       ref={ref}
       testID={ids.root}
-      // Raised while open: react-native-web gives every View `z-index: 0`, so
-      // the anchor's own z-index stays inside this root, and the next field
-      // down would paint over the list and take its taps.
-      style={[styles.root, fullWidth ? styles.fullWidth : styles.auto, open ? { zIndex: theme.zIndex.modal } : null, style]}
+      style={[rootStyle(theme, fullWidth, open), style]}
       {...withoutTestIdProps(others)}
     >
       {pulse ? <SelectPulse theme={theme} size={size} testID={`${ids.trigger}-pulse`} /> : null}
