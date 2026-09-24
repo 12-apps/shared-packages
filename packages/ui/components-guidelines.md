@@ -105,6 +105,42 @@ Hosts set the height with `createAppTheme(mode, { fieldHeight })`,
 factories' `fieldOverrides(radius, height)` also put MUI's own outlined fields on
 it.
 
+### Density — no raw values
+
+Every size and colour a component draws is RELATIVE to the theme, so that a
+density mode is one decision in the theme rather than a hunt through every
+component (FUT-2585). `pnpm quality:ui-tokens` enforces it on every pull request.
+
+| you want | write | not |
+|---|---|---|
+| any length — font size, height, width, padding, gap, offset, radius, shadow offset, blur, keyframe distance | `rem(theme, 14)`, `sxRem(14)` in `sx`, `rems(theme, 0, 8, 32)` for a list | `'14px'`, `'0.875rem'`, `fontSize: 14`, `px(14)` |
+| a container width equal to a breakpoint | `rem(theme, theme.breakpoints.values.md)` | `900` |
+| a length JavaScript computes with (row height, overflow cost, cell size) | `remPx(theme, 52)` | `const ROW_HEIGHT = 52` |
+| spacing in `sx` | `p: 2`, `gap: 1` (spacing units are already relative) | — |
+| a colour | a palette role (`text.secondary`, `divider`, `action.hover`, `primary.contrastText`) or a named token from `@12-apps/ui/tokens` | `'#fff'`, `'rgba(0,0,0,.5)'`, `'white'`, `palette.grey[300]` |
+| a length that must BE px (`IntersectionObserver.rootMargin`, a virtualiser's inline offset) | `` `${remPx(theme, 150)}px` `` | `` `${150}px` `` |
+
+`rem(theme, px)` is `theme.typography.pxToRem(px)`: at MUI's defaults it is
+exactly `px / 16` rem, so converting a literal changes nothing on screen, and a
+host that moves `typography.fontSize` scales every size written through it
+(`htmlFontSize` only declares what the root already is). Spacing units in `sx` (`p: 2`) and `theme.spacing()` follow
+`theme.spacing` instead, so a density mode sets BOTH the type scale and the
+spacing unit (and `fieldHeight`). The one literal left is the `1px` hairline
+border (`FIELD_BORDER_WIDTH`).
+
+A number that comes from the layout itself — a pointer-dragged width, a
+virtualiser spacer computed from `remPx` pitches — is already right in px; wrap
+it in `rem()` and it would scale twice. Those are `exempt` ledger entries, each
+with its argument.
+
+`*.metrics.ts` keeps its numbers in px — they are the native renderer's dp —
+and the web reads them through `rem(theme, n)`. Colours are in scope there too.
+
+A raw value that is right and always will be (a CSS mask's opaque stop, a
+gesture's physical swipe distance) goes in `.ui-tokens-exceptions.json` as an
+`exempt` entry WITH a written argument; everything else in that ledger is debt
+that only shrinks.
+
 ### TypeScript Requirements
 
 - All props properly typed
@@ -131,8 +167,8 @@ are in [NATIVE.md](./NATIVE.md). Two rules matter while building any component,
 ported or not:
 
 - **Numbers live in `X.metrics.ts`**, in px, and the web derives its `rem` from
-  them with `px()`. A size written straight into a `styled()` call is a number the
-  native renderer cannot find.
+  them with `rem(theme, n)` (see "Density — no raw values"). A size written
+  straight into a `styled()` call is a number the native renderer cannot find.
 - **A `*.native.tsx` imports no MUI, emotion or react-dom.** The lint rule and the
   native tsup build both refuse it.
 
