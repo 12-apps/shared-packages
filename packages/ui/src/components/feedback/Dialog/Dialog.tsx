@@ -129,12 +129,12 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
         open={open}
         onClose={onClose}
         data-testid={testId}
+        // On the Drawer's own paper: on an inner Box it left the paper 0px wide.
+        PaperProps={{ sx: paperSx }}
         {...props}
       >
-        <Box sx={{ ...paperSx, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {header}
-          {body}
-        </Box>
+        {header}
+        {body}
       </Drawer>
     );
   }

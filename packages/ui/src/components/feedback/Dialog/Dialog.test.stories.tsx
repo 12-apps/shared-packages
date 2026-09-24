@@ -988,3 +988,38 @@ export const Integration: Story = {
     });
   },
 };
+
+/**
+ * The drawer variant is actually drawn. Its look used to sit on a Box inside
+ * MUI's Drawer, absolutely positioned: the Drawer's paper had no in-flow
+ * content, collapsed to 0px wide, and its overflow clipped the whole panel —
+ * opening a drawer dialog showed a dimmed page and nothing else. Its leading
+ * corners are the theme radius (they were written '16pxpx', which the browser
+ * dropped).
+ */
+export const DrawerIsDrawn: Story = {
+  render: () => (
+    <Dialog open variant="drawer" size="sm" onClose={fn()} dataTestId="drawer-dialog">
+      <DialogHeader title="Drawer Dialog" subtitle="Slide-in panel" />
+      <DialogContent>
+        <Typography>Content</Typography>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async () => {
+    const body = within(globalThis.document.body);
+    const title = await body.findByText('Drawer Dialog');
+    const paper = title.closest('.MuiDrawer-paper');
+    await expect(paper).not.toBeNull();
+    await waitFor(() => {
+      const rect = (paper as HTMLElement).getBoundingClientRect();
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the panel's width IS the behaviour under test: 0px was the bug
+      expect(rect.width).toBeGreaterThan(300);
+      expect(rect.right).toBeLessThanOrEqual(globalThis.innerWidth);
+      expect(rect.left).toBeGreaterThanOrEqual(0);
+    });
+    const style = globalThis.getComputedStyle(paper as HTMLElement);
+    await expect(style.borderTopLeftRadius).toBe('16px');
+    await expect(style.borderTopRightRadius).toBe('0px');
+  },
+};

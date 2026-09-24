@@ -3,7 +3,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { separatorMargin, separatorStyles } from './Separator.styles';
+import { separatorBlockMargin, separatorStyles } from './Separator.styles';
 import type { SeparatorProps } from './Separator.types';
 
 export const Separator: React.FC<SeparatorProps> = ({
@@ -22,6 +22,9 @@ export const Separator: React.FC<SeparatorProps> = ({
 
   if (children) {
     const isHorizontal = orientation === 'horizontal';
+    // The rules either side of the label sit INSIDE the row, which carries the
+    // margin; their own would add it a second time.
+    const ruleStyles = { ...styles, margin: 0 };
 
     return (
       <Box
@@ -33,12 +36,12 @@ export const Separator: React.FC<SeparatorProps> = ({
         sx={{
           display: 'flex',
           alignItems: 'center',
-          margin: separatorMargin(size, margin),
+          margin: separatorBlockMargin(size, margin, isHorizontal),
           flexDirection: isHorizontal ? 'row' : 'column',
           gap: theme.spacing(2),
         }}
       >
-        <Box sx={styles} />
+        <Box sx={ruleStyles} />
         {/*
           No background behind the label. The two rules and the words are a FLEX
           ROW — the rules stop where the label starts — so there is nothing for a
@@ -53,7 +56,7 @@ export const Separator: React.FC<SeparatorProps> = ({
         >
           {children}
         </Typography>
-        <Box sx={styles} />
+        <Box sx={ruleStyles} />
       </Box>
     );
   }

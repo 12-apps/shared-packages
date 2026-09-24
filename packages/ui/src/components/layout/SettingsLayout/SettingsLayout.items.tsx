@@ -166,7 +166,9 @@ function indexListSx(shape: RailShape) {
   return (theme: import('@mui/material').Theme) => ({
     display: 'grid',
     gridTemplateColumns: '1fr',
-    columnGap: 8,
+    // One spacing unit (8px). This is an `sx` callback, where a bare 8 is
+    // EIGHT units — it drew a 64px gutter between the two columns.
+    columnGap: 1,
     [theme.breakpoints.up('sm')]: { gridTemplateColumns: '1fr 1fr' },
     [atLeastRail(theme, shape.breakpoint)]: { gridTemplateColumns: '1fr' },
   });
