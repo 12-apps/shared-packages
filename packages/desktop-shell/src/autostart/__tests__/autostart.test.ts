@@ -160,6 +160,38 @@ describe("createAutostart", () => {
     expect(setSettings).toHaveBeenCalledWith({ openAtLogin: false, args: [] });
   });
 
+  it("reads the Windows login item with the arguments it was written with", async () => {
+    // Windows matches the `Run` value on its arguments too, so this fake
+    // answers only when the read carries what the write stored. A read that
+    // passes nothing looks for a different entry and reports OFF with
+    // autostart plainly on — which the settings checkbox then mirrors, so it
+    // is born unchecked and snaps back the moment somebody clicks it.
+    let stored: readonly string[] | null = null;
+    const loginItem: LoginItemPort = {
+      setLoginItemSettings: (settings) => {
+        stored = settings.openAtLogin ? (settings.args ?? []) : null;
+      },
+      getLoginItemSettings: (identity) => ({
+        openAtLogin:
+          stored !== null && (identity?.args ?? []).join("\u0000") === stored.join("\u0000"),
+      }),
+    };
+
+    const autostart = createAutostart({
+      platform: "win32",
+      id: "app.agent",
+      entry: { name: "Agent", exec: "C:/agent.exe" },
+      backgroundArgs: ["--background"],
+      loginItem,
+    });
+
+    await autostart.enable();
+    expect(await autostart.isEnabled()).toBe(true);
+
+    await autostart.disable();
+    expect(await autostart.isEnabled()).toBe(false);
+  });
+
   it("answers off and changes nothing when the platform's port was not supplied", async () => {
     const autostart = createAutostart({
       platform: "linux",

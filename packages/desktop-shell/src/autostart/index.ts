@@ -33,7 +33,19 @@ export {
 
 /** Electron's `app` login-item surface, narrowed to what is used. */
 export interface LoginItemPort {
-  getLoginItemSettings(): { openAtLogin: boolean };
+  /**
+   * Read the login item back.
+   *
+   * The identity argument is NOT optional decoration on Windows: the registry
+   * `Run` value is matched on its executable AND its arguments, so a read that
+   * omits the arguments the write used looks for a different entry and answers
+   * `openAtLogin: false` with autostart plainly enabled. Electron says so in
+   * `getLoginItemSettings`, and it is the sort of thing that only shows up on
+   * the one platform nobody develops on.
+   */
+  getLoginItemSettings(identity?: { path?: string; args?: string[] }): {
+    openAtLogin: boolean;
+  };
   setLoginItemSettings(settings: {
     openAtLogin: boolean;
     openAsHidden?: boolean;
@@ -129,7 +141,15 @@ export function createAutostart(options: AutostartOptions): Autostart {
     return Promise.resolve();
   };
   return {
-    isEnabled: () => Promise.resolve(loginItem.getLoginItemSettings().openAtLogin),
+    // Read with the SAME identity `enable` wrote, or Windows answers about an
+    // entry nobody created. The symptom is a settings checkbox that is born
+    // unchecked and snaps back when clicked, because a renderer that mirrors
+    // this read onto the box is being told the truth about the wrong key.
+    // Only `args`, deliberately: `enable` does not pass a path either, so the
+    // write landed under Electron's default (the running executable). Naming a
+    // path HERE and not there would be a second identity, and a mismatch in
+    // spelling or casing would break the very read this is fixing.
+    isEnabled: () => Promise.resolve(loginItem.getLoginItemSettings({ args }).openAtLogin),
     enable,
     disable,
     set: (next) => (next ? enable() : disable()),
