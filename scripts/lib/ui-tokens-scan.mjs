@@ -167,7 +167,21 @@ function isTypedRawValue(ctx, key, expr, node) {
   return !(sx && (SPACING_KEYS.has(key) || key === "borderRadius"));
 }
 
+/** `divider ? 1 : 0` — a choice between literals is judged literal by literal. */
+function literalBranches(expr) {
+  const e = unwrap(expr);
+  if (!ts.isConditionalExpression(e)) return null;
+  const a = numericValue(e.whenTrue);
+  const b = numericValue(e.whenFalse);
+  return a !== null && b !== null ? [a, b] : null;
+}
+
 function checkValue(ctx, key, expr, node) {
+  const branches = literalBranches(expr);
+  if (branches) {
+    if (branches.some((v) => isRawNumber(key, v, node))) ctx.add(ruleForKey(key, "raw-number-length"), node);
+    return;
+  }
   const value = numericValue(expr);
   if (value !== null) {
     if (isRawNumber(key, value, node)) ctx.add(ruleForKey(key, "raw-number-length"), node);

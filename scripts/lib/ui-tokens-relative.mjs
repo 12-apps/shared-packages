@@ -32,6 +32,8 @@ export function unwrap(expr) {
 /** The named hairline (`FIELD_BORDER_WIDTH`) — the one literal the vocabulary keeps on purpose. */
 export const isHairlineName = (expr, sf) => HAIRLINE_NAME.test(unwrap(expr).getText(sf));
 
+const isZero = (a) => ts.isNumericLiteral(unwrap(a)) && Number(unwrap(a).text) === 0;
+
 function calleeName(call, sf) {
   const callee = call.expression;
   return ts.isPropertyAccessExpression(callee) && !ts.isPropertyAccessExpression(callee.expression)
@@ -42,7 +44,9 @@ function calleeName(call, sf) {
 function relativeCall(e, ctx, depth) {
   const name = calleeName(e, ctx.sf);
   if (VOCAB_CALL.test(name.replace(/^.*\./, ""))) return true;
-  return MATH_OVER_VALUES.test(name) && e.arguments.length > 0 && e.arguments.every((a) => isRelative(a, ctx, depth + 1));
+  // A literal 0 in a clamp is neutral — `Math.max(pitch, 0)` is still `pitch`.
+  const clampArg = (a) => isZero(a) || isRelative(a, ctx, depth + 1);
+  return MATH_OVER_VALUES.test(name) && e.arguments.some((a) => !isZero(a)) && e.arguments.every(clampArg);
 }
 
 function relativeBinary(e, ctx, depth) {
@@ -62,8 +66,15 @@ function relativeDeclaration(e, ctx, depth) {
   const symbol = ts.isShorthandPropertyAssignment(e.parent) && e.parent.name === e
     ? ctx.checker.getShorthandAssignmentValueSymbol(e.parent)
     : ctx.checker.getSymbolAtLocation(ts.isPropertyAccessExpression(e) ? e.name : e);
-  const decl = symbol?.valueDeclaration;
-  if (!decl) return false;
+  return declarationIsRelative(symbol?.valueDeclaration, ctx, depth);
+}
+
+/** What a declaration was initialised with: `const x = …`, `{ x: … }`, or `{ x }` → the variable `x`. */
+function declarationIsRelative(decl, ctx, depth) {
+  if (!decl || depth > MAX_DEPTH) return false;
+  if (ts.isShorthandPropertyAssignment(decl)) {
+    return declarationIsRelative(ctx.checker.getShorthandAssignmentValueSymbol(decl)?.valueDeclaration, ctx, depth + 1);
+  }
   const init = ts.isVariableDeclaration(decl) || ts.isPropertyAssignment(decl) ? decl.initializer : undefined;
   return init !== undefined && isRelative(init, ctx, depth + 1);
 }

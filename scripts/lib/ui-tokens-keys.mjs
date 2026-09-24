@@ -43,6 +43,7 @@ export const JSX_SIZE_ATTRS = new Set(["size", "width", "height", "fontSize", "i
 /** `size` on a grid is a COLUMN count, not a length. */
 export const COLUMN_SIZED_TAGS = /^(Grid|Grid2|MuiGrid)$/;
 /** The vocabulary: a call to one of these IS theme-relative. */
-export const VOCAB_CALL = /^(rem|rems|sxRem|remPx|fieldHeight|fieldHeightPx|fieldHeightRem|fieldRadius|fieldRadiusPx|pxToRem|spacing)$/;
+/** `fieldHeightPx` is NOT here: it converts against a fixed 16px, like the `px()` the gate forbids. */
+export const VOCAB_CALL = /^(rem|rems|sxRem|remPx|fieldHeight|fieldHeightRem|fieldRadius|fieldRadiusPx|pxToRem|spacing)$/;
 export const THEME_RELATIVE_MEMBER = /^(theme|t)\.(shape\.borderRadius|spacing)\b/;
 

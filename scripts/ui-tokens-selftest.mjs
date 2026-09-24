@@ -87,6 +87,7 @@ const c = (theme) => ({ border: '1px solid transparent', boxShadow: \`0 0 0 \${r
 const d = (theme) => ({ width: '100%', maxWidth: rem(theme, theme.breakpoints.values.sm), margin: '0 auto' });
 const e = <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" /></svg>;
 const f = { color: 'inherit', background: 'transparent', lineHeight: 1.5, zIndex: 10, opacity: 0.5 };
+const hair = (divider) => <Box sx={{ borderBottom: divider ? 1 : 0 }} />;
 const g = { margin: 0, top: 0, flex: 1, borderWidth: 1, border: '1px solid transparent', outline: '1px dashed transparent' };
 const i = <Grid size={6}><CircularProgress thickness={4} /><Box width={1} height={0.5} /></Grid>;
 const HOVER_OFFSET_MS = 300;
@@ -134,7 +135,7 @@ const TYPED = {
     "const pitch = remPx(theme, 52); const geometry = { row: remPx(theme, 40) };",
     "const d = { height: pitch, top: i * pitch, width: Math.max(pitch, geometry.row), minHeight: -pitch };",
     "const e = { rootMargin: `${pitch}px`, border: `${FIELD_BORDER_WIDTH}px solid`, borderWidth: FIELD_BORDER_WIDTH };",
-    "const rowHeight = remPx(theme, 52); const g = { rowHeight };",
+    "const rowHeight = remPx(theme, 52); const g = { rowHeight }; const g2 = { height: g.rowHeight, minHeight: Math.max(pitch, 0) };",
     // Raw riding along: flagged.
     "const f = { height: remPx(theme, 52) + 40, borderWidth: BORDERS.focused };",
     // Untyped: cannot be proven relative, so it is reported.
