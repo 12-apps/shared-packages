@@ -63,13 +63,10 @@ export const INPUT_MUI_SIZE: Record<SizeValue, MuiInputSize> = {
 };
 
 /**
- * The three steps MUI has no height for, as `padding` on the input itself.
- *
- * `sm` and `md` are absent on purpose — they ARE MUI's two heights, so they
- * fall through to {@link MUI_INPUT_PADDING} below rather than restating it.
- * (`lg`'s 16px is a hair under `md`'s 16.5px: the override is a round number
- * where MUI's is derived from a 56px box. Kept as written — this table is what
- * the web draws, not what it ought to draw.)
+ * The horizontal inset of the steps that have their own, and — for `filled` and
+ * `underline`, which are not drawn at the field height — their vertical one.
+ * An outlined-family field takes its vertical inset from the field height
+ * instead ({@link inputPadding}).
  */
 export const INPUT_SIZE_OVERRIDES: Partial<Record<SizeValue, { vertical: number; horizontal: number }>> = {
   xs: { vertical: 6, horizontal: 10 },

@@ -45,8 +45,6 @@ export function ToggleField({ name, options, label }: ToggleFieldProps): React.R
         value={values[name] ?? ''}
         fullWidth
         dataTestId={testId}
-        // Match the input field height so the toggle lines up in a form row.
-        sx={{ '& .MuiToggleButtonGroup-grouped': { height: 56 } }}
         onChange={(_event, next) => {
           if (typeof next === 'string') setFieldValue(name, next);
         }}

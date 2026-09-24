@@ -18,6 +18,7 @@ import type {
   MultiSelectOption,
 } from './ContentToolbar.types';
 import { buildTriggerLabel, InlineTrigger, PillTrigger, StackedTrigger } from './MultiSelectTriggers';
+import { fieldTextFieldStyles } from '../../../tokens/field-height';
 
 /** One checkbox menu row with an optional trailing count. */
 function CheckboxRow({
@@ -152,6 +153,7 @@ function MenuSearchField({
       <TextField
         autoFocus
         size="small"
+        sx={fieldTextFieldStyles}
         fullWidth
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}

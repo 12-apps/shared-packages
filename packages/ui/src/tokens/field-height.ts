@@ -85,9 +85,16 @@ export function fieldControlStyles(theme: Theme, size: SizeValue = 'md'): CSSObj
 }
 
 /**
+ * The notched outline's resting colour, as a MUI style-override callback. One
+ * function, not one per call: two themes built from the same options must
+ * compare equal, and a fresh closure each time would make them differ.
+ */
+const restingEdge = ({ theme }: { theme: Theme }): CSSObject => ({ borderColor: fieldEdge(theme) });
+
+/**
  * MUI component overrides that put MUI's OWN outlined fields on the standard
- * height — for a host's bare `TextField` / `Select`, the way
- * `fieldRadiusOverrides` rounds them. Every size MUI has maps to the standard:
+ * height and the one resting border — for a host's bare `TextField` / `Select`,
+ * the way `fieldRadiusOverrides` rounds them. Every size MUI has maps to the standard:
  * a host that wants another density asks this package's fields for a `size`.
  */
 export function fieldHeightOverrides(height: number = DEFAULT_FIELD_HEIGHT): Components<Theme> {
@@ -96,6 +103,8 @@ export function fieldHeightOverrides(height: number = DEFAULT_FIELD_HEIGHT): Com
     MuiOutlinedInput: {
       styleOverrides: {
         input: { '&:not(.MuiInputBase-inputMultiline)': { paddingTop: inset, paddingBottom: inset } },
+        // The one resting border; MUI's hover, focus and error rules outrank it.
+        notchedOutline: restingEdge,
       },
     },
     MuiInputLabel: {

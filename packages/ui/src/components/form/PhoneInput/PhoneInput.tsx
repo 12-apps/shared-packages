@@ -19,7 +19,7 @@ import type { PhoneInputCopy } from '../../../copy';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
-import { fieldTextFieldStyles } from '../../../tokens/field-height';
+import { fieldControlStyles, fieldTextFieldStyles } from '../../../tokens/field-height';
 
 // Country data with expanded support
 
@@ -28,6 +28,7 @@ import { fieldTextFieldStyles } from '../../../tokens/field-height';
 const FieldTextField = styled(TextField)(({ theme }) => fieldTextFieldStyles(theme));
 
 const GlassTextField = styled(TextField)(({ theme }) => ({
+  ...fieldControlStyles(theme),
   '& .MuiOutlinedInput-root': {
     borderRadius: fieldRadius(theme),
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,

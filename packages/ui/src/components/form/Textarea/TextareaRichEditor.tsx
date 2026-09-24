@@ -21,6 +21,7 @@ import type { RichEditorToolbarCopy } from '../../../copy';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height';
 
 const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   display: 'flex',
@@ -102,12 +103,14 @@ const ContentEditableDiv = styled('div')<{
   if (!theme) return {};
   const colorPalette = getColorFromTheme(theme, customColor);
   const errorColor = theme.palette.error;
+  // The edge's colour once the field is engaged: the error's, else the accent.
+  const engaged = error ? errorColor.main : colorPalette.main;
 
   return {
     minHeight: '120px',
     padding: theme.spacing(1.5),
     borderRadius: `0 0 ${fieldRadius(theme)}px ${fieldRadius(theme)}px`,
-    border: `2px solid ${error ? errorColor.main : focused ? colorPalette.main : fieldEdge(theme)}`,
+    border: `${FIELD_BORDER_WIDTH}px solid ${error || focused ? engaged : fieldEdge(theme)}`,
     borderTop: 'none',
     backgroundColor: glass
       ? alpha(theme.palette.background.paper, 0.1)
@@ -128,9 +131,11 @@ const ContentEditableDiv = styled('div')<{
         ? alpha(theme.palette.background.paper, 0.15)
         : alpha(theme.palette.background.paper, 0.9) },
 
+    // Focused, the 1px edge doubles inside the box (an inset shadow, so nothing
+    // moves), as every other field's does, under the halo.
     '&:focus': {
-      borderColor: error ? errorColor.main : colorPalette.main,
-      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` },
+      borderColor: engaged,
+      boxShadow: `inset 0 0 0 1px ${engaged}, 0 0 0 3px ${alpha(engaged, 0.1)}` },
 
     '& > *': {
       margin: '0.5em 0' },

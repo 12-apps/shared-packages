@@ -112,7 +112,7 @@ function renderField(
       placeholder={field.placeholder}
       error={Boolean(field.error)}
       size={MUI_SIZE[field.size]}
-      sx={[fieldSx, fieldControlStyles]}
+      sx={[fieldSx, (theme) => fieldControlStyles(theme, field.size)]}
       inputProps={{ ...params.inputProps, 'data-testid': `${field.dataTestId}-input` }}
       slotProps={{
         input: {

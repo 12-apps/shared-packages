@@ -308,6 +308,7 @@ function RangeBound({
   return (
     <TextField
       size="small"
+      sx={fieldTextFieldStyles}
       type="number"
       error={error}
       placeholder={placeholder}

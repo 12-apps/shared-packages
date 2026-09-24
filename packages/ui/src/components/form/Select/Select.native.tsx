@@ -156,15 +156,6 @@ function useSelectValue(
   return [value ?? own, setOwn];
 }
 
-/**
- * The native `Select`.
- *
- * The list is an absolutely positioned panel under the field rather than a
- * portal over the screen: React Native's `Modal` traps focus, which is right
- * for a dialog and wrong for a dropdown — and wrong for the shared stories,
- * which expect the trigger to keep focus while the list is open. The trade is
- * recorded in `NATIVE-NOTES.md`.
- */
 /** The pulse bar, at the field's own height and corner. */
 function SelectPulse({
   theme,
@@ -185,6 +176,15 @@ function SelectPulse({
   );
 }
 
+/**
+ * The native `Select`.
+ *
+ * The list is an absolutely positioned panel under the field rather than a
+ * portal over the screen: React Native's `Modal` traps focus, which is right
+ * for a dialog and wrong for a dropdown — and wrong for the shared stories,
+ * which expect the trigger to keep focus while the list is open. The trade is
+ * recorded in `NATIVE-NOTES.md`.
+ */
 export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
   const {
     variant, options, label, helperText, fullWidth, size, placeholder, error, glow, pulse,

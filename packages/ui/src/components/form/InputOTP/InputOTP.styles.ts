@@ -3,6 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 
 interface ColorPalette {
   main: string;
@@ -51,13 +52,13 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
 
 type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
-/** Each slot is a square, so width and height always match. */
-const SIZES: Record<SizeKey, { side: string; fontSize: string }> = {
-  xs: { side: '32px', fontSize: '0.75rem' },
-  sm: { side: '40px', fontSize: '0.875rem' },
-  md: { side: '48px', fontSize: '1rem' },
-  lg: { side: '56px', fontSize: '1.125rem' },
-  xl: { side: '64px', fontSize: '1.25rem' },
+/** Each slot's type. Its side is the theme's field height for the size (a square). */
+const SIZES: Record<SizeKey, { fontSize: string }> = {
+  xs: { fontSize: '0.75rem' },
+  sm: { fontSize: '0.875rem' },
+  md: { fontSize: '1rem' },
+  lg: { fontSize: '1.125rem' },
+  xl: { fontSize: '1.25rem' },
 };
 
 export interface OtpSlotFlags {
@@ -70,7 +71,9 @@ export interface OtpSlotFlags {
 export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
   const { customColor = 'primary', customSize = 'md', glass, gradient } = flags;
   const palette = getColorFromTheme(theme, customColor);
-  const { side, fontSize } = SIZES[customSize as SizeKey] ?? SIZES.md;
+  const { fontSize } = SIZES[customSize as SizeKey] ?? SIZES.md;
+  // A slot is a field: a square of the theme's field height for its size.
+  const side = fieldHeight(theme, asFieldSize(customSize));
 
   return {
     width: side,
@@ -94,6 +97,7 @@ export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
         },
       }),
       '& input': { textAlign: 'center', padding: 0, fontWeight: 'inherit' },
+      ...(!glass && { '& fieldset': { borderColor: fieldEdge(theme) } }),
       '&:hover fieldset': { borderColor: palette.main },
       '&.Mui-focused fieldset': { borderColor: palette.main, borderWidth: '2px' },
     },

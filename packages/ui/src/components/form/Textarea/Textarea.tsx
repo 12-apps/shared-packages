@@ -91,10 +91,12 @@ const StyledTextarea = styled(TextareaAutosize, {
       borderColor: error ? errorColor.dark : colorPalette.main,
       backgroundColor: alpha(theme.palette.background.paper, 0.8) },
 
+    // Focus is two pixels, like every other field's: the second is an inset
+    // shadow, so the 1px resting border can thicken without the box moving.
     '&:focus': {
       borderColor: error ? errorColor.main : colorPalette.main,
       backgroundColor: theme.palette.background.paper,
-      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` } };
+      boxShadow: `inset 0 0 0 1px ${error ? errorColor.main : colorPalette.main}, 0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` } };
 
   // Glass morphism effect
   return {

@@ -21,14 +21,16 @@ import type React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { fieldEdge } from '../../../tokens/field-edge';
-import { fieldTextFieldStyles } from '../../../tokens/field-height';
+import { fieldHeightOverrides, fieldTextFieldStyles } from '../../../tokens/field-height';
 import { MultiSelectDropdown } from '../../layout/ContentToolbar';
 import { Button } from '../Button';
+import { InputOTP } from '../InputOTP';
 import { Input } from '../Input';
 import { RadioGroup } from '../RadioGroup';
 import { Select } from '../Select';
 import { Toggle } from '../Toggle';
 import { ToggleGroup } from '../ToggleGroup';
+import { Fields, FormContainer, SubmitButton } from '../total-form';
 
 afterEach(cleanup);
 
@@ -103,5 +105,43 @@ describe('the field height', () => {
     const styles = fieldTextFieldStyles(theme);
     expect(styles['& .MuiOutlinedInput-notchedOutline']).toEqual({ borderColor: fieldEdge(theme) });
     expect(JSON.stringify(styles)).toContain(inset(3));
+  });
+
+  it('stands a Select at the height Input draws for the same size', () => {
+    expect(cssOf(<Select size="lg" label="Tipo" options={options} value="" onChange={noop} />)).toContain(inset(3.6));
+  });
+
+  it('squares an OTP slot to the field height and rests it on the field border', () => {
+    const css = cssOf(<InputOTP length={4} />);
+    expect(css).toMatch(/height:3rem/u);
+    expect(css).toContain(`border-color:${fieldEdge(theme)}`);
+  });
+
+  it("lines a form's toggle, fields and submit up at the field height", () => {
+    // The toggle used to pin 56px ("match the input field height") and the
+    // submit button a hand-copied 56 — the two copies FUT-2555 retired.
+    const css = cssOf(
+      <FormContainer<{ kind: string; name: string }>
+        initialValues={{ kind: 'a', name: '' }}
+        schema={{}}
+        onSubmit={noop}
+      >
+        <Fields.ToggleField name="kind" options={options} />
+        <Fields.TextField name="name" label="Nome" />
+        <SubmitButton>Salvar</SubmitButton>
+      </FormContainer>,
+    );
+    // The TextField's own inset is the Input case above (emotion reuses its
+    // class here); what is this form's own is the toggle and the submit.
+    expect(css).not.toMatch(/height:56px/u);
+    expect(css).toMatch(/min-height:3rem/u);
+    expect(css).toMatch(/[^-]height:3rem/u);
+  });
+
+  it("rests a host's bare MUI field on the field border, at the field height", () => {
+    const overrides = fieldHeightOverrides(3).MuiOutlinedInput?.styleOverrides;
+    const notched = overrides?.notchedOutline as (props: { theme: typeof theme }) => unknown;
+    expect(notched({ theme })).toEqual({ borderColor: fieldEdge(theme) });
+    expect(JSON.stringify(overrides?.input)).toContain(inset(3));
   });
 });
