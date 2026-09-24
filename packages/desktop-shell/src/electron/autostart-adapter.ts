@@ -30,7 +30,9 @@ export function createShellAutostart(options: {
     },
     backgroundArgs: options.backgroundArgs,
     loginItem: {
-      getLoginItemSettings: () => app.getLoginItemSettings(),
+      // `identity` forwarded, never dropped: on Windows the read is matched on
+      // the executable and its arguments (see `LoginItemPort`).
+      getLoginItemSettings: (identity) => app.getLoginItemSettings(identity),
       setLoginItemSettings: (settings) => app.setLoginItemSettings(settings),
     },
     files: {
