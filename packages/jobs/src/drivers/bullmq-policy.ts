@@ -1,7 +1,7 @@
 import { UnrecoverableError, type JobsOptions } from "bullmq";
 
 import { assertValidRetention } from "../core/retention";
-import type { AnyJobDefinition, JobRetention } from "../core/types";
+import type { AnyJobDefinition, JobRetention, JobStallPolicy } from "../core/types";
 
 /**
  * The BullMQ driver's three policy decisions, kept together and out of the
@@ -83,4 +83,51 @@ export function isTerminalFailure(
   error: unknown,
 ): boolean {
   return attemptsMade >= maxAttempts || error instanceof UnrecoverableError;
+}
+
+/**
+ * The most times one run of a job may be STARTED on this queue before the
+ * worker fails it as a dead-letter: every attempt it is allowed,
+ * plus every stall it is allowed to recover from.
+ *
+ * This is the only bound a SCHEDULED job has. BullMQ never applies
+ * `maxStalledCount` to a job-scheduler job (`moveStalledJobsToWait`'s
+ * `isRepeatableJob` branch), so a tick whose handler takes the worker down
+ * every time it runs, a poison pill, would otherwise be put back and started
+ * again forever, taking every other job on the queue down with it. With the
+ * cap, the start that goes over it is failed as unrecoverable, reaches the
+ * failed set and `onJobFailed` with `terminal: true`, and the next tick of the
+ * schedule is a fresh job with its own budget.
+ *
+ * Worker-wide, so it takes the largest attempt budget on the queue: a cap
+ * below one job's legitimate retries would dead-letter it early.
+ */
+export function maxStartedAttemptsFor(
+  group: readonly AnyJobDefinition[],
+  maxStalledCount: number,
+): number {
+  const attempts = group.map((definition) => Math.max(1, definition.attempts ?? 1));
+  return Math.max(1, ...attempts) + maxStalledCount;
+}
+
+/**
+ * A queue's lock and stall settings, in BullMQ's option names. Spelled out
+ * rather than left to BullMQ's defaults: the numbers a stall is judged by
+ * belong where the host can read and configure them.
+ */
+export function workerStallOptions(
+  group: readonly AnyJobDefinition[],
+  stall: JobStallPolicy,
+): {
+  lockDuration: number;
+  stalledInterval: number;
+  maxStalledCount: number;
+  maxStartedAttempts: number;
+} {
+  return {
+    lockDuration: stall.lockDurationMs,
+    stalledInterval: stall.stalledIntervalMs,
+    maxStalledCount: stall.maxStalledCount,
+    maxStartedAttempts: maxStartedAttemptsFor(group, stall.maxStalledCount),
+  };
 }

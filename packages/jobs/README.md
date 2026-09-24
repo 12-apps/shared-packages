@@ -103,6 +103,13 @@ simply stops happening:
   scheduler removed from Redis, instead of firing forever at a handler that no
   longer exists. That removal is reported to `events.onScheduleRemoved`,
   because it is destructive and a deploy did it.
+- **A stalled job is re-run, and reported.** When a worker's lock on a job
+  expires (a blocked event loop, a paused process, a silent Redis link), BullMQ
+  puts the job back and runs it again. Each stall is an error line and
+  `events.onJobStalled`. A job that keeps stalling (more than `maxStalledCount`
+  times, or, for a scheduled job, more starts than its attempts plus that) is
+  failed as a terminal dead-letter instead of being restarted forever. The
+  lock and stall numbers are configurable per queue through `stall`.
 - The `inline` driver honours `attempts` but not delays or schedules, and both
   omissions are logged rather than silent. It is refused in production —
   by name, by env var and by instance.
@@ -130,6 +137,8 @@ createApiJobs({
       if (terminal) void notifyOperators(name, error);
     },
     onJobCompleted: ({ name, runId }) => void publishRealtime(name, runId),
+    // A job lost its lock mid-run and was put back to run again.
+    onJobStalled: ({ name, runId, stalledCount }) => void notifyOperators(name, runId, stalledCount),
     // A deploy just cancelled a recurring job, permanently.
     onScheduleRemoved: ({ name, queue }) => void audit("schedule.removed", { name, queue }),
   },
