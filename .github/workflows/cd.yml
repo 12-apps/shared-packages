@@ -18,17 +18,25 @@ name: CD
 # passed on that commit — the same ordering the old `needs:` chain gave, across
 # two workflows instead of one.
 #
-# The checkout below deliberately takes `main` rather than the triggering commit:
-# semantic-release checks the branch it is ON against its `branches` config, and
-# a detached SHA is not a release branch. Releasing whatever main holds is also
-# the honest thing when two merges land close together — the second run finds
-# nothing left to cut rather than racing the first.
+# The checkout below deliberately takes the triggering BRANCH rather than the
+# triggering commit: semantic-release checks the branch it is ON against its
+# `branches` config, and a detached SHA is not a release branch. Releasing
+# whatever the branch holds is also the honest thing when two merges land close
+# together — the second run finds nothing left to cut rather than racing the first.
+#
+# Two kinds of branch release. `main` is every package's release branch.
+# `release/<pkg>-<major>.<minor>.x` is a semantic-release MAINTENANCE branch: a
+# package opts in by naming it, with its `range` and `channel`, in its own
+# .releaserc.json, and every other package logs "not configured" there and cuts
+# nothing. scripts/release-tags.mjs tells semantic-release which branch it is on,
+# and scripts/publish.mjs publishes a maintenance line on its own dist-tag, never
+# on `latest` (RELEASE_BRANCH below, ./scripts/lib/dist-tag.mjs).
 
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [main]
+    branches: [main, 'release/**']
 
 permissions:
   contents: read
@@ -37,14 +45,22 @@ permissions:
 # never received, which is the exact shape of the auth-v1.22.0 incident. A
 # second merge waits its turn instead.
 concurrency:
-  group: cd-main
+  group: cd-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 jobs:
   release:
     name: Release
-    if: github.event.workflow_run.conclusion == 'success'
+    # `push` only: a pull request's CI run can never release, even one whose head
+    # branch happens to match the filter above.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
+    env:
+      # The branch checked out below, for the steps that must know it:
+      # release-tags.mjs hands it to semantic-release as GITHUB_REF (which
+      # workflow_run pins to the default branch), and publish.mjs publishes a
+      # maintenance line on its own dist-tag, never `latest`. ./scripts/lib/dist-tag.mjs.
+      RELEASE_BRANCH: ${{ github.event.workflow_run.head_branch }}
     permissions:
       contents: write # tags + GitHub releases
       issues: write # semantic-release's "release is failing" issue
@@ -55,6 +71,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_branch }}
       - uses: pnpm/action-setup@v4
         with:
           run_install: false

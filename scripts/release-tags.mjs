@@ -34,6 +34,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
+import { releaseBranchEnv } from "./lib/dist-tag.mjs";
 import { MAX_OUTPUT, classifyGitFailure, sleep } from "./lib/git-transience.mjs";
 import { bumpFor } from "./lib/major-bump.mjs";
 import { publishDirs } from "./lib/release-state.mjs";
@@ -77,6 +78,8 @@ const ATTEMPTS = BACKOFF_MS.length + 1;
 function semanticRelease(dir, pkg) {
   const run = spawnSync("pnpm", ["exec", "semantic-release", "--tag-format", `${pkg}-v\${version}`], {
     cwd: resolve(dir),
+    // GITHUB_REF names the branch cd.yml checked out, not workflow_run's default one.
+    env: releaseBranchEnv(),
     encoding: "utf8",
     maxBuffer: MAX_OUTPUT,
   });

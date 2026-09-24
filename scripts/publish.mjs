@@ -22,6 +22,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { distTagArgs } from "./lib/dist-tag.mjs";
 import { publishDirs } from "./lib/release-state.mjs";
 
 // Through the helper, so this still resolves when no PUBLISH_DIRS is set —
@@ -63,8 +64,8 @@ const TRANSIENT =
 // `silly` and nothing at the default level, so a job log at default loglevel
 // contains zero lines about the exchange — measured on run 31682461784, where
 // grepping 4,765 lines for oidc/trusted/id-token found only this workflow's own
-// echoed text. The evidence existed; the loglevel threw it away.
-const PUBLISH_ARGS = ["publish", "--access", "public", "--loglevel", "verbose"];
+// echoed text. The evidence existed; the loglevel threw it away. (`--tag`: ./lib/dist-tag.mjs.)
+const PUBLISH_ARGS = ["publish", "--access", "public", "--loglevel", "verbose", ...distTagArgs()];
 
 // Every way npm's OIDC exchange can end, in npm's own words
 // (npm/cli lib/utils/oidc.js — and the workflow runs `npm install -g npm@latest`
