@@ -77,6 +77,10 @@ export function fieldControlStyles(theme: Theme, size: SizeValue = 'md'): CSSObj
       paddingTop: 0,
       paddingBottom: 0,
       '& .MuiOutlinedInput-input, & .MuiSelect-select': { paddingTop: inset, paddingBottom: inset },
+      // A select's display box inherits the ROOT's line height as an absolute
+      // length, so at a smaller font (0.875rem) it outgrew the inset measured in
+      // its own `em` — 42.88px in a 40px row. Its line follows its own type now.
+      '& .MuiSelect-select': { lineHeight: '1.4375em' },
     },
     '& .MuiInputLabel-outlined:not(.MuiInputLabel-shrink)': {
       transform: `translate(14px, ${inset}) scale(1)`,

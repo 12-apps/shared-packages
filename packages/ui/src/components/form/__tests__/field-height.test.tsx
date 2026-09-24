@@ -144,4 +144,11 @@ describe('the field height', () => {
     expect(notched({ theme })).toEqual({ borderColor: fieldEdge(theme) });
     expect(JSON.stringify(overrides?.input)).toContain(inset(3));
   });
+
+  it("sets a select's line in its own type, so a smaller font still fills the height exactly", () => {
+    // At 0.875rem the display box used to keep the root's 23px line against an
+    // inset measured in 14px `em`s, and stood 42.88px tall.
+    const styles = JSON.stringify(fieldTextFieldStyles(theme));
+    expect(styles).toContain('"& .MuiSelect-select":{"lineHeight":"1.4375em"}');
+  });
 });
