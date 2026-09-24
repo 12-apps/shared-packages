@@ -61,6 +61,8 @@ const VIOLATIONS = {
     `const d = <Box sx={{ minWidth: { md: 168 }, width: [40, 60] }} />;`,
     `const e = <Box sx={{ borderTopLeftRadius: 8 }} />;`,
     `const f = { paddingInlineStart: 12, insetInlineStart: 4 };`,
+    `const g = (c) => ({ width: c ? 280 : 'auto', maxWidth: c ? 'none' : 384 });`,
+    `const h = (c) => <Box sx={{ left: c ? 4 : '50%' }} />;`,
   ],
   "raw-jsx-size": [
     `const a = <CircularProgress size={20} />;`,
@@ -136,6 +138,7 @@ const TYPED = {
     "const d = { height: pitch, top: i * pitch, width: Math.max(pitch, geometry.row), minHeight: -pitch };",
     "const e = { rootMargin: `${pitch}px`, border: `${FIELD_BORDER_WIDTH}px solid`, borderWidth: FIELD_BORDER_WIDTH };",
     "const rowHeight = remPx(theme, 52); const g = { rowHeight }; const g2 = { height: g.rowHeight, minHeight: Math.max(pitch, 0) };",
+    "declare const c: boolean; const g3 = { top: c ? pitch : 0, width: c ? pitch : 'auto', rootMargin: `${c ? pitch : 0}px` };",
     // Raw riding along: flagged.
     "const f = { height: remPx(theme, 52) + 40, borderWidth: BORDERS.focused };",
     // Untyped: cannot be proven relative, so it is reported.

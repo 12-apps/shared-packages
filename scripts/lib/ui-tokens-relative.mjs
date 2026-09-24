@@ -2,7 +2,8 @@
 // (`./ui-tokens-scan.mjs`, FUT-2585).
 //
 // A value is relative when it comes from the vocabulary (`rem`, `remPx`,
-// `fieldHeight*`, `theme.spacing`, `theme.shape.borderRadius`), and it stays
+// `fieldHeight`/`fieldHeightRem` — never the fixed-16px `fieldHeightPx` —
+// `theme.spacing`, `theme.shape.borderRadius`), and it stays
 // relative through the things JavaScript layout does with one: a name that
 // holds it (`const pitch = remPx(theme, 52)`), a member of an object built
 // from it, scaling by a count (`i * pitch`), `Math.max/min/round` over
@@ -79,10 +80,15 @@ function declarationIsRelative(decl, ctx, depth) {
   return init !== undefined && isRelative(init, ctx, depth + 1);
 }
 
+/** `c ? pitch : 0` — every branch relative, a literal 0 neutral, not all of them 0. */
+function relativeChoice(branches, ctx, depth) {
+  return branches.some((b) => !isZero(b)) && branches.every((b) => isZero(b) || isRelative(b, ctx, depth + 1));
+}
+
 /** The composite shapes — calls, `? :`, arithmetic, negation — or undefined for a leaf. */
 function relativeComposite(e, ctx, depth) {
   if (ts.isCallExpression(e)) return relativeCall(e, ctx, depth);
-  if (ts.isConditionalExpression(e)) return isRelative(e.whenTrue, ctx, depth + 1) && isRelative(e.whenFalse, ctx, depth + 1);
+  if (ts.isConditionalExpression(e)) return relativeChoice([e.whenTrue, e.whenFalse], ctx, depth);
   if (ts.isBinaryExpression(e)) return relativeBinary(e, ctx, depth);
   if (ts.isPrefixUnaryExpression(e) && e.operator === ts.SyntaxKind.MinusToken) return isRelative(e.operand, ctx, depth + 1);
   return undefined;

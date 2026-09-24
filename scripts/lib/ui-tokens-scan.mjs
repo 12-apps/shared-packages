@@ -151,8 +151,8 @@ function isNumberTyped(checker, expr) {
   const type = checker.getTypeAtLocation(expr);
   if ((type.flags & ts.TypeFlags.Any) !== 0) return true;
   const isNum = (t) => (t.flags & ts.TypeFlags.NumberLike) !== 0;
-  const isNullish = (t) => (t.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null)) !== 0;
-  if (type.isUnion()) return type.types.every((t) => isNum(t) || isNullish(t)) && type.types.some(isNum);
+  // A union with a number in it (`number | 'auto'`, `number | undefined`) can carry raw px.
+  if (type.isUnion()) return type.types.some(isNum);
   return isNum(type);
 }
 
@@ -167,27 +167,32 @@ function isTypedRawValue(ctx, key, expr, node) {
   return !(sx && (SPACING_KEYS.has(key) || key === "borderRadius"));
 }
 
-/** `divider ? 1 : 0` — a choice between literals is judged literal by literal. */
-function literalBranches(expr) {
+const isChoice = (e) =>
+  ts.isConditionalExpression(e) ||
+  (ts.isBinaryExpression(e) && [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(e.operatorToken.kind));
+
+/**
+ * The LEAVES of a choice — `c ? 280 : 'auto'`, `a ?? 12`, nested — each judged
+ * on its own. Judging the whole union let a number hide behind a string or
+ * `undefined` in the other branch (`width: open ? 280 : 'auto'`).
+ */
+function leavesOf(expr) {
   const e = unwrap(expr);
-  if (!ts.isConditionalExpression(e)) return null;
-  const a = numericValue(e.whenTrue);
-  const b = numericValue(e.whenFalse);
-  return a !== null && b !== null ? [a, b] : null;
+  if (!isChoice(e)) return [e];
+  return ts.isConditionalExpression(e) ? [...leavesOf(e.whenTrue), ...leavesOf(e.whenFalse)] : [...leavesOf(e.left), ...leavesOf(e.right)];
+}
+
+const isNullishLeaf = (e) => e.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(e) && e.text === "undefined");
+
+function isRawLeaf(ctx, key, leaf, node) {
+  const value = numericValue(leaf);
+  if (value !== null) return isRawNumber(key, value, node);
+  if (isStringy(leaf) || isNullishLeaf(leaf)) return false;
+  return isTypedRawValue(ctx, key, leaf, node);
 }
 
 function checkValue(ctx, key, expr, node) {
-  const branches = literalBranches(expr);
-  if (branches) {
-    if (branches.some((v) => isRawNumber(key, v, node))) ctx.add(ruleForKey(key, "raw-number-length"), node);
-    return;
-  }
-  const value = numericValue(expr);
-  if (value !== null) {
-    if (isRawNumber(key, value, node)) ctx.add(ruleForKey(key, "raw-number-length"), node);
-  } else if (isTypedRawValue(ctx, key, expr, node)) {
-    ctx.add(ruleForKey(key, "raw-number-length"), node);
-  }
+  if (leavesOf(expr).some((leaf) => isRawLeaf(ctx, key, leaf, node))) ctx.add(ruleForKey(key, "raw-number-length"), node);
 }
 
 // ---- checks, one per node kind ---------------------------------------------
