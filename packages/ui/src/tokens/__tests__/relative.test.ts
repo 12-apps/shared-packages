@@ -1,5 +1,5 @@
 import { createTheme } from '@mui/material/styles/index.js';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { rem, remPx, rems, resetRootFontCache, sxRem } from '../relative';
 
@@ -45,39 +45,76 @@ describe('rem', () => {
   });
 });
 
+/**
+ * The root font is read through `getComputedStyle(<html>)`. The tests answer
+ * that read instead of restyling the real `<html>`, which every other test in
+ * the run shares.
+ */
+const realComputedStyle = globalThis.getComputedStyle.bind(globalThis);
+function rootAt(px: number): void {
+  vi.spyOn(globalThis, 'getComputedStyle').mockImplementation((element, pseudo) =>
+    element === document.documentElement
+      ? ({ fontSize: `${px}px` } as CSSStyleDeclaration)
+      : realComputedStyle(element, pseudo),
+  );
+}
+
 describe('remPx', () => {
   const theme = createTheme();
 
   afterEach(() => {
-    document.documentElement.style.fontSize = '';
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     resetRootFontCache();
   });
 
   it('is the px rem() renders at under the default 16px root', () => {
-    document.documentElement.style.fontSize = '16px';
-    resetRootFontCache();
+    rootAt(16);
     expect(remPx(theme, 52)).toBe(52);
   });
 
   it('follows a reader who raised the browser root font', () => {
-    document.documentElement.style.fontSize = '20px';
-    resetRootFontCache();
+    rootAt(20);
     expect(remPx(theme, 52)).toBe(65);
   });
 
-  it('re-measures when the root font changes at runtime', async () => {
-    document.documentElement.style.fontSize = '16px';
-    resetRootFontCache();
+  it('re-measures after the window resizes (a viewport-relative root)', async () => {
+    rootAt(16);
     expect(remPx(theme, 10)).toBe(10);
-    document.documentElement.style.fontSize = '20px';
-    // The MutationObserver on <html style> drops the cache asynchronously.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(remPx(theme, 10)).toBe(12.5);
+    rootAt(20);
+    expect(remPx(theme, 10)).toBe(10);
+    globalThis.dispatchEvent(new Event('resize'));
+    await vi.waitFor(() => expect(remPx(theme, 10)).toBe(12.5));
+  });
+
+  it("re-measures when <html>'s style or class changes (a host's density toggle)", async () => {
+    const onRootChange: MutationCallback[] = [];
+    vi.stubGlobal(
+      'MutationObserver',
+      class {
+        constructor(callback: MutationCallback) {
+          onRootChange.push(callback);
+        }
+        observe = vi.fn();
+        disconnect = vi.fn();
+        takeRecords = vi.fn(() => []);
+      },
+    );
+    // A fresh module, so the watcher is installed through the stub above
+    // rather than by whichever test measured first.
+    vi.resetModules();
+    const fresh = await import('../relative');
+    rootAt(16);
+    expect(fresh.remPx(theme, 10)).toBe(10);
+    rootAt(20);
+    expect(fresh.remPx(theme, 10)).toBe(10);
+    expect(onRootChange).toHaveLength(1);
+    onRootChange[0]?.([], {} as MutationObserver);
+    expect(fresh.remPx(theme, 10)).toBe(12.5);
   });
 
   it('follows a theme with a smaller type base', () => {
-    document.documentElement.style.fontSize = '16px';
-    resetRootFontCache();
+    rootAt(16);
     const compact = createTheme({ typography: { fontSize: 12 } });
     expect(remPx(compact, 14)).toBeCloseTo(12, 10);
   });
