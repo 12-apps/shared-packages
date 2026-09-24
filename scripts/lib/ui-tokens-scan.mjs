@@ -57,7 +57,7 @@ function unwrap(expr) {
 }
 
 /** A numeric literal (negative included, through any wrapper), or null. */
-export function numericValue(expr) {
+function numericValue(expr) {
   const e = unwrap(expr);
   if (!e) return null;
   if (ts.isNumericLiteral(e)) return Number(e.text);
@@ -88,7 +88,7 @@ function keyStep(p) {
   return BREAKPOINT_KEYS.has(key) ? { next: p.parent?.parent } : { key };
 }
 
-export function styleKeyOf(node) {
+function styleKeyOf(node) {
   let p = isProperty(node) ? node : node.parent;
   while (p) {
     const step = keyStep(p);
@@ -127,7 +127,7 @@ function sxVerdict(p) {
 }
 
 /** Whether a node sits inside an `sx` value — where spacing numbers are units and `borderRadius` a shape multiple. */
-export function inSxContext(node) {
+function inSxContext(node) {
   for (let p = node.parent; p; p = p.parent) {
     const verdict = sxVerdict(p);
     if (verdict !== undefined) return verdict;
