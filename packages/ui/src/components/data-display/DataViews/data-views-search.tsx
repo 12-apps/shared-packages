@@ -13,6 +13,7 @@ import TextField from "@mui/material/TextField/index.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Box } from "../../../mui/Box";
+import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
 
 /** How long the box waits after the last keystroke before it queries. */
@@ -167,8 +168,9 @@ export function InlineKeyword({
         ) : undefined,
       }}
       // Takes the free space and gives it up first — step 3 of the ladder,
-      // which needs no flag because flex does it (see `computeSplit`).
-      sx={boxWidth(fill)}
+      // which needs no flag because flex does it (see `computeSplit`). The
+      // corner is the theme's field radius, so the box matches the pills beside it.
+      sx={(theme) => ({ ...boxWidth(fill), "& .MuiOutlinedInput-root": { borderRadius: fieldRadiusPx(theme) } })}
     />
   );
 }
@@ -200,7 +202,7 @@ export function CollapsedSearch({
       sx={{
         position: "relative",
         border: 1,
-        borderRadius: 1,
+        borderRadius: fieldRadiusPx,
         borderColor: active ? "primary.main" : "divider",
         color: active ? "primary.main" : "text.secondary",
         bgcolor: active ? "action.selected" : "background.paper",

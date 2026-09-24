@@ -7,3 +7,4 @@
 export * from './vocabulary';
 export * from './theme';
 export * from './color';
+export { DEFAULT_FIELD_RADIUS } from './field-radius.core';

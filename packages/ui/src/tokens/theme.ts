@@ -8,6 +8,7 @@ import { contrastText, DARK_TEXT_PRIMARY, inkOver } from './ink-over';
 */
 export { contrastText, inkOver };
 import { cssLengthToPx, cssTrackingToEm } from './css-units';
+import { DEFAULT_FIELD_RADIUS } from './field-radius.core';
 import { HEADING_SCALE, type HeadingLevel } from './heading-scale';
 
 import type { SizeValue } from './vocabulary';
@@ -106,8 +107,12 @@ export interface UiTheme {
   /** MUI's `theme.spacing(n)`: `n` units of {@link UiTheme.spacingUnit}, in px. */
   spacing: (units: number) => number;
   spacingUnit: number;
-  /** `md` is MUI's `shape.borderRadius`; the others are its halves and doubles. */
-  radius: { sm: number; md: number; lg: number; xl: number; full: number };
+  /**
+   * `md` is MUI's `shape.borderRadius`; `sm`–`xl` are its halves and doubles.
+   * `field` is not on that scale: it is the one corner every field is drawn
+   * with (see `./field-radius.core`), MUI's `theme.fieldRadius` on the web.
+   */
+  radius: { sm: number; md: number; lg: number; xl: number; full: number; field: number };
   typography: UiTypography;
   zIndex: { appBar: number; drawer: number; modal: number; snackbar: number; tooltip: number };
 }
@@ -128,6 +133,8 @@ export interface UiThemeOptions {
   }>;
   typography?: Partial<Pick<UiTypography, 'fontFamily' | 'monospaceFontFamily'>>;
   spacingUnit?: number;
+  /** The radius every field is drawn with, in dp. Defaults to {@link DEFAULT_FIELD_RADIUS}. */
+  fieldRadius?: number;
 }
 
 const ROOT_FONT_PX = 16;
@@ -311,7 +318,7 @@ export function createUiTheme(options: UiThemeOptions = {}): UiTheme {
     palette,
     spacing: (units: number) => units * spacingUnit,
     spacingUnit,
-    radius: { sm: 2, md: 4, lg: 8, xl: 16, full: 9999 },
+    radius: { sm: 2, md: 4, lg: 8, xl: 16, full: 9999, field: options.fieldRadius ?? DEFAULT_FIELD_RADIUS },
     typography: {
       fontFamily: options.typography?.fontFamily,
       monospaceFontFamily: options.typography?.monospaceFontFamily,

@@ -188,6 +188,39 @@ describe('createAppTheme components', () => {
 });
 
 /**
+ * One corner for every field. The ui package's own fields read `fieldRadius`
+ * themselves; these assert the factory states it, and rounds MUI's bare
+ * controls to the same number so they agree when they share a row.
+ */
+describe('createAppTheme fieldRadius', () => {
+  it('defaults every field to the 8px corner', () => {
+    const theme = createAppTheme('light');
+
+    expect(theme.fieldRadius).toBe(8);
+    expect(theme.components?.MuiOutlinedInput?.styleOverrides?.root).toEqual({ borderRadius: 8 });
+    expect(theme.components?.MuiButton?.styleOverrides?.root).toEqual({ borderRadius: 8 });
+  });
+
+  it("takes the host's radius, and does not move the general one", () => {
+    const theme = createAppTheme('dark', { fieldRadius: 12 });
+
+    expect(theme.fieldRadius).toBe(12);
+    expect(theme.components?.MuiOutlinedInput?.styleOverrides?.root).toEqual({ borderRadius: 12 });
+    // Cards, menus and papers keep MUI's general radius.
+    expect(theme.shape.borderRadius).toBe(4);
+  });
+
+  it("lets a host's own override of a field component win", () => {
+    const theme = createAppTheme('light', {
+      components: { MuiButton: { styleOverrides: { root: { borderRadius: 2 } } } },
+    });
+
+    expect(theme.components?.MuiButton?.styleOverrides?.root).toEqual({ borderRadius: 2 });
+    expect(theme.components?.MuiOutlinedInput?.styleOverrides?.root).toEqual({ borderRadius: 8 });
+  });
+});
+
+/**
  * A HOST's own primary is a brand too.
  *
  * `separateFromBrand` was written for one failure and states it plainly: a brand

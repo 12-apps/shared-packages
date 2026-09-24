@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography/index.js';
 import React, { useId } from 'react';
 
 import type { MultiSelectOption } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 /**
  * Trigger label from the current selection: `allLabel` when none/all are
@@ -173,7 +174,7 @@ export function PillTrigger({
       }
       endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
-        borderRadius: 999,
+        borderRadius: fieldRadiusPx,
         height: 34,
         px: 1.5,
         color: 'text.primary',

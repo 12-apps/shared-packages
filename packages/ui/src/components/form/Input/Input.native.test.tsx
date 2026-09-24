@@ -110,7 +110,8 @@ describe('Input (native)', () => {
     const filled = fieldOf('filled');
     expect(filled.style.borderBottomWidth).toBe(`${INPUT_BORDER.rest}px`);
     expect(filled.style.borderTopWidth).toBe('');
-    expect(filled).toHaveStyle({ borderTopLeftRadius: `${theme.radius.md}px` });
+    expect(filled).toHaveStyle({ borderTopLeftRadius: `${theme.radius.field}px` });
+    expect(fieldOf('glass').style.borderBottomLeftRadius).toBe(`${theme.radius.field}px`);
     expect(fieldOf('under').style.borderBottomWidth).toBe(`${INPUT_BORDER.rest}px`);
     expect(fieldOf('under').style.borderTopWidth).toBe('');
     // `glass` washes the paper at 0.1 and keeps a border on every side.

@@ -19,7 +19,6 @@ import {
   BUTTON_FONT_WEIGHT,
   BUTTON_ICON_GAP_UNITS,
   BUTTON_LINE_HEIGHT,
-  BUTTON_RADIUS_UNITS,
   BUTTON_SIZES,
   BUTTON_SPINNER_SIZE,
   BUTTON_WASH_ALPHA,
@@ -214,7 +213,8 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   const iconOnly = !loading && icon != null && children == null;
   const inactive = Boolean(disabled) || loading;
   const paint = inactive ? disabledPaint(theme, variant) : paintFor(theme, variant, color, palette, active);
-  const radius = theme.spacing(BUTTON_RADIUS_UNITS);
+  // The theme's one field radius, so a button and the input beside it agree.
+  const radius = theme.radius.field;
   const metrics = BUTTON_SIZES[size];
   // The web button is `overflow: hidden` (its ripple needs it) unless the pulse
   // ring turns it visible; on native the glow's shadow needs it visible too,

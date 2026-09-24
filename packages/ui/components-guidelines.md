@@ -42,6 +42,30 @@ Where:
 - [ ] Accessibility attributes (aria-\*, role, etc.)
 - [ ] Theme integration via MUI (web) / `useUiTheme()` (native, when ported)
 - [ ] Responsive design considerations
+- [ ] A field's corner comes from the field radius — never a literal (see below)
+
+### Field Radius
+
+Every **field** — a text input, select, textarea, OTP slot, date or filter
+trigger, toggle, and the buttons that share their rows — is drawn with ONE
+corner: the theme's field radius (default `8`, `DEFAULT_FIELD_RADIUS`). A row
+that mixed MUI's 4px text field, an 8px button and 999px filter pills read as
+three kits glued together; this is the rule that stops it recurring.
+
+| where | read it with |
+|---|---|
+| `styled()` / a `CSSObject` | `fieldRadius(theme)` — a number, in px |
+| `sx` | `fieldRadiusPx` — `sx` multiplies a bare number by `shape.borderRadius` |
+| native | `theme.radius.field` from `useUiTheme()` |
+
+All three are exported from `@12-apps/ui/tokens`. A host sets it with
+`createAppTheme(mode, { fieldRadius })` (`@12-apps/app-shell/react`), with
+`createUiTheme({ fieldRadius })`, or with `fieldRadius` on MUI's `createTheme`;
+`fieldRadiusOverrides(radius)` rounds MUI's own `OutlinedInput`, `FilledInput`,
+`Button` and `ToggleButton` to the same number, so a bare MUI control agrees too.
+
+It is NOT `shape.borderRadius`, which is the general radius cards, menus and
+papers multiply. Badges, counters, chips, menus and cards keep that scale.
 
 ### TypeScript Requirements
 

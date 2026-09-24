@@ -8,11 +8,12 @@ import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import type { ContentToolbarProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 const selectionButtonSx = {
   minWidth: 0,
   height: 'auto',
-  borderRadius: 0.5,
+  borderRadius: fieldRadiusPx,
   fontWeight: 600,
   py: 0.5,
   px: 1.5,

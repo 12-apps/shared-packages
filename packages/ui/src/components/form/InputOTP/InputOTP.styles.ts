@@ -2,6 +2,7 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
 
 interface ColorPalette {
   main: string;
@@ -80,7 +81,7 @@ export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
       fontSize,
       fontWeight: 600,
       textAlign: 'center',
-      borderRadius: theme.spacing(1),
+      borderRadius: fieldRadius(theme),
       ...(glass && {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
         backdropFilter: 'blur(20px)',

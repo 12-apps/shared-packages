@@ -6,6 +6,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import type { ToggleGroupProps } from './ToggleGroup.types';
+import { fieldRadius } from '../../../tokens/field-radius';
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
@@ -46,14 +47,15 @@ const StyledToggleGroup = styled(ToggleButtonGroup, {
 }>(({ theme, glass }) => ({
   backgroundColor: glass ? alpha(theme.palette.background.paper, 0.1) : 'transparent',
   backdropFilter: glass ? 'blur(20px)' : 'none',
-  borderRadius: theme.spacing(1),
+  borderRadius: fieldRadius(theme),
   padding: glass ? 4 : 0,
   border: glass ? `1px solid ${alpha(theme.palette.divider, 0.2)}` : 'none',
 
   '& .MuiToggleButtonGroup-grouped': {
     margin: theme.spacing(0.5),
     border: 0,
-    borderRadius: `${theme.shape.borderRadius}px !important`,
+    // Inset by its own margin, so the inner corner follows the group's outer one.
+    borderRadius: `${Math.max(fieldRadius(theme) - Number.parseFloat(theme.spacing(0.5)), 0)}px !important`,
   },
 }));
 

@@ -13,6 +13,7 @@ import type { CodeEditorProps } from './CodeEditor.types';
 import { EditorToolbar } from './CodeEditorToolbar';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
 
 // Styled components
 const EditorContainer = styled(Paper)(({ theme }) => ({
@@ -22,7 +23,7 @@ const EditorContainer = styled(Paper)(({ theme }) => ({
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
   border: `1px solid ${fieldEdge(theme)}`,
-  borderRadius: theme.shape.borderRadius * 2,
+  borderRadius: fieldRadius(theme),
   overflow: 'hidden' }));
 
 const EditorWrapper = styled(Box, {

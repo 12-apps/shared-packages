@@ -9,6 +9,7 @@ import type { RichTextEditorProps, ToolbarConfig } from './RichTextEditor.types'
 import { RichTextEditorToolbar } from './RichTextEditorToolbar';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 const DEFAULT_TOOLBAR: Required<Omit<ToolbarConfig, 'customItems'>> & Pick<ToolbarConfig, 'customItems'> = {
   bold: true,
@@ -71,7 +72,7 @@ const editorContentSx = (theme: Theme, disabled: boolean, placeholder?: string, 
 
 const shellSx = (theme: Theme, isFocused: boolean, disabled: boolean) => ({
   border: `1px solid ${fieldEdge(theme)}`,
-  borderRadius: 1,
+  borderRadius: fieldRadiusPx(theme),
   overflow: 'hidden',
   transition: 'border-color 0.2s ease-in-out',
   ...(isFocused && {

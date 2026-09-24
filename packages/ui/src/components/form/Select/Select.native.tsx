@@ -22,7 +22,6 @@ import {
   SELECT_GLOW,
   SELECT_ICON,
   SELECT_MENU,
-  SELECT_PULSE,
   inputVariantFor,
   selectInputSize,
 } from './Select.metrics';
@@ -209,7 +208,7 @@ export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
       {pulse ? (
         <FieldPulse
           color={theme.palette.primary.main}
-          radius={theme.spacing(SELECT_PULSE.radiusUnits)}
+          radius={theme.radius.field}
           testID={`${ids.trigger}-pulse`}
         />
       ) : null}

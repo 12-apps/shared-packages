@@ -1,4 +1,5 @@
 import { createTheme, type Theme } from '@12-apps/ui/mui/styles';
+import { DEFAULT_FIELD_RADIUS, fieldRadiusOverrides } from '@12-apps/ui/tokens';
 
 import { brandHex, DEFAULT_SURFACES as CORE_SURFACES, readableInk, separateFromBrand } from '../core/brand-palette';
 
@@ -267,6 +268,15 @@ export interface AppThemeOptions {
    * drawn.
    */
   components?: ThemeComponents;
+  /**
+   * The corner every field is drawn with, in px — inputs, selects, filter
+   * triggers and the buttons beside them. Defaults to {@link DEFAULT_FIELD_RADIUS}.
+   * One number so a row stops mixing 4px boxes, 8px buttons and 999px pills:
+   * `@12-apps/ui`'s fields read it, and the factory rounds MUI's own
+   * `OutlinedInput`, `FilledInput`, `Button` and `ToggleButton` to it too. A
+   * host entry for one of those in {@link components} still wins.
+   */
+  fieldRadius?: number;
 }
 
 /**
@@ -375,15 +385,15 @@ function themePalette(
  * `contrastText` from `main`, so a tenant hex needs no extra plumbing beyond the
  * legibility correction in {@link brandRole}.
  *
- * `components` is the host's, passed through untouched — see
- * {@link AppThemeOptions.components}.
+ * `components` is the host's, laid over the field-radius overrides — see
+ * {@link AppThemeOptions.components} and {@link AppThemeOptions.fieldRadius}.
  */
 export function createAppTheme(mode: ThemeMode = 'light', options: AppThemeOptions = {}): Theme {
+  const fieldRadius = options.fieldRadius ?? DEFAULT_FIELD_RADIUS;
   return createTheme({
     palette: themePalette(mode, options),
-    // Omitted entirely rather than passed as `undefined`: MUI treats an explicit
-    // `components: undefined` the same as absent today, but the spread keeps the
-    // built options identical to what a host that passed nothing used to get.
-    ...(options.components ? { components: options.components } : {}),
+    fieldRadius,
+    // The field corners first, the host's own overrides over them.
+    components: { ...fieldRadiusOverrides(fieldRadius), ...options.components },
   });
 }

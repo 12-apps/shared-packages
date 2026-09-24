@@ -11,6 +11,7 @@ import {
   type UiThemeMode,
 } from '../theme';
 import { getContrastRatio } from '../color';
+import { DEFAULT_FIELD_RADIUS } from '../field-radius.core';
 
 /**
  * The theme's whole purpose is to hand the native renderer the palette MUI
@@ -120,6 +121,12 @@ describe('createUiTheme derives the palette MUI derives', () => {
     expect(built.spacing(2.5)).toBe(20);
     expect(built.radius.md).toBe(createTheme().shape.borderRadius);
     expect(built.radius.lg).toBe(8);
+  });
+
+  it('draws every field with one radius, 8 unless the host picks another', () => {
+    expect(createUiTheme().radius.field).toBe(DEFAULT_FIELD_RADIUS);
+    expect(DEFAULT_FIELD_RADIUS).toBe(8);
+    expect(createUiTheme({ fieldRadius: 12 }).radius.field).toBe(12);
   });
 
   it('px() writes the rem string the web components write', () => {

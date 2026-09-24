@@ -17,7 +17,7 @@ import {
 import { resolveInputProps } from './Input.helpers';
 import { FieldPulse } from '../field-pulse.native';
 import { fieldLook, helperStyle, labelStyle, type FieldState } from './Input.look.native';
-import { ADORNMENT_GAP, INPUT_GLOW, INPUT_LOADING, INPUT_PULSE } from './Input.metrics';
+import { ADORNMENT_GAP, INPUT_GLOW, INPUT_LOADING } from './Input.metrics';
 import type { InputProps } from './Input.types.native';
 import { webAria, webClick, webDisabled } from '../../../platform/aria';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
@@ -180,7 +180,7 @@ export const Input = React.forwardRef<RNTextInput, InputProps>((rawProps, ref) =
       {pulse ? (
         <FieldPulse
           color={theme.palette.primary.main}
-          radius={theme.spacing(INPUT_PULSE.radiusUnits)}
+          radius={theme.radius.field}
           testID={idFor('pulse')}
         />
       ) : null}

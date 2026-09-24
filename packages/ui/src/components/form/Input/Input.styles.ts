@@ -13,6 +13,7 @@ import {
 import type { InputProps } from './Input.types';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
 
 type InputVariant = NonNullable<InputProps['variant']>;
 
@@ -56,7 +57,7 @@ export const pulseStyles = (theme: Theme): CSSObject => ({
     right: '0',
     height: `${INPUT_PULSE.height}px`,
     transform: 'translateY(-50%)',
-    borderRadius: theme.spacing(INPUT_PULSE.radiusUnits),
+    borderRadius: fieldRadius(theme),
     backgroundColor: theme.palette.primary.main,
     opacity: INPUT_PULSE.opacity,
     animation: `${pulseAnimation} ${INPUT_PULSE.ms / 1000}s infinite`,
@@ -75,6 +76,18 @@ export const floatingLabelStyles = (theme: Theme): CSSObject => ({
     },
   },
 });
+
+/**
+ * The field's corner: the theme's one field radius (see `tokens/field-radius`).
+ * `filled` rounds its top two only — its bottom edge is the underline — and
+ * `underline` none, which is how MUI draws those two variants.
+ */
+export const inputRadiusStyles = (theme: Theme, variant?: InputVariant): CSSObject => {
+  if (variant === 'underline') return {};
+  const radius = fieldRadius(theme);
+  if (variant === 'filled') return { borderTopLeftRadius: radius, borderTopRightRadius: radius };
+  return { borderRadius: radius };
+};
 
 export const inputBaseStyles = (theme: Theme, variant?: InputVariant): CSSObject => {
   switch (variant) {

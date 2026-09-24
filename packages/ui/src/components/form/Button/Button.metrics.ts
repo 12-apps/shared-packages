@@ -61,8 +61,6 @@ export const ICON_ONLY_PADDING: Record<SizeValue, number> = {
 export const BUTTON_ICON_GLYPH_SIZE = 20;
 
 export const BUTTON_FONT_WEIGHT = 500;
-/** `theme.spacing(1)`. */
-export const BUTTON_RADIUS_UNITS = 1;
 /** Between the icon and the label: `theme.spacing(0.5)`. */
 export const BUTTON_ICON_GAP_UNITS = 0.5;
 export const BUTTON_SPINNER_SIZE = 16;

@@ -11,6 +11,7 @@ import {
   floatingLabelStyles,
   glowStyles,
   inputBaseStyles,
+  inputRadiusStyles,
   muiVariantFor,
   outlinedStyles,
   pulseStyles,
@@ -45,6 +46,7 @@ const StyledTextField = styled(TextFieldSlim, {
 
   '& .MuiInputBase-root': {
     transition: 'all 0.3s ease',
+    ...inputRadiusStyles(theme, customVariant),
     ...inputBaseStyles(theme, customVariant),
   },
 

@@ -32,6 +32,7 @@ import {
   rangeChipLabel,
 } from './data-views-range-values';
 import type { RangeFieldConfig, RangeValue } from './data-views-types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 
 
@@ -226,7 +227,7 @@ function RangeTrigger<T extends Record<string, unknown>>({
       }
       endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
-        borderRadius: 999,
+        borderRadius: fieldRadiusPx,
         height: 34,
         px: 1.5,
         maxWidth: 280,
