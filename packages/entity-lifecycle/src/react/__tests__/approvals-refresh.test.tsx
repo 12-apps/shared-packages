@@ -6,7 +6,7 @@ import { changeRequest } from '../__stories__/fixtures';
 import type { ApprovalRequestWire, ApprovalStatusWire } from '../api';
 import { createWebEntityLifecycle } from '../create-web-entity-lifecycle';
 import { PT_BR_LIFECYCLE_WEB_COPY } from '../pt-BR';
-import type { LifecycleResult, LifecycleTransport } from '../transport';
+import { LifecycleHttpError, type LifecycleResult, type LifecycleTransport } from '../transport';
 
 /**
  * The inbox's two host hooks (FUT-2520), driven through the FACTORY's
@@ -16,7 +16,11 @@ import type { LifecycleResult, LifecycleTransport } from '../transport';
  *  - `refreshSignal`: a change re-reads the current status in the background,
  *    with the rows left mounted, and a read answering for a status the user
  *    already left never lands;
- *  - `onDecided`: once per successful decision, never for a refused one.
+ *  - `onDecided`: once per successful decision, never for a refused one, and
+ *    a hook that throws cannot escape the click.
+ *
+ * A failed refresh keeps the rows (a 403 aside), and a signal that arrives
+ * while the list is LOADING waits for the load instead of superseding it.
  */
 
 afterEach(cleanup);
@@ -35,6 +39,7 @@ function inboxTransport(writes: LifecycleResult<unknown>[] = []) {
     REJECTED: [],
   };
   const held = new Map<ApprovalStatusWire, Promise<void>>();
+  const failing = new Map<ApprovalStatusWire, Error>();
   const reads: string[] = [];
   const sends: string[] = [];
 
@@ -43,8 +48,11 @@ function inboxTransport(writes: LifecycleResult<unknown>[] = []) {
       reads.push(url);
       const status = /[?&]status=(\w+)/.exec(url)?.[1] as ApprovalStatusWire;
       const gate = held.get(status);
+      const failure = failing.get(status);
       held.delete(status);
+      failing.delete(status);
       if (gate) await gate;
+      if (failure) throw failure;
       // Answer with the list as it stands WHEN the read resolves.
       return { data: { requests: answers[status] } } as T;
     },
@@ -61,8 +69,21 @@ function inboxTransport(writes: LifecycleResult<unknown>[] = []) {
     return () => openers.forEach((open) => open());
   }
 
-  return { transport, answers, reads, sends, hold };
+  /** Make the next read of `status` to START fail with `error`. */
+  function fail(status: ApprovalStatusWire, error: Error): void {
+    failing.set(status, error);
+  }
+
+  return { transport, answers, reads, sends, hold, fail };
 }
+
+/** The error state's title — the load failure a refresh must not surface. */
+const LOAD_FAILED = PT_BR_LIFECYCLE_WEB_COPY.approvals.loadFailedTitle;
+
+/** Let any read that just settled reach the screen. */
+const flush = async (): Promise<void> => {
+  await act(async () => undefined);
+};
 
 function screenOver(transport: LifecycleTransport) {
   return createWebEntityLifecycle({
@@ -149,6 +170,90 @@ describe('ApprovalsScreen refreshSignal', () => {
   });
 });
 
+describe('ApprovalsScreen refreshSignal failures and overlaps', () => {
+  it('keeps the rows when a refresh fails, with no error and no loading state', async () => {
+    const inbox = inboxTransport();
+    inbox.answers.PENDING = [changeRequest({ id: 'cr-1' })];
+    const Screen = screenOver(inbox.transport);
+    const { rerender } = render(<Screen refreshSignal={0} />);
+    await waitFor(() => expect(screen.getByTestId('approval-request-cr-1')).toBeTruthy());
+
+    inbox.fail('PENDING', new Error('Falha de rede.'));
+    rerender(<Screen refreshSignal={1} />);
+    await waitFor(() => expect(inbox.reads).toHaveLength(2));
+    await flush();
+
+    expect(screen.getByTestId('approval-request-cr-1')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText(LOAD_FAILED)).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('approvals-loading')).toBeNull());
+  });
+
+  it('queues a signal that arrives mid-load, so a failed refresh cannot hide the load', async () => {
+    // The page's own decision re-loads the list AND triggers the hint that
+    // bumps the signal. The refresh must wait for the load, not supersede it.
+    const inbox = inboxTransport();
+    inbox.answers.PENDING = [changeRequest({ id: 'cr-1' })];
+    const Screen = screenOver(inbox.transport);
+    const releaseLoad = inbox.hold('PENDING');
+    const { rerender } = render(<Screen refreshSignal={0} />);
+    await waitFor(() => expect(screen.getByTestId('approvals-loading')).toBeTruthy());
+
+    inbox.fail('PENDING', new Error('Falha de rede.'));
+    rerender(<Screen refreshSignal={1} />);
+    // Queued, not sent: only the load is in flight.
+    expect(inbox.reads).toHaveLength(1);
+
+    await act(async () => releaseLoad());
+    await waitFor(() => expect(screen.getByTestId('approval-request-cr-1')).toBeTruthy());
+    // …and then the ONE queued refresh ran, failed, and left the rows alone.
+    await waitFor(() => expect(inbox.reads).toHaveLength(2));
+    await flush();
+    expect(screen.getByTestId('approval-request-cr-1')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText(LOAD_FAILED)).toBeNull());
+  });
+
+  it('drops a FAILED refresh answering for a status the user already left', async () => {
+    const inbox = inboxTransport();
+    inbox.answers.PENDING = [changeRequest({ id: 'cr-1' })];
+    inbox.answers.APPROVED = [changeRequest({ id: 'cr-9', status: 'APPROVED' })];
+    const Screen = screenOver(inbox.transport);
+    const { rerender } = render(<Screen refreshSignal={0} />);
+    await waitFor(() => expect(screen.getByTestId('approval-request-cr-1')).toBeTruthy());
+
+    const releasePending = inbox.hold('PENDING');
+    inbox.fail('PENDING', new Error('Falha de rede.'));
+    rerender(<Screen refreshSignal={1} />);
+    await waitFor(() => expect(inbox.reads).toHaveLength(2));
+
+    const releaseApproved = inbox.hold('APPROVED');
+    fireEvent.click(screen.getByTestId('approvals-filter-APPROVED'));
+    await waitFor(() => expect(screen.getByTestId('approvals-loading')).toBeTruthy());
+
+    // The stale PENDING failure lands while Aprovadas is loading — dropped.
+    await act(async () => releasePending());
+    await flush();
+    await waitFor(() => expect(screen.queryByText(LOAD_FAILED)).toBeNull());
+    expect(screen.getByTestId('approvals-loading')).toBeTruthy();
+
+    await act(async () => releaseApproved());
+    await waitFor(() => expect(screen.getByTestId('approval-request-cr-9')).toBeTruthy());
+  });
+
+  it('lets a refresh answered 403 through: the feature was switched off', async () => {
+    const inbox = inboxTransport();
+    inbox.answers.PENDING = [changeRequest({ id: 'cr-1' })];
+    const Screen = screenOver(inbox.transport);
+    const { rerender } = render(<Screen refreshSignal={0} />);
+    await waitFor(() => expect(screen.getByTestId('approval-request-cr-1')).toBeTruthy());
+
+    inbox.fail('PENDING', new LifecycleHttpError(403, 'Recurso não está ativo.'));
+    rerender(<Screen refreshSignal={1} />);
+
+    await waitFor(() => expect(screen.getByTestId('approvals-feature-off')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByTestId('approval-request-cr-1')).toBeNull());
+  });
+});
+
 describe('ApprovalsScreen onDecided', () => {
   it('fires once per successful approve or reject, and not for a refused one', async () => {
     const inbox = inboxTransport([
@@ -182,5 +287,36 @@ describe('ApprovalsScreen onDecided', () => {
       `${API_BASE}/approvals/cr-2/reject`,
       `${API_BASE}/approvals/cr-1/approve`,
     ]);
+  });
+
+  it('absorbs a throwing or rejecting hook: the decision stands, the list re-reads', async () => {
+    // Plain functions, not `vi.fn`: the spy would attach its own handler to a
+    // returned promise and hide the unhandled rejection this case catches
+    // (vitest fails the run on one).
+    const heard: string[] = [];
+    const hooks = [
+      () => {
+        heard.push('sync');
+        throw new Error('badge down');
+      },
+      async () => {
+        heard.push('async');
+        throw new Error('badge down');
+      },
+    ];
+    for (const hook of hooks) {
+      const inbox = inboxTransport();
+      inbox.answers.PENDING = [changeRequest({ id: 'cr-1' })];
+      const Screen = screenOver(inbox.transport);
+      const { unmount } = render(<Screen onDecided={hook} />);
+      await waitFor(() => expect(screen.getByTestId('approval-approve-cr-1')).toBeTruthy());
+
+      fireEvent.click(screen.getByTestId('approval-approve-cr-1'));
+      await waitFor(() => expect(inbox.reads).toHaveLength(2));
+      await waitFor(() => expect(screen.getByTestId('approval-request-cr-1')).toBeTruthy());
+      await waitFor(() => expect(screen.queryByTestId('approvals-error')).toBeNull());
+      unmount();
+    }
+    expect(heard).toEqual(['sync', 'async']);
   });
 });

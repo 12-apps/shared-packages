@@ -156,17 +156,28 @@ per-route call to forget. It fires, with the tenant's id:
 | Store call | Fires | Reached from |
 |---|---|---|
 | `create` resolves | once | every intercepted write: `entity(type).lifecycle` create/update/softDelete, the generated restore and draft-publish routes |
-| `decide` returns `true` | once | `POST /approvals/:requestId/approve` and `…/reject` |
+| `decide` returns `true` | once | `POST /approvals/:requestId/approve` and `…/reject` — for an approve this is the CLAIM, before the parked write is applied |
 | `decide` returns `false` | never | a lost decide race (the 409) changed nothing |
 | `reopen` resolves | once | an approval whose apply failed, rolled back to PENDING (after the claim's own call, so twice for that request) |
 
 An applied write (approvals off, or an actor who may approve) never reaches
 the queue and calls nothing.
 
-Each store call has committed when it returns, so the callback runs after the
-commit. It is fire-and-forget: it is not awaited, and neither a throw nor a
-rejected promise from it can fail the write — the host's callback owns its own
-error reporting. It carries no payload beyond the tenant: a listener re-reads.
+Two timing caveats, both about what a listener may re-read:
+
+- **An approve fires on the claim**, before the parked write is applied. That
+  is right for the queue (the request has already left PENDING) but too early
+  for a list of the entities themselves: the change may not be there yet, and
+  if applying it fails the `reopen` fires a second time.
+- **"After the commit" assumes a non-transactional client.** Each store call
+  is a standalone write, so it has committed when it returns — as long as
+  `db` hands back an ordinary client. A provider that returns a client bound
+  to a host transaction moves the commit to the host, and the callback then
+  runs BEFORE it.
+
+It is fire-and-forget: it is not awaited, and neither a throw nor a rejected
+promise from it can fail the write — the host's callback owns its own error
+reporting. It carries no payload beyond the tenant: a listener re-reads.
 
 ### `LifecycleEntityRegistration`
 
@@ -204,8 +215,8 @@ neither renders exactly as before. `page` takes none.
 
 | Prop | Notes |
 |---|---|
-| `refreshSignal` | any value; each CHANGE re-reads the current status list in the background — the rows stay on screen and no loading state shows. The mount's first value reads nothing extra. A counter bumped on a realtime hint (the server's `onApprovalsChanged`) or a window focus is the intended shape. A status chip still blanks and reloads as before, and a background read answering for a status the user has since left is dropped |
-| `onDecided` | `() => void`, called once after each SUCCESSFUL approve or reject (never a refused one), so the host can refresh its own copy of the queue — a nav badge, say |
+| `refreshSignal` | any value; each CHANGE re-reads the current status list in the background — the rows stay on screen and no loading state shows. The mount's first value reads nothing extra. A counter bumped on a realtime hint (the server's `onApprovalsChanged`) or a window focus is the intended shape. A status chip still blanks and reloads as before, and a background read answering for a status the user has since left is dropped. A change while the list is LOADING is queued and read once the load lands. A failed refresh keeps the rows on screen, except a 403, which shows the feature-off notice |
+| `onDecided` | `() => void`, called once after each SUCCESSFUL approve or reject (never a refused one), so the host can refresh its own copy of the queue — a nav badge, say. A throw or rejected promise from it is swallowed: the decision stands and the list still re-reads |
 
 ```tsx
 const [tick, setTick] = useState(0);

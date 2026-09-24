@@ -71,12 +71,15 @@ export interface EntityLifecycleServerConfig {
    * whose apply failed went back to PENDING. A host re-broadcasts it (a
    * realtime hint, a cache bust) so an open inbox and its badge re-read.
    *
-   * Runs AFTER the store write has committed, is not awaited, and can never
-   * fail that write — a throw or a rejected promise is swallowed. A lost
-   * decide race and an applied (unintercepted) write change no queue and call
-   * nothing. It covers the generated routes and the host's own
-   * `entity(type).lifecycle` writes alike, because it is wired on the shared
-   * `stores.approvals`.
+   * Runs after the store write returns — which is after its commit while
+   * `db` hands back an ordinary client, NOT when it hands back one bound to a
+   * host transaction. An approve fires on the claim, BEFORE the parked write
+   * is applied: right for the queue, too early to re-read the entity itself.
+   * Not awaited, and it can never fail the write — a throw or a rejected
+   * promise is swallowed. A lost decide race and an applied (unintercepted)
+   * write change no queue and call nothing. It covers the generated routes
+   * and the host's own `entity(type).lifecycle` writes alike, because it is
+   * wired on the shared `stores.approvals`.
    */
   onApprovalsChanged?: ApprovalsChangedListener;
 }

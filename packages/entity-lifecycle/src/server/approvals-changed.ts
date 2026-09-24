@@ -9,11 +9,14 @@
  * host's own `entity(type).lifecycle` writes alike. One decoration therefore
  * covers them all, and a new route can never forget to call it.
  *
- * Each store call is a standalone write that has committed when it returns,
- * so the callback runs after the commit, never inside it. It is a hint, not a
- * participant: it is not awaited, and neither a throw nor a rejected promise
- * from it can fail the write that triggered it. The host's callback owns its
- * own error reporting.
+ * Each store call is a standalone write, so while the db provider hands back
+ * an ordinary (non-transactional) client it has committed when it returns and
+ * the callback runs after the commit. A provider that hands back a client
+ * bound to a host transaction moves the commit to the host, and the callback
+ * then runs BEFORE it — a listener that re-reads straight away could miss it.
+ * The callback is a hint, not a participant: it is not awaited, and neither a
+ * throw nor a rejected promise from it can fail the write that triggered it.
+ * The host's callback owns its own error reporting.
  */
 
 import type { ApprovalStore } from '../types';
@@ -40,7 +43,9 @@ function notifier(listener: ApprovalsChangedListener): (tenantId: string) => voi
  *
  *  - `create` — a write was parked (a new PENDING request);
  *  - `decide` — only when it returned `true`: a request left PENDING. A lost
- *    compare-and-set race changed nothing, so it reports nothing;
+ *    compare-and-set race changed nothing, so it reports nothing. For an
+ *    approve this is the CLAIM, which comes before the parked write is
+ *    applied: right for the queue, too early for a list of the entities;
  *  - `reopen` — an approval whose apply failed went back to PENDING.
  *
  * Reads pass straight through.

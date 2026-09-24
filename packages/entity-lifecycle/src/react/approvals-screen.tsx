@@ -42,6 +42,8 @@ export interface ApprovalsScreenHostProps {
   /**
    * Called once after each SUCCESSFUL approve or reject (never a refused one),
    * so the host can refresh its own copy of the queue, such as a nav badge.
+   * A throw or a rejected promise from it is swallowed: it cannot turn the
+   * decision into a failure, and the host's hook reports its own errors.
    */
   onDecided?: () => void;
 }
@@ -73,6 +75,23 @@ interface DecisionActions {
   reject: (note: string) => Promise<void>;
 }
 
+/**
+ * Tell the host a decision stood. Its hook can never undo that: a throw or a
+ * rejected promise from it is swallowed rather than escaping the click as an
+ * unhandled rejection. The decision is recorded and the list re-reads either
+ * way, and the host's hook owns its own error reporting.
+ */
+function notifyDecided(onDecided: (() => void) | undefined): void {
+  if (!onDecided) return;
+  // Widened to `unknown` so an ASYNC hook's rejection is absorbed too.
+  const hook: () => unknown = onDecided;
+  try {
+    Promise.resolve(hook()).catch(() => undefined);
+  } catch {
+    // A synchronous throw is the host's bug; the decision already stood.
+  }
+}
+
 /** Decision dispatch state: approve, and the note-gated reject dialog. */
 function useDecisionActions(
   api: LifecycleApiClient,
@@ -93,7 +112,7 @@ function useDecisionActions(
       const result = await dispatch();
       if (result.ok) {
         refetch();
-        onDecided?.();
+        notifyDecided(onDecided);
       } else setError(result.error);
     } finally {
       setBusyId(null);
