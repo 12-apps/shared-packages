@@ -14,6 +14,8 @@ export { headingMetrics } from './typography';
 // host can build a `UiTheme` from the same module path a native one does.
 export * from './theme';
 export * from './color';
+// The relative-size vocabulary every component writes its sizes in (FUT-2585).
+export { rem, rems, remPx, resetRootFontCache, sxRem } from './relative';
 export { DEFAULT_FIELD_RADIUS, fieldRadius, fieldRadiusOverrides, fieldRadiusPx, fieldRootStyles } from './field-radius';
 export {
   asFieldSize,
