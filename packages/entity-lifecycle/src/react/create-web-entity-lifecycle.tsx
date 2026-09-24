@@ -5,7 +5,7 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { Stack } from '@12-apps/ui/mui/Stack';
 
 import { createLifecycleApiClient, type LifecycleApiClient } from './api';
-import { ApprovalsScreen } from './approvals-screen';
+import { ApprovalsScreen, type ApprovalsScreenHostProps } from './approvals-screen';
 import type { LifecycleWebCopy } from './copy';
 import { DraftBanner, type DraftBannerProps } from './draft-banner';
 import { type EntityTypeLabels } from './labels';
@@ -51,7 +51,12 @@ export interface WebEntityLifecycle {
   page: ComponentType;
   /** The two screens individually, for hosts that route them themselves. */
   RecycleBinScreen: ComponentType;
-  ApprovalsScreen: ComponentType;
+  /**
+   * The inbox alone. It takes the host's optional `refreshSignal` (a change
+   * re-reads in the background) and `onDecided` (after each successful
+   * decision) — the hooks a host needs to keep it and a badge live.
+   */
+  ApprovalsScreen: ComponentType<ApprovalsScreenHostProps>;
   /** Per-entity pieces a host mounts inside its own editors. */
   VersionHistoryDialog: ComponentType<VersionHistoryDialogProps>;
   DraftBanner: ComponentType<DraftBannerProps>;
@@ -126,8 +131,9 @@ export function createWebEntityLifecycle(config: EntityLifecycleWebConfig): WebE
     RecycleBinScreen: () => (
       <RecycleBinScreen api={api} labels={labels} copy={copy.recycleBin} />
     ),
-    ApprovalsScreen: () => (
+    ApprovalsScreen: (props) => (
       <ApprovalsScreen
+        {...props}
         api={api}
         labels={labels}
         copy={copy.approvals}

@@ -32,6 +32,7 @@
 import { createEntityLifecycle, type EntityLifecycle } from '../service';
 import type { LifecycleContext, LifecycleStores } from '../types';
 
+import { notifyingApprovalStore, type ApprovalsChangedListener } from './approvals-changed';
 import {
   contextOf,
   type LifecycleActor,
@@ -64,6 +65,20 @@ export interface EntityLifecycleServerConfig {
    * host from paying for a choice it never makes.
    */
   messages: LifecycleCopySource<LifecycleMessages>;
+  /**
+   * Told, with the tenant's id, whenever that tenant's approvals queue moved:
+   * a write was parked, a request was approved or rejected, or an approval
+   * whose apply failed went back to PENDING. A host re-broadcasts it (a
+   * realtime hint, a cache bust) so an open inbox and its badge re-read.
+   *
+   * Runs AFTER the store write has committed, is not awaited, and can never
+   * fail that write — a throw or a rejected promise is swallowed. A lost
+   * decide race and an applied (unintercepted) write change no queue and call
+   * nothing. It covers the generated routes and the host's own
+   * `entity(type).lifecycle` writes alike, because it is wired on the shared
+   * `stores.approvals`.
+   */
+  onApprovalsChanged?: ApprovalsChangedListener;
 }
 
 /** A registered collection's service + per-request context builder. */
@@ -90,6 +105,18 @@ export interface ApiEntityLifecycle {
 
 const RESERVED_SLUGS = new Set(['recycle-bin', 'approvals']);
 
+/**
+ * Decorate the ONE approval store every collection and route shares, so the
+ * host hears about each queue change exactly once, whichever path wrote it.
+ */
+function withApprovalsListener(
+  stores: LifecycleStores,
+  listener: ApprovalsChangedListener | undefined,
+): LifecycleStores {
+  if (!listener || !stores.approvals) return stores;
+  return { ...stores, approvals: notifyingApprovalStore(stores.approvals, listener) };
+}
+
 export function createApiEntityLifecycle(
   config: EntityLifecycleServerConfig,
 ): ApiEntityLifecycle {
@@ -98,7 +125,10 @@ export function createApiEntityLifecycle(
   // assembly, say) reads the DEFAULT rendering, which is the right one: nobody
   // is being answered yet.
   const messages = config.messages;
-  const stores = createDbLifecycleStores(config.db);
+  const stores = withApprovalsListener(
+    createDbLifecycleStores(config.db),
+    config.onApprovalsChanged,
+  );
 
   const entities = new Map<string, RegisteredEntity>();
   const slugs = new Set<string>();

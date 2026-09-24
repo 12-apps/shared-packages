@@ -137,7 +137,36 @@ declaration per collection rather than hand-written per entity.
 | `entities` | yes | — | one `LifecycleEntityRegistration` per collection (below) |
 | `directory` | no | system fallback names | `getUsers(ids)` — actor names on history/bin/approvals |
 | `messages` | yes | — | every refusal the surface answers with — the host's words (pt-BR hosts pass `PT_BR_LIFECYCLE_MESSAGES` from `/server`) |
+| `onApprovalsChanged` | no | — | `(tenantId) => void` — told whenever that tenant's approvals queue moved (below) |
 | `resolveActor` (hono) | yes | — | `LifecycleActor` or `null` (→ 401); includes the tenant's two feature layers |
+
+### `onApprovalsChanged` — hearing the queue move
+
+The inbox and any count of it (a nav badge) are reads the package cannot
+refresh on its own: the queue changes when a colleague's write is parked, or
+when a request is decided in another tab or by an agent. `onApprovalsChanged`
+is the host's one place to hear that, and to re-broadcast it however it likes
+(a realtime hint, a cache bust). The package itself knows nothing about
+either.
+
+It is wired ONCE, on the shared `stores.approvals`, so it covers the generated
+routes and the host's own `entity(type).lifecycle` writes alike — there is no
+per-route call to forget. It fires, with the tenant's id:
+
+| Store call | Fires | Reached from |
+|---|---|---|
+| `create` resolves | once | every intercepted write: `entity(type).lifecycle` create/update/softDelete, the generated restore and draft-publish routes |
+| `decide` returns `true` | once | `POST /approvals/:requestId/approve` and `…/reject` |
+| `decide` returns `false` | never | a lost decide race (the 409) changed nothing |
+| `reopen` resolves | once | an approval whose apply failed, rolled back to PENDING (after the claim's own call, so twice for that request) |
+
+An applied write (approvals off, or an actor who may approve) never reaches
+the queue and calls nothing.
+
+Each store call has committed when it returns, so the callback runs after the
+commit. It is fire-and-forget: it is not awaited, and neither a throw nor a
+rejected promise from it can fail the write — the host's callback owns its own
+error reporting. It carries no payload beyond the tenant: a listener re-reads.
 
 ### `LifecycleEntityRegistration`
 
@@ -167,6 +196,22 @@ declaration per collection rather than hand-written per entity.
 
 The package ships no label catalog: every host — the origin host included —
 names its own, which is the same conclusion rbac's catalog reached.
+
+#### `ApprovalsScreen` props (`ApprovalsScreenHostProps`)
+
+The returned `ApprovalsScreen` takes two optional props; a host that passes
+neither renders exactly as before. `page` takes none.
+
+| Prop | Notes |
+|---|---|
+| `refreshSignal` | any value; each CHANGE re-reads the current status list in the background — the rows stay on screen and no loading state shows. The mount's first value reads nothing extra. A counter bumped on a realtime hint (the server's `onApprovalsChanged`) or a window focus is the intended shape. A status chip still blanks and reloads as before, and a background read answering for a status the user has since left is dropped |
+| `onDecided` | `() => void`, called once after each SUCCESSFUL approve or reject (never a refused one), so the host can refresh its own copy of the queue — a nav badge, say |
+
+```tsx
+const [tick, setTick] = useState(0);
+useApprovalsHint(() => setTick((n) => n + 1));   // the host's realtime/focus glue
+<lifecycle.ApprovalsScreen refreshSignal={tick} onDecided={invalidateBadge} />
+```
 
 ## The endpoints
 
