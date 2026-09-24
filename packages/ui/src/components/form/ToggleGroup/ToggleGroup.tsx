@@ -6,7 +6,11 @@ import type { Theme } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import type { ToggleGroupProps } from './ToggleGroup.types';
+import { cssLengthToPx } from '../../../tokens/css-units';
 import { fieldRadius } from '../../../tokens/field-radius';
+
+const GLASS_PADDING = 4;
+const GLASS_BORDER = 1;
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
@@ -44,20 +48,26 @@ const StyledToggleGroup = styled(ToggleButtonGroup, {
   customColor?: string;
   customSize?: string;
   glass?: boolean;
-}>(({ theme, glass }) => ({
-  backgroundColor: glass ? alpha(theme.palette.background.paper, 0.1) : 'transparent',
-  backdropFilter: glass ? 'blur(20px)' : 'none',
-  borderRadius: fieldRadius(theme),
-  padding: glass ? 4 : 0,
-  border: glass ? `1px solid ${alpha(theme.palette.divider, 0.2)}` : 'none',
+}>(({ theme, glass }) => {
+  // Each button is the field, so it takes the field radius. The glass frame
+  // around them is inset by its padding, the buttons' margin and its border,
+  // and rounds by that much more so the two corners stay concentric.
+  const radius = fieldRadius(theme);
+  const inset = GLASS_PADDING + cssLengthToPx(theme.spacing(0.5), 4) + GLASS_BORDER;
+  return {
+    backgroundColor: glass ? alpha(theme.palette.background.paper, 0.1) : 'transparent',
+    backdropFilter: glass ? 'blur(20px)' : 'none',
+    borderRadius: glass ? radius + inset : radius,
+    padding: glass ? GLASS_PADDING : 0,
+    border: glass ? `${GLASS_BORDER}px solid ${alpha(theme.palette.divider, 0.2)}` : 'none',
 
-  '& .MuiToggleButtonGroup-grouped': {
-    margin: theme.spacing(0.5),
-    border: 0,
-    // Inset by its own margin, so the inner corner follows the group's outer one.
-    borderRadius: `${Math.max(fieldRadius(theme) - Number.parseFloat(theme.spacing(0.5)), 0)}px !important`,
-  },
-}));
+    '& .MuiToggleButtonGroup-grouped': {
+      margin: theme.spacing(0.5),
+      border: 0,
+      borderRadius: `${radius}px !important`,
+    },
+  };
+});
 
 export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
   (

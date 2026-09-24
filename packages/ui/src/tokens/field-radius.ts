@@ -1,4 +1,4 @@
-import type { Components, Theme } from '@mui/material/styles/index.js';
+import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { DEFAULT_FIELD_RADIUS } from './field-radius.core';
 
@@ -52,13 +52,26 @@ export function fieldRadiusPx(theme: Theme): string {
 }
 
 /**
+ * The field radius on a MUI `TextField`'s input root — for a composite that
+ * renders MUI's own `TextField`, so it follows the theme's field radius under
+ * ANY theme, not only one built with {@link fieldRadiusOverrides}. Plain CSS
+ * with the unit, so it works as `styled()` styles and as an `sx` entry.
+ */
+export function fieldRootStyles(theme: Theme): CSSObject {
+  const radius = fieldRadiusPx(theme);
+  return {
+    '& .MuiOutlinedInput-root': { borderRadius: radius },
+    '& .MuiFilledInput-root': { borderTopLeftRadius: radius, borderTopRightRadius: radius },
+  };
+}
+
+/**
  * MUI component overrides that round MUI's OWN fields to `radius`.
  *
- * This package's components read {@link fieldRadius} themselves, so they are
- * right under any theme. These overrides are for the rest: a bare `TextField`,
- * `Select` or `Button` a host (or a composite in this package) renders straight
- * from MUI would otherwise keep `shape.borderRadius` and sit in the row with a
- * different corner. A theme builder spreads them into `components`, under the
+ * This package's fields read {@link fieldRadius} themselves, so they are right
+ * under any theme. These overrides are for the host's: a bare `TextField`,
+ * `Select` or `Button` a host renders straight from MUI would otherwise keep
+ * `shape.borderRadius` and sit in the row with a different corner. A theme builder spreads them into `components`, under the
  * host's own entries so a host override still wins.
  *
  * `FilledInput` rounds its top corners only — its bottom edge is the underline.

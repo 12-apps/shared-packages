@@ -6,6 +6,7 @@ import Button from '@mui/material/Button/index.js';
 import React from 'react';
 
 import type { FilterTriggerProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 /**
  * Labeled filter toggle: a "Filtros" button (styled like the sibling toolbar
@@ -37,6 +38,7 @@ export function FilterTrigger({
         height: 32,
         px: 1,
         gap: 0.25,
+        borderRadius: fieldRadiusPx,
         textTransform: 'none',
         fontWeight: 600,
         color: active ? 'primary.main' : 'text.primary',

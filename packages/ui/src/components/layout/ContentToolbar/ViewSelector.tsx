@@ -18,6 +18,7 @@ import type SvgIcon from '@mui/material/SvgIcon/index.js';
 import React, { useState } from 'react';
 
 import type { ViewMode, ViewSelectorProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof SvgIcon }[] = [
   { value: 'grid', label: 'Grid View', icon: GridIcon },
@@ -66,7 +67,7 @@ export function ViewSelector({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 1, color: 'text.secondary' }}
+        sx={{ minWidth: 0, height: 32, px: 1, gap: 1, borderRadius: fieldRadiusPx, color: 'text.secondary' }}
       >
         <ActiveIcon sx={{ fontSize: 16 }} />
         <ChevronDownIcon sx={{ fontSize: 14 }} />

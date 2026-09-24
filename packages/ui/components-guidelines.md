@@ -56,13 +56,20 @@ three kits glued together; this is the rule that stops it recurring.
 |---|---|
 | `styled()` / a `CSSObject` | `fieldRadius(theme)` — a number, in px |
 | `sx` | `fieldRadiusPx` — `sx` multiplies a bare number by `shape.borderRadius` |
+| a composite on MUI's own `TextField` | `fieldRootStyles` — as `styled()` styles or an `sx` entry |
 | native | `theme.radius.field` from `useUiTheme()` |
 
-All three are exported from `@12-apps/ui/tokens`. A host sets it with
-`createAppTheme(mode, { fieldRadius })` (`@12-apps/app-shell/react`), with
-`createUiTheme({ fieldRadius })`, or with `fieldRadius` on MUI's `createTheme`;
-`fieldRadiusOverrides(radius)` rounds MUI's own `OutlinedInput`, `FilledInput`,
-`Button` and `ToggleButton` to the same number, so a bare MUI control agrees too.
+All are exported from `@12-apps/ui/tokens`, and every field in this package
+reads one of them itself, so it is right under any theme. A host sets the value
+with `createAppTheme(mode, { fieldRadius })` (`@12-apps/app-shell/react`), with
+`createUiTheme({ fieldRadius })`, or with `fieldRadius` on MUI's `createTheme`.
+The two factories also apply `fieldRadiusOverrides(radius)`, which rounds MUI's
+own `OutlinedInput`, `FilledInput`, `Button` and `ToggleButton` — the HOST's bare
+MUI controls. A hand-built `createTheme` wants `components:
+fieldRadiusOverrides(radius)` too, or those keep `shape.borderRadius`.
+
+A wrapper around fields (a segment track, a glass group frame) is not itself a
+field: its corner is the field radius PLUS its inset, so the two stay concentric.
 
 It is NOT `shape.borderRadius`, which is the general radius cards, menus and
 papers multiply. Badges, counters, chips, menus and cards keep that scale.

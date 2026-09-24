@@ -16,6 +16,7 @@ import React from 'react';
 import { highlightLabel, type MatchMode } from './Autocomplete.helpers';
 import type { SuggestionItemState, SuggestionType } from './Autocomplete.types';
 import type { AutocompleteCopy } from '../../../copy';
+import { fieldRootStyles } from '../../../tokens/field-radius';
 
 const StyledPopper = styled(Popper)(({ theme }) => ({
   zIndex: theme.zIndex.tooltip,
@@ -113,6 +114,7 @@ export function AutocompleteInput(props: AutocompleteInputProps): React.JSX.Elem
       <TextField
         ref={props.inputRef}
         fullWidth
+        sx={fieldRootStyles}
         value={props.inputValue}
         onChange={props.onChange}
         onKeyDown={props.onKeyDown}

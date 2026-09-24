@@ -4,6 +4,11 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { glowAnimation, rippleAnimation, scaleAnimation, slideAnimation } from './RadioGroup.animations';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
+
+/** The segment track's padding and border: its corner is the segments' plus these. */
+const SEGMENT_TRACK_PADDING = 4;
+const SEGMENT_TRACK_BORDER = 1;
 
 interface ColorPalette {
   main: string;
@@ -182,7 +187,7 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
   const { selected, animated, customSize = 'md' } = flags;
 
   return {
-    borderRadius: theme.spacing(1),
+    borderRadius: fieldRadius(theme),
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontWeight: 500,
     border: `2px solid ${selected ? palette.main : fieldEdge(theme)}`,
@@ -249,13 +254,14 @@ export const segmentContainerSx = (
   const palette = getColorFromTheme(theme, customColor);
 
   return {
-    padding: '4px',
-    borderRadius: theme.spacing(1.5),
+    padding: `${SEGMENT_TRACK_PADDING}px`,
+    // Concentric with the segments inside it, which take the field radius.
+    borderRadius: fieldRadius(theme) + SEGMENT_TRACK_PADDING + SEGMENT_TRACK_BORDER,
     backgroundColor: glass
       ? alpha(theme.palette.background.paper, 0.1)
       : alpha(palette.main, 0.05),
     backdropFilter: glass ? 'blur(20px)' : 'none',
-    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+    border: `${SEGMENT_TRACK_BORDER}px solid ${alpha(theme.palette.divider, 0.2)}`,
     display: 'flex',
     gap: '2px',
   };
@@ -283,7 +289,7 @@ export const segmentButtonSx = (theme: Theme, flags: SurfaceFlags): CSSObject =>
 
   return {
     flex: 1,
-    borderRadius: theme.spacing(1),
+    borderRadius: fieldRadius(theme),
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontWeight: 500,
     backgroundColor: selected ? theme.palette.background.paper : 'transparent',

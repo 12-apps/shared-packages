@@ -18,12 +18,17 @@ import type { CountryData,PhoneInputProps } from './PhoneInput.types';
 import type { PhoneInputCopy } from '../../../copy';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius, fieldRootStyles } from '../../../tokens/field-radius';
 
 // Country data with expanded support
 
 // Styled components
+/** The plain variant: MUI's own field, on the theme's field radius. */
+const FieldTextField = styled(TextField)(({ theme }) => fieldRootStyles(theme));
+
 const GlassTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
+    borderRadius: fieldRadius(theme),
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
@@ -332,7 +337,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     countryName: selectedCountry?.name,
     copy });
 
-  const TextFieldComponent = variant === 'glass' ? GlassTextField : TextField;
+  const TextFieldComponent = variant === 'glass' ? GlassTextField : FieldTextField;
 
   return (
     <Box data-testid="phone-input-container">

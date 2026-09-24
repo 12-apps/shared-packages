@@ -23,6 +23,7 @@ import { RangeBounds } from "./data-views-range-pill";
 import { isRangeSet } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { fieldRadiusPx } from "../../../tokens/field-radius";
 
 /** What each field's control needs, minus the panel's own chrome. */
 export interface MoreFieldProps {
@@ -95,7 +96,7 @@ function OverflowPill<T extends Record<string, unknown>>({
               borderStyle: "solid",
               borderColor: checked ? "primary.main" : "divider",
               bgcolor: checked ? "action.selected" : "transparent",
-              borderRadius: 5,
+              borderRadius: fieldRadiusPx,
               cursor: "pointer",
               fontSize: "0.8125rem",
               color: checked ? "primary.main" : "text.secondary",

@@ -10,6 +10,7 @@ import MenuItem from '@mui/material/MenuItem/index.js';
 import React, { useState } from 'react';
 
 import type { ColumnVisibilityOption, ColumnsMenuProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 /** One column checkbox row; toggling never closes the menu. */
 function ColumnRow({
@@ -72,7 +73,7 @@ export function ColumnsMenu({
         sx={{
           width: 32,
           height: 32,
-          borderRadius: 1,
+          borderRadius: fieldRadiusPx,
           color: 'text.secondary',
           bgcolor: open ? 'action.selected' : 'transparent',
         }}
