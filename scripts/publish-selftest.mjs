@@ -100,7 +100,7 @@ function workspace(packages) {
 }
 
 /** Runs the real scripts/publish.mjs over a scripted registry. */
-function release(packages, plan) {
+function release(packages, plan, branch = "") {
   const { root, bin, dirs } = workspace(packages);
   const calls = join(root, "calls.log");
   const planFile = join(root, "plan.json");
@@ -123,6 +123,8 @@ function release(packages, plan) {
       FAKE_NPM_ARGV: argv,
       GITHUB_STEP_SUMMARY: summary,
       GITHUB_ENV: handoff,
+      // The branch cd.yml checked out. Pinned per case so the runner's own never leaks in.
+      RELEASE_BRANCH: branch,
     },
   });
 
@@ -340,6 +342,37 @@ check(
   "the held-back package is handed to the tag check too — its version is not on the registry either",
   new RegExp(`PUBLISH_INCOMPLETE=.*${DEPENDENT}`).test(cascade.handoff),
   `GITHUB_ENV got:\n${cascade.handoff}`,
+);
+
+// ── A maintenance branch publishes on its line's dist-tag, never `latest` ──
+// `npm publish` with no `--tag` means `latest`, so a 5.8.2 cut from a
+// release/<pkg>-5.8.x branch after 5.11.0 shipped would move every unpinned
+// install backwards. See ./lib/dist-tag.mjs.
+const LINE = "@selftest/line";
+const onLine = release([{ name: LINE }], { [LINE]: [{ status: 0, out: OK }] }, "release/app-shell-5.8.x");
+check(
+  "a maintenance branch publishes with --tag <its line>",
+  onLine.status === 0 &&
+    onLine.argv.length > 0 &&
+    onLine.argv.every((call) => /(^|\s)--tag app-shell-5\.8\.x(\s|$)/.test(call)),
+  `npm was invoked as:\n    ${onLine.argv.join("\n    ")}`,
+);
+check(
+  "a maintenance branch never publishes on latest",
+  onLine.argv.every((call) => !/\blatest\b/.test(call)),
+  `npm was invoked as:\n    ${onLine.argv.join("\n    ")}`,
+);
+const onMain = release([{ name: LINE }], { [LINE]: [{ status: 0, out: OK }] }, "main");
+check(
+  "main keeps npm's default dist-tag",
+  onMain.status === 0 && onMain.argv.length > 0 && onMain.argv.every((call) => !/--tag/.test(call)),
+  `npm was invoked as:\n    ${onMain.argv.join("\n    ")}`,
+);
+const stray = release([{ name: LINE }], { [LINE]: [{ status: 0, out: OK }] }, "feat/not-a-line");
+check(
+  "any other branch is refused before npm is asked anything",
+  stray.status !== 0 && stray.attempts(LINE) === 0 && /refusing to publish/.test(stray.output),
+  `exit ${stray.status} after ${stray.attempts(LINE)} npm call(s):\n${stray.output}`,
 );
 
 if (failures.length > 0) {

@@ -1,7 +1,12 @@
 {
   "extends": "semantic-release-monorepo",
   "branches": [
-    "main"
+    "main",
+    {
+      "name": "release/app-shell-5.8.x",
+      "range": "5.8.x",
+      "channel": "app-shell-5.8.x"
+    }
   ],
   "plugins": [
     [
