@@ -62,6 +62,7 @@ const VIOLATIONS = {
     `const e = <Box sx={{ borderTopLeftRadius: 8 }} />;`,
     `const f = { paddingInlineStart: 12, insetInlineStart: 4 };`,
     `const g = (c) => ({ width: c ? 280 : 'auto', maxWidth: c ? 'none' : 384 });`,
+    `function grow(styles) { styles.height += 40; }`,
     `const h = (c) => <Box sx={{ left: c ? 4 : '50%' }} />;`,
   ],
   "raw-jsx-size": [

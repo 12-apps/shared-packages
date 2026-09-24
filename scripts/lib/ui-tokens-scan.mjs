@@ -206,12 +206,18 @@ function checkProperty(node, ctx) {
   for (const v of values) checkValue(ctx, key, v, node);
 }
 
-/** `styles.height = 40`, `styles['fontSize'] = 13` — a style written by assignment gets the same key rules. */
+const STYLE_WRITE_OPS = new Set([ts.SyntaxKind.EqualsToken, ts.SyntaxKind.PlusEqualsToken, ts.SyntaxKind.MinusEqualsToken]);
+
+/** The key an assignment writes to: `x.key` or `x['key']`. */
+function assignedKey(target) {
+  if (ts.isPropertyAccessExpression(target)) return target.name.text;
+  return ts.isElementAccessExpression(target) && ts.isStringLiteral(target.argumentExpression) ? target.argumentExpression.text : null;
+}
+
+/** `styles.height = 40`, `styles['fontSize'] = 13`, `styles.height += 40` — a style written by assignment gets the same key rules. */
 function checkAssignment(node, ctx) {
-  if (ctx.isMetrics || !ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return;
-  const target = node.left;
-  const key = ts.isPropertyAccessExpression(target) ? target.name.text
-    : ts.isElementAccessExpression(target) && ts.isStringLiteral(target.argumentExpression) ? target.argumentExpression.text : null;
+  if (ctx.isMetrics || !ts.isBinaryExpression(node) || !STYLE_WRITE_OPS.has(node.operatorToken.kind)) return;
+  const key = assignedKey(node.left);
   if (key && isLengthKey(key)) checkValue(ctx, key, node.right, node);
 }
 
