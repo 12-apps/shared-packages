@@ -25,6 +25,7 @@ import {
 } from "../core/registry";
 import { configureJobs, enqueueJob, resetJobRuntime, startJobWorkers } from "../core/runtime";
 import { InvalidJobRetentionError } from "../core/retention";
+import { InvalidJobStallError } from "../core/stall";
 import { createBullMqJobDriver } from "../drivers/bullmq";
 import { createInlineJobDriver } from "../drivers/inline";
 import { jobsRouter } from "../hono/index";
@@ -156,6 +157,18 @@ describe("`./bullmq` — the production driver, imported directly", () => {
         },
       }),
     ).toThrow(InvalidJobRetentionError);
+  });
+
+  it("refuses a stall setting BullMQ could not honour, without going through the factory", () => {
+    // Same backstop as retention (FUT-2480): a lock of 0 expires the moment
+    // it is taken, and every job would be re-run while still running.
+    expect(() =>
+      createBullMqJobDriver({
+        redisUrl: "redis://127.0.0.1:6379",
+        logger: silentLogger(),
+        stall: { lockDurationMs: 0 },
+      }),
+    ).toThrow(InvalidJobStallError);
   });
 
   it("refuses to write an unregistered job to the backend", async () => {

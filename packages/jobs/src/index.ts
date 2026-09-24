@@ -98,12 +98,17 @@ export type {
   JobRetentionWindow,
   JobRunEvent,
   JobSchedule,
+  JobStallConfig,
+  JobStalledEvent,
+  JobStallPolicy,
   ScheduleRemovedEvent,
 } from "./core/types";
 
 // Retention validation lives in `core` so this barrel can carry it without
 // pulling `bullmq` (and ioredis) into a bundle that only ever enqueues.
 export { assertValidRetention, InvalidJobRetentionError } from "./core/retention";
+// The stall settings' check and defaults, for the same reason.
+export { assertValidStall, DEFAULT_STALL_POLICY, InvalidJobStallError } from "./core/stall";
 
 export { createInlineJobDriver } from "./drivers/inline";
 export type { InlineJobDriver, InlineJobRun } from "./drivers/inline";

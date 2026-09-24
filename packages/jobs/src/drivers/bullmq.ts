@@ -28,6 +28,7 @@ import { Queue, UnrecoverableError, Worker, type JobsOptions } from "bullmq";
 import { createEventEmitter, type EmitJobEvent } from "../core/events";
 import { DEFAULT_QUEUE } from "../core/queues";
 import { resolveRegisteredJob } from "../core/registry";
+import { assertValidStall, resolveStallPolicy } from "../core/stall";
 import type {
   AnyJobDefinition,
   EnqueueOptions,
@@ -37,15 +38,19 @@ import type {
   JobEvents,
   JobLogger,
   JobRetention,
+  JobStallConfig,
 } from "../core/types";
 
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_JOB_RETENTION,
   isTerminalFailure,
+  maxStartedAttemptsFor,
   resolveConcurrency,
   retentionOptions,
+  workerStallOptions,
 } from "./bullmq-policy";
+import { reportFailure, reportStall } from "./bullmq-reporting";
 import { parseRedisUrl, type RedisConnectionOptions } from "./redis-url";
 
 /** The one ioredis command this driver reads outside BullMQ's own surface. */
@@ -66,8 +71,13 @@ export interface BullMqJobDriverOptions {
   retention?: JobRetention;
   /** Per-queue concurrency when no definition on the queue states one. */
   defaultConcurrency?: number;
-  /** Where completions, dead-letters and removed schedules are reported. */
+  /** Where completions, dead-letters, stalls and removed schedules are reported. */
   events?: JobEvents;
+  /**
+   * Lock and stall settings, for every queue and per queue. Defaults to
+   * BullMQ's own numbers, spelled out in `DEFAULT_STALL_POLICY`.
+   */
+  stall?: JobStallConfig;
 }
 
 /** Everything the driver's helpers need, threaded instead of closed over. */
@@ -77,6 +87,7 @@ interface DriverState {
   prefix?: string;
   retention: Pick<JobsOptions, "removeOnComplete" | "removeOnFail">;
   defaultConcurrency: number;
+  stall: JobStallConfig | undefined;
   /** Reports to the host's observer; see `core/events`. Never throws. */
   emit: EmitJobEvent;
   queues: Map<string, Queue>;
@@ -203,6 +214,7 @@ function startWorker(
 ): Worker {
   const onThisQueue = new Set(group.map((definition) => definition.name));
   const concurrency = resolveConcurrency(group, state.defaultConcurrency);
+  const stall = resolveStallPolicy(queueName, state.stall);
 
   const worker = new Worker(
     queueName,
@@ -240,30 +252,19 @@ function startWorker(
       connection: state.connection,
       concurrency,
       ...(state.prefix ? { prefix: state.prefix } : {}),
+      ...workerStallOptions(group, stall),
     },
   );
 
-  worker.on("failed", (job, error) => {
-    const maxAttempts = job?.opts.attempts ?? 1;
-    const attempts = job ? `${job.attemptsMade}/${maxAttempts}` : "?";
-    state.logger.error(
-      `job "${job?.name ?? queueName}" failed (attempt ${attempts}):`,
-      error,
-    );
-    if (!job) return;
-    const terminal = isTerminalFailure(job.attemptsMade, maxAttempts, error);
-    state.emit((events) =>
-      events.onJobFailed?.({
-        name: job.name,
-        queue: queueName,
-        runId: job.id ?? `${job.name}:unknown`,
-        attempt: job.attemptsMade,
-        maxAttempts,
-        error,
-        terminal,
-      }),
-    );
+  worker.on("failed", (job, error) => reportFailure(state, queueName, job, error));
+  worker.on("stalled", (jobId) => {
+    const getJob = (id: string) => queueFor(state, queueName).getJob(id);
+    void reportStall(state, queueName, jobId, getJob, stall.maxStalledCount);
   });
+  // Lock-renewal and lost-lock errors ("could not renew lock for job …",
+  // "Missing lock for job … moveToFinished") arrive here. They stay ERRORS:
+  // each one is a stall somebody should look at, even though the job itself
+  // recovers.
   worker.on("error", (error) =>
     state.logger.error(`worker "${queueName}" error:`, error),
   );
@@ -285,6 +286,9 @@ function groupByQueue(
 }
 
 export function createBullMqJobDriver(options: BullMqJobDriverOptions): JobDriver {
+  // The same backstop as retention: a host building the driver directly off
+  // `@12-apps/jobs/bullmq` must not reach BullMQ with a lock of 0 or NaN.
+  assertValidStall(options.stall);
   const state: DriverState = {
     connection: parseRedisUrl(options.redisUrl),
     logger: options.logger,
@@ -294,6 +298,7 @@ export function createBullMqJobDriver(options: BullMqJobDriverOptions): JobDrive
       typeof options.defaultConcurrency === "number" && options.defaultConcurrency > 0
         ? options.defaultConcurrency
         : DEFAULT_CONCURRENCY,
+    stall: options.stall,
     emit: createEventEmitter(options.events, options.logger),
     queues: new Map(),
     workers: [],
@@ -353,5 +358,8 @@ export function createBullMqJobDriver(options: BullMqJobDriverOptions): JobDrive
 export const __testables = {
   resolveConcurrency,
   isTerminalFailure,
+  maxStartedAttemptsFor,
+  reportFailure,
+  reportStall,
   DEFAULT_CONCURRENCY,
 };

@@ -144,6 +144,7 @@ async function resolveBullMq(
         events: resolved.events,
         retention: resolved.retention,
         defaultConcurrency: resolved.defaultConcurrency,
+        stall: resolved.stall,
       }),
       deliberatelyOff: false,
     };
