@@ -206,6 +206,15 @@ function checkProperty(node, ctx) {
   for (const v of values) checkValue(ctx, key, v, node);
 }
 
+/** `styles.height = 40`, `styles['fontSize'] = 13` — a style written by assignment gets the same key rules. */
+function checkAssignment(node, ctx) {
+  if (ctx.isMetrics || !ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return;
+  const target = node.left;
+  const key = ts.isPropertyAccessExpression(target) ? target.name.text
+    : ts.isElementAccessExpression(target) && ts.isStringLiteral(target.argumentExpression) ? target.argumentExpression.text : null;
+  if (key && isLengthKey(key)) checkValue(ctx, key, node.right, node);
+}
+
 function checkLengths(ctx, node, text, key) {
   for (const m of text.matchAll(LENGTH)) {
     const value = Number(m[2]);
@@ -322,7 +331,7 @@ function checkLengthDefault(node, ctx) {
 }
 
 const CHECKS = [
-  checkString, checkTemplate, checkConcat, checkRamp, checkProperty,
+  checkString, checkTemplate, checkConcat, checkRamp, checkProperty, checkAssignment,
   checkJsxSize, checkPxHelper, checkConstant, checkLengthDefault,
 ];
 

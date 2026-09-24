@@ -142,11 +142,15 @@ const TYPED = {
     "const rowHeight = remPx(theme, 52); const g = { rowHeight }; const g2 = { height: g.rowHeight, minHeight: Math.max(pitch, 0) };",
     "declare const c: boolean; const g3 = { top: c ? pitch : 0, width: c ? pitch : 'auto', rootMargin: `${c ? pitch : 0}px` };",
     "declare const w: number | undefined; const named = c ? pitch : undefined; const g4 = { height: named, minHeight: named ?? pitch };",
+    "const auto = c ? pitch : 'auto'; const g5 = { width: auto };",
     // Raw riding along: flagged.
     "const f = { height: remPx(theme, 52) + 40, borderWidth: BORDERS.focused };",
     // Untyped: cannot be proven relative, so it is reported.
     "declare const untyped: any; const h = { width: untyped };",
     "let grow = remPx(theme, 8); grow += 40; const k = { height: grow };",
+    "let o = { h: remPx(theme, 52) }; o = { h: 40 }; const k2 = { height: o.h };",
+    "const m = { hm: remPx(theme, 52) }; m.hm += 40; const k3 = { height: m.hm };",
+    "const styles: Record<string, unknown> = {}; styles.height = 40; styles['fontSize'] = 13;",
   ].join("\n"),
 };
 
@@ -160,11 +164,11 @@ for (const { rule, src } of cases) {
 for (const rule of RULES.filter((r) => !(r in VIOLATIONS))) failures.push(`${rule} has no violating fixture`);
 
 const typed = typedFindings(TYPED, "/v/Sel.tsx");
-if (typed.filter((r) => r === "raw-number-length").length !== 6) {
-  failures.push(`type-aware: expected 6 raw-number-length (height and maxWidth through a name, remPx()+40, a typed 2px border, an untyped width, a reassigned let), got ${JSON.stringify(typed)}`);
+if (typed.filter((r) => r === "raw-number-length").length !== 9) {
+  failures.push(`type-aware: expected 9 raw-number-length (height and maxWidth through a name, remPx()+40, a typed 2px border, an untyped width, a reassigned let, a reassigned object, a mutated member, an assigned styles.height), got ${JSON.stringify(typed)}`);
 }
 if (typed.some((r) => r === "raw-length")) failures.push(`type-aware: a px glued onto a remPx-traced value was flagged: ${JSON.stringify(typed)}`);
-if (typed.filter((r) => r === "raw-font-size").length !== 1) failures.push(`type-aware: expected 1 raw-font-size (fontSize through a name), got ${JSON.stringify(typed)}`);
+if (typed.filter((r) => r === "raw-font-size").length !== 2) failures.push(`type-aware: expected 2 raw-font-size (fontSize through a name, an assigned styles fontSize), got ${JSON.stringify(typed)}`);
 
 const cleanHits = scanSource(AS, CLEAN);
 if (cleanHits.length > 0) {

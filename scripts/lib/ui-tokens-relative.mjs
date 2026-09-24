@@ -35,6 +35,53 @@ export const isHairlineName = (expr, sf) => HAIRLINE_NAME.test(unwrap(expr).getT
 
 const isZero = (a) => ts.isNumericLiteral(unwrap(a)) && Number(unwrap(a).text) === 0;
 
+/** Only a `const` is traced: a `let` can be reassigned (`grow += 40`) after an initialiser that was relative. */
+const isConstVariable = (decl) =>
+  ts.isVariableDeclaration(decl) && (ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const) !== 0;
+
+const ASSIGNMENT_OPS = new Set([
+  ts.SyntaxKind.EqualsToken, ts.SyntaxKind.PlusEqualsToken, ts.SyntaxKind.MinusEqualsToken,
+  ts.SyntaxKind.AsteriskEqualsToken, ts.SyntaxKind.SlashEqualsToken,
+]);
+
+/** Every member name this file WRITES to (`x.h = …`, `x.h += …`, `x['h'] = …`, `x.h++`) — cached per file. */
+function writtenMembers(sf) {
+  if (sf.__uiTokensWritten) return sf.__uiTokensWritten;
+  const written = new Set();
+  const nameOf = (t) => (ts.isPropertyAccessExpression(t) ? t.name.text
+    : ts.isElementAccessExpression(t) && ts.isStringLiteral(t.argumentExpression) ? t.argumentExpression.text : null);
+  const visit = (n) => {
+    if (ts.isBinaryExpression(n) && ASSIGNMENT_OPS.has(n.operatorToken.kind)) written.add(nameOf(n.left));
+    if ((ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) &&
+        (n.operator === ts.SyntaxKind.PlusPlusToken || n.operator === ts.SyntaxKind.MinusMinusToken)) written.add(nameOf(n.operand));
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  sf.__uiTokensWritten = written;
+  return written;
+}
+
+/**
+ * A member (`o.h` → `{ h: … }`) is traced only when its object literal is held
+ * by a `const` and nothing in the file writes to a member of that name — the
+ * same `grow += 40` hole, one level down.
+ */
+const isObjectWrapper = (n) =>
+  ts.isObjectLiteralExpression(n) || ts.isPropertyAssignment(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n);
+
+/** The declaration holding the object literal a property sits in. */
+function holderOf(decl) {
+  let holder = decl.parent;
+  while (holder && isObjectWrapper(holder)) holder = holder.parent;
+  return holder;
+}
+
+function isFrozenMember(decl) {
+  if (!ts.isPropertyAssignment(decl) || !ts.isIdentifier(decl.name)) return false;
+  const holder = holderOf(decl);
+  return Boolean(holder) && isConstVariable(holder) && !writtenMembers(decl.getSourceFile()).has(decl.name.text);
+}
+
 function calleeName(call, sf) {
   const callee = call.expression;
   return ts.isPropertyAccessExpression(callee) && !ts.isPropertyAccessExpression(callee.expression)
@@ -79,9 +126,7 @@ function declarationIsRelative(decl, ctx, depth) {
   if (ts.isShorthandPropertyAssignment(decl)) {
     return declarationIsRelative(ctx.checker.getShorthandAssignmentValueSymbol(decl)?.valueDeclaration, ctx, depth + 1);
   }
-  // Only a `const` is traced: a `let` can be reassigned (`grow += 40`) after an initialiser that was relative.
-  const isConstVariable = ts.isVariableDeclaration(decl) && (ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const) !== 0;
-  const init = isConstVariable || ts.isPropertyAssignment(decl) ? decl.initializer : undefined;
+  const init = isConstVariable(decl) || isFrozenMember(decl) ? decl.initializer : undefined;
   return init !== undefined && isRelative(init, ctx, depth + 1);
 }
 
@@ -89,7 +134,9 @@ const isNullish = (b) => {
   const e = unwrap(b);
   return e.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(e) && e.text === "undefined");
 };
-const isNeutral = (b) => isZero(b) || isNullish(b);
+const isStringLeaf = (b) => ts.isStringLiteral(unwrap(b)) || ts.isNoSubstitutionTemplateLiteral(unwrap(b));
+/** A branch that carries no length of its own: 0, null/undefined, or a keyword string (`'auto'`, `'none'`). */
+const isNeutral = (b) => isZero(b) || isNullish(b) || isStringLeaf(b);
 
 /** `c ? pitch : 0`, `c ? pitch : undefined` — every branch relative or neutral, not all of them neutral. */
 function relativeChoice(branches, ctx, depth) {
