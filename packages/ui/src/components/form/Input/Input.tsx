@@ -19,6 +19,8 @@ import {
 } from './Input.styles';
 import type { InputProps } from './Input.types';
 import { splitTestId } from '../../../platform/test-id';
+import { fieldControlStyles } from '../../../tokens/field-height';
+import type { SizeValue } from '../../../tokens/vocabulary';
 
 /**
  * `TextFieldSlim`, not `TextField` — see `text-field-slim.tsx`. MUI's own
@@ -29,19 +31,22 @@ import { splitTestId } from '../../../platform/test-id';
  */
 const StyledTextField = styled(TextFieldSlim, {
   shouldForwardProp: (prop) =>
-    !['customVariant', 'floating', 'glow', 'pulse', 'loading'].includes(prop as string),
+    !['customVariant', 'fieldSize', 'floating', 'glow', 'pulse', 'loading'].includes(prop as string),
 })<{
   customVariant?: InputProps['variant'];
+  fieldSize: SizeValue;
   floating?: boolean;
   glow?: boolean;
   pulse?: boolean;
   loading?: boolean;
-}>(({ theme, customVariant, floating, glow, pulse, loading }) => ({
+}>(({ theme, customVariant, fieldSize, floating, glow, pulse, loading }) => ({
   position: 'relative',
+  // The theme's field height for this size (outlined family, one line).
+  ...fieldControlStyles(theme, fieldSize),
   opacity: loading ? INPUT_LOADING.opacity : 1,
 
   ...(glow ? glowStyles(theme) : {}),
-  ...(pulse ? pulseStyles(theme) : {}),
+  ...(pulse ? pulseStyles(theme, fieldSize) : {}),
   ...(floating ? floatingLabelStyles(theme) : {}),
 
   '& .MuiInputBase-root': {
@@ -111,6 +116,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         variant={muiVariantFor(variant)}
         customVariant={variant}
+        fieldSize={size}
         floating={floating}
         glow={glow}
         pulse={pulse}

@@ -24,6 +24,8 @@ import { isRangeSet } from "./data-views-range-values";
 import type { RangeValue } from "./data-views-types";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
+import { fieldHeight } from "../../../tokens/field-height";
+import { fieldEdge } from "../../../tokens/field-edge";
 
 /** What each field's control needs, minus the panel's own chrome. */
 export interface MoreFieldProps {
@@ -94,7 +96,8 @@ function OverflowPill<T extends Record<string, unknown>>({
               pr: 1,
               border: 1,
               borderStyle: "solid",
-              borderColor: checked ? "primary.main" : "divider",
+              minHeight: fieldHeight,
+              borderColor: (theme) => (checked ? theme.palette.primary.main : fieldEdge(theme)),
               bgcolor: checked ? "action.selected" : "transparent",
               borderRadius: fieldRadiusPx,
               cursor: "pointer",

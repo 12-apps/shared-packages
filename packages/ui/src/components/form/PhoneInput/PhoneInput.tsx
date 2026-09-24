@@ -18,13 +18,14 @@ import type { CountryData,PhoneInputProps } from './PhoneInput.types';
 import type { PhoneInputCopy } from '../../../copy';
 
 import { fieldEdge } from '../../../tokens/field-edge';
-import { fieldRadius, fieldRootStyles } from '../../../tokens/field-radius';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { fieldTextFieldStyles } from '../../../tokens/field-height';
 
 // Country data with expanded support
 
 // Styled components
 /** The plain variant: MUI's own field, on the theme's field radius. */
-const FieldTextField = styled(TextField)(({ theme }) => fieldRootStyles(theme));
+const FieldTextField = styled(TextField)(({ theme }) => fieldTextFieldStyles(theme));
 
 const GlassTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {

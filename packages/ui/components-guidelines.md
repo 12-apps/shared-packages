@@ -71,6 +71,35 @@ fieldRadiusOverrides(radius)` too, or those keep `shape.borderRadius`.
 A wrapper around fields (a segment track, a glass group frame) is not itself a
 field: its corner is the field radius PLUS its inset, so the two stay concentric.
 
+### Field Height and Border
+
+A field also has ONE height and ONE resting border (FUT-2555).
+
+**Height** is a multiple of the default font size — `rem` on the web, the 16dp
+body size on native — so it grows with the type: `fieldHeight` (default `2.5`,
+40px). `sm` and `md` are that standard; `xs` is `0.8×`, `lg` `1.2×`, `xl` `1.4×`.
+
+| where | read it with |
+|---|---|
+| `sx` / `styled()` | `fieldHeight` (`fieldHeight(theme, size)` for a step) — a `rem` string |
+| a MUI `TextField` / `Select` | `fieldControlStyles(theme, size)`, or `fieldTextFieldStyles` for radius + height + border together |
+| native | `fieldHeightPx(theme.fieldHeight, size)` |
+
+A one-line field is the height; a button is AT LEAST the height with its label
+centred (a label that wraps still grows it); an icon-only button is that square.
+Multiline fields, `filled` and `underline` keep their own heights.
+
+**Border** at rest is `fieldBorder(theme)` — 1px in `fieldEdge`'s colour, never
+`divider` (a row hairline, not a control boundary). Hover, focus and error keep
+their own. A variant that draws a different edge on purpose (`glass`,
+`gradient`, `underline`, a coloured outline button) keeps it; a NEUTRAL outline
+button is a field-row control and rests on the field border.
+
+Hosts set the height with `createAppTheme(mode, { fieldHeight })`,
+`createUiTheme({ fieldHeight })` or `fieldHeight` on MUI's `createTheme`; the
+factories' `fieldOverrides(radius, height)` also put MUI's own outlined fields on
+it.
+
 It is NOT `shape.borderRadius`, which is the general radius cards, menus and
 papers multiply. Badges, counters, chips, menus and cards keep that scale.
 

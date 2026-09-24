@@ -13,6 +13,7 @@ import {
   pinnedSx,
 } from './CategorySelect.styles';
 import type { CategorySelectionChip } from './CategorySelect.types';
+import { fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 interface PanelHeadProps {
@@ -33,11 +34,10 @@ const searchFieldSx = {
   alignItems: 'center',
   '& input': {
     width: '100%',
-    height: 36,
+    height: fieldHeight,
     padding: '0 30px 0 32px',
     fontSize: 13,
-    border: '1px solid',
-    borderColor: 'divider',
+    border: fieldBorder,
     borderRadius: fieldRadiusPx,
     background: 'background.paper',
     color: 'text.primary',

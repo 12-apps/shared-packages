@@ -32,6 +32,7 @@ import type { TextareaProps } from './Textarea.types';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { FIELD_BORDER_WIDTH, fieldBorder } from '../../../tokens/field-height';
 
 // Interface for styled component props
 interface StyledTextareaProps {
@@ -74,7 +75,7 @@ const StyledTextarea = styled(TextareaAutosize, {
     width: '100%',
     fontFamily: theme.typography.fontFamily,
     borderRadius: fieldRadius(theme),
-    border: `2px solid ${error ? errorColor.main : fieldEdge(theme)}`,
+    border: error ? `${FIELD_BORDER_WIDTH}px solid ${errorColor.main}` : fieldBorder(theme),
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
     transition: 'all 0.3s ease',

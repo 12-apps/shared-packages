@@ -8,6 +8,7 @@ import { contrastText, DARK_TEXT_PRIMARY, inkOver } from './ink-over';
 */
 export { contrastText, inkOver };
 import { cssLengthToPx, cssTrackingToEm } from './css-units';
+import { resolveFieldHeight } from './field-height.core';
 import { DEFAULT_FIELD_RADIUS } from './field-radius.core';
 import { HEADING_SCALE, type HeadingLevel } from './heading-scale';
 
@@ -113,6 +114,12 @@ export interface UiTheme {
    * with (see `./field-radius.core`), MUI's `theme.fieldRadius` on the web.
    */
   radius: { sm: number; md: number; lg: number; xl: number; full: number; field: number };
+  /**
+   * The standard field height, in multiples of the default font size — MUI's
+   * `theme.fieldHeight` on the web. `fieldHeightPx(theme.fieldHeight, size)`
+   * (`./field-height.core`) is the dp a field of `size` lays out at.
+   */
+  fieldHeight: number;
   typography: UiTypography;
   zIndex: { appBar: number; drawer: number; modal: number; snackbar: number; tooltip: number };
 }
@@ -135,6 +142,8 @@ export interface UiThemeOptions {
   spacingUnit?: number;
   /** The radius every field is drawn with, in dp. Defaults to {@link DEFAULT_FIELD_RADIUS}. */
   fieldRadius?: number;
+  /** The standard field height, in multiples of the default font size. Defaults to 2.5. */
+  fieldHeight?: number;
 }
 
 const ROOT_FONT_PX = 16;
@@ -319,6 +328,7 @@ export function createUiTheme(options: UiThemeOptions = {}): UiTheme {
     spacing: (units: number) => units * spacingUnit,
     spacingUnit,
     radius: { sm: 2, md: 4, lg: 8, xl: 16, full: 9999, field: options.fieldRadius ?? DEFAULT_FIELD_RADIUS },
+    fieldHeight: resolveFieldHeight(options.fieldHeight),
     typography: {
       fontFamily: options.typography?.fontFamily,
       monospaceFontFamily: options.typography?.monospaceFontFamily,

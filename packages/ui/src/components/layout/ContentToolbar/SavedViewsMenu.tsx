@@ -19,6 +19,8 @@ import type {
   SavedViewsLabels,
   SavedViewsMenuProps,
 } from './ContentToolbar.types';
+import { fieldHeight } from '../../../tokens/field-height';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 /** How many non-pinned views show under "Recentes". */
 const RECENT_LIMIT = 5;
@@ -294,7 +296,7 @@ export function SavedViewsMenu<V extends SavedViewLike = SavedViewLike>({
         aria-haspopup="menu"
         aria-expanded={Boolean(anchorEl)}
         aria-label={activeViewName ?? labels.mainView}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
+        sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
         {/* Mobile: an eye icon stands in for the view name to keep the toolbar one line. */}
         <ViewIcon sx={{ fontSize: 18, display: { xs: 'inline-flex', md: 'none' } }} />

@@ -11,6 +11,7 @@ import React, { useState } from 'react';
 
 import type { ColumnVisibilityOption, ColumnsMenuProps } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
 
 /** One column checkbox row; toggling never closes the menu. */
 function ColumnRow({
@@ -71,8 +72,8 @@ export function ColumnsMenu({
         aria-expanded={open}
         onClick={(event) => setAnchorEl(event.currentTarget)}
         sx={{
-          width: 32,
-          height: 32,
+          width: fieldHeight,
+          height: fieldHeight,
           borderRadius: fieldRadiusPx,
           color: 'text.secondary',
           bgcolor: open ? 'action.selected' : 'transparent',

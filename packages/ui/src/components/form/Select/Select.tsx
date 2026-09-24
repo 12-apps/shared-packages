@@ -18,6 +18,7 @@ import type { SelectProps } from './Select.types';
 
 import { splitTestId } from '../../../platform/test-id';
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldControlStyles, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
 
 // Define pulse animation
@@ -54,7 +55,7 @@ const pulseStyles = (theme: Theme): CSSObject => ({
     top: '50%',
     left: '0',
     right: '0',
-    height: `${SELECT_PULSE.height}px`,
+    height: fieldHeight(theme),
     transform: 'translateY(-50%)',
     borderRadius: fieldRadius(theme),
     backgroundColor: theme.palette.primary.main,
@@ -141,6 +142,8 @@ const StyledFormControl = styled(FormControl, {
   pulse?: boolean;
 }>(({ theme, customVariant, glow, pulse }) => ({
   position: 'relative',
+  // The theme's field height — `sm` and `md` are both the standard step.
+  ...fieldControlStyles(theme),
   ...(glow ? glowStyles(theme) : {}),
   ...(pulse ? pulseStyles(theme) : {}),
   '& .MuiOutlinedInput-root': {

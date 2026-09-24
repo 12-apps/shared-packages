@@ -8,7 +8,7 @@ import { UiProvider } from '../../../provider/UiProvider.native';
 import { alpha } from '../../../tokens/color';
 import { resolveFieldEdge } from '../../../tokens/field-edge.core';
 import { createUiTheme } from '../../../tokens/theme';
-import { MUI_INPUT_PADDING, INPUT_BORDER } from '../Input/Input.metrics';
+import { INPUT_BORDER, inputPadding, MUI_INPUT_PADDING } from '../Input/Input.metrics';
 
 const theme = createUiTheme();
 const edge = resolveFieldEdge(theme.palette.divider, theme.palette.background.paper);
@@ -183,24 +183,21 @@ describe('Select (native)', () => {
     expect(screen.getByTestId('plain-select')).toHaveAttribute('tabindex', '0');
   });
 
-  it('pads the trigger at the two densities its size scale maps onto', () => {
+  it('pads the trigger to the field height at both of its sizes', () => {
     render(
       <>
         <Select dataTestId="small" options={OPTIONS} size="sm" />
         <Select dataTestId="medium" options={OPTIONS} size="md" />
       </>,
     );
-    // `selectInputSize` sends `sm` to MUI's small box and everything else to
-    // medium. The inset sits on the DISPLAY, which is the trigger's own child —
-    // the trigger carries only the horizontal padding, equal at both densities.
+    // `sm` and `md` are both the standard field height (FUT-2555), so both
+    // centre the 23px line in 40dp. The inset sits on the DISPLAY, which is the
+    // trigger's own child — the trigger carries only the horizontal padding.
     const display = (id: string): HTMLElement =>
       screen.getByTestId(`${id}-select`).firstElementChild as HTMLElement;
-    expect(display('small').style.paddingTop).toBe(
-      `${MUI_INPUT_PADDING.outlined.small.top - INPUT_BORDER.rest}px`,
-    );
-    expect(display('medium').style.paddingTop).toBe(
-      `${MUI_INPUT_PADDING.outlined.medium.top - INPUT_BORDER.rest}px`,
-    );
+    const inset = `${inputPadding('outlined', 'md').top - INPUT_BORDER.rest}px`;
+    expect(display('small').style.paddingTop).toBe(inset);
+    expect(display('medium').style.paddingTop).toBe(inset);
   });
 
   it('is a tab stop with the arrow MUI draws, turned over while open', () => {

@@ -10,6 +10,7 @@ const comparable = (theme: ReturnType<typeof createUiTheme>) => ({
   palette: theme.palette,
   spacingUnit: theme.spacingUnit,
   radius: theme.radius,
+  fieldHeight: theme.fieldHeight,
   heading: theme.typography.heading,
   zIndex: theme.zIndex,
 });
@@ -29,6 +30,19 @@ describe('the MUI bridge', () => {
     expect(read.spacing(2)).toBe(8);
     // The field radius is NOT on the general scale: a rounder `shape` leaves it be.
     expect(read.radius).toEqual({ sm: 6, md: 12, lg: 24, xl: 48, full: 9999, field: 8 });
+  });
+
+  it('reads the field height a host sets, and writes it back with the MUI overrides', () => {
+    expect(uiThemeFromMui(createTheme()).fieldHeight).toBe(2.5);
+    expect(uiThemeFromMui(createTheme({ fieldHeight: 3 })).fieldHeight).toBe(3);
+
+    const options = muiThemeOptionsFrom(createUiTheme({ fieldHeight: 3, fieldRadius: 6 }));
+    expect(options.fieldHeight).toBe(3);
+    // Both overrides land on MuiOutlinedInput without one erasing the other.
+    expect(options.components?.MuiOutlinedInput?.styleOverrides).toMatchObject({
+      root: { borderRadius: 6 },
+      input: { '&:not(.MuiInputBase-inputMultiline)': { paddingTop: 'calc((3rem - 1.4375em) / 2)' } },
+    });
   });
 
   it('reads the field radius a host sets, and writes it back with the MUI overrides', () => {

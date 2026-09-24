@@ -7,6 +7,7 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { fieldRadius } from '../../../tokens/field-radius';
+import { fieldControlStyles } from '../../../tokens/field-height';
 
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
@@ -21,6 +22,7 @@ const SearchBar = styled(Box)(({ theme }) => ({
 }));
 
 const SearchField = styled(TextField)(({ theme }) => ({
+  ...fieldControlStyles(theme),
   '& .MuiOutlinedInput-root': {
     background: alpha(theme.palette.background.paper, 0.95),
     backdropFilter: 'blur(10px)',

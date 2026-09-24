@@ -167,7 +167,7 @@ export function fieldLook(
   size: SizeValue,
   state: FieldState,
 ): FieldLook {
-  const padding = inputPadding(variant, size);
+  const padding = inputPadding(variant, size, theme.fieldHeight);
   const width = borderWidthFor(variant, state.focused);
   const inset = BORDER_IS_FREE[variant] ? width : 0;
   const sides = BORDER_SIDES[variant];
@@ -218,7 +218,7 @@ export function labelStyle(theme: UiTheme, variant: InputVariant, size: SizeValu
     marginBottom: INPUT_LABEL.gap,
     // Aligned with the value it names: the web's floating label and the input
     // share one left inset (14px outlined, 12px filled, 0 standard).
-    marginLeft: inputPadding(variant, size).left,
+    marginLeft: inputPadding(variant, size, theme.fieldHeight).left,
   };
 }
 

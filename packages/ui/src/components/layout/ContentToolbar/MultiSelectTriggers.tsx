@@ -9,6 +9,8 @@ import React, { useId } from 'react';
 
 import type { MultiSelectOption } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
+import { fieldEdge } from '../../../tokens/field-edge';
 
 /**
  * Trigger label from the current selection: `allLabel` when none/all are
@@ -52,7 +54,7 @@ export function InlineTrigger({ label, triggerLabel, open, onOpen, testId }: Tri
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={onOpen}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
+        sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
         {triggerLabel}
         <ChevronDownIcon sx={{ fontSize: 14 }} />
@@ -82,14 +84,14 @@ export function StackedTrigger({ label, triggerLabel, open, onOpen, testId }: Tr
         endIcon={<ChevronDownIcon sx={{ fontSize: 18, color: 'text.secondary' }} />}
         sx={{
           justifyContent: 'space-between',
-          height: 40,
+          height: fieldHeight,
           borderRadius: fieldRadiusPx,
           px: 1.5,
           color: 'text.primary',
           textTransform: 'none',
           fontWeight: 400,
           fontSize: '0.875rem',
-          borderColor: 'divider',
+          borderColor: fieldEdge,
           bgcolor: 'background.paper',
           '&:hover': { borderColor: 'text.primary', bgcolor: 'background.paper' },
         }}
@@ -176,13 +178,13 @@ export function PillTrigger({
       endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
         borderRadius: fieldRadiusPx,
-        height: 34,
+        height: fieldHeight,
         px: 1.5,
         color: 'text.primary',
         fontWeight: 600,
         fontSize: '0.8125rem',
         textTransform: 'none',
-        borderColor: active ? 'primary.main' : 'divider',
+        borderColor: (theme) => (active ? theme.palette.primary.main : fieldEdge(theme)),
         bgcolor: active ? 'action.selected' : 'background.paper',
         '&:hover': { borderColor: active ? 'primary.main' : 'text.primary', bgcolor: active ? 'action.selected' : 'action.hover' },
       }}

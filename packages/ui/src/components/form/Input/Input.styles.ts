@@ -13,7 +13,9 @@ import {
 import type { InputProps } from './Input.types';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
+import type { SizeValue } from '../../../tokens/vocabulary';
 
 type InputVariant = NonNullable<InputProps['variant']>;
 
@@ -48,14 +50,14 @@ export const glowStyles = (theme: Theme): CSSObject => ({
 
 // A bar behind the field rather than a border on it, so it can pulse outward
 // without the input resizing.
-export const pulseStyles = (theme: Theme): CSSObject => ({
+export const pulseStyles = (theme: Theme, size: SizeValue = 'md'): CSSObject => ({
   '&::after': {
     content: '""',
     position: 'absolute',
     top: '50%',
     left: '0',
     right: '0',
-    height: `${INPUT_PULSE.height}px`,
+    height: fieldHeight(theme, size),
     transform: 'translateY(-50%)',
     borderRadius: fieldRadius(theme),
     backgroundColor: theme.palette.primary.main,

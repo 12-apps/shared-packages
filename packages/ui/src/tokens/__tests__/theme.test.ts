@@ -11,6 +11,7 @@ import {
   type UiThemeMode,
 } from '../theme';
 import { getContrastRatio } from '../color';
+import { DEFAULT_FIELD_HEIGHT, fieldHeightPx, fieldHeightRem, resolveFieldHeight } from '../field-height.core';
 import { DEFAULT_FIELD_RADIUS } from '../field-radius.core';
 
 /**
@@ -127,6 +128,20 @@ describe('createUiTheme derives the palette MUI derives', () => {
     expect(createUiTheme().radius.field).toBe(DEFAULT_FIELD_RADIUS);
     expect(DEFAULT_FIELD_RADIUS).toBe(8);
     expect(createUiTheme({ fieldRadius: 12 }).radius.field).toBe(12);
+  });
+
+  it('stands every field at one height, a multiple of the default font size', () => {
+    expect(DEFAULT_FIELD_HEIGHT).toBe(2.5);
+    expect(createUiTheme().fieldHeight).toBe(2.5);
+    expect(createUiTheme({ fieldHeight: 3 }).fieldHeight).toBe(3);
+    // `sm` and `md` are the standard; `xs` compact, `lg` and `xl` roomy.
+    expect(fieldHeightPx(2.5, 'md')).toBe(40);
+    expect(fieldHeightPx(2.5, 'sm')).toBe(40);
+    expect(fieldHeightRem(2.5, 'xs')).toBe(2);
+    expect(fieldHeightRem(2.5, 'lg')).toBe(3);
+    expect(fieldHeightRem(2.5, 'xl')).toBe(3.5);
+    // A value no one could lay out falls back to the default.
+    for (const bad of [0, -1, Number.NaN, undefined]) expect(resolveFieldHeight(bad)).toBe(2.5);
   });
 
   it('px() writes the rem string the web components write', () => {

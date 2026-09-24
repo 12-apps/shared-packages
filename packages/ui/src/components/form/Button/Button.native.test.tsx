@@ -7,6 +7,7 @@ import { BUTTON_SIZES } from './Button.metrics';
 import { Icon } from '../../../icons/Icon.native';
 import { UiProvider } from '../../../provider/UiProvider.native';
 import { createUiTheme } from '../../../tokens/theme';
+import { DEFAULT_FIELD_HEIGHT, fieldHeightPx } from '../../../tokens/field-height.core';
 
 const theme = createUiTheme();
 
@@ -81,14 +82,16 @@ describe('Button (native)', () => {
     expect(screen.getByText('Novo').nextElementSibling).toBe(screen.getByTestId('add-icon'));
   });
 
-  it('is square with no minimum width when it carries only an icon', () => {
+  it('is a field-height square when it carries only an icon', () => {
     render(<Button dataTestId="close" icon={<Icon name="Close" />} />);
     const style = screen.getByTestId('close').style;
-    expect(style.minWidth).toBe('0px');
-    expect(style.padding).toBe('7px');
+    // 2.5 × the 16dp default font size, on both sides (FUT-2555).
+    expect(style.minWidth).toBe('40px');
+    expect(style.minHeight).toBe('40px');
+    expect(style.padding).toBe('0px');
   });
 
-  it.each(['xs', 'sm', 'md', 'lg', 'xl'] as const)('size %s pads and types like the web', (size) => {
+  it.each(['xs', 'sm', 'md', 'lg', 'xl'] as const)('size %s stands, pads and types like the web', (size) => {
     render(
       <Button dataTestId={size} size={size}>
         x
@@ -96,7 +99,9 @@ describe('Button (native)', () => {
     );
     const metrics = BUTTON_SIZES[size];
     const style = screen.getByTestId(size).style;
-    expect(style.paddingTop).toBe(`${metrics.paddingVertical}px`);
+    // The theme's field height for the size, the label centred in it.
+    expect(style.minHeight).toBe(`${fieldHeightPx(DEFAULT_FIELD_HEIGHT, size)}px`);
+    expect(style.paddingTop).toBe('0px');
     expect(style.paddingLeft).toBe(`${metrics.paddingHorizontal}px`);
     expect(labelOf(size).style.fontSize).toBe(`${metrics.fontSize}px`);
   });

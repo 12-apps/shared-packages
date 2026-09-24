@@ -17,6 +17,7 @@ import Tooltip from "@mui/material/Tooltip/index.js";
 import { Box } from "../../../mui/Box";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { fieldHeight } from "../../../tokens/field-height";
 
 /**
  * "Limpar" — one gesture back to the unfiltered list.
@@ -55,7 +56,7 @@ export function ClearAllControl({
         display: "inline-flex",
         alignItems: "center",
         gap: 0.5,
-        height: 34,
+        height: fieldHeight,
         px: compact ? 0.75 : 1,
         border: 0,
         borderRadius: fieldRadiusPx,
@@ -106,7 +107,7 @@ export function CloseSearchControl({
         sx={{
           display: "inline-flex",
           alignItems: "center",
-          height: 34,
+          height: fieldHeight,
           px: 0.75,
           border: 0,
           borderRadius: fieldRadiusPx,

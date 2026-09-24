@@ -210,6 +210,22 @@ describe('createAppTheme fieldRadius', () => {
     expect(theme.shape.borderRadius).toBe(4);
   });
 
+  it('stands MUI\'s outlined fields at the field height, 2.5rem unless the host picks another', () => {
+    const inset = (rem: number) => ({ paddingTop: `calc((${rem}rem - 1.4375em) / 2)` });
+    const standard = createAppTheme('light');
+    expect(standard.fieldHeight).toBe(2.5);
+    expect(standard.components?.MuiOutlinedInput?.styleOverrides).toMatchObject({
+      root: { borderRadius: 8 },
+      input: { '&:not(.MuiInputBase-inputMultiline)': inset(2.5) },
+    });
+
+    const roomy = createAppTheme('light', { fieldHeight: 3 });
+    expect(roomy.fieldHeight).toBe(3);
+    expect(roomy.components?.MuiOutlinedInput?.styleOverrides).toMatchObject({
+      input: { '&:not(.MuiInputBase-inputMultiline)': inset(3) },
+    });
+  });
+
   it("lets a host's own override of a field component win", () => {
     const theme = createAppTheme('light', {
       components: { MuiButton: { styleOverrides: { root: { borderRadius: 2 } } } },

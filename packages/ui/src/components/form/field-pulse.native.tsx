@@ -17,10 +17,13 @@ import { INPUT_PULSE } from './Input/Input.metrics';
 export function FieldPulse({
   color,
   radius,
+  height,
   testID,
 }: {
   color: string;
   radius: number;
+  /** The field's own height, so the bar sits exactly behind it. */
+  height: number;
   testID: string;
 }): React.JSX.Element {
   const progress = React.useRef(new Animated.Value(0)).current;
@@ -45,6 +48,7 @@ export function FieldPulse({
       style={[
         styles.pulse,
         {
+          height,
           borderRadius: radius,
           backgroundColor: color,
           opacity: progress.interpolate({
@@ -52,11 +56,11 @@ export function FieldPulse({
             outputRange: [INPUT_PULSE.opacity, 0, 0],
           }),
           transform: [
-            { translateY: -INPUT_PULSE.height / 2 },
+            { translateY: -height / 2 },
             {
               scale: progress.interpolate({
                 inputRange: [0, 0.7, 1],
-                outputRange: [1, 1 + INPUT_PULSE.spread / INPUT_PULSE.height, 1],
+                outputRange: [1, 1 + INPUT_PULSE.spread / height, 1],
               }),
             },
           ],
@@ -72,7 +76,6 @@ const styles = StyleSheet.create({
     top: '50%',
     left: 0,
     right: 0,
-    height: INPUT_PULSE.height,
     pointerEvents: 'none',
   },
 });

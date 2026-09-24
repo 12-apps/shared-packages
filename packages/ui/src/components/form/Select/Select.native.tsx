@@ -29,7 +29,9 @@ import type { SelectProps, SelectValue } from './Select.types.native';
 import { Icon } from '../../../icons/Icon.native';
 import { webAria, webKeyDown, webRole, type WebKeyEvent } from '../../../platform/aria';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
+import { fieldHeightPx } from '../../../tokens/field-height.core';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
+import type { UiTheme } from '../../../tokens/theme';
 import { FieldPulse } from '../field-pulse.native';
 import { helperStyle, labelStyle, type FieldState } from '../Input/Input.look.native';
 
@@ -163,6 +165,26 @@ function useSelectValue(
  * which expect the trigger to keep focus while the list is open. The trade is
  * recorded in `NATIVE-NOTES.md`.
  */
+/** The pulse bar, at the field's own height and corner. */
+function SelectPulse({
+  theme,
+  size,
+  testID,
+}: {
+  theme: UiTheme;
+  size: SelectProps['size'];
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <FieldPulse
+      color={theme.palette.primary.main}
+      radius={theme.radius.field}
+      height={fieldHeightPx(theme.fieldHeight, selectInputSize(size))}
+      testID={testID}
+    />
+  );
+}
+
 export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
   const {
     variant, options, label, helperText, fullWidth, size, placeholder, error, glow, pulse,
@@ -205,13 +227,7 @@ export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
       style={[styles.root, fullWidth ? styles.fullWidth : styles.auto, style]}
       {...withoutTestIdProps(others)}
     >
-      {pulse ? (
-        <FieldPulse
-          color={theme.palette.primary.main}
-          radius={theme.radius.field}
-          testID={`${ids.trigger}-pulse`}
-        />
-      ) : null}
+      {pulse ? <SelectPulse theme={theme} size={size} testID={`${ids.trigger}-pulse`} /> : null}
       {label === undefined ? null : (
         <RNText id={labelId} style={labelStyle(theme, inputVariantFor(variant), size, state)}>
           {label}

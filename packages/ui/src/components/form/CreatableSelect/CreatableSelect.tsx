@@ -14,6 +14,7 @@ import type { SizeValue } from '../../../tokens/scales';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldControlStyles } from '../../../tokens/field-height';
 
 /** Internal option shape: a real option, or the synthetic "create new" row. */
 interface InternalOption extends CreatableSelectOption {
@@ -111,7 +112,7 @@ function renderField(
       placeholder={field.placeholder}
       error={Boolean(field.error)}
       size={MUI_SIZE[field.size]}
-      sx={fieldSx}
+      sx={[fieldSx, fieldControlStyles]}
       inputProps={{ ...params.inputProps, 'data-testid': `${field.dataTestId}-input` }}
       slotProps={{
         input: {

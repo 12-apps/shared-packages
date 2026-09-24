@@ -2,6 +2,7 @@ import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
+import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { inkOver, px } from '../../../tokens/theme';
 
 // Define pulse animation globally
@@ -101,9 +102,21 @@ const iconOnlySize = (size: string): CSSObject => ({
   '& .MuiButton-startIcon, & .MuiButton-endIcon': { margin: 0 },
 });
 
-/** The size styles for a button, square when it carries nothing but an icon. */
-export const buttonSize = (size: string, iconOnly: boolean): CSSObject =>
-  iconOnly ? iconOnlySize(size) : (SIZE_MAP[size] ?? DEFAULT_SIZE);
+/**
+ * The size styles for a button, square when it carries nothing but an icon.
+ *
+ * The HEIGHT is the theme's field height for the size (`tokens/field-height`),
+ * so a button stands level with the field beside it: the vertical padding goes
+ * and the label is centred in a box at least that tall — a label that wraps
+ * still grows it. An icon-only button is that height on every side.
+ */
+export const buttonSize =
+  (size: string, iconOnly: boolean) =>
+  (theme: Theme): CSSObject => {
+    const height = fieldHeight(theme, asFieldSize(size));
+    if (iconOnly) return { ...iconOnlySize(size), padding: 0, minWidth: height, minHeight: height };
+    return { ...(SIZE_MAP[size] ?? DEFAULT_SIZE), minHeight: height, paddingTop: 0, paddingBottom: 0 };
+  };
 
 /**
  * MUI centres icons with a negative margin that fights our own padding, so the
@@ -199,10 +212,13 @@ const VARIANT_STYLES: Record<
       boxShadow: theme.shadows[8],
     },
   }),
-  outline: (_theme, palette) => ({
+  // A NEUTRAL outline is a field-row control ("Mais", "Exibir"), so it rests on
+  // the one field border; a coloured outline keeps its colour, which is the
+  // point of asking for one.
+  outline: (theme, palette, color) => ({
     backgroundColor: 'transparent',
     color: palette.main,
-    border: `1px solid ${palette.main}`,
+    border: color === 'neutral' ? fieldBorder(theme) : `1px solid ${palette.main}`,
     '&:hover': {
       backgroundColor: alpha(palette.main, 0.1),
       borderColor: palette.dark,

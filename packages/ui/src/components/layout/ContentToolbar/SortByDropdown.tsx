@@ -17,6 +17,7 @@ import type {
   SortOrderOption,
 } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
 
 function findActiveField<TField extends string>(
   fields: SortFieldDefinition<TField>[] | undefined,
@@ -219,7 +220,7 @@ export function SortByDropdown<TField extends string = string>({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
+        sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
         {/* Full "Nome (crescente)" on md+; just the field name on mobile — the
             arrow already conveys the direction, so the parenthetical is dropped. */}

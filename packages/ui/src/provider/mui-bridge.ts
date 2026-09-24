@@ -1,7 +1,9 @@
 import type { PaletteColor, Theme, ThemeOptions } from '@mui/material/styles/index.js';
 
 import { cssLengthToPx, cssTrackingToEm } from '../tokens/css-units';
-import { fieldRadius, fieldRadiusOverrides } from '../tokens/field-radius';
+import { resolveFieldHeight } from '../tokens/field-height.core';
+import { fieldOverrides } from '../tokens/field-height';
+import { fieldRadius } from '../tokens/field-radius';
 import { accentFor } from '../tokens/scales';
 import {
   FONT_WEIGHTS,
@@ -99,6 +101,7 @@ export function uiThemeFromMui(theme: Theme): UiTheme {
     spacing: (units: number) => units * unit,
     spacingUnit: unit,
     radius: { sm: md / 2, md, lg: md * 2, xl: md * 4, full: 9999, field: fieldRadius(theme) },
+    fieldHeight: resolveFieldHeight(theme.fieldHeight),
     typography: {
       fontFamily: theme.typography.fontFamily ?? WEB_FONT_FAMILY,
       monospaceFontFamily: WEB_MONOSPACE_FONT_FAMILY,
@@ -136,7 +139,8 @@ export function muiThemeOptionsFrom(ui: UiTheme): ThemeOptions {
     },
     shape: { borderRadius: ui.radius.md },
     fieldRadius: ui.radius.field,
-    components: fieldRadiusOverrides(ui.radius.field),
+    fieldHeight: ui.fieldHeight,
+    components: fieldOverrides(ui.radius.field, ui.fieldHeight),
     spacing: ui.spacingUnit,
     typography: { fontFamily: ui.typography.fontFamily ?? WEB_FONT_FAMILY },
     zIndex: { ...ui.zIndex },
