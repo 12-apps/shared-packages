@@ -11,10 +11,11 @@
  *
  * Ported from `@repo/spa-shared`'s route-error-boundary suite.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FRESH_RELOAD_PARAM } from '../../core/chunk-recovery';
 import type { AppShellMessages } from '../messages';
 import { CLUB_MESSAGES } from '../../__tests__/host-copy';
 import { createShellRouteErrorBoundary } from '../route-error-boundary';
@@ -29,6 +30,18 @@ function BadPage(): JSX.Element {
   throw new Error('chunk exploded');
 }
 
+/** A page whose chunk the last deploy removed, as Safari words it. */
+function StalePage(): JSX.Element {
+  throw new TypeError('Importing a module script failed.');
+}
+
+/** The club's "newer version" screen — its own words, like the rest of its copy. */
+const CLUB_UPDATE = {
+  title: 'O site do clube foi atualizado',
+  body: 'Carregue de novo para ver a versão nova do clube.',
+  retry: 'Carregar a versão nova',
+};
+
 /** The crashes a host's reporter saw, in a container the test owns. */
 function reporter(): {
   seen: unknown[];
@@ -41,6 +54,30 @@ function reporter(): {
   return { seen, onCrash: (error: unknown) => seen.push(error), messages: CLUB_MESSAGES };
 }
 
+/**
+ * Replaces `window.location` with one that records where it was sent. The
+ * record is returned, so the test owns it — no module-scope state for the next
+ * test to inherit.
+ */
+function stubNavigation(): { replaced: string[]; reloads: number } {
+  const calls = { replaced: [] as string[], reloads: 0 };
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: {
+      href: 'https://clube.example/pedaladas?grupo=2',
+      replace: (url: string) => {
+        calls.replaced.push(url);
+      },
+      reload: () => {
+        calls.reloads += 1;
+      },
+    },
+  });
+  return calls;
+}
+
+const originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
+
 beforeEach(() => {
   // React logs the caught error itself, and so does the boundary; silence both so a
   // passing run is quiet.
@@ -49,6 +86,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  if (originalLocation) Object.defineProperty(window, 'location', originalLocation);
 });
 
 describe('createShellRouteErrorBoundary', () => {
@@ -133,5 +171,99 @@ describe('createShellRouteErrorBoundary', () => {
     );
     expect(screen.getByText('This page could not open')).toBeDefined();
     expect(screen.getByText('Reload')).toBeDefined();
+  });
+
+  it('keeps the plain reload for an ordinary crash', () => {
+    const nav = stubNavigation();
+    const RouteErrorBoundary = createShellRouteErrorBoundary({
+      ...reporter(),
+      messages: { ...CLUB_MESSAGES, routeUpdate: CLUB_UPDATE },
+    });
+    render(
+      <RouteErrorBoundary resetKey="a">
+        <BadPage />
+      </RouteErrorBoundary>,
+    );
+    // A page bug is not a newer build: the new-version screen must not claim it.
+    expect(screen.queryByText(CLUB_UPDATE.title)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: CLUB_MESSAGES.routeErrorRetry }));
+    expect(nav.replaced).toEqual([]);
+    expect(nav.reloads).toBe(1);
+  });
+});
+
+/**
+ * FUT-2485 (future-pay): a page from an older build is not an error the reader
+ * can act on beyond one tap, and "Importing a module script failed." is noise to
+ * them. The host's own "there is a new version" screen replaces it, and its
+ * button reloads PAST the caches — the plain reload the recovery already tried
+ * is the one a stale document won.
+ */
+describe('createShellRouteErrorBoundary · a page from an older build', () => {
+  it("shows the host's new-version screen instead of the raw message", () => {
+    const RouteErrorBoundary = createShellRouteErrorBoundary({
+      ...reporter(),
+      messages: { ...CLUB_MESSAGES, routeUpdate: CLUB_UPDATE },
+    });
+    render(
+      <RouteErrorBoundary resetKey="a">
+        <StalePage />
+      </RouteErrorBoundary>,
+    );
+    // Same test id: every host's e2e specs still find the crashed page.
+    expect(screen.getByTestId('route-error')).toBeDefined();
+    expect(screen.getByText(CLUB_UPDATE.title)).toBeDefined();
+    expect(screen.getByText(CLUB_UPDATE.body)).toBeDefined();
+    expect(screen.queryByText(/module script/)).toBeNull();
+    expect(screen.queryByText(CLUB_MESSAGES.routeErrorTitle)).toBeNull();
+  });
+
+  it('reloads past every cache from its button, not with a bare reload', () => {
+    const nav = stubNavigation();
+    const RouteErrorBoundary = createShellRouteErrorBoundary({
+      ...reporter(),
+      messages: { ...CLUB_MESSAGES, routeUpdate: CLUB_UPDATE },
+    });
+    render(
+      <RouteErrorBoundary resetKey="a">
+        <StalePage />
+      </RouteErrorBoundary>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: CLUB_UPDATE.retry }));
+    expect(nav.reloads).toBe(0);
+    expect(nav.replaced).toHaveLength(1);
+    const target = new URL(nav.replaced[0] ?? '');
+    expect(target.searchParams.has(FRESH_RELOAD_PARAM)).toBe(true);
+    expect(target.pathname).toBe('/pedaladas');
+    expect(target.searchParams.get('grupo')).toBe('2');
+  });
+
+  it('still reports the stale chunk — the screen changes, the signal does not', () => {
+    const host = reporter();
+    const RouteErrorBoundary = createShellRouteErrorBoundary({
+      ...host,
+      messages: { ...CLUB_MESSAGES, routeUpdate: CLUB_UPDATE },
+    });
+    render(
+      <RouteErrorBoundary resetKey="a">
+        <StalePage />
+      </RouteErrorBoundary>,
+    );
+    expect(host.seen).toHaveLength(1);
+  });
+
+  it('keeps the generic screen for a host with no new-version copy, and still reloads fresh', () => {
+    const nav = stubNavigation();
+    const RouteErrorBoundary = createShellRouteErrorBoundary(reporter());
+    render(
+      <RouteErrorBoundary resetKey="a">
+        <StalePage />
+      </RouteErrorBoundary>,
+    );
+    expect(screen.getByText(CLUB_MESSAGES.routeErrorTitle)).toBeDefined();
+    expect(screen.getByText('Importing a module script failed.')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: CLUB_MESSAGES.routeErrorRetry }));
+    expect(nav.reloads).toBe(0);
+    expect(nav.replaced).toHaveLength(1);
   });
 });

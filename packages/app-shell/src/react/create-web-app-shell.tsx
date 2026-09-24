@@ -79,6 +79,7 @@ import type { Theme } from '@12-apps/ui/mui/styles';
 import { createEmailAuth, createWebAuth } from '@12-apps/auth/react';
 
 import { apiFetch, type ApiFetchOptions } from '../core/api';
+import { clearFreshReloadParam } from '../core/chunk-recovery';
 import { joinApiPath } from '../core/paths';
 import { TermsConsentDialog } from './consent/terms-consent-dialog';
 import { lazyRoute } from './lazy-route';
@@ -173,6 +174,11 @@ export type {
 
 /** Build the browser shell. One call, one config object. */
 export function createWebAppShell(config: WebAppShellConfig): WebAppShell {
+  // A stale-chunk recovery reload marks its URL so no cache can answer it with
+  // the old document (see `core/chunk-recovery`). This factory runs at module
+  // scope, before the router below it first reads the address — the one moment
+  // the mark can come off without the router keeping a copy of it.
+  clearFreshReloadParam();
   const apiBase = config.apiBase ?? '/api';
   const theme = createAppTheme(config.theme?.mode ?? 'light', config.theme ?? {});
   const authBasePath = config.authBasePath ?? '/api/auth';
