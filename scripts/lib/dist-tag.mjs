@@ -36,3 +36,24 @@ export function distTagArgs(branch = process.env.RELEASE_BRANCH ?? "") {
   }
   return ["--tag", found[1]];
 }
+
+/**
+ * The environment semantic-release must run with, so it knows which branch it
+ * is releasing.
+ *
+ * semantic-release takes the branch from env-ci, and env-ci reads it from
+ * `GITHUB_REF` on GitHub Actions. cd.yml runs on `workflow_run`, and for that
+ * event `GITHUB_REF` is ALWAYS the default branch, whatever branch's CI
+ * triggered the run. So on a maintenance branch semantic-release would believe
+ * it was on `main`, find the checkout is not main's head, and release nothing.
+ * A step's `env:` is no fix: GitHub documents that a workflow cannot overwrite
+ * a `GITHUB_*` default variable. The child process's environment can, so this
+ * points `GITHUB_REF` at the branch cd.yml checked out (RELEASE_BRANCH). Unset
+ * or `main` leaves the environment exactly as it was.
+ */
+export function releaseBranchEnv(env = process.env) {
+  const branch = env.RELEASE_BRANCH ?? "";
+  if (branch === "" || branch === "main") return env;
+  distTagArgs(branch); // the same refusal: an unconfigured branch never reaches semantic-release
+  return { ...env, GITHUB_REF: `refs/heads/${branch}` };
+}

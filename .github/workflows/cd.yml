@@ -28,8 +28,9 @@ name: CD
 # `release/<pkg>-<major>.<minor>.x` is a semantic-release MAINTENANCE branch: a
 # package opts in by naming it, with its `range` and `channel`, in its own
 # .releaserc.json, and every other package logs "not configured" there and cuts
-# nothing. scripts/publish.mjs publishes a maintenance line on its own dist-tag
-# (RELEASE_BRANCH below, ./scripts/lib/dist-tag.mjs), never on `latest`.
+# nothing. scripts/release-tags.mjs tells semantic-release which branch it is on,
+# and scripts/publish.mjs publishes a maintenance line on its own dist-tag, never
+# on `latest` (RELEASE_BRANCH below, ./scripts/lib/dist-tag.mjs).
 
 on:
   workflow_run:
@@ -54,6 +55,12 @@ jobs:
     # branch happens to match the filter above.
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
+    env:
+      # The branch checked out below, for the steps that must know it:
+      # release-tags.mjs hands it to semantic-release as GITHUB_REF (which
+      # workflow_run pins to the default branch), and publish.mjs publishes a
+      # maintenance line on its own dist-tag, never `latest`. ./scripts/lib/dist-tag.mjs.
+      RELEASE_BRANCH: ${{ github.event.workflow_run.head_branch }}
     permissions:
       contents: write # tags + GitHub releases
       issues: write # semantic-release's "release is failing" issue
@@ -158,9 +165,6 @@ jobs:
       - name: Publish to npm (OIDC, tokenless)
         if: ${{ !cancelled() }}
         shell: bash
-        env:
-          # A maintenance branch publishes on its line's dist-tag, never `latest`.
-          RELEASE_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -o pipefail
           # npm cannot resolve workspace:* — rewrite interdeps to concrete versions.
