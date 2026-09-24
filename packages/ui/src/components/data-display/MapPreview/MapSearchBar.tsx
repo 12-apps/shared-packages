@@ -6,6 +6,8 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 
+import { fieldRadius } from '../../../tokens/field-radius';
+
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
 const SearchBar = styled(Box)(({ theme }) => ({
@@ -23,7 +25,7 @@ const SearchField = styled(TextField)(({ theme }) => ({
     background: alpha(theme.palette.background.paper, 0.95),
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
-    borderRadius: theme.shape.borderRadius * 2,
+    borderRadius: fieldRadius(theme),
     '& fieldset': {
       borderColor: alpha(theme.palette.divider, 0.2),
     },

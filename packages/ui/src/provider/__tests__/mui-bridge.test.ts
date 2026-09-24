@@ -27,7 +27,17 @@ describe('the MUI bridge', () => {
     const read = uiThemeFromMui(host);
     expect(read.spacingUnit).toBe(4);
     expect(read.spacing(2)).toBe(8);
-    expect(read.radius).toEqual({ sm: 6, md: 12, lg: 24, xl: 48, full: 9999 });
+    // The field radius is NOT on the general scale: a rounder `shape` leaves it be.
+    expect(read.radius).toEqual({ sm: 6, md: 12, lg: 24, xl: 48, full: 9999, field: 8 });
+  });
+
+  it('reads the field radius a host sets, and writes it back with the MUI overrides', () => {
+    expect(uiThemeFromMui(createTheme({ fieldRadius: 12 })).radius.field).toBe(12);
+
+    const options = muiThemeOptionsFrom(createUiTheme({ fieldRadius: 6 }));
+    expect(options.fieldRadius).toBe(6);
+    expect(options.components?.MuiOutlinedInput?.styleOverrides?.root).toEqual({ borderRadius: 6 });
+    expect(options.components?.MuiButton?.styleOverrides?.root).toEqual({ borderRadius: 6 });
   });
 
   it('reads the heading scale a host overrides', () => {

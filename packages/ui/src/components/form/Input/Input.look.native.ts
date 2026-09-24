@@ -119,13 +119,16 @@ function backgroundFor(theme: UiTheme, variant: InputVariant, state: FieldState)
   }
 }
 
-/** `filled` rounds its top two corners, `underline` none, the rest all four. */
+/**
+ * The theme's one field radius: `filled` rounds its top two corners with it,
+ * `underline` none, the rest all four.
+ */
 function radiusFor(theme: UiTheme, variant: InputVariant): ViewStyle {
   if (variant === 'underline') return {};
   if (variant === 'filled') {
-    return { borderTopLeftRadius: theme.radius.md, borderTopRightRadius: theme.radius.md };
+    return { borderTopLeftRadius: theme.radius.field, borderTopRightRadius: theme.radius.field };
   }
-  return { borderRadius: theme.radius.md };
+  return { borderRadius: theme.radius.field };
 }
 
 /** The border as React Native writes it: a width per side, one colour, one style. */

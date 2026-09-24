@@ -5,12 +5,13 @@ import Button from '@mui/material/Button/index.js';
 
 import type { CategorySelectCopy } from '../../../copy';
 import { footerSx, METRICS } from './CategorySelect.styles';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 const buttonSx = (sheet: boolean) =>
   ({
     height: sheet ? METRICS.sheetFooterButton : METRICS.footerButton,
     padding: '0 13px',
-    borderRadius: '8px',
+    borderRadius: fieldRadiusPx,
     fontSize: 12.5,
     fontWeight: 600,
     textTransform: 'none',

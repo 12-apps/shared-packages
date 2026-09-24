@@ -31,6 +31,7 @@ const TextareaRichEditor = lazy(async () => ({
 import type { TextareaProps } from './Textarea.types';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
 
 // Interface for styled component props
 interface StyledTextareaProps {
@@ -72,7 +73,7 @@ const StyledTextarea = styled(TextareaAutosize, {
   const baseStyles = {
     width: '100%',
     fontFamily: theme.typography.fontFamily,
-    borderRadius: theme.spacing(1),
+    borderRadius: fieldRadius(theme),
     border: `2px solid ${error ? errorColor.main : fieldEdge(theme)}`,
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,

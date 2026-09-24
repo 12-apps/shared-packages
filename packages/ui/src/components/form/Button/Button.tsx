@@ -6,6 +6,7 @@ import * as React from 'react';
 import { resolveButtonProps } from './Button.helpers';
 import { BUTTON_ICON_GLYPH_SIZE } from './Button.metrics';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
+import { fieldRadius } from '../../../tokens/field-radius';
 import {
   buttonEmphasisStyles,
   buttonVariantStyles,
@@ -32,7 +33,7 @@ const StyledButton = styled(MuiButton, {
   return {
     textTransform: 'none',
     fontWeight: 500,
-    borderRadius: theme.spacing(1),
+    borderRadius: fieldRadius(theme),
     transition: 'all 0.3s ease',
     position: 'relative',
     overflow: 'hidden',

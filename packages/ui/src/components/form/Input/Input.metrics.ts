@@ -170,10 +170,12 @@ export const INPUT_GLOW = {
   focused: { blur: 20, alpha: 0.5 },
 } as const;
 
-/** `pulse`: a 56px bar behind the field, fading outward every two seconds. */
+/**
+ * `pulse`: a 56px bar behind the field, fading outward every two seconds. Its
+ * corner is the field's own — `fieldRadius` on the web, `radius.field` native.
+ */
 export const INPUT_PULSE = {
   height: 56,
-  radiusUnits: 0.5,
   opacity: 0.3,
   ms: 2000,
   spread: 10,

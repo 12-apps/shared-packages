@@ -13,6 +13,7 @@ import type { CreatableSelectOption, CreatableSelectProps } from './CreatableSel
 import type { SizeValue } from '../../../tokens/scales';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 /** Internal option shape: a real option, or the synthetic "create new" row. */
 interface InternalOption extends CreatableSelectOption {
@@ -36,6 +37,7 @@ const MUI_SIZE = { xs: 'small', sm: 'small', md: 'medium', lg: 'medium', xl: 'me
 /** Match the outlined border treatment of `Input` so siblings look identical. */
 const fieldSx = {
   '& .MuiOutlinedInput-root': {
+    borderRadius: fieldRadiusPx,
     '& fieldset': {
       borderColor: (theme: Theme) => fieldEdge(theme),
     },

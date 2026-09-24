@@ -14,6 +14,7 @@ export { headingMetrics } from './typography';
 // host can build a `UiTheme` from the same module path a native one does.
 export * from './theme';
 export * from './color';
+export { DEFAULT_FIELD_RADIUS, fieldRadius, fieldRadiusOverrides, fieldRadiusPx, fieldRootStyles } from './field-radius';
 
 export interface Accent {
   main: string;

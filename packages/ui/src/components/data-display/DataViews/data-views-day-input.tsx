@@ -29,6 +29,7 @@
  */
 import TextField from '@mui/material/TextField/index.js';
 import React, { useEffect, useState } from 'react';
+import { fieldRootStyles } from '../../../tokens/field-radius';
 
 
 /**
@@ -253,7 +254,7 @@ export function DayBoundInput({
       // The placeholder occupies the space an un-shrunk label would render into.
       InputLabelProps={{ shrink: true }}
       inputProps={dayInputProps(testId, describedBy)}
-      sx={{ width: 165 }}
+      sx={[{ width: 165 }, fieldRootStyles]}
     />
   );
 }

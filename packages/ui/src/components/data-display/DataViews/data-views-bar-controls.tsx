@@ -15,6 +15,7 @@ import FilterAltOffRoundedIcon from "@mui/icons-material/FilterAltOffRounded";
 import Tooltip from "@mui/material/Tooltip/index.js";
 
 import { Box } from "../../../mui/Box";
+import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
 
 /**
@@ -40,7 +41,7 @@ export function ClearAllControl({
   testIdPrefix: string;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
-  // No border, no fill. Every other control on this row is an outlined pill
+  // No border, no fill. Every other control on this row is an outlined field
   // because it OPENS something; this one is an escape hatch, and giving it the
   // same weight made it read as a sixth filter. Quiet until hovered.
   const button = (
@@ -57,7 +58,7 @@ export function ClearAllControl({
         height: 34,
         px: compact ? 0.75 : 1,
         border: 0,
-        borderRadius: 1,
+        borderRadius: fieldRadiusPx,
         bgcolor: "transparent",
         cursor: "pointer",
         font: "inherit",
@@ -108,7 +109,7 @@ export function CloseSearchControl({
           height: 34,
           px: 0.75,
           border: 0,
-          borderRadius: 1,
+          borderRadius: fieldRadiusPx,
           bgcolor: "transparent",
           cursor: "pointer",
           color: "text.secondary",

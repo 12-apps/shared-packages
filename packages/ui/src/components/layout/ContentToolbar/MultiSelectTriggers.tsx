@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography/index.js';
 import React, { useId } from 'react';
 
 import type { MultiSelectOption } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 /**
  * Trigger label from the current selection: `allLabel` when none/all are
@@ -51,7 +52,7 @@ export function InlineTrigger({ label, triggerLabel, open, onOpen, testId }: Tri
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={onOpen}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
+        sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
         {triggerLabel}
         <ChevronDownIcon sx={{ fontSize: 14 }} />
@@ -82,6 +83,7 @@ export function StackedTrigger({ label, triggerLabel, open, onOpen, testId }: Tr
         sx={{
           justifyContent: 'space-between',
           height: 40,
+          borderRadius: fieldRadiusPx,
           px: 1.5,
           color: 'text.primary',
           textTransform: 'none',
@@ -173,7 +175,7 @@ export function PillTrigger({
       }
       endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
-        borderRadius: 999,
+        borderRadius: fieldRadiusPx,
         height: 34,
         px: 1.5,
         color: 'text.primary',

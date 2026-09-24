@@ -1,6 +1,7 @@
 import { alpha, type CSSObject, type Theme } from '@mui/material/styles/index.js';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
 
 /**
  * The prototype's METRICS, verbatim.
@@ -10,6 +11,10 @@ import { fieldEdge } from '../../../tokens/field-edge';
  * a half-pixel type scale (13.5px rows, 1.5px checkbox borders) that an 8px
  * spacing grid cannot express without rounding the look away.
  *
+ * The trigger's CORNER is the other exception: it is a field, so it takes the
+ * theme's one field radius (`tokens/field-radius`) and lines up with the inputs
+ * and filter pills it sits beside.
+ *
  * COLOURS are the deliberate exception — they come from the theme, because a
  * tenant can white-label the palette (a hard-coded indigo would survive the
  * rebrand and the rest of the screen would not) and because the library ships a
@@ -18,7 +23,6 @@ import { fieldEdge } from '../../../tokens/field-edge';
  */
 export const METRICS = {
   triggerHeight: 38,
-  triggerRadius: 10,
   panelWidth: 340,
   panelRadius: 14,
   listMaxHeight: 290,
@@ -54,7 +58,7 @@ export const triggerSx = (theme: Theme, selected: boolean, open: boolean): CSSOb
     gap: '8px',
     height: METRICS.triggerHeight,
     padding: '0 10px 0 12px',
-    borderRadius: `${METRICS.triggerRadius}px`,
+    borderRadius: fieldRadiusPx(theme),
     border: `1px solid ${open || selected ? brand.edge : fieldEdge(theme)}`,
     background: selected ? brand.soft : theme.palette.background.paper,
     color: selected ? brand.ink : theme.palette.text.primary,

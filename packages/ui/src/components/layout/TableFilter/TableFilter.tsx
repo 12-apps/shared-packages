@@ -24,6 +24,7 @@ import type {
   TableFilterRangeFieldProps,
   TableFilterSectionProps,
 } from './TableFilter.types';
+import { fieldRootStyles } from '../../../tokens/field-radius';
 
 const PANEL_WIDTH = 280;
 
@@ -182,6 +183,7 @@ const TableFilterKeyword = ({
       </Typography>
       <TextField
         size="small"
+        sx={fieldRootStyles}
         name="keyword"
         placeholder={placeholder}
         value={draft}
