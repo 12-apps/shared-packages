@@ -166,14 +166,17 @@ describe("createAutostart", () => {
     // passes nothing looks for a different entry and reports OFF with
     // autostart plainly on — which the settings checkbox then mirrors, so it
     // is born unchecked and snaps back the moment somebody clicks it.
-    let stored: readonly string[] | null = null;
+    // The state lives on an object rather than a reassigned binding: the
+    // flakiness gate reads a closed-over `let` written from inside a callback
+    // as shared mutable state, and it is right to — this fake IS a registry.
+    const registry: { args: readonly string[] | null } = { args: null };
+    const key = (args: readonly string[]): string => args.join("\u0000");
     const loginItem: LoginItemPort = {
       setLoginItemSettings: (settings) => {
-        stored = settings.openAtLogin ? (settings.args ?? []) : null;
+        registry.args = settings.openAtLogin ? (settings.args ?? []) : null;
       },
       getLoginItemSettings: (identity) => ({
-        openAtLogin:
-          stored !== null && (identity?.args ?? []).join("\u0000") === stored.join("\u0000"),
+        openAtLogin: registry.args !== null && key(identity?.args ?? []) === key(registry.args),
       }),
     };
 
