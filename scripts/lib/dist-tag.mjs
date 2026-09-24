@@ -8,7 +8,8 @@
 // from a maintenance branch after 5.11.0 shipped would move every unpinned
 // install BACKWARDS — silently, with every step green. A maintenance branch
 // therefore publishes on a dist-tag named after its line (`app-shell-5.8.x`),
-// the same name its .releaserc.json declares as `channel`.
+// the same name its .releaserc.json declares as `channel` — which
+// scripts/release-bump-selftest.mjs holds every package's config to.
 //
 // The branch is cd.yml's RELEASE_BRANCH — the ref it checked out. Unset or
 // `main` is the ordinary release and keeps npm's default. Any other branch is
