@@ -185,7 +185,7 @@ describe('createShellRouteErrorBoundary', () => {
       </RouteErrorBoundary>,
     );
     // A page bug is not a newer build: the new-version screen must not claim it.
-    expect(screen.queryByText(CLUB_UPDATE.title)).toBeNull();
+    expect(screen.getByTestId('route-error').textContent).not.toContain(CLUB_UPDATE.title);
     fireEvent.click(screen.getByRole('button', { name: CLUB_MESSAGES.routeErrorRetry }));
     expect(nav.replaced).toEqual([]);
     expect(nav.reloads).toBe(1);
@@ -214,8 +214,9 @@ describe('createShellRouteErrorBoundary · a page from an older build', () => {
     expect(screen.getByTestId('route-error')).toBeDefined();
     expect(screen.getByText(CLUB_UPDATE.title)).toBeDefined();
     expect(screen.getByText(CLUB_UPDATE.body)).toBeDefined();
-    expect(screen.queryByText(/module script/)).toBeNull();
-    expect(screen.queryByText(CLUB_MESSAGES.routeErrorTitle)).toBeNull();
+    const shown = screen.getByTestId('route-error').textContent ?? '';
+    expect(shown).not.toMatch(/module script/);
+    expect(shown).not.toContain(CLUB_MESSAGES.routeErrorTitle);
   });
 
   it('reloads past every cache from its button, not with a bare reload', () => {
