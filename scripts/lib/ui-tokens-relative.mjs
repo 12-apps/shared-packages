@@ -52,6 +52,9 @@ function relativeCall(e, ctx, depth) {
 
 function relativeBinary(e, ctx, depth) {
   const op = e.operatorToken.kind;
+  // `w ?? pitch`, `a || pitch`: either side may be the value. `c && pitch`: the right side is.
+  if (op === ts.SyntaxKind.QuestionQuestionToken || op === ts.SyntaxKind.BarBarToken) return relativeChoice([e.left, e.right], ctx, depth);
+  if (op === ts.SyntaxKind.AmpersandAmpersandToken) return isRelative(e.right, ctx, depth + 1);
   const left = isRelative(e.left, ctx, depth + 1);
   const right = isRelative(e.right, ctx, depth + 1);
   // Scaling a relative length by a count or a ratio keeps it relative.
@@ -76,13 +79,21 @@ function declarationIsRelative(decl, ctx, depth) {
   if (ts.isShorthandPropertyAssignment(decl)) {
     return declarationIsRelative(ctx.checker.getShorthandAssignmentValueSymbol(decl)?.valueDeclaration, ctx, depth + 1);
   }
-  const init = ts.isVariableDeclaration(decl) || ts.isPropertyAssignment(decl) ? decl.initializer : undefined;
+  // Only a `const` is traced: a `let` can be reassigned (`grow += 40`) after an initialiser that was relative.
+  const isConstVariable = ts.isVariableDeclaration(decl) && (ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const) !== 0;
+  const init = isConstVariable || ts.isPropertyAssignment(decl) ? decl.initializer : undefined;
   return init !== undefined && isRelative(init, ctx, depth + 1);
 }
 
-/** `c ? pitch : 0` — every branch relative, a literal 0 neutral, not all of them 0. */
+const isNullish = (b) => {
+  const e = unwrap(b);
+  return e.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(e) && e.text === "undefined");
+};
+const isNeutral = (b) => isZero(b) || isNullish(b);
+
+/** `c ? pitch : 0`, `c ? pitch : undefined` — every branch relative or neutral, not all of them neutral. */
 function relativeChoice(branches, ctx, depth) {
-  return branches.some((b) => !isZero(b)) && branches.every((b) => isZero(b) || isRelative(b, ctx, depth + 1));
+  return branches.some((b) => !isNeutral(b)) && branches.every((b) => isNeutral(b) || isRelative(b, ctx, depth + 1));
 }
 
 /** The composite shapes — calls, `? :`, arithmetic, negation — or undefined for a leaf. */
