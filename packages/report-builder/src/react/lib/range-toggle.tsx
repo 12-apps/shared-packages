@@ -14,6 +14,7 @@
 import { useState, type JSX } from "react";
 
 import { ToggleGroup } from "@12-apps/ui/form/ToggleGroup";
+import { fieldBorder } from "@12-apps/ui/tokens";
 
 import {
   reportRangeLabel,
@@ -22,7 +23,7 @@ import {
   type ReportRange,
 } from "../reports-api";
 import { CustomRangeDialog, type CustomRangeWindow } from "./custom-range-dialog";
-import { CONTROL_HEIGHT_PX, CONTROL_RADIUS_PX } from "./report-surface";
+import { CONTROL_HEIGHT, CONTROL_RADIUS_PX } from "./report-surface";
 import type { ReportRangeCopy } from "../screens-copy";
 import { useReportCopy } from "../transport-context";
 
@@ -69,12 +70,12 @@ const QUICK_RANGE_PRESETS: Record<string, ReportRange> = {
  * with several states, not a handful of buttons that happen to be adjacent.
  */
 const SEGMENT_SX = {
-  height: `${CONTROL_HEIGHT_PX}px`,
-  minHeight: `${CONTROL_HEIGHT_PX}px`,
+  height: CONTROL_HEIGHT,
+  minHeight: CONTROL_HEIGHT,
   boxSizing: "border-box",
   p: 0,
-  border: "1px solid",
-  borderColor: "divider",
+  // The one resting border every field draws (FUT-2555), not the row hairline.
+  border: fieldBorder,
   borderRadius: `${CONTROL_RADIUS_PX}px`,
   bgcolor: "background.paper",
   // Five pills do not fit a phone in one line; wrapping keeps them all

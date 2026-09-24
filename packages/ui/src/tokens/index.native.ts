@@ -8,3 +8,10 @@ export * from './vocabulary';
 export * from './theme';
 export * from './color';
 export { DEFAULT_FIELD_RADIUS } from './field-radius.core';
+export {
+  DEFAULT_FIELD_HEIGHT,
+  FIELD_BORDER_WIDTH,
+  FIELD_HEIGHT_SCALE,
+  fieldHeightPx,
+  fieldHeightRem,
+} from './field-height.core';

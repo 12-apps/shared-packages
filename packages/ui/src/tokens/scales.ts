@@ -15,6 +15,20 @@ export { headingMetrics } from './typography';
 export * from './theme';
 export * from './color';
 export { DEFAULT_FIELD_RADIUS, fieldRadius, fieldRadiusOverrides, fieldRadiusPx, fieldRootStyles } from './field-radius';
+export {
+  asFieldSize,
+  DEFAULT_FIELD_HEIGHT,
+  FIELD_BORDER_WIDTH,
+  FIELD_HEIGHT_SCALE,
+  fieldBorder,
+  fieldControlStyles,
+  fieldHeight,
+  fieldHeightOverrides,
+  fieldHeightPx,
+  fieldHeightRem,
+  fieldOverrides,
+  fieldTextFieldStyles,
+} from './field-height';
 
 export interface Accent {
   main: string;

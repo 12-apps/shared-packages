@@ -1,8 +1,8 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.js';
 
-import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
 
 const glowAnimation = keyframes`
   0% { box-shadow: 0 0 5px currentColor; }
@@ -77,7 +77,7 @@ export const baseStyles = (
   fontWeight: 500,
   borderRadius: fieldRadius(theme),
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  border: `2px solid ${fieldEdge(theme)}`,
+  border: fieldBorder(theme),
   color: theme.palette.text.primary,
   backgroundColor: 'transparent',
   position: 'relative',
@@ -138,8 +138,12 @@ export const baseStyles = (
     },
   },
 
-  // Size wins over everything above it.
+  // Size wins over everything above it — its font and horizontal padding; the
+  // height is the theme's field height for the size.
   ...(SIZE_MAP[customSize] ?? {}),
+  minHeight: fieldHeight(theme, asFieldSize(customSize)),
+  paddingTop: 0,
+  paddingBottom: 0,
 });
 
 export const variantStyles = (

@@ -5,6 +5,7 @@ import { glowAnimation, rippleAnimation, scaleAnimation, slideAnimation } from '
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { asFieldSize, FIELD_BORDER_WIDTH, fieldHeight } from '../../../tokens/field-height';
 
 /** The segment track's padding and border: its corner is the segments' plus these. */
 const SEGMENT_TRACK_PADDING = 4;
@@ -190,7 +191,7 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
     borderRadius: fieldRadius(theme),
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontWeight: 500,
-    border: `2px solid ${selected ? palette.main : fieldEdge(theme)}`,
+    border: `${FIELD_BORDER_WIDTH}px solid ${selected ? palette.main : fieldEdge(theme)}`,
     backgroundColor: selected ? palette.main : 'transparent',
     color: selected ? palette.contrastText || '#fff' : theme.palette.text.primary,
     position: 'relative' as const,
@@ -222,6 +223,10 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
     },
     '&:active': { transform: 'scale(0.98)' },
     ...pickSize(BUTTON_SIZES, customSize),
+    // The theme's field height for the size, in place of the table's own.
+    minHeight: fieldHeight(theme, asFieldSize(customSize)),
+    paddingTop: 0,
+    paddingBottom: 0,
   };
 };
 
@@ -310,5 +315,9 @@ export const segmentButtonSx = (theme: Theme, flags: SurfaceFlags): CSSObject =>
     },
     '&:active': { transform: 'scale(0.98)' },
     ...pickSize(SEGMENT_SIZES, customSize),
+    // Each segment is a field; the track around it adds its own inset.
+    minHeight: fieldHeight(theme, asFieldSize(customSize)),
+    paddingTop: 0,
+    paddingBottom: 0,
   };
 };

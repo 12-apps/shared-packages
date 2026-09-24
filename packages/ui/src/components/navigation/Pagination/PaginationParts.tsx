@@ -8,6 +8,7 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { scaleFor } from './Pagination.helpers';
+import { asFieldSize, fieldTextFieldStyles } from '../../../tokens/field-height';
 
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
@@ -47,7 +48,7 @@ export const ItemsPerPageSelect: FC<ItemsPerPageSelectProps> = ({
     <Typography variant="body2" color="text.secondary">
       {pageSizeLabel}
     </Typography>
-    <FormControl size="small" sx={{ minWidth: 80 }}>
+    <FormControl size="small" sx={(theme) => ({ minWidth: 80, ...fieldTextFieldStyles(theme, asFieldSize(size)) })}>
       <Select
         value={value}
         onChange={(event) => onChange(event.target.value as number)}
@@ -56,7 +57,6 @@ export const ItemsPerPageSelect: FC<ItemsPerPageSelectProps> = ({
         sx={{
           '& .MuiSelect-select': {
             fontSize: scaleFor(size, ['0.875rem', '1rem', '1.125rem']),
-            py: scaleFor(size, [0.5, 1, 1.5]),
           },
         }}
       >

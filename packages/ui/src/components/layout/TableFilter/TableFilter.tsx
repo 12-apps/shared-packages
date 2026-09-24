@@ -24,7 +24,7 @@ import type {
   TableFilterRangeFieldProps,
   TableFilterSectionProps,
 } from './TableFilter.types';
-import { fieldRootStyles } from '../../../tokens/field-radius';
+import { fieldTextFieldStyles } from '../../../tokens/field-height';
 
 const PANEL_WIDTH = 280;
 
@@ -183,7 +183,7 @@ const TableFilterKeyword = ({
       </Typography>
       <TextField
         size="small"
-        sx={fieldRootStyles}
+        sx={fieldTextFieldStyles}
         name="keyword"
         placeholder={placeholder}
         value={draft}
@@ -308,6 +308,7 @@ function RangeBound({
   return (
     <TextField
       size="small"
+      sx={fieldTextFieldStyles}
       type="number"
       error={error}
       placeholder={placeholder}

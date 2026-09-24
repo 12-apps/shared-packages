@@ -21,6 +21,7 @@ import { ADORNMENT_GAP, INPUT_GLOW, INPUT_LOADING } from './Input.metrics';
 import type { InputProps } from './Input.types.native';
 import { webAria, webClick, webDisabled } from '../../../platform/aria';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
+import { fieldHeightPx } from '../../../tokens/field-height.core';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 
 /**
@@ -181,6 +182,7 @@ export const Input = React.forwardRef<RNTextInput, InputProps>((rawProps, ref) =
         <FieldPulse
           color={theme.palette.primary.main}
           radius={theme.radius.field}
+          height={fieldHeightPx(theme.fieldHeight, size)}
           testID={idFor('pulse')}
         />
       ) : null}

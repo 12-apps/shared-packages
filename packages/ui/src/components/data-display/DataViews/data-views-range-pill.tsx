@@ -33,6 +33,8 @@ import {
 } from './data-views-range-values';
 import type { RangeFieldConfig, RangeValue } from './data-views-types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
+import { fieldEdge } from '../../../tokens/field-edge';
 
 
 
@@ -206,7 +208,8 @@ function RangeTrigger<T extends Record<string, unknown>>({
   const inverted = isRangeInverted(value);
   // An INVERTED window gets its own tone rather than the ordinary "applied"
   // one: it is applied, and it matches nothing, and those are different states.
-  const tone = inverted ? 'error.main' : active ? 'primary.main' : 'divider';
+  // At rest the pill draws the one field border (`fieldEdge`).
+  const tone = inverted ? 'error.main' : active ? 'primary.main' : null;
   return (
     <Button
       variant="outlined"
@@ -228,7 +231,7 @@ function RangeTrigger<T extends Record<string, unknown>>({
       endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
       sx={{
         borderRadius: fieldRadiusPx,
-        height: 34,
+        height: fieldHeight,
         px: 1.5,
         maxWidth: 280,
         color: inverted ? 'error.main' : 'text.primary',
@@ -236,7 +239,7 @@ function RangeTrigger<T extends Record<string, unknown>>({
         fontSize: '0.8125rem',
         textTransform: 'none',
         whiteSpace: 'nowrap',
-        borderColor: tone,
+        borderColor: (theme) => tone ?? fieldEdge(theme),
         bgcolor: active ? 'action.selected' : 'background.paper',
         '&:hover': {
           borderColor: active ? tone : 'text.primary',

@@ -10,13 +10,13 @@ import {
   INPUT_FONT_SIZE,
   INPUT_LINE_HEIGHT,
   INPUT_LOADING,
-  MUI_INPUT_PADDING,
   inputPadding,
 } from './Input.metrics';
 import { Icon } from '../../../icons/Icon.native';
 import { UiProvider } from '../../../provider/UiProvider.native';
 import { createUiTheme } from '../../../tokens/theme';
 import { resolveFieldEdge } from '../../../tokens/field-edge.core';
+import { DEFAULT_FIELD_HEIGHT, fieldHeightPx } from '../../../tokens/field-height.core';
 
 const theme = createUiTheme();
 const edge = resolveFieldEdge(theme.palette.divider, theme.palette.background.paper);
@@ -49,13 +49,16 @@ describe('Input (native)', () => {
     expect(rootOf('email')).toHaveTextContent('Obrigatório');
   });
 
-  it('types at MUI body1 on its 23px line, inset by the outlined medium padding', () => {
+  it('types at MUI body1 on its 23px line, centred in the field height', () => {
     render(<Input dataTestId="f" />);
     const style = screen.getByTestId('f').style;
     expect(style.fontSize).toBe(`${INPUT_FONT_SIZE}px`);
     expect(style.lineHeight).toBe(`${INPUT_LINE_HEIGHT}px`);
-    // The border is free on the web, so the inset gives its width back.
-    const padding = MUI_INPUT_PADDING.outlined.medium;
+    // 2.5 × the 16dp default font is 40dp: the 23px line leaves 8.5 above and
+    // below (FUT-2555). The border is free on the web, so the inset gives its
+    // width back.
+    const padding = inputPadding('outlined', 'md');
+    expect(padding.top).toBe((fieldHeightPx(DEFAULT_FIELD_HEIGHT, 'md') - INPUT_LINE_HEIGHT) / 2);
     expect(style.paddingTop).toBe(`${padding.top - INPUT_BORDER.rest}px`);
     expect(fieldOf('f').style.paddingLeft).toBe(`${padding.left - INPUT_BORDER.rest}px`);
   });
@@ -80,7 +83,7 @@ describe('Input (native)', () => {
     });
     // The value does not move: the inset gives back exactly what the border took.
     expect(screen.getByTestId('f').style.paddingTop).toBe(
-      `${MUI_INPUT_PADDING.outlined.medium.top - INPUT_BORDER.focused}px`,
+      `${inputPadding('outlined', 'md').top - INPUT_BORDER.focused}px`,
     );
   });
 
@@ -175,11 +178,12 @@ describe('Input (native)', () => {
     expect(onChangeText).toHaveBeenCalledWith('oi');
   });
 
-  it('sets the helper text in caption type, 3px under the field', () => {
+  it('sets the helper text in caption type, 4px under the field at its small density', () => {
     render(<Input dataTestId="h" helperText="Ajuda" />);
     const helper = screen.getByText('Ajuda');
     expect(helper.style.fontSize).toBe(`${HELPER_TEXT.fontSize}px`);
-    expect(helper.style.marginTop).toBe(`${HELPER_TEXT.marginTop}px`);
+    // `md` is drawn at the 40px field height, MUI's small density (FUT-2555).
+    expect(helper.style.marginTop).toBe(`${HELPER_TEXT.marginTopSmall}px`);
     expect(helper.style.marginLeft).toBe(`${HELPER_TEXT.marginHorizontal}px`);
   });
 

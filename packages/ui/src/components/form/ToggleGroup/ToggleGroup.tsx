@@ -7,6 +7,7 @@ import React, { forwardRef } from 'react';
 
 import type { ToggleGroupProps } from './ToggleGroup.types';
 import { cssLengthToPx } from '../../../tokens/css-units';
+import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
 
 const GLASS_PADDING = 4;
@@ -119,6 +120,10 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
               fontWeight: 500,
               transition: 'all 0.3s ease',
               ...sizeMap[size as keyof typeof sizeMap],
+              // The theme's field height for the size; the label centres in it.
+              minHeight: (theme) => fieldHeight(theme, asFieldSize(size)),
+              paddingTop: 0,
+              paddingBottom: 0,
 
               '&.Mui-selected': {
                 backgroundColor: colorPalette.main,

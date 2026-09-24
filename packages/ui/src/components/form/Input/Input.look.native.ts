@@ -46,7 +46,7 @@ const BORDER_SIDES: Record<InputVariant, 'all' | 'bottom'> = {
  * Whether the web draws this border on an absolutely positioned element.
  *
  * MUI's `notchedOutline` fieldset and the `::before` / `::after` underlines
- * cost no height — the field is 56px tall WITH its border. `glass` and
+ * cost no height — the field is the field height tall WITH its border. `glass` and
  * `gradient` instead put a real `border` on the input root, which does add to
  * the box, so the web field is 2px and 4px taller respectively. React Native
  * has only the second kind, so the first three compensate below.
@@ -158,7 +158,7 @@ export interface FieldLook {
  * adornments and one without.
  *
  * Where the web's border costs no height, the inset gives the border back its
- * width, so the box is the height MUI draws (56px medium, 40px small) and the
+ * width, so the box is the theme's field height (40px by default) and the
  * value does not shift by a pixel when the focused border thickens.
  */
 export function fieldLook(
@@ -167,7 +167,7 @@ export function fieldLook(
   size: SizeValue,
   state: FieldState,
 ): FieldLook {
-  const padding = inputPadding(variant, size);
+  const padding = inputPadding(variant, size, theme.fieldHeight);
   const width = borderWidthFor(variant, state.focused);
   const inset = BORDER_IS_FREE[variant] ? width : 0;
   const sides = BORDER_SIDES[variant];
@@ -218,14 +218,14 @@ export function labelStyle(theme: UiTheme, variant: InputVariant, size: SizeValu
     marginBottom: INPUT_LABEL.gap,
     // Aligned with the value it names: the web's floating label and the input
     // share one left inset (14px outlined, 12px filled, 0 standard).
-    marginLeft: inputPadding(variant, size).left,
+    marginLeft: inputPadding(variant, size, theme.fieldHeight).left,
   };
 }
 
 /**
  * `FormHelperText`: caption type, 3px below the field, inset 14px when
  * contained — and 4px below at MUI's `small` density, which `INPUT_MUI_SIZE`
- * selects for `xs` and `sm` (`FormHelperText.js`: `marginTop: 3`, then a
+ * selects for `xs`, `sm` and `md` (`FormHelperText.js`: `marginTop: 3`, then a
  * `size: 'small'` variant raising it to 4).
  */
 export function helperStyle(

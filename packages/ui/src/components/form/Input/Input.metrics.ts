@@ -1,5 +1,6 @@
 import type { InputVariant } from './Input.base';
 import { decomposeColor, recomposeColor } from '../../../tokens/color';
+import { DEFAULT_FIELD_HEIGHT, fieldHeightPx } from '../../../tokens/field-height.core';
 import type { UiTheme } from '../../../tokens/theme';
 import { SIZE_VALUES, type SizeValue } from '../../../tokens/vocabulary';
 
@@ -47,23 +48,25 @@ export const muiVariantFor = (variant: InputVariant): MuiInputVariant => {
   }
 };
 
-/** Which of MUI's two heights each step of the house scale asks for. */
+/**
+ * Which of MUI's two densities each step asks for — its label offsets and
+ * helper-text lift. The HEIGHT is not MUI's: every outlined step is drawn at
+ * the theme's field height (`tokens/field-height`), which puts `md` at MUI's
+ * small 40px, so `md` takes the small density with it.
+ */
 export const INPUT_MUI_SIZE: Record<SizeValue, MuiInputSize> = {
   xs: 'small',
   sm: 'small',
-  md: 'medium',
+  md: 'small',
   lg: 'medium',
   xl: 'medium',
 };
 
 /**
- * The three steps MUI has no height for, as `padding` on the input itself.
- *
- * `sm` and `md` are absent on purpose — they ARE MUI's two heights, so they
- * fall through to {@link MUI_INPUT_PADDING} below rather than restating it.
- * (`lg`'s 16px is a hair under `md`'s 16.5px: the override is a round number
- * where MUI's is derived from a 56px box. Kept as written — this table is what
- * the web draws, not what it ought to draw.)
+ * The horizontal inset of the steps that have their own, and — for `filled` and
+ * `underline`, which are not drawn at the field height — their vertical one.
+ * An outlined-family field takes its vertical inset from the field height
+ * instead ({@link inputPadding}).
  */
 export const INPUT_SIZE_OVERRIDES: Partial<Record<SizeValue, { vertical: number; horizontal: number }>> = {
   xs: { vertical: 6, horizontal: 10 },
@@ -91,9 +94,34 @@ export const MUI_INPUT_PADDING: Record<MuiInputVariant, Record<MuiInputSize, Inp
   },
 };
 
-/** The inset the value is drawn at: the size override where there is one, MUI's otherwise. */
-export function inputPadding(variant: InputVariant, size: SizeValue): InputInset {
+/** The variants drawn at the theme's field height: the outline and the two that restyle it. */
+const AT_FIELD_HEIGHT: Record<InputVariant, boolean> = {
+  outlined: true,
+  glass: true,
+  gradient: true,
+  filled: false,
+  underline: false,
+};
+
+/**
+ * The inset the value is drawn at.
+ *
+ * An outlined-family field is the theme's field height tall, so its vertical
+ * inset is whatever centres the 23px line in that height; its horizontal inset
+ * is the size override's, or MUI's 14px. `filled` and `underline` keep their
+ * own heights — their label sits inside the box — so they keep MUI's insets.
+ */
+export function inputPadding(
+  variant: InputVariant,
+  size: SizeValue,
+  fieldHeight: number = DEFAULT_FIELD_HEIGHT,
+): InputInset {
   const override = INPUT_SIZE_OVERRIDES[size];
+  if (AT_FIELD_HEIGHT[variant]) {
+    const vertical = (fieldHeightPx(fieldHeight, size) - INPUT_LINE_HEIGHT) / 2;
+    const horizontal = override?.horizontal ?? MUI_INPUT_PADDING.outlined.small.left;
+    return { top: vertical, right: horizontal, bottom: vertical, left: horizontal };
+  }
   if (override) {
     return {
       top: override.vertical,
@@ -171,11 +199,10 @@ export const INPUT_GLOW = {
 } as const;
 
 /**
- * `pulse`: a 56px bar behind the field, fading outward every two seconds. Its
- * corner is the field's own — `fieldRadius` on the web, `radius.field` native.
+ * `pulse`: a bar behind the field, fading outward every two seconds. Its height
+ * and corner are the field's own — the theme's field height and radius.
  */
 export const INPUT_PULSE = {
-  height: 56,
   opacity: 0.3,
   ms: 2000,
   spread: 10,
@@ -208,12 +235,13 @@ export const INPUT_GRADIENT = {
 export const FILLED_WASH = { rest: 0.04, hover: 0.08, focused: 0.12 } as const;
 
 /**
- * The `sx` the web spreads onto the `TextField` for a size: MUI's height, plus
- * the input padding for the three steps MUI has no height for.
+ * The props the web spreads onto the `TextField` for a size: MUI's density, and
+ * the horizontal inset of the steps that have their own. The HEIGHT is not
+ * here — `Input.tsx` draws every outlined step at the theme's field height.
  */
 export interface InputSizeProps {
   size: MuiInputSize;
-  sx?: { '& .MuiInputBase-input': { padding: string } };
+  sx?: { '& .MuiInputBase-input': { paddingLeft: string; paddingRight: string } };
 }
 
 const sizeProps = (size: SizeValue): InputSizeProps => {
@@ -221,7 +249,14 @@ const sizeProps = (size: SizeValue): InputSizeProps => {
   return {
     size: INPUT_MUI_SIZE[size],
     ...(override
-      ? { sx: { '& .MuiInputBase-input': { padding: `${override.vertical}px ${override.horizontal}px` } } }
+      ? {
+          sx: {
+            '& .MuiInputBase-input': {
+              paddingLeft: `${override.horizontal}px`,
+              paddingRight: `${override.horizontal}px`,
+            },
+          },
+        }
       : {}),
   };
 };

@@ -15,6 +15,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Box } from "../../../mui/Box";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { fieldHeight, fieldTextFieldStyles } from "../../../tokens/field-height";
+import { fieldEdge } from "../../../tokens/field-edge";
 
 /** How long the box waits after the last keystroke before it queries. */
 const SEARCH_DEBOUNCE_MS = 350;
@@ -170,7 +172,7 @@ export function InlineKeyword({
       // Takes the free space and gives it up first — step 3 of the ladder,
       // which needs no flag because flex does it (see `computeSplit`). The
       // corner is the theme's field radius, so the box matches the pills beside it.
-      sx={(theme) => ({ ...boxWidth(fill), "& .MuiOutlinedInput-root": { borderRadius: fieldRadiusPx(theme) } })}
+      sx={(theme) => ({ ...boxWidth(fill), ...fieldTextFieldStyles(theme) })}
     />
   );
 }
@@ -201,9 +203,11 @@ export function CollapsedSearch({
       data-testid={testId ? `${testId}-collapsed` : undefined}
       sx={{
         position: "relative",
+        width: fieldHeight,
+        height: fieldHeight,
         border: 1,
         borderRadius: fieldRadiusPx,
-        borderColor: active ? "primary.main" : "divider",
+        borderColor: (theme) => (active ? theme.palette.primary.main : fieldEdge(theme)),
         color: active ? "primary.main" : "text.secondary",
         bgcolor: active ? "action.selected" : "background.paper",
       }}

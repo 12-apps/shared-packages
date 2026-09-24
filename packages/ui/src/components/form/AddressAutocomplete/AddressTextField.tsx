@@ -7,12 +7,14 @@ import React from 'react';
 import type { AddressAutocompleteProps } from './AddressAutocomplete.types';
 
 import { fieldEdge } from '../../../tokens/field-edge';
-import { fieldRadius, fieldRootStyles } from '../../../tokens/field-radius';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { fieldControlStyles, fieldTextFieldStyles } from '../../../tokens/field-height';
 
 // Kept module-local on purpose: the inferred type of a styled() component cannot
 // be named across a module boundary here (TS2742), so the plain component below
 // is what the rest of the folder imports.
 const GlassTextField = styled(TextField)(({ theme }) => ({
+  ...fieldControlStyles(theme),
   '& .MuiOutlinedInput-root': {
     borderRadius: fieldRadius(theme),
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,
@@ -35,7 +37,7 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
 }));
 
 /** The plain variants: MUI's own field, on the theme's field radius. */
-const FieldTextField = styled(TextField)(({ theme }) => fieldRootStyles(theme));
+const FieldTextField = styled(TextField)(({ theme }) => fieldTextFieldStyles(theme));
 
 export type AddressTextFieldProps = Omit<TextFieldProps, 'variant'> & {
   addressVariant: AddressAutocompleteProps['variant'];

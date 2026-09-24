@@ -7,6 +7,7 @@ import {
   Text as RNText,
   View,
   useWindowDimensions,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
@@ -29,7 +30,9 @@ import type { SelectProps, SelectValue } from './Select.types.native';
 import { Icon } from '../../../icons/Icon.native';
 import { webAria, webKeyDown, webRole, type WebKeyEvent } from '../../../platform/aria';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
+import { fieldHeightPx } from '../../../tokens/field-height.core';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
+import type { UiTheme } from '../../../tokens/theme';
 import { FieldPulse } from '../field-pulse.native';
 import { helperStyle, labelStyle, type FieldState } from '../Input/Input.look.native';
 
@@ -154,6 +157,35 @@ function useSelectValue(
   return [value ?? own, setOwn];
 }
 
+/** The pulse bar, at the field's own height and corner. */
+function SelectPulse({
+  theme,
+  size,
+  testID,
+}: {
+  theme: UiTheme;
+  size: SelectProps['size'];
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <FieldPulse
+      color={theme.palette.primary.main}
+      radius={theme.radius.field}
+      height={fieldHeightPx(theme.fieldHeight, size ?? 'md')}
+      testID={testID}
+    />
+  );
+}
+
+/**
+ * The field's own box. Raised while open: react-native-web gives every View
+ * `z-index: 0`, so the anchor's z-index stays inside this root, and the next
+ * field down would paint over the list and take its taps.
+ */
+function rootStyle(theme: UiTheme, fullWidth: boolean | undefined, open: boolean): StyleProp<ViewStyle> {
+  return [styles.root, fullWidth ? styles.fullWidth : styles.auto, open ? { zIndex: theme.zIndex.modal } : null];
+}
+
 /**
  * The native `Select`.
  *
@@ -202,16 +234,10 @@ export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
     <View
       ref={ref}
       testID={ids.root}
-      style={[styles.root, fullWidth ? styles.fullWidth : styles.auto, style]}
+      style={[rootStyle(theme, fullWidth, open), style]}
       {...withoutTestIdProps(others)}
     >
-      {pulse ? (
-        <FieldPulse
-          color={theme.palette.primary.main}
-          radius={theme.radius.field}
-          testID={`${ids.trigger}-pulse`}
-        />
-      ) : null}
+      {pulse ? <SelectPulse theme={theme} size={size} testID={`${ids.trigger}-pulse`} /> : null}
       {label === undefined ? null : (
         <RNText id={labelId} style={labelStyle(theme, inputVariantFor(variant), size, state)}>
           {label}

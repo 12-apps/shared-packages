@@ -18,6 +18,8 @@ import type { SelectProps } from './Select.types';
 
 import { splitTestId } from '../../../platform/test-id';
 import { fieldEdge } from '../../../tokens/field-edge';
+import { asFieldSize, fieldControlStyles, fieldHeight } from '../../../tokens/field-height';
+import type { SizeValue } from '../../../tokens/vocabulary';
 import { fieldRadius } from '../../../tokens/field-radius';
 
 // Define pulse animation
@@ -47,14 +49,14 @@ const glowStyles = (theme: Theme): CSSObject => ({
 });
 
 /** Pulsing halo behind the control, keyed off the `pulse` prop. */
-const pulseStyles = (theme: Theme): CSSObject => ({
+const pulseStyles = (theme: Theme, size: SizeValue): CSSObject => ({
   '&::after': {
     content: '""',
     position: 'absolute',
     top: '50%',
     left: '0',
     right: '0',
-    height: `${SELECT_PULSE.height}px`,
+    height: fieldHeight(theme, size),
     transform: 'translateY(-50%)',
     borderRadius: fieldRadius(theme),
     backgroundColor: theme.palette.primary.main,
@@ -134,15 +136,19 @@ const variantStyles = (theme: Theme, variant: SelectProps['variant']): CSSObject
 };
 
 const StyledFormControl = styled(FormControl, {
-  shouldForwardProp: (prop) => prop !== 'customVariant' && prop !== 'glow' && prop !== 'pulse',
+  shouldForwardProp: (prop) =>
+    prop !== 'customVariant' && prop !== 'fieldSize' && prop !== 'glow' && prop !== 'pulse',
 })<{
   customVariant?: SelectProps['variant'];
+  fieldSize: SizeValue;
   glow?: boolean;
   pulse?: boolean;
-}>(({ theme, customVariant, glow, pulse }) => ({
+}>(({ theme, customVariant, fieldSize, glow, pulse }) => ({
   position: 'relative',
+  // The theme's field height for this size — the height `Input` draws for it.
+  ...fieldControlStyles(theme, fieldSize),
   ...(glow ? glowStyles(theme) : {}),
-  ...(pulse ? pulseStyles(theme) : {}),
+  ...(pulse ? pulseStyles(theme, fieldSize) : {}),
   '& .MuiOutlinedInput-root': {
     transition: 'all 0.3s ease',
     borderRadius: fieldRadius(theme),
@@ -227,8 +233,8 @@ export const Select = React.forwardRef<HTMLDivElement, SelectProps>(
         size={formControlSize(size)}
         error={error}
         customVariant={variant}
-        glow={glow}
-        pulse={pulse}
+        fieldSize={asFieldSize(size)}
+        glow={glow} pulse={pulse}
         ref={ref}
         data-testid={dataTestId}
       >

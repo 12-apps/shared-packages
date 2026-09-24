@@ -7,6 +7,7 @@ import React from 'react';
 
 import type { FilterTriggerProps } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
 
 /**
  * Labeled filter toggle: a "Filtros" button (styled like the sibling toolbar
@@ -35,7 +36,7 @@ export function FilterTrigger({
       startIcon={<FilterIcon sx={{ fontSize: 16 }} />}
       sx={{
         minWidth: 0,
-        height: 32,
+        height: fieldHeight,
         px: 1,
         gap: 0.25,
         borderRadius: fieldRadiusPx,

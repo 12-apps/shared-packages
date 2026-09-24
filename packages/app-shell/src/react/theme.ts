@@ -1,5 +1,5 @@
 import { createTheme, type Theme } from '@12-apps/ui/mui/styles';
-import { DEFAULT_FIELD_RADIUS, fieldRadiusOverrides } from '@12-apps/ui/tokens';
+import { DEFAULT_FIELD_HEIGHT, DEFAULT_FIELD_RADIUS, fieldOverrides } from '@12-apps/ui/tokens';
 
 import { brandHex, DEFAULT_SURFACES as CORE_SURFACES, readableInk, separateFromBrand } from '../core/brand-palette';
 
@@ -269,14 +269,14 @@ export interface AppThemeOptions {
    */
   components?: ThemeComponents;
   /**
-   * The corner every field is drawn with, in px — inputs, selects, filter
-   * triggers and the buttons beside them. Defaults to {@link DEFAULT_FIELD_RADIUS}.
-   * One number so a row stops mixing 4px boxes, 8px buttons and 999px pills:
-   * `@12-apps/ui`'s fields read it, and the factory rounds MUI's own
-   * `OutlinedInput`, `FilledInput`, `Button` and `ToggleButton` to it too. A
-   * host entry for one of those in {@link components} still wins.
+   * The field corner (px) and height (multiples of the default font size).
+   * Default 8px and 2.5rem. `@12-apps/ui`'s fields read both; the factory also
+   * puts MUI's own outlined fields, buttons and toggles on them, under any
+   * host entry in {@link components}.
    */
   fieldRadius?: number;
+  /** See {@link fieldRadius}. */
+  fieldHeight?: number;
 }
 
 /**
@@ -389,11 +389,12 @@ function themePalette(
  * {@link AppThemeOptions.components} and {@link AppThemeOptions.fieldRadius}.
  */
 export function createAppTheme(mode: ThemeMode = 'light', options: AppThemeOptions = {}): Theme {
-  const fieldRadius = options.fieldRadius ?? DEFAULT_FIELD_RADIUS;
+  const { fieldRadius = DEFAULT_FIELD_RADIUS, fieldHeight = DEFAULT_FIELD_HEIGHT } = options;
   return createTheme({
     palette: themePalette(mode, options),
     fieldRadius,
-    // The field corners first, the host's own overrides over them.
-    components: { ...fieldRadiusOverrides(fieldRadius), ...options.components },
+    fieldHeight,
+    // The field corner and height first, the host's own overrides over them.
+    components: { ...fieldOverrides(fieldRadius, fieldHeight), ...options.components },
   });
 }

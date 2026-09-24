@@ -2,6 +2,7 @@ import { alpha, type CSSObject, type Theme } from '@mui/material/styles/index.js
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
 
 /**
  * The prototype's METRICS, verbatim.
@@ -11,9 +12,9 @@ import { fieldRadiusPx } from '../../../tokens/field-radius';
  * a half-pixel type scale (13.5px rows, 1.5px checkbox borders) that an 8px
  * spacing grid cannot express without rounding the look away.
  *
- * The trigger's CORNER is the other exception: it is a field, so it takes the
- * theme's one field radius (`tokens/field-radius`) and lines up with the inputs
- * and filter pills it sits beside.
+ * The trigger's CORNER and HEIGHT are the other exception: it is a field, so it
+ * takes the theme's field radius and field height (`tokens/field-radius`,
+ * `tokens/field-height`) and lines up with the inputs and filter pills beside it.
  *
  * COLOURS are the deliberate exception — they come from the theme, because a
  * tenant can white-label the palette (a hard-coded indigo would survive the
@@ -22,7 +23,6 @@ import { fieldRadiusPx } from '../../../tokens/field-radius';
  * prototype's own values.
  */
 export const METRICS = {
-  triggerHeight: 38,
   panelWidth: 340,
   panelRadius: 14,
   listMaxHeight: 290,
@@ -56,7 +56,7 @@ export const triggerSx = (theme: Theme, selected: boolean, open: boolean): CSSOb
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    height: METRICS.triggerHeight,
+    height: fieldHeight(theme),
     padding: '0 10px 0 12px',
     borderRadius: fieldRadiusPx(theme),
     border: `1px solid ${open || selected ? brand.edge : fieldEdge(theme)}`,
