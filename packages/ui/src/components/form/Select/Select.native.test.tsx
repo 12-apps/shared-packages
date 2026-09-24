@@ -222,6 +222,15 @@ describe('Select (native)', () => {
     expect(screen.getByTestId('t-select')).toHaveStyle({ borderTopColor: 'rgb(0, 137, 123)' });
   });
 
+  it('lifts the whole field while open, so the next field down cannot cover the list', () => {
+    // react-native-web gives every View `z-index: 0`, so a z-index on the
+    // list's own anchor stays inside the field; the field itself must rise.
+    render(<Select dataTestId="z" options={OPTIONS} />);
+    expect(screen.getByTestId('z')).not.toHaveStyle({ zIndex: String(theme.zIndex.modal) });
+    openList('z-select');
+    expect(screen.getByTestId('z')).toHaveStyle({ zIndex: String(theme.zIndex.modal) });
+  });
+
   it('renders the pulse bar only while pulsing', async () => {
     const { rerender } = render(<Select dataTestId="p" options={OPTIONS} pulse />);
     expect(screen.getByTestId('p-select-pulse')).toHaveAttribute('aria-hidden', 'true');

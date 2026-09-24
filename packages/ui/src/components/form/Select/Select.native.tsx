@@ -224,7 +224,10 @@ export const Select = React.forwardRef<View, SelectProps>((rawProps, ref) => {
     <View
       ref={ref}
       testID={ids.root}
-      style={[styles.root, fullWidth ? styles.fullWidth : styles.auto, style]}
+      // Raised while open: react-native-web gives every View `z-index: 0`, so
+      // the anchor's own z-index stays inside this root, and the next field
+      // down would paint over the list and take its taps.
+      style={[styles.root, fullWidth ? styles.fullWidth : styles.auto, open ? { zIndex: theme.zIndex.modal } : null, style]}
       {...withoutTestIdProps(others)}
     >
       {pulse ? <SelectPulse theme={theme} size={size} testID={`${ids.trigger}-pulse`} /> : null}

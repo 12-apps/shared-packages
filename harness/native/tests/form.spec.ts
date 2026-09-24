@@ -70,13 +70,14 @@ test.describe('the form components of the native build', () => {
         const edge = field ? Number.parseFloat(getComputedStyle(field).borderTopWidth) : 0;
         return own + edge;
       });
-    // xs, lg and xl are the three stops the house overrides; md is MUI's own.
-    expect(await inset('input-size-xs')).toBe(6);
-    expect(await inset('input-size-lg')).toBe(16);
-    expect(await inset('input-size-xl')).toBe(20);
-    expect(await inset('input-size-md')).toBe(16.5);
+    // Each size centres the 23px line in the theme's field height for it:
+    // (32 | 40 | 48 | 56 − 23) / 2.
+    expect(await inset('input-size-xs')).toBe(4.5);
+    expect(await inset('input-size-md')).toBe(8.5);
+    expect(await inset('input-size-lg')).toBe(12.5);
+    expect(await inset('input-size-xl')).toBe(16.5);
     // And the padding alone is that inset less the resting 1px outline.
-    expect(await px(page.getByTestId('input-size-xs'), 'padding-top')).toBe(5);
+    expect(await px(page.getByTestId('input-size-xs'), 'padding-top')).toBe(3.5);
   });
 
   test('Select opens, picks, and reports through event.target.value', async ({ page }) => {
