@@ -193,7 +193,7 @@ describe('createShellRouteErrorBoundary', () => {
 });
 
 /**
- * FUT-2485 (future-pay): a page from an older build is not an error the reader
+ * Seen in production by an adopter: a page from an older build is not an error the reader
  * can act on beyond one tap, and "Importing a module script failed." is noise to
  * them. The host's own "there is a new version" screen replaces it, and its
  * button reloads PAST the caches — the plain reload the recovery already tried

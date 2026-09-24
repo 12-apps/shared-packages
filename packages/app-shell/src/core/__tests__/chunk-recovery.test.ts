@@ -111,7 +111,7 @@ describe('loadRouteChunk', () => {
   });
 
   /**
-   * FUT-2485 (future-pay): a bare `location.reload()` asks for the same URL,
+   * Seen in production by an adopter: a bare `location.reload()` asks for the same URL,
    * and a cache still holding the pre-deploy document answers it with the page
    * that names the dead chunk — so the one reload "recovers" onto the same
    * failure. The recovery must ask for a URL no cache has seen.
