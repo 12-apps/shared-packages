@@ -170,7 +170,7 @@ function SelectPulse({
     <FieldPulse
       color={theme.palette.primary.main}
       radius={theme.radius.field}
-      height={fieldHeightPx(theme.fieldHeight, selectInputSize(size))}
+      height={fieldHeightPx(theme.fieldHeight, size ?? 'md')}
       testID={testID}
     />
   );
