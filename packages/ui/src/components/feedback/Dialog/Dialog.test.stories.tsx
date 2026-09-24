@@ -1023,3 +1023,33 @@ export const DrawerIsDrawn: Story = {
     await expect(style.borderTopRightRadius).toBe('0px');
   },
 };
+
+/**
+ * Raw children (no `DialogContent`) taller than the drawer scroll with its
+ * paper. The drawer's paper keeps MUI's own `overflow-y: auto`; clipping it to
+ * round the corners would leave everything below the fold unreachable.
+ */
+export const DrawerScrollsRawChildren: Story = {
+  render: () => (
+    <Dialog open variant="drawer" size="sm" onClose={fn()}>
+      <Box data-testid="drawer-raw-body">
+        {Array.from({ length: 60 }, (_, i) => (
+          <Typography key={i}>Linha {i + 1}</Typography>
+        ))}
+      </Box>
+    </Dialog>
+  ),
+  play: async () => {
+    const body = await within(globalThis.document.body).findByTestId('drawer-raw-body');
+    const paper = body.closest('.MuiDrawer-paper') as HTMLElement;
+    await expect(paper).not.toBeNull();
+    // The panel is as tall as the viewport and 60 lines overflow it at any size;
+    // scrolling it IS the behaviour under test.
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    await waitFor(() => expect(paper.scrollHeight).toBeGreaterThan(paper.clientHeight));
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    paper.scrollTop = paper.scrollHeight;
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    await waitFor(() => expect(paper.scrollTop).toBeGreaterThan(0));
+  },
+};

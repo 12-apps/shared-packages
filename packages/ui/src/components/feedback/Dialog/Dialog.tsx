@@ -5,10 +5,10 @@ import MuiDialog from '@mui/material/Dialog/index.js';
 import MuiDialogActions from '@mui/material/DialogActions/index.js';
 import MuiDialogContent from '@mui/material/DialogContent/index.js';
 import MuiDialogTitle from '@mui/material/DialogTitle/index.js';
-import Drawer from '@mui/material/Drawer/index.js';
+import Drawer, { type DrawerProps } from '@mui/material/Drawer/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { hasSpacingSlot, withDialogDefaults } from './Dialog.helpers';
@@ -74,6 +74,40 @@ function bodyOf(children: React.ReactNode, hasTitle: boolean): React.ReactNode {
   return <Box sx={{ ...BODY_SX, pt }}>{children}</Box>;
 }
 
+/** Our look first, then whatever `sx` the caller adds — so the caller's escape hatch still wins. */
+function withCallerSx(own: SxProps<Theme>, caller: SxProps<Theme> | undefined): SxProps<Theme> {
+  return [own, ...(Array.isArray(caller) ? caller : caller === undefined ? [] : [caller])] as SxProps<Theme>;
+}
+
+/**
+ * The drawer variant: MUI's `Drawer`, with the variant's look on the Drawer's
+ * OWN paper — on an inner Box it left the paper 0px wide and clipped the panel —
+ * and a caller's paper props merged over it rather than replacing it.
+ */
+function DrawerDialog({
+  paperSx,
+  testId,
+  drawerProps,
+  children,
+}: {
+  paperSx: SxProps<Theme>;
+  testId: string | undefined;
+  drawerProps: DrawerProps;
+  children: React.ReactNode;
+}) {
+  const { PaperProps: callerPaper, ...rest } = drawerProps;
+  return (
+    <Drawer
+      anchor="right"
+      data-testid={testId}
+      {...rest}
+      PaperProps={{ ...callerPaper, sx: withCallerSx(paperSx, callerPaper?.sx) }}
+    >
+      {children}
+    </Drawer>
+  );
+}
+
 export const Dialog: React.FC<DialogProps> = (rawProps) => {
   const {
     children,
@@ -124,18 +158,10 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
 
   if (variant === 'drawer') {
     return (
-      <Drawer
-        anchor="right"
-        open={open}
-        onClose={onClose}
-        data-testid={testId}
-        // On the Drawer's own paper: on an inner Box it left the paper 0px wide.
-        PaperProps={{ sx: paperSx }}
-        {...props}
-      >
+      <DrawerDialog paperSx={paperSx} testId={testId} drawerProps={{ ...props, open, onClose }}>
         {header}
         {body}
-      </Drawer>
+      </DrawerDialog>
     );
   }
 

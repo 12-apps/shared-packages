@@ -173,8 +173,6 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         width: maxWidthOf(opts.size),
         ...dynamicViewportHeight('height'),
         maxHeight: 'none',
-        // The header and body share the rounded panel; the body scrolls inside.
-        overflow: 'hidden',
         ...decorations,
       };
     }
