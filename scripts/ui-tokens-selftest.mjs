@@ -134,8 +134,11 @@ const TYPED = {
     "const pitch = remPx(theme, 52); const geometry = { row: remPx(theme, 40) };",
     "const d = { height: pitch, top: i * pitch, width: Math.max(pitch, geometry.row), minHeight: -pitch };",
     "const e = { rootMargin: `${pitch}px`, border: `${FIELD_BORDER_WIDTH}px solid`, borderWidth: FIELD_BORDER_WIDTH };",
+    "const rowHeight = remPx(theme, 52); const g = { rowHeight };",
     // Raw riding along: flagged.
     "const f = { height: remPx(theme, 52) + 40, borderWidth: BORDERS.focused };",
+    // Untyped: cannot be proven relative, so it is reported.
+    "declare const untyped: any; const h = { width: untyped };",
   ].join("\n"),
 };
 
@@ -149,8 +152,8 @@ for (const { rule, src } of cases) {
 for (const rule of RULES.filter((r) => !(r in VIOLATIONS))) failures.push(`${rule} has no violating fixture`);
 
 const typed = typedFindings(TYPED, "/v/Sel.tsx");
-if (typed.filter((r) => r === "raw-number-length").length !== 4) {
-  failures.push(`type-aware: expected 4 raw-number-length (height and maxWidth through a name, remPx()+40, a typed 2px border), got ${JSON.stringify(typed)}`);
+if (typed.filter((r) => r === "raw-number-length").length !== 5) {
+  failures.push(`type-aware: expected 5 raw-number-length (height and maxWidth through a name, remPx()+40, a typed 2px border, an untyped width), got ${JSON.stringify(typed)}`);
 }
 if (typed.some((r) => r === "raw-length")) failures.push(`type-aware: a px glued onto a remPx-traced value was flagged: ${JSON.stringify(typed)}`);
 if (typed.filter((r) => r === "raw-font-size").length !== 1) failures.push(`type-aware: expected 1 raw-font-size (fontSize through a name), got ${JSON.stringify(typed)}`);

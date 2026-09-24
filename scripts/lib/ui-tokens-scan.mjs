@@ -140,10 +140,16 @@ function isRawNumber(key, value, node) {
   return true;
 }
 
-/** Whether a non-literal expression is a NUMBER — needs the type checker. */
+/**
+ * Whether a non-literal expression is a NUMBER — needs the type checker. An
+ * UNTYPED (`any`) value counts too: the scanner cannot prove it relative, and
+ * treating "unknown" as "fine" is how a gate goes quiet. A value that is right
+ * anyway can be typed, or argued as `exempt`.
+ */
 function isNumberTyped(checker, expr) {
   if (!checker) return false;
   const type = checker.getTypeAtLocation(expr);
+  if ((type.flags & ts.TypeFlags.Any) !== 0) return true;
   const isNum = (t) => (t.flags & ts.TypeFlags.NumberLike) !== 0;
   const isNullish = (t) => (t.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null)) !== 0;
   if (type.isUnion()) return type.types.every((t) => isNum(t) || isNullish(t)) && type.types.some(isNum);

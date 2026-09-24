@@ -29,20 +29,17 @@ export function scopeFiles(repoRoot = process.cwd()) {
 }
 
 /**
- * One program over the scope, resolving RELATIVE imports only — that is where
- * the metrics tables are. A bare import (`react`, `@mui/*`) stays unresolved,
- * its values type as `any`, and `any` is never reported: skipping node_modules
- * can only under-report, and it is most of the cost.
+ * One program over the scope, with every import resolved — MUI's and React's
+ * included. Resolving only relative imports was tried (3s instead of ~15s) and
+ * undone: with MUI unresolved a `styled()` callback's props and a component's
+ * props type as `any`, and `minWidth: CIRCLE_SIZE[size]` went unreported.
  */
 function createScopeProgram(files) {
-  const options = {
+  return ts.createProgram(files, {
     jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler, noEmit: true, types: [], strict: true, noUncheckedIndexedAccess: true,
-  };
-  const host = ts.createCompilerHost(options);
-  host.resolveModuleNameLiterals = (literals, containingFile) => literals.map((lit) =>
-    (lit.text.startsWith(".") ? ts.resolveModuleName(lit.text, containingFile, options, host) : { resolvedModule: undefined }));
-  return ts.createProgram(files, options, host);
+    moduleResolution: ts.ModuleResolutionKind.Bundler, noEmit: true, types: [], strict: true,
+    noUncheckedIndexedAccess: true, skipLibCheck: true, esModuleInterop: true, allowSyntheticDefaultImports: true,
+  });
 }
 
 /** `file — rule` -> count, and the lines behind each, over the whole scope. */

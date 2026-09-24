@@ -58,7 +58,10 @@ function relativeBinary(e, ctx, depth) {
 /** Follow a name or a member to what it was initialised with. */
 function relativeDeclaration(e, ctx, depth) {
   if (!ctx.checker) return false;
-  const symbol = ctx.checker.getSymbolAtLocation(ts.isPropertyAccessExpression(e) ? e.name : e);
+  // `{ rowHeight }` — the shorthand's own symbol is the PROPERTY; the value is the variable.
+  const symbol = ts.isShorthandPropertyAssignment(e.parent) && e.parent.name === e
+    ? ctx.checker.getShorthandAssignmentValueSymbol(e.parent)
+    : ctx.checker.getSymbolAtLocation(ts.isPropertyAccessExpression(e) ? e.name : e);
   const decl = symbol?.valueDeclaration;
   if (!decl) return false;
   const init = ts.isVariableDeclaration(decl) || ts.isPropertyAssignment(decl) ? decl.initializer : undefined;
