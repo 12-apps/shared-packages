@@ -171,6 +171,9 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         borderRadius: `${radius} 0 0 ${radius}`,
         margin: 0,
         width: maxWidthOf(opts.size),
+        // Never wider than the screen: a 600px panel on a 375px phone put its
+        // title and the start of every line off the left edge.
+        maxWidth: '100%',
         ...dynamicViewportHeight('height'),
         maxHeight: 'none',
         ...decorations,
