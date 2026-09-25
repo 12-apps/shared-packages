@@ -31,7 +31,9 @@
  * The candidate list `FocusTrap`'s own `defaultGetTabbable` uses
  * (`@mui/material/Unstable_TrapFocus/FocusTrap.js`), so "first tabbable
  * descendant" means the same thing here as it does to the trap that then
- * keeps Tab cycling inside it.
+ * keeps Tab cycling inside it. Like the trap, a match whose resolved
+ * `tabIndex` is -1 is skipped: `<button tabIndex={-1}>` is focusable but out
+ * of the Tab order, so it is not the first Tab stop.
  */
 const FOCUSABLE_SELECTOR = [
   'input:not([disabled]):not([type="hidden"])',
@@ -61,7 +63,9 @@ export function focusFirstTabbable(target: HTMLElement): void {
   const active = target.ownerDocument.activeElement;
   if (active !== target && target.contains(active)) return;
 
-  const tabbable = target.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+  const tabbable = Array.from(target.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).find(
+    (element) => element.tabIndex >= 0,
+  );
   if (tabbable) {
     tabbable.focus();
     return;

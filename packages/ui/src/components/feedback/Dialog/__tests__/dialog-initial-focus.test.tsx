@@ -50,6 +50,21 @@ describe('Dialog initial focus (default variant)', () => {
     });
   });
 
+  it('skips a focusable element taken out of the Tab order with tabIndex={-1}', async () => {
+    render(
+      <Dialog open transitionDuration={0}>
+        <DialogContent>
+          <button type="button" tabIndex={-1}>
+            Out of order
+          </button>
+          <button type="button">First stop</button>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    await waitFor(() => expect(screen.getByText('First stop')).toHaveFocus());
+  });
+
   it('falls back to the paper itself, given tabIndex={-1}, when nothing inside is focusable', async () => {
     render(
       <Dialog open transitionDuration={0}>
