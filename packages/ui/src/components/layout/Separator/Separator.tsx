@@ -35,6 +35,12 @@ export const Separator: React.FC<SeparatorProps> = ({
         // silently dropped it, so a LABELLED separator was the one variant no
         // test could address except through its own words.
         data-testid={dataTestId}
+        // The same semantics as the plain branch, on the group, as MUI's
+        // `Divider` does with children (FUT-2674). Without them a screen reader
+        // heard the label with nothing marking a boundary. The label stays
+        // inside, and the separator takes no name from it.
+        role="separator"
+        aria-orientation={orientation}
         sx={{
           display: 'flex',
           alignItems: 'center',
