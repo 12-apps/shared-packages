@@ -1,12 +1,24 @@
 import React from 'react';
 
+type TimerRef = React.MutableRefObject<number | undefined>;
+
+/**
+ * Cancel the timer a ref holds, and forget it. Every place that schedules
+ * or dismisses goes through this, so no timer outlives the ref that could
+ * cancel it (FUT-2619: an overwritten enter timer reopened a dismissed card).
+ */
+const clearPending = (ref: TimerRef) => {
+  if (ref.current !== undefined) window.clearTimeout(ref.current);
+  ref.current = undefined;
+};
+
 interface HandlerInput {
   isTouchDevice: boolean;
   touchEnabled: boolean;
   enterDelay: number;
-  openCard: (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => void;
+  openCard: (trigger: HTMLElement) => void;
   closeCard: () => void;
-  exitTimeoutRef: React.MutableRefObject<number | undefined>;
+  exitTimeoutRef: TimerRef;
 }
 
 /**
@@ -44,7 +56,7 @@ const useHoverHandlers = ({
   const triggerHandlers = {
     onMouseEnter: (event: React.MouseEvent<HTMLElement>) => {
       if (hoverIgnored) return;
-      openCard(event);
+      openCard(event.currentTarget);
     },
     onMouseLeave: () => {
       if (hoverIgnored) return;
@@ -53,7 +65,10 @@ const useHoverHandlers = ({
     onTouchStart: (event: React.TouchEvent<HTMLElement>) => {
       if (!touchEnabled) return;
       if (touchTimeout) window.clearTimeout(touchTimeout);
-      setTouchTimeout(window.setTimeout(() => openCard(event), enterDelay));
+      // Read NOW: React nulls `currentTarget` once the handler returns, so
+      // the long-press timer used to open the card with no anchor at all.
+      const trigger = event.currentTarget;
+      setTouchTimeout(window.setTimeout(() => openCard(trigger), enterDelay));
     },
     // End and cancel do the same thing: the press did not become a long press.
     onTouchEnd: cancelTouch,
@@ -62,9 +77,7 @@ const useHoverHandlers = ({
 
   /** Moving onto the card keeps it open; leaving it starts the exit delay. */
   const cardHandlers = {
-    onMouseEnter: () => {
-      if (exitTimeoutRef.current) window.clearTimeout(exitTimeoutRef.current);
-    },
+    onMouseEnter: () => clearPending(exitTimeoutRef),
     onMouseLeave: closeCard,
   };
 
@@ -83,6 +96,45 @@ const useEscapeKey = (active: boolean, onEscape: () => void) => {
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [active, onEscape]);
+};
+
+/**
+ * A press anywhere outside the trigger and the card dismisses it.
+ *
+ * Touch has no mouse-leave, and MUI's own click-away was the popover's
+ * backdrop, which `pointer-events: none` on the popover root (so the page
+ * under an open card stays usable) takes out of play. So this listens on the
+ * document itself, in the CAPTURE phase, where a `stopPropagation` further in
+ * cannot swallow it. It only observes: no `preventDefault`, so the tap or
+ * click still reaches whatever it landed on. Attached while open, removed on
+ * close and on unmount.
+ */
+const useClickAway = (
+  active: boolean,
+  inside: () => ReadonlyArray<Element | null>,
+  onAway: () => void,
+) => {
+  React.useEffect(() => {
+    if (!active) return;
+
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && inside().some((el) => el?.contains(target))) return;
+      onAway();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [active, inside, onAway]);
+};
+
+/** Whatever is still pending when the card unmounts is cancelled with it. */
+const useClearOnUnmount = (...refs: TimerRef[]) => {
+  React.useEffect(
+    () => () => refs.forEach(clearPending),
+    // The refs are stable objects: a mount/unmount pair, as before.
+    [],
+  );
 };
 
 interface HoverCardTimingInput {
@@ -115,6 +167,8 @@ export const useHoverCard = ({
   const [isTouchDevice, setIsTouchDevice] = React.useState(false);
   const enterTimeoutRef = React.useRef<number | undefined>(undefined);
   const exitTimeoutRef = React.useRef<number | undefined>(undefined);
+  /** The card's own box, inside the popover paper: a press here is not "away". */
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
 
   // Probed in an effect, not during render, so SSR and hydration stay intact.
   React.useEffect(() => {
@@ -122,16 +176,18 @@ export const useHoverCard = ({
   }, []);
 
   const openCard = React.useCallback(
-    (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
+    (trigger: HTMLElement) => {
       if (disabled) return;
 
-      if (exitTimeoutRef.current) {
-        window.clearTimeout(exitTimeoutRef.current);
-      }
+      clearPending(exitTimeoutRef);
+      // A second enter before the delay ran out (a click and then a hover, or
+      // the pointer jittering across the edge) must REPLACE the pending open,
+      // not add one: an overwritten timer can no longer be cancelled, and it
+      // reopened the card after Escape had closed it.
+      clearPending(enterTimeoutRef);
 
-      const target = event.currentTarget;
       enterTimeoutRef.current = window.setTimeout(() => {
-        setAnchorEl(target);
+        setAnchorEl(trigger);
         setIsOpen(true);
         onOpen?.();
       }, enterDelay);
@@ -140,9 +196,8 @@ export const useHoverCard = ({
   );
 
   const closeCard = React.useCallback(() => {
-    if (enterTimeoutRef.current) {
-      window.clearTimeout(enterTimeoutRef.current);
-    }
+    clearPending(enterTimeoutRef);
+    clearPending(exitTimeoutRef);
 
     exitTimeoutRef.current = window.setTimeout(() => {
       setIsOpen(false);
@@ -151,7 +206,11 @@ export const useHoverCard = ({
     }, exitDelay);
   }, [exitDelay, onClose]);
 
+  // Escape and the popover's own close are FINAL: nothing still pending may
+  // reopen the card behind them. It opens again on the next enter.
   const handleClose = React.useCallback(() => {
+    clearPending(enterTimeoutRef);
+    clearPending(exitTimeoutRef);
     setIsOpen(false);
     setAnchorEl(null);
     onClose?.();
@@ -166,15 +225,11 @@ export const useHoverCard = ({
     exitTimeoutRef,
   });
 
+  const insideCard = React.useCallback(() => [anchorEl, contentRef.current], [anchorEl]);
+
   useEscapeKey(isOpen, handleClose);
+  useClickAway(isOpen, insideCard, handleClose);
+  useClearOnUnmount(enterTimeoutRef, exitTimeoutRef);
 
-  React.useEffect(
-    () => () => {
-      if (enterTimeoutRef.current) window.clearTimeout(enterTimeoutRef.current);
-      if (exitTimeoutRef.current) window.clearTimeout(exitTimeoutRef.current);
-    },
-    [],
-  );
-
-  return { anchorEl, isOpen, handleClose, triggerHandlers, cardHandlers };
+  return { anchorEl, isOpen, handleClose, triggerHandlers, cardHandlers, contentRef };
 };
