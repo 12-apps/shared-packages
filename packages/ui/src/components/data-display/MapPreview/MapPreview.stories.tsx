@@ -10,7 +10,7 @@ const meta: Meta<typeof MapPreview> = {
   title: 'Media/MapPreview',
   component: MapPreview,
   parameters: {
-    layout: 'centered',
+    layout: 'padded',
     docs: {
       description: {
         component: 'A versatile map preview component with support for markers, routes, heatmaps, and interactive features.',

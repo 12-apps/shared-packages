@@ -370,6 +370,9 @@ export const ResponsiveDesign: Story = {
     onChange: fn(),
   },
   parameters: {
+    // A `width: '100%'` carousel inside the meta's centered layout has no box
+    // to fill and collapses to 0px; padded gives it the canvas width.
+    layout: 'padded',
     viewport: {
       viewports: {
         mobile: { name: 'Mobile', styles: { width: '360px', height: '640px' } },
