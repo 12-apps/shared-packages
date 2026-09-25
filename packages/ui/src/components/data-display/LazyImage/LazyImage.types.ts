@@ -63,7 +63,9 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
   objectPosition?: string;
 
   /**
-   * Border radius (number in pixels or CSS string)
+   * Border radius: a number is design px, scaled with the theme's type scale,
+   * and rounds the image, its clipping box, its skeleton and its fallback alike;
+   * a string is any CSS length and passes through untouched.
    */
   borderRadius?: number | string;
 
