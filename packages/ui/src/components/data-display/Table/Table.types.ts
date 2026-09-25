@@ -229,8 +229,11 @@ export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   showColumnToggle?: boolean;
   
   /**
-   * Container height for virtual scrolling (default 400). A number is design
-   * px, scaled with the theme's type scale; a string is used as given.
+   * The scroller's height — with or without `virtualScrolling` (FUT-2677).
+   * The 400 default applies only when `virtualScrolling` is on and this is
+   * unset; without it, no `containerHeight` means no height at all. A number
+   * is design px, scaled with the theme's type scale; a string is used as
+   * given.
    */
   containerHeight?: number | string;
   

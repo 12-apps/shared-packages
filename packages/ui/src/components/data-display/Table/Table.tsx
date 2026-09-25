@@ -21,8 +21,10 @@ import type {
   TableStripeColor} from './Table.types';
 import {
   TABLE_DEFAULTS,
+  containerStyle,
   definedProps,
-  scrollerStyle,
+  headerRefFor,
+  scrollerRadiusStyle,
   tableDomProps,
   tableRowHeight,
   virtualHeight,
@@ -84,7 +86,10 @@ const TableShell: React.FC<{
   header,
   rest,
   children }) => (
-  <TableContainer>
+  // The loading and empty shells are not scrollers (no `containerHeight`), so
+  // they get only the rounded clip `stickyHeader` moves off the `<table>`,
+  // never a height (FUT-2677).
+  <TableContainer style={scrollerRadiusStyle(useTheme(), stickyHeader)}>
     <StyledTable
       ref={innerRef}
       customVariant={variant}
@@ -198,13 +203,13 @@ const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerR
     tableRowHeight(p.rowHeight) || 40,
     windowHeight ?? 400,
     p.overscan,
-    headRef,
+    headerRefFor(windowHeight, headRef),
   );
 
   return (
     <Box position="relative">
       <TableContainer
-        style={scrollerStyle(theme, p)}
+        style={containerStyle(theme, p)}
         onScroll={windowHeight ? handleScroll : undefined}
       >
         <StyledTable

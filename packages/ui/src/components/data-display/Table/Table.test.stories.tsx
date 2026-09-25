@@ -368,3 +368,193 @@ export const Integration: Story = {
     });
   },
 };
+
+/**
+ * A STICKY HEADER STICKS INSIDE THE TABLE'S OWN SCROLLER (FUT-2677).
+ *
+ * jsdom has no layout, so this is the one place the actual sticking is
+ * checked: `getBoundingClientRect` on the `<thead>` and on the scroller after
+ * scrolling, in a real browser. shared-packages CI does not run play
+ * functions (FUT-2619) — this is reported by hand in the PR.
+ */
+// Waiting two animation frames is what the ticket (FUT-2677) asks for:
+// `position: sticky` and scroll-anchoring settle across a paint, and jsdom
+// cannot fake that — this file only runs in a real browser (Storybook play
+// function).
+async function waitTwoFrames(): Promise<void> {
+  await new Promise<void>((resolve) =>
+    // eslint-disable-next-line test-flakiness/no-animation-wait -- see the function comment above: two real frames are the thing under test.
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
+}
+
+/** The `<thead>`'s top sits within 1px of its scroller's — it stuck. */
+async function expectHeaderStuckTo(scroller: HTMLElement): Promise<void> {
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the bug this checks (FUT-2677) is defined in terms of scroll position: whether the header's rect tracks the scroller's after a scroll.
+  scroller.scrollTop = 150;
+  scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+  await waitTwoFrames();
+
+  const thead = scroller.querySelector('thead')!;
+  const headerTop = thead.getBoundingClientRect().top;
+  const scrollerTop = scroller.getBoundingClientRect().top;
+  await expect(Math.abs(headerTop - scrollerTop)).toBeLessThanOrEqual(1);
+}
+
+const stickyRows = Array.from({ length: 60 }, (_, i) => ({
+  id: i,
+  name: `Row ${i}`,
+  email: `row${i}@example.com`,
+  role: 'User',
+}));
+
+export const StickyHeaderSticks: Story = {
+  render: function StickyHeaderSticksTable() {
+    return (
+      <Box height={300} width={400} data-testid="sticky-header-sticks">
+        <Table
+          emptyText="Nenhum dado"
+          columns={basicColumns}
+          data={stickyRows}
+          stickyHeader
+          variant="striped"
+          containerHeight={300}
+        />
+      </Box>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const table = canvas.getByRole('table');
+    await expectHeaderStuckTo(table.parentElement as HTMLElement);
+  },
+};
+
+export const AllFeaturesCombinedSticks: Story = {
+  render: function AllFeaturesCombinedSticksTable() {
+    return (
+      <Box height={400} width={500} data-testid="all-features-sticks">
+        <Table
+          emptyText="Nenhum dado"
+          columns={basicColumns}
+          data={stickyRows}
+          variant="gradient"
+          glow
+          density="comfortable"
+          stickyHeader
+          selectable
+          sortable
+          hoverable
+          containerHeight={400}
+        />
+      </Box>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const table = canvas.getByRole('table');
+    await expectHeaderStuckTo(table.parentElement as HTMLElement);
+  },
+};
+
+export const VirtualStickyHeaderSticks: Story = {
+  render: function VirtualStickyHeaderSticksTable() {
+    const virtualData = Array.from({ length: 200 }, (_, i) => ({
+      id: i,
+      name: `Row ${i}`,
+      email: `row${i}@example.com`,
+      role: 'User',
+    }));
+
+    return (
+      <Box width={400} data-testid="virtual-sticky-sticks">
+        <Table
+          emptyText="Nenhum dado"
+          columns={basicColumns}
+          data={virtualData}
+          virtualScrolling
+          stickyHeader
+          containerHeight={300}
+          overscan={5}
+          variant="striped"
+        />
+      </Box>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const table = canvas.getByRole('table');
+    await expectHeaderStuckTo(table.parentElement as HTMLElement);
+  },
+};
+
+/**
+ * THE VIRTUAL WINDOW IS RE-MEASURED WHEN THE HEADER CHANGES, WITHOUT A SCROLL
+ * (FUT-2678).
+ *
+ * `overflow-anchor: none` turns off the browser's own scroll-anchoring, which
+ * would otherwise mask the bug by firing a synthetic `scroll` event whenever
+ * the header's height changes. Growing the header should not leave a blank
+ * strip at the top of the body area — the `ResizeObserver` re-measures it
+ * directly.
+ */
+export const HeaderResizeRepaints: Story = {
+  render: function HeaderResizeRepaintsTable() {
+    const rows = Array.from({ length: 200 }, (_, i) => ({ id: i, name: `Row ${i}` }));
+    const [tall, setTall] = useState(false);
+
+    return (
+      <Box width={400} data-testid="header-resize-repaints">
+        <button data-testid="grow-header" onClick={() => setTall(true)}>
+          Grow header
+        </button>
+        <Box
+          data-testid="scroller-wrap"
+          sx={{ '& .MuiTableContainer-root': { overflowAnchor: 'none' } }}
+        >
+          <Table
+            emptyText="Nenhum dado"
+            columns={[{ key: 'name', label: 'Nome' }]}
+            data={rows}
+            virtualScrolling
+            containerHeight={300}
+            overscan={0}
+            variant="default"
+          />
+          {tall && (
+            <style>{`[data-testid="header-resize-repaints"] thead { height: 452px; display: table-row-group; }`}</style>
+          )}
+        </Box>
+      </Box>
+    );
+  },
+  // What FUT-2678 fixes only shows up at a scroll offset the header's height
+  // change can leave stale: the check is inherently about scroll position.
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const table = canvas.getByRole('table');
+    const scroller = table.parentElement as HTMLElement;
+
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see the play function comment above.
+    scroller.scrollTop = 3000;
+    scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+    await waitTwoFrames();
+
+    const beforeTop = scroller.getBoundingClientRect().top;
+    const firstRowBefore = table.querySelector('tbody tr[aria-hidden]')?.nextElementSibling;
+    const beforeGap = firstRowBefore
+      ? firstRowBefore.getBoundingClientRect().top - beforeTop
+      : 0;
+
+    await userEvent.click(canvas.getByTestId('grow-header'));
+    await waitTwoFrames();
+
+    const afterTop = scroller.getBoundingClientRect().top;
+    const firstRowAfter = table.querySelector('tbody tr[aria-hidden]')?.nextElementSibling;
+    const afterGap = firstRowAfter ? firstRowAfter.getBoundingClientRect().top - afterTop : 0;
+
+    // No blank strip: the first visible data row still starts at (about) the
+    // top of the scroller's body area, not 400px into it.
+    await expect(Math.abs(afterGap - beforeGap)).toBeLessThanOrEqual(2);
+  },
+};
