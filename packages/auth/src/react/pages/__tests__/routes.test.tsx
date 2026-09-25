@@ -1,6 +1,6 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EmailAuthScreens } from "../../screens";
@@ -138,7 +138,25 @@ describe("createAuthRoutes — the base-path pair", () => {
 
     // Auth.js must return to the app's real URL...
     expect(signIn).toHaveBeenCalledWith("google", "/admin/pedidos");
-    // ...while the router, already mounted under /admin, must not repeat it.
+    // ...while the router is not sent anywhere by the click: the handoff is
+    // Auth.js's. Flushed first, so a navigate that follows the resolved
+    // `signIn` is caught too, and unconditional, so a one-argument call is.
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("redirects an authenticated visitor to the router path, not the prefixed one", async () => {
+    const { config, navigate } = harness({
+      basePath: "/admin",
+      useSearchParams: () => new URLSearchParams("callbackUrl=/pedidos"),
+      useSession: () => ({ status: "authenticated", signIn: vi.fn() }),
+    });
+    const { LoginRoute } = createAuthRoutes(config);
+    render(<LoginRoute />);
+
+    // The router is already mounted under /admin, so the redirect must not
+    // repeat the prefix that only the Auth.js callback needs.
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/pedidos", { replace: true }));
     expect(navigate).not.toHaveBeenCalledWith("/admin/pedidos", expect.anything());
   });
 });
@@ -262,6 +280,7 @@ describe("createAuthRoutes — the sign-up gate", () => {
             onChange={(event) => setSatisfied(event.target.checked)}
           />
         ),
+        onBeforeProceed: vi.fn(() => Promise.resolve()),
         failureMessage: "Não foi possível registrar o consentimento.",
       },
       ...overrides,
@@ -281,6 +300,11 @@ describe("createAuthRoutes — the sign-up gate", () => {
 
     // A provider button is a second door to the same account.
     fireEvent.click(await screen.findByTestId("google"));
+    // The guard acts before the gate runs, and `runGate` calls the gate's
+    // side effect before its first await, so this is not racing anything.
+    expect(config.signupGate?.onBeforeProceed).not.toHaveBeenCalled();
+    // `signIn` would only follow the awaited gate: flush before looking.
+    await act(() => new Promise((r) => setTimeout(r, 0)));
     expect(signIn).not.toHaveBeenCalled();
 
     fireEvent.click(await screen.findByTestId("accept"));
