@@ -16,7 +16,7 @@ import React, { useState } from 'react';
 
 import { Command } from './Command';
 import type { CommandItem,CommandProps } from './Command.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Command> = {
   title: 'Navigation/Command',

@@ -60,6 +60,7 @@ const AutocompleteWrapper = (props: Partial<AutocompleteProps<Person | string>>)
   return (
     <div style={{ padding: '20px', minHeight: '200px' }}>
       <Autocomplete
+        copy={PT_BR_AUTOCOMPLETE_COPY}
         {...props}
         value={value}
         onChange={setValue}
@@ -767,6 +768,7 @@ const SearchLinkWrapper = () => {
   return (
     <div style={{ padding: '20px', minHeight: '260px' }}>
       <Autocomplete<SearchLinkItem>
+        copy={PT_BR_AUTOCOMPLETE_COPY}
         value={value}
         onChange={setValue}
         suggestions={searchLinkItems}

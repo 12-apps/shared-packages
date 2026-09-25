@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Carousel } from './Carousel';
+import { PT_BR_CAROUSEL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Carousel> = {
+  args: { copy: PT_BR_CAROUSEL_COPY },
   title: 'Media/Carousel/Tests',
   component: Carousel,
   parameters: {

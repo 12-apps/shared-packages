@@ -12,12 +12,13 @@ import { Box } from "../../../mui/Box";
 
 import { BaseCard } from "./base-card";
 import { BaseListCard } from "./base-list-card";
+import { DataViewsCopyProvider } from "./data-views-copy-context";
 import { queryPedidos, type ServerPage, type ServerRow } from "./data-views-table.stories.server";
 import { DataViewsTableBase } from "./DataViewsTableBase";
 import type { BoardConfig } from "./DataViewsBoard";
 import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
-import { PT_BR_BREADCRUMB_COPY } from "../../../pt-BR";
+import { PT_BR_BREADCRUMB_COPY, PT_BR_DATA_VIEWS_COPY } from "../../../pt-BR";
 import type {
   DataViewCardSelection,
   DataViewColumn,
@@ -386,6 +387,13 @@ function PedidosHeader(): React.JSX.Element {
 const meta: Meta<typeof DataViewsTableBase<PedidoRow>> = {
   title: "Dashboards/DataViewsTable",
   component: DataViewsTableBase,
+  decorators: [
+    (Story) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <Story />
+      </DataViewsCopyProvider>
+    ),
+  ],
   parameters: {
     layout: "fullscreen",
     docs: {

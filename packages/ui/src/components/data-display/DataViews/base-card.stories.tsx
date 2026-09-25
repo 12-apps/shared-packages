@@ -8,8 +8,10 @@ import { Chip } from "../Chip";
 import { Button } from "../../form/Button";
 import { DropdownMenu } from "../../navigation/DropdownMenu";
 import { Box } from "../../../mui/Box";
+import { PT_BR_DATA_VIEWS_COPY } from "../../../pt-BR";
 
 import { BaseCard } from "./base-card";
+import { DataViewsCopyProvider } from "./data-views-copy-context";
 import { DragContainerProvider } from "./data-views-drag";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
 
@@ -56,6 +58,13 @@ const kebab = (
 const meta: Meta<typeof BaseCard> = {
   title: "Cards/BaseCard",
   component: BaseCard,
+  decorators: [
+    (Story) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <Story />
+      </DataViewsCopyProvider>
+    ),
+  ],
   parameters: { layout: "centered" },
   tags: ["autodocs"],
   /**

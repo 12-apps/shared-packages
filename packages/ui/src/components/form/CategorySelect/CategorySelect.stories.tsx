@@ -2,6 +2,7 @@ import Box from '@mui/material/Box/index.js';
 import { useState } from 'react';
 
 import { CategorySelect } from './CategorySelect';
+import { PT_BR_CATEGORY_SELECT_COPY } from '../../../pt-BR';
 import type { CategorySelectOption } from './CategorySelect.types';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
@@ -126,6 +127,7 @@ const COMPONENTES: CategorySelectOption[] = [
 ];
 
 const meta = {
+  args: { copy: PT_BR_CATEGORY_SELECT_COPY },
   title: 'Form/CategorySelect',
   component: CategorySelect,
   parameters: { layout: 'padded' },

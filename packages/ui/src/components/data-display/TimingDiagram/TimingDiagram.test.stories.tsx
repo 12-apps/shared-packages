@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent,waitFor, within } from 'storybook/test';
 
 import { TimingDiagram } from './TimingDiagram';
+import { PT_BR_TIMING_DIAGRAM_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TimingDiagram> = {
+  args: { copy: PT_BR_TIMING_DIAGRAM_COPY },
   title: 'Charts/TimingDiagram/Tests',
   component: TimingDiagram,
   parameters: {

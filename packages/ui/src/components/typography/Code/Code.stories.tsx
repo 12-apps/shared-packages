@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
+import { SIZE_VALUES } from '../../../tokens/scales';
 import { Code } from './Code';
 
 const meta: Meta<typeof Code> = {
@@ -412,7 +413,6 @@ export const WithLineNumbers: Story = {
       <Code variant="block" language="javascript" lineNumbers>
         {`// React component with hooks
 import React, { useState, useEffect } from 'react';
-import { SIZE_VALUES } from '../../../tokens/scales';
 
 function Counter() {
   const [count, setCount] = useState(0);

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { PhoneInput } from './PhoneInput';
+import { PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof PhoneInput> = {
   title: 'Form/PhoneInput/Tests',
@@ -17,6 +18,7 @@ const meta: Meta<typeof PhoneInput> = {
   },
   tags: ['autodocs', 'test'],
   args: {
+    copy: PT_BR_PHONE_INPUT_COPY,
     label: 'Phone Number',
     placeholder: 'Enter phone number',
     countryCode: 'US',
