@@ -375,6 +375,22 @@ check(
   `exit ${stray.status} after ${stray.attempts(LINE)} npm call(s):\n${stray.output}`,
 );
 
+// ── The hand-over: tell verify-released.mjs propagation from an orphan ──────
+// A package this run just published must not read as STUCK there — it has not
+// had time to propagate. PUBLISH_ACCEPTED lets that step (and release-alert.mjs,
+// asking the same question) tell the two apart.
+const ACCEPTED_PKG = "@selftest/accepted";
+const accepted = release([{ name: ACCEPTED_PKG }], { [ACCEPTED_PKG]: [{ status: 0, out: OK }] });
+check(
+  "a version npm actually accepted this run is handed over as PUBLISH_ACCEPTED",
+  accepted.handoff.includes(`PUBLISH_ACCEPTED=${ACCEPTED_PKG}`),
+  `verify-released.mjs needs this to avoid calling its own propagating publish an\n    orphan. GITHUB_ENV got:\n${accepted.handoff}`,
+);
+check(
+  "a skipped (already-published) version is NOT handed over as accepted",
+  !skip.handoff.includes(`PUBLISH_ACCEPTED=${ONE}`),
+  `a skip means the version predates this run, so it must not suppress a real\n    orphan's remedy. GITHUB_ENV got:\n${skip.handoff}`,
+);
 if (failures.length > 0) {
   console.error(`\nscripts/publish.mjs misclassified ${failures.length} case(s):\n`);
   for (const failure of failures) console.error(`  ✗ ${failure}\n`);

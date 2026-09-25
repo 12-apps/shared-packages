@@ -327,17 +327,14 @@ function summarize(lines) {
 }
 
 // Tell the REST OF THE JOB which packages this run did not get onto the
-// registry. The next step is scripts/verify-released.mjs, whose whole remedy for
-// a tag the registry never received is "delete the tag and re-run" — correct for
-// an orphan left behind by some earlier run, and wrong for one this run just
-// made, because re-cutting the version walks straight back into the failure
-// above. Without this handoff the two steps print opposite advice in the same
-// job summary, and the reader has no way to tell which applies.
+// registry (and, separately, which it DID). scripts/verify-released.mjs's
+// whole remedy for a tag the registry never received is "delete the tag and
+// re-run" — correct for an orphan left by some earlier run, wrong for one this
+// run just made, since re-cutting walks straight back into the failure above.
 //
 // GITHUB_ENV rather than a file: the runner reads it after the step exits
-// (failed or not) and exports it to every later step, which is exactly the
-// lifetime wanted. Outside Actions the variable is simply unset and
-// verify-released.mjs behaves as it always did.
+// (failed or not) and exports it to every later step. Outside Actions the
+// variable is simply unset and the readers behave as they always did.
 function handOff(names, variable) {
   if (!process.env.GITHUB_ENV || names.length === 0) return;
   appendFileSync(process.env.GITHUB_ENV, `${variable}=${names.join(" ")}\n`);
@@ -396,5 +393,7 @@ summarize([
 
 handOff([...missing], "PUBLISH_INCOMPLETE");
 handOff(wedged, "PUBLISH_WEDGED");
+// npm accepted these THIS run — read-after-write lag, not an orphan (lib/release-state.mjs).
+handOff(published, "PUBLISH_ACCEPTED");
 
 if (failed.length + blocked.length > 0) process.exitCode = 1;
