@@ -43,7 +43,7 @@ const DropdownItem: React.FC<{ child: MenubarItem; onActivate: (item: MenubarIte
           label={child.shortcut}
           size="small"
           variant="outlined"
-          sx={{ ml: 2, height: 20, fontSize: sxRem(11.2) }}
+          sx={{ ml: 2, height: sxRem(20), fontSize: sxRem(11.2) }}
         />
       )}
     </MenuItem>
@@ -108,7 +108,7 @@ export const MenubarItemView: React.FC<MenubarItemViewProps> = ({
           open={isOpen}
           onClose={onClose}
           autoFocus
-          PaperProps={{ sx: { minWidth: 200, mt: 1 } }}
+          PaperProps={{ sx: { minWidth: sxRem(200), mt: 1 } }}
         >
           {item.children?.map((child) => (
             <DropdownItem key={child.id} child={child} onActivate={onActivate} />

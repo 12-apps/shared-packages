@@ -6,14 +6,14 @@ import type { Theme } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import type { ToggleGroupProps } from './ToggleGroup.types';
-import { cssLengthToPx } from '../../../tokens/css-units';
-import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
+import { asFieldSize, FIELD_BORDER_WIDTH, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { controlNeutral } from '../../../tokens/ink';
-import { rem } from '../../../tokens/relative';
+import { rem, remPx, rems } from '../../../tokens/relative';
+import { cssLengthToPx } from '../../../tokens/css-units';
 
-const GLASS_PADDING = 4;
-const GLASS_BORDER = 1;
+/** The glass frame's padding (4px at the design scale); its border is the field hairline. */
+const glassPadding = (theme: Theme): string => rem(theme, 4);
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
@@ -41,6 +41,10 @@ const getColorFromTheme = (theme: Theme, color: string) => {
   };
 };
 
+/** The glass frame's radius: the field radius plus its padding, the buttons' margin and its border. */
+const glassFrameRadius = (theme: Theme): number =>
+  fieldRadius(theme) + remPx(theme, 4) + cssLengthToPx(theme.spacing(0.5), 4) + FIELD_BORDER_WIDTH;
+
 const StyledToggleGroup = styled(ToggleButtonGroup, {
   shouldForwardProp: (prop) => !['customColor', 'customSize', 'glass'].includes(prop as string),
 })<{
@@ -52,13 +56,12 @@ const StyledToggleGroup = styled(ToggleButtonGroup, {
   // around them is inset by its padding, the buttons' margin and its border,
   // and rounds by that much more so the two corners stay concentric.
   const radius = fieldRadius(theme);
-  const inset = GLASS_PADDING + cssLengthToPx(theme.spacing(0.5), 4) + GLASS_BORDER;
   return {
     backgroundColor: glass ? alpha(theme.palette.background.paper, 0.1) : 'transparent',
-    backdropFilter: glass ? 'blur(20px)' : 'none',
-    borderRadius: glass ? radius + inset : radius,
-    padding: glass ? GLASS_PADDING : 0,
-    border: glass ? `${GLASS_BORDER}px solid ${alpha(theme.palette.divider, 0.2)}` : 'none',
+    backdropFilter: glass ? `blur(${rem(theme, 20)})` : 'none',
+    borderRadius: glass ? glassFrameRadius(theme) : radius,
+    padding: glass ? glassPadding(theme) : 0,
+    border: glass ? `${FIELD_BORDER_WIDTH}px solid ${alpha(theme.palette.divider, 0.2)}` : 'none',
 
     '& .MuiToggleButtonGroup-grouped': {
       margin: theme.spacing(0.5),
@@ -88,11 +91,11 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
     const colorPalette = getColorFromTheme(theme, color);
 
     const sizeMap = {
-      xs: { padding: '4px 8px', fontSize: rem(theme, 12) },
-      sm: { padding: '6px 12px', fontSize: rem(theme, 14) },
-      md: { padding: '8px 16px', fontSize: rem(theme, 16) },
-      lg: { padding: '10px 20px', fontSize: rem(theme, 18) },
-      xl: { padding: '12px 24px', fontSize: rem(theme, 20) },
+      xs: { padding: rems(theme, 4, 8), fontSize: rem(theme, 12) },
+      sm: { padding: rems(theme, 6, 12), fontSize: rem(theme, 14) },
+      md: { padding: rems(theme, 8, 16), fontSize: rem(theme, 16) },
+      lg: { padding: rems(theme, 10, 20), fontSize: rem(theme, 18) },
+      xl: { padding: rems(theme, 12, 24), fontSize: rem(theme, 20) },
     };
 
     return (

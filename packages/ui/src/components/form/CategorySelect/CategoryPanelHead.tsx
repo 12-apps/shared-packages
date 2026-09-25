@@ -3,7 +3,7 @@
 import type { CategorySelectCopy } from '../../../copy';
 import Box from '@mui/material/Box/index.js';
 import InputBase from '@mui/material/InputBase/index.js';
-import { alpha, type Theme } from '@mui/material/styles/index.js';
+import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 
 import { SearchGlyph } from './CategoryIcons';
 import {
@@ -16,7 +16,7 @@ import {
 import type { CategorySelectionChip } from './CategorySelect.types';
 import { fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
-import { sxRem } from '../../../tokens/relative';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 interface PanelHeadProps {
   query: string;
@@ -37,7 +37,7 @@ const searchFieldSx = {
   '& input': {
     width: '100%',
     height: fieldHeight,
-    padding: '0 30px 0 32px',
+    padding: (theme: Theme) => rems(theme, 0, 30, 0, 32),
     fontSize: sxRem(13),
     border: fieldBorder,
     borderRadius: fieldRadiusPx,
@@ -47,16 +47,16 @@ const searchFieldSx = {
       outline: 'none',
       borderColor: 'primary.main',
       // 0x26 of 0xFF: the ring's old hex-alpha suffix, kept exact.
-      boxShadow: (theme: Theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0x26 / 0xff)}`,
+      boxShadow: (theme: Theme) => `0 0 0 ${rem(theme, 3)} ${alpha(theme.palette.primary.main, 0x26 / 0xff)}`,
     },
   },
 } as const;
 
 const clearButtonSx = {
   position: 'absolute',
-  right: 7,
-  width: 20,
-  height: 20,
+  right: sxRem(7),
+  width: sxRem(20),
+  height: sxRem(20),
   border: 0,
   background: 'action.selected',
   color: 'text.secondary',
@@ -80,15 +80,16 @@ export function CategoryPanelHead({
   dataTestId,
   copy,
 }: PanelHeadProps): React.JSX.Element {
+  const theme = useTheme();
   return (
     <Box sx={(theme) => panelHeadSx(theme, sheet)}>
       <Box sx={searchFieldSx}>
         <SearchGlyph
           style={{
             position: 'absolute',
-            left: 10,
-            width: 15,
-            height: 15,
+            left: rem(theme, 10),
+            width: rem(theme, 15),
+            height: rem(theme, 15),
             opacity: 0.55,
             pointerEvents: 'none',
           }}
@@ -120,8 +121,8 @@ export function CategoryPanelHead({
           sx={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
-            marginTop: '8px',
+            gap: sxRem(10),
+            marginTop: sxRem(8),
             fontSize: sxRem(12),
           }}
         >

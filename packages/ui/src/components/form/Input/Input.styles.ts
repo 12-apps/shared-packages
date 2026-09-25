@@ -13,9 +13,10 @@ import {
 import type { InputProps } from './Input.types';
 
 import { fieldEdge } from '../../../tokens/field-edge';
-import { fieldHeight } from '../../../tokens/field-height';
+import { FIELD_BORDER_WIDTH, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { absoluteInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 type InputVariant = NonNullable<InputProps['variant']>;
@@ -24,14 +25,14 @@ type InputVariant = NonNullable<InputProps['variant']>;
 // reads too — see its header for why MUI's own values are in there as well.
 export { muiVariantFor, SIZE_MAP } from './Input.metrics';
 
-// Define pulse animation
-const pulseAnimation = keyframes`
+// The pulse ring, its spread through the theme's type scale.
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 ${INPUT_PULSE.spread}px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, INPUT_PULSE.spread)} currentColor;
     opacity: 0;
   }
   100% {
@@ -42,9 +43,9 @@ const pulseAnimation = keyframes`
 
 export const glowStyles = (theme: Theme): CSSObject => ({
   '& .MuiInputBase-root': {
-    boxShadow: `0 0 ${INPUT_GLOW.rest.blur}px ${alpha(theme.palette.primary.main, INPUT_GLOW.rest.alpha)}`,
+    boxShadow: `0 0 ${rem(theme, INPUT_GLOW.rest.blur)} ${alpha(theme.palette.primary.main, INPUT_GLOW.rest.alpha)}`,
     '&.Mui-focused': {
-      boxShadow: `0 0 ${INPUT_GLOW.focused.blur}px ${alpha(theme.palette.primary.main, INPUT_GLOW.focused.alpha)}`,
+      boxShadow: `0 0 ${rem(theme, INPUT_GLOW.focused.blur)} ${alpha(theme.palette.primary.main, INPUT_GLOW.focused.alpha)}`,
     },
   },
 });
@@ -63,7 +64,7 @@ export const pulseStyles = (theme: Theme, size: SizeValue = 'md'): CSSObject => 
     borderRadius: fieldRadius(theme),
     backgroundColor: theme.palette.primary.main,
     opacity: INPUT_PULSE.opacity,
-    animation: `${pulseAnimation} ${INPUT_PULSE.ms / 1000}s infinite`,
+    animation: `${pulseAnimation(theme)} ${INPUT_PULSE.ms / 1000}s infinite`,
     pointerEvents: 'none',
     zIndex: -1,
   },
@@ -71,11 +72,11 @@ export const pulseStyles = (theme: Theme, size: SizeValue = 'md'): CSSObject => 
 
 export const floatingLabelStyles = (theme: Theme): CSSObject => ({
   '& .MuiInputLabel-root': {
-    transform: `translate(${FLOATING_LABEL.rest.x}px, ${FLOATING_LABEL.rest.y}px) scale(1)`,
+    transform: `translate(${rem(theme, FLOATING_LABEL.rest.x)}, ${rem(theme, FLOATING_LABEL.rest.y)}) scale(1)`,
     '&.MuiInputLabel-shrink': {
-      transform: `translate(${FLOATING_LABEL.shrink.x}px, ${FLOATING_LABEL.shrink.y}px) scale(${FLOATING_LABEL.scale})`,
+      transform: `translate(${rem(theme, FLOATING_LABEL.shrink.x)}, ${rem(theme, FLOATING_LABEL.shrink.y)}) scale(${FLOATING_LABEL.scale})`,
       backgroundColor: theme.palette.background.paper,
-      padding: `0 ${FLOATING_LABEL.paddingX}px`,
+      padding: `0 ${rem(theme, FLOATING_LABEL.paddingX)}`,
     },
   },
 });
@@ -97,8 +98,8 @@ export const inputBaseStyles = (theme: Theme, variant?: InputVariant): CSSObject
     case 'glass':
       return {
         backgroundColor: alpha(theme.palette.background.paper, INPUT_GLASS.background.rest),
-        backdropFilter: `blur(${INPUT_GLASS.blur}px)`,
-        border: `${INPUT_BORDER.rest}px solid ${fieldEdge(theme)}`,
+        backdropFilter: `blur(${rem(theme, INPUT_GLASS.blur)})`,
+        border: `${FIELD_BORDER_WIDTH}px solid ${fieldEdge(theme)}`,
         '&:hover': {
           backgroundColor: alpha(theme.palette.background.paper, INPUT_GLASS.background.hover),
           borderColor: alpha(theme.palette.primary.main, INPUT_GLASS.hoverBorderAlpha),
@@ -106,7 +107,7 @@ export const inputBaseStyles = (theme: Theme, variant?: InputVariant): CSSObject
         '&.Mui-focused': {
           backgroundColor: alpha(theme.palette.background.paper, INPUT_GLASS.background.focused),
           borderColor: theme.palette.primary.main,
-          boxShadow: `0 0 0 ${INPUT_GLASS.focusRing.width}px ${alpha(theme.palette.primary.main, INPUT_GLASS.focusRing.alpha)}`,
+          boxShadow: `0 0 0 ${rem(theme, INPUT_GLASS.focusRing.width)} ${alpha(theme.palette.primary.main, INPUT_GLASS.focusRing.alpha)}`,
         },
       };
     case 'underline':
@@ -136,7 +137,7 @@ const gradientFill = (theme: Theme, strength: number): string =>
 // since CSS cannot put a gradient on `border-color` directly.
 const gradientStyles = (theme: Theme): CSSObject => ({
   background: gradientFill(theme, INPUT_GRADIENT.fill.rest),
-  border: `${INPUT_GRADIENT.borderWidth}px solid transparent`,
+  border: `${rem(theme, INPUT_GRADIENT.borderWidth)} solid transparent`,
   backgroundOrigin: 'border-box',
   backgroundClip: 'padding-box, border-box',
   position: 'relative',
@@ -151,7 +152,7 @@ const gradientStyles = (theme: Theme): CSSObject => ({
     background: `linear-gradient(${INPUT_GRADIENT.angleDeg}deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
     mask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
     maskComposite: 'exclude',
-    padding: `${INPUT_GRADIENT.borderWidth}px`,
+    padding: rem(theme, INPUT_GRADIENT.borderWidth),
     zIndex: -1,
   },
   '&:hover': {
@@ -174,7 +175,7 @@ export const outlinedStyles = (theme: Theme): CSSObject => ({
   },
   '&.Mui-focused fieldset': {
     borderColor: theme.palette.primary.main,
-    borderWidth: INPUT_BORDER.focused,
+    borderWidth: rem(theme, INPUT_BORDER.focused),
   },
   '&.Mui-error fieldset': {
     borderColor: theme.palette.error.main,

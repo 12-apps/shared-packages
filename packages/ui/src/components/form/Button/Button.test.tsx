@@ -32,9 +32,9 @@ describe('Button (web)', () => {
     );
     // The height is the theme's field height, a multiple of the default font
     // size (FUT-2555); the vertical padding goes so the label centres in it.
-    expect(screen.getByTestId('xs')).toHaveStyle({ minHeight: '2rem', padding: '0px 8px', fontSize: '0.75rem' });
-    expect(screen.getByTestId('md')).toHaveStyle({ minHeight: '2.5rem', padding: '0px 16px' });
-    expect(screen.getByTestId('xl')).toHaveStyle({ minHeight: '3.5rem', padding: '0px 24px', fontSize: '1.25rem' });
+    expect(screen.getByTestId('xs')).toHaveStyle({ minHeight: '2rem', padding: '0px 0.5rem', fontSize: '0.75rem' });
+    expect(screen.getByTestId('md')).toHaveStyle({ minHeight: '2.5rem', padding: '0px 1rem' });
+    expect(screen.getByTestId('xl')).toHaveStyle({ minHeight: '3.5rem', padding: '0px 1.5rem', fontSize: '1.25rem' });
   });
 
   it('is square when it carries only an icon', () => {

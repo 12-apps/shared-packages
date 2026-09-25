@@ -7,7 +7,6 @@ export const makeTestId =
     dataTestId ? `${dataTestId}-${suffix}` : `code-editor-${suffix}`;
 
 type CodeEditorDefaultedKeys =
-  | 'height'
   | 'theme'
   | 'readOnly'
   | 'lineNumbers'
@@ -21,7 +20,6 @@ type ResolvedCodeEditorProps = CodeEditorProps &
   Required<Pick<CodeEditorProps, CodeEditorDefaultedKeys>>;
 
 const CODE_EDITOR_DEFAULTS: Pick<CodeEditorProps, CodeEditorDefaultedKeys> = {
-  height: '400px',
   theme: 'auto',
   readOnly: false,
   lineNumbers: true,

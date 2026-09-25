@@ -22,7 +22,7 @@ import type { RichEditorToolbarCopy } from '../../../copy';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
 const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   display: 'flex',
@@ -33,9 +33,9 @@ const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   borderBottom: `1px solid ${theme.palette.divider}`,
   background: glass ? alpha(theme.palette.background.paper, 0.1) : theme.palette.background.paper,
   ...(glass && {
-    backdropFilter: 'blur(15px)' }),
+    backdropFilter: `blur(${rem(theme, 15)})` }),
   '& .MuiDivider-root': {
-    height: 24,
+    height: rem(theme, 24),
     margin: `0 ${theme.spacing(1)}` } }));
 
 const ToolbarButton = styled(IconButton, {
@@ -63,8 +63,8 @@ const ToolbarButton = styled(IconButton, {
   '&:hover': {
     color: theme.palette.primary.main,
     backgroundColor: alpha(theme.palette.primary.main, 0.15),
-    transform: 'translateY(-1px)',
-    animation: `${floatAnimation} 1.5s ease-in-out infinite`,
+    transform: `translateY(${rem(theme, -1)})`,
+    animation: `${floatAnimation(theme)} 1.5s ease-in-out infinite`,
 
     '&::before': {
       width: '100%',
@@ -87,10 +87,10 @@ const CharacterCount = styled(Box)<{ limit?: number; count: number }>(({ theme, 
       : isWarning
         ? theme.palette.warning.main
         : theme.palette.text.secondary,
-    padding: '2px 6px',
+    padding: rems(theme, 2, 6),
     borderRadius: theme.spacing(0.5),
     backgroundColor: alpha(theme.palette.background.paper, 0.8),
-    backdropFilter: 'blur(10px)',
+    backdropFilter: `blur(${rem(theme, 10)})`,
     transition: 'all 0.3s ease' };
 });
 
@@ -108,7 +108,7 @@ const ContentEditableDiv = styled('div')<{
   const engaged = error ? errorColor.main : colorPalette.main;
 
   return {
-    minHeight: '120px',
+    minHeight: rem(theme, 120),
     padding: theme.spacing(1.5),
     borderRadius: `0 0 ${fieldRadius(theme)}px ${fieldRadius(theme)}px`,
     border: `${FIELD_BORDER_WIDTH}px solid ${error || focused ? engaged : fieldEdge(theme)}`,
@@ -125,7 +125,7 @@ const ContentEditableDiv = styled('div')<{
     cursor: 'text',
 
     ...(glass && {
-      backdropFilter: 'blur(20px)' }),
+      backdropFilter: `blur(${rem(theme, 20)})` }),
 
     '&:hover': {
       backgroundColor: glass
@@ -136,7 +136,7 @@ const ContentEditableDiv = styled('div')<{
     // moves), as every other field's does, under the halo.
     '&:focus': {
       borderColor: engaged,
-      boxShadow: `inset 0 0 0 1px ${engaged}, 0 0 0 3px ${alpha(engaged, 0.1)}` },
+      boxShadow: `inset 0 0 0 ${FIELD_BORDER_WIDTH}px ${engaged}, 0 0 0 ${rem(theme, 3)} ${alpha(engaged, 0.1)}` },
 
     '& > *': {
       margin: '0.5em 0' },

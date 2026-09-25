@@ -9,11 +9,11 @@ type Variant = NonNullable<MenubarProps['variant']>;
 type Color = NonNullable<MenubarProps['color']>;
 
 const SIZES: Record<Size, (theme: Theme) => CSSObject> = {
-  xs: (theme) => ({ minHeight: 40, fontSize: rem(theme, 12), padding: theme.spacing(0.5, 1) }),
-  sm: (theme) => ({ minHeight: 48, fontSize: rem(theme, 14), padding: theme.spacing(0.75, 1.5) }),
-  md: (theme) => ({ minHeight: 56, fontSize: rem(theme, 16), padding: theme.spacing(1, 2) }),
-  lg: (theme) => ({ minHeight: 64, fontSize: rem(theme, 18), padding: theme.spacing(1.25, 2.5) }),
-  xl: (theme) => ({ minHeight: 72, fontSize: rem(theme, 20), padding: theme.spacing(1.5, 3) }),
+  xs: (theme) => ({ minHeight: rem(theme, 40), fontSize: rem(theme, 12), padding: theme.spacing(0.5, 1) }),
+  sm: (theme) => ({ minHeight: rem(theme, 48), fontSize: rem(theme, 14), padding: theme.spacing(0.75, 1.5) }),
+  md: (theme) => ({ minHeight: rem(theme, 56), fontSize: rem(theme, 16), padding: theme.spacing(1, 2) }),
+  lg: (theme) => ({ minHeight: rem(theme, 64), fontSize: rem(theme, 18), padding: theme.spacing(1.25, 2.5) }),
+  xl: (theme) => ({ minHeight: rem(theme, 72), fontSize: rem(theme, 20), padding: theme.spacing(1.5, 3) }),
 };
 
 export const sizeStyles = (theme: Theme, size: Size): CSSObject =>
@@ -53,7 +53,7 @@ interface MenubarStyleFlags {
 const SURFACES: Record<Variant, (theme: Theme, flags: MenubarStyleFlags) => CSSObject> = {
   glass: (theme, { glass }) => ({
     backgroundColor: alpha(theme.palette.background.paper, glass ? 0.1 : 0.8),
-    backdropFilter: 'blur(20px)',
+    backdropFilter: `blur(${rem(theme, 20)})`,
     borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
   }),
 
@@ -69,24 +69,24 @@ const SURFACES: Record<Variant, (theme: Theme, flags: MenubarStyleFlags) => CSSO
   },
 
   elevated: (theme, { blur, elevation }) => ({
-    ...(blur && { backdropFilter: 'blur(10px)' }),
+    ...(blur && { backdropFilter: `blur(${rem(theme, 10)})` }),
     boxShadow: theme.shadows[elevation],
   }),
 
-  minimal: (_theme, { blur }) => ({
-    ...(blur && { backdropFilter: 'blur(10px)' }),
+  minimal: (theme, { blur }) => ({
+    ...(blur && { backdropFilter: `blur(${rem(theme, 10)})` }),
     boxShadow: 'none',
     borderBottom: 'none',
   }),
 
   bordered: (theme, { blur, color }) => ({
-    ...(blur && { backdropFilter: 'blur(10px)' }),
-    borderBottom: `2px solid ${
+    ...(blur && { backdropFilter: `blur(${rem(theme, 10)})` }),
+    borderBottom: `${rem(theme, 2)} solid ${
       color === 'neutral' ? theme.palette.divider : accentFor(theme, color).main
     }`,
   }),
 
-  default: (_theme, { blur }) => ({ ...(blur && { backdropFilter: 'blur(10px)' }) }),
+  default: (theme, { blur }) => ({ ...(blur && { backdropFilter: `blur(${rem(theme, 10)})` }) }),
 };
 
 export const barStyles = (theme: Theme, flags: MenubarStyleFlags): CSSObject => {
@@ -98,7 +98,7 @@ export const barStyles = (theme: Theme, flags: MenubarStyleFlags): CSSObject => 
     }),
     ...sizeStyles(theme, size),
     ...colorStyles(theme, color, transparent),
-    ...(glow && { boxShadow: `0 0 20px ${alpha(accentOf(theme, color), 0.4)}` }),
+    ...(glow && { boxShadow: `0 0 ${rem(theme, 20)} ${alpha(accentOf(theme, color), 0.4)}` }),
     ...(pulse && {
       animation: 'pulse 2s infinite',
       '@keyframes pulse': {

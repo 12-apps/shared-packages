@@ -20,7 +20,7 @@ import type { PhoneInputCopy } from '../../../copy';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { fieldControlStyles, fieldTextFieldStyles } from '../../../tokens/field-height';
-import { rem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 // Country data with expanded support
 
@@ -33,8 +33,8 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     borderRadius: fieldRadius(theme),
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
+    backdropFilter: `blur(${rem(theme, 10)})`,
+    WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
     border: `1px solid ${fieldEdge(theme)}`,
     transition: theme.transitions.create(['border-color', 'box-shadow', 'background']),
     '&:hover': {
@@ -42,7 +42,7 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
       borderColor: theme.palette.primary.main },
     '&.Mui-focused': {
       background: theme.palette.background.paper,
-      boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}` },
+      boxShadow: `0 0 0 ${rem(theme, 2)} ${alpha(theme.palette.primary.main, 0.25)}` },
     '& fieldset': {
       border: 'none' } },
   '& .MuiInputLabel-root': {
@@ -62,10 +62,10 @@ const CountrySelector = styled(Box)(({ theme }) => ({
 const CountryMenu = styled(Menu)(({ theme }) => ({
   '& .MuiPaper-root': {
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    backdropFilter: `blur(${rem(theme, 20)})`,
+    WebkitBackdropFilter: `blur(${rem(theme, 20)})`,
     border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
-    maxHeight: 400 } }));
+    maxHeight: rem(theme, 400) } }));
 
 // Helper functions with enhanced validation
 // The text field itself with its two adornments. Split out so PhoneInput is
@@ -138,7 +138,7 @@ const PhoneField: React.FC<{
           endAdornment: <ValidityAdornment icon={icon} isValid={isValid} /> }}
         sx={{
           '& input': {
-            letterSpacing: '0.5px' } }}
+            letterSpacing: sxRem(0.5) } }}
       />
 );
 
@@ -253,7 +253,7 @@ const CountryPicker: React.FC<{
                 '&:hover': {
                   background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)` } }}
             >
-              <ListItemIcon sx={{ minWidth: 36 }}>
+              <ListItemIcon sx={{ minWidth: sxRem(36) }}>
                 <Typography variant="h5" component="span">
                   {country.flag}
                 </Typography>

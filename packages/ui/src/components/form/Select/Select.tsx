@@ -18,19 +18,20 @@ import type { SelectProps } from './Select.types';
 
 import { splitTestId } from '../../../platform/test-id';
 import { fieldEdge } from '../../../tokens/field-edge';
-import { asFieldSize, fieldControlStyles, fieldHeight } from '../../../tokens/field-height';
+import { asFieldSize, FIELD_BORDER_WIDTH, fieldControlStyles, fieldHeight } from '../../../tokens/field-height';
 import type { SizeValue } from '../../../tokens/vocabulary';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { absoluteInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 // Define pulse animation
-const pulseAnimation = keyframes`
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 ${SELECT_PULSE.spread}px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, SELECT_PULSE.spread)} currentColor;
     opacity: 0;
   }
   100% {
@@ -42,9 +43,9 @@ const pulseAnimation = keyframes`
 /** Glow ring on the outlined input, keyed off the `glow` prop. */
 const glowStyles = (theme: Theme): CSSObject => ({
   '& .MuiOutlinedInput-root': {
-    boxShadow: `0 0 ${SELECT_GLOW.rest.blur}px ${alpha(theme.palette.primary.main, SELECT_GLOW.rest.alpha)}`,
+    boxShadow: `0 0 ${rem(theme, SELECT_GLOW.rest.blur)} ${alpha(theme.palette.primary.main, SELECT_GLOW.rest.alpha)}`,
     '&.Mui-focused': {
-      boxShadow: `0 0 ${SELECT_GLOW.focused.blur}px ${alpha(theme.palette.primary.main, SELECT_GLOW.focused.alpha)}`,
+      boxShadow: `0 0 ${rem(theme, SELECT_GLOW.focused.blur)} ${alpha(theme.palette.primary.main, SELECT_GLOW.focused.alpha)}`,
     },
   },
 });
@@ -62,7 +63,7 @@ const pulseStyles = (theme: Theme, size: SizeValue): CSSObject => ({
     borderRadius: fieldRadius(theme),
     backgroundColor: theme.palette.primary.main,
     opacity: SELECT_PULSE.opacity,
-    animation: `${pulseAnimation} ${SELECT_PULSE.ms / 1000}s infinite`,
+    animation: `${pulseAnimation(theme)} ${SELECT_PULSE.ms / 1000}s infinite`,
     pointerEvents: 'none',
     zIndex: -1,
   },
@@ -71,8 +72,9 @@ const pulseStyles = (theme: Theme, size: SizeValue): CSSObject => ({
 /** `glass` variant: translucent, blurred background. */
 const glassVariant = (theme: Theme): CSSObject => ({
   backgroundColor: alpha(theme.palette.background.paper, SELECT_GLASS.background.rest),
-  backdropFilter: `blur(${SELECT_GLASS.blur}px)`,
-  border: `${SELECT_BORDER.rest}px solid ${fieldEdge(theme)}`,
+  backdropFilter: `blur(${rem(theme, SELECT_GLASS.blur)})`,
+  // `SELECT_BORDER.rest` is the field hairline.
+  border: `${FIELD_BORDER_WIDTH}px solid ${fieldEdge(theme)}`,
   '& fieldset': { border: 'none' },
   '&:hover': {
     backgroundColor: alpha(theme.palette.background.paper, SELECT_GLASS.background.hover),
@@ -81,7 +83,7 @@ const glassVariant = (theme: Theme): CSSObject => ({
   '&.Mui-focused': {
     backgroundColor: alpha(theme.palette.background.paper, SELECT_GLASS.background.focused),
     borderColor: theme.palette.primary.main,
-    boxShadow: `0 0 0 ${SELECT_GLASS.focusRing.width}px ${alpha(theme.palette.primary.main, SELECT_GLASS.focusRing.alpha)}`,
+    boxShadow: `0 0 0 ${rem(theme, SELECT_GLASS.focusRing.width)} ${alpha(theme.palette.primary.main, SELECT_GLASS.focusRing.alpha)}`,
   },
 });
 
@@ -91,7 +93,7 @@ const gradientFill = (theme: Theme, strength: number): string =>
 
 const gradientVariant = (theme: Theme): CSSObject => ({
   background: gradientFill(theme, SELECT_GRADIENT.fill.rest),
-  border: `${SELECT_GRADIENT.borderWidth}px solid transparent`,
+  border: `${rem(theme, SELECT_GRADIENT.borderWidth)} solid transparent`,
   backgroundOrigin: 'border-box',
   backgroundClip: 'padding-box, border-box',
   position: 'relative',
@@ -107,7 +109,7 @@ const gradientVariant = (theme: Theme): CSSObject => ({
     background: `linear-gradient(${SELECT_GRADIENT.angleDeg}deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
     mask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
     maskComposite: 'exclude',
-    padding: `${SELECT_GRADIENT.borderWidth}px`,
+    padding: rem(theme, SELECT_GRADIENT.borderWidth),
     zIndex: -1,
   },
   '&:hover': {
@@ -125,7 +127,7 @@ const gradientVariant = (theme: Theme): CSSObject => ({
 const defaultVariant = (theme: Theme): CSSObject => ({
   '& fieldset': { borderColor: fieldEdge(theme) },
   '&:hover fieldset': { borderColor: theme.palette.primary.main },
-  '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main, borderWidth: SELECT_BORDER.focused },
+  '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main, borderWidth: rem(theme, SELECT_BORDER.focused) },
   '&.Mui-error fieldset': { borderColor: theme.palette.error.main },
 });
 

@@ -21,7 +21,7 @@ const HOVER_TINT = 0x05 / 0xff;
 const GHOST_HOVER_TINT = 0x08 / 0xff;
 import type { UploadButtonCopy } from '../../../copy';
 import type { UploadButtonProps } from './UploadButton.types';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 /** Shared shape for the two trigger variants. */
 export interface TriggerProps {
@@ -55,7 +55,7 @@ export function UploadDropzone({
       {...drag}
       onClick={onOpen}
       sx={{
-        border: `2px dashed ${isDragOver ? theme.palette.primary.main : theme.palette.divider}`,
+        border: `${rem(theme, 2)} dashed ${isDragOver ? theme.palette.primary.main : theme.palette.divider}`,
         borderRadius: 2,
         padding: 3,
         textAlign: 'center',
@@ -149,6 +149,7 @@ function UploadAnnouncer({
   progress: number;
   error: string | null;
 }): React.ReactElement {
+  const theme = useTheme();
   return (
     <div
       aria-live="polite"
@@ -156,9 +157,9 @@ function UploadAnnouncer({
       className="sr-only"
       style={{
         position: 'absolute',
-        left: '-10000px',
-        width: '1px',
-        height: '1px',
+        left: rem(theme, -10000),
+        width: rem(theme, 1),
+        height: rem(theme, 1),
         overflow: 'hidden',
       }}
     >

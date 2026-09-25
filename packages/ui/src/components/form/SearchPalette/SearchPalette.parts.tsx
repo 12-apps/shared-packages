@@ -9,10 +9,11 @@ import List from '@mui/material/List/index.js';
 import ListItemButton from '@mui/material/ListItemButton/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { SearchFilterChip, SearchResultLead } from './SearchPalette.types';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 /** Bold the first case-insensitive occurrence of `query` within `text`. */
 export function highlight(text: string, query: string): React.ReactNode {
@@ -39,19 +40,19 @@ export function Lead({ lead }: { lead: SearchResultLead | undefined }): React.JS
         component="img"
         src={lead.src}
         alt={lead.alt ?? ''}
-        sx={{ width: 32, height: 32, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
+        sx={{ width: sxRem(32), height: sxRem(32), borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
       />
     );
   }
   if (lead.kind === 'avatar') {
     return (
-      <Avatar src={lead.src} alt={lead.alt ?? ''} sx={{ width: 32, height: 32, fontSize: sxRem(13.6) }}>
+      <Avatar src={lead.src} alt={lead.alt ?? ''} sx={{ width: sxRem(32), height: sxRem(32), fontSize: sxRem(13.6) }}>
         {lead.fallback}
       </Avatar>
     );
   }
   return (
-    <Box sx={{ display: 'flex', width: 32, justifyContent: 'center', flexShrink: 0, color: 'text.secondary' }}>
+    <Box sx={{ display: 'flex', width: sxRem(32), justifyContent: 'center', flexShrink: 0, color: 'text.secondary' }}>
       {lead.node}
     </Box>
   );
@@ -77,6 +78,7 @@ export function PaletteInput(props: {
   onChange: (v: string) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
 }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 2, py: 1.5 }}>
       <SearchIcon fontSize="small" sx={{ color: 'text.secondary', flexShrink: 0 }} />
@@ -119,7 +121,7 @@ export function PaletteInput(props: {
           sx={{ fontSize: sxRem(16) }}
         />
       </Box>
-      {props.isLoading && <CircularProgress size={18} sx={{ flexShrink: 0 }} />}
+      {props.isLoading && <CircularProgress size={rem(theme, 18)} sx={{ flexShrink: 0 }} />}
     </Box>
   );
 }
@@ -311,7 +313,7 @@ export function PaletteBody<T>(view: BodyView<T>): React.JSX.Element | null {
  */
 export const PALETTE_CARD_SX = {
   width: '100%',
-  maxWidth: 640,
+  maxWidth: sxRem(640),
   maxHeight: '100%',
   borderRadius: 2,
   overflow: 'hidden',

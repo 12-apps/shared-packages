@@ -4,17 +4,17 @@ import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.
 import { fieldRadius } from '../../../tokens/field-radius';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral, sheen } from '../../../tokens/ink';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
-const glowAnimation = keyframes`
-  0% { box-shadow: 0 0 5px currentColor; }
-  50% { box-shadow: 0 0 15px currentColor, 0 0 25px currentColor; }
-  100% { box-shadow: 0 0 5px currentColor; }
+const glowAnimation = (theme: Theme) => keyframes`
+  0% { box-shadow: 0 0 ${rem(theme, 5)} currentColor; }
+  50% { box-shadow: 0 0 ${rem(theme, 15)} currentColor, 0 0 ${rem(theme, 25)} currentColor; }
+  100% { box-shadow: 0 0 ${rem(theme, 5)} currentColor; }
 `;
 
-const floatAnimation = keyframes`
+const floatAnimation = (theme: Theme) => keyframes`
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-2px); }
+  50% { transform: translateY(${rem(theme, -2)}); }
 `;
 
 interface TogglePalette {
@@ -57,18 +57,21 @@ export const getColorFromTheme = (theme: Theme, color: string): TogglePalette =>
   };
 };
 
-/** Each size's padding and type; the type is design px, read through the type scale. */
-const SIZE_MAP: Record<string, { padding: string; fontPx: number }> = {
-  xs: { padding: '4px 8px', fontPx: 12 },
-  sm: { padding: '6px 12px', fontPx: 14 },
-  md: { padding: '8px 16px', fontPx: 16 },
-  lg: { padding: '10px 20px', fontPx: 18 },
-  xl: { padding: '12px 24px', fontPx: 20 },
+/**
+ * Each size's padding (vertical, horizontal) and type, in design px, read
+ * through the type scale.
+ */
+const SIZE_MAP: Record<string, { paddingPx: readonly [number, number]; fontPx: number }> = {
+  xs: { paddingPx: [4, 8], fontPx: 12 },
+  sm: { paddingPx: [6, 12], fontPx: 14 },
+  md: { paddingPx: [8, 16], fontPx: 16 },
+  lg: { paddingPx: [10, 20], fontPx: 18 },
+  xl: { paddingPx: [12, 24], fontPx: 20 },
 };
 
 const sizeStyles = (theme: Theme, customSize: string): CSSObject => {
   const size = SIZE_MAP[customSize];
-  return size ? { padding: size.padding, fontSize: rem(theme, size.fontPx) } : {};
+  return size ? { padding: rems(theme, ...size.paddingPx), fontSize: rem(theme, size.fontPx) } : {};
 };
 
 export const baseStyles = (
@@ -103,9 +106,9 @@ export const baseStyles = (
   '&:hover': {
     backgroundColor: alpha(colorPalette.main, 0.08),
     borderColor: colorPalette.main,
-    transform: 'translateY(-1px)',
-    boxShadow: `0 4px 8px ${alpha(colorPalette.main, 0.15)}`,
-    animation: `${floatAnimation} 2s ease-in-out infinite`,
+    transform: `translateY(${rem(theme, -1)})`,
+    boxShadow: `0 ${rems(theme, 4, 8)} ${alpha(colorPalette.main, 0.15)}`,
+    animation: `${floatAnimation(theme)} 2s ease-in-out infinite`,
 
     '&::before': {
       width: '100%',
@@ -121,7 +124,7 @@ export const baseStyles = (
     backgroundColor: colorPalette.main,
     color: colorPalette.contrastText || absoluteInk(theme).white,
     borderColor: colorPalette.main,
-    boxShadow: `0 2px 8px ${alpha(colorPalette.main, 0.3)}`,
+    boxShadow: `0 ${rems(theme, 2, 8)} ${alpha(colorPalette.main, 0.3)}`,
 
     '&::after': {
       content: '""',
@@ -136,8 +139,8 @@ export const baseStyles = (
 
     '&:hover': {
       backgroundColor: colorPalette.dark,
-      transform: 'translateY(-2px) scale(1.02)',
-      boxShadow: `0 6px 20px ${alpha(colorPalette.main, 0.4)}`,
+      transform: `translateY(${rem(theme, -2)}) scale(1.02)`,
+      boxShadow: `0 ${rems(theme, 6, 20)} ${alpha(colorPalette.main, 0.4)}`,
     },
   },
 
@@ -158,7 +161,7 @@ export const variantStyles = (
     case 'outline':
       return {
         backgroundColor: 'transparent',
-        border: `2px solid ${colorPalette.main}`,
+        border: `${rem(theme, 2)} solid ${colorPalette.main}`,
         color: colorPalette.main,
 
         '&.Mui-selected': {
@@ -197,7 +200,7 @@ export const effectStyles = (
 ): CSSObject => ({
   ...(glass && {
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
-    backdropFilter: 'blur(20px)',
+    backdropFilter: `blur(${rem(theme, 20)})`,
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
   }),
 
@@ -205,7 +208,7 @@ export const effectStyles = (
     '&.Mui-selected': {
       background: `linear-gradient(135deg, ${colorPalette.light}, ${colorPalette.main}, ${colorPalette.dark})`,
       backgroundSize: '200% 200%',
-      animation: `${floatAnimation} 3s ease-in-out infinite`,
+      animation: `${floatAnimation(theme)} 3s ease-in-out infinite`,
       border: 'none',
 
       '&:hover': {
@@ -216,8 +219,8 @@ export const effectStyles = (
 
   ...(glow && {
     '&.Mui-selected': {
-      animation: `${glowAnimation} 2s ease-in-out infinite`,
-      boxShadow: `0 0 15px ${alpha(colorPalette.main, 0.6)}`,
+      animation: `${glowAnimation(theme)} 2s ease-in-out infinite`,
+      boxShadow: `0 0 ${rem(theme, 15)} ${alpha(colorPalette.main, 0.6)}`,
     },
   }),
 });

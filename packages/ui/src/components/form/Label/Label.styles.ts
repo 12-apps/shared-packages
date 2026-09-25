@@ -1,8 +1,8 @@
 import { alpha } from '@mui/material/styles/index.js';
-import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import type { CSSObject, SxProps, Theme } from '@mui/material/styles/index.js';
 
 import type { LabelProps } from './Label.types';
-import { accentFor, rem } from '../../../tokens/scales';
+import { accentFor, rem, sxRem } from '../../../tokens/scales';
 
 type Size = NonNullable<LabelProps['size']>;
 type Variant = NonNullable<LabelProps['variant']>;
@@ -108,7 +108,7 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => CSSObject> = {
 
   glass: ({ theme, flags }) => ({
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
-    backdropFilter: 'blur(10px)',
+    backdropFilter: `blur(${rem(theme, 10)})`,
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     borderRadius: theme.spacing(0.5),
     '&:hover': flags.clickable
@@ -181,7 +181,7 @@ export const labelStyles = (theme: Theme, flags: LabelStyleFlags): CSSObject => 
     ...textLayout(theme, flags),
     ...sizeStyles(theme, size),
     color,
-    ...(flags.glow && { textShadow: `0 0 10px ${alpha(accent, 0.5)}` }),
+    ...(flags.glow && { textShadow: `0 0 ${rem(theme, 10)} ${alpha(accent, 0.5)}` }),
     ...(flags.pulse && {
       animation: 'pulse 2s infinite',
       '@keyframes pulse': {
@@ -196,12 +196,12 @@ export const labelStyles = (theme: Theme, flags: LabelStyleFlags): CSSObject => 
 };
 
 /** Visually hidden but still read aloud, for the `srOnly` label. */
-export const SR_ONLY_SX: CSSObject = {
+export const SR_ONLY_SX: SxProps<Theme> = {
   position: 'absolute',
-  width: '1px',
-  height: '1px',
+  width: sxRem(1),
+  height: sxRem(1),
   padding: 0,
-  margin: '-1px',
+  margin: sxRem(-1),
   overflow: 'hidden',
   clip: 'rect(0, 0, 0, 0)',
   whiteSpace: 'nowrap',

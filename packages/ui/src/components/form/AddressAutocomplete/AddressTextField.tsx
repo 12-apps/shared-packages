@@ -9,6 +9,7 @@ import type { AddressAutocompleteProps } from './AddressAutocomplete.types';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { fieldControlStyles, fieldTextFieldStyles } from '../../../tokens/field-height';
+import { rem } from '../../../tokens/relative';
 
 // Kept module-local on purpose: the inferred type of a styled() component cannot
 // be named across a module boundary here (TS2742), so the plain component below
@@ -18,8 +19,8 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     borderRadius: fieldRadius(theme),
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.paper, 0.6)} 100%)`,
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
+    backdropFilter: `blur(${rem(theme, 10)})`,
+    WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
     border: `1px solid ${fieldEdge(theme)}`,
     transition: theme.transitions.create(['border-color', 'box-shadow', 'background']),
     '&:hover': {
@@ -28,7 +29,7 @@ const GlassTextField = styled(TextField)(({ theme }) => ({
     },
     '&.Mui-focused': {
       background: theme.palette.background.paper,
-      boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.25)}`,
+      boxShadow: `0 0 0 ${rem(theme, 2)} ${alpha(theme.palette.primary.main, 0.25)}`,
     },
     '& fieldset': {
       border: 'none',

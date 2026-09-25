@@ -3,11 +3,14 @@ import type { AutocompleteRenderInputParams } from '@mui/material/Autocomplete/i
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import InputAdornment from '@mui/material/InputAdornment/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 
 import type { AddressAutocompleteProps } from './AddressAutocomplete.types';
 import { AddressTextField } from './AddressTextField';
+
+import { rem } from '../../../tokens/relative';
 
 const CurrentLocationButton: FC<{
   disabled: boolean;
@@ -58,32 +61,36 @@ export const AddressInputField: FC<AddressInputFieldProps> = ({
   loading,
   showCurrentLocation,
   onGetCurrentLocation,
-}) => (
-  <AddressTextField
-    {...params}
-    addressVariant={addressVariant}
-    label={label}
-    placeholder={placeholder}
-    error={error}
-    helperText={helperText}
-    required={required}
-    InputProps={{
-      ...params.InputProps,
-      startAdornment: icon && <InputAdornment position="start">{icon}</InputAdornment>,
-      endAdornment: (
-        <>
-          {loading && <CircularProgress color="inherit" size={20} data-testid="address-loading" />}
-          {showCurrentLocation && (
-            <CurrentLocationButton
-              disabled={disabled}
-              onClick={onGetCurrentLocation}
-              currentLocationLabel={copy.useCurrentLocation}
-            />
-          )}
-          {params.InputProps.endAdornment}
-        </>
-      ),
-    }}
-    inputProps={{ ...params.inputProps, 'data-testid': 'address-input' }}
-  />
-);
+}) => {
+  const theme = useTheme();
+
+  return (
+    <AddressTextField
+      {...params}
+      addressVariant={addressVariant}
+      label={label}
+      placeholder={placeholder}
+      error={error}
+      helperText={helperText}
+      required={required}
+      InputProps={{
+        ...params.InputProps,
+        startAdornment: icon && <InputAdornment position="start">{icon}</InputAdornment>,
+        endAdornment: (
+          <>
+            {loading && <CircularProgress color="inherit" size={rem(theme, 20)} data-testid="address-loading" />}
+            {showCurrentLocation && (
+              <CurrentLocationButton
+                disabled={disabled}
+                onClick={onGetCurrentLocation}
+                currentLocationLabel={copy.useCurrentLocation}
+              />
+            )}
+            {params.InputProps.endAdornment}
+          </>
+        ),
+      }}
+      inputProps={{ ...params.inputProps, 'data-testid': 'address-input' }}
+    />
+  );
+};

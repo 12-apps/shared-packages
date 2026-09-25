@@ -74,7 +74,7 @@ function EditorWithSave() {
 
 ### Optional Props
 
-- **`height`** (`string`): Editor height (default: `'400px'`)
+- **`height`** (`string`): Editor height (default: the design's 400px through the type scale — `25rem` at MUI's defaults)
 - **`theme`** (`EditorTheme`): Color theme (default: `'auto'`)
   - Options: `'light' | 'dark' | 'auto'`
 - **`onChange`** (`(value: string) => void`): Callback when content changes

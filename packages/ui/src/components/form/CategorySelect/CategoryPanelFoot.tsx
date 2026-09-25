@@ -2,16 +2,17 @@
 
 import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 
 import type { CategorySelectCopy } from '../../../copy';
 import { footerSx, METRICS } from './CategorySelect.styles';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
-import { sxRem } from '../../../tokens/relative';
+import { rems, sxRem } from '../../../tokens/relative';
 
 const buttonSx = (sheet: boolean) =>
   ({
-    height: sheet ? METRICS.sheetFooterButton : METRICS.footerButton,
-    padding: '0 13px',
+    height: sxRem(sheet ? METRICS.sheetFooterButtonPx : METRICS.footerButtonPx),
+    padding: (theme: Theme) => rems(theme, 0, 13),
     borderRadius: fieldRadiusPx,
     fontSize: sxRem(12.5),
     fontWeight: 600,
@@ -49,7 +50,7 @@ export function CategoryMultiFoot({
       <Box component="span" sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>
         {copy.footer.selectedCount(count)}
       </Box>
-      <Box sx={{ display: 'flex', gap: '6px' }}>
+      <Box sx={{ display: 'flex', gap: sxRem(6) }}>
         <Button
           variant="outlined"
           disabled={count === 0}
