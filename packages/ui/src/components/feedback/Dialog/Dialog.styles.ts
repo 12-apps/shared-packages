@@ -125,6 +125,17 @@ function defaultVariantStyles(theme: Theme, opts: VariantStyleOptions) {
   };
 }
 
+/**
+ * The paper never grows an outline of its own — same as `.MuiDialog-container`
+ * (`outline: 0`, unconditionally, in MUI's own `Dialog.js`). It matters once
+ * `focusDialogOnEntered` (FUT-2696) falls back to focusing the paper itself: a
+ * browser's default `:focus`/`:focus-visible` ring is drawn OUTSIDE the box
+ * model — it never resizes a box or shifts a sibling — but this keeps the
+ * paper visually identical whether or not that fallback ever fires, rather
+ * than relying on that guarantee.
+ */
+const NO_FOCUS_OUTLINE = { outline: 0 } as const;
+
 export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProps<Theme> {
   const decorations = {
     ...glowStylesOf(theme, opts.glow),
@@ -135,6 +146,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
       return {
         ...baseStylesOf(theme, opts),
         ...decorations,
+        ...NO_FOCUS_OUTLINE,
         backgroundColor: alpha(theme.palette.background.paper, DIALOG_GLASS.backgroundAlpha),
         backdropFilter: `blur(${rem(theme, DIALOG_GLASS.blurPx)})`,
         border: `${DIALOG_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, DIALOG_GLASS.borderAlpha)}`,
@@ -150,6 +162,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         maxWidth: 'none',
         maxHeight: 'none',
         ...decorations,
+        ...NO_FOCUS_OUTLINE,
       };
     case 'drawer': {
       const radius = borderRadiusOf(theme, opts.borderRadius);
@@ -166,6 +179,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         ...dynamicViewportHeight('height'),
         maxHeight: 'none',
         ...decorations,
+        ...NO_FOCUS_OUTLINE,
       };
     }
     default:
@@ -173,6 +187,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         ...baseStylesOf(theme, opts),
         ...decorations,
         ...defaultVariantStyles(theme, opts),
+        ...NO_FOCUS_OUTLINE,
       };
   }
 }

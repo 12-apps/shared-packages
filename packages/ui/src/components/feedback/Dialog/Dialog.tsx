@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { focusDialogOnEntered } from './Dialog.focus';
 import { hasSpacingSlot, withDialogDefaults } from './Dialog.helpers';
 import {
   DIALOG_ACTIONS,
@@ -20,7 +21,7 @@ import {
   DIALOG_TITLE,
   DIALOG_TITLED_BODY_PADDING_TOP_UNITS,
 } from './Dialog.metrics';
-import { mergedBackdropSlot, mergedPaperSlot } from './Dialog.slots';
+import { mergedBackdropSlot, mergedPaperSlot, mergedTransitionSlot } from './Dialog.slots';
 import { backdropSxOf, variantStylesOf } from './Dialog.styles';
 import { childTestId, resolveTestId, slotTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type {
@@ -106,6 +107,8 @@ type RendererProps = DialogLooks & { children: React.ReactNode };
  * `slotProps.backdrop`, not the deprecated `BackdropProps`, and a caller's
  * backdrop props from either spelling merge over it rather than replacing it
  * (FUT-2672) — as their paper props merge over the variant's look (FUT-2613).
+ * `slotProps.transition` gives initial focus to the paper (FUT-2696, see
+ * `Dialog.focus.ts` and `Dialog.md`) ahead of a caller's own `onEntered`.
  */
 function ModalDialog({
   paperSx,
@@ -114,7 +117,7 @@ function ModalDialog({
   dialogProps,
   children,
 }: RendererProps & { dialogProps: MuiDialogProps }) {
-  const { PaperProps: callerPaper, BackdropProps: callerBackdrop, slotProps, ...rest } = dialogProps;
+  const { PaperProps: callerPaper, BackdropProps: callerBackdrop, TransitionProps: callerTransition, slotProps, ...rest } = dialogProps;
   return (
     <MuiDialog
       {...rest}
@@ -122,6 +125,7 @@ function ModalDialog({
         ...slotProps,
         paper: mergedPaperSlot(paperSx, testId, callerPaper, slotProps?.paper),
         backdrop: mergedBackdropSlot(backdropSx, callerBackdrop, slotProps?.backdrop),
+        transition: mergedTransitionSlot(focusDialogOnEntered, callerTransition, slotProps?.transition),
       }}
     >
       {children}
@@ -139,6 +143,9 @@ function ModalDialog({
  * `glass` blurs it here too; the paper does not frost (FUT-2673). MUI's
  * `Drawer` does not merge `BackdropProps` into `slotProps.backdrop` — it takes
  * one or the other — so both are folded into the one slot here.
+ * `slotProps.transition` gives initial focus the same way `ModalDialog` does
+ * (FUT-2696, see `Dialog.focus.ts` and `Dialog.md` for why the drawer's paper
+ * differs from the modal's paper here and needed the fix less).
  */
 function DrawerDialog({
   paperSx,
@@ -147,7 +154,7 @@ function DrawerDialog({
   drawerProps,
   children,
 }: RendererProps & { drawerProps: DrawerProps }) {
-  const { PaperProps: callerPaper, BackdropProps: callerBackdrop, slotProps, ...rest } = drawerProps;
+  const { PaperProps: callerPaper, BackdropProps: callerBackdrop, SlideProps: callerTransition, slotProps, ...rest } = drawerProps;
   return (
     <Drawer
       anchor="right"
@@ -157,6 +164,7 @@ function DrawerDialog({
         ...slotProps,
         paper: mergedPaperSlot(paperSx, undefined, callerPaper, slotProps?.paper),
         backdrop: mergedBackdropSlot(backdropSx, callerBackdrop, slotProps?.backdrop),
+        transition: mergedTransitionSlot(focusDialogOnEntered, callerTransition, slotProps?.transition),
       }}
     >
       {children}

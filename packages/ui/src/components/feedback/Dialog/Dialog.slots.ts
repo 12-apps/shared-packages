@@ -98,3 +98,35 @@ export function mergedBackdropSlot<O>(
 ): Slot<SlotValue, O> {
   return mergedSlot(look, legacy, slot);
 }
+
+/** What the transition slot's `onEntered` looks like on either renderer. */
+interface TransitionSlotValue {
+  onEntered?: (node: HTMLElement, isAppearing: boolean) => void;
+}
+
+/**
+ * The transition slot: `onFocusEntered` (initial-focus, FUT-2696) runs
+ * first, then the deprecated `TransitionProps`/`SlideProps`, then
+ * `slotProps.transition` — so a caller's own `onEntered` still runs, and
+ * still runs last, meaning it can move focus again if it wants to.
+ *
+ * No `sx`/`look` here: unlike the paper and the backdrop, the transition slot
+ * carries no visual look of the Dialog's own to merge under a caller's.
+ */
+export function mergedTransitionSlot<O>(
+  onFocusEntered: (node: HTMLElement, isAppearing: boolean) => void,
+  legacy: TransitionSlotValue | undefined,
+  slot: Slot<TransitionSlotValue, O> | undefined,
+): Slot<TransitionSlotValue, O> {
+  const compose = (merged: TransitionSlotValue): TransitionSlotValue => ({
+    ...merged,
+    onEntered: (node: HTMLElement, isAppearing: boolean) => {
+      onFocusEntered(node, isAppearing);
+      merged.onEntered?.(node, isAppearing);
+    },
+  });
+  if (typeof slot === 'function') {
+    return (ownerState: O) => compose({ ...legacy, ...slot(ownerState) });
+  }
+  return compose({ ...legacy, ...slot });
+}
