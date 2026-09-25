@@ -70,6 +70,19 @@ async function submitWith(password: string): Promise<void> {
   await screen.findByTestId("auth-failure");
 }
 
+/**
+ * Fill the e-mail and the password, and send the form inside `act`, so the
+ * refusal's commit AND its passive effects have run before this returns.
+ */
+async function submitInAct(password: string): Promise<void> {
+  fireEvent.change(emailInput(), { target: { value: "ana@example.test" } });
+  fireEvent.change(passwordInput(), { target: { value: password } });
+  await act(async () => {
+    fireEvent.submit(screen.getByTestId("email-signup-form"));
+  });
+  screen.getByTestId("auth-failure");
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -247,16 +260,23 @@ describe("the refusal banner and keyboard focus", () => {
     place({ "auth-failure-layer": LAYER });
     renderSignup();
 
-    await submitWith("abc12345");
+    await submitInAct("abc12345");
     // The refusal's bottom edge and the gap: focus scrolling stops below it.
-    // Published by an effect, which may run after the refusal is in the DOM.
-    await waitFor(() => {
-      expect(root.style.scrollPaddingTop).toBe("calc(196px + 12px)");
-    });
+    expect(root.style.scrollPaddingTop).toBe("calc(196px + 12px)");
+    const layer = screen.getByTestId("auth-failure-layer");
 
-    // The Alert collapses before it reports the close.
-    fireEvent.click(screen.getByRole("button", { name: SCREEN_COPY.dismissFailure }));
-    await waitForElementToBeRemoved(() => screen.queryByTestId("auth-failure-layer"));
+    // The Alert reports the close on a timer; run it inside `act`, so the
+    // unmount AND the cleanup that restores the host's padding have both run.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      fireEvent.click(screen.getByRole("button", { name: SCREEN_COPY.dismissFailure }));
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(layer.isConnected).toBe(false);
     expect(root.style.scrollPaddingTop).toBe("8px");
   });
 
@@ -265,17 +285,26 @@ describe("the refusal banner and keyboard focus", () => {
     // 10px sliver at its bottom edge — none of what it says shows.
     place({ "auth-failure-layer": LAYER, "signup-name": { top: 148, bottom: 206, left: 24, right: 296 } });
     renderSignup();
-    await submitWith("abc12345");
+    await submitInAct("abc12345");
+    const layer = screen.getByTestId("auth-failure-layer");
 
-    await focusName();
-
-    await waitForElementToBeRemoved(() => screen.queryByTestId("auth-failure-layer"));
+    // The check runs on the frame after the focus; hand that frame over now.
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    try {
+      await focusName();
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(layer.isConnected).toBe(false);
   });
 
   it("stays up over a control whose middle shows", async () => {
     place({ "auth-failure-layer": LAYER, "signup-name": { top: 180, bottom: 236, left: 24, right: 296 } });
     renderSignup();
-    await submitWith("abc12345");
+    await submitInAct("abc12345");
     // The check runs on the frame after the focus; hand that frame over now.
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
     try {
@@ -295,7 +324,7 @@ describe("the refusal banner and keyboard focus", () => {
     // focused control itself.
     place({ "auth-failure-layer": LAYER, "signup-name": { top: 100, bottom: 156, left: 24, right: 296 } });
     renderSignup();
-    await submitWith("abc12345");
+    await submitInAct("abc12345");
     const field = screen.getByLabelText(SCREEN_COPY.signUp.nameLabel);
     Object.defineProperty(document, "elementFromPoint", { value: () => field, configurable: true });
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
