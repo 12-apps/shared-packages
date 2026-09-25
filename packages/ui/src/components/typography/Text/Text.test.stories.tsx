@@ -4,14 +4,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';
 
-// Type extension for performance.memory API
-interface PerformanceWithMemory {
-  memory?: {
-    usedJSHeapSize: number;
-  };
-  now?: () => number;
-}
-
 import { Text } from './Text';
 
 const meta: Meta<typeof Text> = {
@@ -513,7 +505,7 @@ export const VisualStates: Story = {
 
 // Performance Tests
 export const Performance: Story = {
-  // The web asserts the rendered TAG (`as="p"`) or a heap budget; react-native-web has neither.
+  // The web asserts DOM node identity across hovers; react-native-web renders no such nodes.
   tags: ['native-skip'],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -529,24 +521,20 @@ export const Performance: Story = {
     const largeTextElement = canvas.getByTestId('large-content');
     expect(largeTextElement).toBeInTheDocument();
 
-    // Test memory usage doesn't increase dramatically
-    const initialMemory =
-      (globalThis.performance as PerformanceWithMemory)?.memory?.usedJSHeapSize || 0;
-
-    // Trigger re-renders
+    // Re-rendering on hover must not remount the list. The heap delta that
+    // used to stand here measured when the garbage collector last ran, not the
+    // component: in a real browser it swung past its 1 MB budget (2.9 MB) with
+    // no code change (FUT-2619). Node identity is what a leak would break.
     for (let i = 0; i < 10; i++) {
       await userEvent.hover(textElements[0]);
       await userEvent.unhover(textElements[0]);
     }
 
-    const finalMemory =
-      (globalThis.performance as PerformanceWithMemory)?.memory?.usedJSHeapSize || 0;
-
-    // Memory increase should be minimal (if memory API is available)
-    if (initialMemory > 0 && finalMemory > 0) {
-      const memoryIncrease = finalMemory - initialMemory;
-      expect(memoryIncrease).toBeLessThan(1000000); // Less than 1MB increase
-    }
+    const afterHover = canvas.getAllByText(/Performance text/);
+    expect(afterHover).toHaveLength(50);
+    afterHover.forEach((element, index) => {
+      expect(element).toBe(textElements[index]);
+    });
   },
   render: () => (
     <Stack spacing={1}>
