@@ -43,6 +43,24 @@ function App() {
 />
 ```
 
+The placeholder is a loading state, and only `loadingState="placeholder"` draws
+it — under `skeleton`, `spinner` or `none` the `placeholder` prop is ignored.
+
+- It shows from mount, lazy or not, until the real image settles: its `load`
+  plus `fadeInDuration` (at once when `fadeIn` is off), or its final error once
+  any retries are spent.
+- It sits in the box's flow and gives the box its size. The real image is drawn
+  over it, cropped by `objectFit`, and fades in on top; when the placeholder
+  goes, the real image takes the flow. So a placeholder whose shape differs
+  from the real image's gives the box its shape until the fade ends.
+- A placeholder that fails to load is dropped at once, as if none were set.
+- `onLoad` and `onError` are the real image's only: the placeholder's load
+  never calls `onLoad`, and its failure never calls `onError`.
+- An empty `src` keeps the placeholder up; no empty `<img>` is rendered.
+
+**Give it a width.** With no `width` the placeholder shows at its own size,
+which for a low-res placeholder is usually tiny. Set one, or `width="100%"`.
+
 ### With Error Fallback
 
 ```tsx
@@ -170,8 +188,8 @@ wrapping element, rounded to match the image:
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `lazy` | `boolean` | `true` | Enable lazy loading |
-| `loadingState` | `'skeleton' \| 'spinner' \| 'placeholder' \| 'none'` | `'skeleton'` | Type of loading indicator |
-| `placeholder` | `string` | - | Placeholder image URL |
+| `loadingState` | `'skeleton' \| 'spinner' \| 'placeholder' \| 'none'` | `'skeleton'` | Type of loading indicator. `'placeholder'` shows the `placeholder` image until the real image has faded in over it; set a `width` (or `"100%"`) with it |
+| `placeholder` | `string` | - | Low-res image shown while loading, only under `loadingState="placeholder"` (ignored otherwise). See [With Placeholder](#with-placeholder) |
 | `rootMargin` | `string` | `'100px'` | Intersection Observer margin |
 | `threshold` | `number \| number[]` | `0` | Intersection Observer threshold |
 
@@ -263,11 +281,13 @@ wrapping element, rounded to match the image:
   height={48}
 />
 
-// For hero images with low-res placeholders
+// For hero images with low-res placeholders — give it a width, or the
+// placeholder shows at its own, tiny, size
 <LazyImage
   src="hero-hd.jpg"
   placeholder="hero-lowres.jpg"
   alt="Hero image"
+  width="100%"
   loadingState="placeholder"
 />
 ```
