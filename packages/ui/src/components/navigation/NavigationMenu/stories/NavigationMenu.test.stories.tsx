@@ -494,6 +494,12 @@ export const PerformanceTest: Story = {
     const menuItems = canvas.getAllByText(/Menu Item \d+/);
     expect(menuItems.length).toBeGreaterThan(20);
 
+    // "Menu Item 1" (index 0) is fed `badge: 0` (`i % 5 === 0 ? i : undefined`).
+    // FUT-2701: a falsy-zero badge must not print a bare "0" next to the label.
+    const menuItem1Link = canvas.getByText('Menu Item 1').closest('a');
+    expect(menuItem1Link).toBeTruthy();
+    expect(menuItem1Link).not.toHaveTextContent('0');
+
     // Test scrolling functionality exists
     const menuContainer =
       canvas.getByRole('list').closest('[role="list"]') || canvas.getByRole('list');
