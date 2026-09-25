@@ -99,7 +99,9 @@ Four things to get right:
 
 1. **The feed URL is yours.** `settings().feedUrl` is read before every check,
    so it can depend on who is signed in. `null` means "nothing to ask yet" and
-   answers `idle`, not `failed`.
+   answers `idle`, not `failed`. With a `cookie` port the session goes to that
+   URL as a header, so it must be the host's own origin — never a CDN or a
+   third party.
 2. **Call `telemetry.installing(version)` before `updates.install()`.** It is
    the only way the next start can tell a failed install from a clean one.
 3. **Gate the menu.** A host that draws the updater into an application menu

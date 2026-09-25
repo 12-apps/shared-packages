@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global console, process */
 // ---------------------------------------------------------------------------
 // desktop-shell-upload-release — put a release's files in an S3-compatible
 // bucket, with no `aws` binary.
@@ -104,7 +105,9 @@ async function plan(files) {
 }
 
 async function upload(config, prefix, uploads) {
-  const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3").catch(() => {
+    throw new Error("@aws-sdk/client-s3 is not installed — add it as a devDependency of the app that publishes");
+  });
   const client = new S3Client({
     ...config,
     // Belt and braces against `aws-chunked` signing, which frames the body in

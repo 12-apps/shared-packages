@@ -142,6 +142,9 @@ export interface UpdateSettings {
   /**
    * The generic-provider feed to ask. `null` is a setup that is not finished
    * — there is nothing to ask yet — and answers `idle`.
+   *
+   * With a `cookie` port, the session cookie is sent to THIS URL, whatever its
+   * origin: point it only at the host's own origin, never at a CDN.
    */
   feedUrl: string | null;
 }

@@ -20,7 +20,7 @@
     "clean": "rm -rf node_modules coverage dist",
     "test": "node ../../scripts/vitest-with-teardown.mjs run",
     "test:watch": "vitest watch",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "eslint src bin --max-warnings 0",
     "check-types": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
