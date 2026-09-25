@@ -2049,16 +2049,16 @@ export const Integration: Story = {
         { timeout: 5000 },
       );
 
-      // Processing progress should pulse. The pulse is on the CircularProgress
-      // root, not its <svg>: the old check read the svg's `animation`, which
-      // older Chromium serialised as a long "none 0s ease …" string and so
-      // passed vacuously; Chrome 149 serialises it as plain "none".
-      // Web only: the Native lane runs this story too, and there the pulse is
-      // an animated opacity on a View with no CSS animation and no such id.
-      if (canvas.queryByTestId('processing-progress-circular')) {
+      // Processing progress should pulse. The caller's data-testid lands on the
+      // CircularProgress root, which carries the pulse. The old check read its
+      // <svg>, which has no animation: older Chromium serialised that as a long
+      // "none 0s ease …" string, so it passed vacuously; Chrome 149 says "none".
+      // Web only: in the Native lane the same element is a View whose pulse is
+      // an animated opacity, with no CSS animation to read.
+      const processingRoot = canvas.getByTestId('processing-progress');
+      if (processingRoot.classList.contains('MuiCircularProgress-root')) {
         await waitFor(() => {
-          const circular = canvas.getByTestId('processing-progress-circular');
-          expect(window.getComputedStyle(circular).animationName).not.toBe('none');
+          expect(window.getComputedStyle(processingRoot).animationName).not.toBe('none');
         });
       }
     });
