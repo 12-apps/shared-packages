@@ -254,5 +254,32 @@ export interface ProviderCopyPacks {
   stone: StoneCopy;
   infinitepay: InfinitePayCopy;
   stripe: StripeCopy;
+  itau: ItauCopy;
+}
+
+/**
+ * Itaú (e.Rede / Pix Recebimentos) — PIX only. No `setupGuide` for the same
+ * reason PagBank ships none: a merchant's contract with the bank (opening the
+ * Pix Recebimentos API access, generating the mTLS certificate) happens on
+ * paper before any credential exists to walk a stepper against.
+ */
+export interface ItauCopy extends ProbeUnreachableCopy {
+  /** No token could be minted — nothing to probe with. */
+  credentialsMissing: string;
+  /** Itaú answered 401/403: the client id/secret or certificate is refused. */
+  refused: string;
+  fields: {
+    clientId: string;
+    clientSecret: string;
+    /** PEM-encoded mTLS client certificate, pasted whole. */
+    certificate: string;
+    /** The store's own registered Pix key — what a charge is raised AGAINST. */
+    pixKey: string;
+    webhookSecret: string;
+  };
+  payer: {
+    /** `solicitacaoPagador` — the one line the buyer's bank app shows for this charge. */
+    chargeDescription: string;
+  };
 }
 

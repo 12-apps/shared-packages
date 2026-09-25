@@ -5,6 +5,7 @@ import {
 } from './setup-guide-pt-BR';
 import type {
   InfinitePayCopy,
+  ItauCopy,
   PagbankCopy,
   ProviderCopyPacks,
   StoneCopy,
@@ -98,6 +99,22 @@ export const PT_BR_STONE_COPY: StoneCopy = {
   payer: { boletoInstructions: 'Pagar até o vencimento', statementDescriptor: 'PEDIDO' },
 };
 
+export const PT_BR_ITAU_COPY: ItauCopy = {
+  unreachable:
+    'Não conseguimos falar com o Itaú agora. ' +
+    'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
+  credentialsMissing: 'Credenciais do Itaú não configuradas.',
+  refused: 'Credenciais recusadas pelo Itaú.',
+  fields: {
+    clientId: 'Client ID',
+    clientSecret: 'Client Secret',
+    certificate: 'Certificado (.pem)',
+    pixKey: 'Chave Pix cadastrada no Itaú',
+    webhookSecret: 'Segredo do webhook',
+  },
+  payer: { chargeDescription: 'PEDIDO' },
+};
+
 export const PT_BR_PAGBANK_COPY: PagbankCopy = {
   unreachable:
     'Não conseguimos falar com o PagBank agora. ' +
@@ -139,4 +156,5 @@ export const PT_BR_PROVIDER_COPY: ProviderCopyPacks = {
   stone: PT_BR_STONE_COPY,
   infinitepay: PT_BR_INFINITEPAY_COPY,
   stripe: PT_BR_STRIPE_COPY,
+  itau: PT_BR_ITAU_COPY,
 };
