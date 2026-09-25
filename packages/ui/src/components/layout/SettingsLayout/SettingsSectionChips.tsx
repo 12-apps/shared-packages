@@ -4,6 +4,7 @@ import Box from '@mui/material/Box/index.js';
 import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useEffect, useRef, type RefObject } from 'react';
 
+import { watchVisitorScroll } from './SettingsSectionChips.scroll';
 import { SettingsStatusMarker } from './SettingsStatusMarker';
 import { TOUCH_TARGET } from './SettingsLayout.styles';
 import { rem, sxRem } from '../../../tokens/relative';
@@ -37,7 +38,38 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Keep the open section's chip in view, however the visitor got here.
+ * Where the strip has to scroll for `chip`'s centre to sit on its own, clamped
+ * to what the strip can scroll.
+ *
+ * Measured from the two boxes rather than from `chip.offsetLeft`. `offsetLeft`
+ * counts from the nearest POSITIONED ancestor, and the strip is not one — nor
+ * are the panel and layout around it — so it counted from whatever box the host
+ * happened to position, and every target overshot by the strip's offset inside
+ * it. The clamp hid that for the last chip; a middle one was simply off-centre.
+ * The boxes are both in viewport coordinates, so their difference is the strip's
+ * own, whatever the host wraps it in.
+ */
+function centredScrollLeft(strip: HTMLElement, chip: HTMLElement): number {
+  const chipBox = chip.getBoundingClientRect();
+  const visibleStart = strip.getBoundingClientRect().left + strip.clientLeft;
+  const chipCentre = chipBox.left - visibleStart + strip.scrollLeft + chipBox.width / 2;
+  const target = chipCentre - strip.clientWidth / 2;
+  return Math.max(0, Math.min(target, strip.scrollWidth - strip.clientWidth));
+}
+
+/** The chip for `id`, walked rather than selected. */
+function findChip(strip: HTMLElement, id: string): HTMLElement | undefined {
+  // An id is host data, and a section id carrying a quote would turn a selector
+  // string into a thrown SyntaxError — which here would take the whole strip
+  // down to centre one chip.
+  return Array.from(strip.children).find(
+    (node): node is HTMLElement => node instanceof HTMLElement && node.dataset.chipId === id,
+  );
+}
+
+/**
+ * Keep the open section's chip in view, however the visitor got here — and
+ * however the strip's content settles after it mounted.
  *
  * Keyed on `activeItemId` in an effect rather than done in a click handler:
  * arriving by the desktop rail, by a card, by a pasted link and by the browser's
@@ -46,9 +78,22 @@ function prefersReducedMotion(): boolean {
  * the active chip off the right edge on any list longer than a screen — the
  * visitor is told where they are by an element they cannot see.
  *
+ * Centring ONCE is not enough (FUT-2606). A host can widen a chip after mount
+ * with the ids unchanged — a status marker whose read resolves late, a web font
+ * arriving — and a strip that fitted at mount then overflows with its last chip
+ * clipped, because the one centring saw nothing to scroll. So the strip and
+ * every chip are watched with a `ResizeObserver`, and a resize re-aims at the
+ * active chip when its target has moved.
+ *
+ * Never against the visitor, though: once they have scrolled the strip
+ * themselves, it is theirs until the open section changes
+ * ({@link watchVisitorScroll}, which also says why the strip's OWN smooth scroll
+ * never counts as theirs). A strip that yanks back mid-drag because a
+ * marker loaded is worse than one that does not centre.
+ *
  * `itemsKey` rather than `items`: a host almost always rebuilds that array per
  * render (`groups.flatMap(...)`), and depending on it would re-run this on every
- * render and yank the strip back mid-drag.
+ * render and reset the visitor's latch with it.
  *
  * The key joins on NUL — as the ESCAPE `'\u0000'`, which it must stay. A
  * literal NUL byte works identically at runtime and makes git classify this file
@@ -63,25 +108,38 @@ function useCentreActiveChip(
 ): void {
   useEffect(() => {
     const strip = stripRef.current;
-    if (!strip || !activeItemId) return;
-    // Walked rather than selected: an id is host data, and a section id carrying
-    // a quote would turn a selector string into a thrown SyntaxError — which
-    // here would take the whole strip down to centre one chip.
-    const chip = Array.from(strip.children).find(
-      (node): node is HTMLElement =>
-        node instanceof HTMLElement && node.dataset.chipId === activeItemId,
-    );
-    if (!chip) return;
+    if (!strip || !activeItemId) return undefined;
     // Feature-checked, not assumed. `Element.scrollTo` is absent in jsdom and in
     // a few embedded webviews, and an unguarded call there THROWS out of an
     // effect — which React escalates to the nearest error boundary. The whole
     // settings area would go down to centre one chip, and the host's own tests
     // could not render the shell at all. Same reasoning as walking the children
     // instead of building a selector: nothing in here is worth a crash.
-    if (typeof strip.scrollTo !== 'function') return;
-    const target = chip.offsetLeft + chip.offsetWidth / 2 - strip.clientWidth / 2;
-    const left = Math.max(0, Math.min(target, strip.scrollWidth - strip.clientWidth));
-    strip.scrollTo({ left, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    if (typeof strip.scrollTo !== 'function') return undefined;
+    const visitor = watchVisitorScroll(strip);
+    const centre = (): void => {
+      const chip = findChip(strip, activeItemId);
+      // Not while a scroll that may be the visitor's is still moving: a resize
+      // mid-drag must not yank the strip. It is re-tried once that scroll rests.
+      if (!chip || visitor.hasScrolled() || visitor.isUndecided()) return;
+      const left = centredScrollLeft(strip, chip);
+      // Only when the target MOVED: a resize that leaves it where it was must not
+      // restart a smooth scroll that is already on its way there. The aim is a
+      // runtime-computed scroll offset, like the exempt `left` below — not a size.
+      if (Math.abs(left - visitor.aimedAt()) < 0.5) return;
+      visitor.beforeOwnScroll(left);
+      strip.scrollTo({ left, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    };
+    visitor.onSettled(centre);
+    centre();
+    // Also feature-checked: without it the strip still centres once, as before.
+    const resizes = typeof ResizeObserver === 'function' ? new ResizeObserver(centre) : undefined;
+    resizes?.observe(strip);
+    for (const child of Array.from(strip.children)) resizes?.observe(child);
+    return () => {
+      resizes?.disconnect();
+      visitor.detach();
+    };
   }, [stripRef, activeItemId, itemsKey]);
 }
 
