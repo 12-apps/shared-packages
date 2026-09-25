@@ -310,15 +310,18 @@ export interface TableHeaderProps {
 /**
  * The rows a virtualised body mounts. Computed by `useVirtualScrolling` in the
  * table, which owns the one scroll container, and handed down to the body.
+ *
+ * The mounted rows stay in the table's flow, between two spacer rows standing
+ * in for the rows above and below the window (FUT-2668).
  */
 export interface VirtualWindow {
   startIndex: number;
   endIndex: number;
   items: Record<string, unknown>[];
-  /** Every row at the scaled pitch, as CSS. */
-  totalHeight: string;
-  /** Where the first mounted row sits, in design px. */
+  /** The rows above the window — `startIndex × rowHeight` — in design px. */
   offsetY: number;
+  /** The rows below the window — `(total − endIndex) × rowHeight` — in design px. */
+  trailingPx: number;
 }
 
 export interface TableBodyProps {
@@ -335,7 +338,6 @@ export interface TableBodyProps {
   hoverable?: boolean;
   renderRow?: (rowData: Record<string, unknown>, index: number, isSelected: boolean) => React.ReactNode;
   renderCell?: (value: unknown, column: ColumnConfig, rowData: Record<string, unknown>, rowIndex: number) => React.ReactNode;
-  virtualScrolling?: boolean;
   /** Set only when the body is virtualised: the rows in view and where they sit. */
   virtualWindow?: VirtualWindow;
   rowHeight?: number;

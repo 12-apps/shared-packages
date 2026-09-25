@@ -141,7 +141,10 @@ describe('Table (virtual scrolling) DOM', () => {
     });
     const first = dataRows()[0]!;
     expect(first).toHaveTextContent('row-100');
-    expect(first.style.transform).toBe(`translateY(${theme.typography.pxToRem(100 * 52)})`);
+    // The rows above the window are one spacer row, in the table's flow (FUT-2668).
+    expect((first.previousElementSibling as HTMLElement).style.height).toBe(
+      theme.typography.pxToRem(100 * 52),
+    );
 
     act(() => {
       fireEvent.scroll(scroller, { target: { scrollTop: 40 } });

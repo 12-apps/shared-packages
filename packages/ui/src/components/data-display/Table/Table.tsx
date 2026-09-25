@@ -37,7 +37,7 @@ import { rem } from '../../../tokens/relative';
 // Helper function to get stripe color from theme
 const StyledTable = styled(MuiTable, {
   shouldForwardProp: (prop) =>
-    !['customVariant', 'glow', 'pulse', 'hoverable', 'density', 'stickyHeader', 'stripeColor'].includes(prop as string) })<{
+    !['customVariant', 'glow', 'pulse', 'hoverable', 'density', 'stickyHeader', 'stripeColor', 'virtualised'].includes(prop as string) })<{
   customVariant?: string;
   glow?: boolean;
   pulse?: boolean;
@@ -45,7 +45,8 @@ const StyledTable = styled(MuiTable, {
   density?: TableDensity;
   stickyHeader?: boolean;
   stripeColor?: TableStripeColor;
-}>(({ theme, customVariant, glow, pulse, hoverable, density, stickyHeader, stripeColor = 'neutral' }) => {
+  virtualised?: boolean;
+}>(({ theme, customVariant, glow, pulse, hoverable, density, stickyHeader, stripeColor = 'neutral', virtualised }) => {
   return tableStyles({
     theme,
     customVariant,
@@ -54,7 +55,8 @@ const StyledTable = styled(MuiTable, {
     hoverable,
     density,
     stickyHeader,
-    stripeColor });
+    stripeColor,
+    virtualised });
 });
 
 // Virtual Scrolling Hook
@@ -214,6 +216,7 @@ const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerR
           hoverable={p.hoverable}
           density={p.density}
           stickyHeader={p.stickyHeader}
+          virtualised={Boolean(windowHeight)}
           {...rest}
         >
           <EnhancedTableHeader
@@ -243,7 +246,6 @@ const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerR
             hoverable={p.hoverable}
             renderRow={p.renderRow}
             renderCell={p.renderCell}
-            virtualScrolling={p.virtualScrolling}
             virtualWindow={windowHeight ? visibleItems : undefined}
             rowHeight={p.rowHeight}
           />

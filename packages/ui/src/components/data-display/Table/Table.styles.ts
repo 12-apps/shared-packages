@@ -110,6 +110,29 @@ type VariantArgs = {
 const tableVariantStyles = (args: VariantArgs, customVariant?: string): CSSObject =>
   customVariant ? (TABLE_VARIANTS[customVariant]?.(args) ?? {}) : {};
 
+/**
+ * A virtualised table (FUT-2668). Fixed layout takes the column widths from the
+ * header — a column's declared `width`, the rest sharing what is left — so they
+ * hold still while different rows mount (it ignores a column's `minWidth`). A
+ * body cell drops its vertical padding and the density's height: the pitch is
+ * `rowHeight`, and the cell's content wrapper is exactly that tall.
+ *
+ * The checkbox column is MUI's 48 wide, and fixed layout holds it there. The
+ * density's side padding would leave its checkbox 16 of that and clip it in the
+ * body, so it keeps MUI's own checkbox padding (4 on the left, none on the
+ * right), in the header and the body alike. After the sticky header's rule,
+ * which it would otherwise lose to.
+ */
+const virtualisedStyles = (theme: Theme): CSSObject => ({
+  tableLayout: 'fixed',
+  '& .MuiTableBody-root .MuiTableCell-root': {
+    paddingTop: 0,
+    paddingBottom: 0,
+    height: 'auto' },
+  '& .MuiTableHead-root .MuiTableCell-paddingCheckbox, & .MuiTableBody-root .MuiTableCell-paddingCheckbox': {
+    paddingLeft: rem(theme, 4),
+    paddingRight: 0 } });
+
 // Sticky headers and row hover are independent of the variant.
 const stickyHeaderStyles = (
   theme: Theme,
@@ -183,7 +206,8 @@ export const tableStyles = ({
   hoverable,
   density,
   stickyHeader,
-  stripeColor = 'neutral' }: {
+  stripeColor = 'neutral',
+  virtualised }: {
   theme: Theme;
   customVariant?: string;
   glow?: boolean;
@@ -192,6 +216,8 @@ export const tableStyles = ({
   density?: TableDensity;
   stickyHeader?: boolean;
   stripeColor?: TableStripeColor;
+  /** The body is a virtual window, drawn at `rowHeight`. */
+  virtualised?: boolean;
 }): CSSObject => {
   const densityConfig = getDensityConfig(theme, density);
   
@@ -212,6 +238,7 @@ export const tableStyles = ({
     ...(stickyHeader ? stickyHeaderStyles(theme, densityConfig) : {}),
     ...(hoverable ? hoverableRowStyles(theme) : {}),
     ...emphasisStyles(theme, glow, pulse),
+    ...(virtualised ? virtualisedStyles(theme) : {}),
 
 
     // Variant styles

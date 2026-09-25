@@ -127,6 +127,12 @@ Handle large datasets efficiently:
 />
 ```
 
+Only a numeric `containerHeight` virtualises; a string only sizes the scroll box. On the virtual path:
+
+- **Every row is exactly `rowHeight`** (default 52), whatever the `density`: the density still sets the header and the font size, but not the body's row height or vertical padding. A cell's content is centred vertically and clipped — taller or wider content does not grow the row — so pick a `rowHeight` the tallest cell fits in.
+- **Column widths come from the header** (`table-layout: fixed`): a column's `width`, with the columns that declare none sharing what is left. They hold still while rows scroll in and out. **`minWidth` is ignored** on this path; give a column that must not shrink a `width` its content and the density's side padding fit in. With `selectable`, the checkbox column is MUI's 48 wide with MUI's own checkbox padding.
+- The rows outside the window are two `aria-hidden` spacer rows at the top and bottom of the `<tbody>`, so `striped` stripes follow the mounted rows rather than the data index.
+
 ### Responsive Design
 Automatically hide/show columns based on viewport:
 

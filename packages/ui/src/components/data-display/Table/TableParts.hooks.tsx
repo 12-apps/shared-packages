@@ -31,6 +31,24 @@ const useRowSelection = ({
     [onSelectionChange, selectedRows],
   );
 
+type RowRendererProps = Pick<
+  TableBodyProps,
+  | 'columns'
+  | 'onRowClick'
+  | 'onRowFocus'
+  | 'onRowBlur'
+  | 'onSelectionChange'
+  | 'rowKeyExtractor'
+  | 'selectable'
+  | 'renderRow'
+  | 'renderCell'
+  | 'rowHeight'
+> & {
+  selectedRows: Array<string | number>;
+  /** Whether the rows are a virtual window's, drawn at exactly `rowHeight`. */
+  virtualised: boolean;
+};
+
 export const useTableRowRenderer = ({
   columns,
   selectedRows,
@@ -42,22 +60,9 @@ export const useTableRowRenderer = ({
   selectable,
   renderRow,
   renderCell,
-  virtualScrolling,
+  virtualised,
   rowHeight,
-}: Pick<
-  TableBodyProps,
-  | 'columns'
-  | 'onRowClick'
-  | 'onRowFocus'
-  | 'onRowBlur'
-  | 'onSelectionChange'
-  | 'rowKeyExtractor'
-  | 'selectable'
-  | 'renderRow'
-  | 'renderCell'
-  | 'virtualScrolling'
-  | 'rowHeight'
-> & { selectedRows: Array<string | number> }) => {
+}: RowRendererProps) => {
   const getRowKey = useRowKey(rowKeyExtractor);
   const isRowSelected = useCallback(
     (rowKey: string | number) => selectedRows.includes(rowKey),
@@ -66,7 +71,7 @@ export const useTableRowRenderer = ({
   const handleRowSelection = useRowSelection({ selectedRows, onSelectionChange });
 
   const renderTableRow = useCallback(
-    (rowData: Record<string, unknown>, index: number, offsetY: number = 0) => {
+    (rowData: Record<string, unknown>, index: number) => {
       const rowKey = getRowKey(rowData, index);
       const selected = isRowSelected(rowKey);
 
@@ -78,7 +83,6 @@ export const useTableRowRenderer = ({
           rowData={rowData}
           rowKey={rowKey}
           index={index}
-          offsetY={offsetY}
           columns={columns}
           selected={selected}
           selectable={selectable}
@@ -87,7 +91,7 @@ export const useTableRowRenderer = ({
           onRowFocus={onRowFocus}
           onRowBlur={onRowBlur}
           onSelect={handleRowSelection}
-          virtualScrolling={virtualScrolling}
+          virtualised={virtualised}
           renderCell={renderCell}
         />
       );
@@ -104,7 +108,7 @@ export const useTableRowRenderer = ({
       renderCell,
       rowHeight,
       selectable,
-      virtualScrolling,
+      virtualised,
     ],
   );
 
