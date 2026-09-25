@@ -2,6 +2,11 @@ import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
+// A server render has no layout to measure, and React warns about
+// `useLayoutEffect` there; the effect below only measures, so on the server
+// it can be a plain (never-run) effect.
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 import { remPx } from '../../../tokens/relative';
 
 import type { ColumnConfig, TableProps, VirtualWindow } from './Table.types';
@@ -42,7 +47,7 @@ export const useVirtualScrolling = (
 
   // Once after mount, so a header measured before any scroll or resize is
   // still right the first time the window is drawn.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     measureHeader();
   }, [measureHeader]);
 

@@ -25,7 +25,8 @@ const scrollHeight = (theme: Theme, containerHeight: number | string | undefined
  * holding the header and the body. `containerHeight` sizes the scroller with
  * or without `virtualScrolling` (FUT-2677) — no consumer relies on the old
  * virtual-only gate, and `stickyHeader` needs this box to stick inside.
- * Inline, so the height it was given reads back off the element.
+ * Inline, so the height it was given reads back off the element. A
+ * `containerHeight` of 0 counts as unset: a zero-height scroller shows nothing.
  */
 export const scrollerStyle = (theme: Theme, p: TableProps): React.CSSProperties | undefined =>
   p.virtualScrolling || p.containerHeight

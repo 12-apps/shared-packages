@@ -374,8 +374,8 @@ export const Integration: Story = {
  *
  * jsdom has no layout, so this is the one place the actual sticking is
  * checked: `getBoundingClientRect` on the `<thead>` and on the scroller after
- * scrolling, in a real browser. shared-packages CI does not run play
- * functions (FUT-2619) — this is reported by hand in the PR.
+ * scrolling, in a real browser. The ui-stories gate (FUT-2619) runs these
+ * play functions in CI, so a story here that fails fails the build.
  */
 // Waiting two animation frames is what the ticket (FUT-2677) asks for:
 // `position: sticky` and scroll-anchoring settle across a paint, and jsdom
