@@ -168,7 +168,7 @@ export const ScreenReader: Story = {
     const inputs = canvas.getAllByRole('textbox');
 
     // Check that inputs are accessible
-    inputs.forEach(async (input) => {
+    for (const input of inputs) {
       expect(input).toBeInTheDocument();
       expect(input).toHaveAttribute('maxLength', '1');
 
@@ -176,7 +176,7 @@ export const ScreenReader: Story = {
       await userEvent.click(input);
       await waitFor(() => expect(input).toHaveFocus());
       await input.blur();
-    });
+    }
 
     // Test ARIA attributes
     const container = inputs[0].closest('[role], div');

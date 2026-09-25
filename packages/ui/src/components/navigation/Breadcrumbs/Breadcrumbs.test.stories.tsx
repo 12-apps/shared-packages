@@ -535,14 +535,14 @@ export const ThemeVariations: Story = {
     await step('Verify contrast ratios', async () => {
       const links = canvas.getAllByRole('link');
 
-      links.forEach(async (link) => {
+      for (const link of links) {
         const style = window.getComputedStyle(link);
         const color = style.color;
 
         // Ensure text is visible
         await expect(color).not.toBe('rgba(0, 0, 0, 0)');
         await expect(color).not.toBe('transparent');
-      });
+      }
     });
   },
 };
@@ -942,11 +942,13 @@ export const SeparatorTypesTest: Story = {
     await step('Check separator visibility', async () => {
       const navigations = canvas.getAllByRole('navigation');
 
-      navigations.forEach(async (nav) => {
-        const separators = within(nav).queryAllByText(/[/>•|]/);
-        // Each navigation should have separators
-        await expect(separators.length).toBeGreaterThanOrEqual(0);
-      });
+      for (const nav of navigations) {
+        // Count MUI's separator slots rather than matching separator text: the
+        // default, arrow and chevron types draw SVG icons, so a text query finds
+        // nothing for them. One separator sits between each pair of items.
+        const separators = nav.querySelectorAll('.MuiBreadcrumbs-separator');
+        await expect(separators).toHaveLength(basicItems.length - 1);
+      }
     });
   },
 };
