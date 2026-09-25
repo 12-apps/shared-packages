@@ -167,11 +167,7 @@ const StepConnector = styled(Box, {
   color: WorkflowStepProps['color'];
   variant: WorkflowStepProps['variant'];
 }>(({ theme, orientation, isCompleted, color, variant }) => {
-  const colorKey = color || 'primary';
-  const colorValue = colorKey === 'neutral' 
-    ? { main: neutralTones(theme).emphasis }
-    : theme.palette[colorKey as 'primary' | 'secondary' | 'success' | 'warning' | 'error'];
-  const connectorColor = isCompleted ? colorValue.main : neutralTones(theme).track;
+  const connectorColor = isCompleted ? stepPalette(theme, color).main : neutralTones(theme).track;
 
   return {
     flex: 1,
