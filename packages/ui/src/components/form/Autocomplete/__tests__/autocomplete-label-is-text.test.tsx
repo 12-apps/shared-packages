@@ -12,7 +12,7 @@ import type { AutocompleteProps } from '../Autocomplete.types';
  *
  * The default row used to build its highlight as an HTML string and hand it to
  * React's raw-HTML prop, so a label is whatever a caller's data says it is —
- * in Future Pay, a shopper's self-chosen display name shown to a store operator.
+ * in the origin host, a shopper's self-chosen display name shown to a store operator.
  * A label of `<img src=x onerror=…>` ran script in the admin session. These
  * cases type into a real `<Autocomplete>` and read the listbox it opens: the
  * label must come out as literal text, with the query's matches wrapped in real
