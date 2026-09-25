@@ -7,7 +7,7 @@ import React from 'react';
 
 import type { Step, StepItemProps, StepperProps } from './Stepper.types';
 import { neutralTones } from '../../../tokens/ink';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/scales';
 
 /**
@@ -56,9 +56,9 @@ const StepButton = styled(Button, {
     !['isActive', 'isCompleted', 'clickable', 'stepSize'].includes(prop as string),
 })<{ isActive: boolean; isCompleted: boolean; clickable: boolean; stepSize: SizeValue }>(
   ({ theme, isActive, isCompleted, clickable, stepSize }) => ({
-    minWidth: CIRCLE_SIZE[stepSize],
-    width: CIRCLE_SIZE[stepSize],
-    height: CIRCLE_SIZE[stepSize],
+    minWidth: rem(theme, CIRCLE_SIZE[stepSize]),
+    width: rem(theme, CIRCLE_SIZE[stepSize]),
+    height: rem(theme, CIRCLE_SIZE[stepSize]),
     borderRadius: '50%',
     padding: 0,
     backgroundColor: isCompleted
@@ -101,18 +101,18 @@ const StepConnector = styled(Box, {
     ...(orientation === 'horizontal'
       ? {
           flex: 1,
-          height: 2,
+          height: rem(theme, 2),
           // Vertically centered on the circle (circle/2 - 1 for the 2px line).
-          marginTop: CIRCLE_SIZE[size] / 2 - 1,
-          marginLeft: 8,
-          marginRight: 8,
-          minWidth: 24,
+          marginTop: rem(theme, CIRCLE_SIZE[size] / 2 - 1),
+          marginLeft: rem(theme, 8),
+          marginRight: rem(theme, 8),
+          minWidth: rem(theme, 24),
         }
       : {
-          width: 2,
-          height: 32,
-          marginTop: 8,
-          marginBottom: 8,
+          width: rem(theme, 2),
+          height: rem(theme, 32),
+          marginTop: rem(theme, 8),
+          marginBottom: rem(theme, 8),
           // Use margin auto to center horizontally
           marginLeft: 'auto',
           marginRight: 'auto',
@@ -122,9 +122,9 @@ const StepConnector = styled(Box, {
 
 const StepLabel = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'orientation',
-})<{ orientation: 'horizontal' | 'vertical' }>(({ orientation }) => ({
+})<{ orientation: 'horizontal' | 'vertical' }>(({ theme, orientation }) => ({
   textAlign: 'center',
-  marginTop: orientation === 'horizontal' ? 8 : 0,
+  marginTop: orientation === 'horizontal' ? rem(theme, 8) : 0,
 }));
 
 type StepSize = SizeValue;
@@ -144,7 +144,7 @@ function stepClasses(isActive: boolean, isCompleted: boolean, optional?: boolean
 /** The circle content-column width per orientation/size. */
 function contentSx(orientation: 'horizontal' | 'vertical', size: StepSize) {
   return orientation === 'horizontal'
-    ? { minWidth: STEP_MIN_WIDTH[size], maxWidth: 150, flex: '0 1 auto' }
+    ? { minWidth: sxRem(STEP_MIN_WIDTH[size]), maxWidth: sxRem(150), flex: '0 1 auto' }
     : { flexShrink: 0 };
 }
 
@@ -196,7 +196,7 @@ const StepLabelBlock: React.FC<StepPartProps & { orientation: 'horizontal' | 've
   <StepLabel
     orientation={orientation}
     data-testid={`stepper-step-label-${index}`}
-    sx={size === 'sm' && orientation === 'horizontal' ? { mt: '2px' } : undefined}
+    sx={size === 'sm' && orientation === 'horizontal' ? { mt: sxRem(2) } : undefined}
   >
     <Typography
       variant={labelVariant}

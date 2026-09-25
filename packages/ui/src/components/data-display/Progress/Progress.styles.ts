@@ -13,7 +13,7 @@ import {
 } from './Progress.metrics';
 import type { ProgressSize, ProgressVariant } from './Progress.types';
 import { softNeutral } from '../../../tokens/ink';
-import { sxRem } from '../../../tokens/relative';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 // Define pulse animation. The stops and the two seconds are the shared metrics'
 // (`PULSE`), so the native `Progress` breathes on the same cadence.
@@ -51,17 +51,24 @@ export const getColorFromTheme = (theme: Theme, color: string): PaletteColor => 
 
 // Derived from the shared metrics, not restated: the native `Progress` reads
 // the same table, so the two renderers cannot disagree on a size.
-const SIZE_MAP: Record<ProgressSize, { height: number; circularSize: number; fontSize: (theme: Theme) => string }> =
-  Object.fromEntries(
-    Object.entries(PROGRESS_SIZES).map(([size, step]) => [
-      size,
-      { height: step.height, circularSize: step.circularSize, fontSize: sxRem(step.fontSize) },
-    ]),
-  ) as Record<ProgressSize, { height: number; circularSize: number; fontSize: (theme: Theme) => string }>;
+// The lengths stay design px (`…Px`) and go through `rem` where they are drawn.
+interface SizeStep {
+  heightPx: number;
+  circularSizePx: number;
+  fontSize: (theme: Theme) => string;
+}
+
+const SIZE_MAP: Record<ProgressSize, SizeStep> = Object.fromEntries(
+  Object.entries(PROGRESS_SIZES).map(([size, step]) => [
+    size,
+    { heightPx: step.height, circularSizePx: step.circularSize, fontSize: sxRem(step.fontSize) },
+  ]),
+) as Record<ProgressSize, SizeStep>;
 
 export const getSizeStyles = (size?: ProgressSize) => SIZE_MAP[size as ProgressSize] || SIZE_MAP.md;
 
 export const barVariantStyles = (
+  theme: Theme,
   variant: ProgressVariant | undefined,
   colorPalette: PaletteColor,
 ): CSSObject => {
@@ -75,7 +82,7 @@ export const barVariantStyles = (
     case 'glass':
       return {
         backgroundColor: alpha(colorPalette.main, GLASS_BAR_ALPHA),
-        backdropFilter: `blur(${GLASS_BLUR_PX}px)`,
+        backdropFilter: `blur(${rem(theme, GLASS_BLUR_PX)})`,
         border: `1px solid ${alpha(colorPalette.main, GLASS_BAR_BORDER_ALPHA)}`,
       };
     default:
@@ -86,12 +93,13 @@ export const barVariantStyles = (
 // glow and pulse are independent flags. The three combinations used to be spelled
 // out one by one, but each is just the union of whichever flags are set.
 export const barEmphasisStyles = (
+  theme: Theme,
   colorPalette: PaletteColor,
   glow?: boolean,
   pulse?: boolean,
 ): CSSObject => ({
   ...(glow && {
-    boxShadow: `0 0 ${BAR_GLOW.blur}px ${BAR_GLOW.spread}px ${alpha(colorPalette.main, BAR_GLOW.alpha)}`,
+    boxShadow: `${rems(theme, 0, 0, BAR_GLOW.blur, BAR_GLOW.spread)} ${alpha(colorPalette.main, BAR_GLOW.alpha)}`,
     filter: `brightness(${GLOW_BRIGHTNESS})`,
   }),
   ...(pulse && {
@@ -100,12 +108,13 @@ export const barEmphasisStyles = (
 });
 
 export const circularEmphasisStyles = (
+  theme: Theme,
   colorPalette: PaletteColor,
   glow?: boolean,
   pulse?: boolean,
 ): CSSObject => ({
   ...(glow && {
-    filter: `drop-shadow(0 0 ${CIRCULAR_GLOW.blur}px ${alpha(colorPalette.main, CIRCULAR_GLOW.alpha)})`,
+    filter: `drop-shadow(${rems(theme, 0, 0, CIRCULAR_GLOW.blur)} ${alpha(colorPalette.main, CIRCULAR_GLOW.alpha)})`,
   }),
   ...(pulse && {
     animation: `${pulseAnimation} ${PULSE.durationMs / 1000}s infinite`,

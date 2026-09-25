@@ -2,9 +2,10 @@ import Box from '@mui/material/Box/index.js';
 import Card from '@mui/material/Card/index.js';
 import CardContent from '@mui/material/CardContent/index.js';
 import Popover from '@mui/material/Popover/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { rem } from '../../../tokens/relative';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import { HoverCardContent } from './HoverCard.content';
@@ -13,7 +14,7 @@ import { arrowSx, cardSx, getAnchorOrigin, getTransformOrigin, sideOf } from './
 import type { CardStyleFlags } from './HoverCard.styles';
 import type { HoverCardAnimation, HoverCardPlacement, HoverCardProps } from './HoverCard.types';
 
-const ArrowContainer = styled('div')<{ placement: HoverCardPlacement; offset: number }>(
+const ArrowContainer = styled('div')<{ placement: HoverCardPlacement; offset?: number }>(
   ({ theme, placement }) => ({ ...arrowSx(theme, placement) }),
 );
 
@@ -43,10 +44,8 @@ const DEFAULTS = {
   animation: 'fade',
   enterDelay: 700,
   exitDelay: 0,
-  maxWidth: 400,
   loading: false,
   touchEnabled: true,
-  offset: 8,
   disabled: false,
 } satisfies Partial<HoverCardProps>;
 
@@ -55,11 +54,23 @@ type ResolvedProps = HoverCardProps & Required<Pick<HoverCardProps, keyof typeof
 /** Padding is the variant's own: detailed roomier, minimal tighter. */
 const CONTENT_PADDING: Record<string, number> = { detailed: 3, minimal: 1.5 };
 
-/** The card is nudged off the anchor on whichever side it sits. */
-const offsetMargin = (placement: HoverCardPlacement, offset: number) => {
+/**
+ * The card is nudged off the anchor on whichever side it sits — `offset` design
+ * px (8 unless the caller says otherwise), through the theme's type scale.
+ */
+const offsetMargin = (theme: Theme, placement: HoverCardPlacement, offset: number | undefined) => {
   const side = sideOf(placement);
   const key = ({ top: 'mt', bottom: 'mb', left: 'ml', right: 'mr' } as const)[side];
-  return { [key]: `${offset}px` };
+  return { [key]: rem(theme, offset ?? 8) };
+};
+
+/**
+ * The card's cap: 400 design px unless the caller says otherwise. `sx` has always
+ * read a number of 1 or less as a fraction of the parent, and that stays so.
+ */
+const capOf = (theme: Theme, maxWidth: number | undefined): string => {
+  const cap = maxWidth ?? 400;
+  return cap <= 1 && cap !== 0 ? `${cap * 100}%` : rem(theme, cap);
 };
 
 export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props, ref) => {
@@ -121,7 +132,7 @@ export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props
             pulse={pulse}
             animation={animation}
             data-testid={dataTestId || 'hover-card-content'}
-            sx={{ maxWidth, ...offsetMargin(placement, offset) }}
+            sx={(theme) => ({ maxWidth: capOf(theme, maxWidth), ...offsetMargin(theme, placement, offset) })}
           >
             <CardContent sx={{ p: padding, '&:last-child': { pb: padding } }}>
               <HoverCardContent

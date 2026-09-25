@@ -30,6 +30,7 @@
 import TextField from '@mui/material/TextField/index.js';
 import React, { useEffect, useState } from 'react';
 import { fieldTextFieldStyles } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 
 /**
@@ -254,7 +255,7 @@ export function DayBoundInput({
       // The placeholder occupies the space an un-shrunk label would render into.
       InputLabelProps={{ shrink: true }}
       inputProps={dayInputProps(testId, describedBy)}
-      sx={[{ width: 165 }, fieldTextFieldStyles]}
+      sx={[{ width: sxRem(165) }, fieldTextFieldStyles]}
     />
   );
 }

@@ -1,9 +1,12 @@
 "use client";
 
+import type { Theme } from "@mui/material/styles/index.js";
+
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { type GridColumn } from "../DataGrid";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
+import { rem, sxRem } from "../../../tokens/relative";
 import { Button } from "../../form/Button";
 import { DropdownMenu, type DropdownMenuItem } from "../../navigation/DropdownMenu";
 
@@ -89,12 +92,12 @@ export function buildRowActionsColumn<T extends Record<string, unknown>>(
     // so it needs room for just one or two icons.
     width: leading ? 72 : 44,
     cell: ({ row }) => (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: sxRem(2), justifyContent: "flex-end" }}>
         {leading?.(row)}
         {renderRowMenu
           ? renderRowMenu(row)
           : renderAutoKebab(kebabActions, row, testIdPrefix, getRowId)}
-      </span>
+      </Box>
     ),
   };
 }
@@ -264,9 +267,9 @@ export function togglePillValues(current: string[] | undefined, value: string, c
  */
 export function cardGridTracks(targetWidth: number) {
   return {
-    gridTemplateColumns: {
+    gridTemplateColumns: (theme: Theme) => ({
       xs: "1fr",
-      sm: `repeat(auto-fill, minmax(${targetWidth}px, 1fr))`,
-    },
+      sm: `repeat(auto-fill, minmax(${rem(theme, targetWidth)}, 1fr))`,
+    }),
   };
 }

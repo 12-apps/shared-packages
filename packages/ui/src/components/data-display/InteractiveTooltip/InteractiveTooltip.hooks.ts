@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { InteractiveTooltipProps } from './InteractiveTooltip.types';
 
-type TooltipDefaultedKeys = 'variant' | 'size' | 'glow' | 'pulse' | 'maxWidth' | 'clickable';
+// `maxWidth` defaults where it is read (`tooltipCap`), in design px through the theme.
+type TooltipDefaultedKeys = 'variant' | 'size' | 'glow' | 'pulse' | 'clickable';
 
 type ResolvedTooltipProps = InteractiveTooltipProps &
   Required<Pick<InteractiveTooltipProps, TooltipDefaultedKeys>>;
@@ -12,7 +13,6 @@ const TOOLTIP_DEFAULTS: Pick<InteractiveTooltipProps, TooltipDefaultedKeys> = {
   size: 'md',
   glow: false,
   pulse: false,
-  maxWidth: 300,
   clickable: true,
 };
 

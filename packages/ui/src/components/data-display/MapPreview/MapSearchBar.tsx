@@ -8,6 +8,7 @@ import React from 'react';
 
 import { fieldRadius } from '../../../tokens/field-radius';
 import { fieldControlStyles } from '../../../tokens/field-height';
+import { rem } from '../../../tokens/relative';
 
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
@@ -18,15 +19,15 @@ const SearchBar = styled(Box)(({ theme }) => ({
   transform: 'translateX(-50%)',
   zIndex: 2,
   width: '90%',
-  maxWidth: 400,
+  maxWidth: rem(theme, 400),
 }));
 
 const SearchField = styled(TextField)(({ theme }) => ({
   ...fieldControlStyles(theme),
   '& .MuiOutlinedInput-root': {
     background: alpha(theme.palette.background.paper, 0.95),
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
+    backdropFilter: `blur(${rem(theme, 10)})`,
+    WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
     borderRadius: fieldRadius(theme),
     '& fieldset': {
       borderColor: alpha(theme.palette.divider, 0.2),

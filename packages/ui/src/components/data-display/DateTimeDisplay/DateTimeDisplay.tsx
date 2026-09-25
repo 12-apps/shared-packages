@@ -5,6 +5,7 @@ import { forwardRef } from 'react';
 
 import { useDateTimeParts } from './DateTimeDisplay.hooks';
 import type { DateTimeDisplayProps } from './DateTimeDisplay.types';
+import { sxRem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/scales';
 
 /**
@@ -14,13 +15,13 @@ function getFontSizes(size: SizeValue) {
   switch (size) {
     case 'xs':
     case 'sm':
-      return { date: '0.75rem', time: '0.65rem' };
+      return { date: sxRem(12), time: sxRem(10.4) };
     case 'lg':
     case 'xl':
-      return { date: '1rem', time: '0.875rem' };
+      return { date: sxRem(16), time: sxRem(14) };
     case 'md':
     default:
-      return { date: '0.875rem', time: '0.75rem' };
+      return { date: sxRem(14), time: sxRem(12) };
   }
 }
 

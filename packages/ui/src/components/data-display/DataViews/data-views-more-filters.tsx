@@ -8,6 +8,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 // which. On a phone, where both are icon-only, they were indistinguishable.
 import FilterAltRoundedIcon from "@mui/icons-material/FilterAltRounded";
 import Popover from "@mui/material/Popover/index.js";
+import type { Theme } from "@mui/material/styles/index.js";
 import { useState } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
@@ -17,7 +18,7 @@ import { Text } from "../../typography/Text";
 
 import { fieldClearing, MoreGroup, type MoreFieldProps } from "./data-views-more-fields";
 import type { OverflowField } from "./data-views-overflow";
-import { sxRem } from "../../../tokens/relative";
+import { rem, sxRem } from "../../../tokens/relative";
 
 /**
  * "MAIS" — the filter overflow: its trigger, its panel and its footer. What
@@ -126,7 +127,7 @@ function MoreHeading(): React.JSX.Element {
       }}
     >
       <Text variant="caption" as="span">
-        <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.5, color: "text.disabled" }}>
+        <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: sxRem(0.5), color: "text.disabled" }}>
           {copy.filters.moreHeading}
         </Box>
       </Text>
@@ -239,7 +240,7 @@ export function MoreFilters<T extends Record<string, unknown>>({
           onOpenChange?.(false);
         }}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        slotProps={{ paper: { sx: { width: 300, maxWidth: "calc(100vw - 32px)" } } }}
+        slotProps={{ paper: { sx: { width: sxRem(300), maxWidth: (theme: Theme) => `calc(100vw - ${rem(theme, 32)})` } } }}
       >
         <Box data-testid={`${rest.testIdPrefix}-more-panel`}>
           <MoreHeading />
@@ -247,7 +248,7 @@ export function MoreFilters<T extends Record<string, unknown>>({
               contents are told to shrink into it. A horizontal scrollbar here
               means something refused to, which is a bug to fix rather than a
               scrollbar to live with. */}
-          <Box sx={{ maxHeight: 320, overflowY: "auto", overflowX: "hidden", p: 1.5, minWidth: 0 }}>
+          <Box sx={{ maxHeight: sxRem(320), overflowY: "auto", overflowX: "hidden", p: 1.5, minWidth: 0 }}>
             {fields.map((field) => (
               <MoreGroup key={field.id} field={field} {...rest} />
             ))}

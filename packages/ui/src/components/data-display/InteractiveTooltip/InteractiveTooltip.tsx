@@ -7,6 +7,7 @@ import {
   arrowColor,
   emphasisStyles,
   getSizeStyles,
+  tooltipCap,
   variantStyles,
 } from './InteractiveTooltip.styles';
 import type { InteractiveTooltipProps } from './InteractiveTooltip.types';
@@ -26,7 +27,7 @@ const StyledTooltip = styled(MuiTooltip, {
     '& .MuiTooltip-tooltip': {
       borderRadius: theme.spacing(1),
       fontSize: sizeStyles.fontSize(theme),
-      padding: sizeStyles.padding,
+      padding: sizeStyles.padding(theme),
       fontWeight: 500,
       transition: 'all 0.3s ease',
       position: 'relative',
@@ -101,7 +102,7 @@ export const InteractiveTooltip = React.forwardRef<HTMLDivElement, InteractiveTo
           disableTouchListener={isPinned}
           slotProps={{
             tooltip: {
-              sx: { maxWidth },
+              sx: { maxWidth: tooltipCap(maxWidth) },
               role: 'tooltip',
               ...(dataTestId && { 'data-testid': `${dataTestId}-content` }),
             },

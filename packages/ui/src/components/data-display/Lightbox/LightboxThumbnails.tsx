@@ -7,10 +7,12 @@ import React from 'react';
 import { thumbnailStripSx } from './Lightbox.constants';
 import type { LightboxItem } from './Lightbox.types';
 import { onMedia, sheen } from '../../../tokens/ink';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
-const THUMB_WIDTH = 60;
-const THUMB_HEIGHT = 40;
+/** One filmstrip frame, in design px. */
+const THUMB = { widthPx: 60, heightPx: 40 } as const;
+
+const frame = (theme: Theme, color: string): string => `${rem(theme, 2)} solid ${color}`;
 
 const VideoThumbnail: FC = () => (
   <Box
@@ -44,7 +46,7 @@ export const LightboxThumbnails: FC<LightboxThumbnailsProps> = ({
     sx={{
       ...thumbnailStripSx,
       position: 'absolute',
-      bottom: 16,
+      bottom: sxRem(16),
       left: '50%',
       transform: 'translateX(-50%)',
       display: 'flex',
@@ -60,14 +62,14 @@ export const LightboxThumbnails: FC<LightboxThumbnailsProps> = ({
         key={`${item.src}-${index}`}
         onClick={() => onSelect(index)}
         sx={{
-          width: THUMB_WIDTH,
-          height: THUMB_HEIGHT,
+          width: sxRem(THUMB.widthPx),
+          height: sxRem(THUMB.heightPx),
           cursor: 'pointer',
-          border: currentIndex === index ? (theme: Theme) => `2px solid ${onMedia(theme)}` : '2px solid transparent',
+          border: (theme: Theme) => frame(theme, currentIndex === index ? onMedia(theme) : 'transparent'),
           borderRadius: 0.5,
           overflow: 'hidden',
           flexShrink: 0,
-          '&:hover': { border: (theme: Theme) => `2px solid ${sheen(theme, 0.7)}` },
+          '&:hover': { border: (theme: Theme) => frame(theme, sheen(theme, 0.7)) },
         }}
         data-testid={testId(`thumbnail-${index}`)}
       >

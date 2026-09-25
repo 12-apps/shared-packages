@@ -234,7 +234,7 @@ function RangeTrigger<T extends Record<string, unknown>>({
         borderRadius: fieldRadiusPx,
         height: fieldHeight,
         px: 1.5,
-        maxWidth: 280,
+        maxWidth: sxRem(280),
         color: inverted ? 'error.main' : 'text.primary',
         fontWeight: 600,
         fontSize: sxRem(13),

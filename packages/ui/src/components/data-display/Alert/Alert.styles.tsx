@@ -32,17 +32,17 @@ import {
   SEMANTIC_VARIANTS,
 } from './Alert.metrics';
 import type { IconName } from '../../../icons/Icon.types';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
 export type { AlertPalette } from './Alert.metrics';
 
-export const pulseAnimation = keyframes`
+export const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 ${PULSE.spread}px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, PULSE.spread)} currentColor;
     opacity: 0;
   }
   100% {
@@ -82,19 +82,19 @@ export const pulseAnimation = keyframes`
 
 // Removed unused slideInAnimation - can be re-added if needed for future features
 
-export const shimmerAnimation = keyframes`
+export const shimmerAnimation = (theme: Theme) => keyframes`
   0% {
-    background-position: -${GRADIENT.shimmerTravel}px 0;
+    background-position: ${rem(theme, -GRADIENT.shimmerTravel)} 0;
   }
   100% {
-    background-position: ${GRADIENT.shimmerTravel}px 0;
+    background-position: ${rem(theme, GRADIENT.shimmerTravel)} 0;
   }
 `;
 
-export const fadeInScale = keyframes`
+export const fadeInScale = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: scale(${FADE_IN.scale}) translateY(-${FADE_IN.lift}px);
+    transform: scale(${FADE_IN.scale}) translateY(${rem(theme, -FADE_IN.lift)});
   }
   to {
     opacity: 1;
@@ -296,8 +296,8 @@ export const alertVariantStyles = (
     // be mostly pane — the backdrop should be legible AS texture behind the
     // text, never as competition with it.
     backgroundColor: alpha(theme.palette.background.paper, GLASS.backgroundAlpha),
-    backdropFilter: `blur(${GLASS.blur}px) saturate(${GLASS.saturatePercent}%)`,
-    WebkitBackdropFilter: `blur(${GLASS.blur}px) saturate(${GLASS.saturatePercent}%)`,
+    backdropFilter: `blur(${rem(theme, GLASS.blur)}) saturate(${GLASS.saturatePercent}%)`,
+    WebkitBackdropFilter: `blur(${rem(theme, GLASS.blur)}) saturate(${GLASS.saturatePercent}%)`,
     border: `1px solid ${alpha(theme.palette.divider, GLASS.borderAlpha)}`,
     color: theme.palette.text.primary,
     '.MuiAlert-icon': {
@@ -307,7 +307,7 @@ export const alertVariantStyles = (
     // alpha with nothing blurred behind it — the see-through banner this is
     // fixing. There is no degraded frost to fall back to, so it falls back to an
     // opaque pane: less pretty, still readable.
-    '@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))': {
+    [`@supports not ((backdrop-filter: blur(${rem(theme, 1)})) or (-webkit-backdrop-filter: blur(${rem(theme, 1)})))`]: {
       backgroundColor: theme.palette.background.paper,
     },
   }),
@@ -325,26 +325,26 @@ export const alertVariantStyles = (
       content: '""',
       position: 'absolute',
       top: 0,
-      left: `-${GRADIENT.shimmerTravel}px`,
+      left: rem(theme, -GRADIENT.shimmerTravel),
       width: '100%',
       height: '100%',
       background: `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
-      animation: `${shimmerAnimation} ${seconds(GRADIENT.shimmerMs)} infinite`,
+      animation: `${shimmerAnimation(theme)} ${seconds(GRADIENT.shimmerMs)} infinite`,
     },
   }),
 });
 
 /** The web's glow: a soft shadow of the hue and a touch of brightness. */
-const glowStyles = (colorPalette: AlertPalette): CSSObject => ({
+const glowStyles = (theme: Theme, colorPalette: AlertPalette): CSSObject => ({
   // No `!important`: the pointer states paint their tint as an INSET shadow on
   // the same property, and compose this one alongside it rather than fighting
   // it. `glowShadow` in `Alert.tsx` is the other half of that pair.
-  boxShadow: `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`,
+  boxShadow: `0 0 ${rems(theme, GLOW.blur, GLOW.spread)} ${alpha(colorPalette.main, GLOW.alpha)}`,
   filter: `brightness(${GLOW.brightness})`,
 });
 
 /** The web's pulse: a wash of the hue over the whole card, fading out every two seconds. */
-const pulseAfter = (colorPalette: AlertPalette): CSSObject => ({
+const pulseAfter = (theme: Theme, colorPalette: AlertPalette): CSSObject => ({
   content: '""',
   position: 'absolute',
   top: 0,
@@ -354,7 +354,7 @@ const pulseAfter = (colorPalette: AlertPalette): CSSObject => ({
   borderRadius: 'inherit',
   backgroundColor: colorPalette.main,
   opacity: PULSE.alpha,
-  animation: `${pulseAnimation} ${seconds(PULSE.ms)} infinite`,
+  animation: `${pulseAnimation(theme)} ${seconds(PULSE.ms)} infinite`,
   pointerEvents: 'none',
   zIndex: -1,
 });
@@ -364,24 +364,25 @@ const pulseAfter = (colorPalette: AlertPalette): CSSObject => ({
 // leak into the glow+pulse case. Declaration ORDER is kept as it has always
 // been, because emotion hashes the serialised block into the class name.
 export const alertEmphasisStyles = (
+  theme: Theme,
   colorPalette: AlertPalette,
   glow: boolean,
   pulse: boolean,
 ): CSSObject => ({
-  ...(glow && !pulse && glowStyles(colorPalette)),
+  ...(glow && !pulse && glowStyles(theme, colorPalette)),
 
   // Pulse animation
   ...(pulse &&
     !glow && {
       position: 'relative',
-      '&::after': pulseAfter(colorPalette),
+      '&::after': pulseAfter(theme, colorPalette),
     }),
 
   // Both glow and pulse
   ...(glow &&
     pulse && {
       position: 'relative',
-      ...glowStyles(colorPalette),
-      '&::after': pulseAfter(colorPalette),
+      ...glowStyles(theme, colorPalette),
+      '&::after': pulseAfter(theme, colorPalette),
     }),
 });

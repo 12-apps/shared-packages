@@ -6,6 +6,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 // share with the "Mais" FILTER trigger — see the note there.
 import DisplaySettingsRoundedIcon from "@mui/icons-material/DisplaySettingsRounded";
 import Popover from "@mui/material/Popover/index.js";
+import type { Theme } from "@mui/material/styles/index.js";
 import { useState } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
@@ -23,7 +24,7 @@ import {
 import type { SavedViewSummary } from "./data-views-types";
 import { DisplayTab, SortTab } from "./data-views-display-tabs";
 import type { DataViewsController } from "./use-data-views-state";
-import { sxRem } from "../../../tokens/relative";
+import { rem, sxRem } from "../../../tokens/relative";
 
 /**
  * "EXIBIR" — one panel for every question about how the list is READ.
@@ -209,7 +210,7 @@ function PanelSurface<T extends Record<string, unknown>>({
           />
           {/* Constrained + scrolled: the columns list is unbounded, and a panel
               taller than the viewport puts its own save button off screen. */}
-          <Box sx={{ maxHeight: 320, minHeight: 220, overflowY: "auto" }}>
+          <Box sx={{ maxHeight: sxRem(320), minHeight: sxRem(220), overflowY: "auto" }}>
             {nav ? (
               <ViewsBody
                 nav={nav}
@@ -283,7 +284,7 @@ function DisplayTrigger({
           </Box>
         )}
         {dirty && (
-          <Box component="span" sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
+          <Box component="span" sx={{ height: sxRem(6), width: sxRem(6), borderRadius: "50%", bgcolor: "primary.main" }} />
         )}
         {/* The chevron goes with the label. Once the control is a bare icon it
             is already unmistakably a button, and on the rung where that happens
@@ -334,7 +335,7 @@ export function DataViewsDisplayPanel<T extends Record<string, unknown>>({
         onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{ paper: { sx: { width: 320, maxWidth: "calc(100vw - 32px)" } } }}
+        slotProps={{ paper: { sx: { width: sxRem(320), maxWidth: (theme: Theme) => `calc(100vw - ${rem(theme, 32)})` } } }}
       >
         <PanelSurface
           c={c}

@@ -43,7 +43,7 @@ const StyledBanner = styled(Box, {
     width: fullWidth ? '100vw' : '100%',
     marginLeft: fullWidth ? '50%' : 0,
     transform: fullWidth ? 'translateX(-50%)' : 'none',
-    animation: `${fadeInSlide} 0.3s ease-out`,
+    animation: `${fadeInSlide(theme)} 0.3s ease-out`,
     transition: `all 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow ${BANNER_TINT_S}s cubic-bezier(0.4, 0, 0.2, 1)`,
 
     ...bannerPointerStates(theme),
@@ -57,8 +57,8 @@ const StyledBanner = styled(Box, {
     // ring stays for whoever tabs here and never fires on a click. Same defect
     // and same fix as `Alert`, which is the sibling surface (FUT-1458).
     '&:focus-visible': {
-      outline: `${FOCUS.ringWidth}px solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
-      outlineOffset: `${FOCUS.offset}px`,
+      outline: `${rem(theme, FOCUS.ringWidth)} solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
+      outlineOffset: rem(theme, FOCUS.offset),
     },
 
     ...bannerPartStyles(theme, colorPalette),
@@ -84,7 +84,7 @@ const StyledBanner = styled(Box, {
     // Glass effect variant (optional enhancement)
     '&.banner-glass': {
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
       color: theme.palette.text.primary,
       

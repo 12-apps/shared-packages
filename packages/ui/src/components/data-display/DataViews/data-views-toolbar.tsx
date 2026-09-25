@@ -17,6 +17,7 @@ import { DataViewsExportMenu, type DataViewExport } from "./data-views-export";
 import { renderBulkActions } from "./data-views-grid-helpers";
 import type { RowAction } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
+import { sxRem } from "../../../tokens/relative";
 
 export interface GridToolbarProps<T extends Record<string, unknown>> {
   testIdPrefix: string;
@@ -97,7 +98,7 @@ function ToolbarRightControls<T extends Record<string, unknown>>(props: GridTool
           <Divider
             orientation="vertical"
             flexItem
-            sx={{ height: 20, alignSelf: "center", mx: 0.5 }}
+            sx={{ height: sxRem(20), alignSelf: "center", mx: 0.5 }}
           />
         </>
       )}

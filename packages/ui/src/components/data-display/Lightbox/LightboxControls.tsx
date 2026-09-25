@@ -13,6 +13,7 @@ import React from 'react';
 
 import { navButtonSx, OVERLAY_Z_INDEX, overlayButtonSx } from './Lightbox.constants';
 import { useLightboxCopy } from './lightbox-copy-context';
+import { sxRem } from '../../../tokens/relative';
 
 type TestId = (suffix: string) => string;
 
@@ -24,7 +25,7 @@ export const LightboxCloseButton: FC<{ testId: TestId; onClose: () => void }> = 
   return (
   <IconButton
     onClick={onClose}
-    sx={{ ...overlayButtonSx, position: 'absolute', top: 16, right: 16, zIndex: OVERLAY_Z_INDEX }}
+    sx={{ ...overlayButtonSx, position: 'absolute', top: sxRem(16), right: sxRem(16), zIndex: OVERLAY_Z_INDEX }}
     aria-label={copy.close}
     data-testid={testId('close')}
   >
@@ -37,7 +38,7 @@ const arrowSx = (side: 'left' | 'right') =>
   ({
     ...navButtonSx,
     position: 'absolute',
-    [side]: 16,
+    [side]: sxRem(16),
     top: '50%',
     transform: 'translateY(-50%)',
     zIndex: OVERLAY_Z_INDEX,
@@ -102,8 +103,8 @@ export const LightboxZoomControls: FC<LightboxZoomControlsProps> = ({
   <Box
     sx={{
       position: 'absolute',
-      top: 16,
-      left: 16,
+      top: sxRem(16),
+      left: sxRem(16),
       display: 'flex',
       flexDirection: 'column',
       gap: 1,
@@ -152,7 +153,7 @@ export const LightboxAutoplayButton: FC<LightboxAutoplayButtonProps> = ({
     sx={{
       ...overlayButtonSx,
       position: 'absolute',
-      top: 16,
+      top: sxRem(16),
       left: '50%',
       transform: 'translateX(-50%)',
       zIndex: OVERLAY_Z_INDEX,

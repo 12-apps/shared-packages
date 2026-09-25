@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 
 import type { ChartProps, ChartSeries } from './Chart.types';
 import { uiInk } from '../../../tokens/ink';
-import { accentFor, sxRem } from '../../../tokens/scales';
+import { accentFor, rem, remPx, sxRem } from '../../../tokens/scales';
 
 /**
  * Non-JSX internals of the prop-driven Chart: size/variant styling, palette
@@ -12,10 +12,12 @@ import { accentFor, sxRem } from '../../../tokens/scales';
  */
 
 export interface SizeStyles {
+  /** The plot's height in rendered px — Recharts sizes from a number — through the type scale. */
   height: number;
   fontSize: string;
   /**
-   * Gap between an axis line and its tick labels, px.
+   * Gap between an axis line and its tick labels, in rendered px, through the
+   * type scale.
    *
    * Recharts' default of 2 is not enough. The bottom VALUE tick is centred on
    * the x-axis line, so its text box reaches ~0.79em BELOW that line, while
@@ -26,19 +28,34 @@ export interface SizeStyles {
   tickMargin: number;
 }
 
-type SizePreset = Omit<SizeStyles, 'fontSize'> & { fontSize: (theme: Theme) => string };
+/** One size step, in design px: the plot's height, its type size and its tick margin. */
+interface SizePreset {
+  heightPx: number;
+  fontSize: (theme: Theme) => string;
+  tickMarginPx: number;
+}
 
 const SIZE_PRESETS: Record<NonNullable<ChartProps['size']>, SizePreset> = {
-  xs: { height: 200, fontSize: sxRem(12), tickMargin: 10 },
-  sm: { height: 300, fontSize: sxRem(14), tickMargin: 12 },
-  md: { height: 400, fontSize: sxRem(16), tickMargin: 14 },
-  lg: { height: 500, fontSize: sxRem(18), tickMargin: 16 },
-  xl: { height: 600, fontSize: sxRem(20), tickMargin: 18 },
+  xs: { heightPx: 200, fontSize: sxRem(12), tickMarginPx: 10 },
+  sm: { heightPx: 300, fontSize: sxRem(14), tickMarginPx: 12 },
+  md: { heightPx: 400, fontSize: sxRem(16), tickMarginPx: 14 },
+  lg: { heightPx: 500, fontSize: sxRem(18), tickMarginPx: 16 },
+  xl: { heightPx: 600, fontSize: sxRem(20), tickMarginPx: 18 },
 };
 
+const presetOf = (size: ChartProps['size']): SizePreset => SIZE_PRESETS[size ?? 'md'] ?? SIZE_PRESETS.md;
+
+/** The plot's height in design px: the explicit `height`, else the size's preset. */
+export const plotHeightPx = (size: ChartProps['size'], height?: number): number =>
+  height ?? presetOf(size).heightPx;
+
 export function getSizeStyles(theme: Theme, size: ChartProps['size'], height?: number): SizeStyles {
-  const preset = SIZE_PRESETS[size ?? 'md'] ?? SIZE_PRESETS.md;
-  return { ...preset, fontSize: preset.fontSize(theme), height: height ?? preset.height };
+  const preset = presetOf(size);
+  return {
+    height: remPx(theme, plotHeightPx(size, height)),
+    fontSize: preset.fontSize(theme),
+    tickMargin: remPx(theme, preset.tickMarginPx),
+  };
 }
 
 export function getDefaultColors(theme: Theme, variant: ChartProps['variant'], colors?: string[]): string[] {
@@ -68,13 +85,13 @@ interface VariantOptions {
 
 function effectStyles(theme: Theme, options: VariantOptions): SxStyles {
   const accent = accentFor(theme, options.color).main;
-  const glow = options.glow ? { boxShadow: `0 0 30px ${alpha(accent, 0.4)}` } : {};
+  const glow = options.glow ? { boxShadow: `0 0 ${rem(theme, 30)} ${alpha(accent, 0.4)}` } : {};
   const pulse = options.pulse
     ? {
         animation: 'pulse 2s infinite',
         '@keyframes pulse': {
           '0%': { boxShadow: `0 0 0 0 ${alpha(accent, 0.4)}` },
-          '70%': { boxShadow: `0 0 0 20px ${alpha(accent, 0)}` },
+          '70%': { boxShadow: `0 0 0 ${rem(theme, 20)} ${alpha(accent, 0)}` },
           '100%': { boxShadow: `0 0 0 0 ${alpha(accent, 0)}` },
         },
       }
@@ -87,7 +104,7 @@ function variantSurface(theme: Theme, options: VariantOptions): SxStyles {
     case 'glass':
       return {
         backgroundColor: alpha(theme.palette.background.paper, options.glass ? 0.1 : 0.9),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
       };
     case 'gradient':

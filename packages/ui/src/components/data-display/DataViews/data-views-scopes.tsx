@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { Box } from "../../../mui/Box";
-import { sxRem } from "../../../tokens/relative";
+import type { Theme } from "@mui/material/styles/index.js";
+
+import { rem, sxRem } from "../../../tokens/relative";
 
 /**
  * SCOPES — a page-level partition rendered as a strip of tabs under the toolbar.
@@ -175,14 +177,14 @@ function useScrollActiveIntoView(value: string | undefined): React.RefObject<HTM
 }
 
 /** One tab's visual + a11y state, kept out of the strip's map for readability. */
-function scopeTabSx(active: boolean): Record<string, unknown> {
+const scopeTabSx = (active: boolean): Record<string, unknown> => {
   return {
     // A 44px min target: the strip is the first thing a thumb reaches on a phone.
-    minHeight: 44,
+    minHeight: sxRem(44),
     px: 1.5,
     py: 1,
     border: 0,
-    borderBottom: 2,
+    borderBottom: (theme: Theme) => `${rem(theme, 2)} solid`,
     borderStyle: "solid",
     borderColor: active ? "primary.main" : "transparent",
     background: "none",
@@ -193,9 +195,13 @@ function scopeTabSx(active: boolean): Record<string, unknown> {
     fontWeight: active ? 600 : 400,
     color: active ? "primary.main" : "text.secondary",
     "&:hover": { color: active ? "primary.main" : "text.primary" },
-    "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 },
+    "&:focus-visible": {
+      outline: (theme: Theme) => `${rem(theme, 2)} solid`,
+      outlineColor: "primary.main",
+      outlineOffset: sxRem(-2),
+    },
   };
-}
+};
 
 /** The count badge. Rendered only when the server actually supplied a number. */
 function ScopeCount({

@@ -37,8 +37,7 @@ export const MapLayers: FC<MapLayersProps> = ({ settings, zoom, mapType, search,
       {settings.showHeatmap && settings.heatmapData.length > 0 && (
         <HeatmapOverlay
           points={settings.heatmapData}
-          width={HEATMAP_VIEWBOX.width}
-          height={HEATMAP_VIEWBOX.height}
+          viewBox={HEATMAP_VIEWBOX}
         />
       )}
 

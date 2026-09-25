@@ -23,7 +23,7 @@ import {
 } from "./card-surface";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
 import { useDataViewsCopy } from "./data-views-copy-context";
-import { rem } from "../../../tokens/relative";
+import { rem, sxRem } from "../../../tokens/relative";
 
 export interface BaseCardProps extends CardSurfaceProps {
   /** Extra body content below the caption (chips, meta). Optional. */
@@ -72,13 +72,13 @@ export interface BaseCardProps extends CardSurfaceProps {
  * its track physically and lays its contents out in the unscaled box behind it
  * — which is what "the whole card grows together" was always meant to mean.
  */
-function cardSx(opts: {
+const cardSx = (opts: {
   aspectRatio: CardAspectRatio;
   pad: number;
   scale: number;
   interactive: boolean;
   draggable: boolean;
-}): CardSx {
+}): CardSx => {
   const { aspectRatio, pad, scale, interactive, draggable } = opts;
   return {
     position: "relative",
@@ -91,14 +91,15 @@ function cardSx(opts: {
     cursor: draggable ? "grab" : interactive ? "pointer" : undefined,
     ...(draggable ? { touchAction: "none", "&:active": { cursor: "grabbing" } } : {}),
   };
-}
+};
 
 /**
  * How far the first block in flow must start below the tile's top edge to clear
- * the absolute overlays: their 4px inset plus the checkbox's 38px hit area (20px
- * glyph in MUI's 9px padding), which is the taller of the two corners.
+ * the absolute overlays, in MUI spacing units: their 4px inset plus the
+ * checkbox's 38px hit area (20px glyph in MUI's 9px padding), which is the
+ * taller of the two corners — 42px at 8px a unit.
  */
-const OVERLAY_BAND_PX = 42;
+const OVERLAY_BAND_UNITS = 42 / 8;
 
 /**
  * The top margin each stacked slot needs, in MUI spacing units.
@@ -118,7 +119,7 @@ function contentGaps(opts: {
 }): { body: number; caption: number } {
   const { hasMedia, hasBody, overlays, pad } = opts;
   const gap = pad * 0.5;
-  const clear = !hasMedia && overlays ? Math.max(0, OVERLAY_BAND_PX / 8 - pad) : 0;
+  const clear = !hasMedia && overlays ? Math.max(0, OVERLAY_BAND_UNITS - pad) : 0;
   return { body: hasMedia ? gap : clear, caption: hasMedia || hasBody ? gap : clear };
 }
 
@@ -133,7 +134,7 @@ function CardOverlays({
   return (
     <>
       {onToggleSelect && (
-        <Box sx={{ position: "absolute", top: 4, left: 4, zIndex: 2 }}>
+        <Box sx={{ position: "absolute", top: sxRem(4), left: sxRem(4), zIndex: 2 }}>
           <Checkbox
             checked={selected}
             onChange={() => onToggleSelect()}
@@ -147,7 +148,7 @@ function CardOverlays({
       )}
       {menu && (
         <Box
-          sx={{ position: "absolute", top: 4, right: 4, zIndex: 2 }}
+          sx={{ position: "absolute", top: sxRem(4), right: sxRem(4), zIndex: 2 }}
           // Acting on the menu must never trigger the card's own click.
           onClick={(event) => event.stopPropagation()}
         >
@@ -356,7 +357,7 @@ export function BaseCard(props: BaseCardProps): React.JSX.Element {
           the same corner as a control that toggles selection means every drag
           starts with a near-miss on it. */}
       {drag.draggable && (
-        <Box sx={{ position: "absolute", bottom: 4, left: 4, zIndex: 2 }}>
+        <Box sx={{ position: "absolute", bottom: sxRem(4), left: sxRem(4), zIndex: 2 }}>
           <DragHandle
             handleProps={drag.handleProps}
             gated={drag.handleProps !== undefined}

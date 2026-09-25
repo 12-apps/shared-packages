@@ -1,8 +1,10 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import type { Theme } from "@mui/material/styles/index.js";
 
 import { Box } from "../../../mui/Box";
+import { rem, sxRem } from "../../../tokens/relative";
 
 /**
  * DRAGGING, OWNED BY THE CONTAINER AND NOT BY THE CARD.
@@ -138,8 +140,8 @@ export function DropIndicator({ edge }: { edge: "before" | "after" }): React.JSX
         // Centred ON the gap rather than inside the card: the item lands
         // BETWEEN two rows, and a rule sitting within one of them reads as
         // "into this row" instead.
-        ...(edge === "before" ? { top: -2 } : { bottom: -2 }),
-        height: 3,
+        ...(edge === "before" ? { top: sxRem(-2) } : { bottom: sxRem(-2) }),
+        height: sxRem(3),
         borderRadius: 2,
         bgcolor: "primary.main",
         pointerEvents: "none",
@@ -174,8 +176,8 @@ export function DragHandle({
       {...handleProps}
       sx={{
         display: "inline-grid",
-        gridTemplateColumns: "repeat(2, 3px)",
-        gap: "2px",
+        gridTemplateColumns: (theme: Theme) => `repeat(2, ${rem(theme, 3)})`,
+        gap: sxRem(2),
         flexShrink: 0,
         p: 0.5,
         borderRadius: 1,
@@ -190,7 +192,7 @@ export function DragHandle({
         <Box
           key={index}
           component="span"
-          sx={{ width: 3, height: 3, borderRadius: "50%", bgcolor: "currentColor" }}
+          sx={{ width: sxRem(3), height: sxRem(3), borderRadius: "50%", bgcolor: "currentColor" }}
         />
       ))}
     </Box>

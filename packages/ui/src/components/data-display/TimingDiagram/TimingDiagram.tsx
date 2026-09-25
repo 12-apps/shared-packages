@@ -19,8 +19,8 @@ import { rem } from '../../../tokens/relative';
 const DiagramContainer = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.8)} 100%)`,
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  backdropFilter: `blur(${rem(theme, 10)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
 }));
@@ -39,9 +39,9 @@ const LegendItem = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   gap: theme.spacing(1),
   '& .color': {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
+    width: rem(theme, 12),
+    height: rem(theme, 12),
+    borderRadius: rem(theme, 2),
   },
   '& .label': {
     fontSize: rem(theme, 12.8),
@@ -83,7 +83,7 @@ export const TimingDiagram: FC<TimingDiagramProps> = ({
   copy,
   data,
   showLabels = true,
-  height = 40,
+  height,
   animated = true,
   showTooltips = true,
   variant = 'waterfall',
@@ -106,7 +106,8 @@ export const TimingDiagram: FC<TimingDiagramProps> = ({
           animated={animated}
           showLabels={showLabels}
           showTooltips={showTooltips}
-          height={height}
+          // The waterfall's plot height, 40 design px unless the caller says otherwise.
+          plotHeightPx={height ?? 40}
         />
       )}
 

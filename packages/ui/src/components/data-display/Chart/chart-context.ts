@@ -10,6 +10,7 @@ import {
   resolveSeries,
   type SizeStyles,
 } from './chart-internals';
+import { remPx } from '../../../tokens/relative';
 
 /**
  * Everything the per-type renderers in `chart-renderers.tsx` read, resolved
@@ -64,12 +65,26 @@ export function buildChartContext(props: ChartProps, theme: Theme): ChartRenderC
     gridStroke,
     gridOpacity,
     axisConfig: resolveAxisConfig(props, sizeStyles.tickMargin),
-    barGeometry: resolveBarGeometry(props),
+    barGeometry: resolveBarGeometry(props, theme),
     animationDuration: (props.animate ?? true) ? (props.animationDuration ?? 1500) : 0,
     commonProps: {
       data: props.data,
-      margin: { top: 20, right: 30, left: 20, bottom: 20, ...props.margin },
+      margin: {
+        top: remPx(theme, 20),
+        right: remPx(theme, 30),
+        left: remPx(theme, 20),
+        bottom: remPx(theme, 20),
+        ...marginPx(theme, props.margin),
+      },
       onClick: handleChartClick,
     },
   };
+}
+
+/** A caller's margin is in design px (the prop's contract); Recharts takes px numbers. */
+function marginPx(theme: Theme, margin: ChartProps['margin']): ChartProps['margin'] {
+  if (!margin) return undefined;
+  return Object.fromEntries(
+    Object.entries(margin).map(([side, px]) => [side, typeof px === 'number' ? remPx(theme, px) : px]),
+  );
 }

@@ -27,6 +27,7 @@ import type { BadgeSizeMetrics } from './Badge.metrics';
 import { badgeVariantStyles } from './Badge.variants';
 import type { BadgeSize, BadgeVariant } from './Badge.types';
 import { sheen } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 import { accentFor } from '../../../tokens/scales';
 
 export type BadgePalette = {
@@ -52,35 +53,22 @@ const getColorFromTheme = (theme: Theme, color: string) => {
   return colorMap[color] || theme.palette.primary;
 };
 
-// Derived from the shared metrics, not restated: the native `Badge` reads the
-// same table, so the two renderers cannot disagree on a chip.
-const sizeMap: Record<
-  BadgeSize,
-  {
-    minWidth: number;
-    height: number;
-    /** The step itself: its `fontSize`/`iconSize` are design px, drawn through `rem(theme, …)`. */
-    step: BadgeSizeMetrics;
-    padding: string;
-    dotSize: number;
-  }
-> = Object.fromEntries(
-  Object.entries(BADGE_SIZES).map(([size, metrics]) => [
-    size,
-    {
-      minWidth: metrics.minWidth,
-      height: metrics.height,
-      step: metrics,
-      padding: `0 ${metrics.paddingHorizontal}px`,
-      dotSize: metrics.dotSize,
-    },
-  ]),
-) as Record<
-  BadgeSize,
-  { minWidth: number; height: number; step: BadgeSizeMetrics; padding: string; dotSize: number }
->;
-
-export const getSizeStyles = (size: BadgeSize) => sizeMap[size] || sizeMap.md;
+// Read from the shared metrics, not restated: the native `Badge` reads the
+// same table, so the two renderers cannot disagree on a chip. The table is
+// design px; the web draws every length through the type scale here.
+export const getSizeStyles = (theme: Theme, size: BadgeSize) => {
+  /** The step itself: its `fontSize`/`iconSize` are design px, drawn through `rem(theme, …)`. */
+  const step: BadgeSizeMetrics = BADGE_SIZES[size] || BADGE_SIZES.md;
+  return {
+    minWidth: rem(theme, step.minWidth),
+    height: rem(theme, step.height),
+    /** Half the height: the pill's end caps. */
+    pillRadius: rem(theme, step.height / 2),
+    step,
+    padding: rems(theme, 0, step.paddingHorizontal),
+    dotSize: rem(theme, step.dotSize),
+  };
+};
 
 export const getAnchorOrigin = (position: string) =>
   badgeAnchor((position || 'top-right') as Parameters<typeof badgeAnchor>[0]);
@@ -105,18 +93,20 @@ const rgbValuesOf = (color: string): string => {
 const badgeLightingStyles = ({
   glow,
   pulse,
-  colorPalette }: {
+  colorPalette,
+  theme }: {
   glow?: boolean;
   pulse?: boolean;
   colorPalette: BadgePalette;
+  theme: Theme;
 }): CSSObject => ({
       // Glow effect
       ...(glow &&
         !pulse && {
-          boxShadow: `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`,
+          boxShadow: `0 0 ${rems(theme, GLOW.blur, GLOW.spread)} ${alpha(colorPalette.main, GLOW.alpha)}`,
           filter: `brightness(${GLOW.brightness})`,
           '&:hover': {
-            boxShadow: `0 0 ${GLOW.hoverBlur}px ${GLOW.hoverSpread}px ${alpha(colorPalette.main, GLOW.hoverAlpha)}` } }),
+            boxShadow: `0 0 ${rems(theme, GLOW.hoverBlur, GLOW.hoverSpread)} ${alpha(colorPalette.main, GLOW.hoverAlpha)}` } }),
 
       // Pulse animation
       ...(pulse &&
@@ -126,7 +116,7 @@ const badgeLightingStyles = ({
       // Both glow and pulse
       ...(glow &&
         pulse && {
-          animation: `${glowPulseAnimation} ${PULSE.durationMs / 1000}s ease-in-out infinite, ${pulseAnimation} ${PULSE.durationMs / 1000}s ease-in-out infinite`,
+          animation: `${glowPulseAnimation(theme)} ${PULSE.durationMs / 1000}s ease-in-out infinite, ${pulseAnimation} ${PULSE.durationMs / 1000}s ease-in-out infinite`,
           filter: `brightness(${GLOW.brightness})`,
         }),
 
@@ -156,7 +146,7 @@ const badgeAnimationStyles = ({
 
       // Bounce animation
       ...(bounce && {
-        animation: `${bounceAnimation} ${BOUNCE.durationMs / 1000}s ease-in-out` }),
+        animation: `${bounceAnimation(theme)} ${BOUNCE.durationMs / 1000}s ease-in-out` }),
 
       // Shimmer effect
       ...(shimmer && {
@@ -164,7 +154,7 @@ const badgeAnimationStyles = ({
           customVariant === 'gradient'
             ? `linear-gradient(135deg, ${colorPalette.main} 0%, ${colorPalette.dark || colorPalette.main} 100%)`
             : colorPalette.main,
-        backgroundSize: shimmer ? '1000px 100%' : 'auto',
+        backgroundSize: shimmer ? `${rem(theme, 1000)} 100%` : 'auto',
         position: 'relative',
         overflow: 'hidden',
         '&::after': {
@@ -180,7 +170,7 @@ const badgeAnimationStyles = ({
             ${sheen(theme, SHIMMER.alpha)},
             transparent
           )`,
-          animation: `${shimmerAnimation} ${SHIMMER.durationMs / 1000}s infinite` } }) });
+          animation: `${shimmerAnimation(theme)} ${SHIMMER.durationMs / 1000}s infinite` } }) });
 
 // The badge chip's own styling, lifted out so the styled() callback just
 // forwards its props.
@@ -209,7 +199,7 @@ export const badgeStyles = ({
   bounce,
   hasIcon }: BadgeStyleArgs): CSSObject => {
   const colorPalette = getColorFromTheme(theme, customColor);
-  const sizeStyles = getSizeStyles(customSize);
+  const sizeStyles = getSizeStyles(theme, customSize);
 
   return {
     '--glow-color': rgbValuesOf(colorPalette.main),
@@ -235,7 +225,7 @@ export const badgeStyles = ({
         paddingLeft: sizeStyles.padding.split(' ')[1],
         display: 'inline-flex',
         alignItems: 'center',
-        gap: `${BADGE_CONTENT_GAP}px`,
+        gap: rem(theme, BADGE_CONTENT_GAP),
       }),
 
       // Animation on mount
@@ -248,7 +238,7 @@ export const badgeStyles = ({
         customVariant,
         colorPalette,
         theme }),
-      ...badgeLightingStyles({ glow, pulse, colorPalette }),
+      ...badgeLightingStyles({ glow, pulse, colorPalette, theme }),
 
       '&:not(.MuiBadge-dot):hover': {
         transform: `scale(${HOVER_SCALE})`,

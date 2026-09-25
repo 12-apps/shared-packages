@@ -1,6 +1,9 @@
 "use client";
 
+import type { Theme } from "@mui/material/styles/index.js";
+
 import { Box } from "../../../mui/Box";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * Miniature previews of what a layout or a density setting DOES.
@@ -16,19 +19,19 @@ import { Box } from "../../../mui/Box";
  */
 
 /** The glyph's own footprint, so every tile in a picker lines up. */
-const FRAME = { width: 32, height: 24, display: "flex" } as const;
+const FRAME = { width: sxRem(32), height: sxRem(24), display: "flex" } as const;
 
 /** Active tiles use the accent; the rest stay muted so the choice reads at a glance. */
 function barColor(active: boolean): string {
   return active ? "primary.main" : "action.disabled";
 }
 
-/** Three rows at a given gap — the density preview for the table and list. */
-export function RowsGlyph({ gap, active }: { gap: number; active: boolean }): React.JSX.Element {
+/** Three rows at a given gap (through the type scale) — the density preview for the table and list. */
+export function RowsGlyph({ gap, active }: { gap: (theme: Theme) => string; active: boolean }): React.JSX.Element {
   return (
-    <Box sx={{ ...FRAME, flexDirection: "column", justifyContent: "center", gap: `${gap}px` }}>
+    <Box sx={{ ...FRAME, flexDirection: "column", justifyContent: "center", gap }}>
       {[0, 1, 2].map((index) => (
-        <Box key={index} sx={{ height: 2, width: "100%", borderRadius: 1, bgcolor: barColor(active) }} />
+        <Box key={index} sx={{ height: sxRem(2), width: "100%", borderRadius: 1, bgcolor: barColor(active) }} />
       ))}
     </Box>
   );
@@ -37,7 +40,7 @@ export function RowsGlyph({ gap, active }: { gap: number; active: boolean }): Re
 /** A dense block grid — the table layout. */
 export function TableGlyph({ active }: { active: boolean }): React.JSX.Element {
   return (
-    <Box sx={{ ...FRAME, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "2px" }}>
+    <Box sx={{ ...FRAME, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: sxRem(2) }}>
       {Array.from({ length: 9 }).map((_, index) => (
         <Box
           key={index}
@@ -51,12 +54,12 @@ export function TableGlyph({ active }: { active: boolean }): React.JSX.Element {
 /** Full-width rows each carrying a leading mark — the list layout. */
 export function ListGlyph({ active }: { active: boolean }): React.JSX.Element {
   return (
-    <Box sx={{ ...FRAME, flexDirection: "column", justifyContent: "center", gap: "4px" }}>
+    <Box sx={{ ...FRAME, flexDirection: "column", justifyContent: "center", gap: sxRem(4) }}>
       {[0, 1, 2].map((index) => (
         <Box
           key={index}
           sx={{
-            height: 5,
+            height: sxRem(5),
             width: "100%",
             borderRadius: 0.5,
             bgcolor: barColor(active),
@@ -65,7 +68,7 @@ export function ListGlyph({ active }: { active: boolean }): React.JSX.Element {
             alignItems: "center",
           }}
         >
-          <Box sx={{ ml: "2px", height: 3, width: 3, borderRadius: "50%", bgcolor: "background.paper" }} />
+          <Box sx={{ ml: sxRem(2), height: sxRem(3), width: sxRem(3), borderRadius: "50%", bgcolor: "background.paper" }} />
         </Box>
       ))}
     </Box>
@@ -79,7 +82,7 @@ export function ListGlyph({ active }: { active: boolean }): React.JSX.Element {
  */
 export function GridGlyph({ n = 3, active }: { n?: number; active: boolean }): React.JSX.Element {
   return (
-    <Box sx={{ ...FRAME, display: "grid", gridTemplateColumns: `repeat(${n}, 1fr)`, gap: "2px" }}>
+    <Box sx={{ ...FRAME, display: "grid", gridTemplateColumns: `repeat(${n}, 1fr)`, gap: sxRem(2) }}>
       {Array.from({ length: n * 2 }).map((_, index) => (
         <Box key={index} sx={{ borderRadius: 0.5, bgcolor: barColor(active) }} />
       ))}
@@ -95,7 +98,7 @@ export function GridGlyph({ n = 3, active }: { n?: number; active: boolean }): R
  */
 export function ColumnsGlyph({ n, active }: { n: number; active: boolean }): React.JSX.Element {
   return (
-    <Box sx={{ ...FRAME, gap: "2px" }}>
+    <Box sx={{ ...FRAME, gap: sxRem(2) }}>
       {Array.from({ length: n }).map((_, column) => (
         <Box key={column} sx={{ flex: 1, borderRadius: 0.5, bgcolor: barColor(active) }} />
       ))}
@@ -106,11 +109,11 @@ export function ColumnsGlyph({ n, active }: { n: number; active: boolean }): Rea
 /** Three columns of decreasing height — the board. */
 export function BoardGlyph({ active }: { active: boolean }): React.JSX.Element {
   return (
-    <Box sx={{ ...FRAME, gap: "2px" }}>
+    <Box sx={{ ...FRAME, gap: sxRem(2) }}>
       {[3, 2, 1].map((count, column) => (
-        <Box key={column} sx={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
+        <Box key={column} sx={{ flex: 1, display: "flex", flexDirection: "column", gap: sxRem(2) }}>
           {Array.from({ length: count }).map((_, index) => (
-            <Box key={index} sx={{ height: 5, borderRadius: 0.5, bgcolor: barColor(active) }} />
+            <Box key={index} sx={{ height: sxRem(5), borderRadius: 0.5, bgcolor: barColor(active) }} />
           ))}
         </Box>
       ))}

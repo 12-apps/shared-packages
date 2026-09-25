@@ -1,11 +1,12 @@
+import { useTheme } from '@mui/material/styles/index.js';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   DEFAULT_AUTOPLAY_INTERVAL_MS,
   MAX_ZOOM,
-  MIN_SWIPE_DISTANCE,
   MIN_ZOOM,
+  minSwipeDistance,
   WHEEL_ZOOM_FACTOR,
   ZOOM_STEP,
 } from './Lightbox.constants';
@@ -224,6 +225,7 @@ export const useSwipe = ({
   next: () => void;
   close: () => void;
 }) => {
+  const theme = useTheme();
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleTouchStart = useCallback((event: React.TouchEvent) => {
@@ -240,19 +242,20 @@ export const useSwipe = ({
 
       const deltaX = touch.clientX - start.x;
       const deltaY = touch.clientY - start.y;
+      const swipe = minSwipeDistance(theme);
 
       // Whichever axis moved further decides what the gesture meant.
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        if (Math.abs(deltaX) > MIN_SWIPE_DISTANCE) {
+        if (Math.abs(deltaX) > swipe) {
           if (deltaX > 0) prev();
           else next();
         }
         return;
       }
 
-      if (deltaY > MIN_SWIPE_DISTANCE) close();
+      if (deltaY > swipe) close();
     },
-    [prev, next, close],
+    [prev, next, close, theme],
   );
 
   return { handleTouchStart, handleTouchEnd };

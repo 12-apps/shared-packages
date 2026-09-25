@@ -4,6 +4,7 @@ import type { FC } from 'react';
 import React from 'react';
 import { TimelineRow } from './TimelineRow';
 import type { TimelineProps } from './Timeline.types';
+import { rem } from '../../../tokens/relative';
 
 // ---
 
@@ -19,13 +20,13 @@ const TimelineContainer = styled(Box)<{ orientation: 'vertical' | 'horizontal' }
       overflowX: 'auto',
       paddingBottom: theme.spacing(2),
       '&::-webkit-scrollbar': {
-        height: 8 },
+        height: rem(theme, 8) },
       '&::-webkit-scrollbar-track': {
         background: alpha(theme.palette.action.disabled, 0.1),
-        borderRadius: 4 },
+        borderRadius: rem(theme, 4) },
       '&::-webkit-scrollbar-thumb': {
         background: alpha(theme.palette.primary.main, 0.3),
-        borderRadius: 4,
+        borderRadius: rem(theme, 4),
         '&:hover': {
           background: alpha(theme.palette.primary.main, 0.5) } } }) }),
 );

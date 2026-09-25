@@ -15,7 +15,7 @@ import type {
   StatCardDeltaTone,
   StatCardProps,
 } from './StatCard.types';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 /** The arrow each direction renders (decorative — the text carries the meaning). */
 const DIRECTION_ICON: Record<StatCardDeltaDirection, typeof ArrowUpwardIcon> = {
@@ -134,7 +134,7 @@ function ValueRow({
     return (
       <Skeleton
         variant="rectangular"
-        height={28}
+        height={rem(theme, 28)}
         width="60%"
         borderRadius={4}
         data-testid={`${testId}-value-skeleton`}
@@ -167,12 +167,13 @@ function DeltaSlot({
   loading: boolean;
   testId: string;
 }): React.JSX.Element | null {
+  const theme = useTheme();
   if (!delta) return null;
   if (loading) {
     return (
       <Skeleton
         variant="rectangular"
-        height={16}
+        height={rem(theme, 16)}
         width="40%"
         borderRadius={4}
         data-testid={`${testId}-delta-skeleton`}

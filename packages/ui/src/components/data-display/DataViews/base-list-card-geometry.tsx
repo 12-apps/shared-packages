@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "@mui/material/styles/index.js";
+import { useTheme, type Theme } from "@mui/material/styles/index.js";
 
 import {
   CARD_RADIUS,
@@ -14,6 +14,7 @@ import { DENSITY_ROW_PADDING } from "./data-views-layout-context";
 import { RAIL_COUNT, RAIL_GAP, railsTemplateFor, useListRails } from "./list-card-rails";
 import { STACK_BREAK } from "./base-list-card-slots";
 import type { BaseListCardProps } from "./base-list-card";
+import { rem } from "../../../tokens/relative";
 
 /**
  * THE ROW'S GEOMETRY AND SURFACE, split from the component at the size gate.
@@ -60,6 +61,21 @@ function clickKeys(onClick: () => void) {
  * 1.4 all four rows keep identical rail edges, because subgrid tracks and the
  * zoom that reads them are the same for every row.
  */
+/** What {@link rowSx} needs to know about the row it lays out. */
+interface RowSxOptions {
+  inGroup: boolean;
+  railCount: number;
+  cellTemplate: string | null;
+  gutters: { disclose: boolean; drag: boolean; select: boolean };
+  metaColumns: number;
+  pad: number;
+  padY: number;
+  scale: number;
+  divider: boolean;
+  interactive: boolean;
+  draggable: boolean;
+}
+
 /**
  * DIVIDER COMPOSES WITH THE VARIANT — it changes the row's SHAPE, not its
  * surface.
@@ -74,19 +90,7 @@ function clickKeys(onClick: () => void) {
  * A variant that draws no border of its own gets the neutral rule from
  * {@link rowStyles}.
  */
-export function rowSx(opts: {
-  inGroup: boolean;
-  railCount: number;
-  cellTemplate: string | null;
-  gutters: { disclose: boolean; drag: boolean; select: boolean };
-  metaColumns: number;
-  pad: number;
-  padY: number;
-  scale: number;
-  divider: boolean;
-  interactive: boolean;
-  draggable: boolean;
-}): Record<string, unknown> {
+export const rowSx = (theme: Theme, opts: RowSxOptions): Record<string, unknown> => {
   const { inGroup, railCount, cellTemplate, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable } = opts;
   return {
     position: "relative",
@@ -118,7 +122,12 @@ export function rowSx(opts: {
     ...(draggable ? { touchAction: "none", "&:active": { cursor: "grabbing" } } : {}),
     ...(interactive ? { "&:hover": { backgroundColor: "action.hover" } } : {}),
     // A real focus ring, which a clickable <div> never had.
-    "&:focus-visible": { outline: 2, outlineStyle: "solid", outlineColor: "primary.main", outlineOffset: 2 },
+    "&:focus-visible": {
+      outline: `${rem(theme, 2)} solid`,
+      outlineStyle: "solid",
+      outlineColor: "primary.main",
+      outlineOffset: rem(theme, 2),
+    },
     // TWO-LINE, below the point where the shared rails stop helping.
     //
     // The standard mobile transaction row: what the record IS and what it COST
@@ -133,7 +142,7 @@ export function rowSx(opts: {
     // The MENU stays in the top-right corner at every width. It is the row's
     // one fixed landmark — an overflow that moves to the second line on a phone
     // is an overflow nobody finds twice.
-    [`@container (max-width: ${STACK_BREAK}px)`]: {
+    [`@container (max-width: ${rem(theme, STACK_BREAK)})`]: {
       gridTemplateColumns: "auto auto minmax(0, 1fr) max-content",
       ...(inGroup ? { gridColumn: `span ${RAIL_COUNT}` } : {}),
       rowGap: 0.75,
@@ -151,7 +160,7 @@ export function rowSx(opts: {
       ? { borderRadius: 0, borderWidth: 0, borderBottomWidth: 1, borderStyle: "solid" }
       : {}),
   };
-}
+};
 
 /**
  * A selectable full-width row: a marker, a title over a subtitle, labelled
@@ -258,10 +267,10 @@ export function rowStyles(
   shell: ReturnType<typeof useRowShell>,
   cellTemplate: string | null,
 ): Record<string, unknown> {
-  const { group, selectable, drag, reserve, pad, padY, scale, acts } = shell;
+  const { theme, group, selectable, drag, reserve, pad, padY, scale, acts } = shell;
   return {
     ...rowSurface(props, shell),
-    ...rowSx({
+    ...rowSx(theme, {
       inGroup: group !== null,
       railCount: group?.railCount ?? RAIL_COUNT,
       cellTemplate,

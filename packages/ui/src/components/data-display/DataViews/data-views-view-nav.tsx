@@ -232,7 +232,7 @@ function ToggleContents({
           component="span"
           aria-label={copy.nav.unsavedChanges}
           data-testid={`${testIdPrefix}-display-dirty`}
-          sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: "primary.main" }}
+          sx={{ height: sxRem(6), width: sxRem(6), borderRadius: "50%", bgcolor: "primary.main" }}
         />
       )}
       {interactive && (
@@ -260,7 +260,7 @@ function ViewToggle({
   const interactive = Boolean(view.nav);
   // One decision, not eight: a panel with no views renders the same row as
   // plain text rather than as a button that opens nothing.
-  const affordance = interactive
+  const affordanceSx = interactive
     ? { px: 0.75, py: 0.25, cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }
     : { px: 0, py: 0, cursor: "default" };
   return (
@@ -281,7 +281,7 @@ function ViewToggle({
         font: "inherit",
         fontSize: sxRem(12),
         bgcolor: open ? "action.selected" : "transparent",
-        ...affordance,
+        ...affordanceSx,
       }}
     >
       <ToggleContents view={view} open={open} interactive={interactive} testIdPrefix={testIdPrefix} />
@@ -300,7 +300,7 @@ export function ViewHeader(props: {
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderBottom: 1, borderColor: "divider" }}>
       <Text variant="caption" as="span">
-        <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.5, color: "text.disabled" }}>
+        <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: sxRem(0.5), color: "text.disabled" }}>
           {copy.nav.label}
         </Box>
       </Text>
