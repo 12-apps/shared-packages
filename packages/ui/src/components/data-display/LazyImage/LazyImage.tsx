@@ -91,7 +91,7 @@ const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
       height={styleLength(theme, props.height || 200)}
       animation={props.skeletonProps.animation || 'pulse'}
       intensity={props.skeletonProps.intensity}
-      borderRadius={props.borderRadius}
+      borderRadius={styleLength(theme, props.borderRadius)}
       data-testid={`${props['data-testid']}-skeleton`}
     />
   );
@@ -169,7 +169,7 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
 
   return (
     <FallbackContainer
-      sx={{ width: sxLength(theme, width), height: sxLength(theme, height), borderRadius }}
+      sx={{ width: sxLength(theme, width), height: sxLength(theme, height), borderRadius: styleLength(theme, borderRadius) }}
       data-testid={`${testId}-fallback`}
     >
       {fallback}
@@ -211,7 +211,9 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
       sx={{
         width: sxLength(theme, width || 'auto'),
         height: sxLength(theme, height || 'auto'),
-        borderRadius,
+        // The same px length the image gets (`metrics`): in `sx` a bare number
+        // would be a multiple of `shape.borderRadius`, and this box clips (FUT-2656).
+        borderRadius: metrics.borderRadius,
       }}
       data-testid={testId}
     >
