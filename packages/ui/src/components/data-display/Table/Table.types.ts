@@ -303,6 +303,22 @@ export interface TableHeaderProps {
   onSelectAll?: (selected: boolean) => void;
   density?: TableDensity;
   stickyHeader?: boolean;
+  /** The `<thead>`, so the virtual window can subtract its height from the scroller's offset. */
+  headRef?: React.Ref<globalThis.HTMLTableSectionElement>;
+}
+
+/**
+ * The rows a virtualised body mounts. Computed by `useVirtualScrolling` in the
+ * table, which owns the one scroll container, and handed down to the body.
+ */
+export interface VirtualWindow {
+  startIndex: number;
+  endIndex: number;
+  items: Record<string, unknown>[];
+  /** Every row at the scaled pitch, as CSS. */
+  totalHeight: string;
+  /** Where the first mounted row sits, in design px. */
+  offsetY: number;
 }
 
 export interface TableBodyProps {
@@ -320,9 +336,9 @@ export interface TableBodyProps {
   renderRow?: (rowData: Record<string, unknown>, index: number, isSelected: boolean) => React.ReactNode;
   renderCell?: (value: unknown, column: ColumnConfig, rowData: Record<string, unknown>, rowIndex: number) => React.ReactNode;
   virtualScrolling?: boolean;
-  containerHeight?: number;
+  /** Set only when the body is virtualised: the rows in view and where they sit. */
+  virtualWindow?: VirtualWindow;
   rowHeight?: number;
-  overscan?: number;
 }
 
 export interface VirtualTableBodyProps extends TableBodyProps {

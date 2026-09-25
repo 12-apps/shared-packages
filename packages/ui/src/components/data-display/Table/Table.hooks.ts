@@ -4,29 +4,37 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { rem, remPx } from '../../../tokens/relative';
 
-import type { ColumnConfig, TableProps } from './Table.types';
+import type { ColumnConfig, TableProps, VirtualWindow } from './Table.types';
 
 /**
  * The virtual window. `rowHeight` and `containerHeight` are design px: the
  * window is computed in the px `scrollTop` is measured in (`remPx`), and what it
  * hands back to draw with stays in design px (`offsetY`) or is CSS already
  * (`totalHeight`), so the rows and the window share one pitch at any type scale.
+ *
+ * The scroller holds the header as well as the body, so the `<tbody>` starts
+ * the header's height into it. `handleScroll` measures that height from
+ * `headerRef` in the same live px as `scrollTop`, and the window subtracts it
+ * before dividing by the pitch (FUT-2658).
  */
 export const useVirtualScrolling = (
   data: Record<string, unknown>[],
   rowHeight: number,
   containerHeight: number,
-  overscan: number = 5
+  overscan: number = 5,
+  headerRef?: React.RefObject<HTMLElement | null>,
 ) => {
   const theme = useTheme();
-  const [scrollTop, setScrollTop] = useState(0);
+  // Both live px, as the browser measures them.
+  const [scroll, setScroll] = useState({ scrollTop: 0, headerPx: 0 });
   
-  const visibleItems = useMemo(() => {
+  const visibleItems = useMemo((): VirtualWindow => {
     const pitch = remPx(theme, rowHeight);
-    const startIndex = Math.floor(scrollTop / pitch);
+    const bodyScrollTop = Math.max(0, scroll.scrollTop - scroll.headerPx);
+    const startIndex = Math.floor(bodyScrollTop / pitch);
     const endIndex = Math.min(
       data.length,
-      Math.ceil((scrollTop + remPx(theme, containerHeight)) / pitch)
+      Math.ceil((bodyScrollTop + remPx(theme, containerHeight)) / pitch)
     );
     
     const start = Math.max(0, startIndex - overscan);
@@ -36,16 +44,17 @@ export const useVirtualScrolling = (
       startIndex: start,
       endIndex: end,
       items: data.slice(start, end),
-      /** Every row at the scaled pitch, as CSS. */
       totalHeight: rem(theme, data.length * rowHeight),
-      /** Where the first mounted row sits, in design px. */
       offsetY: start * rowHeight,
     };
-  }, [data, rowHeight, containerHeight, scrollTop, overscan, theme]);
+  }, [data, rowHeight, containerHeight, scroll, overscan, theme]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop);
-  }, []);
+    setScroll({
+      scrollTop: e.currentTarget.scrollTop,
+      headerPx: headerRef?.current?.offsetHeight ?? 0,
+    });
+  }, [headerRef]);
 
   return { visibleItems, handleScroll };
 };
