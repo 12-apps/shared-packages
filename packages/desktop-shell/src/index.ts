@@ -21,7 +21,12 @@
  * | `.` | the status a tray draws, and the supervisor that keeps work alive. Pure. |
  * | `./autostart` | "start with the machine" on macOS, Windows and Linux. |
  * | `./session` | signing in **through the host's own web sign-in page** — no second credential path. |
- * | `./electron` | the adapter: single instance, tray, windows, background start. |
+ * | `./telemetry` | crash reports: a session marker, breadcrumbs and a disk queue that outlive the crash. Pure. |
+ * | `./updates` | replacing itself: the update manager over the host's `autoUpdater`, auto-install, the banner, the menu gate. Pure. |
+ * | `./electron` | the adapter: single instance, tray, windows, background start, Crashpad, the updater's session cookie. |
+ *
+ * Plus one bin, `desktop-shell-upload-release`, that puts a release's files in
+ * an S3-compatible bucket from any CI runner with Node on it.
  *
  * Everything but `./electron` is framework-free and runs in a plain Node test.
  *

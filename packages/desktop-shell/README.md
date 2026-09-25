@@ -50,7 +50,10 @@ agent the same day, and there is no credential handling in this package at all:
 | `@12-apps/desktop-shell` | The status a tray draws (`deriveShellStatus`) and the supervisor that keeps background work alive. Pure. |
 | `…/autostart` | "Start with the machine" across the three platforms — a login item on macOS/Windows, an XDG `.desktop` file on Linux. |
 | `…/session` | The cookie watch, the local sign-out, and `guardSession` — a 401 moves the tray, a 403 does not. |
-| `…/electron` | The adapter: single instance, tray, windows-hide-never-close, background start, and `startDesktopShell`. |
+| `…/telemetry` | Crash reports that outlive the crash: a session marker, breadcrumbs, a disk queue, and lost-run / crash / failed-install detection. Pure. |
+| `…/updates` | Self-updating over the host's own `electron-updater`: `createUpdateManager`, `createAutoInstall`, `updateBanner`, `createMenuGate`. Pure. |
+| `…/electron` | The adapter: single instance, tray, windows-hide-never-close, background start, `startDesktopShell`, `startCrashReporting`, `updaterFileLogger` and `sessionCookieReader`. |
+| bin `desktop-shell-upload-release` | Puts a release's files in an S3-compatible bucket from any CI runner with Node — no `aws` binary. |
 
 Everything but `…/electron` is framework-free and runs in a plain Node test —
 which is how the autostart quoting and the status ranking are asserted on a
@@ -69,6 +72,32 @@ outranks the link (the link recovers on its own; a fault does not).
 `degraded` is not an error. It means the live link is down and the host's
 fallback poll is carrying the work — slower, not broken. A host that nags
 somebody over `degraded` is nagging them over a reconnect.
+
+## Crashes, updates and releases
+
+A tray program fails where nobody is looking, and every fix to it would
+otherwise cost a phone call. So the package also carries the three things that
+make an agent maintainable from a distance:
+
+- **Telemetry.** `startCrashReporting()` writes a session marker at start and
+  removes it on a clean quit. A marker left behind is reported as a crash only
+  when Crashpad wrote a dump in that run — a Windows shutdown leaves one too,
+  with no dump. A restart to install that came back as the OLD version is
+  reported as `install-failed` and never retried by itself. Reports queue on
+  disk and `flush(send)` delivers them through whatever route the host owns; a
+  4xx that will not change is dropped instead of blocking the queue.
+- **Updates.** `createUpdateManager` checks once a day plus whenever the host
+  asks, downloads in the background, and never lets a skipped check overwrite
+  a version already downloading or ready. The host passes its `autoUpdater`
+  (this package does not depend on `electron-updater`) and answers
+  `settings()` per check with the switch and the feed URL — `null` while setup
+  is unfinished. A gated feed gets the session as a `Cookie` header via
+  `sessionCookieReader`. macOS reports `unsupported`: Squirrel.Mac refuses an
+  unsigned update after downloading it.
+- **Releases.** `desktop-shell-upload-release <key-prefix> <file>...` uploads
+  with `@aws-sdk/client-s3` (an optional peer), as a buffer so the object is
+  byte-for-byte the file's size. A missing file is reported and skipped; no
+  bucket configured is exit 0 with a note.
 
 ## It carries no words
 
