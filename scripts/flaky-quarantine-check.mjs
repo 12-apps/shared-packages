@@ -7,6 +7,10 @@
  * that is malformed, expired, or points at a spec that no longer exists — so
  * quarantined tests get un-quarantined instead of rotting silently.
  *
+ * `@12-apps/ui`'s story play functions read it too: scripts/ui-stories-gate.mjs
+ * ignores the result of a story whose source file is `spec` and whose
+ * `"<title> › <story name>"` matches `titlePattern`, until `expiresAt`.
+ *
  * Entry shape:
  *   {
  *     "spec": "apps/web/tests/e2e/checkout.spec.ts",

@@ -2049,14 +2049,17 @@ export const Integration: Story = {
         { timeout: 5000 },
       );
 
-      // Processing progress should have pulse effect
-      const processingProgress = canvas.getByTestId('processing-progress');
-      const circularSvg = processingProgress.querySelector('.MuiCircularProgress-svg');
-
-      if (circularSvg) {
-        const style = window.getComputedStyle(circularSvg);
-        // Should have animation for pulse
-        expect(style.animation).not.toBe('none');
+      // Processing progress should pulse. The caller's data-testid lands on the
+      // CircularProgress root, which carries the pulse. The old check read its
+      // <svg>, which has no animation: older Chromium serialised that as a long
+      // "none 0s ease …" string, so it passed vacuously; Chrome 149 says "none".
+      // Web only: in the Native lane the same element is a View whose pulse is
+      // an animated opacity, with no CSS animation to read.
+      const processingRoot = canvas.getByTestId('processing-progress');
+      if (processingRoot.classList.contains('MuiCircularProgress-root')) {
+        await waitFor(() => {
+          expect(window.getComputedStyle(processingRoot).animationName).not.toBe('none');
+        });
       }
     });
 

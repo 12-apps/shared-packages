@@ -635,7 +635,8 @@ export const VisualStates: Story = {
 
       // Check slide-in animation with staggered delay
       await expect(style.animation).toContain('0.5s');
-      await expect(style.animation).toContain('ease');
+      // Chrome 149 drops the default `ease` from the `animation` shorthand.
+      await expect(style.animationTimingFunction).toContain('ease');
       // Animation delay varies per item - just check it has some delay
       await expect(style.animation).toBeTruthy();
     }
@@ -651,7 +652,8 @@ export const VisualStates: Story = {
       const dotElement = dot as HTMLElement;
       const style = window.getComputedStyle(dotElement);
       await expect(style.animation).toContain('2s');
-      await expect(style.animation).toContain('ease');
+      // Chrome 149 drops the default `ease` from the `animation` shorthand.
+      await expect(style.animationTimingFunction).toContain('ease');
       await expect(style.animation).toContain('infinite');
     }
 

@@ -155,6 +155,15 @@ jobs:
           # Which packages get packed and verified as a consumer sees them is
           # exactly what this file names.
           - 'release-packages.txt'
+          # The ui-stories gate in the Storybook job (FUT-2619): its code, its
+          # ledger and the quarantine it honours. A PR touching only these
+          # would otherwise SKIP the one job that judges them — and a skipped
+          # job counts as passing, so a ledger could grow with no ratchet run.
+          - 'scripts/ui-stories-*.mjs'
+          - 'scripts/lib/ui-stories-*.mjs'
+          - 'scripts/lib/exception-ledger.mjs'
+          - '.ui-stories-exceptions.json'
+          - 'flaky-quarantine.json'
           # Self-verifying: narrowing these filters must re-run the lanes they
           # gate, or a filter could be quietly weakened with nothing to catch it.
           - '.github/workflows/ci.yml'
@@ -542,7 +551,12 @@ jobs:
     if: fromJSON(needs.changes.outputs.changes).publishable
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth 0: the ui-stories gate below holds its exception ledger
+      # against origin/main's (shrink-only), and a one-commit checkout has no
+      # origin/main to read.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           run_install: false
@@ -611,11 +625,7 @@ jobs:
       # Storybook also mounts resolve the design system by package name; that
       # package and its own dependencies export `src`).
       #
-      # NOT ADDED HERE: the `test-storybook` half of `test:ci`. That needs
-      # Playwright browsers in this job and would run every `*.test.stories.tsx`
-      # in the package for the first time — an unknown number of pre-existing
-      # failures to triage, which is its own change rather than a line in this
-      # one.
+      # The `test-storybook` half follows below, as its own steps (FUT-2619).
       - name: Build the design system Storybook
         shell: bash
         run: |
@@ -625,6 +635,52 @@ jobs:
         with:
           name: ui-storybook
           path: packages/ui/storybook-static
+          retention-days: 7
+      # THE PLAY FUNCTIONS of the build above (FUT-2619). The design system's
+      # browser-level tests are the `*.test.stories.tsx` play functions — the
+      # only tier that measures layout, since its unit tests run in jsdom. The
+      # Native lane drives the SHARED stories through react-native-web; every
+      # web-only one (no native port, or tagged `native-skip`) ran nowhere.
+      #
+      # Chromium the way the Native lane installs it, with one difference: the
+      # version is resolved THROUGH `playwright`, because `playwright-core` is
+      # not a direct dependency of packages/ui and a bare require of it fails
+      # under pnpm — which leaves the Native lane's key at `playwright-Linux-`.
+      - name: Resolve the Playwright version
+        id: playwright
+        working-directory: packages/ui
+        run: |
+          version="$(node -p "require(require.resolve('playwright-core/package.json', { paths: [require.resolve('playwright')] })).version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        working-directory: packages/ui
+        timeout-minutes: 10
+        run: pnpm exec playwright install chromium
+      # `quality:ui-stories` is the gate's selftest chained before the gate, so
+      # the selftest cannot land as a file nothing runs. The gate serves the
+      # build above and runs `test-storybook --index-json --includeTags test`
+      # over the test suites under `concurrently -k -s first` (the `test:ci` /
+      # Native-lane sequencing, so the runner never races the server), then
+      # judges the Jest JSON: an unlisted failure, a stale or grown
+      # `.ui-stories-exceptions.json`, or a test story that did not run fails
+      # this step, and so `CI Success`. `flaky-quarantine.json` entries are
+      # honoured until they expire. scripts/ui-stories-gate.mjs has the rules.
+      - name: Run the design system's story play functions
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm quality:ui-stories 2>&1 | tee ui-stories.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ui-stories-results
+          path: packages/ui/test-results/ui-stories.json
           retention-days: 7
 
   # THE NATIVE LANE: the same components, the other renderer.
