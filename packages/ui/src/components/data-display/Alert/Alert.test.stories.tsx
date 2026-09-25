@@ -222,10 +222,10 @@ export const AllVariantsVisual: Story = {
       const titles = canvas.getAllByText(/Alert$/);
       expect(titles).toHaveLength(6);
 
-      titles.forEach(async (title) => {
+      for (const title of titles) {
         const computedStyle = window.getComputedStyle(title);
         await expect(parseFloat(computedStyle.fontWeight)).toBeGreaterThanOrEqual(600);
-      });
+      }
     });
   },
 };
@@ -405,9 +405,9 @@ export const EdgeCases: Story = {
       expect(alerts).toHaveLength(5);
 
       // All alerts should render without errors
-      alerts.forEach(async (alert) => {
+      for (const alert of alerts) {
         await expect(alert).toBeInTheDocument();
-      });
+      }
     });
 
     await step('Verify text overflow handling', async () => {
@@ -674,11 +674,11 @@ export const ColorOverrideTest: Story = {
       expect(alerts).toHaveLength(6);
 
       // Each should have different styling
-      alerts.forEach(async (alert) => {
+      for (const alert of alerts) {
         await expect(alert).toBeInTheDocument();
         const style = window.getComputedStyle(alert);
         await expect(style.backgroundColor).toBeTruthy();
-      });
+      }
     });
   },
 };

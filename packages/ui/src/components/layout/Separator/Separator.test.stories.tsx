@@ -298,9 +298,9 @@ export const FocusManagement: Story = {
       const separators = canvas.getAllByRole('separator');
       await expect(separators.length).toBeGreaterThan(0);
 
-      separators.forEach(async (separator) => {
+      for (const separator of separators) {
         await expect(separator).toHaveAttribute('role', 'separator');
-      });
+      }
     });
 
     await step('Verify aria-orientation attributes', async () => {
@@ -314,9 +314,9 @@ export const FocusManagement: Story = {
     await step('Verify separators are not focusable', async () => {
       const separators = canvas.getAllByRole('separator');
 
-      separators.forEach(async (separator) => {
+      for (const separator of separators) {
         await expect(separator).not.toHaveAttribute('tabindex');
-      });
+      }
     });
 
     await step('Verify text content is accessible', async () => {
@@ -502,9 +502,9 @@ export const Performance: Story = {
       // Verify all separators are in DOM without memory leaks
       const separators = canvas.getAllByRole('separator');
 
-      separators.forEach(async (separator) => {
+      for (const separator of separators) {
         await expect(separator).toBeInTheDocument();
-      });
+      }
     });
   },
   render: () => (

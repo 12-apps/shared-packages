@@ -522,11 +522,11 @@ export const ScreenReader: Story = {
       await expect(allProgressBars).toHaveLength(2);
 
       // Each should have appropriate labeling
-      allProgressBars.forEach(async (progress) => {
+      for (const progress of allProgressBars) {
         const hasLabel =
           progress.hasAttribute('aria-label') || progress.hasAttribute('aria-labelledby');
         await expect(hasLabel).toBe(true);
-      });
+      }
     });
   },
 };
@@ -1101,7 +1101,7 @@ export const ThemeVariations: Story = {
         canvas.getByTestId('theme-neutral'),
       ];
 
-      allThemeProgress.forEach(async (progress) => {
+      for (const progress of allThemeProgress) {
         await expect(progress).toBeVisible();
 
         const progressBar = bar(progress);
@@ -1111,7 +1111,7 @@ export const ThemeVariations: Story = {
           expect(computedStyle.backgroundColor).not.toBe('transparent');
           expect(computedStyle.backgroundColor).not.toBe('');
         }
-      });
+      }
     });
   },
 };
@@ -1775,7 +1775,7 @@ export const EdgeCases: Story = {
         'single-segment-progress',
       ];
 
-      allProgressComponents.forEach(async (testId) => {
+      for (const testId of allProgressComponents) {
         const component = canvas.getByTestId(testId);
         await expect(component).toBeInTheDocument();
         await expect(component).toBeVisible();
@@ -1783,7 +1783,7 @@ export const EdgeCases: Story = {
         // Should not have any error boundaries or broken rendering
         const hasError = component.querySelector('[data-error], .error, [aria-errormessage]');
         expect(hasError).toBeFalsy();
-      });
+      }
     });
   },
 };
@@ -2096,7 +2096,7 @@ export const Integration: Story = {
         canvas.getByTestId('overall-progress'),
       ];
 
-      allProgressComponents.forEach(async (component) => {
+      for (const component of allProgressComponents) {
         await expect(component).toBeVisible();
         await expect(component).toBeInTheDocument();
 
@@ -2105,7 +2105,7 @@ export const Integration: Story = {
           '.MuiLinearProgress-bar, .MuiCircularProgress-svg, div[style*="display: flex"], div div',
         );
         expect(hasProgressBar).toBeTruthy();
-      });
+      }
     });
   },
 };
