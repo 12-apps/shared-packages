@@ -88,7 +88,7 @@ export function ColumnsMenu({
         onClose={close}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{ paper: { sx: { minWidth: 200 } } }}
+        slotProps={{ paper: { sx: { minWidth: sxRem(200) } } }}
       >
         <ListSubheader sx={{ px: 1.5, py: 0.75, fontSize: sxRem(12), fontWeight: 600, color: 'text.primary', lineHeight: 1.5 }}>
           {title}

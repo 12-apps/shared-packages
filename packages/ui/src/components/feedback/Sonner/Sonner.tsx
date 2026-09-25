@@ -2,7 +2,7 @@ import Box from '@mui/material/Box/index.js';
 import Portal from '@mui/material/Portal/index.js';
 import React, { createContext, useCallback, useContext, useRef,useState, useMemo } from 'react';
 
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 import type { SonnerContextType, SonnerItem,SonnerProps } from './Sonner.types';
 
@@ -182,13 +182,13 @@ const SonnerToaster: React.FC<{
       <Box
         sx={{
           position: 'fixed',
-          top: 16,
-          right: 16,
+          top: sxRem(16),
+          right: sxRem(16),
           zIndex: 9999,
           display: 'flex',
           flexDirection: 'column',
           pointerEvents: 'none',
-          maxHeight: 'calc(100vh - 32px)',
+          maxHeight: (theme) => `calc(100vh - ${rem(theme, 32)})`,
           overflowY: 'auto',
           overflowX: 'hidden' }}
       >

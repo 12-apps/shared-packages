@@ -59,10 +59,10 @@ describe('the chip strip', () => {
     const chip = styleTextOf(screen.getByTestId('settings-chip-hours'));
 
     // Drawn short…
-    expect(chip).toContain('min-height:34px');
+    expect(chip).toContain('min-height:2.125rem');
     // …and tapped at the full target, from a pseudo-element centred on the pill.
     expect(chip).toContain('::after');
-    expect(chip).toContain(`height:${TOUCH_TARGET}px`);
+    expect(chip).toContain(`height:${TOUCH_TARGET / 16}rem`);
     expect(chip).toContain('translateY(-50%)');
   });
 });

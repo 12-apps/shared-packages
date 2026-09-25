@@ -51,19 +51,19 @@ const StyledBlockquote = styled('blockquote', {
     return {
       ...baseStyles,
       padding: theme.spacing(3),
-      border: `2px solid ${alpha(colorPalette.main, 0.2)}`,
+      border: `${rem(theme, 2)} solid ${alpha(colorPalette.main, 0.2)}`,
       borderRadius: theme.shape.borderRadius * 2,
       backgroundColor: alpha(colorPalette.main, 0.03),
       '&::before': {
         content: '""',
         position: 'absolute',
-        top: -1,
-        left: -1,
-        right: -1,
-        bottom: -1,
+        top: rem(theme, -1),
+        left: rem(theme, -1),
+        right: rem(theme, -1),
+        bottom: rem(theme, -1),
         background: `linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.light})`,
         borderRadius: theme.shape.borderRadius * 2,
-        padding: '2px',
+        padding: rem(theme, 2),
         WebkitMask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
         WebkitMaskComposite: 'exclude',
         mask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
@@ -80,7 +80,7 @@ const StyledBlockquote = styled('blockquote', {
         theme.palette.mode === 'dark'
           ? alpha(theme.palette.background.paper, 0.8)
           : alpha(neutralTones(theme).canvas, 0.95),
-      backdropFilter: theme.palette.mode === 'dark' ? 'blur(10px)' : 'none',
+      backdropFilter: theme.palette.mode === 'dark' ? `blur(${rem(theme, 10)})` : 'none',
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
       borderRadius: theme.shape.borderRadius * 2,
       boxShadow: theme.palette.mode === 'dark' ? theme.shadows[4] : 'none',
@@ -92,7 +92,7 @@ const StyledBlockquote = styled('blockquote', {
   return {
     ...baseStyles,
     paddingLeft: theme.spacing(3),
-    borderLeft: `4px solid ${colorPalette.main}`,
+    borderLeft: `${rem(theme, 4)} solid ${colorPalette.main}`,
     backgroundColor: alpha(colorPalette.main, 0.05),
     padding: theme.spacing(2, 3),
     borderRadius: theme.shape.borderRadius,

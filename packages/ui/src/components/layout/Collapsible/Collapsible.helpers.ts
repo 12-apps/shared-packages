@@ -1,5 +1,7 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
+import { rem } from '../../../tokens/relative';
+
 import type { CollapsibleVariant } from './Collapsible.types';
 
 /**
@@ -73,8 +75,8 @@ export const triggerStyles = (
           : theme.palette.action.hover,
     },
     '&:focus': {
-      outline: `2px solid ${theme.palette.primary.main}`,
-      outlineOffset: 2,
+      outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
+      outlineOffset: rem(theme, 2),
     },
     '&:active': {
       backgroundColor: disabled ? 'transparent' : theme.palette.action.focus,

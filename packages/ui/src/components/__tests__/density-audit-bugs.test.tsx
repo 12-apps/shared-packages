@@ -64,9 +64,10 @@ describe('Separator margin', () => {
         </Separator>
       </>,
     );
-    expect(marginsOf(screen.getByTestId('plain'))).toEqual(['16px', '0px', '16px', '0px']);
+    // 16px through the type scale (FUT-2597): 1rem at the default 16px root.
+    expect(marginsOf(screen.getByTestId('plain'))).toEqual(['1rem', '0px', '1rem', '0px']);
     // Was 128px on all four sides: 16 read as spacing units.
-    expect(marginsOf(screen.getByTestId('labelled'))).toEqual(['16px', '0px', '16px', '0px']);
+    expect(marginsOf(screen.getByTestId('labelled'))).toEqual(['1rem', '0px', '1rem', '0px']);
   });
 
   it('puts no second margin on the rules inside the labelled row', () => {
@@ -88,7 +89,8 @@ describe('Separator margin', () => {
         ou
       </Separator>,
     );
-    expect(marginsOf(screen.getByTestId('v'))).toEqual(['0px', '8px', '0px', '8px']);
+    // 8px through the type scale: 0.5rem at the default 16px root.
+    expect(marginsOf(screen.getByTestId('v'))).toEqual(['0px', '0.5rem', '0px', '0.5rem']);
   });
 });
 

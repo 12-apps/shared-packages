@@ -42,7 +42,7 @@ export const AnimatedIcon: FC<AnimatedIconProps> = (props) => {
 
   return (
     <AnimationContainer
-      $size={config.size}
+      $size={config.ring}
       $fontSize={config.glyph}
       $animationVariant={variant}
       $duration={duration}

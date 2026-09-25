@@ -12,7 +12,7 @@ import { breadcrumbLinkStyles } from './Breadcrumbs.styles';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
 import type { BreadcrumbCopy } from '../../../copy';
 import { sheen, uiInk } from '../../../tokens/ink';
-import { rem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const BreadcrumbLink = styled(Link, {
   shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle' })<{ size?: string; active?: boolean; visualStyle?: string }>(
@@ -34,7 +34,7 @@ const BreadcrumbText = styled(Typography, {
 
   ...(visualStyle === 'glass' && {
     background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-    backdropFilter: 'blur(4px)',
+    backdropFilter: `blur(${rem(theme, 4)})`,
     border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}` }),
 
   '& .breadcrumb-icon': {
@@ -64,11 +64,11 @@ const CollapsedItemsPopover: React.FC<{
           theme.palette.mode === 'dark'
             ? alpha(uiInk(theme).glassSlate, 0.95)
             : sheen(theme, 0.95),
-        backdropFilter: 'blur(10px)',
+        backdropFilter: (theme) => `blur(${rem(theme, 10)})`,
         borderRadius: 1,
         boxShadow: 3,
         p: 1,
-        minWidth: 150 }}
+        minWidth: sxRem(150) }}
     >
       {items.map((item, index) => (
         <Box

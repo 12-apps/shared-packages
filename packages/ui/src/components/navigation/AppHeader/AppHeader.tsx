@@ -1,9 +1,10 @@
 'use client';
 
 import Box from '@mui/material/Box/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import type { AppHeaderProps } from './AppHeader.types';
@@ -15,7 +16,6 @@ const BAR_MIN_HEIGHT = { regular: 64, dense: 52 } as const;
 type Defaulted =
   | 'position'
   | 'offsetTop'
-  | 'maxWidth'
   | 'divider'
   | 'elevateOnScroll'
   | 'dense'
@@ -28,13 +28,25 @@ type ResolvedHeaderProps = AppHeaderProps & Required<Pick<AppHeaderProps, Defaul
 const HEADER_DEFAULTS: Pick<ResolvedHeaderProps, Defaulted> = {
   position: 'sticky',
   offsetTop: 0,
-  maxWidth: 1200,
   divider: true,
   elevateOnScroll: false,
   dense: false,
   disableSpacer: false,
   dataTestId: 'app-header',
 };
+
+/**
+ * The content's cap. A number is design px — or, at `≤ 1`, the fraction `sx`
+ * reads it as — and no value at all is the `lg` breakpoint (1200 at MUI's
+ * defaults), the width the bar has always stopped at.
+ */
+function contentMaxWidth(maxWidth: number | string | undefined): string | ((theme: Theme) => string) {
+  if (typeof maxWidth === 'string') return maxWidth;
+  return (theme) => {
+    const value = maxWidth ?? theme.breakpoints.values.lg;
+    return value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value);
+  };
+}
 
 /**
  * Watch the document scroll so a lifted bar can cast a shadow only once there
@@ -97,7 +109,7 @@ function surfaceSx({
 }): Record<string, unknown> {
   return {
     position,
-    ...(position === 'static' ? {} : { top: offsetTop, zIndex: 'appBar' }),
+    ...(position === 'static' ? {} : { top: typeof offsetTop === 'number' ? sxRem(offsetTop) : offsetTop, zIndex: 'appBar' }),
     ...(position === 'fixed' ? { left: 0, right: 0 } : {}),
     backgroundColor: 'background.paper',
     borderBottom: divider ? 1 : 0,
@@ -199,13 +211,13 @@ export const AppHeader: React.FC<AppHeaderProps> = (props) => {
         data-testid={dataTestId}
         sx={surfaceSx({ position, offsetTop, divider, scrolled })}
       >
-        <Box sx={{ maxWidth, mx: 'auto', px: { xs: 2, md: 3 } }}>
+        <Box sx={{ maxWidth: contentMaxWidth(maxWidth), mx: 'auto', px: { xs: 2, md: 3 } }}>
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
               gap: { xs: 1, md: 2 },
-              minHeight: dense ? BAR_MIN_HEIGHT.dense : BAR_MIN_HEIGHT.regular,
+              minHeight: sxRem(dense ? BAR_MIN_HEIGHT.dense : BAR_MIN_HEIGHT.regular),
               py: 1,
             }}
           >

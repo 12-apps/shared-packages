@@ -23,15 +23,15 @@ import {
 } from './AnimatedIcon.animations';
 import type { AnimationSize, AnimationVariant } from './AnimatedIcon.types';
 import { neutralTones, shadowInk, sheen } from '../../../tokens/ink';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
 /** Per size: the ring's edge and the glyph's edge (its font size, width and height), in design px. */
-export const sizeConfigs: Record<AnimationSize, { size: number; glyph: number }> = {
-  xs: { size: 12, glyph: 10 },
-  sm: { size: 24, glyph: 20 },
-  md: { size: 32, glyph: 28 },
-  lg: { size: 48, glyph: 44 },
-  xl: { size: 64, glyph: 60 },
+export const sizeConfigs: Record<AnimationSize, { ring: number; glyph: number }> = {
+  xs: { ring: 12, glyph: 10 },
+  sm: { ring: 24, glyph: 20 },
+  md: { ring: 32, glyph: 28 },
+  lg: { ring: 48, glyph: 44 },
+  xl: { ring: 64, glyph: 60 },
 };
 
 /**
@@ -40,26 +40,27 @@ export const sizeConfigs: Record<AnimationSize, { size: number; glyph: number }>
  * tabulated. `scale` multiplies the caller's duration for the variants that
  * read as slower than the rest.
  */
-const ANIMATIONS: Record<string, { keyframes: string; easing: string; scale: number }> = {
-  rotate: { keyframes: `${rotateAnimation}`, easing: 'linear', scale: 1 },
-  pulse: { keyframes: `${pulseAnimation}`, easing: 'ease-in-out', scale: 1 },
-  translate: { keyframes: `${translateAnimation}`, easing: 'ease-in-out', scale: 1 },
-  bounce: { keyframes: `${bounceAnimation}`, easing: 'ease-in-out', scale: 1 },
-  shake: { keyframes: `${shakeAnimation}`, easing: 'ease-in-out', scale: 1 },
-  flip: { keyframes: `${flipAnimation}`, easing: 'ease-in-out', scale: 1 },
-  spin: { keyframes: `${spinAnimation}`, easing: 'ease-in-out', scale: 1 },
-  fadeInOut: { keyframes: `${fadeInOutAnimation}`, easing: 'ease-in-out', scale: 1 },
-  heartbeat: { keyframes: `${heartbeatAnimation}`, easing: 'ease-in-out', scale: 1 },
-  wobble: { keyframes: `${wobbleAnimation}`, easing: 'ease-in-out', scale: 1 },
-  morph: { keyframes: `${morphAnimation}`, easing: 'ease-in-out', scale: 1 },
-  swing: { keyframes: `${swingAnimation}`, easing: 'ease-in-out', scale: 1 },
-  jello: { keyframes: `${jelloAnimation}`, easing: 'ease-in-out', scale: 1 },
-  float: { keyframes: `${floatAnimation}`, easing: 'ease-in-out', scale: 2 },
-  neonFlicker: { keyframes: `${neonFlickerAnimation}`, easing: 'ease-in-out', scale: 2 },
-  breathe: { keyframes: `${breatheAnimation}`, easing: 'ease-in-out', scale: 1.5 },
+const ANIMATIONS: Record<string, { keyframes: (theme: Theme) => string; easing: string; scale: number }> = {
+  rotate: { keyframes: () => `${rotateAnimation}`, easing: 'linear', scale: 1 },
+  pulse: { keyframes: () => `${pulseAnimation}`, easing: 'ease-in-out', scale: 1 },
+  translate: { keyframes: (theme) => `${translateAnimation(theme)}`, easing: 'ease-in-out', scale: 1 },
+  bounce: { keyframes: (theme) => `${bounceAnimation(theme)}`, easing: 'ease-in-out', scale: 1 },
+  shake: { keyframes: (theme) => `${shakeAnimation(theme)}`, easing: 'ease-in-out', scale: 1 },
+  flip: { keyframes: (theme) => `${flipAnimation(theme)}`, easing: 'ease-in-out', scale: 1 },
+  spin: { keyframes: () => `${spinAnimation}`, easing: 'ease-in-out', scale: 1 },
+  fadeInOut: { keyframes: () => `${fadeInOutAnimation}`, easing: 'ease-in-out', scale: 1 },
+  heartbeat: { keyframes: () => `${heartbeatAnimation}`, easing: 'ease-in-out', scale: 1 },
+  wobble: { keyframes: (theme) => `${wobbleAnimation(theme)}`, easing: 'ease-in-out', scale: 1 },
+  morph: { keyframes: () => `${morphAnimation}`, easing: 'ease-in-out', scale: 1 },
+  swing: { keyframes: () => `${swingAnimation}`, easing: 'ease-in-out', scale: 1 },
+  jello: { keyframes: () => `${jelloAnimation}`, easing: 'ease-in-out', scale: 1 },
+  float: { keyframes: (theme) => `${floatAnimation(theme)}`, easing: 'ease-in-out', scale: 2 },
+  neonFlicker: { keyframes: (theme) => `${neonFlickerAnimation(theme)}`, easing: 'ease-in-out', scale: 2 },
+  breathe: { keyframes: () => `${breatheAnimation}`, easing: 'ease-in-out', scale: 1.5 },
 };
 
 const animationFor = (
+  theme: Theme,
   variant: AnimationVariant,
   duration: number,
   delay: number,
@@ -69,14 +70,14 @@ const animationFor = (
   if (!spec) return 'none';
 
   const iterationCount = loop ? 'infinite' : '1';
-  return `${spec.keyframes} ${duration * spec.scale}s ${spec.easing} ${iterationCount} ${delay > 0 ? `${delay}s` : '0s'}`;
+  return `${spec.keyframes(theme)} ${duration * spec.scale}s ${spec.easing} ${iterationCount} ${delay > 0 ? `${delay}s` : '0s'}`;
 };
 
 const SHADOWS: Record<string, (theme: Theme) => string> = {
-  soft: (theme) => `0 4px 20px ${shadowInk(theme, 0.15)}`,
-  hard: (theme) => `4px 4px 0px ${shadowInk(theme, 0.25)}`,
+  soft: (theme) => `0 ${rems(theme, 4, 20)} ${shadowInk(theme, 0.15)}`,
+  hard: (theme) => `${rems(theme, 4, 4)} 0px ${shadowInk(theme, 0.25)}`,
   elevated: (theme) =>
-    `0 10px 40px ${shadowInk(theme, 0.2)}, 0 2px 10px ${shadowInk(theme, 0.1)}`,
+    `0 ${rems(theme, 10, 40)} ${shadowInk(theme, 0.2)}, 0 ${rems(theme, 2, 10)} ${shadowInk(theme, 0.1)}`,
 };
 
 export interface IconStyleFlags {
@@ -114,9 +115,9 @@ const effectStyles = (
   return {
     ...($glass && {
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.2)}, ${alpha(theme.palette.background.paper, 0.1)})`,
-      backdropFilter: 'blur(10px)',
+      backdropFilter: `blur(${rem(theme, 10)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-      boxShadow: `inset 0 1px 1px ${sheen(theme, 0.3)}, 0 8px 32px ${shadowInk(theme, 0.1)}`,
+      boxShadow: `inset 0 ${rems(theme, 1, 1)} ${sheen(theme, 0.3)}, 0 ${rems(theme, 8, 32)} ${shadowInk(theme, 0.1)}`,
     }),
     ...($metallic && {
       background: `linear-gradient(145deg,
@@ -127,9 +128,9 @@ const effectStyles = (
       ${neutralTones(theme).subtle} 100%)`,
       backgroundSize: '200% 200%',
       animation: `${animation}, ${breatheAnimation} 4s ease-in-out infinite`,
-      boxShadow: `inset 0 2px 4px ${sheen(theme, 0.5)},
-                inset 0 -2px 4px ${shadowInk(theme, 0.3)},
-                0 4px 8px ${shadowInk(theme, 0.2)}`,
+      boxShadow: `inset 0 ${rems(theme, 2, 4)} ${sheen(theme, 0.5)},
+                inset 0 ${rems(theme, -2, 4)} ${shadowInk(theme, 0.3)},
+                0 ${rems(theme, 4, 8)} ${shadowInk(theme, 0.2)}`,
     }),
     ...($gradient && {
       background: `linear-gradient(135deg,
@@ -140,9 +141,9 @@ const effectStyles = (
     }),
     ...($neon && {
       color,
-      textShadow: `0 0 10px ${color}, 0 0 20px ${color}, 0 0 30px ${color}`,
+      textShadow: `0 0 ${rem(theme, 10)} ${color}, 0 0 ${rem(theme, 20)} ${color}, 0 0 ${rem(theme, 30)} ${color}`,
       filter: `brightness(1.2) contrast(1.2)`,
-      animation: `${animation}, ${neonFlickerAnimation} 3s ease-in-out infinite`,
+      animation: `${animation}, ${neonFlickerAnimation(theme)} 3s ease-in-out infinite`,
     }),
     ...($holographic && {
       background: `linear-gradient(45deg,
@@ -152,7 +153,7 @@ const effectStyles = (
       ${theme.palette.warning.main} 75%,
       ${theme.palette.primary.main} 100%)`,
       backgroundSize: '400% 400%',
-      animation: `${animation}, ${floatAnimation} 6s ease-in-out infinite`,
+      animation: `${animation}, ${floatAnimation(theme)} 6s ease-in-out infinite`,
       backgroundClip: 'text',
       WebkitBackgroundClip: 'text',
       WebkitTextFillColor: 'transparent',
@@ -164,10 +165,10 @@ const effectStyles = (
       '&::before': {
         content: '""',
         position: 'absolute' as const,
-        inset: -2,
+        inset: rem(theme, -2),
         borderRadius: '50%',
         background: 'inherit',
-        filter: 'blur(10px)',
+        filter: `blur(${rem(theme, 10)})`,
         opacity: 0.5,
         zIndex: -1,
       },
@@ -183,18 +184,22 @@ export const iconSx = (theme: Theme, flags: IconStyleFlags): CSSObject => {
 
   const color = $customColor || theme.palette.primary.main;
   const glowColor = $glowColor || color;
-  const animation = animationFor($animationVariant, $duration, $delay, $loop);
+  const animation = animationFor(theme, $animationVariant, $duration, $delay, $loop);
 
   // Both selectors size the same glyph — MUI icons render an MuiSvgIcon-root,
   // a bare child renders an svg.
-  const glyphSize = { fontSize: rem(theme, $fontSize), width: $fontSize, height: $fontSize };
+  const glyphSize = {
+    fontSize: rem(theme, $fontSize),
+    width: rem(theme, $fontSize),
+    height: rem(theme, $fontSize),
+  };
 
   return {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: $size,
-    height: $size,
+    width: rem(theme, $size),
+    height: rem(theme, $size),
     color,
     animation,
     position: 'relative' as const,
@@ -206,13 +211,13 @@ export const iconSx = (theme: Theme, flags: IconStyleFlags): CSSObject => {
       '&::before': {
         content: '""',
         position: 'absolute' as const,
-        inset: -8,
+        inset: rem(theme, -8),
         borderRadius: '50%',
         background: `radial-gradient(circle, ${alpha(glowColor, 0.3)} 0%, transparent 70%)`,
-        animation: `${glowPulseAnimation} ${$duration * 1.2}s ease-in-out infinite`,
+        animation: `${glowPulseAnimation(theme)} ${$duration * 1.2}s ease-in-out infinite`,
         zIndex: -1,
       },
-      filter: `drop-shadow(0 0 8px ${alpha(glowColor, 0.5)})`,
+      filter: `drop-shadow(0 0 ${rem(theme, 8)} ${alpha(glowColor, 0.5)})`,
     }),
     ...effectStyles(theme, flags, animation, color),
     ...($ripple && {
@@ -221,7 +226,7 @@ export const iconSx = (theme: Theme, flags: IconStyleFlags): CSSObject => {
         position: 'absolute' as const,
         inset: 0,
         borderRadius: '50%',
-        border: `2px solid ${color}`,
+        border: `${rem(theme, 2)} solid ${color}`,
         animation: `${rippleAnimation} ${$duration * 1.5}s ease-out infinite`,
       },
     }),

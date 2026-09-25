@@ -23,8 +23,8 @@ function markSx(
   { edge, round, showLogo, seed }: { edge: number; round: boolean; showLogo: boolean; seed: string },
 ): Record<string, unknown> {
   return {
-    width: edge,
-    height: edge,
+    width: rem(theme, edge),
+    height: rem(theme, edge),
     flex: '0 0 auto',
     overflow: 'hidden',
     borderRadius: round ? '50%' : '30%',

@@ -17,19 +17,20 @@ import {
   neumorphicShadows,
 } from './Card.metrics';
 import { neutralTones, shadowInk, sheen } from '../../../tokens/ink';
-import { shadowCss, shadowListCss } from '../../../tokens/shadow';
+import { rem, rems } from '../../../tokens/relative';
+import type { UiShadow } from '../../../tokens/shadow';
 
 type BorderRadius = CardBorderRadius;
 
 // Define pulse animation. The 15px spread and the 2s period are the shared
 // metrics, so the native ring grows by exactly as much for exactly as long.
-const pulseAnimation = keyframes`
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 ${CARD_PULSE.spread}px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, CARD_PULSE.spread)} currentColor;
     opacity: 0;
   }
   100% {
@@ -38,11 +39,20 @@ const pulseAnimation = keyframes`
   }
 `;
 
-const borderRadiusFor = (theme: Theme, radius: BorderRadius): number | string => {
+/**
+ * A shared-metrics shadow as CSS, every length through the type scale: the text
+ * `shadowCss` writes (a bare `0`, no zero spread) with rem in place of px.
+ */
+const shadowRem = (theme: Theme, shadow: UiShadow): string => {
+  const spread = shadow.spreadDistance === 0 ? [] : [shadow.spreadDistance];
+  return `${rems(theme, shadow.offsetX, shadow.offsetY, shadow.blurRadius, ...spread)} ${shadow.color}`;
+};
+
+const borderRadiusFor = (theme: Theme, radius: BorderRadius): string => {
   if (radius === 'full') return CARD_RADIUS_FULL;
   const units = CARD_RADIUS_UNITS[radius] ?? CARD_RADIUS_UNITS.md;
   // `none` is a bare 0 rather than `spacing(0)`, as this has always written it.
-  return units === 0 ? 0 : theme.spacing(units);
+  return units === 0 ? '0' : theme.spacing(units);
 };
 
 const pulseSurface = (theme: Theme): CSSObject => ({
@@ -58,7 +68,7 @@ const pulseSurface = (theme: Theme): CSSObject => ({
     borderRadius: 'inherit',
     backgroundColor: theme.palette.primary.main,
     opacity: CARD_PULSE.alpha,
-    animation: `${pulseAnimation} ${CARD_PULSE.durationMs / 1000}s infinite`,
+    animation: `${pulseAnimation(theme)} ${CARD_PULSE.durationMs / 1000}s infinite`,
     pointerEvents: 'none',
     zIndex: CARD_PULSE.zIndex,
   },
@@ -77,7 +87,7 @@ const neumorphicShadow = (theme: Theme, lifted: boolean): string => {
           sheen(theme, lifted ? light.far.lifted : light.far.rest),
         ];
 
-  return shadowListCss(neumorphicShadows(lifted, near, far));
+  return neumorphicShadows(lifted, near, far).map((shadow) => shadowRem(theme, shadow)).join(', ');
 };
 
 const sectionBackground = (theme: Theme, lifted: boolean): string => {
@@ -87,13 +97,7 @@ const sectionBackground = (theme: Theme, lifted: boolean): string => {
 
 const glowShadow = (theme: Theme, lifted: boolean): string => {
   const { blurRadius, alpha: opacity } = lifted ? CARD_GLOW.lifted : CARD_GLOW.rest;
-  return shadowCss({
-    offsetX: 0,
-    offsetY: 0,
-    blurRadius,
-    spreadDistance: 0,
-    color: alpha(theme.palette.primary.main, opacity),
-  });
+  return `${rems(theme, 0, 0, blurRadius)} ${alpha(theme.palette.primary.main, opacity)}`;
 };
 
 interface Surface {
@@ -121,15 +125,9 @@ const VARIANT_SURFACES: Record<CardVariant, (theme: Theme, lifted: boolean) => S
   glass: (theme, lifted) => ({
     surface: {
       backgroundColor: alpha(theme.palette.background.paper, CARD_GLASS.backgroundAlpha.rest),
-      backdropFilter: `blur(${CARD_GLASS.blurPx}px)`,
+      backdropFilter: `blur(${rem(theme, CARD_GLASS.blurPx)})`,
       border: `${CARD_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, CARD_GLASS.borderAlpha.rest)}`,
-      boxShadow: shadowCss({
-        offsetX: 0,
-        offsetY: CARD_GLASS.shadow.offsetY,
-        blurRadius: CARD_GLASS.shadow.blurRadius,
-        spreadDistance: 0,
-        color: shadowInk(theme, CARD_GLASS.shadow.alpha),
-      }),
+      boxShadow: `${rems(theme, 0, CARD_GLASS.shadow.offsetY, CARD_GLASS.shadow.blurRadius)} ${shadowInk(theme, CARD_GLASS.shadow.alpha)}`,
     },
     hover: {
       backgroundColor: alpha(
@@ -143,13 +141,7 @@ const VARIANT_SURFACES: Record<CardVariant, (theme: Theme, lifted: boolean) => S
     surface: {
       background: cardGradient(theme, false),
       color: theme.palette.primary.contrastText,
-      boxShadow: shadowCss({
-        offsetX: 0,
-        offsetY: CARD_GRADIENT.shadow.offsetY,
-        blurRadius: CARD_GRADIENT.shadow.blurRadius,
-        spreadDistance: 0,
-        color: alpha(theme.palette.primary.main, CARD_GRADIENT.shadow.alpha),
-      }),
+      boxShadow: `${rems(theme, 0, CARD_GRADIENT.shadow.offsetY, CARD_GRADIENT.shadow.blurRadius)} ${alpha(theme.palette.primary.main, CARD_GRADIENT.shadow.alpha)}`,
     },
     hover: { background: cardGradient(theme, lifted) },
   }),
@@ -215,7 +207,7 @@ export const cardStyles = (
     ...(pulse && pulseSurface(theme)),
     ...chosen.surface,
     '&:hover': {
-      ...(interactive && { transform: `translateY(-${CARD_INTERACTIVE_LIFT}px)` }),
+      ...(interactive && { transform: `translateY(${rem(theme, -CARD_INTERACTIVE_LIFT)})` }),
       ...(glow && { boxShadow: glowShadow(theme, true) }),
       ...chosen.hover,
     },

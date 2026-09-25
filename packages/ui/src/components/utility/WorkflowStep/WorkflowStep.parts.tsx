@@ -23,7 +23,7 @@ const indicatorVariantStyles = (
 ): CSSObject => {
   if (variant === 'outlined') {
     return {
-      border: `2px solid ${borderColor}`,
+      border: `${rem(theme, 2)} solid ${borderColor}`,
       backgroundColor: theme.palette.background.paper,
     };
   }
@@ -79,8 +79,8 @@ const StepIndicator = styled(Box, {
   });
 
   return {
-    width: indicatorSize,
-    height: indicatorSize,
+    width: rem(theme, indicatorSize),
+    height: rem(theme, indicatorSize),
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
@@ -104,8 +104,8 @@ const StepIndicator = styled(Box, {
         boxShadow: theme.shadows[2],
       },
       '&:focus-visible': {
-        outline: `2px solid ${palette.main}`,
-        outlineOffset: '2px',
+        outline: `${rem(theme, 2)} solid ${palette.main}`,
+        outlineOffset: rem(theme, 2),
       },
     }),
 
@@ -178,14 +178,14 @@ const StepConnector = styled(Box, {
     position: 'relative',
     
     ...(orientation === 'horizontal' && {
-      height: '2px',
+      height: rem(theme, 2),
       backgroundColor: connectorColor,
       margin: `0 ${theme.spacing(1)}`,
       minWidth: theme.spacing(2),
     }),
     
     ...(orientation === 'vertical' && {
-      width: '2px',
+      width: rem(theme, 2),
       backgroundColor: connectorColor,
       minHeight: theme.spacing(3),
       marginLeft: theme.spacing(2),

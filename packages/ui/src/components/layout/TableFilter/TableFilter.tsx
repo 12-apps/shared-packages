@@ -27,7 +27,8 @@ import type {
 import { fieldTextFieldStyles } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
 
-const PANEL_WIDTH = 280;
+/** The open panel's width, 280 design px through the type scale. */
+const PANEL_WIDTH = sxRem(280);
 
 /**
  * Compound filter-panel system, MUI port of the reference `TableFilter`. Provides

@@ -18,10 +18,11 @@ export const Separator: React.FC<SeparatorProps> = ({
   'data-testid': dataTestId,
 }) => {
   const theme = useTheme();
-  const styles = separatorStyles(theme, { variant, orientation, size, color, margin, length });
+  const isHorizontal = orientation === 'horizontal';
+  const blockMargin = separatorBlockMargin(theme, size, margin, isHorizontal);
+  const styles = separatorStyles(theme, { variant, orientation, size, color, blockMargin, length });
 
   if (children) {
-    const isHorizontal = orientation === 'horizontal';
     // The rules either side of the label sit INSIDE the row, which carries the
     // margin; their own would add it a second time.
     const ruleStyles = { ...styles, margin: 0 };
@@ -36,7 +37,7 @@ export const Separator: React.FC<SeparatorProps> = ({
         sx={{
           display: 'flex',
           alignItems: 'center',
-          margin: separatorBlockMargin(size, margin, isHorizontal),
+          margin: blockMargin,
           flexDirection: isHorizontal ? 'row' : 'column',
           gap: theme.spacing(2),
         }}

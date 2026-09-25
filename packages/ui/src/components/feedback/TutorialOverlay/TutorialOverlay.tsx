@@ -4,35 +4,37 @@ import LinearProgress from '@mui/material/LinearProgress/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Portal from '@mui/material/Portal/index.js';
 import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import type { FC} from 'react';
 import React, {  } from 'react';
 
 import { scrim, sheen } from '../../../tokens/ink';
 import { ABSOLUTE_INK } from '../../../tokens/ink.core';
+import { rem, remPx, rems } from '../../../tokens/relative';
 
 import { useTutorialOverlay } from './TutorialOverlay.hooks';
 import { TutorialStepBody } from './TutorialStepBody';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 
-// Animation keyframes — static, so the ring's sheen is the absolute white.
-const pulseAnimation = keyframes`
+// Animation keyframes — the ring's sheen is the absolute white; its reach follows the type scale.
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 ${alpha(ABSOLUTE_INK.white, 0.7)};
   }
   70% {
-    box-shadow: 0 0 0 20px ${alpha(ABSOLUTE_INK.white, 0)};
+    box-shadow: 0 0 0 ${rem(theme, 20)} ${alpha(ABSOLUTE_INK.white, 0)};
   }
   100% {
     box-shadow: 0 0 0 0 ${alpha(ABSOLUTE_INK.white, 0)};
   }
 `;
 
-const floatAnimation = keyframes`
+const floatAnimation = (theme: Theme) => keyframes`
   0%, 100% {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-10px);
+    transform: translateY(${rem(theme, -10)});
   }
 `;
 
@@ -55,70 +57,74 @@ const Backdrop = styled(Box)(({ theme }) => ({
   right: 0,
   bottom: 0,
   background: scrim(theme, 0.7),
-  backdropFilter: 'blur(2px)' }));
+  backdropFilter: `blur(${rem(theme, 2)})` }));
 
 const Spotlight = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding' })<{ bounds: globalThis.DOMRect; padding: number }>(({ theme, bounds, padding }) => ({
-  position: 'absolute',
-  top: bounds.top - padding,
-  left: bounds.left - padding,
-  width: bounds.width + padding * 2,
-  height: bounds.height + padding * 2,
-  borderRadius: 8,
-  border: `2px solid ${sheen(theme, 0.5)}`,
-  animation: `${pulseAnimation} 2s infinite`,
-  pointerEvents: 'none',
-  '&::before': {
-    content: '""',
+  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding' })<{ bounds: globalThis.DOMRect; padding: number }>(({ theme, bounds, padding }) => {
+  // `bounds` is the target's measured rect; the design-px clearance joins it as px.
+  const clearance = remPx(theme, padding);
+  return {
     position: 'absolute',
-    inset: -2,
-    borderRadius: 8,
-    background: 'transparent',
-    boxShadow: `0 0 0 9999px ${scrim(theme, 0.7)}` } }));
+    top: bounds.top - clearance,
+    left: bounds.left - clearance,
+    width: bounds.width + clearance * 2,
+    height: bounds.height + clearance * 2,
+    borderRadius: rem(theme, 8),
+    border: `${rem(theme, 2)} solid ${sheen(theme, 0.5)}`,
+    animation: `${pulseAnimation(theme)} 2s infinite`,
+    pointerEvents: 'none',
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      inset: rem(theme, -2),
+      borderRadius: rem(theme, 8),
+      background: 'transparent',
+      boxShadow: `${rems(theme, 0, 0, 0, 9999)} ${scrim(theme, 0.7)}` } };
+});
 
 const TooltipContainer = styled(Paper, {
   shouldForwardProp: (prop) => prop !== 'placement' })<{ placement: string }>(({ theme, placement }) => ({
   position: 'absolute',
-  maxWidth: 360,
+  maxWidth: rem(theme, 360),
   padding: theme.spacing(3),
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  backdropFilter: `blur(${rem(theme, 20)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 20)})`,
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   boxShadow: theme.shadows[12],
-  animation: `${floatAnimation} 3s ease-in-out infinite`,
+  animation: `${floatAnimation(theme)} 3s ease-in-out infinite`,
   pointerEvents: 'auto',
   zIndex: theme.zIndex.modal + 101,
   '&::before': {
     content: '""',
     position: 'absolute',
-    width: 12,
-    height: 12,
+    width: rem(theme, 12),
+    height: rem(theme, 12),
     background: 'inherit',
     transform: 'rotate(45deg)',
     border: 'inherit',
     ...(placement === 'top' && {
-      bottom: -7,
+      bottom: rem(theme, -7),
       left: '50%',
-      marginLeft: -6,
+      marginLeft: rem(theme, -6),
       borderTop: 'none',
       borderLeft: 'none' }),
     ...(placement === 'bottom' && {
-      top: -7,
+      top: rem(theme, -7),
       left: '50%',
-      marginLeft: -6,
+      marginLeft: rem(theme, -6),
       borderBottom: 'none',
       borderRight: 'none' }),
     ...(placement === 'left' && {
-      right: -7,
+      right: rem(theme, -7),
       top: '50%',
-      marginTop: -6,
+      marginTop: rem(theme, -6),
       borderLeft: 'none',
       borderBottom: 'none' }),
     ...(placement === 'right' && {
-      left: -7,
+      left: rem(theme, -7),
       top: '50%',
-      marginTop: -6,
+      marginTop: rem(theme, -6),
       borderRight: 'none',
       borderTop: 'none' }) } }));
 
@@ -127,7 +133,7 @@ const ProgressBar = styled(LinearProgress)(({ theme }) => ({
   top: 0,
   left: 0,
   right: 0,
-  height: 4,
+  height: rem(theme, 4),
   zIndex: theme.zIndex.modal + 102,
   '& .MuiLinearProgress-bar': {
     background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)` } }));

@@ -12,16 +12,21 @@ import { Separator } from '../components/layout/Separator';
 import type { SocialLoginCopy } from '../copy/form';
 import { EN_US_SOCIAL_LOGIN_COPY } from '../en-US.form';
 import { uiInk, type UiInk } from '../tokens/ink';
+import { rem, sxRem } from '../tokens/relative';
 
 export type SocialProvider = 'google' | 'facebook' | 'apple';
+
+/** A provider logo's box: 20 design px square, through the type scale. */
+const logoStyle = (theme: Theme): React.CSSProperties => ({ width: rem(theme, 20), height: rem(theme, 20) });
 
 /**
  * SVG Icons for social providers
  */
 const GoogleIcon = (): React.ReactElement => {
-  const logo = uiInk(useTheme()).socialBrand.googleLogo;
+  const theme = useTheme();
+  const logo = uiInk(theme).socialBrand.googleLogo;
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg style={logoStyle(theme)} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
         fill={logo.blue}
@@ -43,9 +48,10 @@ const GoogleIcon = (): React.ReactElement => {
 };
 
 const FacebookIcon = (): React.ReactElement => {
-  const { logo } = uiInk(useTheme()).socialBrand.facebook;
+  const theme = useTheme();
+  const { logo } = uiInk(theme).socialBrand.facebook;
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg style={logoStyle(theme)} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
         d="M24 12c0-6.627-5.373-12-12-12S0 5.373 0 12c0 5.99 4.388 10.954 10.125 11.854V15.47H7.078V12h3.047V9.356c0-3.007 1.792-4.668 4.533-4.668 1.312 0 2.686.234 2.686.234v2.953H15.83c-1.491 0-1.956.925-1.956 1.874V12h3.328l-.532 3.469h-2.796v8.385C19.612 22.954 24 17.99 24 12z"
         fill={logo}
@@ -55,7 +61,7 @@ const FacebookIcon = (): React.ReactElement => {
 };
 
 const AppleIcon = (): React.ReactElement => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+  <svg style={logoStyle(useTheme())} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
     <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
   </svg>
 );
@@ -241,7 +247,7 @@ export const SocialLoginButton = React.forwardRef<HTMLButtonElement, SocialLogin
         fullWidth={fullWidth}
         {...(iconOnly ? { 'aria-label': label, title: label } : {})}
         sx={{
-          minHeight: 48,
+          minHeight: sxRem(48),
           justifyContent: 'flex-start',
           gap: 2,
           ...(iconOnly ? ICON_ONLY_SX : {}),
@@ -276,14 +282,25 @@ export interface SocialLoginContainerProps {
   maxWidth?: number | string;
 }
 
+/**
+ * The card's cap as CSS. `sx` reads a number of 1 or less as a fraction of the
+ * parent, and that stays so; any other number is design px, through the type
+ * scale; a string is as given.
+ */
+function cardMaxWidth(theme: Theme, value: number | string): string {
+  if (typeof value !== 'number') return value;
+  return value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value);
+}
+
 export function SocialLoginContainer({
   children,
   title = "Sign in to continue",
   subtitle,
   showDivider = false,
   dividerText = "or",
-  maxWidth = 400,
+  maxWidth,
 }: SocialLoginContainerProps): React.ReactElement {
+  const theme = useTheme();
   return (
     // `width: 100%` is what makes the cap below mean anything. Every caller
     // centres this card in a flex column (`Container variant="centered"` does),
@@ -291,7 +308,7 @@ export function SocialLoginContainer({
     // card sat at whatever the longest label happened to need, ~267px, at every
     // viewport from 390 to 1280. The 400 was never reached, which is why raising
     // it would have changed nothing; the card had no width to cap.
-    <Card variant="elevated" borderRadius="lg" sx={{ width: '100%', maxWidth }}>
+    <Card variant="elevated" borderRadius="lg" sx={{ width: '100%', maxWidth: cardMaxWidth(theme, maxWidth ?? 400) }}>
       <CardContent>
         <Stack spacing={3} sx={{ width: '100%' }}>
           {title && (

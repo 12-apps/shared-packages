@@ -1,6 +1,7 @@
 import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { scrim } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 import { dynamicViewportHeight } from '../../../utils/viewport';
 import type { ModalPanelRole, PanelMaxWidth } from './StackedModal.types';
 
@@ -53,14 +54,14 @@ const cap = (customMaxWidth?: PanelMaxWidth): number | null =>
   customMaxWidth ? MAX_WIDTH_PX[customMaxWidth] : null;
 
 /** One breakpoint's width: the viewport share, held under the optional px cap. */
-const panelWidth = (share: string, capPx: number | null): CSSObject =>
+const panelWidth = (theme: Theme, share: string, capPx: number | null): CSSObject =>
   capPx
-    ? { width: `min(${share}, ${capPx}px)`, maxWidth: `${capPx}px` }
+    ? { width: `min(${share}, ${rem(theme, capPx)})`, maxWidth: rem(theme, capPx) }
     : { width: share, maxWidth: share };
 
 const backdropStyles = (theme: Theme, modalRole?: ModalPanelRole): CSSObject => ({
   backgroundColor: scrim(theme, (modalRole && BACKDROP_ALPHA_BY_ROLE[modalRole]) ?? 0.5),
-  backdropFilter: modalRole === 'primary' ? 'blur(4px)' : 'none',
+  backdropFilter: modalRole === 'primary' ? `blur(${rem(theme, 4)})` : 'none',
 });
 
 /**
@@ -71,10 +72,11 @@ const backdropStyles = (theme: Theme, modalRole?: ModalPanelRole): CSSObject => 
  * prop, when given, caps it further.
  */
 const primaryPanelStyles = (theme: Theme, capPx: number | null): CSSObject => ({
-  [theme.breakpoints.down('sm')]: panelWidth('100%', capPx),
-  [theme.breakpoints.between('sm', 'lg')]: panelWidth('80vw', capPx),
-  [theme.breakpoints.up('lg')]: panelWidth('60vw', capPx),
-  '@media (min-width:2200px)': panelWidth('40vw', capPx),
+  [theme.breakpoints.down('sm')]: panelWidth(theme, '100%', capPx),
+  [theme.breakpoints.between('sm', 'lg')]: panelWidth(theme, '80vw', capPx),
+  [theme.breakpoints.up('lg')]: panelWidth(theme, '60vw', capPx),
+  // A viewport width, in the theme's breakpoint unit like the three above.
+  [theme.breakpoints.up(2200)]: panelWidth(theme, '40vw', capPx),
 });
 
 /** Panels below the top one expand to full width, producing the GTM stacking effect. */
@@ -101,8 +103,8 @@ const glassStyles = (theme: Theme, glass?: boolean, role?: ModalPanelRole): CSSO
   glass && role === 'primary'
     ? {
         backgroundColor: alpha(theme.palette.background.paper, 0.85),
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
+        backdropFilter: `blur(${rem(theme, 10)})`,
+        WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
         border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
       }
     : {};

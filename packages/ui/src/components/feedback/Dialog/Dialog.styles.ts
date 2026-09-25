@@ -15,7 +15,7 @@ import {
   DIALOG_WIDTH_PERCENT,
 } from './Dialog.metrics';
 import { scrim, shadowInk } from '../../../tokens/ink';
-import { shadowCss } from '../../../tokens/shadow';
+import { rem, rems } from '../../../tokens/relative';
 import { dynamicViewportHeight } from '../../../utils/viewport';
 
 /**
@@ -26,14 +26,14 @@ import { dynamicViewportHeight } from '../../../utils/viewport';
  * too — so a paper cannot be 800px wide on one side and 780 on the other.
  */
 
-// Define pulse animation
-const pulseAnimation = keyframes`
+// Define pulse animation — a function of the theme so the ring's spread follows the type scale.
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 ${DIALOG_PULSE.spread}px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, DIALOG_PULSE.spread)} currentColor;
     opacity: 0;
   }
   100% {
@@ -56,17 +56,17 @@ interface VariantStyleOptions {
 function borderRadiusOf(theme: Theme, borderRadius: VariantStyleOptions['borderRadius']) {
   const units = DIALOG_RADIUS_UNITS[borderRadius] ?? DIALOG_RADIUS_UNITS.lg;
   // `none` is a bare 0 rather than `spacing(0)`, as this has always written it.
-  return units === 0 ? 0 : theme.spacing(units);
+  return units === 0 ? '0' : theme.spacing(units);
 }
 
-function maxWidthOf(size: VariantStyleOptions['size']): number {
-  return DIALOG_MAX_WIDTH[size] ?? DIALOG_MAX_WIDTH.md;
+function maxWidthOf(theme: Theme, size: VariantStyleOptions['size']): string {
+  return rem(theme, DIALOG_MAX_WIDTH[size] ?? DIALOG_MAX_WIDTH.md);
 }
 
 function baseStylesOf(theme: Theme, opts: VariantStyleOptions) {
   return {
     borderRadius: borderRadiusOf(theme, opts.borderRadius),
-    maxWidth: maxWidthOf(opts.size),
+    maxWidth: maxWidthOf(theme, opts.size),
     width: `${DIALOG_WIDTH_PERCENT}vw`,
     margin: theme.spacing(DIALOG_MARGIN_UNITS),
     transition: theme.transitions.create(
@@ -79,13 +79,7 @@ function baseStylesOf(theme: Theme, opts: VariantStyleOptions) {
 function glowStylesOf(theme: Theme, glow: boolean) {
   return glow
     ? {
-        boxShadow: shadowCss({
-          offsetX: 0,
-          offsetY: 0,
-          blurRadius: DIALOG_GLOW.blurRadius,
-          spreadDistance: 0,
-          color: alpha(theme.palette.primary.main, DIALOG_GLOW.alpha),
-        }),
+        boxShadow: `${rems(theme, 0, 0, DIALOG_GLOW.blurRadius)} ${alpha(theme.palette.primary.main, DIALOG_GLOW.alpha)}`,
       }
     : {};
 }
@@ -104,7 +98,7 @@ function pulseStylesOf(theme: Theme, pulse: boolean) {
       borderRadius: 'inherit',
       backgroundColor: theme.palette.primary.main,
       opacity: DIALOG_PULSE.alpha,
-      animation: `${pulseAnimation} ${DIALOG_PULSE.durationMs / 1000}s infinite`,
+      animation: `${pulseAnimation(theme)} ${DIALOG_PULSE.durationMs / 1000}s infinite`,
       pointerEvents: 'none' as const,
       zIndex: DIALOG_PULSE.zIndex,
     },
@@ -116,7 +110,7 @@ function defaultVariantStyles(theme: Theme, opts: VariantStyleOptions) {
   const gradientStyles = opts.gradient
     ? {
         background: `linear-gradient(${DIALOG_GRADIENT.angleDeg}deg, ${alpha(theme.palette.primary.main, DIALOG_GRADIENT.stopAlpha)}, ${alpha(theme.palette.secondary.main, DIALOG_GRADIENT.stopAlpha)})`,
-        backdropFilter: `blur(${DIALOG_GRADIENT.blurPx}px)`,
+        backdropFilter: `blur(${rem(theme, DIALOG_GRADIENT.blurPx)})`,
       }
     : {};
   return {
@@ -124,7 +118,7 @@ function defaultVariantStyles(theme: Theme, opts: VariantStyleOptions) {
     backgroundColor: opts.glass
       ? alpha(theme.palette.background.paper, DIALOG_GLASS.backgroundAlpha)
       : theme.palette.background.paper,
-    backdropFilter: opts.glass ? `blur(${DIALOG_GLASS.blurPx}px)` : 'none',
+    backdropFilter: opts.glass ? `blur(${rem(theme, DIALOG_GLASS.blurPx)})` : 'none',
     border: opts.glass
       ? `${DIALOG_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, DIALOG_GLASS.borderAlpha)}`
       : 'none',
@@ -142,15 +136,9 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         ...baseStylesOf(theme, opts),
         ...decorations,
         backgroundColor: alpha(theme.palette.background.paper, DIALOG_GLASS.backgroundAlpha),
-        backdropFilter: `blur(${DIALOG_GLASS.blurPx}px)`,
+        backdropFilter: `blur(${rem(theme, DIALOG_GLASS.blurPx)})`,
         border: `${DIALOG_BORDER_WIDTH}px solid ${alpha(theme.palette.primary.main, DIALOG_GLASS.borderAlpha)}`,
-        boxShadow: shadowCss({
-          offsetX: 0,
-          offsetY: DIALOG_GLASS.shadow.offsetY,
-          blurRadius: DIALOG_GLASS.shadow.blurRadius,
-          spreadDistance: 0,
-          color: shadowInk(theme, DIALOG_GLASS.shadow.alpha),
-        }),
+        boxShadow: `${rems(theme, 0, DIALOG_GLASS.shadow.offsetY, DIALOG_GLASS.shadow.blurRadius)} ${shadowInk(theme, DIALOG_GLASS.shadow.alpha)}`,
       };
     case 'fullscreen':
       return {
@@ -171,7 +159,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
         // panel's leading corners square.
         borderRadius: `${radius} 0 0 ${radius}`,
         margin: 0,
-        width: maxWidthOf(opts.size),
+        width: maxWidthOf(theme, opts.size),
         // Never wider than the screen: a 600px panel on a 375px phone put its
         // title and the start of every line off the left edge.
         maxWidth: '100%',
@@ -192,6 +180,6 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
 export function backdropSxOf(theme: Theme, glass: boolean) {
   return {
     backgroundColor: scrim(theme, glass ? DIALOG_BACKDROP.alpha.glass : DIALOG_BACKDROP.alpha.plain),
-    backdropFilter: glass ? `blur(${DIALOG_BACKDROP.blurPx}px)` : 'none',
+    backdropFilter: glass ? `blur(${rem(theme, DIALOG_BACKDROP.blurPx)})` : 'none',
   };
 }

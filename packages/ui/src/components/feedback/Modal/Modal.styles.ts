@@ -2,6 +2,7 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { scrim, shadowInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
 import type { ModalProps } from './Modal.types';
 
@@ -9,13 +10,13 @@ type Variant = NonNullable<ModalProps['variant']>;
 type Size = NonNullable<ModalProps['size']>;
 type Radius = NonNullable<ModalProps['borderRadius']>;
 
-const pulseAnimation = keyframes`
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 20px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 20)} currentColor;
     opacity: 0;
   }
   100% {
@@ -71,7 +72,7 @@ const pulseRing = (theme: Theme): CSSObject => ({
   borderRadius: 'inherit',
   backgroundColor: theme.palette.primary.main,
   opacity: 0.3,
-  animation: `${pulseAnimation} 2s infinite`,
+  animation: `${pulseAnimation(theme)} 2s infinite`,
   pointerEvents: 'none' as const,
   zIndex: -1,
 });
@@ -83,16 +84,16 @@ const surface = (theme: Theme, flags: ModalStyleFlags): CSSObject => {
   const isGlass = glass || variant === 'glass';
 
   const boxShadow = glow
-    ? `0 0 40px ${alpha(theme.palette.primary.main, 0.3)}`
+    ? `${rems(theme, 0, 0, 40)} ${alpha(theme.palette.primary.main, 0.3)}`
     : isGlass
-      ? `0 8px 32px ${shadowInk(theme, 0.1)}`
+      ? `${rems(theme, 0, 8, 32)} ${shadowInk(theme, 0.1)}`
       : theme.shadows[8];
 
   return {
     backgroundColor: isGlass
       ? alpha(theme.palette.background.paper, 0.1)
       : theme.palette.background.paper,
-    backdropFilter: isGlass ? 'blur(20px)' : gradient ? 'blur(10px)' : 'none',
+    backdropFilter: isGlass ? `blur(${rem(theme, 20)})` : gradient ? `blur(${rem(theme, 10)})` : 'none',
     border: isGlass ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
     boxShadow,
     ...(gradient && {
@@ -107,7 +108,7 @@ export const panelSx = (theme: Theme, flags: ModalStyleFlags): CSSObject => {
   return {
     // A pulsing panel positions its own ring, so it becomes the containing block.
     position: pulse ? ('relative' as const) : ('absolute' as const),
-    width: WIDTHS[size] ?? WIDTHS.md,
+    width: rem(theme, WIDTHS[size] ?? WIDTHS.md),
     maxWidth: '90vw',
     borderRadius: (RADII[borderRadius] ?? RADII.lg)(theme),
     outline: 0,
@@ -124,5 +125,5 @@ export const panelSx = (theme: Theme, flags: ModalStyleFlags): CSSObject => {
 
 export const backdropSx = (theme: Theme, isGlass: boolean): CSSObject => ({
   backgroundColor: scrim(theme, isGlass ? 0.2 : 0.5),
-  backdropFilter: isGlass ? 'blur(8px)' : 'none',
+  backdropFilter: isGlass ? `blur(${rem(theme, 8)})` : 'none',
 });

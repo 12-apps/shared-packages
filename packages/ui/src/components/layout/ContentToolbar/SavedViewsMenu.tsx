@@ -92,7 +92,7 @@ function ViewKebab<V extends SavedViewLike>({
         aria-label={`${labels.apply} ${view.name}`}
         data-testid={`${testIdPrefix}-kebab-${view.id}`}
         onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{ width: 28, height: 28, color: 'text.secondary' }}
+        sx={{ width: sxRem(28), height: sxRem(28), color: 'text.secondary' }}
       >
         <KebabIcon sx={{ fontSize: sxRem(16) }} />
       </IconButton>
@@ -215,7 +215,7 @@ function PopoverBody<V extends SavedViewLike>({
   testIdPrefix: string;
 }): React.JSX.Element {
   return (
-    <Stack spacing={1.5} sx={{ p: 1.5, width: 300 }} data-testid={`${testIdPrefix}-popover`}>
+    <Stack spacing={1.5} sx={{ p: 1.5, width: sxRem(300) }} data-testid={`${testIdPrefix}-popover`}>
       {/* Built-in no-filter default, always available above the saved views. */}
       <MenuItem data-testid={`${testIdPrefix}-main`} selected={!activeViewName} onClick={onSelectMain} sx={{ borderRadius: 1, px: 1, gap: 1 }}>
         <Box component="span" sx={{ flex: 1, minWidth: 0, fontSize: sxRem(14) }}>

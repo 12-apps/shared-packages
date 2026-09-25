@@ -17,7 +17,7 @@ import { useMenuItemState } from './NavigationMenuItem.hooks';
 import { navItemButtonStyles, pulseGlow } from './NavigationMenu.styles';
 import type { NavigationMenuItem } from './NavigationMenu.types';
 import { onMedia, shadowInk, uiInk } from '../../../tokens/ink';
-import { sxRem } from '../../../tokens/relative';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 const StyledListItem = styled(ListItem, {
   shouldForwardProp: (prop) => !['variant', 'active', 'size', 'level'].includes(prop as string) })<{ variant?: string; active?: boolean; size?: string; level?: number }>(
@@ -79,12 +79,12 @@ const MenuItemPopover: React.FC<{
           pointerEvents: 'auto',
           mt: 0.5,
           borderRadius: 2,
-          boxShadow: (theme) => `0 12px 40px ${shadowInk(theme, 0.15)}`,
+          boxShadow: (theme) => `0 ${rems(theme, 12, 40)} ${shadowInk(theme, 0.15)}`,
           border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           background: (theme) =>
             `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.default, 0.95)} 100%)`,
-          backdropFilter: 'blur(10px)',
-          minWidth: 200 } } }}
+          backdropFilter: (theme) => `blur(${rem(theme, 10)})`,
+          minWidth: sxRem(200) } } }}
   >
     <List sx={{ p: 1 }}>
       {item.children?.map((child) => {
@@ -147,19 +147,19 @@ const MenuItemLabel: React.FC<{
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minWidth: 20,
-            height: 20,
+            minWidth: sxRem(20),
+            height: sxRem(20),
             px: 0.75,
-            borderRadius: '10px',
+            borderRadius: sxRem(10),
             fontSize: sxRem(12),
             fontWeight: 600,
             color: (theme) => onMedia(theme),
             background: (theme) =>
               `linear-gradient(135deg, ${uiInk(theme).attention.from} 0%, ${uiInk(theme).attention.to} 100%)`,
-            boxShadow: (theme) => `0 2px 8px ${alpha(uiInk(theme).attention.glow, 0.4)}`,
-            animation:
+            boxShadow: (theme) => `0 ${rems(theme, 2, 8)} ${alpha(uiInk(theme).attention.glow, 0.4)}`,
+            animation: (theme) =>
               typeof item.badge === 'number' && item.badge > 0
-                ? `${pulseGlow} 2s infinite`
+                ? `${pulseGlow(theme)} 2s infinite`
                 : 'none' }}
         >
           {item.badge}
@@ -229,11 +229,11 @@ const MenuItemContent: React.FC<{
         {item.icon && (
           <ListItemIcon
             sx={{
-              minWidth: collapsed ? 0 : 40,
+              minWidth: collapsed ? 0 : sxRem(40),
               justifyContent: 'center',
               transition: 'all 0.3s ease',
               '& svg': {
-                filter: (theme) => (item.active ? `drop-shadow(0 2px 8px ${shadowInk(theme, 0.15)})` : 'none'),
+                filter: (theme) => (item.active ? `drop-shadow(0 ${rems(theme, 2, 8)} ${shadowInk(theme, 0.15)})` : 'none'),
                 transition: 'all 0.3s ease' } }}
           >
             <Grow in={true} timeout={600}>

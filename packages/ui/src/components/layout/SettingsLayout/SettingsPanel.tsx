@@ -66,7 +66,7 @@ function BackLink({
         ...displayAcrossRail(theme, breakpoint, "inline-flex", "none"),
         alignItems: "center",
         gap: 0.5,
-        minHeight: TOUCH_TARGET,
+        minHeight: rem(theme, TOUCH_TARGET),
         pr: 1,
         textDecoration: "none",
         color: "text.secondary",

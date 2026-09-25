@@ -148,7 +148,7 @@ function SelectionState({
       >
         {clearAllText}
       </Button>
-      <Divider orientation="vertical" flexItem sx={{ height: 16, alignSelf: 'center' }} />
+      <Divider orientation="vertical" flexItem sx={{ height: sxRem(16), alignSelf: 'center' }} />
       <Typography
         component="span"
         data-testid="selected-count-indicator"
@@ -231,7 +231,7 @@ function BrowsingClusters({
           flexWrap: leadingControls === undefined ? 'wrap' : 'nowrap',
           // Tight (5px) when browsing so the controls fit one line beside the
           // checkbox; roomier (14px) in selection mode where they get their own row.
-          gap: hasSelection ? '14px' : '5px',
+          gap: hasSelection ? sxRem(14) : sxRem(5),
           ml: 'auto',
           mr: edgeAlign ? -1.5 : 0,
           '& > *': { flexShrink: 0 },

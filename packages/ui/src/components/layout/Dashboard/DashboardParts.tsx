@@ -64,7 +64,7 @@ export const DashboardInfo = ({
         anchorEl={anchorEl}
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        slotProps={{ paper: { sx: { width: 360, maxWidth: '90vw' } } }}
+        slotProps={{ paper: { sx: { width: sxRem(360), maxWidth: '90vw' } } }}
         data-testid={`${testIdPrefix}-info-popover`}
       >
         <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', display: 'flex', gap: 1, alignItems: 'center' }}>

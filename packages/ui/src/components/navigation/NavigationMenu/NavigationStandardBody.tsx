@@ -13,6 +13,7 @@ import { CollapseToggle, LogoBar, MenuList } from './NavigationMenu.shell';
 import { slideIn } from './NavigationMenu.styles';
 import type { NavigationMenuItem } from './NavigationMenu.types';
 import { renderMenuItem } from './NavigationMenuItem';
+import { sxRem } from '../../../tokens/relative';
 
 const DividerRule: FC = () => (
   <Divider
@@ -42,7 +43,7 @@ const CollapseControl: FC<{ collapsed: boolean; onToggle: () => void }> = ({
   onToggle,
 }) => (
   <CollapseToggle onClick={onToggle}>
-    <ListItemIcon sx={{ minWidth: collapsed ? 0 : 40, justifyContent: 'center' }}>
+    <ListItemIcon sx={{ minWidth: collapsed ? 0 : sxRem(40), justifyContent: 'center' }}>
       <MenuIcon />
     </ListItemIcon>
     {!collapsed && <ListItemText primary="Collapse" />}
@@ -63,7 +64,7 @@ const MenuItems: FC<{
         <Box
           sx={{
             // Staggered so the list fills in rather than appearing at once.
-            animation: `${slideIn} 0.4s ease-out`,
+            animation: (theme) => `${slideIn(theme)} 0.4s ease-out`,
             animationDelay: `${index * 0.05}s`,
             animationFillMode: 'both',
           }}

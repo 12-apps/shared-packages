@@ -70,8 +70,9 @@ export const Modal: React.FC<ModalProps> = (props) => {
   );
 };
 
-export const ModalContent: React.FC<ModalContentProps> = ({ children, padding = 3, dataTestId }) => (
-  <Box sx={{ p: padding }} data-testid={dataTestId || 'modal-content'}>
+// `padding` is in spacing units; the default is applied in `sx`, where `p` reads it as one.
+export const ModalContent: React.FC<ModalContentProps> = ({ children, padding, dataTestId }) => (
+  <Box sx={{ p: padding ?? 3 }} data-testid={dataTestId || 'modal-content'}>
     {children}
   </Box>
 );

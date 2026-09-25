@@ -1,6 +1,8 @@
 import { alpha } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 
+import { rem, rems } from '../../../tokens/relative';
+
 import type { AccordionVariant } from './Accordion.types';
 
 const BASE_TRANSITION = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
@@ -12,7 +14,7 @@ export const accordionVariantStyles = (theme: Theme, variant: AccordionVariant) 
     case 'glass':
       return {
         backgroundColor: alpha(theme.palette.background.paper, 0.08),
-        backdropFilter: 'blur(24px) saturate(180%)',
+        backdropFilter: `blur(${rem(theme, 24)}) saturate(180%)`,
         border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
         borderRadius: theme.spacing(1.5),
         transition: BASE_TRANSITION,
@@ -22,8 +24,8 @@ export const accordionVariantStyles = (theme: Theme, variant: AccordionVariant) 
         '&:hover': {
           backgroundColor: alpha(theme.palette.background.paper, 0.12),
           border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
-          transform: 'translateY(-1px)',
-          boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.12)}`,
+          transform: `translateY(${rem(theme, -1)})`,
+          boxShadow: `${rems(theme, 0, 8, 32)} ${alpha(theme.palette.primary.main, 0.12)}`,
         },
         '&.Mui-expanded': {
           backgroundColor: alpha(theme.palette.background.paper, 0.15),
@@ -43,7 +45,7 @@ export const accordionVariantStyles = (theme: Theme, variant: AccordionVariant) 
         },
         '&:hover': {
           borderColor: theme.palette.primary.main,
-          boxShadow: `0 0 0 1px ${alpha(theme.palette.primary.main, 0.1)}`,
+          boxShadow: `${rems(theme, 0, 0, 0, 1)} ${alpha(theme.palette.primary.main, 0.1)}`,
         },
         '&.Mui-expanded': {
           borderColor: theme.palette.primary.main,
@@ -62,11 +64,11 @@ export const accordionVariantStyles = (theme: Theme, variant: AccordionVariant) 
         },
         '&:hover': {
           boxShadow: theme.shadows[4],
-          transform: 'translateY(-2px)',
+          transform: `translateY(${rem(theme, -2)})`,
         },
         '&.Mui-expanded': {
           boxShadow: theme.shadows[6],
-          transform: 'translateY(-1px)',
+          transform: `translateY(${rem(theme, -1)})`,
         },
       };
     default:

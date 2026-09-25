@@ -10,20 +10,20 @@ import React, { cloneElement, isValidElement,useState } from 'react';
 
 import type { ContextMenuItem,ContextMenuProps } from './ContextMenu.types';
 import { absoluteInk, neutralTones, shadowInk, sheen } from '../../../tokens/ink';
-import { rem } from '../../../tokens/relative';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 const StyledMenu = styled(Menu, {
   shouldForwardProp: (prop) => prop !== 'customVariant' && prop !== 'size',
 })<{ customVariant?: string; size?: string }>(({ theme, customVariant, size }) => ({
   '& .MuiPaper-root': {
-    minWidth: 160,
+    minWidth: rem(theme, 160),
     borderRadius: theme.spacing(1),
 
     ...(customVariant === 'glass' && {
       backgroundColor: alpha(theme.palette.background.paper, 0.85),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-      boxShadow: `0 8px 32px ${shadowInk(theme, 0.12)}`,
+      boxShadow: `0 ${rems(theme, 8, 32)} ${shadowInk(theme, 0.12)}`,
     }),
 
     ...(customVariant === 'dark' && {
@@ -43,7 +43,7 @@ const StyledMenu = styled(Menu, {
     ...(size === 'sm' && {
       '& .MuiMenuItem-root': {
         fontSize: rem(theme, 14),
-        minHeight: 32,
+        minHeight: rem(theme, 32),
         padding: theme.spacing(0.5, 1.5),
       },
     }),
@@ -51,7 +51,7 @@ const StyledMenu = styled(Menu, {
     ...(size === 'lg' && {
       '& .MuiMenuItem-root': {
         fontSize: rem(theme, 18),
-        minHeight: 48,
+        minHeight: rem(theme, 48),
         padding: theme.spacing(1.5, 2),
       },
     }),
@@ -101,7 +101,7 @@ const MenuHeader = styled(Typography)(({ theme }) => ({
   fontWeight: 600,
   textTransform: 'uppercase',
   color: theme.palette.text.secondary,
-  letterSpacing: 0.5,
+  letterSpacing: rem(theme, 0.5),
 }));
 
 const ShortcutText = styled(Typography)(({ theme }) => ({
@@ -135,7 +135,7 @@ const renderMenuItem = (
       dangerous={item.dangerous}
     >
       {hasIcon && (
-        <ListItemIcon sx={{ minWidth: size === 'sm' ? 32 : 40 }}>{item.icon}</ListItemIcon>
+        <ListItemIcon sx={{ minWidth: sxRem(size === 'sm' ? 32 : 40) }}>{item.icon}</ListItemIcon>
       )}
       <ListItemText primary={item.label} />
       {item.shortcut && <ShortcutText variant="caption">{item.shortcut}</ShortcutText>}

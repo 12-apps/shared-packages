@@ -2,16 +2,18 @@ import Box from '@mui/material/Box/index.js';
 import List from '@mui/material/List/index.js';
 import ListItemButton from '@mui/material/ListItemButton/index.js';
 import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import type { CSSProperties, PropsWithChildren, ReactNode } from 'react';
 import React from 'react';
 
 import { slideIn } from './NavigationMenu.styles';
 import { shadowInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
-const megaMenuSlide = keyframes`
+const megaMenuSlide = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(${rem(theme, 20)});
   }
   to {
     opacity: 1;
@@ -27,35 +29,35 @@ const NavigationContainer = styled(Box, {
 })<{ variant?: string; collapsed?: boolean; minimal?: boolean }>(({ theme, variant, collapsed, minimal }) => ({
   display: 'flex',
   position: 'relative',
-  animation: `${slideIn} 0.4s ease-out`,
+  animation: `${slideIn(theme)} 0.4s ease-out`,
   ...(variant === 'horizontal' && {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
     ...(!minimal && {
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`,
-      backdropFilter: 'blur(10px)',
+      backdropFilter: `blur(${rem(theme, 10)})`,
       borderRadius: theme.spacing(2),
-      boxShadow: `0 8px 32px ${shadowInk(theme, 0.08)}`,
+      boxShadow: `0 ${rems(theme, 8, 32)} ${shadowInk(theme, 0.08)}`,
     }),
   }),
   ...(variant === 'vertical' && {
     flexDirection: 'column',
-    width: collapsed ? 80 : 280,
+    width: rem(theme, collapsed ? 80 : 280),
     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
     height: '100%',
     ...(!minimal && {
       background: `linear-gradient(180deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-      backdropFilter: 'blur(12px)',
+      backdropFilter: `blur(${rem(theme, 12)})`,
       borderRadius: theme.spacing(2),
-      boxShadow: `0 12px 40px ${shadowInk(theme, 0.1)}`,
+      boxShadow: `0 ${rems(theme, 12, 40)} ${shadowInk(theme, 0.1)}`,
       '&::before': {
         content: '""',
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        height: '200px',
+        height: rem(theme, 200),
         background: `radial-gradient(ellipse at top, ${alpha(theme.palette.primary.main, 0.05)} 0%, transparent 70%)`,
         pointerEvents: 'none',
       },
@@ -66,10 +68,10 @@ const NavigationContainer = styled(Box, {
     width: '100%',
     ...(!minimal && {
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.default, 0.95)} 100%)`,
-      backdropFilter: 'blur(15px)',
+      backdropFilter: `blur(${rem(theme, 15)})`,
       borderRadius: theme.spacing(3),
       overflow: 'hidden',
-      boxShadow: `0 20px 60px ${shadowInk(theme, 0.12)}`,
+      boxShadow: `0 ${rems(theme, 20, 60)} ${shadowInk(theme, 0.12)}`,
     }),
   }),
 }));
@@ -86,7 +88,7 @@ const StyledList = styled(List, {
   }),
   ...(variant === 'mega' && {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gridTemplateColumns: `repeat(auto-fit, minmax(${rem(theme, 250)}, 1fr))`,
     gap: theme.spacing(2),
     padding: theme.spacing(2),
   }),
@@ -97,7 +99,7 @@ const LogoContainer = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(2),
   position: 'relative',
   background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.primary.dark, 0.04)} 100%)`,
-  borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+  borderBottom: `${rem(theme, 2)} solid ${alpha(theme.palette.primary.main, 0.2)}`,
   overflow: 'hidden',
 
   '&::before': {
@@ -108,7 +110,7 @@ const LogoContainer = styled(Box)(({ theme }) => ({
     width: '200%',
     height: '200%',
     background: `radial-gradient(circle, ${alpha(theme.palette.primary.light, 0.1)} 0%, transparent 70%)`,
-    animation: `${slideIn} 1s ease-out`,
+    animation: `${slideIn(theme)} 1s ease-out`,
   },
 
   '& > *': {
@@ -127,7 +129,7 @@ const CollapseButton = styled(ListItemButton)(({ theme }) => ({
   '&:hover': {
     backgroundColor: alpha(theme.palette.primary.main, 0.12),
     transform: 'scale(1.05)',
-    boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.2)}`,
+    boxShadow: `0 ${rems(theme, 6, 20)} ${alpha(theme.palette.primary.main, 0.2)}`,
 
     '& .MuiListItemIcon-root': {
       transform: 'rotate(180deg)',
@@ -144,11 +146,11 @@ const MegaMenuSection = styled(Box)(({ theme }) => ({
   padding: theme.spacing(3),
   borderRadius: theme.spacing(2),
   background: `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.default, 0.9)} 100%)`,
-  boxShadow: `0 10px 30px ${shadowInk(theme, 0.08)}`,
+  boxShadow: `0 ${rems(theme, 10, 30)} ${shadowInk(theme, 0.08)}`,
   border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
   position: 'relative',
   overflow: 'hidden',
-  animation: `${megaMenuSlide} 0.5s ease-out`,
+  animation: `${megaMenuSlide(theme)} 0.5s ease-out`,
   animationFillMode: 'both',
 
   '&::before': {
@@ -157,7 +159,7 @@ const MegaMenuSection = styled(Box)(({ theme }) => ({
     top: 0,
     left: 0,
     right: 0,
-    height: '3px',
+    height: rem(theme, 3),
     background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.primary.main} 100%)`,
     backgroundSize: '200% 100%',
     animation: 'shimmer 3s ease-in-out infinite',
@@ -173,8 +175,8 @@ const MegaMenuSection = styled(Box)(({ theme }) => ({
   },
 
   '&:hover': {
-    transform: 'translateY(-4px)',
-    boxShadow: `0 15px 40px ${shadowInk(theme, 0.12)}`,
+    transform: `translateY(${rem(theme, -4)})`,
+    boxShadow: `0 ${rems(theme, 15, 40)} ${shadowInk(theme, 0.12)}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   },
 

@@ -1,5 +1,3 @@
-const DEFAULT_PADDING = 16;
-
 export const getElementBounds = (selector: string): globalThis.DOMRect | null =>
   document.querySelector(selector)?.getBoundingClientRect() ?? null;
 
@@ -53,7 +51,8 @@ export const calculateTooltipPosition = (
   targetBounds: globalThis.DOMRect,
   tooltipBounds: globalThis.DOMRect,
   placement: string,
-  padding = DEFAULT_PADDING,
+  /** The clearance around the target, in px — the caller reads it through `remPx`. */
+  padding: number,
 ) => {
   const finalPlacement = placement === 'auto' ? pickPlacement(targetBounds) : placement;
   const offset = offsetFor(finalPlacement, targetBounds, tooltipBounds, padding);

@@ -61,8 +61,8 @@ export function SettingsStatusMarker({
       <Box
         component="span"
         sx={{
-          width: 8,
-          height: 8,
+          width: sxRem(8),
+          height: sxRem(8),
           borderRadius: '50%',
           flex: '0 0 auto',
           bgcolor: STATUS_COLOR[status],

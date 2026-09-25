@@ -248,7 +248,7 @@ function MultiSelectMenu<TValue extends string>({
       slotProps={{
         // Cap the height so a long list (e.g. many categories) scrolls instead
         // of running off-screen; the sticky search box stays pinned on top.
-        paper: { sx: { minWidth: anchorWidth ?? 180, width: anchorWidth, maxHeight: 360 } },
+        paper: { sx: { minWidth: anchorWidth ?? sxRem(180), width: anchorWidth, maxHeight: sxRem(360) } },
         list: { sx: { pt: showSearch ? 0 : undefined, pb: 0 } },
       }}
     >
