@@ -81,6 +81,13 @@ const sxLength = (theme: Theme, value: Length): string | undefined =>
 const innerLength = (theme: Theme, value: Length): string | undefined =>
   isFraction(value) ? '100%' : styleLength(theme, value);
 
+/**
+ * A width or height with its default. Only an unset or empty size takes it: `0`
+ * is a size, which `||` read as unset (FUT-2669), and `sx` reads `''` as `0%`.
+ */
+const orDefault = (value: Length, fallback: number | string): number | string =>
+  value === undefined || value === '' ? fallback : value;
+
 /** The box the image occupies, as CSS, shared by the real image and every stand-in for it. */
 interface BoxMetrics {
   width?: string;
@@ -100,8 +107,8 @@ const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
   return (
     <Skeleton
       variant="rectangular"
-      width={innerLength(theme, props.width || '100%')}
-      height={innerLength(theme, props.height || 200)}
+      width={innerLength(theme, orDefault(props.width, '100%'))}
+      height={innerLength(theme, orDefault(props.height, 'auto'))}
       animation={props.skeletonProps.animation || 'pulse'}
       intensity={props.skeletonProps.intensity}
       borderRadius={styleLength(theme, props.borderRadius)}
@@ -226,8 +233,8 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
       ref={containerRef}
       className={props.className}
       sx={{
-        width: sxLength(theme, width || 'auto'),
-        height: sxLength(theme, height || 'auto'),
+        width: sxLength(theme, orDefault(width, 'auto')),
+        height: sxLength(theme, orDefault(height, 'auto')),
         // The same px length the image gets (`metrics`): in `sx` a bare number
         // would be a multiple of `shape.borderRadius`, and this box clips (FUT-2656).
         borderRadius: metrics.borderRadius,
