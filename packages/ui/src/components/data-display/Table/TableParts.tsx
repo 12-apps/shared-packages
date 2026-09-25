@@ -1,4 +1,3 @@
-import Box from '@mui/material/Box/index.js';
 import Checkbox from '@mui/material/Checkbox/index.js';
 import TableBody from '@mui/material/TableBody/index.js';
 import TableCell from '@mui/material/TableCell/index.js';
@@ -11,9 +10,8 @@ import React, { useCallback } from 'react';
 import { rem } from '../../../tokens/relative';
 
 import { tableRowHeight } from './Table.helpers';
-import { useVirtualScrolling } from './Table.hooks';
 import { useTableRowRenderer } from './TableParts.hooks';
-import type { ColumnConfig, TableBodyProps, TableHeaderProps } from './Table.types';
+import type { ColumnConfig, TableBodyProps, TableHeaderProps, VirtualWindow } from './Table.types';
 
 // Mirrors the visible sort indicator for assistive technology; undefined when
 // the column is not sorted, which is what removes the attribute entirely.
@@ -77,7 +75,8 @@ export const EnhancedTableHeader: React.FC<TableHeaderProps> = React.memo(({
   onSortChange,
   selectable,
   selectedRows = [],
-  onSelectAll }) => {
+  onSelectAll,
+  headRef }) => {
   const handleSort = useCallback(
     (columnKey: string) => {
       if (!sortable || !onSortChange) return;
@@ -98,7 +97,7 @@ export const EnhancedTableHeader: React.FC<TableHeaderProps> = React.memo(({
   );
 
   return (
-    <TableHead>
+    <TableHead ref={headRef}>
       <TableRow>
         {selectable && (
           <TableCell padding="checkbox">
@@ -205,46 +204,28 @@ export const TableDataRow: React.FC<{
 };
 
 // Only the rows in view are rendered, positioned by absolute offset inside a
-// spacer sized to the full data set. `rowHeight`, `containerHeight` and every
-// offset are design px, drawn through `rem`.
+// body sized to the full data set. `rowHeight` and every offset are design px,
+// drawn through `rem`. The `<tbody>` sits directly in the `<table>`; the one
+// scroll container wraps the whole table, header included (FUT-2658).
 const VirtualisedBody: React.FC<{
-  visibleItems: {
-    items: Record<string, unknown>[];
-    startIndex: number;
-    offsetY: number;
-    /** As CSS. */
-    totalHeight: string;
-  };
+  visibleItems: VirtualWindow;
   rowHeight: number;
-  containerHeight: number;
-  onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
   renderTableRow: (
     rowData: Record<string, unknown>,
     index: number,
     offsetY?: number,
   ) => React.ReactNode;
-}> = ({ visibleItems, rowHeight, containerHeight, onScroll, renderTableRow }) => {
-  const theme = useTheme();
-  return (
-    <Box
-      onScroll={onScroll}
-      style={{
-        height: rem(theme, containerHeight),
-        overflow: 'auto',
-        position: 'relative' }}
-    >
-      <TableBody
-        style={{
-          height: visibleItems.totalHeight,
-          position: 'relative' }}
-      >
-        {visibleItems.items.map((rowData, index) => 
-          renderTableRow(rowData, visibleItems.startIndex + index, visibleItems.offsetY + index * rowHeight)
-        )}
-      </TableBody>
-    </Box>
-  );
-};
+}> = ({ visibleItems, rowHeight, renderTableRow }) => (
+  <TableBody
+    style={{
+      height: visibleItems.totalHeight,
+      position: 'relative' }}
+  >
+    {visibleItems.items.map((rowData, index) => 
+      renderTableRow(rowData, visibleItems.startIndex + index, visibleItems.offsetY + index * rowHeight)
+    )}
+  </TableBody>
+);
 
 const PlainBody: React.FC<{
   data: TableBodyProps['data'];
@@ -258,26 +239,16 @@ const PlainBody: React.FC<{
 
 // Enhanced Table Body Component  
 export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo((props) => {
-  const { data, virtualScrolling, containerHeight, overscan = 5 } = props;
+  const { data, virtualWindow } = props;
   // The row renderer takes the body's own props; its `rowHeight` stays the
   // caller's design px, and the row resolves the default where it draws it.
   const renderTableRow = useTableRowRenderer({ ...props, selectedRows: props.selectedRows ?? [] });
-  const rowHeight = tableRowHeight(props.rowHeight);
 
-  const { visibleItems, handleScroll } = useVirtualScrolling(
-    data, 
-    rowHeight || 40, 
-    typeof containerHeight === 'number' ? containerHeight : 400, 
-    overscan
-  );
-
-  if (virtualScrolling && containerHeight && rowHeight) {
+  if (virtualWindow) {
     return (
       <VirtualisedBody
-        visibleItems={visibleItems}
-        rowHeight={rowHeight}
-        containerHeight={containerHeight}
-        onScroll={handleScroll}
+        visibleItems={virtualWindow}
+        rowHeight={tableRowHeight(props.rowHeight)}
         renderTableRow={renderTableRow}
       />
     );

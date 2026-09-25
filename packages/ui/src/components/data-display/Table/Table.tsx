@@ -11,7 +11,7 @@ import TableBody from '@mui/material/TableBody/index.js';
 import TableCell from '@mui/material/TableCell/index.js';
 import TableContainer from '@mui/material/TableContainer/index.js';
 import TableRow from '@mui/material/TableRow/index.js';
-import { styled, useTheme, type Theme } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type {
@@ -19,29 +19,20 @@ import type {
   TableDensity,
   TableProps,
   TableStripeColor} from './Table.types';
-import { TABLE_DEFAULTS, definedProps } from './Table.helpers';
-import { useTableSelection } from './Table.hooks';
+import {
+  TABLE_DEFAULTS,
+  definedProps,
+  scrollerStyle,
+  tableDomProps,
+  tableRowHeight,
+  virtualHeight,
+} from './Table.helpers';
+import { useTableSelection, useVirtualScrolling } from './Table.hooks';
 import { EnhancedTableBody, EnhancedTableHeader } from './TableParts';
 import { EmptyRow, NoDataPlaceholder } from './TableStates';
 import {
   tableStyles } from './Table.styles';
 import { rem } from '../../../tokens/relative';
-
-/** The scroll box's height: a number is design px, 400 unless the caller says otherwise. */
-const scrollHeight = (theme: Theme, containerHeight: number | string | undefined): string => {
-  const box = containerHeight || 400;
-  return typeof box === 'number' ? rem(theme, box) : box;
-};
-
-// Define pulse animation
-const StyledTableContainer = styled(TableContainer, {
-  shouldForwardProp: (prop) => !['virtualScrolling', 'containerHeight'].includes(prop as string) })<{ 
-  virtualScrolling?: boolean; 
-  containerHeight?: number | string;
-}>(({ theme, virtualScrolling, containerHeight }) => ({
-  ...(virtualScrolling && {
-    height: scrollHeight(theme, containerHeight),
-    overflow: 'auto' }) }));
 
 // Helper function to get stripe color from theme
 const StyledTable = styled(MuiTable, {
@@ -91,7 +82,7 @@ const TableShell: React.FC<{
   header,
   rest,
   children }) => (
-  <StyledTableContainer>
+  <TableContainer>
     <StyledTable
       ref={innerRef}
       customVariant={variant}
@@ -106,7 +97,7 @@ const TableShell: React.FC<{
       {header}
       {children}
     </StyledTable>
-  </StyledTableContainer>
+  </TableContainer>
 );
 
 const SKELETON_ROW_COUNT = 5;
@@ -177,8 +168,8 @@ const ColumnToggleMenu: React.FC<{
   </Box>
 );
 
-// The populated table. Local because StyledTableContainer and StyledTable
-// cannot cross a module boundary (TS2742).
+// The populated table. Local because StyledTable cannot cross a module
+// boundary (TS2742).
 const columnsFor = (resolved: TableProps, selection: Selection): ColumnConfig[] =>
   (resolved.responsive ? selection.visibleColumns : resolved.columns) ?? [];
 
@@ -192,15 +183,27 @@ const showsColumnToggle = (resolved: TableProps, selection: Selection): boolean 
       selection.hiddenColumns.length > 0,
   );
 
+// The virtual window lives here, with the one scroller whose offset drives it;
+// the header's ref lets it subtract the height the `<thead>` pushes the body down.
 const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerRef, rest }) => {
+  const theme = useTheme();
   const finalColumns = columnsFor(p, selection);
   const showToggle = showsColumnToggle(p, selection);
+  const headRef = React.useRef<globalThis.HTMLTableSectionElement>(null);
+  const windowHeight = virtualHeight(p);
+  const { visibleItems, handleScroll } = useVirtualScrolling(
+    p.data ?? [],
+    tableRowHeight(p.rowHeight) || 40,
+    windowHeight ?? 400,
+    p.overscan,
+    headRef,
+  );
 
   return (
     <Box position="relative">
-      <StyledTableContainer
-        virtualScrolling={p.virtualScrolling}
-        containerHeight={p.containerHeight}
+      <TableContainer
+        style={scrollerStyle(theme, p)}
+        onScroll={windowHeight ? handleScroll : undefined}
       >
         <StyledTable
           ref={innerRef}
@@ -224,6 +227,7 @@ const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerR
             onSelectAll={selection.handleSelectAll}
             density={p.density}
             stickyHeader={p.stickyHeader}
+            headRef={headRef}
           />
           <EnhancedTableBody
             data={p.data ?? []}
@@ -240,12 +244,11 @@ const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerR
             renderRow={p.renderRow}
             renderCell={p.renderCell}
             virtualScrolling={p.virtualScrolling}
-            containerHeight={typeof p.containerHeight === 'number' ? p.containerHeight : undefined}
+            virtualWindow={windowHeight ? visibleItems : undefined}
             rowHeight={p.rowHeight}
-            overscan={p.overscan}
           />
         </StyledTable>
-      </StyledTableContainer>
+      </TableContainer>
 
       {showToggle && (
         <ColumnToggleMenu
@@ -329,7 +332,6 @@ export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
       emptyStateComponent,
       emptyText,
       children,
-      ...props
     } = resolved;
 
     const selection = useTableSelection({
@@ -341,7 +343,8 @@ export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
       rowKeyExtractor: resolved.rowKeyExtractor,
       onSelectionChange: resolved.onSelectionChange });
 
-    const rest = props as unknown as Record<string, unknown>;
+    // Only MUI's and the DOM's own props reach the `<table>` (FUT-2658).
+    const rest = tableDomProps(tableProps);
     const renderer: RendererProps = { resolved, selection, innerRef: ref, rest };
     const finalColumns = responsive ? selection.visibleColumns : columns;
     const shell = buildShell({ ...renderer, finalColumns });

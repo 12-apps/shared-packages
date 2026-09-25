@@ -70,7 +70,8 @@ describe('Table (virtual scrolling) under a non-default type scale', () => {
 
   it('picks the window by dividing scrollTop by that same pitch', () => {
     renderTable();
-    const scroller = dataRows()[0]!.closest('tbody')!.parentElement!;
+    // The one scroll container wraps the whole table (FUT-2658).
+    const scroller = dataRows()[0]!.closest('table')!.parentElement!;
     expect(cssPx(scroller.style.height)).toBeCloseTo(remPx(theme, 400), 6);
 
     act(() => {
