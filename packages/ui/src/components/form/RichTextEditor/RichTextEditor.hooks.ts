@@ -16,6 +16,13 @@ const SANITIZE_CONFIG = {
   KEEP_CONTENT: true,
 };
 
+// The one way editor html reaches the DOM. Both writes (the render-path effect
+// and the over-limit restore) use it, so they cannot drift to different configs.
+const sanitize = (html: string): string => DOMPurify.sanitize(html, SANITIZE_CONFIG);
+
+// INVARIANT: only ever pass SANITISED html here. Assigning innerHTML to a
+// detached element still fetches `<img src>` and fires its `onerror`, so raw
+// markup would execute. Its one caller passes `sanitizedContent`.
 const textLengthOf = (html: string): number => {
   const probe = document.createElement('div');
   probe.innerHTML = html;
@@ -34,6 +41,11 @@ const useEditorContent = ({
   onChange?: (value: string) => void;
   maxLength?: number;
 }) => {
+  // `content` holds UNSANITISED html: the caller's raw `value` (read once, at
+  // mount) until the first accepted input, and the editor's raw live innerHTML
+  // after it. Every write of it to the DOM must go through `sanitize` below.
+  // INVARIANT: if syncing a later `value` is ever added, the new value reaches
+  // the DOM through the same sanitiser, never by a direct innerHTML write.
   const [content, setContent] = useState(value ?? '');
 
   const handleContentChange = useCallback(() => {
@@ -42,12 +54,17 @@ const useEditorContent = ({
     const newContent = editorRef.current.innerHTML;
 
     // Over the limit, put the last accepted content back rather than truncating
-    // mid-markup.
+    // mid-markup. `content` may be the caller's raw `value`, so the restore is
+    // sanitised exactly as the render path is: writing it raw ran an `onerror`
+    // handler carried in `value` (FUT-2685).
     if (maxLength && (editorRef.current.textContent || '').length > maxLength) {
-      editorRef.current.innerHTML = content;
+      editorRef.current.innerHTML = sanitize(content);
       return;
     }
 
+    // Emitting the live DOM is safe only because nothing but `sanitize()` ever
+    // writes it: the editor renders empty and the effect below fills it. Give
+    // the first render its own markup and this must emit `sanitize(newContent)`.
     setContent(newContent);
     onChange?.(newContent);
   }, [maxLength, onChange, content, editorRef]);
@@ -121,7 +138,7 @@ export const useRichTextEditor = ({
     [disabled, readOnly, handleContentChange],
   );
 
-  const sanitizedContent = DOMPurify.sanitize(content, SANITIZE_CONFIG);
+  const sanitizedContent = sanitize(content);
 
   // Reflect the sanitized result back when it differs from what is on screen.
   useEffect(() => {
