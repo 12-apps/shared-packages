@@ -2,7 +2,15 @@ import Box from '@mui/material/Box/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React, { useMemo } from 'react';
 
-import { defaultHandles, handleStyle, resolveResizableProps } from './Resizable.helpers';
+import { remPx } from '../../../tokens/relative';
+
+import {
+  axisPx,
+  defaultHandles,
+  handleStyle,
+  resolveResizableProps,
+  startSizePx,
+} from './Resizable.helpers';
 import { useResize } from './Resizable.hooks';
 import type { ResizableProps } from './Resizable.types';
 
@@ -10,8 +18,8 @@ export const Resizable: React.FC<ResizableProps> = (rawProps) => {
   const {
     children,
     variant,
-    width: initialWidth,
-    height: initialHeight,
+    width,
+    height,
     minWidth,
     maxWidth,
     minHeight,
@@ -24,18 +32,20 @@ export const Resizable: React.FC<ResizableProps> = (rawProps) => {
     ...rest
   } = resolveResizableProps(rawProps);
   const theme = useTheme();
+  // Keyed apart: a new `start` re-seats the box, which a changed clamp must not do.
+  const start = useMemo(() => startSizePx(theme, width, height), [theme, width, height]);
   const bounds = useMemo(
     () => ({
-      width: { min: minWidth, max: maxWidth },
-      height: { min: minHeight, max: maxHeight },
+      width: axisPx(theme, minWidth, maxWidth),
+      height: axisPx(theme, minHeight, maxHeight),
     }),
-    [minWidth, maxWidth, minHeight, maxHeight],
+    [theme, minWidth, maxWidth, minHeight, maxHeight],
   );
 
   const { size, isResizing, activeHandle, handleMouseDown } = useResize({
-    width: initialWidth,
-    height: initialHeight,
+    start,
     bounds,
+    pxPerDesignPx: remPx(theme, 1),
     disabled,
     onResize,
   });
@@ -49,6 +59,8 @@ export const Resizable: React.FC<ResizableProps> = (rawProps) => {
       data-testid={dataTestId}
       sx={{
         position: 'relative',
+        // The live size: the start and the clamp came through `remPx`, the rest
+        // is pointer pixels dragged, so it is px as it stands.
         width: size.width,
         height: size.height,
         border: `1px solid ${theme.palette.divider}`,

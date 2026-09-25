@@ -1,4 +1,9 @@
-export const TILE_SIZE = 256;
+/**
+ * One tile's extent in Web Mercator's world units at zoom 0 — the projection's
+ * own coordinate space, not a drawn length: the tile index it yields is the
+ * same at any drawn size. `MapTiles` draws one world unit as one design px.
+ */
+export const TILE_WORLD_UNITS = 256;
 
 // Metres covered by one pixel at zoom 0 on the equator; each zoom level halves it.
 const EQUATOR_METRES_PER_PIXEL = 156543.03392;
@@ -12,8 +17,8 @@ const project = (lat: number, lng: number) => {
   const boundedSiny = Math.max(-0.9999, Math.min(0.9999, siny));
 
   return {
-    x: TILE_SIZE * (0.5 + lng / 360),
-    y: TILE_SIZE * (0.5 - Math.log((1 + boundedSiny) / (1 - boundedSiny)) / (4 * Math.PI)),
+    x: TILE_WORLD_UNITS * (0.5 + lng / 360),
+    y: TILE_WORLD_UNITS * (0.5 - Math.log((1 + boundedSiny) / (1 - boundedSiny)) / (4 * Math.PI)),
   };
 };
 
@@ -22,8 +27,8 @@ export const getTileCoordinates = (lat: number, lng: number, zoom: number) => {
   const world = project(lat, lng);
 
   return {
-    x: Math.floor(Math.floor(world.x * scale) / TILE_SIZE),
-    y: Math.floor(Math.floor(world.y * scale) / TILE_SIZE),
+    x: Math.floor(Math.floor(world.x * scale) / TILE_WORLD_UNITS),
+    y: Math.floor(Math.floor(world.y * scale) / TILE_WORLD_UNITS),
   };
 };
 

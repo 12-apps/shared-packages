@@ -54,6 +54,8 @@ export function buildGridColumns<T extends Record<string, unknown>>(
 }
 
 interface ActionsColumnConfig<T extends Record<string, unknown>> {
+  /** Whose type scale the column's width is drawn at. */
+  theme: Theme;
   /** Actions that build the auto "⋮" kebab. Ignored when `renderRowMenu` is set. */
   rowActions: RowAction<T>[];
   /** Optional leading slot (e.g. a favourite star) rendered before the kebab. */
@@ -80,7 +82,7 @@ interface ActionsColumnConfig<T extends Record<string, unknown>> {
 export function buildRowActionsColumn<T extends Record<string, unknown>>(
   config: ActionsColumnConfig<T>,
 ): DataViewColumn<T> {
-  const { rowActions, leading, testIdPrefix, getRowId, renderRowMenu } = config;
+  const { theme, rowActions, leading, testIdPrefix, getRowId, renderRowMenu } = config;
   const kebabActions = rowActions.filter((action) => action.row !== false);
   return {
     id: "actions",
@@ -89,8 +91,8 @@ export function buildRowActionsColumn<T extends Record<string, unknown>>(
     enableSort: false,
     hideable: false,
     // Narrow: the column only holds the "⋮" kebab (plus an optional leading icon),
-    // so it needs room for just one or two icons.
-    width: leading ? 72 : 44,
+    // so it needs room for just one or two icons — 72 or 44 design px.
+    width: rem(theme, leading ? 72 : 44),
     cell: ({ row }) => (
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: sxRem(2), justifyContent: "flex-end" }}>
         {leading?.(row)}

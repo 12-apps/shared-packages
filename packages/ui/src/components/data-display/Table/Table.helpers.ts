@@ -1,5 +1,12 @@
 import type { TableProps } from './Table.types';
 
+/**
+ * A virtualised row's height in design px: the caller's `rowHeight`, else 52.
+ * Resolved here rather than in {@link TABLE_DEFAULTS} so the one number is read
+ * where it is drawn (`rem`) and where the window is positioned with it (`remPx`).
+ */
+export const tableRowHeight = (rowHeight: number | undefined): number => rowHeight ?? 52;
+
 export const TABLE_DEFAULTS: Partial<TableProps> = {
   variant: 'default',
   stripeColor: 'neutral',
@@ -13,7 +20,6 @@ export const TABLE_DEFAULTS: Partial<TableProps> = {
   selectedRows: [],
   sortable: false,
   virtualScrolling: false,
-  rowHeight: 52,
   overscan: 5,
   responsive: false,
   showColumnToggle: true,

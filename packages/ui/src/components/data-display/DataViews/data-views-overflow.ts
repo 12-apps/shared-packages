@@ -1,16 +1,19 @@
 "use client";
 
+import { useTheme, type Theme } from "@mui/material/styles/index.js";
 import { useRef } from "react";
 
+import { remPx } from "../../../tokens/relative";
 import { splitToFit, useMeasuredWidth } from "../../utility/Overflow";
 import {
   estimateWidth,
   furnitureCost,
-  GAP,
   isRangeSet,
   pillText,
+  pricesFor,
   RESERVED,
   rightClusterCost,
+  type Prices,
 } from "./data-views-overflow-costs";
 import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
 
@@ -118,15 +121,16 @@ function isActiveField<T extends Record<string, unknown>>(
     : isRangeSet(ranges[field.id]);
 }
 
-/** Estimated rendered width of one control at its CURRENT value. */
+/** Estimated rendered width of one control at its CURRENT value, in px at `theme`'s scale. */
 function fieldWidth<T extends Record<string, unknown>>(
+  theme: Theme,
   field: OverflowField<T>,
   pills: Record<string, string[]>,
   ranges: Record<string, RangeValue>,
 ): number {
-  if (field.group === "pill") return estimateWidth(pillText(field, pills[field.id] ?? []), 0);
-  // A bounded range renders two number inputs beside its label.
-  return estimateWidth(field.label, isRangeSet(ranges[field.id]) ? 100 : 0);
+  if (field.group === "pill") return estimateWidth(theme, pillText(field, pills[field.id] ?? []), 0);
+  // A bounded range renders two number inputs (100 design px) beside its label.
+  return estimateWidth(theme, field.label, isRangeSet(ranges[field.id]) ? 100 : 0);
 }
 
 /** What one split costs on the bar, so the ladder below can price the next step. */
@@ -147,12 +151,16 @@ function splitFilters<T extends Record<string, unknown>>(
   furniture: number,
   /** Is the bar already down to icons? "Mais" shrinks with everything else. */
   compact: boolean,
+  /** Whose type scale every price is read at — the bar's own. */
+  theme: Theme,
 ): Split<T> {
   const active = all.filter((field) => isActiveField(field, pills, ranges));
   const idle = all.filter((field) => !isActiveField(field, pills, ranges));
+  const price = pricesFor(theme);
+  const gap = remPx(theme, RESERVED.betweenControls);
 
   // "Limpar" rides the end of the cluster whenever anything is applied.
-  const clearCost = active.length > 0 ? RESERVED.clearAll + GAP : 0;
+  const clearCost = active.length > 0 ? price.clearAll + gap : 0;
   // APPLIED FIRST, BUT NOT EXEMPT.
   //
   // Applied controls take the visible slots ahead of idle ones — that part was
@@ -170,13 +178,13 @@ function splitFilters<T extends Record<string, unknown>>(
   // one part of this that is not filter-shaped, and the part a second cluster
   // in the design system would otherwise have had to reimplement.
   const split = splitToFit(all, {
-    widthOf: (field) => fieldWidth(field, pills, ranges),
+    widthOf: (field) => fieldWidth(theme, field, pills, ranges),
     keyOf: (field) => field.id,
-    gap: GAP,
+    gap,
     available: width - furniture - clearCost,
     // The overflow button at the width it will actually have, which on a phone
     // is the icon-and-badge one.
-    overflowCost: compact ? RESERVED.overflowButtonCompact : RESERVED.overflowButton,
+    overflowCost: compact ? price.overflowButtonCompact : price.overflowButton,
     priority: [...active, ...idle],
   });
   return { ...split, used: split.used + clearCost };
@@ -206,6 +214,7 @@ function computeSplit<T extends Record<string, unknown>>(
   width: number,
   /** Does the host render "Exportar" beside "Exibir"? Half the cluster if not. */
   hasExport: boolean,
+  theme: Theme,
 ): Omit<OverflowSplit<T>, "barRef"> {
   // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
   if (width === 0) {
@@ -219,9 +228,11 @@ function computeSplit<T extends Record<string, unknown>>(
       searchTakeover: false,
     };
   }
+  const price = pricesFor(theme);
   // Pass 1 prices the furniture at its widest — no rung has been taken yet.
-  let split = splitFilters(all, pills, ranges, width, furnitureCost(UNCOLLAPSED, hasExport), false);
-  let flags = ladderFlags(split, width, hasExport);
+  let budget = furnitureCost(price, UNCOLLAPSED, hasExport);
+  let split = splitFilters(all, pills, ranges, width, budget, false, theme);
+  let flags = ladderFlags(split, width, hasExport, price);
   // RE-SPEND WHAT THE LATER RUNGS FREED.
   //
   // Rungs 2/4/5 turn 200 + 96 + 216 of furniture into 44 + 0 + 140, and until
@@ -234,13 +245,12 @@ function computeSplit<T extends Record<string, unknown>>(
   // ladder FURTHER down, and a further rung can only make the furniture
   // cheaper again — so the budget decreases monotonically and the loop exits
   // the moment it stops moving. The bound is a backstop, not the exit.
-  let budget = furnitureCost(UNCOLLAPSED, hasExport);
   for (let pass = 0; pass < 3; pass += 1) {
-    const freed = furnitureCost(flags, hasExport);
+    const freed = furnitureCost(price, flags, hasExport);
     if (freed >= budget) break;
     budget = freed;
-    split = splitFilters(all, pills, ranges, width, budget, flags.compactControls);
-    flags = ladderFlags(split, width, hasExport);
+    split = splitFilters(all, pills, ranges, width, budget, flags.compactControls, theme);
+    flags = ladderFlags(split, width, hasExport, price);
   }
   return { inline: split.inline, overflow: split.overflow, ...flags };
 }
@@ -253,21 +263,22 @@ function ladderFlags<T extends Record<string, unknown>>(
   split: Split<T>,
   width: number,
   hasExport: boolean,
+  price: Prices,
 ): Omit<OverflowSplit<T>, "barRef" | "inline" | "overflow"> {
   const { overflow, used } = split;
-  const base = width - used - RESERVED.chrome;
+  const base = width - used - price.chrome;
 
   // Would the search still make its minimum with the labels on?
-  const compactControls = base - RESERVED.counter - rightClusterCost(hasExport, false) < RESERVED.search;
-  const rightCost = rightClusterCost(hasExport, compactControls);
+  const compactControls = base - price.counter - rightClusterCost(price, hasExport, false) < price.search;
+  const rightCost = rightClusterCost(price, hasExport, compactControls);
   // …and with them off?
-  const searchCollapsed = base - RESERVED.counter - rightCost < RESERVED.search;
+  const searchCollapsed = base - price.counter - rightCost < price.search;
   // Everything has collapsed and the row STILL overflows. The controls cannot
   // shrink further — they are `flexShrink: 0` precisely so an over-packed row
   // sheds rather than squeezes — so without this last rung they simply paint
   // outside the toolbar, which is what a narrow phone was doing.
   const counterHidden =
-    searchCollapsed && base - RESERVED.counter - rightCost < RESERVED.searchIcon;
+    searchCollapsed && base - price.counter - rightCost < price.searchIcon;
   // Step 6 — below even that, "Limpar" leaves the bar. It is the ONLY control
   // here with a second home: the overflow panel's footer carries "Limpar todos
   // os filtros", so nothing is lost, which is exactly why it goes before the
@@ -288,14 +299,14 @@ function ladderFlags<T extends Record<string, unknown>>(
   // pushed the box under `usableSearch`, and tipped a row that had ample space
   // to share into a full takeover.
   const overflowButton = compactControls
-    ? RESERVED.overflowButtonCompact
-    : RESERVED.overflowButton;
-  const shedRoom = width - RESERVED.chrome - (overflow.length > 0 ? overflowButton : 0);
-  const searchBoxRoom = shedRoom - (counterHidden ? 0 : RESERVED.counter) - rightCost;
+    ? price.overflowButtonCompact
+    : price.overflowButton;
+  const shedRoom = width - price.chrome - (overflow.length > 0 ? overflowButton : 0);
+  const searchBoxRoom = shedRoom - (counterHidden ? 0 : price.counter) - rightCost;
   // Below this a box is too narrow to read what you typed into it, and shrinking
   // further buys nothing; that is the only point at which taking the whole
   // cluster is worth losing the filters.
-  const searchTakeover = searchCollapsed && searchBoxRoom < RESERVED.usableSearch;
+  const searchTakeover = searchCollapsed && searchBoxRoom < price.usableSearch;
 
   return { compactControls, counterHidden, searchCollapsed, clearAllHidden, searchTakeover };
 }
@@ -336,16 +347,19 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   // first measurement lands (and forever under SSR or jsdom), which
   // `computeSplit` reads as "degrade nothing".
   const { ref: barRef, width } = useMeasuredWidth<HTMLDivElement>();
+  // The prices follow the theme's type scale, so the answer does too.
+  const theme = useTheme();
   const signature = JSON.stringify({
     ids: all.map((field) => field.id),
     pills,
     ranges,
     width,
     hasExport,
+    scale: remPx(theme, 1),
   });
   const cache = useRef<{ signature: string; split: ReturnType<typeof computeSplit<T>> } | null>(null);
   if (cache.current === null || (!frozen && cache.current.signature !== signature)) {
-    cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport) };
+    cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport, theme) };
   }
   return { ...cache.current.split, barRef };
 }

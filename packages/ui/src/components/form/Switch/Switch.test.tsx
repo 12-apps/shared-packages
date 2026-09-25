@@ -21,13 +21,13 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
-import type { Theme } from '@mui/material/styles/index.js';
+import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Switch } from './Switch';
-import { TAP_TARGET_MIN } from './Switch.metrics';
-import { onTrackInk } from './Switch.styles';
+import { IOS_THUMB_SHADOW, TAP_TARGET_MIN, iosTrackShadow } from './Switch.metrics';
+import { onTrackInk, switchSx } from './Switch.styles';
 
 /** A real seeded tenant's brand: 1.76:1 against white, which is the whole point. */
 const PALE_BRAND = '#7ED957';
@@ -410,5 +410,38 @@ describe('the ink on a tenant-coloured track (FUT-1924)', () => {
     // tenant chooses — so this one was never the defect, and a fix that
     // repainted it would be a redesign wearing a bug fix's clothes.
     expect(thumbFill(rules, 'resting')).toBe('#fff');
+  });
+});
+
+describe('the iOS shadows scale with the type like every other length (FUT-2598)', () => {
+  /** The `box-shadow` the web gives the iOS thumb and track under `theme`. */
+  const iosShadows = (theme: Theme) => {
+    const sx = switchSx(theme, { customVariant: 'ios' });
+    return {
+      thumb: String((sx['& .MuiSwitch-thumb'] as CSSObject).boxShadow),
+      track: String((sx['& .MuiSwitch-track'] as CSSObject).boxShadow),
+    };
+  };
+
+  /** A rem length back to the px it renders at on a 16px root. */
+  const asPx = (css: string) => css.replace(/(\d*\.?\d+)rem/gu, (_, n: string) => `${Number(n) * 16}px`);
+
+  it('draws the thumb shadow and the track inset through a compact type scale', () => {
+    const dense = createTheme({ typography: { fontSize: 12 } });
+    const r = (px: number) => dense.typography.pxToRem(px);
+    const { thumb, track } = iosShadows(dense);
+
+    expect(thumb).toContain(`0 ${r(3)} ${r(1)} 0`);
+    expect(thumb).toContain(`0 ${r(3)} ${r(8)} 0`);
+    expect(thumb).toContain(`0 ${r(1)} 0 0`);
+    expect(track).toContain(`inset 0 0 0 ${r(0.5)}`);
+    expect(track).toContain(`inset 0 ${r(2)} ${r(3)}`);
+  });
+
+  it('renders the px native draws, at MUI defaults', () => {
+    const { thumb, track } = iosShadows(createTheme());
+
+    expect(asPx(thumb)).toBe(IOS_THUMB_SHADOW);
+    expect(asPx(track)).toBe(iosTrackShadow());
   });
 });

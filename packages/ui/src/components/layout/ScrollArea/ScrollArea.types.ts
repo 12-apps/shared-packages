@@ -63,7 +63,10 @@ export interface ScrollAreaBase extends Omit<BoxProps, 'ref'> {
   /** Scroll event handler */
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 
-  /** Threshold for showing scroll-to-top button (in pixels) */
+  /**
+   * How far down the scroll-to-top button appears (default 100) — design px,
+   * scaled with the theme's type scale.
+   */
   scrollToTopThreshold?: number;
 
   /** Custom scrollbar color */

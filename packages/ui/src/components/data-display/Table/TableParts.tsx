@@ -5,8 +5,12 @@ import TableCell from '@mui/material/TableCell/index.js';
 import TableHead from '@mui/material/TableHead/index.js';
 import TableRow from '@mui/material/TableRow/index.js';
 import TableSortLabel from '@mui/material/TableSortLabel/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useCallback } from 'react';
 
+import { rem } from '../../../tokens/relative';
+
+import { tableRowHeight } from './Table.helpers';
 import { useVirtualScrolling } from './Table.hooks';
 import { useTableRowRenderer } from './TableParts.hooks';
 import type { ColumnConfig, TableBodyProps, TableHeaderProps } from './Table.types';
@@ -23,6 +27,10 @@ const ariaSortFor = (
   return direction === 'asc' ? 'ascending' : 'descending';
 };
 
+/** A column's `width`/`minWidth` as CSS: a number is design px, a string as given. */
+const columnLength = (theme: Theme, value: number | string | undefined): string | undefined =>
+  typeof value === 'number' ? rem(theme, value) : value;
+
 // One header cell. Sorting is offered when the table is sortable and the column
 // has not opted out; aria-sort mirrors the visible indicator.
 const HeaderCell: React.FC<{
@@ -31,13 +39,17 @@ const HeaderCell: React.FC<{
   sortConfig?: { key: string; direction: 'asc' | 'desc' };
   onSort: (columnKey: string) => void;
 }> = ({ column, sortable, sortConfig, onSort }) => {
+  const theme = useTheme();
   const canSort = Boolean(sortable) && column.sortable !== false;
   const isSorted = sortConfig?.key === column.key;
 
   return (
     <TableCell
       align={column.align || 'left'}
-      style={{ minWidth: column.minWidth, width: column.width }}
+      style={{
+        minWidth: columnLength(theme, column.minWidth),
+        width: columnLength(theme, column.width),
+      }}
       aria-sort={ariaSortFor(canSort, isSorted, sortConfig?.direction)}
     >
       {canSort ? (
@@ -120,10 +132,12 @@ export const TableDataRow: React.FC<{
   rowData: Record<string, unknown>;
   rowKey: string | number;
   index: number;
+  /** Where a virtualised row sits, in design px — drawn through `rem`, like its height. */
   offsetY: number;
   columns: ColumnConfig[];
   selected: boolean;
   selectable?: boolean;
+  /** Design px; 52 when unset (`tableRowHeight`). */
   rowHeight?: number;
   onRowClick?: TableBodyProps['onRowClick'];
   onRowFocus?: TableBodyProps['onRowFocus'];
@@ -145,8 +159,9 @@ export const TableDataRow: React.FC<{
   onRowBlur,
   onSelect,
   virtualScrolling,
-  renderCell }) => (
-
+  renderCell }) => {
+  const theme = useTheme();
+  return (
       <TableRow
         key={String(rowKey)}
         selected={selected}
@@ -155,12 +170,12 @@ export const TableDataRow: React.FC<{
         onFocus={(event: React.FocusEvent<globalThis.HTMLTableRowElement>) => onRowFocus?.(event, rowData)}
         onBlur={(event: React.FocusEvent<globalThis.HTMLTableRowElement>) => onRowBlur?.(event, rowData)}
         style={virtualScrolling ? { 
-          transform: `translateY(${offsetY}px)`,
+          transform: `translateY(${rem(theme, offsetY)})`,
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          height: rowHeight } : undefined}
+          height: rem(theme, tableRowHeight(rowHeight)) } : undefined}
       >
         {selectable && (
           <TableCell padding="checkbox">
@@ -186,16 +201,19 @@ export const TableDataRow: React.FC<{
           );
         })}
       </TableRow>
-);
+  );
+};
 
 // Only the rows in view are rendered, positioned by absolute offset inside a
-// spacer sized to the full data set.
+// spacer sized to the full data set. `rowHeight`, `containerHeight` and every
+// offset are design px, drawn through `rem`.
 const VirtualisedBody: React.FC<{
   visibleItems: {
     items: Record<string, unknown>[];
     startIndex: number;
     offsetY: number;
-    totalHeight: number;
+    /** As CSS. */
+    totalHeight: string;
   };
   rowHeight: number;
   containerHeight: number;
@@ -205,12 +223,13 @@ const VirtualisedBody: React.FC<{
     index: number,
     offsetY?: number,
   ) => React.ReactNode;
-}> = ({ visibleItems, rowHeight, containerHeight, onScroll, renderTableRow }) => (
-
+}> = ({ visibleItems, rowHeight, containerHeight, onScroll, renderTableRow }) => {
+  const theme = useTheme();
+  return (
     <Box
       onScroll={onScroll}
       style={{
-        height: containerHeight,
+        height: rem(theme, containerHeight),
         overflow: 'auto',
         position: 'relative' }}
     >
@@ -224,8 +243,8 @@ const VirtualisedBody: React.FC<{
         )}
       </TableBody>
     </Box>
-  
-);
+  );
+};
 
 const PlainBody: React.FC<{
   data: TableBodyProps['data'];
@@ -238,35 +257,12 @@ const PlainBody: React.FC<{
 );
 
 // Enhanced Table Body Component  
-export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo(({
-  data,
-  columns,
-  selectedRows = [],
-  onRowClick,
-  onRowFocus,
-  onRowBlur,
-  onSelectionChange,
-  rowKeyExtractor,
-  selectable,
-  renderRow,
-  renderCell,
-  virtualScrolling,
-  containerHeight,
-  rowHeight,
-  overscan = 5 }) => {
-  const renderTableRow = useTableRowRenderer({
-    columns,
-    selectedRows,
-    onRowClick,
-    onRowFocus,
-    onRowBlur,
-    onSelectionChange,
-    rowKeyExtractor,
-    selectable,
-    renderRow,
-    renderCell,
-    virtualScrolling,
-    rowHeight });
+export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo((props) => {
+  const { data, virtualScrolling, containerHeight, overscan = 5 } = props;
+  // The row renderer takes the body's own props; its `rowHeight` stays the
+  // caller's design px, and the row resolves the default where it draws it.
+  const renderTableRow = useTableRowRenderer({ ...props, selectedRows: props.selectedRows ?? [] });
+  const rowHeight = tableRowHeight(props.rowHeight);
 
   const { visibleItems, handleScroll } = useVirtualScrolling(
     data, 

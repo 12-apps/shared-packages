@@ -22,7 +22,9 @@ export interface ColumnConfig {
   label: string;
   sortable?: boolean;
   filterable?: boolean;
+  /** A number is design px, scaled with the theme's type scale; a string is used as given. */
   width?: number | string;
+  /** Design px, scaled with the theme's type scale. */
   minWidth?: number;
   priority?: number; // 1 = highest priority, higher numbers = lower priority
   align?: 'left' | 'center' | 'right';
@@ -191,7 +193,8 @@ export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   virtualScrolling?: boolean;
   
   /**
-   * Height of each row for virtual scrolling (required if virtualScrolling is true)
+   * Height of each row for virtual scrolling (default 52) — design px, scaled
+   * with the theme's type scale.
    */
   rowHeight?: number;
   
@@ -226,7 +229,8 @@ export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   showColumnToggle?: boolean;
   
   /**
-   * Container height for virtual scrolling
+   * Container height for virtual scrolling (default 400). A number is design
+   * px, scaled with the theme's type scale; a string is used as given.
    */
   containerHeight?: number | string;
   

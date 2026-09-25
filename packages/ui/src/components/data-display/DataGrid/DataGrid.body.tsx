@@ -13,6 +13,8 @@ import TableRow from '@mui/material/TableRow/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import type React from 'react';
 
+import { rem } from '../../../tokens/relative';
+
 import { GridRow, HeaderCell } from './DataGrid.cells';
 import type { DataGridModel } from './DataGrid.model';
 import type { DataGridProps } from './DataGrid.types';
@@ -78,7 +80,10 @@ export function GridHeader<T extends Record<string, unknown>>(
   section: GridSectionProps<T>,
 ): React.JSX.Element {
   const { model, props } = section;
-  const { sorting = {}, stickyHeader = true, headerHeight = 56 } = props;
+  const theme = useTheme();
+  const { sorting = {}, stickyHeader = true } = props;
+  // 56 design px unless the caller says, drawn through the type scale.
+  const headerHeight = rem(theme, props.headerHeight ?? 56);
   const sortable = sorting.mode === 'client' || sorting.mode === 'server';
   return (
     <TableHead data-slot="header">
@@ -100,12 +105,27 @@ export function GridHeader<T extends Record<string, unknown>>(
   );
 }
 
-/** An invisible row standing in for the rows the window is not rendering. */
-function Spacer({ height, colSpan }: { height: number; colSpan: number }): React.JSX.Element | null {
-  if (height <= 0) return null;
+/**
+ * An invisible row standing in for `rows` rows the window is not rendering —
+ * that many times the row's own CSS height, so the spacer and the rows it
+ * replaces are the same length by construction.
+ */
+function Spacer({
+  rows,
+  rowHeight,
+  colSpan,
+}: {
+  rows: number;
+  rowHeight: string;
+  colSpan: number;
+}): React.JSX.Element | null {
+  if (rows <= 0) return null;
   return (
     <TableRow>
-      <TableCell colSpan={colSpan} sx={{ height, border: 'none', p: 0 }} />
+      <TableCell
+        colSpan={colSpan}
+        sx={{ height: `calc(${rows} * ${rowHeight})`, border: 'none', p: 0 }}
+      />
     </TableRow>
   );
 }
@@ -119,7 +139,7 @@ export function GridBody<T extends Record<string, unknown>>(
   return (
     <TableBody data-slot="body">
       {model.virtualized ? (
-        <Spacer height={start * model.rowHeight} colSpan={totalColumns} />
+        <Spacer rows={start} rowHeight={model.rowHeight} colSpan={totalColumns} />
       ) : null}
       {model.visibleRows.map((row, offset) => {
         const index = model.virtualized ? start + offset : offset;
@@ -139,7 +159,7 @@ export function GridBody<T extends Record<string, unknown>>(
         );
       })}
       {model.virtualized ? (
-        <Spacer height={trailing * model.rowHeight} colSpan={totalColumns} />
+        <Spacer rows={trailing} rowHeight={model.rowHeight} colSpan={totalColumns} />
       ) : null}
     </TableBody>
   );

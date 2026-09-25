@@ -8,7 +8,7 @@ import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { rem, sxRem } from '../../../tokens/relative';
+import { rem, remPx, sxRem } from '../../../tokens/relative';
 
 import type { ResolvedScrollAreaProps } from './ScrollArea.helpers';
 import { resolveScrollAreaProps } from './ScrollArea.helpers';
@@ -105,6 +105,7 @@ const useScrollArea = (
     scrollToTopThreshold,
     smoothScroll } = props;
 
+  const theme = useTheme();
   const { scrollRef, setScrollRef, containerDimensions } = useObservedScrollRef({
     externalScrollRef,
     onResize });
@@ -121,12 +122,13 @@ const useScrollArea = (
       noteScroll();
 
       if (scrollToTopButton && scrollRef.current) {
-        setShowScrollToTop(scrollRef.current.scrollTop > scrollToTopThreshold);
+        // 100 design px unless the caller says, in the px `scrollTop` is measured in.
+        setShowScrollToTop(scrollRef.current.scrollTop > remPx(theme, scrollToTopThreshold ?? 100));
       }
 
       onScroll?.(event);
     },
-    [disabled, noteScroll, scrollToTopButton, scrollToTopThreshold, onScroll, scrollRef],
+    [disabled, noteScroll, scrollToTopButton, scrollToTopThreshold, onScroll, scrollRef, theme],
   );
 
   const scrollToTop = useCallback(() => {

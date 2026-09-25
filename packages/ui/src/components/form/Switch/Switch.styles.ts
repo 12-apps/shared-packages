@@ -12,7 +12,6 @@ import {
 import {
   DISABLED,
   IOS_BASE_OFFSET,
-  IOS_THUMB_SHADOW,
   IOS_TRAVEL_INSET,
   SWITCH_GLASS,
   SWITCH_GLOW,
@@ -30,6 +29,7 @@ import {
   TRACK_LABEL,
   TRACK_RADIUS,
   geometryOf,
+  iosThumbShadow,
   iosTrackShadow,
   lookOf,
   seconds,
@@ -108,7 +108,9 @@ const lengthOrPercent = (theme: Theme, value: number | string): string =>
   typeof value === 'number' ? rem(theme, value) : value;
 
 const thumbShadow = (theme: Theme, look: SwitchLook): string =>
-  look === 'ios' ? IOS_THUMB_SHADOW : (theme.shadows[THUMB_ELEVATION[look]] ?? 'none');
+  look === 'ios'
+    ? iosThumbShadow((px) => rem(theme, px))
+    : (theme.shadows[THUMB_ELEVATION[look]] ?? 'none');
 
 /** The ripple that expands from the thumb on hover. */
 const rippleOverlay = (palette: ColorPalette): CSSObject => ({
@@ -356,7 +358,7 @@ const trackSx = (
     opacity: 1,
     transition: `all ${seconds(SWITCH_TRANSITION.ms)} ${SWITCH_TRANSITION.easing}`,
     position: 'relative',
-    boxShadow: look === 'ios' ? iosTrackShadow() : 'none',
+    boxShadow: look === 'ios' ? iosTrackShadow((px) => rem(theme, px)) : 'none',
     ...(glass && {
       backgroundColor: alpha(theme.palette.background.paper, SWITCH_GLASS.trackAlpha),
       backdropFilter: `blur(${rem(theme, SWITCH_GLASS.trackBlur)})`,

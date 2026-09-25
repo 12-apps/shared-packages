@@ -18,10 +18,14 @@ export interface GridColumn<T = Record<string, unknown>> {
   accessor?: keyof T | ((row: T) => unknown);
   /** Column type influences default formatting and editors */
   type?: 'text' | 'number' | 'date' | 'datetime' | 'boolean' | 'currency' | 'actions';
-  /** Width hints (px) and min/max constraints */
-  width?: number;
-  minWidth?: number;
-  maxWidth?: number;
+  /**
+   * Width hint and min/max constraints. A number is design px, scaled with the
+   * theme's type scale (1 or less is a fraction of the table, as in `sx`); a
+   * string (`'312px'`, `'20%'`) is used as given.
+   */
+  width?: number | string;
+  minWidth?: number | string;
+  maxWidth?: number | string;
   /** Column is initially hidden */
   hidden?: boolean;
   /** Pin to left/right (sticky) */
@@ -144,8 +148,10 @@ export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAt
   /** Sizing, density, and layout */
   sizeMode?: GridSizeMode; // auto | fixed | fill
   density?: GridDensity; // compact | comfortable | spacious
-  rowHeight?: number; // default row height (px)
-  headerHeight?: number; // default header height (px)
+  /** Row height (default 52) — design px, scaled with the theme's type scale; `density` scales it first. */
+  rowHeight?: number;
+  /** Header row height (default 56) — design px, scaled with the theme's type scale. */
+  headerHeight?: number;
   footerHeight?: number; // optional
 
   /** Interaction features */

@@ -2,22 +2,31 @@ import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { rem, remPx } from '../../../tokens/relative';
+
 import type { ColumnConfig, TableProps } from './Table.types';
 
+/**
+ * The virtual window. `rowHeight` and `containerHeight` are design px: the
+ * window is computed in the px `scrollTop` is measured in (`remPx`), and what it
+ * hands back to draw with stays in design px (`offsetY`) or is CSS already
+ * (`totalHeight`), so the rows and the window share one pitch at any type scale.
+ */
 export const useVirtualScrolling = (
   data: Record<string, unknown>[],
   rowHeight: number,
   containerHeight: number,
   overscan: number = 5
 ) => {
+  const theme = useTheme();
   const [scrollTop, setScrollTop] = useState(0);
   
   const visibleItems = useMemo(() => {
-    const visibleHeight = containerHeight;
-    const startIndex = Math.floor(scrollTop / rowHeight);
+    const pitch = remPx(theme, rowHeight);
+    const startIndex = Math.floor(scrollTop / pitch);
     const endIndex = Math.min(
       data.length,
-      Math.ceil((scrollTop + visibleHeight) / rowHeight)
+      Math.ceil((scrollTop + remPx(theme, containerHeight)) / pitch)
     );
     
     const start = Math.max(0, startIndex - overscan);
@@ -27,10 +36,12 @@ export const useVirtualScrolling = (
       startIndex: start,
       endIndex: end,
       items: data.slice(start, end),
-      totalHeight: data.length * rowHeight,
+      /** Every row at the scaled pitch, as CSS. */
+      totalHeight: rem(theme, data.length * rowHeight),
+      /** Where the first mounted row sits, in design px. */
       offsetY: start * rowHeight,
     };
-  }, [data, rowHeight, containerHeight, scrollTop, overscan]);
+  }, [data, rowHeight, containerHeight, scrollTop, overscan, theme]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);

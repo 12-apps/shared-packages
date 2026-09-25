@@ -9,12 +9,21 @@
  * Every number here is either MEASURED in a browser (and says so) or
  * deliberately generous. Over-pricing sheds one control too early, which the
  * "Mais" button absorbs invisibly; under-pricing breaks the line.
+ *
+ * Every number is DESIGN px — measured at MUI's default type scale. The bar is
+ * measured in real px, so a price reaches it through `remPx` (`estimateWidth`,
+ * `pricesFor`): a theme that scales its type scales the controls, and so the
+ * prices, together — a denser theme fits more pills on the same bar.
  */
+import type { Theme } from "@mui/material/styles/index.js";
+
+import { remPx } from "../../../tokens/relative";
+
 import type { OverflowField } from "./data-views-overflow";
 import type { RangeValue } from "./data-views-types";
 
 /**
- * Rough rendered width of a control, in px.
+ * Rough rendered width of a control, in px at `theme`'s type scale.
  *
  * An ESTIMATE from the label text rather than a real measurement, deliberately:
  * measuring the true width needs every control mounted first, and mounting them
@@ -22,7 +31,7 @@ import type { RangeValue } from "./data-views-types";
  * avoid. The estimate only has to rank controls and find the cut point — being
  * a few px out moves the cut by at most one control, and the overflow catches it.
  */
-export function estimateWidth(text: string, extra: number): number {
+export function estimateWidth(theme: Theme, text: string, extra: number): number {
   /**
    * ~7.6px per character at the toolbar's font size, plus 76px of chrome:
    * horizontal padding, the border, and the dropdown chevron. The chrome used
@@ -41,7 +50,7 @@ export function estimateWidth(text: string, extra: number): number {
    * still above the ~50 measured, so the slack the comment above asks for is
    * intact; it is just slack rather than a second control's worth of budget.
    */
-  return Math.round(text.length * 7.6) + 56 + extra;
+  return remPx(theme, Math.round(text.length * 7.6) + 56 + extra);
 }
 
 /** Is a range bounded at either end? */
@@ -59,7 +68,7 @@ export function pillText<T extends Record<string, unknown>>(field: OverflowField
   return `${field.label}: ${values.length}`;
 }
 
-/** Fixed toolbar furniture the filters have to fit around, in px. */
+/** Fixed toolbar furniture the filters have to fit around, in design px. */
 export const RESERVED = {
   /** The search box never shrinks below this. */
   search: 200,
@@ -131,20 +140,28 @@ export const RESERVED = {
   /**
    * The row's own padding, plus the gaps BETWEEN the fixed furniture.
    *
-   * Not the per-control gaps — `splitFilters` already adds a `GAP` for every
-   * filter it keeps, so counting a fourth one here charged one gap twice.
+   * Not the per-control gaps — `splitFilters` already adds `betweenControls`
+   * for every filter it keeps, so counting a fourth one here charged one gap twice.
    * MEASURED: 32px of padding (16 each side) + three 8px gaps between the
    * search, the counter and the right cluster.
    */
   chrome: 56,
+  /** The gap between two controls. */
+  betweenControls: 8,
 } as const;
 
-/** The gap between two controls. */
-export const GAP = 8;
+/** {@link RESERVED} at a theme's type scale — the px the measured bar is in. */
+export type Prices = Record<keyof typeof RESERVED, number>;
+
+/** Price the furniture for `theme`: every {@link RESERVED} entry through `remPx`. */
+export function pricesFor(theme: Theme): Prices {
+  const entries = Object.entries(RESERVED).map(([key, px]) => [key, remPx(theme, px)]);
+  return Object.fromEntries(entries) as Prices;
+}
 
 /** What the right-hand cluster costs, given what the host actually renders. */
-export function rightClusterCost(hasExport: boolean, compact: boolean): number {
-  const one = compact ? RESERVED.displayControlCompact : RESERVED.displayControl;
+export function rightClusterCost(price: Prices, hasExport: boolean, compact: boolean): number {
+  const one = compact ? price.displayControlCompact : price.displayControl;
   return hasExport ? one * 2 : one;
 }
 
@@ -159,13 +176,14 @@ export function rightClusterCost(hasExport: boolean, compact: boolean): number {
  * as a bar carrying a magnifier, a "Mais 5" pill, and a band of nothing.
  */
 export function furnitureCost(
+  price: Prices,
   flags: { searchCollapsed: boolean; counterHidden: boolean; compactControls: boolean },
   hasExport: boolean,
 ): number {
   return (
-    (flags.searchCollapsed ? RESERVED.searchIcon : RESERVED.search) +
-    (flags.counterHidden ? 0 : RESERVED.counter) +
-    rightClusterCost(hasExport, flags.compactControls) +
-    RESERVED.chrome
+    (flags.searchCollapsed ? price.searchIcon : price.search) +
+    (flags.counterHidden ? 0 : price.counter) +
+    rightClusterCost(price, hasExport, flags.compactControls) +
+    price.chrome
   );
 }
