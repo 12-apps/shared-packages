@@ -20,6 +20,7 @@ import {
   DIALOG_TITLE,
   DIALOG_TITLED_BODY_PADDING_TOP_UNITS,
 } from './Dialog.metrics';
+import { mergedPaperSlot } from './Dialog.paper';
 import { backdropSxOf, variantStylesOf } from './Dialog.styles';
 import { childTestId, resolveTestId, slotTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type {
@@ -74,15 +75,11 @@ function bodyOf(children: React.ReactNode, hasTitle: boolean): React.ReactNode {
   return <Box sx={{ ...BODY_SX, pt }}>{children}</Box>;
 }
 
-/** Our look first, then whatever `sx` the caller adds — so the caller's escape hatch still wins. */
-function withCallerSx(own: SxProps<Theme>, caller: SxProps<Theme> | undefined): SxProps<Theme> {
-  return [own, ...(Array.isArray(caller) ? caller : caller === undefined ? [] : [caller])] as SxProps<Theme>;
-}
-
 /**
  * The drawer variant: MUI's `Drawer`, with the variant's look on the Drawer's
  * OWN paper — on an inner Box it left the paper 0px wide and clipped the panel —
- * and a caller's paper props merged over it rather than replacing it.
+ * and a caller's paper props merged over it rather than replacing it. The
+ * test id stays on the Drawer root, so the paper carries none of its own.
  */
 function DrawerDialog({
   paperSx,
@@ -95,13 +92,13 @@ function DrawerDialog({
   drawerProps: DrawerProps;
   children: React.ReactNode;
 }) {
-  const { PaperProps: callerPaper, ...rest } = drawerProps;
+  const { PaperProps: callerPaper, slotProps, ...rest } = drawerProps;
   return (
     <Drawer
       anchor="right"
       data-testid={testId}
       {...rest}
-      PaperProps={{ ...callerPaper, sx: withCallerSx(paperSx, callerPaper?.sx) }}
+      slotProps={{ ...slotProps, paper: mergedPaperSlot(paperSx, undefined, callerPaper, slotProps?.paper) }}
     >
       {children}
     </Drawer>
@@ -133,7 +130,7 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
   // Native's name for it and is not a DOM attribute. The native `Dialog` does
   // the same in reverse.
   const testId = resolveTestId(others, 'dialog');
-  const props = withoutTestIdProps(others);
+  const { PaperProps: callerPaper, slotProps, ...props } = withoutTestIdProps(others);
   const paperSx = variantStylesOf(theme, {
     variant, size, borderRadius, glass, gradient, glow, pulse,
   });
@@ -158,7 +155,11 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
 
   if (variant === 'drawer') {
     return (
-      <DrawerDialog paperSx={paperSx} testId={testId} drawerProps={{ ...props, open, onClose }}>
+      <DrawerDialog
+        paperSx={paperSx}
+        testId={testId}
+        drawerProps={{ ...props, PaperProps: callerPaper, slotProps, open, onClose }}
+      >
         {header}
         {body}
       </DrawerDialog>
@@ -172,8 +173,8 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
       fullScreen={variant === 'fullscreen'}
       BackdropComponent={backdrop ? Backdrop : undefined}
       BackdropProps={{ sx: backdropSxOf(theme, glass) }}
-      PaperProps={{ sx: paperSx, 'data-testid': testId }}
       {...props}
+      slotProps={{ ...slotProps, paper: mergedPaperSlot(paperSx, testId, callerPaper, slotProps?.paper) }}
     >
       {header}
       {body}
