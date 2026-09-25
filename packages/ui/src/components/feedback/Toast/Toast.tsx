@@ -15,6 +15,8 @@ import Typography from '@mui/material/Typography/index.js';
 import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React, { createContext, useCallback,useContext, useState } from 'react';
 
+import { rem } from '../../../tokens/relative';
+
 import type { ToastContainerProps, ToastContextType, ToastItem,ToastProps } from './Toast.types';
 
 const ToastContext = createContext<ToastContextType | null>(null);
@@ -118,7 +120,7 @@ export const useToast = (): ToastContextType => {
   return context;
 };
 
-const renderVariantIcon = (variant: ToastProps['variant']) => {
+const renderVariantIcon = (theme: Theme, variant: ToastProps['variant']) => {
   switch (variant) {
     case 'success':
       return <SuccessIcon />;
@@ -129,7 +131,7 @@ const renderVariantIcon = (variant: ToastProps['variant']) => {
     case 'info':
       return <InfoIcon />;
     case 'promise':
-      return <CircularProgress size={20} />;
+      return <CircularProgress size={rem(theme, 20)} />;
     default:
       return null;
   }
@@ -151,7 +153,7 @@ const buildToastStyles = (theme: Theme, glass: boolean) => {
     return {
       ...baseStyles,
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
     };
   }
@@ -180,7 +182,7 @@ export const Toast: React.FC<ToastProps> = ({
   return (
     <Alert
       data-testid={dataTestId}
-      icon={renderVariantIcon(variant)}
+      icon={renderVariantIcon(theme, variant)}
       severity={toAlertSeverity(variant)}
       onClose={closable ? handleClose : undefined}
       action={
@@ -218,10 +220,11 @@ export const Toast: React.FC<ToastProps> = ({
 export const ToastContainer: React.FC<ToastContainerProps> = ({
   position = 'top-right',
   maxToasts = 5,
-  gap = 8,
+  gap,
   className,
   dataTestId = 'toast-container',
 }) => {
+  const theme = useTheme();
   const context = useContext(ToastContext);
   
   if (!context) {
@@ -236,8 +239,9 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
       zIndex: 9999,
       display: 'flex',
       flexDirection: 'column',
-      gap: `${gap}px`,
-      padding: '16px',
+      // `gap` is design px (default 8), read through the type scale.
+      gap: rem(theme, gap ?? 8),
+      padding: rem(theme, 16),
       pointerEvents: 'none',
     };
 

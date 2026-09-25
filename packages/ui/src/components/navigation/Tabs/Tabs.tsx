@@ -5,12 +5,13 @@ import Divider from '@mui/material/Divider/index.js';
 import MuiTab from '@mui/material/Tab/index.js';
 import MuiTabs from '@mui/material/Tabs/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { CustomTabPanel } from './TabsPanel';
 import { tabsRootStyles } from './Tabs.styles';
 import type { TabItem, TabsProps } from './Tabs.types';
-import { rem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const StyledTabs = styled(MuiTabs, {
   shouldForwardProp: (prop) => !['customVariant', 'size', 'showDividers'].includes(prop as string) })<{ customVariant?: string; size?: string; showDividers?: boolean }>(
@@ -21,8 +22,8 @@ const StyledTabs = styled(MuiTabs, {
 const CloseButton = styled(Box)(({ theme }) => ({
   marginLeft: theme.spacing(0.5),
   padding: theme.spacing(0.25),
-  width: 20,
-  height: 20,
+  width: rem(theme, 20),
+  height: rem(theme, 20),
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -35,11 +36,11 @@ const CloseButton = styled(Box)(({ theme }) => ({
 
 const BadgeWrapper = styled(Badge)(({ theme }) => ({
   '& .MuiBadge-badge': {
-    right: -6,
-    top: 4,
+    right: rem(theme, -6),
+    top: rem(theme, 4),
     fontSize: rem(theme, 12),
-    minWidth: 16,
-    height: 16,
+    minWidth: rem(theme, 16),
+    height: rem(theme, 16),
     padding: 0 } }));
 
 const TABS_DEFAULTS: Partial<TabsProps> = {
@@ -124,7 +125,8 @@ const buildTabsSx = ({
   disabled }: {
   fullWidth?: boolean;
   sticky?: boolean;
-  stickyOffset?: number;
+  /** The pinned list's `top`, already through the theme (the prop is design px). */
+  stickyOffset: (theme: Theme) => string;
   indicatorColor?: string;
   disabled?: boolean;
 }) => ({
@@ -209,7 +211,7 @@ const TabsBar: React.FC<
     sx={buildTabsSx({
       fullWidth: p.fullWidth,
       sticky: p.sticky,
-      stickyOffset: p.stickyOffset,
+      stickyOffset: sxRem(p.stickyOffset ?? 0),
       indicatorColor: p.indicatorColor,
       disabled: p.disabled })}
   >

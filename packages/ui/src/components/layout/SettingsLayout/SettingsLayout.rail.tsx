@@ -10,7 +10,8 @@ import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import { SettingsRailGroup, type RailShape } from './SettingsLayout.items';
-import { atLeastRail, displayAcrossRail, RAIL_WIDTH, TOUCH_TARGET } from './SettingsLayout.styles';
+import { atLeastRail, displayAcrossRail, railWidth, TOUCH_TARGET } from './SettingsLayout.styles';
+import { rem, sxRem } from '../../../tokens/relative';
 import type {
   SettingsEmptySearchAction,
   SettingsLayoutProps,
@@ -54,7 +55,7 @@ function SettingsRailToggle({
         justifyContent: 'space-between',
         gap: 1,
         width: '100%',
-        minHeight: TOUCH_TARGET,
+        minHeight: rem(theme, TOUCH_TARGET),
         px: 1.5,
         py: 1,
         mb: 1,
@@ -116,7 +117,7 @@ function SettingsSearchEmpty({
             action.onClear?.();
           }}
           data-testid={`${testIdPrefix}-empty-action`}
-          sx={{ mt: 1.5, minHeight: TOUCH_TARGET }}
+          sx={{ mt: 1.5, minHeight: sxRem(TOUCH_TARGET) }}
         >
           {action.label}
         </Button>
@@ -248,8 +249,8 @@ export function SettingsRail({
         width: '100%',
         [atLeastRail(theme, breakpoint)]: {
           display: 'block',
-          flex: `0 0 ${RAIL_WIDTH}px`,
-          width: RAIL_WIDTH,
+          flex: `0 0 ${railWidth(theme)}`,
+          width: railWidth(theme),
           borderRight: `1px solid ${theme.palette.divider}`,
           pr: 2,
           // Its own scrollbar, so a settings area with twenty categories does

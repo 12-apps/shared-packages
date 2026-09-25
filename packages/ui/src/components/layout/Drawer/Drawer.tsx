@@ -9,8 +9,19 @@ import React from 'react';
 
 import type { DrawerContentProps,DrawerHeaderProps, DrawerProps } from './Drawer.types';
 import { shadowInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
 type DrawerAnchor = 'left' | 'right' | 'top' | 'bottom';
+
+/**
+ * A `width`/`height` prop as CSS. `sx` reads a number of 1 or less as a
+ * fraction of the parent, and that stays so; any other number is design px,
+ * through the type scale; a string is as given.
+ */
+const drawerLength = (theme: Theme, value: number | string | undefined): string | undefined => {
+  if (typeof value !== 'number') return value;
+  return value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value);
+};
 
 // `variant` doubles as a position preset, but an explicit `anchor` always wins.
 const resolveAnchor = (
@@ -47,9 +58,11 @@ const buildDrawerStyles = (
   // omit it and the drawer styles exactly as it always has.
   paperSx?: DrawerProps['paperSx'],
 ) => {
+  const widthCss = drawerLength(theme, width);
+  const heightCss = drawerLength(theme, height);
   const baseStyles = {
-    width: ['left', 'right'].includes(anchor) ? width : '100%',
-    height: ['top', 'bottom'].includes(anchor) ? height : '100%',
+    width: ['left', 'right'].includes(anchor) ? widthCss : '100%',
+    height: ['top', 'bottom'].includes(anchor) ? heightCss : '100%',
     flexShrink: 0,
   };
 
@@ -57,12 +70,12 @@ const buildDrawerStyles = (
     return {
       ...baseStyles,
       '& .MuiDrawer-paper': {
-        width,
+        width: widthCss,
         height: '100%',
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-        boxShadow: `0 8px 32px ${shadowInk(theme, 0.1)}`,
+        boxShadow: `${rems(theme, 0, 8, 32)} ${shadowInk(theme, 0.1)}`,
         ...paperSx,
       },
     };
@@ -71,8 +84,8 @@ const buildDrawerStyles = (
   return {
     ...baseStyles,
     '& .MuiDrawer-paper': {
-      width: ['left', 'right'].includes(anchor) ? width : '100%',
-      height: ['top', 'bottom'].includes(anchor) ? height : '100%',
+      width: ['left', 'right'].includes(anchor) ? widthCss : '100%',
+      height: ['top', 'bottom'].includes(anchor) ? heightCss : '100%',
       boxSizing: 'border-box',
       ...paperSx,
     },
@@ -85,7 +98,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   onClose,
   variant = 'left',
   anchor,
-  width = 280,
+  width,
   height = '100%',
   persistent = false,
   backdrop = true,
@@ -112,7 +125,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           invisible: !backdrop,
         },
       }}
-      sx={buildDrawerStyles(theme, drawerAnchor, variant, width, height, paperSx)}
+      sx={buildDrawerStyles(theme, drawerAnchor, variant, width ?? 280, height, paperSx)}
       className={className}
       data-testid={dataTestId || 'drawer'}
       {...rest}
@@ -139,7 +152,7 @@ export const DrawerHeader: React.FC<DrawerHeaderProps> = ({
         alignItems: 'center',
         padding: theme.spacing(2),
         borderBottom: `1px solid ${theme.palette.divider}`,
-        minHeight: 64,
+        minHeight: rem(theme, 64),
         justifyContent: 'space-between',
       }}
     >

@@ -3,7 +3,9 @@ import { useTheme } from '@mui/material/styles/index.js';
 import type { FC, ReactNode, UIEvent } from 'react';
 import React from 'react';
 
-import { getOverflowStyle, getVariantStyles } from './ScrollArea.styles';
+import { rem } from '../../../tokens/relative';
+
+import { getOverflowStyle, getVariantStyles, sizeCss } from './ScrollArea.styles';
 import type { ResolvedScrollAreaProps } from './ScrollArea.helpers';
 
 export interface ScrollViewportProps
@@ -63,7 +65,7 @@ export const ScrollViewport: FC<ScrollViewportProps> = ({
         width: '100%',
         height: '100%',
         // Use an explicit maxHeight when height is 'auto', else inherit.
-        maxHeight: height === 'auto' && maxHeight ? maxHeight : '100%',
+        maxHeight: height === 'auto' && maxHeight ? sizeCss(theme, maxHeight) : '100%',
         padding: contentPadding,
         opacity: loading ? 0.5 : 1,
         pointerEvents: disabled || loading ? 'none' : 'auto',
@@ -71,8 +73,8 @@ export const ScrollViewport: FC<ScrollViewportProps> = ({
         '&:focus': {
           outline: 'none',
           '&:focus-visible': {
-            outline: `2px solid ${theme.palette.primary.main}`,
-            outlineOffset: -2,
+            outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
+            outlineOffset: rem(theme, -2),
           },
         },
         ...getOverflowStyle({ disabled, orientation }),

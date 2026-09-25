@@ -46,7 +46,7 @@ export function ViewSelector({
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
       {viewMode === 'grid' && (
-        <Box sx={{ width: 96, display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ width: sxRem(96), display: 'flex', alignItems: 'center' }}>
           <Slider
             data-testid="resize-card-slider"
             aria-label={cardSizeLabel}
@@ -80,7 +80,7 @@ export function ViewSelector({
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{ paper: { sx: { minWidth: 180 } } }}
+        slotProps={{ paper: { sx: { minWidth: sxRem(180) } } }}
       >
         {VIEW_OPTIONS.map((option) => {
           const OptionIcon = option.icon;

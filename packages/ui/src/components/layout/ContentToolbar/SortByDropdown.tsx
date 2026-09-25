@@ -74,7 +74,7 @@ const sectionLabelSx = { px: 1, py: 0.75, fontSize: sxRem(12), fontWeight: 600, 
 /** A fixed-width check slot (empty when unchecked) so labels align. */
 function SortCheck({ checked }: { checked: boolean }): React.JSX.Element {
   return (
-    <Box component="span" sx={{ display: 'flex', width: 16, flexShrink: 0, alignItems: 'center', justifyContent: 'center' }} aria-hidden>
+    <Box component="span" sx={{ display: 'flex', width: sxRem(16), flexShrink: 0, alignItems: 'center', justifyContent: 'center' }} aria-hidden>
       {checked ? <CheckIcon sx={{ fontSize: sxRem(14) }} /> : null}
     </Box>
   );
@@ -137,7 +137,7 @@ function SortMenu<TField extends string>({
       onClose={close}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-      slotProps={{ paper: { sx: { minWidth: 180 } } }}
+      slotProps={{ paper: { sx: { minWidth: sxRem(180) } } }}
     >
       {orderOptions.length > 0 && [
         <ListSubheader key="order-label" sx={sectionLabelSx}>

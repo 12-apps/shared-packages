@@ -12,6 +12,7 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import React, {  } from 'react';
 
 import { onMedia, uiInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 import type { TutorialCopy } from '../../../copy';
@@ -27,8 +28,8 @@ const StepIndicator = styled(Box)(({ theme }) => ({
 
 const StepDot = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'active' && prop !== 'completed' })<{ active?: boolean; completed?: boolean }>(({ theme, active, completed }) => ({
-  width: 8,
-  height: 8,
+  width: rem(theme, 8),
+  height: rem(theme, 8),
   borderRadius: '50%',
   background: completed
     ? theme.palette.success.main

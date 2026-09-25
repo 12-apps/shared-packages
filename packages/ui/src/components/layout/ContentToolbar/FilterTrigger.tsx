@@ -54,8 +54,8 @@ export function FilterTrigger({
           data-testid={`${testId}-count`}
           sx={{
             ml: 0.5,
-            minWidth: 18,
-            height: 18,
+            minWidth: sxRem(18),
+            height: sxRem(18),
             px: 0.5,
             borderRadius: 999,
             display: 'inline-flex',

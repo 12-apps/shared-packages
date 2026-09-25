@@ -1,22 +1,23 @@
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { alpha } from '@mui/material/styles/index.js';
-import { rem } from '../../../tokens/relative';
+import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height';
+import { rem, rems } from '../../../tokens/relative';
 
 const sizeStyles = (theme: Theme, size?: string): CSSObject => ({
     ...(size === 'sm' && {
-      minHeight: 32,
+      minHeight: rem(theme, 32),
       '& .MuiTab-root': {
         fontSize: rem(theme, 14),
-        minHeight: 32,
+        minHeight: rem(theme, 32),
         padding: theme.spacing(0.5, 1.5),
       },
     }),
 
     ...(size === 'lg' && {
-      minHeight: 56,
+      minHeight: rem(theme, 56),
       '& .MuiTab-root': {
         fontSize: rem(theme, 18),
-        minHeight: 56,
+        minHeight: rem(theme, 56),
         padding: theme.spacing(1.5, 3),
       },
     }),
@@ -26,8 +27,8 @@ const sizeStyles = (theme: Theme, size?: string): CSSObject => ({
 const compactVariantStyles = (theme: Theme, customVariant?: string): CSSObject => ({
     ...(customVariant === 'default' && {
       '& .MuiTabs-indicator': {
-        height: 3,
-        borderRadius: '3px 3px 0 0',
+        height: rem(theme, 3),
+        borderRadius: rems(theme, 3, 3, 0, 0),
         background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
       },
     }),
@@ -44,12 +45,12 @@ const compactVariantStyles = (theme: Theme, customVariant?: string): CSSObject =
         transition: 'all 0.3s ease',
         '&:hover': {
           backgroundColor: alpha(theme.palette.primary.main, 0.08),
-          transform: 'translateY(-1px)',
+          transform: `translateY(${rem(theme, -1)})`,
         },
         '&.Mui-selected': {
           backgroundColor: theme.palette.primary.main,
           color: theme.palette.primary.contrastText,
-          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+          boxShadow: `0 ${rems(theme, 4, 12)} ${alpha(theme.palette.primary.main, 0.3)}`,
           '&:hover': {
             backgroundColor: theme.palette.primary.dark,
           },
@@ -66,9 +67,9 @@ const boxedVariantStyles = (theme: Theme, customVariant?: string): CSSObject => 
         gap: theme.spacing(2),
       },
       '& .MuiTabs-indicator': {
-        height: 2,
+        height: rem(theme, 2),
         backgroundColor: theme.palette.primary.main,
-        borderRadius: 1,
+        borderRadius: rem(theme, 1),
       },
       '& .MuiTab-root': {
         textTransform: 'none',
@@ -98,7 +99,8 @@ const boxedVariantStyles = (theme: Theme, customVariant?: string): CSSObject => 
         borderBottom: 'none',
         borderRadius: `${theme.spacing(1)} ${theme.spacing(1)} 0 0`,
         margin: theme.spacing(0, 0.5),
-        marginBottom: -1,
+        // Overlap the list's own hairline so the selected tab reads as open.
+        marginBottom: `-${FIELD_BORDER_WIDTH}px`,
         backgroundColor: alpha(theme.palette.action.hover, 0.5),
         '&:hover': {
           backgroundColor: alpha(theme.palette.action.hover, 0.8),

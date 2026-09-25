@@ -26,7 +26,7 @@ import { rem, sxRem } from '../../../tokens/relative';
 const StyledDialog = styled(Dialog)(({ theme }) => ({
   '& .MuiBackdrop-root': {
     backgroundColor: scrim(theme, 0.6),
-    backdropFilter: 'blur(4px)' },
+    backdropFilter: `blur(${rem(theme, 4)})` },
   '& .MuiDialog-paper': {
     position: 'fixed',
     top: '20%',
@@ -38,10 +38,10 @@ const StyledDialog = styled(Dialog)(({ theme }) => ({
 
 const PaletteContainer = styled(Paper)(({ theme }) => ({
   width: '100%',
-  maxWidth: 640,
+  maxWidth: rem(theme, 640),
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  backdropFilter: `blur(${rem(theme, 20)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 20)})`,
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
   overflow: 'hidden',
@@ -136,8 +136,8 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
   onClose,
   commands,
   placeholder = 'Type a command or search...',
-  width = '640px',
-  maxHeight = '400px',
+  width,
+  maxHeight,
   showRecent = true,
   recentCommands = [],
   onCommandExecute,
@@ -174,7 +174,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
       data-testid={dataTestId}
     >
       <DialogContent sx={{ overflow: 'visible', p: 0 }}>
-        <PaletteContainer elevation={24} sx={{ width, maxHeight }}>
+        <PaletteContainer elevation={24} sx={{ width: width ?? sxRem(640), maxHeight: maxHeight ?? sxRem(400) }}>
           <PaletteSearch
             inputRef={searchInputRef}
             placeholder={placeholder}

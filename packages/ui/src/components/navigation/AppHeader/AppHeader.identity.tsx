@@ -5,9 +5,10 @@ import Box from '@mui/material/Box/index.js';
 import Skeleton from '@mui/material/Skeleton/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 import { accentFor, type SizeValue } from '../../../tokens/scales';
 
 import { AppHeaderBrand } from './AppHeader.brand';
@@ -53,8 +54,8 @@ export const AppHeaderStatus: React.FC<AppHeaderStatusProps> = ({
           aria-hidden
           data-testid={`${dataTestId}-dot`}
           sx={{
-            width: 8,
-            height: 8,
+            width: rem(theme, 8),
+            height: rem(theme, 8),
             flex: '0 0 auto',
             borderRadius: '50%',
             backgroundColor: accentFor(theme, tone).main,
@@ -148,7 +149,11 @@ const discloseSx = {
   // Guarded: on a touch screen an unguarded `:hover` sticks after the tap that
   // opened the panel, so the row stays highlighted behind it.
   '@media (hover: hover)': { '&:hover': { backgroundColor: 'action.hover' } },
-  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+  '&:focus-visible': {
+    outline: (theme: Theme) => `${rem(theme, 2)} solid`,
+    outlineColor: 'primary.main',
+    outlineOffset: sxRem(2),
+  },
 } as const;
 
 /**
@@ -232,18 +237,26 @@ const IdentityText: React.FC<
 const IdentitySkeleton: React.FC<{ size: SizeValue; dataTestId: string }> = ({
   size,
   dataTestId,
-}) => (
-  <Box
-    data-testid={`${dataTestId}-loading`}
-    sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}
-  >
-    <Skeleton variant="rounded" width={40} height={40} sx={{ flex: '0 0 auto' }} />
-    <Box sx={{ minWidth: 0, flex: 1 }}>
-      <Skeleton variant="text" width={140} height={TITLE_PX[size] * 1.4} />
-      <Skeleton variant="text" width={180} height={16} />
+}) => {
+  const theme = useTheme();
+  return (
+    <Box
+      data-testid={`${dataTestId}-loading`}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}
+    >
+      <Skeleton
+        variant="rounded"
+        width={rem(theme, 40)}
+        height={rem(theme, 40)}
+        sx={{ flex: '0 0 auto' }}
+      />
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Skeleton variant="text" width={rem(theme, 140)} height={rem(theme, TITLE_PX[size] * 1.4)} />
+        <Skeleton variant="text" width={rem(theme, 180)} height={rem(theme, 16)} />
+      </Box>
     </Box>
-  </Box>
-);
+  );
+};
 
 /**
  * The BLOCK's row: the mark, then the text column beside it.

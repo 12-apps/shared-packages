@@ -22,7 +22,7 @@ import {
 import type { TextProps } from './Text.types';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type { ColorValue } from '../../../tokens/scales';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 import type { UiTypeStep } from '../../../tokens/theme';
 
 const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
@@ -120,7 +120,7 @@ const textVariantStyles = (theme: Theme, a: TextStyleArgs, base: CSSObject): CSS
         fontFamily: 'Monaco, Menlo, "Ubuntu Mono", "Courier New", monospace',
         fontSize: sizeOverride(theme, a.customSize, CODE_FONT_SIZE),
         backgroundColor: alpha(theme.palette.primary.main, CODE_BACKGROUND_ALPHA),
-        padding: `${CODE_PADDING.vertical}px ${CODE_PADDING.horizontal}px`,
+        padding: rems(theme, CODE_PADDING.vertical, CODE_PADDING.horizontal),
         borderRadius: theme.shape.borderRadius * CODE_RADIUS_FACTOR,
         border: `1px solid ${alpha(theme.palette.primary.main, CODE_BORDER_ALPHA)}`,
       };

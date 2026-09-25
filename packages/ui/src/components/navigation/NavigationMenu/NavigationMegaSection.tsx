@@ -6,6 +6,7 @@ import React from 'react';
 
 import { MegaSection } from './NavigationMenu.shell';
 import { slideIn } from './NavigationMenu.styles';
+import { sxRem } from '../../../tokens/relative';
 import type { NavigationMenuItem } from './NavigationMenu.types';
 import { renderMenuItem } from './NavigationMenuItem';
 
@@ -21,11 +22,11 @@ const SECTION_TITLE_SX = {
     position: 'absolute',
     bottom: 0,
     left: 0,
-    width: '40px',
-    height: '3px',
+    width: sxRem(40),
+    height: sxRem(3),
     background: (theme: { palette: { primary: { main: string } } }) =>
       `linear-gradient(90deg, ${theme.palette.primary.main} 0%, transparent 100%)`,
-    borderRadius: '2px',
+    borderRadius: sxRem(2),
   },
 } as const;
 
@@ -55,7 +56,7 @@ export const NavigationMegaSection: FC<NavigationMegaSectionProps> = ({
         <Box
           key={item.id}
           sx={{
-            animation: `${slideIn} 0.4s ease-out`,
+            animation: (theme) => `${slideIn(theme)} 0.4s ease-out`,
             animationDelay: `${sectionIndex * 0.1 + itemIndex * 0.05}s`,
             animationFillMode: 'both',
           }}

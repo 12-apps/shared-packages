@@ -6,7 +6,7 @@ import React, { useEffect, useRef, type RefObject } from 'react';
 
 import { SettingsStatusMarker } from './SettingsStatusMarker';
 import { TOUCH_TARGET } from './SettingsLayout.styles';
-import { rem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 /**
  * The chip's drawn height, against `TOUCH_TARGET`'s 44 for the tappable one.
@@ -15,7 +15,7 @@ import { rem } from '../../../tokens/relative';
  * with the least room for either, so the pill is sized to its text rather than
  * to the thumb — and the thumb is served by the hit area instead.
  */
-const CHIP_HEIGHT = 34;
+const CHIP_HEIGHT = sxRem(34);
 import type { SettingsLayoutProps, SettingsNavItem } from './SettingsLayout.types';
 
 export interface SettingsSectionChipsProps {
@@ -146,7 +146,7 @@ function SectionChip({
           insetInlineEnd: 0,
           top: '50%',
           transform: 'translateY(-50%)',
-          height: TOUCH_TARGET,
+          height: rem(theme, TOUCH_TARGET),
         },
       }}
     >

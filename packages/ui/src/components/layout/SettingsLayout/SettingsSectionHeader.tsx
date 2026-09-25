@@ -6,7 +6,7 @@ import React from 'react';
 
 import { displayAcrossRail, TOUCH_TARGET } from './SettingsLayout.styles';
 import type { SettingsLayoutProps, SettingsRailBreakpoint } from './SettingsLayout.types';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 /** One line that must not wrap, whatever the section is called. */
 const CLIP = {
@@ -142,8 +142,8 @@ export function SettingsSectionHeader({
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: TOUCH_TARGET,
-          height: TOUCH_TARGET,
+          width: rem(theme, TOUCH_TARGET),
+          height: rem(theme, TOUCH_TARGET),
           border: 1,
           borderColor: 'divider',
           borderRadius: 2,

@@ -11,7 +11,7 @@ export const ShortcutChip: React.FC<ChipProps> = (props) => (
   <Chip
     {...props}
     sx={{
-      height: 20,
+      height: sxRem(20),
       fontSize: sxRem(11.2),
       fontFamily: 'monospace',
       ...props.sx,

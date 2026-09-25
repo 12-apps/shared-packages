@@ -3,6 +3,8 @@ import Collapse from '@mui/material/Collapse/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 
+import { remPx, sxRem } from '../../../tokens/relative';
+
 import {
   dimmedStyles,
   regionAttrs,
@@ -20,16 +22,17 @@ const useMeasuredHeight = (
   maxHeight: number | undefined,
   children: React.ReactNode,
 ) => {
+  const theme = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>('auto');
 
   const measureHeight = useCallback(() => {
     if (contentRef.current) {
       const scrollHeight = contentRef.current.scrollHeight;
-      // Cap at maxHeight if provided
-      setHeight(maxHeight ? Math.min(scrollHeight, maxHeight) : scrollHeight);
+      // Cap at maxHeight (design px, through the type scale) if provided
+      setHeight(maxHeight ? Math.min(scrollHeight, remPx(theme, maxHeight)) : scrollHeight);
     }
-  }, [maxHeight]);
+  }, [maxHeight, theme]);
 
   useEffect(() => {
     if (!open) {
@@ -69,7 +72,8 @@ const DefaultCollapsible: React.FC<VariantProps> = ({
     timeout={disabled ? 0 : duration}
     sx={{
       ...dimmedStyles(disabled),
-      ...(maxHeight && { maxHeight, overflow: 'hidden' }),
+      // `sx` reads 1 or less as a fraction of the parent; anything else is design px.
+      ...(maxHeight && { maxHeight: maxHeight <= 1 ? `${maxHeight * 100}%` : sxRem(maxHeight), overflow: 'hidden' }),
       ...sx,
     }}
     className={className}

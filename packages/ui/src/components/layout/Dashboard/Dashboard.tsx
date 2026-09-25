@@ -217,7 +217,7 @@ const DashboardHeader = ({ title, children, className }: DashboardHeaderProps): 
     <Box
       className={className}
       data-testid={`${testIdPrefix}-header`}
-      sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', minHeight: 40 }}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', minHeight: sxRem(40) }}
     >
       <Typography variant="h5" component="h1" sx={{ fontWeight: 600, mr: 0.5 }}>
         {title}

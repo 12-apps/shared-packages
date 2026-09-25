@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box/index.js';
 import { alpha, useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type {
@@ -9,14 +10,22 @@ import type {
   SidebarProps,
 } from './Sidebar.types';
 import { shadowInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
+
+/**
+ * A width prop as CSS. `sx` reads a number of 1 or less as a fraction of the
+ * parent, and that stays so; any other number is design px, through the type scale.
+ */
+const widthCss = (theme: Theme, value: number): string =>
+  value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value);
 
 export const Sidebar: React.FC<SidebarProps> = ({
   children,
   variant = 'fixed',
   open = true,
   onToggle: _onToggle,
-  width = 280,
-  collapsedWidth = 64,
+  width,
+  collapsedWidth,
   position = 'left',
   className,
   dataTestId = 'sidebar',
@@ -27,7 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const theme = useTheme();
 
   const isCollapsed = variant === 'collapsible' && !open;
-  const currentWidth = isCollapsed ? collapsedWidth : width;
+  // Design px: 280 open, 64 collapsed, unless the caller says otherwise.
+  const currentWidth = isCollapsed ? (collapsedWidth ?? 64) : (width ?? 280);
 
   const getVariantStyles = () => {
     switch (variant) {
@@ -44,9 +54,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'glass':
         return {
           backgroundColor: alpha(theme.palette.background.paper, 0.1),
-          backdropFilter: 'blur(20px)',
+          backdropFilter: `blur(${rem(theme, 20)})`,
           border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-          boxShadow: `0 8px 32px ${shadowInk(theme, 0.1)}`,
+          boxShadow: `${rems(theme, 0, 8, 32)} ${shadowInk(theme, 0.1)}`,
         };
       case 'collapsible':
         return {
@@ -69,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       data-testid={dataTestId}
       {...rest}
       sx={{
-        width: currentWidth,
+        width: widthCss(theme, currentWidth),
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',

@@ -15,18 +15,18 @@ import type { CommandPaletteCopy } from '../../../copy';
 import { rem, sxRem } from '../../../tokens/relative';
 
 const ResultsList = styled(List)(({ theme }) => ({
-  maxHeight: 400,
+  maxHeight: rem(theme, 400),
   overflowY: 'auto',
   padding: theme.spacing(1),
   '&::-webkit-scrollbar': {
-    width: 8,
+    width: rem(theme, 8),
   },
   '&::-webkit-scrollbar-track': {
     background: alpha(theme.palette.action.disabled, 0.1),
   },
   '&::-webkit-scrollbar-thumb': {
     background: alpha(theme.palette.primary.main, 0.3),
-    borderRadius: 4,
+    borderRadius: rem(theme, 4),
     '&:hover': {
       background: alpha(theme.palette.primary.main, 0.5),
     },
@@ -40,7 +40,7 @@ const CommandItem = styled(ListItem)<{ selected?: boolean }>(({ theme, selected 
   cursor: 'pointer',
   ...(selected && {
     backgroundColor: alpha(theme.palette.primary.main, 0.12),
-    transform: 'translateX(4px)',
+    transform: `translateX(${rem(theme, 4)})`,
     '& .MuiListItemIcon-root': {
       color: theme.palette.primary.main,
     },
@@ -81,7 +81,7 @@ const CommandRow: React.FC<{
     onClick={() => onExecute(command)}
     onMouseEnter={() => onSelect(index)}
   >
-    {command.icon && <ListItemIcon sx={{ minWidth: 40 }}>{command.icon}</ListItemIcon>}
+    {command.icon && <ListItemIcon sx={{ minWidth: sxRem(40) }}>{command.icon}</ListItemIcon>}
     <ListItemText
       primary={command.label}
       secondary={command.description}

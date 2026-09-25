@@ -8,9 +8,10 @@ import DialogTitle from '@mui/material/DialogTitle/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Skeleton from '@mui/material/Skeleton/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
+import { rem } from '../../../tokens/relative';
 import { safeAreaBottom } from '../../../utils/viewport';
 import {
   loadingOverlayStyles,
@@ -102,16 +103,19 @@ export const modalAriaIds = (
 export const ModalLoadingOverlay: FC<{ loadingText?: string; dataTestId?: string }> = ({
   loadingText,
   dataTestId,
-}) => (
-  <LoadingOverlay data-testid={testId(dataTestId, 'loading-overlay')}>
-    <CircularProgress size={40} data-testid={testId(dataTestId, 'loading-spinner')} />
-    {loadingText && (
-      <Typography variant="body2" sx={{ mt: 2 }} data-testid={testId(dataTestId, 'loading-text')}>
-        {loadingText}
-      </Typography>
-    )}
-  </LoadingOverlay>
-);
+}) => {
+  const theme = useTheme();
+  return (
+    <LoadingOverlay data-testid={testId(dataTestId, 'loading-overlay')}>
+      <CircularProgress size={rem(theme, 40)} data-testid={testId(dataTestId, 'loading-spinner')} />
+      {loadingText && (
+        <Typography variant="body2" sx={{ mt: 2 }} data-testid={testId(dataTestId, 'loading-text')}>
+          {loadingText}
+        </Typography>
+      )}
+    </LoadingOverlay>
+  );
+};
 
 interface ModalHeaderProps {
   titleId: string;
@@ -211,14 +215,17 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
   </StyledDialogTitle>
 );
 
-const ContentSkeleton: FC = () => (
-  <Box sx={{ p: 3 }}>
-    <Skeleton variant="text" width="60%" height={32} />
-    <Skeleton variant="text" width="100%" />
-    <Skeleton variant="text" width="100%" />
-    <Skeleton variant="rectangular" height={200} sx={{ mt: 2 }} />
-  </Box>
-);
+const ContentSkeleton: FC = () => {
+  const theme = useTheme();
+  return (
+    <Box sx={{ p: 3 }}>
+      <Skeleton variant="text" width="60%" height={rem(theme, 32)} />
+      <Skeleton variant="text" width="100%" />
+      <Skeleton variant="text" width="100%" />
+      <Skeleton variant="rectangular" height={rem(theme, 200)} sx={{ mt: 2 }} />
+    </Box>
+  );
+};
 
 interface ModalBodyProps {
   descId: string;

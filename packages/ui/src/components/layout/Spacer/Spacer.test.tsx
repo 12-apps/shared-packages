@@ -49,7 +49,7 @@ describe('Spacer (web)', () => {
     const horizontal = screen.getByTestId('h');
     expect(horizontal).toHaveStyle({ width: '24px' });
     expect(globalThis.getComputedStyle(horizontal).height).not.toBe('24px');
-    expect(screen.getByTestId('w')).toHaveStyle({ width: '2rem', height: '0px' });
+    expect(screen.getByTestId('w')).toHaveStyle({ width: '2rem', height: '0rem' });
   });
 
   it('is decoration: hidden, unfocusable, and a non-shrinking flex item when asked', () => {

@@ -29,7 +29,7 @@ describe('Dialog variant="drawer" paper', () => {
       </Dialog>,
     );
     const style = getComputedStyle(paperOf());
-    expect(style.width).toBe('600px');
+    expect(style.width).toBe('37.5rem');
     expect(style.maxWidth).toBe('100%');
     // jsdom does not expand the shorthand into the four corners.
     expect(style.borderRadius).toBe('16px 0 0 16px');
@@ -50,7 +50,7 @@ describe('Dialog variant="drawer" paper', () => {
     const style = getComputedStyle(paper);
     expect(paper).toHaveClass('caller-paper');
     expect(style.letterSpacing).toBe('1px');
-    expect(style.width).toBe('600px');
+    expect(style.width).toBe('37.5rem');
     expect(style.borderRadius).toBe('16px 0 0 16px');
   });
 

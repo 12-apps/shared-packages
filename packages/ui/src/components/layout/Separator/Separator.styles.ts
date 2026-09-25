@@ -6,6 +6,8 @@ import type {
   SeparatorSize,
   SeparatorVariant,
 } from './Separator.types';
+import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height.core';
+import { rem } from '../../../tokens/relative';
 
 const THICKNESS_PX: Record<SeparatorSize, number> = {
   xs: 1,
@@ -59,7 +61,7 @@ const gradientBackground = (
 // a parent's border shorthand cannot leak through.
 const borderEdges = (
   isHorizontal: boolean,
-  thickness: number,
+  thickness: string,
   style: 'dashed' | 'dotted' | 'solid',
   color: string,
 ): CSSObject => {
@@ -90,41 +92,60 @@ const borderEdges = (
 type SeparatorStyleArgs = Required<
   Pick<SeparatorProps, 'variant' | 'orientation' | 'size'>
 > &
-  Pick<SeparatorProps, 'color' | 'margin' | 'length'>;
+  Pick<SeparatorProps, 'color' | 'length'> & {
+    /** From {@link separatorBlockMargin}, which both the plain and the labelled separator read. */
+    blockMargin: string;
+  };
 
 /**
  * The separator's margin, on the axis it separates along only: above and below
  * a horizontal rule, either side of a vertical one. A margin given as a string
- * carries its own units; a number is pixels.
+ * carries its own units; a number is design px, through the type scale.
  *
  * The LABELLED separator uses this too. It used to hand the number straight to
  * `sx.margin`, where a number is SPACING UNITS — `md`'s 16 drew 128px on all
  * four sides, against 16px above and below for the unlabelled one.
  */
 export const separatorBlockMargin = (
+  theme: Theme,
   size: SeparatorSize,
   margin: number | string | undefined,
   isHorizontal: boolean,
 ): string => {
   const value = separatorMargin(size, margin);
-  const length = typeof value === 'string' ? value : `${value}px`;
+  const length = typeof value === 'string' ? value : rem(theme, value);
   return isHorizontal ? `${length} 0` : `0 ${length}`;
+};
+
+/**
+ * The rule's extent along its axis. It lands in `sx`, which reads a number of 1
+ * or less as a fraction of the parent, and that stays so; any other number is
+ * design px, through the type scale. Unset (or `0`/`''`) is the full run.
+ */
+const ruleLength = (theme: Theme, length: SeparatorProps['length']): string => {
+  if (!length) return '100%';
+  if (typeof length === 'string') return length;
+  return length <= 1 ? `${length * 100}%` : rem(theme, length);
 };
 
 export const separatorStyles = (
   theme: Theme,
-  { variant, orientation, size, color, margin, length }: SeparatorStyleArgs,
+  { variant, orientation, size, color, blockMargin, length }: SeparatorStyleArgs,
 ): CSSObject => {
   const isHorizontal = orientation === 'horizontal';
-  const thickness = separatorThickness(size);
+  // `xs` is the 1px hairline: it stays one device-independent pixel at every
+  // root size, like every other hairline in the package; heavier rules scale.
+  const thicknessPx = separatorThickness(size);
+  const thickness = thicknessPx === FIELD_BORDER_WIDTH ? `${FIELD_BORDER_WIDTH}px` : rem(theme, thicknessPx);
+  const along = ruleLength(theme, length);
   const resolvedColor = color || theme.palette.divider;
 
   const baseStyles: CSSObject = {
     display: 'flex',
     alignItems: 'center',
-    margin: separatorBlockMargin(size, margin, isHorizontal),
-    width: isHorizontal ? length || '100%' : `${thickness}px`,
-    height: isHorizontal ? `${thickness}px` : length || '100%',
+    margin: blockMargin,
+    width: isHorizontal ? along : thickness,
+    height: isHorizontal ? thickness : along,
     boxSizing: 'border-box',
   };
 
