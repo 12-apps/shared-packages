@@ -118,6 +118,7 @@ function verify(plan, env = {}) {
       GITHUB_STEP_SUMMARY: "",
       PUBLISH_INCOMPLETE: "",
       PUBLISH_WEDGED: "",
+      PUBLISH_ACCEPTED: "",
       ...env,
     },
   });
@@ -183,6 +184,49 @@ check(
   "a tag for a version the registry lacks still fails",
   orphan.status !== 0 && /--delete/.test(orphan.output),
   `the direction this check has always guarded must survive the new one.\n    Output:\n    ${orphan.output}`,
+);
+
+// ── A version THIS run's publish accepted is propagation lag, not an orphan ──
+// npm answering `ok` does not mean the version is servable yet, and this is the
+// one absence that is not a fault: scripts/publish.mjs handed over the name it
+// just got an `ok` for, and this step must read that as "still propagating",
+// never as "delete the tag".
+const acceptedThisRun = verify(
+  { scope: { tag: "scope-v2.0.0", versions: ["1.0.0"] } },
+  { PUBLISH_ACCEPTED: "@selftest/scope" },
+);
+
+check(
+  "a version this run's npm publish accepted does not fail the step",
+  acceptedThisRun.status === 0,
+  `accepted-but-not-yet-served is not an orphan; failing here is the exact false\n    alarm this ticket exists to remove. Output:\n    ${acceptedThisRun.output}`,
+);
+check(
+  "it is reported with a warning, not an error",
+  /::warning::/.test(acceptedThisRun.output) && !/::error::/.test(acceptedThisRun.output),
+  `Output:\n    ${acceptedThisRun.output}`,
+);
+check(
+  "it never prints the delete remedy",
+  !/--delete/.test(acceptedThisRun.output),
+  `printing the delete remedy for a version this run just published is the exact\n    harm being fixed. Output:\n    ${acceptedThisRun.output}`,
+);
+check(
+  "it says this run's publish accepted it, so the reader does not read it as stuck",
+  /accepted by npm this run/.test(acceptedThisRun.output),
+  `Output:\n    ${acceptedThisRun.output}`,
+);
+
+// ── The mirror: an absence this run did NOT publish keeps today's behaviour ──
+const notAcceptedThisRun = verify(
+  { scope: { tag: "scope-v2.0.0", versions: ["1.0.0"] } },
+  { PUBLISH_ACCEPTED: "@selftest/some-other-package" },
+);
+
+check(
+  "an orphan THIS run did not publish still fails, PUBLISH_ACCEPTED notwithstanding",
+  notAcceptedThisRun.status !== 0 && /--delete/.test(notAcceptedThisRun.output),
+  `PUBLISH_ACCEPTED must be read PER PACKAGE, not as "something published this\n    run". Output:\n    ${notAcceptedThisRun.output}`,
 );
 
 // ── The two that must stay QUIET ─────────────────────────────────────────────
