@@ -3,7 +3,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { separatorBlockMargin, separatorStyles } from './Separator.styles';
+import { labelledSeparatorLayout, separatorBlockMargin, separatorStyles } from './Separator.styles';
 import type { SeparatorProps } from './Separator.types';
 
 export const Separator: React.FC<SeparatorProps> = ({
@@ -25,7 +25,8 @@ export const Separator: React.FC<SeparatorProps> = ({
   if (children) {
     // The rules either side of the label sit INSIDE the row, which carries the
     // margin; their own would add it a second time.
-    const ruleStyles = { ...styles, margin: 0 };
+    const layout = labelledSeparatorLayout(theme, isHorizontal, length);
+    const ruleStyles = { ...styles, margin: 0, ...layout.rule };
 
     return (
       <Box
@@ -40,6 +41,7 @@ export const Separator: React.FC<SeparatorProps> = ({
           margin: blockMargin,
           flexDirection: isHorizontal ? 'row' : 'column',
           gap: theme.spacing(2),
+          ...layout.group,
         }}
       >
         <Box sx={ruleStyles} />

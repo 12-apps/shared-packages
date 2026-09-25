@@ -128,6 +128,38 @@ const ruleLength = (theme: Theme, length: SeparatorProps['length']): string => {
   return length <= 1 ? `${length * 100}%` : rem(theme, length);
 };
 
+/**
+ * What a labelled separator's rules add to {@link separatorStyles}, and whether
+ * the group stretches to its parent (FUT-2617).
+ *
+ * A labelled VERTICAL separator is a flex COLUMN — rule, label, rule — and with
+ * no `length` each rule is `height: 100%` of a column whose height is its own
+ * content: both resolved to 0px and only the label showed. So the column
+ * stretches to the row it sits in and the two rules split what the label
+ * leaves, equally (`flex: 1 1 0`), never shorter than a visible minimum. With a
+ * `length` the rule is exactly that long: no grow, no shrink, no basis, and the
+ * column keeps its content height, centred as before.
+ *
+ * Only the labelled branch reads this. The plain separator keeps
+ * `separatorStyles` as is, since `flex: 1 1 0` there would widen a vertical
+ * separator sitting in a row. The horizontal rules already shrink around the
+ * label in their row, so they are left alone.
+ */
+export const labelledSeparatorLayout = (
+  theme: Theme,
+  isHorizontal: boolean,
+  length: SeparatorProps['length'],
+): { rule: CSSObject; group: CSSObject } => {
+  if (isHorizontal) return { rule: {}, group: {} };
+  if (length) return { rule: { flex: 'none' }, group: {} };
+  return {
+    // A design 16px, as long as the gap beside the label at the default
+    // spacing, so a short or unsized row still shows two rules and not a word.
+    rule: { flex: '1 1 0', minHeight: rem(theme, 16) },
+    group: { alignSelf: 'stretch' },
+  };
+};
+
 export const separatorStyles = (
   theme: Theme,
   { variant, orientation, size, color, blockMargin, length }: SeparatorStyleArgs,
