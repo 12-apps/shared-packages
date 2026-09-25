@@ -4,7 +4,8 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral } from '../../../tokens/ink';
-import { inkOver, px } from '../../../tokens/theme';
+import { rem } from '../../../tokens/relative';
+import { inkOver } from '../../../tokens/theme';
 
 // Define pulse animation globally
 const pulseAnimation = keyframes`
@@ -62,17 +63,25 @@ export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => 
   };
 };
 
+/** A size's padding shorthand and its type in design px, read through the type scale. */
+interface WebButtonSize {
+  padding: string;
+  fontPx: number;
+}
+
 // Derived from `Button.metrics.ts`, which the native `Button` reads too — one
 // table, so a size cannot differ between the renderers.
-const SIZE_MAP: Record<string, CSSObject> = Object.fromEntries(
+const SIZE_MAP: Record<string, WebButtonSize> = Object.fromEntries(
   Object.entries(BUTTON_SIZES).map(([size, m]) => [
     size,
-    { padding: `${m.paddingVertical}px ${m.paddingHorizontal}px`, fontSize: px(m.fontSize) },
+    { padding: `${m.paddingVertical}px ${m.paddingHorizontal}px`, fontPx: m.fontSize },
   ]),
 );
 
 /** What an unrecognised size falls back to, named so indexing can never be undefined. */
-const DEFAULT_SIZE: CSSObject = SIZE_MAP.md as CSSObject;
+const DEFAULT_SIZE: WebButtonSize = SIZE_MAP.md as WebButtonSize;
+
+const sizeOf = (size: string): WebButtonSize => SIZE_MAP[size] ?? DEFAULT_SIZE;
 
 /**
  * A BUTTON THAT IS ONLY AN ICON IS SQUARE.
@@ -91,10 +100,10 @@ const ICON_ONLY_PADDING: Record<string, string> = Object.fromEntries(
   Object.entries(ICON_ONLY_PADDING_PX).map(([size, padding]) => [size, `${padding}px`]),
 );
 
-const iconOnlySize = (size: string): CSSObject => ({
+const iconOnlySize = (theme: Theme, size: string): CSSObject => ({
   minWidth: 0,
   padding: ICON_ONLY_PADDING[size] ?? ICON_ONLY_PADDING.md,
-  fontSize: SIZE_MAP[size]?.fontSize ?? DEFAULT_SIZE.fontSize,
+  fontSize: rem(theme, sizeOf(size).fontPx),
   '& .MuiButton-startIcon, & .MuiButton-endIcon': { margin: 0 },
 });
 
@@ -110,8 +119,9 @@ export const buttonSize =
   (size: string, iconOnly: boolean) =>
   (theme: Theme): CSSObject => {
     const height = fieldHeight(theme, asFieldSize(size));
-    if (iconOnly) return { ...iconOnlySize(size), padding: 0, minWidth: height, minHeight: height };
-    return { ...(SIZE_MAP[size] ?? DEFAULT_SIZE), minHeight: height, paddingTop: 0, paddingBottom: 0 };
+    if (iconOnly) return { ...iconOnlySize(theme, size), padding: 0, minWidth: height, minHeight: height };
+    const { padding, fontPx } = sizeOf(size);
+    return { padding, fontSize: rem(theme, fontPx), minHeight: height, paddingTop: 0, paddingBottom: 0 };
   };
 
 /**

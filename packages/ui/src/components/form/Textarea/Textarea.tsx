@@ -33,6 +33,7 @@ import type { TextareaProps } from './Textarea.types';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { FIELD_BORDER_WIDTH, fieldBorder } from '../../../tokens/field-height';
+import { rem } from '../../../tokens/relative';
 
 // Interface for styled component props
 interface StyledTextareaProps {
@@ -65,11 +66,11 @@ const StyledTextarea = styled(TextareaAutosize, {
   const errorColor = theme.palette.error;
 
   const sizeMap = {
-    xs: { padding: '6px 8px', fontSize: '0.75rem', minHeight: '60px' },
-    sm: { padding: '8px 10px', fontSize: '0.875rem', minHeight: '80px' },
-    md: { padding: '10px 12px', fontSize: '1rem', minHeight: '100px' },
-    lg: { padding: '12px 14px', fontSize: '1.125rem', minHeight: '120px' },
-    xl: { padding: '14px 16px', fontSize: '1.25rem', minHeight: '140px' } };
+    xs: { padding: '6px 8px', fontSize: rem(theme, 12), minHeight: '60px' },
+    sm: { padding: '8px 10px', fontSize: rem(theme, 14), minHeight: '80px' },
+    md: { padding: '10px 12px', fontSize: rem(theme, 16), minHeight: '100px' },
+    lg: { padding: '12px 14px', fontSize: rem(theme, 18), minHeight: '120px' },
+    xl: { padding: '14px 16px', fontSize: rem(theme, 20), minHeight: '140px' } };
 
   const baseStyles = {
     width: '100%',

@@ -14,6 +14,7 @@ import React from 'react';
 import { BANNER_TINT_S, bannerPartStyles, bannerPointerStates, fadeInSlide, getVariantColor } from './Banner.styles';
 import { FOCUS } from '../Alert/Alert.metrics';
 import type { BannerProps, BannerVariant } from './Banner.types';
+import { rem } from '../../../tokens/relative';
 
 
 
@@ -129,7 +130,7 @@ const buildActionSx = (
     minWidth: 'auto',
     px: 1.5,
     py: 0.5,
-    fontSize: '0.8125rem',
+    fontSize: rem(theme, 13),
     fontWeight: 500,
     borderRadius: 1,
 

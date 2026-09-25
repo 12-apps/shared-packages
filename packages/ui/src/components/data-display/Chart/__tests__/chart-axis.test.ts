@@ -1,3 +1,4 @@
+import { createTheme } from '@mui/material/styles/index.js';
 import { describe, expect, it } from 'vitest';
 
 import type { ChartDataPoint, ChartProps } from '../Chart.types';
@@ -133,13 +134,13 @@ describe('axis tick margin', () => {
   // each other at the corner — the collision the visual pass is about.
   it('clears the value label descender at every size', () => {
     for (const size of ['xs', 'sm', 'md', 'lg', 'xl'] as const) {
-      const { fontSize, tickMargin } = getSizeStyles(size);
+      const { fontSize, tickMargin } = getSizeStyles(createTheme(), size);
       const fontPx = Number.parseFloat(fontSize) * 16;
       expect(tickMargin).toBeGreaterThanOrEqual(fontPx * 0.79);
     }
   });
 
   it('keeps an explicit height from disturbing the margin', () => {
-    expect(getSizeStyles('sm', 220)).toEqual({ height: 220, fontSize: '0.875rem', tickMargin: 12 });
+    expect(getSizeStyles(createTheme(), 'sm', 220)).toEqual({ height: 220, fontSize: '0.875rem', tickMargin: 12 });
   });
 });

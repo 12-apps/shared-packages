@@ -32,7 +32,7 @@ import {
   SEMANTIC_VARIANTS,
 } from './Alert.metrics';
 import type { IconName } from '../../../icons/Icon.types';
-import { px } from '../../../tokens/theme';
+import { rem } from '../../../tokens/relative';
 
 export type { AlertPalette } from './Alert.metrics';
 
@@ -181,7 +181,7 @@ export const alertLayoutStyles = (
     // between prose and a thing you press has to be bigger than the gap between
     // two lines of prose or the button looks like part of the text.
     gap: theme.spacing(MESSAGE_GAP_UNITS),
-    fontSize: px(MESSAGE_FONT_SIZE),
+    fontSize: rem(theme, MESSAGE_FONT_SIZE),
     lineHeight: MESSAGE_LINE_HEIGHT,
     // No padding of its own — the root's is now doing that job, and MUI's
     // default `8px 0` on top of it would double the vertical space.

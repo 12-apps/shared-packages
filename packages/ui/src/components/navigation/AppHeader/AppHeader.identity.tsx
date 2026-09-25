@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { sxRem } from '../../../tokens/relative';
 import { accentFor, type SizeValue } from '../../../tokens/scales';
 
 import { AppHeaderBrand } from './AppHeader.brand';
@@ -99,7 +100,7 @@ const IdentityTitle: React.FC<
     <Typography
       component="span"
       data-testid={`${dataTestId}-title`}
-      sx={{ fontSize: TITLE_PX[size], fontWeight: 700, lineHeight: 1.2, ...ONE_LINE }}
+      sx={{ fontSize: sxRem(TITLE_PX[size]), fontWeight: 700, lineHeight: 1.2, ...ONE_LINE }}
     >
       {title}
     </Typography>
@@ -109,7 +110,7 @@ const IdentityTitle: React.FC<
         data-testid={`${dataTestId}-chevron`}
         sx={{
           flex: '0 0 auto',
-          fontSize: 20,
+          fontSize: sxRem(20),
           opacity: 0.7,
           transition: 'transform 150ms ease',
           transform: disclosed ? 'rotate(180deg)' : 'none',

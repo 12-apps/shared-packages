@@ -15,6 +15,7 @@ import type {
   StatCardDeltaTone,
   StatCardProps,
 } from './StatCard.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** The arrow each direction renders (decorative — the text carries the meaning). */
 const DIRECTION_ICON: Record<StatCardDeltaDirection, typeof ArrowUpwardIcon> = {
@@ -69,7 +70,7 @@ function DeltaRow({ delta, testId }: { delta: StatCardDelta; testId: string }): 
     >
       {/* The arrow duplicates what the aria-label already says, so it is hidden
           from assistive tech rather than read twice. */}
-      <Icon aria-hidden="true" sx={{ fontSize: '1rem', color }} />
+      <Icon aria-hidden="true" sx={{ fontSize: sxRem(16), color }} />
       <Typography
         variant="body2"
         component="span"

@@ -40,7 +40,7 @@ export interface ChartRenderContext {
 }
 
 export function buildChartContext(props: ChartProps, theme: Theme): ChartRenderContext {
-  const sizeStyles = getSizeStyles(props.size, props.height);
+  const sizeStyles = getSizeStyles(theme, props.size, props.height);
   const chartColors = getDefaultColors(theme, props.variant ?? 'default', props.colors);
   const { axisStyle, gridStroke, gridOpacity } = getAxisStyles(
     theme,

@@ -22,6 +22,7 @@ import type { RichEditorToolbarCopy } from '../../../copy';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height';
+import { rem } from '../../../tokens/relative';
 
 const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   display: 'flex',
@@ -80,7 +81,7 @@ const CharacterCount = styled(Box)<{ limit?: number; count: number }>(({ theme, 
     position: 'absolute',
     bottom: theme.spacing(1),
     right: theme.spacing(1),
-    fontSize: '0.75rem',
+    fontSize: rem(theme, 12),
     color: isError
       ? theme.palette.error.main
       : isWarning
@@ -117,7 +118,7 @@ const ContentEditableDiv = styled('div')<{
       : theme.palette.background.paper,
     color: theme.palette.text.primary,
     fontFamily: theme.typography.fontFamily,
-    fontSize: '1rem',
+    fontSize: rem(theme, 16),
     lineHeight: 1.5,
     outline: 'none',
     transition: 'all 0.3s ease',

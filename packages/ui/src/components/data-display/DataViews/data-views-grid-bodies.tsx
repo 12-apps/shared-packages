@@ -21,6 +21,7 @@ import type { DataViewCardSelection } from "./data-views-types";
 import { toGridExpansion, type DataViewRowDetail } from "./data-views-row-detail";
 import type { DataViewsController } from "./use-data-views-state";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { sxRem } from "../../../tokens/relative";
 
 /* ── Body (grid) ─────────────────────────────────────────────────────────── */
 
@@ -66,8 +67,8 @@ function GridBody<T extends Record<string, unknown>>({
         // Tabwoah-style dense rows: MUI's default TableCell padding keeps rows
         // tall regardless of rowHeight, so the DENSITY preference is applied
         // here rather than through `rowHeight`, which it would fight.
-        "& .MuiTableCell-root": { py: rowPadding, fontSize: "0.8125rem" },
-        "& .MuiTableCell-head": { py: 0.5, fontSize: "0.75rem" },
+        "& .MuiTableCell-root": { py: rowPadding, fontSize: sxRem(13) },
+        "& .MuiTableCell-head": { py: 0.5, fontSize: sxRem(12) },
       }}
     >
       <DataGrid<T>

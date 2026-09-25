@@ -9,6 +9,7 @@ import { LABEL_GAP_UNITS, SWITCH_ICON_SIZES, TAP_TARGET_MIN } from './Switch.met
 import { onTrackInk, switchSx } from './Switch.styles';
 import type { SwitchFlags } from './Switch.styles';
 import type { SwitchProps } from './Switch.types';
+import { sxRem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 const StyledSwitch = styled(MuiSwitch, {
@@ -103,7 +104,7 @@ export const SwitchIcon: React.FC<SwitchIconProps> = ({
         pointerEvents: 'none',
         zIndex: 2,
         color: isOn ? onInk : 'text.secondary',
-        fontSize: SWITCH_ICON_SIZES[size as SizeValue] ?? SWITCH_ICON_SIZES.md,
+        fontSize: sxRem(SWITCH_ICON_SIZES[size as SizeValue] ?? SWITCH_ICON_SIZES.md),
       }}
     >
       {icon}

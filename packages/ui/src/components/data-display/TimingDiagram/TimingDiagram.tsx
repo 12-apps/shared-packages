@@ -13,6 +13,7 @@ import {
   StackedView,
   WaterfallView,
 } from './TimingDiagram.views';
+import { rem } from '../../../tokens/relative';
 
 // Styled components
 const DiagramContainer = styled(Paper)(({ theme }) => ({
@@ -43,7 +44,7 @@ const LegendItem = styled(Box)(({ theme }) => ({
     borderRadius: 2,
   },
   '& .label': {
-    fontSize: '0.8rem',
+    fontSize: rem(theme, 12.8),
     color: theme.palette.text.secondary,
   },
 }));

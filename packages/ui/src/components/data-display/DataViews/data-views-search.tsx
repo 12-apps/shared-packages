@@ -17,6 +17,7 @@ import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldHeight, fieldTextFieldStyles } from "../../../tokens/field-height";
 import { fieldEdge } from "../../../tokens/field-edge";
+import { sxRem } from "../../../tokens/relative";
 
 /** How long the box waits after the last keystroke before it queries. */
 const SEARCH_DEBOUNCE_MS = 350;
@@ -152,7 +153,7 @@ export function InlineKeyword({
       InputProps={{
         startAdornment: (
           <InputAdornment position="start">
-            <SearchIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+            <SearchIcon sx={{ fontSize: sxRem(16), color: "text.secondary" }} />
           </InputAdornment>
         ),
         endAdornment: draft ? (
@@ -164,7 +165,7 @@ export function InlineKeyword({
               onClick={() => setDraft("")}
               sx={{ p: 0.25 }}
             >
-              <CloseIcon sx={{ fontSize: 14 }} />
+              <CloseIcon sx={{ fontSize: sxRem(14) }} />
             </IconButton>
           </InputAdornment>
         ) : undefined,
@@ -212,7 +213,7 @@ export function CollapsedSearch({
         bgcolor: active ? "action.selected" : "background.paper",
       }}
     >
-      <SearchIcon sx={{ fontSize: 18 }} />
+      <SearchIcon sx={{ fontSize: sxRem(18) }} />
       {active && (
         <Box
           component="span"

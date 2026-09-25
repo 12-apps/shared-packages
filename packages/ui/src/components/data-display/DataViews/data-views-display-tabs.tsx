@@ -24,6 +24,7 @@ import {
   type DataViewsDensity,
   type DataViewsLayout,
 } from "./data-views-layout-context";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * Two of the three tabs inside the "Exibir" panel — Ordenar and Exibição. The
@@ -73,7 +74,7 @@ function Tile({
         borderRadius: 1,
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.75rem",
+        fontSize: sxRem(12),
         fontWeight: active ? 600 : 400,
         color: active ? "primary.main" : "text.secondary",
         "&:hover": { bgcolor: "action.hover" },
@@ -197,7 +198,7 @@ function SortFieldRow({
         borderRadius: 1,
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.8125rem",
+        fontSize: sxRem(13),
         textAlign: "left",
         fontWeight: active ? 600 : 400,
         color: active ? "primary.main" : "text.primary",

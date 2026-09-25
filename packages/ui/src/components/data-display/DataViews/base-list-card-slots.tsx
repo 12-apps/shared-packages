@@ -6,6 +6,7 @@ import { DescriptionItem, type DescriptionItemProps } from "../DescriptionItem";
 import { RAIL_GAP_PX } from "./list-card-rails";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * WHAT SITS IN EACH RAIL.
@@ -60,7 +61,7 @@ export function ListCardCaption({
             sx={{
               display: "block",
               lineHeight: 1.2,
-              fontSize: "0.9rem",
+              fontSize: sxRem(14.4),
               color: "inherit",
               textDecoration: "none",
               ...CLAMP,
@@ -104,7 +105,7 @@ function MetaRule(): React.JSX.Element {
         color: "text.disabled",
         opacity: 0.5,
         userSelect: "none",
-        fontSize: "0.875rem",
+        fontSize: sxRem(14),
         // A cancelled row strikes the whole meta cluster, and a struck `|` is a
         // dagger. The rule is punctuation, not data — nothing to void.
         textDecoration: "none",
@@ -219,7 +220,7 @@ function ListCardValue({ value }: { value: ReactNode }): React.JSX.Element {
     <Text variant="body" size="sm" weight="medium" as="span">
       <Box
         component="span"
-        sx={{ fontSize: "0.875rem", whiteSpace: "nowrap", ...TABULAR }}
+        sx={{ fontSize: sxRem(14), whiteSpace: "nowrap", ...TABULAR }}
       >
         {value}
       </Box>

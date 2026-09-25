@@ -2,6 +2,8 @@ import type { ChipProps } from '@mui/material/Chip/index.js';
 import Chip from '@mui/material/Chip/index.js';
 import React from 'react';
 
+import { sxRem } from '../../../tokens/relative';
+
 // A plain component rather than styled(Chip): a styled component's inferred type
 // cannot be named across a module boundary in this package (TS2742), and both
 // the results list and the palette footer need this one.
@@ -10,7 +12,7 @@ export const ShortcutChip: React.FC<ChipProps> = (props) => (
     {...props}
     sx={{
       height: 20,
-      fontSize: '0.7rem',
+      fontSize: sxRem(11.2),
       fontFamily: 'monospace',
       ...props.sx,
     }}

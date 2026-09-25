@@ -16,6 +16,7 @@ import {
 import type { CategorySelectionChip } from './CategorySelect.types';
 import { fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { sxRem } from '../../../tokens/relative';
 
 interface PanelHeadProps {
   query: string;
@@ -37,7 +38,7 @@ const searchFieldSx = {
     width: '100%',
     height: fieldHeight,
     padding: '0 30px 0 32px',
-    fontSize: 13,
+    fontSize: sxRem(13),
     border: fieldBorder,
     borderRadius: fieldRadiusPx,
     background: 'background.paper',
@@ -63,7 +64,7 @@ const clearButtonSx = {
   display: 'grid',
   placeItems: 'center',
   cursor: 'pointer',
-  fontSize: 12,
+  fontSize: sxRem(12),
   padding: 0,
   lineHeight: 1,
 } as const;
@@ -121,7 +122,7 @@ export function CategoryPanelHead({
             alignItems: 'center',
             gap: '10px',
             marginTop: '8px',
-            fontSize: 12,
+            fontSize: sxRem(12),
           }}
         >
           {quickActions}

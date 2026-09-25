@@ -2,6 +2,8 @@ import Box from '@mui/material/Box/index.js';
 import Portal from '@mui/material/Portal/index.js';
 import React, { createContext, useCallback, useContext, useRef,useState, useMemo } from 'react';
 
+import { sxRem } from '../../../tokens/relative';
+
 import type { SonnerContextType, SonnerItem,SonnerProps } from './Sonner.types';
 
 const SonnerContext = createContext<SonnerContextType | null>(null);
@@ -196,7 +198,7 @@ const SonnerToaster: React.FC<{
               p: 1,
               mb: 0.5,
               textAlign: 'center',
-              fontSize: '0.75rem',
+              fontSize: sxRem(12),
               color: 'text.secondary',
               pointerEvents: 'none' }}
           >

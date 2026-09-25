@@ -1,11 +1,12 @@
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { alpha } from '@mui/material/styles/index.js';
+import { rem } from '../../../tokens/relative';
 
 const sizeStyles = (theme: Theme, size?: string): CSSObject => ({
     ...(size === 'sm' && {
       minHeight: 32,
       '& .MuiTab-root': {
-        fontSize: '0.875rem',
+        fontSize: rem(theme, 14),
         minHeight: 32,
         padding: theme.spacing(0.5, 1.5),
       },
@@ -14,7 +15,7 @@ const sizeStyles = (theme: Theme, size?: string): CSSObject => ({
     ...(size === 'lg' && {
       minHeight: 56,
       '& .MuiTab-root': {
-        fontSize: '1.125rem',
+        fontSize: rem(theme, 18),
         minHeight: 56,
         padding: theme.spacing(1.5, 3),
       },

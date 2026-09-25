@@ -10,6 +10,7 @@ import React from 'react';
 import { CustomTabPanel } from './TabsPanel';
 import { tabsRootStyles } from './Tabs.styles';
 import type { TabItem, TabsProps } from './Tabs.types';
+import { rem } from '../../../tokens/relative';
 
 const StyledTabs = styled(MuiTabs, {
   shouldForwardProp: (prop) => !['customVariant', 'size', 'showDividers'].includes(prop as string) })<{ customVariant?: string; size?: string; showDividers?: boolean }>(
@@ -32,11 +33,11 @@ const CloseButton = styled(Box)(({ theme }) => ({
     backgroundColor: alpha(theme.palette.error.main, 0.1),
     color: theme.palette.error.main } }));
 
-const BadgeWrapper = styled(Badge)(() => ({
+const BadgeWrapper = styled(Badge)(({ theme }) => ({
   '& .MuiBadge-badge': {
     right: -6,
     top: 4,
-    fontSize: '0.75rem',
+    fontSize: rem(theme, 12),
     minWidth: 16,
     height: 16,
     padding: 0 } }));

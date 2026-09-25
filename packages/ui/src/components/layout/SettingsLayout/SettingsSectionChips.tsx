@@ -6,6 +6,7 @@ import React, { useEffect, useRef, type RefObject } from 'react';
 
 import { SettingsStatusMarker } from './SettingsStatusMarker';
 import { TOUCH_TARGET } from './SettingsLayout.styles';
+import { rem } from '../../../tokens/relative';
 
 /**
  * The chip's drawn height, against `TOUCH_TARGET`'s 44 for the tappable one.
@@ -129,7 +130,7 @@ function SectionChip({
         borderRadius: 999,
         cursor: 'pointer',
         font: 'inherit',
-        fontSize: '0.8125rem',
+        fontSize: rem(theme, 13),
         fontWeight: active ? 700 : 500,
         textDecoration: 'none',
         whiteSpace: 'nowrap',

@@ -39,7 +39,7 @@ import {
 import type { AlertColor } from '@mui/material/Alert/index.js';
 import type { AlertProps } from './Alert.types';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
-import { px } from '../../../tokens/theme';
+import { sxRem } from '../../../tokens/relative';
 
 const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
 
@@ -188,7 +188,7 @@ const AlertContent: React.FC<{
         data-testid={testIdFor(dataTestId, 'title')}
         sx={{
           fontWeight: TITLE.fontWeight,
-          fontSize: px(TITLE.fontSize),
+          fontSize: sxRem(TITLE.fontSize),
           marginBottom: description ? TITLE.marginBottomUnits : 0,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
@@ -204,7 +204,7 @@ const AlertContent: React.FC<{
         data-testid={testIdFor(dataTestId, 'message')}
         sx={{
           opacity: DESCRIPTION.opacity,
-          fontSize: px(DESCRIPTION.fontSize),
+          fontSize: sxRem(DESCRIPTION.fontSize),
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
           wordBreak: 'break-word',

@@ -3,6 +3,7 @@
 import Box from '@mui/material/Box/index.js';
 import React from 'react';
 
+import { sxRem } from '../../../tokens/relative';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import type { AppHeaderProps } from './AppHeader.types';
@@ -123,7 +124,7 @@ const HeaderTrailing: React.FC<Pick<AppHeaderProps, 'meta' | 'actions'>> = ({ me
         <Box
           data-testid="app-header-meta"
           sx={{
-            fontSize: 11,
+            fontSize: sxRem(11),
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',

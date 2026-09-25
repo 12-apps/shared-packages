@@ -31,6 +31,7 @@ import type {
   DashboardInfoProps,
   DashboardSettingsProps,
 } from './Dashboard.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** Flexible spacer — everything composed after it is pushed to the right. */
 export const DashboardSpacer = (): React.JSX.Element => <Box sx={{ flex: 1 }} aria-hidden />;
@@ -70,7 +71,7 @@ export const DashboardInfo = ({
           <InfoIcon fontSize="small" sx={{ color: 'text.secondary' }} />
           <Typography sx={{ fontWeight: 600 }}>{title}</Typography>
         </Box>
-        <Box sx={{ px: 2, py: 1.5, fontSize: '0.875rem', color: 'text.secondary' }}>{children}</Box>
+        <Box sx={{ px: 2, py: 1.5, fontSize: sxRem(14), color: 'text.secondary' }}>{children}</Box>
       </Popover>
     </>
   );

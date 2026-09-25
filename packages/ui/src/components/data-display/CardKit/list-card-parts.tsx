@@ -5,6 +5,7 @@ import type { JSX, ReactNode } from 'react';
 import { Box } from '../../../mui/Box';
 
 import type { CardFactProps, CardLedgerLine } from './CardKit.types';
+import { sxRem } from '../../../tokens/relative';
 
 /**
  * THE SHARED FURNITURE OF AN EXPANDED LIST-CARD BODY.
@@ -37,7 +38,7 @@ export function DetailColumns({ left, right }: { left: ReactNode; right: ReactNo
  */
 export function Fact({ label, value }: CardFactProps): JSX.Element {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, fontSize: 13, py: 0.25 }}>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, fontSize: sxRem(13), py: 0.25 }}>
       <Box component="span" sx={{ color: 'text.secondary', flexShrink: 0 }}>
         {label}
       </Box>
@@ -73,7 +74,7 @@ export function Ledger({
           sx={{
             display: 'flex',
             justifyContent: 'space-between',
-            fontSize: 13,
+            fontSize: sxRem(13),
             color: line.tone === 'info' ? 'info.main' : 'text.secondary',
           }}
         >
@@ -108,7 +109,7 @@ export function BodyHeading({ children }: { children: ReactNode }): JSX.Element 
   return (
     <Box
       sx={{
-        fontSize: 11,
+        fontSize: sxRem(11),
         fontWeight: 700,
         letterSpacing: 0.4,
         textTransform: 'uppercase',
@@ -137,7 +138,7 @@ export function TagList({
   empty: string;
 }): JSX.Element {
   if (items.length === 0) {
-    return <Box sx={{ fontSize: 13, color: 'text.disabled' }}>{empty}</Box>;
+    return <Box sx={{ fontSize: sxRem(13), color: 'text.disabled' }}>{empty}</Box>;
   }
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -146,7 +147,7 @@ export function TagList({
           key={item}
           component="span"
           sx={{
-            fontSize: 12,
+            fontSize: sxRem(12),
             px: 0.75,
             py: 0.25,
             borderRadius: 1,

@@ -41,7 +41,8 @@ import {
 import type { SwitchVariant } from './Switch.base';
 
 import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
-import { inkOver, px } from '../../../tokens/theme';
+import { rem } from '../../../tokens/relative';
+import { inkOver } from '../../../tokens/theme';
 import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
 
 // Every number below comes from `./Switch.metrics`, which the native renderer
@@ -303,13 +304,13 @@ const trackLabels = (
   justifyContent: 'space-between',
   paddingLeft: theme.spacing(TRACK_LABEL.insetUnits),
   paddingRight: theme.spacing(TRACK_LABEL.insetUnits),
-  fontSize: px(TRACK_LABEL.fontSize),
+  fontSize: rem(theme, TRACK_LABEL.fontSize),
   fontWeight: TRACK_LABEL.fontWeight,
   color: theme.palette.text.secondary,
   '&::before, &::after': {
     content: '""',
     position: 'absolute',
-    fontSize: px(TRACK_LABEL.fontSize),
+    fontSize: rem(theme, TRACK_LABEL.fontSize),
     fontWeight: TRACK_LABEL.fontWeight,
     top: '50%',
     transform: 'translateY(-50%)',

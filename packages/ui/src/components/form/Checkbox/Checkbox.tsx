@@ -19,7 +19,7 @@ import {
 } from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types';
 import { splitTestId } from '../../../platform/test-id';
-import { px } from '../../../tokens/theme';
+import { rem } from '../../../tokens/relative';
 
 const pulse = keyframes`
   0% {
@@ -99,7 +99,7 @@ const StyledFormControlLabel = styled(FormControlLabel, {
     marginLeft: CHECKBOX_LABEL.marginLeft,
     '& .MuiFormControlLabel-label': {
       color: error ? theme.palette.error.main : theme.palette.text.primary,
-      fontSize: px(CHECKBOX_LABEL.fontSize),
+      fontSize: rem(theme, CHECKBOX_LABEL.fontSize),
     },
   })
 );

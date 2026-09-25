@@ -1,17 +1,18 @@
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 
 import { BADGE_CONTENT_GAP, BADGE_SIZES } from './Badge.metrics';
 import { getSizeStyles } from './Badge.styles';
 import type { BadgeSize } from './Badge.types';
-import { px } from '../../../tokens/theme';
+import { rem, sxRem } from '../../../tokens/relative';
 
 // Derived from the shared metrics: `xl` takes `lg`'s glyph, which is what the
 // hand-written map did through its `?? CLOSE_ICON_SIZES.lg` fallback.
-const CLOSE_ICON_SIZES: Record<string, string> = Object.fromEntries(
-  Object.entries(BADGE_SIZES).map(([size, metrics]) => [size, px(metrics.closeIconSize)]),
+const CLOSE_ICON_SIZES: Record<string, number> = Object.fromEntries(
+  Object.entries(BADGE_SIZES).map(([size, metrics]) => [size, metrics.closeIconSize]),
 );
 
 const makeTestId =
@@ -23,19 +24,22 @@ const BadgeIcon: FC<{ icon: ReactNode; size: BadgeSize; testId: string }> = ({
   icon,
   size,
   testId,
-}) => (
-  <span
-    key="icon"
-    data-testid={testId}
-    style={{
-      fontSize: getSizeStyles(size).iconSize,
-      display: 'inline-flex',
-      alignItems: 'center',
-    }}
-  >
-    {icon}
-  </span>
-);
+}) => {
+  const theme = useTheme();
+  return (
+    <span
+      key="icon"
+      data-testid={testId}
+      style={{
+        fontSize: rem(theme, getSizeStyles(size).step.iconSize),
+        display: 'inline-flex',
+        alignItems: 'center',
+      }}
+    >
+      {icon}
+    </span>
+  );
+};
 
 const BadgeCloseButton: FC<{ size: BadgeSize; testId: string; onClose: (e: React.MouseEvent) => void }> = ({
   size,
@@ -51,7 +55,7 @@ const BadgeCloseButton: FC<{ size: BadgeSize; testId: string; onClose: (e: React
       p: 0,
       ml: 0.5,
       color: 'inherit',
-      '& svg': { fontSize: CLOSE_ICON_SIZES[size] ?? CLOSE_ICON_SIZES.lg },
+      '& svg': { fontSize: sxRem(CLOSE_ICON_SIZES[size] ?? BADGE_SIZES.lg.closeIconSize) },
       '&:hover': { opacity: 0.8 },
     }}
   >

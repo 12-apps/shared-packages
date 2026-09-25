@@ -11,7 +11,7 @@ import React from 'react';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import { neutralTones } from '../../../tokens/ink';
-import { accentFor, muiSize } from '../../../tokens/scales';
+import { accentFor, muiSize, rem } from '../../../tokens/scales';
 
 import type {
   CarouselArrowsProps,
@@ -105,7 +105,7 @@ const NumberIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onS
         backgroundColor: isActive ? accentFor(theme, color).main : 'transparent',
         color: isActive ? accentFor(theme, color).contrastText : accentFor(theme, color).main,
         border: `1px solid ${accentFor(theme, color).main}`,
-        fontSize: '0.75rem',
+        fontSize: rem(theme, 12),
         fontWeight: isActive ? 'bold' : 'normal',
         cursor: 'pointer',
         transition: theme.transitions.create(['all']),

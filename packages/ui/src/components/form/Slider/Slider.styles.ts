@@ -2,6 +2,7 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { glowAnimation, gradientShiftAnimation, pulseAnimation } from './Slider.animations';
+import { rem } from '../../../tokens/relative';
 
 import { absoluteInk, controlNeutral, onMedia, sheen } from '../../../tokens/ink';
 
@@ -61,12 +62,15 @@ const SIZES: Record<SizeKey, Geometry> = {
   xl: { height: 12, thumbSize: 28, markHeight: 16 },
 };
 
-/** The value bubble and mark labels shrink at the two smallest sizes only. */
-const LABEL_SCALE: Record<string, { fontSize: number; box: number; markFont: string }> = {
-  xs: { fontSize: 10, box: 28, markFont: '0.65rem' },
-  sm: { fontSize: 11, box: 30, markFont: '0.7rem' },
+/**
+ * The value bubble and mark labels shrink at the two smallest sizes only. The
+ * two fonts are design px, read through the type scale.
+ */
+const LABEL_SCALE: Record<string, { fontPx: number; box: number; markFont: number }> = {
+  xs: { fontPx: 10, box: 28, markFont: 10.4 },
+  sm: { fontPx: 11, box: 30, markFont: 11.2 },
 };
-const LABEL_DEFAULT = { fontSize: 12, box: 32, markFont: '0.75rem' };
+const LABEL_DEFAULT = { fontPx: 12, box: 32, markFont: 12 };
 
 export interface SliderFlags {
   customColor?: string;
@@ -216,7 +220,7 @@ const valueLabelPart = ({ theme, flags, palette }: PartInput): CSSObject => {
 
   return {
     lineHeight: 1.2,
-    fontSize: scale.fontSize,
+    fontSize: rem(theme, scale.fontPx),
     padding: 0,
     width: scale.box,
     height: scale.box,
@@ -260,7 +264,7 @@ const markPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject => 
 };
 
 const markLabelPart = ({ theme, flags, palette }: PartInput): CSSObject => ({
-  fontSize: (LABEL_SCALE[flags.customSize ?? ''] ?? LABEL_DEFAULT).markFont,
+  fontSize: rem(theme, (LABEL_SCALE[flags.customSize ?? ''] ?? LABEL_DEFAULT).markFont),
   color: theme.palette.text.secondary,
   marginTop: theme.spacing(1.5),
   fontWeight: 500,

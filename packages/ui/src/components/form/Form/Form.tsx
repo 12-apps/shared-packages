@@ -10,6 +10,7 @@ import type {
   FormMessageProps,
   FormProps,
 } from './Form.types';
+import { rem } from '../../../tokens/relative';
 
 const StyledForm = styled('form', {
   shouldForwardProp: (prop) => prop !== 'variant',
@@ -130,7 +131,7 @@ export const FormField: React.FC<FormFieldProps> = ({
 const StyledFormLabel = styled('label', {
   shouldForwardProp: (prop) => prop !== 'error',
 })<{ error?: boolean }>(({ theme, error }) => ({
-  fontSize: '0.875rem',
+  fontSize: rem(theme, 14),
   fontWeight: 500,
   color: error ? theme.palette.error.main : theme.palette.text.primary,
   marginBottom: theme.spacing(0.5),
@@ -168,7 +169,7 @@ export const FormControl: React.FC<FormControlProps> = ({ fullWidth = true, chil
 const StyledFormMessage = styled('span', {
   shouldForwardProp: (prop) => prop !== 'error',
 })<{ error?: boolean }>(({ theme, error }) => ({
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   marginTop: theme.spacing(0.5),
   color: error ? theme.palette.error.main : theme.palette.text.secondary,
   display: 'block',

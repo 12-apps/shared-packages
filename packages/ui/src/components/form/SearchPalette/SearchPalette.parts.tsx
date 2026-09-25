@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import type { SearchFilterChip, SearchResultLead } from './SearchPalette.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** Bold the first case-insensitive occurrence of `query` within `text`. */
 export function highlight(text: string, query: string): React.ReactNode {
@@ -44,7 +45,7 @@ export function Lead({ lead }: { lead: SearchResultLead | undefined }): React.JS
   }
   if (lead.kind === 'avatar') {
     return (
-      <Avatar src={lead.src} alt={lead.alt ?? ''} sx={{ width: 32, height: 32, fontSize: '0.85rem' }}>
+      <Avatar src={lead.src} alt={lead.alt ?? ''} sx={{ width: 32, height: 32, fontSize: sxRem(13.6) }}>
         {lead.fallback}
       </Avatar>
     );
@@ -91,7 +92,7 @@ export function PaletteInput(props: {
               pointerEvents: 'none',
               whiteSpace: 'pre',
               overflow: 'hidden',
-              fontSize: '1rem',
+              fontSize: sxRem(16),
             }}
           >
             <Box component="span" sx={{ visibility: 'hidden' }}>
@@ -115,7 +116,7 @@ export function PaletteInput(props: {
             'aria-label': props.inputAriaLabel,
             'aria-autocomplete': 'list',
           }}
-          sx={{ fontSize: '1rem' }}
+          sx={{ fontSize: sxRem(16) }}
         />
       </Box>
       {props.isLoading && <CircularProgress size={18} sx={{ flexShrink: 0 }} />}
@@ -197,7 +198,7 @@ export function ResultRow(props: {
         )}
       </Box>
       {props.trailing != null && (
-        <Box sx={{ flexShrink: 0, color: 'text.secondary', fontSize: '0.75rem' }}>{props.trailing}</Box>
+        <Box sx={{ flexShrink: 0, color: 'text.secondary', fontSize: sxRem(12) }}>{props.trailing}</Box>
       )}
     </ListItemButton>
   );
@@ -226,7 +227,7 @@ export function SubmitAllFooter(props: {
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
         <Typography variant="caption">{props.keyLabel}</Typography>
-        <KeyboardReturnIcon sx={{ fontSize: 14 }} />
+        <KeyboardReturnIcon sx={{ fontSize: sxRem(14) }} />
       </Box>
     </ListItemButton>
   );

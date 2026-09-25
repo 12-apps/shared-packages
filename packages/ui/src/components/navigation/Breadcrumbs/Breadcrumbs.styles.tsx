@@ -3,6 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { modeInk, shadowInk, sheen, uiInk } from '../../../tokens/ink';
 import { EFFECT_GLOW } from '../../../tokens/ink.core';
+import { rem } from '../../../tokens/relative';
 
 export const slideIn = keyframes`
   from {
@@ -173,7 +174,7 @@ export const breadcrumbLinkStyles = ({
     alignItems: 'center',
     gap: theme.spacing(0.5),
     textDecoration: 'none',
-    fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
+    fontSize: rem(theme, size === 'sm' ? 14 : size === 'lg' ? 18 : 16),
     fontWeight: active ? 600 : 400,
     color: active ? theme.palette.text.primary : theme.palette.text.secondary,
     padding: theme.spacing(0.5, 0.75),
@@ -204,7 +205,7 @@ export const breadcrumbLinkStyles = ({
 
     // Mobile responsiveness
     [theme.breakpoints.down('sm')]: {
-      fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
+      fontSize: rem(theme, size === 'lg' ? 16 : size === 'sm' ? 12 : 14),
       padding: theme.spacing(0.375, 0.5) } });
 
 export const sizeIconMap = {

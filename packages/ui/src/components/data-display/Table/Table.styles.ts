@@ -2,6 +2,7 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { TableDensity, TableStripeColor } from './Table.types';
+import { rem } from '../../../tokens/relative';
 
 const pulseAnimation = keyframes`
   0% {
@@ -19,22 +20,22 @@ const pulseAnimation = keyframes`
 `;
 
 // Density configurations
-const getDensityConfig = (density: TableDensity = 'normal') => {
+const getDensityConfig = (theme: Theme, density: TableDensity = 'normal') => {
   const configs = {
     compact: {
       rowHeight: 36,
       cellPadding: '6px 12px',
-      fontSize: '0.8125rem',
+      fontSize: rem(theme, 13),
       headerPadding: '8px 12px' },
     normal: {
       rowHeight: 52,
       cellPadding: '12px 16px',
-      fontSize: '0.875rem',
+      fontSize: rem(theme, 14),
       headerPadding: '16px 16px' },
     comfortable: {
       rowHeight: 68,
       cellPadding: '18px 24px',
-      fontSize: '0.875rem',
+      fontSize: rem(theme, 14),
       headerPadding: '20px 24px' } };
   return configs[density];
 };
@@ -191,7 +192,7 @@ export const tableStyles = ({
   stickyHeader?: boolean;
   stripeColor?: TableStripeColor;
 }): CSSObject => {
-  const densityConfig = getDensityConfig(density);
+  const densityConfig = getDensityConfig(theme, density);
   
   return {
     borderRadius: theme.spacing(1),

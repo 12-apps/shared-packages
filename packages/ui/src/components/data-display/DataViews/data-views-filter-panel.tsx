@@ -14,6 +14,7 @@ import type {
   RangeFieldConfig,
   RangeValue,
 } from "./data-views-types";
+import { sxRem } from "../../../tokens/relative";
 
 /* ── Filter panel ────────────────────────────────────────────────────────── */
 
@@ -174,7 +175,7 @@ export function FilterDialog<T extends Record<string, unknown>>({
               underline="hover"
               onClick={props.onClearAll}
               data-testid={`${props.testIdPrefix}-clear-filters`}
-              sx={{ fontSize: "0.75rem", color: "text.secondary" }}
+              sx={{ fontSize: sxRem(12), color: "text.secondary" }}
             >
               {copy.filters.clearAllFilters}
             </Link>

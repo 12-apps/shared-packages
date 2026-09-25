@@ -5,6 +5,7 @@ import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 interface ColorPalette {
   main: string;
@@ -48,13 +49,13 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
 
 type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
-/** Each slot's type. Its side is the theme's field height for the size (a square). */
-const SIZES: Record<SizeKey, { fontSize: string }> = {
-  xs: { fontSize: '0.75rem' },
-  sm: { fontSize: '0.875rem' },
-  md: { fontSize: '1rem' },
-  lg: { fontSize: '1.125rem' },
-  xl: { fontSize: '1.25rem' },
+/** Each slot's type, in design px. Its side is the theme's field height for the size (a square). */
+const SIZES: Record<SizeKey, { fontPx: number }> = {
+  xs: { fontPx: 12 },
+  sm: { fontPx: 14 },
+  md: { fontPx: 16 },
+  lg: { fontPx: 18 },
+  xl: { fontPx: 20 },
 };
 
 export interface OtpSlotFlags {
@@ -67,7 +68,7 @@ export interface OtpSlotFlags {
 export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
   const { customColor = 'primary', customSize = 'md', glass, gradient } = flags;
   const palette = getColorFromTheme(theme, customColor);
-  const { fontSize } = SIZES[customSize as SizeKey] ?? SIZES.md;
+  const { fontPx } = SIZES[customSize as SizeKey] ?? SIZES.md;
   // A slot is a field: a square of the theme's field height for its size.
   const side = fieldHeight(theme, asFieldSize(customSize));
 
@@ -77,7 +78,7 @@ export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
     '& .MuiOutlinedInput-root': {
       width: side,
       height: side,
-      fontSize,
+      fontSize: rem(theme, fontPx),
       fontWeight: 600,
       textAlign: 'center',
       borderRadius: fieldRadius(theme),

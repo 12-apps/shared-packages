@@ -8,6 +8,7 @@ import React from 'react';
 
 import type { TimingData } from './TimingDiagram.types';
 import { onMedia, sheen, uiInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 export type PhaseKey = 'dns' | 'connect' | 'ssl' | 'request' | 'response';
 
@@ -94,7 +95,7 @@ const WaterfallBar = styled(Box, {
   alignItems: 'center',
   justifyContent: 'center',
   color: theme.palette.getContrastText(phaseColor),
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 500,
   boxShadow: `0 2px 8px ${alpha(phaseColor, 0.3)}`,
   transition: animated ? 'all 0.5s ease' : 'none',
@@ -125,7 +126,7 @@ const TimelineAxis = styled(Box)(({ theme }) => ({
 }));
 
 const TimeLabel = styled(Typography)(({ theme }) => ({
-  fontSize: '0.7rem',
+  fontSize: rem(theme, 11.2),
   color: theme.palette.text.secondary,
   fontWeight: 500,
 }));
@@ -211,7 +212,7 @@ const StackedSegment = styled(Box, {
   alignItems: 'center',
   justifyContent: 'center',
   color: onMedia(theme),
-  fontSize: '0.7rem',
+  fontSize: rem(theme, 11.2),
   fontWeight: 600,
   position: 'relative',
   transition: 'all 0.3s ease',
@@ -284,7 +285,7 @@ const HorizontalSegment = styled(Box, {
   gap: theme.spacing(2),
   '& .label': {
     minWidth: 80,
-    fontSize: '0.85rem',
+    fontSize: rem(theme, 13.6),
     fontWeight: 500,
     color: theme.palette.text.secondary,
   },
@@ -316,7 +317,7 @@ const HorizontalSegment = styled(Box, {
   '& .value': {
     minWidth: 60,
     textAlign: 'right',
-    fontSize: '0.85rem',
+    fontSize: rem(theme, 13.6),
     fontWeight: 600,
     color: phaseColor,
   },

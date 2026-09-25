@@ -6,13 +6,14 @@ import Button from '@mui/material/Button/index.js';
 import type { CategorySelectCopy } from '../../../copy';
 import { footerSx, METRICS } from './CategorySelect.styles';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { sxRem } from '../../../tokens/relative';
 
 const buttonSx = (sheet: boolean) =>
   ({
     height: sheet ? METRICS.sheetFooterButton : METRICS.footerButton,
     padding: '0 13px',
     borderRadius: fieldRadiusPx,
-    fontSize: 12.5,
+    fontSize: sxRem(12.5),
     fontWeight: 600,
     textTransform: 'none',
     minWidth: 0,
@@ -45,7 +46,7 @@ export function CategoryMultiFoot({
 }: MultiFootProps): React.JSX.Element {
   return (
     <Box sx={footerSx} data-testid={`${dataTestId}-footer`}>
-      <Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>
+      <Box component="span" sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>
         {copy.footer.selectedCount(count)}
       </Box>
       <Box sx={{ display: 'flex', gap: '6px' }}>
@@ -85,7 +86,7 @@ export function CategorySingleFoot({
 }): React.JSX.Element {
   return (
     <Box sx={footerSx} data-testid={`${dataTestId}-footer`}>
-      <Box component="span" sx={{ fontSize: 12, color: 'text.secondary' }}>
+      <Box component="span" sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>
         {copy.footer.singleHint}
       </Box>
       <Button

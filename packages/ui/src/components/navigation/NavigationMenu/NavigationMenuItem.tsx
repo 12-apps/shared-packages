@@ -17,6 +17,7 @@ import { useMenuItemState } from './NavigationMenuItem.hooks';
 import { navItemButtonStyles, pulseGlow } from './NavigationMenu.styles';
 import type { NavigationMenuItem } from './NavigationMenu.types';
 import { onMedia, shadowInk, uiInk } from '../../../tokens/ink';
+import { sxRem } from '../../../tokens/relative';
 
 const StyledListItem = styled(ListItem, {
   shouldForwardProp: (prop) => !['variant', 'active', 'size', 'level'].includes(prop as string) })<{ variant?: string; active?: boolean; size?: string; level?: number }>(
@@ -150,7 +151,7 @@ const MenuItemLabel: React.FC<{
             height: 20,
             px: 0.75,
             borderRadius: '10px',
-            fontSize: '0.75rem',
+            fontSize: sxRem(12),
             fontWeight: 600,
             color: (theme) => onMedia(theme),
             background: (theme) =>

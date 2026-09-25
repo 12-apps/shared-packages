@@ -17,6 +17,7 @@ import React from 'react';
 import { neutralTones } from '../../../tokens/ink';
 
 import type { AlertDialogProps } from './AlertDialog.types';
+import { rem } from '../../../tokens/relative';
 
 // Define pulse animation
 const pulseAnimation = keyframes`
@@ -129,7 +130,7 @@ const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
   paddingRight: theme.spacing(6), // Space for close button
   '& .MuiTypography-root': {
     fontWeight: 600,
-    fontSize: '1.25rem',
+    fontSize: rem(theme, 20),
   },
 }));
 

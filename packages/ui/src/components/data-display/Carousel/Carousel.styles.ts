@@ -2,18 +2,18 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { CarouselProps } from './Carousel.types';
-import { accentFor } from '../../../tokens/scales';
+import { accentFor, sxRem } from '../../../tokens/scales';
 
 type Variant = NonNullable<CarouselProps['variant']>;
 type Size = NonNullable<CarouselProps['size']>;
 type Color = NonNullable<CarouselProps['color']>;
 
-const SIZES: Record<Size, { height: number; fontSize: string }> = {
-  xs: { height: 200, fontSize: '0.75rem' },
-  sm: { height: 300, fontSize: '0.875rem' },
-  md: { height: 400, fontSize: '1rem' },
-  lg: { height: 500, fontSize: '1.125rem' },
-  xl: { height: 600, fontSize: '1.25rem' },
+const SIZES: Record<Size, { height: number; fontSize: (theme: Theme) => string }> = {
+  xs: { height: 200, fontSize: sxRem(12) },
+  sm: { height: 300, fontSize: sxRem(14) },
+  md: { height: 400, fontSize: sxRem(16) },
+  lg: { height: 500, fontSize: sxRem(18) },
+  xl: { height: 600, fontSize: sxRem(20) },
 };
 
 const sizeStyles = (size: Size) => SIZES[size] ?? SIZES.md;

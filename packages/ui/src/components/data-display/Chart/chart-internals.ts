@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 
 import type { ChartProps, ChartSeries } from './Chart.types';
 import { uiInk } from '../../../tokens/ink';
-import { accentFor} from '../../../tokens/scales';
+import { accentFor, sxRem } from '../../../tokens/scales';
 
 /**
  * Non-JSX internals of the prop-driven Chart: size/variant styling, palette
@@ -26,17 +26,19 @@ export interface SizeStyles {
   tickMargin: number;
 }
 
-const SIZE_PRESETS: Record<NonNullable<ChartProps['size']>, SizeStyles> = {
-  xs: { height: 200, fontSize: '0.75rem', tickMargin: 10 },
-  sm: { height: 300, fontSize: '0.875rem', tickMargin: 12 },
-  md: { height: 400, fontSize: '1rem', tickMargin: 14 },
-  lg: { height: 500, fontSize: '1.125rem', tickMargin: 16 },
-  xl: { height: 600, fontSize: '1.25rem', tickMargin: 18 },
+type SizePreset = Omit<SizeStyles, 'fontSize'> & { fontSize: (theme: Theme) => string };
+
+const SIZE_PRESETS: Record<NonNullable<ChartProps['size']>, SizePreset> = {
+  xs: { height: 200, fontSize: sxRem(12), tickMargin: 10 },
+  sm: { height: 300, fontSize: sxRem(14), tickMargin: 12 },
+  md: { height: 400, fontSize: sxRem(16), tickMargin: 14 },
+  lg: { height: 500, fontSize: sxRem(18), tickMargin: 16 },
+  xl: { height: 600, fontSize: sxRem(20), tickMargin: 18 },
 };
 
-export function getSizeStyles(size: ChartProps['size'], height?: number): SizeStyles {
+export function getSizeStyles(theme: Theme, size: ChartProps['size'], height?: number): SizeStyles {
   const preset = SIZE_PRESETS[size ?? 'md'] ?? SIZE_PRESETS.md;
-  return { ...preset, height: height ?? preset.height };
+  return { ...preset, fontSize: preset.fontSize(theme), height: height ?? preset.height };
 }
 
 export function getDefaultColors(theme: Theme, variant: ChartProps['variant'], colors?: string[]): string[] {

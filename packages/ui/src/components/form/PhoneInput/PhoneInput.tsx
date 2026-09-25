@@ -20,6 +20,7 @@ import type { PhoneInputCopy } from '../../../copy';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { fieldControlStyles, fieldTextFieldStyles } from '../../../tokens/field-height';
+import { rem } from '../../../tokens/relative';
 
 // Country data with expanded support
 
@@ -260,8 +261,8 @@ const CountryPicker: React.FC<{
               <ListItemText
                 primary={country.name}
                 secondary={country.dial}
-                primaryTypographyProps={{ fontSize: '0.9rem' }}
-                secondaryTypographyProps={{ fontSize: '0.8rem' }}
+                primaryTypographyProps={{ fontSize: rem(theme, 14.4) }}
+                secondaryTypographyProps={{ fontSize: rem(theme, 12.8) }}
               />
             </MenuItem>
           ))}

@@ -26,6 +26,7 @@ import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { fieldHeight } from "../../../tokens/field-height";
 import { fieldEdge } from "../../../tokens/field-edge";
+import { sxRem } from "../../../tokens/relative";
 
 /** What each field's control needs, minus the panel's own chrome. */
 export interface MoreFieldProps {
@@ -101,7 +102,7 @@ function OverflowPill<T extends Record<string, unknown>>({
               bgcolor: checked ? "action.selected" : "transparent",
               borderRadius: fieldRadiusPx,
               cursor: "pointer",
-              fontSize: "0.8125rem",
+              fontSize: sxRem(13),
               color: checked ? "primary.main" : "text.secondary",
             }}
           >
@@ -248,7 +249,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
               bgcolor: "transparent",
               cursor: "pointer",
               font: "inherit",
-              fontSize: "0.75rem",
+              fontSize: sxRem(12),
               color: "primary.main",
               "&:hover": { textDecoration: "underline" },
             }}

@@ -22,6 +22,7 @@ import {
   SuggestionsList } from './PasswordStrength.helpers';
 import type { PasswordRequirements, PasswordStrengthProps } from './PasswordStrength.types';
 import type { PasswordStrengthCopy } from '../../../copy';
+import { rem } from '../../../tokens/relative';
 
 interface RequirementIconProps {
   met: boolean;
@@ -107,7 +108,7 @@ const RequirementItem = styled(Box, {
   transition: animated ? 'all 0.3s ease' : 'none',
   animation: animated ? `${slideInAnimation} 0.3s ease` : 'none',
   '& svg': {
-    fontSize: '1rem',
+    fontSize: rem(theme, 16),
     color: met ? theme.palette.success.main : theme.palette.text.disabled } }));
 
 const StrengthLabel = styled(Chip, {

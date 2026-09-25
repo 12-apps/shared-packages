@@ -9,6 +9,7 @@ import React from 'react';
 
 import type { ContentToolbarProps } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { sxRem } from '../../../tokens/relative';
 
 const selectionButtonSx = {
   minWidth: 0,
@@ -17,7 +18,7 @@ const selectionButtonSx = {
   fontWeight: 600,
   py: 0.5,
   px: 1.5,
-  fontSize: '0.75rem',
+  fontSize: sxRem(12),
   textTransform: 'none',
   color: 'text.primary',
 } as const;
@@ -151,7 +152,7 @@ function SelectionState({
       <Typography
         component="span"
         data-testid="selected-count-indicator"
-        sx={{ fontSize: '0.875rem', color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
+        sx={{ fontSize: sxRem(14), color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
       >
         {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
       </Typography>

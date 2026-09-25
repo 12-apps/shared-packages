@@ -23,13 +23,15 @@ import {
 } from './AnimatedIcon.animations';
 import type { AnimationSize, AnimationVariant } from './AnimatedIcon.types';
 import { neutralTones, shadowInk, sheen } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
-export const sizeConfigs: Record<AnimationSize, { size: number; fontSize: number }> = {
-  xs: { size: 12, fontSize: 10 },
-  sm: { size: 24, fontSize: 20 },
-  md: { size: 32, fontSize: 28 },
-  lg: { size: 48, fontSize: 44 },
-  xl: { size: 64, fontSize: 60 },
+/** Per size: the ring's edge and the glyph's edge (its font size, width and height), in design px. */
+export const sizeConfigs: Record<AnimationSize, { size: number; glyph: number }> = {
+  xs: { size: 12, glyph: 10 },
+  sm: { size: 24, glyph: 20 },
+  md: { size: 32, glyph: 28 },
+  lg: { size: 48, glyph: 44 },
+  xl: { size: 64, glyph: 60 },
 };
 
 /**
@@ -185,7 +187,7 @@ export const iconSx = (theme: Theme, flags: IconStyleFlags): CSSObject => {
 
   // Both selectors size the same glyph — MUI icons render an MuiSvgIcon-root,
   // a bare child renders an svg.
-  const glyphSize = { fontSize: $fontSize, width: $fontSize, height: $fontSize };
+  const glyphSize = { fontSize: rem(theme, $fontSize), width: $fontSize, height: $fontSize };
 
   return {
     display: 'inline-flex',

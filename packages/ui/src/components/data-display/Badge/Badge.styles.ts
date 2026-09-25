@@ -23,11 +23,11 @@ import {
   SHIMMER,
   badgeAnchor,
 } from './Badge.metrics';
+import type { BadgeSizeMetrics } from './Badge.metrics';
 import { badgeVariantStyles } from './Badge.variants';
 import type { BadgeSize, BadgeVariant } from './Badge.types';
 import { sheen } from '../../../tokens/ink';
 import { accentFor } from '../../../tokens/scales';
-import { px } from '../../../tokens/theme';
 
 export type BadgePalette = {
   main: string;
@@ -59,10 +59,10 @@ const sizeMap: Record<
   {
     minWidth: number;
     height: number;
-    fontSize: string;
+    /** The step itself: its `fontSize`/`iconSize` are design px, drawn through `rem(theme, …)`. */
+    step: BadgeSizeMetrics;
     padding: string;
     dotSize: number;
-    iconSize: string;
   }
 > = Object.fromEntries(
   Object.entries(BADGE_SIZES).map(([size, metrics]) => [
@@ -70,15 +70,14 @@ const sizeMap: Record<
     {
       minWidth: metrics.minWidth,
       height: metrics.height,
-      fontSize: px(metrics.fontSize),
+      step: metrics,
       padding: `0 ${metrics.paddingHorizontal}px`,
       dotSize: metrics.dotSize,
-      iconSize: px(metrics.iconSize),
     },
   ]),
 ) as Record<
   BadgeSize,
-  { minWidth: number; height: number; fontSize: string; padding: string; dotSize: number; iconSize: string }
+  { minWidth: number; height: number; step: BadgeSizeMetrics; padding: string; dotSize: number }
 >;
 
 export const getSizeStyles = (size: BadgeSize) => sizeMap[size] || sizeMap.md;

@@ -13,6 +13,7 @@ import React, { cloneElement, isValidElement,useRef, useState } from 'react';
 
 import type { DropdownMenuItem,DropdownMenuProps } from './DropdownMenu.types';
 import { modeInk, shadowInk, sheen } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 // Resolves every light/dark decision once. The inline version repeated
 // `theme.palette.mode === 'dark' ? … : …` nine times, and two of those had the
@@ -79,7 +80,7 @@ const StyledMenu = styled(Menu, {
 
     ...(size === 'sm' && {
       '& .MuiMenuItem-root': {
-        fontSize: '0.875rem',
+        fontSize: rem(theme, 14),
         minHeight: 32,
         padding: theme.spacing(0.75, 2),
       },
@@ -87,7 +88,7 @@ const StyledMenu = styled(Menu, {
 
     ...(size === 'lg' && {
       '& .MuiMenuItem-root': {
-        fontSize: '1.125rem',
+        fontSize: rem(theme, 18),
         minHeight: 48,
         padding: theme.spacing(1.5, 3),
       },
@@ -132,7 +133,7 @@ const StyledMenuItem = styled(MenuItem, {
 
 const MenuHeader = styled(Typography)(({ theme }) => ({
   padding: theme.spacing(1, 2),
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 600,
   textTransform: 'uppercase',
   color: theme.palette.text.secondary,
@@ -140,7 +141,7 @@ const MenuHeader = styled(Typography)(({ theme }) => ({
 }));
 
 const ShortcutText = styled(Typography)(({ theme }) => ({
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   color: theme.palette.text.secondary,
   marginLeft: 'auto',
   paddingLeft: theme.spacing(2),

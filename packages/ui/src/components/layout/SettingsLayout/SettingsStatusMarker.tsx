@@ -6,6 +6,7 @@ import React from 'react';
 
 import { SR_ONLY_SX, STATUS_COLOR } from './SettingsLayout.styles';
 import type { SettingsNavStatus } from './SettingsLayout.types';
+import { sxRem } from '../../../tokens/relative';
 
 export interface SettingsStatusMarkerProps {
   /** Which situation to draw. */
@@ -44,7 +45,7 @@ export function SettingsStatusMarker({
         data-status={status}
         sx={{ display: 'inline-flex', alignItems: 'center', color: 'text.disabled' }}
       >
-        <LockOutlinedIcon sx={{ fontSize: 16 }} />
+        <LockOutlinedIcon sx={{ fontSize: sxRem(16) }} />
         {hidden}
       </Box>
     );

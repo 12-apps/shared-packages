@@ -2,6 +2,7 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { absoluteInk, neutralTones, shadowInk, sheen } from '../../../tokens/ink';
+import { sxRem } from '../../../tokens/relative';
 
 const pulseAnimation = keyframes`
   0% {
@@ -19,12 +20,12 @@ const pulseAnimation = keyframes`
 `;
 
 const SIZE_MAP = {
-  sm: { fontSize: '0.75rem', padding: '4px 8px' },
-  md: { fontSize: '0.875rem', padding: '6px 12px' },
-  lg: { fontSize: '1rem', padding: '8px 16px' },
+  sm: { fontSize: sxRem(12), padding: '4px 8px' },
+  md: { fontSize: sxRem(14), padding: '6px 12px' },
+  lg: { fontSize: sxRem(16), padding: '8px 16px' },
 } as const;
 
-export const getSizeStyles = (size?: string): { fontSize: string; padding: string } =>
+export const getSizeStyles = (size?: string): { fontSize: (theme: Theme) => string; padding: string } =>
   SIZE_MAP[size as keyof typeof SIZE_MAP] || SIZE_MAP.md;
 
 export const variantStyles = (theme: Theme, variant?: string): CSSObject => {
