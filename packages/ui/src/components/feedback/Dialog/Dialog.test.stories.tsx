@@ -998,6 +998,8 @@ export const Integration: Story = {
  * dropped).
  */
 export const DrawerIsDrawn: Story = {
+  // DOM-only: it measures MUI's web Drawer paper, which the native Dialog does not render.
+  tags: ['native-skip'],
   render: () => (
     <Dialog open variant="drawer" size="sm" onClose={fn()} dataTestId="drawer-dialog">
       <DialogHeader title="Drawer Dialog" subtitle="Slide-in panel" />
@@ -1030,6 +1032,8 @@ export const DrawerIsDrawn: Story = {
  * round the corners would leave everything below the fold unreachable.
  */
 export const DrawerScrollsRawChildren: Story = {
+  // DOM-only: it measures MUI's web Drawer paper, which the native Dialog does not render.
+  tags: ['native-skip'],
   render: () => (
     <Dialog open variant="drawer" size="sm" onClose={fn()}>
       <Box data-testid="drawer-raw-body">
