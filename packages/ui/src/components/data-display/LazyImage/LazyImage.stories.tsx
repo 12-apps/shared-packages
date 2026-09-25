@@ -348,12 +348,19 @@ export const ResponsiveImage: Story = {
   },
 };
 
-const hoverSx: SxProps<Theme> = {
+const HOVER_RADIUS = 12;
+
+// LazyImage's own `sx` is inline CSS for the <img>, and its box clips anything
+// painted outside the image, so the shadow and the hover live on a wrapper
+// rounded to match (FUT-2657).
+const hoverFrameSx: SxProps<Theme> = {
+  display: 'inline-flex',
+  borderRadius: (theme) => theme.typography.pxToRem(HOVER_RADIUS),
   transition: 'transform 0.3s, box-shadow 0.3s',
   cursor: 'pointer',
   '&:hover': {
     transform: 'scale(1.05)',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+    boxShadow: 6,
   },
 };
 
@@ -363,9 +370,13 @@ export const HoverEffects: Story = {
     alt: 'Image with hover effects',
     width: 400,
     height: 300,
-    borderRadius: 12,
-    sx: hoverSx,
+    borderRadius: HOVER_RADIUS,
   },
+  render: (args) => (
+    <Box sx={hoverFrameSx} data-testid="hover-frame">
+      <LazyImage {...args} />
+    </Box>
+  ),
 };
 
 export const AccessibleImage: Story = {

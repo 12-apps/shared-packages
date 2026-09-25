@@ -60,13 +60,26 @@ const styleLength = (theme: Theme, value: Length): string | undefined =>
   typeof value === 'number' ? rem(theme, value) : value;
 
 /**
+ * A width or height above 0 and up to 1 is a fraction of the container's parent, as in `sx`.
+ * A negative number is no fraction: it stays a (negative, so invalid) length.
+ */
+const isFraction = (value: Length): value is number =>
+  typeof value === 'number' && value > 0 && value <= 1;
+
+/**
  * A length prop as `sx` reads it on a width or height: a number of 1 or less is
  * a fraction of the parent, and that stays so; any other number is design px.
  */
-const sxLength = (theme: Theme, value: Length): string | undefined => {
-  if (typeof value !== 'number') return value;
-  return value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value);
-};
+const sxLength = (theme: Theme, value: Length): string | undefined =>
+  isFraction(value) ? `${value * 100}%` : styleLength(theme, value);
+
+/**
+ * A width or height for what is drawn inside the container. The container alone
+ * takes a fraction, so everything in it fills it: a percentage here is measured
+ * against the container and would stack (FUT-2666). Otherwise the same as `styleLength`.
+ */
+const innerLength = (theme: Theme, value: Length): string | undefined =>
+  isFraction(value) ? '100%' : styleLength(theme, value);
 
 /** The box the image occupies, as CSS, shared by the real image and every stand-in for it. */
 interface BoxMetrics {
@@ -87,8 +100,8 @@ const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
   return (
     <Skeleton
       variant="rectangular"
-      width={styleLength(theme, props.width || '100%')}
-      height={styleLength(theme, props.height || 200)}
+      width={innerLength(theme, props.width || '100%')}
+      height={innerLength(theme, props.height || 200)}
       animation={props.skeletonProps.animation || 'pulse'}
       intensity={props.skeletonProps.intensity}
       borderRadius={styleLength(theme, props.borderRadius)}
@@ -169,7 +182,11 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
 
   return (
     <FallbackContainer
-      sx={{ width: sxLength(theme, width), height: sxLength(theme, height), borderRadius: styleLength(theme, borderRadius) }}
+      sx={{
+        width: innerLength(theme, width),
+        height: innerLength(theme, height),
+        borderRadius: styleLength(theme, borderRadius),
+      }}
       data-testid={`${testId}-fallback`}
     >
       {fallback}
@@ -197,8 +214,8 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
   const { width, height, borderRadius, alt } = props;
   const testId = props['data-testid'];
   const metrics: BoxMetrics = {
-    width: styleLength(theme, width),
-    height: styleLength(theme, height),
+    width: innerLength(theme, width),
+    height: innerLength(theme, height),
     objectFit: props.objectFit,
     objectPosition: props.objectPosition,
     borderRadius: styleLength(theme, borderRadius),
