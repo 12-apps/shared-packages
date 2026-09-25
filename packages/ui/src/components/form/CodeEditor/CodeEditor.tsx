@@ -2,7 +2,7 @@ import Editor from '@monaco-editor/react';
 import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { alpha, styled } from '@mui/material/styles/index.js';
+import { alpha, styled, useTheme, type Theme } from '@mui/material/styles/index.js';
 import type { editor } from 'monaco-editor';
 import type { FC} from 'react';
 import React, {  } from 'react';
@@ -14,6 +14,7 @@ import { EditorToolbar } from './CodeEditorToolbar';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { rem, remPx } from '../../../tokens/relative';
 
 // Styled components
 const EditorContainer = styled(Paper)(({ theme }) => ({
@@ -46,7 +47,7 @@ const PlaceholderOverlay = styled(Box)(({ theme }) => ({
   left: theme.spacing(8),
   color: theme.palette.text.disabled,
   fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
-  fontSize: '0.875rem',
+  fontSize: rem(theme, 14),
   pointerEvents: 'none',
   userSelect: 'none' }));
 
@@ -65,13 +66,16 @@ const EditorLoading: FC<{ label: string }> = ({ label }) => (
 );
 
 const buildEditorOptions = ({
+  theme,
   minimap,
-  fontSize,
+  fontPx,
   isWrapped,
   lineNumbers,
   readOnly }: {
+  theme: Theme;
   minimap?: boolean;
-  fontSize: number;
+  /** The `fontSize` prop: design px. */
+  fontPx: number;
   isWrapped: boolean;
   lineNumbers: boolean;
   readOnly: boolean;
@@ -80,7 +84,8 @@ const buildEditorOptions = ({
     // Explicitly convert minimap to boolean to ensure Monaco receives a definitive value
     // This prevents undefined from being interpreted differently in various environments
     minimap: { enabled: minimap === true },
-    fontSize,
+    // Monaco takes a px number: the design px, at the document's real type scale.
+    fontSize: remPx(theme, fontPx),
     wordWrap: isWrapped ? 'on' : 'off',
     lineNumbers: lineNumbers ? 'on' : 'off',
     scrollBeyondLastLine: false,
@@ -123,9 +128,11 @@ export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
   const testId = makeTestId(dataTestId);
   const editor = useCodeEditor({ themeProp, wordWrap, autoFormat, readOnly, onSave });
 
+  const muiTheme = useTheme();
   const editorOptions = buildEditorOptions({
+    theme: muiTheme,
     minimap,
-    fontSize,
+    fontPx: fontSize,
     isWrapped: editor.isWrapped,
     lineNumbers,
     readOnly });

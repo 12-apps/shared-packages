@@ -12,6 +12,7 @@ import type {
   WorkflowStepProps,
 } from './WorkflowStep.types';
 import { neutralTones } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 // `outlined` shows the surface through a coloured rim; the other three fill it and
 // differ only in what border they keep.
@@ -84,7 +85,7 @@ const StepIndicator = styled(Box, {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: theme.typography.caption.fontSize,
+    fontSize: rem(theme, 12),
     fontWeight: theme.typography.fontWeightMedium,
     cursor: interactive && !disabled ? 'pointer' : 'default',
     transition: animated
@@ -134,7 +135,7 @@ const StepContent = styled(Box, {
   flex: 1,
 
   '& .step-title': {
-    fontSize: theme.typography.body2.fontSize,
+    fontSize: rem(theme, 14),
     fontWeight: theme.typography.fontWeightMedium,
     color: theme.palette.text.primary,
     marginBottom: theme.spacing(0.5),
@@ -145,7 +146,7 @@ const StepContent = styled(Box, {
   },
 
   '& .step-description': {
-    fontSize: theme.typography.caption.fontSize,
+    fontSize: rem(theme, 12),
     color: theme.palette.text.secondary,
     overflow: 'hidden',
     textOverflow: 'ellipsis',

@@ -12,6 +12,7 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import type { DataViewQuery } from "./data-views-types";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * EXPORT — the current QUERY, never the rendered page.
@@ -153,10 +154,10 @@ function FormatRow({
         "&:hover": { bgcolor: "action.hover" },
       }}
     >
-      <Box component="span" sx={{ fontSize: "0.8125rem" }}>
+      <Box component="span" sx={{ fontSize: sxRem(13) }}>
         {copy.export.formats[format]?.label ?? format}
       </Box>
-      <Box component="span" sx={{ fontSize: "0.6875rem", color: "text.disabled" }}>
+      <Box component="span" sx={{ fontSize: sxRem(11), color: "text.disabled" }}>
         {copy.export.formats[format]?.hint ?? ""}
       </Box>
     </Box>

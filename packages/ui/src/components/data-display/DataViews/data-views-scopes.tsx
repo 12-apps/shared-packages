@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { Box } from "../../../mui/Box";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * SCOPES — a page-level partition rendered as a strip of tabs under the toolbar.
@@ -188,7 +189,7 @@ function scopeTabSx(active: boolean): Record<string, unknown> {
     cursor: "pointer",
     whiteSpace: "nowrap",
     font: "inherit",
-    fontSize: "0.8125rem",
+    fontSize: sxRem(13),
     fontWeight: active ? 600 : 400,
     color: active ? "primary.main" : "text.secondary",
     "&:hover": { color: active ? "primary.main" : "text.primary" },
@@ -217,7 +218,7 @@ function ScopeCount({
         ml: 0.75,
         px: 0.75,
         borderRadius: 5,
-        fontSize: "0.6875rem",
+        fontSize: sxRem(11),
         fontWeight: 600,
         bgcolor: active ? "primary.main" : "action.selected",
         color: active ? "primary.contrastText" : "text.secondary",

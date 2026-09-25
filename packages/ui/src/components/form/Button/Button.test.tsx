@@ -92,7 +92,7 @@ describe('Button (web)', () => {
     // the one the glyph inherits from, so pinning it is the mechanism; that the
     // glyph then follows was measured in a browser (see `Button.metrics.ts`).
     for (const id of ['xs', 'xl']) {
-      expect(window.getComputedStyle(screen.getByTestId(`${id}-icon`)).fontSize).toBe('20px');
+      expect(window.getComputedStyle(screen.getByTestId(`${id}-icon`)).fontSize).toBe('1.25rem');
     }
   });
 

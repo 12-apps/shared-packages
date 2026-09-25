@@ -5,6 +5,7 @@ import React from 'react';
 
 import type { TooltipProps } from './Tooltip.types';
 import { absoluteInk, neutralTones } from '../../../tokens/ink';
+import { sxRem } from '../../../tokens/relative';
 
 // Define pulse animation
 const pulseAnimation = keyframes`
@@ -23,12 +24,12 @@ const pulseAnimation = keyframes`
 `;
 
 const SIZE_MAP = {
-  sm: { fontSize: '0.75rem', padding: '4px 8px' },
-  md: { fontSize: '0.875rem', padding: '6px 12px' },
-  lg: { fontSize: '1rem', padding: '8px 16px' },
+  sm: { fontSize: sxRem(12), padding: '4px 8px' },
+  md: { fontSize: sxRem(14), padding: '6px 12px' },
+  lg: { fontSize: sxRem(16), padding: '8px 16px' },
 } as const;
 
-const getSizeStyles = (size?: string): { fontSize: string; padding: string } =>
+const getSizeStyles = (size?: string): { fontSize: (theme: Theme) => string; padding: string } =>
   SIZE_MAP[size as keyof typeof SIZE_MAP] || SIZE_MAP.md;
 
 const variantStyles = (theme: Theme, variant?: string): CSSObject => {
@@ -101,7 +102,7 @@ const StyledTooltip = styled(MuiTooltip, {
   return {
     '& .MuiTooltip-tooltip': {
       borderRadius: theme.spacing(1),
-      fontSize: sizeStyles.fontSize,
+      fontSize: sizeStyles.fontSize(theme),
       padding: sizeStyles.padding,
       fontWeight: 500,
       transition: 'all 0.3s ease',

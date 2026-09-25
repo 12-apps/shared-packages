@@ -2,18 +2,18 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { LabelProps } from './Label.types';
-import { accentFor} from '../../../tokens/scales';
+import { accentFor, rem } from '../../../tokens/scales';
 
 type Size = NonNullable<LabelProps['size']>;
 type Variant = NonNullable<LabelProps['variant']>;
 type Weight = NonNullable<LabelProps['weight']>;
 
 const SIZES: Record<Size, (theme: Theme) => CSSObject> = {
-  xs: (theme) => ({ fontSize: '0.75rem', lineHeight: 1.2, padding: theme.spacing(0.25, 0.5) }),
-  sm: (theme) => ({ fontSize: '0.875rem', lineHeight: 1.3, padding: theme.spacing(0.5, 0.75) }),
-  md: (theme) => ({ fontSize: '1rem', lineHeight: 1.5, padding: theme.spacing(0.75, 1) }),
-  lg: (theme) => ({ fontSize: '1.125rem', lineHeight: 1.6, padding: theme.spacing(1, 1.25) }),
-  xl: (theme) => ({ fontSize: '1.25rem', lineHeight: 1.7, padding: theme.spacing(1.25, 1.5) }),
+  xs: (theme) => ({ fontSize: rem(theme, 12), lineHeight: 1.2, padding: theme.spacing(0.25, 0.5) }),
+  sm: (theme) => ({ fontSize: rem(theme, 14), lineHeight: 1.3, padding: theme.spacing(0.5, 0.75) }),
+  md: (theme) => ({ fontSize: rem(theme, 16), lineHeight: 1.5, padding: theme.spacing(0.75, 1) }),
+  lg: (theme) => ({ fontSize: rem(theme, 18), lineHeight: 1.6, padding: theme.spacing(1, 1.25) }),
+  xl: (theme) => ({ fontSize: rem(theme, 20), lineHeight: 1.7, padding: theme.spacing(1.25, 1.5) }),
 };
 
 export const sizeStyles = (theme: Theme, size: Size): CSSObject => (SIZES[size] ?? SIZES.md)(theme);

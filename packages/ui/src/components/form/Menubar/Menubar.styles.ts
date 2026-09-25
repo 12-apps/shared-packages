@@ -2,18 +2,18 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { MenubarProps } from './Menubar.types';
-import { accentFor} from '../../../tokens/scales';
+import { accentFor, rem } from '../../../tokens/scales';
 
 type Size = NonNullable<MenubarProps['size']>;
 type Variant = NonNullable<MenubarProps['variant']>;
 type Color = NonNullable<MenubarProps['color']>;
 
 const SIZES: Record<Size, (theme: Theme) => CSSObject> = {
-  xs: (theme) => ({ minHeight: 40, fontSize: '0.75rem', padding: theme.spacing(0.5, 1) }),
-  sm: (theme) => ({ minHeight: 48, fontSize: '0.875rem', padding: theme.spacing(0.75, 1.5) }),
-  md: (theme) => ({ minHeight: 56, fontSize: '1rem', padding: theme.spacing(1, 2) }),
-  lg: (theme) => ({ minHeight: 64, fontSize: '1.125rem', padding: theme.spacing(1.25, 2.5) }),
-  xl: (theme) => ({ minHeight: 72, fontSize: '1.25rem', padding: theme.spacing(1.5, 3) }),
+  xs: (theme) => ({ minHeight: 40, fontSize: rem(theme, 12), padding: theme.spacing(0.5, 1) }),
+  sm: (theme) => ({ minHeight: 48, fontSize: rem(theme, 14), padding: theme.spacing(0.75, 1.5) }),
+  md: (theme) => ({ minHeight: 56, fontSize: rem(theme, 16), padding: theme.spacing(1, 2) }),
+  lg: (theme) => ({ minHeight: 64, fontSize: rem(theme, 18), padding: theme.spacing(1.25, 2.5) }),
+  xl: (theme) => ({ minHeight: 72, fontSize: rem(theme, 20), padding: theme.spacing(1.5, 3) }),
 };
 
 export const sizeStyles = (theme: Theme, size: Size): CSSObject =>

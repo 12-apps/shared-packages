@@ -18,6 +18,7 @@ import type {
 } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 function findActiveField<TField extends string>(
   fields: SortFieldDefinition<TField>[] | undefined,
@@ -68,13 +69,13 @@ function resolveTriggerParts(
   return { full, short: fieldDef?.label ?? full, arrowSuffix };
 }
 
-const sectionLabelSx = { px: 1, py: 0.75, fontSize: '0.75rem', fontWeight: 600, color: 'text.primary', lineHeight: 1.5 } as const;
+const sectionLabelSx = { px: 1, py: 0.75, fontSize: sxRem(12), fontWeight: 600, color: 'text.primary', lineHeight: 1.5 } as const;
 
 /** A fixed-width check slot (empty when unchecked) so labels align. */
 function SortCheck({ checked }: { checked: boolean }): React.JSX.Element {
   return (
     <Box component="span" sx={{ display: 'flex', width: 16, flexShrink: 0, alignItems: 'center', justifyContent: 'center' }} aria-hidden>
-      {checked ? <CheckIcon sx={{ fontSize: 14 }} /> : null}
+      {checked ? <CheckIcon sx={{ fontSize: sxRem(14) }} /> : null}
     </Box>
   );
 }
@@ -205,10 +206,10 @@ export function SortByDropdown<TField extends string = string>({
   }
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.875rem' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: sxRem(14) }}>
       <Typography
         component="span"
-        sx={{ display: { xs: 'none', md: 'inline' }, color: 'text.secondary', fontSize: '0.875rem' }}
+        sx={{ display: { xs: 'none', md: 'inline' }, color: 'text.secondary', fontSize: sxRem(14) }}
       >
         {triggerPrefix}
       </Typography>
@@ -231,7 +232,7 @@ export function SortByDropdown<TField extends string = string>({
           {trigger.short}
         </Box>
         {trigger.arrowSuffix}
-        <ChevronDownIcon sx={{ fontSize: 14 }} />
+        <ChevronDownIcon sx={{ fontSize: sxRem(14) }} />
       </Button>
       <SortMenu
         orderHeading={orderHeading}

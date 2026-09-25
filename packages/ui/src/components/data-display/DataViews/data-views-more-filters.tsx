@@ -17,6 +17,7 @@ import { Text } from "../../typography/Text";
 
 import { fieldClearing, MoreGroup, type MoreFieldProps } from "./data-views-more-fields";
 import type { OverflowField } from "./data-views-overflow";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * "MAIS" — the filter overflow: its trigger, its panel and its footer. What
@@ -97,7 +98,7 @@ function MoreTrigger({
             borderRadius: 5,
             bgcolor: applied ? "primary.main" : "action.selected",
             color: applied ? "primary.contrastText" : undefined,
-            fontSize: "0.6875rem",
+            fontSize: sxRem(11),
             fontWeight: applied ? 700 : undefined,
           }}
         >
@@ -168,7 +169,7 @@ function MoreFooter({
           bgcolor: "transparent",
           cursor: "pointer",
           font: "inherit",
-          fontSize: "0.8125rem",
+          fontSize: sxRem(13),
           textAlign: "left",
           color: "primary.main",
           "&:hover": { textDecoration: "underline" },

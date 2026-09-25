@@ -14,6 +14,7 @@ import {
 } from './Badge.metrics';
 import type { BadgePalette, BadgeSizeStyles } from './Badge.styles';
 import { absoluteInk, onMedia, sheen } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const BADGE_VARIANTS: Record<
   string,
@@ -25,7 +26,7 @@ const BADGE_VARIANTS: Record<
           colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || absoluteInk(theme).white,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }),
   dot: (theme, colorPalette, sizeStyles) => ({
@@ -41,7 +42,7 @@ const BADGE_VARIANTS: Record<
           colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || absoluteInk(theme).white,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: '50%' }),
   gradient: (theme, colorPalette, sizeStyles) => ({
@@ -49,7 +50,7 @@ const BADGE_VARIANTS: Record<
         color: onMedia(theme),
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }),
   glass: (theme, colorPalette, sizeStyles) => ({
@@ -60,7 +61,7 @@ const BADGE_VARIANTS: Record<
         color: colorPalette.main,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2,
         boxShadow: `inset 0 1px 1px ${sheen(theme, GLASS_INSET_HIGHLIGHT_ALPHA)}` }),
@@ -70,7 +71,7 @@ const BADGE_VARIANTS: Record<
         color: colorPalette.main,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }),
   secondary: (theme, colorPalette, sizeStyles) => ({
@@ -79,7 +80,7 @@ const BADGE_VARIANTS: Record<
         border: `1px solid ${alpha(colorPalette.main, SECONDARY_BORDER_ALPHA)}`,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }),
   destructive: (theme, colorPalette, sizeStyles) => ({
@@ -87,7 +88,7 @@ const BADGE_VARIANTS: Record<
         color: theme.palette.error.contrastText,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2,
         fontWeight: BADGE_DESTRUCTIVE_FONT_WEIGHT }),
@@ -96,7 +97,7 @@ const BADGE_VARIANTS: Record<
         color: theme.palette.success.contrastText,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }),
   warning: (theme, colorPalette, sizeStyles) => ({
@@ -104,7 +105,7 @@ const BADGE_VARIANTS: Record<
         color: theme.palette.warning.contrastText,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2 }) };
 

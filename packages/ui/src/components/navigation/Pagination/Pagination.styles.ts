@@ -1,14 +1,15 @@
 import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import { rem } from '../../../tokens/relative';
 
 const ITEM_SIZE_STYLES: Record<string, (theme: Theme) => CSSObject> = {
   sm: (theme) => ({
-      fontSize: '0.875rem',
+      fontSize: rem(theme, 14),
       minWidth: 28,
       height: 28,
       padding: theme.spacing(0.25, 0.5) }),
   lg: (theme) => ({
-      fontSize: '1.125rem',
+      fontSize: rem(theme, 18),
       minWidth: 44,
       height: 44,
       padding: theme.spacing(1, 1.5) }) };

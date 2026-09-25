@@ -4,6 +4,7 @@ import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, uiInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 /**
  * The prototype's METRICS, verbatim.
@@ -64,7 +65,7 @@ export const triggerSx = (theme: Theme, selected: boolean, open: boolean): CSSOb
     background: selected ? brand.soft : theme.palette.background.paper,
     color: selected ? brand.ink : theme.palette.text.primary,
     font: 'inherit',
-    fontSize: 13,
+    fontSize: rem(theme, 13),
     cursor: 'pointer',
     maxWidth: '100%',
     transition: 'border-color .12s, box-shadow .12s',
@@ -82,7 +83,7 @@ export const triggerSx = (theme: Theme, selected: boolean, open: boolean): CSSOb
 /** The count pill inside the trigger. */
 export const triggerCountSx = (theme: Theme): CSSObject => ({
   fontWeight: 600,
-  fontSize: 11,
+  fontSize: rem(theme, 11),
   lineHeight: 1,
   background: theme.palette.primary.main,
   color: theme.palette.primary.contrastText,
@@ -165,7 +166,7 @@ export const pinnedSx = (theme: Theme): CSSObject => ({
 
 export const pinnedLabelSx = (theme: Theme): CSSObject => ({
   fontWeight: 600,
-  fontSize: 10,
+  fontSize: rem(theme, 10),
   lineHeight: 1,
   letterSpacing: '.08em',
   textTransform: 'uppercase',
@@ -188,7 +189,7 @@ export const chipSx = (theme: Theme): CSSObject => {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '5px',
-    fontSize: 12,
+    fontSize: rem(theme, 12),
     background: brand.soft,
     color: brand.ink,
     border: `1px solid ${brand.edge}`,
@@ -206,7 +207,7 @@ export const chipSx = (theme: Theme): CSSObject => {
       display: 'grid',
       placeItems: 'center',
       opacity: 0.65,
-      fontSize: 13,
+      fontSize: rem(theme, 13),
       lineHeight: 1,
       '&:hover': { background: alpha(theme.palette.primary.main, 0.16), opacity: 1 },
     },
@@ -263,13 +264,13 @@ export const rowNameSx = (theme: Theme, isCategory: boolean): CSSObject => ({
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  fontSize: 13.5,
+  fontSize: rem(theme, 13.5),
   fontWeight: isCategory ? 600 : 450,
   color: isCategory ? theme.palette.text.primary : theme.palette.text.secondary,
 });
 
 export const rowMetaSx = (theme: Theme, selected: boolean): CSSObject => ({
-  font: '500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace',
+  font: `500 ${rem(theme, 11)}/1 ui-monospace, SFMono-Regular, Menlo, monospace`,
   color: selected ? theme.palette.primary.main : theme.palette.text.secondary,
   fontWeight: selected ? 600 : 500,
   flex: '0 0 auto',
@@ -335,7 +336,7 @@ export const radioSx = (theme: Theme, on: boolean): CSSObject => ({
 
 export const sectionHeadSx = (theme: Theme): CSSObject => ({
   fontWeight: 600,
-  fontSize: 10,
+  fontSize: rem(theme, 10),
   lineHeight: 1,
   letterSpacing: '.08em',
   textTransform: 'uppercase',
@@ -360,10 +361,10 @@ export const emptySx = (theme: Theme): CSSObject => ({
   '& strong': {
     display: 'block',
     color: theme.palette.text.primary,
-    fontSize: 13.5,
+    fontSize: rem(theme, 13.5),
     marginBottom: '4px',
   },
-  '& p': { margin: '0 0 12px', fontSize: 12.5, lineHeight: 1.5 },
+  '& p': { margin: '0 0 12px', fontSize: rem(theme, 12.5), lineHeight: 1.5 },
 });
 
 /** Skeleton row used while the catalogue loads. */

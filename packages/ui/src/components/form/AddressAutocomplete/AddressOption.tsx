@@ -5,6 +5,7 @@ import type { FC, HTMLAttributes } from 'react';
 import React from 'react';
 
 import type { AddressOptionValue } from './AddressAutocomplete.types';
+import { rem } from '../../../tokens/relative';
 
 // Module-local: styled() components cannot be exported across a module boundary
 // here without tripping TS2742.
@@ -28,13 +29,13 @@ const LocationIconWrapper = styled(Box)(({ theme }) => ({
 const AddressText = styled(Box)(({ theme }) => ({
   flex: 1,
   '& .primary': {
-    fontSize: '0.9rem',
+    fontSize: rem(theme, 14.4),
     fontWeight: 500,
     color: theme.palette.text.primary,
     marginBottom: theme.spacing(0.25),
   },
   '& .secondary': {
-    fontSize: '0.8rem',
+    fontSize: rem(theme, 12.8),
     color: theme.palette.text.secondary,
   },
 }));

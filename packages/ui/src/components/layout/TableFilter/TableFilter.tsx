@@ -25,6 +25,7 @@ import type {
   TableFilterSectionProps,
 } from './TableFilter.types';
 import { fieldTextFieldStyles } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 const PANEL_WIDTH = 280;
 
@@ -140,7 +141,7 @@ const TableFilterPanel = ({
               underline="hover"
               data-testid={clearTestId}
               onClick={onClearAll}
-              sx={{ fontSize: '0.75rem', color: 'text.secondary' }}
+              sx={{ fontSize: sxRem(12), color: 'text.secondary' }}
             >
               {copy.clearAllFilters}
             </Link>
@@ -178,7 +179,7 @@ const TableFilterKeyword = ({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Typography component="label" sx={{ fontSize: '0.75rem', fontWeight: 500, color: 'text.secondary' }}>
+      <Typography component="label" sx={{ fontSize: sxRem(12), fontWeight: 500, color: 'text.secondary' }}>
         {label}
       </Typography>
       <TextField
@@ -198,7 +199,7 @@ const TableFilterKeyword = ({
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
-              <SearchIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              <SearchIcon sx={{ fontSize: sxRem(16), color: 'text.secondary' }} />
             </InputAdornment>
           ),
           endAdornment:
@@ -211,7 +212,7 @@ const TableFilterKeyword = ({
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={clearKeyword}
                 >
-                  <CloseIcon sx={{ fontSize: 16 }} />
+                  <CloseIcon sx={{ fontSize: sxRem(16) }} />
                 </IconButton>
               </InputAdornment>
             ) : null,
@@ -226,7 +227,7 @@ const TableFilterSection = ({ title, children }: TableFilterSectionProps): React
   <Box>
     <Divider sx={{ mb: 2.5 }} />
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-      <Typography component="h2" sx={{ fontSize: '0.875rem', fontWeight: 600, color: 'text.primary' }}>
+      <Typography component="h2" sx={{ fontSize: sxRem(14), fontWeight: 600, color: 'text.primary' }}>
         {title}
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</Box>
@@ -244,7 +245,7 @@ function TableFilterCheckboxField<TValue extends string = string>({
 }: TableFilterCheckboxFieldProps<TValue>): React.JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }} data-testid={testId}>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: 'text.secondary' }}>{label}</Typography>
+      <Typography sx={{ fontSize: sxRem(12), fontWeight: 500, color: 'text.secondary' }}>{label}</Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
         {options.map((option) => {
           const checked = selected.has(option.value);
@@ -261,7 +262,7 @@ function TableFilterCheckboxField<TValue extends string = string>({
                 />
               }
               label={
-                <Box component="span" sx={{ fontSize: '0.875rem' }}>
+                <Box component="span" sx={{ fontSize: sxRem(14) }}>
                   {option.label}
                   {option.count != null && (
                     <Box component="span" sx={{ color: 'text.secondary' }}>
@@ -343,7 +344,7 @@ const TableFilterRangeField = ({
   const invalidText = invalidLabel ?? copy.invalidRange;
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }} data-testid={testId}>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: 'text.secondary' }}>
+      <Typography sx={{ fontSize: sxRem(12), fontWeight: 500, color: 'text.secondary' }}>
         {label}
         {unit ? ` (${unit})` : ''}
       </Typography>
@@ -374,7 +375,7 @@ const TableFilterRangeField = ({
         <Typography
           role="alert"
           data-testid={testId ? `${testId}-error` : undefined}
-          sx={{ fontSize: '0.7rem', color: 'error.main' }}
+          sx={{ fontSize: sxRem(11.2), color: 'error.main' }}
         >
           {invalidText}
         </Typography>

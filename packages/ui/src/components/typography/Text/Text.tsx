@@ -22,7 +22,8 @@ import {
 import type { TextProps } from './Text.types';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type { ColorValue } from '../../../tokens/scales';
-import { px } from '../../../tokens/theme';
+import { rem } from '../../../tokens/relative';
+import type { UiTypeStep } from '../../../tokens/theme';
 
 const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
   if (color === 'neutral') {
@@ -50,12 +51,13 @@ const getColorFromTheme = (theme: Theme, color: ColorValue): string => {
 
 // Derived from the shared metrics, not restated: the native `Text` reads the
 // same table, so the two renderers cannot disagree on a size.
-const SIZE_MAP: Record<string, { fontSize: string; lineHeight: number }> = Object.fromEntries(
-  Object.entries(TEXT_SIZES).map(([size, step]) => [
-    size,
-    { fontSize: px(step.fontSize), lineHeight: step.lineHeight },
-  ]),
-);
+// The table keeps the design px; the size is converted where it is read.
+const SIZE_MAP: Readonly<Record<string, UiTypeStep | undefined>> = TEXT_SIZES;
+
+const fontSizeFor = (theme: Theme, customSize: string | undefined): string | undefined => {
+  const drawnAt = SIZE_MAP[customSize ?? 'md']?.fontSize;
+  return drawnAt === undefined ? undefined : rem(theme, drawnAt);
+};
 
 const WEIGHT_MAP: Record<string, number> = TEXT_WEIGHTS;
 
@@ -77,7 +79,7 @@ const decorationFor = (underline?: boolean, strikethrough?: boolean): string =>
 
 const baseTextStyles = (theme: Theme, a: TextStyleArgs): CSSObject => ({
   color: getColorFromTheme(theme, a.customColor ?? 'neutral'),
-  fontSize: SIZE_MAP[a.customSize ?? 'md']?.fontSize,
+  fontSize: fontSizeFor(theme, a.customSize),
   lineHeight: SIZE_MAP[a.customSize ?? 'md']?.lineHeight,
   fontWeight: WEIGHT_MAP[a.customWeight ?? 'normal'],
   fontStyle: a.italic ? 'italic' : 'normal',
@@ -87,8 +89,12 @@ const baseTextStyles = (theme: Theme, a: TextStyleArgs): CSSObject => ({
 
 // Captions and code shrink relative to the body scale, but only at the default
 // size — an explicit size wins.
-const sizeOverride = (customSize: string | undefined, atDefault: string): string | undefined =>
-  (customSize ?? 'md') === 'md' ? atDefault : SIZE_MAP[customSize ?? 'md']?.fontSize;
+const sizeOverride = (
+  theme: Theme,
+  customSize: string | undefined,
+  atDefault: number,
+): string | undefined =>
+  (customSize ?? 'md') === 'md' ? rem(theme, atDefault) : fontSizeFor(theme, customSize);
 
 const textVariantStyles = (theme: Theme, a: TextStyleArgs, base: CSSObject): CSSObject => {
   const weight = a.customWeight ?? 'normal';
@@ -104,7 +110,7 @@ const textVariantStyles = (theme: Theme, a: TextStyleArgs, base: CSSObject): CSS
     case 'caption':
       return {
         ...base,
-        fontSize: sizeOverride(a.customSize, px(CAPTION_FONT_SIZE)),
+        fontSize: sizeOverride(theme, a.customSize, CAPTION_FONT_SIZE),
         opacity: CAPTION_OPACITY,
         letterSpacing: `${CAPTION_LETTER_SPACING_EM}em`,
       };
@@ -112,7 +118,7 @@ const textVariantStyles = (theme: Theme, a: TextStyleArgs, base: CSSObject): CSS
       return {
         ...base,
         fontFamily: 'Monaco, Menlo, "Ubuntu Mono", "Courier New", monospace',
-        fontSize: sizeOverride(a.customSize, px(CODE_FONT_SIZE)),
+        fontSize: sizeOverride(theme, a.customSize, CODE_FONT_SIZE),
         backgroundColor: alpha(theme.palette.primary.main, CODE_BACKGROUND_ALPHA),
         padding: `${CODE_PADDING.vertical}px ${CODE_PADDING.horizontal}px`,
         borderRadius: theme.shape.borderRadius * CODE_RADIUS_FACTOR,

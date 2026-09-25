@@ -12,6 +12,7 @@ import {
   sizeIconMap } from './Breadcrumbs.styles';
 import { BreadcrumbEntry } from './BreadcrumbEntry';
 import type { BreadcrumbItem,BreadcrumbsProps } from './Breadcrumbs.types';
+import { sxRem } from '../../../tokens/relative';
 
 // Animation keyframes
 const StyledBreadcrumbs = styled(MuiBreadcrumbs, {
@@ -45,7 +46,7 @@ const getSeparator = (separatorType: string) => {
       case 'pipe':
         return '|';
       default:
-        return <ArrowForwardIos sx={{ fontSize: 12 }} />;
+        return <ArrowForwardIos sx={{ fontSize: sxRem(12) }} />;
     }
   })();
 

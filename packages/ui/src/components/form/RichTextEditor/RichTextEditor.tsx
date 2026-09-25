@@ -10,6 +10,7 @@ import { RichTextEditorToolbar } from './RichTextEditorToolbar';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { rem } from '../../../tokens/relative';
 
 const DEFAULT_TOOLBAR: Required<Omit<ToolbarConfig, 'customItems'>> & Pick<ToolbarConfig, 'customItems'> = {
   bold: true,
@@ -66,7 +67,7 @@ const editorContentSx = (theme: Theme, disabled: boolean, placeholder?: string, 
     padding: theme.spacing(1),
     borderRadius: 1,
     fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
-    fontSize: '0.875rem',
+    fontSize: rem(theme, 14),
     overflow: 'auto' },
   '& a': { color: theme.palette.primary.main, textDecoration: 'underline' } });
 

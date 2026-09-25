@@ -12,6 +12,7 @@ import React from 'react';
 
 import { sizeStyles } from './Menubar.styles';
 import type { MenubarItem, MenubarProps } from './Menubar.types';
+import { sxRem } from '../../../tokens/relative';
 
 export interface MenubarItemViewProps {
   item: MenubarItem;
@@ -42,7 +43,7 @@ const DropdownItem: React.FC<{ child: MenubarItem; onActivate: (item: MenubarIte
           label={child.shortcut}
           size="small"
           variant="outlined"
-          sx={{ ml: 2, height: 20, fontSize: '0.7rem' }}
+          sx={{ ml: 2, height: 20, fontSize: sxRem(11.2) }}
         />
       )}
     </MenuItem>

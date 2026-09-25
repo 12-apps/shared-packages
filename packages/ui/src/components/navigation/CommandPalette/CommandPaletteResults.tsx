@@ -12,6 +12,7 @@ import React from 'react';
 import { ShortcutChip } from './ShortcutChip';
 import type { PaletteCommand } from './CommandPalette.types';
 import type { CommandPaletteCopy } from '../../../copy';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const ResultsList = styled(List)(({ theme }) => ({
   maxHeight: 400,
@@ -50,7 +51,7 @@ const CommandItem = styled(ListItem)<{ selected?: boolean }>(({ theme, selected 
 }));
 
 const CategoryLabel = styled(Typography)(({ theme }) => ({
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 600,
   color: theme.palette.text.secondary,
   textTransform: 'uppercase',
@@ -84,8 +85,8 @@ const CommandRow: React.FC<{
     <ListItemText
       primary={command.label}
       secondary={command.description}
-      primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: selected ? 500 : 400 }}
-      secondaryTypographyProps={{ fontSize: '0.75rem' }}
+      primaryTypographyProps={{ fontSize: sxRem(14.4), fontWeight: selected ? 500 : 400 }}
+      secondaryTypographyProps={{ fontSize: sxRem(12) }}
     />
     {command.shortcut && <ShortcutChip label={command.shortcut} size="small" />}
   </CommandItem>
@@ -168,7 +169,7 @@ export const PaletteResults: React.FC<{
       {showRecentSection && (
         <>
           <CategoryLabel data-testid={`${dataTestId}-group-recent`}>
-            <RecentIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />
+            <RecentIcon sx={{ fontSize: sxRem(14), mr: 0.5, verticalAlign: 'middle' }} />
             {copy.recent}
           </CategoryLabel>
           {recent.map(row)}

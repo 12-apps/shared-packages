@@ -20,6 +20,7 @@ import { ShortcutChip } from './ShortcutChip';
 import type { CommandPaletteProps } from './CommandPalette.types';
 import type { CommandPaletteCopy } from '../../../copy';
 import { scrim } from '../../../tokens/ink';
+import { rem, sxRem } from '../../../tokens/relative';
 
 // Styled components
 const StyledDialog = styled(Dialog)(({ theme }) => ({
@@ -55,7 +56,7 @@ const SearchContainer = styled(Box)(({ theme }) => ({
 
 const SearchInput = styled(InputBase)(({ theme }) => ({
   flex: 1,
-  fontSize: '1.125rem',
+  fontSize: rem(theme, 18),
   fontWeight: 400,
   '& input': {
     padding: theme.spacing(0, 1),
@@ -115,7 +116,7 @@ const PaletteFooter: React.FC<{ commandCount: number; copy: CommandPaletteCopy }
     >
       <Box sx={{ display: 'flex', gap: 1 }}>
         <ShortcutChip
-          icon={<EnterIcon sx={{ fontSize: 12 }} />}
+          icon={<EnterIcon sx={{ fontSize: sxRem(12) }} />}
           label={copy.execute}
           size="small"
         />

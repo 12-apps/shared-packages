@@ -2,21 +2,25 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { CommandProps } from './Command.types';
-import { accentFor } from '../../../tokens/scales';
+import { accentFor, rem } from '../../../tokens/scales';
 
 type CommandVariant = NonNullable<CommandProps['variant']>;
 type CommandColor = NonNullable<CommandProps['color']>;
 type CommandSize = NonNullable<CommandProps['size']>;
 
-const SIZE_MAP: Record<CommandSize, { width: number; fontSize: string }> = {
-  xs: { width: 400, fontSize: '0.75rem' },
-  sm: { width: 450, fontSize: '0.875rem' },
-  md: { width: 500, fontSize: '1rem' },
-  lg: { width: 550, fontSize: '1.125rem' },
-  xl: { width: 600, fontSize: '1.25rem' },
+const SIZE_MAP: Record<CommandSize, { width: number; fontPx: number }> = {
+  xs: { width: 400, fontPx: 12 },
+  sm: { width: 450, fontPx: 14 },
+  md: { width: 500, fontPx: 16 },
+  lg: { width: 550, fontPx: 18 },
+  xl: { width: 600, fontPx: 20 },
 };
 
-export const commandSizeStyles = (size: CommandSize) => SIZE_MAP[size] || SIZE_MAP.md;
+/** The paper's width and type for a size, both design px read through the type scale. */
+export const commandSizeStyles = (theme: Theme, size: CommandSize) => {
+  const { width, fontPx } = SIZE_MAP[size] || SIZE_MAP.md;
+  return { width: rem(theme, width), fontSize: rem(theme, fontPx) };
+};
 
 const emphasisStyles = (
   theme: Theme,

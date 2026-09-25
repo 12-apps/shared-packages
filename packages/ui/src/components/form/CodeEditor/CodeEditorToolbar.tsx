@@ -12,6 +12,7 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { CodeEditorCopy } from '../../../copy';
+import { rem, sxRem } from '../../../tokens/relative';
 
 // Each button repeated the same conditional test id; this is that ternary once.
 const makeTestId =
@@ -36,7 +37,7 @@ const LanguageBadge = styled(Box)(({ theme }) => ({
   borderRadius: theme.shape.borderRadius,
   background: alpha(theme.palette.primary.main, 0.1),
   color: theme.palette.primary.main,
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: '0.05em',
@@ -152,7 +153,7 @@ export const EditorToolbar: React.FC<{
   <Toolbar data-testid={testId('toolbar')}>
     <Stack direction="row" spacing={2} alignItems="center">
       <LanguageBadge data-testid={testId('language-badge')}>
-        <CodeIcon sx={{ fontSize: 14 }} />
+        <CodeIcon sx={{ fontSize: sxRem(14) }} />
         {language}
       </LanguageBadge>
       {readOnly && (

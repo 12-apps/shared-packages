@@ -32,6 +32,7 @@ import { Text } from "../../typography/Text";
 
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { SavedViewSummary } from "./data-views-types";
+import { sxRem } from "../../../tokens/relative";
 
 /** What the panel needs to drive the views without owning any of them. */
 export interface ViewNavHandlers {
@@ -59,7 +60,7 @@ const rowSx = {
   bgcolor: "transparent",
   cursor: "pointer",
   font: "inherit",
-  fontSize: "0.8125rem",
+  fontSize: sxRem(13),
   textAlign: "left",
   color: "text.primary",
   "&:hover": { bgcolor: "action.hover" },
@@ -190,7 +191,7 @@ export function ViewActions({
         type="button"
         onClick={onBack}
         data-testid={`${testIdPrefix}-view-actions-back`}
-        sx={{ ...rowSx, color: "text.secondary", fontSize: "0.75rem" }}
+        sx={{ ...rowSx, color: "text.secondary", fontSize: sxRem(12) }}
       >
         <ChevronLeftRoundedIcon fontSize="small" />
         <Box component="span" sx={{ flex: 1, fontWeight: 600, color: "text.primary" }}>
@@ -278,7 +279,7 @@ function ViewToggle({
         border: 0,
         borderRadius: 1,
         font: "inherit",
-        fontSize: "0.75rem",
+        fontSize: sxRem(12),
         bgcolor: open ? "action.selected" : "transparent",
         ...affordance,
       }}

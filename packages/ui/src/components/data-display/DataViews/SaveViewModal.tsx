@@ -22,6 +22,7 @@ import type {
   FilterFieldConfig,
   SavedViewSummary,
 } from "./data-views-types";
+import { sxRem } from "../../../tokens/relative";
 
 /** The values the modal collects (the current view state is captured by the parent). */
 export interface SaveViewPayload {
@@ -92,7 +93,7 @@ function FlagRow({
       <Box sx={{ mt: 0.25, color: "text.disabled", display: "flex" }}>{icon}</Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Text variant="body" as="span">
-          <Box component="span" sx={{ display: "block", fontSize: "0.875rem" }}>
+          <Box component="span" sx={{ display: "block", fontSize: sxRem(14) }}>
             {title}
           </Box>
         </Text>

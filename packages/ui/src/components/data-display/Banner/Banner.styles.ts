@@ -4,6 +4,7 @@ import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.
 import type { BannerVariant } from './Banner.types';
 import { ACTIVE, HOVER } from '../Alert/Alert.metrics';
 import { modeInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 // Animations
 export const fadeInSlide = keyframes`
@@ -48,7 +49,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
     flexShrink: 0,
     marginTop: theme.spacing(0.25),
     color: colorPalette.main,
-    fontSize: '1.25rem',
+    fontSize: rem(theme, 20),
     display: 'flex',
     alignItems: 'center',
     position: 'relative',
@@ -72,7 +73,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
   // Title styles
   '.banner-title': {
     fontWeight: 600,
-    fontSize: '1rem',
+    fontSize: rem(theme, 16),
     lineHeight: 1.4,
     marginBottom: theme.spacing(0.5),
     color: colorPalette.dark || colorPalette.main,
@@ -80,7 +81,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
 
   // Description styles  
   '.banner-description': {
-    fontSize: '0.875rem',
+    fontSize: rem(theme, 14),
     lineHeight: 1.5,
     opacity: 0.9,
     color: 'inherit',

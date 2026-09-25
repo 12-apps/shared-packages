@@ -66,7 +66,7 @@ function ChartHeader({ title, subtitle, neon, dataTestId }: HeaderProps): React.
 
 export const Chart: React.FC<ChartProps> = (props) => {
   const theme = useTheme();
-  const sizeStyles = getSizeStyles(props.size, props.height);
+  const sizeStyles = getSizeStyles(theme, props.size, props.height);
   const styles = variantSx(theme, props);
   const dataTestId = props['data-testid'] ?? 'chart';
 

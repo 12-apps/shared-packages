@@ -7,6 +7,7 @@ import React from 'react';
 
 import type { Step, StepItemProps, StepperProps } from './Stepper.types';
 import { neutralTones } from '../../../tokens/ink';
+import { sxRem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/scales';
 
 /**
@@ -173,7 +174,7 @@ const StepCircle: React.FC<
       data-testid={`stepper-step-icon-${index}`}
     >
       {isCompleted ? (
-        <CheckCircle sx={{ fontSize: STEP_ICON_SIZE[size] }} />
+        <CheckCircle sx={{ fontSize: sxRem(STEP_ICON_SIZE[size]) }} />
       ) : (
         <Typography variant={labelVariant} fontWeight="bold">
           {index + 1}

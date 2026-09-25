@@ -10,6 +10,7 @@ import React from 'react';
 import { getScaleDistance } from './mapProjection';
 import { BOUNCE_KEYFRAMES } from './mapSurface';
 import { shadowInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 // Decorative only: these give the mock surface something to look like without
 // standing in for real map data.
@@ -50,7 +51,7 @@ const DecorativePin: FC<{ top: string; left: string }> = ({ top, left }) => {
 
   return (
     <Box sx={{ position: 'absolute', top, left, opacity: 0.6 }}>
-      <PlaceIcon sx={{ fontSize: 20, color: theme.palette.primary.main }} />
+      <PlaceIcon sx={{ fontSize: rem(theme, 20), color: theme.palette.primary.main }} />
     </Box>
   );
 };
@@ -79,7 +80,7 @@ export const MapCentreMarker: FC = () => {
     >
       <LocationIcon
         sx={{
-          fontSize: 36,
+          fontSize: rem(theme, 36),
           color: theme.palette.error.main,
           animation: 'bounce 2s infinite',
           '@keyframes bounce': BOUNCE_KEYFRAMES,
@@ -104,7 +105,7 @@ export const MapScaleBar: FC<{ zoom: number }> = ({ zoom }) => {
         padding: theme.spacing(0.5, 1),
         background: alpha(theme.palette.background.paper, 0.9),
         borderRadius: theme.shape.borderRadius,
-        fontSize: '0.75rem',
+        fontSize: rem(theme, 12),
         color: theme.palette.text.secondary,
       }}
     >
@@ -151,7 +152,7 @@ export const MapCompass: FC = () => {
       }}
     >
       <NavigationIcon
-        sx={{ fontSize: 24, color: theme.palette.primary.main, transform: 'rotate(-45deg)' }}
+        sx={{ fontSize: rem(theme, 24), color: theme.palette.primary.main, transform: 'rotate(-45deg)' }}
       />
     </Box>
   );

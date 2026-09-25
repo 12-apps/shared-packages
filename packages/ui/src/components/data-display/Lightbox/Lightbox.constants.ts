@@ -1,6 +1,7 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
 import { onMedia, scrim, sheen } from '../../../tokens/ink';
+import { sxRem } from '../../../tokens/relative';
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 5;
@@ -39,7 +40,7 @@ export const captionSx = {
 
 export const counterSx = {
   color: onMedia,
-  fontSize: '0.875rem',
+  fontSize: sxRem(14),
   backgroundColor: SCRIM,
   borderRadius: 1,
 } as const;

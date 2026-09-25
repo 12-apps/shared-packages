@@ -7,6 +7,7 @@ import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { asFieldSize, FIELD_BORDER_WIDTH, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 /** The segment track's padding and border: its corner is the segments' plus these. */
 const SEGMENT_TRACK_PADDING = 4;
@@ -72,20 +73,20 @@ const CARD_SIZES: Record<SizeKey, CSSObject> = {
   xl: { padding: '24px', minHeight: '100px' },
 };
 
-const BUTTON_SIZES: Record<SizeKey, CSSObject> = {
-  xs: { padding: '6px 12px', fontSize: '0.75rem', minHeight: '32px' },
-  sm: { padding: '8px 16px', fontSize: '0.875rem', minHeight: '36px' },
-  md: { padding: '10px 20px', fontSize: '1rem', minHeight: '40px' },
-  lg: { padding: '12px 24px', fontSize: '1.125rem', minHeight: '44px' },
-  xl: { padding: '14px 28px', fontSize: '1.25rem', minHeight: '48px' },
+const BUTTON_SIZES: Record<SizeKey, (theme: Theme) => CSSObject> = {
+  xs: (theme) => ({ padding: '6px 12px', fontSize: rem(theme, 12), minHeight: '32px' }),
+  sm: (theme) => ({ padding: '8px 16px', fontSize: rem(theme, 14), minHeight: '36px' }),
+  md: (theme) => ({ padding: '10px 20px', fontSize: rem(theme, 16), minHeight: '40px' }),
+  lg: (theme) => ({ padding: '12px 24px', fontSize: rem(theme, 18), minHeight: '44px' }),
+  xl: (theme) => ({ padding: '14px 28px', fontSize: rem(theme, 20), minHeight: '48px' }),
 };
 
-const SEGMENT_SIZES: Record<SizeKey, CSSObject> = {
-  xs: { padding: '4px 8px', fontSize: '0.75rem' },
-  sm: { padding: '6px 12px', fontSize: '0.875rem' },
-  md: { padding: '8px 16px', fontSize: '1rem' },
-  lg: { padding: '10px 20px', fontSize: '1.125rem' },
-  xl: { padding: '12px 24px', fontSize: '1.25rem' },
+const SEGMENT_SIZES: Record<SizeKey, (theme: Theme) => CSSObject> = {
+  xs: (theme) => ({ padding: '4px 8px', fontSize: rem(theme, 12) }),
+  sm: (theme) => ({ padding: '6px 12px', fontSize: rem(theme, 14) }),
+  md: (theme) => ({ padding: '8px 16px', fontSize: rem(theme, 16) }),
+  lg: (theme) => ({ padding: '10px 20px', fontSize: rem(theme, 18) }),
+  xl: (theme) => ({ padding: '12px 24px', fontSize: rem(theme, 20) }),
 };
 
 export interface SurfaceFlags {
@@ -214,7 +215,7 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
       boxShadow: `0 4px 12px ${alpha(palette.main, 0.2)}`,
     },
     '&:active': { transform: 'scale(0.98)' },
-    ...pickSize(BUTTON_SIZES, customSize),
+    ...pickSize(BUTTON_SIZES, customSize)(theme),
     // The theme's field height for the size, in place of the table's own.
     minHeight: fieldHeight(theme, asFieldSize(customSize)),
     paddingTop: 0,
@@ -306,7 +307,7 @@ export const segmentButtonSx = (theme: Theme, flags: SurfaceFlags): CSSObject =>
       '&::before': { width: '100%', left: 0, transform: 'translateX(0)' },
     },
     '&:active': { transform: 'scale(0.98)' },
-    ...pickSize(SEGMENT_SIZES, customSize),
+    ...pickSize(SEGMENT_SIZES, customSize)(theme),
     // Each segment is a field; the track around it adds its own inset.
     minHeight: fieldHeight(theme, asFieldSize(customSize)),
     paddingTop: 0,

@@ -14,6 +14,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { shadowInk } from '../../../tokens/ink';
+import { sxRem } from '../../../tokens/relative';
 
 import type { SonnerItem } from './Sonner.types';
 import type { SonnerProps } from './Sonner.types';
@@ -23,13 +24,13 @@ const renderToastIcon = (icon: SonnerProps['icon'], type: SonnerProps['type']) =
 
   switch (type) {
     case 'success':
-      return <SuccessIcon sx={{ fontSize: 20, color: 'success.main' }} />;
+      return <SuccessIcon sx={{ fontSize: sxRem(20), color: 'success.main' }} />;
     case 'error':
-      return <ErrorIcon sx={{ fontSize: 20, color: 'error.main' }} />;
+      return <ErrorIcon sx={{ fontSize: sxRem(20), color: 'error.main' }} />;
     case 'warning':
-      return <WarningIcon sx={{ fontSize: 20, color: 'warning.main' }} />;
+      return <WarningIcon sx={{ fontSize: sxRem(20), color: 'warning.main' }} />;
     case 'info':
-      return <InfoIcon sx={{ fontSize: 20, color: 'info.main' }} />;
+      return <InfoIcon sx={{ fontSize: sxRem(20), color: 'info.main' }} />;
     case 'loading':
       return <CircularProgress size={16} />;
     default:
@@ -115,7 +116,7 @@ const ToastContent: React.FC<{
     )}
 
     {description && (
-      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: sxRem(14) }}>
         {description}
       </Typography>
     )}
@@ -139,7 +140,7 @@ const ToastActionButton: React.FC<{
     size="small"
     onClick={action.onClick}
     variant={buttonVariant}
-    sx={{ fontSize: '0.75rem', py: 0.5, px: 1.5 }}
+    sx={{ fontSize: sxRem(12), py: 0.5, px: 1.5 }}
   >
     {action.label}
   </Button>

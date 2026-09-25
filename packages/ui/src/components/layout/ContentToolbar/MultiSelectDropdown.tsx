@@ -19,6 +19,7 @@ import type {
 } from './ContentToolbar.types';
 import { buildTriggerLabel, InlineTrigger, PillTrigger, StackedTrigger } from './MultiSelectTriggers';
 import { fieldTextFieldStyles } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 /** One checkbox menu row with an optional trailing count. */
 function CheckboxRow({
@@ -162,7 +163,7 @@ function MenuSearchField({
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
-              <SearchIcon sx={{ fontSize: 16 }} />
+              <SearchIcon sx={{ fontSize: sxRem(16) }} />
             </InputAdornment>
           ),
         }}
@@ -255,7 +256,7 @@ function MultiSelectMenu<TValue extends string>({
         <MenuSearchField query={query} onQueryChange={onQueryChange} placeholder={searchPlaceholder} testId={testId} />
       )}
       {visibleOptions.length === 0 && showSearch ? (
-        <MenuItem disabled data-testid={testId ? `${testId}-no-results` : undefined} sx={{ fontSize: '0.8125rem' }}>
+        <MenuItem disabled data-testid={testId ? `${testId}-no-results` : undefined} sx={{ fontSize: sxRem(13) }}>
           {noResultsLabel}
         </MenuItem>
       ) : (
@@ -272,7 +273,7 @@ function MultiSelectMenu<TValue extends string>({
       {extraOptions && extraOptions.length > 0
         ? [
             <Divider key="extra-divider" />,
-            <ListSubheader key="extra-label" sx={{ px: 1, py: 0.75, fontSize: '0.75rem', fontWeight: 600 }}>
+            <ListSubheader key="extra-label" sx={{ px: 1, py: 0.75, fontSize: sxRem(12), fontWeight: 600 }}>
               {extraOptionsHeading}
             </ListSubheader>,
             ...extraOptions.map((extra) => (
@@ -329,7 +330,7 @@ function MenuClearFooter({
           onClear();
           close();
         }}
-        sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: '0.75rem', fontWeight: 400, textTransform: 'none', color: 'text.secondary' }}
+        sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: sxRem(12), fontWeight: 400, textTransform: 'none', color: 'text.secondary' }}
       >
         {clearText}
       </Button>

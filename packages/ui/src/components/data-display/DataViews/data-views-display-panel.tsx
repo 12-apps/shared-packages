@@ -23,6 +23,7 @@ import {
 import type { SavedViewSummary } from "./data-views-types";
 import { DisplayTab, SortTab } from "./data-views-display-tabs";
 import type { DataViewsController } from "./use-data-views-state";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * "EXIBIR" — one panel for every question about how the list is READ.
@@ -114,7 +115,7 @@ function PanelTabs({
             borderRadius: 1,
             cursor: "pointer",
             font: "inherit",
-            fontSize: "0.8125rem",
+            fontSize: sxRem(13),
             bgcolor: active ? "background.paper" : "transparent",
             boxShadow: active ? 1 : 0,
             fontWeight: active ? 600 : 400,

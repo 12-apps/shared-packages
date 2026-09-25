@@ -12,6 +12,7 @@ import { breadcrumbLinkStyles } from './Breadcrumbs.styles';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
 import type { BreadcrumbCopy } from '../../../copy';
 import { sheen, uiInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const BreadcrumbLink = styled(Link, {
   shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle' })<{ size?: string; active?: boolean; visualStyle?: string }>(
@@ -24,7 +25,7 @@ const BreadcrumbText = styled(Typography, {
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(0.5),
-  fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
+  fontSize: rem(theme, size === 'sm' ? 14 : size === 'lg' ? 18 : 16),
   fontWeight: 600,
   color: theme.palette.primary.main,
   padding: theme.spacing(0.5, 0.75),
@@ -41,7 +42,7 @@ const BreadcrumbText = styled(Typography, {
 
   // Mobile responsiveness
   [theme.breakpoints.down('sm')]: {
-    fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
+    fontSize: rem(theme, size === 'lg' ? 16 : size === 'sm' ? 12 : 14),
     padding: theme.spacing(0.375, 0.5) } }));
 
 // Animated separator wrapper

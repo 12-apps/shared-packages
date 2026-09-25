@@ -6,6 +6,7 @@ import React from 'react';
 
 import { displayAcrossRail, TOUCH_TARGET } from './SettingsLayout.styles';
 import type { SettingsLayoutProps, SettingsRailBreakpoint } from './SettingsLayout.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** One line that must not wrap, whatever the section is called. */
 const CLIP = {
@@ -32,7 +33,7 @@ function HeaderText({
     <Box sx={{ minWidth: 0 }}>
       <Box
         component="h2"
-        sx={{ m: 0, font: 'inherit', fontSize: '1rem', fontWeight: 600, lineHeight: 1.3, ...CLIP }}
+        sx={{ m: 0, font: 'inherit', fontSize: sxRem(16), fontWeight: 600, lineHeight: 1.3, ...CLIP }}
       >
         {title}
       </Box>
@@ -42,7 +43,7 @@ function HeaderText({
           sx={{
             m: 0,
             font: 'inherit',
-            fontSize: '0.8125rem',
+            fontSize: sxRem(13),
             color: 'text.secondary',
             lineHeight: 1.35,
             ...CLIP,

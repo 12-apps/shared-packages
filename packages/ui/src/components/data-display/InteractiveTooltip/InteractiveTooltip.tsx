@@ -25,7 +25,7 @@ const StyledTooltip = styled(MuiTooltip, {
   return {
     '& .MuiTooltip-tooltip': {
       borderRadius: theme.spacing(1),
-      fontSize: sizeStyles.fontSize,
+      fontSize: sizeStyles.fontSize(theme),
       padding: sizeStyles.padding,
       fontWeight: 500,
       transition: 'all 0.3s ease',

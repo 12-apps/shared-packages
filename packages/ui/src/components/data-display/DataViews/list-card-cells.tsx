@@ -3,6 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 import { Box } from "../../../mui/Box";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * THE CELL CONFIG — the list declares its columns once, every row obeys them.
@@ -126,14 +127,14 @@ function Cell<T extends Record<string, unknown>>({
     >
       <Box
         component="span"
-        sx={{ ...clamp, fontSize: 14, fontWeight: config.strong ? 700 : 600, lineHeight: 1.25, ...numeric }}
+        sx={{ ...clamp, fontSize: sxRem(14), fontWeight: config.strong ? 700 : 600, lineHeight: 1.25, ...numeric }}
       >
         {config.primary(row)}
       </Box>
       {secondary != null && (
         <Box
           component="span"
-          sx={{ ...clamp, fontSize: 12.5, lineHeight: 1.3, color: "text.secondary", ...numeric }}
+          sx={{ ...clamp, fontSize: sxRem(12.5), lineHeight: 1.3, color: "text.secondary", ...numeric }}
         >
           {secondary}
         </Box>

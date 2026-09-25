@@ -1,5 +1,6 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import { rem } from '../../../tokens/relative';
 
 import { EFFECT_GLOW } from '../../../tokens/ink.core';
 
@@ -29,12 +30,12 @@ export const pulseGlow = keyframes`
 const SIZE_STYLES: Record<string, (theme: Theme) => CSSObject> = {
   sm: (theme) => ({
     padding: theme.spacing(1, 1.5),
-    fontSize: '0.875rem',
+    fontSize: rem(theme, 14),
     '& .MuiListItemIcon-root': { transform: 'scale(0.85)' },
   }),
   lg: (theme) => ({
     padding: theme.spacing(2, 2.5),
-    fontSize: '1.125rem',
+    fontSize: rem(theme, 18),
     '& .MuiListItemIcon-root': { transform: 'scale(1.15)' },
   }),
 };

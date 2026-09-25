@@ -5,6 +5,7 @@ import { useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { rem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/scales';
 
 import { brandGradient, initialsOf } from './AppHeader.colors';
@@ -35,7 +36,7 @@ function markSx(
     backgroundImage: showLogo ? 'none' : brandGradient(seed),
     backgroundColor: showLogo ? theme.palette.action.hover : 'transparent',
     color: theme.palette.getContrastText(seed),
-    fontSize: Math.round(edge * INITIALS_RATIO),
+    fontSize: rem(theme, Math.round(edge * INITIALS_RATIO)),
     fontWeight: 700,
     lineHeight: 1,
     letterSpacing: '0.02em',

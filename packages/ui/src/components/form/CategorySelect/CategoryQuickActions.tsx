@@ -4,6 +4,7 @@ import Box from '@mui/material/Box/index.js';
 import { useMemo } from 'react';
 
 import type { CategorySelectCopy } from '../../../copy';
+import { sxRem } from '../../../tokens/relative';
 
 import { collectBranchIds, collectLeafIds } from './category-tree';
 import type { CategorySelectState } from './useCategorySelect';
@@ -14,7 +15,7 @@ const linkButtonSx = {
   border: 0,
   padding: 0,
   font: 'inherit',
-  fontSize: 12,
+  fontSize: sxRem(12),
   color: 'primary.main',
   cursor: 'pointer',
   fontWeight: 550,

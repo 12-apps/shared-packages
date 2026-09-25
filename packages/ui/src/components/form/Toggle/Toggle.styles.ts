@@ -4,6 +4,7 @@ import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.
 import { fieldRadius } from '../../../tokens/field-radius';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral, sheen } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const glowAnimation = keyframes`
   0% { box-shadow: 0 0 5px currentColor; }
@@ -56,12 +57,18 @@ export const getColorFromTheme = (theme: Theme, color: string): TogglePalette =>
   };
 };
 
-const SIZE_MAP: Record<string, CSSObject> = {
-  xs: { padding: '4px 8px', fontSize: '0.75rem' },
-  sm: { padding: '6px 12px', fontSize: '0.875rem' },
-  md: { padding: '8px 16px', fontSize: '1rem' },
-  lg: { padding: '10px 20px', fontSize: '1.125rem' },
-  xl: { padding: '12px 24px', fontSize: '1.25rem' },
+/** Each size's padding and type; the type is design px, read through the type scale. */
+const SIZE_MAP: Record<string, { padding: string; fontPx: number }> = {
+  xs: { padding: '4px 8px', fontPx: 12 },
+  sm: { padding: '6px 12px', fontPx: 14 },
+  md: { padding: '8px 16px', fontPx: 16 },
+  lg: { padding: '10px 20px', fontPx: 18 },
+  xl: { padding: '12px 24px', fontPx: 20 },
+};
+
+const sizeStyles = (theme: Theme, customSize: string): CSSObject => {
+  const size = SIZE_MAP[customSize];
+  return size ? { padding: size.padding, fontSize: rem(theme, size.fontPx) } : {};
 };
 
 export const baseStyles = (
@@ -136,7 +143,7 @@ export const baseStyles = (
 
   // Size wins over everything above it — its font and horizontal padding; the
   // height is the theme's field height for the size.
-  ...(SIZE_MAP[customSize] ?? {}),
+  ...sizeStyles(theme, customSize),
   minHeight: fieldHeight(theme, asFieldSize(customSize)),
   paddingTop: 0,
   paddingBottom: 0,

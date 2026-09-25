@@ -24,6 +24,7 @@ import {
 } from './ErrorState.metrics';
 import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
 import { resolveTestId } from '../../../platform/test-id';
+import { sxRem } from '../../../tokens/relative';
 
 const makeTestId =
   (dataTestId?: string) =>
@@ -56,7 +57,7 @@ const ErrorIcon: React.FC<{
         opacity: ERROR_ICON_BOX_OPACITY,
       }}
     >
-      {icon || <Fallback sx={{ fontSize: ERROR_ICON_SIZE, color: color.main }} />}
+      {icon || <Fallback sx={{ fontSize: sxRem(ERROR_ICON_SIZE), color: color.main }} />}
     </Box>
   );
 };

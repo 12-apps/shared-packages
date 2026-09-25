@@ -17,6 +17,7 @@ import type {
   SettingsNavItem,
   SettingsRailBreakpoint,
 } from "./SettingsLayout.types";
+import { rem } from "../../../tokens/relative";
 
 export interface SettingsPanelProps {
   /** True in `drilldown`, inside a section rather than at the index. */
@@ -70,7 +71,7 @@ function BackLink({
         textDecoration: "none",
         color: "text.secondary",
         font: "inherit",
-        fontSize: "0.875rem",
+        fontSize: rem(theme, 14),
       })}
     >
       <ChevronLeftIcon fontSize="small" />

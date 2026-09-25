@@ -7,6 +7,7 @@ import React from 'react';
 import { thumbnailStripSx } from './Lightbox.constants';
 import type { LightboxItem } from './Lightbox.types';
 import { onMedia, sheen } from '../../../tokens/ink';
+import { sxRem } from '../../../tokens/relative';
 
 const THUMB_WIDTH = 60;
 const THUMB_HEIGHT = 40;
@@ -22,7 +23,7 @@ const VideoThumbnail: FC = () => (
       justifyContent: 'center',
     }}
   >
-    <PlayIcon sx={{ color: onMedia, fontSize: 16 }} />
+    <PlayIcon sx={{ color: onMedia, fontSize: sxRem(16) }} />
   </Box>
 );
 

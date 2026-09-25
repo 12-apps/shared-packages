@@ -3,6 +3,7 @@
 import React from 'react';
 
 import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 import { Button } from '../Button';
 import { useFormContext } from './FormContext';
 
@@ -37,7 +38,7 @@ export function SubmitButton({
       // `Button` replaces (not merges) its size styles with this `sx`, so restate
       // the md padding/font here alongside the theme's field height — the height
       // every input on the form stands at — and no-wrap alignment.
-      sx={{ height: fieldHeight, px: 2, fontSize: '1rem', flexShrink: 0, whiteSpace: 'nowrap' }}
+      sx={{ height: fieldHeight, px: 2, fontSize: sxRem(16), flexShrink: 0, whiteSpace: 'nowrap' }}
     >
       {children}
     </Button>

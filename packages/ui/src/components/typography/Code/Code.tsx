@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 
 import type { CodeProps } from './Code.types';
 import { modeInk, neutralTones } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const StyledCodeContainer = styled(Box, {
   shouldForwardProp: (prop) =>
@@ -20,17 +21,17 @@ const StyledCodeContainer = styled(Box, {
 }>(({ theme, customVariant = 'inline', customSize = 'md', copyable }) => {
   // Size mapping
   const sizeMap = {
-    xs: { fontSize: '0.75rem', padding: '2px 4px' },
-    sm: { fontSize: '0.8125rem', padding: '3px 6px' },
-    md: { fontSize: '0.875rem', padding: '4px 8px' },
-    lg: { fontSize: '1rem', padding: '6px 12px' },
+    xs: { fontSize: rem(theme, 12), padding: '2px 4px' },
+    sm: { fontSize: rem(theme, 13), padding: '3px 6px' },
+    md: { fontSize: rem(theme, 14), padding: '4px 8px' },
+    lg: { fontSize: rem(theme, 16), padding: '6px 12px' },
   };
 
   const blockSizeMap = {
-    xs: { fontSize: '0.75rem', padding: '8px 12px' },
-    sm: { fontSize: '0.8125rem', padding: '12px 16px' },
-    md: { fontSize: '0.875rem', padding: '16px 20px' },
-    lg: { fontSize: '1rem', padding: '20px 24px' },
+    xs: { fontSize: rem(theme, 12), padding: '8px 12px' },
+    sm: { fontSize: rem(theme, 13), padding: '12px 16px' },
+    md: { fontSize: rem(theme, 14), padding: '16px 20px' },
+    lg: { fontSize: rem(theme, 16), padding: '20px 24px' },
   };
 
   const baseStyles = {
@@ -121,7 +122,7 @@ const CopyButton = styled(IconButton)(({ theme }) => ({
     transform: 'scale(1.05)',
   },
   '& .MuiSvgIcon-root': {
-    fontSize: 16,
+    fontSize: rem(theme, 16),
   },
 }));
 
@@ -129,7 +130,7 @@ const LanguageLabel = styled(Box)(({ theme }) => ({
   position: 'absolute',
   top: theme.spacing(1),
   left: theme.spacing(2),
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 500,
   color: alpha(theme.palette.text.primary, 0.6),
   backgroundColor:

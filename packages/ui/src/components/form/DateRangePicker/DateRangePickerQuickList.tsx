@@ -17,6 +17,7 @@ import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React, { useId } from 'react';
 
 import type { ResolvedQuickRange } from './DateRangePicker.types';
+import { sxRem } from '../../../tokens/relative';
 
 const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
   display: 'block',
@@ -28,7 +29,7 @@ const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
   flex: { xs: '0 0 auto', md: '0 1 auto' },
   textAlign: 'left',
   font: 'inherit',
-  fontSize: '0.875rem',
+  fontSize: sxRem(14),
   fontWeight: active ? 600 : 400,
   lineHeight: 1.4,
   px: 1.5,
@@ -50,7 +51,7 @@ const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
 
 const REASON_SX: SxProps<Theme> = {
   display: 'block',
-  fontSize: '0.6875rem',
+  fontSize: sxRem(11),
   lineHeight: 1.3,
   mt: 0.25,
   color: 'text.disabled',

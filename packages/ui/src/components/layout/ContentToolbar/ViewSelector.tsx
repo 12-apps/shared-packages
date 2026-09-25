@@ -20,6 +20,7 @@ import React, { useState } from 'react';
 import type { ViewMode, ViewSelectorProps } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof SvgIcon }[] = [
   { value: 'grid', label: 'Grid View', icon: GridIcon },
@@ -70,8 +71,8 @@ export function ViewSelector({
         onClick={(event) => setAnchorEl(event.currentTarget)}
         sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 1, borderRadius: fieldRadiusPx, color: 'text.secondary' }}
       >
-        <ActiveIcon sx={{ fontSize: 16 }} />
-        <ChevronDownIcon sx={{ fontSize: 14 }} />
+        <ActiveIcon sx={{ fontSize: sxRem(16) }} />
+        <ChevronDownIcon sx={{ fontSize: sxRem(14) }} />
       </Button>
       <Menu
         anchorEl={anchorEl}
@@ -95,9 +96,9 @@ export function ViewSelector({
               sx={{ gap: 1.5 }}
             >
               <ListItemText>{option.label}</ListItemText>
-              <OptionIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              <OptionIcon sx={{ fontSize: sxRem(16), color: 'text.secondary' }} />
               <ListItemIcon sx={{ minWidth: 'auto !important' }}>
-                <CheckIcon sx={{ fontSize: 16, color: selected ? 'text.primary' : 'transparent' }} />
+                <CheckIcon sx={{ fontSize: sxRem(16), color: selected ? 'text.primary' : 'transparent' }} />
               </ListItemIcon>
             </MenuItem>
           );

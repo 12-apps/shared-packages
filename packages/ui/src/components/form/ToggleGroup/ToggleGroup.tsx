@@ -10,6 +10,7 @@ import { cssLengthToPx } from '../../../tokens/css-units';
 import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { controlNeutral } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const GLASS_PADDING = 4;
 const GLASS_BORDER = 1;
@@ -87,11 +88,11 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
     const colorPalette = getColorFromTheme(theme, color);
 
     const sizeMap = {
-      xs: { padding: '4px 8px', fontSize: '0.75rem' },
-      sm: { padding: '6px 12px', fontSize: '0.875rem' },
-      md: { padding: '8px 16px', fontSize: '1rem' },
-      lg: { padding: '10px 20px', fontSize: '1.125rem' },
-      xl: { padding: '12px 24px', fontSize: '1.25rem' },
+      xs: { padding: '4px 8px', fontSize: rem(theme, 12) },
+      sm: { padding: '6px 12px', fontSize: rem(theme, 14) },
+      md: { padding: '8px 16px', fontSize: rem(theme, 16) },
+      lg: { padding: '10px 20px', fontSize: rem(theme, 18) },
+      xl: { padding: '12px 24px', fontSize: rem(theme, 20) },
     };
 
     return (

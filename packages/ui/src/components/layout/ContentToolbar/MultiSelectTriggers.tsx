@@ -11,6 +11,7 @@ import type { MultiSelectOption } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { fieldEdge } from '../../../tokens/field-edge';
+import { sxRem } from '../../../tokens/relative';
 
 /**
  * Trigger label from the current selection: `allLabel` when none/all are
@@ -42,8 +43,8 @@ export interface TriggerProps {
 /** Compact `Label:` text button for a horizontal toolbar (the default layout). */
 export function InlineTrigger({ label, triggerLabel, open, onOpen, testId }: TriggerProps): React.JSX.Element {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.875rem' }}>
-      <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: sxRem(14) }}>
+      <Typography component="span" sx={{ color: 'text.secondary', fontSize: sxRem(14) }}>
         {label}:
       </Typography>
       <Button
@@ -57,7 +58,7 @@ export function InlineTrigger({ label, triggerLabel, open, onOpen, testId }: Tri
         sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
         {triggerLabel}
-        <ChevronDownIcon sx={{ fontSize: 14 }} />
+        <ChevronDownIcon sx={{ fontSize: sxRem(14) }} />
       </Button>
     </Box>
   );
@@ -69,7 +70,7 @@ export function StackedTrigger({ label, triggerLabel, open, onOpen, testId }: Tr
   const baseId = useId();
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Typography id={`${baseId}-label`} component="label" sx={{ fontSize: '0.75rem', fontWeight: 500, color: 'text.secondary' }}>
+      <Typography id={`${baseId}-label`} component="label" sx={{ fontSize: sxRem(12), fontWeight: 500, color: 'text.secondary' }}>
         {label}
       </Typography>
       <Button
@@ -81,7 +82,7 @@ export function StackedTrigger({ label, triggerLabel, open, onOpen, testId }: Tr
         aria-expanded={open}
         aria-labelledby={`${baseId}-label ${baseId}-value`}
         onClick={onOpen}
-        endIcon={<ChevronDownIcon sx={{ fontSize: 18, color: 'text.secondary' }} />}
+        endIcon={<ChevronDownIcon sx={{ fontSize: sxRem(18), color: 'text.secondary' }} />}
         sx={{
           justifyContent: 'space-between',
           height: fieldHeight,
@@ -90,7 +91,7 @@ export function StackedTrigger({ label, triggerLabel, open, onOpen, testId }: Tr
           color: 'text.primary',
           textTransform: 'none',
           fontWeight: 400,
-          fontSize: '0.875rem',
+          fontSize: sxRem(14),
           borderColor: fieldEdge,
           bgcolor: 'background.paper',
           '&:hover': { borderColor: 'text.primary', bgcolor: 'background.paper' },
@@ -171,18 +172,18 @@ export function PillTrigger({
               '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' },
             }}
           >
-            <CloseIcon sx={{ fontSize: 14 }} />
+            <CloseIcon sx={{ fontSize: sxRem(14) }} />
           </Box>
         ) : undefined
       }
-      endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
+      endIcon={<ChevronDownIcon sx={{ fontSize: sxRem(16) }} />}
       sx={{
         borderRadius: fieldRadiusPx,
         height: fieldHeight,
         px: 1.5,
         color: 'text.primary',
         fontWeight: 600,
-        fontSize: '0.8125rem',
+        fontSize: sxRem(13),
         textTransform: 'none',
         borderColor: (theme) => (active ? theme.palette.primary.main : fieldEdge(theme)),
         bgcolor: active ? 'action.selected' : 'background.paper',

@@ -21,6 +21,7 @@ import type {
 } from './ContentToolbar.types';
 import { fieldHeight } from '../../../tokens/field-height';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { sxRem } from '../../../tokens/relative';
 
 /** How many non-pinned views show under "Recentes". */
 const RECENT_LIMIT = 5;
@@ -39,7 +40,7 @@ function DefaultTag({ label, testId }: { label: string; testId: string }): React
     <Box
       component="span"
       data-testid={testId}
-      sx={{ px: 0.75, py: 0.125, borderRadius: 1, fontSize: '0.7rem', bgcolor: 'primary.main', color: 'primary.contrastText' }}
+      sx={{ px: 0.75, py: 0.125, borderRadius: 1, fontSize: sxRem(11.2), bgcolor: 'primary.main', color: 'primary.contrastText' }}
     >
       {label}
     </Box>
@@ -93,7 +94,7 @@ function ViewKebab<V extends SavedViewLike>({
         onClick={(event) => setAnchorEl(event.currentTarget)}
         sx={{ width: 28, height: 28, color: 'text.secondary' }}
       >
-        <KebabIcon sx={{ fontSize: 16 }} />
+        <KebabIcon sx={{ fontSize: sxRem(16) }} />
       </IconButton>
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={close}>
         {buildActions(view, handlers, labels).map((action) => (
@@ -132,7 +133,7 @@ function ViewRow<V extends SavedViewLike>({
         sx={{ flex: 1, minWidth: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0.75 }}
         data-testid={`${testIdPrefix}-apply-${view.id}`}
       >
-        <Typography component="span" sx={{ fontSize: '0.875rem' }}>
+        <Typography component="span" sx={{ fontSize: sxRem(14) }}>
           {view.name}
         </Typography>
         {view.isDefault && <DefaultTag label={labels.defaultTag} testId={`${testIdPrefix}-default-${view.id}`} />}
@@ -160,7 +161,7 @@ function ViewSection<V extends SavedViewLike>({
   if (list.length === 0) return null;
   return (
     <Box data-testid={`${testIdPrefix}-section-${sectionKey}`}>
-      <Typography component="span" sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'text.secondary' }}>
+      <Typography component="span" sx={{ fontSize: sxRem(12), fontWeight: 600, color: 'text.secondary' }}>
         {title}
       </Typography>
       <Stack spacing={0.5} sx={{ mt: 0.5 }}>
@@ -217,13 +218,13 @@ function PopoverBody<V extends SavedViewLike>({
     <Stack spacing={1.5} sx={{ p: 1.5, width: 300 }} data-testid={`${testIdPrefix}-popover`}>
       {/* Built-in no-filter default, always available above the saved views. */}
       <MenuItem data-testid={`${testIdPrefix}-main`} selected={!activeViewName} onClick={onSelectMain} sx={{ borderRadius: 1, px: 1, gap: 1 }}>
-        <Box component="span" sx={{ flex: 1, minWidth: 0, fontSize: '0.875rem' }}>
+        <Box component="span" sx={{ flex: 1, minWidth: 0, fontSize: sxRem(14) }}>
           {labels.mainView}
         </Box>
-        {!activeViewName && <CheckIcon sx={{ fontSize: 16, color: 'primary.main' }} />}
+        {!activeViewName && <CheckIcon sx={{ fontSize: sxRem(16), color: 'primary.main' }} />}
       </MenuItem>
       {views.length === 0 ? (
-        <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{labels.empty}</Typography>
+        <Typography sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>{labels.empty}</Typography>
       ) : (
         <>
           <ViewSection title={labels.pinned} list={pinned} sectionKey="pinned" handlers={handlers} labels={labels} testIdPrefix={testIdPrefix} />
@@ -299,11 +300,11 @@ export function SavedViewsMenu<V extends SavedViewLike = SavedViewLike>({
         sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
         {/* Mobile: an eye icon stands in for the view name to keep the toolbar one line. */}
-        <ViewIcon sx={{ fontSize: 18, display: { xs: 'inline-flex', md: 'none' } }} />
+        <ViewIcon sx={{ fontSize: sxRem(18), display: { xs: 'inline-flex', md: 'none' } }} />
         <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
           {activeViewName ?? labels.mainView}
         </Box>
-        <ChevronDownIcon sx={{ fontSize: 14 }} />
+        <ChevronDownIcon sx={{ fontSize: sxRem(14) }} />
       </Button>
       <Popover
         open={Boolean(anchorEl)}

@@ -8,6 +8,7 @@ import React from 'react';
 import type { FilterTriggerProps } from './ContentToolbar.types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 /**
  * Labeled filter toggle: a "Filtros" button (styled like the sibling toolbar
@@ -33,7 +34,7 @@ export function FilterTrigger({
       aria-expanded={open}
       aria-label={open ? 'Close filters' : 'Open filters'}
       onClick={() => onOpenChange(!open)}
-      startIcon={<FilterIcon sx={{ fontSize: 16 }} />}
+      startIcon={<FilterIcon sx={{ fontSize: sxRem(16) }} />}
       sx={{
         minWidth: 0,
         height: fieldHeight,
@@ -60,7 +61,7 @@ export function FilterTrigger({
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '0.7rem',
+            fontSize: sxRem(11.2),
             fontWeight: 700,
             lineHeight: 1,
             bgcolor: 'primary.main',

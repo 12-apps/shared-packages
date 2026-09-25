@@ -27,7 +27,7 @@ import {
 } from './Avatar.metrics';
 import type { AvatarSize, AvatarStatus, ContentType } from './Avatar.types';
 import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
-import { px } from '../../../tokens/theme';
+import { rem } from '../../../tokens/relative';
 
 export type { ContentType };
 
@@ -60,7 +60,6 @@ const getColorFromTheme = (theme: Theme, color: string): PaletteLike => {
 interface SizeStyle {
   width: number;
   height: number;
-  fontSize: string;
 }
 
 // Derived from the shared metrics, not restated: the native `Avatar` reads the
@@ -68,11 +67,14 @@ interface SizeStyle {
 const sizeMap: Record<AvatarSize, SizeStyle> = Object.fromEntries(
   Object.entries(AVATAR_SIZES).map(([size, step]) => [
     size,
-    { width: step.box, height: step.box, fontSize: px(step.fontSize) },
+    { width: step.box, height: step.box },
   ]),
 ) as Record<AvatarSize, SizeStyle>;
 
 const getSizeStyles = (size: AvatarSize): SizeStyle => sizeMap[size] || sizeMap.md;
+
+/** The glyph size in design px, read through the type scale where it is drawn. */
+const glyphPx = (size: AvatarSize): number => (AVATAR_SIZES[size] || AVATAR_SIZES.md).fontSize;
 
 const getStatusColor = (status: AvatarStatus, theme: Theme): string => {
   // The same four decisions the native half reads out of `Avatar.metrics`,
@@ -206,6 +208,7 @@ const StyledAvatar = styled(MuiAvatar, {
     const palette = getColorFromTheme(theme, customColor);
     return {
       ...getSizeStyles(customSize),
+      fontSize: rem(theme, glyphPx(customSize)),
       transition: `all ${AVATAR_TRANSITION_MS / 1000}s ${AVATAR_TRANSITION_EASING}`,
       position: 'relative',
       overflow: 'visible',

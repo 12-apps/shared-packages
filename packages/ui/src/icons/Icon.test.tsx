@@ -11,7 +11,7 @@ describe('Icon (web)', () => {
     const svg = screen.getByTestId('icon-Close');
     expect(svg.getAttribute('viewBox')).toBe('0 0 24 24');
     expect(svg.querySelector('path')?.getAttribute('d')).toBe(ICON_PATHS.Close[0]);
-    expect(svg).toHaveStyle({ fontSize: '24px' });
+    expect(svg).toHaveStyle({ fontSize: '1.5rem' });
   });
 
   it('sizes from the scale or an exact number', () => {
@@ -21,8 +21,8 @@ describe('Icon (web)', () => {
         <Icon name="Check" size={30} testID="n" />
       </>,
     );
-    expect(screen.getByTestId('xs')).toHaveStyle({ fontSize: '16px' });
-    expect(screen.getByTestId('n')).toHaveStyle({ fontSize: '30px' });
+    expect(screen.getByTestId('xs')).toHaveStyle({ fontSize: '1rem' });
+    expect(screen.getByTestId('n')).toHaveStyle({ fontSize: '1.875rem' });
   });
 
   it('fills from the palette, the surrounding text, or a literal', () => {

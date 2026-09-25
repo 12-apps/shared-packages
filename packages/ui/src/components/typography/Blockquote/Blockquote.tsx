@@ -7,6 +7,7 @@ import React from 'react';
 
 import type { BlockquoteProps } from './Blockquote.types';
 import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
@@ -39,7 +40,7 @@ const StyledBlockquote = styled('blockquote', {
     padding: 0,
     position: 'relative' as const,
     fontFamily: theme.typography.body1.fontFamily,
-    fontSize: '1.125rem',
+    fontSize: rem(theme, 18),
     lineHeight: 1.6,
     fontStyle: 'italic',
     color: theme.palette.text.primary,
@@ -105,7 +106,7 @@ const QuoteIcon = styled(FormatQuote)<{ customColor: string }>(({ theme, customC
     position: 'absolute',
     top: theme.spacing(1),
     left: theme.spacing(1),
-    fontSize: '2rem',
+    fontSize: rem(theme, 32),
     opacity: 0.3,
     transform: 'rotate(180deg)',
     color: colorPalette.main,
@@ -121,12 +122,12 @@ const CitationContainer = styled(Box)(({ theme }) => ({
 
 const AuthorName = styled(Typography)(({ theme }) => ({
   fontWeight: 600,
-  fontSize: '0.875rem',
+  fontSize: rem(theme, 14),
   marginBottom: theme.spacing(0.5),
 }));
 
-const SourceName = styled(Typography)(() => ({
-  fontSize: '0.75rem',
+const SourceName = styled(Typography)(({ theme }) => ({
+  fontSize: rem(theme, 12),
   opacity: 0.7,
 }));
 

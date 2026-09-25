@@ -18,6 +18,7 @@ import { Box } from "../../../mui/Box";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldHeight } from "../../../tokens/field-height";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * "Limpar" — one gesture back to the unfiltered list.
@@ -63,13 +64,13 @@ export function ClearAllControl({
         bgcolor: "transparent",
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.8125rem",
+        fontSize: sxRem(13),
         whiteSpace: "nowrap",
         color: "text.secondary",
         "&:hover": { color: "text.primary", bgcolor: "action.hover" },
       }}
     >
-      <FilterAltOffRoundedIcon sx={{ fontSize: 16 }} />
+      <FilterAltOffRoundedIcon sx={{ fontSize: sxRem(16) }} />
       {!compact && <Box component="span">{copy.filters.clear}</Box>}
     </Box>
   );
@@ -117,7 +118,7 @@ export function CloseSearchControl({
           "&:hover": { color: "text.primary", bgcolor: "action.hover" },
         }}
       >
-        <CloseRoundedIcon sx={{ fontSize: 18 }} />
+        <CloseRoundedIcon sx={{ fontSize: sxRem(18) }} />
       </Box>
     </Tooltip>
   );

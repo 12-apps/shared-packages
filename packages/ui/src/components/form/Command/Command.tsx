@@ -29,6 +29,7 @@ import type {
   CommandListProps,
   CommandProps,
 } from './Command.types';
+import { rem } from '../../../tokens/relative';
 
 export { CommandEmpty, CommandLoading, CommandSeparator } from './Command.parts';
 
@@ -52,7 +53,7 @@ export const Command: React.FC<CommandProps> = (rawProps) => {
       PaperProps={{
         sx: {
           ...commandPaperStyles(theme, props),
-          ...commandSizeStyles(props.size),
+          ...commandSizeStyles(theme, props.size),
           overflow: 'hidden',
           ...props.style,
         },
@@ -308,11 +309,11 @@ const CommandItemComponent: React.FC<CommandItemProps> = ({
         primary={label}
         secondary={showDescription && description}
         primaryTypographyProps={{
-          fontSize: '0.875rem',
+          fontSize: rem(theme, 14),
           fontWeight: selected ? 600 : 400,
         }}
         secondaryTypographyProps={{
-          fontSize: '0.75rem',
+          fontSize: rem(theme, 12),
         }}
       />
 
@@ -323,7 +324,7 @@ const CommandItemComponent: React.FC<CommandItemProps> = ({
           variant="outlined"
           sx={{
             height: 20,
-            fontSize: '0.7rem',
+            fontSize: rem(theme, 11.2),
             ml: 1,
           }}
         />

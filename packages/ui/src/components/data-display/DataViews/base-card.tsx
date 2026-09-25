@@ -23,6 +23,7 @@ import {
 } from "./card-surface";
 import { CARD_ASPECT_RATIOS, type CardAspectRatio } from "./data-views-types";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { rem } from "../../../tokens/relative";
 
 export interface BaseCardProps extends CardSurfaceProps {
   /** Extra body content below the caption (chips, meta). Optional. */
@@ -220,6 +221,7 @@ function CardCaption({
   subtitle?: ReactNode;
   topGap: number;
 }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <Box sx={{ mt: topGap, minWidth: 0 }}>
       {title != null && (
@@ -230,7 +232,7 @@ function CardCaption({
           as="p"
           style={{
             lineHeight: 1.15,
-            fontSize: "0.95rem",
+            fontSize: rem(theme, 15.2),
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",

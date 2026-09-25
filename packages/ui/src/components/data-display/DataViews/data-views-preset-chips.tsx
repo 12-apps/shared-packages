@@ -16,6 +16,7 @@ import Box from "@mui/material/Box/index.js";
 
 import { isPresetActive, resolvePreset } from "./data-views-range-presets";
 import type { RangePreset, RangeValue } from "./data-views-types";
+import { sxRem } from "../../../tokens/relative";
 
 /** One preset, styled as the same pill-shaped chip the filter bar uses. */
 function PresetChip({
@@ -47,7 +48,7 @@ function PresetChip({
         color: active ? "primary.main" : "text.secondary",
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.75rem",
+        fontSize: sxRem(12),
         fontWeight: 600,
         whiteSpace: "nowrap",
         "&:hover": { borderColor: active ? "primary.main" : "text.primary" },

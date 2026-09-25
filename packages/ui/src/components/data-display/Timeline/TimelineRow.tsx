@@ -15,6 +15,7 @@ import React from 'react';
 
 import type { TimelineItem, TimelineProps } from './Timeline.types';
 import { onMedia, uiInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const slideInAnimation = keyframes`from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); }`;
 const pulseAnimation = keyframes`0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; }`;
@@ -88,7 +89,7 @@ const TimelineDot = styled(Box, {
     animation: `${pulseAnimation} 2s ease infinite`,
   }),
   '& svg': {
-    fontSize: hasIcon ? '1.2rem' : '0.8rem',
+    fontSize: rem(theme, hasIcon ? 19.2 : 12.8),
     color: theme.palette.background.paper,
   },
 }));
@@ -124,7 +125,7 @@ const TimelineCard = styled(Card, {
 
 const TimelineTimestamp = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.secondary,
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 500,
   letterSpacing: '0.5px',
   textTransform: 'uppercase',
@@ -132,7 +133,7 @@ const TimelineTimestamp = styled(Typography)(({ theme }) => ({
 
 const MetadataChip = styled(Chip)(({ theme }) => ({
   height: 24,
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   background: alpha(theme.palette.primary.main, 0.08),
   border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
 }));

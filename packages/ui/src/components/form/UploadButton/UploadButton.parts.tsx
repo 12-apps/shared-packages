@@ -21,6 +21,7 @@ const HOVER_TINT = 0x05 / 0xff;
 const GHOST_HOVER_TINT = 0x08 / 0xff;
 import type { UploadButtonCopy } from '../../../copy';
 import type { UploadButtonProps } from './UploadButton.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** Shared shape for the two trigger variants. */
 export interface TriggerProps {
@@ -82,7 +83,7 @@ export function UploadDropzone({
       aria-label={copy.dropzoneRole(label)}
     >
       <Box sx={{ mb: 2 }}>
-        {icon || <CloudUploadOutlined sx={{ fontSize: 48, color: 'text.secondary' }} />}
+        {icon || <CloudUploadOutlined sx={{ fontSize: sxRem(48), color: 'text.secondary' }} />}
       </Box>
       <Typography variant="body1" sx={{ mb: 1 }}>
         {label}

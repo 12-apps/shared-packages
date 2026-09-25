@@ -13,7 +13,7 @@ import {
 } from './Progress.metrics';
 import type { ProgressSize, ProgressVariant } from './Progress.types';
 import { softNeutral } from '../../../tokens/ink';
-import { px } from '../../../tokens/theme';
+import { sxRem } from '../../../tokens/relative';
 
 // Define pulse animation. The stops and the two seconds are the shared metrics'
 // (`PULSE`), so the native `Progress` breathes on the same cadence.
@@ -51,13 +51,13 @@ export const getColorFromTheme = (theme: Theme, color: string): PaletteColor => 
 
 // Derived from the shared metrics, not restated: the native `Progress` reads
 // the same table, so the two renderers cannot disagree on a size.
-const SIZE_MAP: Record<ProgressSize, { height: number; circularSize: number; fontSize: string }> =
+const SIZE_MAP: Record<ProgressSize, { height: number; circularSize: number; fontSize: (theme: Theme) => string }> =
   Object.fromEntries(
     Object.entries(PROGRESS_SIZES).map(([size, step]) => [
       size,
-      { height: step.height, circularSize: step.circularSize, fontSize: px(step.fontSize) },
+      { height: step.height, circularSize: step.circularSize, fontSize: sxRem(step.fontSize) },
     ]),
-  ) as Record<ProgressSize, { height: number; circularSize: number; fontSize: string }>;
+  ) as Record<ProgressSize, { height: number; circularSize: number; fontSize: (theme: Theme) => string }>;
 
 export const getSizeStyles = (size?: ProgressSize) => SIZE_MAP[size as ProgressSize] || SIZE_MAP.md;
 
