@@ -9,9 +9,20 @@
  *
  * What is here is deliberately GLUE. Every decision it makes —  what the menu
  * contains, whether a window may open, what the tray says — is a pure function
- * from one of the other subpaths, asserted there.
+ * from one of the other subpaths, asserted there. The crash reports
+ * (`startCrashReporting`) are the real files and Crashpad under `../telemetry`;
+ * `sessionCookieReader` is the one thing `../updates` needs from Electron's
+ * cookie jar.
  */
 export { BACKGROUND_FLAG, startedInBackground } from "./background";
+export {
+  startCrashReporting,
+  updaterFileLogger,
+  waitForTheLock,
+  type CrashReportingOptions,
+  type UpdaterLogger,
+} from "./crash-reporting";
+export { sessionCookieReader, type SessionRef } from "./session-cookie";
 export {
   buildTrayMenu,
   type TrayActions,
