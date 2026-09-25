@@ -19,6 +19,14 @@ import type { NavigationMenuItem } from './NavigationMenu.types';
 import { onMedia, shadowInk, uiInk } from '../../../tokens/ink';
 import { rem, rems, sxRem } from '../../../tokens/relative';
 
+// A numeric or empty-string zero is treated the way the package's own Badge
+// treats a zero count by default (`Badge.helpers.ts`'s `showZero: false`):
+// hidden. `badge && …` prints a bare "0" text node for `badge: 0`, because
+// `0 && …` evaluates to the falsy `0` itself rather than `false`. A caller
+// who wants a visible zero passes the string `'0'`, which is truthy here.
+const hasBadge = (badge: NavigationMenuItem['badge']): boolean =>
+  badge !== undefined && badge !== null && badge !== '' && badge !== 0;
+
 const StyledListItem = styled(ListItem, {
   shouldForwardProp: (prop) => !['variant', 'active', 'size', 'level'].includes(prop as string) })<{ variant?: string; active?: boolean; size?: string; level?: number }>(
   ({ theme, variant, level = 0 }) => ({
@@ -139,9 +147,10 @@ const MenuItemLabel: React.FC<{
               opacity: 0.7,
               transition: 'all 0.3s ease' } } }}
       />
-      {item.badge && (
+      {hasBadge(item.badge) && (
         <Box
           component="span"
+          data-testid={`navigation-menu-badge-${item.id}`}
           sx={{
             flexShrink: 0,
             display: 'inline-flex',
