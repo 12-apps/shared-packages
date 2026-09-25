@@ -26,6 +26,15 @@ const StyledCard = styled(Card, {
 const StyledPopover = styled(Popover, {
   shouldForwardProp: (prop) => prop !== 'customAnimation',
 })<{ customAnimation?: HoverCardAnimation }>(({ customAnimation }) => ({
+  // Only the card takes the pointer (its paper sets `pointer-events: auto`).
+  // MUI's popover root and its invisible backdrop cover the whole viewport, so
+  // while a card was open the pointer was "on the card" wherever it went: the
+  // backdrop's mouseover reached the card's onMouseEnter and cancelled the
+  // close the trigger's mouseleave had just scheduled. A card left by moving
+  // the mouse away stayed open, and the page's next click hit the backdrop
+  // instead of its target (FUT-2619). The backdrop was also the only
+  // click-away; `useClickAway` in the hooks replaces it.
+  pointerEvents: 'none',
   // The popover only positions; StyledCard draws the surface.
   '& .MuiPopover-paper': {
     backgroundColor: 'transparent',
@@ -81,7 +90,7 @@ export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props
     ...rest
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
 
-  const { anchorEl, isOpen, handleClose, triggerHandlers, cardHandlers } = useHoverCard({
+  const { anchorEl, isOpen, handleClose, triggerHandlers, cardHandlers, contentRef } = useHoverCard({
     disabled,
     touchEnabled,
     enterDelay,
@@ -124,7 +133,7 @@ export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props
         slotProps={{ paper: { style: { pointerEvents: 'auto' } } }}
         {...rest}
       >
-        <Box sx={{ position: 'relative' }}>
+        <Box ref={contentRef} sx={{ position: 'relative' }}>
           {showArrow && <ArrowContainer placement={placement} offset={offset} />}
           <StyledCard
             customVariant={variant}

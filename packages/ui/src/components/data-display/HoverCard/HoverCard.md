@@ -107,6 +107,7 @@ The HoverCard component displays additional information in a card-style popup wh
 ## Accessibility Notes
 
 - The component supports keyboard navigation (Escape key to close)
+- The card is dismissed by moving the pointer off the trigger and the card (after `exitDelay`), by Escape, or by a tap or click anywhere outside them. The outside press still reaches what it landed on: the page under an open card stays usable
 - Proper ARIA attributes are applied to the popover
 - Focus management is handled automatically
 - Touch support for mobile devices can be enabled/disabled

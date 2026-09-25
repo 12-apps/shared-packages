@@ -3,6 +3,7 @@ import Button from '@mui/material/Button/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { type ReactNode, useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Dashboard, markDashboardSlot } from './Dashboard';
@@ -91,15 +92,49 @@ export const SettingsDialog: Story = {
   },
 };
 
+/**
+ * Keeps a link's click inside the story, and records where it was going.
+ *
+ * In link mode the gear is a real `<a href>`, and test-storybook plays every
+ * story of a file in ONE page. Followed, the click navigated that page to
+ * `/admin/acme/config/inventory`, off Storybook: the story itself still passed
+ * (its assertions ran first), and the stories after it failed on
+ * `ReferenceError: __test is not defined` whenever the navigation landed before
+ * they started (FUT-2619). The runner's helper had left with the old page.
+ *
+ * Capture phase on a wrapper, so the component and its own handlers are
+ * untouched: only the browser's default action (following the link) is
+ * cancelled, and the target it would have followed is printed for the play
+ * function to assert.
+ */
+const StayInStory = ({ children }: { children: ReactNode }) => {
+  const [followed, setFollowed] = useState('');
+  return (
+    <Box
+      onClickCapture={(event) => {
+        const link = (event.target as Element).closest('a[href]');
+        if (!link) return;
+        event.preventDefault();
+        setFollowed(link.getAttribute('href') ?? '');
+      }}
+    >
+      {children}
+      <output data-testid="followed-link">{followed}</output>
+    </Box>
+  );
+};
+
 export const SettingsLink: Story = {
   name: '🧪 Settings gear links to a settings route (no dialog)',
   render: () => (
-    <Dashboard>
-      <Dashboard.Header title="Estoque">
-        <Dashboard.Settings ariaLabel="Configurações de estoque" href="/admin/acme/config/inventory" />
-      </Dashboard.Header>
-      <Dashboard.Body>{body}</Dashboard.Body>
-    </Dashboard>
+    <StayInStory>
+      <Dashboard>
+        <Dashboard.Header title="Estoque">
+          <Dashboard.Settings ariaLabel="Configurações de estoque" href="/admin/acme/config/inventory" />
+        </Dashboard.Header>
+        <Dashboard.Body>{body}</Dashboard.Body>
+      </Dashboard>
+    </StayInStory>
   ),
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -108,9 +143,20 @@ export const SettingsLink: Story = {
       await expect(gear.tagName).toBe('A');
       await expect(gear).toHaveAttribute('href', '/admin/acme/config/inventory');
     });
-    await step('Clicking it opens no dialog', async () => {
+    await step('Clicking it follows the link and opens no dialog', async () => {
+      const page = canvasElement.ownerDocument.defaultView?.location.pathname;
       await userEvent.click(canvas.getByTestId('dashboard-settings-trigger'));
-      await expect(canvas.queryAllByTestId('dashboard-settings-dialog')).toHaveLength(0);
+      // The click reached the anchor and would have gone to the config route…
+      await expect(canvas.getByTestId('followed-link')).toHaveTextContent('/admin/acme/config/inventory');
+      // …and the page it would have left is still this story.
+      await expect(canvasElement.ownerDocument.defaultView?.location.pathname).toBe(page);
+      // The dialog-mode gear's dialog renders into document.body, a portal the
+      // canvas never contains, and not in the same tick as the click. So look
+      // THERE, and give it the window `SettingsDialog` above gives the real one
+      // to appear (`waitFor`'s default): the wait must run out without it.
+      await expect(
+        waitFor(() => expect(within(document.body).getByTestId('dashboard-settings-dialog')).toBeInTheDocument()),
+      ).rejects.toThrow();
     });
   },
 };
