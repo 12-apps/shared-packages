@@ -2053,10 +2053,14 @@ export const Integration: Story = {
       // root, not its <svg>: the old check read the svg's `animation`, which
       // older Chromium serialised as a long "none 0s ease …" string and so
       // passed vacuously; Chrome 149 serialises it as plain "none".
-      await waitFor(() => {
-        const circular = canvas.getByTestId('processing-progress-circular');
-        expect(window.getComputedStyle(circular).animationName).not.toBe('none');
-      });
+      // Web only: the Native lane runs this story too, and there the pulse is
+      // an animated opacity on a View with no CSS animation and no such id.
+      if (canvas.queryByTestId('processing-progress-circular')) {
+        await waitFor(() => {
+          const circular = canvas.getByTestId('processing-progress-circular');
+          expect(window.getComputedStyle(circular).animationName).not.toBe('none');
+        });
+      }
     });
 
     await step('Workflow completion integration', async () => {
