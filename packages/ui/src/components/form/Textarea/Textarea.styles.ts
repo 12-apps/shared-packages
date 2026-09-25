@@ -2,6 +2,7 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
 
 const glowAnimation = keyframes`
   0% {
@@ -49,18 +50,8 @@ type ResolvedPalette = {
 
 type PartialPalette = { main: string; dark?: string; light?: string; contrastText?: string };
 
-// grey is indexed by weight rather than main/dark/light, so neutral is built by
-// hand. The literals are the MUI grey values, used if the theme omits a weight.
-const neutralPalette = (theme: Theme): ResolvedPalette => {
-  const grey = theme.palette.grey as unknown as Record<number, string>;
-
-  return {
-    main: grey?.[700] || '#616161',
-    dark: grey?.[800] || '#424242',
-    light: grey?.[500] || '#9e9e9e',
-    contrastText: '#fff',
-  };
-};
+// `neutral` is not a MUI palette entry, so it is the controls' neutral tone.
+const neutralPalette = (theme: Theme): ResolvedPalette => controlNeutral(theme);
 
 // Each slot falls back to the palette's own main, then to primary — a custom
 // theme can define main without dark or light.
@@ -71,7 +62,7 @@ const withFallbacks = (theme: Theme, palette: PartialPalette): ResolvedPalette =
   main: pick(palette?.main, theme.palette.primary.main),
   dark: pick(palette?.dark, palette?.main, theme.palette.primary.dark),
   light: pick(palette?.light, palette?.main, theme.palette.primary.light),
-  contrastText: pick(palette?.contrastText, '#fff'),
+  contrastText: pick(palette?.contrastText, absoluteInk(theme).white),
 });
 
 export const getColorFromTheme = (theme: Theme, color: string): ResolvedPalette => {

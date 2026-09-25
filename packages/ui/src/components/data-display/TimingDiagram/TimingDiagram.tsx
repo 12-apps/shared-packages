@@ -115,7 +115,7 @@ export const TimingDiagram: FC<TimingDiagramProps> = ({
             <LegendItem key={phase.key}>
               <Box
                 className="color"
-                sx={{ backgroundColor: phaseColors[phase.key as PhaseKey] }}
+                sx={(theme) => ({ backgroundColor: phaseColors(theme)[phase.key as PhaseKey] })}
               />
               <Typography className="label">{phase.label}</Typography>
             </LegendItem>

@@ -15,6 +15,7 @@ import type { InputProps } from './Input.types';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { absoluteInk } from '../../../tokens/ink';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 type InputVariant = NonNullable<InputProps['variant']>;
@@ -148,7 +149,7 @@ const gradientStyles = (theme: Theme): CSSObject => ({
     bottom: 0,
     borderRadius: 'inherit',
     background: `linear-gradient(${INPUT_GRADIENT.angleDeg}deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-    mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+    mask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
     maskComposite: 'exclude',
     padding: `${INPUT_GRADIENT.borderWidth}px`,
     zIndex: -1,

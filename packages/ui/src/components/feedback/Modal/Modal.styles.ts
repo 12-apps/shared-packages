@@ -1,6 +1,8 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { scrim, shadowInk } from '../../../tokens/ink';
+
 import type { ModalProps } from './Modal.types';
 
 type Variant = NonNullable<ModalProps['variant']>;
@@ -83,7 +85,7 @@ const surface = (theme: Theme, flags: ModalStyleFlags): CSSObject => {
   const boxShadow = glow
     ? `0 0 40px ${alpha(theme.palette.primary.main, 0.3)}`
     : isGlass
-      ? `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`
+      ? `0 8px 32px ${shadowInk(theme, 0.1)}`
       : theme.shadows[8];
 
   return {
@@ -121,6 +123,6 @@ export const panelSx = (theme: Theme, flags: ModalStyleFlags): CSSObject => {
 };
 
 export const backdropSx = (theme: Theme, isGlass: boolean): CSSObject => ({
-  backgroundColor: alpha(theme.palette.common.black, isGlass ? 0.2 : 0.5),
+  backgroundColor: scrim(theme, isGlass ? 0.2 : 0.5),
   backdropFilter: isGlass ? 'blur(8px)' : 'none',
 });

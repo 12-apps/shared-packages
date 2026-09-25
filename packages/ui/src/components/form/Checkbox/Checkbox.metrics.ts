@@ -1,3 +1,6 @@
+import { alpha } from '../../../tokens/color';
+import { EFFECT_GLOW } from '../../../tokens/ink.core';
+
 import type { CheckboxVariant } from './Checkbox.base';
 
 /**
@@ -56,15 +59,13 @@ export const CHECKBOX_SPINNER = { size: 20, offset: -10 } as const;
 
 /**
  * `glow` and `pulse` are keyed to MUI's DEFAULT blue rather than the theme's
- * primary — the web writes the rgba out by hand — so both renderers do.
+ * primary — `EFFECT_GLOW.muiBlue` (`tokens/ink.core`) — on both renderers.
  */
-export const CHECKBOX_EFFECT_INK = { r: 25, g: 118, b: 210 } as const;
 export const CHECKBOX_GLOW = { blur: { from: 5, to: 20 }, alpha: { from: 0.5, to: 0.8 }, ms: 2000 } as const;
 export const CHECKBOX_PULSE = { spread: 10, alpha: 0.7, ms: 2000 } as const;
 
 /** MUI's default blue at an alpha, as the web's keyframes spell it. */
-export const effectInk = (alphaValue: number): string =>
-  `rgba(${CHECKBOX_EFFECT_INK.r}, ${CHECKBOX_EFFECT_INK.g}, ${CHECKBOX_EFFECT_INK.b}, ${alphaValue})`;
+export const effectInk = (alphaValue: number): string => alpha(EFFECT_GLOW.muiBlue, alphaValue);
 
 /** `FormControlLabel`: flush left, its label at MUI's `body2` size. */
 export const CHECKBOX_LABEL = { marginLeft: 0, fontSize: 14 } as const;

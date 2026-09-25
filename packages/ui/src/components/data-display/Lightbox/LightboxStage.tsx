@@ -7,6 +7,7 @@ import React from 'react';
 
 import { captionSx, counterSx } from './Lightbox.constants';
 import type { LightboxItem } from './Lightbox.types';
+import { onMedia } from '../../../tokens/ink';
 
 type TestId = (suffix: string) => string;
 
@@ -48,7 +49,7 @@ export const LightboxStage: FC<LightboxStageProps> = ({
   >
     {isLoading && (
       <CircularProgress
-        sx={{ position: 'absolute', color: 'white', zIndex: 999 }}
+        sx={{ position: 'absolute', color: onMedia, zIndex: 999 }}
         data-testid={testId('loading')}
       />
     )}

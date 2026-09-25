@@ -28,6 +28,7 @@ import {
 import type { ChartProps, ChartSeries } from './Chart.types';
 import { ChartLegendContent, ChartTooltipContent } from './ChartComposables';
 import { buildChartContext, type ChartRenderContext } from './chart-context';
+import { uiInk } from '../../../tokens/ink';
 
 /**
  * Per-type Recharts renderers for the prop-driven Chart, dispatched from a
@@ -156,7 +157,7 @@ function pieCenterLabel(ctx: ChartRenderContext): React.ReactNode {
   const { centerLabel } = ctx.props;
   const innerRadius = ctx.props.innerRadius ?? 0;
   if (!centerLabel || innerRadius <= 0) return null;
-  const fill = ctx.props.variant === 'neon' ? '#00ffff' : ctx.theme.palette.text.primary;
+  const fill = ctx.props.variant === 'neon' ? uiInk(ctx.theme).dataVizNeon.accent : ctx.theme.palette.text.primary;
   return (
     <text
       x="50%"

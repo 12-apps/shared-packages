@@ -6,14 +6,12 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { BlockquoteProps } from './Blockquote.types';
+import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
-    return {
-      main: theme.palette.grey?.[700] || '#616161',
-      light: theme.palette.grey?.[500] || '#9e9e9e',
-      dark: theme.palette.grey?.[800] || '#424242',
-    };
+    const { main, light, dark } = controlNeutral(theme);
+    return { main, light, dark };
   }
 
   const colorMap: Record<string, typeof theme.palette.primary> = {
@@ -65,9 +63,9 @@ const StyledBlockquote = styled('blockquote', {
         background: `linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.light})`,
         borderRadius: theme.shape.borderRadius * 2,
         padding: '2px',
-        WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+        WebkitMask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
         WebkitMaskComposite: 'exclude',
-        mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+        mask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
         maskComposite: 'exclude',
       },
     };
@@ -80,7 +78,7 @@ const StyledBlockquote = styled('blockquote', {
       backgroundColor:
         theme.palette.mode === 'dark'
           ? alpha(theme.palette.background.paper, 0.8)
-          : alpha(theme.palette.grey[50], 0.95),
+          : alpha(neutralTones(theme).canvas, 0.95),
       backdropFilter: theme.palette.mode === 'dark' ? 'blur(10px)' : 'none',
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
       borderRadius: theme.shape.borderRadius * 2,

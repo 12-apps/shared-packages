@@ -1,6 +1,7 @@
 import type { SelectVariant } from './Select.base';
 import type { InputVariant } from '../Input/Input.base';
 import { ICON_SIZES } from '../../../icons/Icon.types';
+import { ELEVATION_SHADOWS } from '../../../tokens/ink.core';
 import type { UiTheme } from '../../../tokens/theme';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
@@ -68,8 +69,7 @@ export const SELECT_MENU = {
 } as const;
 
 /** MUI's `theme.shadows[8]`, the elevation a `Menu` paper rests at. */
-export const MUI_MENU_SHADOW =
-  '0px 5px 5px -3px rgba(0,0,0,0.2),0px 8px 10px 1px rgba(0,0,0,0.14),0px 3px 14px 2px rgba(0,0,0,0.12)';
+export const MUI_MENU_SHADOW = ELEVATION_SHADOWS[8];
 
 /** The wash behind the option the value currently names. */
 export const selectedWashAlpha = (theme: UiTheme): number =>

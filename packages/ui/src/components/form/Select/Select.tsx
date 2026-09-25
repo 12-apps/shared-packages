@@ -21,6 +21,7 @@ import { fieldEdge } from '../../../tokens/field-edge';
 import { asFieldSize, fieldControlStyles, fieldHeight } from '../../../tokens/field-height';
 import type { SizeValue } from '../../../tokens/vocabulary';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { absoluteInk } from '../../../tokens/ink';
 
 // Define pulse animation
 const pulseAnimation = keyframes`
@@ -104,7 +105,7 @@ const gradientVariant = (theme: Theme): CSSObject => ({
     bottom: 0,
     borderRadius: 'inherit',
     background: `linear-gradient(${SELECT_GRADIENT.angleDeg}deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-    mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+    mask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
     maskComposite: 'exclude',
     padding: `${SELECT_GRADIENT.borderWidth}px`,
     zIndex: -1,

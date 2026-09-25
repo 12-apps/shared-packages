@@ -7,20 +7,23 @@ import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import type { FC} from 'react';
 import React, {  } from 'react';
 
+import { scrim, sheen } from '../../../tokens/ink';
+import { ABSOLUTE_INK } from '../../../tokens/ink.core';
+
 import { useTutorialOverlay } from './TutorialOverlay.hooks';
 import { TutorialStepBody } from './TutorialStepBody';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 
-// Animation keyframes
+// Animation keyframes — static, so the ring's sheen is the absolute white.
 const pulseAnimation = keyframes`
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 0 0 ${alpha(ABSOLUTE_INK.white, 0.7)};
   }
   70% {
-    box-shadow: 0 0 0 20px rgba(255, 255, 255, 0);
+    box-shadow: 0 0 0 20px ${alpha(ABSOLUTE_INK.white, 0)};
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    box-shadow: 0 0 0 0 ${alpha(ABSOLUTE_INK.white, 0)};
   }
 `;
 
@@ -45,24 +48,24 @@ const Overlay = styled(Box, {
   pointerEvents: allowClickThrough ? 'none' : 'auto',
   transition: 'opacity 0.3s ease' }));
 
-const Backdrop = styled(Box)(() => ({
+const Backdrop = styled(Box)(({ theme }) => ({
   position: 'absolute',
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  background: alpha('#000', 0.7),
+  background: scrim(theme, 0.7),
   backdropFilter: 'blur(2px)' }));
 
 const Spotlight = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding' })<{ bounds: globalThis.DOMRect; padding: number }>(({ bounds, padding }) => ({
+  shouldForwardProp: (prop) => prop !== 'bounds' && prop !== 'padding' })<{ bounds: globalThis.DOMRect; padding: number }>(({ theme, bounds, padding }) => ({
   position: 'absolute',
   top: bounds.top - padding,
   left: bounds.left - padding,
   width: bounds.width + padding * 2,
   height: bounds.height + padding * 2,
   borderRadius: 8,
-  border: '2px solid rgba(255, 255, 255, 0.5)',
+  border: `2px solid ${sheen(theme, 0.5)}`,
   animation: `${pulseAnimation} 2s infinite`,
   pointerEvents: 'none',
   '&::before': {
@@ -71,7 +74,7 @@ const Spotlight = styled(Box, {
     inset: -2,
     borderRadius: 8,
     background: 'transparent',
-    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)' } }));
+    boxShadow: `0 0 0 9999px ${scrim(theme, 0.7)}` } }));
 
 const TooltipContainer = styled(Paper, {
   shouldForwardProp: (prop) => prop !== 'placement' })<{ placement: string }>(({ theme, placement }) => ({

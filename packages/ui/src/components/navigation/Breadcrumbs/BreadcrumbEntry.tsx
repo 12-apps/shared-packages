@@ -11,6 +11,7 @@ import React from 'react';
 import { breadcrumbLinkStyles } from './Breadcrumbs.styles';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
 import type { BreadcrumbCopy } from '../../../copy';
+import { sheen, uiInk } from '../../../tokens/ink';
 
 const BreadcrumbLink = styled(Link, {
   shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle' })<{ size?: string; active?: boolean; visualStyle?: string }>(
@@ -60,8 +61,8 @@ const CollapsedItemsPopover: React.FC<{
       sx={{
         background: (theme) =>
           theme.palette.mode === 'dark'
-            ? 'rgba(17, 24, 39, 0.95)'
-            : 'rgba(255, 255, 255, 0.95)',
+            ? alpha(uiInk(theme).glassSlate, 0.95)
+            : sheen(theme, 0.95),
         backdropFilter: 'blur(10px)',
         borderRadius: 1,
         boxShadow: 3,

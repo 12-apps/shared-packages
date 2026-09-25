@@ -9,6 +9,7 @@ import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { scrim, sheen } from '../../../tokens/ink';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import { shimmerAnimation } from './Sheet.animations';
@@ -45,7 +46,7 @@ const handleSx = (theme: Theme, isDraggable: boolean) => ({
     background: `linear-gradient(
       90deg,
       transparent,
-      ${alpha(theme.palette.common.white, 0.3)},
+      ${sheen(theme, 0.3)},
       transparent
     )`,
     animation: isDraggable ? `${shimmerAnimation} 2s infinite` : 'none',
@@ -223,7 +224,7 @@ export const SheetOverlay: React.FC<SheetOverlayProps> = (props) => {
           // One below the drawer: this backdrop replaces MUI's own (the drawer
           // is given a no-op BackdropComponent) and must sit under the panel.
           zIndex: theme.zIndex.drawer - 1,
-          backgroundColor: alpha(theme.palette.common.black, blur ? 0.6 : 0.5),
+          backgroundColor: scrim(theme, blur ? 0.6 : 0.5),
           backdropFilter: blur ? 'blur(8px) saturate(180%)' : 'none',
           WebkitBackdropFilter: blur ? 'blur(8px) saturate(180%)' : 'none',
           ...style,

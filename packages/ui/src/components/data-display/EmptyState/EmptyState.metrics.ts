@@ -1,4 +1,5 @@
 import type { EmptyStateVariant } from './EmptyState.base';
+import { ELEVATION_SHADOWS } from '../../../tokens/ink.core';
 
 /**
  * THE NUMBERS BOTH `EmptyState` RENDERERS DRAW WITH.
@@ -46,8 +47,7 @@ export const ACTION_BUTTON = {
   outlinedBorderAlpha: 0.5,
 } as const;
 /** MUI's `theme.shadows[2]`, the elevation a contained button rests at. */
-export const MUI_CONTAINED_SHADOW =
-  '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)';
+export const MUI_CONTAINED_SHADOW = ELEVATION_SHADOWS[2];
 
 /** The help link: 8px below whatever precedes it, marked when it leaves the app. */
 export const HELP_LINK_MARGIN_TOP_UNITS = 1;

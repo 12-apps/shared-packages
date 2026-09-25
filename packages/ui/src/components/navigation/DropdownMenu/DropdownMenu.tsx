@@ -12,6 +12,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React, { cloneElement, isValidElement,useRef, useState } from 'react';
 
 import type { DropdownMenuItem,DropdownMenuProps } from './DropdownMenu.types';
+import { modeInk, shadowInk, sheen } from '../../../tokens/ink';
 
 // Resolves every light/dark decision once. The inline version repeated
 // `theme.palette.mode === 'dark' ? … : …` nine times, and two of those had the
@@ -21,7 +22,7 @@ const glassTokens = (theme: Theme) => {
   const isDark = theme.palette.mode === 'dark';
 
   return {
-    edge: isDark ? theme.palette.common.white : theme.palette.common.black,
+    edge: modeInk(theme),
     dropShadowAlpha: isDark ? 0.4 : 0.12,
     insetHighlightAlpha: isDark ? 0.2 : 0.8,
     sheenAlpha: isDark ? 0.1 : 0.8,
@@ -37,9 +38,9 @@ const glassMenuStyles = (theme: Theme): CSSObject => {
     WebkitBackdropFilter: 'blur(24px) saturate(1.8)', // Safari support
     border: `1px solid ${alpha(edge, 0.12)}`,
     boxShadow: [
-      `0 8px 32px ${alpha(theme.palette.common.black, dropShadowAlpha)}`,
+      `0 8px 32px ${shadowInk(theme, dropShadowAlpha)}`,
       `0 0 0 1px ${alpha(edge, 0.05)}`,
-      `inset 0 1px 0 ${alpha(theme.palette.common.white, insetHighlightAlpha)}`,
+      `inset 0 1px 0 ${sheen(theme, insetHighlightAlpha)}`,
     ].join(', '),
     // Enhanced glass morphism with subtle gradient overlay
     '&::before': {
@@ -49,7 +50,7 @@ const glassMenuStyles = (theme: Theme): CSSObject => {
       left: 0,
       right: 0,
       bottom: 0,
-      background: `linear-gradient(135deg, ${alpha(theme.palette.common.white, sheenAlpha)} 0%, transparent 50%)`,
+      background: `linear-gradient(135deg, ${sheen(theme, sheenAlpha)} 0%, transparent 50%)`,
       borderRadius: 'inherit',
       pointerEvents: 'none',
       zIndex: 1,
@@ -72,7 +73,7 @@ const StyledMenu = styled(Menu, {
     ...(customVariant === 'glass' && glassMenuStyles(theme)),
 
     ...(customVariant === 'minimal' && {
-      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.08)}`,
+      boxShadow: `0 2px 8px ${shadowInk(theme, 0.08)}`,
       border: `1px solid ${theme.palette.divider}`,
     }),
 

@@ -1,5 +1,6 @@
 import type { SwitchVariant } from './Switch.base';
 import { alpha } from '../../../tokens/color';
+import { ABSOLUTE_INK, ELEVATION_SHADOWS, NEUTRAL_RAMP } from '../../../tokens/ink.core';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 /**
@@ -16,7 +17,7 @@ import type { SizeValue } from '../../../tokens/vocabulary';
  */
 
 /** MUI's `palette.common.black`, which `UiTheme` does not carry. */
-export const SWITCH_BLACK = '#000';
+export const SWITCH_BLACK = ABSOLUTE_INK.black;
 
 export interface SwitchGeometry {
   width: number;
@@ -82,8 +83,8 @@ export const thumbRadius = (look: SwitchLook, thumbSize: number): number => {
 export const THUMB_ELEVATION: Record<SwitchLook, number> = { ios: 0, android: 3, material: 2, default: 2 };
 
 export const MUI_SHADOWS: Record<number, string> = {
-  2: '0px 3px 1px -2px rgba(0,0,0,0.2),0px 2px 2px 0px rgba(0,0,0,0.14),0px 1px 5px 0px rgba(0,0,0,0.12)',
-  3: '0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12)',
+  2: ELEVATION_SHADOWS[2],
+  3: ELEVATION_SHADOWS[3],
 };
 
 /** The iOS thumb's own three-layer shadow, which the web writes out literally. */
@@ -183,8 +184,12 @@ export const TAP_TARGET_MIN = 40;
  * from.
  */
 export const NEUTRAL_GREY = { main: 700, dark: 800, light: 500 } as const;
-export const NEUTRAL_FALLBACK = { main: '#616161', dark: '#424242', light: '#9e9e9e' } as const;
-export const NEUTRAL_CONTRAST = '#fff';
+export const NEUTRAL_FALLBACK = {
+  main: NEUTRAL_RAMP[NEUTRAL_GREY.main],
+  dark: NEUTRAL_RAMP[NEUTRAL_GREY.dark],
+  light: NEUTRAL_RAMP[NEUTRAL_GREY.light],
+} as const;
+export const NEUTRAL_CONTRAST = ABSOLUTE_INK.white;
 
 /**
  * The RESTING thumb — the knob while the switch is off (FUT-1924).
@@ -196,7 +201,7 @@ export const NEUTRAL_CONTRAST = '#fff';
  * does pick, and that is where a stated white was a defect. See `checkedInk`
  * in `Switch.styles.ts` and its native twin.
  */
-export const RESTING_THUMB = '#fff';
+export const RESTING_THUMB = ABSOLUTE_INK.white;
 
 /** Hover: the thumb lifts a shade and takes a halo of the hue. */
 export const SWITCH_HOVER = { thumbScale: 1.05, elevation: 4, blur: 12, alpha: 0.2 } as const;

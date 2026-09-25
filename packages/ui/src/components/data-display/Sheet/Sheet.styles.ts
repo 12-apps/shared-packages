@@ -4,6 +4,7 @@ import type React from 'react';
 
 import { glowAnimation, pulseAnimation, shimmerAnimation } from './Sheet.animations';
 import type { SheetProps } from './Sheet.types';
+import { shadowInk, sheen } from '../../../tokens/ink';
 import { accentFor } from '../../../tokens/scales';
 
 type Position = NonNullable<SheetProps['position']>;
@@ -161,7 +162,7 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => Record<string, unknown>
   draggable: ({ theme, elevation, accent }) => ({
     boxShadow: `
             ${theme.shadows[Math.min(elevation + 4, 24)]},
-            0 -2px 10px 0 ${alpha(theme.palette.common.black, 0.1)}
+            0 -2px 10px 0 ${shadowInk(theme, 0.1)}
           `,
     border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
     borderTop: `2px solid ${alpha(accent, 0.3)}`,
@@ -178,8 +179,8 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => Record<string, unknown>
     WebkitBackdropFilter: 'blur(24px) saturate(180%)',
     border: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
     boxShadow: `
-            0 8px 32px 0 ${alpha(theme.palette.common.black, 0.15)},
-            inset 0 0 0 1px ${alpha(theme.palette.common.white, 0.1)}
+            0 8px 32px 0 ${shadowInk(theme, 0.15)},
+            inset 0 0 0 1px ${sheen(theme, 0.1)}
           `,
   }),
 
@@ -200,7 +201,7 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => Record<string, unknown>
   elevated: ({ theme, elevation }) => ({
     boxShadow: `
             ${theme.shadows[elevation]},
-            0 20px 40px -15px ${alpha(theme.palette.common.black, 0.15)}
+            0 20px 40px -15px ${shadowInk(theme, 0.15)}
           `,
     transform: 'translateZ(0)',
     willChange: 'transform',
@@ -222,7 +223,7 @@ const shimmerOverlay = (theme: Theme) => ({
   background: `linear-gradient(
               90deg,
               transparent,
-              ${alpha(theme.palette.common.white, 0.2)},
+              ${sheen(theme, 0.2)},
               transparent
             )`,
   animation: `${shimmerAnimation} 3s infinite`,

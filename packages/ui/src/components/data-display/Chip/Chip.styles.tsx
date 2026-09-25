@@ -6,6 +6,7 @@ import React from 'react';
 import { chipKeyAction, type ChipKeyArgs } from './Chip.helpers';
 import { CHIP_SIZES, CHIP_TRANSITION_EASING, CHIP_TRANSITION_MS, HOVER_LIFT_PX, HOVER_SHADOW } from './Chip.metrics';
 import type { ChipProps } from './Chip.types';
+import { shadowInk } from '../../../tokens/ink';
 
 /**
  * A chip is not a native control, so the two keyboard conventions it stands in
@@ -47,10 +48,11 @@ interface ChipStyleArgs {
 }
 
 /** The lift's shadow, per mode — the same numbers the native chip reads. */
-const hoverShadow = (mode: Theme['palette']['mode']): string =>
-  `0 ${HOVER_SHADOW.offsetY}px ${HOVER_SHADOW.blur}px rgba(0, 0, 0, ${
-    mode === 'dark' ? HOVER_SHADOW.alphaDark : HOVER_SHADOW.alphaLight
-  })`;
+const hoverShadow = (theme: Theme): string =>
+  `0 ${HOVER_SHADOW.offsetY}px ${HOVER_SHADOW.blur}px ${shadowInk(
+    theme,
+    theme.palette.mode === 'dark' ? HOVER_SHADOW.alphaDark : HOVER_SHADOW.alphaLight,
+  )}`;
 
 /**
  * Selection styling uses SEMANTIC palette tokens (not hardcoded rgba). A filled
@@ -80,7 +82,7 @@ export const chipStyles = ({
     '&:hover': {
       ...(lifts && {
         transform: `translateY(-${HOVER_LIFT_PX}px)`,
-        boxShadow: (theme: Theme) => hoverShadow(theme.palette.mode),
+        boxShadow: (theme: Theme) => hoverShadow(theme),
       }),
     },
     '&:active': {

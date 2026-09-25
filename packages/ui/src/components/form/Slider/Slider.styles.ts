@@ -3,6 +3,8 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { glowAnimation, gradientShiftAnimation, pulseAnimation } from './Slider.animations';
 
+import { absoluteInk, controlNeutral, onMedia, sheen } from '../../../tokens/ink';
+
 interface ColorPalette {
   main: string;
   dark?: string;
@@ -11,12 +13,7 @@ interface ColorPalette {
 }
 
 /** `neutral` is not a MUI palette entry, so it is built from the grey ramp. */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey[700],
-  dark: theme.palette.grey[800],
-  light: theme.palette.grey[500],
-  contrastText: '#fff',
-});
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 /** `danger` is this component's name for the error palette. */
 const namedPalette = (theme: Theme, color: string): ColorPalette => {
@@ -44,7 +41,7 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
     main: palette.main || primary.main,
     dark: palette.dark || palette.main || primary.dark,
     light: palette.light || palette.main || primary.light,
-    contrastText: palette.contrastText || '#fff',
+    contrastText: palette.contrastText || absoluteInk(theme).white,
   };
 };
 
@@ -87,7 +84,7 @@ interface PartInput {
   geometry: Geometry;
 }
 
-const trackPart = ({ flags, palette, geometry }: PartInput): CSSObject => {
+const trackPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject => {
   const { gradient, glow, glass, customVariant } = flags;
   const isGradientVariant = customVariant === 'gradient';
 
@@ -115,7 +112,7 @@ const trackPart = ({ flags, palette, geometry }: PartInput): CSSObject => {
         left: 0,
         right: 0,
         bottom: 0,
-        background: `linear-gradient(90deg, transparent, ${alpha('#fff', 0.2)}, transparent)`,
+        background: `linear-gradient(90deg, transparent, ${sheen(theme, 0.2)}, transparent)`,
         animation: `${gradientShiftAnimation} 2s linear infinite`,
       },
     }),
@@ -156,7 +153,7 @@ const thumbPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject =>
   return {
     height: geometry.thumbSize,
     width: geometry.thumbSize,
-    backgroundColor: gradient ? palette.main : '#fff',
+    backgroundColor: gradient ? palette.main : absoluteInk(theme).white,
     border: `2px solid ${palette.main}`,
     boxShadow: `${theme.shadows[2]}, 0 0 0 0 ${alpha(palette.main, 0.2)}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -190,7 +187,7 @@ const thumbPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject =>
     ...(gradient && {
       background: `linear-gradient(135deg, ${palette.light}, ${palette.main})`,
       border: 'none',
-      color: '#fff',
+      color: onMedia(theme),
     }),
   };
 };

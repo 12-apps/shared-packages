@@ -1,4 +1,6 @@
 import type { DialogBorderRadius, DialogSize } from './Dialog.base';
+import { alpha } from '../../../tokens/color';
+import { ABSOLUTE_INK } from '../../../tokens/ink.core';
 import type { UiShadow } from '../../../tokens/shadow';
 
 /**
@@ -46,9 +48,9 @@ export const DIALOG_BORDER_WIDTH = 1;
  * inherit that from.
  */
 export const DIALOG_PAPER_SHADOW: readonly UiShadow[] = [
-  { offsetX: 0, offsetY: 11, blurRadius: 15, spreadDistance: -7, color: 'rgba(0, 0, 0, 0.2)' },
-  { offsetX: 0, offsetY: 24, blurRadius: 38, spreadDistance: 3, color: 'rgba(0, 0, 0, 0.14)' },
-  { offsetX: 0, offsetY: 9, blurRadius: 46, spreadDistance: 8, color: 'rgba(0, 0, 0, 0.12)' },
+  { offsetX: 0, offsetY: 11, blurRadius: 15, spreadDistance: -7, color: alpha(ABSOLUTE_INK.black, 0.2) },
+  { offsetX: 0, offsetY: 24, blurRadius: 38, spreadDistance: 3, color: alpha(ABSOLUTE_INK.black, 0.14) },
+  { offsetX: 0, offsetY: 9, blurRadius: 46, spreadDistance: 8, color: alpha(ABSOLUTE_INK.black, 0.12) },
 ];
 
 /* ── Variants and decorations ─────────────────────────────────────────────── */

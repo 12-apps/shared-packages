@@ -15,3 +15,5 @@ export {
   fieldHeightPx,
   fieldHeightRem,
 } from './field-height.core';
+// The named colour sets a *.metrics.ts table reads (FUT-2593); no MUI behind them.
+export * from './ink.core';

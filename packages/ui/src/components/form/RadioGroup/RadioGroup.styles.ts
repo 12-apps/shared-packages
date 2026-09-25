@@ -6,6 +6,7 @@ import { glowAnimation, rippleAnimation, scaleAnimation, slideAnimation } from '
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { asFieldSize, FIELD_BORDER_WIDTH, fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
 
 /** The segment track's padding and border: its corner is the segments' plus these. */
 const SEGMENT_TRACK_PADDING = 4;
@@ -18,17 +19,8 @@ interface ColorPalette {
   contrastText?: string;
 }
 
-/**
- * `neutral` is not a MUI palette entry, so it is built from the grey ramp. The
- * literal fallbacks cover a theme whose grey ramp has been replaced with one
- * that omits these steps.
- */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey?.[700] || '#616161',
-  dark: theme.palette.grey?.[800] || '#424242',
-  light: theme.palette.grey?.[500] || '#9e9e9e',
-  contrastText: '#fff',
-});
+/** `neutral` is not a MUI palette entry, so it is the controls' neutral tone. */
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 /** `danger` is this component's name for the error palette; the rest map straight through. */
 const namedPalette = (theme: Theme, color: string): ColorPalette => {
@@ -64,7 +56,7 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
     main: palette.main || primary.main,
     dark: palette.dark || palette.main || primary.dark,
     light: palette.light || palette.main || primary.light,
-    contrastText: palette.contrastText || '#fff',
+    contrastText: palette.contrastText || absoluteInk(theme).white,
   };
 };
 
@@ -193,7 +185,7 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
     fontWeight: 500,
     border: `${FIELD_BORDER_WIDTH}px solid ${selected ? palette.main : fieldEdge(theme)}`,
     backgroundColor: selected ? palette.main : 'transparent',
-    color: selected ? palette.contrastText || '#fff' : theme.palette.text.primary,
+    color: selected ? palette.contrastText || absoluteInk(theme).white : theme.palette.text.primary,
     position: 'relative' as const,
     overflow: 'hidden' as const,
     ...(animated && selected && { animation: `${scaleAnimation} 0.3s ease-out` }),
@@ -206,7 +198,7 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
       width: 0,
       height: 0,
       borderRadius: '50%',
-      backgroundColor: alpha(palette.contrastText || '#fff', 0.3),
+      backgroundColor: alpha(palette.contrastText || absoluteInk(theme).white, 0.3),
       transform: 'translate(-50%, -50%)',
       pointerEvents: 'none' as const,
     },

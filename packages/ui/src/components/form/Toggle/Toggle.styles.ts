@@ -3,6 +3,7 @@ import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.
 
 import { fieldRadius } from '../../../tokens/field-radius';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, controlNeutral, sheen } from '../../../tokens/ink';
 
 const glowAnimation = keyframes`
   0% { box-shadow: 0 0 5px currentColor; }
@@ -22,12 +23,7 @@ interface TogglePalette {
   contrastText: string;
 }
 
-const neutralPalette = (theme: Theme): TogglePalette => ({
-  main: theme.palette.grey?.[700] || '#616161',
-  dark: theme.palette.grey?.[800] || '#424242',
-  light: theme.palette.grey?.[500] || '#9e9e9e',
-  contrastText: '#fff',
-});
+const neutralPalette = (theme: Theme): TogglePalette => controlNeutral(theme);
 
 // A theme can be handed to us with shades missing, so each one falls back through
 // the palette's own main colour before reaching for primary.
@@ -56,7 +52,7 @@ export const getColorFromTheme = (theme: Theme, color: string): TogglePalette =>
     main: palette?.main || fallback.main,
     dark: shade(palette, 'dark', fallback),
     light: shade(palette, 'light', fallback),
-    contrastText: palette?.contrastText || '#fff',
+    contrastText: palette?.contrastText || absoluteInk(theme).white,
   };
 };
 
@@ -116,7 +112,7 @@ export const baseStyles = (
 
   '&.Mui-selected': {
     backgroundColor: colorPalette.main,
-    color: colorPalette.contrastText || '#fff',
+    color: colorPalette.contrastText || absoluteInk(theme).white,
     borderColor: colorPalette.main,
     boxShadow: `0 2px 8px ${alpha(colorPalette.main, 0.3)}`,
 
@@ -127,7 +123,7 @@ export const baseStyles = (
       left: 0,
       right: 0,
       bottom: 0,
-      background: `linear-gradient(135deg, transparent, ${alpha('#fff', 0.1)})`,
+      background: `linear-gradient(135deg, transparent, ${sheen(theme, 0.1)})`,
       pointerEvents: 'none',
     },
 
@@ -147,6 +143,7 @@ export const baseStyles = (
 });
 
 export const variantStyles = (
+  theme: Theme,
   customVariant: string | undefined,
   colorPalette: TogglePalette,
 ): CSSObject => {
@@ -159,7 +156,7 @@ export const variantStyles = (
 
         '&.Mui-selected': {
           backgroundColor: colorPalette.main,
-          color: colorPalette.contrastText || '#fff',
+          color: colorPalette.contrastText || absoluteInk(theme).white,
         },
       };
     case 'soft':

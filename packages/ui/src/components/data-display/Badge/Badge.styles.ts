@@ -25,6 +25,8 @@ import {
 } from './Badge.metrics';
 import { badgeVariantStyles } from './Badge.variants';
 import type { BadgeSize, BadgeVariant } from './Badge.types';
+import { sheen } from '../../../tokens/ink';
+import { accentFor } from '../../../tokens/scales';
 import { px } from '../../../tokens/theme';
 
 export type BadgePalette = {
@@ -45,11 +47,7 @@ const getColorFromTheme = (theme: Theme, color: string) => {
     // `danger`, the house word the prop actually takes. Keyed on MUI's `error`
     // it matched nothing and fell through to the default.
     danger: theme.palette.error,
-    neutral: {
-      main: theme.palette.grey[600],
-      light: theme.palette.grey[400],
-      dark: theme.palette.grey[800],
-      contrastText: theme.palette.getContrastText(theme.palette.grey[600]) } };
+    neutral: accentFor(theme, 'neutral') };
 
   return colorMap[color] || theme.palette.primary;
 };
@@ -180,7 +178,7 @@ const badgeAnimationStyles = ({
           background: `linear-gradient(
             90deg,
             transparent,
-            ${alpha(theme.palette.common.white, SHIMMER.alpha)},
+            ${sheen(theme, SHIMMER.alpha)},
             transparent
           )`,
           animation: `${shimmerAnimation} ${SHIMMER.durationMs / 1000}s infinite` } }) });

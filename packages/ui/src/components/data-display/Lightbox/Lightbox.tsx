@@ -1,6 +1,7 @@
 import Dialog from '@mui/material/Dialog/index.js';
 import Fade from '@mui/material/Fade/index.js';
 import Typography from '@mui/material/Typography/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { makeTestId } from './Lightbox.constants';
@@ -12,13 +13,14 @@ import { LightboxOverlay } from './LightboxOverlay';
 import { LightboxStage } from './LightboxStage';
 import { LightboxThumbnails } from './LightboxThumbnails';
 import { useLightbox } from './useLightbox';
+import { scrim } from '../../../tokens/ink';
 
 const DIALOG_STATIC_PROPS = {
   maxWidth: false,
   fullScreen: true,
   TransitionComponent: Fade,
   TransitionProps: { timeout: 300 },
-  PaperProps: { sx: { background: 'rgba(0, 0, 0, 0.9)', backdropFilter: 'blur(2px)' } },
+  PaperProps: { sx: { background: (theme: Theme) => scrim(theme, 0.9), backdropFilter: 'blur(2px)' } },
   'aria-label': 'Lightbox',
   'aria-labelledby': 'lightbox-title',
   role: 'dialog',

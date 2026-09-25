@@ -19,11 +19,12 @@ import { PaletteResults } from './CommandPaletteResults';
 import { ShortcutChip } from './ShortcutChip';
 import type { CommandPaletteProps } from './CommandPalette.types';
 import type { CommandPaletteCopy } from '../../../copy';
+import { scrim } from '../../../tokens/ink';
 
 // Styled components
-const StyledDialog = styled(Dialog)(() => ({
+const StyledDialog = styled(Dialog)(({ theme }) => ({
   '& .MuiBackdrop-root': {
-    backgroundColor: alpha('#000', 0.6),
+    backgroundColor: scrim(theme, 0.6),
     backdropFilter: 'blur(4px)' },
   '& .MuiDialog-paper': {
     position: 'fixed',

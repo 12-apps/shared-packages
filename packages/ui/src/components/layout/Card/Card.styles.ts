@@ -16,6 +16,7 @@ import {
   CARD_SECTION_BACKGROUND,
   neumorphicShadows,
 } from './Card.metrics';
+import { neutralTones, shadowInk, sheen } from '../../../tokens/ink';
 import { shadowCss, shadowListCss } from '../../../tokens/shadow';
 
 type BorderRadius = CardBorderRadius;
@@ -68,12 +69,12 @@ const neumorphicShadow = (theme: Theme, lifted: boolean): string => {
   const [near, far] =
     theme.palette.mode === 'dark'
       ? [
-          alpha(theme.palette.common.black, dark.near),
-          alpha(theme.palette.common.white, dark.far),
+          shadowInk(theme, dark.near),
+          sheen(theme, dark.far),
         ]
       : [
-          alpha(theme.palette.grey[400], lifted ? light.near.lifted : light.near.rest),
-          alpha(theme.palette.common.white, lifted ? light.far.lifted : light.far.rest),
+          alpha(neutralTones(theme).subtle, lifted ? light.near.lifted : light.near.rest),
+          sheen(theme, lifted ? light.far.lifted : light.far.rest),
         ];
 
   return shadowListCss(neumorphicShadows(lifted, near, far));
@@ -127,7 +128,7 @@ const VARIANT_SURFACES: Record<CardVariant, (theme: Theme, lifted: boolean) => S
         offsetY: CARD_GLASS.shadow.offsetY,
         blurRadius: CARD_GLASS.shadow.blurRadius,
         spreadDistance: 0,
-        color: alpha(theme.palette.common.black, CARD_GLASS.shadow.alpha),
+        color: shadowInk(theme, CARD_GLASS.shadow.alpha),
       }),
     },
     hover: {
@@ -155,7 +156,7 @@ const VARIANT_SURFACES: Record<CardVariant, (theme: Theme, lifted: boolean) => S
   neumorphic: (theme, lifted) => ({
     surface: {
       backgroundColor:
-        theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.grey[100],
+        theme.palette.mode === 'dark' ? neutralTones(theme).raised : neutralTones(theme).surface,
       boxShadow: neumorphicShadow(theme, false),
       border: 'none',
     },

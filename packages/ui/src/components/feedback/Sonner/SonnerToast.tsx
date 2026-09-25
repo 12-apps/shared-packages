@@ -13,6 +13,8 @@ import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { shadowInk } from '../../../tokens/ink';
+
 import type { SonnerItem } from './Sonner.types';
 import type { SonnerProps } from './Sonner.types';
 
@@ -71,7 +73,7 @@ const buildToastStyles = (
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
         backdropFilter: 'blur(20px)',
         border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+        boxShadow: `0 8px 32px ${shadowInk(theme, 0.1)}`,
       };
 
     case 'minimal':

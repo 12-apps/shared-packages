@@ -17,8 +17,6 @@ import {
   SWITCH_GLASS,
   SWITCH_GLOW,
   NEUTRAL_CONTRAST,
-  NEUTRAL_FALLBACK,
-  NEUTRAL_GREY,
   SWITCH_FOCUS_RING,
   SWITCH_GRADIENT,
   SWITCH_HOVER,
@@ -42,6 +40,7 @@ import {
 } from './Switch.metrics';
 import type { SwitchVariant } from './Switch.base';
 
+import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
 import { inkOver, px } from '../../../tokens/theme';
 import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
 
@@ -55,13 +54,8 @@ interface ColorPalette {
   contrastText?: string;
 }
 
-/** `neutral` is not a MUI palette entry, so it is built from the grey ramp. */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey?.[NEUTRAL_GREY.main] || NEUTRAL_FALLBACK.main,
-  dark: theme.palette.grey?.[NEUTRAL_GREY.dark] || NEUTRAL_FALLBACK.dark,
-  light: theme.palette.grey?.[NEUTRAL_GREY.light] || NEUTRAL_FALLBACK.light,
-  contrastText: NEUTRAL_CONTRAST,
-});
+/** `neutral` is not a MUI palette entry, so it is the controls' neutral tone. */
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 /**
  * Resolves a colour name to a full palette, filling any step the theme leaves
@@ -238,7 +232,7 @@ const switchBaseSx = (
       color: palette.main,
       border: `${SWITCH_FOCUS_RING.width}px solid ${alpha(palette.main, SWITCH_FOCUS_RING.alpha)}`,
     },
-    '&.Mui-disabled .MuiSwitch-thumb': { color: theme.palette.grey[DISABLED.thumbGrey] },
+    '&.Mui-disabled .MuiSwitch-thumb': { color: neutralTones(theme).surface },
     '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.trackOpacity },
   };
 };
@@ -351,7 +345,7 @@ const trackSx = (
   return {
     borderRadius: TRACK_RADIUS[look](height),
     backgroundColor: trackColor(
-      { black: theme.palette.common.black, disabled: theme.palette.action.disabled },
+      { black: absoluteInk(theme).black, disabled: theme.palette.action.disabled },
       look,
     ),
     opacity: 1,

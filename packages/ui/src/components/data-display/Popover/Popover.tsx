@@ -5,6 +5,7 @@ import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { PopoverProps } from './Popover.types';
+import { shadowInk } from '../../../tokens/ink';
 
 // Define pulse animation
 const pulseAnimation = keyframes`
@@ -46,7 +47,7 @@ const StyledPaper = styled(Paper, {
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
     backdropFilter: 'blur(20px)',
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-    boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+    boxShadow: `0 8px 32px ${shadowInk(theme, 0.1)}`,
   }),
 
   ...(customVariant === 'arrow' && {

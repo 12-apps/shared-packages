@@ -1,4 +1,6 @@
 import type { CardBorderRadius } from './Card.base';
+import { alpha } from '../../../tokens/color';
+import { ABSOLUTE_INK } from '../../../tokens/ink.core';
 import type { UiShadow } from '../../../tokens/shadow';
 
 /**
@@ -11,7 +13,8 @@ import type { UiShadow } from '../../../tokens/shadow';
  * hands the same shadow objects to `boxShadow` and the same numbers to a
  * `StyleSheet`.
  *
- * Nothing here imports a renderer, a theme or a colour: a shadow's COLOUR is
+ * Nothing here imports a renderer or a theme — its fixed inks are the
+ * renderer-free absolutes of `src/tokens/ink.core` — and a variant shadow's COLOUR is
  * the caller's, because the two sides reach for the same arithmetic through
  * different doors (`alpha` from `@mui/material/styles` on the web, from
  * `src/tokens/color` natively — a port of it, asserted equal).
@@ -52,9 +55,9 @@ export type CardShadow = UiShadow;
  * property and paints nothing — see {@link CARD_ELEVATION}.)
  */
 export const CARD_PAPER_SHADOW: readonly UiShadow[] = [
-  { offsetX: 0, offsetY: 2, blurRadius: 1, spreadDistance: -1, color: 'rgba(0, 0, 0, 0.2)' },
-  { offsetX: 0, offsetY: 1, blurRadius: 1, spreadDistance: 0, color: 'rgba(0, 0, 0, 0.14)' },
-  { offsetX: 0, offsetY: 1, blurRadius: 3, spreadDistance: 0, color: 'rgba(0, 0, 0, 0.12)' },
+  { offsetX: 0, offsetY: 2, blurRadius: 1, spreadDistance: -1, color: alpha(ABSOLUTE_INK.black, 0.2) },
+  { offsetX: 0, offsetY: 1, blurRadius: 1, spreadDistance: 0, color: alpha(ABSOLUTE_INK.black, 0.14) },
+  { offsetX: 0, offsetY: 1, blurRadius: 3, spreadDistance: 0, color: alpha(ABSOLUTE_INK.black, 0.12) },
 ];
 
 /**
@@ -111,8 +114,8 @@ export function neumorphicShadows(lifted: boolean, near: string, far: string): U
  * a recess in whatever surface it sits on.
  */
 export const CARD_SECTION_BACKGROUND = {
-  dark: { rest: 'rgba(0, 0, 0, 0.2)', lifted: 'rgba(0, 0, 0, 0.25)' },
-  light: { rest: 'rgba(0, 0, 0, 0.02)', lifted: 'rgba(0, 0, 0, 0.04)' },
+  dark: { rest: alpha(ABSOLUTE_INK.black, 0.2), lifted: alpha(ABSOLUTE_INK.black, 0.25) },
+  light: { rest: alpha(ABSOLUTE_INK.black, 0.02), lifted: alpha(ABSOLUTE_INK.black, 0.04) },
 } as const;
 
 /* ── Decorations ──────────────────────────────────────────────────────────── */

@@ -1,7 +1,22 @@
+import type { Theme } from '@mui/material/styles/index.js';
 import type { Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 
-const customLightTheme = {
+import { uiInk, type UiInk } from '../../../tokens/ink';
+
+type EditorChrome = UiInk['codeEditor']['light'];
+
+/** Monaco's colour keys, filled from one mode's chrome. */
+const chromeColors = (chrome: EditorChrome) => ({
+  'editor.background': chrome.background,
+  'editor.foreground': chrome.foreground,
+  'editor.lineHighlightBackground': chrome.lineHighlight,
+  'editorLineNumber.foreground': chrome.lineNumber,
+  'editorIndentGuide.background': chrome.gutterBorder,
+  'editor.selectionBackground': chrome.selection,
+});
+
+const customLightTheme = (chrome: EditorChrome) => ({
   base: 'vs' as const,
   inherit: true,
   rules: [
@@ -10,17 +25,10 @@ const customLightTheme = {
     { token: 'string', foreground: '032F62' },
     { token: 'number', foreground: '005CC5' },
   ],
-  colors: {
-    'editor.background': '#FFFFFF',
-    'editor.foreground': '#24292E',
-    'editor.lineHighlightBackground': '#F6F8FA',
-    'editorLineNumber.foreground': '#959DA5',
-    'editorIndentGuide.background': '#D1D5DA',
-    'editor.selectionBackground': '#C8E1FF',
-  },
-};
+  colors: chromeColors(chrome),
+});
 
-const customDarkTheme = {
+const customDarkTheme = (chrome: EditorChrome) => ({
   base: 'vs-dark' as const,
   inherit: true,
   rules: [
@@ -29,22 +37,16 @@ const customDarkTheme = {
     { token: 'string', foreground: '9ECBFF' },
     { token: 'number', foreground: '79B8FF' },
   ],
-  colors: {
-    'editor.background': '#0D1117',
-    'editor.foreground': '#C9D1D9',
-    'editor.lineHighlightBackground': '#161B22',
-    'editorLineNumber.foreground': '#8B949E',
-    'editorIndentGuide.background': '#21262D',
-    'editor.selectionBackground': '#3392FF44',
-  },
-};
+  colors: chromeColors(chrome),
+});
 
 // Main component
 const AUTO_FORMAT_DELAY_MS = 100;
 
-export const registerEditorThemes = (monaco: Monaco) => {
-  monaco.editor.defineTheme('custom-light', customLightTheme);
-  monaco.editor.defineTheme('custom-dark', customDarkTheme);
+export const registerEditorThemes = (monaco: Monaco, theme: Theme) => {
+  const chrome = uiInk(theme).codeEditor;
+  monaco.editor.defineTheme('custom-light', customLightTheme(chrome.light));
+  monaco.editor.defineTheme('custom-dark', customDarkTheme(chrome.dark));
 };
 
 // Best-effort: a Monaco build without the TypeScript worker (as in jsdom) throws

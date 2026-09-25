@@ -6,6 +6,7 @@ import type { CSSProperties, PropsWithChildren, ReactNode } from 'react';
 import React from 'react';
 
 import { slideIn } from './NavigationMenu.styles';
+import { shadowInk } from '../../../tokens/ink';
 
 const megaMenuSlide = keyframes`
   from {
@@ -35,7 +36,7 @@ const NavigationContainer = styled(Box, {
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`,
       backdropFilter: 'blur(10px)',
       borderRadius: theme.spacing(2),
-      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.08)}`,
+      boxShadow: `0 8px 32px ${shadowInk(theme, 0.08)}`,
     }),
   }),
   ...(variant === 'vertical' && {
@@ -47,7 +48,7 @@ const NavigationContainer = styled(Box, {
       background: `linear-gradient(180deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
       backdropFilter: 'blur(12px)',
       borderRadius: theme.spacing(2),
-      boxShadow: `0 12px 40px ${alpha(theme.palette.common.black, 0.1)}`,
+      boxShadow: `0 12px 40px ${shadowInk(theme, 0.1)}`,
       '&::before': {
         content: '""',
         position: 'absolute',
@@ -68,7 +69,7 @@ const NavigationContainer = styled(Box, {
       backdropFilter: 'blur(15px)',
       borderRadius: theme.spacing(3),
       overflow: 'hidden',
-      boxShadow: `0 20px 60px ${alpha(theme.palette.common.black, 0.12)}`,
+      boxShadow: `0 20px 60px ${shadowInk(theme, 0.12)}`,
     }),
   }),
 }));
@@ -143,7 +144,7 @@ const MegaMenuSection = styled(Box)(({ theme }) => ({
   padding: theme.spacing(3),
   borderRadius: theme.spacing(2),
   background: `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.default, 0.9)} 100%)`,
-  boxShadow: `0 10px 30px ${alpha(theme.palette.common.black, 0.08)}`,
+  boxShadow: `0 10px 30px ${shadowInk(theme, 0.08)}`,
   border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
   position: 'relative',
   overflow: 'hidden',
@@ -173,7 +174,7 @@ const MegaMenuSection = styled(Box)(({ theme }) => ({
 
   '&:hover': {
     transform: 'translateY(-4px)',
-    boxShadow: `0 15px 40px ${alpha(theme.palette.common.black, 0.12)}`,
+    boxShadow: `0 15px 40px ${shadowInk(theme, 0.12)}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   },
 

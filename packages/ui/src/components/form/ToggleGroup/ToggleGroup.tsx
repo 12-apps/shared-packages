@@ -9,18 +9,15 @@ import type { ToggleGroupProps } from './ToggleGroup.types';
 import { cssLengthToPx } from '../../../tokens/css-units';
 import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadius } from '../../../tokens/field-radius';
+import { controlNeutral } from '../../../tokens/ink';
 
 const GLASS_PADDING = 4;
 const GLASS_BORDER = 1;
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
-    return {
-      main: theme.palette.grey[700],
-      dark: theme.palette.grey[800],
-      light: theme.palette.grey[500],
-      contrastText: theme.palette.getContrastText(theme.palette.grey[700]),
-    };
+    const neutral = controlNeutral(theme);
+    return { ...neutral, contrastText: theme.palette.getContrastText(neutral.main) };
   }
 
   const colorMap = {

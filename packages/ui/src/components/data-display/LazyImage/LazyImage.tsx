@@ -6,6 +6,7 @@ import { Skeleton } from '../../layout/Skeleton';
 import type { ResolvedLazyImageProps } from './LazyImage.hooks';
 import { imgPassThrough, resolveLazyImageProps, useLazyImage } from './LazyImage.hooks';
 import type { LazyImageProps } from './LazyImage.types';
+import { sheen } from '../../../tokens/ink';
 
 const ImageContainer = styled(Box)(() => ({
   position: 'relative',
@@ -33,7 +34,7 @@ const SpinnerOverlay = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  backgroundColor: sheen(theme, 0.8),
   borderRadius: '50%',
   padding: theme.spacing(1),
 }));

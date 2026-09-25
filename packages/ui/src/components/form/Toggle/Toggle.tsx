@@ -35,7 +35,7 @@ const StyledToggle = styled(ToggleButton, {
 
   return {
     ...baseStyles(theme, colorPalette, customSize),
-    ...variantStyles(customVariant, colorPalette),
+    ...variantStyles(theme, customVariant, colorPalette),
     ...effectStyles(theme, colorPalette, { glass, gradient, glow }),
   };
 });

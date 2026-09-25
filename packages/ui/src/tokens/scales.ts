@@ -16,6 +16,9 @@ export * from './theme';
 export * from './color';
 // The relative-size vocabulary every component writes its sizes in (FUT-2585).
 export { rem, rems, remPx, resetRootFontCache, sxRem } from './relative';
+// Every colour by role (FUT-2593): ink roles, neutral tones, the named sets.
+export * from './ink';
+export * from './ink.core';
 export { DEFAULT_FIELD_RADIUS, fieldRadius, fieldRadiusOverrides, fieldRadiusPx, fieldRootStyles } from './field-radius';
 export {
   asFieldSize,

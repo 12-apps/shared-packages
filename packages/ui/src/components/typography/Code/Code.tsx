@@ -7,6 +7,7 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import React, { useState } from 'react';
 
 import type { CodeProps } from './Code.types';
+import { modeInk, neutralTones } from '../../../tokens/ink';
 
 const StyledCodeContainer = styled(Box, {
   shouldForwardProp: (prop) =>
@@ -55,10 +56,10 @@ const StyledCodeContainer = styled(Box, {
       display: 'block',
       backgroundColor:
         theme.palette.mode === 'dark'
-          ? alpha(theme.palette.grey[900], 0.95)
-          : alpha(theme.palette.grey[100], 0.95),
+          ? alpha(neutralTones(theme).inverseSurface, 0.95)
+          : alpha(neutralTones(theme).surface, 0.95),
       color:
-        theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.text.primary,
+        theme.palette.mode === 'dark' ? modeInk(theme) : theme.palette.text.primary,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
       overflow: 'auto',
       whiteSpace: 'pre' as const,
@@ -116,7 +117,7 @@ const CopyButton = styled(IconButton)(({ theme }) => ({
     backgroundColor:
       theme.palette.mode === 'dark'
         ? alpha(theme.palette.background.paper, 0.9)
-        : theme.palette.grey[100],
+        : neutralTones(theme).surface,
     transform: 'scale(1.05)',
   },
   '& .MuiSvgIcon-root': {
