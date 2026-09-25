@@ -2,6 +2,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 
 import type { WorkflowStepItem, WorkflowStepProps } from './WorkflowStep.types';
 import { neutralTones } from '../../../tokens/ink';
+import { paletteKey } from '../../../tokens/scales';
 
 type StepColor = NonNullable<WorkflowStepProps['color']>;
 type StepSize = NonNullable<WorkflowStepProps['size']>;
@@ -22,9 +23,15 @@ interface StepPalette {
   contrastText: string;
 }
 
-/** `neutral` has no MUI palette entry, so its pair is derived from grey. */
+/**
+ * The step's colour pair, keyed through `paletteKey` so `danger` reads MUI's
+ * `error` (the palette has no `danger`). `neutral` lands on `grey`, a ramp with
+ * no `main`, so its pair is derived from the ramp — with the contrast computed,
+ * not assumed.
+ */
 export const stepPalette = (theme: Theme, color?: StepColor): StepPalette => {
-  if (color === 'neutral') {
+  const key = paletteKey(color || 'primary');
+  if (key === 'grey') {
     const main = neutralTones(theme).emphasis;
     return {
       main,
@@ -32,7 +39,6 @@ export const stepPalette = (theme: Theme, color?: StepColor): StepPalette => {
     };
   }
 
-  const key = (color || 'primary') as 'primary' | 'secondary' | 'success' | 'warning' | 'error';
   return theme.palette[key];
 };
 
