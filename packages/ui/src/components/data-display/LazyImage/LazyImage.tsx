@@ -133,38 +133,57 @@ const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
   );
 };
 
-const PlaceholderIndicator: React.FC<IndicatorProps & { hasSrc: boolean }> = ({
+/**
+ * The placeholder sits in the box's flow and gives the box its size: the box's
+ * own when one is set, the placeholder's when not. The real image is drawn over
+ * it (`OVER_PLACEHOLDER`) until it has faded in. Its load and error are not the
+ * image's, so neither reaches the caller; a failing one just retires.
+ */
+const PlaceholderIndicator: React.FC<IndicatorProps & { onError: () => void }> = ({
   props,
   metrics,
-  hasSrc,
+  onError,
 }) => {
-  // Once a src has been chosen the real <img> is on screen, so the placeholder
-  // would only stack behind it.
-  if (!props.placeholder || hasSrc) return null;
+  if (!props.placeholder) return null;
 
   return (
     <StyledImage
       src={props.placeholder}
       alt={`${props.alt} (loading)`}
       style={metrics}
+      decoding={props.decoding}
+      loading={props.lazy ? 'lazy' : props.loading}
+      onError={onError}
       data-testid={`${props['data-testid']}-placeholder`}
     />
   );
 };
 
 const LoadingIndicator: React.FC<
-  IndicatorProps & { kind: NonNullable<LazyImageProps['loadingState']>; hasSrc: boolean }
-> = ({ kind, hasSrc, ...rest }) => {
+  IndicatorProps & { kind: NonNullable<LazyImageProps['loadingState']>; onPlaceholderError: () => void }
+> = ({ kind, onPlaceholderError, ...rest }) => {
   switch (kind) {
     case 'skeleton':
       return <SkeletonIndicator {...rest} />;
     case 'spinner':
       return <SpinnerIndicator {...rest} />;
     case 'placeholder':
-      return <PlaceholderIndicator {...rest} hasSrc={hasSrc} />;
+      return <PlaceholderIndicator {...rest} onError={onPlaceholderError} />;
     default:
       return null;
   }
+};
+
+/**
+ * The real image while the placeholder is up: laid over it and cropped by
+ * `objectFit`, so the box never grows to hold both. It takes the flow back
+ * when the placeholder goes.
+ */
+const OVER_PLACEHOLDER: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
 };
 
 const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
@@ -214,8 +233,10 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
     effectiveLoadingState,
     handleImageLoad,
     handleImageError,
+    handlePlaceholderError,
     showImage,
     showLoading,
+    showPlaceholder,
   } = useLazyImage(props);
 
   const { width, height, borderRadius, alt } = props;
@@ -246,7 +267,7 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
           kind={effectiveLoadingState}
           props={props}
           metrics={metrics}
-          hasSrc={Boolean(state.currentSrc)}
+          onPlaceholderError={handlePlaceholderError}
         />
       )}
 
@@ -261,7 +282,7 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
           isLoaded={!state.isLoading}
           decoding={props.decoding}
           loading={props.lazy ? 'lazy' : props.loading}
-          style={{ ...metrics, ...props.sx }}
+          style={{ ...metrics, ...props.sx, ...(showPlaceholder && OVER_PLACEHOLDER) }}
           aria-label={props['aria-label'] || alt}
           aria-describedby={props['aria-describedby']}
           role={props.role}

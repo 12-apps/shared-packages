@@ -34,7 +34,17 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
   height?: number | string;
 
   /**
-   * Placeholder image URL to show while loading
+   * A low-resolution image URL shown while the real image loads. Only
+   * `loadingState="placeholder"` draws it; under any other loading state it is
+   * ignored. It shows from mount, lazy or not, until the real image has loaded
+   * and faded in (at once when `fadeIn` is off) or has finally failed. The real
+   * image is drawn over it and cropped by `objectFit`, so the box takes the
+   * placeholder's shape until the fade ends. A placeholder that fails to load is
+   * dropped, as if none were set, and is never reported to `onError`; neither
+   * does its load reach `onLoad`.
+   *
+   * Give LazyImage a `width` (or `"100%"`) in placeholder mode: with none, the
+   * placeholder shows at its own, usually tiny, size.
    */
   placeholder?: string;
 
@@ -47,8 +57,12 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
    * Loading state type
    * - 'skeleton': Shows a skeleton loader
    * - 'spinner': Shows a loading spinner
-   * - 'placeholder': Shows placeholder image
+   * - 'placeholder': Shows the `placeholder` image, in the box's flow, until the
+   *   real image has faded in over it; nothing when no `placeholder` is set.
+   *   Set a `width` (or `"100%"`), or the placeholder shows at its own size.
    * - 'none': No loading indicator
+   *
+   * `placeholder` applies only to 'placeholder'.
    * @default 'skeleton'
    */
   loadingState?: LazyImageLoadingState;
@@ -180,7 +194,9 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
    * Inline CSS for the `<img>` (its `style`), not MUI's `sx`: theme values and
    * nested selectors such as `'&:hover'` do not apply. The image's box clips
    * anything painted outside the image, such as a shadow, so put those on a
-   * wrapping element.
+   * wrapping element. While a placeholder is up (`loadingState="placeholder"`),
+   * the image is laid over it, so its `position`, `inset`, `width` and `height`
+   * are fixed until the placeholder retires; the rest applies throughout.
    */
   sx?: React.CSSProperties;
 

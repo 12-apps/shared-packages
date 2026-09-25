@@ -115,8 +115,8 @@ const useVisibility = (
   }, [lazy, src, rootMargin, threshold, isVisible, onLoadStart, onVisible, containerRef]);
 };
 
-/** A pending retry has to be cancelled on unmount, or it sets state on a dead component. */
-const useRetryTimeout = () => {
+/** A pending timer has to be cancelled on unmount, or it sets state on a dead component. */
+const useTimeoutRef = () => {
   const ref = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(
@@ -132,25 +132,59 @@ const useRetryTimeout = () => {
 };
 
 /**
- * Owns whether the real image has been requested yet and how it went: the
- * observer above, the load/error handlers, and the retry timer.
+ * Whether the placeholder image is up. It is a loading state: only
+ * `loadingState="placeholder"` with a `placeholder` set draws it, from mount
+ * until the real image settles — its `load` plus the fade, or its final error.
+ * A placeholder that fails to load retires at once, as if none were set.
  */
-export const useLazyImage = (props: ResolvedLazyImageProps) => {
-  const { src, placeholder, lazy, loadingState, showSpinner } = props;
-  const { onLoad, onError, retryOnError, maxRetries, retryDelay } = props;
+const usePlaceholderPhase = (
+  props: ResolvedLazyImageProps,
+  loadingState: NonNullable<LazyImageProps['loadingState']>,
+) => {
+  const { placeholder, fadeIn, fadeInDuration } = props;
+  // Only this mode draws a placeholder. Otherwise the real image settling
+  // retires the phase at once — batched into the load's own render, with no
+  // timer — so a placeholder switched on afterwards never covers a loaded image.
+  const active = loadingState === 'placeholder' && Boolean(placeholder);
+  const [retired, setRetired] = useState(false);
+  const fadeTimeoutRef = useTimeoutRef();
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const retryTimeoutRef = useRetryTimeout();
+  const retire = useCallback(() => setRetired(true), []);
 
-  // Handle deprecated showSpinner prop
-  const effectiveLoadingState = showSpinner ? 'spinner' : loadingState;
+  // The real image fades in over the placeholder, so it goes when the fade ends.
+  const retireAfterFade = useCallback(() => {
+    if (!active || !fadeIn) {
+      setRetired(true);
+      return;
+    }
+    clearTimeout(fadeTimeoutRef.current);
+    fadeTimeoutRef.current = setTimeout(() => setRetired(true), fadeInDuration);
+  }, [active, fadeIn, fadeInDuration, fadeTimeoutRef]);
 
+  return {
+    showPlaceholder: active && !retired,
+    retirePlaceholder: retire,
+    retirePlaceholderAfterFade: retireAfterFade,
+  };
+};
+
+/**
+ * The real image's state, and when it is requested: at once when not lazy,
+ * else the first time the container nears the viewport. The main <img> only
+ * ever carries the real src — a placeholder is drawn by its own element, so its
+ * load and error are never the image's.
+ */
+const useImageSource = (
+  props: ResolvedLazyImageProps,
+  containerRef: React.RefObject<HTMLDivElement | null>,
+) => {
+  const { src, lazy } = props;
   const [state, setState] = useState<LazyImageState>({
     isLoading: true,
     hasError: false,
     isVisible: !lazy, // If not lazy, load immediately
     retryCount: 0,
-    currentSrc: lazy ? placeholder || null : src,
+    currentSrc: lazy ? null : src,
   });
 
   const markVisible = useCallback(
@@ -168,18 +202,43 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
     setState((prev) => ({ ...prev, currentSrc: src, isLoading: true, hasError: false }));
   }, [state.isVisible, src, state.currentSrc]);
 
+  return [state, setState] as const;
+};
+
+/**
+ * Owns whether the real image has been requested yet and how it went: the
+ * observer above, the load/error handlers, the retry timer, and how long the
+ * placeholder stays up.
+ */
+export const useLazyImage = (props: ResolvedLazyImageProps) => {
+  const { src, loadingState, showSpinner } = props;
+  const { onLoad, onError, retryOnError, maxRetries, retryDelay } = props;
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const retryTimeoutRef = useTimeoutRef();
+  const [state, setState] = useImageSource(props, containerRef);
+
+  // Handle deprecated showSpinner prop
+  const effectiveLoadingState = showSpinner ? 'spinner' : loadingState;
+  const { showPlaceholder, retirePlaceholder, retirePlaceholderAfterFade } = usePlaceholderPhase(
+    props,
+    effectiveLoadingState,
+  );
+
   const handleImageLoad = useCallback(
     (event: React.SyntheticEvent<HTMLImageElement>) => {
       setState((prev) => ({ ...prev, isLoading: false, hasError: false, retryCount: 0 }));
+      retirePlaceholderAfterFade();
       onLoad?.(event);
     },
-    [onLoad],
+    [onLoad, retirePlaceholderAfterFade],
   );
 
   const handleImageError = useCallback(
     (event: React.SyntheticEvent<HTMLImageElement>) => {
       if (!retryOnError || state.retryCount >= maxRetries) {
         setState((prev) => ({ ...prev, isLoading: false, hasError: true }));
+        retirePlaceholder();
         onError?.(event);
         return;
       }
@@ -192,7 +251,7 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
         }));
       }, retryDelay);
     },
-    [onError, retryOnError, state.retryCount, maxRetries, retryDelay, src],
+    [onError, retryOnError, state.retryCount, maxRetries, retryDelay, src, retirePlaceholder],
   );
 
   return {
@@ -201,8 +260,11 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
     effectiveLoadingState,
     handleImageLoad,
     handleImageError,
+    handlePlaceholderError: retirePlaceholder,
     showImage: Boolean(state.currentSrc) && !state.hasError,
-    showLoading:
-      state.isLoading && (!state.currentSrc || effectiveLoadingState !== 'placeholder'),
+    // In placeholder mode the placeholder outlasts `isLoading`: it stays under
+    // the real image until the fade has ended.
+    showLoading: effectiveLoadingState === 'placeholder' ? showPlaceholder : state.isLoading,
+    showPlaceholder,
   };
 };
