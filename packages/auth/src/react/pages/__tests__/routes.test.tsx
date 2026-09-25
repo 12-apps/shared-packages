@@ -420,7 +420,9 @@ describe("createAuthRoutes — a failure that arrives after the page painted", (
     fireEvent.click(await screen.findByTestId("google"));
 
     await screen.findByText("Não foi possível registrar o consentimento.");
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    // The rejection commits outside `act()`, so the reveal's effect runs on
+    // React's own scheduler and may land after the text is already in the DOM.
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" }));
   });
 });
 
