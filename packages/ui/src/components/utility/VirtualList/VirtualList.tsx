@@ -1,15 +1,19 @@
 import Box from '@mui/material/Box/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { useRef } from 'react';
 
-import { useVirtualGrid, useVirtualList } from './VirtualList.hooks';
+import { useVirtualGrid, useVirtualList, widthCss } from './VirtualList.hooks';
 import type { VirtualGridProps, VirtualListProps } from './VirtualList.types';
 
 interface ContainerProps {
   children: React.ReactNode;
   role: 'list' | 'grid';
-  totalHeight: number;
-  height: number;
-  width: number | string;
+  /** The scroll content's height, as CSS. */
+  totalHeight: string;
+  /** The viewport's height, as CSS. */
+  height: string;
+  /** The viewport's width, as CSS. */
+  width: string;
   disableInternalScroll: boolean;
   onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
   className?: string;
@@ -64,40 +68,25 @@ const VirtualContainer: React.FC<ContainerProps> = ({
   );
 };
 
-export const VirtualList: React.FC<VirtualListProps> = ({
-  items,
-  variant = 'fixed',
-  height,
-  width = '100%',
-  itemHeight = 40,
-  estimatedItemHeight = 40,
-  overscan = 5,
-  renderItem,
-  onScroll,
-  className,
-  style,
-  'data-testid': dataTestId,
-  'aria-label': ariaLabel,
-  scrollContainerRef,
-  disableInternalScroll = false,
-}) => {
-  const { totalHeight, visibleItems, handleScroll } = useVirtualList({
-    items,
-    variant,
-    height,
-    itemHeight,
-    estimatedItemHeight,
-    overscan,
-    onScroll,
-    scrollContainerRef,
-  });
+export const VirtualList: React.FC<VirtualListProps> = (props) => {
+  const {
+    width = '100%',
+    renderItem,
+    className,
+    style,
+    'data-testid': dataTestId,
+    'aria-label': ariaLabel,
+    disableInternalScroll = false,
+  } = props;
+  const theme = useTheme();
+  const { totalHeight, viewportHeight, visibleItems, handleScroll } = useVirtualList(props);
 
   return (
     <VirtualContainer
       role="list"
       totalHeight={totalHeight}
-      height={height}
-      width={width}
+      height={viewportHeight}
+      width={widthCss(theme, width)}
       disableInternalScroll={disableInternalScroll}
       onScroll={handleScroll}
       className={className}
@@ -112,43 +101,25 @@ export const VirtualList: React.FC<VirtualListProps> = ({
   );
 };
 
-export const VirtualGrid: React.FC<VirtualGridProps> = ({
-  items,
-  height,
-  width = '100%',
-  columnCount,
-  rowHeight,
-  columnWidth,
-  gap = 0,
-  overscan = 5,
-  renderItem,
-  onScroll,
-  className,
-  style,
-  'data-testid': dataTestId,
-  'aria-label': ariaLabel,
-  scrollContainerRef,
-  disableInternalScroll = false,
-}) => {
-  const { totalHeight, visibleItems, handleScroll } = useVirtualGrid({
-    items,
-    height,
-    width,
-    columnCount,
-    rowHeight,
-    columnWidth,
-    gap,
-    overscan,
-    onScroll,
-    scrollContainerRef,
-  });
+export const VirtualGrid: React.FC<VirtualGridProps> = (props) => {
+  const {
+    width = '100%',
+    renderItem,
+    className,
+    style,
+    'data-testid': dataTestId,
+    'aria-label': ariaLabel,
+    disableInternalScroll = false,
+  } = props;
+  const theme = useTheme();
+  const { totalHeight, viewportHeight, visibleItems, handleScroll } = useVirtualGrid(props);
 
   return (
     <VirtualContainer
       role="grid"
       totalHeight={totalHeight}
-      height={height}
-      width={width}
+      height={viewportHeight}
+      width={widthCss(theme, width)}
       disableInternalScroll={disableInternalScroll}
       onScroll={handleScroll}
       className={className}

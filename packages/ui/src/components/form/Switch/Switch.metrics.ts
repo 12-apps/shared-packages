@@ -87,12 +87,26 @@ export const MUI_SHADOWS: Record<number, string> = {
   3: ELEVATION_SHADOWS[3],
 };
 
-/** The iOS thumb's own three-layer shadow, which the web writes out literally. */
-export const IOS_THUMB_SHADOW = `0 3px 1px 0 ${alpha(SWITCH_BLACK, 0.04)}, 0 3px 8px 0 ${alpha(SWITCH_BLACK, 0.12)}, 0 1px 0 0 ${alpha(SWITCH_BLACK, 0.08)}`;
+/**
+ * How a shadow builder writes one of its lengths. Native takes the px as they
+ * stand ({@link AS_PX}); the web hands in its type scale (`rem`), so the iOS
+ * shadows scale with the theme like every other length it draws.
+ */
+export type ShadowLength = (px: number) => string;
 
-/** The iOS track's inset hairline. */
-export const iosTrackShadow = (): string =>
-  `inset 0 0 0 0.5px ${alpha(SWITCH_BLACK, 0.1)}, inset 0 2px 3px ${alpha(SWITCH_BLACK, 0.12)}`;
+/** A length written as the px it was drawn at — what native reads. */
+export const AS_PX: ShadowLength = (value) => `${value}px`;
+
+/** The iOS thumb's own three-layer shadow. */
+export const iosThumbShadow = (length: ShadowLength = AS_PX): string =>
+  `0 ${length(3)} ${length(1)} 0 ${alpha(SWITCH_BLACK, 0.04)}, 0 ${length(3)} ${length(8)} 0 ${alpha(SWITCH_BLACK, 0.12)}, 0 ${length(1)} 0 0 ${alpha(SWITCH_BLACK, 0.08)}`;
+
+/** {@link iosThumbShadow} in px, as native draws it. */
+export const IOS_THUMB_SHADOW = iosThumbShadow();
+
+/** The iOS track's inset hairline and inner shade. */
+export const iosTrackShadow = (length: ShadowLength = AS_PX): string =>
+  `inset 0 0 0 ${length(0.5)} ${alpha(SWITCH_BLACK, 0.1)}, inset 0 ${length(2)} ${length(3)} ${alpha(SWITCH_BLACK, 0.12)}`;
 
 /** The resting track: a black wash on iOS, the disabled ink elsewhere. */
 export const TRACK_ALPHA = { ios: 0.1, android: 0.2, other: 0.3 } as const;

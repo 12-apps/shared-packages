@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme, type Theme } from "@mui/material/styles/index.js";
 import { useMemo } from "react";
 
 import { type GridColumn } from "../DataGrid";
@@ -44,6 +45,7 @@ function computeHideableColumns<T extends Record<string, unknown>>(
 function appendActionsColumn<T extends Record<string, unknown>>(
   columns: DataViewColumn<T>[],
   opts: {
+    theme: Theme;
     rowActions?: RowAction<T>[];
     rowActionsLeading?: (row: T) => React.ReactNode;
     renderRowMenu?: (row: T) => React.ReactNode;
@@ -51,11 +53,12 @@ function appendActionsColumn<T extends Record<string, unknown>>(
     getRowId: (row: T) => string | number;
   },
 ): DataViewColumn<T>[] {
-  const { rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId } = opts;
+  const { theme, rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId } = opts;
   if ((!rowActions && !renderRowMenu) || columns.some(isActionsColumn)) return columns;
   return [
     ...columns,
     buildRowActionsColumn({
+      theme,
       rowActions: rowActions ?? [],
       leading: rowActionsLeading,
       testIdPrefix,
@@ -84,10 +87,18 @@ export function useColumnsWithActions<T extends Record<string, unknown>>(
   opts: ActionsColumnOpts<T>,
 ): { columnsWithActions: DataViewColumn<T>[]; allColumnIds: string[] } {
   const { rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId } = opts;
+  const theme = useTheme();
   const columnsWithActions = useMemo(
     () =>
-      appendActionsColumn(columns, { rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId }),
-    [columns, rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId],
+      appendActionsColumn(columns, {
+        theme,
+        rowActions,
+        rowActionsLeading,
+        renderRowMenu,
+        testIdPrefix,
+        getRowId,
+      }),
+    [columns, theme, rowActions, rowActionsLeading, renderRowMenu, testIdPrefix, getRowId],
   );
   const allColumnIds = useMemo(() => columnsWithActions.map((col) => col.id), [columnsWithActions]);
   return { columnsWithActions, allColumnIds };

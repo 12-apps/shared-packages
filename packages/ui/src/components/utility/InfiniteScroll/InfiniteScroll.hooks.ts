@@ -19,7 +19,8 @@ const resolveScrollable = (scrollableTarget: ScrollableTarget): Element | null =
 
 interface ObserverArgs {
   testMode: boolean;
-  threshold: number;
+  /** The observer's `rootMargin` — px, which is all `IntersectionObserver` takes. */
+  rootMargin: string;
   scrollableTarget: ScrollableTarget;
 }
 
@@ -28,7 +29,7 @@ interface ObserverArgs {
  * it fire before the sentinel is actually on screen, so the next page is already
  * loading by the time the user reaches the bottom.
  */
-export const useSentinel = ({ testMode, threshold, scrollableTarget }: ObserverArgs) => {
+export const useSentinel = ({ testMode, rootMargin, scrollableTarget }: ObserverArgs) => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [isIntersecting, setIsIntersecting] = useState(false);
 
@@ -43,7 +44,7 @@ export const useSentinel = ({ testMode, threshold, scrollableTarget }: ObserverA
       },
       {
         root: resolveScrollable(scrollableTarget) || undefined,
-        rootMargin: `${threshold}px`,
+        rootMargin,
         threshold: 0,
       },
     );
@@ -51,7 +52,7 @@ export const useSentinel = ({ testMode, threshold, scrollableTarget }: ObserverA
     observer.observe(sentinelRef.current);
 
     return () => observer.disconnect();
-  }, [testMode, threshold, scrollableTarget]);
+  }, [testMode, rootMargin, scrollableTarget]);
 
   return { sentinelRef, isIntersecting };
 };

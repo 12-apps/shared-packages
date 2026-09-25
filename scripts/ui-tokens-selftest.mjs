@@ -129,9 +129,11 @@ const TYPED = {
   "/v/Sel.metrics.ts": [
     "export const SIZES = { sm: { height: 32, font: 14 } } as const; export const MAX_W: number = 400;",
     "export const BORDERS = { rest: 1, focused: 2 } as const; export const FIELD_BORDER_WIDTH = 1;",
+    // A hairline's NAME on a value that is not 1: a length, whatever it is called.
+    "export const FOCUS_BORDER_WIDTH = 2; export const LINES = { HAIRLINE: 1, THICK_HAIRLINE: 2 };",
   ].join("\n"),
   "/v/Sel.tsx": [
-    "import { SIZES, MAX_W, BORDERS, FIELD_BORDER_WIDTH } from './Sel.metrics';",
+    "import { SIZES, MAX_W, BORDERS, FIELD_BORDER_WIDTH, FOCUS_BORDER_WIDTH, LINES } from './Sel.metrics';",
     "declare const rem: (t: unknown, n: number) => string; declare const theme: unknown;",
     "const a = { height: SIZES.sm.height, maxWidth: MAX_W };",
     "const b = { fontSize: SIZES.sm.font };",
@@ -145,8 +147,12 @@ const TYPED = {
     "declare const c: boolean; const g3 = { top: c ? pitch : 0, width: c ? pitch : 'auto', rootMargin: `${c ? pitch : 0}px` };",
     "declare const w: number | undefined; const named = c ? pitch : undefined; const g4 = { height: named, minHeight: named ?? pitch };",
     "const auto = c ? pitch : 'auto'; const g5 = { width: auto };",
+    // A named hairline that holds 1 — a literal type, or a member initialised to 1: clean.
+    "const e2 = { borderWidth: LINES.HAIRLINE, outline: `${LINES.HAIRLINE}px solid` };",
     // Raw riding along: flagged.
     "const f = { height: remPx(theme, 52) + 40, borderWidth: BORDERS.focused };",
+    // A hairline's name on 2px: flagged on the key, and glued onto `px`.
+    "const f2 = { borderWidth: FOCUS_BORDER_WIDTH, borderTopWidth: LINES.THICK_HAIRLINE, border: `${FOCUS_BORDER_WIDTH}px solid` };",
     // Untyped: cannot be proven relative, so it is reported.
     "declare const untyped: any; const h = { width: untyped };",
     "let grow = remPx(theme, 8); grow += 40; const k = { height: grow };",
@@ -166,10 +172,14 @@ for (const { rule, src } of cases) {
 for (const rule of RULES.filter((r) => !(r in VIOLATIONS))) failures.push(`${rule} has no violating fixture`);
 
 const typed = typedFindings(TYPED, "/v/Sel.tsx");
-if (typed.filter((r) => r === "raw-number-length").length !== 9) {
-  failures.push(`type-aware: expected 9 raw-number-length (height and maxWidth through a name, remPx()+40, a typed 2px border, an untyped width, a reassigned let, a reassigned object, a mutated member, an assigned styles.height), got ${JSON.stringify(typed)}`);
+if (typed.filter((r) => r === "raw-number-length").length !== 11) {
+  failures.push(`type-aware: expected 11 raw-number-length (height and maxWidth through a name, remPx()+40, a typed 2px border, a 2px FOCUS_BORDER_WIDTH, a 2px LINES.THICK_HAIRLINE, an untyped width, a reassigned let, a reassigned object, a mutated member, an assigned styles.height), got ${JSON.stringify(typed)}`);
 }
-if (typed.some((r) => r === "raw-length")) failures.push(`type-aware: a px glued onto a remPx-traced value was flagged: ${JSON.stringify(typed)}`);
+// Exactly one: `${FOCUS_BORDER_WIDTH}px` (2px under a hairline's name). A px glued
+// onto a remPx-traced value, or onto a named hairline that holds 1, is clean.
+if (typed.filter((r) => r === "raw-length").length !== 1) {
+  failures.push(`type-aware: expected 1 raw-length (a 2px FOCUS_BORDER_WIDTH glued onto px), got ${JSON.stringify(typed)}`);
+}
 if (typed.filter((r) => r === "raw-font-size").length !== 2) failures.push(`type-aware: expected 2 raw-font-size (fontSize through a name, an assigned styles fontSize), got ${JSON.stringify(typed)}`);
 
 const cleanHits = scanSource(AS, CLEAN);

@@ -1,11 +1,13 @@
+import { useTheme, type Theme } from "@mui/material/styles/index.js";
 import { Children, type CSSProperties, type ReactNode, type Ref } from "react";
 
+import { rem } from "../../../tokens/relative";
 import { cn } from "../../../utils/cn";
 
 /**
  * How the grid turns surplus row space into layout:
  *
- * - `"fixed"` — every column is exactly `cardWidth` px; leftover row space is
+ * - `"fixed"` — every column is exactly `cardWidth` design px; leftover row space is
  *   spread as even gutters (`justify-content: space-around`). Cards never resize;
  *   the column count changes with the viewport. This is the original tabwoah
  *   card-grid behavior.
@@ -14,7 +16,7 @@ import { cn } from "../../../utils/cn";
  *   left-aligned at a single track's width rather than stretching edge to edge.
  * - `"scroll"` — a single row that scrolls horizontally, with fluid-width cards
  *   sized from the container so that exactly {@link SCROLL_VISIBLE_CARDS} cards
- *   plus a {@link SCROLL_PEEK_WIDTH}px sliver of the next one fit on screen (up
+ *   plus a `GRID.peekPx` sliver of the next one fit on screen (up
  *   to `maxCardWidth`, past which more cards simply fit). The sliver is the
  *   point: it makes the rail visibly continue past the fold, so the row reads as
  *   swipeable instead of as a finished pair of cards. Wrapping is off; the row
@@ -23,18 +25,26 @@ import { cn } from "../../../utils/cn";
  */
 export type CardGridVariant = "fixed" | "fluid" | "scroll";
 
-/** The grid gap, in px — mirrors the `gap: 1rem` below, for the scroll math. */
-const GRID_GAP = 16;
+/**
+ * The grid's own lengths, in design px — every one drawn through `rem`, so the
+ * `gap` the grid lays out with and the gap the scroll track math reserves are
+ * the same length at any type scale.
+ */
+const GRID = {
+  /** Between cards: the grid's `gap`, and what the scroll math reserves per gap. */
+  gapPx: 16,
+  /**
+   * `scroll`: the next card left visible past the last whole one — the
+   * "there's more, swipe" hint. Wide enough to read as a clipped card (rounded
+   * edge + a slice of its photo) rather than as a rendering glitch.
+   */
+  peekPx: 28,
+  /** Under the row — the tabwoah original's Tailwind `pb-0.5`. */
+  paddingBottomPx: 2,
+} as const;
 
 /** `scroll`: how many WHOLE cards the rail commits to showing at once. */
 const SCROLL_VISIBLE_CARDS = 2;
-
-/**
- * `scroll`: px of the next card left visible past the last whole one — the
- * "there's more, swipe" hint. Wide enough to read as a clipped card (rounded
- * edge + a slice of its photo) rather than as a rendering glitch.
- */
-const SCROLL_PEEK_WIDTH = 28;
 
 /**
  * The `scroll` track width: the widest a card can be while the container still
@@ -46,25 +56,27 @@ const SCROLL_PEEK_WIDTH = 28;
  * that follow them (one between each pair, one before the peeked card), and the
  * peek. With no overflow there are only N-1 gaps and no peek.
  */
-function scrollTrackWidth(count: number, max: number): string {
+function scrollTrackWidth(theme: Theme, count: number, max: number): string {
   const tracks = Math.max(1, Math.min(count, SCROLL_VISIBLE_CARDS));
   const overflows = count > tracks;
   const gaps = overflows ? tracks : tracks - 1;
-  const reserved = gaps * GRID_GAP + (overflows ? SCROLL_PEEK_WIDTH : 0);
-  return `min(${max}px, calc((100% - ${reserved}px) / ${tracks}))`;
+  const reserved = gaps * GRID.gapPx + (overflows ? GRID.peekPx : 0);
+  return `min(${rem(theme, max)}, calc((100% - ${rem(theme, reserved)}) / ${tracks}))`;
 }
 
 interface CardGridProps {
   /**
-   * `"fixed"`: the exact column width in px. `"fluid"`: the minimum column width
+   * `"fixed"`: the exact column width. `"fluid"`: the minimum column width
    * (columns grow from here). `"scroll"`: only seeds the default `maxCardWidth`
    * — a scroll track has no minimum, because a minimum is exactly what would
    * break the "two cards plus a peek" promise on a narrow phone.
+   *
+   * Design px, scaled with the theme's type scale.
    */
   cardWidth: number;
   /**
-   * `"scroll"` only: the maximum fluid card width in px. Defaults to
-   * `1.6 × cardWidth`.
+   * `"scroll"` only: the maximum fluid card width. Defaults to
+   * `1.6 × cardWidth`. Design px, scaled with the theme's type scale.
    */
   maxCardWidth?: number;
   /** Layout behavior — see {@link CardGridVariant}. Defaults to `"fixed"`. */
@@ -84,8 +96,8 @@ interface CardGridProps {
  *
  * Ported from the tabwoah card grid (the `"fixed"` variant is verbatim). The one
  * adaptation: that app is Tailwind (`className="grid gap-4 pb-0.5"`); this one
- * has no Tailwind, so those three utilities (display:grid, gap 1rem,
- * padding-bottom 2px) live in `style`.
+ * has no Tailwind, so those three utilities (display:grid, gap 16 design px,
+ * padding-bottom 2 design px) live in `style`, drawn through `rem`.
  */
 export function CardGrid({
   cardWidth,
@@ -96,10 +108,11 @@ export function CardGrid({
   containerRef,
   children,
 }: CardGridProps) {
+  const theme = useTheme();
   const style: CSSProperties = {
     display: "grid",
-    gap: "1rem",
-    paddingBottom: "2px",
+    gap: rem(theme, GRID.gapPx),
+    paddingBottom: rem(theme, GRID.paddingBottomPx),
   };
 
   if (variant === "scroll") {
@@ -109,14 +122,14 @@ export function CardGrid({
     // always fit (see `scrollTrackWidth`). Scroll-snap makes a swipe settle on a
     // card boundary instead of drifting mid-card.
     style.gridAutoFlow = "column";
-    style.gridAutoColumns = scrollTrackWidth(Children.count(children), max);
+    style.gridAutoColumns = scrollTrackWidth(theme, Children.count(children), max);
     style.overflowX = "auto";
     style.overflowY = "hidden";
     style.scrollSnapType = "x mandatory";
   } else if (variant === "fluid") {
-    style.gridTemplateColumns = `repeat(auto-fill, minmax(${cardWidth}px, 1fr))`;
+    style.gridTemplateColumns = `repeat(auto-fill, minmax(${rem(theme, cardWidth)}, 1fr))`;
   } else {
-    style.gridTemplateColumns = `repeat(auto-fill, ${cardWidth}px)`;
+    style.gridTemplateColumns = `repeat(auto-fill, ${rem(theme, cardWidth)})`;
     // `space-around` only distributes leftover width in the fixed variant; the
     // fluid variant consumes it via `1fr` and scroll overflows instead.
     style.justifyContent = "space-around";

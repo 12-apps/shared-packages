@@ -161,7 +161,7 @@ const isStringy = (e) => ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLit
 /** A value on a length key that is a NAME holding a number (metrics constant, size map, prop default). */
 function isTypedRawValue(ctx, key, expr, node) {
   if (!ctx.checker || isStringy(expr) || ts.isObjectLiteralExpression(expr)) return false;
-  if (HAIRLINE_KEY.test(key) && isHairlineName(expr, ctx.sf)) return false;
+  if (HAIRLINE_KEY.test(key) && isHairlineName(expr, ctx)) return false;
   if (isRelative(expr, ctx) || !isNumberTyped(ctx.checker, expr)) return false;
   const sx = inSxContext(node);
   return !(sx && (SPACING_KEYS.has(key) || key === "borderRadius"));

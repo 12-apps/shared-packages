@@ -10,8 +10,11 @@
  * passes `sorting.sortBy` owns the sort, and a caller that does not gets the
  * internal state — the component never holds a second, divergent copy.
  */
+import { useTheme } from '@mui/material/styles/index.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
+
+import { rem, remPx } from '../../../tokens/relative';
 
 import { processRows } from './DataGrid.rows';
 import type {
@@ -22,7 +25,6 @@ import type {
   SortDirection,
 } from './DataGrid.types';
 
-const DEFAULT_ROW_HEIGHT = 52;
 const DEFAULT_PAGE_SIZE = 50;
 /** Rows rendered on either side of the window, so a fast scroll stays filled. */
 const OVERSCAN_COUNT = 20;
@@ -48,7 +50,13 @@ export interface VisibleRange {
 /** Everything the render needs, and nothing it has to derive. */
 export interface DataGridModel<T extends Record<string, unknown>> {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  rowHeight: number;
+  /** A row's height as CSS: the design height, density applied, through `rem`. */
+  rowHeight: string;
+  /**
+   * The same height in px (`remPx`) — what the window divides `scrollTop` by.
+   * One design number drawn two ways, so the rows and the window never disagree.
+   */
+  rowPitch: number;
   visibleColumns: GridColumn<T>[];
   processedRows: T[];
   visibleRows: T[];
@@ -67,7 +75,7 @@ export interface DataGridModel<T extends Record<string, unknown>> {
   onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
-/** The row height a density implies. */
+/** The row height a density implies, in design px. */
 function densityHeight(base: number, density: DataGridProps['density']): number {
   if (density === 'compact') return Math.max(base * 0.8, 32);
   if (density === 'spacious') return base * 1.2;
@@ -114,7 +122,8 @@ function useProcessedRows<T extends Record<string, unknown>>(
 }
 
 /**
- * The virtualization window and the scroll handler that moves it.
+ * The virtualization window and the scroll handler that moves it. `rowPitch` is
+ * px, like the `scrollTop` and `clientHeight` it is divided into.
  *
  * Throttled through `requestAnimationFrame`, and only committed once the window
  * has drifted meaningfully — a `setState` per scroll event re-renders every
@@ -122,7 +131,7 @@ function useProcessedRows<T extends Record<string, unknown>>(
  */
 function useRowWindow(
   rowCount: number,
-  rowHeight: number,
+  rowPitch: number,
   enabled: boolean,
 ): { range: VisibleRange; onScroll: (event: React.UIEvent<HTMLDivElement>) => void } {
   const [range, setRange] = useState<VisibleRange>({ start: 0, end: INITIAL_WINDOW });
@@ -145,8 +154,8 @@ function useRowWindow(
       const { scrollTop, clientHeight } = event.currentTarget;
       if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
       rafRef.current = window.requestAnimationFrame(() => {
-        const first = Math.floor(scrollTop / rowHeight);
-        const visible = Math.ceil(clientHeight / rowHeight);
+        const first = Math.floor(scrollTop / rowPitch);
+        const visible = Math.ceil(clientHeight / rowPitch);
         const start = Math.max(0, first - OVERSCAN_COUNT);
         const end = Math.min(first + visible + OVERSCAN_COUNT, rowCount);
         setRange((current) =>
@@ -158,7 +167,7 @@ function useRowWindow(
         rafRef.current = null;
       });
     },
-    [enabled, rowHeight, rowCount],
+    [enabled, rowPitch, rowCount],
   );
 
   return { range, onScroll };
@@ -282,10 +291,13 @@ export function useDataGridModel<T extends Record<string, unknown>>(
   props: DataGridProps<T>,
 ): DataGridModel<T> {
   const { columns } = props;
+  const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const { sortBy, filters, setInternalSortBy } = useSortAndFilter(props);
-  const rowHeight = densityHeight(props.rowHeight ?? DEFAULT_ROW_HEIGHT, props.density);
+  // 52 design px unless the caller says; the density scales it, then the type scale does.
+  const designRowHeight = densityHeight(props.rowHeight ?? 52, props.density);
+  const rowPitch = remPx(theme, designRowHeight);
   const columnMap = useMemo(
     () => new Map(columns.map((column) => [column.id, column])),
     [columns],
@@ -294,12 +306,13 @@ export function useDataGridModel<T extends Record<string, unknown>>(
   const processedRows = useProcessedRows(props, columnMap, sortBy, filters);
   const virtualized =
     (props.virtualizeRows ?? true) && processedRows.length > VIRTUALIZATION_THRESHOLD;
-  const { range, onScroll } = useRowWindow(processedRows.length, rowHeight, virtualized);
+  const { range, onScroll } = useRowWindow(processedRows.length, rowPitch, virtualized);
   const onSort = useSortHandler(props, sortBy, filters, setInternalSortBy);
 
   return {
     containerRef,
-    rowHeight,
+    rowHeight: rem(theme, designRowHeight),
+    rowPitch,
     visibleColumns,
     processedRows,
     visibleRows: virtualized ? processedRows.slice(range.start, range.end) : processedRows,

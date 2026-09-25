@@ -30,10 +30,41 @@ export function unwrap(expr) {
   return e;
 }
 
-/** The named hairline (`FIELD_BORDER_WIDTH`) — the one literal the vocabulary keeps on purpose. */
-export const isHairlineName = (expr, sf) => HAIRLINE_NAME.test(unwrap(expr).getText(sf));
-
 const isZero = (a) => ts.isNumericLiteral(unwrap(a)) && Number(unwrap(a).text) === 0;
+const isOne = (a) => ts.isNumericLiteral(unwrap(a)) && Number(unwrap(a).text) === 1;
+
+/** The declaration a name or member reads, through an `import`. */
+function declarationOf(e, checker) {
+  let symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(e) ? e.name : e);
+  if (symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol);
+  return symbol?.valueDeclaration;
+}
+
+/**
+ * Does this name HOLD 1? Its type is the literal `1` (`export const
+ * FIELD_BORDER_WIDTH = 1`), or it is a `const` / frozen member initialised to
+ * `1` (`{ FIELD_BORDER_WIDTH: 1 }`, whose type widens to `number`).
+ */
+function holdsOne(e, checker) {
+  const type = checker.getTypeAtLocation(e);
+  if (type.isNumberLiteral()) return type.value === 1;
+  const decl = declarationOf(e, checker);
+  return Boolean(decl) && (isConstVariable(decl) || isFrozenMember(decl)) && decl.initializer !== undefined && isOne(decl.initializer);
+}
+
+/**
+ * The named hairline (`FIELD_BORDER_WIDTH`) — the one literal the vocabulary
+ * keeps on purpose. The NAME alone is not the argument: a `FOCUS_BORDER_WIDTH
+ * = 2` is a 2px length wearing a hairline's name, so with a checker the name
+ * must also hold 1 — the same value the string path asks of a `1px`
+ * (`./ui-tokens-scan.mjs`, `checkLengths`). Without one (the syntax-only
+ * fixtures) the value cannot be read, and the name is taken as said.
+ */
+export const isHairlineName = (expr, ctx) => {
+  const e = unwrap(expr);
+  if (!HAIRLINE_NAME.test(e.getText(ctx.sf))) return false;
+  return !ctx.checker || holdsOne(e, ctx.checker);
+};
 
 /** Only a `const` is traced: a `let` can be reassigned (`grow += 40`) after an initialiser that was relative. */
 const isConstVariable = (decl) =>
@@ -163,4 +194,4 @@ export function isRelative(expr, ctx, depth = 0) {
 }
 
 /** Glued onto `px`, is this already right in px? Traced to `remPx`, or the named hairline. */
-export const isPxSafe = (expr, ctx) => isHairlineName(expr, ctx.sf) || isRelative(expr, ctx);
+export const isPxSafe = (expr, ctx) => isHairlineName(expr, ctx) || isRelative(expr, ctx);
