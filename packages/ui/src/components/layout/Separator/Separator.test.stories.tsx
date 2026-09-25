@@ -533,6 +533,14 @@ const middleOf = (el: Element): number => {
   return top + height / 2;
 };
 
+// FUT-2675: the relative lengths, each in the `With Text` story's 120px row.
+const RELATIVE_ROWS: ReadonlyArray<{ id: string; length: string | number }> = [
+  { id: 'quarter-percent', length: '25%' },
+  { id: 'quarter-number', length: 0.25 },
+  { id: 'half-percent', length: '50%' },
+  { id: 'half-number', length: 0.5 },
+];
+
 export const VerticalLabelledRules: Story = {
   name: '📐 Vertical Labelled Rules Test',
   play: async ({ canvasElement, step }) => {
@@ -563,6 +571,45 @@ export const VerticalLabelledRules: Story = {
       const group = canvas.getByTestId('fixed-labelled');
       await expect(middleOf(group)).toBeCloseTo(middleOf(row), 0);
     });
+
+    // FUT-2675: a relative length is a fraction of the run, as on a horizontal
+    // labelled separator. Both rows are 120px, so a quarter is 30px.
+    await step('A relative length stretches the column to the row', async () => {
+      for (const id of ['quarter-percent', 'quarter-number', 'half-percent', 'half-number']) {
+        const row = canvas.getByTestId(`${id}-row`);
+        const group = canvas.getByTestId(`${id}-labelled`);
+        await expect(heightOf(group)).toBeCloseTo(heightOf(row), 0);
+      }
+    });
+
+    await step('A quarter draws each rule a quarter of the row', async () => {
+      for (const id of ['quarter-percent', 'quarter-number']) {
+        const rules = rulesOf(canvas.getByTestId(`${id}-labelled`));
+        await expect(rules).toHaveLength(2);
+        for (const rule of rules) await expect(heightOf(rule)).toBeCloseTo(30, 0);
+      }
+    });
+
+    await step('A half shrinks both rules alike to fit the label in the row', async () => {
+      for (const id of ['half-percent', 'half-number']) {
+        const row = canvas.getByTestId(`${id}-row`);
+        const rules = rulesOf(canvas.getByTestId(`${id}-labelled`));
+        await expect(rules).toHaveLength(2);
+        const [first = 0, second = 0] = rules.map(heightOf);
+        await expect(first).toBeGreaterThanOrEqual(MIN_RULE_PX);
+        await expect(second).toBeCloseTo(first, 0);
+        // Rule, gap, label, gap, rule: from the first rule's top to the last's bottom.
+        const top = rules[0]?.getBoundingClientRect().top ?? 0;
+        const bottom = rules.at(-1)?.getBoundingClientRect().bottom ?? 0;
+        await expect(bottom - top).toBeLessThanOrEqual(heightOf(row));
+      }
+    });
+
+    await step('In a block parent a relative length keeps the minimum', async () => {
+      const rules = rulesOf(canvas.getByTestId('block-half-labelled'));
+      await expect(rules).toHaveLength(2);
+      for (const rule of rules) await expect(heightOf(rule)).toBe(MIN_RULE_PX);
+    });
   },
   render: () => (
     <Stack spacing={4} sx={{ p: 2 }}>
@@ -579,6 +626,20 @@ export const VerticalLabelledRules: Story = {
           OR
         </Separator>
         <Typography>Right Content</Typography>
+      </Box>
+      {RELATIVE_ROWS.map(({ id, length }) => (
+        <Box key={id} data-testid={`${id}-row`} sx={{ display: 'flex', alignItems: 'center', height: 120 }}>
+          <Typography>Left Content</Typography>
+          <Separator orientation="vertical" length={length} data-testid={`${id}-labelled`}>
+            OR
+          </Separator>
+          <Typography>Right Content</Typography>
+        </Box>
+      ))}
+      <Box data-testid="block-half-row" sx={{ height: 120 }}>
+        <Separator orientation="vertical" length="50%" data-testid="block-half-labelled">
+          OR
+        </Separator>
       </Box>
     </Stack>
   ),
