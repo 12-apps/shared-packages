@@ -165,13 +165,17 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
     case 'drawer': {
       const radius = borderRadiusOf(theme, opts.borderRadius);
       return {
-        borderRadius: `${radius}px 0 0 ${radius}px`,
+        // `radius` is already a length (`theme.spacing(n)` → '16px', or 0): gluing
+        // another `px` on wrote '16pxpx', which the browser dropped, leaving the
+        // panel's leading corners square.
+        borderRadius: `${radius} 0 0 ${radius}`,
         margin: 0,
         width: maxWidthOf(opts.size),
+        // Never wider than the screen: a 600px panel on a 375px phone put its
+        // title and the start of every line off the left edge.
+        maxWidth: '100%',
         ...dynamicViewportHeight('height'),
         maxHeight: 'none',
-        position: 'absolute' as const,
-        right: 0,
         ...decorations,
       };
     }

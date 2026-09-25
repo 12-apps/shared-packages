@@ -92,6 +92,25 @@ type SeparatorStyleArgs = Required<
 > &
   Pick<SeparatorProps, 'color' | 'margin' | 'length'>;
 
+/**
+ * The separator's margin, on the axis it separates along only: above and below
+ * a horizontal rule, either side of a vertical one. A margin given as a string
+ * carries its own units; a number is pixels.
+ *
+ * The LABELLED separator uses this too. It used to hand the number straight to
+ * `sx.margin`, where a number is SPACING UNITS — `md`'s 16 drew 128px on all
+ * four sides, against 16px above and below for the unlabelled one.
+ */
+export const separatorBlockMargin = (
+  size: SeparatorSize,
+  margin: number | string | undefined,
+  isHorizontal: boolean,
+): string => {
+  const value = separatorMargin(size, margin);
+  const length = typeof value === 'string' ? value : `${value}px`;
+  return isHorizontal ? `${length} 0` : `0 ${length}`;
+};
+
 export const separatorStyles = (
   theme: Theme,
   { variant, orientation, size, color, margin, length }: SeparatorStyleArgs,
@@ -100,14 +119,10 @@ export const separatorStyles = (
   const thickness = separatorThickness(size);
   const resolvedColor = color || theme.palette.divider;
 
-  // A margin given as a string carries its own units; a number is pixels.
-  const marginValue = separatorMargin(size, margin);
-  const marginStr = typeof marginValue === 'string' ? marginValue : `${marginValue}px`;
-
   const baseStyles: CSSObject = {
     display: 'flex',
     alignItems: 'center',
-    margin: isHorizontal ? `${marginStr} 0` : `0 ${marginStr}`,
+    margin: separatorBlockMargin(size, margin, isHorizontal),
     width: isHorizontal ? length || '100%' : `${thickness}px`,
     height: isHorizontal ? `${thickness}px` : length || '100%',
     boxSizing: 'border-box',

@@ -2,7 +2,8 @@ import Box from '@mui/material/Box/index.js';
 import FormControl from '@mui/material/FormControl/index.js';
 import FormLabel from '@mui/material/FormLabel/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+import { ThemeProvider, createTheme } from '@mui/material/styles/index.js';
+import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import React from 'react';
 
@@ -573,5 +574,38 @@ export const MultipleFilesStillRunOnUpload: Story = {
     await waitFor(() => expect(canvas.getByTestId('uploaded')).toHaveTextContent('a.xml,b.xml'), {
       timeout: 5000,
     });
+  },
+};
+
+/**
+ * The dropzone's drag-over tint under a primary written as `rgb(…)`. The tint
+ * was a hex-alpha suffix glued onto the palette colour (`${main}0A`), which is
+ * only a colour while `main` is six-digit hex; an `rgb(…)` primary produced
+ * `rgb(25, 118, 210)0A`, the browser dropped it, and dragging a file over the
+ * zone showed nothing at all.
+ */
+const RGB_PRIMARY_THEME = createTheme({ palette: { primary: { main: 'rgb(25, 118, 210)' } } });
+
+export const RgbPrimaryTintsTheDropzone: Story = {
+  render: () => (
+    <ThemeProvider theme={RGB_PRIMARY_THEME}>
+      <Box sx={{ width: 360 }}>
+        <UploadButton
+          copy={PT_BR_UPLOAD_BUTTON_COPY}
+          onSelect={fn()}
+          variant="dropzone"
+          label="Dropzone"
+          data-testid="rgb-dropzone"
+        />
+      </Box>
+    </ThemeProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const dropzone = within(canvasElement).getByTestId('rgb-dropzone');
+    fireEvent.dragEnter(dropzone);
+    // 0x0A of 0xFF, the tint a hex primary has always drawn.
+    await waitFor(() =>
+      expect(globalThis.getComputedStyle(dropzone).backgroundColor).toBe('rgba(25, 118, 210, 0.04)'),
+    );
   },
 };

@@ -4,10 +4,21 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import LinearProgress from '@mui/material/LinearProgress/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type React from 'react';
 
 import type { DragHandlers } from './UploadButton.hooks';
+
+/*
+ * The tints the dropzone and the ghost button have always drawn — 0x0A, 0x05
+ * and 0x08 out of 0xFF — as `alpha()` opacities. They were hex-alpha suffixes
+ * glued onto `palette.primary.main`, which only works while the palette colour
+ * is a six-digit hex: an `rgb(…)` primary produced an invalid colour and no
+ * tint at all.
+ */
+const DRAG_OVER_TINT = 0x0a / 0xff;
+const HOVER_TINT = 0x05 / 0xff;
+const GHOST_HOVER_TINT = 0x08 / 0xff;
 import type { UploadButtonCopy } from '../../../copy';
 import type { UploadButtonProps } from './UploadButton.types';
 
@@ -48,12 +59,12 @@ export function UploadDropzone({
         padding: 3,
         textAlign: 'center',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        backgroundColor: isDragOver ? `${theme.palette.primary.main}0A` : 'transparent',
+        backgroundColor: isDragOver ? alpha(theme.palette.primary.main, DRAG_OVER_TINT) : 'transparent',
         transition: 'all 0.2s ease-in-out',
         ...(!disabled && {
           '&:hover': {
             borderColor: theme.palette.primary.main,
-            backgroundColor: `${theme.palette.primary.main}05`,
+            backgroundColor: alpha(theme.palette.primary.main, HOVER_TINT),
           },
         }),
         opacity: disabled ? 0.6 : 1,
@@ -114,7 +125,7 @@ export function UploadTrigger({
       aria-describedby={describedBy}
       sx={{
         ...(variant === 'ghost' && {
-          '&:hover': { backgroundColor: `${theme.palette.primary.main}08` },
+          '&:hover': { backgroundColor: alpha(theme.palette.primary.main, GHOST_HOVER_TINT) },
         }),
       }}
     >

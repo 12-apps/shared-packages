@@ -988,3 +988,72 @@ export const Integration: Story = {
     });
   },
 };
+
+/**
+ * The drawer variant is actually drawn. Its look used to sit on a Box inside
+ * MUI's Drawer, absolutely positioned: the Drawer's paper had no in-flow
+ * content, collapsed to 0px wide, and its overflow clipped the whole panel —
+ * opening a drawer dialog showed a dimmed page and nothing else. Its leading
+ * corners are the theme radius (they were written '16pxpx', which the browser
+ * dropped).
+ */
+export const DrawerIsDrawn: Story = {
+  // DOM-only: it measures MUI's web Drawer paper, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open variant="drawer" size="sm" onClose={fn()} dataTestId="drawer-dialog">
+      <DialogHeader title="Drawer Dialog" subtitle="Slide-in panel" />
+      <DialogContent>
+        <Typography>Content</Typography>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async () => {
+    const body = within(globalThis.document.body);
+    const title = await body.findByText('Drawer Dialog');
+    const paper = title.closest('.MuiDrawer-paper');
+    await expect(paper).not.toBeNull();
+    await waitFor(() => {
+      const rect = (paper as HTMLElement).getBoundingClientRect();
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the panel's width IS the behaviour under test: 0px was the bug
+      expect(rect.width).toBeGreaterThan(300);
+      expect(rect.right).toBeLessThanOrEqual(globalThis.innerWidth);
+      expect(rect.left).toBeGreaterThanOrEqual(0);
+    });
+    const style = globalThis.getComputedStyle(paper as HTMLElement);
+    await expect(style.borderTopLeftRadius).toBe('16px');
+    await expect(style.borderTopRightRadius).toBe('0px');
+  },
+};
+
+/**
+ * Raw children (no `DialogContent`) taller than the drawer scroll with its
+ * paper. The drawer's paper keeps MUI's own `overflow-y: auto`; clipping it to
+ * round the corners would leave everything below the fold unreachable.
+ */
+export const DrawerScrollsRawChildren: Story = {
+  // DOM-only: it measures MUI's web Drawer paper, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open variant="drawer" size="sm" onClose={fn()}>
+      <Box data-testid="drawer-raw-body">
+        {Array.from({ length: 60 }, (_, i) => (
+          <Typography key={i}>Linha {i + 1}</Typography>
+        ))}
+      </Box>
+    </Dialog>
+  ),
+  play: async () => {
+    const body = await within(globalThis.document.body).findByTestId('drawer-raw-body');
+    const paper = body.closest('.MuiDrawer-paper') as HTMLElement;
+    await expect(paper).not.toBeNull();
+    // The panel is as tall as the viewport and 60 lines overflow it at any size;
+    // scrolling it IS the behaviour under test.
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    await waitFor(() => expect(paper.scrollHeight).toBeGreaterThan(paper.clientHeight));
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    paper.scrollTop = paper.scrollHeight;
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    await waitFor(() => expect(paper.scrollTop).toBeGreaterThan(0));
+  },
+};
