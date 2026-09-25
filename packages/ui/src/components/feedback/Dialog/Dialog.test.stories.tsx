@@ -1057,3 +1057,54 @@ export const DrawerScrollsRawChildren: Story = {
     await waitFor(() => expect(paper.scrollTop).toBeGreaterThan(0));
   },
 };
+
+const backdropFilterOf = (): string | undefined => {
+  const backdrop = globalThis.document.querySelector<HTMLElement>('.MuiBackdrop-root');
+  return backdrop ? globalThis.getComputedStyle(backdrop).backdropFilter : undefined;
+};
+
+/**
+ * A caller's backdrop props add to the `glass` scrim rather than replacing it:
+ * the class lands AND the blur stays. They used to replace it whole (FUT-2672).
+ * jsdom does not compute `backdrop-filter`, so this half is checked here;
+ * `dialog-backdrop-props.test.tsx` covers the rest.
+ */
+export const GlassBackdropKeepsItsBlur: Story = {
+  // DOM-only: it measures MUI's web backdrop, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open glass onClose={fn()} BackdropProps={{ className: 'caller-backdrop' }}>
+      <DialogContent>
+        <Typography>Glass</Typography>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async () => {
+    await within(globalThis.document.body).findByText('Glass');
+    await waitFor(() =>
+      expect(globalThis.document.querySelector('.MuiBackdrop-root')).toHaveClass('caller-backdrop'),
+    );
+    await waitFor(() => expect(backdropFilterOf()).toBe('blur(8px)'));
+  },
+};
+
+/**
+ * `glass` blurs the drawer's backdrop too, as it does every other variant's;
+ * the drawer used to set no backdrop props at all (FUT-2673). jsdom does not
+ * compute `backdrop-filter`; `dialog-drawer-backdrop.test.tsx` covers the rest.
+ */
+export const DrawerGlassBackdropIsBlurred: Story = {
+  // DOM-only: it measures MUI's web backdrop, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open variant="drawer" glass onClose={fn()}>
+      <DialogContent>
+        <Typography>Glass drawer</Typography>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async () => {
+    await within(globalThis.document.body).findByText('Glass drawer');
+    await waitFor(() => expect(backdropFilterOf()).toBe('blur(8px)'));
+  },
+};
