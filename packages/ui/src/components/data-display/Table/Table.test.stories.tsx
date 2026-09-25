@@ -497,6 +497,21 @@ export const VirtualStickyHeaderSticks: Story = {
  * the header's height changes. Growing the header should not leave a blank
  * strip at the top of the body area — the `ResizeObserver` re-measures it
  * directly.
+ *
+ * `scrollTop` is not a multiple of the pitch relative to the header's height,
+ * on purpose: `startIndex = floor(bodyScrollTop / pitch)` (`useVirtualScrolling`)
+ * leaves a REMAINDER — the amount already scrolled past the first mounted
+ * row's own top — of anywhere from 0 up to (but never reaching) one pitch.
+ * That remainder is not the thing this checks, and it is NOT the same before
+ * and after the header grows (the two `bodyScrollTop`s differ by the header's
+ * growth, which is not a multiple of the pitch either): an earlier version of
+ * this test compared the two remainders and failed even with the fix
+ * applied — always, not intermittently, `git blame` this comment for the
+ * numbers. What the bug actually produces is a remainder OUTSIDE that [-pitch,
+ * 0] range: the stale window still measured against the OLD header height
+ * would place the first row hundreds of px below the scroller's visible top,
+ * a genuine blank strip — so the bound below is on the remainder's own range,
+ * not on matching it to a value taken at a different scroll offset.
  */
 export const HeaderResizeRepaints: Story = {
   render: function HeaderResizeRepaintsTable() {
@@ -528,33 +543,41 @@ export const HeaderResizeRepaints: Story = {
       </Box>
     );
   },
-  // What FUT-2678 fixes only shows up at a scroll offset the header's height
-  // change can leave stale: the check is inherently about scroll position.
+  // The default `rowHeight` (`tableRowHeight`'s fallback), at this story's
+  // default (unscaled) theme.
   play: async ({ canvasElement }) => {
+    const PITCH = 52;
     const canvas = within(canvasElement);
     const table = canvas.getByRole('table');
     const scroller = table.parentElement as HTMLElement;
 
+    // What FUT-2678 fixes only shows up at a scroll offset the header's
+    // height change can leave stale: the check is inherently about scroll
+    // position.
     // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see the play function comment above.
     scroller.scrollTop = 3000;
     scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
     await waitTwoFrames();
 
-    const beforeTop = scroller.getBoundingClientRect().top;
-    const firstRowBefore = table.querySelector('tbody tr[aria-hidden]')?.nextElementSibling;
-    const beforeGap = firstRowBefore
-      ? firstRowBefore.getBoundingClientRect().top - beforeTop
-      : 0;
-
     await userEvent.click(canvas.getByTestId('grow-header'));
-    await waitTwoFrames();
 
-    const afterTop = scroller.getBoundingClientRect().top;
-    const firstRowAfter = table.querySelector('tbody tr[aria-hidden]')?.nextElementSibling;
-    const afterGap = firstRowAfter ? firstRowAfter.getBoundingClientRect().top - afterTop : 0;
+    // `ResizeObserver` notifications are scheduled by the browser's own
+    // rendering opportunities, not chained to a fixed count of
+    // `requestAnimationFrame` calls, so this polls for the settled state
+    // (bounded below) instead of asserting after an arbitrary pause.
+    await waitFor(
+      () => {
+        const top = scroller.getBoundingClientRect().top;
+        const firstRow = table.querySelector('tbody tr[aria-hidden]')?.nextElementSibling;
+        const gap = firstRow ? firstRow.getBoundingClientRect().top - top : 0;
 
-    // No blank strip: the first visible data row still starts at (about) the
-    // top of the scroller's body area, not 400px into it.
-    await expect(Math.abs(afterGap - beforeGap)).toBeLessThanOrEqual(2);
+        // No blank strip: the stale-window bug placed the first row hundreds
+        // of px below the scroller's visible top (the header's real growth,
+        // roughly), which is nothing like a floor-division remainder.
+        expect(gap).toBeGreaterThan(-PITCH);
+        expect(gap).toBeLessThanOrEqual(0);
+      },
+      { timeout: 2000 },
+    );
   },
 };
