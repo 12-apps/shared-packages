@@ -15,6 +15,9 @@
  *   shows. The words are the host's.
  * - {@link createMenuGate} and {@link sameMenu} — redrawing an application
  *   menu without replacing it under an open popup.
+ * - {@link buildAppMenu} and {@link updateText} — the menu bar itself, with
+ *   the updater under Help and the host's own entries first under File. The
+ *   Electron half is `installAppMenu` and `wireUpdates` in `./electron`.
  */
 export {
   CHECK_EVERY_MS,
@@ -31,3 +34,12 @@ export {
 export { createAutoInstall, INSTALL_GRACE_MS, INSTALL_RETRY_MS } from "./auto-install";
 export { updateBanner, type UpdateBanner, type UpdateBannerCopy } from "./update-banner";
 export { createMenuGate, menuUpdateState, sameMenu, type MenuGate } from "./menu";
+export {
+  buildAppMenu,
+  updateText,
+  type AppMenuActions,
+  type AppMenuInput,
+  type AppMenuItem,
+  type MenuCopy,
+  type UpdateCopy,
+} from "./app-menu";

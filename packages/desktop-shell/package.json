@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "sideEffects": false,
-  "description": "The reusable half of a desktop AGENT: a background Electron app that signs in against the host's own web sign-in page (no second credential path), keeps working from the tray with every window closed, and starts with the machine on Windows, macOS and Linux. Framework-free core (the status a tray draws, the supervisor that keeps background work alive) plus an injected-port Electron adapter, so everything but the adapter is testable with no Electron and no display.",
+  "description": "The reusable half of a desktop AGENT: a background Electron app that signs in against the host's own web sign-in page (no second credential path), keeps working from the tray with every window closed, and starts with the machine on Windows, macOS and Linux. Framework-free core (the status a tray draws, the supervisor that keeps background work alive) plus an injected-port Electron adapter (with the updater's menu bar and wiring) and a web-host half (./server: serving builds, the crash-report intake), so everything but the adapter is testable with no Electron and no display.",
   "exports": {
     ".": "./src/index.ts",
     "./autostart": "./src/autostart/index.ts",
@@ -11,6 +11,7 @@
     "./electron": "./src/electron/index.ts",
     "./telemetry": "./src/telemetry/index.ts",
     "./updates": "./src/updates/index.ts",
+    "./server": "./src/server/index.ts",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -33,17 +34,22 @@
     "eslint": "^9.39.1",
     "eslint-plugin-test-flakiness": "^1.4.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "zod": "^4.3.5"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": ">=3.700.0",
-    "electron": ">=30.0.0"
+    "electron": ">=30.0.0",
+    "zod": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "@aws-sdk/client-s3": {
       "optional": true
     },
     "electron": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   },

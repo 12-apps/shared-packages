@@ -12,6 +12,7 @@ surfaces; when the library updates, every host updates with no app changes.
 | **ESC/POS** | `…/escpos` | `encodeTicket(lines)`. No configuration: the command set is the universally implemented core and the code page is CP850. |
 | **HTML** | `…/html` | `renderTicketHtml(lines, paperWidthMm, lang)`. Hand the string to a tab that prints it. |
 | **Socket** | `…/net` | `sendToNetworkPrinter(host, port, bytes)`. Node-only; behind its own subpath so a browser bundle never resolves `node:net`. |
+| **Electron** | `…/electron` | `printHtml({ html: renderTicketHtml(…), deviceName, session })` from an Electron main process. Map `PrintRefusedError.reason` (or its absence) to your own sentence; a load failure is Electron's own error. |
 | **Routing** | `…/routing` | `printerFor(printerRoute(rows), destinationId)`. Generic over your rows — pass them straight in. |
 | **Prisma** | — none | This package owns **no models**. Printers and print jobs are host tables; see below. |
 

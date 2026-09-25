@@ -3,6 +3,8 @@
 A **leaf library for a second process.** It mounts nothing in your web app: it
 is consumed by an Electron main process that talks to your host over HTTP, so
 there is no route to register, no table to migrate and no manifest to wire.
+Its `./server` half is plain functions your OWN routes call once they have
+authenticated the caller.
 (Recorded as an argued exemption in `.wiring-conformance.json`.)
 
 ## The standardized surfaces
@@ -15,9 +17,12 @@ there is no route to register, no table to migrate and no manifest to wire.
 | **Electron** | `…/electron` | `startDesktopShell(options)` → the tray, the windows, the single-instance lock. Returns `null` when this process is a second copy. |
 | **Telemetry** | `…/telemetry`, `…/electron` | `startCrashReporting()` → `{ telemetry, started }`, before `app.whenReady()`. `telemetry.breadcrumb(text)` as things happen; `telemetry.flush(send)` whenever there is a session to send with. |
 | **Updates** | `…/updates`, `…/electron` | `createUpdateManager({ updater: autoUpdater, cookie, platform, settings, onState })`; feed `onState` into `createAutoInstall({ autoUpdate, busy, failedBefore, install })`. |
+| **Menu bar** | `…/updates`, `…/electron` | `wireUpdates({ create, telemetry, busy, autoUpdate, menuCopy, bannerCopy, extraMenuItems, showBanner, onWindowShown })` before `startDesktopShell` — see below. |
+| **Serving builds** | `…/server` | `serveDesktopAsset(request, { directory, assets, objectPrefix, missingCode, storage })` and `serveNamedDesktopAsset({ directory, objectPrefix, file, missingCode, storage })` from routes that authenticate first. `storage` is the host's bucket as `{ head, presign, get }`. |
+| **Crash intake** | `…/server` | `desktopReportSchema` as the route's body validator, `createReportBudget({ perHour })`, then log `describeDesktopReport(report, { label, fields })` as one line. Needs `zod`. |
 | **Releases** | bin `desktop-shell-upload-release` | Run from CI after `electron-builder`, with `@aws-sdk/client-s3` in the host's devDependencies. |
 | **Prisma** | — | **None.** This package owns no tables. |
-| **Wiring manifest** | — | **None, deliberately.** Nothing here is wired into a web host. |
+| **Wiring manifest** | — | **None, deliberately.** Nothing mounts itself in a web host: `…/server` is plain functions the host's own routes call after their auth. |
 
 ## What the host must supply
 
@@ -111,6 +116,40 @@ Four things to get right:
 4. **Crash reporting takes the single-instance lock first.** Call it before
    `startDesktopShell`; a second copy then leaves the running copy's marker
    alone, and an update's relaunch waits for the old process to let go.
+
+## The menu bar and one install path
+
+`wireUpdates` owns the menu bar (File with the host's `extraMenuItems` first,
+then Quit; Edit on macOS only; Help with the check, the restart, the version
+and the updater's state), the manual check's message box, breadcrumbs and
+auto-install. Every install — the host's button (`install()` on the manager
+it returns), the menu, the box, the automatic restart — calls
+`telemetry.installing(version)` first. The host keeps its windows:
+
+```ts
+const updates = wireUpdates({
+  create: (onState) => createUpdateManager({ updater: autoUpdater, platform, settings, onState }),
+  telemetry,
+  busy: () => workInProgress,
+  autoUpdate: () => prefs.autoUpdate,
+  menuCopy,              // every word, incl. `title` for the message box and `updates`
+  bannerCopy,
+  extraMenuItems: [{ label: myCopy.settings, click: openSettings }],
+  showBanner: (banner) => mainWindow()?.webContents.send("my-app:update", banner),
+  onWindowShown: (listener) => whenMainWindowShown(listener),
+});
+```
+
+The menu is never rebuilt while one of its popups is open, and only when what
+it says changes — both enforced in `installAppMenu`.
+
+## Serving builds and receiving reports
+
+The routes stay the host's: authentication, tenancy, paths and the logger.
+`…/server` answers once they have decided the caller may ask. The storage port
+answers "not there" as `false` / `null`; any error it throws reads the same, so
+a missing build is always the route's coded 404 and never a redirect to the
+bucket's error page. The S3 client behind it is the host's.
 
 ## Packaging
 

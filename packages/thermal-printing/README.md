@@ -64,10 +64,12 @@ mount.
 | `…/routing` | `printerRoute(printers)` / `printerFor(route, destinationId)` — per-destination with a default, generic over your own printer rows. |
 | `…/discovery` | `scanForPrinters(options?)` / `probePrinter(host, port?)` — find the address nobody wrote down. Node-only. |
 | `…/discovery/bridge` | `startDiscoveryBridge({ allowedOrigins })` — a loopback server an HTTPS page may call to run that scan. Node-only. |
+| `…/electron` | `printHtml({ html, deviceName, session? })` — an offscreen window, a silent print to a named device (or the default), destroyed after. A refusal rejects with `PrintRefusedError` (`reason: string \| null`, never a sentence). `electron` is an optional peer. |
 | `…/discovery/cli` | `runFinder({ allowedOrigins })` / `main(argv, env)` — the helper a merchant downloads, as a function to bundle. Node-only. |
 
 `./net` and `./discovery` sit behind their own subpaths so that importing the
-encoders into a browser bundle never drags `node:net` in.
+encoders into a browser bundle never drags `node:net` in, and `./electron`
+behind its own so that nothing else ever imports `electron`.
 
 ## Finding a printer nobody wrote the address of down
 
