@@ -519,3 +519,67 @@ export const Performance: Story = {
     </Stack>
   ),
 };
+
+// The rules' minimum run, in px at the default 16px root (FUT-2617).
+const MIN_RULE_PX = 16;
+
+const rulesOf = (group: HTMLElement): HTMLElement[] =>
+  Array.from(group.children).filter((el): el is HTMLElement => el.tagName === 'DIV');
+
+const heightOf = (el: Element): number => el.getBoundingClientRect().height;
+
+const middleOf = (el: Element): number => {
+  const { top, height } = el.getBoundingClientRect();
+  return top + height / 2;
+};
+
+export const VerticalLabelledRules: Story = {
+  name: '📐 Vertical Labelled Rules Test',
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Without a length, the column is as tall as the row', async () => {
+      const row = canvas.getByTestId('auto-row');
+      const group = canvas.getByTestId('auto-labelled');
+      await expect(heightOf(group)).toBeCloseTo(heightOf(row), 0);
+    });
+
+    await step('Without a length, both rules are drawn at one visible length', async () => {
+      const rules = rulesOf(canvas.getByTestId('auto-labelled'));
+      await expect(rules).toHaveLength(2);
+      const [first, second] = rules.map(heightOf);
+      await expect(first).toBeGreaterThanOrEqual(MIN_RULE_PX);
+      await expect(second).toBeCloseTo(first, 0);
+    });
+
+    await step('An explicit length wins exactly', async () => {
+      const rules = rulesOf(canvas.getByTestId('fixed-labelled'));
+      await expect(rules).toHaveLength(2);
+      for (const rule of rules) await expect(heightOf(rule)).toBe(80);
+    });
+
+    await step('An explicit length keeps the group centred in the row', async () => {
+      const row = canvas.getByTestId('fixed-row');
+      const group = canvas.getByTestId('fixed-labelled');
+      await expect(middleOf(group)).toBeCloseTo(middleOf(row), 0);
+    });
+  },
+  render: () => (
+    <Stack spacing={4} sx={{ p: 2 }}>
+      <Box data-testid="auto-row" sx={{ display: 'flex', alignItems: 'center', height: 120 }}>
+        <Typography>Left Content</Typography>
+        <Separator orientation="vertical" data-testid="auto-labelled">
+          OR
+        </Separator>
+        <Typography>Right Content</Typography>
+      </Box>
+      <Box data-testid="fixed-row" sx={{ display: 'flex', alignItems: 'center', height: 120 }}>
+        <Typography>Left Content</Typography>
+        <Separator orientation="vertical" length="80px" data-testid="fixed-labelled">
+          OR
+        </Separator>
+        <Typography>Right Content</Typography>
+      </Box>
+    </Stack>
+  ),
+};
