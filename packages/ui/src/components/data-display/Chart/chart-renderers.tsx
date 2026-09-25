@@ -29,6 +29,7 @@ import type { ChartProps, ChartSeries } from './Chart.types';
 import { ChartLegendContent, ChartTooltipContent } from './ChartComposables';
 import { buildChartContext, type ChartRenderContext } from './chart-context';
 import { uiInk } from '../../../tokens/ink';
+import { remPx } from '../../../tokens/relative';
 
 /**
  * Per-type Recharts renderers for the prop-driven Chart, dispatched from a
@@ -198,7 +199,7 @@ function renderPie(ctx: ChartRenderContext): React.ReactElement {
         cx="50%"
         cy="50%"
         outerRadius={ctx.sizeStyles.height / 3}
-        innerRadius={props.innerRadius ?? 0}
+        innerRadius={remPx(ctx.theme, props.innerRadius ?? 0)}
         fill={ctx.chartColors[0]}
         label={props.showValues ?? false}
         animationDuration={ctx.animationDuration}

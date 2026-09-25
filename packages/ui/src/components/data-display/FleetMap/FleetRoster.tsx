@@ -4,6 +4,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { rem } from '../../../tokens/relative';
 import { Skeleton } from '../../layout/Skeleton/Skeleton';
 
 import { freshnessOf } from './FleetMap.helpers';
@@ -196,8 +197,8 @@ function FleetRow({
         aria-hidden="true"
         data-testid={`${testId}-dot`}
         sx={{
-          width: FLEET_DOT.size,
-          height: FLEET_DOT.size,
+          width: rem(theme, FLEET_DOT.size),
+          height: rem(theme, FLEET_DOT.size),
           borderRadius: '50%',
           flexShrink: 0,
           backgroundColor: color,
@@ -229,13 +230,14 @@ function FleetRow({
  * against 12px on a re-themed host.
  */
 function FirstLoad({ testId }: { testId: string }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <Stack spacing={FLEET_SKELETON.gapUnits} data-testid={`${testId}-skeleton`} aria-hidden="true">
       {Array.from({ length: FLEET_SKELETON.rows }, (_, row) => (
         <Skeleton
           key={row}
           variant="rectangular"
-          height={FLEET_SKELETON.height}
+          height={rem(theme, FLEET_SKELETON.height)}
           borderRadius={FLEET_SKELETON.radiusMultiple}
         />
       ))}
@@ -304,8 +306,8 @@ export function FleetRoster({
         overflowY: 'auto',
         minWidth: 0,
         '&:focus-visible': {
-          outline: `${FLEET_ROSTER.focusRingWidth}px solid ${theme.palette.primary.main}`,
-          outlineOffset: FLEET_ROSTER.focusRingOffset,
+          outline: `${rem(theme, FLEET_ROSTER.focusRingWidth)} solid ${theme.palette.primary.main}`,
+          outlineOffset: rem(theme, FLEET_ROSTER.focusRingOffset),
         },
       }}
     >

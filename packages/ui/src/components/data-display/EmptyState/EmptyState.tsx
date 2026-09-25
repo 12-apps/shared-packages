@@ -27,6 +27,7 @@ import {
 } from './EmptyState.metrics';
 import type { EmptyStateProps, EmptyStateVariant } from './EmptyState.types';
 import { resolveTestId } from '../../../platform/test-id';
+import { rem, sxRem } from '../../../tokens/relative';
 
 /** The shared action list names its glyph; the web draws it with MUI's icon. */
 const ACTION_ICONS: Record<ActionIconName, React.ReactNode> = {
@@ -42,7 +43,7 @@ const Illustration: React.FC<{
   <Box
     data-testid={testId}
     sx={{
-      maxWidth: illustrationMaxWidth(variant),
+      maxWidth: sxRem(illustrationMaxWidth(variant)),
       width: '100%',
       height: 'auto',
       opacity: illustrationOpacity(variant),
@@ -73,7 +74,7 @@ const Actions: React.FC<{
           onClick={spec.onClick}
           startIcon={spec.icon && ACTION_ICONS[spec.icon]}
           data-testid={testId(spec.key)}
-          sx={{ minWidth: ACTION_MIN_WIDTH }}
+          sx={{ minWidth: sxRem(ACTION_MIN_WIDTH) }}
         >
           {spec.label}
         </Button>
@@ -130,7 +131,7 @@ const Content: React.FC<{
         sx={{
           fontWeight: theme.typography.fontWeightMedium,
           color: theme.palette.text.primary,
-          maxWidth: TITLE_MAX_WIDTH,
+          maxWidth: rem(theme, TITLE_MAX_WIDTH),
         }}
       >
         {title}
@@ -142,7 +143,7 @@ const Content: React.FC<{
           color="text.secondary"
           data-testid={testId('description')}
           sx={{
-            maxWidth: DESCRIPTION_MAX_WIDTH,
+            maxWidth: rem(theme, DESCRIPTION_MAX_WIDTH),
             lineHeight: DESCRIPTION_LINE_HEIGHT,
           }}
         >
@@ -192,7 +193,7 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo((props) => {
         justifyContent: 'center',
         textAlign: 'center',
         padding: theme.spacing(EMPTY_STATE_PADDING_UNITS),
-        minHeight: EMPTY_STATE_MIN_HEIGHT,
+        minHeight: rem(theme, EMPTY_STATE_MIN_HEIGHT),
         gap: theme.spacing(EMPTY_STATE_GAP_UNITS),
       }}
     >

@@ -1,12 +1,13 @@
 import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
-import { styled, useTheme } from '@mui/material/styles/index.js';
+import { styled, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 import { Skeleton } from '../../layout/Skeleton';
 import type { ResolvedLazyImageProps } from './LazyImage.hooks';
 import { imgPassThrough, resolveLazyImageProps, useLazyImage } from './LazyImage.hooks';
 import type { LazyImageProps } from './LazyImage.types';
 import { sheen } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const ImageContainer = styled(Box)(() => ({
   position: 'relative',
@@ -52,13 +53,28 @@ const FallbackContainer = styled(Box)(({ theme }) => ({
   left: 0,
 }));
 
-/** The box the image occupies, shared by the real image and every stand-in for it. */
+type Length = number | string | undefined;
+
+/** A length prop as React `style` and MUI's `Skeleton` read it: a number is design px. */
+const styleLength = (theme: Theme, value: Length): string | undefined =>
+  typeof value === 'number' ? rem(theme, value) : value;
+
+/**
+ * A length prop as `sx` reads it on a width or height: a number of 1 or less is
+ * a fraction of the parent, and that stays so; any other number is design px.
+ */
+const sxLength = (theme: Theme, value: Length): string | undefined => {
+  if (typeof value !== 'number') return value;
+  return value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value);
+};
+
+/** The box the image occupies, as CSS, shared by the real image and every stand-in for it. */
 interface BoxMetrics {
-  width?: number | string;
-  height?: number | string;
+  width?: string;
+  height?: string;
   objectFit: NonNullable<LazyImageProps['objectFit']>;
   objectPosition: string;
-  borderRadius?: number | string;
+  borderRadius?: string;
 }
 
 interface IndicatorProps {
@@ -66,17 +82,20 @@ interface IndicatorProps {
   metrics: BoxMetrics;
 }
 
-const SkeletonIndicator: React.FC<IndicatorProps> = ({ props, metrics }) => (
-  <Skeleton
-    variant="rectangular"
-    width={metrics.width || '100%'}
-    height={metrics.height || 200}
-    animation={props.skeletonProps.animation || 'pulse'}
-    intensity={props.skeletonProps.intensity}
-    borderRadius={props.borderRadius}
-    data-testid={`${props['data-testid']}-skeleton`}
-  />
-);
+const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
+  const theme = useTheme();
+  return (
+    <Skeleton
+      variant="rectangular"
+      width={styleLength(theme, props.width || '100%')}
+      height={styleLength(theme, props.height || 200)}
+      animation={props.skeletonProps.animation || 'pulse'}
+      intensity={props.skeletonProps.intensity}
+      borderRadius={props.borderRadius}
+      data-testid={`${props['data-testid']}-skeleton`}
+    />
+  );
+};
 
 const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
   const theme = useTheme();
@@ -85,7 +104,7 @@ const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
   return (
     <SpinnerOverlay>
       <CircularProgress
-        size={spinnerProps.size || 40}
+        size={styleLength(theme, spinnerProps.size || 40)}
         thickness={spinnerProps.thickness || 4}
         sx={{ color: spinnerProps.color || theme.palette.primary.main }}
         data-testid={`${props['data-testid']}-spinner`}
@@ -129,7 +148,8 @@ const LoadingIndicator: React.FC<
 };
 
 const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
-  const { alt, fallback, borderRadius } = props;
+  const theme = useTheme();
+  const { alt, fallback, width, height, borderRadius } = props;
   const testId = props['data-testid'];
 
   if (!fallback) return null;
@@ -149,7 +169,7 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
 
   return (
     <FallbackContainer
-      sx={{ width: metrics.width, height: metrics.height, borderRadius }}
+      sx={{ width: sxLength(theme, width), height: sxLength(theme, height), borderRadius }}
       data-testid={`${testId}-fallback`}
     >
       {fallback}
@@ -163,6 +183,7 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
  */
 export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps) {
   const props = resolveLazyImageProps(rawProps);
+  const theme = useTheme();
   const {
     state,
     containerRef,
@@ -176,18 +197,22 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
   const { width, height, borderRadius, alt } = props;
   const testId = props['data-testid'];
   const metrics: BoxMetrics = {
-    width,
-    height,
+    width: styleLength(theme, width),
+    height: styleLength(theme, height),
     objectFit: props.objectFit,
     objectPosition: props.objectPosition,
-    borderRadius,
+    borderRadius: styleLength(theme, borderRadius),
   };
 
   return (
     <ImageContainer
       ref={containerRef}
       className={props.className}
-      sx={{ width: width || 'auto', height: height || 'auto', borderRadius }}
+      sx={{
+        width: sxLength(theme, width || 'auto'),
+        height: sxLength(theme, height || 'auto'),
+        borderRadius,
+      }}
       data-testid={testId}
     >
       {showLoading && (

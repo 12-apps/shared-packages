@@ -6,7 +6,9 @@ import { DescriptionItem, type DescriptionItemProps } from "../DescriptionItem";
 import { RAIL_GAP_PX } from "./list-card-rails";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
-import { sxRem } from "../../../tokens/relative";
+import type { Theme } from "@mui/material/styles/index.js";
+
+import { rem, sxRem } from "../../../tokens/relative";
 
 /**
  * WHAT SITS IN EACH RAIL.
@@ -150,7 +152,7 @@ export function ListCardMeta({
   return (
     <Box
       data-slot="meta"
-      sx={{
+      sx={(theme) => ({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-evenly",
@@ -161,8 +163,8 @@ export function ListCardMeta({
         whiteSpace: "nowrap",
         ...TABULAR,
         // Rung 1 of the ladder.
-        [`@container (max-width: ${META_BREAK}px)`]: { display: "none" },
-      }}
+        [`@container (max-width: ${rem(theme, META_BREAK)})`]: { display: "none" },
+      })}
     >
       {items.map((item, index) => (
         <Fragment key={`${item.label}-${index}`}>
@@ -209,10 +211,10 @@ export function ListCardMeta({
  * `META_BREAK` the cluster (and its rule) are gone, so the gap comes back —
  * otherwise the value would sit straight against the title.
  */
-const VALUE_FLUSH = {
-  marginLeft: `-${RAIL_GAP_PX}px`,
-  [`@container (max-width: ${META_BREAK}px)`]: { marginLeft: 0 },
-} as const;
+const valueFlush = (theme: Theme) => ({
+  marginLeft: rem(theme, -RAIL_GAP_PX),
+  [`@container (max-width: ${rem(theme, META_BREAK)})`]: { marginLeft: 0 },
+});
 
 /** The value, on its own rail, never truncated and never shunted by the chip. */
 function ListCardValue({ value }: { value: ReactNode }): React.JSX.Element {
@@ -305,10 +307,10 @@ export function ListCardTail({
     <>
       <Box
         data-slot="value"
-        sx={{
+        sx={(theme) => ({
           textAlign: "right",
-          ...(separated && value != null ? VALUE_FLUSH : {}),
-        }}
+          ...(separated && value != null ? valueFlush(theme) : {}),
+        })}
         data-testid={testId("value")}
       >
         {value != null && <ListCardValue value={value} />}

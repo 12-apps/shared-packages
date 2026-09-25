@@ -1,12 +1,15 @@
 import { keyframes } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 
-export const pulseAnimation = keyframes`
+import { rem } from '../../../tokens/relative';
+
+export const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 10px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 10)} currentColor;
     opacity: 0;
   }
   100% {

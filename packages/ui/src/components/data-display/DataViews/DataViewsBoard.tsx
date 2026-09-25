@@ -1,10 +1,13 @@
 "use client";
 
+import { useTheme, type Theme } from "@mui/material/styles/index.js";
+
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import type { DataViewCardSelection } from "./data-views-types";
+import { rem } from "../../../tokens/relative";
 
 /**
  * One column of the board — a single value of the grouping field, with the label
@@ -179,7 +182,8 @@ interface BoardColumnProps<T extends Record<string, unknown>> {
   selectedIds: Set<string | number>;
   onToggleId: (id: string | number) => void;
   cardScale: number;
-  width: number;
+  /** The column's width as CSS, already through the type scale. */
+  width: string;
   testId: string;
 }
 
@@ -201,12 +205,12 @@ function BoardColumn<T extends Record<string, unknown>>({
     <Box
       data-testid={testId}
       sx={{
-        flex: `0 0 ${width}px`,
+        flex: `0 0 ${width}`,
         minWidth: width,
         display: "flex",
         flexDirection: "column",
         gap: 1,
-        borderTop: 3,
+        borderTop: (theme: Theme) => `${rem(theme, 3)} solid`,
         borderStyle: "solid",
         borderColor: toneColor(column.tone),
         borderRadius: 1,
@@ -257,10 +261,13 @@ interface DataViewsBoardProps<T extends Record<string, unknown>> {
   dataTestId?: string;
 }
 
-/** The board's column width at scale 1; the zoom slider multiplies it. */
-const BASE_COLUMN_WIDTH = 240;
-/** Never narrower than this, however far the zoom is wound down (touch targets). */
-const MIN_COLUMN_WIDTH = 220;
+/**
+ * The board's column width: 240 design px at scale 1, which the zoom slider
+ * multiplies, and never narrower than 220 however far the zoom is wound down
+ * (touch targets) — through the type scale.
+ */
+const columnWidth = (theme: Theme, cardScale: number): string =>
+  rem(theme, Math.max(220, Math.round(240 * cardScale)));
 
 /**
  * The BOARD layout: the loaded page distributed into columns of the entity's own
@@ -287,8 +294,9 @@ export function DataViewsBoard<T extends Record<string, unknown>>({
   dataTestId,
 }: DataViewsBoardProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
+  const theme = useTheme();
   const columns = groupRows(rows, board);
-  const width = Math.max(MIN_COLUMN_WIDTH, Math.round(BASE_COLUMN_WIDTH * cardScale));
+  const width = columnWidth(theme, cardScale);
   const testId = dataTestId ? `${dataTestId}-board` : "data-views-board";
   return (
     <Box sx={{ mt: 1.5 }}>

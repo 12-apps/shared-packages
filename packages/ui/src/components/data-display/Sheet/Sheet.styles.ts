@@ -4,7 +4,9 @@ import type React from 'react';
 
 import { glowAnimation, pulseAnimation, shimmerAnimation } from './Sheet.animations';
 import type { SheetProps } from './Sheet.types';
+import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height';
 import { shadowInk, sheen } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 import { accentFor } from '../../../tokens/scales';
 
 type Position = NonNullable<SheetProps['position']>;
@@ -15,18 +17,19 @@ type Color = NonNullable<SheetProps['color']>;
 const isHorizontalPosition = (position: Position) => position === 'left' || position === 'right';
 
 /**
- * Horizontal (left/right) sheets are viewport-aware: a px floor keeps the panel
+ * Horizontal (left/right) sheets are viewport-aware: a design-px floor (through
+ * `rem`) keeps the panel
  * usable, `…vw` lets the larger presets grow on wide screens (lg ≥32%, xl ≥40%
  * of the viewport), and the outer `min(92vw, …)` guarantees the panel never
  * overflows a small screen.
  */
-const HORIZONTAL_SIZES: Record<Size, string> = {
-  xs: 'min(92vw, 240px)',
-  sm: 'min(92vw, 320px)',
-  md: 'min(92vw, 400px)',
-  lg: 'min(92vw, max(560px, 32vw))',
-  xl: 'min(92vw, max(720px, 40vw))',
-  full: '100%',
+const HORIZONTAL_SIZES: Record<Size, (theme: Theme) => string> = {
+  xs: (theme) => `min(92vw, ${rem(theme, 240)})`,
+  sm: (theme) => `min(92vw, ${rem(theme, 320)})`,
+  md: (theme) => `min(92vw, ${rem(theme, 400)})`,
+  lg: (theme) => `min(92vw, max(${rem(theme, 560)}, 32vw))`,
+  xl: (theme) => `min(92vw, max(${rem(theme, 720)}, 40vw))`,
+  full: () => '100%',
 };
 
 /**
@@ -42,12 +45,12 @@ const HORIZONTAL_SIZES: Record<Size, string> = {
  * `full` is absent on purpose: it is not a ceiling, it is the whole viewport,
  * and `sizeStyles` answers it before it gets here.
  */
-const VERTICAL_SIZES: Record<Exclude<Size, 'full'>, string> = {
-  xs: 'min(200px, 100%)',
-  sm: 'min(300px, 100%)',
-  md: 'min(400px, 100%)',
-  lg: 'min(500px, 100%)',
-  xl: 'min(600px, 100%)',
+const VERTICAL_SIZES: Record<Exclude<Size, 'full'>, (theme: Theme) => string> = {
+  xs: (theme) => `min(${rem(theme, 200)}, 100%)`,
+  sm: (theme) => `min(${rem(theme, 300)}, 100%)`,
+  md: (theme) => `min(${rem(theme, 400)}, 100%)`,
+  lg: (theme) => `min(${rem(theme, 500)}, 100%)`,
+  xl: (theme) => `min(${rem(theme, 600)}, 100%)`,
 };
 
 /**
@@ -64,9 +67,10 @@ const VERTICAL_SIZES: Record<Exclude<Size, 'full'>, string> = {
  * this axis — and it becomes meaningful here for the first time: it used to
  * name the behaviour every bottom sheet already had.
  */
-const VERTICAL_MAX_WIDTH = 'min(100%, 640px)';
+const verticalMaxWidth = (theme: Theme): string => `min(100%, ${rem(theme, 640)})`;
 
 interface SizeStyleInput {
+  theme: Theme;
   position: Position;
   size: Size;
   isDraggableVariant: boolean;
@@ -74,13 +78,14 @@ interface SizeStyleInput {
 }
 
 const sizeStyles = ({
+  theme,
   position,
   size,
   isDraggableVariant,
   currentHeight,
 }: SizeStyleInput) => {
   if (isHorizontalPosition(position)) {
-    return { width: HORIZONTAL_SIZES[size] ?? HORIZONTAL_SIZES.md };
+    return { width: (HORIZONTAL_SIZES[size] ?? HORIZONTAL_SIZES.md)(theme) };
   }
 
   // `full` is not a size on the scale — it is THE WHOLE VIEWPORT, on both axes,
@@ -94,7 +99,7 @@ const sizeStyles = ({
   // variant needs it too — dragging moves the panel's height, never its width.
   // `marginInline` is what centres it: MUI pins the bottom paper `left: 0;
   // right: 0`, so a definite width plus auto margins resolves to the middle.
-  const cross = { width: VERTICAL_MAX_WIDTH, marginInline: 'auto' };
+  const cross = { width: verticalMaxWidth(theme), marginInline: 'auto' };
 
   // The draggable variant owns its own height: the snap point decides it, so a
   // preset would fight the drag.
@@ -108,7 +113,7 @@ const sizeStyles = ({
     // rather than left off so the rule survives a caller who set a height on a
     // previous render, and it is what lets the panel hug what it holds.
     height: 'auto',
-    maxHeight: VERTICAL_SIZES[size] ?? VERTICAL_SIZES.md,
+    maxHeight: (VERTICAL_SIZES[size] ?? VERTICAL_SIZES.md)(theme),
   };
 };
 
@@ -162,10 +167,10 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => Record<string, unknown>
   draggable: ({ theme, elevation, accent }) => ({
     boxShadow: `
             ${theme.shadows[Math.min(elevation + 4, 24)]},
-            0 -2px 10px 0 ${shadowInk(theme, 0.1)}
+            ${rems(theme, 0, -2, 10, 0)} ${shadowInk(theme, 0.1)}
           `,
     border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-    borderTop: `2px solid ${alpha(accent, 0.3)}`,
+    borderTop: `${rem(theme, 2)} solid ${alpha(accent, 0.3)}`,
     transition: theme.transitions.create(['transform', 'box-shadow', 'border-color'], {
       duration: theme.transitions.duration.shorter,
       easing: theme.transitions.easing.easeInOut,
@@ -175,12 +180,12 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => Record<string, unknown>
 
   glass: ({ theme, glass }) => ({
     backgroundColor: alpha(theme.palette.background.paper, glass ? 0.75 : 0.95),
-    backdropFilter: 'blur(24px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+    backdropFilter: `blur(${rem(theme, 24)}) saturate(180%)`,
+    WebkitBackdropFilter: `blur(${rem(theme, 24)}) saturate(180%)`,
     border: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
     boxShadow: `
-            0 8px 32px 0 ${shadowInk(theme, 0.15)},
-            inset 0 0 0 1px ${sheen(theme, 0.1)}
+            ${rems(theme, 0, 8, 32, 0)} ${shadowInk(theme, 0.15)},
+            inset 0 0 0 ${FIELD_BORDER_WIDTH}px ${sheen(theme, 0.1)}
           `,
   }),
 
@@ -201,7 +206,7 @@ const SURFACES: Record<Variant, (input: SurfaceInput) => Record<string, unknown>
   elevated: ({ theme, elevation }) => ({
     boxShadow: `
             ${theme.shadows[elevation]},
-            0 20px 40px -15px ${shadowInk(theme, 0.15)}
+            ${rems(theme, 0, 20, 40, -15)} ${shadowInk(theme, 0.15)}
           `,
     transform: 'translateZ(0)',
     willChange: 'transform',
@@ -226,7 +231,7 @@ const shimmerOverlay = (theme: Theme) => ({
               ${sheen(theme, 0.2)},
               transparent
             )`,
-  animation: `${shimmerAnimation} 3s infinite`,
+  animation: `${shimmerAnimation(theme)} 3s infinite`,
 });
 
 /**
@@ -267,8 +272,8 @@ const variantStyles = (input: VariantStyleInput) => {
     ...baseSurface(input, accent),
     // glow first, then pulse: with both set the pulse keyframes win the shared
     // `animation` slot, which is the order the original spread produced.
-    ...(glow && { animation: `${glowAnimation} 2s ease-in-out infinite`, filter: 'brightness(1.05)' }),
-    ...(pulse && { animation: `${pulseAnimation} 2s infinite`, position: 'relative' as const }),
+    ...(glow && { animation: `${glowAnimation(theme)} 2s ease-in-out infinite`, filter: 'brightness(1.05)' }),
+    ...(pulse && { animation: `${pulseAnimation(theme)} 2s infinite`, position: 'relative' as const }),
     ...(rounded && roundedStyles(theme, position)),
     ...(SURFACES[variant] ?? SURFACES.default)({ ...input, accent }),
   };
@@ -289,7 +294,7 @@ interface PanelSxInput extends VariantStyleInput {
  * branches of its own — the cross-axis rule below is four on its own.
  */
 export const panelSx = (input: PanelSxInput): CSSObject => {
-  const { position, size, isDraggableVariant, isVerticalSheet, currentHeight, fullHeight, style } =
+  const { theme, position, size, isDraggableVariant, isVerticalSheet, currentHeight, fullHeight, style } =
     input;
 
   return {
@@ -301,7 +306,7 @@ export const panelSx = (input: PanelSxInput): CSSObject => {
     // `left: -100%` and a full-width panel put it off-screen; a 640px one puts
     // it on the backdrop beside the sheet.
     overflow: 'visible',
-    ...sizeStyles({ position, size, isDraggableVariant, currentHeight }),
+    ...sizeStyles({ theme, position, size, isDraggableVariant, currentHeight }),
     // A COLUMN, so `maxHeight` above can be a ceiling rather than a height: the
     // body is then a flex item that shrinks against it, and the scrolling falls
     // to `SheetContent` where it belongs. Without this the panel would clip a

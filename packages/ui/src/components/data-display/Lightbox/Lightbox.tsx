@@ -14,13 +14,14 @@ import { LightboxStage } from './LightboxStage';
 import { LightboxThumbnails } from './LightboxThumbnails';
 import { useLightbox } from './useLightbox';
 import { scrim } from '../../../tokens/ink';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const DIALOG_STATIC_PROPS = {
   maxWidth: false,
   fullScreen: true,
   TransitionComponent: Fade,
   TransitionProps: { timeout: 300 },
-  PaperProps: { sx: { background: (theme: Theme) => scrim(theme, 0.9), backdropFilter: 'blur(2px)' } },
+  PaperProps: { sx: { background: (theme: Theme) => scrim(theme, 0.9), backdropFilter: (theme: Theme) => `blur(${rem(theme, 2)})` } },
   'aria-label': 'Lightbox',
   'aria-labelledby': 'lightbox-title',
   role: 'dialog',
@@ -49,7 +50,7 @@ export const Lightbox = React.forwardRef<LightboxRef, LightboxProps>((componentP
       data-testid={dataTestId || 'lightbox'}
     >
       {/* Visually hidden title for screen readers */}
-      <Typography id="lightbox-title" variant="h6" sx={{ position: 'absolute', left: -10000 }}>
+      <Typography id="lightbox-title" variant="h6" sx={{ position: 'absolute', left: sxRem(-10000) }}>
         Lightbox - {currentItem?.alt || `Item ${currentIndex + 1} of ${items.length}`}
       </Typography>
 

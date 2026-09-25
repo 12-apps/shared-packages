@@ -11,7 +11,7 @@ import { withDefaults } from '../../../utils/withDefaults';
 import { useCarouselNavigation } from './Carousel.hooks';
 import { CarouselChrome } from './Carousel.chrome';
 import { CarouselTrack } from './Carousel.slide';
-import { containerStyles } from './Carousel.styles';
+import { containerStyles, frameBox } from './Carousel.styles';
 import type { CarouselItem, CarouselProps } from './Carousel.types';
 import { muiColor } from '../../../tokens/scales';
 
@@ -33,7 +33,6 @@ const DEFAULTS = {
   gradient: false,
   loading: false,
   disabled: false,
-  height: 400,
   width: '100%',
   pauseOnHover: true,
   indicatorPosition: 'bottom',
@@ -80,7 +79,7 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   );
 
   const frameSx = containerStyles({
-    theme, variant, size, color, height, width, glow, pulse, glass, gradient,
+    theme, variant, size, color, ...frameBox(theme, size, height, width), glow, pulse, glass, gradient,
   });
 
   if (loading) {

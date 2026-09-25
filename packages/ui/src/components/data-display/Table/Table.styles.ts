@@ -2,15 +2,15 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { TableDensity, TableStripeColor } from './Table.types';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
-const pulseAnimation = keyframes`
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 10px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 10)} currentColor;
     opacity: 0;
   }
   100% {
@@ -19,24 +19,25 @@ const pulseAnimation = keyframes`
   }
 `;
 
-// Density configurations
+// Density configurations. The row height stays design px (`…Px`) and goes
+// through `rem` where the cell is drawn.
 const getDensityConfig = (theme: Theme, density: TableDensity = 'normal') => {
   const configs = {
     compact: {
-      rowHeight: 36,
-      cellPadding: '6px 12px',
+      rowHeightPx: 36,
+      cellPadding: rems(theme, 6, 12),
       fontSize: rem(theme, 13),
-      headerPadding: '8px 12px' },
+      headerPadding: rems(theme, 8, 12) },
     normal: {
-      rowHeight: 52,
-      cellPadding: '12px 16px',
+      rowHeightPx: 52,
+      cellPadding: rems(theme, 12, 16),
       fontSize: rem(theme, 14),
-      headerPadding: '16px 16px' },
+      headerPadding: rems(theme, 16, 16) },
     comfortable: {
-      rowHeight: 68,
-      cellPadding: '18px 24px',
+      rowHeightPx: 68,
+      cellPadding: rems(theme, 18, 24),
       fontSize: rem(theme, 14),
-      headerPadding: '20px 24px' } };
+      headerPadding: rems(theme, 20, 24) } };
   return configs[density];
 };
 
@@ -86,7 +87,7 @@ const TABLE_VARIANTS: Record<string, (args: VariantArgs) => CSSObject> = {
         backgroundColor: stripeRowColor(theme, stripeColor) } }),
   glass: ({ theme }) => ({
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}` }),
   minimal: ({ theme }) => ({
       backgroundColor: 'transparent',
@@ -120,7 +121,7 @@ const stickyHeaderStyles = (
         zIndex: 100,
         backgroundColor: theme.palette.background.paper,
         '& .MuiTableCell-root': {
-          borderBottom: `2px solid ${theme.palette.divider}`,
+          borderBottom: `${rem(theme, 2)} solid ${theme.palette.divider}`,
           fontWeight: 600,
           padding: densityConfig.headerPadding } } });
 
@@ -135,7 +136,7 @@ const hoverableRowStyles = (theme: Theme): CSSObject => ({
 const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObject => {
   if (glow && pulse) return ({
       position: 'relative',
-      boxShadow: `0 0 20px 5px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      boxShadow: `${rems(theme, 0, 0, 20, 5)} ${alpha(theme.palette.primary.main, 0.3)} !important`,
       filter: 'brightness(1.05)',
       '&::after': {
         content: '""',
@@ -147,11 +148,11 @@ const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObjec
         borderRadius: 'inherit',
         backgroundColor: theme.palette.primary.main,
         opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
+        animation: `${pulseAnimation(theme)} 2s infinite`,
         pointerEvents: 'none',
         zIndex: -1 } });
   if (glow) return ({
-      boxShadow: `0 0 20px 5px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      boxShadow: `${rems(theme, 0, 0, 20, 5)} ${alpha(theme.palette.primary.main, 0.3)} !important`,
       filter: 'brightness(1.05)' });
   if (pulse) return ({
       position: 'relative',
@@ -165,7 +166,7 @@ const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObjec
         borderRadius: 'inherit',
         backgroundColor: theme.palette.primary.main,
         opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
+        animation: `${pulseAnimation(theme)} 2s infinite`,
         pointerEvents: 'none',
         zIndex: -1 } });
 
@@ -204,7 +205,7 @@ export const tableStyles = ({
     '& .MuiTableCell-root': {
       padding: densityConfig.cellPadding,
       fontSize: densityConfig.fontSize,
-      height: densityConfig.rowHeight },
+      height: rem(theme, densityConfig.rowHeightPx) },
 
     // Sticky header
     ...tableVariantStyles({ theme, densityConfig, stripeColor }, customVariant),

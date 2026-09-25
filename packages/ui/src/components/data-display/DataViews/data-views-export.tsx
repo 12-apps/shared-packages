@@ -4,6 +4,7 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import CircularProgress from "@mui/material/CircularProgress/index.js";
 import Popover from "@mui/material/Popover/index.js";
+import { useTheme, type Theme } from "@mui/material/styles/index.js";
 import { useState } from "react";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
@@ -12,7 +13,7 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import type { DataViewQuery } from "./data-views-types";
-import { sxRem } from "../../../tokens/relative";
+import { rem, sxRem } from "../../../tokens/relative";
 
 /**
  * EXPORT — the current QUERY, never the rendered page.
@@ -96,6 +97,7 @@ function ExportTrigger({
   compact?: boolean;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
+  const theme = useTheme();
   return (
     <Button
       variant="outline"
@@ -109,7 +111,7 @@ function ExportTrigger({
       title={compact ? copy.export.trigger : undefined}
     >
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-        {busy ? <CircularProgress size={14} /> : <DownloadRoundedIcon fontSize="small" />}
+        {busy ? <CircularProgress size={rem(theme, 14)} /> : <DownloadRoundedIcon fontSize="small" />}
         {!compact && (
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
             {copy.export.triggerLabel}
@@ -246,7 +248,7 @@ export function DataViewsExportMenu({
         onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{ paper: { sx: { width: 260, maxWidth: "calc(100vw - 32px)" } } }}
+        slotProps={{ paper: { sx: { width: sxRem(260), maxWidth: (theme: Theme) => `calc(100vw - ${rem(theme, 32)})` } } }}
       >
         <ExportPanel
           formats={config.formats ?? ALL_FORMATS}

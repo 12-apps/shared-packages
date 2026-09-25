@@ -7,10 +7,10 @@ import React from 'react';
 
 import type { ChartProps } from './Chart.types';
 import { ChartContainer } from './ChartComposables';
-import { getSizeStyles, getVariantStyles } from './chart-internals';
+import { getSizeStyles, getVariantStyles, plotHeightPx } from './chart-internals';
 import { renderChartByType } from './chart-renderers';
 import { uiInk } from '../../../tokens/ink';
-import { muiColor } from '../../../tokens/scales';
+import { muiColor, rem } from '../../../tokens/scales';
 
 /**
  * Prop-driven Recharts wrapper (line/bar/area/pie/radar/scatter/composed)
@@ -97,8 +97,8 @@ export const Chart: React.FC<ChartProps> = (props) => {
       />
       <ChartContainer
         responsive={props.responsive ?? true}
-        width={props.width ?? '100%'}
-        height={props.fillHeight === true ? '100%' : sizeStyles.height}
+        width={typeof props.width === 'number' ? rem(theme, props.width) : (props.width ?? '100%')}
+        height={props.fillHeight === true ? '100%' : plotHeightPx(props.size, props.height)}
         data-testid={`${dataTestId}-container`}
       >
         {renderChartByType(props, theme)}

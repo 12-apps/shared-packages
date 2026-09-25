@@ -112,15 +112,15 @@ describe('resolveAxisConfig', () => {
 
 describe('resolveBarGeometry', () => {
   it('rounds the top corners and caps the width by default', () => {
-    expect(resolveBarGeometry({ data: [] })).toEqual({ radius: [3, 3, 0, 0], maxBarSize: 38 });
+    expect(resolveBarGeometry({ data: [] }, createTheme())).toEqual({ radius: [3, 3, 0, 0], maxBarSize: 38 });
   });
 
   it('keeps stacked segments square', () => {
-    expect(resolveBarGeometry({ data: [], stacked: true }).radius).toBe(0);
+    expect(resolveBarGeometry({ data: [], stacked: true }, createTheme()).radius).toBe(0);
   });
 
   it('honours caller overrides', () => {
-    expect(resolveBarGeometry({ data: [], barRadius: 8, maxBarWidth: 64 })).toEqual({
+    expect(resolveBarGeometry({ data: [], barRadius: 8, maxBarWidth: 64 }, createTheme())).toEqual({
       radius: [8, 8, 0, 0],
       maxBarSize: 64,
     });

@@ -111,7 +111,7 @@ export function BodyHeading({ children }: { children: ReactNode }): JSX.Element 
       sx={{
         fontSize: sxRem(11),
         fontWeight: 700,
-        letterSpacing: 0.4,
+        letterSpacing: sxRem(0.4),
         textTransform: 'uppercase',
         color: 'text.disabled',
         mb: 0.5,

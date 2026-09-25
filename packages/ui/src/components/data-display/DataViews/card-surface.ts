@@ -2,6 +2,7 @@ import { alpha, keyframes, type CSSObject, type Theme } from "@mui/material/styl
 
 import { fadeInScaleAnimation } from "../Badge/Badge.animations";
 import { shadowInk } from "../../../tokens/ink";
+import { rem, rems, sxRem } from "../../../tokens/relative";
 
 /**
  * A plain style object, not MUI's `SxProps`.
@@ -138,7 +139,7 @@ export interface CardSurfaceProps {
  * 3px takes the hard point off the corner without being seen as a curve.
  * `divider` rows override it back to 0; a bottom rule has no corners to round.
  */
-export const CARD_RADIUS = "3px";
+export const CARD_RADIUS = sxRem(3);
 
 /** Every slot's test id, derived from the card's one. */
 export function slotTestIds(testId: string | undefined): (slot: string) => string | undefined {
@@ -191,12 +192,12 @@ function variantSx(variant: CardSurfaceVariant, theme: Theme): CardSx {
     // over an image or a gradient the blur does the rest.
     return {
       backgroundColor: alpha(theme.palette.background.paper, 0.55),
-      backdropFilter: "blur(8px)",
+      backdropFilter: `blur(${rem(theme, 8)})`,
       // `divider` as-is. NOT `alpha(divider, …)`: MUI's `alpha` REPLACES the
       // channel rather than scaling it, and `divider` is already a 12% black —
       // so asking for 80% of it produced an 80% black slab of a border.
       borderColor: theme.palette.divider,
-      boxShadow: `0 1px 3px ${shadowInk(theme, 0.1)}`,
+      boxShadow: `0 ${rems(theme, 1, 3)} ${shadowInk(theme, 0.1)}`,
     };
   }
   return {};
@@ -224,14 +225,14 @@ const MOTION_OK = "@media (prefers-reduced-motion: no-preference)";
  * under reduced-motion, cannot bleed into a neighbour, and stacks cleanly
  * however many rows raise their hand. It is where operational tables land.
  */
-function accentBar(main: string): CardSx {
+function accentBar(theme: Theme, main: string): CardSx {
   return {
     "&::before": {
       content: '""',
       position: "absolute",
       insetInlineStart: 0,
       insetBlock: 0,
-      width: 3,
+      width: rem(theme, 3),
       borderStartStartRadius: "inherit",
       borderEndStartRadius: "inherit",
       backgroundColor: main,
@@ -256,12 +257,12 @@ function accentBar(main: string): CardSx {
  * light is somewhere else. It stays legible on a dark canvas, where the old
  * bloom was the brightest thing on the screen.
  */
-function liftSx(main: string): CardSx {
+function liftSx(theme: Theme, main: string): CardSx {
   return {
     boxShadow: [
-      `0 0 0 1px ${alpha(main, 0.45)}`,
-      `0 1px 2px ${alpha(main, 0.12)}`,
-      `0 8px 20px -6px ${alpha(main, 0.3)}`,
+      `0 0 0 ${rem(theme, 1)} ${alpha(main, 0.45)}`,
+      `0 ${rems(theme, 1, 2)} ${alpha(main, 0.12)}`,
+      `0 ${rems(theme, 8, 20, -6)} ${alpha(main, 0.3)}`,
     ].join(", "),
   };
 }
@@ -278,7 +279,7 @@ function liftSx(main: string): CardSx {
  * box-shadow keyframe repaints every frame, and fifty of them drop frames on
  * exactly the tablet a restaurant floor uses. This one is compositor-only.
  */
-function pulseSx(main: string): CardSx {
+function pulseSx(theme: Theme, main: string): CardSx {
   return {
     [MOTION_OK]: {
       "&::after": {
@@ -286,7 +287,7 @@ function pulseSx(main: string): CardSx {
         position: "absolute",
         inset: 0,
         borderRadius: "inherit",
-        border: `2px solid ${main}`,
+        border: `${rem(theme, 2)} solid ${main}`,
         animation: `${pulseRing} 1.6s ease-out 6`,
         pointerEvents: "none",
       },
@@ -295,18 +296,18 @@ function pulseSx(main: string): CardSx {
 }
 
 /** The emphasis treatments, in the terms the shape can actually carry. */
-function emphasisSx(emphasis: CardEmphasis, main: string, shape: CardShape): CardSx {
+function emphasisSx(theme: Theme, emphasis: CardEmphasis, main: string, shape: CardShape): CardSx {
   if (emphasis === "attention") {
     // The bar on both; the lift only where there is room for it to spread.
     return {
-      ...accentBar(main),
-      ...(shape === "tile" ? liftSx(main) : {}),
-      ...pulseSx(main),
+      ...accentBar(theme, main),
+      ...(shape === "tile" ? liftSx(theme, main) : {}),
+      ...pulseSx(theme, main),
     };
   }
   if (emphasis === "new") {
     return {
-      ...accentBar(main),
+      ...accentBar(theme, main),
       [MOTION_OK]: { animation: `${fadeInScaleAnimation} 240ms ease-out` },
     };
   }
@@ -370,10 +371,10 @@ export function cardSurfaceStyles(
     ...(showSelected
       ? {
           borderColor: `${color}.main`,
-          boxShadow: `inset 0 0 0 1px ${main}`,
+          boxShadow: `inset 0 0 0 ${rem(theme, 1)} ${main}`,
           backgroundColor: "action.selected",
         }
       : {}),
-    ...emphasisSx(emphasis, main, props.shape),
+    ...emphasisSx(theme, emphasis, main, props.shape),
   };
 }

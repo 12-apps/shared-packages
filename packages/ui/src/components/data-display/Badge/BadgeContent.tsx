@@ -31,7 +31,7 @@ const BadgeIcon: FC<{ icon: ReactNode; size: BadgeSize; testId: string }> = ({
       key="icon"
       data-testid={testId}
       style={{
-        fontSize: rem(theme, getSizeStyles(size).step.iconSize),
+        fontSize: rem(theme, getSizeStyles(theme, size).step.iconSize),
         display: 'inline-flex',
         alignItems: 'center',
       }}
@@ -62,6 +62,14 @@ const BadgeCloseButton: FC<{ size: BadgeSize; testId: string; onClose: (e: React
     <CloseIcon />
   </IconButton>
 );
+
+/** The row the parts sit in, `BADGE_CONTENT_GAP` apart. */
+const BadgeRun: FC<{ children: ReactNode }> = ({ children }) => {
+  const theme = useTheme();
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: rem(theme, BADGE_CONTENT_GAP) }}>{children}</span>
+  );
+};
 
 // The badge's inner run: optional icon, the content itself, optional close
 // button. A dot badge shows none of it.
@@ -105,7 +113,5 @@ export const buildBadgeContent = ({
 
   if (parts.length === 0) return null;
 
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: `${BADGE_CONTENT_GAP}px` }}>{parts}</span>
-  );
+  return <BadgeRun>{parts}</BadgeRun>;
 };

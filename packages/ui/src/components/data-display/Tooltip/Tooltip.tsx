@@ -5,7 +5,7 @@ import React from 'react';
 
 import type { TooltipProps } from './Tooltip.types';
 import { absoluteInk, neutralTones } from '../../../tokens/ink';
-import { sxRem } from '../../../tokens/relative';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 // Define pulse animation
 const pulseAnimation = keyframes`
@@ -24,12 +24,14 @@ const pulseAnimation = keyframes`
 `;
 
 const SIZE_MAP = {
-  sm: { fontSize: sxRem(12), padding: '4px 8px' },
-  md: { fontSize: sxRem(14), padding: '6px 12px' },
-  lg: { fontSize: sxRem(16), padding: '8px 16px' },
+  sm: { fontSize: sxRem(12), padding: (theme: Theme) => rems(theme, 4, 8) },
+  md: { fontSize: sxRem(14), padding: (theme: Theme) => rems(theme, 6, 12) },
+  lg: { fontSize: sxRem(16), padding: (theme: Theme) => rems(theme, 8, 16) },
 } as const;
 
-const getSizeStyles = (size?: string): { fontSize: (theme: Theme) => string; padding: string } =>
+const getSizeStyles = (
+  size?: string,
+): { fontSize: (theme: Theme) => string; padding: (theme: Theme) => string } =>
   SIZE_MAP[size as keyof typeof SIZE_MAP] || SIZE_MAP.md;
 
 const variantStyles = (theme: Theme, variant?: string): CSSObject => {
@@ -54,7 +56,7 @@ const variantStyles = (theme: Theme, variant?: string): CSSObject => {
     case 'glass':
       return {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
         color: theme.palette.text.primary,
       };
@@ -67,7 +69,7 @@ const variantStyles = (theme: Theme, variant?: string): CSSObject => {
 // out one by one, but each is just the union of whichever flags are set.
 const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObject => ({
   ...(glow && {
-    boxShadow: `0 0 15px 3px ${alpha(theme.palette.primary.main, 0.4)} !important`,
+    boxShadow: `${rems(theme, 0, 0, 15, 3)} ${alpha(theme.palette.primary.main, 0.4)} !important`,
     filter: 'brightness(1.05)',
   }),
   ...(pulse && {
@@ -103,7 +105,7 @@ const StyledTooltip = styled(MuiTooltip, {
     '& .MuiTooltip-tooltip': {
       borderRadius: theme.spacing(1),
       fontSize: sizeStyles.fontSize(theme),
-      padding: sizeStyles.padding,
+      padding: sizeStyles.padding(theme),
       fontWeight: 500,
       transition: 'all 0.3s ease',
       position: 'relative',
@@ -118,6 +120,17 @@ const StyledTooltip = styled(MuiTooltip, {
   };
 });
 
+/**
+ * The tooltip's cap: 300 design px unless the caller says otherwise. `sx` has
+ * always read a number of 1 or less as a fraction of the parent, and that stays so.
+ */
+const tooltipCap =
+  (maxWidth: number | undefined) =>
+  (theme: Theme): string => {
+    const cap = maxWidth ?? 300;
+    return cap <= 1 && cap !== 0 ? `${cap * 100}%` : rem(theme, cap);
+  };
+
 export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
   (
     {
@@ -125,7 +138,7 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
       size = 'md',
       glow = false,
       pulse = false,
-      maxWidth = 300,
+      maxWidth,
       dataTestId,
       children,
       ...props
@@ -152,7 +165,7 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
         disableTouchListener={false}
         slotProps={{
           tooltip: {
-            sx: { maxWidth },
+            sx: { maxWidth: tooltipCap(maxWidth) },
             role: 'tooltip',
             ...(dataTestId && { 'data-testid': `${dataTestId}-content` }),
           },

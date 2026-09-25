@@ -72,8 +72,8 @@ const LineIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onSel
       tabIndex={0}
       {...indicatorAttrs(index, isActive)}
       sx={{
-        width: isActive ? 30 : 20,
-        height: 3,
+        width: rem(theme, isActive ? 30 : 20),
+        height: rem(theme, 3),
         backgroundColor: isActive
           ? accentFor(theme, color).main
           : alpha(accentFor(theme, color).main, 0.3),
@@ -96,8 +96,8 @@ const NumberIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onS
       tabIndex={0}
       {...indicatorAttrs(index, isActive)}
       sx={{
-        width: 24,
-        height: 24,
+        width: rem(theme, 24),
+        height: rem(theme, 24),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -223,7 +223,7 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
 
   const theme = useTheme();
   const sx = arrowSx(theme, color, position === 'overlay');
-  const offset = position === 'outside' ? -40 : 8;
+  const offset = rem(theme, position === 'outside' ? -40 : 8);
 
   return (
     <Box data-testid="carousel-navigation">
@@ -255,7 +255,9 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
 };
 
 const THUMBNAIL_SIZES = { xs: 40, sm: 60, md: 80, lg: 100, xl: 120 } as const;
-const DEFAULT_THUMBNAIL_SIZE = 60;
+/** A thumbnail's side in design px — 60 for a size the table does not know. */
+const thumbnailSidePx = (size: string): number =>
+  THUMBNAIL_SIZES[size as keyof typeof THUMBNAIL_SIZES] ?? 60;
 
 const Thumbnail: React.FC<{
   item: CarouselItem;
@@ -272,9 +274,9 @@ const Thumbnail: React.FC<{
       data-testid={`carousel-thumbnail-${index}`}
       data-active={isActive}
       sx={{
-        width: side,
-        height: side,
-        border: `2px solid ${isActive ? theme.palette.primary.main : 'transparent'}`,
+        width: rem(theme, side),
+        height: rem(theme, side),
+        border: `${rem(theme, 2)} solid ${isActive ? theme.palette.primary.main : 'transparent'}`,
         borderRadius: 1,
         overflow: 'hidden',
         cursor: 'pointer',
@@ -318,7 +320,7 @@ export const CarouselThumbnails: React.FC<CarouselThumbnailsProps> = ({
   style,
 }) => {
   const theme = useTheme();
-  const side = THUMBNAIL_SIZES[size as keyof typeof THUMBNAIL_SIZES] ?? DEFAULT_THUMBNAIL_SIZE;
+  const side = thumbnailSidePx(size);
 
   return (
     <Box
@@ -327,7 +329,7 @@ export const CarouselThumbnails: React.FC<CarouselThumbnailsProps> = ({
       sx={{
         position: 'absolute',
         // Hung below the frame, clear of its own height plus a gap.
-        bottom: -side - 16,
+        bottom: rem(theme, -side - 16),
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',

@@ -11,22 +11,23 @@ import DialogContentText from '@mui/material/DialogContentText/index.js';
 import DialogTitle from '@mui/material/DialogTitle/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
+import { alpha, keyframes, styled, useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { neutralTones } from '../../../tokens/ink';
 
 import type { AlertDialogProps } from './AlertDialog.types';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
 // Define pulse animation
-const pulseAnimation = keyframes`
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 15px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 15)} currentColor;
     opacity: 0;
   }
   100% {
@@ -71,13 +72,13 @@ const StyledDialog = styled(Dialog, {
 
     ...(customVariant === 'glass' && {
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     }),
 
     // Glow effect
     ...(glow && !pulse && {
-      boxShadow: `0 0 30px 10px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      boxShadow: `0 0 ${rems(theme, 30, 10)} ${alpha(theme.palette.primary.main, 0.3)} !important`,
       filter: 'brightness(1.05)',
     }),
 
@@ -94,7 +95,7 @@ const StyledDialog = styled(Dialog, {
         borderRadius: 'inherit',
         backgroundColor: theme.palette.primary.main,
         opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
+        animation: `${pulseAnimation(theme)} 2s infinite`,
         pointerEvents: 'none',
         zIndex: -1,
       },
@@ -103,7 +104,7 @@ const StyledDialog = styled(Dialog, {
     // Both glow and pulse
     ...(glow && pulse && {
       position: 'relative',
-      boxShadow: `0 0 30px 10px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      boxShadow: `0 0 ${rems(theme, 30, 10)} ${alpha(theme.palette.primary.main, 0.3)} !important`,
       filter: 'brightness(1.05)',
       '&::after': {
         content: '""',
@@ -115,7 +116,7 @@ const StyledDialog = styled(Dialog, {
         borderRadius: 'inherit',
         backgroundColor: theme.palette.primary.main,
         opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
+        animation: `${pulseAnimation(theme)} 2s infinite`,
         pointerEvents: 'none',
         zIndex: -1,
       },
@@ -263,6 +264,7 @@ function AlertDialogFooter({
   onConfirm: () => void;
   dataTestId: string;
 }): React.ReactElement {
+  const theme = useTheme();
   return (
     <StyledDialogActions data-testid={`${dataTestId}-actions`}>
       {showCancel && (
@@ -285,7 +287,7 @@ function AlertDialogFooter({
         startIcon={
           loading ? (
             <CircularProgress
-              size={16}
+              size={rem(theme, 16)}
               color="inherit"
               data-testid={`${dataTestId}-loading-spinner`}
             />

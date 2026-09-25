@@ -14,20 +14,23 @@ const OVERLAY_STYLE: CSSProperties = {
   zIndex: 1,
 };
 
-const MAX_HEAT_RADIUS = 30;
+// The hottest point's circle `r`, in the viewBox's user units: it scales with the
+// SVG box, which fills the map, so it is not a CSS length.
+const MAX_HEAT_R = 30;
 const MAX_HEAT_OPACITY = 0.3;
 const DEGREES_TO_PIXELS = 10;
 
 export interface HeatmapOverlayProps {
   points: HeatmapPoint[];
-  width: number;
-  height: number;
+  /** The drawing's user-space extent — the `viewBox`, not a CSS size. */
+  viewBox: { width: number; height: number };
 }
 
 // Each point's weight drives both its radius and its opacity, so denser areas
 // read hotter where circles overlap.
-export const HeatmapOverlay: FC<HeatmapOverlayProps> = ({ points, width, height }) => {
+export const HeatmapOverlay: FC<HeatmapOverlayProps> = ({ points, viewBox }) => {
   const theme = useTheme();
+  const { width, height } = viewBox;
 
   if (points.length === 0) return null;
 
@@ -38,7 +41,7 @@ export const HeatmapOverlay: FC<HeatmapOverlayProps> = ({ points, width, height 
           key={`${point.lat}-${point.lng}-${index}`}
           cx={width / 2 + point.lng * DEGREES_TO_PIXELS}
           cy={height / 2 - point.lat * DEGREES_TO_PIXELS}
-          r={MAX_HEAT_RADIUS * point.weight}
+          r={MAX_HEAT_R * point.weight}
           fill={theme.palette.error.main}
           opacity={MAX_HEAT_OPACITY * point.weight}
         />

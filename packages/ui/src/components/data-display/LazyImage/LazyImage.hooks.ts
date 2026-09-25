@@ -1,4 +1,7 @@
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { remPx } from '../../../tokens/relative';
 
 import type { LazyImageProps, LazyImageState } from './LazyImage.types';
 
@@ -8,7 +11,6 @@ type LazyImageDefaultedKeys =
   | 'objectFit'
   | 'objectPosition'
   | 'lazy'
-  | 'rootMargin'
   | 'threshold'
   | 'fadeIn'
   | 'fadeInDuration'
@@ -30,7 +32,6 @@ const LAZY_IMAGE_DEFAULTS: Pick<LazyImageProps, LazyImageDefaultedKeys> = {
   objectFit: 'cover',
   objectPosition: 'center',
   lazy: true,
-  rootMargin: '100px',
   threshold: 0,
   fadeIn: true,
   fadeInDuration: 300,
@@ -78,7 +79,11 @@ const useVisibility = (
   isVisible: boolean,
   onVisible: () => void,
 ) => {
-  const { lazy, src, rootMargin, threshold, onLoadStart } = props;
+  const { lazy, src, threshold, onLoadStart } = props;
+  const theme = useTheme();
+  // `IntersectionObserver` takes px or %, never rem: the default reach is 100
+  // design px, measured through the theme so it moves with the root.
+  const rootMargin = props.rootMargin ?? `${remPx(theme, 100)}px`;
 
   useEffect(() => {
     if (!lazy || isVisible) {

@@ -26,6 +26,7 @@ import {
 } from './LoadingState.metrics';
 import type { LoadingStateProps, LoadingStateSize } from './LoadingState.types';
 import { resolveTestId } from '../../../platform/test-id';
+import { rem } from '../../../tokens/relative';
 
 interface ViewProps {
   message?: string;
@@ -79,7 +80,7 @@ const SkeletonView: React.FC<ViewProps> = ({
             key={`skeleton-row-${index}`}
             variant="rectangular"
             animation="wave"
-            height={SKELETON_ROW_HEIGHT[size]}
+            height={rem(theme, SKELETON_ROW_HEIGHT[size])}
             // The last row is short, so the block reads as a paragraph of text.
             width={index === skeletonRows - 1 ? SKELETON_LAST_ROW_WIDTH : SKELETON_FULL_ROW_WIDTH}
             borderRadius={SKELETON_RADIUS}
@@ -113,12 +114,12 @@ const SpinnerView: React.FC<ViewProps> = ({ message, size, className, testIds })
         alignItems: 'center',
         justifyContent: 'center',
         padding: theme.spacing(SPINNER_PADDING_UNITS),
-        minHeight: SPINNER_MIN_HEIGHT,
+        minHeight: rem(theme, SPINNER_MIN_HEIGHT),
         gap: theme.spacing(SPINNER_GAP_UNITS),
       }}
     >
       <CircularProgress
-        size={SIZE_MAP[size].spinner}
+        size={rem(theme, SIZE_MAP[size].spinner)}
         data-testid={testIds.named('spinner')}
       />
       <LoadingMessage message={message} size={size} testIds={testIds} />

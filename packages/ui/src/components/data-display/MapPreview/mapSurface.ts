@@ -3,6 +3,7 @@ import { alpha } from '@mui/material/styles/index.js';
 
 import type { MapType } from './MapPreview.types';
 import { neutralTones, uiInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const toneGradient = (from: string, to: string, opacity = 1): string =>
   `linear-gradient(135deg, ${alpha(from, opacity)} 0%, ${alpha(to, opacity)} 100%)`;
@@ -32,7 +33,8 @@ export const tileBackground = (mapType: MapType, theme: Theme): string => {
   return toneGradient(tones.surface, tones.faint, 0.5);
 };
 
-export const BOUNCE_KEYFRAMES = {
-  '0%, 100%': { transform: 'translateY(0)' },
-  '50%': { transform: 'translateY(-10px)' },
-} as const;
+export const bounceKeyframes = (theme: Theme) =>
+  ({
+    '0%, 100%': { transform: 'translateY(0)' },
+    '50%': { transform: `translateY(${rem(theme, -10)})` },
+  }) as const;

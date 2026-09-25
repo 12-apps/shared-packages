@@ -39,6 +39,7 @@ import Box from '@mui/material/Box/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import React, { useEffect, useState } from 'react';
 import { fieldTextFieldStyles } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 /** Everything this field lets through: digits and the two separators. */
 const ALLOWED = /[^\d.,]/g;
@@ -163,7 +164,7 @@ export function NumberBoundInput({
             }
           : undefined
       }
-      sx={[{ width: 140 }, fieldTextFieldStyles]}
+      sx={[{ width: sxRem(140) }, fieldTextFieldStyles]}
     />
   );
 }

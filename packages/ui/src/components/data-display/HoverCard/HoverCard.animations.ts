@@ -1,12 +1,14 @@
-import { keyframes } from '@mui/material/styles/index.js';
+import { keyframes, type Theme } from '@mui/material/styles/index.js';
 
-export const pulseAnimation = keyframes`
+import { rem } from '../../../tokens/relative';
+
+export const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 10px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 10)} currentColor;
     opacity: 0;
   }
   100% {
@@ -15,10 +17,10 @@ export const pulseAnimation = keyframes`
   }
 `;
 
-export const slideInUp = keyframes`
+export const slideInUp = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(${rem(theme, 8)});
   }
   to {
     opacity: 1;
@@ -26,10 +28,10 @@ export const slideInUp = keyframes`
   }
 `;
 
-export const slideInDown = keyframes`
+export const slideInDown = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(${rem(theme, -8)});
   }
   to {
     opacity: 1;
@@ -37,10 +39,10 @@ export const slideInDown = keyframes`
   }
 `;
 
-export const slideInLeft = keyframes`
+export const slideInLeft = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateX(8px);
+    transform: translateX(${rem(theme, 8)});
   }
   to {
     opacity: 1;
@@ -48,10 +50,10 @@ export const slideInLeft = keyframes`
   }
 `;
 
-export const slideInRight = keyframes`
+export const slideInRight = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateX(${rem(theme, -8)});
   }
   to {
     opacity: 1;

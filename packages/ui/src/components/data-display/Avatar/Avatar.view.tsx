@@ -27,7 +27,7 @@ import {
 } from './Avatar.metrics';
 import type { AvatarSize, AvatarStatus, ContentType } from './Avatar.types';
 import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
 export type { ContentType };
 
@@ -57,21 +57,16 @@ const getColorFromTheme = (theme: Theme, color: string): PaletteLike => {
   return colorMap[color] || theme.palette.primary;
 };
 
-interface SizeStyle {
-  width: number;
-  height: number;
-}
+// Read from the shared metrics, not restated: the native `Avatar` reads the
+// same table, so the two renderers cannot disagree on a box. Design px; every
+// read below draws it through the type scale.
+const boxPx = (size: AvatarSize): number => (AVATAR_SIZES[size] || AVATAR_SIZES.md).box;
 
-// Derived from the shared metrics, not restated: the native `Avatar` reads the
-// same table, so the two renderers cannot disagree on a box.
-const sizeMap: Record<AvatarSize, SizeStyle> = Object.fromEntries(
-  Object.entries(AVATAR_SIZES).map(([size, step]) => [
-    size,
-    { width: step.box, height: step.box },
-  ]),
-) as Record<AvatarSize, SizeStyle>;
-
-const getSizeStyles = (size: AvatarSize): SizeStyle => sizeMap[size] || sizeMap.md;
+/** The square box, as rem through the theme. */
+const boxStyles = (theme: Theme, size: AvatarSize): CSSObject => {
+  const side = rem(theme, boxPx(size));
+  return { width: side, height: side };
+};
 
 /** The glyph size in design px, read through the type scale where it is drawn. */
 const glyphPx = (size: AvatarSize): number => (AVATAR_SIZES[size] || AVATAR_SIZES.md).fontSize;
@@ -90,12 +85,12 @@ const getStatusColor = (status: AvatarStatus, theme: Theme): string => {
 };
 
 /** Hover/active lift, only when the avatar is interactive. */
-const interactiveStyles = (interactive: boolean | undefined, main: string): CSSObject =>
+const interactiveStyles = (theme: Theme, interactive: boolean | undefined, main: string): CSSObject =>
   interactive
     ? {
         '&:hover': {
-          transform: `scale(${HOVER.scale}) translateY(-${HOVER.lift}px)`,
-          boxShadow: `0 ${HOVER.shadowY}px ${HOVER.shadowBlur}px ${alpha(main, HOVER.shadowAlpha)}`,
+          transform: `scale(${HOVER.scale}) translateY(${rem(theme, -HOVER.lift)})`,
+          boxShadow: `0 ${rems(theme, HOVER.shadowY, HOVER.shadowBlur)} ${alpha(main, HOVER.shadowAlpha)}`,
           filter: `brightness(${HOVER.brightness})`,
           zIndex: 10,
         },
@@ -129,20 +124,21 @@ const variantRadius = (variant: string | undefined, theme: Theme): CSSObject => 
 const borderedStyles = (bordered: boolean | undefined, theme: Theme): CSSObject =>
   bordered
     ? {
-        border: `${BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
-        boxShadow: `0 0 0 1px ${alpha(theme.palette.divider, BORDER_HALO_ALPHA)}`,
+        border: `${rem(theme, BORDER_WIDTH)} solid ${theme.palette.background.paper}`,
+        boxShadow: `0 0 0 ${rem(theme, 1)} ${alpha(theme.palette.divider, BORDER_HALO_ALPHA)}`,
       }
     : {};
 
 /** Glow adds the halo; pulse adds the expanding ring — either or both. */
 const glowPulseStyles = (
+  theme: Theme,
   glow: boolean | undefined,
   pulse: boolean | undefined,
   main: string,
 ): CSSObject => {
   const styles: CSSObject = {};
   if (glow) {
-    styles.boxShadow = `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(main, GLOW.alpha)} !important`;
+    styles.boxShadow = `0 0 ${rems(theme, GLOW.blur, GLOW.spread)} ${alpha(main, GLOW.alpha)} !important`;
     styles.filter = `brightness(${GLOW.brightness})`;
   }
   if (pulse) {
@@ -158,7 +154,7 @@ const glowPulseStyles = (
       transform: 'translate(-50%, -50%)',
       backgroundColor: main,
       opacity: PULSE.alpha,
-      animation: `${pulseAnimation} ${PULSE.durationMs / 1000}s infinite`,
+      animation: `${pulseAnimation(theme)} ${PULSE.durationMs / 1000}s infinite`,
       pointerEvents: 'none',
       zIndex: -1,
     };
@@ -207,7 +203,7 @@ const StyledAvatar = styled(MuiAvatar, {
   }) => {
     const palette = getColorFromTheme(theme, customColor);
     return {
-      ...getSizeStyles(customSize),
+      ...boxStyles(theme, customSize),
       fontSize: rem(theme, glyphPx(customSize)),
       transition: `all ${AVATAR_TRANSITION_MS / 1000}s ${AVATAR_TRANSITION_EASING}`,
       position: 'relative',
@@ -216,37 +212,36 @@ const StyledAvatar = styled(MuiAvatar, {
       cursor: interactive ? 'pointer' : 'default',
       backgroundColor: hasError ? theme.palette.error.main : palette.main,
       color: hasError ? theme.palette.error.contrastText : (palette.contrastText ?? absoluteInk(theme).white),
-      ...interactiveStyles(interactive, palette.main),
+      ...interactiveStyles(theme, interactive, palette.main),
       ...loadingStyles(isLoading, palette.main),
       ...variantRadius(customVariant, theme),
       ...borderedStyles(bordered, theme),
-      ...glowPulseStyles(glow, pulse, palette.main),
+      ...glowPulseStyles(theme, glow, pulse, palette.main),
       '&:focus-visible': {
-        outline: `${FOCUS_RING.width}px solid ${alpha(palette.main, FOCUS_RING.alpha)}`,
-        outlineOffset: FOCUS_RING.offset,
+        outline: `${rem(theme, FOCUS_RING.width)} solid ${alpha(palette.main, FOCUS_RING.alpha)}`,
+        outlineOffset: rem(theme, FOCUS_RING.offset),
       },
     };
   },
 );
 
 const LoadingOverlay = styled('div')<{ size: AvatarSize }>(({ theme, size }) => {
-  const sizeStyles = getSizeStyles(size);
+  const box = boxPx(size);
   return {
     position: 'absolute',
     top: 0,
     left: 0,
-    width: sizeStyles.width,
-    height: sizeStyles.height,
+    ...boxStyles(theme, size),
     borderRadius: 'inherit',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: alpha(theme.palette.background.paper, LOADING_OVERLAY.paperAlpha),
-    backdropFilter: `blur(${LOADING_OVERLAY.blur}px)`,
+    backdropFilter: `blur(${rem(theme, LOADING_OVERLAY.blur)})`,
     '& .loading-spinner': {
-      width: sizeStyles.width * SPINNER.scale,
-      height: sizeStyles.height * SPINNER.scale,
-      border: `${SPINNER.ringWidth}px solid ${alpha(theme.palette.primary.main, SPINNER.trackAlpha)}`,
+      width: rem(theme, box * SPINNER.scale),
+      height: rem(theme, box * SPINNER.scale),
+      border: `${rem(theme, SPINNER.ringWidth)} solid ${alpha(theme.palette.primary.main, SPINNER.trackAlpha)}`,
       borderTopColor: theme.palette.primary.main,
       borderRadius: '50%',
       animation: `${rotateAnimation} ${SPINNER.durationMs / 1000}s linear infinite`,
@@ -260,8 +255,7 @@ const StatusBadge = styled(Badge, {
   statusColor?: string;
   avatarSize?: AvatarSize;
 }>(({ theme, statusColor, avatarSize = 'md' }) => {
-  const sizeStyles = getSizeStyles(avatarSize);
-  const badgeSize = Math.max(STATUS_DOT.min, sizeStyles.width * STATUS_DOT.scale);
+  const badgeSize = rem(theme, Math.max(STATUS_DOT.min, boxPx(avatarSize) * STATUS_DOT.scale));
 
   return {
     '& .MuiBadge-badge': {
@@ -270,7 +264,7 @@ const StatusBadge = styled(Badge, {
       width: badgeSize,
       height: badgeSize,
       borderRadius: '50%',
-      border: `${STATUS_DOT.borderWidth}px solid ${theme.palette.background.paper}`,
+      border: `${rem(theme, STATUS_DOT.borderWidth)} solid ${theme.palette.background.paper}`,
       '&::after': {
         position: 'absolute',
         top: 0,

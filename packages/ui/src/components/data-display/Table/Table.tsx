@@ -11,7 +11,7 @@ import TableBody from '@mui/material/TableBody/index.js';
 import TableCell from '@mui/material/TableCell/index.js';
 import TableContainer from '@mui/material/TableContainer/index.js';
 import TableRow from '@mui/material/TableRow/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type {
@@ -25,15 +25,22 @@ import { EnhancedTableBody, EnhancedTableHeader } from './TableParts';
 import { EmptyRow, NoDataPlaceholder } from './TableStates';
 import {
   tableStyles } from './Table.styles';
+import { rem } from '../../../tokens/relative';
+
+/** The scroll box's height: a number is design px, 400 unless the caller says otherwise. */
+const scrollHeight = (theme: Theme, containerHeight: number | string | undefined): string => {
+  const box = containerHeight || 400;
+  return typeof box === 'number' ? rem(theme, box) : box;
+};
 
 // Define pulse animation
 const StyledTableContainer = styled(TableContainer, {
   shouldForwardProp: (prop) => !['virtualScrolling', 'containerHeight'].includes(prop as string) })<{ 
   virtualScrolling?: boolean; 
   containerHeight?: number | string;
-}>(({ virtualScrolling, containerHeight }) => ({
+}>(({ theme, virtualScrolling, containerHeight }) => ({
   ...(virtualScrolling && {
-    height: containerHeight || 400,
+    height: scrollHeight(theme, containerHeight),
     overflow: 'auto' }) }));
 
 // Helper function to get stripe color from theme
@@ -104,19 +111,22 @@ const TableShell: React.FC<{
 
 const SKELETON_ROW_COUNT = 5;
 
-const LoadingSkeletonRows: React.FC<{ columns?: ColumnConfig[] }> = ({ columns }) => (
-  <>
-    {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-      <TableRow key={index}>
-        {columns?.map((column) => (
-          <TableCell key={column.key}>
-            <Skeleton height={20} />
-          </TableCell>
-        ))}
-      </TableRow>
-    ))}
-  </>
-);
+const LoadingSkeletonRows: React.FC<{ columns?: ColumnConfig[] }> = ({ columns }) => {
+  const theme = useTheme();
+  return (
+    <>
+      {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+        <TableRow key={index}>
+          {columns?.map((column) => (
+            <TableCell key={column.key}>
+              <Skeleton height={rem(theme, 20)} />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+};
 
 export type TableShellProps = Omit<React.ComponentProps<typeof TableShell>, 'children'>;
 

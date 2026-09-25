@@ -1,7 +1,7 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
 import { onMedia, scrim, sheen } from '../../../tokens/ink';
-import { sxRem } from '../../../tokens/relative';
+import { remPx, sxRem } from '../../../tokens/relative';
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 5;
@@ -10,8 +10,13 @@ export const ZOOM_STEP = 1.2;
 export const WHEEL_ZOOM_FACTOR = 0.01;
 
 export const DEFAULT_AUTOPLAY_INTERVAL_MS = 4000;
-export const MIN_SWIPE_DISTANCE = 50;
 export const OVERLAY_Z_INDEX = 1000;
+
+/**
+ * How far a finger must travel to count as a swipe: 50 design px, in the px a
+ * touch event reports, so it moves with the theme's type scale.
+ */
+export const minSwipeDistance = (theme: Theme): number => remPx(theme, 50);
 
 const SCRIM = (theme: Theme): string => scrim(theme, 0.5);
 const SCRIM_HOVER = (theme: Theme): string => scrim(theme, 0.7);
