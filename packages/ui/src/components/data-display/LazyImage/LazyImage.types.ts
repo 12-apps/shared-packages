@@ -15,12 +15,21 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
   alt: string;
 
   /**
-   * Width of the image (number in pixels or CSS string)
+   * Width of the image. A number above 1 is design px, scaled with the theme's
+   * type scale. A number above 0 and up to 1 is a fraction of the
+   * container's parent, as in `sx`: `0.5` is `50%`. The container takes it and
+   * the image, its skeleton and its fallback fill the container.
+   * A string is any CSS length and passes through untouched.
    */
   width?: number | string;
 
   /**
-   * Height of the image (number in pixels or CSS string)
+   * Height of the image. A number above 1 is design px, scaled with the theme's
+   * type scale. A number above 0 and up to 1 is a fraction of the
+   * container's parent, as in `sx`: `0.5` is `50%`. The container takes it and
+   * the image, its skeleton and its fallback fill the container. A fractional
+   * height takes effect only when the parent has a definite height.
+   * A string is any CSS length and passes through untouched.
    */
   height?: number | string;
 
@@ -168,7 +177,10 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
   };
 
   /**
-   * Additional CSS styles
+   * Inline CSS for the `<img>` (its `style`), not MUI's `sx`: theme values and
+   * nested selectors such as `'&:hover'` do not apply. The image's box clips
+   * anything painted outside the image, such as a shadow, so put those on a
+   * wrapping element.
    */
   sx?: React.CSSProperties;
 

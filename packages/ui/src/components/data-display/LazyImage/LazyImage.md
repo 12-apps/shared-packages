@@ -117,22 +117,29 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 
 ### With Custom Styles
 
+`sx` here is inline CSS for the `<img>`, not MUI's `sx`, and the image's box
+clips anything painted outside the image. So a shadow or a hover goes on a
+wrapping element, rounded to match the image:
+
 ```tsx
-<LazyImage
-  src="https://example.com/image.jpg"
-  alt="Styled image"
-  width={200}
-  height={200}
-  objectFit="cover"
-  borderRadius={8}
+<Box
   sx={{
+    display: 'inline-flex',
+    borderRadius: (theme) => theme.typography.pxToRem(8),
     boxShadow: 3,
-    '&:hover': {
-      transform: 'scale(1.05)',
-      transition: 'transform 0.3s'
-    }
+    transition: 'transform 0.3s',
+    '&:hover': { transform: 'scale(1.05)' },
   }}
-/>
+>
+  <LazyImage
+    src="https://example.com/image.jpg"
+    alt="Styled image"
+    width={200}
+    height={200}
+    objectFit="cover"
+    borderRadius={8}
+  />
+</Box>
 ```
 
 ### With Callbacks
@@ -155,8 +162,8 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 |------|------|---------|-------------|
 | `src` | `string` | - | **Required.** Image source URL |
 | `alt` | `string` | - | **Required.** Alternative text for accessibility |
-| `width` | `number \| string` | - | Image width |
-| `height` | `number \| string` | `'auto'` | Image height |
+| `width` | `number \| string` | - | Image width. A number above 1 is design px; a number above 0 and up to 1 is a fraction of the parent, as in `sx` (`0.5` is `50%`); a string is any CSS length |
+| `height` | `number \| string` | `'auto'` | Image height, read like `width`. A fractional height takes effect only when the parent has a definite height |
 
 ### Loading Props
 
@@ -209,7 +216,7 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 |------|------|-------------|
 | `skeletonProps` | `object` | Props for skeleton loader |
 | `spinnerProps` | `object` | Props for spinner loader |
-| `sx` | `CSSProperties` | Additional CSS styles |
+| `sx` | `CSSProperties` | Inline CSS for the `<img>`, not MUI's `sx`. The image's box clips anything painted outside the image, such as a shadow |
 | `className` | `string` | CSS class name |
 | `data-testid` | `string` | Test ID for testing |
 
