@@ -2,7 +2,8 @@ import MuiCheckbox from '@mui/material/Checkbox/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import FormControlLabel from '@mui/material/FormControlLabel/index.js';
 import FormHelperText from '@mui/material/FormHelperText/index.js';
-import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
+import { alpha, keyframes, styled, useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { makeTestId, resolveCheckboxProps } from './Checkbox.helpers';
@@ -19,28 +20,32 @@ import {
 } from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types';
 import { splitTestId } from '../../../platform/test-id';
-import { rem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
-const pulse = keyframes`
+const pulse = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 ${effectInk(CHECKBOX_PULSE.alpha)};
   }
   70% {
-    box-shadow: 0 0 0 ${CHECKBOX_PULSE.spread}px ${effectInk(0)};
+    box-shadow: 0 0 0 ${rem(theme, CHECKBOX_PULSE.spread)} ${effectInk(0)};
   }
   100% {
     box-shadow: 0 0 0 0 ${effectInk(0)};
   }
 `;
 
-const glow = keyframes`
+const glow = (theme: Theme) => keyframes`
   0%, 100% {
-    box-shadow: 0 0 ${CHECKBOX_GLOW.blur.from}px ${effectInk(CHECKBOX_GLOW.alpha.from)};
+    box-shadow: 0 0 ${rem(theme, CHECKBOX_GLOW.blur.from)} ${effectInk(CHECKBOX_GLOW.alpha.from)};
   }
   50% {
-    box-shadow: 0 0 ${CHECKBOX_GLOW.blur.to}px ${effectInk(CHECKBOX_GLOW.alpha.to)};
+    box-shadow: 0 0 ${rem(theme, CHECKBOX_GLOW.blur.to)} ${effectInk(CHECKBOX_GLOW.alpha.to)};
   }
 `;
+
+/** A variant's corner: a design-px number through the type scale, a percentage as it is. */
+const cornerOf = (theme: Theme, radius: number | string | undefined): string | undefined =>
+  typeof radius === 'number' ? rem(theme, radius) : radius;
 
 const StyledCheckbox = styled(MuiCheckbox, {
   shouldForwardProp: (prop) => !['customVariant', 'ripple', 'glow', 'pulse'].includes(prop as string),
@@ -53,13 +58,13 @@ const StyledCheckbox = styled(MuiCheckbox, {
   ({ theme, customVariant, ripple, glow: glowProp, pulse: pulseProp }) => ({
     ...(customVariant === 'rounded' && {
       '& .MuiSvgIcon-root': {
-        borderRadius: CHECKBOX_VARIANT.rounded.radius,
+        borderRadius: cornerOf(theme, CHECKBOX_VARIANT.rounded.radius),
       },
     }),
     
     ...(customVariant === 'toggle' && {
       '& .MuiSvgIcon-root': {
-        borderRadius: `${CHECKBOX_VARIANT.toggle.radius}px`,
+        borderRadius: cornerOf(theme, CHECKBOX_VARIANT.toggle.radius),
         transform: `scale(${CHECKBOX_VARIANT.toggle.scale})`,
       },
     }),
@@ -72,10 +77,10 @@ const StyledCheckbox = styled(MuiCheckbox, {
         },
       }),
       ...(glowProp && {
-        animation: `${glow} ${CHECKBOX_GLOW.ms / 1000}s ease-in-out infinite`,
+        animation: `${glow(theme)} ${CHECKBOX_GLOW.ms / 1000}s ease-in-out infinite`,
       }),
       ...(pulseProp && {
-        animation: `${pulse} ${CHECKBOX_PULSE.ms / 1000}s infinite`,
+        animation: `${pulse(theme)} ${CHECKBOX_PULSE.ms / 1000}s infinite`,
       }),
       '&:hover': {
         backgroundColor: alpha(theme.palette.primary.main, CHECKBOX_HOVER_ALPHA),
@@ -96,7 +101,7 @@ const StyledFormControlLabel = styled(FormControlLabel, {
   shouldForwardProp: (prop) => prop !== 'error',
 })<{ error?: boolean }>(
   ({ theme, error }) => ({
-    marginLeft: CHECKBOX_LABEL.marginLeft,
+    marginLeft: rem(theme, CHECKBOX_LABEL.marginLeft),
     '& .MuiFormControlLabel-label': {
       color: error ? theme.palette.error.main : theme.palette.text.primary,
       fontSize: rem(theme, CHECKBOX_LABEL.fontSize),
@@ -123,6 +128,7 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
       disabled,
       ...others
     } = resolveCheckboxProps(rawProps);
+    const theme = useTheme();
     const isDisabled = disabled || loading;
     const { testId: dataTestId, rest: props } = splitTestId(others);
     const testId = makeTestId(dataTestId);
@@ -141,13 +147,13 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
         />
         {loading && (
           <CircularProgress
-            size={CHECKBOX_SPINNER.size}
+            size={rem(theme, CHECKBOX_SPINNER.size)}
             sx={{
               position: 'absolute',
               top: '50%',
               left: '50%',
-              marginTop: `${CHECKBOX_SPINNER.offset}px`,
-              marginLeft: `${CHECKBOX_SPINNER.offset}px`,
+              marginTop: sxRem(CHECKBOX_SPINNER.offset),
+              marginLeft: sxRem(CHECKBOX_SPINNER.offset),
               color: 'primary.main',
             }}
           />

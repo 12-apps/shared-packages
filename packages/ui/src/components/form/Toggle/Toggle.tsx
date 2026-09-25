@@ -1,5 +1,5 @@
 import ToggleButton from '@mui/material/ToggleButton/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import {
@@ -9,6 +9,8 @@ import {
   variantStyles,
 } from './Toggle.styles';
 import type { ToggleProps } from './Toggle.types';
+
+import { rem } from '../../../tokens/relative';
 
 const StyledToggle = styled(ToggleButton, {
   shouldForwardProp: (prop) =>
@@ -56,6 +58,7 @@ export const Toggle = forwardRef<HTMLButtonElement, ToggleProps>(
     },
     ref,
   ) => {
+    const theme = useTheme();
     const testIds = {
       container: dataTestId,
       icon: dataTestId ? `${dataTestId}-icon` : undefined,
@@ -75,7 +78,7 @@ export const Toggle = forwardRef<HTMLButtonElement, ToggleProps>(
       >
         {icon && (
           <span
-            style={{ marginRight: children ? '8px' : '0' }}
+            style={{ marginRight: children ? rem(theme, 8) : '0' }}
             data-testid={testIds.icon}
           >
             {icon}

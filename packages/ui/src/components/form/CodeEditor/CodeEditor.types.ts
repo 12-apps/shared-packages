@@ -14,7 +14,7 @@ export interface CodeEditorProps {
   copy: CodeEditorCopy;
   /** Programming language for syntax highlighting */
   language: EditorLanguage;
-  /** Editor height (default: '400px') */
+  /** Editor height (default: the design's 400px through the type scale — `25rem` at MUI's defaults) */
   height?: string;
   /** Editor color theme (default: 'auto') */
   theme?: EditorTheme;

@@ -84,19 +84,19 @@ export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
       borderRadius: fieldRadius(theme),
       ...(glass && {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         '& fieldset': { border: `1px solid ${fieldEdge(theme)}` },
       }),
       ...(gradient && {
         '&.Mui-focused fieldset': {
           background: `linear-gradient(135deg, ${palette.main}, ${palette.light})`,
-          borderWidth: '2px',
+          borderWidth: rem(theme, 2),
         },
       }),
       '& input': { textAlign: 'center', padding: 0, fontWeight: 'inherit' },
       ...(!glass && { '& fieldset': { borderColor: fieldEdge(theme) } }),
       '&:hover fieldset': { borderColor: palette.main },
-      '&.Mui-focused fieldset': { borderColor: palette.main, borderWidth: '2px' },
+      '&.Mui-focused fieldset': { borderColor: palette.main, borderWidth: rem(theme, 2) },
     },
   };
 };

@@ -1,6 +1,6 @@
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import InputAdornment from '@mui/material/InputAdornment/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { INPUT_LOADING } from './Input.metrics';
@@ -20,6 +20,7 @@ import {
 import type { InputProps } from './Input.types';
 import { splitTestId } from '../../../platform/test-id';
 import { fieldControlStyles } from '../../../tokens/field-height';
+import { rem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 /**
@@ -64,10 +65,11 @@ const EndAdornment: React.FC<{ loading: boolean; endAdornment?: React.ReactNode 
   loading,
   endAdornment,
 }) => {
+  const theme = useTheme();
   if (loading) {
     return (
       <InputAdornment position="end">
-        <CircularProgress size={INPUT_LOADING.spinnerSize} />
+        <CircularProgress size={rem(theme, INPUT_LOADING.spinnerSize)} />
       </InputAdornment>
     );
   }

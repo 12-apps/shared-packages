@@ -41,7 +41,7 @@ const StyledButton = styled(MuiButton, {
     overflow: 'hidden',
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
-    ...buttonEmphasisStyles(colorPalette, glow, pulse),
+    ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
   };
 });
 
@@ -200,7 +200,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={mergedClassName}
       >
         {loading ? (
-          <CircularProgress size={16} color="inherit" data-testid={testId('loading')} />
+          <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
         ) : (
           children
         )}

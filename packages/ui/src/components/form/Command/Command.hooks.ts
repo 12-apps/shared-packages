@@ -14,7 +14,6 @@ type CommandDefaultedKeys =
   | 'pulse'
   | 'loading'
   | 'disabled'
-  | 'maxHeight'
   | 'emptyMessage'
   | 'showCategories'
   | 'showShortcuts'
@@ -37,7 +36,6 @@ const COMMAND_DEFAULTS: Pick<CommandProps, CommandDefaultedKeys> = {
   pulse: false,
   loading: false,
   disabled: false,
-  maxHeight: 400,
   emptyMessage: 'No results found',
   showCategories: true,
   showShortcuts: true,

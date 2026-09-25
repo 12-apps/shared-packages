@@ -4,17 +4,17 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral } from '../../../tokens/ink';
-import { rem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 import { inkOver } from '../../../tokens/theme';
 
-// Define pulse animation globally
-const pulseAnimation = keyframes`
+// The pulse ring, its spread through the theme's type scale.
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 15px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 15)} currentColor;
     opacity: 0;
   }
   100% {
@@ -63,9 +63,10 @@ export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => 
   };
 };
 
-/** A size's padding shorthand and its type in design px, read through the type scale. */
+/** A size's padding and its type in design px, read through the type scale. */
 interface WebButtonSize {
-  padding: string;
+  paddingYPx: number;
+  paddingXPx: number;
   fontPx: number;
 }
 
@@ -74,7 +75,7 @@ interface WebButtonSize {
 const SIZE_MAP: Record<string, WebButtonSize> = Object.fromEntries(
   Object.entries(BUTTON_SIZES).map(([size, m]) => [
     size,
-    { padding: `${m.paddingVertical}px ${m.paddingHorizontal}px`, fontPx: m.fontSize },
+    { paddingYPx: m.paddingVertical, paddingXPx: m.paddingHorizontal, fontPx: m.fontSize },
   ]),
 );
 
@@ -96,13 +97,14 @@ const sizeOf = (size: string): WebButtonSize => SIZE_MAP[size] ?? DEFAULT_SIZE;
  * Derived, not declared: a button with an `icon` and no children can only be an
  * icon button, so no consumer has to opt in and none can forget to.
  */
-const ICON_ONLY_PADDING: Record<string, string> = Object.fromEntries(
-  Object.entries(ICON_ONLY_PADDING_PX).map(([size, padding]) => [size, `${padding}px`]),
-);
+const iconOnlyPadding = (theme: Theme, size: string): string => {
+  const bySize: Record<string, number> = ICON_ONLY_PADDING_PX;
+  return rem(theme, bySize[size] ?? ICON_ONLY_PADDING_PX.md);
+};
 
 const iconOnlySize = (theme: Theme, size: string): CSSObject => ({
   minWidth: 0,
-  padding: ICON_ONLY_PADDING[size] ?? ICON_ONLY_PADDING.md,
+  padding: iconOnlyPadding(theme, size),
   fontSize: rem(theme, sizeOf(size).fontPx),
   '& .MuiButton-startIcon, & .MuiButton-endIcon': { margin: 0 },
 });
@@ -120,8 +122,8 @@ export const buttonSize =
   (theme: Theme): CSSObject => {
     const height = fieldHeight(theme, asFieldSize(size));
     if (iconOnly) return { ...iconOnlySize(theme, size), padding: 0, minWidth: height, minHeight: height };
-    const { padding, fontPx } = sizeOf(size);
-    return { padding, fontSize: rem(theme, fontPx), minHeight: height, paddingTop: 0, paddingBottom: 0 };
+    const { paddingYPx, paddingXPx, fontPx } = sizeOf(size);
+    return { padding: rems(theme, paddingYPx, paddingXPx), fontSize: rem(theme, fontPx), minHeight: height, paddingTop: 0, paddingBottom: 0 };
   };
 
 /**
@@ -214,7 +216,7 @@ const VARIANT_STYLES: Record<
     color: palette.contrastText || absoluteInk(theme).white,
     '&:hover': {
       backgroundColor: palette.dark,
-      transform: 'translateY(-2px)',
+      transform: `translateY(${rem(theme, -2)})`,
       boxShadow: theme.shadows[8],
     },
   }),
@@ -251,12 +253,12 @@ const VARIANT_STYLES: Record<
   }),
   glass: (theme, palette) => ({
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
-    backdropFilter: 'blur(20px)',
+    backdropFilter: `blur(${rem(theme, 20)})`,
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     color: palette.main,
     '&:hover': {
       backgroundColor: alpha(theme.palette.background.paper, 0.2),
-      transform: 'translateY(-2px)',
+      transform: `translateY(${rem(theme, -2)})`,
     },
   }),
   gradient: (theme, palette, color) => ({
@@ -264,7 +266,7 @@ const VARIANT_STYLES: Record<
     color: gradientInk(theme, color, palette),
     '&:hover': {
       filter: 'brightness(1.1)',
-      transform: 'translateY(-2px)',
+      transform: `translateY(${rem(theme, -2)})`,
       boxShadow: theme.shadows[12],
     },
   }),
@@ -278,18 +280,18 @@ export const buttonVariantStyles = (
 ): CSSObject => VARIANT_STYLES[variant ?? '']?.(theme, palette, color) ?? {};
 
 // Glow effect - applied with !important to override variant shadows
-const glowStyles = (palette: ColorPalette): CSSObject => ({
-  boxShadow: `0 0 20px 5px ${alpha(palette.main, 0.6)}, 0 0 40px 10px ${alpha(palette.main, 0.3)} !important`,
+const glowStyles = (theme: Theme, palette: ColorPalette): CSSObject => ({
+  boxShadow: `${rems(theme, 0, 0, 20, 5)} ${alpha(palette.main, 0.6)}, ${rems(theme, 0, 0, 40, 10)} ${alpha(palette.main, 0.3)} !important`,
   filter: 'brightness(1.05)',
   '&:hover': {
-    boxShadow: `0 0 25px 8px ${alpha(palette.main, 0.7)}, 0 0 50px 15px ${alpha(palette.main, 0.4)} !important`,
+    boxShadow: `${rems(theme, 0, 0, 25, 8)} ${alpha(palette.main, 0.7)}, ${rems(theme, 0, 0, 50, 15)} ${alpha(palette.main, 0.4)} !important`,
     filter: 'brightness(1.1)',
-    transform: 'translateY(-2px) scale(1.02)',
+    transform: `translateY(${rem(theme, -2)}) scale(1.02)`,
   },
 });
 
 // Pulse animation using pseudo-element
-const pulseStyles = (palette: ColorPalette): CSSObject => ({
+const pulseStyles = (theme: Theme, palette: ColorPalette): CSSObject => ({
   position: 'relative',
   overflow: 'visible',
   '&::after': {
@@ -303,7 +305,7 @@ const pulseStyles = (palette: ColorPalette): CSSObject => ({
     transform: 'translate(-50%, -50%)',
     backgroundColor: palette.main,
     opacity: 0.3,
-    animation: `${pulseAnimation} 2s infinite`,
+    animation: `${pulseAnimation(theme)} 2s infinite`,
     pointerEvents: 'none',
     zIndex: -1,
   },
@@ -314,10 +316,11 @@ const pulseStyles = (palette: ColorPalette): CSSObject => ({
  * out one by one, but each is just the union of whichever flags are set.
  */
 export const buttonEmphasisStyles = (
+  theme: Theme,
   palette: ColorPalette,
   glow?: boolean,
   pulse?: boolean,
 ): CSSObject => ({
-  ...(glow ? glowStyles(palette) : {}),
-  ...(pulse ? pulseStyles(palette) : {}),
+  ...(glow ? glowStyles(theme, palette) : {}),
+  ...(pulse ? pulseStyles(theme, palette) : {}),
 });

@@ -264,13 +264,14 @@ describe('the tap target (FUT-1905 §2)', () => {
     // bigger `size` — the label is what clears 40.
     render(<Switch label="Modo escuro" dataTestId="dark" />);
 
-    expect(screen.getByTestId('dark-label')).toHaveStyle({ minHeight: `${TAP_TARGET_MIN}px` });
+    // `TAP_TARGET_MIN` px through the type scale: its rem at the default 16px root.
+    expect(screen.getByTestId('dark-label')).toHaveStyle({ minHeight: `${TAP_TARGET_MIN / 16}rem` });
   });
 
   it('leaves the row alone where a description already makes it taller', () => {
     render(<Switch label="Modo escuro" description="uma explicação" dataTestId="dark" />);
 
-    expect(screen.getByTestId('dark-label')).not.toHaveStyle({ minHeight: `${TAP_TARGET_MIN}px` });
+    expect(screen.getByTestId('dark-label')).not.toHaveStyle({ minHeight: `${TAP_TARGET_MIN / 16}rem` });
   });
 });
 

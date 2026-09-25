@@ -103,6 +103,10 @@ export interface SwitchFlags {
   pulse?: boolean;
 }
 
+/** A metrics radius on the web: its px through the type scale, a percentage as-is. */
+const lengthOrPercent = (theme: Theme, value: number | string): string =>
+  typeof value === 'number' ? rem(theme, value) : value;
+
 const thumbShadow = (theme: Theme, look: SwitchLook): string =>
   look === 'ios' ? IOS_THUMB_SHADOW : (theme.shadows[THUMB_ELEVATION[look]] ?? 'none');
 
@@ -148,15 +152,15 @@ const checkedInk = (flags: SwitchFlags, palette: ColorPalette): string => {
 };
 
 /** The checked track: the filled bar behind the thumb once the switch is on. */
-const checkedTrack = (flags: SwitchFlags, palette: ColorPalette): CSSObject => ({
+const checkedTrack = (theme: Theme, flags: SwitchFlags, palette: ColorPalette): CSSObject => ({
   backgroundColor: palette.main,
   opacity: 1,
   border: 0,
   position: 'relative',
   overflow: 'hidden',
   ...(flags.glow && {
-    animation: `${glowAnimation} ${seconds(SWITCH_GLOW.ms)} ease-in-out infinite`,
-    boxShadow: `0 0 ${SWITCH_GLOW.blur}px ${alpha(palette.main, SWITCH_GLOW.alpha)}, inset 0 0 ${SWITCH_GLOW.insetBlur}px ${alpha(palette.main, SWITCH_GLOW.insetAlpha)}`,
+    animation: `${glowAnimation(theme)} ${seconds(SWITCH_GLOW.ms)} ease-in-out infinite`,
+    boxShadow: `0 0 ${rem(theme, SWITCH_GLOW.blur)} ${alpha(palette.main, SWITCH_GLOW.alpha)}, inset 0 0 ${rem(theme, SWITCH_GLOW.insetBlur)} ${alpha(palette.main, SWITCH_GLOW.insetAlpha)}`,
   }),
   ...(flags.gradient && {
     background: `linear-gradient(${SWITCH_GRADIENT.checked.angleDeg}deg, ${palette.light || palette.main} ${SWITCH_GRADIENT.checked.stops[0]}%, ${palette.main} ${SWITCH_GRADIENT.checked.stops[1]}%, ${palette.dark || palette.main} ${SWITCH_GRADIENT.checked.stops[2]}%)`,
@@ -176,22 +180,22 @@ const switchBaseSx = (
   const isIos = look === 'ios';
 
   return {
-    padding,
+    padding: rem(theme, padding),
     margin: 0,
     transitionDuration: `${SWITCH_TRANSITION.ms}ms`,
     transitionTimingFunction: SWITCH_TRANSITION.easing,
-    ...(isIos && { transform: `translateX(${IOS_BASE_OFFSET}px)` }),
+    ...(isIos && { transform: `translateX(${rem(theme, IOS_BASE_OFFSET)})` }),
     '&:hover': {
       '& .MuiSwitch-thumb': {
         transform: flags.loading ? 'none' : `scale(${SWITCH_HOVER.thumbScale})`,
-        boxShadow: `${theme.shadows[SWITCH_HOVER.elevation]}, 0 0 ${SWITCH_HOVER.blur}px ${alpha(palette.main, SWITCH_HOVER.alpha)}`,
+        boxShadow: `${theme.shadows[SWITCH_HOVER.elevation]}, 0 0 ${rem(theme, SWITCH_HOVER.blur)} ${alpha(palette.main, SWITCH_HOVER.alpha)}`,
       },
       ...(flags.ripple && { '&::after': rippleOverlay(palette) }),
     },
     '&.Mui-checked': {
       // The thumb travels the track minus its own width and both paddings; the
       // iOS look insets differently, so it gets its own distance.
-      transform: `translateX(${width - thumbSize - padding * 2}px)`,
+      transform: `translateX(${rem(theme, width - thumbSize - padding * 2)})`,
       color: checkedInk(flags, palette),
       '& .MuiSwitch-thumb': {
         animation: flags.loading ? 'none' : `${bounceAnimation} ${seconds(SWITCH_TRANSITION.ms)} ease-out`,
@@ -225,13 +229,13 @@ const switchBaseSx = (
           ? { borderColor: checkedInk(flags, palette) }
           : { backgroundColor: checkedInk(flags, palette) }),
       },
-      '& + .MuiSwitch-track': checkedTrack(flags, palette),
+      '& + .MuiSwitch-track': checkedTrack(theme, flags, palette),
       '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.checkedTrackOpacity },
-      ...(isIos && { transform: `translateX(${width - thumbSize - IOS_TRAVEL_INSET}px)` }),
+      ...(isIos && { transform: `translateX(${rem(theme, width - thumbSize - IOS_TRAVEL_INSET)})` }),
     },
     '&.Mui-focusVisible .MuiSwitch-thumb': {
       color: palette.main,
-      border: `${SWITCH_FOCUS_RING.width}px solid ${alpha(palette.main, SWITCH_FOCUS_RING.alpha)}`,
+      border: `${rem(theme, SWITCH_FOCUS_RING.width)} solid ${alpha(palette.main, SWITCH_FOCUS_RING.alpha)}`,
     },
     '&.Mui-disabled .MuiSwitch-thumb': { color: neutralTones(theme).surface },
     '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.trackOpacity },
@@ -245,9 +249,9 @@ const thumbSx = (
   thumbSize: number,
   look: SwitchLook,
 ): CSSObject => ({
-  width: thumbSize,
-  height: thumbSize,
-  borderRadius: THUMB_RADIUS[look](thumbSize),
+  width: rem(theme, thumbSize),
+  height: rem(theme, thumbSize),
+  borderRadius: lengthOrPercent(theme, THUMB_RADIUS[look](thumbSize)),
   // `.Mui-checked` above replaces this for the brand-filled track; see
   // {@link RESTING_THUMB} for why the resting one stays white.
   backgroundColor: RESTING_THUMB,
@@ -259,7 +263,7 @@ const thumbSx = (
   justifyContent: 'center',
   ...(flags.glass && {
     backgroundColor: alpha(theme.palette.background.paper, SWITCH_GLASS.thumbAlpha),
-    backdropFilter: `blur(${SWITCH_GLASS.thumbBlur}px)`,
+    backdropFilter: `blur(${rem(theme, SWITCH_GLASS.thumbBlur)})`,
     border: `1px solid ${alpha(theme.palette.divider, SWITCH_GLASS.borderAlpha)}`,
   }),
   ...(flags.pulse && { animation: `${pulseAnimation} ${seconds(SWITCH_PULSE.ms)} ease-in-out infinite` }),
@@ -268,10 +272,10 @@ const thumbSx = (
     '&::after': {
       content: '""',
       position: 'absolute',
-      width: thumbSize * SWITCH_SPINNER.sizeRatio,
-      height: thumbSize * SWITCH_SPINNER.sizeRatio,
-      border: `${SWITCH_SPINNER.borderWidth}px solid ${palette.main}`,
-      borderTop: `${SWITCH_SPINNER.borderWidth}px solid transparent`,
+      width: rem(theme, thumbSize * SWITCH_SPINNER.sizeRatio),
+      height: rem(theme, thumbSize * SWITCH_SPINNER.sizeRatio),
+      border: `${rem(theme, SWITCH_SPINNER.borderWidth)} solid ${palette.main}`,
+      borderTop: `${rem(theme, SWITCH_SPINNER.borderWidth)} solid transparent`,
       borderRadius: '50%',
       animation: `${spinAnimation} ${seconds(SWITCH_SPINNER.ms)} linear infinite`,
     },
@@ -344,7 +348,7 @@ const trackSx = (
   const { glass, gradient, onText, offText, customVariant } = flags;
 
   return {
-    borderRadius: TRACK_RADIUS[look](height),
+    borderRadius: rem(theme, TRACK_RADIUS[look](height)),
     backgroundColor: trackColor(
       { black: absoluteInk(theme).black, disabled: theme.palette.action.disabled },
       look,
@@ -355,7 +359,7 @@ const trackSx = (
     boxShadow: look === 'ios' ? iosTrackShadow() : 'none',
     ...(glass && {
       backgroundColor: alpha(theme.palette.background.paper, SWITCH_GLASS.trackAlpha),
-      backdropFilter: `blur(${SWITCH_GLASS.trackBlur}px)`,
+      backdropFilter: `blur(${rem(theme, SWITCH_GLASS.trackBlur)})`,
       border: `1px solid ${alpha(theme.palette.divider, SWITCH_GLASS.borderAlpha)}`,
     }),
     ...(gradient &&
@@ -381,8 +385,8 @@ export const switchSx = (theme: Theme, flags: SwitchFlags): CSSObject => {
   const look = lookOf(flags.customVariant);
 
   return {
-    width: geometry.width,
-    height: geometry.height,
+    width: rem(theme, geometry.width),
+    height: rem(theme, geometry.height),
     padding: 0,
     overflow: 'visible',
     '& .MuiSwitch-switchBase': switchBaseSx(theme, flags, palette, geometry, look),

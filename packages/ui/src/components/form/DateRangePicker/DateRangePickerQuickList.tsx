@@ -17,7 +17,7 @@ import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React, { useId } from 'react';
 
 import type { ResolvedQuickRange } from './DateRangePicker.types';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
   display: 'block',
@@ -46,7 +46,11 @@ const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
   color: overMax ? 'text.disabled' : active ? 'primary.main' : 'text.primary',
   backgroundColor: active ? 'action.selected' : 'transparent',
   '&:hover': { backgroundColor: overMax ? 'transparent' : 'action.hover' },
-  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
+  '&:focus-visible': {
+    outline: (theme: Theme) => `${rem(theme, 2)} solid`,
+    outlineColor: 'primary.main',
+    outlineOffset: sxRem(1),
+  },
 });
 
 const REASON_SX: SxProps<Theme> = {
@@ -107,8 +111,8 @@ export function DateRangeQuickList({
         '&::-webkit-scrollbar': { display: 'none' },
         alignContent: 'flex-start',
         gap: 0.5,
-        minWidth: { md: 168 },
-        maxWidth: { md: 200 },
+        minWidth: (theme: Theme) => ({ md: rem(theme, 168) }),
+        maxWidth: (theme: Theme) => ({ md: rem(theme, 200) }),
       }}
     >
       {options.map((option) => {

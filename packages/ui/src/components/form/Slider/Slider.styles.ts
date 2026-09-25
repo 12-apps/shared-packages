@@ -48,29 +48,30 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
 
 type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
+/** Design px, converted through the type scale where each is read. */
 interface Geometry {
-  height: number;
-  thumbSize: number;
-  markHeight: number;
+  heightPx: number;
+  thumbSizePx: number;
+  markHeightPx: number;
 }
 
 const SIZES: Record<SizeKey, Geometry> = {
-  xs: { height: 4, thumbSize: 16, markHeight: 8 },
-  sm: { height: 6, thumbSize: 18, markHeight: 10 },
-  md: { height: 8, thumbSize: 20, markHeight: 12 },
-  lg: { height: 10, thumbSize: 24, markHeight: 14 },
-  xl: { height: 12, thumbSize: 28, markHeight: 16 },
+  xs: { heightPx: 4, thumbSizePx: 16, markHeightPx: 8 },
+  sm: { heightPx: 6, thumbSizePx: 18, markHeightPx: 10 },
+  md: { heightPx: 8, thumbSizePx: 20, markHeightPx: 12 },
+  lg: { heightPx: 10, thumbSizePx: 24, markHeightPx: 14 },
+  xl: { heightPx: 12, thumbSizePx: 28, markHeightPx: 16 },
 };
 
 /**
  * The value bubble and mark labels shrink at the two smallest sizes only. The
  * two fonts are design px, read through the type scale.
  */
-const LABEL_SCALE: Record<string, { fontPx: number; box: number; markFont: number }> = {
-  xs: { fontPx: 10, box: 28, markFont: 10.4 },
-  sm: { fontPx: 11, box: 30, markFont: 11.2 },
+const LABEL_SCALE: Record<string, { fontPx: number; boxPx: number; markFont: number }> = {
+  xs: { fontPx: 10, boxPx: 28, markFont: 10.4 },
+  sm: { fontPx: 11, boxPx: 30, markFont: 11.2 },
 };
-const LABEL_DEFAULT = { fontPx: 12, box: 32, markFont: 12 };
+const LABEL_DEFAULT = { fontPx: 12, boxPx: 32, markFont: 12 };
 
 export interface SliderFlags {
   customColor?: string;
@@ -94,8 +95,8 @@ const trackPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject =>
 
   return {
     border: 'none',
-    height: geometry.height,
-    borderRadius: geometry.height / 2,
+    height: rem(theme, geometry.heightPx),
+    borderRadius: rem(theme, geometry.heightPx / 2),
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     position: 'relative',
     overflow: 'hidden',
@@ -121,12 +122,12 @@ const trackPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject =>
       },
     }),
     ...(glow && {
-      animation: `${glowAnimation} 2s ease-in-out infinite`,
-      boxShadow: `0 0 10px ${alpha(palette.main, 0.6)}, inset 0 0 10px ${alpha(palette.main, 0.2)}`,
+      animation: `${glowAnimation(theme)} 2s ease-in-out infinite`,
+      boxShadow: `0 0 ${rem(theme, 10)} ${alpha(palette.main, 0.6)}, inset 0 0 ${rem(theme, 10)} ${alpha(palette.main, 0.2)}`,
     }),
     ...(glass && {
       backgroundColor: alpha(palette.main, 0.8),
-      backdropFilter: 'blur(10px)',
+      backdropFilter: `blur(${rem(theme, 10)})`,
       border: `1px solid ${alpha(palette.light || palette.main, 0.3)}`,
     }),
   };
@@ -135,12 +136,12 @@ const trackPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject =>
 const railPart = ({ theme, flags, geometry }: PartInput): CSSObject => ({
   color: alpha(theme.palette.action.disabled, 0.3),
   opacity: 1,
-  height: geometry.height,
-  borderRadius: geometry.height / 2,
+  height: rem(theme, geometry.heightPx),
+  borderRadius: rem(theme, geometry.heightPx / 2),
   transition: 'all 0.3s ease',
   ...(flags.glass && {
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
-    backdropFilter: 'blur(20px)',
+    backdropFilter: `blur(${rem(theme, 20)})`,
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
   }),
   ...(flags.customVariant === 'gradient' && {
@@ -155,10 +156,10 @@ const thumbPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject =>
   const { gradient, glow, glass } = flags;
 
   return {
-    height: geometry.thumbSize,
-    width: geometry.thumbSize,
+    height: rem(theme, geometry.thumbSizePx),
+    width: rem(theme, geometry.thumbSizePx),
     backgroundColor: gradient ? palette.main : absoluteInk(theme).white,
-    border: `2px solid ${palette.main}`,
+    border: `${rem(theme, 2)} solid ${palette.main}`,
     boxShadow: `${theme.shadows[2]}, 0 0 0 0 ${alpha(palette.main, 0.2)}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     position: 'relative',
@@ -177,16 +178,16 @@ const thumbPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject =>
     },
     '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
       boxShadow: glow
-        ? `${theme.shadows[4]}, 0 0 20px ${alpha(palette.main, 0.6)}, 0 0 0 8px ${alpha(palette.main, 0.15)}`
-        : `${theme.shadows[4]}, 0 0 0 8px ${alpha(palette.main, 0.15)}`,
+        ? `${theme.shadows[4]}, 0 0 ${rem(theme, 20)} ${alpha(palette.main, 0.6)}, 0 0 0 ${rem(theme, 8)} ${alpha(palette.main, 0.15)}`
+        : `${theme.shadows[4]}, 0 0 0 ${rem(theme, 8)} ${alpha(palette.main, 0.15)}`,
       transform: 'scale(1.15)',
       '&::before': { animation: `${pulseAnimation} 0.6s ease-out` },
     },
     '&:active': { transform: 'scale(1.05)' },
     ...(glass && {
       backgroundColor: alpha(theme.palette.background.paper, 0.9),
-      backdropFilter: 'blur(10px)',
-      border: `2px solid ${alpha(palette.main, 0.8)}`,
+      backdropFilter: `blur(${rem(theme, 10)})`,
+      border: `${rem(theme, 2)} solid ${alpha(palette.main, 0.8)}`,
     }),
     ...(gradient && {
       background: `linear-gradient(135deg, ${palette.light}, ${palette.main})`,
@@ -222,18 +223,18 @@ const valueLabelPart = ({ theme, flags, palette }: PartInput): CSSObject => {
     lineHeight: 1.2,
     fontSize: rem(theme, scale.fontPx),
     padding: 0,
-    width: scale.box,
-    height: scale.box,
-    borderRadius: gradient ? '8px' : '50% 50% 50% 0',
+    width: rem(theme, scale.boxPx),
+    height: rem(theme, scale.boxPx),
+    borderRadius: gradient ? rem(theme, 8) : '50% 50% 50% 0',
     backgroundColor: bubbleBackground(palette, Boolean(gradient), Boolean(glass)),
     background: gradient
       ? `linear-gradient(135deg, ${palette.light}, ${palette.main})`
       : 'unset',
-    backdropFilter: glass ? 'blur(10px)' : 'none',
+    backdropFilter: glass ? `blur(${rem(theme, 10)})` : 'none',
     transformOrigin: 'bottom left',
     transform: bubbleTransform.hidden,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: `${theme.shadows[2]}, 0 0 10px ${alpha(palette.main, 0.2)}`,
+    boxShadow: `${theme.shadows[2]}, 0 0 ${rem(theme, 10)} ${alpha(palette.main, 0.2)}`,
     '&:before': { display: 'none' },
     '&.MuiSlider-valueLabelOpen': { transform: bubbleTransform.shown },
     '& > *': { transform: gradient ? 'none' : 'rotate(45deg)', fontWeight: 600 },
@@ -243,22 +244,22 @@ const valueLabelPart = ({ theme, flags, palette }: PartInput): CSSObject => {
 const markPart = ({ theme, flags, palette, geometry }: PartInput): CSSObject => {
   const { gradient, glow, customVariant } = flags;
   const isMarksVariant = customVariant === 'marks';
-  const { markHeight, height } = geometry;
+  const { markHeightPx, heightPx } = geometry;
 
   return {
     backgroundColor: alpha(theme.palette.action.disabled, 0.5),
-    height: markHeight,
-    width: isMarksVariant ? 3 : 2,
+    height: rem(theme, markHeightPx),
+    width: rem(theme, isMarksVariant ? 3 : 2),
     // Centred on the rail rather than hanging below it.
-    marginTop: -(markHeight - height) / 2,
-    borderRadius: 1,
+    marginTop: rem(theme, -(markHeightPx - heightPx) / 2),
+    borderRadius: rem(theme, 1),
     transition: 'all 0.3s ease',
     '&.MuiSlider-markActive': {
       backgroundColor: gradient ? palette.light : palette.main,
-      width: isMarksVariant ? 4 : 2,
-      height: markHeight + 2,
-      marginTop: -(markHeight + 2 - height) / 2,
-      ...(glow && { boxShadow: `0 0 8px ${alpha(palette.main, 0.5)}` }),
+      width: rem(theme, isMarksVariant ? 4 : 2),
+      height: rem(theme, markHeightPx + 2),
+      marginTop: rem(theme, -(markHeightPx + 2 - heightPx) / 2),
+      ...(glow && { boxShadow: `0 0 ${rem(theme, 8)} ${alpha(palette.main, 0.5)}` }),
     },
   };
 };
@@ -283,7 +284,7 @@ export const sliderSx = (theme: Theme, flags: SliderFlags): CSSObject => {
 
   return {
     color: palette.main,
-    height: geometry.height,
+    height: rem(theme, geometry.heightPx),
     '& .MuiSlider-track': trackPart(input),
     '& .MuiSlider-rail': railPart(input),
     '& .MuiSlider-thumb': thumbPart(input),

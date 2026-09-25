@@ -21,8 +21,8 @@ const EditorContainer = styled(Paper)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  backdropFilter: `blur(${rem(theme, 10)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
   border: `1px solid ${fieldEdge(theme)}`,
   borderRadius: fieldRadius(theme),
   overflow: 'hidden' }));
@@ -31,7 +31,7 @@ const EditorWrapper = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'fullscreen' })<{ fullscreen: boolean }>(({ theme, fullscreen }) => ({
   position: 'relative',
   flex: 1,
-  minHeight: 200,
+  minHeight: rem(theme, 200),
   ...(fullscreen && {
     position: 'fixed',
     top: 0,
@@ -102,7 +102,7 @@ const buildEditorOptions = ({
     renderLineHighlight: 'all',
     selectOnLineNumbers: true,
     roundedSelection: true,
-    padding: { top: 16, bottom: 16 },
+    padding: { top: remPx(theme, 16), bottom: remPx(theme, 16) },
     fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, source-code-pro, monospace',
     fontLigatures: true });
 
@@ -161,7 +161,7 @@ export const CodeEditor: FC<CodeEditorProps> = (componentProps) => {
         )}
 
         <Editor
-          height={editor.isFullscreen ? '100vh' : height}
+          height={editor.isFullscreen ? '100vh' : (height ?? rem(muiTheme, 400))}
           language={language}
           value={value}
           onChange={(newValue) => onChange?.(newValue || '')}

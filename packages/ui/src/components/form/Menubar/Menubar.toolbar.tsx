@@ -1,12 +1,13 @@
 import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Toolbar from '@mui/material/Toolbar/index.js';
-import type { CSSObject } from '@mui/material/styles/index.js';
+import { useTheme, type CSSObject } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { MenubarItemView } from './Menubar.item';
 import { MenubarSeparator } from './Menubar.separator';
 import type { MenubarItem, MenubarProps } from './Menubar.types';
+import { rem } from '../../../tokens/relative';
 
 export interface MenubarToolbarProps {
   ariaLabel: string;
@@ -52,6 +53,7 @@ export const MenubarToolbar: React.FC<MenubarToolbarProps> = ({
   onFocus,
   onBlur,
 }) => {
+  const theme = useTheme();
   const isVertical = orientation === 'vertical';
 
   return (
@@ -69,7 +71,7 @@ export const MenubarToolbar: React.FC<MenubarToolbarProps> = ({
       {logo && <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>{logo}</Box>}
 
       {loading ? (
-        <CircularProgress size={20} color="inherit" />
+        <CircularProgress size={rem(theme, 20)} color="inherit" />
       ) : (
         <Box
           sx={{
