@@ -2049,15 +2049,14 @@ export const Integration: Story = {
         { timeout: 5000 },
       );
 
-      // Processing progress should have pulse effect
-      const processingProgress = canvas.getByTestId('processing-progress');
-      const circularSvg = processingProgress.querySelector('.MuiCircularProgress-svg');
-
-      if (circularSvg) {
-        const style = window.getComputedStyle(circularSvg);
-        // Should have animation for pulse
-        expect(style.animation).not.toBe('none');
-      }
+      // Processing progress should pulse. The pulse is on the CircularProgress
+      // root, not its <svg>: the old check read the svg's `animation`, which
+      // older Chromium serialised as a long "none 0s ease …" string and so
+      // passed vacuously; Chrome 149 serialises it as plain "none".
+      await waitFor(() => {
+        const circular = canvas.getByTestId('processing-progress-circular');
+        expect(window.getComputedStyle(circular).animationName).not.toBe('none');
+      });
     });
 
     await step('Workflow completion integration', async () => {
