@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
+import { PT_BR_CODE_EDITOR_COPY } from '../../../pt-BR';
 import { CodeEditor } from './CodeEditor';
 import type { EditorLanguage } from './CodeEditor.types';
 
@@ -473,7 +474,6 @@ Import and use components in your React application:
 
 \`\`\`jsx
 import { Button, Card, Dialog } from '@company/ui-components';
-import { PT_BR_CODE_EDITOR_COPY } from '../../../pt-BR';
 
 function App() {
   return (

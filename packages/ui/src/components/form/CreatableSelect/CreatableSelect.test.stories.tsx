@@ -14,6 +14,7 @@ const meta: Meta<typeof CreatableSelect> = {
     chromatic: { disableSnapshot: false },
   },
   tags: ['autodocs', 'test', 'component:CreatableSelect'],
+  args: { createOptionLabel: (input: string) => `Criar "${input}"` },
 };
 
 export default meta;

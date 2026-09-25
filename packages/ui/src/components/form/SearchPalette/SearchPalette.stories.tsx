@@ -87,6 +87,9 @@ function Harness({ initial = '' }: { initial?: string }) {
         setActive((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
       }
       onSubmitAll={() => undefined}
+      submitAllLabel={(q) => `Todos os resultados para "${q}"`}
+      submitKeyLabel="Enter"
+      noResultsLabel="Nenhum resultado encontrado"
       emptyQueryContent={
         <div style={{ padding: '8px 16px', color: '#5f6368', fontSize: 13 }}>
           Comece a digitar para buscar…

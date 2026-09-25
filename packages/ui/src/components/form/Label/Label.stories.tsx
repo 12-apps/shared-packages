@@ -10,7 +10,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Label } from './Label';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Label> = {
   title: 'Form/Label',

@@ -8,7 +8,7 @@ import React from 'react';
 
 import { Carousel } from './Carousel';
 import type { CarouselItem } from './Carousel.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 import { PT_BR_CAROUSEL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Carousel> = {

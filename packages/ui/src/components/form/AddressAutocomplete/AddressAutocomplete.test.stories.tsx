@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,Mock,userEvent, waitFor, within } from 'storybook/test';
 
 import { AddressAutocomplete } from './AddressAutocomplete';
+import { PT_BR_ADDRESS_AUTOCOMPLETE_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof AddressAutocomplete> = {
+  args: { copy: PT_BR_ADDRESS_AUTOCOMPLETE_COPY },
   title: 'Form/AddressAutocomplete/Tests',
   component: AddressAutocomplete,
   parameters: {

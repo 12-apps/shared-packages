@@ -5,7 +5,7 @@ import React from 'react';
 
 import { Chart } from './Chart';
 import type { ChartDataPoint } from './Chart.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Chart> = {
   title: 'Charts/Chart',

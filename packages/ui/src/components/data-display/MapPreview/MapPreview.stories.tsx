@@ -3,12 +3,14 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { MapPreview } from './MapPreview';
 import type { HeatmapPoint,MapMarker } from './MapPreview.types';
+import { PT_BR_MAP_PREVIEW_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof MapPreview> = {
+  args: { copy: PT_BR_MAP_PREVIEW_COPY },
   title: 'Media/MapPreview',
   component: MapPreview,
   parameters: {
-    layout: 'centered',
+    layout: 'padded',
     docs: {
       description: {
         component: 'A versatile map preview component with support for markers, routes, heatmaps, and interactive features.',

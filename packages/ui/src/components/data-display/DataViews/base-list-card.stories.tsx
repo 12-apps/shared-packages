@@ -7,8 +7,10 @@ import type { InputType } from "storybook/internal/types";
 import { Button } from "../../form/Button";
 import { DropdownMenu } from "../../navigation/DropdownMenu";
 import { Box } from "../../../mui/Box";
+import { PT_BR_DATA_VIEWS_COPY } from "../../../pt-BR";
 
 import { BaseListCard, type BaseListCardProps } from "./base-list-card";
+import { DataViewsCopyProvider } from "./data-views-copy-context";
 import { DragContainerProvider } from "./data-views-drag";
 import { ListCardGroup } from "./list-card-rails";
 
@@ -131,6 +133,13 @@ const ACTIONS = {
 const meta: Meta<typeof BaseListCard> = {
   title: "Cards/BaseListCard",
   component: BaseListCard,
+  decorators: [
+    (Story) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <Story />
+      </DataViewsCopyProvider>
+    ),
+  ],
   parameters: { layout: "padded" },
   tags: ["autodocs"],
   /**

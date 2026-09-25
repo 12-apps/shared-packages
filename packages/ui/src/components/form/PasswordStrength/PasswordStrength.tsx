@@ -239,12 +239,20 @@ const StrengthHeading: React.FC<{
 
 // One row per enabled requirement. Previously five near-identical JSX blocks,
 // each with its own `requirements.x &&` guard.
-const RequirementsList: React.FC<{
-  copy: PasswordStrengthCopy;
-  requirements: PasswordRequirements;
-  checks: RequirementChecks;
-  animated: boolean;
-}> = ({ copy, requirements, checks, animated }) => {
+//
+// `forwardRef` because it is `Fade`'s child: Fade hands it a ref and reads
+// `scrollTop` off that node on enter, so a component that drops the ref throws
+// the moment the first character is typed. Only the ref: Fade's injected
+// `style` (opacity/visibility) is still dropped, so the list stays visible.
+const RequirementsList = React.forwardRef<
+  HTMLDivElement,
+  {
+    copy: PasswordStrengthCopy;
+    requirements: PasswordRequirements;
+    checks: RequirementChecks;
+    animated: boolean;
+  }
+>(({ copy, requirements, checks, animated }, ref) => {
   const rows: ReadonlyArray<[unknown, keyof RequirementChecks, React.ReactNode]> = [
     [requirements.minLength, 'length', copy.requirements.minLength(requirements.minLength ?? 0)],
     [requirements.uppercase, 'uppercase', copy.requirements.uppercase],
@@ -254,7 +262,7 @@ const RequirementsList: React.FC<{
   ];
 
   return (
-    <Stack spacing={1}>
+    <Stack ref={ref} spacing={1}>
       <Typography variant="caption" color="text.secondary" fontWeight="medium">
         {copy.requirementsHeading}
       </Typography>
@@ -268,7 +276,8 @@ const RequirementsList: React.FC<{
         ))}
     </Stack>
   );
-};
+});
+RequirementsList.displayName = 'RequirementsList';
 
 // The visible sections. Kept apart from PasswordStrength itself so the exported
 // component is just prop defaults plus the three memos, and every display guard

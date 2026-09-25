@@ -5,7 +5,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState, type JSX } from 'react';
 
 import { Button } from '../../form/Button';
-import { BaseCard } from '../DataViews';
+import { BaseCard, DataViewsCopyProvider } from '../DataViews';
+import { PT_BR_CONFIRM_ACTION_COPY, PT_BR_DATA_VIEWS_COPY } from '../../../pt-BR';
 import { exportRows, type ExportColumn } from '../../../utils';
 
 import { CardActionsProvider, useCardActions } from './card-actions-context';
@@ -29,6 +30,13 @@ import { useRowConfirm } from './use-row-confirm';
  */
 const meta: Meta = {
   title: 'Cards/CardKit',
+  decorators: [
+    (Story) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <Story />
+      </DataViewsCopyProvider>
+    ),
+  ],
   parameters: {
     layout: 'padded',
     docs: {
@@ -165,6 +173,7 @@ function DemoMenu({ fails }: { fails: boolean }): JSX.Element {
     confirmText: 'Excluir',
     fallbackError: 'Não foi possível excluir o desconto.',
     dataTestId: 'story-remove-confirm',
+    copy: PT_BR_CONFIRM_ACTION_COPY,
   });
 
   return (
@@ -194,6 +203,7 @@ export const RemoveFromAMenu: Story = {
       tenantSlug="minha-loja"
       onRefresh={() => {}}
       errorTitle="Não foi possível concluir a ação"
+      errorDismissLabel="Fechar o aviso"
     >
       <DemoMenu fails={false} />
     </CardActionsProvider>
@@ -215,6 +225,7 @@ export const RemoveRefused: Story = {
       tenantSlug="minha-loja"
       onRefresh={() => {}}
       errorTitle="Não foi possível concluir a ação"
+      errorDismissLabel="Fechar o aviso"
     >
       <DemoMenu fails />
     </CardActionsProvider>
@@ -240,6 +251,8 @@ function DemoSelection(): JSX.Element {
             confirmText: 'Excluir',
           },
     dataTestId: 'story-row-confirm',
+    errorText: 'Não foi possível excluir.',
+    copy: PT_BR_CONFIRM_ACTION_COPY,
   });
 
   return (

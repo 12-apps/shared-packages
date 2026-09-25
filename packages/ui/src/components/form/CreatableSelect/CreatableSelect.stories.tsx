@@ -18,6 +18,7 @@ const meta: Meta<typeof CreatableSelect> = {
     },
   },
   tags: ['autodocs', 'component:CreatableSelect'],
+  args: { createOptionLabel: (input: string) => `Criar "${input}"` },
   argTypes: {
     label: { control: 'text' },
     placeholder: { control: 'text' },
