@@ -7,6 +7,7 @@ import TableSortLabel from '@mui/material/TableSortLabel/index.js';
 import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useCallback } from 'react';
 
+import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height.core';
 import { rem } from '../../../tokens/relative';
 
 import { tableRowHeight } from './Table.helpers';
@@ -125,14 +126,62 @@ export const EnhancedTableHeader: React.FC<TableHeaderProps> = React.memo(({
 
 EnhancedTableHeader.displayName = 'EnhancedTableHeader';
 
+/** How a virtual cell's wrapper places its content along the row, per `align`. */
+const JUSTIFY: Record<NonNullable<ColumnConfig['align']>, React.CSSProperties['justifyContent']> = {
+  left: 'flex-start',
+  center: 'center',
+  right: 'flex-end',
+};
+
+/**
+ * A virtual cell's content (FUT-2668). The cell has no vertical padding, and
+ * this fills its content box — the pitch less the cell's bottom rule, the one
+ * hairline every variant draws — so the cell's border box is exactly the pitch
+ * whatever it holds. Centred vertically, placed by the column's `align`, and
+ * clipped rather than allowed to grow the row.
+ */
+const VirtualCellContent: React.FC<{
+  rowHeight: number;
+  align: NonNullable<ColumnConfig['align']>;
+  children: React.ReactNode;
+}> = ({ rowHeight, align, children }) => {
+  const theme = useTheme();
+  return (
+    <div
+      style={{
+        height: `calc(${rem(theme, rowHeight)} - ${FIELD_BORDER_WIDTH}px)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: JUSTIFY[align],
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
+/** What one cell shows: the caller's `renderCell`, else the column's `render`, else the value. */
+const cellContent = (
+  column: ColumnConfig,
+  rowData: Record<string, unknown>,
+  index: number,
+  renderCell: TableBodyProps['renderCell'],
+): React.ReactNode => {
+  const value = rowData[column.key];
+  if (renderCell) return renderCell(value, column, rowData, index);
+  return column.render ? column.render(value, rowData) : (value as React.ReactNode);
+};
+
 // One data row. Split out of the memoised renderTableRow callback so the
 // callback stays a short dispatch and the row markup is readable on its own.
+// A virtualised row stays in the table's flow at `rowHeight`, and each of its
+// cells holds its content in a `VirtualCellContent` (FUT-2668); a plain row is
+// drawn as MUI draws it.
 export const TableDataRow: React.FC<{
   rowData: Record<string, unknown>;
   rowKey: string | number;
   index: number;
-  /** Where a virtualised row sits, in design px — drawn through `rem`, like its height. */
-  offsetY: number;
   columns: ColumnConfig[];
   selected: boolean;
   selectable?: boolean;
@@ -142,13 +191,13 @@ export const TableDataRow: React.FC<{
   onRowFocus?: TableBodyProps['onRowFocus'];
   onRowBlur?: TableBodyProps['onRowBlur'];
   onSelect: (event: React.MouseEvent | React.ChangeEvent, rowKey: string | number) => void;
-  virtualScrolling?: boolean;
+  /** Whether the row is one of a virtual window's. */
+  virtualised: boolean;
   renderCell?: TableBodyProps['renderCell'];
 }> = ({
   rowData,
   rowKey,
   index,
-  offsetY,
   columns,
   selected,
   selectable,
@@ -157,9 +206,19 @@ export const TableDataRow: React.FC<{
   onRowFocus,
   onRowBlur,
   onSelect,
-  virtualScrolling,
+  virtualised,
   renderCell }) => {
   const theme = useTheme();
+  const pitch = tableRowHeight(rowHeight);
+  const fit = (align: NonNullable<ColumnConfig['align']>, content: React.ReactNode) =>
+    virtualised ? (
+      <VirtualCellContent rowHeight={pitch} align={align}>
+        {content}
+      </VirtualCellContent>
+    ) : (
+      content
+    );
+
   return (
       <TableRow
         key={String(rowKey)}
@@ -168,62 +227,62 @@ export const TableDataRow: React.FC<{
         onClick={(event: React.MouseEvent<globalThis.HTMLTableRowElement>) => onRowClick?.(event, rowData)}
         onFocus={(event: React.FocusEvent<globalThis.HTMLTableRowElement>) => onRowFocus?.(event, rowData)}
         onBlur={(event: React.FocusEvent<globalThis.HTMLTableRowElement>) => onRowBlur?.(event, rowData)}
-        style={virtualScrolling ? { 
-          transform: `translateY(${rem(theme, offsetY)})`,
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: rem(theme, tableRowHeight(rowHeight)) } : undefined}
+        style={virtualised ? { height: rem(theme, pitch) } : undefined}
       >
         {selectable && (
           <TableCell padding="checkbox">
-            <Checkbox
-              checked={selected}
-              onChange={(event) => onSelect(event, rowKey)}
-              onClick={(event) => event.stopPropagation()}
-              inputProps={{ 'aria-label': `select row ${index + 1}` }}
-            />
+            {fit(
+              'left',
+              <Checkbox
+                checked={selected}
+                onChange={(event) => onSelect(event, rowKey)}
+                onClick={(event) => event.stopPropagation()}
+                inputProps={{ 'aria-label': `select row ${index + 1}` }}
+              />,
+            )}
           </TableCell>
         )}
-        {columns.map((column) => {
-          const value = rowData[column.key];
-          return (
-            <TableCell key={column.key} align={column.align || 'left'}>
-              {renderCell 
-                ? renderCell(value, column, rowData, index)
-                : column.render 
-                ? column.render(value, rowData) 
-                : (value as React.ReactNode)
-              }
-            </TableCell>
-          );
-        })}
+        {columns.map((column) => (
+          <TableCell key={column.key} align={column.align || 'left'}>
+            {fit(column.align || 'left', cellContent(column, rowData, index, renderCell))}
+          </TableCell>
+        ))}
       </TableRow>
   );
 };
 
-// Only the rows in view are rendered, positioned by absolute offset inside a
-// body sized to the full data set. `rowHeight` and every offset are design px,
+/**
+ * A stand-in for the rows outside the window, `heightPx` design px tall. A bare
+ * `<tr>` and `<td>` with no padding or border: none of MUI's row or cell
+ * classes, so hover, striping and cell padding never reach it. Not rendered at
+ * all when there is nothing to stand in for.
+ */
+const SpacerRow: React.FC<{ heightPx: number; colSpan: number }> = ({ heightPx, colSpan }) => {
+  const theme = useTheme();
+  if (heightPx <= 0) return null;
+  return (
+    <tr aria-hidden="true" style={{ height: rem(theme, heightPx) }}>
+      <td colSpan={colSpan} style={{ padding: 0, border: 0 }} />
+    </tr>
+  );
+};
+
+// Only the rows in view are rendered, in the table's own flow between two
+// spacer rows standing in for the rest (FUT-2668) — an absolutely positioned
+// `<tr>` is blockified and leaves the column grid. Every height is design px,
 // drawn through `rem`. The `<tbody>` sits directly in the `<table>`; the one
 // scroll container wraps the whole table, header included (FUT-2658).
 const VirtualisedBody: React.FC<{
   visibleItems: VirtualWindow;
-  rowHeight: number;
-  renderTableRow: (
-    rowData: Record<string, unknown>,
-    index: number,
-    offsetY?: number,
-  ) => React.ReactNode;
-}> = ({ visibleItems, rowHeight, renderTableRow }) => (
-  <TableBody
-    style={{
-      height: visibleItems.totalHeight,
-      position: 'relative' }}
-  >
-    {visibleItems.items.map((rowData, index) => 
-      renderTableRow(rowData, visibleItems.startIndex + index, visibleItems.offsetY + index * rowHeight)
+  colSpan: number;
+  renderTableRow: (rowData: Record<string, unknown>, index: number) => React.ReactNode;
+}> = ({ visibleItems, colSpan, renderTableRow }) => (
+  <TableBody>
+    <SpacerRow heightPx={visibleItems.offsetY} colSpan={colSpan} />
+    {visibleItems.items.map((rowData, index) =>
+      renderTableRow(rowData, visibleItems.startIndex + index)
     )}
+    <SpacerRow heightPx={visibleItems.trailingPx} colSpan={colSpan} />
   </TableBody>
 );
 
@@ -242,13 +301,17 @@ export const EnhancedTableBody: React.FC<TableBodyProps> = React.memo((props) =>
   const { data, virtualWindow } = props;
   // The row renderer takes the body's own props; its `rowHeight` stays the
   // caller's design px, and the row resolves the default where it draws it.
-  const renderTableRow = useTableRowRenderer({ ...props, selectedRows: props.selectedRows ?? [] });
+  const renderTableRow = useTableRowRenderer({
+    ...props,
+    selectedRows: props.selectedRows ?? [],
+    virtualised: Boolean(virtualWindow),
+  });
 
   if (virtualWindow) {
     return (
       <VirtualisedBody
         visibleItems={virtualWindow}
-        rowHeight={tableRowHeight(props.rowHeight)}
+        colSpan={props.columns.length + (props.selectable ? 1 : 0)}
         renderTableRow={renderTableRow}
       />
     );

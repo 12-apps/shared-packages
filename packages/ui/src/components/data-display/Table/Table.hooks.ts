@@ -2,15 +2,16 @@ import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { rem, remPx } from '../../../tokens/relative';
+import { remPx } from '../../../tokens/relative';
 
 import type { ColumnConfig, TableProps, VirtualWindow } from './Table.types';
 
 /**
  * The virtual window. `rowHeight` and `containerHeight` are design px: the
  * window is computed in the px `scrollTop` is measured in (`remPx`), and what it
- * hands back to draw with stays in design px (`offsetY`) or is CSS already
- * (`totalHeight`), so the rows and the window share one pitch at any type scale.
+ * hands back to draw with stays in design px (`offsetY`, `trailingPx` — the
+ * spacer rows either side of the window), so the rows and the window share one
+ * pitch at any type scale.
  *
  * The scroller holds the header as well as the body, so the `<tbody>` starts
  * the header's height into it. `handleScroll` measures that height from
@@ -44,8 +45,8 @@ export const useVirtualScrolling = (
       startIndex: start,
       endIndex: end,
       items: data.slice(start, end),
-      totalHeight: rem(theme, data.length * rowHeight),
       offsetY: start * rowHeight,
+      trailingPx: (data.length - end) * rowHeight,
     };
   }, [data, rowHeight, containerHeight, scroll, overscan, theme]);
 

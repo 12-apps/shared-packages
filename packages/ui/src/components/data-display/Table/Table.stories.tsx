@@ -309,6 +309,17 @@ export const ColumnSorting: Story = {
   },
 };
 
+/**
+ * The virtual path lays columns out fixed (FUT-2668), so a column's `width` is
+ * final: the avatar's is its 32px plus the widest density's side padding, and
+ * the e-mail's fits the longest address.
+ */
+const virtualColumns: ColumnConfig[] = extendedColumns.map((column) => {
+  if (column.key === 'avatar') return { ...column, width: 80 };
+  if (column.key === 'email') return { ...column, width: 240 };
+  return column;
+});
+
 export const VirtualScrolling: Story = {
   render: () => (
     <Box>
@@ -319,7 +330,7 @@ export const VirtualScrolling: Story = {
         Only visible rows are rendered for optimal performance
       </Typography>
       <Table
-        columns={extendedColumns}
+        columns={virtualColumns}
         data={largeDataset}
         virtualScrolling
         rowHeight={52}
@@ -329,6 +340,44 @@ export const VirtualScrolling: Story = {
       />
     </Box>
   ),
+};
+
+/**
+ * The virtual path with the checkbox column and a sticky header (FUT-2668):
+ * every body cell sits in its header's column, and every row is `rowHeight`
+ * tall. Unlike `VirtualScrolling`, this one reads its args, so the variant and
+ * the density can be switched from the controls.
+ */
+export const VirtualScrollingSelectableStickyHeader: Story = {
+  args: {
+    variant: 'default',
+    density: 'normal',
+    rowHeight: 52,
+  },
+  render: function VirtualSelectableTable(args) {
+    const [selectedRows, setSelectedRows] = useState<(string | number)[]>([2, 5]);
+
+    return (
+      <Box>
+        <Typography variant="h6" gutterBottom>
+          Virtual Scrolling - selectable, sticky header
+        </Typography>
+        <Table
+          {...args}
+          emptyText="Nenhum dado"
+          columns={virtualColumns}
+          data={largeDataset}
+          virtualScrolling
+          containerHeight={400}
+          overscan={10}
+          selectable
+          selectedRows={selectedRows}
+          onSelectionChange={setSelectedRows}
+          stickyHeader
+        />
+      </Box>
+    );
+  },
 };
 
 export const ResponsiveDesign: Story = {
