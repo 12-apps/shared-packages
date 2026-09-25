@@ -45,7 +45,8 @@ const searchFieldSx = {
     '&:focus': {
       outline: 'none',
       borderColor: 'primary.main',
-      boxShadow: (theme: Theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.15)}`,
+      // 0x26 of 0xFF: the ring's old hex-alpha suffix, kept exact.
+      boxShadow: (theme: Theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0x26 / 0xff)}`,
     },
   },
 } as const;

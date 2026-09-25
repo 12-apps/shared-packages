@@ -285,44 +285,44 @@ export function SocialLoginContainer({
   maxWidth = 400,
 }: SocialLoginContainerProps): React.ReactElement {
   return (
-      // `width: 100%` is what makes the cap below mean anything. Every caller
-      // centres this card in a flex column (`Container variant="centered"` does),
-      // and a flex item under `align-items: center` sizes to its CONTENT — so the
-      // card sat at whatever the longest label happened to need, ~267px, at every
-      // viewport from 390 to 1280. The 400 was never reached, which is why raising
-      // it would have changed nothing; the card had no width to cap.
-      <Card variant="elevated" borderRadius="lg" sx={{ width: '100%', maxWidth }}>
-        <CardContent>
-          <Stack spacing={3} sx={{ width: '100%' }}>
-            {title && (
-              <Box sx={{ textAlign: 'center' }}>
-                <Heading level="h2">
-                  {title}
-                </Heading>
-                {subtitle && (
-                  <Text color="secondary" size="sm">
-                    {subtitle}
-                  </Text>
-                )}
-              </Box>
-            )}
-
-            <Stack spacing={2}>
-              {children}
-            </Stack>
-
-            {showDivider && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Separator />
+    // `width: 100%` is what makes the cap below mean anything. Every caller
+    // centres this card in a flex column (`Container variant="centered"` does),
+    // and a flex item under `align-items: center` sizes to its CONTENT — so the
+    // card sat at whatever the longest label happened to need, ~267px, at every
+    // viewport from 390 to 1280. The 400 was never reached, which is why raising
+    // it would have changed nothing; the card had no width to cap.
+    <Card variant="elevated" borderRadius="lg" sx={{ width: '100%', maxWidth }}>
+      <CardContent>
+        <Stack spacing={3} sx={{ width: '100%' }}>
+          {title && (
+            <Box sx={{ textAlign: 'center' }}>
+              <Heading level="h2">
+                {title}
+              </Heading>
+              {subtitle && (
                 <Text color="secondary" size="sm">
-                  {dividerText}
+                  {subtitle}
                 </Text>
-                <Separator />
-              </Box>
-            )}
+              )}
+            </Box>
+          )}
+
+          <Stack spacing={2}>
+            {children}
           </Stack>
-        </CardContent>
-      </Card>
+
+          {showDivider && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Separator />
+              <Text color="secondary" size="sm">
+                {dividerText}
+              </Text>
+              <Separator />
+            </Box>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
