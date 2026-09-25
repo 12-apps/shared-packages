@@ -37,7 +37,8 @@ describe('NavigationMenuItem badge', () => {
     render(<NavigationMenu variant="vertical" items={items} />);
 
     const zeroNumberLink = screen.getByRole('link', { name: 'Pedidos' });
-    expect(within(zeroNumberLink).queryByTestId('navigation-menu-badge-zero-number')).not.toBeInTheDocument();
+    // Rendered once and never removed, so a count is the honest check here.
+    expect(within(zeroNumberLink).queryAllByTestId('navigation-menu-badge-zero-number')).toHaveLength(0);
   });
 
   it('shows the pill for the string "0"', () => {
@@ -56,6 +57,7 @@ describe('NavigationMenuItem badge', () => {
   it('renders no badge pill at all when the item has none', () => {
     render(<NavigationMenu variant="vertical" items={items} />);
 
-    expect(screen.queryByTestId('navigation-menu-badge-none')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Configurações' })).toBeInTheDocument();
+    expect(screen.queryAllByTestId('navigation-menu-badge-none')).toHaveLength(0);
   });
 });
