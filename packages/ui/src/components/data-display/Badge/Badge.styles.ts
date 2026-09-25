@@ -206,7 +206,7 @@ export const badgeStyles = ({
     '& .MuiBadge-badge': {
       transition: `all ${BADGE_TRANSITION_MS / 1000}s ${BADGE_TRANSITION_EASING}`,
       fontWeight: BADGE_FONT_WEIGHT,
-      border: `${BADGE_BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
+      border: `${rem(theme, BADGE_BORDER_WIDTH)} solid ${theme.palette.background.paper}`,
       letterSpacing: `${BADGE_LETTER_SPACING_EM}em`,
       textTransform:
         customVariant === 'gradient' || customVariant === 'glass' ? 'uppercase' : 'none',

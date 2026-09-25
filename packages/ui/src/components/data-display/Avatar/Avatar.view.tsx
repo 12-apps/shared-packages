@@ -124,7 +124,7 @@ const variantRadius = (variant: string | undefined, theme: Theme): CSSObject => 
 const borderedStyles = (bordered: boolean | undefined, theme: Theme): CSSObject =>
   bordered
     ? {
-        border: `${BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
+        border: `${rem(theme, BORDER_WIDTH)} solid ${theme.palette.background.paper}`,
         boxShadow: `0 0 0 ${rem(theme, 1)} ${alpha(theme.palette.divider, BORDER_HALO_ALPHA)}`,
       }
     : {};

@@ -168,7 +168,7 @@ const AvatarGroupContainer = styled('div')<{ overlap?: number }>(({ theme, overl
     marginLeft: rem(theme, -overlap),
     transition: 'all 0.3s ease',
     position: 'relative',
-    border: `${BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
+    border: `${rem(theme, BORDER_WIDTH)} solid ${theme.palette.background.paper}`,
     '&:hover': {
       zIndex: 100,
       transform: `scale(${GROUP_HOVER.scale}) translateY(${rem(theme, -GROUP_HOVER.lift)})`,

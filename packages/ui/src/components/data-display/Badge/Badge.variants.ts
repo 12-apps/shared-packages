@@ -67,7 +67,7 @@ const BADGE_VARIANTS: Record<
         boxShadow: `inset 0 ${rems(theme, 1, 1)} ${sheen(theme, GLASS_INSET_HIGHLIGHT_ALPHA)}` }),
   outline: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: 'transparent',
-        border: `${OUTLINE_BORDER_WIDTH}px solid ${colorPalette.main}`,
+        border: `${rem(theme, OUTLINE_BORDER_WIDTH)} solid ${colorPalette.main}`,
         color: colorPalette.main,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
