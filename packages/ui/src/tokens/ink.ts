@@ -70,7 +70,11 @@ declare module '@mui/material/styles' {
     uiInk?: Partial<UiInk>;
   }
   interface ThemeOptions {
-    /** Replace any of the named colour sets `@12-apps/ui` draws with. */
+    /**
+     * Replace any of the named colour sets `@12-apps/ui` draws with. Each set is
+     * replaced WHOLE (the merge is one level deep): to change `codeEditor.dark`,
+     * pass `codeEditor` with both `light` and `dark`.
+     */
     uiInk?: Partial<UiInk>;
   }
 }
