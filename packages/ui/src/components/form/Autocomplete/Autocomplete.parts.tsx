@@ -194,7 +194,8 @@ export function DefaultSuggestion<T>({
 }): React.JSX.Element {
   const label = getLabel(item);
   const description = getDescription?.(item);
-  const displayLabel = highlightLabel(label, state.query, matchMode);
+  // Each run is a React text child, so the label is escaped however it reads.
+  const segments = highlightLabel(label, state.query, matchMode);
   return (
     <Box
       sx={{
@@ -202,13 +203,26 @@ export function DefaultSuggestion<T>({
         alignItems: 'center',
         gap: 1,
         width: '100%',
-        // Bold the matched prefix (not a yellow <mark> highlight).
+        // Bold every run the query matched, in any match mode but fuzzy — not
+        // only a prefix, even under `startsWith` (not a yellow <mark> highlight).
         '& mark': { backgroundColor: 'transparent', color: 'inherit', fontWeight: 700 },
       }}
     >
       {suggestionTypeIcon(getSuggestionType(item))}
       <ListItemText
-        primary={<span dangerouslySetInnerHTML={{ __html: displayLabel }} />}
+        primary={
+          <span>
+            {segments.map((segment, index) =>
+              // The runs are derived from one label and never reorder, so the
+              // position is a stable key.
+              segment.match ? (
+                <mark key={index}>{segment.text}</mark>
+              ) : (
+                <React.Fragment key={index}>{segment.text}</React.Fragment>
+              ),
+            )}
+          </span>
+        }
         secondary={description}
       />
     </Box>
