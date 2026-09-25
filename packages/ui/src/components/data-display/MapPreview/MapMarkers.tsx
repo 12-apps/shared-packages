@@ -9,6 +9,7 @@ import React from 'react';
 import { MARKER_PIXELS_PER_DEGREE } from './MapPreview.constants';
 import type { LatLng, MapMarker } from './MapPreview.types';
 import { BOUNCE_KEYFRAMES } from './mapSurface';
+import { shadowInk } from '../../../tokens/ink';
 
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
@@ -61,7 +62,7 @@ export const MapMarkers: FC<MapMarkersProps> = ({ markers, centre, animated }) =
               sx={{
                 fontSize: 32,
                 color: theme.palette.error.main,
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                filter: `drop-shadow(0 2px 4px ${shadowInk(theme, 0.3)})`,
                 animation: animated ? 'bounce 2s infinite' : 'none',
                 '@keyframes bounce': BOUNCE_KEYFRAMES,
               }}

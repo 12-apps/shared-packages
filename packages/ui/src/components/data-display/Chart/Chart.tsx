@@ -2,13 +2,14 @@ import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme, type Theme } from '@mui/material/styles/index.js';
+import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { ChartProps } from './Chart.types';
 import { ChartContainer } from './ChartComposables';
 import { getSizeStyles, getVariantStyles } from './chart-internals';
 import { renderChartByType } from './chart-renderers';
+import { uiInk } from '../../../tokens/ink';
 import { muiColor } from '../../../tokens/scales';
 
 /**
@@ -45,7 +46,7 @@ function ChartHeader({ title, subtitle, neon, dataTestId }: HeaderProps): React.
         <Typography
           variant="h6"
           data-testid={`${dataTestId}-title`}
-          sx={{ color: neon ? '#00ffff' : 'text.primary', fontWeight: 600 }}
+          sx={(theme) => ({ color: neon ? uiInk(theme).dataVizNeon.accent : 'text.primary', fontWeight: 600 })}
         >
           {title}
         </Typography>
@@ -54,7 +55,7 @@ function ChartHeader({ title, subtitle, neon, dataTestId }: HeaderProps): React.
         <Typography
           variant="body2"
           data-testid={`${dataTestId}-subtitle`}
-          sx={{ color: neon ? 'rgba(0, 255, 255, 0.7)' : 'text.secondary' }}
+          sx={(theme) => ({ color: neon ? alpha(uiInk(theme).dataVizNeon.accent, 0.7) : 'text.secondary' })}
         >
           {subtitle}
         </Typography>

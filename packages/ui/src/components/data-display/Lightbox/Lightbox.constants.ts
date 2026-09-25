@@ -1,3 +1,7 @@
+import type { Theme } from '@mui/material/styles/index.js';
+
+import { onMedia, scrim, sheen } from '../../../tokens/ink';
+
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 5;
 export const ZOOM_STEP = 1.2;
@@ -8,11 +12,11 @@ export const DEFAULT_AUTOPLAY_INTERVAL_MS = 4000;
 export const MIN_SWIPE_DISTANCE = 50;
 export const OVERLAY_Z_INDEX = 1000;
 
-const SCRIM = 'rgba(0, 0, 0, 0.5)';
-const SCRIM_HOVER = 'rgba(0, 0, 0, 0.7)';
+const SCRIM = (theme: Theme): string => scrim(theme, 0.5);
+const SCRIM_HOVER = (theme: Theme): string => scrim(theme, 0.7);
 
 export const overlayButtonSx = {
-  color: 'white',
+  color: onMedia,
   backgroundColor: SCRIM,
   '&:hover': { backgroundColor: SCRIM_HOVER },
 } as const;
@@ -20,21 +24,21 @@ export const overlayButtonSx = {
 // The arrows drop their hover treatment at the ends of a non-looping gallery and
 // dim instead, so a disabled arrow does not look pressable.
 export const navButtonSx = {
-  color: 'white',
+  color: onMedia,
   backgroundColor: SCRIM,
   '&:hover:not(:disabled)': { backgroundColor: SCRIM_HOVER },
-  '&:disabled': { color: 'rgba(255, 255, 255, 0.3)' },
+  '&:disabled': { color: (theme: Theme) => sheen(theme, 0.3) },
 } as const;
 
 export const captionSx = {
-  color: 'white',
+  color: onMedia,
   textAlign: 'center',
   backgroundColor: SCRIM_HOVER,
   borderRadius: 1,
 } as const;
 
 export const counterSx = {
-  color: 'white',
+  color: onMedia,
   fontSize: '0.875rem',
   backgroundColor: SCRIM,
   borderRadius: 1,

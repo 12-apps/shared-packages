@@ -2,6 +2,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { alpha } from '@mui/material/styles/index.js';
 
 import type { ScrollAreaProps } from './ScrollArea.types';
+import { neutralTones, sheen } from '../../../tokens/ink';
 
 const SCROLLBAR_SIZES: Record<string, number> = {
   thin: 8,
@@ -29,15 +30,15 @@ const getScrollbarColors = ({
     variant === 'glass'
       ? alpha(theme.palette.primary.main, 0.5)
       : theme.palette.mode === 'dark'
-        ? theme.palette.grey[600]
-        : theme.palette.grey[400];
+        ? neutralTones(theme).emphasis
+        : neutralTones(theme).subtle;
 
   const defaultTrackColor =
     variant === 'glass'
       ? alpha(theme.palette.background.paper, 0.1)
       : theme.palette.mode === 'dark'
-        ? theme.palette.grey[900]
-        : theme.palette.grey[200];
+        ? neutralTones(theme).inverseSurface
+        : neutralTones(theme).faint;
 
   return {
     scrollbar: scrollbarColor || defaultScrollbarColor,
@@ -200,7 +201,7 @@ const VARIANT_SCROLLBARS: Record<string, (args: VariantArgs) => CSSObject> = {
       '&::-webkit-scrollbar-thumb': {
         ...(base['&::-webkit-scrollbar-thumb'] as object),
         boxShadow: shouldShowScrollbar
-          ? `inset 0 0 6px ${alpha(theme.palette.common.white, 0.3)}`
+          ? `inset 0 0 6px ${sheen(theme, 0.3)}`
           : 'none',
       },
       scrollbarColor: shouldShowScrollbar

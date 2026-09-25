@@ -3,6 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
 import { inkOver, px } from '../../../tokens/theme';
 
 // Define pulse animation globally
@@ -35,12 +36,7 @@ const shade = (
 ): string => palette?.[key] || palette?.main || fallback[key];
 
 /** `neutral` has no MUI palette entry, so its four shades come from grey. */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey?.[700] || '#616161',
-  dark: theme.palette.grey?.[800] || '#424242',
-  light: theme.palette.grey?.[500] || '#9e9e9e',
-  contrastText: '#fff',
-});
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
   if (color === 'neutral') return neutralPalette(theme);
@@ -62,7 +58,7 @@ export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => 
     main: palette?.main || fallback.main,
     dark: shade(palette, 'dark', fallback),
     light: shade(palette, 'light', fallback),
-    contrastText: palette?.contrastText || '#fff',
+    contrastText: palette?.contrastText || absoluteInk(theme).white,
   };
 };
 
@@ -178,7 +174,7 @@ const gradientFor = (theme: Theme, color: string, palette: ColorPalette): string
  * the worse of them.
  */
 const gradientInk = (theme: Theme, color: string, palette: ColorPalette): string =>
-  inkOver(gradientStops(theme, color, palette), palette.contrastText || '#fff');
+  inkOver(gradientStops(theme, color, palette), palette.contrastText || absoluteInk(theme).white);
 
 /**
  * The label colour for the two variants that paint no background of their own.
@@ -205,7 +201,7 @@ const VARIANT_STYLES: Record<
 > = {
   solid: (theme, palette) => ({
     backgroundColor: palette.main,
-    color: palette.contrastText || '#fff',
+    color: palette.contrastText || absoluteInk(theme).white,
     '&:hover': {
       backgroundColor: palette.dark,
       transform: 'translateY(-2px)',

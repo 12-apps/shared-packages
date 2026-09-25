@@ -62,7 +62,7 @@ export const useCodeEditor = ({
     editorRef.current = mountedEditor;
     monacoRef.current = monaco;
 
-    registerEditorThemes(monaco);
+    registerEditorThemes(monaco, theme);
     configureTypeScriptDefaults(monaco);
     scheduleAutoFormat(mountedEditor, autoFormat && !readOnly);
     registerSaveShortcut(mountedEditor, monaco, onSave);

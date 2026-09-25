@@ -16,6 +16,7 @@ import React, {  } from 'react';
 import { useMenuItemState } from './NavigationMenuItem.hooks';
 import { navItemButtonStyles, pulseGlow } from './NavigationMenu.styles';
 import type { NavigationMenuItem } from './NavigationMenu.types';
+import { onMedia, shadowInk, uiInk } from '../../../tokens/ink';
 
 const StyledListItem = styled(ListItem, {
   shouldForwardProp: (prop) => !['variant', 'active', 'size', 'level'].includes(prop as string) })<{ variant?: string; active?: boolean; size?: string; level?: number }>(
@@ -77,7 +78,7 @@ const MenuItemPopover: React.FC<{
           pointerEvents: 'auto',
           mt: 0.5,
           borderRadius: 2,
-          boxShadow: (theme) => `0 12px 40px ${alpha(theme.palette.common.black, 0.15)}`,
+          boxShadow: (theme) => `0 12px 40px ${shadowInk(theme, 0.15)}`,
           border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           background: (theme) =>
             `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.default, 0.95)} 100%)`,
@@ -151,9 +152,10 @@ const MenuItemLabel: React.FC<{
             borderRadius: '10px',
             fontSize: '0.75rem',
             fontWeight: 600,
-            color: '#fff',
-            background: 'linear-gradient(135deg, #ff5252 0%, #ff1744 100%)',
-            boxShadow: '0 2px 8px rgba(255, 23, 68, 0.4)',
+            color: (theme) => onMedia(theme),
+            background: (theme) =>
+              `linear-gradient(135deg, ${uiInk(theme).attention.from} 0%, ${uiInk(theme).attention.to} 100%)`,
+            boxShadow: (theme) => `0 2px 8px ${alpha(uiInk(theme).attention.glow, 0.4)}`,
             animation:
               typeof item.badge === 'number' && item.badge > 0
                 ? `${pulseGlow} 2s infinite`
@@ -230,7 +232,7 @@ const MenuItemContent: React.FC<{
               justifyContent: 'center',
               transition: 'all 0.3s ease',
               '& svg': {
-                filter: item.active ? 'drop-shadow(0 2px 8px rgba(0,0,0,0.15))' : 'none',
+                filter: (theme) => (item.active ? `drop-shadow(0 2px 8px ${shadowInk(theme, 0.15)})` : 'none'),
                 transition: 'all 0.3s ease' } }}
           >
             <Grow in={true} timeout={600}>

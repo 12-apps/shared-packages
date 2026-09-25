@@ -1,4 +1,5 @@
 import { darken, lighten } from '../../../tokens/color';
+import { ABSOLUTE_INK, NEUTRAL_RAMP } from '../../../tokens/ink.core';
 import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
 import type { UiPaletteColor, UiTheme } from '../../../tokens/theme';
 
@@ -86,10 +87,10 @@ export const PULSE_SPREAD = 15;
 export function buttonPalette(theme: UiTheme, color: ColorValue): UiPaletteColor {
   if (color === 'neutral') {
     return {
-      main: theme.palette.grey[700],
-      dark: theme.palette.grey[800],
-      light: theme.palette.grey[500],
-      contrastText: '#fff',
+      main: NEUTRAL_RAMP[700],
+      dark: NEUTRAL_RAMP[800],
+      light: NEUTRAL_RAMP[500],
+      contrastText: ABSOLUTE_INK.white,
     };
   }
   return theme.palette[color];

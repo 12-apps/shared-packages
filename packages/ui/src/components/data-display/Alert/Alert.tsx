@@ -8,6 +8,8 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { absoluteInk, modeInk } from '../../../tokens/ink';
+
 import { resolveAlertProps, resolveAnnouncement, testIdFor } from './Alert.helpers';
 import type { AlertPalette } from './Alert.metrics';
 import {
@@ -69,7 +71,7 @@ function pointerShadow(
   // white-on-gradient fell to 2.90:1 on hover and 2.41:1 pressed, under the 3:1
   // floor and below its own idle. Every other variant's surface tracks the mode,
   // so for them the two rules agree.
-  const ink = variant === 'gradient' || theme.palette.mode === 'light' ? '#000000' : '#ffffff';
+  const ink = variant === 'gradient' ? absoluteInk(theme).black : modeInk(theme);
   const glowShadow = glow
     ? `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`
     : null;

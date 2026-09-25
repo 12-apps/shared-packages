@@ -10,6 +10,7 @@ import {
   slideInUp,
 } from './HoverCard.animations';
 import type { HoverCardAnimation, HoverCardPlacement } from './HoverCard.types';
+import { shadowInk } from '../../../tokens/ink';
 
 /** The edge the card sits on, ignoring the `-start`/`-end` alignment suffix. */
 type Side = 'top' | 'bottom' | 'left' | 'right';
@@ -115,7 +116,7 @@ const VARIANTS: Record<string, (theme: Theme) => CSSObject> = {
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-    boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
+    boxShadow: `0 8px 32px ${shadowInk(theme, 0.12)}`,
   }),
   detailed: (theme) => ({
     backgroundColor: theme.palette.background.paper,

@@ -2,21 +2,26 @@ import Box from '@mui/material/Box/index.js';
 import Tooltip from '@mui/material/Tooltip/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import type { FC, ReactElement } from 'react';
 import React from 'react';
 
 import type { TimingData } from './TimingDiagram.types';
+import { onMedia, sheen, uiInk } from '../../../tokens/ink';
 
-// Color configurations
-export const phaseColors = {
-  dns: '#9C27B0', // Purple
-  connect: '#2196F3', // Blue
-  ssl: '#00BCD4', // Cyan
-  request: '#4CAF50', // Green
-  response: '#FF9800', // Orange
+export type PhaseKey = 'dns' | 'connect' | 'ssl' | 'request' | 'response';
+
+// Each phase's colour, from the theme's named timing set (`uiInk`).
+export const phaseColors = (theme: Theme): Record<PhaseKey, string> => {
+  const phases = uiInk(theme).timingPhases;
+  return {
+    dns: phases.dns,
+    connect: phases.connect,
+    ssl: phases.tls,
+    request: phases.request,
+    response: phases.response,
+  };
 };
-
-export type PhaseKey = keyof typeof phaseColors;
 
 export interface Phase {
   key: string;
@@ -39,7 +44,7 @@ export const formatTime = (ms: number): string => {
   return `${(ms / 1000).toFixed(2)}s`;
 };
 
-const colorOf = (phase: Phase): string => phaseColors[phase.key as PhaseKey];
+const colorOf = (theme: Theme, phase: Phase): string => phaseColors(theme)[phase.key as PhaseKey];
 const widthOf = (percentages: Record<string, number>, phase: Phase): number =>
   percentages[phase.key] ?? 0;
 
@@ -134,6 +139,7 @@ export const WaterfallView: FC<TimingViewProps> = ({
   showTooltips,
   height,
 }) => {
+  const theme = useTheme();
   // Each bar starts where the previous one ended, so the row reads as a timeline.
   let offset = 0;
 
@@ -150,7 +156,7 @@ export const WaterfallView: FC<TimingViewProps> = ({
           <WaterfallBar
             key={phase.key}
             data-testid={`timing-segment-${phase.key}`}
-            phaseColor={colorOf(phase)}
+            phaseColor={colorOf(theme, phase)}
             offset={currentOffset}
             width={width}
             animated={animated}
@@ -198,13 +204,13 @@ const StackedBar = styled(Box, {
 
 const StackedSegment = styled(Box, {
   shouldForwardProp: (prop) => !['phaseColor', 'width'].includes(prop as string),
-})<{ phaseColor: string; width: number }>(({ phaseColor, width }) => ({
+})<{ phaseColor: string; width: number }>(({ theme, phaseColor, width }) => ({
   width: `${width}%`,
   background: `linear-gradient(135deg, ${phaseColor} 0%, ${alpha(phaseColor, 0.85)} 100%)`,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#fff',
+  color: onMedia(theme),
   fontSize: '0.7rem',
   fontWeight: 600,
   position: 'relative',
@@ -222,39 +228,42 @@ export const StackedView: FC<TimingViewProps> = ({
   animated,
   showLabels,
   showTooltips,
-}) => (
-  <Box data-variant="stacked">
-    <StackedBar animated={animated} data-animated={animated.toString()}>
-      {phases.map((phase) => {
-        const width = widthOf(percentages, phase);
+}) => {
+  const theme = useTheme();
+  return (
+    <Box data-variant="stacked">
+      <StackedBar animated={animated} data-animated={animated.toString()}>
+        {phases.map((phase) => {
+          const width = widthOf(percentages, phase);
 
-        return withTooltip(
-          phase,
-          showTooltips,
-          <StackedSegment
-            key={phase.key}
-            data-testid={`timing-segment-${phase.key}`}
-            phaseColor={colorOf(phase)}
-            width={width}
-            style={{ width: `${width}%` }}
-          >
-            {showLabels && width > 10 && (
-              <span data-testid="timing-label">{formatTime(phase.value!)}</span>
-            )}
-          </StackedSegment>,
-        );
-      })}
-    </StackedBar>
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-      <Typography variant="caption" color="text.secondary">
-        0ms
-      </Typography>
-      <Typography variant="caption" color="text.secondary" fontWeight="bold">
-        Total: {formatTime(data.total)}
-      </Typography>
+          return withTooltip(
+            phase,
+            showTooltips,
+            <StackedSegment
+              key={phase.key}
+              data-testid={`timing-segment-${phase.key}`}
+              phaseColor={colorOf(theme, phase)}
+              width={width}
+              style={{ width: `${width}%` }}
+            >
+              {showLabels && width > 10 && (
+                <span data-testid="timing-label">{formatTime(phase.value!)}</span>
+              )}
+            </StackedSegment>,
+          );
+        })}
+      </StackedBar>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+        <Typography variant="caption" color="text.secondary">
+          0ms
+        </Typography>
+        <Typography variant="caption" color="text.secondary" fontWeight="bold">
+          Total: {formatTime(data.total)}
+        </Typography>
+      </Box>
     </Box>
-  </Box>
-);
+  );
+};
 
 const HorizontalBar = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -295,7 +304,7 @@ const HorizontalSegment = styled(Box, {
         left: 0,
         right: 0,
         bottom: 0,
-        background: `linear-gradient(90deg, transparent 0%, ${alpha('#fff', 0.3)} 50%, transparent 100%)`,
+        background: `linear-gradient(90deg, transparent 0%, ${sheen(theme, 0.3)} 50%, transparent 100%)`,
         animation: 'shimmer 2s infinite',
       },
       '@keyframes shimmer': {
@@ -327,7 +336,7 @@ export const HorizontalView: FC<TimingViewProps> = ({
         <HorizontalSegment
           key={phase.key}
           data-testid={`timing-segment-${phase.key}`}
-          phaseColor={colorOf(phase)}
+          phaseColor={colorOf(theme, phase)}
           width={widthOf(percentages, phase)}
           animated={animated}
           data-animated={animated.toString()}

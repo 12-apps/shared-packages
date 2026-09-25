@@ -26,6 +26,7 @@ import {
   STATUS_DOT,
 } from './Avatar.metrics';
 import type { AvatarSize, AvatarStatus, ContentType } from './Avatar.types';
+import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
 import { px } from '../../../tokens/theme';
 
 export type { ContentType };
@@ -39,6 +40,7 @@ interface PaletteLike {
 }
 
 const getColorFromTheme = (theme: Theme, color: string): PaletteLike => {
+  const neutral = controlNeutral(theme);
   const colorMap: Record<string, PaletteLike> = {
     primary: theme.palette.primary,
     secondary: theme.palette.secondary,
@@ -49,7 +51,7 @@ const getColorFromTheme = (theme: Theme, color: string): PaletteLike => {
     // took the house one, so `danger` matched nothing and fell through to
     // primary — a red avatar rendering blue, silently.
     danger: theme.palette.error,
-    neutral: { main: theme.palette.grey[700], contrastText: '#fff' },
+    neutral: { main: neutral.main, contrastText: neutral.contrastText },
   };
 
   return colorMap[color] || theme.palette.primary;
@@ -77,7 +79,7 @@ const getStatusColor = (status: AvatarStatus, theme: Theme): string => {
   // against MUI's `Theme` rather than the shared one.
   const statusColorMap: Record<AvatarStatus, string> = {
     online: theme.palette.success.main,
-    offline: theme.palette.grey[500],
+    offline: neutralTones(theme).muted,
     away: theme.palette.warning.main,
     busy: theme.palette.error.main,
   };
@@ -210,7 +212,7 @@ const StyledAvatar = styled(MuiAvatar, {
       animation: `${scaleInAnimation} ${SCALE_IN_MS / 1000}s ease-out`,
       cursor: interactive ? 'pointer' : 'default',
       backgroundColor: hasError ? theme.palette.error.main : palette.main,
-      color: hasError ? theme.palette.error.contrastText : (palette.contrastText ?? '#fff'),
+      color: hasError ? theme.palette.error.contrastText : (palette.contrastText ?? absoluteInk(theme).white),
       ...interactiveStyles(interactive, palette.main),
       ...loadingStyles(isLoading, palette.main),
       ...variantRadius(customVariant, theme),

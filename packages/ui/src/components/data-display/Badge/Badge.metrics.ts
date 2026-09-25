@@ -1,5 +1,5 @@
 import type { BadgePosition, BadgeSize } from './Badge.base';
-import { contrastText, type UiPaletteColor, type UiTheme } from '../../../tokens/theme';
+import type { UiPaletteColor, UiTheme } from '../../../tokens/theme';
 import type { ColorValue } from '../../../tokens/vocabulary';
 
 /**
@@ -105,12 +105,8 @@ export const badgeAnchor = (position: BadgePosition): BadgeAnchor =>
  */
 export function badgePalette(theme: UiTheme, color: ColorValue): UiPaletteColor {
   if (color === 'neutral') {
-    return {
-      main: theme.palette.grey[600],
-      light: theme.palette.grey[400],
-      dark: theme.palette.grey[800],
-      contrastText: contrastText(theme.palette.grey[600]),
-    };
+    // Grey 600 / 400 / 800 under white ink: the shared theme's own `neutral`.
+    return theme.palette.neutral;
   }
   return theme.palette[color];
 }

@@ -6,6 +6,8 @@ import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { sheen, softNeutral } from '../../../tokens/ink';
+
 import type { AlertVariant } from './Alert.base';
 import { VARIANT_ICON } from './Alert.helpers';
 import {
@@ -24,7 +26,6 @@ import {
   MESSAGE_FONT_SIZE,
   MESSAGE_GAP_UNITS,
   MESSAGE_LINE_HEIGHT,
-  NEUTRAL_GREY,
   PULSE,
   seconds,
   SEMANTIC_SURFACE,
@@ -116,6 +117,7 @@ export const iconRotate = keyframes`
 // The MUI-themed twin of `alertPalette` in `Alert.metrics.ts`: same names,
 // same three greys for `neutral`, same fallback to `info`.
 export const getColorFromTheme = (theme: Theme, variant: string): AlertPalette => {
+  const soft = softNeutral(theme);
   const colorMap: Record<string, AlertPalette> = {
     info: theme.palette.info,
     success: theme.palette.success,
@@ -123,11 +125,7 @@ export const getColorFromTheme = (theme: Theme, variant: string): AlertPalette =
     danger: theme.palette.error,
     primary: theme.palette.primary,
     secondary: theme.palette.secondary,
-    neutral: {
-      main: theme.palette.grey[NEUTRAL_GREY.main] || '#9E9E9E',
-      light: theme.palette.grey[NEUTRAL_GREY.light] || '#E0E0E0',
-      dark: theme.palette.grey[NEUTRAL_GREY.dark] || '#616161',
-    },
+    neutral: { main: soft.main, light: soft.light, dark: soft.dark },
   };
 
   return colorMap[variant] || theme.palette.info;
@@ -330,7 +328,7 @@ export const alertVariantStyles = (
       left: `-${GRADIENT.shimmerTravel}px`,
       width: '100%',
       height: '100%',
-      background: `linear-gradient(90deg, transparent, ${alpha(theme.palette.common.white, GRADIENT.shimmerAlpha)}, transparent)`,
+      background: `linear-gradient(90deg, transparent, ${sheen(theme, GRADIENT.shimmerAlpha)}, transparent)`,
       animation: `${shimmerAnimation} ${seconds(GRADIENT.shimmerMs)} infinite`,
     },
   }),

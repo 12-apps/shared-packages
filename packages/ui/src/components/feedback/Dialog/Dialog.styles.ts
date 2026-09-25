@@ -14,6 +14,7 @@ import {
   DIALOG_RADIUS_UNITS,
   DIALOG_WIDTH_PERCENT,
 } from './Dialog.metrics';
+import { scrim, shadowInk } from '../../../tokens/ink';
 import { shadowCss } from '../../../tokens/shadow';
 import { dynamicViewportHeight } from '../../../utils/viewport';
 
@@ -148,7 +149,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
           offsetY: DIALOG_GLASS.shadow.offsetY,
           blurRadius: DIALOG_GLASS.shadow.blurRadius,
           spreadDistance: 0,
-          color: alpha(theme.palette.common.black, DIALOG_GLASS.shadow.alpha),
+          color: shadowInk(theme, DIALOG_GLASS.shadow.alpha),
         }),
       };
     case 'fullscreen':
@@ -190,10 +191,7 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
 
 export function backdropSxOf(theme: Theme, glass: boolean) {
   return {
-    backgroundColor: alpha(
-      theme.palette.common.black,
-      glass ? DIALOG_BACKDROP.alpha.glass : DIALOG_BACKDROP.alpha.plain,
-    ),
+    backgroundColor: scrim(theme, glass ? DIALOG_BACKDROP.alpha.glass : DIALOG_BACKDROP.alpha.plain),
     backdropFilter: glass ? `blur(${DIALOG_BACKDROP.blurPx}px)` : 'none',
   };
 }

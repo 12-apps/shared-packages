@@ -3,6 +3,7 @@ import { alpha, type CSSObject, type Theme } from '@mui/material/styles/index.js
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, uiInk } from '../../../tokens/ink';
 
 /**
  * The prototype's METRICS, verbatim.
@@ -92,7 +93,7 @@ export const triggerCountSx = (theme: Theme): CSSObject => ({
 });
 
 /** The trigger's inline clear (×) and the chevron. */
-export const triggerClearSx: CSSObject = {
+export const triggerClearSx = (theme: Theme): CSSObject => ({
   width: 20,
   height: 20,
   flex: '0 0 auto',
@@ -105,8 +106,8 @@ export const triggerClearSx: CSSObject = {
   color: 'inherit',
   opacity: 0.6,
   padding: 0,
-  '&:hover': { background: alpha('#000', 0.08), opacity: 1 },
-};
+  '&:hover': { background: alpha(absoluteInk(theme).black, 0.08), opacity: 1 },
+});
 
 export const triggerChevronSx = (open: boolean): CSSObject => ({
   width: 14,
@@ -124,7 +125,7 @@ export const panelSx = (theme: Theme): CSSObject => ({
   background: theme.palette.background.paper,
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: `${METRICS.panelRadius}px`,
-  boxShadow: '0 1px 2px rgba(16,20,35,.05), 0 18px 40px -12px rgba(16,20,35,.28)',
+  boxShadow: `0 1px 2px ${alpha(uiInk(theme).panelShadowInk, 0.05)}, 0 18px 40px -12px ${alpha(uiInk(theme).panelShadowInk, 0.28)}`,
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
@@ -275,12 +276,12 @@ export const rowMetaSx = (theme: Theme, selected: boolean): CSSObject => ({
 });
 
 /** The query hit inside a row label. */
-export const markSx: CSSObject = {
-  background: '#fff2a8',
+export const markSx = (theme: Theme): CSSObject => ({
+  background: uiInk(theme).highlightMark,
   color: 'inherit',
   borderRadius: '2px',
   padding: '0 1px',
-};
+});
 
 export const chevronButtonSx = (theme: Theme, open: boolean): CSSObject => ({
   width: METRICS.chevronButton,

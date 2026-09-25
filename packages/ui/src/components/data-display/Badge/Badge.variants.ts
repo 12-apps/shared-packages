@@ -13,6 +13,7 @@ import {
   SECONDARY_BORDER_ALPHA,
 } from './Badge.metrics';
 import type { BadgePalette, BadgeSizeStyles } from './Badge.styles';
+import { absoluteInk, onMedia, sheen } from '../../../tokens/ink';
 
 const BADGE_VARIANTS: Record<
   string,
@@ -21,7 +22,7 @@ const BADGE_VARIANTS: Record<
   default: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: colorPalette.main,
         color:
-          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || '#fff',
+          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || absoluteInk(theme).white,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
         fontSize: sizeStyles.fontSize,
@@ -37,7 +38,7 @@ const BADGE_VARIANTS: Record<
   count: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: colorPalette.main,
         color:
-          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || '#fff',
+          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || absoluteInk(theme).white,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
         fontSize: sizeStyles.fontSize,
@@ -45,7 +46,7 @@ const BADGE_VARIANTS: Record<
         borderRadius: '50%' }),
   gradient: (theme, colorPalette, sizeStyles) => ({
         background: `linear-gradient(135deg, ${colorPalette.main} 0%, ${colorPalette.dark || colorPalette.main} 100%)`,
-        color: '#fff',
+        color: onMedia(theme),
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
         fontSize: sizeStyles.fontSize,
@@ -62,7 +63,7 @@ const BADGE_VARIANTS: Record<
         fontSize: sizeStyles.fontSize,
         padding: sizeStyles.padding,
         borderRadius: sizeStyles.height / 2,
-        boxShadow: `inset 0 1px 1px ${alpha(theme.palette.common.white, GLASS_INSET_HIGHLIGHT_ALPHA)}` }),
+        boxShadow: `inset 0 1px 1px ${sheen(theme, GLASS_INSET_HIGHLIGHT_ALPHA)}` }),
   outline: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: 'transparent',
         border: `${OUTLINE_BORDER_WIDTH}px solid ${colorPalette.main}`,

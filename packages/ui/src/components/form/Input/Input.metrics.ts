@@ -1,6 +1,7 @@
 import type { InputVariant } from './Input.base';
-import { decomposeColor, recomposeColor } from '../../../tokens/color';
+import { alpha, decomposeColor, recomposeColor } from '../../../tokens/color';
 import { DEFAULT_FIELD_HEIGHT, fieldHeightPx } from '../../../tokens/field-height.core';
+import { ABSOLUTE_INK } from '../../../tokens/ink.core';
 import type { UiTheme } from '../../../tokens/theme';
 import { SIZE_VALUES, type SizeValue } from '../../../tokens/vocabulary';
 
@@ -163,8 +164,8 @@ export const INPUT_BORDER = { rest: 1, focused: 2 } as const;
 
 /** `FilledInput`'s and `Input`'s resting underline, MUI's own two greys. */
 export const UNDERLINE_COLOR = {
-  light: 'rgba(0, 0, 0, 0.42)',
-  dark: 'rgba(255, 255, 255, 0.7)',
+  light: alpha(ABSOLUTE_INK.black, 0.42),
+  dark: alpha(ABSOLUTE_INK.white, 0.7),
 } as const;
 
 /**

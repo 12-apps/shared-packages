@@ -4,6 +4,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { TooltipProps } from './Tooltip.types';
+import { absoluteInk, neutralTones } from '../../../tokens/ink';
 
 // Define pulse animation
 const pulseAnimation = keyframes`
@@ -34,17 +35,17 @@ const variantStyles = (theme: Theme, variant?: string): CSSObject => {
   switch (variant) {
     case 'default':
       return {
-        backgroundColor: alpha(theme.palette.grey[900], 0.9),
-        color: theme.palette.common.white,
+        backgroundColor: alpha(neutralTones(theme).inverseSurface, 0.9),
+        color: absoluteInk(theme).white,
       };
     case 'dark':
       return {
-        backgroundColor: theme.palette.grey[900],
-        color: theme.palette.common.white,
+        backgroundColor: neutralTones(theme).inverseSurface,
+        color: absoluteInk(theme).white,
       };
     case 'light':
       return {
-        backgroundColor: theme.palette.common.white,
+        backgroundColor: absoluteInk(theme).white,
         color: theme.palette.text.primary,
         border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
         boxShadow: theme.shadows[4],
@@ -76,13 +77,13 @@ const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObjec
 const arrowColor = (theme: Theme, variant?: string): string => {
   switch (variant) {
     case 'light':
-      return theme.palette.common.white;
+      return absoluteInk(theme).white;
     case 'glass':
       return alpha(theme.palette.background.paper, 0.1);
     case 'dark':
-      return theme.palette.grey[900];
+      return neutralTones(theme).inverseSurface;
     default:
-      return alpha(theme.palette.grey[900], 0.9);
+      return alpha(neutralTones(theme).inverseSurface, 0.9);
   }
 };
 

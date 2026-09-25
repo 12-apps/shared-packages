@@ -4,6 +4,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
 import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
 
 interface ColorPalette {
   main: string;
@@ -13,12 +14,7 @@ interface ColorPalette {
 }
 
 /** `neutral` is not a MUI palette entry, so it is built from the grey ramp. */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey[700],
-  dark: theme.palette.grey[800],
-  light: theme.palette.grey[500],
-  contrastText: '#fff',
-});
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 /** `danger` is this component's name for the error palette. */
 const namedPalette = (theme: Theme, color: string): ColorPalette => {
@@ -46,7 +42,7 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
     main: palette.main || primary.main,
     dark: palette.dark || palette.main || primary.dark,
     light: palette.light || palette.main || primary.light,
-    contrastText: palette.contrastText || '#fff',
+    contrastText: palette.contrastText || absoluteInk(theme).white,
   };
 };
 

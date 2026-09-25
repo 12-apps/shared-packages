@@ -11,6 +11,8 @@ import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
 import React, {  } from 'react';
 
+import { onMedia, uiInk } from '../../../tokens/ink';
+
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 import type { TutorialCopy } from '../../../copy';
 
@@ -117,8 +119,10 @@ const TutorialStepNav: React.FC<{
                 size="small"
                 endIcon={<CompleteIcon />}
                 onClick={onNext}
-                sx={{
-                  background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)' }}
+                sx={(theme) => {
+                  const [from, to] = uiInk(theme).celebration.mint;
+                  return { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` };
+                }}
                 data-testid="tutorial-finish-button"
               >
                 {stepCount === 1 ? 'Complete' : 'Finish'}
@@ -231,9 +235,10 @@ export const TutorialStepBody: React.FC<{
             variant="contained"
             size="small"
             onClick={step.action.onClick}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white' }}
+            sx={(theme) => {
+              const [from, to] = uiInk(theme).celebration.violet;
+              return { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)`, color: onMedia(theme) };
+            }}
           >
             {step.action.label}
           </Button>

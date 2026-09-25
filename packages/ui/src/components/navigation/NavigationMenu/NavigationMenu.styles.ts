@@ -1,6 +1,8 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { EFFECT_GLOW } from '../../../tokens/ink.core';
+
 export const slideIn = keyframes`
   from {
     opacity: 0;
@@ -14,13 +16,13 @@ export const slideIn = keyframes`
 
 export const pulseGlow = keyframes`
   0% {
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.muiBlue, 0.4)};
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+    box-shadow: 0 0 0 10px ${alpha(EFFECT_GLOW.muiBlue, 0)};
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.muiBlue, 0)};
   }
 `;
 

@@ -11,6 +11,7 @@ import type {
   StepIndicatorProps,
   WorkflowStepProps,
 } from './WorkflowStep.types';
+import { neutralTones } from '../../../tokens/ink';
 
 // `outlined` shows the surface through a coloured rim; the other three fill it and
 // differ only in what border they keep.
@@ -167,9 +168,9 @@ const StepConnector = styled(Box, {
 }>(({ theme, orientation, isCompleted, color, variant }) => {
   const colorKey = color || 'primary';
   const colorValue = colorKey === 'neutral' 
-    ? { main: theme.palette.grey[600] }
+    ? { main: neutralTones(theme).emphasis }
     : theme.palette[colorKey as 'primary' | 'secondary' | 'success' | 'warning' | 'error'];
-  const connectorColor = isCompleted ? colorValue.main : theme.palette.grey[300];
+  const connectorColor = isCompleted ? colorValue.main : neutralTones(theme).track;
 
   return {
     flex: 1,

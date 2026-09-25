@@ -3,6 +3,7 @@
 import type { CategorySelectCopy } from '../../../copy';
 import Box from '@mui/material/Box/index.js';
 import InputBase from '@mui/material/InputBase/index.js';
+import { alpha, type Theme } from '@mui/material/styles/index.js';
 
 import { SearchGlyph } from './CategoryIcons';
 import {
@@ -44,8 +45,7 @@ const searchFieldSx = {
     '&:focus': {
       outline: 'none',
       borderColor: 'primary.main',
-      boxShadow: (theme: { palette: { primary: { main: string } } }) =>
-        `0 0 0 3px ${theme.palette.primary.main}26`,
+      boxShadow: (theme: Theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.15)}`,
     },
   },
 } as const;

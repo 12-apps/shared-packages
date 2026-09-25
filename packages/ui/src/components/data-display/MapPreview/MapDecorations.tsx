@@ -9,6 +9,7 @@ import React from 'react';
 
 import { getScaleDistance } from './mapProjection';
 import { BOUNCE_KEYFRAMES } from './mapSurface';
+import { shadowInk } from '../../../tokens/ink';
 
 // Decorative only: these give the mock surface something to look like without
 // standing in for real map data.
@@ -73,7 +74,7 @@ export const MapCentreMarker: FC = () => {
         left: '50%',
         transform: 'translate(-50%, -100%)',
         zIndex: 2,
-        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+        filter: `drop-shadow(0 2px 4px ${shadowInk(theme, 0.3)})`,
       }}
     >
       <LocationIcon

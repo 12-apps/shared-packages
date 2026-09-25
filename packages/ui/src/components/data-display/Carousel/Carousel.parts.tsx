@@ -10,6 +10,7 @@ import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
 
+import { neutralTones } from '../../../tokens/ink';
 import { accentFor, muiSize } from '../../../tokens/scales';
 
 import type {
@@ -295,7 +296,7 @@ const Thumbnail: React.FC<{
           sx={{
             width: '100%',
             height: '100%',
-            backgroundColor: theme.palette.grey[300],
+            backgroundColor: neutralTones(theme).track,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

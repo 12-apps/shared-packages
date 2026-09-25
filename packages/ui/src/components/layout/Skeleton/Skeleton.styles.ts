@@ -13,6 +13,7 @@ import {
   SKELETON_DEFAULT_DIMENSIONS,
   SKELETON_INTENSITY_OPACITY,
 } from './Skeleton.metrics';
+import { modeInk, shadowInk, sheen } from '../../../tokens/ink';
 
 type SkeletonVariant = NonNullable<SkeletonProps['variant']>;
 type SkeletonIntensity = NonNullable<SkeletonProps['intensity']>;
@@ -58,7 +59,7 @@ const glassmorphismStyles = (theme: Theme): CSSObject => ({
         ${alpha(theme.palette.background.paper, GLASS_BACKGROUND_ALPHA_TO)} 100%)`,
   backdropFilter: `blur(${GLASS_BLUR_PX}px)`,
   border: `1px solid ${alpha(theme.palette.divider, GLASS_BORDER_ALPHA)}`,
-  boxShadow: `0 ${GLASS_SHADOW.offsetY}px ${GLASS_SHADOW.blur}px 0 ${alpha(theme.palette.common.black, GLASS_SHADOW.alpha)}`,
+  boxShadow: `0 ${GLASS_SHADOW.offsetY}px ${GLASS_SHADOW.blur}px 0 ${shadowInk(theme, GLASS_SHADOW.alpha)}`,
 });
 
 // The sweep is a pseudo-element sliding across the box, so the box has to clip it
@@ -74,7 +75,7 @@ const shimmerStyles = (theme: Theme): CSSObject => ({
     background: `linear-gradient(
           90deg,
           transparent,
-          ${alpha(theme.palette.common.white, SHIMMER_ALPHA)},
+          ${sheen(theme, SHIMMER_ALPHA)},
           transparent
         )`,
     transform: 'translateX(-100%)',
@@ -101,7 +102,7 @@ export const skeletonStyles = (
 ): CSSObject => ({
   borderRadius,
   backgroundColor: alpha(
-    theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.text.primary,
+    theme.palette.mode === 'dark' ? modeInk(theme) : theme.palette.text.primary,
     intensityOpacity(intensity),
   ),
   ...(shimmer && {

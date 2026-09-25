@@ -14,6 +14,7 @@ import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { TimelineItem, TimelineProps } from './Timeline.types';
+import { onMedia, uiInk } from '../../../tokens/ink';
 
 const slideInAnimation = keyframes`from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); }`;
 const pulseAnimation = keyframes`0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; }`;
@@ -172,10 +173,10 @@ const TimelineDetails: React.FC<{
                   e.stopPropagation();
                   item.action!.onClick();
                 }}
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                }}
+                sx={(theme) => ({
+                  background: `linear-gradient(135deg, ${uiInk(theme).celebration.violet[0]} 0%, ${uiInk(theme).celebration.violet[1]} 100%)`,
+                  color: onMedia(theme),
+                })}
               >
                 {item.action.label}
               </Button>

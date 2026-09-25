@@ -14,6 +14,8 @@ import Typography from '@mui/material/Typography/index.js';
 import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { neutralTones } from '../../../tokens/ink';
+
 import type { AlertDialogProps } from './AlertDialog.types';
 
 // Define pulse animation
@@ -145,7 +147,7 @@ const CloseButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
   right: theme.spacing(1),
   top: theme.spacing(1),
-  color: theme.palette.grey[500],
+  color: neutralTones(theme).muted,
 }));
 
 /**

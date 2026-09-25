@@ -6,6 +6,7 @@ import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { Step, StepItemProps, StepperProps } from './Stepper.types';
+import { neutralTones } from '../../../tokens/ink';
 import type { SizeValue } from '../../../tokens/scales';
 
 /**
@@ -63,7 +64,7 @@ const StepButton = styled(Button, {
       ? theme.palette.primary.main
       : isActive
       ? theme.palette.primary.main
-      : theme.palette.grey[300],
+      : neutralTones(theme).track,
     color: isCompleted || isActive ? theme.palette.primary.contrastText : theme.palette.text.primary,
     cursor: clickable ? 'pointer' : 'default',
     pointerEvents: clickable ? 'auto' : 'none',
@@ -76,12 +77,12 @@ const StepButton = styled(Button, {
             ? theme.palette.primary.dark
             : isActive
             ? theme.palette.primary.dark
-            : theme.palette.grey[400],
+            : neutralTones(theme).subtle,
           transform: 'scale(1.05)',
         }
       : {},
     '&:disabled': {
-      backgroundColor: theme.palette.grey[300],
+      backgroundColor: neutralTones(theme).track,
       color: theme.palette.text.disabled,
     },
   }),
@@ -92,7 +93,7 @@ const StepConnector = styled(Box, {
     !['orientation', 'isCompleted', 'size'].includes(prop as string),
 })<{ orientation: 'horizontal' | 'vertical'; isCompleted: boolean; size: SizeValue }>(
   ({ theme, orientation, isCompleted, size }) => ({
-    backgroundColor: isCompleted ? theme.palette.primary.main : theme.palette.grey[300],
+    backgroundColor: isCompleted ? theme.palette.primary.main : neutralTones(theme).track,
     transition: theme.transitions.create('background-color', {
       duration: theme.transitions.duration.short,
     }),

@@ -2,6 +2,7 @@ import { alpha, type Theme } from '@mui/material/styles/index.js';
 import type { CSSProperties } from 'react';
 
 import type { ChartProps, ChartSeries } from './Chart.types';
+import { uiInk } from '../../../tokens/ink';
 import { accentFor} from '../../../tokens/scales';
 
 /**
@@ -38,11 +39,9 @@ export function getSizeStyles(size: ChartProps['size'], height?: number): SizeSt
   return { ...preset, height: height ?? preset.height };
 }
 
-const NEON_PALETTE = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff0080', '#8000ff'];
-
 export function getDefaultColors(theme: Theme, variant: ChartProps['variant'], colors?: string[]): string[] {
   if (colors) return colors;
-  if (variant === 'neon') return NEON_PALETTE;
+  if (variant === 'neon') return [...uiInk(theme).dataVizNeon.series];
   return [
     theme.palette.primary.main,
     theme.palette.secondary.main,
@@ -99,14 +98,16 @@ function variantSurface(theme: Theme, options: VariantOptions): SxStyles {
       return { boxShadow: theme.shadows[4] };
     case 'minimal':
       return { border: 'none', backgroundColor: 'transparent' };
-    case 'neon':
+    case 'neon': {
+      const neon = uiInk(theme).dataVizNeon;
       return {
-        backgroundColor: '#000',
-        border: `1px solid ${alpha('#00ffff', 0.3)}`,
+        backgroundColor: neon.ground,
+        border: `1px solid ${alpha(neon.accent, 0.3)}`,
         '& .recharts-cartesian-grid-horizontal line, & .recharts-cartesian-grid-vertical line': {
-          stroke: alpha('#00ffff', 0.1),
+          stroke: alpha(neon.accent, 0.1),
         },
       };
+    }
     default:
       return { backgroundColor: theme.palette.background.paper };
   }
@@ -159,14 +160,15 @@ interface AxisTextStyles {
 
 export function getAxisStyles(theme: Theme, variant: ChartProps['variant'], fontSize: string): AxisTextStyles {
   const neon = variant === 'neon';
+  const neonAccent = uiInk(theme).dataVizNeon.accent;
   return {
     axisStyle: {
       fontSize,
-      fill: neon ? '#00ffff' : theme.palette.text.secondary,
+      fill: neon ? neonAccent : theme.palette.text.secondary,
       // Ticks are columns of digits: they have to line up between rows.
       fontVariantNumeric: 'tabular-nums',
     },
-    gridStroke: neon ? alpha('#00ffff', 0.1) : theme.palette.divider,
+    gridStroke: neon ? alpha(neonAccent, 0.1) : theme.palette.divider,
     // The neon grid is already a 10%-alpha cyan; halving it again would erase it.
     gridOpacity: neon ? 1 : 0.5,
   };

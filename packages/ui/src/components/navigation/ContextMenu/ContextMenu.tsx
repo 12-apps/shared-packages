@@ -9,6 +9,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React, { cloneElement, isValidElement,useState } from 'react';
 
 import type { ContextMenuItem,ContextMenuProps } from './ContextMenu.types';
+import { absoluteInk, neutralTones, shadowInk, sheen } from '../../../tokens/ink';
 
 const StyledMenu = styled(Menu, {
   shouldForwardProp: (prop) => prop !== 'customVariant' && prop !== 'size',
@@ -21,20 +22,20 @@ const StyledMenu = styled(Menu, {
       backgroundColor: alpha(theme.palette.background.paper, 0.85),
       backdropFilter: 'blur(20px)',
       border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
+      boxShadow: `0 8px 32px ${shadowInk(theme, 0.12)}`,
     }),
 
     ...(customVariant === 'dark' && {
-      backgroundColor: alpha(theme.palette.grey[900], 0.95),
-      color: theme.palette.common.white,
+      backgroundColor: alpha(neutralTones(theme).inverseSurface, 0.95),
+      color: absoluteInk(theme).white,
       '& .MuiMenuItem-root': {
-        color: theme.palette.common.white,
+        color: absoluteInk(theme).white,
       },
       '& .MuiListItemIcon-root': {
-        color: theme.palette.common.white,
+        color: absoluteInk(theme).white,
       },
       '& .MuiDivider-root': {
-        borderColor: alpha(theme.palette.common.white, 0.12),
+        borderColor: sheen(theme, 0.12),
       },
     }),
 

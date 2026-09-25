@@ -22,6 +22,7 @@ import {
   wobbleAnimation,
 } from './AnimatedIcon.animations';
 import type { AnimationSize, AnimationVariant } from './AnimatedIcon.types';
+import { neutralTones, shadowInk, sheen } from '../../../tokens/ink';
 
 export const sizeConfigs: Record<AnimationSize, { size: number; fontSize: number }> = {
   xs: { size: 12, fontSize: 10 },
@@ -70,10 +71,10 @@ const animationFor = (
 };
 
 const SHADOWS: Record<string, (theme: Theme) => string> = {
-  soft: (theme) => `0 4px 20px ${alpha(theme.palette.common.black, 0.15)}`,
-  hard: (theme) => `4px 4px 0px ${alpha(theme.palette.common.black, 0.25)}`,
+  soft: (theme) => `0 4px 20px ${shadowInk(theme, 0.15)}`,
+  hard: (theme) => `4px 4px 0px ${shadowInk(theme, 0.25)}`,
   elevated: (theme) =>
-    `0 10px 40px ${alpha(theme.palette.common.black, 0.2)}, 0 2px 10px ${alpha(theme.palette.common.black, 0.1)}`,
+    `0 10px 40px ${shadowInk(theme, 0.2)}, 0 2px 10px ${shadowInk(theme, 0.1)}`,
 };
 
 export interface IconStyleFlags {
@@ -113,20 +114,20 @@ const effectStyles = (
       background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.2)}, ${alpha(theme.palette.background.paper, 0.1)})`,
       backdropFilter: 'blur(10px)',
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-      boxShadow: `inset 0 1px 1px ${alpha(theme.palette.common.white, 0.3)}, 0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+      boxShadow: `inset 0 1px 1px ${sheen(theme, 0.3)}, 0 8px 32px ${shadowInk(theme, 0.1)}`,
     }),
     ...($metallic && {
       background: `linear-gradient(145deg,
-      ${theme.palette.grey[300]} 0%,
-      ${theme.palette.grey[500]} 25%,
-      ${theme.palette.grey[400]} 50%,
-      ${theme.palette.grey[600]} 75%,
-      ${theme.palette.grey[400]} 100%)`,
+      ${neutralTones(theme).track} 0%,
+      ${neutralTones(theme).muted} 25%,
+      ${neutralTones(theme).subtle} 50%,
+      ${neutralTones(theme).emphasis} 75%,
+      ${neutralTones(theme).subtle} 100%)`,
       backgroundSize: '200% 200%',
       animation: `${animation}, ${breatheAnimation} 4s ease-in-out infinite`,
-      boxShadow: `inset 0 2px 4px ${alpha(theme.palette.common.white, 0.5)},
-                inset 0 -2px 4px ${alpha(theme.palette.common.black, 0.3)},
-                0 4px 8px ${alpha(theme.palette.common.black, 0.2)}`,
+      boxShadow: `inset 0 2px 4px ${sheen(theme, 0.5)},
+                inset 0 -2px 4px ${shadowInk(theme, 0.3)},
+                0 4px 8px ${shadowInk(theme, 0.2)}`,
     }),
     ...($gradient && {
       background: `linear-gradient(135deg,

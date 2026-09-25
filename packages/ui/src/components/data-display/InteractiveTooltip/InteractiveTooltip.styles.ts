@@ -1,6 +1,8 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { absoluteInk, neutralTones, shadowInk, sheen } from '../../../tokens/ink';
+
 const pulseAnimation = keyframes`
   0% {
     transform: scale(1);
@@ -29,23 +31,23 @@ export const variantStyles = (theme: Theme, variant?: string): CSSObject => {
   switch (variant) {
     case 'default':
       return {
-        backgroundColor: alpha(theme.palette.grey[900], 0.92),
-        color: theme.palette.common.white,
-        boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.3)}`,
+        backgroundColor: alpha(neutralTones(theme).inverseSurface, 0.92),
+        color: absoluteInk(theme).white,
+        boxShadow: `0 4px 12px ${shadowInk(theme, 0.3)}`,
       };
     case 'dark':
       return {
-        backgroundColor: '#000000',
-        color: theme.palette.common.white,
-        boxShadow: `0 6px 16px ${alpha(theme.palette.common.black, 0.5)}`,
-        border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
+        backgroundColor: absoluteInk(theme).black,
+        color: absoluteInk(theme).white,
+        boxShadow: `0 6px 16px ${shadowInk(theme, 0.5)}`,
+        border: `1px solid ${sheen(theme, 0.1)}`,
       };
     case 'light':
       return {
-        backgroundColor: theme.palette.common.white,
-        color: theme.palette.grey[900],
-        border: `1px solid ${alpha(theme.palette.grey[400], 0.4)}`,
-        boxShadow: `0 4px 16px ${alpha(theme.palette.common.black, 0.15)}`,
+        backgroundColor: absoluteInk(theme).white,
+        color: neutralTones(theme).inverseSurface,
+        border: `1px solid ${alpha(neutralTones(theme).subtle, 0.4)}`,
+        boxShadow: `0 4px 16px ${shadowInk(theme, 0.15)}`,
       };
     case 'glass':
       return {
@@ -54,7 +56,7 @@ export const variantStyles = (theme: Theme, variant?: string): CSSObject => {
         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
         color: theme.palette.text.primary,
-        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
+        boxShadow: `0 8px 32px ${shadowInk(theme, 0.12)}`,
       };
     default:
       return {};
@@ -76,12 +78,12 @@ export const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): C
 export const arrowColor = (theme: Theme, variant?: string): string => {
   switch (variant) {
     case 'light':
-      return theme.palette.common.white;
+      return absoluteInk(theme).white;
     case 'glass':
       return alpha(theme.palette.background.paper, 0.75);
     case 'dark':
-      return '#000000';
+      return absoluteInk(theme).black;
     default:
-      return alpha(theme.palette.grey[900], 0.92);
+      return alpha(neutralTones(theme).inverseSurface, 0.92);
   }
 };

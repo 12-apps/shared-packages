@@ -1,6 +1,7 @@
 import { alpha, keyframes, type CSSObject, type Theme } from "@mui/material/styles/index.js";
 
 import { fadeInScaleAnimation } from "../Badge/Badge.animations";
+import { shadowInk } from "../../../tokens/ink";
 
 /**
  * A plain style object, not MUI's `SxProps`.
@@ -195,7 +196,7 @@ function variantSx(variant: CardSurfaceVariant, theme: Theme): CardSx {
       // channel rather than scaling it, and `divider` is already a 12% black —
       // so asking for 80% of it produced an 80% black slab of a border.
       borderColor: theme.palette.divider,
-      boxShadow: `0 1px 3px ${alpha(theme.palette.common.black, 0.1)}`,
+      boxShadow: `0 1px 3px ${shadowInk(theme, 0.1)}`,
     };
   }
   return {};

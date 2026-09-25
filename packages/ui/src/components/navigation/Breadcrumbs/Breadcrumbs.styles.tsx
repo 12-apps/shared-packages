@@ -1,6 +1,9 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { modeInk, shadowInk, sheen, uiInk } from '../../../tokens/ink';
+import { EFFECT_GLOW } from '../../../tokens/ink.core';
+
 export const slideIn = keyframes`
   from {
     opacity: 0;
@@ -14,29 +17,27 @@ export const slideIn = keyframes`
 
 export const pulse = keyframes`
   0% {
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.brandIndigo, 0.4)};
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+    box-shadow: 0 0 0 10px ${alpha(EFFECT_GLOW.brandIndigo, 0)};
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.brandIndigo, 0)};
   }
 `;
 
 const BAR_VARIANTS: Record<string, (theme: Theme, elevation: number) => CSSObject> = {
   glass: (theme, elevation) => ({
       background:
-        theme.palette.mode === 'dark' ? 'rgba(17, 24, 39, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+        theme.palette.mode === 'dark' ? alpha(uiInk(theme).glassSlate, 0.7) : sheen(theme, 0.7),
       backdropFilter: 'blur(10px)',
       WebkitBackdropFilter: 'blur(10px)',
-      border: `1px solid ${
-        theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-      }`,
+      border: `1px solid ${alpha(modeInk(theme), 0.1)}`,
       boxShadow:
         theme.palette.mode === 'dark'
-          ? `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-          : `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)` }),
+          ? `0 ${elevation * 4}px ${elevation * 8}px ${shadowInk(theme, 0.3)}, inset 0 1px 0 ${sheen(theme, 0.1)}`
+          : `0 ${elevation * 4}px ${elevation * 8}px ${shadowInk(theme, 0.08)}, inset 0 1px 0 ${sheen(theme, 0.8)}` }),
   elevated: (theme, elevation) => ({
       background: theme.palette.background.paper,
       boxShadow: theme.shadows[elevation] || theme.shadows[1],
@@ -110,11 +111,11 @@ export const breadcrumbsBarStyles = ({
     '&:hover': {
       ...(visualStyle === 'glass' && {
         background:
-          theme.palette.mode === 'dark' ? 'rgba(17, 24, 39, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+          theme.palette.mode === 'dark' ? alpha(uiInk(theme).glassSlate, 0.85) : sheen(theme, 0.85),
         boxShadow:
           theme.palette.mode === 'dark'
-            ? `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.4)`
-            : `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.12)` }) } });
+            ? `0 ${elevation * 6}px ${elevation * 12}px ${shadowInk(theme, 0.4)}`
+            : `0 ${elevation * 6}px ${elevation * 12}px ${shadowInk(theme, 0.12)}` }) } });
 
 // The idle glass treatment and the active-crumb treatment are mutually
 // exclusive; keeping them as named pieces takes both branches out of the main

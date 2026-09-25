@@ -3,6 +3,7 @@ import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.
 
 import type { BannerVariant } from './Banner.types';
 import { ACTIVE, HOVER } from '../Alert/Alert.metrics';
+import { modeInk } from '../../../tokens/ink';
 
 // Animations
 export const fadeInSlide = keyframes`
@@ -136,7 +137,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
  */
 /** The same flat inset tint `Alert` paints; see `ACTIVE` for why it is a layer. */
 const tint = (theme: Theme, a: number): string =>
-  `inset 0 0 0 100vmax ${alpha(theme.palette.mode === 'light' ? '#000000' : '#ffffff', a)}`;
+  `inset 0 0 0 100vmax ${alpha(modeInk(theme), a)}`;
 
 export const bannerPointerStates = (theme: Theme): CSSObject => ({
   '&:hover': {

@@ -1,4 +1,5 @@
 import type { AvatarSize, AvatarStatus } from './Avatar.base';
+import { ABSOLUTE_INK, NEUTRAL_RAMP } from '../../../tokens/ink.core';
 import type { UiTheme } from '../../../tokens/theme';
 import type { ColorValue } from '../../../tokens/vocabulary';
 
@@ -91,7 +92,7 @@ export function statusColor(theme: UiTheme, status: AvatarStatus): string {
   if (status === 'online') return theme.palette.success.main;
   if (status === 'away') return theme.palette.warning.main;
   if (status === 'busy') return theme.palette.danger.main;
-  return theme.palette.grey[500];
+  return NEUTRAL_RAMP[500];
 }
 
 export interface AvatarAccent {
@@ -105,7 +106,7 @@ export interface AvatarAccent {
  * and fell through to primary: a red avatar rendering blue, silently.
  */
 export function avatarAccent(theme: UiTheme, color: ColorValue): AvatarAccent {
-  if (color === 'neutral') return { main: theme.palette.grey[700], contrastText: '#fff' };
+  if (color === 'neutral') return { main: NEUTRAL_RAMP[700], contrastText: ABSOLUTE_INK.white };
   const accent = theme.palette[color];
-  return { main: accent.main, contrastText: accent.contrastText || '#fff' };
+  return { main: accent.main, contrastText: accent.contrastText || ABSOLUTE_INK.white };
 }

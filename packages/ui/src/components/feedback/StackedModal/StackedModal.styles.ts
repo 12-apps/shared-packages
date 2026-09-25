@@ -1,5 +1,6 @@
 import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import { scrim } from '../../../tokens/ink';
 import { dynamicViewportHeight } from '../../../utils/viewport';
 import type { ModalPanelRole, PanelMaxWidth } from './StackedModal.types';
 
@@ -24,9 +25,10 @@ const MAX_WIDTH_PX: Record<Exclude<PanelMaxWidth, false>, number> = {
   xl: 1920,
 };
 
-const BACKDROP_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
-  secondary: 'rgba(0, 0, 0, 0.3)',
-  background: 'rgba(0, 0, 0, 0.1)',
+/** The scrim's opacity behind each receding panel role. */
+const BACKDROP_ALPHA_BY_ROLE: Partial<Record<ModalPanelRole, number>> = {
+  secondary: 0.3,
+  background: 0.1,
 };
 
 const ANIMATION_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
@@ -56,8 +58,8 @@ const panelWidth = (share: string, capPx: number | null): CSSObject =>
     ? { width: `min(${share}, ${capPx}px)`, maxWidth: `${capPx}px` }
     : { width: share, maxWidth: share };
 
-const backdropStyles = (modalRole?: ModalPanelRole): CSSObject => ({
-  backgroundColor: (modalRole && BACKDROP_BY_ROLE[modalRole]) ?? 'rgba(0, 0, 0, 0.5)',
+const backdropStyles = (theme: Theme, modalRole?: ModalPanelRole): CSSObject => ({
+  backgroundColor: scrim(theme, (modalRole && BACKDROP_ALPHA_BY_ROLE[modalRole]) ?? 0.5),
   backdropFilter: modalRole === 'primary' ? 'blur(4px)' : 'none',
 });
 
@@ -138,7 +140,7 @@ const panelStyles = (theme: Theme, props: PanelStyleProps): CSSObject => {
 /** The full rule set for the sliding panel's Dialog root. */
 export const dialogRootStyles = (theme: Theme, props: PanelStyleProps): CSSObject => ({
   direction: props.rtl ? 'rtl' : 'ltr',
-  '& .MuiBackdrop-root': backdropStyles(props.modalRole),
+  '& .MuiBackdrop-root': backdropStyles(theme, props.modalRole),
   '& .MuiDialog-container': { alignItems: 'flex-start', justifyContent: 'flex-end' },
   '& .MuiDialog-paper': panelStyles(theme, props),
   ...KEYFRAMES,

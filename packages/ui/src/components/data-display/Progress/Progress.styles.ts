@@ -12,6 +12,7 @@ import {
   PULSE,
 } from './Progress.metrics';
 import type { ProgressSize, ProgressVariant } from './Progress.types';
+import { softNeutral } from '../../../tokens/ink';
 import { px } from '../../../tokens/theme';
 
 // Define pulse animation. The stops and the two seconds are the shared metrics'
@@ -31,12 +32,7 @@ export const pulseAnimation = keyframes`
 export const getColorFromTheme = (theme: Theme, color: string): PaletteColor => {
   // Handle special case for neutral (grey) which is a Color, not PaletteColor
   if (color === 'neutral') {
-    return {
-      light: theme.palette.grey[300],
-      main: theme.palette.grey[500],
-      dark: theme.palette.grey[700],
-      contrastText: theme.palette.getContrastText(theme.palette.grey[500]),
-    };
+    return softNeutral(theme);
   }
 
   const colorMap: Record<string, PaletteColor> = {
