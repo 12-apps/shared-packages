@@ -50,8 +50,9 @@ export const Skeleton: React.FC<SkeletonProps> = React.memo((rawProps) => {
     <MuiSkeleton
       variant={muiVariantFor(variant)}
       animation={muiAnimationFor(variant, animation)}
-      width={skeletonLength(theme, finalWidth)}
-      height={skeletonLength(theme, finalHeight)}
+      // A `0` stays `0`: MUI reads a falsy size as "size from children".
+      width={finalWidth === 0 ? 0 : skeletonLength(theme, finalWidth)}
+      height={finalHeight === 0 ? 0 : skeletonLength(theme, finalHeight)}
       sx={skeletonSx(theme, {
         intensity,
         borderRadius,

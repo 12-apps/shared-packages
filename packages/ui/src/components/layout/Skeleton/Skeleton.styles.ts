@@ -100,6 +100,7 @@ interface SkeletonStyleArgs {
 /**
  * A `width`/`height` for MUI's `Skeleton`, which writes it into an inline
  * `style`: a number there is px, so it is design px through the type scale.
+ * The caller keeps a `0` as `0` (see `Skeleton.tsx`).
  */
 export const skeletonLength = (theme: Theme, value: number | string | undefined): string | undefined =>
   typeof value === 'number' ? rem(theme, value) : value;

@@ -134,6 +134,10 @@
     "kind": "exempt",
     "why": "spacing: 1 is the Stack spacing-unit default (a theme.spacing multiple) shared by web and native, not a px length"
   },
+  "packages/ui/src/components/layout/Skeleton/Skeleton.tsx — raw-jsx-size ×2": {
+    "kind": "exempt",
+    "why": "a width or height of 0 is handed to MUI's Skeleton as the number 0, not '0rem': MUI reads a falsy size as 'size from children', and a rem string would be truthy; every other number goes through rem"
+  },
   "packages/ui/src/components/navigation/AppHeader/AppHeader.tsx — raw-number-length ×1": {
     "kind": "exempt",
     "why": "the fixed bar's spacer height comes from getBoundingClientRect and a ResizeObserver: the bar's own rendered height, measured at runtime"
