@@ -57,7 +57,7 @@ const StepItem = styled(Box, {
 }));
 
 const StepIndicator = styled(Box, {
-  shouldForwardProp: (prop) => !['size', 'variant', 'color', 'isActive', 'isCompleted', 'isError', 'interactive', 'disabled'].includes(prop as string),
+  shouldForwardProp: (prop) => !['size', 'variant', 'color', 'isActive', 'isCompleted', 'isError', 'interactive', 'animated', 'disabled'].includes(prop as string),
 })<{
   size: WorkflowStepProps['size'];
   variant: WorkflowStepProps['variant'];

@@ -157,3 +157,18 @@ export const resolveWorkflowStepProps = (
   props: WorkflowStepProps,
 ): ResolvedWorkflowStepProps =>
   ({ ...WORKFLOW_DEFAULTS, ...definedProps(props) }) as ResolvedWorkflowStepProps;
+
+/**
+ * The progressbar's `aria-valuetext`: `Step N of M: <title>` while `currentStep`
+ * names a step, and `Step N of M` when it does not (past the end, below zero, or
+ * no steps at all), so a screen reader never reads a missing title as
+ * "undefined". The index itself is not clamped (FUT-2671).
+ */
+export const progressValueText = (
+  steps: readonly WorkflowStepItem[],
+  currentStep: number,
+): string => {
+  const position = `Step ${currentStep + 1} of ${steps.length}`;
+  const step = steps[currentStep];
+  return step === undefined ? position : `${position}: ${step.title}`;
+};
