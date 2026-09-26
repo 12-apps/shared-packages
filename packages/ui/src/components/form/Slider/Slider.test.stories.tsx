@@ -89,8 +89,10 @@ export const BasicInteraction: Story = {
       expect(slider).toHaveAttribute('aria-valuemax', '100');
       expect(slider).toHaveAttribute('aria-valuenow', '50');
 
-      // Verify slider is focusable
-      await userEvent.click(slider);
+      // Verify slider is focusable. A click on the thumb would also drag it
+      // to the pointer's position, so focus it directly instead.
+      // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+      slider.focus();
       await waitFor(() => expect(slider).toHaveFocus());
 
       // Verify slider ARIA label or accessible name
@@ -275,7 +277,10 @@ export const KeyboardNavigation: Story = {
       const slider = sliders[0] as HTMLElement; // First slider is the single-slider
       expect(slider).toBeInTheDocument();
 
-      await userEvent.click(slider);
+      // A click on the thumb would drag it to the pointer's position (x=0
+      // here), so focus it directly to test keyboard access, not dragging.
+      // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+      slider.focus();
       await waitFor(() => expect(slider).toHaveFocus());
 
       // Verify keyboard accessibility attributes are present
@@ -407,7 +412,10 @@ export const FocusManagement: Story = {
       const toggleButton = canvas.getByTestId('toggle-button');
       const afterButton = canvas.getByTestId('after-button');
 
-      await userEvent.click(toggleButton);
+      // Focus the button without activating it — a click here would toggle
+      // showSlider off and unmount the slider this step is about to tab to.
+      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+      toggleButton.focus();
       await waitFor(() => expect(toggleButton).toHaveFocus());
 
       await userEvent.tab();

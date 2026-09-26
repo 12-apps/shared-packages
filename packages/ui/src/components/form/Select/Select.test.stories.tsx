@@ -344,7 +344,10 @@ export const KeyboardNavigation: Story = {
       const selectContainer = canvas.getByTestId('keyboard-select');
       const selectElement = selectContainer.querySelector('[role="combobox"]') as HTMLElement;
       await expect(selectElement).toBeInTheDocument();
-      await userEvent.click(selectElement);
+      // A click opens the listbox, which then holds focus itself — focus the
+      // trigger directly so this step tests focus, not activation.
+      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+      selectElement.focus();
       await waitFor(() => expect(selectElement).toHaveFocus());
     });
 
@@ -352,10 +355,12 @@ export const KeyboardNavigation: Story = {
       // MUI Select renders as a combobox role - find it using container first
       const selectContainer = canvas.getByTestId('keyboard-select');
       const selectElement = selectContainer.querySelector('[role="combobox"]') as HTMLElement;
-      await userEvent.click(selectElement);
-
-      // Use click instead of Enter for more reliable dropdown opening
-      await userEvent.click(selectElement);
+      // Open with the actual Enter key, as the step says. A click also opens
+      // it, but leaves focus on the popover's paper instead of an option, so
+      // the arrow-key step below would have nothing to move focus through.
+      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+      selectElement.focus();
+      await userEvent.keyboard('{Enter}');
 
       await waitFor(
         async () => {
@@ -375,9 +380,14 @@ export const KeyboardNavigation: Story = {
       const selectContainer = canvas.getByTestId('keyboard-select');
       const selectElement = selectContainer.querySelector('[role="combobox"]') as HTMLElement;
 
-      // Ensure dropdown is still open from previous step
+      // Ensure dropdown is still open from previous step. Reopen with the
+      // keyboard, not a click — a click leaves focus on the popover's paper
+      // rather than an option, and the arrow keys below would have nothing
+      // to move focus through.
       if (selectElement.getAttribute('aria-expanded') !== 'true') {
-        await userEvent.click(selectElement);
+        // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+        selectElement.focus();
+        await userEvent.keyboard('{Enter}');
         await waitFor(async () => {
           await expect(selectElement).toHaveAttribute('aria-expanded', 'true');
         });

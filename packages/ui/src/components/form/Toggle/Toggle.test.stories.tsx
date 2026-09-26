@@ -238,8 +238,11 @@ export const KeyboardNavigation: Story = {
     const toggle3 = canvas.getByTestId('keyboard-toggle-3');
     const stateDiv = canvas.getByTestId('keyboard-state');
 
-    // Test Tab navigation
-    await userEvent.click(toggle1);
+    // Test Tab navigation. Focus directly rather than clicking — a click
+    // would also toggle the control, and the next assertions are about
+    // focus, not activation.
+    // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+    toggle1.focus();
     await waitFor(() => expect(toggle1).toHaveFocus());
 
     await userEvent.tab();
@@ -252,7 +255,8 @@ export const KeyboardNavigation: Story = {
     await waitFor(() => expect(document.activeElement).not.toBe(toggle3));
 
     // Test Space key activation
-    await userEvent.click(toggle1);
+    // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+    toggle1.focus();
     expect(stateDiv).toHaveTextContent('{"toggle1":false,"toggle2":false,"toggle3":false}');
 
     await userEvent.keyboard(' ');
@@ -261,17 +265,18 @@ export const KeyboardNavigation: Story = {
     });
 
     // Test Enter key activation
-    await userEvent.click(toggle2);
+    // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+    toggle2.focus();
     await userEvent.keyboard('{Enter}');
     await waitFor(() => {
       expect(stateDiv).toHaveTextContent('{"toggle1":true,"toggle2":true,"toggle3":false}');
     });
 
-    // Test disabled toggle doesn't respond
-    await userEvent.click(toggle3);
-    await userEvent.keyboard(' ');
-    await userEvent.keyboard('{Enter}');
-    // State should remain unchanged
+    // Test disabled toggle doesn't respond. A disabled control has
+    // pointer-events: none and tabindex="-1", so it can neither be clicked
+    // nor focused for a keyboard press to reach — assert that guarantee
+    // directly instead of dispatching a click the browser would itself block.
+    await expect(toggle3).toBeDisabled();
     expect(stateDiv).toHaveTextContent('{"toggle1":true,"toggle2":true,"toggle3":false}');
   },
 };
@@ -792,8 +797,11 @@ export const VisualStates: Story = {
     await userEvent.click(hoverToggle);
     expect(hoverToggle).toHaveAttribute('aria-pressed', 'true');
 
-    // Test focus
-    await userEvent.click(focusToggle);
+    // Test focus. Focus directly rather than clicking — a click would
+    // already toggle it on, and the Space press right after would toggle it
+    // back off instead of proving Space activates it.
+    // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+    focusToggle.focus();
     await waitFor(() => expect(focusToggle).toHaveFocus());
     await userEvent.keyboard(' ');
     expect(focusToggle).toHaveAttribute('aria-pressed', 'true');

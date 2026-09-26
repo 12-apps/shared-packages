@@ -244,24 +244,27 @@ export const KeyboardNavigation: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Tab navigation forward', async () => {
+    await step('Click on the label focuses its associated input', async () => {
       const firstLabel = canvas.getByTestId('first-label');
       const firstInputContainer = canvas.getByTestId('first-input');
       const firstInput = firstInputContainer.querySelector('input');
 
-      // Focus first label
+      // A <label htmlFor> hands focus to the control it labels, not to itself.
       await userEvent.click(firstLabel);
-      await waitFor(() => expect(firstLabel).toHaveFocus());
-
-      // Tab to input
-      await userEvent.tab();
       await waitFor(() => expect(firstInput).toHaveFocus());
+    });
+
+    await step('Tab navigation forward', async () => {
+      await userEvent.tab();
+      const secondLabel = canvas.getByTestId('second-label');
+      await waitFor(() => expect(secondLabel).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
-      const firstLabel = canvas.getByTestId('first-label');
-      await waitFor(() => expect(firstLabel).toHaveFocus());
+      const firstInputContainer = canvas.getByTestId('first-input');
+      const firstInput = firstInputContainer.querySelector('input');
+      await waitFor(() => expect(firstInput).toHaveFocus());
     });
 
     await step('Enter key activation on clickable label', async () => {
