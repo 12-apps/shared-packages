@@ -656,7 +656,7 @@ export const IntegrationTest: Story = {
       await expect(label).toBeInTheDocument();
 
       // Check current location button is present
-      const locationButton = canvas.getByTitle('Use current location');
+      const locationButton = canvas.getByTitle(PT_BR_ADDRESS_AUTOCOMPLETE_COPY.useCurrentLocation);
       await expect(locationButton).toBeInTheDocument();
 
       // Click current location button

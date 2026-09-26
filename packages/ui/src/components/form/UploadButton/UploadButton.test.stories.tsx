@@ -131,7 +131,7 @@ export const StateChangeTest: Story = {
 
     // Test initial state
     await expect(uploadButton).toBeEnabled();
-    await expect(uploadButton).toHaveTextContent(/upload file/i);
+    await expect(uploadButton).toHaveTextContent(PT_BR_UPLOAD_BUTTON_COPY.buttonLabel);
 
     // Simulate file upload with progress
     const fileInput = canvasElement.querySelector('input[type="file"]') as HTMLInputElement;
@@ -157,7 +157,7 @@ export const StateChangeTest: Story = {
         await waitFor(
           () => {
             const button = canvas.getByRole('button');
-            expect(button).toHaveTextContent(/uploading/i);
+            expect(button).toHaveTextContent(PT_BR_UPLOAD_BUTTON_COPY.uploading);
           },
           { timeout: 1000 },
         );

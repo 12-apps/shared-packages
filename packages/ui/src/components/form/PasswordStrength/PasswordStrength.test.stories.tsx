@@ -7,6 +7,13 @@ import React, { useState } from 'react';
 import { PasswordStrength } from './PasswordStrength';
 import { PT_BR_PASSWORD_STRENGTH_COPY } from '../../../pt-BR';
 
+// Matches any of the pack's band words, for the negatives below that assert a
+// band label has disappeared rather than naming a specific one.
+const PASSWORD_STRENGTH_BAND_PATTERN = new RegExp(
+  Object.values(PT_BR_PASSWORD_STRENGTH_COPY.bands).join('|'),
+  'i',
+);
+
 const meta: Meta<typeof PasswordStrength> = {
   args: { copy: PT_BR_PASSWORD_STRENGTH_COPY },
   title: 'Form/PasswordStrength/Tests',
@@ -43,12 +50,14 @@ export const BasicInteraction: Story = {
     });
 
     await step('Verify strength label is shown', async () => {
-      const strengthText = await canvas.findByText(/Password Strength/i);
+      const strengthText = await canvas.findByText(PT_BR_PASSWORD_STRENGTH_COPY.strengthHeading);
       expect(strengthText).toBeInTheDocument();
     });
 
     await step('Verify requirements section is present', async () => {
-      const requirementsText = await canvas.findByText(/Requirements:/i);
+      const requirementsText = await canvas.findByText(
+        PT_BR_PASSWORD_STRENGTH_COPY.requirementsHeading,
+      );
       expect(requirementsText).toBeInTheDocument();
     });
   },
@@ -87,7 +96,7 @@ export const KeyboardNavigation: Story = {
 
     await step('User types a weak password', async () => {
       await userEvent.type(input, 'test');
-      const strengthLabel = await canvas.findByText(/Weak/i);
+      const strengthLabel = await canvas.findByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.weak);
       expect(strengthLabel).toBeInTheDocument();
     });
 
@@ -95,13 +104,19 @@ export const KeyboardNavigation: Story = {
       // Clear and type a new password
       await userEvent.clear(input);
       await userEvent.type(input, 'test1234');
-      const strengthLabel = await canvas.findByText(/Good/i);
+      const strengthLabel = await canvas.findByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.good);
       expect(strengthLabel).toBeInTheDocument();
     });
 
      await step('User clears the input', async () => {
+      // The previous step established the "Boa" label is on screen, so the
+      // negative below describes something disappearing, not something that
+      // never appeared.
+      expect(canvas.getByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.good)).toBeInTheDocument();
       await userEvent.clear(input);
-      await waitFor(() => expect(canvas.queryByText(/Weak|Fair|Good|Strong/i)).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(canvas.queryByText(PASSWORD_STRENGTH_BAND_PATTERN)).not.toBeInTheDocument(),
+      );
     });
   },
 };
@@ -132,7 +147,7 @@ export const ScreenReader: Story = {
     });
 
     await step('Verify strong password strength is announced', async () => {
-      const strongLabel = await canvas.findByText(/Strong/i);
+      const strongLabel = await canvas.findByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.strong);
       expect(strongLabel).toBeInTheDocument();
     });
 
@@ -191,31 +206,31 @@ export const VisualStates: Story = {
 
     await step('Verify very weak password state and label', async () => {
       const veryWeakContainer = await canvas.findByTestId('very-weak-password');
-      const label = within(veryWeakContainer).getByText('Very Weak');
+      const label = within(veryWeakContainer).getByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.veryWeak);
       expect(label).toBeInTheDocument();
     });
 
     await step('Verify weak password state and label', async () => {
       const weakContainer = await canvas.findByTestId('weak-password');
-      const label = within(weakContainer).getByText('Weak');
+      const label = within(weakContainer).getByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.weak);
       expect(label).toBeInTheDocument();
     });
 
     await step('Verify fair password state and label', async () => {
       const fairContainer = await canvas.findByTestId('fair-password');
-      const label = within(fairContainer).getByText('Fair');
+      const label = within(fairContainer).getByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.fair);
       expect(label).toBeInTheDocument();
     });
 
     await step('Verify good password state and label', async () => {
       const goodContainer = await canvas.findByTestId('good-password');
-      const label = within(goodContainer).getByText('Good');
+      const label = within(goodContainer).getByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.good);
       expect(label).toBeInTheDocument();
     });
 
     await step('Verify strong password state and label', async () => {
       const strongContainer = await canvas.findByTestId('strong-password');
-      const label = within(strongContainer).getByText('Strong');
+      const label = within(strongContainer).getByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.strong);
       expect(label).toBeInTheDocument();
     });
   },
@@ -276,13 +291,18 @@ export const EdgeCases: Story = {
     await step('Verify empty password state shows no strength label', async () => {
       const emptyContainer = await canvas.findByTestId('empty-password');
       expect(emptyContainer).toBeInTheDocument();
-      const label = within(emptyContainer).queryByText(/Very Weak|Weak|Fair|Good|Strong/i);
-      await waitFor(() => expect(label).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(
+          within(emptyContainer).queryByText(PASSWORD_STRENGTH_BAND_PATTERN),
+        ).not.toBeInTheDocument(),
+      );
     });
 
     await step('Verify very long password state shows "Strong"', async () => {
       const veryLongContainer = await canvas.findByTestId('very-long-password');
-      const label = await within(veryLongContainer).findByText('Strong');
+      const label = await within(veryLongContainer).findByText(
+        PT_BR_PASSWORD_STRENGTH_COPY.bands.strong,
+      );
       expect(label).toBeInTheDocument();
     });
   },
@@ -309,12 +329,14 @@ export const Integration: Story = {
     await step('Verify all features render together', async () => {
       const component = await canvas.findByTestId('integration-strength');
       expect(component).toBeInTheDocument();
-      expect(await canvas.findByText(/Password Strength/i)).toBeInTheDocument();
-      expect(await canvas.findByText(/Requirements:/i)).toBeInTheDocument();
+      expect(await canvas.findByText(PT_BR_PASSWORD_STRENGTH_COPY.strengthHeading)).toBeInTheDocument();
+      expect(
+        await canvas.findByText(PT_BR_PASSWORD_STRENGTH_COPY.requirementsHeading),
+      ).toBeInTheDocument();
     });
 
     await step('Verify password strength is calculated correctly as "Fair"', async () => {
-      const strengthIndicator = await canvas.findByText('Fair');
+      const strengthIndicator = await canvas.findByText(PT_BR_PASSWORD_STRENGTH_COPY.bands.fair);
       expect(strengthIndicator).toBeInTheDocument();
     });
 
