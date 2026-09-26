@@ -287,11 +287,11 @@ export const ScreenReaderAccessibility: Story = {
     const list = canvas.getByRole('list');
     expect(list).toBeInTheDocument();
 
-    // Check badge accessibility
-    const badge = canvas.getByText('5');
-    expect(badge).toBeInTheDocument();
-    // Badge should be in a MUI Badge component (class contains MuiBadge)
-    expect(badge.closest('[class*="MuiBadge"]')).toBeInTheDocument();
+    // Check badge accessibility. The badge is a plain span with no class,
+    // role or test id of its own, so assert it by its text, scoped to the
+    // item it belongs to — not by an MuiBadge class it never had.
+    const ordersItem = canvas.getByRole('link', { name: /Orders/ });
+    expect(within(ordersItem).getByText('5')).toBeInTheDocument();
   },
 };
 
@@ -336,7 +336,11 @@ export const FocusManagement: Story = {
     // which proved only that the DOM honours focus(), never that the component
     // moved it.
     const overviewItem = canvas.getByText('Overview').closest('a, div[role="button"]') as HTMLElement;
-    expect(overviewItem).toBeVisible();
+    // Wait for the submenu's enter transition to settle before asserting
+    // visibility — mid-transition it measures 0 height at opacity 0.
+    await waitFor(() => {
+      expect(overviewItem).toBeVisible();
+    });
   },
 };
 
@@ -909,18 +913,17 @@ export const AdvancedKeyboardNavigation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // Focus first menu item
-    // No pre-focus needed: the step below clicks this button directly.
-    const firstMenuItem = canvas.getByText('Dashboard').closest('button');
+    // Focus first menu item. Items with an href render as <a>; the ones
+    // that only expand a submenu (no href), like Analytics below, render as
+    // a div[role="button"] instead — not a <button>.
+    const firstMenuItem = canvas.getByText('Dashboard').closest('a, div[role="button"]') as HTMLElement;
     expect(firstMenuItem).toBeInTheDocument();
 
-    // Test Enter key activation - click the focused button directly
-    if (firstMenuItem) {
-      await userEvent.click(firstMenuItem);
-      await waitFor(() => {
-        expect(canvas.getByTestId('selected-via-keyboard')).toHaveTextContent('Selected: 1');
-      });
-    }
+    // Test Enter key activation - click the focused item directly
+    await userEvent.click(firstMenuItem);
+    await waitFor(() => {
+      expect(canvas.getByTestId('selected-via-keyboard')).toHaveTextContent('Selected: 1');
+    });
 
     // Test Tab navigation
     await userEvent.keyboard('{Tab}');
@@ -929,13 +932,12 @@ export const AdvancedKeyboardNavigation: Story = {
     await userEvent.keyboard('{ArrowDown}');
 
     // Test expanding submenu with Enter
-    const analyticsItem = canvas.getByText('Analytics').closest('button');
-    if (analyticsItem) {
-      await userEvent.click(analyticsItem);
-      await waitFor(() => {
-        expect(canvas.getByText('Overview')).toBeInTheDocument();
-      });
-    }
+    const analyticsItem = canvas.getByText('Analytics').closest('a, div[role="button"]') as HTMLElement;
+    expect(analyticsItem).toBeInTheDocument();
+    await userEvent.click(analyticsItem);
+    await waitFor(() => {
+      expect(canvas.getByText('Overview')).toBeInTheDocument();
+    });
 
     // Test Escape to collapse submenu
     await userEvent.keyboard('{Escape}');

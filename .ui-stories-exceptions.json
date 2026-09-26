@@ -1,25 +1,8 @@
 {
-  "Dashboards/DataGrid/Tests › Focus Management": "FUT-2695: the story passes no sorting arg, so no 'Sort by …' header buttons exist for /sort by name/i to find",
-  "Dashboards/DataGrid/Tests › Keyboard Navigation": "FUT-2695: the story passes no sorting arg, so no 'Sort by …' header buttons exist for /sort by name/i to find",
-  "Dashboards/DataGrid/Tests › Test: Keyboard Navigation": "FUT-2695: the story passes no sorting arg, so no 'Sort by …' header buttons exist for /sort by name/i to find",
-  "Form/Autocomplete/Tests › Search And Link Suggestions": "FUT-2695: highlightLabel wraps the typed match in <mark>, splitting 'Abrir documentação' across elements, so exact getByText misses it",
+  "Form/Autocomplete/Tests › Search And Link Suggestions": "FUT-2763: a pick closes the list, but useLocalFilter's effect re-runs on the activeIndex reset and maybeAutoOpen reopens it, so aria-expanded stays 'true' after the link pick.",
   "Form/CodeEditor/Tests › Basic Interaction": "FUT-2697: Monaco renders in CI, but the story expects its line count to grow past 6 after typing and it stays at 6",
   "Form/CodeEditor/Tests › Integration": "FUT-2697: Monaco renders in CI, but an element the story queries after editing is null (toBeInTheDocument on null)",
   "Form/CodeEditor/Tests › Keyboard Navigation": "FUT-2697: Monaco renders in CI, but an element the story queries after keyboard input is null (toBeInTheDocument on null)",
   "Form/CodeEditor/Tests › Screen Reader": "FUT-2697: Monaco renders in CI, but the story looks for a \"Read Only\" text the editor does not render",
-  "Form/CodeEditor/Tests › Visual States": "FUT-2697: Monaco renders in CI, but the story looks for a \"Read Only\" text the editor does not render",
-  "Form/CreatableSelect/Tests › 🧪 Controlled value round-trips": "FUT-2695: options render in a portal outside the canvas, and the story queries within(canvasElement), so the option text is not found",
-  "Form/CreatableSelect/Tests › 🧪 Creates a new option on Enter": "FUT-2695: options render in a portal outside the canvas, and the story queries within(canvasElement), so the option text is not found",
-  "Form/CreatableSelect/Tests › 🧪 No create row without onCreate": "FUT-2695: options render in a portal outside the canvas, and the story queries within(canvasElement), so the option text is not found",
-  "Form/CreatableSelect/Tests › 🧪 Selects an existing option": "FUT-2695: options render in a portal outside the canvas, and the story queries within(canvasElement), so the option text is not found",
-  "Layout/Sidebar/Tests › Focus Management": "FUT-2695: tab-order assumption — the first Tab lands on a <button> before focus-nav-home",
-  "Navigation/ContextMenu/Tests › Responsive Design": "FUT-2695: toBeVisible() asserted on the menu <ul> during MUI's enter transition; it is visible once settled",
-  "Navigation/NavigationMenu/Tests › Advanced Keyboard Navigation": "FUT-2695: items render as <a> (and the badge outside a MuiBadge node), but the story looks for <button> / [class*=MuiBadge]",
-  "Navigation/NavigationMenu/Tests › Focus Management": "FUT-2695: toBeVisible() asserted while the submenu is still mid-transition, so the 'Overview' item reads not visible",
-  "Navigation/NavigationMenu/Tests › Screen Reader Accessibility": "FUT-2695: items render as <a> (and the badge outside a MuiBadge node), but the story looks for <button> / [class*=MuiBadge]",
-  "Overlays/AlertDialog/Tests › Responsive Design": "FUT-2695: queries role 'dialog', but the component renders role='alertdialog' on the paper",
-  "Overlays/AlertDialog/Tests › Screen Reader": "FUT-2695: queries role 'dialog', but the component renders role='alertdialog' on the paper",
-  "Overlays/AlertDialog/Tests › Theme Variations": "FUT-2695: queries role 'dialog', but the component renders role='alertdialog' on the paper",
-  "Overlays/Tooltip/Tests › 🎯 Focus Management Test": "FUT-2695: tab-order assumption — after userEvent.tab() focus is still on first-element, not focus-trigger",
-  "Utility/InstallPrompt/Tests › Appears When Installable": "FUT-2695: the install button is asserted outside waitFor, a render before it appears after the synthetic beforeinstallprompt"
+  "Form/CodeEditor/Tests › Visual States": "FUT-2697: Monaco renders in CI, but the story looks for a \"Read Only\" text the editor does not render"
 }

@@ -44,8 +44,9 @@ export const SelectsAnExistingOption: Story = {
       const input = canvas.getByTestId('cat-input');
       await userEvent.click(input);
       await userEvent.type(input, 'Beb');
-      await waitFor(() => expect(canvas.getByText('Bebidas')).toBeInTheDocument());
-      await userEvent.click(canvas.getByText('Bebidas'));
+      // The options render in a portal, outside canvasElement.
+      await waitFor(() => expect(within(document.body).getByText('Bebidas')).toBeInTheDocument());
+      await userEvent.click(within(document.body).getByText('Bebidas'));
       await waitFor(() => expect(args.onChange).toHaveBeenCalledWith('drinks'));
     });
   },
@@ -68,7 +69,10 @@ export const CreatesANewOptionOnEnter: Story = {
       const input = canvas.getByTestId('cat-input');
       await userEvent.click(input);
       await userEvent.type(input, 'Lanches');
-      await waitFor(() => expect(canvas.getByText('Criar "Lanches"')).toBeInTheDocument());
+      // The create row renders in a portal, outside canvasElement.
+      await waitFor(() =>
+        expect(within(document.body).getByText('Criar "Lanches"')).toBeInTheDocument(),
+      );
       await userEvent.keyboard('{ArrowDown}{Enter}');
       await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('Lanches'));
     });
@@ -77,6 +81,13 @@ export const CreatesANewOptionOnEnter: Story = {
 
 export const NoCreateRowWhenOnCreateOmitted: Story = {
   name: '🧪 No create row without onCreate',
+  // Disable auto-action generation for onCreate so it stays falsy when the
+  // story omits it (otherwise the global argTypesRegex: '^on[A-Z].*' pattern
+  // auto-mocks it, buildFilter sees a truthy onCreate, and the create row this
+  // story asserts is absent renders anyway).
+  argTypes: {
+    onCreate: { action: false },
+  },
   args: {
     options: OPTIONS,
     value: null,
@@ -84,6 +95,9 @@ export const NoCreateRowWhenOnCreateOmitted: Story = {
     label: 'Categoria',
     noOptionsText: 'Nada encontrado',
     dataTestId: 'cat',
+    // Explicitly set to undefined to override the auto-generated action from
+    // argTypesRegex.
+    onCreate: undefined,
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -92,8 +106,16 @@ export const NoCreateRowWhenOnCreateOmitted: Story = {
       const input = canvas.getByTestId('cat-input');
       await userEvent.click(input);
       await userEvent.type(input, 'Zzz');
-      await waitFor(() => expect(canvas.getByText('Nada encontrado')).toBeInTheDocument());
-      await waitFor(() => expect(canvas.queryByText(/^Criar /)).not.toBeInTheDocument());
+      // The no-options and (absent) create-row text render in a portal,
+      // outside canvasElement — including the negative below, which was
+      // vacuous against canvas since a portalled create row could never be
+      // found there, fixed or not.
+      await waitFor(() =>
+        expect(within(document.body).getByText('Nada encontrado')).toBeInTheDocument(),
+      );
+      await waitFor(() =>
+        expect(within(document.body).queryByText(/^Criar /)).not.toBeInTheDocument(),
+      );
     });
   },
 };
@@ -127,7 +149,10 @@ export const ControlledValueRoundTrips: Story = {
       const input = canvas.getByTestId('cat-input') as HTMLInputElement;
       await userEvent.click(input);
       await userEvent.type(input, 'Combos');
-      await waitFor(() => expect(canvas.getByText('Criar "Combos"')).toBeInTheDocument());
+      // The create row renders in a portal, outside canvasElement.
+      await waitFor(() =>
+        expect(within(document.body).getByText('Criar "Combos"')).toBeInTheDocument(),
+      );
       await userEvent.keyboard('{ArrowDown}{Enter}');
       await waitFor(() => expect(input.value).toBe('Combos'));
     });

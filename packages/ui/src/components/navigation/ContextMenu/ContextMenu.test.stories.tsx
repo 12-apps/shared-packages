@@ -404,8 +404,11 @@ export const ResponsiveDesign: Story = {
     // NOT asserted here: it reads window/document dimensions, so the result depends
     // on the runner's screen size rather than on the component. That belongs in a
     // visual or e2e check pinned to a fixed viewport.
-    const menu = body.getByRole('menu');
-    expect(menu).toBeVisible();
+    // toBeVisible() is checked once MUI's enter transition settles, not
+    // mid-animation, when the menu measures 0×0 at opacity 0.
+    await waitFor(() => {
+      expect(body.getByRole('menu')).toBeVisible();
+    });
 
     // Close menu
     await userEvent.keyboard('{Escape}');
