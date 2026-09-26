@@ -212,6 +212,12 @@ clipping, masks, filters, `<style>` — it **names** in `unsupported`, so a host
 can refuse the file or rasterise it itself and come in at `toMonochrome`.
 Decoding PNG/JPEG is deliberately left to the host, which already has a codec.
 
+**An uploaded SVG is untrusted input.** The document is read by a hand-written
+linear scanner (no backtracking regular expressions, so no crafted comment,
+attribute or number can make parsing polynomial), a document over
+`MAX_SVG_LENGTH` (256 000 characters) is refused as `"too large"`, and scan
+conversion only visits the edges that span each row.
+
 ## Finding a printer nobody wrote the address of down
 
 A settings screen asking a shop owner for an IP address is asking a fair

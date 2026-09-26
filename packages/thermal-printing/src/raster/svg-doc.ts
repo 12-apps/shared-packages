@@ -4,6 +4,7 @@
  * guessed at — see `rasterizeSvg` for why that boundary is where it is.
  */
 import { IDENTITY, multiply, pathToPolygons, type Matrix, type Point } from "./svg-path";
+import { scanAttributes, scanFunctions } from "./xml";
 
 /** A filled shape, ready to scan-convert. */
 export interface Shape {
@@ -26,10 +27,7 @@ export const DEFAULT_PAINT: Paint = { fill: [0, 0, 0], fillOpacity: 1, opacity: 
 export type Attributes = Readonly<Record<string, string>>;
 
 export function parseAttributes(source: string): Attributes {
-  const out: Record<string, string> = {};
-  for (const match of source.matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
-    out[match[1] ?? ""] = match[2] ?? match[3] ?? "";
-  }
+  const out = scanAttributes(source);
   // `style="fill:#000"` wins over the attribute, as the cascade says it does.
   for (const declaration of (out.style ?? "").split(";")) {
     const [name, value] = declaration.split(":").map((part) => part.trim());
@@ -72,8 +70,9 @@ function parseColour(value: string): readonly [number, number, number] | null | 
   const v = value.trim().toLowerCase();
   if (v === "none" || v === "transparent") return null;
   if (v.startsWith("#")) return parseHex(v.slice(1));
-  const rgb = /^rgba?\((.*)\)$/.exec(v);
-  if (rgb) return parseRgb(rgb[1] ?? "");
+  if ((v.startsWith("rgb(") || v.startsWith("rgba(")) && v.endsWith(")")) {
+    return parseRgb(v.slice(v.indexOf("(") + 1, -1));
+  }
   return NAMED[v];
 }
 
@@ -97,9 +96,9 @@ const TRANSFORMS: Readonly<Record<string, (n: number[]) => Matrix>> = {
 /** A `transform` attribute, composed left to right as the specification reads it. */
 function parseTransform(value: string | undefined): Matrix {
   let m = IDENTITY;
-  for (const match of (value ?? "").matchAll(/(\w+)\s*\(([^)]*)\)/g)) {
-    const numbers = (match[2] ?? "").split(/[\s,]+/).filter(Boolean).map(Number);
-    m = multiply(m, TRANSFORMS[match[1] ?? ""]?.(numbers) ?? IDENTITY);
+  for (const { name, args } of scanFunctions(value ?? "")) {
+    const numbers = args.split(/[\s,]+/).filter(Boolean).map(Number);
+    m = multiply(m, TRANSFORMS[name]?.(numbers) ?? IDENTITY);
   }
   return m;
 }

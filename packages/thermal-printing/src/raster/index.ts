@@ -41,6 +41,7 @@
 import { paint } from "./fill";
 import { DEFAULT_PAINT, inheritPaint, parseAttributes, shapeOf, type Attributes, type Paint, type Shape } from "./svg-doc";
 import type { Matrix } from "./svg-path";
+import { xmlTags, type XmlTag } from "./xml";
 import type { RgbaImage } from "./monochrome";
 
 export {
@@ -110,8 +111,6 @@ interface Walk {
   unsupported: Set<string>;
 }
 
-const TAG = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<(\/?)([A-Za-z][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/g;
-
 function note(walk: Walk, name: string, attrs: Attributes): void {
   if (REPORTED.has(name)) walk.unsupported.add(name);
   for (const attribute of REPORTED_ATTRIBUTES) if (attrs[attribute] !== undefined) walk.unsupported.add(attribute);
@@ -144,13 +143,32 @@ function closeElement(walk: Walk): void {
 /** Every filled shape in document order, in device space. */
 function collectShapes(body: string, root: Paint, unsupported: Set<string>): Shape[] {
   const walk: Walk = { stack: [root], skipDepth: 0, shapes: [], unsupported };
-  for (const match of body.matchAll(TAG)) {
-    const name = match[2];
-    if (name === undefined) continue;
-    if (match[1] === "/") closeElement(walk);
-    else openElement(walk, name, parseAttributes(match[3] ?? ""), match[4] === "/");
+  for (const tag of xmlTags(body)) {
+    if (tag.closing) closeElement(walk);
+    else openElement(walk, tag.name, parseAttributes(tag.attrs), tag.selfClosing);
   }
   return walk.shapes;
+}
+
+/**
+ * The largest document read, in characters. A one-plate mark is a few hundred
+ * bytes and a detailed logo tens of kilobytes; past this the input is not
+ * artwork, and refusing it bounds the work any upload can ask for.
+ */
+export const MAX_SVG_LENGTH = 256_000;
+
+/** The root `<svg>` start tag, or null. */
+function findRoot(svg: string): XmlTag | null {
+  if (svg.length > MAX_SVG_LENGTH) return null;
+  for (const tag of xmlTags(svg)) {
+    if (!tag.closing && tag.name.toLowerCase() === "svg") return tag;
+  }
+  return null;
+}
+
+function rootProblem(svg: string, root: XmlTag | null): string {
+  if (svg.length > MAX_SVG_LENGTH) return "too large";
+  return root === null ? "no <svg> root" : "no viewBox or size";
 }
 
 /**
@@ -163,19 +181,19 @@ function collectShapes(body: string, root: Paint, unsupported: Set<string>): Sha
  */
 export function rasterizeSvg(svg: string, options: SvgRasterOptions): SvgRaster {
   const unsupported = new Set<string>();
-  const rootMatch = /<svg\b((?:[^>"']|"[^"]*"|'[^']*')*)>/i.exec(svg);
-  const viewport = rootMatch ? viewportOf(parseAttributes(rootMatch[1] ?? "")) : null;
+  const root = findRoot(svg);
+  const rootAttrs = root === null ? {} : parseAttributes(root.attrs);
+  const viewport = root === null ? null : viewportOf(rootAttrs);
   const width = Math.max(0, Math.round(options.width));
   const aspect = viewport ? viewport.box[3] / viewport.box[2] : 1;
   const height = Math.max(0, Math.round(options.height ?? width * aspect));
-  if (viewport === null || rootMatch === null) {
-    unsupported.add(rootMatch === null ? "no <svg> root" : "no viewBox or size");
+  if (viewport === null || root === null) {
+    unsupported.add(rootProblem(svg, root));
     return { width, height, data: new Uint8ClampedArray(width * height * 4), unsupported: [...unsupported] };
   }
   // The root's own attributes (a transform, a fill) apply to everything in it.
-  const rootAttrs = parseAttributes(rootMatch[1] ?? "");
   const base = inheritPaint({ ...DEFAULT_PAINT, m: viewportMatrix(viewport, width, height) }, rootAttrs, unsupported);
-  const body = svg.slice(rootMatch.index + rootMatch[0].length);
+  const body = svg.slice(root.end);
   const shapes = collectShapes(body, base, unsupported);
   return { width, height, data: paint(shapes, width, height), unsupported: [...unsupported] };
 }

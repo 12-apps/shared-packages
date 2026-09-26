@@ -56,6 +56,8 @@ function cubic(p0: Point, p1: Point, p2: Point, p3: Point): Point[] {
   return out;
 }
 
+const isDigit = (char: string | undefined): boolean => char !== undefined && char >= "0" && char <= "9";
+
 /** Scanner over path data: numbers, and arc flags that may be run together. */
 class Scanner {
   private index = 0;
@@ -80,12 +82,38 @@ class Scanner {
     return /[-+.\d]/.test(this.source[this.index] ?? "");
   }
 
+  /** Digits from the cursor; returns how many were read. */
+  private digits(): number {
+    const start = this.index;
+    while (isDigit(this.source[this.index])) this.index += 1;
+    return this.index - start;
+  }
+
+  /**
+   * One number, read character by character: sign, digits, fraction,
+   * exponent. No regular expression, so no input can make it backtrack.
+   */
   number(): number {
     this.skip();
-    const match = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/.exec(this.source.slice(this.index));
-    if (match === null) throw new SyntaxError("path data");
-    this.index += match[0].length;
-    return Number(match[0]);
+    const start = this.index;
+    if (this.source[this.index] === "+" || this.source[this.index] === "-") this.index += 1;
+    let mantissa = this.digits();
+    if (this.source[this.index] === ".") {
+      this.index += 1;
+      mantissa += this.digits();
+    }
+    if (mantissa === 0) throw new SyntaxError("path data");
+    this.exponent();
+    return Number(this.source.slice(start, this.index));
+  }
+
+  /** An exponent, only when a digit follows it — `1e` alone is a 1 then junk. */
+  private exponent(): void {
+    const mark = this.index;
+    if (this.source[this.index] !== "e" && this.source[this.index] !== "E") return;
+    this.index += 1;
+    if (this.source[this.index] === "+" || this.source[this.index] === "-") this.index += 1;
+    if (this.digits() === 0) this.index = mark;
   }
 
   flag(): boolean {
