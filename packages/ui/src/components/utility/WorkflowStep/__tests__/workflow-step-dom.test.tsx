@@ -10,7 +10,13 @@
  *
  * `aria-valuetext` names the current step's title only when that step exists.
  * An out-of-range `currentStep` (or no steps at all) reads `Step N of M`, with
- * `aria-valuenow`, `aria-valuemax` and the statuses left as they were.
+ * the statuses left as they were.
+ *
+ * FUT-2773: `StepConnector`'s transition now gates on `animated` too, the same
+ * way the indicator's already did. And `aria-valuenow`/`aria-valuemax` are no
+ * longer asserted unclamped for an out-of-range `currentStep` — the value is
+ * clamped to the valid step range, and with no steps at all both attributes
+ * are omitted rather than describing an invalid range (`0 > -1`).
  */
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { render, screen } from '@testing-library/react';
@@ -72,6 +78,17 @@ describe('WorkflowStep DOM props', () => {
     renderWorkflow({ steps: twoSteps, currentStep: 0, animated: false });
     expect(getComputedStyle(screen.getByTestId('workflow-indicator-0')).transition).toBe('none');
   });
+
+  it('gates the connector transition on `animated` the same way as the indicator', () => {
+    const animatedView = renderWorkflow({ steps: twoSteps, currentStep: 0 });
+    const animatedTransition = getComputedStyle(screen.getByTestId('workflow-connector-0')).transition;
+    expect(animatedTransition).not.toBe('none');
+    expect(animatedTransition).toContain('background-color');
+    animatedView.unmount();
+
+    renderWorkflow({ steps: twoSteps, currentStep: 0, animated: false });
+    expect(getComputedStyle(screen.getByTestId('workflow-connector-0')).transition).toBe('none');
+  });
 });
 
 describe('WorkflowStep aria-valuetext', () => {
@@ -87,12 +104,29 @@ describe('WorkflowStep aria-valuetext', () => {
     expect(valueText).not.toContain('undefined');
   });
 
-  it('leaves aria-valuenow and aria-valuemax as they were for an out-of-range step', () => {
+  it('clamps aria-valuenow to the highest valid step when currentStep is past the last index', () => {
     renderWorkflow({ steps: twoSteps, currentStep: 2 });
 
     const progressBar = screen.getByRole('progressbar');
-    expect(progressBar).toHaveAttribute('aria-valuenow', '2');
+    expect(progressBar).toHaveAttribute('aria-valuenow', '1');
     expect(progressBar).toHaveAttribute('aria-valuemax', '1');
+  });
+
+  it('clamps aria-valuenow to the lowest valid step when currentStep is negative', () => {
+    renderWorkflow({ steps: twoSteps, currentStep: -1 });
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+    expect(progressBar).toHaveAttribute('aria-valuemax', '1');
+  });
+
+  it('omits aria-valuenow and aria-valuemax entirely when there are no steps', () => {
+    renderWorkflow({ steps: [], currentStep: 0 });
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).not.toHaveAttribute('aria-valuenow');
+    expect(progressBar).not.toHaveAttribute('aria-valuemax');
+    expect(progressBar).toHaveAttribute('aria-valuemin', '0');
   });
 
   it('still names the current step when it exists', () => {

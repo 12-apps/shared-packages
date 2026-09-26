@@ -117,6 +117,7 @@ export interface StepConnectorProps {
   orientation: WorkflowStepOrientation;
   variant: WorkflowStepVariant;
   color: WorkflowStepColor;
+  animated: boolean;
   'data-testid'?: string;
 }
 

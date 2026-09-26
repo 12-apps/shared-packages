@@ -160,26 +160,27 @@ const StepContent = styled(Box, {
 }));
 
 const StepConnector = styled(Box, {
-  shouldForwardProp: (prop) => !['orientation', 'isCompleted', 'color', 'variant'].includes(prop as string),
+  shouldForwardProp: (prop) => !['orientation', 'isCompleted', 'color', 'variant', 'animated'].includes(prop as string),
 })<{
   orientation: WorkflowStepProps['orientation'];
   isCompleted: boolean;
   color: WorkflowStepProps['color'];
   variant: WorkflowStepProps['variant'];
-}>(({ theme, orientation, isCompleted, color, variant }) => {
+  animated: boolean;
+}>(({ theme, orientation, isCompleted, color, variant, animated }) => {
   const connectorColor = isCompleted ? stepPalette(theme, color).main : neutralTones(theme).track;
 
   return {
     flex: 1,
     position: 'relative',
-    
+
     ...(orientation === 'horizontal' && {
       height: rem(theme, 2),
       backgroundColor: connectorColor,
       margin: `0 ${theme.spacing(1)}`,
       minWidth: theme.spacing(2),
     }),
-    
+
     ...(orientation === 'vertical' && {
       width: rem(theme, 2),
       backgroundColor: connectorColor,
@@ -191,9 +192,11 @@ const StepConnector = styled(Box, {
       top: '100%',
     }),
 
-    transition: theme.transitions.create('background-color', {
-      duration: theme.transitions.duration.short,
-    }),
+    transition: animated
+      ? theme.transitions.create('background-color', {
+          duration: theme.transitions.duration.short,
+        })
+      : 'none',
 
     ...(variant === 'minimal' && {
       opacity: 0.6,
@@ -223,6 +226,8 @@ const StepIndicatorComponent = forwardRef<HTMLDivElement, StepIndicatorProps>(({
   onClick,
   'data-testid': dataTestId,
 }, ref) => {
+  const isDisabled = Boolean(disabled || step.disabled);
+
   const handleClick = useCallback(() => {
     if (interactive && !disabled && onClick) {
       onClick(index, step);
@@ -265,13 +270,14 @@ const StepIndicatorComponent = forwardRef<HTMLDivElement, StepIndicatorProps>(({
       isError={isError}
       interactive={interactive}
       animated={animated}
-      disabled={Boolean(disabled || step.disabled)}
+      disabled={isDisabled}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role={interactive ? 'button' : undefined}
-      tabIndex={interactive && !disabled && !step.disabled ? 0 : -1}
+      tabIndex={!interactive ? undefined : isDisabled ? -1 : 0}
       aria-label={`Step ${index + 1}: ${step.title}`}
       aria-current={isActive ? 'step' : undefined}
+      aria-disabled={interactive && isDisabled ? true : undefined}
       data-testid={dataTestId}
     >
       {renderIndicatorContent()}
@@ -289,6 +295,7 @@ const StepConnectorComponent = forwardRef<HTMLDivElement, StepConnectorProps>(({
   orientation,
   variant,
   color,
+  animated,
   'data-testid': dataTestId,
 }, ref) => (
   <StepConnector
@@ -297,6 +304,7 @@ const StepConnectorComponent = forwardRef<HTMLDivElement, StepConnectorProps>(({
     isCompleted={isCompleted}
     color={color}
     variant={variant}
+    animated={animated}
     data-testid={dataTestId}
   />
 ));
@@ -304,51 +312,34 @@ const StepConnectorComponent = forwardRef<HTMLDivElement, StepConnectorProps>(({
 StepConnectorComponent.displayName = 'StepConnector';
 
 /**
- * Step content component
+ * Step content component.
+ *
+ * Inert on purpose (FUT-2773): the indicator is the step's one focusable
+ * `role="button"` element — it already carries `aria-label="Step N: <title>"`
+ * — so the title/description block gets no `role`, `tabIndex`, click or key
+ * handling of its own. Two independently-interactive elements per step gave
+ * assistive tech two tab stops for what a caller means as a single control.
  */
 const StepContentComponent = forwardRef<HTMLDivElement, StepContentProps>(({
   step,
-  index,
   orientation,
   interactive,
   disabled,
-  onClick,
   'data-testid': dataTestId,
-}, ref) => {
-  const handleClick = useCallback(() => {
-    if (interactive && !disabled && onClick) {
-      onClick(index, step);
-    }
-  }, [interactive, disabled, onClick, index, step]);
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (interactive && !disabled && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault();
-      if (onClick) {
-        onClick(index, step);
-      }
-    }
-  }, [interactive, disabled, onClick, index, step]);
-
-  return (
-    <StepContent
-      ref={ref}
-      orientation={orientation}
-      interactive={interactive}
-      disabled={Boolean(disabled || step.disabled)}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      role={interactive ? 'button' : undefined}
-      tabIndex={interactive && !disabled && !step.disabled ? 0 : -1}
-      data-testid={dataTestId}
-    >
-      <div className="step-title">{step.title}</div>
-      {step.description && (
-        <div className="step-description">{step.description}</div>
-      )}
-    </StepContent>
-  );
-});
+}, ref) => (
+  <StepContent
+    ref={ref}
+    orientation={orientation}
+    interactive={interactive}
+    disabled={Boolean(disabled || step.disabled)}
+    data-testid={dataTestId}
+  >
+    <div className="step-title">{step.title}</div>
+    {step.description && (
+      <div className="step-description">{step.description}</div>
+    )}
+  </StepContent>
+));
 
 StepContentComponent.displayName = 'StepContent';
 

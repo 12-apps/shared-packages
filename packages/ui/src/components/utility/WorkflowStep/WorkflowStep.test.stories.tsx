@@ -74,10 +74,10 @@ export const StateChangeTest: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // Find the second step indicator (should be pending initially)
-    // Since both indicator and content are buttons, we need to find the specific one
-    // Button index 2 should be the second step indicator (0=step1 indicator, 1=step1 content, 2=step2 indicator)
-    const step2Button = canvas.getAllByRole('button')[2];
+    // Find the second step indicator (should be pending initially). The
+    // indicator is now the step's only button (FUT-2773) — the content block
+    // is inert — so button index 1 is the second step's indicator.
+    const step2Button = canvas.getAllByRole('button')[1];
     expect(step2Button).toBeInTheDocument();
 
     // Click on step 2
@@ -107,7 +107,7 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
 
     const stepButtons = canvas.getAllByRole('button');
-    expect(stepButtons).toHaveLength(6); // 3 steps * 2 buttons each (indicator + content)
+    expect(stepButtons).toHaveLength(3); // 3 steps, one button (the indicator) each (FUT-2773)
 
     // Focus on first step indicator (index 0)
     await userEvent.click(stepButtons[0]);
@@ -126,8 +126,8 @@ export const KeyboardNavigation: Story = {
       );
     });
 
-    // Test Space key on second step indicator (index 2)
-    await userEvent.click(stepButtons[2]);
+    // Test Space key on second step indicator (index 1)
+    await userEvent.click(stepButtons[1]);
     await userEvent.keyboard(' ');
 
     await waitFor(() => {
@@ -344,9 +344,9 @@ export const IntegrationTest: Story = {
     expect(canvas.getByText('1')).toBeInTheDocument();
     expect(canvas.getByText('2')).toBeInTheDocument();
 
-    // Check interaction works - click on third step indicator (index 4: 2 buttons per step * 2 = 4)
+    // Check interaction works - click on third step indicator (index 2: one button per step, FUT-2773)
     const stepButtons = canvas.getAllByRole('button');
-    await userEvent.click(stepButtons[4]);
+    await userEvent.click(stepButtons[2]);
 
     await waitFor(() => {
       expect(args.onStepClick).toHaveBeenCalledWith(
