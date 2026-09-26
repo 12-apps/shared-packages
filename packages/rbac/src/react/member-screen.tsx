@@ -125,8 +125,11 @@ function toView(
     name: member.name,
     email: member.email,
     image: member.image,
-    roleLabel: labels.roleLabel(member.role),
-    customRoles: member.customRoles,
+    // One list: the wire still splits `role` from `customRoles`, but a member
+    // holds all of them equally.
+    roleLabels: [...new Set([member.role, ...member.customRoles])].map((name) =>
+      labels.roleLabel(name),
+    ),
     memberSinceLabel: formatters.date(member.memberSince),
     lastLoginLabel: member.lastLoginAt ? formatters.dateTime(member.lastLoginAt) : emptyValue,
   };

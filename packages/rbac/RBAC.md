@@ -244,14 +244,19 @@ can't include an owner-marker permission, and can't bundle an SoD pair.
   `CATALOG.permissions.list`, grouped by domain, disabling owner-marker perms and
   the SoD counterpart of any selected permission (or mount the packaged
   `createWebRbac` surface, which already does both).
-- **Assign a role to a member.** ⚠️ **Gotcha:** if your membership table pins the
-  base role with a DB CHECK constraint (a fixed template enum), a custom role name
-  **cannot** be stored there. Grant it as an **additive `RoleAssignment`**
-  (`roleName` + `scope = clientId`) instead — a member keeps one base template role
-  **plus** zero-or-more custom roles. When you change the base role, clear only the
-  **legacy template-named** assignments and preserve the custom ones; when you
-  **remove** a member, clear all their tenant-scoped assignments in the same
-  transaction so nothing dangles and re-activates on re-invite.
+- **Assign roles to a member.** Person × role × tenant is **N×M×J**: a member
+  holds ANY number of roles at a tenant — several system (template) roles at
+  once, every one of them if the store decides so, plus any custom roles — and
+  none of them is ranked as a "base". The packaged editor and invite form are one
+  checklist over every assignable role; the only selection they refuse is the
+  EMPTY one (that is a removal, not a role edit). Each role is its own
+  `membership_roles` link, granted by `POST /team/:userId/roles` and revoked by
+  `DELETE /team/:userId/roles/:role`; the permission engine unions every link.
+  ⚠️ **Gotcha:** if your membership table keeps a single `role` column (with a DB
+  CHECK), treat it as DERIVED from the links (e.g. the highest system role held),
+  never as the assignment surface. When you **remove** a member, clear all their
+  tenant-scoped assignments in the same transaction so nothing dangles and
+  re-activates on re-invite.
 - Gate the whole roles surface (panel, routes, actions, member-assignment) on a
   single owner-marker permission (`roles:manage`). Enforce it on the **page** too
   (not just the nav filter), since a URL is reachable directly.

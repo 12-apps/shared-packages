@@ -12,49 +12,29 @@ import type { TeamRoleDialogCopy } from './copy';
 import type { RbacLabels } from './labels';
 
 /**
- * The unified role-edit popup (12-13) — ported from the origin host's
- * `role-edit-dialog.tsx` + `use-role-editor.ts`. One checklist over ALL
- * roles: exactly one SYSTEM role is the member's base, any custom picks are
- * additive; the save maps the diff onto the existing set-role +
- * grant/revoke endpoints, so no new server surface exists for it. Every
- * sentence comes from the host's {@link TeamRoleDialogCopy}.
+ * The role-edit popup (12-13): one checklist over EVERY role the tenant can
+ * assign, system and custom alike.
+ *
+ * Person × role × tenant is a plain N×M×J relation. A member may hold any
+ * number of roles — every system role at once, if that is what the store
+ * decides — and nothing here ranks one of them as a "base". The save is a pure
+ * grant/revoke diff over the per-role endpoints, so there is no new server
+ * surface for it. Every sentence comes from the host's {@link TeamRoleDialogCopy}.
  */
 
 export interface MemberWithRoles extends TeamMemberWire {
   customRoles: string[];
-  /** Every role held. The SET model reads this instead of base + customs. */
+  /** Every role held — the set the editor opens on and diffs against. */
   roles: string[];
 }
 
 /**
- * How a host's people relate to roles.
+ * Apply a selection as a pure diff over the per-role endpoints.
  *
- * `base+custom` — the default, and every adopter before this existed: exactly
- * one SYSTEM role is the person's base and any custom picks are additive. The
- * save maps onto set-role plus a grant/revoke diff.
- *
- * `set` — person↔role is a plain m:n. There is no base to name, so the
- * validation asks only for a non-empty selection and the save is a pure
- * grant/revoke diff. A host whose two roles are equal cannot use the other
- * model at all: it refuses to save anything but exactly one system role.
- */
-export type RoleModel = 'base+custom' | 'set';
-
-/** Split a unified selection into the single base role + additive customs. */
-export function splitRoleSelection(
-  roleNames: readonly string[],
-  systemRoles: ReadonlySet<string>,
-): { base: string | null; customRoles: string[] } {
-  const system = roleNames.filter((name) => systemRoles.has(name));
-  const customRoles = roleNames.filter((name) => !systemRoles.has(name));
-  return { base: system.length === 1 ? (system[0] as string) : null, customRoles };
-}
-
-/**
- * Apply a SET selection as a pure diff over the per-role endpoints.
- *
- * No `setMemberRole` call: there is no base to set. Both endpoints already
- * existed — this model simply stops routing half the change through a base.
+ * Grants run BEFORE revokes: a member moving from one set to another is never
+ * left, even for one request, holding fewer roles than either end state — which
+ * is what keeps an owner-protection rule on the server from seeing a transient
+ * member with no owner role.
  */
 export async function applyRoleSet(
   api: RbacApiClient,
@@ -74,45 +54,17 @@ export async function applyRoleSet(
   return null;
 }
 
-/** Apply a selection onto the existing endpoints: base set + custom diff. */
-export async function applyRoleChanges(
-  api: RbacApiClient,
-  member: MemberWithRoles,
-  base: string,
-  customRoles: string[],
-): Promise<string | null> {
-  if (base !== member.role) {
-    const result = await api.setMemberRole(member.userId, base);
-    if (!result.ok) return result.error;
-  }
-  const toAdd = customRoles.filter((role) => !member.customRoles.includes(role));
-  const toRemove = member.customRoles.filter((role) => !customRoles.includes(role));
-  for (const role of toAdd) {
-    const result = await api.grantMemberRole(member.userId, role);
-    if (!result.ok) return result.error;
-  }
-  for (const role of toRemove) {
-    const result = await api.revokeMemberRole(member.userId, role);
-    if (!result.ok) return result.error;
-  }
-  return null;
-}
-
 /**
- * Whether a selection is savable under the model in force.
+ * Whether a selection is savable.
  *
- * The SET model asks only that SOMETHING is held: clearing the last role would
- * leave a person with no access at all, which is a removal rather than a role
- * edit, and the roster has its own affordance for that. The base model asks for
- * exactly one system role, because that is the field it has to fill.
+ * Any non-empty set is — one role, two, or all of them. Clearing the last role
+ * would leave a person with no access at all, which is a REMOVAL rather than a
+ * role edit, and the roster has its own affordance for that. Roles the editor
+ * does not offer (an owner role, which only its own flow grants) still count:
+ * they are held, and the save leaves them exactly as they are.
  */
-function isSelectionValid(
-  isSet: boolean,
-  selected: ReadonlySet<string>,
-  systemSet: ReadonlySet<string>,
-): boolean {
-  if (isSet) return selected.size > 0;
-  return [...selected].filter((name) => systemSet.has(name)).length === 1;
+function isSelectionValid(selected: ReadonlySet<string>, kept: readonly string[]): boolean {
+  return selected.size > 0 || kept.length > 0;
 }
 
 interface RoleEditBodyProps {
@@ -123,8 +75,6 @@ interface RoleEditBodyProps {
   copy: TeamRoleDialogCopy;
   busy: boolean;
   error: string | null;
-  /** Defaults to `base+custom` — see {@link RoleModel}. */
-  roleModel?: RoleModel;
   onClose: () => void;
   onSave: (roleNames: string[]) => void;
 }
@@ -132,17 +82,21 @@ interface RoleEditBodyProps {
 /** The editor body — owns the selection state; mounts fresh per member. */
 function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
   const { member, systemRoles, availableCustomRoles, labels, copy, busy, error } = props;
-  const isSet = props.roleModel === 'set';
-  const systemSet = useMemo(() => new Set(systemRoles), [systemRoles]);
+  // Only what this editor OFFERS is toggled here. Everything else the member
+  // holds — an owner role, a name the host keeps out of the roster — is carried
+  // through the save untouched rather than silently revoked.
+  const offered = useMemo(
+    () => new Set([...systemRoles, ...availableCustomRoles]),
+    [systemRoles, availableCustomRoles],
+  );
+  const kept = useMemo(
+    () => member.roles.filter((name) => !offered.has(name)),
+    [member.roles, offered],
+  );
   const [selected, setSelected] = useState<Set<string>>(
-    // The SET model seeds from the whole set; the base model reconstructs it
-    // from the two fields it keeps separate.
-    () => new Set(isSet ? member.roles : [member.role, ...member.customRoles]),
+    () => new Set(member.roles.filter((name) => offered.has(name))),
   );
-  const valid = useMemo(
-    () => isSelectionValid(isSet, selected, systemSet),
-    [isSet, selected, systemSet],
-  );
+  const valid = useMemo(() => isSelectionValid(selected, kept), [selected, kept]);
 
   const toggle = (name: string, checked: boolean): void => {
     setSelected((prev) => {
@@ -186,9 +140,7 @@ function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
         {!valid && (
           <Alert
             variant="warning"
-            description={
-              isSet ? (copy.atLeastOneRole ?? copy.exactlyOneSystemRole) : copy.exactlyOneSystemRole
-            }
+            description={copy.atLeastOneRole}
             data-testid="role-edit-invalid"
           />
         )}
@@ -198,7 +150,7 @@ function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
             {copy.cancelAction}
           </Button>
           <Button
-            onClick={() => props.onSave([...selected])}
+            onClick={() => props.onSave([...kept, ...selected])}
             disabled={!valid || busy}
             dataTestId="role-edit-save"
           >

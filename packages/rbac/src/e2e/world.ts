@@ -30,7 +30,7 @@ export interface RbacMemberFixture {
   /** What the grid PRINTS for them — the name when there is one. */
   label: string;
   /**
-   * The base role they hold NOW.
+   * A system role they hold NOW.
    *
    * The role editor is a checklist over all roles with exactly-one-system-role
    * enforced, so reassigning means unchecking this one as well as checking the
@@ -60,7 +60,10 @@ export interface RbacFixtures {
   excluded: RbacMemberFixture;
   /** The keyword that separates the two above. */
   keyword: string;
-  /** A base role the roster may assign, and that `matching` does not hold. */
+  /**
+   * A system role the roster may assign, and that `matching` does not hold yet —
+   * granted ALONGSIDE `currentRole`, never instead of it.
+   */
   assignableRole: string;
   /** A seeded custom role the catalog lists, for the roles-grid scenarios. */
   customRole: string;

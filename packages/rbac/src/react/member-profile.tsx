@@ -26,10 +26,11 @@ export interface MemberProfileView {
   name: string | null;
   email: string;
   image: string | null;
-  /** The base tenant role, already mapped to its label. */
-  roleLabel: string;
-  /** Additive tenant custom roles, shown by their own names. */
-  customRoles: string[];
+  /**
+   * EVERY role the member holds at this tenant, already mapped to labels.
+   * Any number of them, of any kind — none is ranked as a "base".
+   */
+  roleLabels: string[];
   memberSinceLabel: string;
   /** The last sign-in, or the copy's empty value when none was recorded. */
   lastLoginLabel: string;
@@ -93,17 +94,12 @@ function DetailsTab({
           sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}
         >
           <DescriptionItem
-            label={copy.fields.baseRole}
-            value={member.roleLabel}
-            data-testid="member-role"
-          />
-          <DescriptionItem
-            label={copy.fields.customRoles}
-            data-testid="member-custom-roles"
+            label={copy.fields.roles}
+            data-testid="member-roles"
             value={
-              member.customRoles.length > 0 ? (
+              member.roleLabels.length > 0 ? (
                 <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                  {member.customRoles.map((role) => (
+                  {member.roleLabels.map((role) => (
                     <Chip key={role} label={role} size="sm" variant="outlined" />
                   ))}
                 </Stack>

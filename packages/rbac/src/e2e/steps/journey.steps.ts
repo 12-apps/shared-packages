@@ -128,18 +128,20 @@ When('I open the role editor for the matching member', async ({ page }) => {
   await expect(page.getByTestId('role-edit-dialog')).toBeVisible();
 });
 
-When('I assign the seeded base role', async ({ page }) => {
-  const { matching, assignableRole } = rbacWorld().fixtures;
-  // Exactly ONE system role may be selected, so the swap is two clicks: the
-  // save stays disabled between them, which is the rule working.
-  await page.getByTestId(`role-opt-${matching.currentRole}`).click();
-  await page.getByTestId(`role-opt-${assignableRole}`).click();
+When('I add the seeded assignable role to the matching member', async ({ page }) => {
+  const { assignableRole } = rbacWorld().fixtures;
+  // One click, and the save is enabled straight away: a second system role is
+  // simply another role held (person × role × tenant is N×M×J).
+  // `check` rather than a click, so a re-run against a world that already holds
+  // it leaves it held instead of toggling it off.
+  await roleOption(page, assignableRole).check();
+  await expect(page.getByTestId('role-edit-invalid')).toHaveCount(0);
   await page.getByTestId('role-edit-save').click();
   await expect(page.getByTestId('role-edit-dialog')).toHaveCount(0);
 });
 
 /**
- * The reassignment is proved by REOPENING the editor, not by reading the grid.
+ * Proved by REOPENING the editor, not by reading the grid.
  *
  * The roster's roles column renders a role's LABEL — host copy, different in
  * every adopter — so an assertion there would either name one app's words or
@@ -150,13 +152,12 @@ When('I assign the seeded base role', async ({ page }) => {
  * It is also the stronger claim: reopening refetches, so what is checked is
  * what the SERVER stored rather than what the dialog left on screen.
  */
-Then('the role editor shows the seeded base role selected', async ({ page }) => {
+Then('the role editor shows both system roles selected', async ({ page }) => {
   const { matching, assignableRole } = rbacWorld().fixtures;
   await expect(roleOption(page, assignableRole)).toBeChecked();
-  // And the old one is GONE — exactly one system role may be held, so a
-  // reassignment that only ADDED would leave an invalid selection the dialog
-  // refuses to save, which a check on the new role alone passes straight over.
-  await expect(roleOption(page, matching.currentRole)).not.toBeChecked();
+  // And the first one is STILL there — adding a system role never takes
+  // another away.
+  await expect(roleOption(page, matching.currentRole)).toBeChecked();
 });
 
 When('I start composing a new role', async ({ page }) => {
@@ -284,13 +285,18 @@ async function toggleCustomRole(page: Page): Promise<void> {
   await expect(page.getByTestId('role-edit-dialog')).toHaveCount(0);
 }
 
-When("I clear the member's base role", async ({ page }) => {
-  await page.getByTestId(`role-opt-${rbacWorld().fixtures.matching.currentRole}`).click();
+When('I clear every role the matching member holds', async ({ page }) => {
+  const dialog = page.getByTestId('role-edit-dialog');
+  const checked = dialog.locator('[data-testid^="role-opt-"] input[type="checkbox"]:checked');
+  // Unticked one at a time, re-querying each round: the list shrinks as it goes.
+  while ((await checked.count()) > 0) {
+    await checked.first().click();
+  }
 });
 
 Then('the editor refuses the save', async ({ page }) => {
-  // Exactly one system role, always. Zero is as invalid as two, and the
-  // refusal is stated on screen rather than only enforced on submit.
+  // Any number of roles is valid; only ZERO is refused, and the refusal is
+  // stated on screen rather than only enforced on submit.
   await expect(page.getByTestId('role-edit-invalid')).toBeVisible();
   await expect(page.getByTestId('role-edit-save')).toBeDisabled();
 });

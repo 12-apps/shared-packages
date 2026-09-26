@@ -15,18 +15,25 @@ export interface RbacPendingInvite {
 }
 
 /**
- * The roles ONE invite grants.
+ * The roles ONE invite grants — any number, of any kind.
  *
- * The shape the roster's picker produces, and deliberately the same division
- * the member-role endpoints already make: exactly one BASE role the membership
- * takes, and any number of the tenant's own roles ON TOP. An invite that could
- * name two base roles would be expressing something `PATCH /team/:userId`
- * cannot apply, so the wire refuses it before the port ever sees it.
+ * Person × role × tenant is N×M×J. The picker is one checklist over every
+ * assignable role; the wire keeps the `role` + `customRoles` split only so a
+ * port written before that keeps compiling. A port MUST grant every role here,
+ * additively, and never demote a role the person already holds.
  */
 export interface RbacInviteRoles {
-  /** The system role the membership takes. */
-  role: string;
-  /** Additive tenant roles, already deduplicated by the wire. */
+  /**
+   * The first system role picked, when any was. Absent for an invite to
+   * custom roles only. It is NOT a cap: a person holds every role they are
+   * granted, and a port must grant this one AND every entry of `customRoles`,
+   * additively, never demoting a role the person already holds.
+   */
+  role?: string;
+  /**
+   * Every other role the invite grants — system or custom — already
+   * deduplicated by the wire.
+   */
   customRoles: readonly string[];
 }
 

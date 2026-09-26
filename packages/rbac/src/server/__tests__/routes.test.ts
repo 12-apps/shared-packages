@@ -848,6 +848,91 @@ describe('team routes', () => {
   });
 });
 
+describe('person × role × tenant is N×M×J', () => {
+  /** A host whose invites port records exactly what each invite asked for. */
+  async function invitingHost(): Promise<{ h: TestHost; asked: unknown[] }> {
+    const asked: unknown[] = [];
+    const h = createTestHost({
+      invites: {
+        invite: async (_tenantId, _email, roles) => {
+          asked.push(roles);
+          return { status: 'invited' as const };
+        },
+        listPending: async () => [],
+        cancel: async () => undefined,
+      },
+    });
+    await h.api.seedTenantRoles(TENANT);
+    enrolMember(h.state, TENANT, 'owner-1', 'DIRECTOR');
+    return { h, asked };
+  }
+
+  it('grants ONE member every assignable system role, then revokes them one by one', async () => {
+    const h = await host();
+    enrolMember(h.state, TENANT, 'owner-1', 'DIRECTOR');
+    enrolMember(h.state, TENANT, 'chef-1', 'CONSERVATOR');
+    const actor = memberActor(TENANT, 'owner-1');
+    const all = ['HEAD_LIBRARIAN', 'BRANCH_LEAD', 'CLERK', 'CONSERVATOR'];
+    for (const role of all) {
+      const granted = await call(h, 'POST', '/team/:userId/roles', {
+        actor,
+        params: { userId: 'chef-1' },
+        body: { role },
+      });
+      expect(granted.status, role).toBe(200);
+    }
+    const detail = await call(h, 'GET', '/team/:userId', { actor, params: { userId: 'chef-1' } });
+    const held = data(detail) as { role: string; customRoles: string[] };
+    expect(new Set([held.role, ...held.customRoles])).toEqual(new Set(all));
+
+    for (const role of all.slice(1)) {
+      const revoked = await call(h, 'DELETE', '/team/:userId/roles/:role', {
+        actor,
+        params: { userId: 'chef-1', role },
+      });
+      expect(revoked.status, role).toBe(200);
+    }
+  });
+
+  it('an invite may carry several system roles and custom ones together', async () => {
+    const { h, asked } = await invitingHost();
+    seedRole(h.state, { clientId: TENANT, name: 'Voluntário', permissions: ['titles:read:all'] });
+    const response = await call(h, 'POST', '/team', {
+      actor: memberActor(TENANT, 'owner-1'),
+      body: {
+        email: 'todos@example.com',
+        role: 'BRANCH_LEAD',
+        customRoles: ['CLERK', 'CONSERVATOR', 'Voluntário'],
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(asked).toEqual([
+      { role: 'BRANCH_LEAD', customRoles: ['CLERK', 'CONSERVATOR', 'Voluntário'] },
+    ]);
+  });
+
+  it('an invite may carry custom roles only, with no system role', async () => {
+    const { h, asked } = await invitingHost();
+    seedRole(h.state, { clientId: TENANT, name: 'Voluntário', permissions: ['titles:read:all'] });
+    const response = await call(h, 'POST', '/team', {
+      actor: memberActor(TENANT, 'owner-1'),
+      body: { email: 'avulso@example.com', customRoles: ['Voluntário'] },
+    });
+    expect(response.status).toBe(200);
+    expect(asked).toEqual([{ customRoles: ['Voluntário'] }]);
+  });
+
+  it('an owner role cannot ride into an invite through the list either', async () => {
+    const { h, asked } = await invitingHost();
+    const response = await call(h, 'POST', '/team', {
+      actor: memberActor(TENANT, 'owner-1'),
+      body: { email: 'dono@example.com', role: 'CLERK', customRoles: ['DIRECTOR'] },
+    });
+    expect(response.status).toBe(400);
+    expect(asked).toEqual([]);
+  });
+});
+
 describe('one mount, two languages', () => {
   /**
    * The property the resolver form of the copy port exists for. rbac has THREE

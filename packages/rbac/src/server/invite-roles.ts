@@ -53,19 +53,23 @@ export function assertAssignableBaseRole<P extends string>(
  * The roles one invite grants, judged before anything is written.
  *
  * `undefined` when the body named none — a screen that predates the picker, or
- * a host that decides the role inside its own port. The port's `roles` argument
+ * a host that decides the roles inside its own port. The port's `roles` argument
  * is optional for exactly that reason, so this returning nothing is a legal
  * outcome and not a fallback.
  *
- * Governance runs for the base role AND for every custom one, with no target
- * user id: at invite time the address may have no account at all, and
- * `assertCanGrantRole` already takes the target as optional. That is not a
- * weaker check — escalation, the scope ceiling, SoD and the owner markers are
- * all properties of the GRANTER and the role, and the only rule a target would
- * add is one about who already holds what, which nobody does yet.
+ * Any number of roles, of any kind: person × role × tenant is N×M×J. Every
+ * SYSTEM role named — as `role` or inside `customRoles` — is narrowed to the
+ * assignable set, so an owner role cannot ride in through the list either.
  *
- * Every role is judged BEFORE the port is called, so a refused custom role
- * leaves no membership, no invite row and no half-applied grant behind.
+ * Governance runs for every role, with no target user id: at invite time the
+ * address may have no account at all, and `assertCanGrantRole` already takes
+ * the target as optional. That is not a weaker check — escalation, the scope
+ * ceiling, SoD and the owner markers are all properties of the GRANTER and the
+ * role, and the only rule a target would add is one about who already holds
+ * what, which nobody does yet.
+ *
+ * Every role is judged BEFORE the port is called, so a refused role leaves no
+ * membership, no invite row and no half-applied grant behind.
  */
 export async function resolveInviteRoles<P extends string>(
   deps: { config: RbacServerConfig<P>; governance: GrantGovernance },
@@ -73,11 +77,15 @@ export async function resolveInviteRoles<P extends string>(
   input: { role?: string; customRoles?: readonly string[] },
   messages: RbacMessages,
 ): Promise<RbacInviteRoles | undefined> {
-  if (input.role === undefined) return undefined;
-  assertAssignableBaseRole(deps.config, input.role, messages);
-  const customRoles = input.customRoles ?? [];
-  for (const role of [input.role, ...customRoles]) {
+  const customRoles = (input.customRoles ?? []).filter((name) => name !== input.role);
+  if (input.role === undefined && customRoles.length === 0) return undefined;
+  const templates = new Set(deps.config.catalog.roleTemplates.map((role) => role.name));
+  const all = input.role === undefined ? customRoles : [input.role, ...customRoles];
+  for (const role of all) {
+    if (role === input.role || templates.has(role)) {
+      assertAssignableBaseRole(deps.config, role, messages);
+    }
     await deps.governance.assertCanGrantRole(actor, role);
   }
-  return { role: input.role, customRoles };
+  return input.role === undefined ? { customRoles } : { role: input.role, customRoles };
 }

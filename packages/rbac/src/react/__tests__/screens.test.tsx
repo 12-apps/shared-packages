@@ -564,7 +564,7 @@ describe('the invite flow', () => {
     });
   });
 
-  it('sends the roles the inviter picked, base and custom together', async () => {
+  it('sends every role the inviter picked, two system roles and a custom one', async () => {
     const api = apiStub({
       teamContext: vi.fn(async () => ({
         customRolesByMember: [],
@@ -583,29 +583,36 @@ describe('the invite flow', () => {
     fireEvent.change(within(form).getByRole('textbox'), {
       target: { value: 'garcom@example.com' },
     });
-    // The base role is a SELECT — one value by construction, so an invite can
-    // never name zero or two system roles the way the edit dialog can.
-    const select = screen.getByTestId('total-form-field-role');
-    fireEvent.mouseDown(within(select).getByRole('combobox'));
-    // The demo catalog's own word for CLERK, spelled out rather than resolved
-    // through the shared `LABELS` — the picker renders a LABEL and posts an id,
-    // and a test that derived the label from the same map would pass even if
-    // the two came apart.
-    const clerk = 'Atendente de balcão';
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: clerk })).toBeTruthy();
-    });
-    fireEvent.click(screen.getByRole('option', { name: clerk }));
-    // ...and the tenant's own roles ride on top, from `teamContext`.
+    // One checklist over EVERY role: the default (BRANCH_LEAD) stays ticked,
+    // a second system role joins it, and the tenant's own role rides along —
+    // person × role × tenant is N×M×J, so an invite may carry them all.
+    fireEvent.click(screen.getByTestId('invite-role-opt-CLERK'));
     fireEvent.click(screen.getByTestId('invite-role-opt-Voluntário'));
     fireEvent.submit(form);
 
     await waitFor(() => {
       expect(api.inviteMember).toHaveBeenCalledWith('garcom@example.com', {
-        role: 'CLERK',
-        customRoles: ['Voluntário'],
+        role: 'BRANCH_LEAD',
+        customRoles: ['CLERK', 'Voluntário'],
       });
     });
+  });
+
+  it('refuses an invite with no role ticked, on screen', async () => {
+    const api = apiStub();
+    mountTeam(api, ['team:manage']);
+    fireEvent.click(await screen.findByTestId('add-admin-button'));
+    const form = await screen.findByTestId('invite-form');
+    fireEvent.change(within(form).getByRole('textbox'), {
+      target: { value: 'ninguem@example.com' },
+    });
+    fireEvent.click(screen.getByTestId('invite-role-opt-BRANCH_LEAD'));
+    await waitFor(() => {
+      expect(screen.getByTestId('invite-no-role')).toBeTruthy();
+    });
+    fireEvent.submit(form);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(api.inviteMember).not.toHaveBeenCalled();
   });
 
   it('says nothing extra when the grant landed immediately', async () => {
