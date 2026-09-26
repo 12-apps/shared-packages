@@ -164,11 +164,8 @@ export const FormInteraction: Story = {
       { timeout: 3000 },
     );
 
-    // Check if tutorial appears - be more lenient
-    const tutorialText = body.queryByText('Fill Input');
-    if (tutorialText) {
-      expect(tutorialText).toBeInTheDocument();
-    }
+    // The tutorial's first step is portaled once its target resolves.
+    expect(await body.findByText('Fill Input', {}, { timeout: 3000 })).toBeInTheDocument();
 
     // Interact with the targeted input
     const input = canvas.getByLabelText('Test Input');
