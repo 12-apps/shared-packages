@@ -21,7 +21,8 @@ type LazyImageDefaultedKeys =
   | 'skeletonProps'
   | 'spinnerProps'
   | 'sx'
-  | 'role';
+  | 'role'
+  | 'data-testid';
 
 export type ResolvedLazyImageProps = LazyImageProps &
   Required<Pick<LazyImageProps, LazyImageDefaultedKeys>>;
@@ -43,6 +44,10 @@ const LAZY_IMAGE_DEFAULTS: Pick<LazyImageProps, LazyImageDefaultedKeys> = {
   spinnerProps: {},
   sx: {},
   role: 'img',
+  // FUT-2774 #3: with no default, every derived id (`${testId}-img`, …) read
+  // literally as `"undefined-img"` for a caller that omitted it — and every
+  // such instance on a page collided on the same ids.
+  'data-testid': 'lazy-image',
 };
 
 // Strips explicitly-undefined props before the merge, so `lazy={undefined}` still
@@ -141,13 +146,25 @@ const usePlaceholderPhase = (
   props: ResolvedLazyImageProps,
   loadingState: NonNullable<LazyImageProps['loadingState']>,
 ) => {
-  const { placeholder, fadeIn, fadeInDuration } = props;
+  const { placeholder, fadeIn, fadeInDuration, src } = props;
   // Only this mode draws a placeholder. Otherwise the real image settling
   // retires the phase at once — batched into the load's own render, with no
   // timer — so a placeholder switched on afterwards never covers a loaded image.
   const active = loadingState === 'placeholder' && Boolean(placeholder);
   const [retired, setRetired] = useState(false);
   const fadeTimeoutRef = useTimeoutRef();
+
+  // FUT-2774 #2: `retired` was set once and never reset, and this hook took
+  // no `src` at all — so a mounted instance reused for a NEW image (a
+  // carousel swapping `src` rather than remounting) never showed the
+  // placeholder again for it. Reset on every `src` change, the same way
+  // `useImageSource` already resets `currentSrc`/`isLoading`/`hasError`; drop
+  // any fade timer left over from the PREVIOUS image, or it would retire the
+  // new placeholder on a schedule that has nothing to do with it.
+  useEffect(() => {
+    clearTimeout(fadeTimeoutRef.current);
+    setRetired(false);
+  }, [src, fadeTimeoutRef]);
 
   const retire = useCallback(() => setRetired(true), []);
 
@@ -186,23 +203,49 @@ const useImageSource = (
     retryCount: 0,
     currentSrc: lazy ? null : src,
   });
+  // FUT-2774 #1: the last `src` PROP this hook has already requested — as
+  // opposed to `state.currentSrc`, which a retry deliberately diverges from
+  // `src` (its cache-busting query string) without a NEW image having
+  // arrived. Comparing the effect's guard against `src` itself let a retry's
+  // own state update immediately retrigger this effect, which overwrote the
+  // cache-busted value back to the plain `src` before the browser ever
+  // re-requested it — so `retryOnError` silently never re-fetched anything.
+  const requestedSrcRef = useRef<string | null>(lazy ? null : src);
+  // `handleImageError` (in `useLazyImage`) owns the retry timer itself, but
+  // it schedules against THIS src's identity: read together, the two hooks
+  // can tell a timeout meant for an image that is no longer the current one
+  // apart from one that still is (FUT-2774, src-changing-mid-retry).
+  const retryTimeoutRef = useTimeoutRef();
 
-  const markVisible = useCallback(
-    () => setState((prev) => ({ ...prev, isVisible: true, currentSrc: src })),
-    [src],
-  );
+  const markVisible = useCallback(() => {
+    requestedSrcRef.current = src;
+    setState((prev) => ({ ...prev, isVisible: true, currentSrc: src }));
+  }, [src]);
   useVisibility(props, containerRef, state.isVisible, markVisible);
 
-  // Load image when it becomes visible
+  // Load image when it becomes visible, or when `src` itself changes to a
+  // genuinely new value — never when only `state.currentSrc` has (a retry).
   useEffect(() => {
-    if (!state.isVisible || !src || state.currentSrc === src) {
+    if (!state.isVisible || !src || requestedSrcRef.current === src) {
       return;
     }
 
-    setState((prev) => ({ ...prev, currentSrc: src, isLoading: true, hasError: false }));
-  }, [state.isVisible, src, state.currentSrc]);
+    // A retry scheduled for the PREVIOUS src must not land on this one: left
+    // pending, its stale `setTimeout` would fire later and overwrite this
+    // fresh `currentSrc` with `${oldSrc}?retry=N` — cache-busting an image
+    // nothing asked for again, and never re-syncing back (FUT-2774).
+    clearTimeout(retryTimeoutRef.current);
+    requestedSrcRef.current = src;
+    setState((prev) => ({
+      ...prev,
+      currentSrc: src,
+      isLoading: true,
+      hasError: false,
+      retryCount: 0,
+    }));
+  }, [state.isVisible, src, retryTimeoutRef]);
 
-  return [state, setState] as const;
+  return { state, setState, requestedSrcRef, retryTimeoutRef };
 };
 
 /**
@@ -215,8 +258,7 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
   const { onLoad, onError, retryOnError, maxRetries, retryDelay } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const retryTimeoutRef = useTimeoutRef();
-  const [state, setState] = useImageSource(props, containerRef);
+  const { state, setState, requestedSrcRef, retryTimeoutRef } = useImageSource(props, containerRef);
 
   // Handle deprecated showSpinner prop
   const effectiveLoadingState = showSpinner ? 'spinner' : loadingState;
@@ -244,6 +286,13 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
       }
 
       retryTimeoutRef.current = setTimeout(() => {
+        // Belt and suspenders alongside `useImageSource`'s own cancel-on-src-
+        // change: if `src` moved on since this timeout was scheduled, this
+        // retry is for an image that is no longer live at all — applying it
+        // would cache-bust the WRONG `<img>` (FUT-2774).
+        if (requestedSrcRef.current !== src) {
+          return;
+        }
         setState((prev) => ({
           ...prev,
           retryCount: prev.retryCount + 1,
@@ -251,7 +300,7 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
         }));
       }, retryDelay);
     },
-    [onError, retryOnError, state.retryCount, maxRetries, retryDelay, src, retirePlaceholder],
+    [onError, retryOnError, state.retryCount, maxRetries, retryDelay, src, retirePlaceholder, requestedSrcRef, retryTimeoutRef],
   );
 
   return {

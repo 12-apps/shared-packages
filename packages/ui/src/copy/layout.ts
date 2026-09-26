@@ -16,3 +16,32 @@ export interface TableFilterCopy {
   rangeMin: string;
   rangeMax: string;
 }
+
+/**
+ * The chrome words of an editable `SettingCard`. The card's own title, summary
+ * and status are per-card props; these are the words every card repeats.
+ */
+export interface SettingCardCopy {
+  /** The closed card's trigger. Its accessible name also carries the card's title. */
+  edit: string;
+  /** Discard the draft and close. */
+  cancel: string;
+  save: string;
+  /** Announced (and shown to sighted users as the Save label) while the save is pending. */
+  saving: string;
+  /** The disclosure that reveals the card's longer explanation. */
+  learnMore: string;
+  /** Shown when the save rejected and the host's `formatError` gave no sentence of its own. */
+  saveFailed: string;
+}
+
+/**
+ * What a switch that saves the moment it flips says about that save — shared
+ * by `SettingToggle` and `SettingGroup`'s main switch.
+ */
+export interface SettingSwitchCopy {
+  /** Announced while the flip is being saved. */
+  saving: string;
+  /** Shown when the save rejected and the host's `formatError` gave no sentence of its own. */
+  saveFailed: string;
+}

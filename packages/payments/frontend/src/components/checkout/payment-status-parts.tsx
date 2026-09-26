@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 
 import { CheckCircleOutlineIcon, ErrorOutlineIcon, ScheduleIcon } from "./icons";
 import type { CheckoutDecline } from "./decline";
@@ -120,17 +120,27 @@ function failedOutcome(copy: PaymentStatusCopy, decline: CheckoutDecline | null)
   return (reason ? copy.declined?.[reason] : undefined) ?? copy.failed;
 }
 
-/** The headline block: icon, outcome, and one supporting line. */
+/**
+ * The headline block: icon, outcome, and one supporting line.
+ *
+ * `hero` replaces the PAID icon with the host's own illustration — a store's
+ * mascot celebrating the order, say — and only the icon: the heading and the
+ * support line stay the package's. Every other status keeps its icon, because
+ * a host celebrating a payment that failed would be telling the buyer the
+ * opposite of what happened.
+ */
 export function OutcomeHero({
   copy,
   status,
   wait,
   decline,
+  hero,
 }: {
   copy: PaymentStatusCopy;
   status: OrderStatus;
   wait: WaitState;
   decline: CheckoutDecline | null;
+  hero?: ReactNode;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const face = status === "AWAITING_PAYMENT" ? awaitingFace(copy, wait) : null;
@@ -154,7 +164,13 @@ export function OutcomeHero({
       }
       sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, textAlign: "center" }}
     >
-      <Box sx={{ color: TONE_COLOR[visual.tone], display: "flex" }}>{visual.icon}</Box>
+      {status === "PAID" && hero ? (
+        <Box data-testid="payment-paid-hero" sx={{ display: "flex" }}>
+          {hero}
+        </Box>
+      ) : (
+        <Box sx={{ color: TONE_COLOR[visual.tone], display: "flex" }}>{visual.icon}</Box>
+      )}
       <Text variant="heading" size="md" weight="bold" as="h2">
         {outcome.heading}
       </Text>

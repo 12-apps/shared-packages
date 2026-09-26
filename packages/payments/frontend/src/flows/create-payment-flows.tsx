@@ -106,6 +106,7 @@ function buildCheckout(
         providerConfig={config}
         tenantSlug={tenantSlug}
         confirmationExtra={runtime.config.confirmation?.extra}
+        confirmationHero={runtime.config.confirmation?.hero}
         validateApplePayMerchant={ports.validateApplePayMerchant}
       />
     );

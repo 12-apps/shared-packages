@@ -626,6 +626,7 @@ order CREATION never enter the package; they arrive as explicit props:
 | `providerConfig` | no | the `GET /api/checkout/config` answer (`fetchCheckoutConfig` is exported); `null` while loading degrades safely |
 | `tenantSlug` | no | scopes the saved-card list to the store being paid |
 | `confirmationExtra` | no | host content on the PAID confirmation, ABOVE the action row — put what the buyer has to DO next here, beside the way out |
+| `confirmationHero` | no | an illustration that REPLACES the PAID confirmation's icon (the storefront's mascot on a buyer's first order) — pass it only when there is one, and mark it `aria-hidden`: the heading beside it carries the meaning |
 | `confirmationFooter` | no | host content on the PAID confirmation, BELOW the action row — put what is merely OFFERED here (an install invite, an ask to turn alerts on), so a panel never lands between two controls |
 | `backActionEmphasis` | no | `"secondary"` when the host renders its own lead action in `confirmationExtra`, so the flow's "back to the menu" stands down instead of being a second primary. Read on PAID only; defaults to `"primary"` |
 | `oneClick` | no | the buyer pressed a BUY button rather than opening a checkout — pay with their saved card and land on Confirmação with no tap (see below) |

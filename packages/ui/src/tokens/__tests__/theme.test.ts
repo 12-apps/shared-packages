@@ -124,6 +124,12 @@ describe('createUiTheme derives the palette MUI derives', () => {
     expect(built.radius.lg).toBe(8);
   });
 
+  it('unset density is normal, factor 1 — today\'s spacingUnit/fieldHeight literals, byte-for-byte (FUT-2765)', () => {
+    expect(createUiTheme().density).toEqual({ level: 'normal', factor: 1 });
+    // `spacingUnit`/`fieldHeight` above already pin the NUMBERS; this pins the
+    // reported density that now derives them.
+  });
+
   it('draws every field with one radius, 8 unless the host picks another', () => {
     expect(createUiTheme().radius.field).toBe(DEFAULT_FIELD_RADIUS);
     expect(DEFAULT_FIELD_RADIUS).toBe(8);

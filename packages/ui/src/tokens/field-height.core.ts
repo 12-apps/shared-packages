@@ -44,9 +44,14 @@ export const FIELD_HEIGHT_SCALE: Record<SizeValue, number> = {
   xl: 1.4,
 };
 
-/** A usable standard height: the given one when it is a positive number, the default otherwise. */
-export function resolveFieldHeight(height: unknown): number {
-  return typeof height === 'number' && Number.isFinite(height) && height > 0 ? height : DEFAULT_FIELD_HEIGHT;
+/**
+ * A usable standard height: the given one when it is a positive number, a
+ * caller's own `fallback` otherwise — {@link DEFAULT_FIELD_HEIGHT} unless a
+ * density factor (`./density.core`) already worked out a denser or roomier
+ * one to fall back to instead.
+ */
+export function resolveFieldHeight(height: unknown, fallback: number = DEFAULT_FIELD_HEIGHT): number {
+  return typeof height === 'number' && Number.isFinite(height) && height > 0 ? height : fallback;
 }
 
 /** A field's height for a size, in multiples of the default font size (`rem`). */
