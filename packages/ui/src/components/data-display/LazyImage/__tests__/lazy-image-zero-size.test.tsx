@@ -1,5 +1,5 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
 
@@ -61,5 +61,35 @@ describe('LazyImage zero and empty sizes (FUT-2669)', () => {
     expect(styleOf('pic').height).toBe('auto');
     expect(styleOf('pic-skeleton').height).toBe('auto');
     expect(styleOf('pic-img').height).toBe('auto');
+  });
+
+  // FUT-2774 #4: `metrics` (the real `<img>`) and `ErrorFallback`'s ReactNode
+  // branch read width/height unguarded — an explicit empty string reached
+  // `sx` as `''`, which reads as `0%` (this same FUT-2669 bug, missed on two
+  // more elements). `emptyToUnset` normalizes it to "as if unset" instead.
+  it('treats an empty width on the image as unset (no explicit style width), not 0%', () => {
+    renderImage({ width: '' });
+    expect(styleOf('pic-img').width).toBe('');
+  });
+
+  it('treats an empty height on the image as auto, not 0%', () => {
+    renderImage({ width: 100, height: '' });
+    expect(styleOf('pic-img').height).toBe('auto');
+  });
+
+  it('treats an empty width on a ReactNode fallback as unset, not 0%', () => {
+    renderImage({ width: '', fallback: <span>sem foto</span> });
+    fireEvent.error(screen.getByTestId('pic-img'));
+    // `sx.width` is omitted (as it would be if `width` were never passed at
+    // all), so `FallbackContainer`'s OWN base CSS (`width: '100%'`, filling
+    // its absolutely-positioned parent) governs — not `''`, which `sx` would
+    // have read as `0%`.
+    expect(styleOf('pic-fallback').width).toBe('100%');
+  });
+
+  it('treats an empty height on a ReactNode fallback as auto, not 0%', () => {
+    renderImage({ width: 100, height: '', fallback: <span>sem foto</span> });
+    fireEvent.error(screen.getByTestId('pic-img'));
+    expect(styleOf('pic-fallback').height).toBe('auto');
   });
 });

@@ -33,7 +33,22 @@ export {
   fieldHeightRem,
   fieldOverrides,
   fieldTextFieldStyles,
+  mergeMuiComponents,
 } from './field-height';
+// The theme's density knob (FUT-2764): the factor table, the resolver, the
+// per-repository override and the standalone entry for a host that builds
+// `createTheme()` directly. `DensityLevel`/`ResolvedDensity` are already
+// exported above, through `./theme`.
+export {
+  DEFAULT_DENSITY,
+  DENSITY_FACTOR,
+  densityFieldHeight,
+  densityFontSize,
+  densitySpacingUnit,
+  densityThemeOptions,
+  resolveDensityFactor,
+  useDensity,
+} from './density';
 
 export interface Accent {
   main: string;
