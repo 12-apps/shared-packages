@@ -9,6 +9,7 @@
     "./locales": "./src/locales.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/web": "./src/manifest/web.ts",
+    "./tender-split": "./src/tender-split/index.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
