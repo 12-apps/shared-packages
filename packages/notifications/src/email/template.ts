@@ -319,11 +319,12 @@ function styleBlock(): string {
  * the style: Outlook reads the first, everything else the second.
  */
 function heroImage(hero: EmailHero): string[] {
-  if (!/^https:\/\//.test(hero.src)) return [];
+  if (!/^https:\/\//i.test(hero.src.trim())) return [];
   const width = Math.round(hero.width);
   const height = Math.round(hero.height ?? hero.width);
+  if (!(width > 0) || !(height > 0)) return [];
   return [
-    `<div style="margin:0 0 16px;text-align:center"><img src="${escapeHtml(hero.src)}" alt="${escapeHtml(hero.alt)}" width="${width}" height="${height}" style="display:inline-block;width:${width}px;height:${height}px;border:0;outline:none;text-decoration:none" /></div>`,
+    `<div style="margin:0 0 16px;text-align:center"><img src="${escapeHtml(hero.src.trim())}" alt="${escapeHtml(hero.alt)}" width="${width}" height="${height}" style="display:inline-block;width:${width}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none" /></div>`,
   ];
 }
 

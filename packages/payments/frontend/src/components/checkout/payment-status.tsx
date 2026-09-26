@@ -60,6 +60,10 @@ interface PaymentStatusProps {
    * Host content that REPLACES the PAID icon at the top of the screen — the
    * storefront's mascot celebrating a buyer's first order or birthday. Absent,
    * the screen is exactly what it was. Never shown on any other status.
+   *
+   * Pass it only when there is something to show (`cond ? <Mascot /> : undefined`):
+   * an element that renders nothing still replaces the icon. It is decorative —
+   * the heading beside it says what happened — so mark it `aria-hidden`.
    */
   paidHero?: ReactNode;
   /**

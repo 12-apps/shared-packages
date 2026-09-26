@@ -9,7 +9,7 @@
  * opposite of what happened — and a host that passes nothing gets the screen
  * exactly as it was.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentStatus } from "../payment-status";
@@ -41,16 +41,17 @@ describe("the paid confirmation's hero", () => {
     );
   });
 
-  it.each(["FAILED", "EXPIRED"] as const)("never shows it on %s", (status) => {
+  it.each(["FAILED", "EXPIRED", "AWAITING_PAYMENT"] as const)("never shows it on %s", async (status) => {
     renderStatus(status, true);
 
-    expect(screen.queryByTestId("host-mascot")).toBeNull();
+    expect(screen.getByTestId("payment-status")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("host-mascot")).toBeNull());
   });
 
-  it("leaves the screen as it was when the host passes nothing", () => {
+  it("leaves the screen as it was when the host passes nothing", async () => {
     renderStatus("PAID");
 
-    expect(screen.queryByTestId("payment-paid-hero")).toBeNull();
     expect(screen.getByTestId("payment-paid").querySelector("svg")).not.toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("payment-paid-hero")).toBeNull());
   });
 });

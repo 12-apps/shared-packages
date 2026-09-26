@@ -195,6 +195,10 @@ describe('the hero image', () => {
     },
   );
 
+  it.each([0, -8, Number.NaN])('drops a hero whose width cannot be drawn: %s', (width) => {
+    expect(renderEmailHtml(documentOf({ hero: { ...hero, width } }))).not.toContain('<img');
+  });
+
   it('leaves the layout exactly as it was without one', () => {
     expect(renderEmailHtml(documentOf({ hero: undefined }))).toBe(renderEmailHtml(documentOf()));
     expect(renderEmailHtml(documentOf())).not.toContain('<img');

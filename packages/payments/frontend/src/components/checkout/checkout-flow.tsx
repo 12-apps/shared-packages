@@ -95,7 +95,10 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** Host content shown on the paid confirmation (the storefront's install invite). */
   confirmationExtra?: ReactNode;
-  /** Host illustration that replaces the paid confirmation's icon — `PaymentStatusProps.paidHero`. */
+  /**
+   * Host illustration that replaces the paid confirmation's icon —
+   * `PaymentStatusProps.paidHero`: pass it only when there is one, and mark it `aria-hidden`.
+   */
   confirmationHero?: ReactNode;
   /** Host content shown AFTER the confirmation's actions — `PaymentStatusProps.paidFooter`. */
   confirmationFooter?: ReactNode;
