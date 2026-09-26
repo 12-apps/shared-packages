@@ -318,12 +318,17 @@ export const ScreenReaderTest: Story = {
 // 4. Focus Management Test
 export const FocusManagement: Story = {
   /*
+   * On open, the web `Dialog` moves focus to the first tabbable descendant of
+   * the `role="dialog"` paper — or the paper itself when it holds nothing
+   * focusable — never to `.MuiDialog-container`, which wraps and so sits
+   * OUTSIDE it (FUT-2696; see `Dialog.focus.ts`).
+   *
    * Tried un-skipped and measured: react-native-web's `Modal` does trap and
    * restore focus, but on open the focused node is NOT inside the element
    * carrying `role="dialog"` — the trap's sentinels and the focused content
    * wrapper sit outside it, so `modal.contains(document.activeElement)` is
-   * false there and true on the web, where MUI focuses inside its own paper.
-   * The whole story hangs off that containment, so it stays web-only.
+   * false there. The whole story hangs off that containment, so it stays
+   * web-only.
    */
   tags: ['native-skip'],
   name: '🎯 Focus Management Test',
@@ -369,20 +374,10 @@ export const FocusManagement: Story = {
       });
 
       // Opening the dialog moves focus off the page behind it and into the
-      // modal. MUI parks that initial focus on `.MuiDialog-container`, which
-      // wraps — and so is OUTSIDE — the `[role="dialog"]` paper, hence the
-      // assertion is on the modal root.
-      //
-      // Two things were wrong here: the callback was a non-async arrow
-      // containing `await`, a syntax error that failed the whole Storybook
-      // build; and `expect(document.activeElement).toBeTruthy()` asserted
-      // nothing, since activeElement falls back to <body> and is never null.
+      // dialog itself — the element carrying `role="dialog"`, not MUI's
+      // `.MuiDialog-container` wrapper around it (FUT-2696).
       await waitFor(() => {
         expect(within(document.body).getByTestId('first-modal-element')).toBeInTheDocument();
-        // The dialog itself, not MUI's `.MuiModal-root` wrapper: both renderers
-        // put `role="dialog"` on something, and focus belongs inside it either
-        // way. react-native-web's `Modal` traps and restores focus just as
-        // MUI's does, so the rest of this story is not DOM-only.
         const modal = document.querySelector('[role="dialog"]');
         expect(modal).toBeInTheDocument();
         expect(modal?.contains(document.activeElement)).toBe(true);
