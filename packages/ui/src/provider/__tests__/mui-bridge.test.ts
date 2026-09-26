@@ -11,6 +11,7 @@ const comparable = (theme: ReturnType<typeof createUiTheme>) => ({
   spacingUnit: theme.spacingUnit,
   radius: theme.radius,
   fieldHeight: theme.fieldHeight,
+  density: theme.density,
   heading: theme.typography.heading,
   zIndex: theme.zIndex,
 });
@@ -66,6 +67,29 @@ describe('the MUI bridge', () => {
 
   it('defaults the web font stack when the UiTheme names none', () => {
     const options = muiThemeOptionsFrom(createUiTheme());
-    expect(options.typography).toEqual({ fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif' });
+    expect(options.typography).toEqual({
+      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      fontSize: 14,
+    });
+  });
+
+  it(
+    'FUT-2765: normal/unset is a true no-op end to end, not just at the resolver — ' +
+      "today has no `fontSize` key at all; MUI's own default is 14, so omitting the key " +
+      'and setting it to 14 render identically',
+    () => {
+      const options = muiThemeOptionsFrom(createUiTheme());
+      expect(options.spacing).toBe(8);
+
+      const built = createTheme(options);
+      const bare = createTheme(); // MUI's own bare defaults, no `fontSize` option at all
+      expect(built.typography.fontSize).toBe(bare.typography.fontSize);
+      expect(built.typography.pxToRem(14)).toBe(bare.typography.pxToRem(14));
+      expect(built.spacing(3)).toBe(bare.spacing(3));
+    },
+  );
+
+  it('reads back a normal/unset density as { level: "normal", factor: 1 } from a bare MUI theme', () => {
+    expect(uiThemeFromMui(createTheme()).density).toEqual({ level: 'normal', factor: 1 });
   });
 });
