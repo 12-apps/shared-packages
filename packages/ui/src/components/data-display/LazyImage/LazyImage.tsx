@@ -88,6 +88,18 @@ const innerLength = (theme: Theme, value: Length): string | undefined =>
 const orDefault = (value: Length, fallback: number | string): number | string =>
   value === undefined || value === '' ? fallback : value;
 
+/**
+ * A width/height as `metrics` and the `ReactNode` `ErrorFallback` read it
+ * (FUT-2774 #4): an explicit empty string is normalized to "as if unset"
+ * rather than mapped to a component-wide default. Unlike `SkeletonIndicator`
+ * (a content-less box with nothing else to size by, hence its own deliberate
+ * `'100%'`/`'auto'` fallback), these draw the real image or a `ReactNode`
+ * fallback — both have their own intrinsic size, so leaving an unset width
+ * unset lets it size naturally (`brand-link.tsx`'s logo relies on exactly
+ * this: an unset width capped by its own `sx.maxWidth`).
+ */
+const emptyToUnset = (value: Length): Length => (value === '' ? undefined : value);
+
 /** The box the image occupies, as CSS, shared by the real image and every stand-in for it. */
 interface BoxMetrics {
   width?: string;
@@ -106,10 +118,14 @@ const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
   const theme = useTheme();
   return (
     <Skeleton
-      variant="rectangular"
+      // FUT-2774 #5: `skeletonProps.variant` was typed but never read — the
+      // variant was hard-coded regardless of what a caller passed.
+      variant={props.skeletonProps.variant ?? 'rectangular'}
       width={innerLength(theme, orDefault(props.width, '100%'))}
       height={innerLength(theme, orDefault(props.height, 'auto'))}
-      animation={props.skeletonProps.animation || 'pulse'}
+      // FUT-2774 #5: `||` reads a caller's `false` the same as "unset", so
+      // `skeletonProps.animation={false}` could never turn the animation off.
+      animation={props.skeletonProps.animation ?? 'pulse'}
       intensity={props.skeletonProps.intensity}
       borderRadius={styleLength(theme, props.borderRadius)}
       data-testid={`${props['data-testid']}-skeleton`}
@@ -124,8 +140,11 @@ const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
   return (
     <SpinnerOverlay>
       <CircularProgress
-        size={styleLength(theme, spinnerProps.size || 40)}
-        thickness={spinnerProps.thickness || 4}
+        // FUT-2774 #5: `||` read `spinnerProps.size`/`thickness` of `0` the
+        // same as unset — the same class of bug FUT-2669 fixed for
+        // `width`/`height`, missed here.
+        size={styleLength(theme, spinnerProps.size ?? 40)}
+        thickness={spinnerProps.thickness ?? 4}
         sx={{ color: spinnerProps.color || theme.palette.primary.main }}
         data-testid={`${props['data-testid']}-spinner`}
       />
@@ -209,8 +228,12 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
   return (
     <FallbackContainer
       sx={{
-        width: innerLength(theme, width),
-        height: innerLength(theme, height),
+        // FUT-2774 #4 (see `emptyToUnset`). Does NOT change the confirmed
+        // height collapse — `ImageContainer`'s own height was already `'auto'`
+        // either way; see `LazyImage.test.stories.tsx` for that separate,
+        // unresolved defect.
+        width: innerLength(theme, emptyToUnset(width)),
+        height: innerLength(theme, orDefault(height, 'auto')),
         borderRadius: styleLength(theme, borderRadius),
       }}
       data-testid={`${testId}-fallback`}
@@ -242,8 +265,11 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
   const { width, height, borderRadius, alt } = props;
   const testId = props['data-testid'];
   const metrics: BoxMetrics = {
-    width: innerLength(theme, width),
-    height: innerLength(theme, height),
+    // FUT-2774 #4 (see `emptyToUnset`): `metrics` also sizes the REAL `<img>`,
+    // where an unset width means "the image's own intrinsic size" —
+    // `brand-link.tsx`'s logo relies on exactly that.
+    width: innerLength(theme, emptyToUnset(width)),
+    height: innerLength(theme, orDefault(height, 'auto')),
     objectFit: props.objectFit,
     objectPosition: props.objectPosition,
     borderRadius: styleLength(theme, borderRadius),
