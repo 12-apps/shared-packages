@@ -1,10 +1,12 @@
 import Box from '@mui/material/Box/index.js';
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
+import { resolveDensityFactor } from '../../../tokens/density';
 import { Table } from './Table';
 import type { ColumnConfig } from './Table.types';
 
@@ -581,5 +583,36 @@ export const HeaderResizeRepaints: Story = {
       },
       { timeout: 2000 },
     );
+  },
+};
+
+// 13. Theme-driven density default (FUT-2769): `TableDensity` is a verbatim
+// match for the theme's `DensityLevel`, so with no explicit `density` prop the
+// theme's own compact level becomes the table's default — no alias table.
+export const ThemeDensityDefault: Story = {
+  name: 'Test: Theme-driven density default',
+  render: () => (
+    <ThemeProvider theme={createTheme({ density: resolveDensityFactor('compact') })}>
+      <Box width={600}>
+        <Table
+          data-testid="theme-density-table"
+          columns={basicColumns}
+          data={testData}
+          emptyText="Nenhum dado"
+        />
+      </Box>
+    </ThemeProvider>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("Renders the theme's compact rows with no density prop given", async () => {
+      const cell = canvas.getAllByRole('cell')[0]!;
+      // Compact's row height is 36 design px; today's unthemed default (52,
+      // 'normal') would fail this — see `table-density-theme-default.test.tsx`
+      // for the same proof against jsdom.
+      const height = Number.parseFloat(globalThis.getComputedStyle(cell).height);
+      await expect(height).toBeCloseTo(36, 0);
+    });
   },
 };

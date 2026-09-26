@@ -1,7 +1,9 @@
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { PT_BR_DATA_GRID_COPY, PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
+import { resolveDensityFactor } from '../../../tokens/density';
 import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
 
@@ -668,6 +670,53 @@ export const IntegrationTest: Story = {
       expect(checkboxes[1]).toBeChecked();
       expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
       expect(canvas.getByText('Expanded: User 1')).toBeInTheDocument();
+    });
+  },
+};
+
+// A row type that satisfies `DataGrid`'s own `T extends Record<string, unknown>`
+// (unlike `TestRow`, which `Meta<typeof DataGrid>` already widens for every
+// OTHER story here through `args` — a pre-existing, grandfathered mismatch,
+// `.ui-stories-types-exceptions.json`, FUT-2699's ratchet). That ratchet only
+// SHRINKS, so this story is rendered explicitly, `<DataGrid<ThemeDensityRow>
+// .../>`, against the real generic component instead of through `args`.
+interface ThemeDensityRow extends Record<string, unknown> {
+  id: number;
+  name: string;
+}
+
+const themeDensityRows: ThemeDensityRow[] = [
+  { id: 1, name: 'Ana' },
+  { id: 2, name: 'Bruno' },
+];
+
+const themeDensityColumns: GridColumn<ThemeDensityRow>[] = [
+  { id: 'id', header: 'ID', accessor: 'id', type: 'number' },
+  { id: 'name', header: 'Name', accessor: 'name', type: 'text' },
+];
+
+// 18. Theme-driven density default (FUT-2769): with no explicit `density`
+// prop, the theme's own level picks the grid's default through the alias
+// table (`mapThemeToGridDensity`) — 'compact' theme level ⇒ 'compact' grid.
+export const ThemeDensityDefaultTest: Story = {
+  name: 'Test: Theme-driven density default',
+  render: () => (
+    <ThemeProvider theme={createTheme({ density: resolveDensityFactor('compact') })}>
+      <DataGrid<ThemeDensityRow>
+        rows={themeDensityRows}
+        columns={themeDensityColumns}
+        ariaLabel="Theme-densitied data grid"
+        emptyText={PT_BR_DATA_STATE_COPY.empty}
+        copy={PT_BR_DATA_GRID_COPY}
+      />
+    </ThemeProvider>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Should default to the theme-mapped density with no density prop', async () => {
+      const grid = canvas.getByRole('grid');
+      expect(grid).toHaveAttribute('data-density', 'compact');
     });
   },
 };

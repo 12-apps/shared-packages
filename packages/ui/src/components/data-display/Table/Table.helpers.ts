@@ -3,8 +3,9 @@ import type { Theme } from '@mui/material/styles/index.js';
 import type React from 'react';
 
 import { rem } from '../../../tokens/relative';
+import type { DensityLevel } from '../../../tokens/density';
 
-import type { TableProps } from './Table.types';
+import type { TableDensity, TableProps } from './Table.types';
 
 /**
  * A virtualised row's height in design px: the caller's `rowHeight`, else 52.
@@ -12,6 +13,18 @@ import type { TableProps } from './Table.types';
  * where it is drawn (`rem`) and where the window is positioned with it (`remPx`).
  */
 export const tableRowHeight = (rowHeight: number | undefined): number => rowHeight ?? 52;
+
+/**
+ * `density`'s default (FUT-2769): the caller's own prop, else the theme's
+ * level — `'normal'` for a theme with no density at all (`useDensity()`'s own
+ * fallback) or an unnamed numeric one. `TableDensity` is a verbatim match for
+ * the theme's `DensityLevel`, so no alias table is needed, unlike `DataGrid`'s
+ * `mapThemeToGridDensity` or `DataViews`' `mapThemeToDataViewsDensity`.
+ */
+export const resolveTableDensity = (
+  explicit: TableDensity | undefined,
+  themeLevel: DensityLevel | undefined,
+): TableDensity => explicit ?? themeLevel ?? 'normal';
 
 /** The scroll box's height: a number is design px, 400 unless the caller says otherwise. */
 const scrollHeight = (theme: Theme, containerHeight: number | string | undefined): string => {
@@ -71,6 +84,12 @@ export const virtualHeight = (p: TableProps): number | undefined =>
     ? p.containerHeight
     : undefined;
 
+// `density` is NOT here (FUT-2769): `TableDensity` is a verbatim match for
+// the theme's `DensityLevel`, so `Table.tsx` resolves it itself —
+// `props.density ?? (useDensity().level ?? 'normal')` — reading the theme
+// requires a hook, which this module-level constant cannot call. At
+// `theme.density` unset, or its level `'normal'`, that reproduces this
+// object's OTHER defaults' shape exactly: today's literal `'normal'`.
 export const TABLE_DEFAULTS: Partial<TableProps> = {
   variant: 'default',
   stripeColor: 'neutral',
@@ -78,7 +97,6 @@ export const TABLE_DEFAULTS: Partial<TableProps> = {
   pulse: false,
   hoverable: false,
   loading: false,
-  density: 'normal',
   stickyHeader: false,
   selectable: false,
   selectedRows: [],

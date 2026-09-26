@@ -24,6 +24,7 @@ import {
   containerStyle,
   definedProps,
   headerRefFor,
+  resolveTableDensity,
   scrollerRadiusStyle,
   tableDomProps,
   tableRowHeight,
@@ -32,9 +33,9 @@ import {
 import { useTableSelection, useVirtualScrolling } from './Table.hooks';
 import { EnhancedTableBody, EnhancedTableHeader } from './TableParts';
 import { EmptyRow, NoDataPlaceholder } from './TableStates';
-import {
-  tableStyles } from './Table.styles';
+import { tableStyles } from './Table.styles';
 import { rem } from '../../../tokens/relative';
+import { useDensity } from '../../../tokens/density';
 
 // Helper function to get stripe color from theme
 const StyledTable = styled(MuiTable, {
@@ -329,7 +330,9 @@ const TableEmptyState: React.FC<{
 
 export const Table = React.forwardRef<globalThis.HTMLTableElement, TableProps>(
   (tableProps, ref) => {
+    const themeDensity = useDensity(); // FUT-2769 — density's default; see resolveTableDensity
     const resolved = { ...TABLE_DEFAULTS, ...definedProps(tableProps) } as TableProps;
+    resolved.density = resolveTableDensity(resolved.density, themeDensity.level);
     const {
       columns,
       data,

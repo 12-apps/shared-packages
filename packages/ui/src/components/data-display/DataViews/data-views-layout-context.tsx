@@ -7,6 +7,7 @@ import GridViewOutlinedIcon from "@mui/icons-material/GridViewOutlined";
 import { Slider } from "../../form/Slider";
 import { Box } from "../../../mui/Box";
 import { sxRem } from "../../../tokens/relative";
+import { useDensity, type DensityLevel } from "../../../tokens/density";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { DATA_VIEWS_LAYOUTS, type DataViewsLayout } from "./data-views-types";
@@ -166,6 +167,22 @@ function isDensity(value: unknown): value is DataViewsDensity {
   return DENSITIES.includes(value as DataViewsDensity);
 }
 
+/**
+ * The theme's density level, aliased to `DataViewsDensity` (FUT-2769 —
+ * umbrella Decision 7, non-breaking): `DataViewsDensity`'s three names are not
+ * the theme's three names, so this is an alias table rather than a verbatim
+ * read. `'normal'` (the theme's own default, and what a theme with no density
+ * at all resolves to) maps to `'cozy'` — today's literal default, unchanged —
+ * so the mapping is a no-op exactly when nothing about density has been said.
+ * The STORED per-viewer preference still wins over this default, unchanged
+ * from today (below).
+ */
+export function mapThemeToDataViewsDensity(level: DensityLevel): DataViewsDensity {
+  if (level === 'compact') return 'compact';
+  if (level === 'comfortable') return 'comfortable';
+  return 'cozy';
+}
+
 /** The remembered density, or undefined (no window, no value, junk). */
 function readStoredDensity(): DataViewsDensity | undefined {
   try {
@@ -258,6 +275,10 @@ export function DataViewsLayoutProvider({
   children,
 }: LayoutProviderProps): React.JSX.Element {
   const availability = { canUseCards, canUseList, canUseBoard };
+  // Read once, outside the lazy initializer below: a hook cannot be called
+  // from inside one (FUT-2769 — the theme is only a fallback when nothing is
+  // stored, same precedence as before this ticket).
+  const themeDensity = useDensity();
   const [layout, setLayoutState] = useState<DataViewsLayout>(() =>
     pinLayout(
       viewLayout ?? (ignoreStoredLayout ? undefined : readStoredLayout()) ?? defaultLayout,
@@ -265,7 +286,9 @@ export function DataViewsLayoutProvider({
     ),
   );
   const [density, setDensityState] = useState<DataViewsDensity>(
-    () => (ignoreStoredLayout ? undefined : readStoredDensity()) ?? "cozy",
+    () =>
+      (ignoreStoredLayout ? undefined : readStoredDensity()) ??
+      mapThemeToDataViewsDensity(themeDensity.level ?? "normal"),
   );
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   // A newly applied view carrying a layout switches to it (its reference-change
