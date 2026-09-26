@@ -4,7 +4,7 @@ import Box from '@mui/material/Box/index.js';
 import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useEffect, useRef, type RefObject } from 'react';
 
-import { watchVisitorScroll } from './SettingsSectionChips.scroll';
+import { physicalScrollLeft, toRawScrollLeft, watchVisitorScroll } from './SettingsSectionChips.scroll';
 import { SettingsStatusMarker } from './SettingsStatusMarker';
 import { TOUCH_TARGET } from './SettingsLayout.styles';
 import { rem, sxRem } from '../../../tokens/relative';
@@ -48,11 +48,20 @@ function prefersReducedMotion(): boolean {
  * it. The clamp hid that for the last chip; a middle one was simply off-centre.
  * The boxes are both in viewport coordinates, so their difference is the strip's
  * own, whatever the host wraps it in.
+ *
+ * Read and returned in PHYSICAL pixels (`physicalScrollLeft`, FUT-2775): the
+ * bounding-rect arithmetic above is already direction-blind, and an RTL
+ * scroller's raw `scrollLeft` is not — the CSSOM View spec has it `0` at the
+ * strip's right-hand start and NEGATIVE past it, not `0`-to-`scrollWidth` like
+ * an LTR one. `Math.max(0, …)` alone, against that raw value, would clamp every
+ * legitimate RTL target straight back to the start. Physical throughout keeps
+ * this comparable to {@link VisitorScrollWatch.aimedAt}; the caller converts to
+ * this engine's raw `scrollLeft` (`toRawScrollLeft`) only at the `scrollTo` call.
  */
 function centredScrollLeft(strip: HTMLElement, chip: HTMLElement): number {
   const chipBox = chip.getBoundingClientRect();
   const visibleStart = strip.getBoundingClientRect().left + strip.clientLeft;
-  const chipCentre = chipBox.left - visibleStart + strip.scrollLeft + chipBox.width / 2;
+  const chipCentre = chipBox.left - visibleStart + physicalScrollLeft(strip) + chipBox.width / 2;
   const target = chipCentre - strip.clientWidth / 2;
   return Math.max(0, Math.min(target, strip.scrollWidth - strip.clientWidth));
 }
@@ -122,13 +131,16 @@ function useCentreActiveChip(
       // Not while a scroll that may be the visitor's is still moving: a resize
       // mid-drag must not yank the strip. It is re-tried once that scroll rests.
       if (!chip || visitor.hasScrolled() || visitor.isUndecided()) return;
+      // Physical pixels throughout (FUT-2775) — comparable to `aimedAt()` and to
+      // what `beforeOwnScroll` records; converted to this engine's raw
+      // `scrollLeft` only for the actual `scrollTo` call below.
       const left = centredScrollLeft(strip, chip);
       // Only when the target MOVED: a resize that leaves it where it was must not
       // restart a smooth scroll that is already on its way there. The aim is a
       // runtime-computed scroll offset, like the exempt `left` below — not a size.
       if (Math.abs(left - visitor.aimedAt()) < 0.5) return;
       visitor.beforeOwnScroll(left);
-      strip.scrollTo({ left, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+      strip.scrollTo({ left: toRawScrollLeft(strip, left), behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
     };
     visitor.onSettled(centre);
     centre();
@@ -250,7 +262,15 @@ export function SettingsSectionChips({
         display: 'flex',
         alignItems: 'center',
         gap: 0.75,
-        px: 0.25,
+        // The start side keeps its old, symmetric 0.25 — nothing sits flush
+        // against it once scrolled. The END side is where a scrolled-to-end
+        // chip's own border used to sit almost against the clip boundary
+        // (FUT-2775): sized like the gap BETWEEN chips (`gap` above) rather
+        // than invented fresh, so the last chip clears the edge by the same
+        // margin any two chips clear each other. Logical, not `pr`: the side
+        // that gets clipped is the strip's END, whichever edge that is.
+        paddingInlineStart: 0.25,
+        paddingInlineEnd: 0.75,
         py: 0.25,
         overflowX: 'auto',
         overflowY: 'hidden',
