@@ -198,6 +198,19 @@ function commitSingleSelect<T>(item: T, p: AutocompleteProps<T>, s: Autocomplete
   onChange(label);
 }
 
+/** Apply a pick: open a link suggestion, or commit a search one to the input. */
+function commitPick<T>(
+  item: T,
+  linkUrl: string | null,
+  p: AutocompleteProps<T>,
+  s: AutocompleteState<T>,
+  onChange: (v: string) => void,
+): void {
+  if (linkUrl !== null) (p.openLink ?? defaultOpenLink)(linkUrl, item);
+  else if (p.multiple) commitMultiSelect(item, p, s, onChange);
+  else commitSingleSelect(item, p, s, onChange);
+}
+
 function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState<T>, onChange: (v: string) => void): void {
   const url = (p.getUrl ?? defaultGetUrl)(item);
   const isLink = (p.getSuggestionType ?? defaultGetSuggestionType)(item) === 'link' && Boolean(url);
@@ -206,13 +219,7 @@ function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState
   // commitMultiSelect already clears inputValue and resets the flag itself,
   // so the empty-input branch of the filter effect keeps the list closed.
   const isSingleSelectPick = isLink || !p.multiple;
-  if (isLink) {
-    (p.openLink ?? defaultOpenLink)(url as string, item);
-  } else if (p.multiple) {
-    commitMultiSelect(item, p, s, onChange);
-  } else {
-    commitSingleSelect(item, p, s, onChange);
-  }
+  commitPick(item, isLink ? (url as string) : null, p, s, onChange);
   s.setOpen(false);
   s.setActiveIndex(-1);
   p.onSelect?.(item);
