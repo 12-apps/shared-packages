@@ -24,6 +24,13 @@ import { ScrollArea } from './ScrollArea';
 const meta: Meta<typeof ScrollArea> = {
   title: 'Layout/ScrollArea/Tests',
   component: ScrollArea,
+  args: {
+    // Every ScrollArea mounts a ResizeObserver that calls onResize on mount
+    // (ScrollArea.tsx), so Storybook 9 treats it as an implicit action arg the
+    // moment any play function runs. An explicit spy here, once, covers every
+    // story in the file.
+    onResize: fn(),
+  },
   parameters: {
     layout: 'centered',
     chromatic: { disableSnapshot: false },

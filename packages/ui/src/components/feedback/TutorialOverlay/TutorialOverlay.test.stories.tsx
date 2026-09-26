@@ -89,8 +89,7 @@ export const BasicInteraction: Story = {
       </TestEnvironment>
     );
   },
-  play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+  play: async () => {
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -102,29 +101,20 @@ export const BasicInteraction: Story = {
       { timeout: 3000 },
     );
 
-    // Should show progress indicator
-    const progressElement = body.queryByText('1 of 2');
-    if (progressElement) {
-      expect(progressElement).toBeInTheDocument();
-    }
-
-    // Should show skip button when allowSkip is true
-    const skipButton = body.queryByText('Skip');
-    if (skipButton) {
-      expect(skipButton).toBeInTheDocument();
-    }
+    // Should show skip button when allowSkip is true, labelled from the copy
+    // pack (the component renders no plain-English fallback).
+    const skipButton = body.getByRole('button', { name: PT_BR_TUTORIAL_COPY.skip });
+    expect(skipButton).toBeInTheDocument();
 
     // Navigate to next step
-    const nextButton = body.queryByText('Next');
-    if (nextButton) {
-      await userEvent.click(nextButton);
-      await waitFor(
-        () => {
-          expect(body.getByText('Tutorial Step 2')).toBeInTheDocument();
-        },
-        { timeout: 3000 },
-      );
-    }
+    const nextButton = body.getByRole('button', { name: PT_BR_TUTORIAL_COPY.next });
+    await userEvent.click(nextButton);
+    await waitFor(
+      () => {
+        expect(body.getByText('Tutorial Step 2')).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   },
 };
 
@@ -162,7 +152,7 @@ export const FormInteraction: Story = {
     );
   },
   play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+    const canvas = within(canvasElement);
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -207,8 +197,7 @@ export const KeyboardNavigation: Story = {
       </TestEnvironment>
     );
   },
-  play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+  play: async () => {
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -252,8 +241,7 @@ export const ScreenReaderTest: Story = {
       />
     </TestEnvironment>
   ),
-  play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+  play: async () => {
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -295,7 +283,7 @@ export const FocusManagement: Story = {
     );
   },
   play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+    const canvas = within(canvasElement);
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -340,7 +328,7 @@ export const ResponsiveDesign: Story = {
     </TestEnvironment>
   ),
   play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+    const canvas = within(canvasElement);
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -374,8 +362,7 @@ export const ThemeVariations: Story = {
       />
     </TestEnvironment>
   ),
-  play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+  play: async () => {
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -428,7 +415,7 @@ export const VisualStates: Story = {
     );
   },
   play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+    const canvas = within(canvasElement);
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -471,8 +458,7 @@ export const PerformanceTest: Story = {
       </TestEnvironment>
     );
   },
-  play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+  play: async () => {
     // Tutorial is portaled to document.body
     const body = within(document.body);
     const startTime = window.performance.now();
@@ -538,7 +524,7 @@ export const EdgeCases: Story = {
     );
   },
   play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+    const canvas = within(canvasElement);
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -550,8 +536,13 @@ export const EdgeCases: Story = {
       expect(body.getByText('Single Step')).toBeInTheDocument();
     });
 
-    // Single step should not show "Next" button
-    await waitFor(() => expect(body.queryByText('Next')).not.toBeInTheDocument());
+    // A single-step tutorial shows the finish control, not a "Next" one —
+    // assert the finish button is there before asserting Next is absent, so
+    // this doesn't pass merely because neither button rendered.
+    await waitFor(() => expect(body.getByTestId('tutorial-finish-button')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(body.queryByRole('button', { name: PT_BR_TUTORIAL_COPY.next })).not.toBeInTheDocument(),
+    );
   },
 };
 
@@ -615,7 +606,7 @@ export const IntegrationTest: Story = {
     );
   },
   play: async ({ canvasElement }) => {
-    const _canvas = within(canvasElement);
+    const canvas = within(canvasElement);
     // Tutorial is portaled to document.body
     const body = within(document.body);
 
@@ -627,15 +618,18 @@ export const IntegrationTest: Story = {
       expect(body.getByText('Onboarding Step')).toBeInTheDocument();
     });
 
-    // Complete tutorial (single step uses "Complete" button)
-    const completeButton = body.queryByText('Complete');
-    if (completeButton) {
-      await userEvent.click(completeButton);
+    // Complete the tutorial by test id — its label is "Complete" or "Finish"
+    // in English today (TutorialStepBody.tsx), not the pt-BR pack, so the
+    // stable id is what survives that copy moving into the pack later.
+    const completeButton = body.getByTestId('tutorial-finish-button');
+    await userEvent.click(completeButton);
 
-      // Wait for tutorial to close
-      await waitFor(() => {
+    // Wait for tutorial to close
+    await waitFor(
+      () => {
         expect(body.queryByText('Onboarding Step')).not.toBeInTheDocument();
-      }, { timeout: 3000 });
-    }
+      },
+      { timeout: 3000 },
+    );
   },
 };
