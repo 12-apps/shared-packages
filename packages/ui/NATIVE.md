@@ -107,7 +107,7 @@ Ported: **27 of 142** public subpaths carry a `react-native` condition.
 | `@12-apps/ui/layout/Spacer` | 21 | 1 | — |
 | `@12-apps/ui/layout/Stack` | 6 | 0 | — |
 | `@12-apps/ui/provider` | 0 | 0 | — |
-| `@12-apps/ui/tokens` | 0 | 0 | — |
+| `@12-apps/ui/tokens` | 0 | 2 | — |
 | `@12-apps/ui/typography/Heading` | 26 | 1 | `gradient` paints the gradient's first stop as a flat colour: React Native has no `background-clip: text` and no gradient fill in core. A host wanting the real thing adds a masked-gradient library. |
 | `@12-apps/ui/typography/Paragraph` | 17 | 1 | — |
 | `@12-apps/ui/typography/Text` | 26 | 3 | — |
