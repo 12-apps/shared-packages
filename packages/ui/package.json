@@ -420,6 +420,10 @@
       "types": "./dist/types/components/form/Menubar/index.d.ts",
       "default": "./dist/form/Menubar.js"
     },
+    "./form/NumberField": {
+      "types": "./dist/types/components/form/NumberField/index.d.ts",
+      "default": "./dist/form/NumberField.js"
+    },
     "./form/PasswordStrength": {
       "types": "./dist/types/components/form/PasswordStrength/index.d.ts",
       "default": "./dist/form/PasswordStrength.js"
@@ -535,6 +539,10 @@
     "./layout/Separator": {
       "types": "./dist/types/components/layout/Separator/index.d.ts",
       "default": "./dist/layout/Separator.js"
+    },
+    "./layout/SettingCard": {
+      "types": "./dist/types/components/layout/SettingCard/index.d.ts",
+      "default": "./dist/layout/SettingCard.js"
     },
     "./layout/SettingsLayout": {
       "types": "./dist/types/components/layout/SettingsLayout/index.d.ts",

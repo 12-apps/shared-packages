@@ -98,6 +98,7 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     aboutTitle: 'Sobre a equipe',
     aboutBody:
       'Gerencie os administradores desta loja. Você pode convidar por e-mail mesmo quem ainda não tem conta — o acesso é atribuído automaticamente quando a pessoa se cadastra.',
+    exportAction: 'Exportar',
     inviteAction: 'Adicionar à equipe',
     inviteDialogTitle: 'Adicionar à equipe',
     inviteEmailLabel: 'E-mail da pessoa',

@@ -5,6 +5,7 @@
 import type { DataViewsCopy } from "./components/data-display/DataViews/data-views-copy";
 import type {
   CarouselCopy,
+  DataGridCopy,
   DataStateCopy,
   LightboxCopy,
   MapPreviewCopy,
@@ -26,6 +27,20 @@ export const PT_BR_LIGHTBOX_COPY: LightboxCopy = {
   resetZoom: "Restaurar o zoom",
   play: "Iniciar a apresentação",
   pause: "Pausar a apresentação",
+  dialogLabel: "Galeria de imagens",
+  itemPosition: (index, total) => `Item ${index} de ${total}`,
+  videoFallback: (index, total) => `Vídeo ${index} de ${total}`,
+  imageFallback: (index, total) => `Imagem ${index} de ${total}`,
+  thumbnailFallback: (index) => `Miniatura ${index}`,
+};
+
+export const PT_BR_DATA_GRID_COPY: DataGridCopy = {
+  sortBy: (header) => `Ordenar por ${header}`,
+  selectRow: (rowNumber) => `Selecionar linha ${rowNumber}`,
+  selectAllRows: "Selecionar todas as linhas",
+  expandRow: "Expandir linha",
+  collapseRow: "Recolher linha",
+  gridLabel: "Grade de dados",
 };
 
 export const PT_BR_MAP_PREVIEW_COPY: MapPreviewCopy = {
@@ -45,6 +60,13 @@ export const PT_BR_CAROUSEL_COPY: CarouselCopy = {
 export const PT_BR_TIMING_DIAGRAM_COPY: TimingDiagramCopy = {
   regionLabel: "Diagrama de tempos",
   heading: "Tempo da requisição",
+  dns: "Busca de DNS",
+  connect: "Conexão",
+  ssl: "SSL/TLS",
+  request: "Requisição",
+  response: "Resposta",
+  total: (formatted) => `Total: ${formatted}`,
+  totalTime: (formatted) => `Tempo total: ${formatted}`,
 };
 
 export const PT_BR_DATA_STATE_COPY: DataStateCopy = {
@@ -158,6 +180,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
   },
   tableFilter: PT_BR_TABLE_FILTER_COPY,
   grid: {
+    ...PT_BR_DATA_GRID_COPY,
     rowActions: "Ações",
     bulkActions: (selectedCount) => `Ações (${selectedCount}) ▾`,
     emptyFilteredTitle: "Nenhum resultado para esses filtros",

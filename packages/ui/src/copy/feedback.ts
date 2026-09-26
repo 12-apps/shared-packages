@@ -15,12 +15,18 @@
  * table, the grid, the async container, the hover card and the infinite
  * scroller each rendered their own copy of.
  */
-/** The guided tour's four controls, and the toast/modal chrome around it. */
+/** The guided tour's controls, and the toast/modal chrome around it. */
 export interface TutorialCopy {
   skip: string;
   previous: string;
   next: string;
   restart: string;
+  /** The last step's own next button, when it is the tour's only step. */
+  complete: string;
+  /** The last step's own next button, in a tour of more than one step. */
+  finish: string;
+  /** The next/finish button's title while `requiresActionBeforeNext` blocks it. */
+  requiresAction: string;
 }
 
 /** Chrome that carries a glyph and no text, across several small surfaces. */

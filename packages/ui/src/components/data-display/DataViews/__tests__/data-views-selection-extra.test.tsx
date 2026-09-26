@@ -81,7 +81,7 @@ describe("the selection-widening slot", () => {
 
   it("reports a PARTIAL page as not-all, so the control can hold itself back", async () => {
     const { seen } = renderGrid();
-    fireEvent.click(screen.getByLabelText("Select row 1"));
+    fireEvent.click(screen.getByLabelText("Selecionar linha 1"));
     await waitFor(() =>
       expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("1 item selected"),
     );
@@ -95,7 +95,7 @@ describe("the selection-widening slot", () => {
 
   it("reports a FULL page as all-selected, and the control appears beside the count", async () => {
     const { seen } = renderGrid();
-    fireEvent.click(screen.getByLabelText("Select all rows"));
+    fireEvent.click(screen.getByLabelText("Selecionar todas as linhas"));
     await waitFor(() => expect(widening()).toBeInTheDocument());
     const last = latest(seen);
     expect(last.allOnPageSelected).toBe(true);
@@ -105,9 +105,9 @@ describe("the selection-widening slot", () => {
 
   it("goes away again when the selection stops covering the page", async () => {
     renderGrid();
-    fireEvent.click(screen.getByLabelText("Select all rows"));
+    fireEvent.click(screen.getByLabelText("Selecionar todas as linhas"));
     await waitFor(() => expect(widening()).toBeInTheDocument());
-    fireEvent.click(screen.getByLabelText("Select row 2"));
+    fireEvent.click(screen.getByLabelText("Selecionar linha 2"));
     await waitFor(() => expect(widening()).not.toBeInTheDocument());
     // Still selecting — this is the partial state, not a cleared one.
     expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("2 items selected");
@@ -115,7 +115,7 @@ describe("the selection-widening slot", () => {
 
   it("hands back a clearSelection that really clears", async () => {
     const { seen } = renderGrid();
-    fireEvent.click(screen.getByLabelText("Select all rows"));
+    fireEvent.click(screen.getByLabelText("Selecionar todas as linhas"));
     await waitFor(() => expect(widening()).toBeInTheDocument());
     act(() => latest(seen).clearSelection());
     await waitFor(() => expect(widening()).not.toBeInTheDocument());
@@ -144,7 +144,7 @@ describe("the selection-widening slot", () => {
         />
       </ThemeProvider>,
     );
-    fireEvent.click(screen.getByLabelText("Select all rows"));
+    fireEvent.click(screen.getByLabelText("Selecionar todas as linhas"));
     // Both are on the bar: `rowActions` short-circuits the low-level
     // `bulkActions` render prop, which is exactly why widening needed a slot
     // of its own rather than a share of that one.

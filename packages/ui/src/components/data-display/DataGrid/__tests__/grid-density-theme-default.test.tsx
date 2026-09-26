@@ -20,6 +20,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { PT_BR_DATA_GRID_COPY } from '../../../../pt-BR';
 import { resolveDensityFactor, type DensityLevel } from '../../../../tokens/density';
 import { DataGrid } from '../DataGrid';
 import type { GridColumn, GridDensity } from '../DataGrid.types';
@@ -39,7 +40,7 @@ function themeAt(level?: DensityLevel) {
 function renderGrid(theme: ReturnType<typeof themeAt>, density?: GridDensity) {
   return render(
     <ThemeProvider theme={theme}>
-      <DataGrid<Row> emptyText="Nada" rows={rows} columns={columns} ariaLabel="grid" density={density} />
+      <DataGrid<Row> emptyText="Nada" rows={rows} columns={columns} ariaLabel="grid" density={density} copy={PT_BR_DATA_GRID_COPY} />
     </ThemeProvider>,
   );
 }

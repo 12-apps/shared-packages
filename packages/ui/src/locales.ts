@@ -30,6 +30,7 @@ import type {
   CodeEditorCopy,
   CommandPaletteCopy,
   ConfirmActionCopy,
+  DataGridCopy,
   DataStateCopy,
   InstallPromptCopy,
   LightboxCopy,
@@ -38,6 +39,8 @@ import type {
   PhoneInputCopy,
   RichEditorToolbarCopy,
   SectionOnboardingCopy,
+  SettingCardCopy,
+  SettingSwitchCopy,
   SocialLoginCopy,
   TableFilterCopy,
   TimingDiagramCopy,
@@ -67,6 +70,7 @@ export const DATA_STATE_COPY = pack<DataStateCopy>(
   pt.PT_BR_DATA_STATE_COPY,
   en.EN_US_DATA_STATE_COPY,
 );
+export const DATA_GRID_COPY = pack<DataGridCopy>(pt.PT_BR_DATA_GRID_COPY, en.EN_US_DATA_GRID_COPY);
 export const DATA_VIEWS_COPY = pack<DataViewsCopy>(
   pt.PT_BR_DATA_VIEWS_COPY,
   en.EN_US_DATA_VIEWS_COPY,
@@ -114,6 +118,14 @@ export const UPLOAD_BUTTON_COPY = pack<UploadButtonCopy>(
 export const TABLE_FILTER_COPY = pack<TableFilterCopy>(
   pt.PT_BR_TABLE_FILTER_COPY,
   en.EN_US_TABLE_FILTER_COPY,
+);
+export const SETTING_CARD_COPY = pack<SettingCardCopy>(
+  pt.PT_BR_SETTING_CARD_COPY,
+  en.EN_US_SETTING_CARD_COPY,
+);
+export const SETTING_SWITCH_COPY = pack<SettingSwitchCopy>(
+  pt.PT_BR_SETTING_SWITCH_COPY,
+  en.EN_US_SETTING_SWITCH_COPY,
 );
 
 // navigation

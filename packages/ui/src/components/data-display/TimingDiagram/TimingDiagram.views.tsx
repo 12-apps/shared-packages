@@ -7,6 +7,7 @@ import type { FC, ReactElement } from 'react';
 import React from 'react';
 
 import type { TimingData } from './TimingDiagram.types';
+import type { TimingDiagramCopy } from '../../../copy';
 import { onMedia, sheen, uiInk } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
 
@@ -34,6 +35,7 @@ export interface TimingViewProps {
   phases: Phase[];
   percentages: Record<string, number>;
   data: TimingData;
+  copy: TimingDiagramCopy;
   animated: boolean;
   showLabels: boolean;
   showTooltips: boolean;
@@ -227,6 +229,7 @@ export const StackedView: FC<TimingViewProps> = ({
   phases,
   percentages,
   data,
+  copy,
   animated,
   showLabels,
   showTooltips,
@@ -260,7 +263,7 @@ export const StackedView: FC<TimingViewProps> = ({
           0ms
         </Typography>
         <Typography variant="caption" color="text.secondary" fontWeight="bold">
-          Total: {formatTime(data.total)}
+          {copy.total(formatTime(data.total))}
         </Typography>
       </Box>
     </Box>
@@ -328,6 +331,7 @@ export const HorizontalView: FC<TimingViewProps> = ({
   phases,
   percentages,
   data,
+  copy,
   animated,
 }) => {
   const theme = useTheme();
@@ -352,7 +356,7 @@ export const HorizontalView: FC<TimingViewProps> = ({
       ))}
       <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}` }}>
         <Typography variant="body2" fontWeight="bold" color="primary">
-          Total Time: {formatTime(data.total)}
+          {copy.totalTime(formatTime(data.total))}
         </Typography>
       </Box>
     </HorizontalBar>

@@ -141,7 +141,7 @@ export function AuditScreen(props: AuditScreenProps & { parts: AuditScreenParts 
         {...(props.renderLink ? { renderLink: props.renderLink } : {})}
       />
       <Dashboard.Header title={labels.title}>
-        <Dashboard.Info title={labels.aboutTitle}>{labels.about}</Dashboard.Info>
+        <Dashboard.Info title={labels.aboutTitle} ariaLabel={labels.aboutTitle}>{labels.about}</Dashboard.Info>
         <Dashboard.Spacer />
         <Dashboard.Export
           label={labels.exportAction}

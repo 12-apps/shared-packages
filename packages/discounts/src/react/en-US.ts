@@ -31,6 +31,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     empty: "No discounts yet.",
     // A FILENAME, not a sentence: it is what the export lands on disk as.
     exportFileName: "discounts",
+    exportAction: "Export",
     loading: "Loading discounts…",
     loadFailed: "Could not load the discounts",
     retry: "Try again",
