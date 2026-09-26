@@ -1,7 +1,47 @@
 import CssBaseline from '@mui/material/CssBaseline/index.js';
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Preview } from '@storybook/react-vite';
+import * as monaco from 'monaco-editor';
+// `?worker` is a Vite-only import suffix: builder-vite (this Storybook's
+// builder) resolves it to a worker constructor. This file is not part of the
+// package's `tsc`/tsup program (tsconfig.json's `include` is `src` only), so
+// no other build reads these imports.
+import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 import React from 'react';
+
+import { configureCodeEditor } from '../src/components/form/CodeEditor/CodeEditor.monaco';
+
+// The Monaco that runs here is the `monaco-editor` this package depends on
+// (resolved from node_modules by Vite, this Storybook's builder), not the
+// CDN build `@monaco-editor/react`'s default loader would otherwise fetch at
+// runtime. See `CodeEditor.md` for why this setup can't live in the package
+// itself, and the same snippet for a host app's own Vite entry point.
+configureCodeEditor({
+  monaco,
+  getWorker: (_workerId, label) => {
+    switch (label) {
+      case 'json':
+        return new JsonWorker();
+      case 'css':
+      case 'scss':
+      case 'less':
+        return new CssWorker();
+      case 'html':
+      case 'handlebars':
+      case 'razor':
+        return new HtmlWorker();
+      case 'typescript':
+      case 'javascript':
+        return new TsWorker();
+      default:
+        return new EditorWorker();
+    }
+  },
+});
 
 const lightTheme = createTheme({
   palette: {
