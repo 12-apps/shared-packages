@@ -143,6 +143,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       'aria-label': ariaLabel,
       'aria-describedby': ariaDescribedBy,
       'aria-busy': ariaBusy,
+      inputProps,
       ...rest
     },
     ref,
@@ -178,6 +179,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
          */
         inputProps={{
           'data-testid': dataTestId,
+          ...inputProps,
           ...inputAriaOf({ id, helperText, label: ariaLabel, describedBy: ariaDescribedBy, busy: ariaBusy }),
         }}
         InputProps={{
