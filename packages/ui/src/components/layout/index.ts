@@ -8,6 +8,7 @@ export * from './Drawer';
 export * from './Resizable';
 export * from './ScrollArea';
 export * from './Separator';
+export * from './SettingCard';
 export * from './Sidebar';
 export * from './Skeleton/Skeleton';
 export * from './TableFilter';
