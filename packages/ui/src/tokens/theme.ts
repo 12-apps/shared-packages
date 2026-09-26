@@ -8,11 +8,22 @@ import { contrastText, DARK_TEXT_PRIMARY, inkOver } from './ink-over';
 */
 export { contrastText, inkOver };
 import { cssLengthToPx, cssTrackingToEm } from './css-units';
+import {
+  densityFieldHeight,
+  densitySpacingUnit,
+  resolveDensityFactor,
+  type DensityLevel,
+  type ResolvedDensity,
+} from './density.core';
 import { resolveFieldHeight } from './field-height.core';
 import { DEFAULT_FIELD_RADIUS } from './field-radius.core';
 import { HEADING_SCALE, type HeadingLevel } from './heading-scale';
 
 import type { SizeValue } from './vocabulary';
+
+// Re-exported so a caller of `@12-apps/ui/tokens` (or `./theme` directly) gets
+// the density types alongside `UiThemeOptions.density` without a second import.
+export type { DensityLevel, ResolvedDensity };
 
 /**
  * THE THEME BOTH RENDERERS READ.
@@ -120,6 +131,14 @@ export interface UiTheme {
    * (`./field-height.core`) is the dp a field of `size` lays out at.
    */
   fieldHeight: number;
+  /**
+   * The resolved density (FUT-2764): `factor` scales the type scale, the
+   * spacing unit and `fieldHeight` together (see `./density.core`); `level`
+   * is present only when a NAMED level was given, absent for a raw numeric
+   * `density`. Always resolved — `factor` is never optional. Unset resolves
+   * to `{ level: 'normal', factor: 1 }`, today's numbers exactly.
+   */
+  density: ResolvedDensity;
   typography: UiTypography;
   zIndex: { appBar: number; drawer: number; modal: number; snackbar: number; tooltip: number };
 }
@@ -139,6 +158,23 @@ export interface UiThemeOptions {
     background: Partial<UiPalette['background']>;
   }>;
   typography?: Partial<Pick<UiTypography, 'fontFamily' | 'monospaceFontFamily'>>;
+  /**
+   * `spacingUnit` and `fieldHeight` below still win over EVERYTHING, including
+   * this — density only supplies THEIR fallback, the same `??` pattern those
+   * two already use. Precedence, highest first: an explicit `spacingUnit` /
+   * `fieldHeight` option > a numeric `density` (used as the factor directly,
+   * no table lookup) > `densityFactors[level]` (below) > the built-in table
+   * (`compact` 0.9 / `normal` 1 / `comfortable` 1.1). No `density` at all is
+   * `'normal'`, factor `1` — today, byte-for-byte.
+   *
+   * A named level (`density: 'compact'`, e.g. a backoffice app), no
+   * `density` at all (`'normal'`, e.g. a storefront), or a raw factor
+   * (`density: 1.15`, e.g. a kiosk app whose own hardware needs a value
+   * none of the three names fit).
+   */
+  density?: DensityLevel | number;
+  /** A repository's own factor for a named level, overriding the built-in table above. */
+  densityFactors?: Partial<Record<DensityLevel, number>>;
   spacingUnit?: number;
   /** The radius every field is drawn with, in dp. Defaults to {@link DEFAULT_FIELD_RADIUS}. */
   fieldRadius?: number;
@@ -304,7 +340,8 @@ export function createUiTheme(options: UiThemeOptions = {}): UiTheme {
   const seeds = options.palette ?? {};
   const brand = DEFAULT_BRAND[mode];
   const defaults = MODE_DEFAULTS[mode];
-  const spacingUnit = options.spacingUnit ?? 8;
+  const density = resolveDensityFactor(options.density, options.densityFactors);
+  const spacingUnit = options.spacingUnit ?? densitySpacingUnit(density.factor);
 
   const palette: UiPalette = {
     mode,
@@ -328,7 +365,8 @@ export function createUiTheme(options: UiThemeOptions = {}): UiTheme {
     spacing: (units: number) => units * spacingUnit,
     spacingUnit,
     radius: { sm: 2, md: 4, lg: 8, xl: 16, full: 9999, field: options.fieldRadius ?? DEFAULT_FIELD_RADIUS },
-    fieldHeight: resolveFieldHeight(options.fieldHeight),
+    fieldHeight: resolveFieldHeight(options.fieldHeight, densityFieldHeight(density.factor)),
+    density,
     typography: {
       fontFamily: options.typography?.fontFamily,
       monospaceFontFamily: options.typography?.monospaceFontFamily,
