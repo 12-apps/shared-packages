@@ -736,10 +736,18 @@ jobs:
         run: pnpm native:check
       # The test-runner drives Chromium through jest-playwright. Same caching
       # argument as the Frontend Harness job, keyed on the resolved version.
+      # The version is resolved as the Storybook job resolves it (FUT-2698):
+      # `playwright-core` is not a direct dependency of
+      # packages/ui and a bare require of it fails under pnpm, which left this
+      # key at `playwright-Linux-` with no version — silent until Playwright
+      # is next bumped, since actions/cache never overwrites an exact hit.
       - name: Resolve the Playwright version
         id: playwright
         working-directory: packages/ui
-        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          version="$(node -p "require(require.resolve('playwright-core/package.json', { paths: [require.resolve('playwright')] })).version")"
+          [ -n "$version" ]
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Cache the Playwright browsers
         uses: actions/cache@v4
         with:
