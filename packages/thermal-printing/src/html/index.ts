@@ -1,4 +1,7 @@
-import { columnsFor, type TicketLine } from "../index";
+import { columnsFor, printableDotsFor, type RasterImage, type TicketLine } from "../index";
+import { rasterToDataUri } from "./bitmap";
+
+export { rasterToDataUri } from "./bitmap";
 
 /**
  * The same laid-out ticket as markup, for a printer on a CABLE.
@@ -43,7 +46,7 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"]/g, (char) => ENTITIES[char] ?? char);
 }
 
-/** The character-mode styles, matching what ESC/POS does with the same line. */
+/** The legacy character-mode styles, matching what ESC/POS does with the same line. */
 const STYLE: Readonly<Record<TicketLine["emphasis"], string>> = {
   normal: "",
   bold: "font-weight:700",
@@ -51,6 +54,66 @@ const STYLE: Readonly<Record<TicketLine["emphasis"], string>> = {
   // width would rewrap the headline at half the columns the layout used.
   double: "font-weight:700;font-size:2em;line-height:1.1",
 };
+
+/**
+ * A sized line's font size, relative to the body's Font A column.
+ *
+ * The body is exactly `columnsFor(paperWidthMm)` characters wide, so a size
+ * whose column count is N must set its glyphs at (body columns / N) of the body
+ * size to fit N of them in the same width. That is the whole mapping: the page
+ * reproduces the printer's column counts, and the ratio between sizes follows —
+ * `small` 0.75em, `large` 1.5em and `xlarge` 2em on an 80 mm roll.
+ */
+function sizeStyle(line: TicketLine, paperWidthMm: number): string {
+  if (line.size === undefined) return STYLE[line.emphasis] ?? "";
+  const scale = columnsFor(paperWidthMm) / columnsFor(paperWidthMm, line.size);
+  const parts = scale === 1 ? [] : [`font-size:${Number(scale.toFixed(4))}em`];
+  if (line.emphasis === "bold" || line.emphasis === "double") parts.push("font-weight:700");
+  return parts.join(";");
+}
+
+/**
+ * The frame's styles. `print-color-adjust:exact` is not optional on the band:
+ * without it a browser drops background colours when printing, and the band
+ * comes out as white text on white paper — nothing at all.
+ */
+const FRAME_STYLE: Readonly<Record<NonNullable<TicketLine["frame"]>, string>> = {
+  band: "background:#000;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact",
+  box: "line-height:1",
+};
+
+function textLineHtml(line: TicketLine, paperWidthMm: number): string {
+  const style = [
+    sizeStyle(line, paperWidthMm),
+    line.frame === undefined ? "" : (FRAME_STYLE[line.frame] ?? ""),
+    line.align === "center" ? "text-align:center" : "",
+  ]
+    .filter((part) => part.length > 0)
+    .join(";");
+  const attr = style.length > 0 ? ` style="${style}"` : "";
+  // A blank line still has to occupy one, hence the non-breaking space.
+  const text = line.text.length === 0 ? "&nbsp;" : escapeHtml(line.text);
+  return `<div${attr}>${text}</div>`;
+}
+
+/**
+ * A picture line, at the width it will have on paper.
+ *
+ * The body is `columnsFor(paperWidthMm)` characters wide and stands for the
+ * printable width, `printableDotsFor(paperWidthMm)` dots — 12 dots per
+ * character on either roll — so a raster N dots wide is N / 12 characters wide
+ * here, whatever the screen's pixel density. `pixelated` keeps the dots square
+ * when that scales up, which is what makes this an honest preview of the paper.
+ */
+function imageLineHtml(line: TicketLine, raster: RasterImage, paperWidthMm: number): string {
+  const dotsPerColumn = printableDotsFor(paperWidthMm) / columnsFor(paperWidthMm);
+  const width = Number((raster.width / dotsPerColumn).toFixed(4));
+  const margin = line.align === "center" ? "0 auto" : "0";
+  return (
+    `<div><img alt="" src="${rasterToDataUri(raster)}" ` +
+    `style="display:block;margin:${margin};width:${width}ch;image-rendering:pixelated"></div>`
+  );
+}
 
 /**
  * Render a ticket as a standalone document.
@@ -72,15 +135,11 @@ export function renderTicketHtml(
 ): string {
   const columns = columnsFor(paperWidthMm);
   const body = lines
-    .map((line) => {
-      const style = [STYLE[line.emphasis] ?? "", line.align === "center" ? "text-align:center" : ""]
-        .filter((part) => part.length > 0)
-        .join(";");
-      const attr = style.length > 0 ? ` style="${style}"` : "";
-      // A blank line still has to occupy one, hence the non-breaking space.
-      const text = line.text.length === 0 ? "&nbsp;" : escapeHtml(line.text);
-      return `<div${attr}>${text}</div>`;
-    })
+    .map((line) =>
+      line.image === undefined
+        ? textLineHtml(line, paperWidthMm)
+        : imageLineHtml(line, line.image, paperWidthMm),
+    )
     .join("");
   return [
     `<!doctype html><html lang="${escapeHtml(lang)}"><head><meta charset="utf-8">`,

@@ -1,4 +1,5 @@
-import type { TicketLine } from "../index";
+import type { RasterImage, TicketLine } from "../index";
+import { resolveStyle, type ResolvedStyle } from "../style";
 
 /**
  * A laid-out ticket as the bytes a thermal printer speaks.
@@ -7,7 +8,8 @@ import type { TicketLine } from "../index";
  * Daruma all take it — which is why this encoder writes bytes to a socket
  * rather than integrating a vendor SDK per model. The commands used are the
  * small, universally implemented core: initialise, select a code page, align,
- * emphasise, double height, feed, cut.
+ * emphasise, font select, double height and width,
+ * reverse, line spacing, raster image, feed, cut.
  *
  * ## The code page is the part that is easy to get wrong
  *
@@ -96,15 +98,113 @@ function encodeText(text: string): number[] {
 /**
  * `ESC ! n` — the character-mode byte.
  *
- * Bit 3 is emphasis (bold) and bit 4 is double height. Double WIDTH (bit 5) is
- * deliberately unused: it halves the columns, and a headline that silently
- * wraps at 24 characters on a 48-column layout is worse than one that is merely
- * tall.
+ * Bit 0 selects Font B, bit 3 is emphasis (bold), bit 4 double height and bit 5
+ * double width. The legacy emphases come out exactly as they always did —
+ * `normal` 0x00, `bold` 0x08, `double` 0x18 — and `double` still never sets the
+ * width bit: it halves the columns, and a headline that silently wraps at 24
+ * characters on a 48-column layout is worse than one that is merely tall.
+ *
+ * The two large sizes DO set it, because a sized line is wrapped at its own
+ * column count (see `columnsFor`), so the width the printer uses is the width
+ * the layout measured. The size table and its reasoning live in `../sizes`.
  */
-const MODE = { normal: 0x00, bold: 0x08, double: 0x18 } as const;
+function modeByte(style: ResolvedStyle): number {
+  return (
+    (style.font === "B" ? 0x01 : 0) |
+    (style.bold ? 0x08 : 0) |
+    (style.heightMultiplier === 2 ? 0x10 : 0) |
+    (style.widthMultiplier === 2 ? 0x20 : 0)
+  );
+}
 
 /** `ESC a n` — 0 left, 1 centre. */
 const ALIGN = { left: 0, center: 1 } as const;
+
+/**
+ * Rows per `GS v 0` command. The command itself allows far more, but a printer
+ * buffers a whole command before it prints, and the cheap ones in this class
+ * have small buffers; a logo sent as strips of at most 255 rows prints the same
+ * and never overruns one.
+ */
+const RASTER_STRIP_ROWS = 255;
+
+/**
+ * `GS v 0` — a 1-bit raster, in strips.
+ *
+ * `RasterImage.data` is already the command's own format (rows top to bottom,
+ * MSB leftmost, 1 = black), so the bytes are copied, not converted. A buffer
+ * shorter than `width × height` prints the rows it has rather than throwing:
+ * a ticket missing half a logo still carries the order.
+ */
+function pushRaster(bytes: number[], raster: RasterImage): void {
+  const rowBytes = Math.ceil(raster.width / 8);
+  if (rowBytes === 0) return;
+  const rows = Math.min(raster.height, Math.floor(raster.data.length / rowBytes));
+  for (let start = 0; start < rows; start += RASTER_STRIP_ROWS) {
+    const count = Math.min(RASTER_STRIP_ROWS, rows - start);
+    bytes.push(GS, 0x76, 0x30, 0x00, rowBytes & 0xff, rowBytes >> 8, count & 0xff, count >> 8);
+    const strip = raster.data.subarray(start * rowBytes, (start + count) * rowBytes);
+    strip.forEach((byte) => bytes.push(byte));
+  }
+}
+
+/** What the printer currently has set, so a command is sent only on a change. */
+interface PrinterState {
+  mode: number;
+  align: number;
+  reverse: boolean;
+  /** Line spacing in dots, or `null` for the printer's default. */
+  spacing: number | null;
+}
+
+function setAlign(bytes: number[], state: PrinterState, align: TicketLine["align"]): void {
+  const wanted: number = ALIGN[align] ?? ALIGN.left;
+  if (wanted === state.align) return;
+  bytes.push(ESC, 0x61, wanted);
+  state.align = wanted;
+}
+
+function setReverse(bytes: number[], state: PrinterState, reverse: boolean): void {
+  if (reverse === state.reverse) return;
+  bytes.push(GS, 0x42, reverse ? 1 : 0); // GS B n — white on black
+  state.reverse = reverse;
+}
+
+/**
+ * `ESC 3 n` / `ESC 2` — line spacing.
+ *
+ * A framed line closes the spacing to the height of its own cell, so the
+ * verticals of a box join into one border and a band of several lines is one
+ * black block rather than stripes. Everything else keeps the printer's default
+ * spacing, which is what the lines around it were designed against.
+ */
+function setSpacing(bytes: number[], state: PrinterState, spacing: number | null): void {
+  if (spacing === state.spacing) return;
+  if (spacing === null) bytes.push(ESC, 0x32);
+  else bytes.push(ESC, 0x33, spacing);
+  state.spacing = spacing;
+}
+
+function pushTextLine(bytes: number[], state: PrinterState, line: TicketLine): void {
+  const style = resolveStyle(line);
+  const mode = modeByte(style);
+  if (mode !== state.mode) {
+    bytes.push(ESC, 0x21, mode);
+    state.mode = mode;
+  }
+  setAlign(bytes, state, line.align);
+  setReverse(bytes, state, line.frame === "band");
+  setSpacing(bytes, state, line.frame === undefined ? null : style.cellHeightDots);
+  bytes.push(...encodeText(line.text), 0x0a);
+}
+
+function pushImageLine(bytes: number[], state: PrinterState, raster: RasterImage, line: TicketLine): void {
+  // `GS v 0` honours justification and nothing else, so only alignment and the
+  // reverse flag (which would otherwise leak into the next text line) matter.
+  setReverse(bytes, state, false);
+  setAlign(bytes, state, line.align);
+  pushRaster(bytes, raster);
+}
 
 /**
  * Encode a laid-out ticket, ready to write to a socket.
@@ -116,30 +216,25 @@ const ALIGN = { left: 0, center: 1 } as const;
  * Ends with a feed and a partial cut. The feed is not decoration: the cutter
  * sits a couple of centimetres above the print head, so without it the cut
  * lands in the middle of the last lines somebody needs to read.
+ *
+ * A ticket that uses none of the newer line kinds encodes to exactly the bytes
+ * it always did: every command is sent only when its setting changes.
  */
 export function encodeTicket(lines: readonly TicketLine[]): Uint8Array {
   const bytes: number[] = [
     ESC, 0x40, // initialise — clears whatever the previous job left set
     ESC, 0x74, 0x02, // select CP850
   ];
-  let mode: number = MODE.normal;
-  let align: number = ALIGN.left;
+  const state: PrinterState = { mode: 0x00, align: ALIGN.left, reverse: false, spacing: null };
   for (const line of lines) {
-    const wanted: number = MODE[line.emphasis] ?? MODE.normal;
-    if (wanted !== mode) {
-      bytes.push(ESC, 0x21, wanted);
-      mode = wanted;
-    }
-    const wantedAlign: number = ALIGN[line.align] ?? ALIGN.left;
-    if (wantedAlign !== align) {
-      bytes.push(ESC, 0x61, wantedAlign);
-      align = wantedAlign;
-    }
-    bytes.push(...encodeText(line.text), 0x0a);
+    if (line.image !== undefined) pushImageLine(bytes, state, line.image, line);
+    else pushTextLine(bytes, state, line);
   }
   // Reset before the cut so the NEXT job starts from a known state even if it
   // is written by something that does not initialise.
-  bytes.push(ESC, 0x21, MODE.normal, ESC, 0x61, ALIGN.left);
+  setReverse(bytes, state, false);
+  setSpacing(bytes, state, null);
+  bytes.push(ESC, 0x21, 0x00, ESC, 0x61, ALIGN.left);
   bytes.push(0x0a, 0x0a, 0x0a, 0x0a);
   bytes.push(GS, 0x56, 0x42, 0x00); // partial cut, feeding to the cutter
   return Uint8Array.from(bytes);
