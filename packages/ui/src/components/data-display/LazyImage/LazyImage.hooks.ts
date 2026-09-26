@@ -232,7 +232,7 @@ const useImageSource = (
 
     // A retry scheduled for the PREVIOUS src must not land on this one: left
     // pending, its stale `setTimeout` would fire later and overwrite this
-    // fresh `currentSrc` with `${oldSrc}?retry=N}` — cache-busting an image
+    // fresh `currentSrc` with `${oldSrc}?retry=N` — cache-busting an image
     // nothing asked for again, and never re-syncing back (FUT-2774).
     clearTimeout(retryTimeoutRef.current);
     requestedSrcRef.current = src;
