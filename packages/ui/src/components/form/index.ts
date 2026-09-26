@@ -13,6 +13,7 @@ export * from './Input';
 export * from './InputOTP';
 export * from './Label';
 export * from './Menubar';
+export * from './NumberField';
 export * from './PasswordStrength';
 export * from './PhoneInput';
 export * from './RadioGroup';
