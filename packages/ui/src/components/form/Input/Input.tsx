@@ -80,6 +80,28 @@ const interactionProps = (
   onClick: loading ? undefined : onClick,
 });
 
+/**
+ * `aria-label` has to ride `inputProps` to reach the `<input>` (FUT-755), and
+ * `aria-describedby` the same way — spread with the rest, either lands on the
+ * FormControl DIV that the text field renders as its root, which carries no
+ * role, so the field kept no accessible name or description and a source
+ * grep saying "this input is labelled" disagreed with the DOM. NumberField's
+ * suffix rides this to reach a caller's field (FUT-2823); this does not also
+ * join MUI's own helper-text id the way the shared package's later Input
+ * does — this maintenance line predates that fix.
+ */
+const mergedInputProps = (
+  dataTestId: string | undefined,
+  inputProps: InputProps['inputProps'],
+  ariaLabel: string | undefined,
+  ariaDescribedBy: string | undefined,
+) => ({
+  'data-testid': dataTestId,
+  ...inputProps,
+  ...(ariaLabel === undefined ? {} : { 'aria-label': ariaLabel }),
+  ...(ariaDescribedBy === undefined ? {} : { 'aria-describedby': ariaDescribedBy }),
+});
+
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
     {
@@ -99,6 +121,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onFocus,
       onBlur,
       'aria-label': ariaLabel,
+      'aria-describedby': ariaDescribedBy,
+      inputProps,
       ...rest
     },
     ref,
@@ -120,18 +144,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {...interactionProps(loading, onClick, props.disabled)}
         onFocus={onFocus}
         onBlur={onBlur}
-        /*
-         * `aria-label` has to ride `inputProps` to reach the `<input>` (FUT-755).
-         * Spread with the rest it lands on the FormControl DIV that the text
-         * field renders as its root, which carries no role — so the field kept
-         * no accessible name, and a source grep saying "this input is labelled"
-         * disagreed with the DOM. The reports search box and the block-title
-         * inputs were both named in source and anonymous to a screen reader.
-         */
-        inputProps={{
-          'data-testid': dataTestId,
-          ...(ariaLabel === undefined ? {} : { 'aria-label': ariaLabel }),
-        }}
+        inputProps={mergedInputProps(dataTestId, inputProps, ariaLabel, ariaDescribedBy)}
         InputProps={{
           startAdornment: startAdornment && (
             <InputAdornment position="start">{startAdornment}</InputAdornment>
