@@ -167,3 +167,40 @@ describe('renderEmail', () => {
     expect(message.subject).toBe('Your order is confirmed');
   });
 });
+
+describe('the hero image', () => {
+  const hero = {
+    src: 'https://shop.example/papi/primeiro-pedido.png',
+    alt: 'Papi holding a star',
+    width: 96,
+  };
+
+  it('renders above the heading, square by default, with its size on the tag', () => {
+    const html = renderEmailHtml(documentOf({ hero }));
+    const img = html.indexOf('<img src="https://shop.example/papi/primeiro-pedido.png"');
+    expect(img).toBeGreaterThan(-1);
+    expect(img).toBeLessThan(html.indexOf('<h1'));
+    expect(html).toContain('alt="Papi holding a star" width="96" height="96"');
+  });
+
+  it('escapes what it is given, like every other caller value', () => {
+    const html = renderEmailHtml(documentOf({ hero: { ...hero, alt: '"><script>' } }));
+    expect(html).not.toContain('"><script>');
+  });
+
+  it.each(['http://shop.example/a.png', '/papi/a.png', 'javascript:alert(1)', 'data:image/png;base64,AA'])(
+    'drops a src that is not an absolute https URL: %s',
+    (src) => {
+      expect(renderEmailHtml(documentOf({ hero: { ...hero, src } }))).not.toContain('<img');
+    },
+  );
+
+  it.each([0, -8, Number.NaN])('drops a hero whose width cannot be drawn: %s', (width) => {
+    expect(renderEmailHtml(documentOf({ hero: { ...hero, width } }))).not.toContain('<img');
+  });
+
+  it('leaves the layout exactly as it was without one', () => {
+    expect(renderEmailHtml(documentOf({ hero: undefined }))).toBe(renderEmailHtml(documentOf()));
+    expect(renderEmailHtml(documentOf())).not.toContain('<img');
+  });
+});

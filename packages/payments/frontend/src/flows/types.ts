@@ -144,8 +144,11 @@ export interface PaymentFlowsConfig extends CheckoutPipelineConfig {
    * makes a new host answer once, at the one call site that knows the answer.
    */
   copy: CheckoutCopyFE;
-  /** Host content under the paid receipt (the storefront's PWA install invite). */
-  confirmation?: { extra?: ReactNode };
+  /**
+   * Host content under the paid receipt (the storefront's PWA install invite),
+   * and the host's own illustration in place of the paid icon (`hero`).
+   */
+  confirmation?: { extra?: ReactNode; hero?: ReactNode };
   /**
    * Warnings the host reports (Sentry). Default SILENT — never `console`: a
    * library that writes to a buyer's console tells them nothing and tells the

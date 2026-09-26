@@ -103,6 +103,7 @@ export interface StoryHost {
   /** Where a hosted handover would have taken the buyer. Recorded, not followed. */
   onNavigate?: (url: string) => void;
   confirmationExtra?: ReactNode;
+  confirmationHero?: ReactNode;
   tenantSlug?: string;
   /**
    * What the `/config` read does, for the two states a live mount cannot be
@@ -169,7 +170,10 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
     useSettlement: () => host.settlement ?? null,
     components: host.components,
     copy: { ...STORY_CHECKOUT_COPY, ...host.copy },
-    confirmation: host.confirmationExtra ? { extra: host.confirmationExtra } : undefined,
+    confirmation:
+      host.confirmationExtra || host.confirmationHero
+        ? { extra: host.confirmationExtra, hero: host.confirmationHero }
+        : undefined,
     ports: {
       createPayable: (input) => raisePayable(world, input),
       saveBuyerContact: () => undefined,

@@ -83,6 +83,22 @@ export interface EmailFact {
   readonly emphasis?: boolean;
 }
 
+/**
+ * An illustration above the heading — a store's mascot on a buyer's first
+ * order, say. One image, hosted by the caller at an absolute `https://` URL
+ * (mail clients do not run a `data:` URI or inline SVG reliably), with the
+ * dimensions stated so the card does not jump when a client loads it late.
+ */
+export interface EmailHero {
+  /** Absolute `https://` URL. Anything else is dropped rather than rendered. */
+  readonly src: string;
+  /** What the image says, for the reader whose client blocks images. */
+  readonly alt: string;
+  /** Display width in px; the image is square unless `height` says otherwise. */
+  readonly width: number;
+  readonly height?: number;
+}
+
 /** Everything a message says, with no opinion about how it looks. */
 export interface EmailDocument {
   /** The subject line. Also the document `<title>`. */
@@ -92,6 +108,8 @@ export interface EmailDocument {
    * which is right far more often than it is wrong.
    */
   readonly preheader?: string;
+  /** An optional illustration above the heading. Absent, the layout is unchanged. */
+  readonly hero?: EmailHero;
   /** The `<h1>`. Usually a restatement of the subject in the reader's terms. */
   readonly heading: string;
   /** The body, one entry per paragraph. Plain sentences — never markup. */
@@ -295,6 +313,22 @@ function styleBlock(): string {
 }
 
 /**
+ * The hero, centred above the heading — or nothing for a `src` that is not an
+ * absolute `https://` URL, since a relative or `javascript:` one cannot mean
+ * anything in an inbox. Width and height go on the tag as attributes AND in
+ * the style: Outlook reads the first, everything else the second.
+ */
+function heroImage(hero: EmailHero): string[] {
+  if (!/^https:\/\//i.test(hero.src.trim())) return [];
+  const width = Math.round(hero.width);
+  const height = Math.round(hero.height ?? hero.width);
+  if (!(width > 0) || !(height > 0)) return [];
+  return [
+    `<div style="margin:0 0 16px;text-align:center"><img src="${escapeHtml(hero.src.trim())}" alt="${escapeHtml(hero.alt)}" width="${width}" height="${height}" style="display:inline-block;width:${width}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none" /></div>`,
+  ];
+}
+
+/**
  * Render the document as the HTML half of the message.
  *
  * A complete document rather than a fragment: a `<!DOCTYPE>` is what puts
@@ -305,6 +339,7 @@ function styleBlock(): string {
 export function renderEmailHtml(document: EmailDocument): string {
   const theme = document.theme ?? NEUTRAL_EMAIL_THEME;
   const body = [
+    ...(document.hero ? heroImage(document.hero) : []),
     `<h1 class="fp-h1" style="margin:0 0 16px;font-size:26px;line-height:1.25;font-weight:700;letter-spacing:-.3px;color:${theme.ink}">${escapeHtml(document.heading)}</h1>`,
     ...(document.paragraphs ?? []).map((text) => paragraph(text, theme)),
     facts(document.facts ?? [], theme),
