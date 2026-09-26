@@ -17,8 +17,9 @@ import type { TenderSplitCopy } from './copy';
 export interface TenderOption<T extends string> {
   readonly id: T;
   readonly label: string;
-  readonly icon?: ReactNode;
-  readonly givesChange?: boolean;
+  /** The glyph on the card; `null` for a host that draws none. */
+  readonly icon: ReactNode;
+  readonly givesChange: boolean;
 }
 
 const CARD_RADIUS = 1.5;
@@ -71,6 +72,7 @@ export function PickedTender<T extends string>({
   currencySign,
   copy,
   testId,
+  autoFocus,
   onType,
   onRemove,
 }: {
@@ -80,6 +82,8 @@ export function PickedTender<T extends string>({
   currencySign: string;
   copy: TenderSplitCopy;
   testId: string;
+  /** The card just picked takes the focus, so its amount can be typed at once. */
+  autoFocus: boolean;
   onType: (typed: string) => void;
   onRemove: () => void;
 }) {
@@ -105,7 +109,7 @@ export function PickedTender<T extends string>({
         aria-label={copy.remove(tender.label)}
         onClick={onRemove}
         data-testid={`${testId}-remove`}
-        sx={{ position: 'absolute', top: 4, right: 4, color: 'text.secondary' }}
+        sx={{ position: 'absolute', top: (t) => t.spacing(0.5), right: (t) => t.spacing(0.5), color: 'text.secondary' }}
       >
         ×
       </IconButton>
@@ -113,6 +117,7 @@ export function PickedTender<T extends string>({
         value={value}
         onChange={(event) => onType(event.target.value)}
         onFocus={(event: FocusEvent<HTMLInputElement>) => event.target.select()}
+        autoFocus={autoFocus}
         inputProps={{
           inputMode: 'decimal',
           'aria-label': copy.amountLabel(tender.label),
@@ -139,7 +144,7 @@ export function PickedTender<T extends string>({
 function TenderHeading<T extends string>({ tender }: { tender: TenderOption<T> }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 3, minWidth: 0 }}>
-      {tender.icon === undefined ? null : (
+      {tender.icon === null ? null : (
         <Box component="span" aria-hidden sx={{ display: 'flex', color: 'primary.main' }}>
           {tender.icon}
         </Box>

@@ -32,9 +32,9 @@ type Tender = "CASH" | "CREDIT" | "DEBIT" | "PIX";
 /** A host's catalogue: its own names, and cash as the tender that gives change. */
 const TENDERS: TenderOption<Tender>[] = [
   { id: "CASH", label: "Dinheiro", icon: <Glyph d="M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5" />, givesChange: true },
-  { id: "CREDIT", label: "Crédito", icon: <Glyph d="M3 6h18v12H3zM3 10h18" /> },
-  { id: "DEBIT", label: "Débito", icon: <Glyph d="M3 6h18v12H3zM6 14h3M13 14h5" /> },
-  { id: "PIX", label: "Pix", icon: <Glyph d="M12 3l9 9-9 9-9-9z" /> },
+  { id: "CREDIT", label: "Crédito", icon: <Glyph d="M3 6h18v12H3zM3 10h18" />, givesChange: false },
+  { id: "DEBIT", label: "Débito", icon: <Glyph d="M3 6h18v12H3zM6 14h3M13 14h5" />, givesChange: false },
+  { id: "PIX", label: "Pix", icon: <Glyph d="M12 3l9 9-9 9-9-9z" />, givesChange: false },
 ];
 
 function Glyph({ d }: { d: string }): JSX.Element {

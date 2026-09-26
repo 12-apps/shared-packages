@@ -61,16 +61,21 @@ export function TenderSplit<T extends string>({
   const [picks, setPicks] = useState<TenderPick<T>[]>([]);
   const money = useMemo(() => moneyFormats(locale, currency), [locale, currency]);
   const changing = useMemo(
-    () => new Set(tenders.filter((tender) => tender.givesChange === true).map((t) => t.id)),
+    () => new Set(tenders.filter((tender) => tender.givesChange).map((t) => t.id)),
     [tenders],
   );
-  const state = readTenderSplit(picks, totalCents, (tender) => changing.has(tender));
+  // A pick the host no longer offers (its list refetched mid-question) is not
+  // on screen, so it is not sent either.
+  const offered = picks.filter((pick) => tenders.some((tender) => tender.id === pick.tender));
+  const state = readTenderSplit(offered, totalCents, (tender) => changing.has(tender));
+  const lastPicked = offered[offered.length - 1]?.tender;
   return (
     <Stack spacing={2} data-testid={dataTestId}>
       <Progress state={state} totalCents={totalCents} copy={copy} money={money} testId={dataTestId} />
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.25 }}>
         {tenders.map((tender) => {
-          const pick = picks.find((candidate) => candidate.tender === tender.id);
+          const pick = offered.find((candidate) => candidate.tender === tender.id);
+          const shown = money.amount(state.amounts.get(tender.id) ?? 0);
           return pick === undefined ? (
             <TenderChoice
               key={tender.id}
@@ -82,12 +87,13 @@ export function TenderSplit<T extends string>({
             <PickedTender
               key={tender.id}
               tender={tender}
-              value={pick.typed ?? money.amount(state.amounts.get(tender.id) ?? 0)}
+              value={pick.typed ?? shown}
               shared={pick.typed === null}
               currencySign={money.sign}
               copy={copy}
               testId={`${dataTestId}-picked-${tender.id}`}
-              onType={(typed) => setPicks((current) => withTyped(current, tender.id, typed))}
+              autoFocus={tender.id === lastPicked}
+              onType={(typed) => setPicks((current) => withTyped(current, tender.id, typed, shown))}
               onRemove={() => setPicks((current) => withoutPicked(current, tender.id))}
             />
           );
@@ -214,7 +220,7 @@ function Progress<T extends string>({
         value={percent}
         color={covered ? 'success' : 'primary'}
         aria-label={copy.progressLabel}
-        sx={{ height: 8, borderRadius: 999 }}
+        sx={{ height: 8, borderRadius: 1 }}
       />
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
         <Typography variant="caption" color="text.secondary" data-testid={`${testId}-launched`}>

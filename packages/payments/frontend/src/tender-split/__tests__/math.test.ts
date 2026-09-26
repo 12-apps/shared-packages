@@ -44,7 +44,7 @@ describe('parseAmount', () => {
     expect(parseAmount(typed)).toBe(cents);
   });
 
-  it.each(['abc', '-5', '12a', 'R$'])('refuses %j', (typed) => {
+  it.each(['abc', '-5', '12a', 'R$', '1,2,3', '12.34.5'])('refuses %j', (typed) => {
     expect(parseAmount(typed)).toBeNull();
   });
 });
@@ -145,6 +145,27 @@ describe('readTenderSplit — typing', () => {
   it('refuses text that is not an amount', () => {
     const picks = withTyped(tap('PIX', 'CASH'), 'PIX', 'abc');
     expect(read(picks)).toMatchObject({ outcome: 'INVALID', answer: null });
+  });
+});
+
+describe('readTenderSplit — a bill of zero', () => {
+  it('still answers with the tender tapped, as the rest of nothing', () => {
+    expect(read(tap('CASH', 'PIX'), 0).answer).toEqual({
+      legs: [{ tender: 'PIX' }],
+      changeCents: 0,
+    });
+  });
+});
+
+describe('withTyped', () => {
+  it('drops the shown share left in front of a first keystroke', () => {
+    const picks = withTyped(tap('CASH'), 'CASH', '444,405', '444,40');
+    expect(picks[0]!.typed).toBe('5');
+  });
+
+  it('keeps the text whole once the amount is typed', () => {
+    const typed = withTyped(tap('CASH'), 'CASH', '5', '444,40');
+    expect(withTyped(typed, 'CASH', '50', '5')[0]!.typed).toBe('50');
   });
 });
 

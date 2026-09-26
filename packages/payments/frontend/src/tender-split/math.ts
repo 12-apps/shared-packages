@@ -89,8 +89,25 @@ export function withTyped<T extends string>(
   picks: readonly TenderPick<T>[],
   tender: T,
   typed: string,
+  shown = '',
 ): TenderPick<T>[] {
-  return picks.map((pick) => (pick.tender === tender ? { tender, typed } : pick));
+  return picks.map((pick) =>
+    pick.tender === tender ? { tender, typed: firstTyping(pick, typed, shown) } : pick,
+  );
+}
+
+/**
+ * What an automatic card's field holds once the operator types into it.
+ *
+ * The field shows the card's share and selects it on focus, so a keystroke
+ * replaces it. Where the selection does not take (iOS Safari), the keystroke
+ * lands after the share instead — "41,00" + "5" → "41,005" — so on that FIRST
+ * edit the share still sitting in front of the new characters is dropped.
+ * `shown` is the share as the field displayed it.
+ */
+function firstTyping<T extends string>(pick: TenderPick<T>, typed: string, shown: string): string {
+  if (pick.typed !== null || shown === '' || typed === shown) return typed;
+  return typed.startsWith(shown) ? typed.slice(shown.length) : typed;
 }
 
 /**
@@ -106,12 +123,22 @@ export function parseAmount(typed: string): number | null {
   if (typed.includes('-')) return null;
   const bare = typed.trim().replace(/^[^\d.,]+/u, '').replace(/\s/gu, '');
   if (bare === '') return typed.trim() === '' ? 0 : null;
-  if (!/^[\d.,]+$/u.test(bare)) return null;
+  return /^[\d.,]+$/u.test(bare) ? centsOf(bare) : null;
+}
+
+/** Digits and separators → cents, or `null` when they are not an amount. */
+function centsOf(bare: string): number | null {
   const decimal = /[.,](\d{1,2})$/u.exec(bare);
-  const whole = (decimal === null ? bare : bare.slice(0, decimal.index)).replace(/[.,]/gu, '');
-  if (whole === '' && decimal === null) return null;
+  const whole = wholeUnits(decimal === null ? bare : bare.slice(0, decimal.index));
+  if (whole === null || (whole === '' && decimal === null)) return null;
   const fraction = decimal === null ? '00' : decimal[1]!.padEnd(2, '0');
   return Number(whole || '0') * 100 + Number(fraction);
+}
+
+/** The digits before the decimal separator; grouping only in threes, so "1,2,3" is refused. */
+function wholeUnits(grouped: string): string | null {
+  if (!/^(\d+|\d{1,3}([.,]\d{3})+)?$/u.test(grouped)) return null;
+  return grouped.replace(/[.,]/gu, '');
 }
 
 /** `pool` cents in `parts` equal shares; the leftover cents go to the last. */
@@ -201,6 +228,9 @@ function legsOf<T extends string>(
       cents: amounts.get(pick.tender)! - (pick.tender === changeFrom ? changeCents : 0),
     }))
     .filter((entry) => entry.cents > 0);
+  // A bill of zero leaves every tender carrying nothing; the last one tapped
+  // still answers, as "the rest" of nothing, which a server accepts.
+  if (carrying.length === 0) return [{ tender: picks[picks.length - 1]!.tender }];
   const open = [...carrying].reverse().find((entry) => entry.pick.typed === null);
   return carrying.map((entry) =>
     entry === open

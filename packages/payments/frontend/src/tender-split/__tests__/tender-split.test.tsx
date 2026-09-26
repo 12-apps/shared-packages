@@ -13,9 +13,9 @@ import type { TenderOption } from '../tender-card';
 type Tender = 'CASH' | 'CREDIT' | 'DEBIT';
 
 const TENDERS: TenderOption<Tender>[] = [
-  { id: 'CASH', label: 'Dinheiro', givesChange: true },
-  { id: 'CREDIT', label: 'Cartão de crédito' },
-  { id: 'DEBIT', label: 'Cartão de débito' },
+  { id: 'CASH', label: 'Dinheiro', icon: null, givesChange: true },
+  { id: 'CREDIT', label: 'Cartão de crédito', icon: null, givesChange: false },
+  { id: 'DEBIT', label: 'Cartão de débito', icon: null, givesChange: false },
 ];
 
 function renderSplit(onCancel?: () => void) {
@@ -119,6 +119,23 @@ describe('TenderSplit', () => {
     expect(amountOf('CREDIT').value).toBe('444,40');
     fireEvent.click(screen.getByTestId('tender-split-option-CASH'));
     expect(amountOf('CASH').value).toBe('222,20');
+  });
+
+  it('focuses the amount of the card just picked', () => {
+    renderSplit();
+    fireEvent.click(screen.getByTestId('tender-split-option-CASH'));
+    expect(document.activeElement).toBe(amountOf('CASH'));
+  });
+
+  it('drops the share still in front of the first keystroke when focus did not select it', () => {
+    renderSplit();
+    fireEvent.click(screen.getByTestId('tender-split-option-CASH'));
+    fireEvent.click(screen.getByTestId('tender-split-option-CREDIT'));
+    // What a browser that ignored select() leaves: "222,20" + "5".
+    fireEvent.change(amountOf('CASH'), { target: { value: '222,205' } });
+
+    expect(amountOf('CASH').value).toBe('5');
+    expect(amountOf('CREDIT').value).toBe('439,40');
   });
 
   it('renders a cancel only for a host that handles it', () => {
