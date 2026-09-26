@@ -1,5 +1,5 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
 
@@ -36,13 +36,17 @@ describe('LazyImage default data-testid (FUT-2774 #3)', () => {
     expect(ids.some((id) => id?.startsWith('undefined'))).toBe(false);
   });
 
-  it('still lets an explicit data-testid win', async () => {
-    render(
+  it('still lets an explicit data-testid win, with no trace of the default left behind', () => {
+    const { container } = render(
       <ThemeProvider theme={theme}>
         <LazyImage src="/photo.png" alt="Foto" lazy={false} data-testid="thumb" />
       </ThemeProvider>,
     );
     expect(screen.getByTestId('thumb-img')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByTestId('lazy-image-img')).not.toBeInTheDocument());
+
+    const ids = Array.from(container.querySelectorAll('[data-testid]')).map((el) =>
+      el.getAttribute('data-testid'),
+    );
+    expect(ids.some((id) => id?.startsWith('lazy-image'))).toBe(false);
   });
 });

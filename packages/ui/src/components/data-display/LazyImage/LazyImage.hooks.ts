@@ -211,6 +211,11 @@ const useImageSource = (
   // cache-busted value back to the plain `src` before the browser ever
   // re-requested it — so `retryOnError` silently never re-fetched anything.
   const requestedSrcRef = useRef<string | null>(lazy ? null : src);
+  // `handleImageError` (in `useLazyImage`) owns the retry timer itself, but
+  // it schedules against THIS src's identity: read together, the two hooks
+  // can tell a timeout meant for an image that is no longer the current one
+  // apart from one that still is (FUT-2774, src-changing-mid-retry).
+  const retryTimeoutRef = useTimeoutRef();
 
   const markVisible = useCallback(() => {
     requestedSrcRef.current = src;
@@ -225,11 +230,22 @@ const useImageSource = (
       return;
     }
 
+    // A retry scheduled for the PREVIOUS src must not land on this one: left
+    // pending, its stale `setTimeout` would fire later and overwrite this
+    // fresh `currentSrc` with `${oldSrc}?retry=N}` — cache-busting an image
+    // nothing asked for again, and never re-syncing back (FUT-2774).
+    clearTimeout(retryTimeoutRef.current);
     requestedSrcRef.current = src;
-    setState((prev) => ({ ...prev, currentSrc: src, isLoading: true, hasError: false }));
-  }, [state.isVisible, src]);
+    setState((prev) => ({
+      ...prev,
+      currentSrc: src,
+      isLoading: true,
+      hasError: false,
+      retryCount: 0,
+    }));
+  }, [state.isVisible, src, retryTimeoutRef]);
 
-  return [state, setState] as const;
+  return { state, setState, requestedSrcRef, retryTimeoutRef };
 };
 
 /**
@@ -242,8 +258,7 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
   const { onLoad, onError, retryOnError, maxRetries, retryDelay } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const retryTimeoutRef = useTimeoutRef();
-  const [state, setState] = useImageSource(props, containerRef);
+  const { state, setState, requestedSrcRef, retryTimeoutRef } = useImageSource(props, containerRef);
 
   // Handle deprecated showSpinner prop
   const effectiveLoadingState = showSpinner ? 'spinner' : loadingState;
@@ -271,6 +286,13 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
       }
 
       retryTimeoutRef.current = setTimeout(() => {
+        // Belt and suspenders alongside `useImageSource`'s own cancel-on-src-
+        // change: if `src` moved on since this timeout was scheduled, this
+        // retry is for an image that is no longer live at all — applying it
+        // would cache-bust the WRONG `<img>` (FUT-2774).
+        if (requestedSrcRef.current !== src) {
+          return;
+        }
         setState((prev) => ({
           ...prev,
           retryCount: prev.retryCount + 1,
@@ -278,7 +300,7 @@ export const useLazyImage = (props: ResolvedLazyImageProps) => {
         }));
       }, retryDelay);
     },
-    [onError, retryOnError, state.retryCount, maxRetries, retryDelay, src, retirePlaceholder],
+    [onError, retryOnError, state.retryCount, maxRetries, retryDelay, src, retirePlaceholder, requestedSrcRef, retryTimeoutRef],
   );
 
   return {

@@ -231,7 +231,14 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
         // FUT-2774 #4 (see `emptyToUnset`). Does NOT change the confirmed
         // height collapse — `ImageContainer`'s own height was already `'auto'`
         // either way; see `LazyImage.test.stories.tsx` for that separate,
-        // unresolved defect.
+        // unresolved defect. `orDefault(height, 'auto')` is safe to share with
+        // `SkeletonIndicator` (unlike width's `'100%'`, deliberately NOT
+        // shared — see `emptyToUnset`): a PERCENTAGE height against an
+        // auto-height containing block computes to `auto` by spec regardless,
+        // so whether `sx.height` is omitted (falling through to
+        // `FallbackContainer`'s own `height: '100%'`) or set to the literal
+        // `'auto'` here, an unset-height container gives the same result
+        // either way — nothing for this fallback to protect against.
         width: innerLength(theme, emptyToUnset(width)),
         height: innerLength(theme, orDefault(height, 'auto')),
         borderRadius: styleLength(theme, borderRadius),
@@ -267,7 +274,10 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
   const metrics: BoxMetrics = {
     // FUT-2774 #4 (see `emptyToUnset`): `metrics` also sizes the REAL `<img>`,
     // where an unset width means "the image's own intrinsic size" —
-    // `brand-link.tsx`'s logo relies on exactly that.
+    // `brand-link.tsx`'s logo relies on exactly that. `height`'s `'auto'`
+    // fallback has no such live case to protect: a percentage height against
+    // an auto-height containing block computes to `auto` regardless, so
+    // sharing `SkeletonIndicator`'s fallback changes nothing observable.
     width: innerLength(theme, emptyToUnset(width)),
     height: innerLength(theme, orDefault(height, 'auto')),
     objectFit: props.objectFit,

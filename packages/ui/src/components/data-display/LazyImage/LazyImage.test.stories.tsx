@@ -27,6 +27,7 @@ import { LazyImage } from './LazyImage';
  * ticket's mechanical guards. Per the ticket's own Decision, this is recorded
  * here rather than fixed blind; both stories characterize TODAY's behaviour
  * so an accidental change to either shows up as a failure here, not silence.
+ * Follow-up: FUT-2805.
  */
 const meta: Meta<typeof LazyImage> = {
   title: 'Media/LazyImage/Tests',
@@ -78,9 +79,10 @@ export const UnsetWidthSkeletonInAutoWidthBox: Story = {
   // width is exactly 0, not merely small — CSS resolves the child's
   // percentage as `auto` for the parent's own shrink-to-fit computation, and
   // an `auto`-width child with no content of its own is 0. NOT fixed in this
-  // ticket (see the file header): flagged as a follow-up rather than picking
-  // a new default size blind. Not reached by any known origin-host call site today —
-  // every one sets an explicit `width` (checked 2026-09-26).
+  // ticket (see the file header): flagged as a follow-up (FUT-2805) rather
+  // than picking a new default size blind. Not reached by any known
+  // origin-host call site today — every one sets an explicit `width`
+  // (checked 2026-09-26).
   name: '🔬 FUT-2774 #5: skeleton width, LazyImage width unset',
   args: {
     src: NEVER_RESOLVES,
@@ -111,9 +113,9 @@ export const UnsetHeightFallbackClipping: Story = {
   // entirely invisible. The `orDefault` fix does not change this (it only
   // normalizes an explicit `height=""` to the same `'auto'` `SkeletonIndicator`
   // already uses); the collapse itself is not fixed in this ticket, for the
-  // same reason as FUT-2774 #5 above. Not reached by any known origin-host
-  // call site today — `menu-card-media.tsx`'s ReactNode fallback sets an
-  // explicit `height="100%"` (checked 2026-09-26).
+  // same reason as FUT-2774 #5 above — follow-up: FUT-2805. Not reached by
+  // any known origin-host call site today — `menu-card-media.tsx`'s
+  // ReactNode fallback sets an explicit `height="100%"` (checked 2026-09-26).
   name: '🔬 FUT-2774 #4: ReactNode fallback, LazyImage height unset',
   args: {
     src: ALWAYS_ERRORS,

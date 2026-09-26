@@ -78,6 +78,33 @@ describe('LazyImage retry (FUT-2774 #1)', () => {
     expect(screen.getByTestId('pic-fallback')).toBeInTheDocument();
   });
 
+  it('follows a src change made mid-retry, instead of resuming the old one', () => {
+    const NEXT_SRC = '/photo-2.png';
+    const { rerender } = renderImage();
+
+    fireEvent.error(screen.getByTestId('pic-img'));
+    // The retry for SRC is now pending (scheduled `retryDelay` away) when the
+    // component is reused for a different image — a carousel advancing, say.
+    rerender(
+      <ThemeProvider theme={theme}>
+        <LazyImage
+          src={NEXT_SRC}
+          alt="Foto"
+          lazy={false}
+          retryOnError
+          maxRetries={2}
+          retryDelay={500}
+          data-testid="pic"
+        />
+      </ThemeProvider>,
+    );
+    expect(currentSrc()).toBe(NEXT_SRC);
+
+    elapse(500);
+
+    expect(currentSrc()).toBe(NEXT_SRC);
+  });
+
   it('never re-requests when retryOnError is off', async () => {
     // Real timers: giving up is synchronous (no `retryDelay` involved), and
     // `waitFor`'s own polling needs a clock that actually advances.
