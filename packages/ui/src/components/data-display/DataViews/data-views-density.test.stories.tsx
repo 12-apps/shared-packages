@@ -85,9 +85,20 @@ export const ThemeDensityDefault: Story = {
 
 export const StoredPreferenceWinsOverTheme: Story = {
   name: "Test: Stored preference still wins over the theme",
+  // `DataViewsLayoutProvider`'s `density` state is seeded by a `useState` LAZY
+  // INITIALIZER, which reads `localStorage` once, at MOUNT. Setting it inside
+  // `play` runs too late — the story has already mounted by then — so a
+  // `loaders` entry is used instead: Storybook awaits every loader before it
+  // renders the story at all, guaranteeing the write lands before `Screen`'s
+  // first render reads it back.
+  loaders: [
+    async () => {
+      window.localStorage.setItem("dataviews:density", "comfortable");
+      return {};
+    },
+  ],
   render: () => <Screen prefix="stored-density" theme={createTheme({ density: resolveDensityFactor("compact") })} />,
   play: async ({ canvasElement, step }) => {
-    window.localStorage.setItem("dataviews:density", "comfortable");
     const canvas = within(canvasElement);
     try {
       await step("Renders the REMEMBERED density, not the theme's compact default", async () => {
