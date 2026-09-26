@@ -4,6 +4,7 @@ import { Box, ButtonBase, IconButton, InputBase, Typography } from '@mui/materia
 import { alpha } from '@mui/material/styles';
 import type { FocusEvent, ReactNode } from 'react';
 
+import { CloseIcon } from '../components/checkout/icons';
 import type { TenderSplitCopy } from './copy';
 
 /**
@@ -28,15 +29,19 @@ const CARD_RADIUS = 1.5;
 export function TenderChoice<T extends string>({
   tender,
   testId,
+  autoFocus,
   onPick,
 }: {
   tender: TenderOption<T>;
   testId: string;
+  /** The card just removed comes back as a choice and keeps the focus. */
+  autoFocus: boolean;
   onPick: () => void;
 }) {
   return (
     <ButtonBase
       onClick={onPick}
+      autoFocus={autoFocus}
       data-testid={testId}
       sx={{
         display: 'flex',
@@ -111,7 +116,7 @@ export function PickedTender<T extends string>({
         data-testid={`${testId}-remove`}
         sx={{ position: 'absolute', top: (t) => t.spacing(0.5), right: (t) => t.spacing(0.5), color: 'text.secondary' }}
       >
-        ×
+        <CloseIcon fontSize="small" />
       </IconButton>
       <InputBase
         value={value}

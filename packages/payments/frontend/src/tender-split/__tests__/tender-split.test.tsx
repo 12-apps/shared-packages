@@ -127,6 +127,15 @@ describe('TenderSplit', () => {
     await waitFor(() => expect(document.activeElement).toBe(amountOf('CASH')));
   });
 
+  it('gives the focus back to the choice of a card just removed', async () => {
+    renderSplit();
+    fireEvent.click(screen.getByTestId('tender-split-option-CASH'));
+    fireEvent.click(screen.getByTestId('tender-split-picked-CASH-remove'));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('tender-split-option-CASH')),
+    );
+  });
+
   it('drops the share still in front of the first keystroke when focus did not select it', () => {
     renderSplit();
     fireEvent.click(screen.getByTestId('tender-split-option-CASH'));

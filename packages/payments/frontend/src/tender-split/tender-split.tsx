@@ -59,6 +59,9 @@ export function TenderSplit<T extends string>({
   dataTestId = 'tender-split',
 }: TenderSplitProps<T>) {
   const [picks, setPicks] = useState<TenderPick<T>[]>([]);
+  // The tender whose card was just removed: its choice takes the focus back,
+  // so a keyboard never falls to the top of the dialog.
+  const [removed, setRemoved] = useState<T | null>(null);
   const money = useMemo(() => moneyFormats(locale, currency), [locale, currency]);
   const changing = useMemo(
     () => new Set(tenders.filter((tender) => tender.givesChange).map((t) => t.id)),
@@ -81,6 +84,7 @@ export function TenderSplit<T extends string>({
               key={tender.id}
               tender={tender}
               testId={`${dataTestId}-option-${tender.id}`}
+              autoFocus={tender.id === removed}
               onPick={() => setPicks((current) => withPicked(current, tender.id))}
             />
           ) : (
@@ -94,7 +98,10 @@ export function TenderSplit<T extends string>({
               testId={`${dataTestId}-picked-${tender.id}`}
               autoFocus={tender.id === lastPicked}
               onType={(typed) => setPicks((current) => withTyped(current, tender.id, typed, shown))}
-              onRemove={() => setPicks((current) => withoutPicked(current, tender.id))}
+              onRemove={() => {
+                setRemoved(tender.id);
+                setPicks((current) => withoutPicked(current, tender.id));
+              }}
             />
           );
         })}
