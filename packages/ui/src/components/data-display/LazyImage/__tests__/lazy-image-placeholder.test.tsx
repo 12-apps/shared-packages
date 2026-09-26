@@ -165,4 +165,33 @@ describe('LazyImage placeholder mode (FUT-2670)', () => {
     expect(screen.getByTestId('pic-placeholder')).toHaveAttribute('src', PLACEHOLDER);
     expect(countOf('pic-img')).toBe(0);
   });
+
+  // FUT-2774 #2: `usePlaceholderPhase` tracked `retired` as plain `useState(false)`,
+  // set once the real image settled and never reset — and the hook took no `src`
+  // at all. A mounted instance reused for a new image (a carousel swapping `src`
+  // rather than remounting) never showed the placeholder again for it.
+  it('brings the placeholder back when src changes on a mounted instance', () => {
+    const NEXT_SRC = '/photo-2.png';
+    const { rerender } = renderImage({ lazy: false, fadeIn: false });
+
+    fireEvent.load(screen.getByTestId('pic-img'));
+    expect(countOf('pic-placeholder')).toBe(0);
+
+    rerender(
+      <ThemeProvider theme={theme}>
+        <LazyImage
+          src={NEXT_SRC}
+          placeholder={PLACEHOLDER}
+          alt="Foto"
+          loadingState="placeholder"
+          fadeIn={false}
+          lazy={false}
+          data-testid="pic"
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('pic-placeholder')).toBeInTheDocument();
+    expect(screen.getByTestId('pic-img')).toHaveAttribute('src', NEXT_SRC);
+  });
 });

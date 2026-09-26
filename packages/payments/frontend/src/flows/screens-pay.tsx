@@ -93,6 +93,7 @@ function buildPaymentStatus(runtime: FlowsRuntime): CheckoutScreens["PaymentStat
           orderId={payable?.orderId}
           onBackToMenu={backToMenu}
           paidExtra={runtime.config.confirmation?.extra}
+          paidHero={runtime.config.confirmation?.hero}
         />
       </FlowsShell>
     );

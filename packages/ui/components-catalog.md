@@ -413,6 +413,13 @@ Components for user input and form interactions.
 **Location**: `src/components/form/Menubar`
 **Docs**: `src/components/form/Menubar/Menubar.md`
 
+### NumberField
+**Purpose**: Digits-only numeric input whose value is `number | null` (`null` = empty, never 0 or NaN)
+**Use Cases**: Counts, durations and limits in settings forms — "prepare in 15 min", "keep for 30 days"
+**Features**: `inputMode="numeric"` on the input, non-digit keystrokes refused and pastes reduced to digits, a `suffix` unit drawn inside the field border, ArrowUp/ArrowDown stepping by `step` within `min`/`max` (typing clamped on blur), `role="spinbutton"` with `aria-value*`, every `Input` size and variant
+**Location**: `src/components/form/NumberField`
+**Docs**: `src/components/form/NumberField/NumberField.md`
+
 ### PasswordStrength
 **Purpose**: Password input with strength indicator
 **Use Cases**: Registration, password change, account security
@@ -587,6 +594,35 @@ Components for structuring and organizing page layouts.
 **Features**: Horizontal/vertical, thickness control, spacing
 **Location**: `src/components/layout/Separator`
 **Docs**: `src/components/layout/Separator/Separator.md`
+
+### SettingCard
+**Purpose**: One setting, summarised while closed and edited in place
+**Use Cases**: Settings screens — any value with a title, a current state and a small form behind an Edit
+**Features**: Closed title + status pill + one-line summary + Edit; opens in place (no modal/route) around the host form with a "learn more" disclosure and Cancel/Save; async save with a pending state, stays open and shows the error on rejection (`formatError` for host sentences); Cancel/Escape discard; focus moves into the card on open and back to Edit on close; controlled or uncontrolled; spans the full row of a grid while open; required `copy` (no shipped words)
+**Types**: `SettingCardProps`, `SettingCardCopy`, `SettingStatus`, `SettingErrorFormatter`, `SettingSaveResult`
+**Location**: `src/components/layout/SettingCard`
+**Docs**: `src/components/layout/SettingCard/SettingCard.md`
+
+### SettingToggle
+**Purpose**: A setting that is one switch — flipping it saves at once, no edit state
+**Use Cases**: On/off preferences, feature flags a user controls, dependent rows inside a `SettingGroup` (`variant="row"`)
+**Features**: Async `onChange` with an optimistic flip, spinner and announced "saving" while pending, revert plus error on rejection; never disabled mid-save (focus stays); title is the switch's label and tap target; `card` or flat `row` variant; required `copy`
+**Location**: `src/components/layout/SettingCard` (same subpath as `SettingCard`)
+**Docs**: `src/components/layout/SettingCard/SettingToggle.md`
+
+### SettingGroup
+**Purpose**: ONE subject: a main switch plus dependent settings indented below it
+**Use Cases**: Notifications and their channels, backups and their schedule — rows that mean nothing while the main switch is off. Different subjects are separate cards, never one group
+**Features**: Dependent rows stay rendered but dimmed, `inert` and `aria-disabled` while off, with an `inactiveHint` explaining why; rows activate only once the main switch's save lands; same async switch contract as `SettingToggle`
+**Location**: `src/components/layout/SettingCard` (same subpath as `SettingCard`)
+**Docs**: `src/components/layout/SettingCard/SettingGroup.md`
+
+### SettingGrid
+**Purpose**: Responsive 1/2/3-column layout for setting cards, by the width it is GIVEN
+**Use Cases**: A settings page body, a settings panel beside a rail, half of a split view
+**Features**: CSS container queries (not viewport media queries), `minColumnWidth`/`maxColumns`/`gap`, equal-height cards per row through grid row sizing (no JS measurement), an open `SettingCard` spans the whole row
+**Location**: `src/components/layout/SettingCard` (same subpath as `SettingCard`)
+**Docs**: `src/components/layout/SettingCard/SettingGrid.md`
 
 ### SettingsLayout
 **Purpose**: Two-pane settings shell — searchable grouped rail + central panel
@@ -856,6 +892,8 @@ const CustomCard = ({ children, ...props }) => (
 | Load more items | InfiniteScroll | Pagination |
 | File upload | UploadButton | Input (type="file") |
 | Async data states | AsyncStateContainer | LoadingState, ErrorState, EmptyState |
+| Settings screen | SettingCard, SettingToggle in a SettingGrid | SettingGroup (one subject, main switch) |
+| Whole number entry | NumberField | Input (free text) |
 
 ### Component Documentation
 
@@ -883,17 +921,17 @@ Documentation files include:
 
 - **Data Display**: 27 components
 - **Feedback**: 6 components
-- **Form**: 24 components
-- **Layout**: 11 components
+- **Form**: 25 components
+- **Layout**: 15 components
 - **Navigation**: 7 components
 - **Typography**: 5 components
 - **Utility**: 7 components
 
-**Total**: 87 components available for reuse
+**Total**: 92 components available for reuse
 
 ---
 
-**Last Updated**: 2025-12-19
-**Version**: 1.1.0
+**Last Updated**: 2026-09-26
+**Version**: 1.2.0
 
 > **Note**: This catalog is auto-generated from the component directory structure. Always verify component availability by checking the actual source files and Storybook.

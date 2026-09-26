@@ -155,6 +155,10 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["payment-paid", "payment-receipt"],
     text: ["Pedido confirmado"],
   },
+  "Screens/StatusPaidWithHostHero": {
+    testIds: ["payment-paid", "payment-paid-hero", "payment-receipt"],
+    text: ["Pedido confirmado"],
+  },
   "Screens/StatusFailed": {
     testIds: ["payment-failed"],
     text: ["Nenhum valor foi cobrado. Você pode tentar novamente."],

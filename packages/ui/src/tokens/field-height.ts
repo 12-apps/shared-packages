@@ -120,21 +120,32 @@ export function fieldHeightOverrides(height: number = DEFAULT_FIELD_HEIGHT): Com
 }
 
 /**
+ * Several `Components<Theme>` override sets, merged per component name — a
+ * later source's `styleOverrides` win over an earlier one's for the SAME
+ * inner key, but neither erases the other's keys. A plain spread of the
+ * top-level objects would drop every override but the last source's for a
+ * component two sources both style (`fieldOverrides` below merges exactly
+ * two; density's geometry overrides, FUT-2766–2768, add more).
+ */
+export function mergeMuiComponents(...sources: Components<Theme>[]): Components<Theme> {
+  type Entry = { styleOverrides?: Record<string, unknown> };
+  const maps = sources as unknown as Record<string, Entry>[];
+  const names = new Set(maps.flatMap((map) => Object.keys(map)));
+  return Object.fromEntries(
+    [...names].map((name) => [
+      name,
+      { styleOverrides: Object.assign({}, ...maps.map((map) => map[name]?.styleOverrides)) },
+    ]),
+  ) as Components<Theme>;
+}
+
+/**
  * Both field overrides — the corner and the height — merged per component.
  * They meet on `MuiOutlinedInput` (`root` from the radius, `input` from the
  * height), so a plain spread would lose one of them.
  */
 export function fieldOverrides(radius: number | undefined, height: number | undefined): Components<Theme> {
-  type Entry = { styleOverrides?: Record<string, unknown> };
-  const corner = fieldRadiusOverrides(radius) as Record<string, Entry>;
-  const tall = fieldHeightOverrides(height) as Record<string, Entry>;
-  const names = new Set([...Object.keys(corner), ...Object.keys(tall)]);
-  return Object.fromEntries(
-    [...names].map((name) => [
-      name,
-      { styleOverrides: { ...corner[name]?.styleOverrides, ...tall[name]?.styleOverrides } },
-    ]),
-  ) as Components<Theme>;
+  return mergeMuiComponents(fieldRadiusOverrides(radius), fieldHeightOverrides(height));
 }
 
 /**

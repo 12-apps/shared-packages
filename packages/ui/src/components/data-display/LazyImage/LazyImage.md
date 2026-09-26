@@ -16,7 +16,7 @@ The LazyImage component optimizes image loading performance by:
 ### Basic Usage
 
 ```tsx
-import { LazyImage } from '@app-services-monitoring/ui';
+import { LazyImage } from '@12-apps/ui';
 
 function App() {
   return (
@@ -225,7 +225,7 @@ wrapping element, rounded to match the image:
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `decoding` | `'async' \| 'sync' \| 'auto'` | `'async'` | Image decoding hint |
-| `loading` | `'eager' \| 'lazy' \| 'auto'` | `'auto'` | Native loading attribute |
+| `loading` | `'eager' \| 'lazy'` | - | Native `loading` attribute; independent of `lazy` (which gates the `IntersectionObserver`) |
 | `fetchPriority` | `'high' \| 'low' \| 'auto'` | - | Fetch priority hint |
 
 ### Customization Props
@@ -334,47 +334,8 @@ The LazyImage component follows accessibility best practices:
 1. **Lazy Loading**: Images load only when needed, reducing initial page load
 2. **Intersection Observer**: Efficient viewport detection with configurable margins
 3. **Progressive Loading**: Support for placeholder images during load
-4. **Retry Logic**: Automatic retry for failed loads with exponential backoff
+4. **Retry Logic**: Automatic retry for failed loads, at a fixed `retryDelay` — the delay does NOT grow between attempts
 5. **Native Loading**: Leverages browser's native lazy loading when available
-
-## Migration from Original LazyImage
-
-If migrating from the original LazyImage in status-site:
-
-```tsx
-// Old usage
-import { LazyImage } from '../components/LazyImage';
-
-<LazyImage
-  src="image.jpg"
-  alt="Description"
-  width={400}
-  height={300}
-  sx={{ borderRadius: 4 }}
-/>
-
-// New usage (fully backward compatible)
-import { LazyImage } from '@app-services-monitoring/ui';
-
-<LazyImage
-  src="image.jpg"
-  alt="Description"
-  width={400}
-  height={300}
-  sx={{ borderRadius: 4 }}
-/>
-```
-
-### New Features Available After Migration
-
-- Error handling with fallback
-- Multiple loading states
-- Retry mechanism
-- Placeholder support
-- Spinner overlay option
-- Event callbacks
-- Better TypeScript support
-- Performance optimizations
 
 ## Related Components
 

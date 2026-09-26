@@ -30,6 +30,7 @@ export {
   type EmailChromeCopy,
   type EmailDocument,
   type EmailFact,
+  type EmailHero,
   type RenderedEmail,
 } from './template';
 
