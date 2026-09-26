@@ -177,8 +177,10 @@ export const KeyboardNavigation: Story = {
       const fileButton = canvas.getByRole('button', { name: /file/i });
       const editButton = canvas.getByRole('button', { name: /edit/i });
 
-      // Focus the first button explicitly
-      await userEvent.click(fileButton);
+      // Focus the first button explicitly — a click would open its menu,
+      // which then takes focus itself.
+      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+      fileButton.focus();
       await waitFor(() => expect(fileButton).toHaveFocus());
 
       // Tab to next button

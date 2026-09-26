@@ -273,7 +273,10 @@ export const KeyboardNavigation: Story = {
 
     await step('Should open popover with Enter key', async () => {
       const trigger = canvas.getByTestId('popover-trigger');
-      await userEvent.click(trigger);
+      // Focus without clicking — a click opens the popover, which then
+      // takes focus itself, before this step gets to test the Enter key.
+      // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+      trigger.focus();
       await waitFor(() => expect(trigger).toHaveFocus());
 
       await userEvent.keyboard('{Enter}');

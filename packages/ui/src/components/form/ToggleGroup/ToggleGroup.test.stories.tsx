@@ -142,8 +142,11 @@ export const KeyboardNavigation: Story = {
 
     const firstButton = canvas.getAllByRole('button')[0];
 
-    // Focus the first button
-    await userEvent.click(firstButton);
+    // Focus the first button without activating it — a click here would
+    // fire onChange itself, and the assertions below count the calls made
+    // by Space and Enter.
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+    firstButton.focus();
     await waitFor(() => {
       expect(firstButton).toHaveFocus();
     });
@@ -384,15 +387,31 @@ export const VisualStates: Story = {
 };
 
 // 9. Performance Tests
+const performanceOptions = Array.from({ length: 20 }, (_, i) => ({
+  value: `option-${i}`,
+  label: `Option ${i + 1}`,
+  icon: <Star size={16} />,
+}));
+
+// ToggleGroup has no internal state of its own — it renders whatever `value`
+// it is given. Storybook's default args-driven render never updates that
+// value on click, so, like the other controlled stories above, this one
+// holds it in useState.
+const ControlledPerformance = () => {
+  const [value, setValue] = React.useState<string[]>([]);
+
+  return (
+    <ToggleGroup
+      options={performanceOptions}
+      variant="multiple"
+      value={value}
+      onChange={(_, newValue) => setValue((newValue as string[]) ?? [])}
+    />
+  );
+};
+
 export const Performance: Story = {
-  args: {
-    options: Array.from({ length: 20 }, (_, i) => ({
-      value: `option-${i}`,
-      label: `Option ${i + 1}`,
-      icon: <Star size={16} />,
-    })),
-    variant: 'multiple',
-  },
+  render: () => <ControlledPerformance />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
