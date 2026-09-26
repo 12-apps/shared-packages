@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "sideEffects": false,
-  "description": "Receipt printing for the two ways a thermal printer is attached, behind ONE fixed-width document. Isomorphic line model and wrapping (./), the ESC/POS encoder with its CP850 code page (./escpos), the same lines as a print-ready HTML document for a printer on a cable (./html), the raw :9100 socket transport for a printer with an address (./net), per-destination routing with a default (./routing), and LAN discovery for the address nobody wrote down, with a loopback bridge a web page may call (./discovery). Carries no product copy: failures are structured, so the host says them in the reader's language. Standardized adoption contract in ADOPTING.md.",
+  "description": "Receipt printing for the two ways a thermal printer is attached, behind ONE fixed-width document. Isomorphic line model and wrapping (./), the ESC/POS encoder with its CP850 code page (./escpos), the same lines as a print-ready HTML document for a printer on a cable (./html), the raw :9100 socket transport for a printer with an address (./net), per-destination routing with a default (./routing), and LAN discovery for the address nobody wrote down, with a loopback bridge a web page may call (./discovery), and a silent print of an HTML ticket from an Electron main process (./electron). Carries no product copy: failures are structured, so the host says them in the reader's language. Standardized adoption contract in ADOPTING.md.",
   "exports": {
     ".": "./src/index.ts",
     "./discovery": "./src/discovery/index.ts",
     "./discovery/cli": "./src/discovery/cli.ts",
     "./discovery/bridge": "./src/discovery/bridge.ts",
+    "./electron": "./src/electron/index.ts",
     "./escpos": "./src/escpos/index.ts",
     "./html": "./src/html/index.ts",
     "./net": "./src/net/index.ts",
@@ -27,10 +28,19 @@
     "@12-apps/eslint-config": "workspace:*",
     "@12-apps/typescript-config": "workspace:*",
     "@types/node": "^22.10.2",
+    "electron": "^33.2.0",
     "eslint": "^9.39.1",
     "eslint-plugin-test-flakiness": "^1.4.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "electron": ">=30.0.0"
+  },
+  "peerDependenciesMeta": {
+    "electron": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22.0.0"

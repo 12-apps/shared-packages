@@ -51,11 +51,12 @@ agent the same day, and there is no credential handling in this package at all:
 | `…/autostart` | "Start with the machine" across the three platforms — a login item on macOS/Windows, an XDG `.desktop` file on Linux. |
 | `…/session` | The cookie watch, the local sign-out, and `guardSession` — a 401 moves the tray, a 403 does not. |
 | `…/telemetry` | Crash reports that outlive the crash: a session marker, breadcrumbs, a disk queue, and lost-run / crash / failed-install detection. Pure. |
-| `…/updates` | Self-updating over the host's own `electron-updater`: `createUpdateManager`, `createAutoInstall`, `updateBanner`, `createMenuGate`. Pure. |
-| `…/electron` | The adapter: single instance, tray, windows-hide-never-close, background start, `startDesktopShell`, `startCrashReporting`, `updaterFileLogger` and `sessionCookieReader`. |
+| `…/updates` | Self-updating over the host's own `electron-updater`: `createUpdateManager`, `createAutoInstall`, `updateBanner`, `createMenuGate`, and the menu bar with the updater under Help (`buildAppMenu`, `updateText`). Pure. |
+| `…/electron` | The adapter: single instance, tray, windows-hide-never-close, background start, `startDesktopShell`, `startCrashReporting`, `updaterFileLogger`, `sessionCookieReader`, `installAppMenu` and `wireUpdates` (the updater joined to the menu, the window strip, breadcrumbs and auto-install through one install path). |
+| `…/server` | The web host's half: `serveDesktopAsset` / `serveNamedDesktopAsset` (disk first, then a presigned redirect through the host's storage port; the channel `.yml` streamed; a coded 404 otherwise), `platformFor`, and the crash-report intake — `desktopReportSchema` (zod, an optional peer), `describeDesktopReport`, `createReportBudget`. Node-only. |
 | bin `desktop-shell-upload-release` | Puts a release's files in an S3-compatible bucket from any CI runner with Node — no `aws` binary. |
 
-Everything but `…/electron` is framework-free and runs in a plain Node test —
+Everything but `…/electron` and `…/server` is framework-free and runs in a plain Node test —
 which is how the autostart quoting and the status ranking are asserted on a
 machine with no display.
 
