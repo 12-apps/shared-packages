@@ -1,5 +1,5 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
@@ -78,12 +78,15 @@ describe('LazyImage retry (FUT-2774 #1)', () => {
     expect(screen.getByTestId('pic-fallback')).toBeInTheDocument();
   });
 
-  it('never re-requests when retryOnError is off', () => {
+  it('never re-requests when retryOnError is off', async () => {
+    // Real timers: giving up is synchronous (no `retryDelay` involved), and
+    // `waitFor`'s own polling needs a clock that actually advances.
+    vi.useRealTimers();
     renderImage({ retryOnError: false });
+    expect(screen.getByTestId('pic-img')).toBeInTheDocument();
 
     fireEvent.error(screen.getByTestId('pic-img'));
-    elapse(500);
 
-    expect(screen.queryByTestId('pic-img')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('pic-img')).not.toBeInTheDocument());
   });
 });

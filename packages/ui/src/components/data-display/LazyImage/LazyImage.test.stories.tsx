@@ -50,24 +50,22 @@ const ALWAYS_ERRORS = 'https://lazyimage-fut2774.invalid/always-errors.png';
  * though `element.getBoundingClientRect()` alone would still report its own
  * unclipped, content-based size.
  */
+function clippedRect(rect: DOMRect, node: Element | null, root: Element): DOMRect {
+  if (!node || node === root.parentElement) return rect;
+  const clips = ['hidden', 'clip'].includes(getComputedStyle(node).overflow);
+  if (!clips) return clippedRect(rect, node.parentElement, root);
+
+  const clip = node.getBoundingClientRect();
+  const left = Math.max(rect.left, clip.left);
+  const top = Math.max(rect.top, clip.top);
+  const right = Math.min(rect.right, clip.right);
+  const bottom = Math.min(rect.bottom, clip.bottom);
+  const next = new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
+  return clippedRect(next, node.parentElement, root);
+}
+
 function visibleRect(element: Element, root: Element): DOMRect {
-  let rect = element.getBoundingClientRect();
-  let node: Element | null = element.parentElement;
-
-  while (node && node !== root.parentElement) {
-    const clips = ['hidden', 'clip'].includes(getComputedStyle(node).overflow);
-    if (clips) {
-      const clip = node.getBoundingClientRect();
-      const left = Math.max(rect.left, clip.left);
-      const top = Math.max(rect.top, clip.top);
-      const right = Math.min(rect.right, clip.right);
-      const bottom = Math.min(rect.bottom, clip.bottom);
-      rect = new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
-    }
-    node = node.parentElement;
-  }
-
-  return rect;
+  return clippedRect(element.getBoundingClientRect(), element.parentElement, root);
 }
 
 export const UnsetWidthSkeletonInAutoWidthBox: Story = {
