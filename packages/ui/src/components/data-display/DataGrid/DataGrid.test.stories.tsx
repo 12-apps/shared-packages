@@ -300,6 +300,9 @@ export const KeyboardNavigationTest: Story = {
     rows: generateTestData(5),
     columns: testColumns,
     selection: { mode: 'single' },
+    // Sorting has to be enabled for the header to render its "Sort by …"
+    // buttons — without it there is nothing for the step below to find.
+    sorting: { mode: 'client' },
     ariaLabel: 'Keyboard navigation data grid',
   },
   play: async ({ canvasElement, step }) => {

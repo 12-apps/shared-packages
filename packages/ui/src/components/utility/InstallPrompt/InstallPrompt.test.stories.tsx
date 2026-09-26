@@ -53,7 +53,11 @@ export const AppearsWhenInstallable: Story = {
     await waitFor(async () => {
       await expect(canvas.getByTestId('install-prompt')).toBeInTheDocument();
     });
-    await expect(canvas.getByTestId('install-prompt-install')).toBeInTheDocument();
+    // One render happens before the install button appears, after the
+    // synthetic beforeinstallprompt — assert it inside waitFor too.
+    await waitFor(async () => {
+      await expect(canvas.getByTestId('install-prompt-install')).toBeInTheDocument();
+    });
   },
 };
 

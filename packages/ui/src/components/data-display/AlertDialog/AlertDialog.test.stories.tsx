@@ -246,7 +246,7 @@ export const ScreenReader: Story = {
     });
 
     await step('Verify ARIA attributes', async () => {
-      const dialog = within(document.body).getByRole('dialog');
+      const dialog = within(document.body).getByRole('alertdialog');
       expect(dialog).toBeInTheDocument();
 
       const closeButton = within(document.body).getByLabelText('close');
@@ -338,7 +338,7 @@ export const ResponsiveDesign: Story = {
     });
 
     await step('Verify dialog is visible and properly sized', async () => {
-      const dialog = within(document.body).getByRole('dialog');
+      const dialog = within(document.body).getByRole('alertdialog');
       expect(dialog).toBeInTheDocument();
       expect(within(document.body).getByText(/Lorem ipsum/)).toBeInTheDocument();
     });
@@ -414,7 +414,7 @@ export const ThemeVariations: Story = {
     });
 
     await step('Verify dialog renders correctly in dark theme', async () => {
-      const dialog = within(document.body).getByRole('dialog');
+      const dialog = within(document.body).getByRole('alertdialog');
       expect(dialog).toBeInTheDocument();
     });
   },

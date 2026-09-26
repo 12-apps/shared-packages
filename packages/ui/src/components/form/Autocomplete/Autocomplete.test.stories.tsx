@@ -797,9 +797,11 @@ export const SearchAndLinkSuggestions: Story = {
       const listbox = await canvas.findByRole('listbox');
       await expect(listbox).toBeInTheDocument();
 
-      const linkOption = await canvas.findByText('Abrir documentação');
+      // The accessible name concatenates the text across the <mark> runs
+      // highlightLabel wraps each match in, unlike an exact getByText.
+      const linkOption = await canvas.findByRole('option', { name: 'Abrir documentação' });
       // A `link` suggestion renders a leading icon.
-      await expect(linkOption.closest('[role="option"]')?.querySelector('svg')).toBeInTheDocument();
+      await expect(linkOption.querySelector('svg')).toBeInTheDocument();
 
       await userEvent.click(linkOption);
 
@@ -816,7 +818,9 @@ export const SearchAndLinkSuggestions: Story = {
       await userEvent.clear(input);
       await userEvent.type(input, 'produt');
 
-      const searchOption = await canvas.findByText('Produtos');
+      // Same reason as above: the matched run ("Produt") is wrapped in its
+      // own <mark>, so only the accessible name spans the whole label.
+      const searchOption = await canvas.findByRole('option', { name: 'Produtos' });
       await userEvent.click(searchOption);
 
       await expect(input).toHaveValue('Produtos');

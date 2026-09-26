@@ -442,7 +442,9 @@ export const FocusManagement: Story = {
 
     await step('Focus is maintained during tooltip display', async () => {
       const focusButton = canvas.getByTestId('focus-trigger');
-      await userEvent.tab();
+      // The autoFocus button from the previous step already holds focus —
+      // no need to Tab to it, and Tab would move focus to the next stop
+      // (first-element) instead of proving it stays on the trigger.
       await waitFor(() => expect(focusButton).toHaveFocus());
 
       // Hover to show tooltip
