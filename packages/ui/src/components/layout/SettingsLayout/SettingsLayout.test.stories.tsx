@@ -1130,3 +1130,116 @@ export const ChipStripKeepsKeyScrollARecentreRaced: Story = {
     });
   },
 };
+
+// ---------------------------------------------------------------------------
+// FUT-2775 — RTL centring, and the last chip's clearance from the clip edge.
+// ---------------------------------------------------------------------------
+
+export const ChipStripCentresActiveUnderRtl: Story = {
+  name: '↔️ Chip Strip Centres Under RTL Test',
+  render: () => (
+    // `dir="rtl"` on purpose: the strip inherits `direction: rtl` from it —
+    // natively, per the HTML spec, with no CSS rule of this story's own — and
+    // a modern (CSSOM View spec) browser then reports this strip's OWN raw
+    // `scrollLeft` as `0` at its right-hand start and NEGATIVE past it, the
+    // opposite sign convention an LTR strip uses. Same 320px wrapper and
+    // numeric breakpoint as `ChipStripCentresActive`, mirrored.
+    <div dir="rtl" style={{ width: 320 }}>
+      <SettingsLayout
+        title="Configuração"
+        groups={MARKED}
+        activeItemId="payments"
+        navVariant="drilldown"
+        railBreakpoint={ALWAYS_NARROW}
+        indexHref="#/config"
+        linkComponent="a"
+        sectionChips={CHIPS}
+      >
+        {panel}
+      </SettingsLayout>
+    </div>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const strip = canvas.getByTestId('settings-chips');
+
+    await step("The strip's own computed direction really is RTL", async () => {
+      await expect(getComputedStyle(strip).direction).toBe('rtl');
+    });
+
+    await step('The strip clips its own overflow rather than widening the page', async () => {
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject under test is scrolling itself; the strip's width is pinned by the story's 320px wrapper and its shape by a numeric breakpoint past any viewport
+      await waitFor(() => expect(strip.scrollWidth).toBeGreaterThan(strip.clientWidth));
+    });
+
+    await step('It scrolls itself away from its start without anyone clicking', async () => {
+      // Not `toBeGreaterThan(0)` as the LTR story asserts: an RTL scroller's
+      // raw `scrollLeft` moves NEGATIVE as it scrolls toward `payments`, at
+      // the strip's end. Only that it moved AT ALL is direction-agnostic.
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- as above: pinned width, pinned shape, and the scroll is the behaviour being proved
+      await waitFor(() => expect(strip.scrollLeft).not.toBe(0));
+    });
+
+    await step('The open chip — past the first screen — ends inside the strip', async () => {
+      // On code with no RTL branch, `Math.max(0, …)` clamps every legitimate
+      // NEGATIVE target straight back to `0` — this chip, past the first
+      // screen, would stay clipped forever, centred no differently than chip 0.
+      await waitFor(() => expectChipInside(canvas.getByTestId('settings-chip-payments'), strip));
+    });
+  },
+};
+
+/**
+ * How much clearance FUT-2775 promises the open chip's bordered edge from the
+ * strip's own clip boundary, once it is the LAST chip and the strip has
+ * scrolled to its end — sized like the gap BETWEEN chips (the strip's own
+ * `gap: 0.75`, 6px at this design system's 8px spacing unit) rather than
+ * invented fresh. Below this, the chip's border sat almost flush with the
+ * edge — reported as reading "cut off" on a 390px-wide phone with a long chip
+ * label.
+ */
+const MIN_END_CLEARANCE = 6;
+
+export const ChipStripEndPaddingClearsClipEdge: Story = {
+  name: '📏 Chip Strip End Padding Clears The Clip Edge Test',
+  render: () => (
+    // Same 320px wrapper, numeric breakpoint and last-chip-open shape as
+    // `ChipStripCentresActive` — this story reads the clearance that one
+    // leaves unchecked.
+    <div style={{ width: 320 }}>
+      <SettingsLayout
+        title="Configuração"
+        groups={MARKED}
+        activeItemId="payments"
+        navVariant="drilldown"
+        railBreakpoint={ALWAYS_NARROW}
+        indexHref="#/config"
+        linkComponent="a"
+        sectionChips={CHIPS}
+      >
+        {panel}
+      </SettingsLayout>
+    </div>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const strip = canvas.getByTestId('settings-chips');
+    const last = canvas.getByTestId('settings-chip-payments');
+
+    await step('The strip scrolls all the way to its end, the last chip open', async () => {
+      await waitFor(() => expectChipInside(last, strip));
+      await waitFor(() =>
+        // eslint-disable-next-line test-flakiness/no-viewport-dependent -- pinned 320px wrapper and numeric breakpoint; the scroll position IS the precondition
+        expect(strip.scrollLeft).toBeGreaterThanOrEqual(strip.scrollWidth - strip.clientWidth - HALF_PIXEL),
+      );
+    });
+
+    await step(`The chip's bordered edge clears the clip boundary by ${MIN_END_CLEARANCE}px`, async () => {
+      await waitFor(() => {
+        // eslint-disable-next-line test-flakiness/no-viewport-dependent -- pinned width; the clearance IS the subject
+        const clearance = visibleBox(strip).right - last.getBoundingClientRect().right;
+        expect(clearance).toBeGreaterThanOrEqual(MIN_END_CLEARANCE - HALF_PIXEL);
+      });
+    });
+  },
+};
