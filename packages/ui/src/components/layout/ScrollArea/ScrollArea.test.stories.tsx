@@ -24,6 +24,13 @@ import { ScrollArea } from './ScrollArea';
 const meta: Meta<typeof ScrollArea> = {
   title: 'Layout/ScrollArea/Tests',
   component: ScrollArea,
+  args: {
+    // Every ScrollArea mounts a ResizeObserver that calls onResize on mount
+    // (ScrollArea.tsx), so Storybook 9 treats it as an implicit action arg the
+    // moment any play function runs. An explicit spy here, once, covers every
+    // story in the file.
+    onResize: fn(),
+  },
   parameters: {
     layout: 'centered',
     chromatic: { disableSnapshot: false },
@@ -55,7 +62,6 @@ export const BasicInteraction: Story = {
     scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     scrollToTopThreshold: 50,
     onScroll: fn(),
-    onResize: fn(),
     children: generateContent(50),
   },
   play: async ({ canvasElement, args }) => {
@@ -237,7 +243,6 @@ export const ScreenReader: Story = {
     loading: false,
     disabled: false,
     onScroll: fn(),
-    onResize: fn(),
     children: generateContent(20),
   },
   play: async ({ canvasElement }) => {
@@ -571,7 +576,6 @@ export const Integration: Story = {
     scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     variant: 'overlay',
     onScroll: fn(),
-    onResize: fn(),
   },
   render: function IntegrationRender(args) {
     const [scrollPosition, setScrollPosition] = React.useState(0);

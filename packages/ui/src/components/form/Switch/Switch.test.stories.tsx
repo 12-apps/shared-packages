@@ -158,6 +158,10 @@ export const ControlTypeTest: Story = {
   args: {
     'data-testid': 'typed-switch',
     label: 'Typed switch',
+    onFocus: fn(),
+    // Clicking the <label> below activates its associated control, which
+    // also trips Storybook 9's implicit-action check for onClick.
+    onClick: fn(),
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);

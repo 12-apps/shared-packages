@@ -280,6 +280,7 @@ export const KeyboardNavigation: Story = {
     onOpenChange: fn(),
     onOpen: fn(),
     onClose: fn(),
+    onClick: fn(),
     onFocus: fn(),
     onBlur: fn(),
   },
