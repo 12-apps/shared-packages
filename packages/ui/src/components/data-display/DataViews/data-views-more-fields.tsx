@@ -9,15 +9,15 @@
  *
  * A field with one or two options renders FLAT: inside a panel there is no
  * space to win back, and two labelled checkboxes are faster than a dropdown
- * needing a second click. Past that it becomes a {@link MultiSelectDropdown} —
- * see `INLINE_OPTION_LIMIT`.
+ * needing a second click. Past that — or whenever the field asks for a tree or
+ * a search — it is the bar's own {@link PillControl}; see `sharesBarControl`.
  */
 import Checkbox from "@mui/material/Checkbox/index.js";
 
-import { MultiSelectDropdown } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
+import { PillControl } from "./data-views-category-pill";
 import type { OverflowField } from "./data-views-overflow";
 import { RangeBounds } from "./data-views-range-pill";
 import { isRangeSet } from "./data-views-range-values";
@@ -41,42 +41,59 @@ export interface MoreFieldProps {
  */
 const INLINE_OPTION_LIMIT = 2;
 
-/** One overflowed pill: its options as checkboxes, all visible at once. */
+/**
+ * Whether an overflowed pill keeps the SAME control it has on the bar.
+ *
+ * The panel used to build its own flat dropdown for every field past two
+ * options, so a field's config only held while it fitted: `control:
+ * "category"` lost its tree (subcategories flattened into one list, no
+ * "Marcar tudo", no count footer) and `searchEnabled` lost its search, on
+ * exactly the phone widths where most filters live in here. Anything the bar
+ * would render as a dropdown now renders as the bar's own {@link PillControl};
+ * only a plain two-option field — one that did not ask for a dropdown, a tree
+ * or a search — stays a flat checkbox row, which is a panel layout rather than
+ * a different control (the filter panel draws the same line).
+ */
+function sharesBarControl<T extends Record<string, unknown>>(field: OverflowField<T>): boolean {
+  const pill = field.pill;
+  if (!pill) return false;
+  return (
+    pill.control === "category" ||
+    pill.control === "multiselect" ||
+    pill.searchEnabled === true ||
+    pill.options.length > INLINE_OPTION_LIMIT
+  );
+}
+
+/** One overflowed pill: the bar's control, or its options as checkboxes. */
 function OverflowPill<T extends Record<string, unknown>>({
   field,
   values,
-  onToggle,
+  onTogglePill,
   onClear,
   testIdPrefix,
 }: {
   field: OverflowField<T>;
   values: string[];
-  onToggle: (value: string, checked: boolean) => void;
+  onTogglePill: (fieldId: string, value: string, checked: boolean) => void;
   onClear: () => void;
   testIdPrefix: string;
 }): React.JSX.Element {
-  const copy = useDataViewsCopy();
-  const options = field.pill?.options ?? [];
-  if (options.length > INLINE_OPTION_LIMIT) {
+  const testId = `${testIdPrefix}-more-${field.id}`;
+  if (field.pill && sharesBarControl(field)) {
     return (
-      <MultiSelectDropdown
-        extraOptionsHeading={copy.filters.optionsHeading}
-        clearText={copy.filters.clear}
-        clearLabel={copy.filters.clearRange(field.label)}
-        label={field.pill?.label ?? field.label}
-        options={options}
-        selected={new Set(values)}
-        onToggle={onToggle}
-        onClear={onClear}
-        allLabel={copy.filters.allOption}
-        searchable={options.length > 6 ? true : undefined}
-        searchPlaceholder={copy.filters.optionSearchPlaceholder}
-        noResultsLabel={copy.filters.optionsEmpty}
-        layout="pill"
-        data-testid={`${testIdPrefix}-more-${field.id}`}
+      <PillControl
+        fieldId={field.id}
+        pill={field.pill}
+        selected={values}
+        onTogglePill={onTogglePill}
+        onClearField={onClear}
+        testIdPrefix={testIdPrefix}
+        testId={testId}
       />
     );
   }
+  const onToggle = (value: string, checked: boolean) => onTogglePill(field.id, value, checked);
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
       {(field.pill?.options ?? []).map((option) => {
@@ -85,7 +102,7 @@ function OverflowPill<T extends Record<string, unknown>>({
           <Box
             key={option.value}
             component="label"
-            data-testid={`${testIdPrefix}-more-${field.id}-${option.value}`}
+            data-testid={`${testId}-${option.value}`}
             sx={{
               display: "inline-flex",
               alignItems: "center",
@@ -162,17 +179,6 @@ function OverflowRange<T extends Record<string, unknown>>({
     />
   );
 }
-
-/**
- * The trigger, badged with how many fields had no room on the bar — and told
- * apart when some of them are APPLIED.
- *
- * An applied filter can land in here now (it is ranked first, not exempt), so
- * this button is the only thing on screen still saying it exists. A neutral
- * badge reading "3" would make "three filters you have not used" and "three
- * filters narrowing this list" look identical, which is the whole failure the
- * old exemption was written to avoid. So an overflow holding applied filters
- * takes the applied tone and counts them in its own badge.
 
 /**
  * Whether a field has anything applied, and how to unapply it — the two shapes
@@ -257,7 +263,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
         <OverflowPill
           field={field}
           values={pills[field.id] ?? []}
-          onToggle={(value, checked) => onTogglePill(field.id, value, checked)}
+          onTogglePill={onTogglePill}
           onClear={() => (pills[field.id] ?? []).forEach((v) => onTogglePill(field.id, v, false))}
           testIdPrefix={testIdPrefix}
         />
