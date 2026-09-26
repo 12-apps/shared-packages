@@ -127,7 +127,9 @@ export function parseAmount(typed: string): number | null {
 }
 
 /** Digits and separators → cents, or `null` when they are not an amount. */
-function centsOf(bare: string): number | null {
+function centsOf(typed: string): number | null {
+  // A separator typed last is a decimal on its way ("50," while typing "50,50").
+  const bare = typed.replace(/[.,]$/u, '');
   const decimal = /[.,](\d{1,2})$/u.exec(bare);
   const whole = wholeUnits(decimal === null ? bare : bare.slice(0, decimal.index));
   if (whole === null || (whole === '' && decimal === null)) return null;
