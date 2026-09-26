@@ -12,6 +12,7 @@ import {
   resolveDensityFactor,
 } from '../density';
 import { muiThemeOptionsFrom } from '../../provider/mui-bridge';
+import { buttonSize } from '../../components/form/Button/Button.styles';
 import { createUiTheme } from '../theme';
 
 /**
@@ -136,4 +137,62 @@ describe('densityThemeOptions — the standalone entry, for a host that never ca
     expect(layered.typography.fontSize).toBeCloseTo(12.6);
     expect(layered.spacing(1)).toBe('7.2px'); // MUI's spacing function returns a CSS length
   });
+});
+
+/**
+ * Coordinator follow-up: `Input`/`Select`/`Button` all read `theme.fieldHeight`
+ * directly (`Input.tsx:46`, `Select.tsx:61`, `Button.styles.ts`'s `buttonSize`),
+ * so a standalone-path host that gets `typography`/`spacing` but no
+ * `fieldHeight` renders every field at the DEFAULT height (2.5) at every
+ * density — the standalone path silently disagreeing with `createUiTheme` on
+ * the one number three components actually key their layout off. The epic's
+ * Design section is explicit that the two paths agree on
+ * "typography/spacing/components" (and, transitively, the `fieldHeight` that
+ * `components` is built from) — this was a real gap, not a documentation nit.
+ */
+describe('densityThemeOptions — fieldHeight and the field components agree with the createUiTheme round-trip', () => {
+  it.each(['compact', 'comfortable', 0.95, 'normal'] as const)(
+    'density=%s: same fieldHeight, same MuiOutlinedInput/MuiInputLabel override numbers',
+    (density) => {
+      const standaloneOptions = densityThemeOptions(density);
+      const viaUiThemeOptions = muiThemeOptionsFrom(createUiTheme({ density }));
+
+      // The top-level key `Input`/`Select`/`Button` read directly.
+      expect(standaloneOptions.fieldHeight).toBe(viaUiThemeOptions.fieldHeight);
+
+      // The MUI-native override a HOST's own bare TextField/Select renders at.
+      expect(standaloneOptions.components?.MuiOutlinedInput?.styleOverrides).toEqual(
+        viaUiThemeOptions.components?.MuiOutlinedInput?.styleOverrides,
+      );
+      expect(standaloneOptions.components?.MuiInputLabel?.styleOverrides).toEqual(
+        viaUiThemeOptions.components?.MuiInputLabel?.styleOverrides,
+      );
+
+      // End to end: a theme built from either path lays a field out identically.
+      const standaloneTheme = createTheme(standaloneOptions);
+      const viaUiThemeTheme = createTheme(viaUiThemeOptions);
+      expect(standaloneTheme.fieldHeight).toBe(viaUiThemeTheme.fieldHeight);
+    },
+  );
+
+  it("at normal/unset, the standalone path's fieldHeight is today's literal 2.5 — no visual change", () => {
+    expect(densityThemeOptions('normal').fieldHeight).toBe(2.5);
+  });
+
+  it.each(['compact', 'normal', 'comfortable'] as const)(
+    "Button's own minHeight (buttonSize, size='md') agrees on both paths at density=%s — " +
+      'it does not read theme.fieldHeight through a components override at all, only ' +
+      'through the SAME top-level key Input/Select read, so fixing that key fixes all three',
+    (density) => {
+      const standaloneTheme = createTheme(densityThemeOptions(density));
+      const viaUiThemeTheme = createTheme(muiThemeOptionsFrom(createUiTheme({ density })));
+      const standaloneHeight = buttonSize('md', false)(standaloneTheme).minHeight;
+      const viaUiThemeHeight = buttonSize('md', false)(viaUiThemeTheme).minHeight;
+      expect(standaloneHeight).toBe(viaUiThemeHeight);
+      // 36px / 40px / 44px at the 16px root — the SAME three numbers the
+      // Input/Select fieldHeight fix produces, because both read one theme key.
+      const expectedRem = { compact: '2.25rem', normal: '2.5rem', comfortable: '2.75rem' }[density];
+      expect(standaloneHeight).toBe(expectedRem);
+    },
+  );
 });
