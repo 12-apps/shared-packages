@@ -22,7 +22,13 @@ const DIALOG_STATIC_PROPS = {
   TransitionComponent: Fade,
   TransitionProps: { timeout: 300 },
   PaperProps: { sx: { background: (theme: Theme) => scrim(theme, 0.9), backdropFilter: (theme: Theme) => `blur(${rem(theme, 2)})` } },
-  'aria-label': 'Lightbox',
+  // `aria-labelledby` is the one accessible name for the modal itself: MUI
+  // forwards it (with `aria-modal` and its own `role="dialog"`) onto the
+  // Paper, the element that is actually the WAI-ARIA dialog. A plain
+  // `aria-label` alongside it would land on the OUTER root instead — a
+  // second, non-modal `role="dialog"` this component sets of its own accord
+  // — duplicating (and, as a static English literal, contradicting) the name
+  // the Paper already carries.
   'aria-labelledby': 'lightbox-title',
   role: 'dialog',
   'aria-modal': 'true',
@@ -51,7 +57,7 @@ export const Lightbox = React.forwardRef<LightboxRef, LightboxProps>((componentP
     >
       {/* Visually hidden title for screen readers */}
       <Typography id="lightbox-title" variant="h6" sx={{ position: 'absolute', left: sxRem(-10000) }}>
-        Lightbox - {currentItem?.alt || `Item ${currentIndex + 1} of ${items.length}`}
+        {props.copy.dialogLabel} - {currentItem?.alt || props.copy.itemPosition(currentIndex + 1, items.length)}
       </Typography>
 
       <LightboxOverlay

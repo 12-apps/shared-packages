@@ -30,6 +30,7 @@ import type {
   CodeEditorCopy,
   CommandPaletteCopy,
   ConfirmActionCopy,
+  DataGridCopy,
   DataStateCopy,
   InstallPromptCopy,
   LightboxCopy,
@@ -69,6 +70,7 @@ export const DATA_STATE_COPY = pack<DataStateCopy>(
   pt.PT_BR_DATA_STATE_COPY,
   en.EN_US_DATA_STATE_COPY,
 );
+export const DATA_GRID_COPY = pack<DataGridCopy>(pt.PT_BR_DATA_GRID_COPY, en.EN_US_DATA_GRID_COPY);
 export const DATA_VIEWS_COPY = pack<DataViewsCopy>(
   pt.PT_BR_DATA_VIEWS_COPY,
   en.EN_US_DATA_VIEWS_COPY,

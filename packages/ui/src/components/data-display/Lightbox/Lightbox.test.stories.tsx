@@ -243,9 +243,15 @@ export const AccessibilityCompliance: Story = {
       // Check if the title element exists (MUI Dialog might handle aria-labelledby differently)
       const title = document.getElementById('lightbox-title');
       expect(title).toBeInTheDocument();
+      // The hidden title carries the dialog's own accessible name — the pt-BR
+      // pack's word, never the package's own English literal.
+      expect(title?.textContent).toContain(PT_BR_LIGHTBOX_COPY.dialogLabel);
+      expect(title?.textContent).not.toBe('Lightbox - Test Image 1');
 
-      // Verify there's a dialog with proper labeling
-      const dialog = document.querySelector('[role="dialog"]');
+      // Verify there's a dialog with proper labeling — the one MUI actually
+      // marks `aria-modal`, since a `[role="dialog"]` query alone can also
+      // match this component's own outer (non-modal) root.
+      const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
       expect(dialog).toBeInTheDocument();
       const hasAriaLabel =
         dialog?.hasAttribute('aria-label') || dialog?.hasAttribute('aria-labelledby');
@@ -595,6 +601,61 @@ export const FocusManagement: Story = {
       const dialog = document.querySelector('[role="dialog"]');
       const activeElement = document.activeElement;
       expect(dialog!.contains(activeElement)).toBe(true);
+    });
+  },
+};
+
+// 13. Media Fallback Tests — items with no `alt` fall back to the pt-BR pack's
+// own words, never the package's English literals.
+const itemsWithNoAlt: LightboxItem[] = [
+  {
+    src: testImages[0]!.src,
+    type: 'image',
+  },
+  {
+    src: 'data:video/mp4;base64,',
+    type: 'video',
+  },
+];
+
+export const MediaFallbacks: Story = {
+  render: () => <LightboxTestWrapper items={itemsWithNoAlt} thumbnails={true} />,
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Should open lightbox', async () => {
+      const openButton = canvas.getByTestId('open-lightbox');
+      await userEvent.click(openButton);
+
+      await waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).toBeInTheDocument();
+      });
+    });
+
+    await step('Should fall back the first image alt and hidden title to the pt-BR pack', async () => {
+      const image = document.querySelector('img[alt]') as HTMLImageElement | null;
+      expect(image?.alt).toBe(PT_BR_LIGHTBOX_COPY.imageFallback(1, 2));
+
+      // The hidden title falls back to `itemPosition`, not `imageFallback` —
+      // it names the current item's POSITION, not its media kind, and stays
+      // the same whether the current item is a photo or a video.
+      const title = document.getElementById('lightbox-title');
+      expect(title?.textContent).toBe(
+        `${PT_BR_LIGHTBOX_COPY.dialogLabel} - ${PT_BR_LIGHTBOX_COPY.itemPosition(1, 2)}`,
+      );
+
+      const thumbnail = document.querySelector('img[alt^="Miniatura"]') as HTMLImageElement | null;
+      expect(thumbnail?.alt).toBe(PT_BR_LIGHTBOX_COPY.thumbnailFallback(1));
+    });
+
+    await step('Should fall back the video aria-label to the pt-BR pack', async () => {
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
+      await userEvent.click(nextButton!);
+
+      await waitFor(() => {
+        const video = document.querySelector('video') as HTMLVideoElement | null;
+        expect(video?.getAttribute('aria-label')).toBe(PT_BR_LIGHTBOX_COPY.videoFallback(2, 2));
+      });
     });
   },
 };

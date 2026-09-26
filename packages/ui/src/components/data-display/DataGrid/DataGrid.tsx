@@ -51,7 +51,7 @@ function resolveChrome<T extends Record<string, unknown>>(props: DataGridProps<T
     },
     placeholder: {
       dataTestId,
-      ariaLabel: props.ariaLabel ?? 'Data grid',
+      ariaLabel: props.ariaLabel ?? props.copy.gridLabel,
       className,
       style,
       // Only the DOM-safe leftovers reach the element: every grid-specific prop
@@ -117,6 +117,7 @@ export const DataGrid = <T extends Record<string, unknown> = Record<string, unkn
  * none reaches the DOM — the check that would have caught `emptyText` missing.
  */
 export const GRID_ONLY_PROPS = [
+  'copy',
   'rows',
   'columns',
   'getRowId',

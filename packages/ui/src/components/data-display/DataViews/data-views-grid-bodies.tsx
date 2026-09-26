@@ -85,6 +85,7 @@ function GridBody<T extends Record<string, unknown>>({
         data-testid={dataTestId}
         emptyState={emptyState}
         emptyText={copy.grid.emptyFilteredTitle}
+        copy={copy.grid}
       />
     </Box>
   );

@@ -109,7 +109,7 @@ const TutorialStepNav: React.FC<{
                 endIcon={<NextIcon />}
                 onClick={onNext}
                 disabled={requiresActionBeforeNext}
-                title={requiresActionBeforeNext ? 'Complete the required action first' : ''}
+                title={requiresActionBeforeNext ? copy.requiresAction : ''}
                 data-testid="tutorial-next-button"
               >
                 {copy.next}
@@ -126,7 +126,7 @@ const TutorialStepNav: React.FC<{
                 }}
                 data-testid="tutorial-finish-button"
               >
-                {stepCount === 1 ? 'Complete' : 'Finish'}
+                {stepCount === 1 ? copy.complete : copy.finish}
               </Button>
             )}
           </Stack>

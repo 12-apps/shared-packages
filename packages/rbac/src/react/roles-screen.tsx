@@ -279,7 +279,7 @@ function RolesHeader({
 }): JSX.Element {
   return (
     <Dashboard.Header title={copy.rolesList.title}>
-      <Dashboard.Info title={copy.rolesList.aboutTitle}>{copy.rolesList.aboutBody}</Dashboard.Info>
+      <Dashboard.Info title={copy.rolesList.aboutTitle} ariaLabel={copy.rolesList.aboutTitle}>{copy.rolesList.aboutBody}</Dashboard.Info>
       <Dashboard.Spacer />
       {/* Gated like the row menu and the batch actions. It never needed to be
           before: `rolesGate` refused the whole screen to anyone without

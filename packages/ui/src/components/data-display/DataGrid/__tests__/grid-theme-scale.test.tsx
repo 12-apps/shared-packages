@@ -20,6 +20,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { remPx } from '../../../../tokens/relative';
+import { PT_BR_DATA_GRID_COPY } from '../../../../pt-BR';
 import { DataGrid } from '../DataGrid';
 import type { GridColumn } from '../DataGrid.types';
 
@@ -64,7 +65,13 @@ const rows: Row[] = Array.from({ length: 400 }, (_, i) => ({ id: `r${i}`, name: 
 function renderGrid() {
   return render(
     <ThemeProvider theme={theme}>
-      <DataGrid<Row> emptyText="Nada" data-testid="grid" rows={rows} columns={columns} />
+      <DataGrid<Row>
+        emptyText="Nada"
+        copy={PT_BR_DATA_GRID_COPY}
+        data-testid="grid"
+        rows={rows}
+        columns={columns}
+      />
     </ThemeProvider>,
   );
 }

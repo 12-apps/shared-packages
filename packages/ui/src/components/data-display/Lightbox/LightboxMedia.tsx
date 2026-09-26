@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import React from 'react';
 
+import { useLightboxCopy } from './lightbox-copy-context';
 import type { LightboxItem } from './Lightbox.types';
 
 export interface LightboxMediaProps {
@@ -37,6 +38,8 @@ export const LightboxMedia: FC<LightboxMediaProps> = ({
   onWheel,
   onDoubleClick,
 }) => {
+  const copy = useLightboxCopy();
+
   if (item.type === 'video') {
     return (
       <video
@@ -45,7 +48,7 @@ export const LightboxMedia: FC<LightboxMediaProps> = ({
         style={{ maxWidth: '90vw', maxHeight: '80vh', objectFit: 'contain' }}
         onLoadStart={onLoadStart}
         onLoadedData={onLoaded}
-        aria-label={item.alt || `Video ${index + 1} of ${total}`}
+        aria-label={item.alt || copy.videoFallback(index + 1, total)}
         data-testid={testId('video')}
       />
     );
@@ -54,7 +57,7 @@ export const LightboxMedia: FC<LightboxMediaProps> = ({
   return (
     <img
       src={item.src}
-      alt={item.alt || `Image ${index + 1} of ${total}`}
+      alt={item.alt || copy.imageFallback(index + 1, total)}
       style={{
         // At 1x the image is bounded by the viewport; once zoomed it is allowed
         // to overflow so there is something to pan around.

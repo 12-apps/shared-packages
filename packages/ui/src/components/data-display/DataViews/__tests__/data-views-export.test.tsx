@@ -193,7 +193,7 @@ describe("the Exportar control", () => {
     renderGrid(vi.fn());
 
     expect(screen.getByTestId("lista-export-trigger")).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("Select all rows"));
+    fireEvent.click(screen.getByLabelText("Selecionar todas as linhas"));
 
     // The trigger is REMOVED by the click, so its absence has to be awaited.
     await waitFor(() => expect(screen.queryByTestId("lista-export-trigger")).toBeNull());
