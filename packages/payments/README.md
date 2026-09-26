@@ -108,6 +108,38 @@ Both components are theme-inheriting MUI; hosts that want their own pixels
 use the exported headless hooks (`useCreateCharge`, `useChargeStatus`) and
 clients instead.
 
+### Money taken in person: `@12-apps/payments-frontend/tender-split`
+
+"How was it paid?" for a bill settled at the counter, the table or the door,
+with no provider involved. The tenders are cards: tapping splits the bill
+equally among the tapped ones (the leftover cent goes to the last), a typed
+amount stays fixed until its card is removed, and the tender flagged
+`givesChange` reports change instead of refusing an amount above the bill.
+
+```tsx
+import { TenderSplit } from '@12-apps/payments-frontend/tender-split';
+import { TENDER_SPLIT_COPY } from '@12-apps/payments-frontend/locales';
+
+<TenderSplit
+  tenders={[
+    { id: 'CASH', label: hostCopy.cash, icon: <CashIcon />, givesChange: true },
+    { id: 'PIX', label: hostCopy.pix, icon: <PixIcon /> },
+  ]}
+  totalCents={bill}
+  copy={TENDER_SPLIT_COPY[locale]}
+  locale={locale}
+  currency="BRL"
+  onConfirm={({ legs, changeCents }) => settle(legs)}
+  onCancel={close}
+/>
+```
+
+Everything is required config: the tenders, their names and glyphs, the words,
+the locale and the currency. It renders no dialog chrome, so a host puts it in
+its own dialog, sheet or page. In `legs`, the last tender that was only tapped
+carries no amount. It is "the rest", divided against the total the host's
+server composes. See `src/tender-split/math.ts`.
+
 ## Database (self-contained)
 
 `backend/prisma/payments.prisma` and `backend/prisma/migrations/` are OWNED
