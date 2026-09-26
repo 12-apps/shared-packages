@@ -20,12 +20,46 @@ const scrollHeight = (theme: Theme, containerHeight: number | string | undefined
 };
 
 /**
- * The table's one scroll container (FUT-2658): `containerHeight` tall when
- * `virtualScrolling` is on, holding the header and the body. Inline, so the
- * height it was given reads back off the element.
+ * The table's one scroll container (FUT-2658): `containerHeight` tall
+ * whenever it is set, or 400 when `virtualScrolling` is on and it is not,
+ * holding the header and the body. `containerHeight` sizes the scroller with
+ * or without `virtualScrolling` (FUT-2677) — no consumer relies on the old
+ * virtual-only gate, and `stickyHeader` needs this box to stick inside.
+ * Inline, so the height it was given reads back off the element. A
+ * `containerHeight` of 0 counts as unset: a zero-height scroller shows nothing.
  */
 export const scrollerStyle = (theme: Theme, p: TableProps): React.CSSProperties | undefined =>
-  p.virtualScrolling ? { height: scrollHeight(theme, p.containerHeight), overflow: 'auto' } : undefined;
+  p.virtualScrolling || p.containerHeight
+    ? { height: scrollHeight(theme, p.containerHeight), overflow: 'auto' }
+    : undefined;
+
+/**
+ * With `stickyHeader`, the scroller takes over the rounded clip the `<table>`
+ * gives up (`tableStyles`, FUT-2677) — the caller's container owns it on the
+ * basic (children) path, and the loading/empty shells get it too, so their
+ * corners do not change between states.
+ */
+export const scrollerRadiusStyle = (
+  theme: Theme,
+  stickyHeader: boolean | undefined,
+): React.CSSProperties | undefined => (stickyHeader ? { borderRadius: theme.spacing(1) } : undefined);
+
+/** `scrollerStyle` and, with `stickyHeader`, the rounded clip it takes over. */
+export const containerStyle = (theme: Theme, p: TableProps): React.CSSProperties | undefined => {
+  const scroller = scrollerStyle(theme, p);
+  const radius = scrollerRadiusStyle(theme, p.stickyHeader);
+  return scroller || radius ? { ...scroller, ...radius } : undefined;
+};
+
+/**
+ * Only a virtualised table needs its header measured — a plain one never
+ * reads `scroll.headerPx`, so it gets no `ResizeObserver` either (FUT-2678).
+ */
+export const headerRefFor = (
+  windowHeight: number | undefined,
+  headRef: React.RefObject<globalThis.HTMLTableSectionElement | null>,
+): React.RefObject<globalThis.HTMLTableSectionElement | null> | undefined =>
+  windowHeight ? headRef : undefined;
 
 /**
  * The window's height in design px when the body is virtualised — only a

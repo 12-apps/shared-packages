@@ -220,10 +220,15 @@ export const tableStyles = ({
   virtualised?: boolean;
 }): CSSObject => {
   const densityConfig = getDensityConfig(theme, density);
-  
+
   return {
-    borderRadius: theme.spacing(1),
-    overflow: 'hidden',
+    // `overflow: hidden` makes the `<table>` a scroll container, which stops
+    // a `stickyHeader`'s `<thead>` sticking within it — a sticky element
+    // sticks within its nearest ancestor scroll container (FUT-2677). With
+    // `stickyHeader`, the rounded clip moves to the `TableContainer` instead
+    // (`containerStyle` and `scrollerRadiusStyle` in `Table.helpers.ts`), which already clips a
+    // scrolling table.
+    ...(stickyHeader ? {} : { borderRadius: theme.spacing(1), overflow: 'hidden' }),
     transition: 'all 0.3s ease',
     position: 'relative',
 

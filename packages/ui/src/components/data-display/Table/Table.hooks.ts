@@ -1,6 +1,11 @@
 import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+
+// A server render has no layout to measure, and React warns about
+// `useLayoutEffect` there; the effect below only measures, so on the server
+// it can be a plain (never-run) effect.
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 import { remPx } from '../../../tokens/relative';
 
@@ -14,9 +19,13 @@ import type { ColumnConfig, TableProps, VirtualWindow } from './Table.types';
  * pitch at any type scale.
  *
  * The scroller holds the header as well as the body, so the `<tbody>` starts
- * the header's height into it. `handleScroll` measures that height from
- * `headerRef` in the same live px as `scrollTop`, and the window subtracts it
- * before dividing by the pitch (FUT-2658).
+ * the header's height into it. That height is measured once after mount, and
+ * again from a `ResizeObserver` on `headerRef` whenever it changes —
+ * `handleScroll` also measures it on every scroll, so a scroll still carries
+ * the latest height, but nothing depends on that any more (FUT-2678: a
+ * resize with no scroll event used to leave the window off until the next
+ * one). The window subtracts the measured height before dividing by the pitch
+ * (FUT-2658).
  */
 export const useVirtualScrolling = (
   data: Record<string, unknown>[],
@@ -28,7 +37,33 @@ export const useVirtualScrolling = (
   const theme = useTheme();
   // Both live px, as the browser measures them.
   const [scroll, setScroll] = useState({ scrollTop: 0, headerPx: 0 });
-  
+
+  const measureHeader = useCallback(() => {
+    setScroll((prev) => {
+      const headerPx = headerRef?.current?.offsetHeight ?? 0;
+      return headerPx === prev.headerPx ? prev : { ...prev, headerPx };
+    });
+  }, [headerRef]);
+
+  // Once after mount, so a header measured before any scroll or resize is
+  // still right the first time the window is drawn.
+  useIsomorphicLayoutEffect(() => {
+    measureHeader();
+  }, [measureHeader]);
+
+  // Then on every change the header makes on its own: a responsive column
+  // hidden or shown, a label wrapping at a new width, a web font loading, a
+  // `density` change. Where `ResizeObserver` is undefined, only the mount
+  // measurement above and `handleScroll` below still apply.
+  useEffect(() => {
+    const header = headerRef?.current;
+    if (!header || typeof ResizeObserver === 'undefined') return undefined;
+
+    const observer = new ResizeObserver(() => measureHeader());
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [headerRef, measureHeader]);
+
   const visibleItems = useMemo((): VirtualWindow => {
     const pitch = remPx(theme, rowHeight);
     const bodyScrollTop = Math.max(0, scroll.scrollTop - scroll.headerPx);

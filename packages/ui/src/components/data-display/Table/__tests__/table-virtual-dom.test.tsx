@@ -13,7 +13,7 @@
  */
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { remPx } from '../../../../tokens/relative';
 import { Table } from '../Table';
@@ -190,5 +190,99 @@ describe('Table props on the DOM', () => {
     expect(table).toHaveAttribute('id', 'orders');
     expect(table).toHaveAttribute('aria-label', 'Pedidos');
     expect(table).toHaveClass('orders-table', 'MuiTable-root');
+  });
+});
+
+/**
+ * THE HEADER'S HEIGHT IS RE-MEASURED WHENEVER IT CHANGES, NOT ONLY ON SCROLL
+ * (FUT-2678).
+ *
+ * `handleScroll` used to be the only place the window's `headerPx` was
+ * written, so a header that changed height without a scroll event left the
+ * window off until the next one. A `ResizeObserver` on the `<thead>` now
+ * re-measures it directly.
+ *
+ * jsdom has no `ResizeObserver`, so this stubs one that stores each
+ * instance's callback where the test can fire it directly — unlike
+ * `DataViews/__tests__/data-views-overflow.test.tsx`'s `stubResizeObserver`,
+ * which fires on `observe` itself, this one must fire on demand, after the
+ * header's stubbed `offsetHeight` has changed.
+ */
+type FakeObserver = {
+  observe: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+  fire: () => void;
+};
+
+function stubResizeObserver(): FakeObserver[] {
+  const observers: FakeObserver[] = [];
+
+  class FakeResizeObserver {
+    private readonly callback: ResizeObserverCallback;
+    observe: ReturnType<typeof vi.fn>;
+    disconnect: ReturnType<typeof vi.fn>;
+    unobserve = vi.fn();
+
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback;
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+      observers.push({
+        observe: this.observe,
+        disconnect: this.disconnect,
+        fire: () =>
+          this.callback([] as unknown as ResizeObserverEntry[], this as unknown as ResizeObserver),
+      });
+    }
+  }
+
+  vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  return observers;
+}
+
+describe('Table (virtual scrolling) re-measures its header from a ResizeObserver', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("re-measures the header's height when it changes, without a scroll event", () => {
+    const observers = stubResizeObserver();
+    renderVirtual();
+    const tableEl = screen.getByRole('table');
+    const scroller = tableEl.parentElement!;
+    const thead = tableEl.querySelector('thead')!;
+    Object.defineProperty(thead, 'offsetHeight', { configurable: true, value: 56 });
+
+    act(() => {
+      fireEvent.scroll(scroller, { target: { scrollTop: 56 + 100 * PITCH + 1 } });
+    });
+    expect(dataRows()[0]).toHaveTextContent('row-100');
+
+    // The header grows, but nothing scrolls.
+    Object.defineProperty(thead, 'offsetHeight', { configurable: true, value: 56 + 3 * PITCH });
+    act(() => {
+      observers[0]!.fire();
+    });
+    expect(dataRows()[0]).toHaveTextContent('row-97');
+  });
+
+  it('constructs exactly one observer, observing the <thead>, and disconnects it on unmount', () => {
+    const observers = stubResizeObserver();
+    const { unmount } = renderVirtual();
+    const thead = screen.getByRole('table').querySelector('thead')!;
+
+    expect(observers).toHaveLength(1);
+    expect(observers[0]!.observe).toHaveBeenCalledWith(thead);
+    expect(observers[0]!.disconnect).not.toHaveBeenCalled();
+
+    unmount();
+    expect(observers[0]!.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates no ResizeObserver for a plain (non-virtual) table', () => {
+    const observers = stubResizeObserver();
+    renderTable({ columns, data });
+
+    expect(observers).toHaveLength(0);
   });
 });

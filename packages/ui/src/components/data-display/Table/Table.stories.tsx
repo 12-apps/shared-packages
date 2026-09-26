@@ -380,6 +380,31 @@ export const VirtualScrollingSelectableStickyHeader: Story = {
   },
 };
 
+/**
+ * `stickyHeader` + `containerHeight` with `virtualScrolling` (FUT-2677): all
+ * three causes of a header that never stuck are exercised together, at the
+ * exact combination `Table.md`'s "Complete Feature Set" example uses.
+ */
+export const VirtualStickyHeader: Story = {
+  render: () => (
+    <Box>
+      <Typography variant="h6" gutterBottom>
+        Virtual scrolling — sticky header, 300px container
+      </Typography>
+      <Table
+        emptyText="Nenhum dado"
+        columns={virtualColumns}
+        data={largeDataset.slice(0, 200)}
+        virtualScrolling
+        stickyHeader
+        containerHeight={300}
+        overscan={10}
+        variant="striped"
+      />
+    </Box>
+  ),
+};
+
 export const ResponsiveDesign: Story = {
   render: () => (
     <Box>

@@ -53,7 +53,7 @@ import { Table } from '@procurement/ui';
 - **selectable** `boolean` - Enable row selection
 - **selectedRows** `(string | number)[]` - Currently selected row IDs
 - **onSelectionChange** `(rows: (string | number)[]) => void` - Selection change handler
-- **stickyHeader** `boolean` - Keep header fixed when scrolling
+- **stickyHeader** `boolean` - Keep header fixed when scrolling. Sticks inside the `containerHeight` scroller — set both together, or the header has nothing to stick within
 - **responsive** `boolean` - Enable responsive column hiding
 - **virtualScrolling** `boolean` - Enable virtual scrolling for large datasets
 - **loading** `boolean` - Show loading state
@@ -67,7 +67,7 @@ import { Table } from '@procurement/ui';
 
 ### Container Props
 
-- **containerHeight** `number` - Fixed height for scrollable container
+- **containerHeight** `number | string` - Fixed height for the scrollable container, with or without `virtualScrolling` — a number is design px, a string is used as given (e.g. `'50vh'`)
 - **rowHeight** `number` - Height per row (for virtual scrolling)
 - **overscan** `number` - Number of rows to render outside viewport
 
@@ -247,3 +247,9 @@ const columns = [
   </Table>
 </TableContainer>
 ```
+
+On this path the caller supplies its own `TableContainer`, so the rounded clip
+is the caller's. Without `stickyHeader` the `<table>` still rounds and clips
+itself, as above; with `stickyHeader` the `<table>` does not, and the
+caller's own container should carry the radius that used to be the
+`<table>`'s (`theme.spacing(1)` at the default theme).
