@@ -6,8 +6,13 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 import { Calendar } from './Calendar';
 import type { DateRange } from './Calendar.types';
 
+// The story feeds this literal as the calendar's own ariaLabel prop (not a
+// copy pack value); hoisted so the assertions below follow whatever this
+// constant says rather than re-typing it.
+const CALENDAR_ARIA_LABEL = 'Calendário';
+
 const meta: Meta<typeof Calendar> = {
-  args: { ariaLabel: 'Calendário' },
+  args: { ariaLabel: CALENDAR_ARIA_LABEL },
   title: 'Form/Calendar/Tests',
   component: Calendar,
   parameters: {
@@ -32,6 +37,10 @@ interface TestWrapperProps {
   selectionMode?: 'single' | 'range';
   onChangeCallback?: (value: Date | null) => void;
   onRangeChangeCallback?: (range: Required<DateRange>) => void;
+  // A caller-supplied starting value, distinct from `value` (the wrapper's own
+  // controlled state below): naming this out of `...props` keeps it from being
+  // silently discarded by the `value={value}` the single-mode branch renders.
+  value?: Date | null;
   [key: string]: unknown;
 }
 
@@ -39,9 +48,10 @@ const TestWrapper = ({
   selectionMode = 'single',
   onChangeCallback = fn(),
   onRangeChangeCallback = fn(),
+  value: initialValue = null,
   ...props
 }: TestWrapperProps) => {
-  const [value, setValue] = useState<Date | null>(null);
+  const [value, setValue] = useState<Date | null>(initialValue);
   const [range, setRange] = useState<DateRange>({ start: null, end: null });
 
   const handleChange = (newValue: Date | null) => {
@@ -56,11 +66,11 @@ const TestWrapper = ({
 
   if (selectionMode === 'range') {
     return (
-      <Calendar ariaLabel="Calendário" {...props} selectionMode="range" range={range} onRangeChange={handleRangeChange} />
+      <Calendar ariaLabel={CALENDAR_ARIA_LABEL} {...props} selectionMode="range" range={range} onRangeChange={handleRangeChange} />
     );
   }
 
-  return <Calendar ariaLabel="Calendário" {...props} selectionMode="single" value={value} onChange={handleChange} />;
+  return <Calendar ariaLabel={CALENDAR_ARIA_LABEL} {...props} selectionMode="single" value={value} onChange={handleChange} />;
 };
 
 export const BasicInteraction: Story = {
@@ -69,7 +79,7 @@ export const BasicInteraction: Story = {
     const canvas = within(canvasElement);
 
     // Find calendar container
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     // Find and click a date (day 15 if available)
@@ -101,7 +111,7 @@ export const RangeInteractionTest: Story = {
     const canvas = within(canvasElement);
 
     // Find calendar container
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     const dateButtons = canvas.getAllByRole('gridcell');
@@ -137,7 +147,7 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
 
     // Find calendar container
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     // Focus the calendar the way a user would, and confirm it took — the keyboard
@@ -174,7 +184,7 @@ export const ScreenReaderTest: Story = {
     const canvas = within(canvasElement);
 
     // Verify ARIA attributes
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     // Check grid role
@@ -205,7 +215,7 @@ export const FocusManagement: Story = {
     const canvas = within(canvasElement);
 
     // Find calendar container
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
 
     // Focus should be managed properly
     await userEvent.click(calendar);
@@ -241,7 +251,7 @@ export const ResponsiveDesign: Story = {
     const canvas = within(canvasElement);
 
     // Verify calendar renders in mobile viewport
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     // Check that calendar adapts to container width
@@ -273,7 +283,7 @@ export const ThemeVariations: Story = {
     const canvas = within(canvasElement);
 
     // Find calendar and verify theme application
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     // Check that theme styles are applied
@@ -303,7 +313,7 @@ export const VisualStates: Story = {
     const canvas = within(canvasElement);
 
     // Verify different visual states
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     const dateButtons = canvas.getAllByRole('gridcell');
@@ -330,7 +340,7 @@ export const PerformanceTest: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     // Check all months are rendered
@@ -361,7 +371,7 @@ export const EdgeCases: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const calendar = canvas.getByRole('application', { name: 'Calendar' });
+    const calendar = canvas.getByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendar).toBeInTheDocument();
 
     const dateButtons = canvas.getAllByRole('gridcell');
@@ -402,13 +412,13 @@ const IntegrationTestComponent = () => {
 
   return (
     <Box sx={{ display: 'flex', gap: 4 }}>
-      <Calendar ariaLabel="Calendário"
+      <Calendar ariaLabel={CALENDAR_ARIA_LABEL}
         selectionMode="single"
         value={singleDate}
         onChange={setSingleDate}
         data-testid="single-calendar"
       />
-      <Calendar ariaLabel="Calendário"
+      <Calendar ariaLabel={CALENDAR_ARIA_LABEL}
         selectionMode="range"
         range={rangeDate}
         onRangeChange={setRangeDate}
@@ -424,7 +434,7 @@ export const IntegrationTest: Story = {
     const canvas = within(canvasElement);
 
     // Test multiple calendars working independently
-    const calendars = canvas.getAllByRole('application', { name: 'Calendar' });
+    const calendars = canvas.getAllByRole('application', { name: CALENDAR_ARIA_LABEL });
     expect(calendars).toHaveLength(2);
 
     // Test interaction with first calendar

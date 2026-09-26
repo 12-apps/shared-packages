@@ -119,7 +119,7 @@ export const BasicInteraction: Story = {
     });
 
     await step('Should close lightbox with close button', async () => {
-      const closeButton = document.querySelector('[aria-label="Close lightbox"]');
+      const closeButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`);
       expect(closeButton).toBeInTheDocument();
 
       await userEvent.click(closeButton!);
@@ -149,7 +149,7 @@ export const Navigation: Story = {
     });
 
     await step('Should navigate to next image', async () => {
-      const nextButton = document.querySelector('[aria-label="Next item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
       expect(nextButton).toBeInTheDocument();
 
       await userEvent.click(nextButton!);
@@ -161,7 +161,7 @@ export const Navigation: Story = {
     });
 
     await step('Should navigate to previous image', async () => {
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
+      const prevButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`);
       expect(prevButton).toBeInTheDocument();
 
       await userEvent.click(prevButton!);
@@ -253,11 +253,11 @@ export const AccessibilityCompliance: Story = {
     });
 
     await step('Should have accessible controls', async () => {
-      const closeButton = document.querySelector('[aria-label="Close lightbox"]');
+      const closeButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`);
       expect(closeButton).toBeInTheDocument();
 
-      const nextButton = document.querySelector('[aria-label="Next item"]');
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
+      const prevButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`);
 
       if (nextButton) expect(nextButton).toBeInTheDocument();
       if (prevButton) expect(prevButton).toBeInTheDocument();
@@ -288,9 +288,9 @@ export const ZoomAndPan: Story = {
     });
 
     await step('Should show zoom controls', async () => {
-      const zoomIn = document.querySelector('[aria-label="Zoom in"]');
-      const zoomOut = document.querySelector('[aria-label="Zoom out"]');
-      const resetZoom = document.querySelector('[aria-label="Reset zoom"]');
+      const zoomIn = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.zoomIn}"]`);
+      const zoomOut = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.zoomOut}"]`);
+      const resetZoom = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.resetZoom}"]`);
 
       expect(zoomIn).toBeInTheDocument();
       expect(zoomOut).toBeInTheDocument();
@@ -298,7 +298,7 @@ export const ZoomAndPan: Story = {
     });
 
     await step('Should zoom in when zoom in button clicked', async () => {
-      const zoomInButton = document.querySelector('[aria-label="Zoom in"]');
+      const zoomInButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.zoomIn}"]`);
       const image = document.querySelector('img[alt="Test Image 1"]');
 
       await userEvent.click(zoomInButton!);
@@ -319,7 +319,7 @@ export const ZoomAndPan: Story = {
     });
 
     await step('Should reset zoom when reset button clicked', async () => {
-      const resetButton = document.querySelector('[aria-label="Reset zoom"]');
+      const resetButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.resetZoom}"]`);
       const image = document.querySelector('img[alt="Test Image 1"]');
 
       await userEvent.click(resetButton!);
@@ -400,7 +400,8 @@ export const AutoplayFunctionality: Story = {
     });
 
     await step('Should show autoplay controls', async () => {
-      const playPauseButton = document.querySelector('[aria-label*="slideshow"]');
+      const playPauseSelector = `[aria-label="${PT_BR_LIGHTBOX_COPY.play}"], [aria-label="${PT_BR_LIGHTBOX_COPY.pause}"]`;
+      const playPauseButton = document.querySelector(playPauseSelector);
       expect(playPauseButton).toBeInTheDocument();
     });
 
@@ -416,16 +417,15 @@ export const AutoplayFunctionality: Story = {
     });
 
     await step('Should pause autoplay when button clicked', async () => {
-      const pauseButton = document.querySelector('[aria-label="Pause slideshow"]');
-      if (pauseButton) {
-        await userEvent.click(pauseButton);
+      const pauseButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.pause}"]`);
+      expect(pauseButton).toBeInTheDocument();
+      await userEvent.click(pauseButton!);
 
-        // Verify it changes to play button
-        await waitFor(() => {
-          const playButton = document.querySelector('[aria-label="Start slideshow"]');
-          expect(playButton).toBeInTheDocument();
-        });
-      }
+      // Verify it changes to play button
+      await waitFor(() => {
+        const playButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.play}"]`);
+        expect(playButton).toBeInTheDocument();
+      });
     });
   },
 };
@@ -447,7 +447,7 @@ export const LoopNavigation: Story = {
     });
 
     await step('Should wrap to last image when going previous from first', async () => {
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
+      const prevButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`);
       expect(prevButton).toBeInTheDocument();
       expect(prevButton).not.toBeDisabled();
 
@@ -460,7 +460,7 @@ export const LoopNavigation: Story = {
     });
 
     await step('Should wrap to first image when going next from last', async () => {
-      const nextButton = document.querySelector('[aria-label="Next item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
       expect(nextButton).toBeInTheDocument();
       expect(nextButton).not.toBeDisabled();
 
@@ -494,9 +494,9 @@ export const EdgeCases: Story = {
       // absence checks below describe what an empty gallery omits, rather than
       // passing because nothing had rendered yet.
       await waitFor(() => {
-        expect(document.querySelector('[aria-label="Close lightbox"]')).toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Next item"]')).not.toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Previous item"]')).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`)).toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`)).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`)).not.toBeInTheDocument();
       });
     });
   },
@@ -522,9 +522,9 @@ export const SingleImageGallery: Story = {
       // The close button proves the overlay rendered, so the absences here are
       // about what a one-item gallery omits rather than about timing.
       await waitFor(() => {
-        expect(document.querySelector('[aria-label="Close lightbox"]')).toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Next item"]')).not.toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Previous item"]')).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`)).toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`)).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`)).not.toBeInTheDocument();
       });
     });
 
@@ -557,7 +557,7 @@ export const Performance: Story = {
     });
 
     await step('Should navigate between images', async () => {
-      const nextButton = document.querySelector('[aria-label="Next item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
       await userEvent.click(nextButton!);
 
       await waitFor(() => {
@@ -578,7 +578,7 @@ export const FocusManagement: Story = {
       await userEvent.click(openButton);
 
       await waitFor(() => {
-        const closeButton = document.querySelector('[aria-label="Close lightbox"]');
+        const closeButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`);
         expect(closeButton).toBeInTheDocument();
         // Focus management is handled by MUI Dialog
         expect(document.activeElement).toBeDefined();

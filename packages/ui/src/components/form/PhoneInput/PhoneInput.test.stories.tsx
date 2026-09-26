@@ -88,9 +88,10 @@ export const FormInteraction: Story = {
     // Blur to trigger validation
     await userEvent.tab();
 
-    // Should show validation error - use regex to match partial text
+    // Should show the pt-BR validation error the copy pack feeds
+    const invalidNumberMessage = PT_BR_PHONE_INPUT_COPY.invalidNumber('United States');
     await waitFor(() => {
-      const helperText = canvas.getByText(/Invalid phone number/i);
+      const helperText = canvas.getByText(invalidNumberMessage);
       expect(helperText).toBeVisible();
     }, { timeout: 3000 });
 
@@ -100,9 +101,11 @@ export const FormInteraction: Story = {
     await userEvent.type(input, '5551234567');
     await userEvent.tab();
 
-    // Error should be gone
+    // Error should be gone. The step above already established the error was
+    // on screen, so this describes it disappearing, not something that never
+    // appeared.
     await waitFor(() => {
-      const errorText = canvas.queryByText(/Invalid phone number/i);
+      const errorText = canvas.queryByText(invalidNumberMessage);
       expect(errorText).not.toBeInTheDocument();
     }, { timeout: 3000 });
   },
@@ -166,7 +169,7 @@ export const ScreenReader: Story = {
     // Check for country selector accessibility using testId
     const countryButton = canvas.getByTestId('country-selector');
     await expect(countryButton).toHaveAttribute('aria-expanded', 'false');
-    await expect(countryButton).toHaveAttribute('aria-label', 'Select country');
+    await expect(countryButton).toHaveAttribute('aria-label', PT_BR_PHONE_INPUT_COPY.selectCountry);
 
     // Open menu and check expanded state
     await userEvent.click(countryButton);
@@ -555,8 +558,9 @@ export const EnhancedValidation: Story = {
     await userEvent.type(input, '123');
     await userEvent.tab();
     
+    const invalidUsNumberMessage = PT_BR_PHONE_INPUT_COPY.invalidNumber('United States');
     await waitFor(() => {
-      const helperText = canvas.getByText(/Invalid phone number for United States/);
+      const helperText = canvas.getByText(invalidUsNumberMessage);
       expect(helperText).toBeVisible();
     });
 
@@ -565,8 +569,10 @@ export const EnhancedValidation: Story = {
     await userEvent.type(input, '2125551234');
     await userEvent.tab();
     
+    // The step above already established the error was on screen, so this
+    // describes it disappearing, not something that never appeared.
     await waitFor(() => {
-      const errorText = canvas.queryByText(/Invalid phone number/);
+      const errorText = canvas.queryByText(invalidUsNumberMessage);
       expect(errorText).not.toBeInTheDocument();
     });
 

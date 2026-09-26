@@ -385,7 +385,7 @@ export const AsyncLoading: Story = {
     // Check for loading text in dropdown
     await waitFor(
       async () => {
-        const loadingText = canvas.getByText('Loading...');
+        const loadingText = canvas.getByText(PT_BR_AUTOCOMPLETE_COPY.loading);
         await expect(loadingText).toBeInTheDocument();
       },
       { timeout: 1000 },
@@ -459,7 +459,7 @@ export const NoResults: Story = {
     // Wait for the dropdown to open with no results message
     await waitFor(
       async () => {
-        const noResults = canvas.getByText('No results found');
+        const noResults = canvas.getByText(PT_BR_AUTOCOMPLETE_COPY.noResults);
         await expect(noResults).toBeInTheDocument();
       },
       { timeout: 1000 },
