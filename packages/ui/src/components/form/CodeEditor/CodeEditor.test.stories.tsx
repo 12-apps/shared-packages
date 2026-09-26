@@ -63,31 +63,56 @@ export const BasicInteraction: Story = {
       { timeout: 3000 },
     );
 
-    // Test actual Monaco editor functionality - line numbers
-    const lineNumbers = canvasElement.querySelectorAll('.line-numbers');
-    expect(lineNumbers.length).toBeGreaterThan(6); // Should have line numbers for our sample code
+    // Test actual Monaco editor functionality - line numbers. sampleCode above
+    // is exactly 6 lines, so a rendered number per line means at least 6 — not
+    // more than 6, which never happens before any edit. `.line-numbers` also
+    // matches Monaco's own margin "textAreaCover" decoration (an empty div
+    // sharing that class to mask the gutter), so this filters to the ones that
+    // actually carry a line number.
+    const lineNumbers = Array.from(canvasElement.querySelectorAll('.line-numbers')).filter(
+      (el) => el.textContent,
+    );
+    expect(lineNumbers.length).toBeGreaterThanOrEqual(6); // Should have line numbers for our sample code
     expect(lineNumbers[0]).toHaveTextContent('1');
     expect(lineNumbers[1]).toHaveTextContent('2');
 
-    // Verify Monaco editor content is editable and responds to input
-    const textArea = canvasElement.querySelector('.inputarea') as HTMLElement;
-    await expect(textArea).toBeInTheDocument();
+    // Verify Monaco editor content is editable and responds to input. Monaco's
+    // `.monaco-editor` root mounts before its internal view finishes building
+    // its input host — a real, if brief, gap. That host is `role="textbox"`
+    // under either of Monaco's input controllers (the classic hidden
+    // `.inputarea` textarea, or the native EditContext `.native-edit-context`
+    // div Chromium defaults to), so querying by role is stable across both.
+    const textArea = await within(canvasElement).findByRole('textbox', {}, { timeout: 10000 });
 
     // Test editor receives focus and is interactive
     await userEvent.click(textArea);
     await waitFor(() => expect(textArea).toHaveFocus());
 
-    // Test that onChange is called when content changes (use existing content)
-    await userEvent.keyboard('{End}'); // Go to end of content
-    await userEvent.type(textArea, '\n// Added comment');
+    // Test that onChange is called when content changes. Typing NEW
+    // characters relies on the browser's real EditContext text-input
+    // pipeline (Chromium's default input controller here) — only genuine
+    // trusted keyboard/IME input drives it, so no DOM-dispatchable event can
+    // simulate it from a play() function. A Monaco COMMAND such as "toggle
+    // line comment" is not text insertion: it goes through the keybinding
+    // service the same way under either input controller (as Ctrl+S does,
+    // below), and it does modify the model — so it is what this story uses
+    // to exercise a real, verifiable edit. `userEvent.keyboard`'s synthetic
+    // KeyboardEvent also does not resolve a keybinding reliably (it omits
+    // the legacy `keyCode` Monaco reads), so the keydown is dispatched
+    // directly, with `keyCode` set — see the Ctrl+S comment in Integration.
+    const dispatchKeydown = (init: KeyboardEventInit) =>
+      textArea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
 
-    // Verify onChange callback was called with modified content
+    dispatchKeydown({ key: 'Home', code: 'Home', keyCode: 36, which: 36, ctrlKey: true }); // Go to the very start
+    dispatchKeydown({ key: '/', code: 'Slash', keyCode: 191, which: 191, ctrlKey: true }); // Toggle line comment
+
+    // Verify onChange callback was called with the commented first line
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalled();
       const mockFn = args.onChange as ReturnType<typeof fn>;
       const calls = mockFn.mock.calls;
       const lastCall = calls[calls.length - 1];
-      expect(lastCall[0]).toContain('// Added comment');
+      expect(lastCall[0]).toContain('// function fibonacci(n) {');
     });
 
     // Test basic Monaco keyboard shortcuts work
@@ -159,6 +184,9 @@ export const KeyboardNavigation: Story = {
     language: 'javascript',
     value: sampleCode,
     height: '300px',
+    // This story types into the editor, which calls onChange — an explicit
+    // spy, or Storybook's implicit-action detection throws during play().
+    onChange: fn(),
     onSave: fn(),
   },
   play: async ({ canvasElement }) => {
@@ -198,9 +226,13 @@ export const KeyboardNavigation: Story = {
       }
     }
 
-    // Test Monaco editor keyboard shortcuts
-    const textarea = canvasElement.querySelector('.inputarea') as HTMLElement;
-    await expect(textarea).toBeInTheDocument();
+    // Monaco's `.monaco-editor` root mounts before its internal view finishes
+    // building its input host — a real, if brief, gap. That host is
+    // `role="textbox"` under either of Monaco's input controllers (the
+    // classic hidden `.inputarea` textarea, or the native EditContext
+    // `.native-edit-context` div Chromium defaults to), so querying by role
+    // is stable across both.
+    const textarea = await within(canvasElement).findByRole('textbox', {}, { timeout: 10000 });
 
     // Focus editor and test Monaco navigation shortcuts
     await userEvent.click(textarea);
@@ -272,12 +304,18 @@ export const ScreenReader: Story = {
     const languageBadge = within(canvasElement).getByText('python');
     await expect(languageBadge).toBeInTheDocument();
 
-    // Check for read-only indicator
-    const readOnlyText = within(canvasElement).getByText('Read Only');
+    // Check for read-only indicator. The toolbar renders the copy pack's own
+    // string (PT_BR_CODE_EDITOR_COPY.readOnly, "Somente leitura") — English
+    // literal "Read Only" is neither that nor even the EN pack's casing.
+    const readOnlyText = within(canvasElement).getByText(PT_BR_CODE_EDITOR_COPY.readOnly);
     await expect(readOnlyText).toBeInTheDocument();
 
-    // Check that buttons have proper accessible names
-    const copyButton = within(canvasElement).getByRole('button', { name: /copy to clipboard/i });
+    // Check that buttons have proper accessible names. The button's aria-label
+    // is the copy pack's own string (PT_BR_CODE_EDITOR_COPY.copyToClipboard),
+    // not the English literal.
+    const copyButton = within(canvasElement).getByRole('button', {
+      name: PT_BR_CODE_EDITOR_COPY.copyToClipboard,
+    });
     await expect(copyButton).toBeInTheDocument();
     await expect(copyButton).toBeEnabled();
 
@@ -403,8 +441,10 @@ export const VisualStates: Story = {
     const normalEditor = canvasElement.querySelectorAll('.monaco-editor')[0];
     await expect(normalEditor).toBeInTheDocument();
 
-    // Check read-only state
-    const readOnlyText = within(canvasElement).getByText('Read Only');
+    // Check read-only state. The toolbar renders the copy pack's own string
+    // (PT_BR_CODE_EDITOR_COPY.readOnly, "Somente leitura") — English literal
+    // "Read Only" is neither that nor even the EN pack's casing.
+    const readOnlyText = within(canvasElement).getByText(PT_BR_CODE_EDITOR_COPY.readOnly);
     await expect(readOnlyText).toBeInTheDocument();
 
     // Check empty state with placeholder
@@ -572,9 +612,13 @@ export const Integration: Story = {
     // Verify initial "Not saved" status
     await expect(within(canvasElement).getByText(/Not saved/)).toBeInTheDocument();
 
-    // Test save functionality (Ctrl+S)
-    const editorTextarea = canvasElement.querySelector('.inputarea') as HTMLElement;
-    await expect(editorTextarea).toBeInTheDocument();
+    // Test save functionality (Ctrl+S). Monaco's `.monaco-editor` root mounts
+    // before its internal view finishes building its input host — a real, if
+    // brief, gap. That host is `role="textbox"` under either of Monaco's
+    // input controllers (the classic hidden `.inputarea` textarea, or the
+    // native EditContext `.native-edit-context` div Chromium defaults to),
+    // so querying by role is stable across both.
+    const editorTextarea = await within(canvasElement).findByRole('textbox', {}, { timeout: 10000 });
 
     // Test save functionality by modifying content and triggering save
     await userEvent.click(editorTextarea);
@@ -582,8 +626,25 @@ export const Integration: Story = {
     // Modify content to trigger save
     await userEvent.type(editorTextarea, '\n// Modified for save test');
 
-    // Try to trigger save with keyboard shortcut
-    await userEvent.keyboard('{Control>}s{/Control}');
+    // Monaco resolves a custom `addCommand` keybinding from the event's
+    // legacy `keyCode`, which `userEvent.keyboard`'s synthetic KeyboardEvent
+    // does not set (it is non-standard, and testing-library deliberately
+    // does not emit it) — so `{Control>}s{/Control}` never reaches the save
+    // command Monaco itself never receives, unlike native browser commands
+    // such as undo. Dispatching the keydown directly, with `keyCode` set,
+    // is what a real Ctrl+S keystroke gives Monaco, and this component's own
+    // save shortcut is the thing under test.
+    editorTextarea.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 's',
+        code: 'KeyS',
+        keyCode: 83,
+        which: 83,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
 
     // The save handler flips the external state, and the status renders "Saved".
     // This is the assertion the story turns on: while the flash was cleared on

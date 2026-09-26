@@ -1,10 +1,45 @@
 import type { Theme } from '@mui/material/styles/index.js';
-import type { Monaco } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+import { loader, type Monaco } from '@monaco-editor/react';
+import type { editor, Environment } from 'monaco-editor';
 
 import { uiInk, type UiInk } from '../../../tokens/ink';
 
 type EditorChrome = UiInk['codeEditor']['light'];
+
+export interface ConfigureCodeEditorOptions {
+  /**
+   * The `monaco-editor` module the host's own bundler resolved, e.g.
+   * `import * as monaco from 'monaco-editor'`. Handing it to the loader is
+   * what stops `@monaco-editor/react` fetching its own copy from
+   * `cdn.jsdelivr.net` at runtime — see `loader.config` below.
+   */
+  monaco: Monaco;
+  /**
+   * Monaco's web-worker factory. The package cannot supply this itself: wiring
+   * a worker needs a bundler-specific import (Vite's `?worker` suffix, or the
+   * equivalent in another bundler), and this package is built by tsup/esbuild,
+   * which does not understand that suffix. The host's own Vite (or other)
+   * entry point builds this from its own worker imports and passes it here.
+   */
+  getWorker: NonNullable<Environment['getWorker']>;
+}
+
+/**
+ * Points `@monaco-editor/react` at the host's own installed Monaco instead of
+ * its default CDN loader, and wires up Monaco's web workers.
+ *
+ * Bundler-agnostic on purpose: it takes the resolved `monaco` module and a
+ * `getWorker` factory rather than importing either itself, so it can be
+ * called from any Vite (or other bundler) entry point — see `CodeEditor.md`
+ * for the Storybook preview and host snippets that call it.
+ *
+ * Call this once, before the first `CodeEditor` mounts (a Vite entry point's
+ * module scope runs once, which is early enough).
+ */
+export const configureCodeEditor = ({ monaco, getWorker }: ConfigureCodeEditorOptions): void => {
+  loader.config({ monaco });
+  (self as unknown as { MonacoEnvironment: Environment }).MonacoEnvironment = { getWorker };
+};
 
 /** Monaco's colour keys, filled from one mode's chrome. */
 const chromeColors = (chrome: EditorChrome) => ({

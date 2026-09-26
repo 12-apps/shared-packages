@@ -95,9 +95,13 @@ export const Default: Story = {
     // Now check aria-expanded is true
     await expect(input).toHaveAttribute('aria-expanded', 'true');
 
+    // Filtering runs in a passive effect after `inputValue` changes, so a
+    // same-tick snapshot can still see the previous keystroke's list (the
+    // 4 options 'a' alone matches). Wait for the settled count before
+    // reading the texts.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(2));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(2); // Apple, Grape (both contain "ap")
-    await expect(options[0]).toHaveTextContent('Apple');
+    await expect(options[0]).toHaveTextContent('Apple'); // Apple, Grape (both contain "ap")
     await expect(options[1]).toHaveTextContent('Grape');
   },
 };
@@ -123,8 +127,11 @@ export const WithObjectSuggestions: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
+    // Filtering runs in a passive effect after `inputValue` changes, so a
+    // same-tick snapshot can still see the previous keystroke's list. Wait
+    // for the settled count (John Doe, Bob Johnson) before reading it.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(2));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(2); // John Doe, Bob Johnson
 
     // Test custom rendering with description
     await expect(options[0]).toHaveTextContent('john@example.com - Engineering');
@@ -152,10 +159,13 @@ export const GhostText: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
-    // Test ghost text appears - look for the new inline suggestion pattern
-    // Since we're using the new pattern, check for the presence of the suggestion
+    // Test ghost text appears - look for the new inline suggestion pattern.
+    // Since we're using the new pattern, check for the presence of the
+    // suggestion. Filtering runs in a passive effect after `inputValue`
+    // changes, so wait for the settled count (Apple, Grape both contain
+    // "ap") before reading the texts.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(2));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(2); // Apple, Grape both contain "ap"
     await expect(options[0]).toHaveTextContent('Apple');
 
     // Test that Tab key completes the ghost text
@@ -186,9 +196,11 @@ export const GhostTextArrowRight: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
-    // Verify suggestion appears
+    // Verify suggestion appears. Filtering runs in a passive effect after
+    // `inputValue` changes, so wait for the settled count before reading it
+    // — a fixture change here should not silently arm the same race.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(1));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(1);
     await expect(options[0]).toHaveTextContent('Cherry');
 
     // Test that ArrowRight key completes the ghost text
@@ -414,8 +426,11 @@ export const FuzzyMatchingTest: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
+    // Filtering runs in a passive effect after `inputValue` changes, so wait
+    // for the settled count before reading it — a fixture change here should
+    // not silently arm the same race.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(1));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(1);
     await expect(options[0]).toHaveTextContent('JavaScript');
   },
 };

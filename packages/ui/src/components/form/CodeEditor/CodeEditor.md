@@ -348,3 +348,73 @@ test('CodeEditor has no accessibility violations', async () => {
 - `@monaco-editor/react`: Monaco Editor React wrapper
 - `@mui/material`: Material-UI components and theming
 - `@mui/icons-material`: Material-UI icons
+
+## Monaco setup (required in the host)
+
+`@monaco-editor/react`'s default loader fetches Monaco from
+`cdn.jsdelivr.net` at runtime — a network dependency the CDN version does not
+even match (`monaco-editor` here is a `dependencies` entry, so the runtime
+version is whatever the host resolves). **A host must configure it before the
+first `CodeEditor` mounts**, or the editor silently depends on that CDN.
+
+This package cannot do that wiring itself: Monaco's web workers need a
+bundler-specific import (Vite's `?worker` suffix, or another bundler's
+equivalent), and the package is built by tsup/esbuild, which does not
+understand that suffix. Instead, `configureCodeEditor` (exported from
+`@12-apps/ui/form/CodeEditor`) takes the host's own resolved `monaco` module
+and a `getWorker` factory, and does the rest:
+
+```ts
+// A Vite entry point — main.tsx, or (as here) .storybook/preview.tsx.
+import * as monaco from 'monaco-editor';
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import { configureCodeEditor } from '@12-apps/ui/form/CodeEditor';
+
+configureCodeEditor({
+  monaco,
+  getWorker: (_workerId, label) => {
+    switch (label) {
+      case 'json':
+        return new JsonWorker();
+      case 'css':
+      case 'scss':
+      case 'less':
+        return new CssWorker();
+      case 'html':
+      case 'handlebars':
+      case 'razor':
+        return new HtmlWorker();
+      case 'typescript':
+      case 'javascript':
+        return new TsWorker();
+      default:
+        return new EditorWorker();
+    }
+  },
+});
+```
+
+Call it once, at module scope, before any `CodeEditor` renders. This
+package's own Storybook (`.storybook/preview.tsx`) calls it exactly this way,
+so its stories load Monaco from `node_modules` rather than the CDN — see
+`CodeEditor.monaco.ts` for `configureCodeEditor`'s implementation.
+
+**One Monaco version.** The `monaco` module a host passes in is resolved from
+its own `node_modules`, at whatever version its lockfile picked for
+`monaco-editor` — keep that version aligned with this package's own
+`monaco-editor` dependency (currently `^0.53.0`) so the types this package
+ships describe the Monaco that actually runs.
+
+**The CDN is still available, as an explicit opt-in** — never a silent
+default. A host that would rather not bundle Monaco can call the loader
+itself instead of `configureCodeEditor`:
+
+```ts
+import { loader } from '@monaco-editor/react';
+
+loader.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.53.0/min/vs' } });
+```
