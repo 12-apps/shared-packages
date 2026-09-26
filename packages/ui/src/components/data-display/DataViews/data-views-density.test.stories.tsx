@@ -1,6 +1,6 @@
 import { createTheme, ThemeProvider } from "@mui/material/styles/index.js";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fireEvent, waitFor, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { resolveDensityFactor } from "../../../tokens/density";
 import { PT_BR_DATA_VIEWS_COPY } from "../../../pt-BR";
@@ -48,10 +48,13 @@ function Screen({ prefix, theme }: { prefix: string; theme: ReturnType<typeof cr
   );
 }
 
+/** The panel is a MUI `Popover` — it portals to `document.body`, not `canvasElement`. */
+const body = (): ReturnType<typeof within> => within(document.body);
+
 /** Open "Exibir", go to the Exibição tab, where the density tiles live. */
 async function openDisplayTab(canvas: ReturnType<typeof within>, prefix: string): Promise<void> {
-  fireEvent.click(canvas.getByTestId(`${prefix}-display-trigger`));
-  fireEvent.click(await canvas.findByTestId(`${prefix}-display-tab-display`));
+  await userEvent.click(canvas.getByTestId(`${prefix}-display-trigger`));
+  await userEvent.click(await body().findByTestId(`${prefix}-display-tab-display`));
 }
 
 const meta: Meta = {
@@ -74,7 +77,7 @@ export const ThemeDensityDefault: Story = {
     await step("Renders at the theme's compact default — nothing stored for this viewer", async () => {
       await openDisplayTab(canvas, "theme-density");
       await waitFor(() =>
-        expect(canvas.getByTestId("theme-density-density-compact")).toHaveAttribute("aria-pressed", "true"),
+        expect(body().getByTestId("theme-density-density-compact")).toHaveAttribute("aria-pressed", "true"),
       );
     });
   },
@@ -90,7 +93,7 @@ export const StoredPreferenceWinsOverTheme: Story = {
       await step("Renders the REMEMBERED density, not the theme's compact default", async () => {
         await openDisplayTab(canvas, "stored-density");
         await waitFor(() =>
-          expect(canvas.getByTestId("stored-density-density-comfortable")).toHaveAttribute(
+          expect(body().getByTestId("stored-density-density-comfortable")).toHaveAttribute(
             "aria-pressed",
             "true",
           ),
