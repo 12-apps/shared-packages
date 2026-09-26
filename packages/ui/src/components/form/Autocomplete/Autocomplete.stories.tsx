@@ -90,6 +90,7 @@ const ControlledAutocomplete = <T = string | Person,>(props: Partial<Autocomplet
 
   return (
     <Autocomplete
+      copy={PT_BR_AUTOCOMPLETE_COPY}
       {...props}
       value={value}
       onChange={setValue}
@@ -192,6 +193,7 @@ const AsyncModeComponent = () => {
 
   return (
     <Autocomplete
+      copy={PT_BR_AUTOCOMPLETE_COPY}
       value={value}
       onChange={handleChange}
       suggestions={suggestions}
@@ -250,6 +252,7 @@ const SearchAndLinkComponent = () => {
   const [value, setValue] = useState('');
   return (
     <Autocomplete<QuickSearchItem>
+      copy={PT_BR_AUTOCOMPLETE_COPY}
       value={value}
       onChange={setValue}
       suggestions={quickSearchItems}

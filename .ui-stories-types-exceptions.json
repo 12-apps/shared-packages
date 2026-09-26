@@ -44,7 +44,7 @@
   "packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.test.stories.tsx ×1": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.stories.tsx ×1": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/form/AddressAutocomplete/AddressAutocomplete.test.stories.tsx ×1": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
-  "packages/ui/src/components/form/Autocomplete/Autocomplete.stories.tsx ×5": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
+  "packages/ui/src/components/form/Autocomplete/Autocomplete.stories.tsx ×3": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/form/Autocomplete/Autocomplete.test.stories.tsx ×7": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/form/Button/Button.test.stories.tsx ×12": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/form/Calendar/Calendar.test.stories.tsx ×13": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
