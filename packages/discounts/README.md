@@ -474,6 +474,16 @@ language is a line in the host's diff rather than a silence.
 resolved (`{ clientId }`); authentication, tenant resolution, RBAC tiers and
 plan gates stay where they belong.
 
+**Who is buying for the first time.** A rule saved with `firstOrderOnly`
+(FUT-2825) applies only when the host sets `buyerIsFirstTime: true` on it —
+this package never reads an order, so "has this buyer bought here before" is
+the host's answer, the way `buyerUsageCount` already is. Unknown (`null` or
+omitted: an anonymous cart, a cached menu) is NOT first-time, on purpose: a
+discount the cart shows and checkout then takes back is worse than one that
+appears once the buyer is known. So a first-purchase rule is never badged or
+teased on a catalog card, and two concurrent first orders by one buyer can both
+pass, as with `perBuyerLimit`. Combos keep their own rules and never carry it.
+
 **The words on a pill.** The validity filter a promotions grid usually wants —
 running / scheduled / ended — compares two nullable columns against "now",
 which no `filterableField` expresses, and its values are words a host chose. So

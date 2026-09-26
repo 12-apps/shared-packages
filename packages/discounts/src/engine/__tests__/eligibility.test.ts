@@ -172,6 +172,73 @@ describe("the redemption caps (R2)", () => {
   });
 });
 
+describe("the first-purchase condition (FUT-2825)", () => {
+  /** An automatic 10% off the order, only on a buyer's first purchase. */
+  function firstOrderResult(buyerIsFirstTime: boolean | null | undefined) {
+    return evaluateCart({
+      lines: [CATEGORY_LINE],
+      rules: [
+        rule({
+          id: "welcome",
+          scope: "ORDER",
+          firstOrderOnly: true,
+          ...(buyerIsFirstTime === undefined ? {} : { buyerIsFirstTime }),
+        }),
+      ],
+    });
+  }
+
+  it("applies to a buyer the host names as first-time", () => {
+    expect(appliedIds(firstOrderResult(true))).toEqual(["welcome"]);
+  });
+
+  it("does not apply for a returning buyer", () => {
+    // A failing AUTOMATIC rule is not a rejection — it is simply not in play.
+    expect(appliedIds(firstOrderResult(false))).toEqual([]);
+  });
+
+  it("does not apply for an unknown buyer, rather than promise what checkout may take back", () => {
+    expect(appliedIds(firstOrderResult(null))).toEqual([]);
+    expect(appliedIds(firstOrderResult(undefined))).toEqual([]);
+  });
+
+  it("refuses a first-purchase COUPON for a returning buyer, with a reason the cart shows", () => {
+    const result = evaluateCart({
+      lines: [CATEGORY_LINE],
+      rules: [
+        rule({ id: "d1", trigger: "CODE", code: "CUPOM", firstOrderOnly: true, buyerIsFirstTime: false }),
+      ],
+      couponCode: "CUPOM",
+    });
+    expect(reasonFor(result, "d1")).toBe("NOT_FIRST_ORDER");
+  });
+
+  it("leaves every other rule alone, including a coupon typed beside it", () => {
+    const result = evaluateCart({
+      lines: [CATEGORY_LINE],
+      rules: [
+        rule({ id: "welcome", scope: "ORDER", firstOrderOnly: true, buyerIsFirstTime: false }),
+        rule({ id: "d1", trigger: "CODE", code: "CUPOM" }),
+      ],
+      couponCode: "CUPOM",
+    });
+    expect(appliedIds(result)).toEqual(["d1"]);
+  });
+
+  it("stacks with a coupon for a first-time buyer", () => {
+    const result = evaluateCart({
+      lines: [CATEGORY_LINE],
+      rules: [
+        rule({ id: "welcome", scope: "ORDER", firstOrderOnly: true, buyerIsFirstTime: true }),
+        rule({ id: "d1", trigger: "CODE", code: "CUPOM" }),
+      ],
+      couponCode: "CUPOM",
+    });
+    expect(appliedIds(result).sort()).toEqual(["d1", "welcome"]);
+    expectMoneyInvariant(result);
+  });
+});
+
 describe("the covered set (R3)", () => {
   it("B16: refuses a category discount that reaches none of the cart's lines", () => {
     const result = couponResult({ scope: "CATEGORY", targetCategoryIds: ["c-other"] });

@@ -36,6 +36,8 @@ export interface DiscountWireRecord {
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
+  /** Only a buyer's first purchase at the store (FUT-2825); absent = false. */
+  firstOrderOnly?: boolean;
   usageCount: number;
   stackable: boolean;
   active: boolean;
@@ -98,6 +100,8 @@ export interface DiscountFormPayload {
   usageLimit: string;
   perBuyerLimit: string;
   stackable: boolean;
+  /** The first-purchase switch (FUT-2825); absent = false. */
+  firstOrderOnly?: boolean;
   active: boolean;
   categoryIds: string[];
   menuItemIds: string[];
@@ -182,6 +186,7 @@ export function toWriteBody(
     usageLimit: toCount(input.usageLimit, formatters),
     perBuyerLimit: toCount(input.perBuyerLimit, formatters),
     stackable: input.stackable,
+    firstOrderOnly: input.firstOrderOnly === true,
     active: input.active,
     // Narrowed to the scope on the way OUT as well as on the way in: leaving a
     // stale id list on a rule whose scope changed is how a promotion goes on

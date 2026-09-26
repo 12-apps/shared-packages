@@ -152,6 +152,9 @@ function screenLimits(rule: DiscountRule, ctx: ScreenContext): DiscountRejection
   if (rule.perBuyerLimit !== null && rule.buyerUsageCount >= rule.perBuyerLimit) {
     return "BUYER_LIMIT_REACHED";
   }
+  // Advisory in the same way `buyerUsageCount` is: two concurrent first orders
+  // by one buyer can both pass (FUT-2825).
+  if (rule.firstOrderOnly === true && rule.buyerIsFirstTime !== true) return "NOT_FIRST_ORDER";
   if (rule.minSubtotalCents !== null && ctx.subtotalCents < rule.minSubtotalCents) {
     return "MIN_SUBTOTAL_NOT_MET";
   }
