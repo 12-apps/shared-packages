@@ -3,6 +3,7 @@ import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_RICH_EDITOR_TOOLBAR_COPY } from '../../../pt-BR';
 import { Textarea } from './Textarea';
 
 const meta: Meta<typeof Textarea> = {
@@ -111,6 +112,7 @@ export const RichTextEditor: Story = {
     placeholder: 'Rich text editor...',
     label: 'Rich Text Content',
     'dataTestId': 'rich-textarea',
+    richEditorCopy: PT_BR_RICH_EDITOR_TOOLBAR_COPY,
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -120,15 +122,19 @@ export const RichTextEditor: Story = {
       expect(label).toBeInTheDocument();
 
       // Look for toolbar buttons
-      const boldButton = canvas.getByRole('button', { name: /bold/i });
-      const italicButton = canvas.getByRole('button', { name: /italic/i });
+      const boldButton = canvas.getByRole('button', { name: PT_BR_RICH_EDITOR_TOOLBAR_COPY.bold });
+      const italicButton = canvas.getByRole('button', {
+        name: PT_BR_RICH_EDITOR_TOOLBAR_COPY.italic,
+      });
       expect(boldButton).toBeInTheDocument();
       expect(italicButton).toBeInTheDocument();
     });
 
     await step('Test rich text toolbar interactions', async () => {
-      const boldButton = canvas.getByRole('button', { name: /bold/i });
-      const italicButton = canvas.getByRole('button', { name: /italic/i });
+      const boldButton = canvas.getByRole('button', { name: PT_BR_RICH_EDITOR_TOOLBAR_COPY.bold });
+      const italicButton = canvas.getByRole('button', {
+        name: PT_BR_RICH_EDITOR_TOOLBAR_COPY.italic,
+      });
 
       // Click toolbar buttons
       await userEvent.click(boldButton);

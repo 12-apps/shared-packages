@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
 import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
 
@@ -44,6 +45,9 @@ const testColumns: GridColumn<TestRow>[] = [
 const meta: Meta<typeof DataGrid> = {
   title: 'Dashboards/DataGrid/Tests',
   component: DataGrid,
+  args: {
+    emptyText: PT_BR_DATA_STATE_COPY.empty,
+  },
   parameters: {
     layout: 'fullscreen',
     chromatic: { disableSnapshot: false },
@@ -379,7 +383,7 @@ export const EmptyStateTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Should display default empty message', async () => {
-      expect(canvas.getByText('No data available')).toBeInTheDocument();
+      expect(canvas.getByText(PT_BR_DATA_STATE_COPY.empty)).toBeInTheDocument();
     });
   },
 };
