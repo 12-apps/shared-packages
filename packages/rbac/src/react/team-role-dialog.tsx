@@ -79,25 +79,32 @@ interface RoleEditBodyProps {
   onSave: (roleNames: string[]) => void;
 }
 
-/** The editor body — owns the selection state; mounts fresh per member. */
-function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
-  const { member, systemRoles, availableCustomRoles, labels, copy, busy, error } = props;
-  // Only what this editor OFFERS is toggled here. Everything else the member
-  // holds — an owner role, a name the host keeps out of the roster — is carried
-  // through the save untouched rather than silently revoked.
+/**
+ * The editor's selection over the roles it OFFERS.
+ *
+ * Only what this editor offers is toggled here. Everything else the member
+ * holds — an owner role, a name the host keeps out of the roster — is `kept`
+ * and carried through the save untouched rather than silently revoked.
+ */
+function useRoleSelection(
+  held: readonly string[],
+  systemRoles: readonly string[],
+  availableCustomRoles: readonly string[],
+): {
+  selected: ReadonlySet<string>;
+  kept: readonly string[];
+  valid: boolean;
+  toggle: (name: string, checked: boolean) => void;
+} {
   const offered = useMemo(
     () => new Set([...systemRoles, ...availableCustomRoles]),
     [systemRoles, availableCustomRoles],
   );
-  const kept = useMemo(
-    () => member.roles.filter((name) => !offered.has(name)),
-    [member.roles, offered],
-  );
+  const kept = useMemo(() => held.filter((name) => !offered.has(name)), [held, offered]);
   const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(member.roles.filter((name) => offered.has(name))),
+    () => new Set(held.filter((name) => offered.has(name))),
   );
   const valid = useMemo(() => isSelectionValid(selected, kept), [selected, kept]);
-
   const toggle = (name: string, checked: boolean): void => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -106,6 +113,17 @@ function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
       return next;
     });
   };
+  return { selected, kept, valid, toggle };
+}
+
+/** The editor body — owns the selection state; mounts fresh per member. */
+function RoleEditBody(props: RoleEditBodyProps): JSX.Element {
+  const { member, systemRoles, availableCustomRoles, labels, copy, busy, error } = props;
+  const { selected, kept, valid, toggle } = useRoleSelection(
+    member.roles,
+    systemRoles,
+    availableCustomRoles,
+  );
 
   const group = (
     title: string,

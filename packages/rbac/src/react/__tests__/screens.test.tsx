@@ -611,8 +611,11 @@ describe('the invite flow', () => {
       expect(screen.getByTestId('invite-no-role')).toBeTruthy();
     });
     fireEvent.submit(form);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(api.inviteMember).not.toHaveBeenCalled();
+    // Refused on screen, never posted: the warning stays and nothing is sent.
+    await waitFor(() => {
+      expect(screen.getByTestId('invite-no-role')).toBeTruthy();
+      expect(api.inviteMember).not.toHaveBeenCalled();
+    });
   });
 
   it('says nothing extra when the grant landed immediately', async () => {
