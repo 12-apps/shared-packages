@@ -110,6 +110,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     aboutTitle: 'About the team',
     aboutBody:
       'Manage this store\u2019s administrators. You can invite by e-mail even somebody with no account yet — access is granted automatically when they sign up.',
+    exportAction: 'Export',
     inviteAction: 'Add to the team',
     inviteDialogTitle: 'Add to the team',
     inviteEmailLabel: 'Their e-mail address',

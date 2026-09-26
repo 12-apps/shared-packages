@@ -26,6 +26,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     create: "Novo desconto",
     empty: "Nenhum desconto cadastrado.",
     exportFileName: "descontos",
+    exportAction: "Exportar",
     loading: "Carregando descontos…",
     loadFailed: "Não foi possível carregar os descontos",
     retry: "Tentar novamente",

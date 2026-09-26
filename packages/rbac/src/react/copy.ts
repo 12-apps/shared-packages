@@ -142,6 +142,8 @@ export interface TeamScreenCopy {
   /** The header explainer, over the roster. */
   aboutTitle: string;
   aboutBody: string;
+  /** The header's export trigger. */
+  exportAction: string;
   /** The header's "add administrator" button, and the dialog it opens. */
   inviteAction: string;
   inviteDialogTitle: string;

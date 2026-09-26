@@ -51,6 +51,8 @@ export interface DiscountsScreenCopy {
   readonly empty: string;
   /** The exported file's base name, without extension. */
   readonly exportFileName: string;
+  /** The header's export trigger. */
+  readonly exportAction: string;
   /** While the first page is loading. */
   readonly loading: string;
   /** The read failed: a heading, and the button that tries again. */
