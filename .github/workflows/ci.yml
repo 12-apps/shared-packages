@@ -900,6 +900,18 @@ jobs:
         run: |
           set -o pipefail
           pnpm quality:portability 2>&1 | tee portability.log
+      # `@12-apps/ui`'s stories, type-checked on a project of their own
+      # (FUT-2699): `packages/ui/tsconfig.json` excludes every
+      # `*.stories.tsx`, and that is the only project `check-types` reads, so
+      # nothing else in CI ever looks at a story's types. Runs here rather
+      # than in a job of its own — the checkout and install above are already
+      # paid for, and its ledger's ratchet reads `origin/main` the same way
+      # `quality:ui-tokens` (inside the gate above) does.
+      - name: UI stories types gate
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm quality:ui-stories-types 2>&1 | tee ui-stories-types.log
 
   # The only gate that sees what a CONSUMER sees. Every other job above runs
   # inside the pnpm workspace, where a sibling import resolves whether or not the
