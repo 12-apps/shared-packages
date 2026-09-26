@@ -13,6 +13,9 @@ export const PT_BR_TUTORIAL_COPY: TutorialCopy = {
   previous: "Anterior",
   next: "Próximo",
   restart: "Recomeçar",
+  complete: "Concluir",
+  finish: "Finalizar",
+  requiresAction: "Conclua a ação obrigatória primeiro",
 };
 
 export const PT_BR_CHROME_COPY: ChromeCopy = {

@@ -1,5 +1,7 @@
 import type React from 'react';
 
+import type { DataGridCopy } from '../../../copy';
+
 export type GridSizeMode = 'auto' | 'fixed' | 'fill';
 export type GridDensity = 'compact' | 'comfortable' | 'spacious';
 export type SortDirection = 'asc' | 'desc' | null;
@@ -83,9 +85,9 @@ export interface GridRowExpansion<T = Record<string, unknown>> {
    * toggle — a chevron that opens onto nothing is a promise the row cannot keep.
    */
   isRowExpandable?: (row: T) => boolean;
-  /** The chevron's accessible name while the row is collapsed. Default "Expand row". */
+  /** The chevron's accessible name while the row is collapsed. Defaults to `copy.expandRow`. */
   expandLabel?: string;
-  /** The chevron's accessible name while the row is expanded. Default "Collapse row". */
+  /** The chevron's accessible name while the row is expanded. Defaults to `copy.collapseRow`. */
   collapseLabel?: string;
 }
 
@@ -138,6 +140,15 @@ export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAt
    * "No data available", on the package every host renders.
    */
   emptyText: string;
+  /**
+   * Every fallback word the grid's own chrome renders — a sortable header's
+   * name, a row's selection checkbox, the select-all checkbox, the expand
+   * chevron's two states, and the grid's own accessible name. REQUIRED — the
+   * fallbacks were English literals with no way to localise them. A caller's
+   * `column.ariaLabel`, `expansion.expandLabel`/`collapseLabel` and the grid's
+   * own `ariaLabel` still win over it wherever both are given.
+   */
+  copy: DataGridCopy;
   /** Dataset (client mode uses this array; server mode renders current page) */
   rows: T[];
   /** Stable row id accessor */

@@ -5,6 +5,7 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { thumbnailStripSx } from './Lightbox.constants';
+import { useLightboxCopy } from './lightbox-copy-context';
 import type { LightboxItem } from './Lightbox.types';
 import { onMedia, sheen } from '../../../tokens/ink';
 import { rem, sxRem } from '../../../tokens/relative';
@@ -41,7 +42,9 @@ export const LightboxThumbnails: FC<LightboxThumbnailsProps> = ({
   currentIndex,
   testId,
   onSelect,
-}) => (
+}) => {
+  const copy = useLightboxCopy();
+  return (
   <Box
     sx={{
       ...thumbnailStripSx,
@@ -78,11 +81,12 @@ export const LightboxThumbnails: FC<LightboxThumbnailsProps> = ({
         ) : (
           <img
             src={item.src}
-            alt={item.alt || `Thumbnail ${index + 1}`}
+            alt={item.alt || copy.thumbnailFallback(index + 1)}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         )}
       </Box>
     ))}
   </Box>
-);
+  );
+};

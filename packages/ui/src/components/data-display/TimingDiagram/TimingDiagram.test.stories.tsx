@@ -205,7 +205,7 @@ export const VisualStatesTest: Story = {
 
     // Verify total time display
     const totalTimeElement = Array.from(container.querySelectorAll('.MuiTypography-body2')).find(
-      (el) => el.textContent?.includes('Total Time:'),
+      (el) => el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.totalTime('')),
     );
     await expect(totalTimeElement?.textContent).toContain('750ms');
 
@@ -423,9 +423,9 @@ export const AccessibilityTest: Story = {
     const legendItems = container.querySelectorAll('.MuiTypography-root');
     const hasLegendLabels = Array.from(legendItems).some(
       (el) =>
-        el.textContent?.includes('DNS Lookup') ||
-        el.textContent?.includes('Connection') ||
-        el.textContent?.includes('SSL/TLS'),
+        el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.dns) ||
+        el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.connect) ||
+        el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.ssl),
     );
     await expect(hasLegendLabels).toBe(true);
 
@@ -700,13 +700,21 @@ export const IntegrationTest: Story = {
       cumulativeOffset += parseFloat(sslSegment.style.width || '0');
     }
 
-    // Verify legend is displayed with all phases
+    // Verify legend is displayed with all phases — the pt-BR pack's own
+    // words, paired with the `sampleData` key each phase renders from (a
+    // label-derived key would have to un-translate the pack's word).
     const legendItems = container.querySelectorAll('.MuiBox-root');
-    const legendLabels = ['DNS Lookup', 'Connection', 'SSL/TLS', 'Request', 'Response'];
+    const legendLabels: Array<[string, keyof typeof sampleData]> = [
+      [PT_BR_TIMING_DIAGRAM_COPY.dns, 'dns'],
+      [PT_BR_TIMING_DIAGRAM_COPY.connect, 'connect'],
+      [PT_BR_TIMING_DIAGRAM_COPY.ssl, 'ssl'],
+      [PT_BR_TIMING_DIAGRAM_COPY.request, 'request'],
+      [PT_BR_TIMING_DIAGRAM_COPY.response, 'response'],
+    ];
 
-    for (const label of legendLabels) {
+    for (const [label, key] of legendLabels) {
       const legendItem = Array.from(legendItems).find((el) => el.textContent?.includes(label));
-      if (sampleData[label.toLowerCase().replace(/[^a-z]/g, '')] > 0) {
+      if (sampleData[key] > 0) {
         await expect(legendItem).toBeInTheDocument();
       }
     }

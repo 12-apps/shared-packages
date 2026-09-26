@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
+import { PT_BR_DATA_GRID_COPY, PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
 
 // Sample data for stories
 interface SampleRow {
@@ -129,6 +130,10 @@ const sampleColumns: GridColumn<SampleRow>[] = [
 const meta: Meta<typeof DataGrid> = {
   title: 'Dashboards/DataGrid',
   component: DataGrid,
+  args: {
+    emptyText: PT_BR_DATA_STATE_COPY.empty,
+    copy: PT_BR_DATA_GRID_COPY,
+  },
   parameters: {
     layout: 'fullscreen',
     docs: {

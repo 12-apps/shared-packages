@@ -38,9 +38,9 @@ export const DashboardSpacer = (): React.JSX.Element => <Box sx={{ flex: 1 }} ar
 DashboardSpacer.displayName = 'Dashboard.Spacer';
 
 export const DashboardInfo = ({
-  title = 'About this page',
+  title,
   children,
-  ariaLabel = 'Page information',
+  ariaLabel,
 }: DashboardInfoProps): React.JSX.Element => {
   const { testIdPrefix } = useDashboardContext();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
@@ -78,9 +78,12 @@ export const DashboardInfo = ({
 };
 DashboardInfo.displayName = 'Dashboard.Info';
 
-export const DashboardFilterToggle = ({ ariaLabel }: DashboardFilterToggleProps): React.JSX.Element => {
+export const DashboardFilterToggle = ({
+  hideLabel,
+  showLabel,
+}: DashboardFilterToggleProps): React.JSX.Element => {
   const { filtersVisible, toggleFilters, activeFilterCount, testIdPrefix } = useDashboardContext();
-  const label = ariaLabel ?? (filtersVisible ? 'Hide filters' : 'Show filters');
+  const label = filtersVisible ? hideLabel : showLabel;
   return (
     <Tooltip title={label}>
       <IconButton
@@ -101,10 +104,10 @@ export const DashboardFilterToggle = ({ ariaLabel }: DashboardFilterToggleProps)
 DashboardFilterToggle.displayName = 'Dashboard.FilterToggle';
 
 export const DashboardSettings = ({
-  title = 'Settings',
+  title,
   closeLabel,
   children,
-  ariaLabel = 'Settings',
+  ariaLabel,
   href,
   linkComponent,
 }: DashboardSettingsProps): React.JSX.Element => {
@@ -168,7 +171,7 @@ const DEFAULT_EXPORT_FORMATS: DashboardExportFormat[] = [
 export const DashboardExport = ({
   formats = DEFAULT_EXPORT_FORMATS,
   onExport,
-  label = 'Export',
+  label,
 }: DashboardExportProps): React.JSX.Element => {
   const { testIdPrefix } = useDashboardContext();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);

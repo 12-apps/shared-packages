@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DataGrid } from '../components/data-display/DataGrid';
 import type { GridColumn } from '../components/data-display/DataGrid/DataGrid.types';
+import { PT_BR_DATA_GRID_COPY } from '../pt-BR';
 
 interface Row extends Record<string, unknown> {
   id: string;
@@ -35,7 +36,7 @@ const rows: Row[] = [
 
 describe('DataGrid — the grid is findable in every state', () => {
   it('names the grid while it is LOADING', () => {
-    render(<DataGrid emptyText="Nenhum dado por aqui" data-testid="things-grid" rows={[]} columns={columns} loading />);
+    render(<DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY} data-testid="things-grid" rows={[]} columns={columns} loading />);
     const grid = screen.getByTestId('things-grid');
     expect(grid).toHaveAttribute('data-loading', 'true');
     // Still announced as a grid, so assistive tech is not told the region
@@ -45,7 +46,7 @@ describe('DataGrid — the grid is findable in every state', () => {
 
   it('names the grid while it is showing an ERROR', () => {
     render(
-      <DataGrid emptyText="Nenhum dado por aqui" data-testid="things-grid" rows={rows} columns={columns} error="Deu ruim" />,
+      <DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY} data-testid="things-grid" rows={rows} columns={columns} error="Deu ruim" />,
     );
     const grid = screen.getByTestId('things-grid');
     expect(grid).toHaveAttribute('data-error', 'true');
@@ -53,7 +54,7 @@ describe('DataGrid — the grid is findable in every state', () => {
   });
 
   it('names the grid while it is EMPTY — the case every spec tripped over', () => {
-    render(<DataGrid emptyText="Nenhum dado por aqui" data-testid="things-grid" rows={[]} columns={columns} />);
+    render(<DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY} data-testid="things-grid" rows={[]} columns={columns} />);
     const grid = screen.getByTestId('things-grid');
     expect(grid).toHaveAttribute('data-empty', 'true');
     // What the CALLER passed, not a sentence restated here: `emptyText` is
@@ -64,7 +65,7 @@ describe('DataGrid — the grid is findable in every state', () => {
 
   it('renders the caller’s own empty state inside that same named grid', () => {
     render(
-      <DataGrid emptyText="Nenhum dado por aqui"
+      <DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY}
         data-testid="things-grid"
         rows={[]}
         columns={columns}
@@ -75,7 +76,7 @@ describe('DataGrid — the grid is findable in every state', () => {
   });
 
   it('names the grid once it HAS rows, and renders them', () => {
-    render(<DataGrid emptyText="Nenhum dado por aqui" data-testid="things-grid" rows={rows} columns={columns} />);
+    render(<DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY} data-testid="things-grid" rows={rows} columns={columns} />);
     const grid = screen.getByTestId('things-grid');
     // The populated render is the one that always worked; it is asserted so the
     // four cases above cannot all pass by the id being applied unconditionally
@@ -87,7 +88,7 @@ describe('DataGrid — the grid is findable in every state', () => {
   });
 
   it('keeps grid-only props off the DOM element', () => {
-    render(<DataGrid emptyText="Nenhum dado por aqui" data-testid="things-grid" rows={rows} columns={columns} />);
+    render(<DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY} data-testid="things-grid" rows={rows} columns={columns} />);
     const grid = screen.getByTestId('things-grid');
     // `DataGridProps` extends HTMLAttributes, so the rest-spread would otherwise
     // serialize the whole dataset into an attribute.
@@ -99,7 +100,7 @@ describe('DataGrid — the grid is findable in every state', () => {
 describe('DataGrid — client-mode rows', () => {
   it('sorts on a header press when sorting is client-mode', () => {
     render(
-      <DataGrid emptyText="Nenhum dado por aqui"
+      <DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY}
         data-testid="things-grid"
         rows={rows}
         columns={columns}
@@ -114,7 +115,7 @@ describe('DataGrid — client-mode rows', () => {
 
   it('filters client-side and falls through to the empty state when nothing matches', () => {
     render(
-      <DataGrid emptyText="Nenhum dado por aqui"
+      <DataGrid emptyText="Nenhum dado por aqui" copy={PT_BR_DATA_GRID_COPY}
         data-testid="things-grid"
         rows={rows}
         columns={columns}

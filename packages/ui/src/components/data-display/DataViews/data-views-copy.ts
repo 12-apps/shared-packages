@@ -1,4 +1,4 @@
-import type { CategorySelectCopy, ConfirmActionCopy, TableFilterCopy } from "../../../copy";
+import type { CategorySelectCopy, ConfirmActionCopy, DataGridCopy, TableFilterCopy } from "../../../copy";
 import type { SavedViewsLabels } from "../../layout/ContentToolbar/ContentToolbar.types";
 /**
  * Every word the DataViews family renders, as REQUIRED host config (FUT-760).
@@ -143,7 +143,13 @@ export interface DataViewsExportCopy {
   triggerLabel: string;
 }
 
-export interface DataViewsGridCopy {
+/**
+ * The table layout's own `<DataGrid>`, which this surface mounts but does not
+ * own — so it carries the grid's full `DataGridCopy` (its sortable headers,
+ * its row/select-all checkboxes, its expand chevron, its own accessible name)
+ * alongside the words DataViews renders around it.
+ */
+export interface DataViewsGridCopy extends DataGridCopy {
   /** The per-row kebab's accessible name. */
   rowActions: string;
   bulkActions(selectedCount: number): string;
