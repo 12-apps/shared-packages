@@ -62,7 +62,6 @@ export const BasicInteraction: Story = {
     scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     scrollToTopThreshold: 50,
     onScroll: fn(),
-    onResize: fn(),
     children: generateContent(50),
   },
   play: async ({ canvasElement, args }) => {
@@ -244,7 +243,6 @@ export const ScreenReader: Story = {
     loading: false,
     disabled: false,
     onScroll: fn(),
-    onResize: fn(),
     children: generateContent(20),
   },
   play: async ({ canvasElement }) => {
@@ -578,7 +576,6 @@ export const Integration: Story = {
     scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     variant: 'overlay',
     onScroll: fn(),
-    onResize: fn(),
   },
   render: function IntegrationRender(args) {
     const [scrollPosition, setScrollPosition] = React.useState(0);
