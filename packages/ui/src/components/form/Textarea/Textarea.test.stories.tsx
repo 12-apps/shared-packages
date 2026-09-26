@@ -121,9 +121,12 @@ export const RichTextEditor: Story = {
       const label = canvas.getByText('Rich Text Content');
       expect(label).toBeInTheDocument();
 
-      // Look for toolbar buttons
-      const boldButton = canvas.getByRole('button', { name: PT_BR_RICH_EDITOR_TOOLBAR_COPY.bold });
-      const italicButton = canvas.getByRole('button', {
+      // The rich editor is lazy-loaded behind a Suspense boundary (Textarea.tsx),
+      // so the toolbar is not there on the first render — wait for it.
+      const boldButton = await canvas.findByRole('button', {
+        name: PT_BR_RICH_EDITOR_TOOLBAR_COPY.bold,
+      });
+      const italicButton = await canvas.findByRole('button', {
         name: PT_BR_RICH_EDITOR_TOOLBAR_COPY.italic,
       });
       expect(boldButton).toBeInTheDocument();
