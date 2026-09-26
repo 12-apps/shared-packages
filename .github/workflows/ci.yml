@@ -907,6 +907,17 @@ jobs:
       # than in a job of its own — the checkout and install above are already
       # paid for, and its ledger's ratchet reads `origin/main` the same way
       # `quality:ui-tokens` (inside the gate above) does.
+      # The stories import @12-apps/ui's source, which reaches workspace
+      # packages (e.g. @12-apps/forms-core, via CepField) whose exports point at
+      # `dist/` only. Nothing above builds them, so on a fresh checkout tsc
+      # cannot resolve them and the gate fails as a broken project on every PR;
+      # locally a leftover `dist/` hides it. Through turbo, so `^build` builds
+      # the design system's workspace dependencies first.
+      - name: Build what the stories type-check against
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm exec turbo run build --filter='@12-apps/ui^...' 2>&1 | tee ui-deps-build.log
       - name: UI stories types gate
         shell: bash
         run: |

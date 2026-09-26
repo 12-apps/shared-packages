@@ -60,8 +60,11 @@ export { collectFindings, parseErrors, runTsc, TSCONFIG } from "./lib/ui-stories
 export { evaluate, findingOf, LEDGER_PATH, parseFinding } from "./lib/ui-stories-types-evaluate.mjs";
 
 const LABEL = "[ui-stories-types]";
+// Only this lane's own config and scripts. The package's shared tsconfig.json is
+// deliberately NOT here: a PR that edits it for another reason must not earn a
+// pass that lets story error counts rise.
 const SCANNER_FILES = [
-  "packages/ui/tsconfig.stories.json", "packages/ui/tsconfig.json",
+  "packages/ui/tsconfig.stories.json",
   "scripts/ui-stories-types-gate.mjs", "scripts/lib/ui-stories-types-collect.mjs",
   "scripts/lib/ui-stories-types-evaluate.mjs",
 ];
@@ -96,6 +99,13 @@ function readRawLedger() {
 
 function update(counts) {
   const baseline = readBase();
+  // `origin/main` is what bounds the ratchet; without it a rewrite could raise a
+  // count unnoticed. (A first run — main reachable, no ledger on it yet — may
+  // still write, as `check()` also allows.)
+  if (baseline.unreachable) {
+    console.error(`${LABEL} --update needs origin/main to bound the ratchet; fetch it first.`);
+    process.exit(1);
+  }
   const previous = readRawLedger();
   const grew = baseline.counts && !scannerChanged()
     ? [...counts].filter(([file, n]) => n > (baseline.counts.get(file) ?? 0))
