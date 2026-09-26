@@ -361,5 +361,16 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   if (cache.current === null || (!frozen && cache.current.signature !== signature)) {
     cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport, theme) };
   }
-  return { ...cache.current.split, barRef };
+  // The cache holds the ARRANGEMENT — which ids sit on the bar, which in "Mais"
+  // — never the fields themselves. The signature keys on ids, so a field whose
+  // options arrive after the first measurement (a category list still loading)
+  // does not re-split, and handing back the cached objects served the empty
+  // list for good: "Categoria" in "Mais" rendered a label with no control under
+  // it (FUT-2828). Re-reading each field from `all` keeps the slots and the
+  // current config.
+  const { split } = cache.current;
+  const current = new Map(all.map((field) => [field.id, field]));
+  const fresh = (fields: OverflowField<T>[]): OverflowField<T>[] =>
+    fields.map((field) => current.get(field.id) ?? field);
+  return { ...split, inline: fresh(split.inline), overflow: fresh(split.overflow), barRef };
 }
