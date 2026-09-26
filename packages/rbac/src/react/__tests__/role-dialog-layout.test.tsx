@@ -59,41 +59,61 @@ function open(
 }
 
 /**
- * The two role models the editor serves.
- *
- * `base+custom` refuses any selection that is not exactly one system role —
- * correct for a host whose model names a base, and fatal for one whose people
- * hold two equal roles. `set` asks only for a non-empty selection.
+ * Person × role × tenant is N×M×J: the editor accepts ANY non-empty set of
+ * roles — two system roles, every system role, system and custom mixed — and
+ * refuses only the empty one, which is a removal rather than a role edit.
  */
-describe('the editor serves both role models', () => {
-  it('refuses two system roles under the base model', async () => {
+describe('the editor accepts any number of roles', () => {
+  it('accepts two system roles, neither promoted to a base', async () => {
     const onSave = vi.fn();
     render(open({ onSave }));
-    // MANAGER is already held; adding WAITER makes two bases, which the model
-    // cannot express.
-    fireEvent.click(screen.getByTestId('role-opt-WAITER'));
-    await waitFor(() => {
-      expect(screen.getByTestId('role-edit-invalid')).toBeTruthy();
-    });
-    fireEvent.click(screen.getByTestId('role-edit-save'));
-    expect(onSave).not.toHaveBeenCalled();
-  });
-
-  it('accepts two system roles under the set model', async () => {
-    const onSave = vi.fn();
-    render(open({ roleModel: 'set', onSave }));
     fireEvent.click(screen.getByTestId('role-opt-WAITER'));
     await waitFor(() => {
       expect(screen.queryByTestId('role-edit-invalid')).toBeNull();
     });
     fireEvent.click(screen.getByTestId('role-edit-save'));
-    // Both roles go over, neither promoted to a base.
     expect(onSave).toHaveBeenCalledWith(expect.arrayContaining(['MANAGER', 'WAITER']));
   });
 
-  it('still refuses an EMPTY selection under the set model', async () => {
+  it('accepts EVERY role at once, system and custom', async () => {
     const onSave = vi.fn();
-    render(open({ roleModel: 'set', onSave }));
+    render(open({ onSave }));
+    fireEvent.click(screen.getByTestId('role-opt-OWNER'));
+    fireEvent.click(screen.getByTestId('role-opt-WAITER'));
+    fireEvent.click(screen.getByTestId('role-opt-Caixa'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('role-edit-invalid')).toBeNull();
+    });
+    fireEvent.click(screen.getByTestId('role-edit-save'));
+    const saved = onSave.mock.calls[0]?.[0] as string[];
+    expect([...saved].sort()).toEqual(['Caixa', 'MANAGER', 'OWNER', 'WAITER']);
+  });
+
+  it('accepts a custom role alone, with no system role at all', async () => {
+    const onSave = vi.fn();
+    render(open({ onSave }));
+    fireEvent.click(screen.getByTestId('role-opt-Caixa'));
+    fireEvent.click(screen.getByTestId('role-opt-MANAGER'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('role-edit-invalid')).toBeNull();
+    });
+    fireEvent.click(screen.getByTestId('role-edit-save'));
+    expect(onSave).toHaveBeenCalledWith(['Caixa']);
+  });
+
+  it('carries a role it does not offer through the save untouched', async () => {
+    const onSave = vi.fn();
+    // SUPERADMIN is held but not offered here — the save must not revoke it.
+    render(open({ onSave, member: { ...MEMBER, roles: ['MANAGER', 'SUPERADMIN'] } }));
+    fireEvent.click(screen.getByTestId('role-opt-WAITER'));
+    fireEvent.click(screen.getByTestId('role-edit-save'));
+    const saved = onSave.mock.calls[0]?.[0] as string[];
+    expect([...saved].sort()).toEqual(['MANAGER', 'SUPERADMIN', 'WAITER']);
+  });
+
+  it('refuses only an EMPTY selection', async () => {
+    const onSave = vi.fn();
+    render(open({ onSave }));
     // Clearing the only role held leaves a person with no access at all, which
     // is a removal, not a role edit.
     fireEvent.click(screen.getByTestId('role-opt-MANAGER'));

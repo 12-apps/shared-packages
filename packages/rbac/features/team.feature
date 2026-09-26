@@ -22,16 +22,17 @@ Feature: The staff roster
     And the matching member is listed
     And the excluded member is not listed
 
-  Scenario: A manager reassigns a member's base role from the roster
-    # Reopened rather than read off the grid: the roles column shows a role's
-    # LABEL, which is host copy, and the editor's checkboxes are keyed on the
-    # wire value. Reopening also refetches, so this asserts what the server
-    # stored rather than what the dialog left behind.
+  Scenario: A manager gives one member a second system role, keeping the first
+    # Person × role × tenant is N×M×J: a member holds as many roles as the store
+    # grants, system ones included. Reopened rather than read off the grid: the
+    # roles column shows a role's LABEL, which is host copy, and the editor's
+    # checkboxes are keyed on the wire value. Reopening also refetches, so this
+    # asserts what the server stored rather than what the dialog left behind.
     When I open the team screen
     And I open the role editor for the matching member
-    And I assign the seeded base role
+    And I add the seeded assignable role to the matching member
     And I open the role editor for the matching member
-    Then the role editor shows the seeded base role selected
+    Then the role editor shows both system roles selected
 
   Scenario: A row opens that member's profile
     # The roster's rows are the ONLY way into the profile, so the navigation is
@@ -59,7 +60,8 @@ Feature: The staff roster
     And the team grid is visible
 
   Scenario: A manager grants an additive custom role, then takes it back
-    # A custom role rides ALONGSIDE the base role rather than replacing it, and
+    # A custom role rides ALONGSIDE the roles already held rather than replacing
+    # any of them, and
     # the same checkbox does both: the dialog diffs the selection and calls the
     # grant or the revoke endpoint. Reopened each time, so both assertions read
     # what the server stored.
@@ -72,11 +74,10 @@ Feature: The staff roster
     And I open the role editor for the matching member
     Then the member no longer holds the seeded custom role
 
-  Scenario: The editor refuses a member with no system role
-    # Exactly one, always — zero is as invalid as two. The refusal is stated on
-    # screen and the save is disabled, rather than the selection being accepted
-    # and refused by the endpoint.
+  Scenario: The editor refuses only an empty role set
+    # Any number of roles is a valid set. Zero is not a role edit, it is a
+    # removal, and the roster has its own affordance for that.
     When I open the team screen
     And I open the role editor for the matching member
-    And I clear the member's base role
+    And I clear every role the matching member holds
     Then the editor refuses the save

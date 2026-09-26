@@ -119,9 +119,10 @@ export const inviteBody = z.object({
 export const setMemberActiveBody = z.object({ active: z.boolean() });
 
 /**
- * Body for granting a tenant CUSTOM role. Unlike the base role (a fixed
- * template enum the host supplies), a custom role is a free-form tenant role
- * name; the route validates it exists and that the granter may grant it.
+ * Body for granting a member one more role — a system role or a tenant custom
+ * role, by name. A member may hold any number of roles (person × role × tenant
+ * is N×M×J); the route validates the role exists at the tenant and that the
+ * granter may grant it.
  */
 export const grantMemberRoleBody = z.object({ role: z.string().trim().min(1) });
 

@@ -20,7 +20,7 @@ import {
   teamSyncState,
   type TeamRow,
 } from './team-grid-config';
-import { RoleEditDialog, type RoleModel } from './team-role-dialog';
+import { RoleEditDialog } from './team-role-dialog';
 import type { TeamExtraColumn } from './team-grid-config';
 import {
   HeaderControls,
@@ -48,16 +48,9 @@ import { useTeamData } from './use-team-data';
  * the screen differently still runs them.
  */
 
-export { splitRoleSelection } from './team-role-dialog';
-
 export interface TeamScreenProps {
   api: RbacApiClient;
   labels: RbacLabels;
-  /**
-   * How this host relates people to roles. Defaults to `base+custom`, which is
-   * every adopter before the set model existed. See {@link RoleModel}.
-   */
-  roleModel?: RoleModel;
   /** Columns this package cannot build. See {@link TeamExtraColumn}. */
   extraColumns?: readonly TeamExtraColumn[];
   /**
@@ -79,7 +72,8 @@ export interface TeamScreenProps {
   ownerRoles: readonly string[];
   managePermission: string;
   /**
-   * The base role the invite dialog opens on.
+   * The role ticked when the invite dialog opens (the inviter may tick any
+   * number of others).
    *
    * STATED rather than derived from `systemRoles[0]`, because this default
    * decides what access somebody gets when the inviter does not touch the
@@ -123,13 +117,7 @@ function useRosterControls(
     () => (data.context?.assignableRoles ?? []).filter((name) => !systemSet.has(name)),
     [data.context, systemSet],
   );
-  const editor = useRoleEditor(
-    props.api,
-    systemSet,
-    data.refresh,
-    actions.setError,
-    props.roleModel,
-  );
+  const editor = useRoleEditor(props.api, data.refresh, actions.setError);
   const removeConfirm = useRemoveConfirm(actions, copy);
   const cancelInviteConfirm = useCancelInviteConfirm(actions, copy);
   // Rebuilt per render rather than memoised on identity: the handlers close
@@ -244,7 +232,6 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
         {cancelInviteConfirm.dialog}
         <RoleEditDialog
           member={editor.editing}
-          roleModel={props.roleModel}
           systemRoles={props.systemRoles}
           availableCustomRoles={customRoles}
           labels={labels}

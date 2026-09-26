@@ -149,12 +149,15 @@ export interface TeamScreenCopy {
   inviteEmailLabel: string;
   inviteHint: string;
   /**
-   * The base-role picker's label, and the heading over the custom roles the
-   * tenant has built. An invite grants a role now; leaving it implicit made
-   * every address added through this dialog an administrator.
+   * The headings over the invite's two checklists — the system roles, and the
+   * custom roles the tenant has built. An invite grants roles explicitly;
+   * leaving it implicit made every address added through this dialog an
+   * administrator.
    */
   inviteRoleLabel: string;
   inviteCustomRolesTitle: string;
+  /** The warning while an invite's role checklist is empty. */
+  inviteNoRole: string;
   /** The success banner shown when a grant was DEFERRED to the person's signup. */
   inviteDeferredTitle: string;
   inviteDeferredBody: string;
@@ -206,8 +209,8 @@ export interface MemberProfileCopy {
   comingSoon: string;
   /** The read-only fields on the details tab. */
   fields: {
-    baseRole: string;
-    customRoles: string;
+    /** Every role the member holds, as one list. */
+    roles: string;
     memberSince: string;
     lastLogin: string;
   };
@@ -228,16 +231,11 @@ export interface TeamRoleDialogCopy {
   fallbackTitle: string;
   systemGroupTitle: string;
   customGroupTitle: string;
-  /** The warning while the selection has zero or two system roles. */
-  exactlyOneSystemRole: string;
   /**
-   * The warning while a SET-model selection is empty.
-   *
-   * Optional: a host on the base+custom model never shows it, and absent it
-   * falls back to {@link TeamRoleDialogCopy.exactlyOneSystemRole} rather than
-   * to a sentence this package invented.
+   * The warning while the selection is empty — the ONLY selection the editor
+   * refuses. Any number of roles, of any kind, is a valid set.
    */
-  atLeastOneRole?: string;
+  atLeastOneRole: string;
   cancelAction: string;
   saveAction: string;
 }

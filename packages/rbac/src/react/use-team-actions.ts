@@ -8,13 +8,7 @@ import type { RbacApiClient } from './api';
 import type { RbacWebCopy } from './copy';
 import type { InviteSelection } from './team-invite-form';
 import type { TeamRow } from './team-grid-config';
-import {
-  applyRoleChanges,
-  applyRoleSet,
-  splitRoleSelection,
-  type MemberWithRoles,
-  type RoleModel,
-} from './team-role-dialog';
+import { applyRoleSet, type MemberWithRoles } from './team-role-dialog';
 
 /**
  * Everything the roster WRITES, and the state those writes drive — extracted
@@ -164,10 +158,8 @@ export function useCancelInviteConfirm(
 /** The role-edit popup's state and its save, over the EXISTING endpoints. */
 export function useRoleEditor(
   api: RbacApiClient,
-  systemSet: ReadonlySet<string>,
   refresh: () => void,
   onError: (message: string | null) => void,
-  roleModel: RoleModel = 'base+custom',
 ): {
   editing: MemberWithRoles | null;
   busy: boolean;
@@ -195,16 +187,9 @@ export function useRoleEditor(
     close: () => setEditing(null),
     async save(roleNames) {
       if (!editing) return;
-      const { base, customRoles } = splitRoleSelection(roleNames, systemSet);
-      // The base model's dialog blocks a save without exactly one system role;
-      // the set model has no base to be missing.
-      if (roleModel !== 'set' && !base) return;
       setBusy(true);
       onError(null);
-      const failure =
-        roleModel === 'set'
-          ? await applyRoleSet(api, editing, roleNames)
-          : await applyRoleChanges(api, editing, base as string, customRoles);
+      const failure = await applyRoleSet(api, editing, roleNames);
       setBusy(false);
       onError(failure);
       if (!failure) {
