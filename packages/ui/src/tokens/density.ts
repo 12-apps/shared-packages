@@ -68,30 +68,60 @@ export function useDensity(): ResolvedDensity {
  * that carried only `typography`/`spacing` left every field standing at the
  * DEFAULT height (2.5) at every density on this path — the two paths would
  * agree on the type scale and disagree on the one number three components key
- * their own layout off. `components` is the matching MUI-native override
- * (`fieldOverrides`) for a HOST's own bare `TextField`/`Select`, mirroring
- * `muiThemeOptionsFrom`'s own `components: mergeMuiComponents(fieldOverrides(...))`
- * — density does not touch the field's CORNER, so the radius half of that
- * override is the same {@link DEFAULT_FIELD_RADIUS} `createUiTheme` itself
- * falls back to when a host names no `fieldRadius`.
+ * their own layout off.
  *
- * Spread it into a `createTheme(built, { ... })` call — but as the FIRST
- * (options) argument if `built` is itself a plain options object; a SECOND,
- * layering argument onto an ALREADY-BUILT `Theme` (`createTheme(outer, {
- * ...densityThemeOptions('compact') })`, the shape a host layering a second
- * theme on top of a first already uses) is deepmerged with no reprocessing, so
- * `spacing`/`typography.fontSize` would overwrite the already-resolved
- * `theme.spacing`/`pxToRem` instead of rescaling them — that host's own
- * adoption needs the fragment merged into its FIRST `createTheme()` call in
- * the chain, not spread onto an already-built one.
+ * `components` is the matching MUI-native override (`fieldOverrides`) for a
+ * HOST's own bare `TextField`/`Select`, mirroring `muiThemeOptionsFrom`'s own
+ * `components: mergeMuiComponents(fieldOverrides(...))`. It carries ONLY the
+ * field overrides this function knows about (`MuiOutlinedInput`'s `root`,
+ * `input` and `notchedOutline`; `MuiInputLabel`'s `outlined`) — a host with
+ * ITS OWN overrides for OTHER components merges them in with
+ * `mergeMuiComponents(densityThemeOptions(density).components, hostOverrides)`,
+ * which keeps a component only ONE side touches untouched. For a component
+ * BOTH sides style, the merge is by INNER key (`root`/`input`/…): a key only
+ * one side sets survives from that side, but a key BOTH set is replaced
+ * WHOLESALE by whichever source is passed LAST — not deep-merged — so a host
+ * wanting to ADD to, say, `MuiOutlinedInput`'s `root` alongside the radius
+ * override needs to write that one key's object out in full itself.
+ *
+ * `fieldRadius` (3rd argument, optional) exists because density does NOT touch
+ * the field's CORNER — this is only for a host that already draws its OWN,
+ * non-default radius and wants `components` to match it instead of clashing;
+ * it defaults
+ * to the same {@link DEFAULT_FIELD_RADIUS} `createUiTheme` itself falls back
+ * to when a host names no `fieldRadius`, so the two paths still agree with no
+ * argument passed at all — the existing 2-argument call keeps working
+ * unchanged.
+ *
+ * **Where to spread it — the first `createTheme()` call, not a later layering
+ * one.** `createTheme(options, ...args)` (`createThemeNoVars.js`) only runs
+ * `createSpacing`/`createTypography` on `options`, the FIRST argument; every
+ * later argument is deep-merged onto the theme those two already built, with
+ * no such reprocessing. So a host with a base theme and a SECOND, layering
+ * `createTheme()` call on top of it — exactly the shape a two-theme host uses,
+ * `createTheme(outer, { palette: { ... } })` — must apply density at the
+ * FIRST call (where the base itself is built), never spread onto `outer` in
+ * the second one:
  *
  * ```ts
- * createTheme({ ...built, ...densityThemeOptions('compact') })
+ * // RIGHT — density goes into the base's OWN construction. The second,
+ * // layering call is unaffected: it never restates spacing/typography/
+ * // fieldHeight/components itself, so `theme.spacing`/`pxToRem`/`fieldHeight`
+ * // carry over from `base` UNCHANGED, already correctly scaled.
+ * const base = createTheme({ palette: { primary: { main }, ... }, ...densityThemeOptions('compact') });
+ * const themed = createTheme(base, { palette: { primary: { main: brand } } });
+ *
+ * // WRONG — a second, layering argument onto an ALREADY-BUILT theme is
+ * // deepmerged with no reprocessing: `spacing`/`typography.fontSize` would
+ * // overwrite the already-resolved `theme.spacing` function/`pxToRem` ratio
+ * // instead of rescaling them.
+ * createTheme(outer, { ...densityThemeOptions('compact') });
  * ```
  */
 export function densityThemeOptions(
   density: DensityLevel | number,
   factors?: Partial<Record<DensityLevel, number>>,
+  fieldRadius: number = DEFAULT_FIELD_RADIUS,
 ): Pick<ThemeOptions, 'typography' | 'spacing' | 'fieldHeight' | 'components'> {
   const { factor } = resolveDensityFactor(density, factors);
   const fieldHeight = densityFieldHeight(factor);
@@ -99,6 +129,6 @@ export function densityThemeOptions(
     typography: { fontSize: densityFontSize(factor) },
     spacing: densitySpacingUnit(factor),
     fieldHeight,
-    components: mergeMuiComponents(fieldOverrides(DEFAULT_FIELD_RADIUS, fieldHeight)),
+    components: mergeMuiComponents(fieldOverrides(fieldRadius, fieldHeight)),
   };
 }

@@ -165,7 +165,10 @@ export interface UiThemeOptions {
    * `fieldHeight` option > a numeric `density` (used as the factor directly,
    * no table lookup) > `densityFactors[level]` (below) > the built-in table
    * (`compact` 0.9 / `normal` 1 / `comfortable` 1.1). No `density` at all is
-   * `'normal'`, factor `1` — today, byte-for-byte.
+   * `'normal'`, factor `1` — today, byte-for-byte. A numeric `density` that is
+   * not a positive, finite number (`0`, negative, `NaN`, `Infinity`) falls back
+   * to `'normal'` the same way; a `densityFactors` entry that isn't falls back
+   * to the built-in table's value for that level (see `./density.core`).
    *
    * A named level (`density: 'compact'`, e.g. a backoffice app), no
    * `density` at all (`'normal'`, e.g. a storefront), or a raw factor

@@ -152,10 +152,22 @@ kiosk app, say). `UiThemeOptions.densityFactors?: Partial<Record<'compact' |
 'normal' | 'comfortable', number>>` lets a repository redefine what a named
 level itself means.
 
-Precedence, highest first: an explicit `typography.fontSize` / `spacingUnit` /
-`fieldHeight` option (unchanged — these already win over everything) > a
-numeric `density` (used as the factor directly, no table lookup) >
-`densityFactors[level]` (a repository's own override) > the built-in table:
+Precedence, highest first, and it differs by WHICH path sets the explicit
+option (`UiThemeOptions` itself carries no `typography.fontSize` — only
+`fontFamily`/`monospaceFontFamily` — so "an explicit `fontSize` wins" is never
+a `createUiTheme` rule):
+
+- On the `createUiTheme` path: an explicit `spacingUnit` / `fieldHeight` option
+  (unchanged — these already win over everything below).
+- On the MUI-native path (`densityThemeOptions`'s output, or a host's own
+  `createTheme()` options merged around it): whichever `typography.fontSize` /
+  `spacing` a host's own object literal states LAST wins — ordinary
+  JavaScript object-spread order, not a rule this package enforces. See the
+  worked example below for where that actually has to go.
+
+Below that: a numeric `density` (used as the factor directly, no table
+lookup) > `densityFactors[level]` (a repository's own override) > the
+built-in table:
 
 | level | factor | `typography.fontSize` (base 14) | `spacingUnit` (base 8) | `fieldHeight` (base 2.5, 40px `md`) |
 | --- | --- | --- | --- | --- |
@@ -164,7 +176,12 @@ numeric `density` (used as the factor directly, no table lookup) >
 | `comfortable` | `1.1` | `15.4` | `8.8` | `2.75` (44px `md`) |
 
 No `density` at all resolves to `'normal'`, factor `1` — today's numbers,
-byte-for-byte; this is why an app that sets nothing sees no visual change.
+byte-for-byte; this is why an app that sets nothing sees no visual change. A
+numeric `density` that is not a positive, finite number (`0`, a negative
+number, `NaN`, `Infinity`) falls back to `'normal'` the same way, rather than
+baking a broken factor into every size; a `densityFactors` entry that isn't
+falls back to the BUILT-IN table's value for that same level instead (the
+level itself is still the one asked for — only its factor was unusable).
 
 **Three worked examples, one per repository shape:**
 
@@ -185,13 +202,44 @@ createUiTheme({ density: 'compact', densityFactors: { compact: 0.8 } });
 
 A host that builds MUI's `createTheme()` directly — never calling
 `createUiTheme`/`UiProvider` — uses the standalone entry point instead, which
-gives the same numbers:
+gives the same numbers: `typography.fontSize`, `spacing`, `fieldHeight` (the
+key `Input`/`Select`/`Button` all read directly for their own height) and
+`components` (the matching `MuiOutlinedInput`/`MuiInputLabel` override for a
+host's own bare fields — an optional 3rd argument names a non-default field
+radius for that override; density never touches the corner, so it defaults to
+the same one `createUiTheme` itself falls back to).
+
+**Where it goes matters.** `createTheme(options, ...args)` only reprocesses
+`spacing`/`typography` on its FIRST argument — every later argument is
+deep-merged onto the theme those two already built, with no such
+reprocessing. A host with a base theme and a SECOND theme layered on top of it
+(`createTheme(outer, { palette: { ... } })` — the shape a two-theme host, such
+as a backoffice app layering its own palette over a shared base, already
+uses) must apply density where the BASE is built, not spread onto `outer`:
 
 ```ts
 import { densityThemeOptions } from '@12-apps/ui/tokens';
 
-createTheme({ ...densityThemeOptions('compact') });
+// RIGHT — density goes into the base's own construction. A second, layering
+// call on top of it is unaffected: it never restates spacing/typography/
+// fieldHeight/components itself, so they carry over from `base` unchanged,
+// already correctly scaled.
+const base = createTheme({ palette: { primary: { main } }, ...densityThemeOptions('compact') });
+const themed = createTheme(base, { palette: { primary: { main: brand } } });
+
+// WRONG — a second, layering argument onto an ALREADY-BUILT theme does not
+// get reprocessed: `spacing`/`typography.fontSize` overwrite the
+// already-resolved `theme.spacing` function/`pxToRem` ratio instead of
+// rescaling them.
+createTheme(outer, { ...densityThemeOptions('compact') });
 ```
+
+A host with its OWN overrides for components density's `fieldOverrides`
+doesn't know about merges them in with `mergeMuiComponents` (also exported
+from `@12-apps/ui/tokens`), which leaves a component only one side touches
+untouched — but replaces a SHARED inner key (e.g. both sides styling
+`MuiOutlinedInput`'s `root`) wholesale with whichever source is passed last,
+rather than deep-merging it.
 
 A `styleOverrides` callback already gets `{ theme }` and can read
 `theme.density` directly; `useDensity()` is for a component that needs the
