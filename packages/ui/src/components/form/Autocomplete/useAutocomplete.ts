@@ -101,16 +101,17 @@ function useLoadingOpen(
   isLoading: boolean,
   inputValue: string,
   disabled: boolean,
+  userClosedDropdown: boolean,
   setOpen: Setter<boolean>,
   setActiveIndex: Setter<number>,
 ): void {
   useEffect(() => {
-    if (isLoading && inputValue.trim().length > 0 && !disabled) setOpen(true);
+    if (isLoading && inputValue.trim().length > 0 && !disabled && !userClosedDropdown) setOpen(true);
     if (disabled) {
       setOpen(false);
       setActiveIndex(-1);
     }
-  }, [isLoading, inputValue, disabled, setOpen, setActiveIndex]);
+  }, [isLoading, inputValue, disabled, userClosedDropdown, setOpen, setActiveIndex]);
 }
 
 /** Inputs to the auto-open check, all primitive/stable so effect deps stay complete. */
@@ -197,20 +198,37 @@ function commitSingleSelect<T>(item: T, p: AutocompleteProps<T>, s: Autocomplete
   onChange(label);
 }
 
+/** Apply a pick: open a link suggestion, or commit a search one to the input. */
+function commitPick<T>(
+  item: T,
+  linkUrl: string | null,
+  p: AutocompleteProps<T>,
+  s: AutocompleteState<T>,
+  onChange: (v: string) => void,
+): void {
+  if (linkUrl !== null) (p.openLink ?? defaultOpenLink)(linkUrl, item);
+  else if (p.multiple) commitMultiSelect(item, p, s, onChange);
+  else commitSingleSelect(item, p, s, onChange);
+}
+
 function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState<T>, onChange: (v: string) => void): void {
   const url = (p.getUrl ?? defaultGetUrl)(item);
   const isLink = (p.getSuggestionType ?? defaultGetSuggestionType)(item) === 'link' && Boolean(url);
-  if (isLink) {
-    (p.openLink ?? defaultOpenLink)(url as string, item);
-  } else if (p.multiple) {
-    commitMultiSelect(item, p, s, onChange);
-  } else {
-    commitSingleSelect(item, p, s, onChange);
-  }
+  // A single-select pick (search or link) ends the current search: the list
+  // stays closed until the user types again. `multiple` mode is unchanged —
+  // commitMultiSelect already clears inputValue and resets the flag itself,
+  // so the empty-input branch of the filter effect keeps the list closed.
+  const isSingleSelectPick = isLink || !p.multiple;
+  commitPick(item, isLink ? (url as string) : null, p, s, onChange);
   s.setOpen(false);
   s.setActiveIndex(-1);
   p.onSelect?.(item);
   s.inputRef.current?.focus();
+  // Set LAST so a re-fired `onFocus` cannot clear the flag. The close itself
+  // relies on the input never blurring during a pick (the option's
+  // `onMouseDown` preventDefault, and Enter keeps focus): `onFocus` reopens a
+  // non-empty input directly, without reading this flag.
+  if (isSingleSelectPick) s.setUserClosedDropdown(true);
 }
 
 function buildKeyContext<T>(
@@ -265,7 +283,14 @@ export function useAutocomplete<T>(p: AutocompleteProps<T>): AutocompleteView<T>
   useDebounceCleanup(s.debounceRef);
   useScrollActiveIntoView(s.activeIndex, optionIdPrefix, s.listRef);
   useGhostFlagReset(s.justCompletedGhost, s.setJustCompletedGhost);
-  useLoadingOpen(Boolean(p.isLoading), s.inputValue, Boolean(p.disabled), s.setOpen, s.setActiveIndex);
+  useLoadingOpen(
+    Boolean(p.isLoading),
+    s.inputValue,
+    Boolean(p.disabled),
+    s.userClosedDropdown,
+    s.setOpen,
+    s.setActiveIndex,
+  );
   useLocalFilter(p, s);
   useGhostText(p, s);
 

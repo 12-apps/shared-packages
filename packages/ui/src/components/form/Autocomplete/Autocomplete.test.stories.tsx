@@ -828,6 +828,9 @@ export const SearchAndLinkSuggestions: Story = {
       await expect(canvas.getByTestId('opened-url')).toHaveTextContent(
         'https://example.com/docs',
       );
+      // A search pick ends the search too: the list stays closed until the
+      // user types again (FUT-2763).
+      await waitFor(() => expect(input).toHaveAttribute('aria-expanded', 'false'));
     });
   },
 };
