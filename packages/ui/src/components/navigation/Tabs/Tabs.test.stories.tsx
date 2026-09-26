@@ -11,12 +11,16 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_CHROME_COPY } from '../../../pt-BR';
 import { Tabs } from './Tabs';
 import type { TabItem, TabsProps } from './Tabs.types';
 
 const meta: Meta<typeof Tabs> = {
   title: 'Navigation/Tabs/Tests',
   component: Tabs,
+  args: {
+    closeTabLabel: PT_BR_CHROME_COPY.closeTab,
+  },
   parameters: {
     layout: 'centered',
     chromatic: { disableSnapshot: false },
@@ -360,14 +364,14 @@ export const ClosableTabsTest: Story = {
 
     await step('Verify close buttons are rendered', async () => {
       // Check close buttons for closable tabs
-      const closeButtons = canvas.getAllByRole('button', { name: 'Close tab' });
+      const closeButtons = canvas.getAllByRole('button', { name: PT_BR_CHROME_COPY.closeTab });
       // Should have 2 close buttons (tab1 and tab2)
       await expect(closeButtons).toHaveLength(2);
     });
 
     await step('Close a tab', async () => {
       // Get the first close button
-      const closeButtons = canvas.getAllByRole('button', { name: 'Close tab' });
+      const closeButtons = canvas.getAllByRole('button', { name: PT_BR_CHROME_COPY.closeTab });
       const firstCloseButton = closeButtons[0];
 
       // Click close button
@@ -385,7 +389,7 @@ export const ClosableTabsTest: Story = {
 
       // Should not have a close button within Tab 3
       await waitFor(() =>
-        expect(within(tab3).queryByRole('button', { name: 'Close tab' })).not.toBeInTheDocument(),
+        expect(within(tab3).queryByRole('button', { name: PT_BR_CHROME_COPY.closeTab })).not.toBeInTheDocument(),
       );
     });
   },
@@ -1191,7 +1195,7 @@ export const IntegrationTest: Story = {
       await expect(securityTab).toHaveAttribute('aria-disabled', 'true');
 
       // Check closable tab has close button
-      const closeButtons = canvas.getAllByRole('button', { name: 'Close tab' });
+      const closeButtons = canvas.getAllByRole('button', { name: PT_BR_CHROME_COPY.closeTab });
       await expect(closeButtons.length).toBeGreaterThan(0);
     });
 
@@ -1207,7 +1211,7 @@ export const IntegrationTest: Story = {
     });
 
     await step('Close the settings tab', async () => {
-      const closeButtons = canvas.getAllByRole('button', { name: 'Close tab' });
+      const closeButtons = canvas.getAllByRole('button', { name: PT_BR_CHROME_COPY.closeTab });
       const settingsCloseButton = closeButtons[0];
 
       await userEvent.click(settingsCloseButton);

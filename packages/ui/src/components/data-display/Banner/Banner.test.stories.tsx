@@ -1,11 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
 import { Banner } from './Banner';
 
 const meta: Meta<typeof Banner> = {
   title: 'Feedback/Banner/Tests',
   component: Banner,
+  args: {
+    dismissLabel: PT_BR_DATA_STATE_COPY.dismissBanner,
+  },
   parameters: {
     layout: 'fullscreen',
     chromatic: { disableSnapshot: false },
@@ -40,7 +44,7 @@ export const BasicInteraction: Story = {
     expect(canvas.getByText('Testing basic interaction functionality')).toBeInTheDocument();
 
     // Verify dismiss button functionality
-    const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
+    const dismissButton = canvas.getByRole('button', { name: PT_BR_DATA_STATE_COPY.dismissBanner });
     expect(dismissButton).toBeInTheDocument();
 
     // Test dismiss functionality
@@ -131,7 +135,7 @@ export const KeyboardNavigation: Story = {
 
     // Tab to dismiss button
     await userEvent.tab();
-    const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
+    const dismissButton = canvas.getByRole('button', { name: PT_BR_DATA_STATE_COPY.dismissBanner });
     await waitFor(() => expect(dismissButton).toHaveFocus());
 
     // Test Enter key on action button. Focused directly rather than clicked:
@@ -176,8 +180,8 @@ export const ScreenReader: Story = {
     expect(banner).toHaveAttribute('aria-atomic', 'true');
 
     // Verify dismiss button accessibility
-    const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
-    expect(dismissButton).toHaveAttribute('aria-label', 'Dismiss banner');
+    const dismissButton = canvas.getByRole('button', { name: PT_BR_DATA_STATE_COPY.dismissBanner });
+    expect(dismissButton).toHaveAttribute('aria-label', PT_BR_DATA_STATE_COPY.dismissBanner);
 
     // Verify content structure for screen readers
     expect(canvas.getByText('Screen Reader Test')).toBeInTheDocument();
@@ -211,7 +215,7 @@ export const FocusManagement: Story = {
     await waitFor(() => expect(actionButton).toHaveFocus());
 
     await userEvent.tab();
-    const dismissButton = canvas.getByRole('button', { name: /dismiss banner/i });
+    const dismissButton = canvas.getByRole('button', { name: PT_BR_DATA_STATE_COPY.dismissBanner });
     await waitFor(() => expect(dismissButton).toHaveFocus());
   },
 };
@@ -252,7 +256,7 @@ export const ResponsiveDesign: Story = {
     expect(canvas.getByText('Testing responsive layout behavior')).toBeInTheDocument();
     expect(canvas.getByRole('button', { name: 'Action 1' })).toBeInTheDocument();
     expect(canvas.getByRole('button', { name: 'Action 2' })).toBeInTheDocument();
-    expect(canvas.getByRole('button', { name: /dismiss banner/i })).toBeInTheDocument();
+    expect(canvas.getByRole('button', { name: PT_BR_DATA_STATE_COPY.dismissBanner })).toBeInTheDocument();
 
     // Verify layout adaptation (elements should be accessible regardless of viewport)
     const banner = canvas.getByRole('alert');
@@ -297,10 +301,30 @@ export const ThemeVariations: Story = {
 export const VisualStates: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
-      <Banner variant="info" title="Info State" description="Information banner state" />
-      <Banner variant="success" title="Success State" description="Success banner state" />
-      <Banner variant="warning" title="Warning State" description="Warning banner state" />
-      <Banner variant="critical" title="Critical State" description="Critical error banner state" />
+      <Banner
+        variant="info"
+        title="Info State"
+        description="Information banner state"
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
+      />
+      <Banner
+        variant="success"
+        title="Success State"
+        description="Success banner state"
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
+      />
+      <Banner
+        variant="warning"
+        title="Warning State"
+        description="Warning banner state"
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
+      />
+      <Banner
+        variant="critical"
+        title="Critical State"
+        description="Critical error banner state"
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
+      />
     </div>
   ),
   play: async ({ canvasElement }) => {
@@ -340,6 +364,7 @@ export const Performance: Story = {
           title={`Performance Test Banner ${i + 1}`}
           description={`Testing performance with multiple banners - Instance ${i + 1}`}
           dismissible={i % 2 === 0}
+          dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
           actions={
             i % 3 === 0 ? [{ label: 'Action', onClick: fn(), variant: 'primary' }] : undefined
           }
@@ -366,7 +391,7 @@ export const Performance: Story = {
     expect(renderTime).toBeLessThan(500); // Should render in less than 500ms
 
     // Test interaction performance - dismissible banners have dismiss buttons
-    const allDismissButtons = canvas.getAllByRole('button', { name: /dismiss banner/i });
+    const allDismissButtons = canvas.getAllByRole('button', { name: PT_BR_DATA_STATE_COPY.dismissBanner });
 
     // Click first 3 dismiss buttons
     const dismissCount = Math.min(3, allDismissButtons.length);
@@ -377,7 +402,7 @@ export const Performance: Story = {
       // both the real signal and the assertion.
       const remaining = allDismissButtons.length - (i + 1);
       await waitFor(() => {
-        expect(canvas.queryAllByRole('button', { name: /dismiss banner/i })).toHaveLength(
+        expect(canvas.queryAllByRole('button', { name: PT_BR_DATA_STATE_COPY.dismissBanner })).toHaveLength(
           remaining,
         );
       });
@@ -389,17 +414,32 @@ export const Performance: Story = {
 export const EdgeCases: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
-      <Banner variant="info" title="" description="" />
-      <Banner variant="success" title="Only Title" />
-      <Banner variant="warning" description="Only description provided" />
+      <Banner
+        variant="info"
+        title=""
+        description=""
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
+      />
+      <Banner
+        variant="success"
+        title="Only Title"
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
+      />
+      <Banner
+        variant="warning"
+        description="Only description provided"
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
+      />
       <Banner
         variant="critical"
         title="Very Long Title That Should Handle Overflow Gracefully Without Breaking Layout"
         description="This is a very long description that tests how the banner handles overflow content and ensures that the layout remains stable even with extensive text content that might wrap to multiple lines."
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
       />
       <Banner
         variant="info"
         title="Many Actions Test"
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
         actions={[
           { label: 'Action 1', onClick: fn(), variant: 'primary' },
           { label: 'Action 2', onClick: fn(), variant: 'secondary' },
@@ -462,6 +502,7 @@ export const Integration: Story = {
           { label: 'Manage Preferences', onClick: fn(), variant: 'secondary' },
         ]}
         dismissible
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
       />
       <div style={{ padding: '16px' }}>
         <p>Page content below the banner</p>
@@ -474,6 +515,7 @@ export const Integration: Story = {
         sticky
         fullWidth
         dismissible
+        dismissLabel={PT_BR_DATA_STATE_COPY.dismissBanner}
       />
     </div>
   ),

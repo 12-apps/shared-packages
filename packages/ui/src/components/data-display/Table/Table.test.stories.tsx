@@ -4,6 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
 import { Table } from './Table';
 import type { ColumnConfig } from './Table.types';
 
@@ -318,6 +319,7 @@ export const EdgeCases: Story = {
           columns={basicColumns}
           data={[]}
           variant="default"
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
         />
       </Box>
     );
@@ -327,7 +329,7 @@ export const EdgeCases: Story = {
     const table = canvas.getByTestId('empty-table');
 
     await expect(table).toBeVisible();
-    await expect(canvas.getByText('No data available')).toBeVisible();
+    await expect(canvas.getByText(PT_BR_DATA_STATE_COPY.empty)).toBeVisible();
   },
 };
 

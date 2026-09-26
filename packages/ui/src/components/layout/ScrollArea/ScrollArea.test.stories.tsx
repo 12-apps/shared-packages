@@ -18,6 +18,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_CHROME_COPY } from '../../../pt-BR';
 import { ScrollArea } from './ScrollArea';
 
 const meta: Meta<typeof ScrollArea> = {
@@ -49,9 +50,12 @@ export const BasicInteraction: Story = {
   args: {
     width: 400,
     height: 300,
+    regionLabel: PT_BR_CHROME_COPY.scrollRegion,
     scrollToTopButton: true,
+    scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     scrollToTopThreshold: 50,
     onScroll: fn(),
+    onResize: fn(),
     children: generateContent(50),
   },
   play: async ({ canvasElement, args }) => {
@@ -66,7 +70,7 @@ export const BasicInteraction: Story = {
     expect(scrollContainer).toBeInTheDocument();
 
     // Verify initial state
-    expect(scrollContainer).toHaveAttribute('aria-label', 'Scrollable content');
+    expect(scrollContainer).toHaveAttribute('aria-label', PT_BR_CHROME_COPY.scrollRegion);
     expect(scrollContainer).toHaveAttribute('aria-busy', 'false');
 
     // Simulate scroll
@@ -81,12 +85,12 @@ export const BasicInteraction: Story = {
 
       // Check if scroll-to-top button appears
       await waitFor(() => {
-        const scrollToTopBtn = canvas.queryByLabelText('Scroll to top');
+        const scrollToTopBtn = canvas.queryByLabelText(PT_BR_CHROME_COPY.scrollToTop);
         expect(scrollToTopBtn).toBeInTheDocument();
       });
 
       // Click scroll to top
-      const scrollToTopBtn = await canvas.findByLabelText('Scroll to top');
+      const scrollToTopBtn = await canvas.findByLabelText(PT_BR_CHROME_COPY.scrollToTop);
       await userEvent.click(scrollToTopBtn);
 
       // Scrolled to top means zero — the old `< 50` would have passed with the
@@ -161,6 +165,7 @@ export const KeyboardNavigation: Story = {
     width: 400,
     height: 300,
     scrollToTopButton: true,
+    scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     onScroll: fn(),
     children: (
       <List>
@@ -228,9 +233,11 @@ export const ScreenReader: Story = {
   args: {
     width: 400,
     height: 300,
+    regionLabel: PT_BR_CHROME_COPY.scrollRegion,
     loading: false,
     disabled: false,
     onScroll: fn(),
+    onResize: fn(),
     children: generateContent(20),
   },
   play: async ({ canvasElement }) => {
@@ -241,7 +248,7 @@ export const ScreenReader: Story = {
     const scrollContainer = scrollArea.querySelector('[role="region"]');
 
     expect(scrollContainer).toHaveAttribute('role', 'region');
-    expect(scrollContainer).toHaveAttribute('aria-label', 'Scrollable content');
+    expect(scrollContainer).toHaveAttribute('aria-label', PT_BR_CHROME_COPY.scrollRegion);
     expect(scrollContainer).toHaveAttribute('aria-busy', 'false');
     expect(scrollContainer).toHaveAttribute('tabIndex', '0');
 
@@ -351,9 +358,9 @@ export const ThemeVariations: Story = {
   },
   render: (args) => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <ScrollArea regionLabel="Área rolável" {...args} variant="default" data-testid="scroll-area" />
-      <ScrollArea regionLabel="Área rolável" {...args} variant="overlay" data-testid="scroll-area-overlay" />
-      <ScrollArea regionLabel="Área rolável" {...args} variant="glass" data-testid="scroll-area-glass" />
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="default" data-testid="scroll-area" />
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="overlay" data-testid="scroll-area-overlay" />
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="glass" data-testid="scroll-area-glass" />
     </Box>
   ),
   play: async ({ canvasElement }) => {
@@ -392,16 +399,16 @@ export const VisualStates: Story = {
   },
   render: (args) => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <ScrollArea regionLabel="Área rolável" {...args} data-testid="scroll-area-normal">
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} data-testid="scroll-area-normal">
         {generateContent(10)}
       </ScrollArea>
-      <ScrollArea regionLabel="Área rolável" {...args} disabled data-testid="scroll-area-disabled">
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} disabled data-testid="scroll-area-disabled">
         {generateContent(10)}
       </ScrollArea>
-      <ScrollArea regionLabel="Área rolável" {...args} loading data-testid="scroll-area-loading">
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} loading data-testid="scroll-area-loading">
         {generateContent(10)}
       </ScrollArea>
-      <ScrollArea regionLabel="Área rolável" {...args} emptyContent="No content" data-testid="scroll-area-empty" />
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} emptyContent="No content" data-testid="scroll-area-empty" />
     </Box>
   ),
   play: async ({ canvasElement }) => {
@@ -509,24 +516,24 @@ export const EdgeCases: Story = {
   render: (args) => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {/* Empty content */}
-      <ScrollArea regionLabel="Área rolável" {...args} data-testid="scroll-area-empty">
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} data-testid="scroll-area-empty">
         {null}
       </ScrollArea>
 
       {/* Very long content */}
-      <ScrollArea regionLabel="Área rolável" {...args} height={100} data-testid="scroll-area-long">
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} height={100} data-testid="scroll-area-long">
         {generateContent(100)}
       </ScrollArea>
 
       {/* Wide content */}
-      <ScrollArea regionLabel="Área rolável" {...args} width={200} orientation="horizontal" data-testid="scroll-area-wide">
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} width={200} orientation="horizontal" data-testid="scroll-area-wide">
         <Box sx={{ width: 1000, p: 2 }}>
           <Typography>Very wide content that requires horizontal scrolling</Typography>
         </Box>
       </ScrollArea>
 
       {/* No scrollable content */}
-      <ScrollArea regionLabel="Área rolável" {...args} height={300} data-testid="scroll-area-no-scroll">
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} height={300} data-testid="scroll-area-no-scroll">
         <Typography>Short content</Typography>
       </ScrollArea>
     </Box>
@@ -561,8 +568,10 @@ export const Integration: Story = {
     width: 600,
     height: 400,
     scrollToTopButton: true,
+    scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     variant: 'overlay',
     onScroll: fn(),
+    onResize: fn(),
   },
   render: function IntegrationRender(args) {
     const [scrollPosition, setScrollPosition] = React.useState(0);
@@ -572,7 +581,7 @@ export const Integration: Story = {
         <Typography variant="h6" gutterBottom>
           Scroll Position: {scrollPosition}px
         </Typography>
-        <ScrollArea regionLabel="Área rolável"
+        <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion}
           {...args}
           data-testid="scroll-area"
           onScroll={(e) => {
@@ -628,7 +637,7 @@ export const Integration: Story = {
       });
 
       // Test scroll to top button
-      const scrollToTopBtn = await canvas.findByLabelText('Scroll to top');
+      const scrollToTopBtn = await canvas.findByLabelText(PT_BR_CHROME_COPY.scrollToTop);
       await userEvent.click(scrollToTopBtn);
 
       await waitFor(() => {
