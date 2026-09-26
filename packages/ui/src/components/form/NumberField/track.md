@@ -39,4 +39,4 @@ and ArrowUp / ArrowDown stepping by `step` within `min` / `max`. Built for the
 - 2026-09-26 16:40 BRT — v1 shipped with `Input` gaining a merged `inputProps`
   pass-through (an attribute `Input` does not recognise otherwise lands on the
   text field's root `<div>`). Remaining TODO: none for v1; a host adoption
-  follows in future-pay.
+  follows in the origin host.

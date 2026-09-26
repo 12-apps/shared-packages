@@ -50,5 +50,5 @@ App-agnostic: every word comes in through props (`SettingCardCopy`,
 ## Current
 
 - 2026-09-26 16:40 BRT — v1: all four components, copy packs in both locales,
-  docs per component. Remaining TODO: first host adoption in future-pay
+  docs per component. Remaining TODO: first host adoption in the origin host
   (FUT-1659 is the admin screens that would fold onto it).
