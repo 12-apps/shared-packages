@@ -247,6 +247,25 @@ export const StatusFailed: StoryObj = statusStory("FAILED");
 export const StatusExpired: StoryObj = statusStory("EXPIRED");
 /** Still confirming — a bounded wait, not an infinite spinner. */
 export const StatusAwaiting: StoryObj = statusStory("AWAITING_PAYMENT");
+/**
+ * PAID with the host's own illustration in place of the icon — the storefront's
+ * mascot on a buyer's first order. The heading and the receipt stay the package's.
+ */
+export const StatusPaidWithHostHero: StoryObj = screen(
+  {},
+  (flows) => <flows.screens.PaymentStatus status="PAID" payable={{ ...PAYABLE, status: "PAID" }} />,
+  {
+    confirmationHero: (
+      <span
+        style={{ display: "grid", placeItems: "center", width: 112, height: 112, borderRadius: "50%", background: "#F9E2C6", fontSize: 48 }}
+        role="img"
+        aria-label="Host mascot"
+      >
+        ★
+      </span>
+    ),
+  },
+);
 
 // ---------------------------------------------------------------------------
 // PaymentsUnavailable / PayerSummary / SavedCards / EmptyCart

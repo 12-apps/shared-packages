@@ -57,6 +57,12 @@ interface PaymentStatusProps {
    */
   paidExtra?: ReactNode;
   /**
+   * Host content that REPLACES the PAID icon at the top of the screen — the
+   * storefront's mascot celebrating a buyer's first order or birthday. Absent,
+   * the screen is exactly what it was. Never shown on any other status.
+   */
+  paidHero?: ReactNode;
+  /**
    * Host content rendered AFTER the action row, and ONLY on PAID.
    *
    * The other half of {@link paidExtra}, and the difference between them is the
@@ -182,7 +188,13 @@ export function PaymentStatus(props: PaymentStatusProps): JSX.Element {
       data-timed-out={view.wait.timedOut ? "true" : undefined}
       sx={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "stretch", py: 2 }}
     >
-      <OutcomeHero copy={copy} status={view.effective} wait={view.wait} decline={view.decline} />
+      <OutcomeHero
+        copy={copy}
+        status={view.effective}
+        wait={view.wait}
+        decline={view.decline}
+        hero={props.paidHero}
+      />
 
       {view.paid ? (
         <PaidFacts copy={copy} totalLabel={totalLabel} orderId={orderId} buyerEmail={buyerEmail} />
