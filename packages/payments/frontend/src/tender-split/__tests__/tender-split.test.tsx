@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PT_BR_TENDER_SPLIT_COPY } from '../pt-BR';
@@ -121,10 +121,10 @@ describe('TenderSplit', () => {
     expect(amountOf('CASH').value).toBe('222,20');
   });
 
-  it('focuses the amount of the card just picked', () => {
+  it('focuses the amount of the card just picked', async () => {
     renderSplit();
     fireEvent.click(screen.getByTestId('tender-split-option-CASH'));
-    expect(document.activeElement).toBe(amountOf('CASH'));
+    await waitFor(() => expect(document.activeElement).toBe(amountOf('CASH')));
   });
 
   it('drops the share still in front of the first keystroke when focus did not select it', () => {
