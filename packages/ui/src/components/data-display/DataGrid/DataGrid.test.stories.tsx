@@ -615,8 +615,12 @@ export const EdgeCasesTest: Story = {
 export const DefaultCopyFallbackTest: Story = {
   name: 'Test: Default Copy Fallbacks',
   args: {
-    rows: generateTestData(3),
-    columns: testColumns,
+    // Cast the same way every other story here would need to (FUT-2699's
+    // stories-types lane): `Meta<typeof DataGrid>` infers `args` over the
+    // component's default `Record<string, unknown>`, which `TestRow` (a
+    // plain interface, no index signature) is not directly assignable to.
+    rows: generateTestData(3) as unknown as Record<string, unknown>[],
+    columns: testColumns as unknown as GridColumn<Record<string, unknown>>[],
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

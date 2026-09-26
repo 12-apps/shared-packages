@@ -609,7 +609,7 @@ export const FocusManagement: Story = {
 // own words, never the package's English literals.
 const itemsWithNoAlt: LightboxItem[] = [
   {
-    src: testImages[0].src,
+    src: testImages[0]!.src,
     type: 'image',
   },
   {
