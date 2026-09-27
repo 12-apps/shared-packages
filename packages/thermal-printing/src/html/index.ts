@@ -92,7 +92,7 @@ function textLineHtml(line: TicketLine, paperWidthMm: number): string {
     .join(";");
   const attr = style.length > 0 ? ` style="${style}"` : "";
   // A blank line still has to occupy one, hence the non-breaking space.
-  const text = line.text.length === 0 ? "&nbsp;" : escapeHtml(line.text);
+  const text = line.text.length === 0 ? "&nbsp;" : escapeHtml(line.text.normalize("NFC"));
   return `<div${attr}>${text}</div>`;
 }
 

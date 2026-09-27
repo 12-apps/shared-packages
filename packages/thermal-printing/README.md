@@ -57,7 +57,7 @@ mount.
 
 | Export | What it is |
 |---|---|
-| `@12-apps/thermal-printing` | The line model — `TicketLine`, `columnsFor`, `wrap`, `line`, `centered`, `rule`, `field`, `PAPER_WIDTHS_MM`, and the [reference-sheet vocabulary](#the-vocabulary-four-sizes-bands-boxes-rows-pictures): `textLines`, `band`, `box`, `row`, `image`, `LINE_SIZES`, `printableDotsFor`. Pure, isomorphic. |
+| `@12-apps/thermal-printing` | The line model — `TicketLine`, `columnsFor`, `wrap`, `line`, `centered`, `rule`, `field`, `PAPER_WIDTHS_MM`, and the [reference-sheet vocabulary](#the-vocabulary-four-sizes-bands-boxes-rows-pictures): `textLines`, `band`, `box`, `row`, `image`, `LINE_SIZES`, `printableDotsFor`, `textWidth`. Pure, isomorphic. |
 | `…/escpos` | `encodeTicket(lines)` → `Uint8Array`. Initialise, CP850, align, emphasise, font and magnification, reverse, line spacing, `GS v 0` raster, feed, partial cut. |
 | `…/html` | `renderTicketHtml(lines, paperWidthMm, lang?)` → a standalone document sized in `ch`, with `@page { margin: 0 }`. `rasterToDataUri(raster)` → the 1-bit picture as a `data:` URI, for a preview. |
 | `…/raster` | `rasterizeSvg(svg, { width })` → RGBA at the printer's dot size; `toMonochrome(rgba, options?)` → a printable 1-bit `RasterImage`. Pure, isomorphic, no canvas and no native module. |
@@ -149,12 +149,28 @@ to draw its own preview.
 - Both default to **bold** — they are there to be noticed; pass `bold: false`
   to opt out.
 
+> **Hardware assumption to verify on paper:** `ESC 3 n` is read as `n` dots,
+> which holds for the 203-dpi class this package targets (Bematech MP4200,
+> Epson TM-T20 and alike, where the line-spacing motion unit is one dot). A
+> printer whose vertical motion unit is different (set by `GS P`, or a
+> 180/300-dpi head) would space framed lines tighter or looser than the cell;
+> check a band and a box on the actual model before relying on them.
+
 ### Rows
 
 `row(label, amount, paperWidthMm, { size?, bold?, indent? })` puts the amount
 flush right on the **first** line and wraps the label beside it (under an
 optional hanging indent). An amount so long the label would get under a third
 of the line moves to a line of its own below the label, still flush right.
+The amount is never split or truncated: one wider than the whole line prints
+whole on its own line and runs past the edge (the printer wraps it), because a
+cut amount is a wrong amount.
+
+**Widths are code points of NFC text** (`textWidth`), not UTF-16 units, in
+every builder: an emoji counts one column and a decomposed `é` is composed
+first. That is exactly what the ESC/POS encoder writes — one CP850 byte per
+code point, `?` for an unmappable one — so alignment holds on paper. A browser
+may draw an emoji wider than one monospace cell in the HTML preview.
 
 ### Pictures
 
@@ -212,11 +228,25 @@ clipping, masks, filters, `<style>` — it **names** in `unsupported`, so a host
 can refuse the file or rasterise it itself and come in at `toMonochrome`.
 Decoding PNG/JPEG is deliberately left to the host, which already has a codec.
 
-**An uploaded SVG is untrusted input.** The document is read by a hand-written
-linear scanner (no backtracking regular expressions, so no crafted comment,
-attribute or number can make parsing polynomial), a document over
-`MAX_SVG_LENGTH` (256 000 characters) is refused as `"too large"`, and scan
-conversion only visits the edges that span each row.
+**An uploaded SVG is untrusted input**, so every cost it can ask for is capped,
+and a document over any cap is **refused** — a 0 × 0 result with the reason in
+`unsupported` — never thrown on and never allocated:
+
+| limit | value | reason in `unsupported` |
+|---|---|---|
+| source length, `MAX_SVG_LENGTH` | 256 000 characters | `too large` |
+| output, `MAX_RASTER_WIDTH` × `MAX_RASTER_HEIGHT` | 576 × 2048 dots (checked before allocating, including a height derived from the viewBox) | `output too large` |
+| shapes, `MAX_SHAPES` | 4096 | `too many shapes` |
+| flattened vertices, `MAX_PATH_POINTS` | 250 000 | `too many path points` |
+| scan-conversion work, `MAX_FILL_WORK` | 20 000 000 units (edges considered, n log n per sub-row, plus pixels touched) | `too complex to fill` |
+
+The document is read by a hand-written linear scanner (no backtracking regular
+expressions, so no crafted comment, attribute or number can make parsing
+polynomial), and each shape is composited only across the pixels it covers on
+each row. `toMonochrome` checks its input too: a buffer that is not exactly
+`width × height × 4` bytes, or dimensions past 576 × 2048, throw a `RangeError`
+before anything is allocated — those dimensions are the host's own choice after
+decoding, so a mismatch is a caller bug rather than something an upload reaches.
 
 ## Finding a printer nobody wrote the address of down
 

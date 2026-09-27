@@ -9,6 +9,8 @@
  * one), so it is sampled in user space at a step derived from its size in dots.
  */
 
+import { BudgetExceeded, type Budget } from "./budget";
+
 /** `[a, b, c, d, e, f]`: x' = a·x + c·y + e, y' = b·x + d·y + f. */
 export type Matrix = readonly [number, number, number, number, number, number];
 
@@ -138,27 +140,37 @@ interface Pen {
   start: Point;
   /** The last control point, reflected by S/s and T/t. */
   control: Point | null;
+  /**
+   * Which kind of curve left `control`. S reflects only a cubic's and T only a
+   * quadratic's; after anything else the reflection is the current point.
+   */
+  controlKind: "cubic" | "quad" | null;
+  budget: Budget;
   subpath: Point[];
   subpaths: Point[][];
 }
 
 function moveTo(pen: Pen, to: Point): void {
   if (pen.subpath.length > 1) pen.subpaths.push(pen.subpath);
+  pen.budget.addPoints(1);
   pen.subpath = [apply(pen.m, to)];
   pen.current = to;
   pen.start = to;
 }
 
 function lineTo(pen: Pen, to: Point): void {
+  pen.budget.addPoints(1);
   pen.subpath.push(apply(pen.m, to));
   pen.current = to;
 }
 
 function cubicTo(pen: Pen, c1: Point, c2: Point, to: Point): void {
   const points = cubic(apply(pen.m, pen.current), apply(pen.m, c1), apply(pen.m, c2), apply(pen.m, to));
+  pen.budget.addPoints(points.length);
   pen.subpath.push(...points);
   pen.current = to;
   pen.control = c2;
+  pen.controlKind = "cubic";
 }
 
 function quadTo(pen: Pen, c: Point, to: Point): void {
@@ -167,10 +179,13 @@ function quadTo(pen: Pen, c: Point, to: Point): void {
   const c2: Point = [to[0] + (2 / 3) * (c[0] - to[0]), to[1] + (2 / 3) * (c[1] - to[1])];
   cubicTo(pen, c1, c2, to);
   pen.control = c;
+  pen.controlKind = "quad";
 }
 
-const reflect = (pen: Pen): Point =>
-  pen.control === null ? pen.current : [2 * pen.current[0] - pen.control[0], 2 * pen.current[1] - pen.control[1]];
+const reflect = (pen: Pen, kind: "cubic" | "quad"): Point =>
+  pen.control === null || pen.controlKind !== kind
+    ? pen.current
+    : [2 * pen.current[0] - pen.control[0], 2 * pen.current[1] - pen.control[1]];
 
 /** An arc in centre form: centre, radii, rotation, start angle and sweep. */
 interface CentreArc {
@@ -227,6 +242,7 @@ function arcTo(pen: Pen, radii: Point, rotation: number, large: boolean, sweep: 
   if (degenerate) return lineTo(pen, to);
   const { cx, cy, rx, ry, cos, sin, theta, delta } = centreArc(pen.current, to, radii, rotation, large, sweep);
   const steps = segmentsFor(Math.abs(delta) * Math.max(rx, ry) * pen.scale);
+  pen.budget.addPoints(steps);
   for (let i = 1; i <= steps; i += 1) {
     const angle = theta + (delta * i) / steps;
     const [ex, ey] = [rx * Math.cos(angle), ry * Math.sin(angle)];
@@ -251,7 +267,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
     cubicTo(pen, c1, c2, at(pen, rel, s.number(), s.number()));
   },
   s: (pen, s, rel) => {
-    const c1 = reflect(pen);
+    const c1 = reflect(pen, "cubic");
     const c2 = at(pen, rel, s.number(), s.number());
     cubicTo(pen, c1, c2, at(pen, rel, s.number(), s.number()));
   },
@@ -259,7 +275,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
     const c = at(pen, rel, s.number(), s.number());
     quadTo(pen, c, at(pen, rel, s.number(), s.number()));
   },
-  t: (pen, s, rel) => quadTo(pen, reflect(pen), at(pen, rel, s.number(), s.number())),
+  t: (pen, s, rel) => quadTo(pen, reflect(pen, "quad"), at(pen, rel, s.number(), s.number())),
   a: (pen, s, rel) => {
     const radii: Point = [s.number(), s.number()];
     const rotation = s.number();
@@ -276,6 +292,7 @@ function runCommand(pen: Pen, scanner: Scanner, command: string): void {
   const key = command.toLowerCase();
   const rel = command !== command.toUpperCase();
   if (key === "z") {
+    pen.budget.addPoints(1);
     pen.subpath.push(apply(pen.m, pen.start));
     moveTo(pen, pen.start);
     return;
@@ -286,7 +303,10 @@ function runCommand(pen: Pen, scanner: Scanner, command: string): void {
   do {
     // Pairs after a moveto are implicit linetos, relative if the moveto was.
     const run = key === "m" && !first ? (HANDLERS.l as Handler) : handler;
-    if (!KEEPS_CONTROL.has(key)) pen.control = null;
+    if (!KEEPS_CONTROL.has(key)) {
+      pen.control = null;
+      pen.controlKind = null;
+    }
     run(pen, scanner, rel);
     first = false;
   } while (scanner.hasNumber());
@@ -299,8 +319,18 @@ function runCommand(pen: Pen, scanner: Scanner, command: string): void {
  * behaviour the SVG specification asks for — rather than throwing the whole
  * picture away.
  */
-export function pathToPolygons(d: string, m: Matrix): Point[][] {
-  const pen: Pen = { m, scale: scaleOf(m), current: [0, 0], start: [0, 0], control: null, subpath: [], subpaths: [] };
+export function pathToPolygons(d: string, m: Matrix, budget: Budget): Point[][] {
+  const pen: Pen = {
+    m,
+    scale: scaleOf(m),
+    current: [0, 0],
+    start: [0, 0],
+    control: null,
+    controlKind: null,
+    budget,
+    subpath: [],
+    subpaths: [],
+  };
   const scanner = new Scanner(d);
   try {
     while (!scanner.done()) {
@@ -308,8 +338,9 @@ export function pathToPolygons(d: string, m: Matrix): Point[][] {
       if (command === null) break;
       runCommand(pen, scanner, command);
     }
-  } catch {
-    // Keep what was drawn so far.
+  } catch (error) {
+    // Keep what was drawn so far — unless a budget ran out, which refuses the document.
+    if (error instanceof BudgetExceeded) throw error;
   }
   if (pen.subpath.length > 1) pen.subpaths.push(pen.subpath);
   return pen.subpaths;

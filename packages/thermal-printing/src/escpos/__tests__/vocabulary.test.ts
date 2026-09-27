@@ -40,6 +40,14 @@ describe("legacy tickets", () => {
   });
 });
 
+describe("text normalisation", () => {
+  it("encodes a decomposed accent as the one CP850 byte of its composed form", () => {
+    const encoded = [...encodeTicket([line("Cafe\u0301")])];
+
+    expect(encoded.slice(PREAMBLE.length, PREAMBLE.length + 5)).toEqual([...ascii("Caf"), 0x82, 0x0a]);
+  });
+});
+
 describe("sizes", () => {
   it.each([
     ["small", 0x01],

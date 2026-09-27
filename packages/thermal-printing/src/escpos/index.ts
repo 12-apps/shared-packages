@@ -92,7 +92,9 @@ function encodeChar(char: string): number {
 }
 
 function encodeText(text: string): number[] {
-  return [...text].map(encodeChar);
+  // NFC first: a decomposed "é" is then one code point and one CP850 byte,
+  // matching the width the layout counted (see `textWidth`).
+  return [...text.normalize("NFC")].map(encodeChar);
 }
 
 /**

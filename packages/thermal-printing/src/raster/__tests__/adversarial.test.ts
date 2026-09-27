@@ -16,9 +16,14 @@ const N = 200_000;
  * patterns these inputs target took over a minute on the same machine.
  */
 function timed(run: () => unknown): number {
+  return measured(run).ms;
+}
+
+/** `run`'s result and its wall time in milliseconds. */
+function measured<T>(run: () => T): { ms: number; result: T } {
   const start = process.hrtime.bigint();
-  run();
-  return Number(process.hrtime.bigint() - start) / 1e6;
+  const result = run();
+  return { ms: Number(process.hrtime.bigint() - start) / 1e6, result };
 }
 
 const BOUND_MS = 2_000;
@@ -40,13 +45,51 @@ describe("rasterizeSvg on hostile input", () => {
     expect(timed(() => rasterizeSvg(svg, { width: 8 }))).toBeLessThan(BOUND_MS);
   });
 
-  it("bounds the fill of a path as dense as the cap allows", () => {
-    // Every segment spans the full height: the worst case for scan conversion.
-    const zigzag = Array.from({ length: 8_000 }, (_, i) => `L${(i % 100) / 100} ${i % 2}`).join("");
-    const svg = `<svg viewBox="0 0 1 1"><path d="M0 0${zigzag}Z"/></svg>`;
+  it("refuses a canvas taller than the cap, from the viewBox aspect, without allocating", () => {
+    const { ms, result: raster } = measured(() =>
+      rasterizeSvg('<svg viewBox="0 0 1 500"><rect width="1" height="500"/></svg>', { width: 576 }),
+    );
+
+    expect(ms).toBeLessThan(1_000);
+    expect(raster.unsupported).toEqual(["output too large"]);
+    expect(raster.data.length).toBe(0);
+  });
+
+  it("refuses an explicit width or height past the cap", () => {
+    expect(rasterizeSvg('<svg viewBox="0 0 1 1"/>', { width: 5_000 }).unsupported).toEqual(["output too large"]);
+    expect(rasterizeSvg('<svg viewBox="0 0 1 1"/>', { width: 8, height: 5_000 }).unsupported).toEqual([
+      "output too large",
+    ]);
+  });
+
+  it("refuses thousands of full-canvas shapes quickly", () => {
+    const svg = `<svg viewBox="0 0 1 1">${'<path d="M0 0H1V1Z"/>'.repeat(11_000)}</svg>`;
 
     expect(svg.length).toBeLessThan(MAX_SVG_LENGTH);
-    expect(timed(() => rasterizeSvg(svg, { width: 384, height: 96 }))).toBeLessThan(10_000);
+    const { ms, result: raster } = measured(() => rasterizeSvg(svg, { width: 576 }));
+
+    expect(ms).toBeLessThan(1_000);
+    expect(raster.unsupported).toEqual(["too many shapes"]);
+  });
+
+  it("stops filling once the work budget is spent", () => {
+    // Under the shape cap, but each shape covers the whole 576 x 576 canvas.
+    const svg = `<svg viewBox="0 0 1 1">${'<path d="M0 0H1V1Z"/>'.repeat(3_000)}</svg>`;
+
+    const { ms, result: raster } = measured(() => rasterizeSvg(svg, { width: 576 }));
+
+    expect(ms).toBeLessThan(1_000);
+    expect(raster.unsupported).toEqual(["too complex to fill"]);
+  });
+
+  it("refuses a path of full-height zigzags quickly", () => {
+    const svg = `<svg viewBox="0 0 1 1"><path d="M0 0${"L.5 1L0 0".repeat(28_000)}"/></svg>`;
+
+    expect(svg.length).toBeLessThan(MAX_SVG_LENGTH);
+    const { ms, result: raster } = measured(() => rasterizeSvg(svg, { width: 576 }));
+
+    expect(ms).toBeLessThan(1_000);
+    expect(raster.unsupported).toEqual(["too complex to fill"]);
   });
 
   it("refuses a document past the size cap without reading it", () => {

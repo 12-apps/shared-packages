@@ -15,7 +15,7 @@
  */
 import type { LineEmphasis, RasterImage, TicketLine } from "./model";
 import { columnsFor, type LineSize } from "./sizes";
-import { wrap } from "./wrap";
+import { padTo, textWidth, wrap } from "./wrap";
 
 /** Size, weight and alignment of sized text. */
 export interface TextStyle {
@@ -53,8 +53,9 @@ function sized(text: string, size: LineSize, bold: boolean | undefined): TicketL
 
 /** `text` centred in `width` columns, padded on both sides. */
 function centerIn(text: string, width: number): string {
-  const left = Math.floor((width - text.length) / 2);
-  return " ".repeat(left) + text + " ".repeat(width - text.length - left);
+  const used = textWidth(text);
+  const left = Math.max(0, Math.floor((width - used) / 2));
+  return " ".repeat(left) + text + " ".repeat(Math.max(0, width - used - left));
 }
 
 /**
@@ -120,6 +121,11 @@ export function box(text: string, paperWidthMm: number, style: FrameStyle = {}):
  * the start of what it prices. When the amount is so long that the label would
  * get less than a third of the line, the label takes the full width and the
  * amount goes on a line of its own below it, still flush right.
+ *
+ * The amount is never split or cut. An amount wider than the whole line is
+ * printed whole on its own line and runs past the edge — the printer wraps it
+ * at its own column — because a truncated amount is a wrong amount, and a
+ * wrong amount on a receipt is worse than an untidy one.
  */
 export function row(
   label: string,
@@ -129,15 +135,15 @@ export function row(
 ): TicketLine[] {
   const size = style.size ?? "medium";
   const columns = columnsFor(paperWidthMm, size);
-  const indent = style.indent ?? 0;
-  const labelWidth = columns - amount.length - 1;
+  const value = amount.normalize("NFC").trim();
+  const amountWidth = textWidth(value);
+  const labelWidth = columns - amountWidth - 1;
   const make = (text: string): TicketLine => sized(text, size, style.bold);
   if (labelWidth < Math.ceil(columns / 3)) {
-    const amountLines = wrap(amount, columns).map((piece) => piece.padStart(columns));
-    return [...wrap(label, columns, indent), ...amountLines].map(make);
+    return [...wrap(label, columns, style.indent ?? 0), padTo(value, columns, "start")].map(make);
   }
-  const [first = "", ...rest] = wrap(label, labelWidth, indent);
-  return [first.padEnd(columns - amount.length) + amount, ...rest].map(make);
+  const [first = "", ...rest] = wrap(label, labelWidth, style.indent ?? 0);
+  return [padTo(first, columns - amountWidth, "end") + value, ...rest].map(make);
 }
 
 /**

@@ -24,10 +24,10 @@
  */
 
 import type { LineEmphasis, TicketLine } from "./model";
-import { wrap } from "./wrap";
+import { textWidth, wrap } from "./wrap";
 
 export type { LineEmphasis, LineFrame, RasterImage, TicketLine } from "./model";
-export { wrap } from "./wrap";
+export { textWidth, wrap } from "./wrap";
 export {
   band,
   box,
@@ -77,5 +77,5 @@ export function rule(columns: number): TicketLine {
  */
 export function field(label: string, value: string | null, columns: number): TicketLine[] {
   if (value === null || value.trim().length === 0) return [];
-  return wrap(`${label}: ${value}`, columns, label.length + 2).map((text) => line(text));
+  return wrap(`${label}: ${value}`, columns, textWidth(label) + 2).map((text) => line(text));
 }

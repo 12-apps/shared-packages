@@ -1,4 +1,5 @@
 import type { RasterImage } from "../model";
+import { MAX_RASTER_HEIGHT, MAX_RASTER_WIDTH } from "./budget";
 
 /**
  * Colour to one bit: which dots of a picture a one-colour printer should burn.
@@ -167,6 +168,26 @@ function dither(source: Float32Array, width: number, height: number, kernel: Dit
 }
 
 /**
+ * Refuse, before allocating anything, an image that is malformed or bigger
+ * than any receipt picture: its buffer must hold exactly `width × height × 4`
+ * bytes, and it must fit `MAX_RASTER_WIDTH` × `MAX_RASTER_HEIGHT`.
+ *
+ * This THROWS (a `RangeError`) where `rasterizeSvg` returns a refusal, because
+ * the two inputs differ: an SVG is a whole untrusted document, while these
+ * dimensions are the host's own choice after decoding — a mismatch here is a
+ * bug in the caller, not something an upload can reach.
+ */
+function assertPrintable({ width, height, data }: RgbaImage): void {
+  const whole = Number.isInteger(width) && Number.isInteger(height) && width >= 0 && height >= 0;
+  if (!whole || width > MAX_RASTER_WIDTH || height > MAX_RASTER_HEIGHT) {
+    throw new RangeError(`image ${width}x${height} exceeds ${MAX_RASTER_WIDTH}x${MAX_RASTER_HEIGHT} dots`);
+  }
+  if (data.length !== width * height * 4) {
+    throw new RangeError(`image data holds ${data.length} bytes, expected ${width * height * 4}`);
+  }
+}
+
+/**
  * Convert RGBA pixels to a printable 1-bit raster, at the size they are.
  *
  * Supply the pixels at the printer's dot size — one pixel per dot, at most
@@ -174,6 +195,7 @@ function dither(source: Float32Array, width: number, height: number, kernel: Dit
  * the fact is how a logo gets jagged, so the size is decided before the bit.
  */
 export function toMonochrome(image: RgbaImage, options: MonochromeOptions = {}): MonochromeImage {
+  assertPrintable(image);
   const { width, height } = image;
   const plane = lumaPlane(image);
   const mode = options.mode ?? "auto";

@@ -104,6 +104,16 @@ describe("the orange-logo policy", () => {
 });
 
 describe("toMonochrome", () => {
+  it("refuses a buffer that does not match its dimensions", () => {
+    expect(() => toMonochrome({ width: 4, height: 4, data: new Uint8ClampedArray(10) })).toThrow(RangeError);
+  });
+
+  it("refuses dimensions past the raster cap before allocating", () => {
+    const huge = { width: 100_000, height: 100_000, data: new Uint8ClampedArray(0) };
+
+    expect(() => toMonochrome(huge)).toThrow(RangeError);
+  });
+
   it("treats a transparent pixel as paper", () => {
     expect(inked(toMonochrome(solid(8, 8, [0, 0, 0, 0])))).toBe(0);
   });
@@ -230,6 +240,26 @@ describe("rasterizeSvg", () => {
     expect(pixel(raster, 5, 5)).toEqual([0, 0, 0, 255]);
   });
 
+  it("reflects S from the current point after a quadratic, as the spec says", () => {
+    // Q leaves a quadratic control point; S must NOT reflect it, so its first
+    // control point is the current point and the curve bulges only to the
+    // right of the chord. Reflecting (5,0) would pull it up to the top rows.
+    const svg = '<svg viewBox="0 0 10 10"><path d="M0 10Q5 0 5 10S10 10 10 10Z"/></svg>';
+    const correct = rasterizeSvg(svg, { width: 10 });
+    const inked = (x: number, y: number): boolean => (pixel(correct, x, y)[3] ?? 0) > 128;
+
+    expect(inked(7, 2)).toBe(false);
+  });
+
+  it("ignores a stray closing tag instead of dropping the root's viewport", () => {
+    const svg = '<svg viewBox="0 0 10 10"></g></g><rect x="5" width="5" height="10"/></svg>';
+    const raster = rasterizeSvg(svg, { width: 20 });
+
+    // Scaled x2 by the viewport: the rect covers x 10-19, not x 5-9.
+    expect(pixel(raster, 7, 5)[3]).toBe(0);
+    expect(pixel(raster, 15, 5)[3]).toBe(255);
+  });
+
   it("skips hidden elements and reads fill from style", () => {
     const svg =
       '<svg viewBox="0 0 10 10"><rect width="10" height="10" style="fill:#ff0000"/>' +
@@ -238,11 +268,11 @@ describe("rasterizeSvg", () => {
     expect(pixel(rasterizeSvg(svg, { width: 10 }), 5, 5)).toEqual([255, 0, 0, 255]);
   });
 
-  it("returns a blank raster, with the reason, for a document it cannot size", () => {
+  it("refuses, with the reason, a document it cannot size", () => {
     const raster = rasterizeSvg("<svg><rect width='1' height='1'/></svg>", { width: 8 });
 
     expect(raster.unsupported).toEqual(["no viewBox or size"]);
-    expect(raster.data.every((byte) => byte === 0)).toBe(true);
+    expect([raster.width, raster.height, raster.data.length]).toEqual([0, 0, 0]);
     expect(rasterizeSvg("not svg", { width: 8 }).unsupported).toEqual(["no <svg> root"]);
   });
 });

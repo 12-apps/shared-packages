@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { band, box, columnsFor, image, row, textLines, wrap } from "../index";
+import { band, box, columnsFor, field, image, row, textLines, textWidth, wrap } from "../index";
 
 /**
  * The size-aware builders. Each yields plain text plus a flag, so what is
@@ -111,13 +111,19 @@ describe("row", () => {
     expect(only).toEqual({ text: `TOTAL${" ".repeat(11)}55.00`, align: "left", emphasis: "bold", size: "large" });
   });
 
-  it("gives an amount too long to share the line a line of its own", () => {
-    const amount = "1234567890.00 (converted)";
+  it("gives an amount too long to share the line a line of its own, right-aligned", () => {
+    const lines = texts(row("Paid in foreign currency", "1 234 567 890.00", 58, { size: "large" }));
+
+    expect(lines.at(-1)).toBe(`${" ".repeat(5)}1 234 567 890.00`);
+    expect(lines.slice(0, -1).join(" ")).toBe("Paid in foreign currency");
+  });
+
+  it("never splits an amount, even one wider than the line: it prints whole", () => {
+    // A cut amount is a wrong amount; overflowing is the documented policy.
+    const amount = "12345678901234567890.00";
     const lines = texts(row("Paid", amount, 58, { size: "large" }));
 
-    expect(lines[0]).toBe("Paid");
-    expect(lines.slice(1).join(" ").replace(/\s+/g, " ").trim()).toBe(amount);
-    for (const produced of lines) expect(produced.length).toBeLessThanOrEqual(21);
+    expect(lines).toEqual(["Paid", amount]);
   });
 
   it("never returns a line wider than its size allows, on either roll", () => {
@@ -137,6 +143,34 @@ describe("image", () => {
 
     expect(image(raster)).toEqual({ text: "", align: "center", emphasis: "normal", image: raster });
     expect(image(raster, "left").align).toBe("left");
+  });
+});
+
+describe("text width counts code points of NFC text", () => {
+  const nfdE = "e\u0301"; // "é" decomposed: two code points, one glyph
+
+  it("aligns a row whose label carries an emoji", () => {
+    const [first] = texts(row("Pizza 🍕 grande", "42.00", 58));
+
+    expect(first).toBe(`Pizza 🍕 grande${" ".repeat(32 - 14 - 5)}42.00`);
+    expect(textWidth(first ?? "")).toBe(32);
+  });
+
+  it("treats a decomposed accent as one column, and composes it", () => {
+    const [first] = texts(row(`Caf${nfdE}`, "5.00", 58));
+
+    expect(first).toBe(`Café${" ".repeat(32 - 4 - 4)}5.00`);
+    expect(textWidth(first ?? "")).toBe(32);
+  });
+
+  it("keeps band, box and field widths exact with emoji and NFD input", () => {
+    for (const entry of band(`Caf${nfdE} 🍕`, 58)) expect(textWidth(entry.text)).toBe(32);
+    for (const entry of box(`Caf${nfdE} 🍕`, 58)) expect(textWidth(entry.text)).toBe(32);
+    expect(texts(field(`Caf${nfdE}`, "one two three four five six", 20))[1]).toMatch(/^ {6}\S/);
+  });
+
+  it("wraps by code points, so an emoji never lands past the edge", () => {
+    for (const produced of wrap("🍕🍕🍕🍕🍕🍕🍕🍕🍕🍕", 4)) expect(textWidth(produced)).toBeLessThanOrEqual(4);
   });
 });
 

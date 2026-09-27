@@ -38,12 +38,20 @@
  * viewport is ignored) and reported. An unsupported fill paint (a gradient) is drawn black, so
  * the silhouette survives.
  */
+import { Budget, BudgetExceeded, MAX_RASTER_HEIGHT, MAX_RASTER_WIDTH } from "./budget";
 import { paint } from "./fill";
 import { DEFAULT_PAINT, inheritPaint, parseAttributes, shapeOf, type Attributes, type Paint, type Shape } from "./svg-doc";
 import type { Matrix } from "./svg-path";
 import { xmlTags, type XmlTag } from "./xml";
 import type { RgbaImage } from "./monochrome";
 
+export {
+  MAX_FILL_WORK,
+  MAX_PATH_POINTS,
+  MAX_RASTER_HEIGHT,
+  MAX_RASTER_WIDTH,
+  MAX_SHAPES,
+} from "./budget";
 export {
   DEFAULT_THRESHOLD,
   isFlatArtwork,
@@ -105,6 +113,7 @@ function viewportMatrix({ box, aspect }: Viewport, width: number, height: number
 }
 
 interface Walk {
+  budget: Budget;
   stack: Paint[];
   skipDepth: number;
   shapes: Shape[];
@@ -130,19 +139,21 @@ function openElement(walk: Walk, name: string, attrs: Attributes, selfClosing: b
   note(walk, name, attrs);
   const parent = walk.stack[walk.stack.length - 1] ?? DEFAULT_PAINT;
   const own = inheritPaint(parent, attrs, walk.unsupported);
-  const shape = shapeOf(name, attrs, own);
+  const shape = shapeOf(name, attrs, own, walk.budget);
   if (shape !== null) walk.shapes.push(shape);
   if (!selfClosing) walk.stack.push(own);
 }
 
 function closeElement(walk: Walk): void {
   if (walk.skipDepth > 0) walk.skipDepth -= 1;
-  else walk.stack.pop();
+  // A stray closing tag must not pop the root's paint: everything after it
+  // would lose the viewport transform and draw at the wrong size.
+  else if (walk.stack.length > 1) walk.stack.pop();
 }
 
 /** Every filled shape in document order, in device space. */
-function collectShapes(body: string, root: Paint, unsupported: Set<string>): Shape[] {
-  const walk: Walk = { stack: [root], skipDepth: 0, shapes: [], unsupported };
+function collectShapes(body: string, root: Paint, unsupported: Set<string>, budget: Budget): Shape[] {
+  const walk: Walk = { budget, stack: [root], skipDepth: 0, shapes: [], unsupported };
   for (const tag of xmlTags(body)) {
     if (tag.closing) closeElement(walk);
     else openElement(walk, tag.name, parseAttributes(tag.attrs), tag.selfClosing);
@@ -153,7 +164,9 @@ function collectShapes(body: string, root: Paint, unsupported: Set<string>): Sha
 /**
  * The largest document read, in characters. A one-plate mark is a few hundred
  * bytes and a detailed logo tens of kilobytes; past this the input is not
- * artwork, and refusing it bounds the work any upload can ask for.
+ * artwork. This bounds the PARSE; the output size and the fill work have
+ * their own limits (`./budget`), because a short document can still declare a
+ * huge canvas or stack thousands of full-canvas shapes.
  */
 export const MAX_SVG_LENGTH = 256_000;
 
@@ -171,29 +184,53 @@ function rootProblem(svg: string, root: XmlTag | null): string {
   return root === null ? "no <svg> root" : "no viewBox or size";
 }
 
+/** An empty result carrying the reason the document was refused. */
+function refused(reason: string, unsupported: Set<string>): SvgRaster {
+  unsupported.add(reason);
+  return { width: 0, height: 0, data: new Uint8ClampedArray(0), unsupported: [...unsupported] };
+}
+
+/** The output size, or the reason it is refused. Checked before anything is allocated. */
+function outputSize(options: SvgRasterOptions, viewport: Viewport | null): { width: number; height: number } | string {
+  const width = Math.round(options.width);
+  const aspect = viewport ? viewport.box[3] / viewport.box[2] : 1;
+  const height = Math.round(options.height ?? width * aspect);
+  if (!(width > 0 && height > 0)) return "empty size";
+  if (width > MAX_RASTER_WIDTH || height > MAX_RASTER_HEIGHT) return "output too large";
+  return { width, height };
+}
+
 /**
  * Rasterise a flat-colour SVG to RGBA at the printer's dot size.
  *
  * `width` is in dots — `printableDotsFor(paperWidthMm)` for a full-width logo,
  * or less for a small mark (8 dots per millimetre: a 12 mm mark is 96 dots).
- * The result is ready for `toMonochrome`. An SVG with no usable size or no
- * root element comes back blank, with the reason in `unsupported`.
+ * The result is ready for `toMonochrome`.
+ *
+ * A document that cannot be drawn is REFUSED, never thrown on: the result is
+ * 0 × 0 and `unsupported` says why — `too large` (source over
+ * `MAX_SVG_LENGTH`), `no <svg> root`, `no viewBox or size`, `empty size`,
+ * `output too large` (over `MAX_RASTER_WIDTH` × `MAX_RASTER_HEIGHT`, checked
+ * before allocating), `too many shapes`, `too many path points`, or `too
+ * complex to fill`.
  */
 export function rasterizeSvg(svg: string, options: SvgRasterOptions): SvgRaster {
   const unsupported = new Set<string>();
   const root = findRoot(svg);
   const rootAttrs = root === null ? {} : parseAttributes(root.attrs);
   const viewport = root === null ? null : viewportOf(rootAttrs);
-  const width = Math.max(0, Math.round(options.width));
-  const aspect = viewport ? viewport.box[3] / viewport.box[2] : 1;
-  const height = Math.max(0, Math.round(options.height ?? width * aspect));
-  if (viewport === null || root === null) {
-    unsupported.add(rootProblem(svg, root));
-    return { width, height, data: new Uint8ClampedArray(width * height * 4), unsupported: [...unsupported] };
+  if (viewport === null || root === null) return refused(rootProblem(svg, root), unsupported);
+  const size = outputSize(options, viewport);
+  if (typeof size === "string") return refused(size, unsupported);
+  const { width, height } = size;
+  const budget = new Budget();
+  try {
+    // The root's own attributes (a transform, a fill) apply to everything in it.
+    const base = inheritPaint({ ...DEFAULT_PAINT, m: viewportMatrix(viewport, width, height) }, rootAttrs, unsupported);
+    const shapes = collectShapes(svg.slice(root.end), base, unsupported, budget);
+    return { width, height, data: paint(shapes, width, height, budget), unsupported: [...unsupported] };
+  } catch (error) {
+    if (error instanceof BudgetExceeded) return refused(error.reason, unsupported);
+    throw error;
   }
-  // The root's own attributes (a transform, a fill) apply to everything in it.
-  const base = inheritPaint({ ...DEFAULT_PAINT, m: viewportMatrix(viewport, width, height) }, rootAttrs, unsupported);
-  const body = svg.slice(root.end);
-  const shapes = collectShapes(body, base, unsupported);
-  return { width, height, data: paint(shapes, width, height), unsupported: [...unsupported] };
 }

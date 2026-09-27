@@ -4,6 +4,7 @@
  * guessed at — see `rasterizeSvg` for why that boundary is where it is.
  */
 import { IDENTITY, multiply, pathToPolygons, type Matrix, type Point } from "./svg-path";
+import type { Budget } from "./budget";
 import { scanAttributes, scanFunctions } from "./xml";
 
 /** A filled shape, ready to scan-convert. */
@@ -158,10 +159,11 @@ const SHAPES: Readonly<Record<string, (a: Attributes) => string>> = {
 };
 
 /** A drawable element as a shape, or null when it paints nothing. */
-export function shapeOf(name: string, attrs: Attributes, paint: Paint): Shape | null {
+export function shapeOf(name: string, attrs: Attributes, paint: Paint, budget: Budget): Shape | null {
   const toPath = SHAPES[name];
   if (toPath === undefined || paint.fill === null) return null;
-  const polygons = pathToPolygons(toPath(attrs), paint.m);
+  budget.shape();
+  const polygons = pathToPolygons(toPath(attrs), paint.m, budget);
   if (polygons.length === 0) return null;
   const alpha = Math.max(0, Math.min(1, paint.fillOpacity * paint.opacity)) * 255;
   return { polygons, rgba: [...paint.fill, alpha], rule: paint.rule };
