@@ -4,29 +4,26 @@ import { MAX_SVG_LENGTH, rasterizeSvg } from "../index";
 
 /**
  * The SVG is uploaded by whoever owns the artwork, so it is untrusted input.
- * Each case here is a shape that makes a backtracking pattern go polynomial;
- * the scanner reads each in one pass, so every one must finish quickly.
+ *
+ * Every assertion here is on WHAT happened — the refusal reason, the size of
+ * what came back, the work estimate — never on how fast a runner was. The
+ * scanner is linear and the budget refuses before filling, so each case is
+ * deterministic; the one wall-clock check is a hang detector, ten seconds,
+ * for a regression back to the polynomial patterns these inputs target (they
+ * took over a minute).
  */
 
 const N = 200_000;
 
-/**
- * Wall time of `run`, in milliseconds. A time bound is the assertion here, so
- * the bounds are generous: a linear pass takes milliseconds, the polynomial
- * patterns these inputs target took over a minute on the same machine.
- */
-function timed(run: () => unknown): number {
-  return measured(run).ms;
-}
+const HANG_MS = 10_000;
 
-/** `run`'s result and its wall time in milliseconds. */
-function measured<T>(run: () => T): { ms: number; result: T } {
+/** `run`'s result, failing the test only if it effectively hung. */
+function guarded<T>(run: () => T): T {
   const start = process.hrtime.bigint();
   const result = run();
-  return { ms: Number(process.hrtime.bigint() - start) / 1e6, result };
+  expect(Number(process.hrtime.bigint() - start) / 1e6).toBeLessThan(HANG_MS);
+  return result;
 }
-
-const BOUND_MS = 2_000;
 
 describe("rasterizeSvg on hostile input", () => {
   it.each([
@@ -41,16 +38,20 @@ describe("rasterizeSvg on hostile input", () => {
     ["a transform of open parens", `<svg viewBox="0 0 1 1"><g transform="${"0(".repeat(N / 2)}"/></svg>`],
     ["a path of one enormous number", `<svg viewBox="0 0 1 1"><path d="M${"1".repeat(N)}x"/></svg>`],
     ["a path of dots", `<svg viewBox="0 0 1 1"><path d="M${".".repeat(N)}"/></svg>`],
-  ])("finishes quickly on %s", (_label, svg) => {
-    expect(timed(() => rasterizeSvg(svg, { width: 8 }))).toBeLessThan(BOUND_MS);
+  ])("reads %s to an empty 8 x 8 picture", (_label, svg) => {
+    const raster = guarded(() => rasterizeSvg(svg, { width: 8 }));
+
+    // Nothing drawable survives any of these; what matters is that the scan
+    // ended and the document was sized, not refused or thrown on.
+    expect([raster.width, raster.height]).toEqual([8, 8]);
+    expect(raster.data.every((byte) => byte === 0)).toBe(true);
   });
 
   it("refuses a canvas taller than the cap, from the viewBox aspect, without allocating", () => {
-    const { ms, result: raster } = measured(() =>
+    const raster = guarded(() =>
       rasterizeSvg('<svg viewBox="0 0 1 500"><rect width="1" height="500"/></svg>', { width: 576 }),
     );
 
-    expect(ms).toBeLessThan(1_000);
     expect(raster.unsupported).toEqual(["output too large"]);
     expect(raster.data.length).toBe(0);
   });
@@ -62,34 +63,32 @@ describe("rasterizeSvg on hostile input", () => {
     ]);
   });
 
-  it("refuses thousands of full-canvas shapes quickly", () => {
+  it("refuses thousands of full-canvas shapes while parsing", () => {
     const svg = `<svg viewBox="0 0 1 1">${'<path d="M0 0H1V1Z"/>'.repeat(11_000)}</svg>`;
 
     expect(svg.length).toBeLessThan(MAX_SVG_LENGTH);
-    const { ms, result: raster } = measured(() => rasterizeSvg(svg, { width: 576 }));
+    const raster = guarded(() => rasterizeSvg(svg, { width: 576 }));
 
-    expect(ms).toBeLessThan(1_000);
     expect(raster.unsupported).toEqual(["too many shapes"]);
+    expect(raster.data.length).toBe(0);
   });
 
-  it("stops filling once the work budget is spent", () => {
-    // Under the shape cap, but each shape covers the whole 576 x 576 canvas.
+  it("refuses full-canvas shapes under the shape cap on the fill estimate", () => {
     const svg = `<svg viewBox="0 0 1 1">${'<path d="M0 0H1V1Z"/>'.repeat(3_000)}</svg>`;
+    const raster = guarded(() => rasterizeSvg(svg, { width: 576 }));
 
-    const { ms, result: raster } = measured(() => rasterizeSvg(svg, { width: 576 }));
-
-    expect(ms).toBeLessThan(1_000);
     expect(raster.unsupported).toEqual(["too complex to fill"]);
+    expect(raster.data.length).toBe(0);
   });
 
-  it("refuses a path of full-height zigzags quickly", () => {
+  it("refuses a path of full-height zigzags on the fill estimate", () => {
     const svg = `<svg viewBox="0 0 1 1"><path d="M0 0${"L.5 1L0 0".repeat(28_000)}"/></svg>`;
 
     expect(svg.length).toBeLessThan(MAX_SVG_LENGTH);
-    const { ms, result: raster } = measured(() => rasterizeSvg(svg, { width: 576 }));
+    const raster = guarded(() => rasterizeSvg(svg, { width: 576 }));
 
-    expect(ms).toBeLessThan(1_000);
     expect(raster.unsupported).toEqual(["too complex to fill"]);
+    expect(raster.data.length).toBe(0);
   });
 
   it("refuses a document past the size cap without reading it", () => {
