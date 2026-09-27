@@ -28,6 +28,11 @@ model Notification {
   id        String    @id @default(uuid())
   userId    String    @map("user_id")
   clientId  String?   @map("client_id")
+  // Which SIDE of the business this row is for — the host's vocabulary
+  // (`customer`, `staff`), resolved from `type` by the host's `sideOf` at the
+  // emit. NULL is "not classified": every reader sees it, which is what every
+  // existing row reads as with no backfill.
+  side      String?
   type      String
   category  String
   title     String
@@ -141,6 +146,10 @@ model PushSubscription {
   ///
   /// Nullable so every pre-existing row reads as "platform" with no backfill.
   clientId  String?  @map("client_id")
+  // Which SIDE this browser's app serves, stamped at registration from the
+  // actor. NULL receives every side — an app that serves both, and every
+  // subscription registered before this column existed.
+  side      String?
   // Free-form browser/device hint ("Chrome · Linux") for a device list.
   userAgent String?  @map("user_agent")
   createdAt DateTime @default(now()) @map("created_at")
