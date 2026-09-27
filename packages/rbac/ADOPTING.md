@@ -201,13 +201,13 @@ exactly as their permissions already resolve to nothing.
 | DELETE | `/roles/templates/:name` | `roles:manage` + curated governance | `{ data: { status: 'reset' } }` (idempotent) — governance judges the SEED the reset would write, so a resetter can never restore a permission they do not themselves hold |
 | GET | `/permissions` | staff tier | `{ data: { permissions, ...permissionsExtras } }` |
 | GET | `/team` | admin tier (ACTIVE membership) | `{ data, pagination }` — `q`, `role_in`, `status_in`, `sort`, paging |
-| POST | `/team` | admin tier + invites port | `{ data: { status: 'added' \| 'invited' } }`, 501 without the port |
+| POST | `/team` | admin tier + invites port | `{ data: { status: 'added' \| 'invited' } }`, 501 without the port. Any number of roles: `role` (first system role, optional) + `customRoles` (every other role, system or custom); each system role must be in `assignableBaseRoles`; the port grants ALL of them additively |
 | GET | `/team/context` | admin tier + `team:read` | custom roles by member, assignable roles, pending invites |
 | GET | `/team/:userId` | admin tier + `team:read` | member detail, 404 reveals nothing |
-| PATCH | `/team/:userId` | admin tier + `team:manage` + governance | base-role set — the name must be in `assignableBaseRoles` (default: non-owner template names; a custom role is 400 — additive roles ride POST /team/:userId/roles); 409 last owner |
+| PATCH | `/team/:userId` | admin tier + `team:manage` + governance | legacy swap of the member's highest system role for another — every other role held stays; the name must be in `assignableBaseRoles` (default: non-owner template names); 409 last owner. The packaged screens never call it: they grant and revoke per role |
 | DELETE | `/team/:userId` | admin tier (owner rules inside) | `{ data: { status: 'removed' } }` |
 | PATCH | `/team/:userId/status` | admin tier + `team:manage` | enable/disable; owner never disabled (TOCTOU-safe) |
-| POST | `/team/:userId/roles` | `roles:manage` + governance | additive custom-role grant (idempotent) |
+| POST | `/team/:userId/roles` | `roles:manage` + governance | grant one more role — system or custom, any number per member (idempotent) |
 | DELETE | `/team/:userId/roles/:role` | `roles:manage` | revoke (idempotent) |
 | DELETE | `/team/invites/:inviteId` | admin tier + `team:manage` + invites port | cancel a pending invite |
 

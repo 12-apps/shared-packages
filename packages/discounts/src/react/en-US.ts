@@ -168,6 +168,9 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     stackable: "Stackable",
     stackableHint:
       "When off, this promotion is exclusive: if it wins, no other one is applied.",
+    firstOrderOnly: "Only on the customer's first purchase at this store",
+    firstOrderOnlyHint:
+      "Only for customers who have never bought here. Menu prices do not change: the discount shows in the cart of whoever can use it.",
     reviewFields: "Check the highlighted fields.",
     saveFailed: "Could not save the discount",
     nameRequired: "Give the promotion a name.",

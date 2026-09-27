@@ -100,6 +100,11 @@ describe("what is never teased", () => {
     expect(teasers([plain], clock(FRI, "14:00"))).toEqual([]);
   });
 
+  it("a first-purchase promotion, which no card can promise (FUT-2825)", () => {
+    const welcome = { ...HAPPY_HOUR, id: "welcome", firstOrderOnly: true };
+    expect(teasers([welcome], clock(FRI, "14:00"))).toEqual([]);
+  });
+
   it("a coupon promotion the buyer has not typed", () => {
     const coupon = { ...HAPPY_HOUR, trigger: "CODE" as const, code: "HAPPY" };
     expect(teasers([coupon], clock(FRI, "14:00"))).toEqual([]);

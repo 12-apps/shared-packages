@@ -8,7 +8,7 @@ import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
 import { createRbacLabels, groupPermissions, sodCounterpart } from '../labels';
 import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { RoleForm } from '../role-form';
-import { splitRoleSelection } from '../team-screen';
+import { toInviteSelection } from '../team-invite-form';
 
 /**
  * The web half's pure logic + the role form's affordances (12-13) — the
@@ -51,19 +51,21 @@ describe('labels', () => {
   });
 });
 
-describe('splitRoleSelection', () => {
-  const system = new Set(['HEAD_LIBRARIAN', 'CLERK']);
+describe('toInviteSelection', () => {
+  const system = ['HEAD_LIBRARIAN', 'CLERK'];
+  const custom = ['Voluntário'];
 
-  it('splits one system role + customs', () => {
-    expect(splitRoleSelection(['CLERK', 'Voluntário'], system)).toEqual({
-      base: 'CLERK',
-      customRoles: ['Voluntário'],
-    });
+  it('carries EVERY ticked role, system ones included', () => {
+    expect(
+      toInviteSelection('a@b.c', new Set(['CLERK', 'HEAD_LIBRARIAN', 'Voluntário']), system, custom),
+    ).toEqual({ email: 'a@b.c', role: 'HEAD_LIBRARIAN', customRoles: ['CLERK', 'Voluntário'] });
   });
 
-  it('answers no base for zero or two system roles', () => {
-    expect(splitRoleSelection(['Voluntário'], system).base).toBeNull();
-    expect(splitRoleSelection(['HEAD_LIBRARIAN', 'CLERK'], system).base).toBeNull();
+  it('sends no role at all for an invite to custom roles only', () => {
+    expect(toInviteSelection('a@b.c', new Set(['Voluntário']), system, custom)).toEqual({
+      email: 'a@b.c',
+      customRoles: ['Voluntário'],
+    });
   });
 });
 

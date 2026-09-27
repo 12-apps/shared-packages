@@ -29,6 +29,7 @@ export const EN_US_DISCOUNT_REJECTION_COPY: DiscountRejectionCopy = {
   MIN_SUBTOTAL_NOT_MET: `This coupon needs a minimum order of ${MIN_SUBTOTAL_TOKEN}.`,
   USAGE_LIMIT_REACHED: "This coupon has reached its usage limit.",
   BUYER_LIMIT_REACHED: "You have already used this coupon.",
+  NOT_FIRST_ORDER: "Only valid on your first purchase at this store.",
   NO_ELIGIBLE_ITEMS: "This coupon does not apply to the items in your cart.",
   COMBO_NOT_MATCHED: "Your cart does not have every item in this bundle yet.",
   ZERO_VALUE: "This coupon does not apply to the items in your cart.",
