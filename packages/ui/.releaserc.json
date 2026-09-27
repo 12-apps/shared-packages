@@ -24,6 +24,10 @@
           {
             "breaking": true,
             "release": "minor"
+          },
+          {
+            "type": "feat",
+            "release": "patch"
           }
         ]
       }
