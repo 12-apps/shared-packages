@@ -24,8 +24,11 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
    * Left unset, the real (loaded) image sizes itself naturally — but the
    * loading skeleton and a `ReactNode` `fallback` never leave BOTH axes
    * unresolved: an unset axis borrows the one that IS set (a square
-   * placeholder), and with neither set, both take the theme's field height
-   * (FUT-2805).
+   * placeholder) when it is a DEFINITE length; a RELATIVE one (a fraction, or
+   * a `%` string) squares up through CSS `aspectRatio` instead, since copying
+   * a percentage onto the other axis would measure against the wrong box.
+   * With neither set, both take the theme's field height (FUT-2805; see
+   * `LazyImage.md`'s own note for the exact rule).
    */
   width?: number | string;
 

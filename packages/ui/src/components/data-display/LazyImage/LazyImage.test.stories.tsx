@@ -38,6 +38,9 @@ type Story = StoryObj<typeof meta>;
 
 const NEVER_RESOLVES = 'https://lazyimage-fut2774.invalid/never-resolves.png';
 const ALWAYS_ERRORS = 'https://lazyimage-fut2774.invalid/always-errors.png';
+// FUT-2805 follow-up: fails once, then the cache-busted retry succeeds — see
+// `.storybook/test-runner.ts`'s route for this exact URL.
+const FAILS_THEN_LOADS = 'https://lazyimage-fut2805.invalid/fails-then-loads.png';
 
 /**
  * A tiny (120×80, so clearly non-square and distinct from any plausible
@@ -291,5 +294,187 @@ export const BothAxesSetSkeletonUnchanged: Story = {
 
     expect(Math.abs(rect.width - 200)).toBeLessThan(PX_TOLERANCE);
     expect(Math.abs(rect.height - 100)).toBeLessThan(PX_TOLERANCE);
+  },
+};
+
+/**
+ * FUT-2805 follow-up (adversarial review of 1b0425ef): `placeholderAxis`
+ * borrowed a RELATIVE set axis (a fraction, or a `%` string) onto the unset
+ * one LITERALLY — `width="100%"` alone produced a skeleton `height: 100%`
+ * too, and a percentage height against an auto-height containing block
+ * computes to `auto` per CSS — the exact collapse this ticket exists to fix,
+ * unfixed for this input shape. The four stories below prove the fix in a
+ * REAL browser: a relative single axis now squares up through
+ * `aspectRatio: '1 / 1'` (verified empirically against a minimal repro that
+ * a borrowed percentage re-collapses on EITHER axis, not just height — see
+ * `isRelativeLength`'s own comment in `LazyImage.tsx`).
+ */
+export const RelativeWidthPercentSkeletonSquare: Story = {
+  name: '🔬 FUT-2805 follow-up: skeleton, LazyImage width="100%" alone (relative, was #broken)',
+  args: {
+    src: NEVER_RESOLVES,
+    alt: 'probe',
+    lazy: false,
+    width: '100%',
+    'data-testid': 'rel-width-pct-probe',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const container = await canvas.findByTestId('rel-width-pct-probe');
+    const skeleton = await canvas.findByTestId('rel-width-pct-probe-skeleton');
+    const containerRect = container.getBoundingClientRect();
+    const skeletonRect = skeleton.getBoundingClientRect();
+
+    await expect(skeletonRect.height).toBeGreaterThan(0);
+    expect(skeletonRect.width).toBeGreaterThan(0);
+    // A square, its side the container's own (100%-resolved) width.
+    expect(Math.abs(skeletonRect.width - containerRect.width)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(skeletonRect.height - containerRect.width)).toBeLessThan(PX_TOLERANCE);
+  },
+};
+
+export const RelativeFractionWidthSkeletonSquare: Story = {
+  name: '🔬 FUT-2805 follow-up: skeleton, LazyImage width={0.5} alone (relative, was #broken)',
+  args: {
+    src: NEVER_RESOLVES,
+    alt: 'probe',
+    lazy: false,
+    width: 0.5,
+    'data-testid': 'rel-width-frac-probe',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const container = await canvas.findByTestId('rel-width-frac-probe');
+    const skeleton = await canvas.findByTestId('rel-width-frac-probe-skeleton');
+    const containerRect = container.getBoundingClientRect();
+    const skeletonRect = skeleton.getBoundingClientRect();
+
+    await expect(skeletonRect.height).toBeGreaterThan(0);
+    expect(skeletonRect.width).toBeGreaterThan(0);
+    // The skeleton fills the container on both axes (a fraction is `100%` to
+    // content, per `innerLength`) — a square, its side the container's width.
+    expect(Math.abs(skeletonRect.width - containerRect.width)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(skeletonRect.height - containerRect.width)).toBeLessThan(PX_TOLERANCE);
+  },
+};
+
+/**
+ * The ReactNode-fallback CONTAINER's own box (`ImageContainer` itself, not
+ * just the fallback's content) — the review noted no story measured the
+ * container for this input shape. `containerAxisFor` is what sizes it here,
+ * through the same `placeholderAxis`/`isRelativeLength` path as the skeleton.
+ */
+export const RelativeWidthFallbackContainerSquare: Story = {
+  name: '🔬 FUT-2805 follow-up: ReactNode fallback CONTAINER, width="100%" alone (relative)',
+  args: {
+    src: ALWAYS_ERRORS,
+    alt: 'probe',
+    lazy: false,
+    width: '100%',
+    'data-testid': 'rel-width-fallback-probe',
+    fallback: (
+      <Box data-testid="rel-width-fallback-probe-content">
+        <Typography variant="caption">Image unavailable</Typography>
+      </Box>
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const container = await canvas.findByTestId('rel-width-fallback-probe');
+    const containerRect = container.getBoundingClientRect();
+
+    await expect(containerRect.height).toBeGreaterThan(0);
+    expect(containerRect.width).toBeGreaterThan(0);
+    // Square: the container's own height now matches its (100%-resolved) width.
+    expect(Math.abs(containerRect.height - containerRect.width)).toBeLessThan(PX_TOLERANCE);
+  },
+};
+
+export const RelativeHeightFallbackContainerSquare: Story = {
+  name: '🔬 FUT-2805 follow-up: ReactNode fallback CONTAINER, LazyImage height={0.5} alone (relative)',
+  args: {
+    src: ALWAYS_ERRORS,
+    alt: 'probe',
+    lazy: false,
+    height: 0.5,
+    'data-testid': 'rel-height-fallback-probe',
+    fallback: (
+      <Box data-testid="rel-height-fallback-probe-content">
+        <Typography variant="caption">Image unavailable</Typography>
+      </Box>
+    ),
+  },
+  render: (args) => (
+    // `height={0.5}` is a fraction OF THE PARENT (`sxLength`), which needs a
+    // definite height to resolve against — a plain 400px wrapper, the same
+    // convention `LazyImage.stories.tsx`'s own fraction examples use.
+    <Box sx={{ height: 400 }}>
+      <LazyImage {...args} />
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const container = await canvas.findByTestId('rel-height-fallback-probe');
+    const containerRect = container.getBoundingClientRect();
+
+    await expect(containerRect.height).toBeGreaterThan(0);
+    expect(containerRect.width).toBeGreaterThan(0);
+    // Square: the container's own width now matches its (50%-of-400px) height.
+    expect(Math.abs(containerRect.width - containerRect.height)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(containerRect.height - 200)).toBeLessThan(PX_TOLERANCE);
+  },
+};
+
+/**
+ * Optional, per the review: a single relative axis with `retryOnError`, going
+ * from the (now-square, via `aspectRatio`) loading skeleton to the loaded
+ * image, must not collapse to 0 at any point along the way — the one failure
+ * mode a "jump" could actually hide.
+ *
+ * NOTE on why this is a skeleton → loaded transition, not an error → loaded
+ * one: `useLazyImage`'s own retry only sets `hasError` (and shows the
+ * `ReactNode` fallback) once retries are EXHAUSTED — a retry that goes on to
+ * SUCCEED never sets it at all; `isLoading` (and so the skeleton) simply
+ * stays up until the retried request settles. `FAILS_THEN_LOADS` fails once,
+ * then the cache-busted retry (`?retry=1`) resolves to a real, tiny image
+ * (`.storybook/test-runner.ts`), so this exercises the actual code path a
+ * `retryOnError` caller relies on, rather than a synthetic one.
+ */
+export const RetryTransitionRelativeAxisNoCollapse: Story = {
+  name: '🔬 FUT-2805 follow-up: retryOnError + relative width alone, skeleton → loaded never collapses',
+  args: {
+    src: FAILS_THEN_LOADS,
+    alt: 'probe',
+    lazy: false,
+    fadeIn: false,
+    width: '100%',
+    retryOnError: true,
+    maxRetries: 1,
+    retryDelay: 50,
+    'data-testid': 'retry-rel-probe',
+    fallback: (
+      <Box data-testid="retry-rel-probe-content">
+        <Typography variant="caption">Image unavailable</Typography>
+      </Box>
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const container = await canvas.findByTestId('retry-rel-probe');
+
+    // Phase 1: the first request has failed and the retry is pending — the
+    // loading skeleton is up, squared by this same fix, never 0.
+    await waitFor(() => expect(canvas.queryByTestId('retry-rel-probe-skeleton')).toBeInTheDocument());
+    const loadingRect = container.getBoundingClientRect();
+    expect(loadingRect.height).toBeGreaterThan(0);
+    expect(loadingRect.width).toBeGreaterThan(0);
+
+    // Phase 2: the retry has loaded — the real image is up, the skeleton is
+    // gone, and the container is still never 0 along the way.
+    await waitFor(() => expect(canvas.queryByTestId('retry-rel-probe-img')).toBeInTheDocument());
+    await waitFor(() => expect(canvas.queryByTestId('retry-rel-probe-skeleton')).not.toBeInTheDocument());
+    const loadedRect = container.getBoundingClientRect();
+    expect(loadedRect.height).toBeGreaterThan(0);
+    expect(loadedRect.width).toBeGreaterThan(0);
   },
 };

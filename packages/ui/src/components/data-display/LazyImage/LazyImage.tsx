@@ -101,58 +101,63 @@ const orDefault = (value: Length, fallback: number | string): number | string =>
  */
 const emptyToUnset = (value: Length): Length => (value === '' ? undefined : value);
 
-/** A single length, already resolved to CSS — {@link innerLength} or {@link sxLength}. */
+/** A length, already resolved to CSS — {@link innerLength} or {@link sxLength}. */
 type LengthResolver = (theme: Theme, value: Length) => string | undefined;
 
 /**
- * The unset-axis DEFAULT for a PLACEHOLDER only (the loading skeleton, the
- * `ReactNode` error fallback) — never the real image/`metrics` (an unset
- * width there sizes the real `<img>` naturally; `brand-link.tsx`'s logo
- * relies on it, see `emptyToUnset`). Decision (FUT-2805, 2026-09-27): an
- * unset axis borrows the set one (a square); neither set, both take the
- * theme's field height. A caller that sets both keeps them, unchanged —
- * this is what fixes FUT-2774 #4/#5 (both stemmed from `ImageContainer`'s
- * own `width`/`height: auto` having nothing to resolve against). `resolve`
- * is `innerLength` (skeleton: a percentage fills its container) or
- * `sxLength` (the container itself: a percentage is of ITS OWN parent).
+ * Whether a length is a PERCENTAGE (a numeric {@link isFraction} or a `%`
+ * string) — copying it onto the OTHER axis re-creates this ticket's own
+ * collapse either way (width%/height% measure different boxes; Chromium-confirmed).
  */
-const placeholderAxis = (
-  theme: Theme,
-  width: Length,
-  height: Length,
-  resolve: LengthResolver,
-): { width: string | undefined; height: string | undefined } => {
+const isRelativeLength = (value: Length): boolean =>
+  isFraction(value) || (typeof value === 'string' && value.trim().endsWith('%'));
+
+/** A resolved axis pair; `aspectRatio` is set when the OTHER axis comes from CSS, not a length. */
+type AxisPair = { width: string | undefined; height: string | undefined; aspectRatio?: string };
+
+/**
+ * The unset-axis DEFAULT for a PLACEHOLDER only (skeleton, `ReactNode`
+ * fallback) — never the real image/`metrics` (an unset width sizes it
+ * naturally; `brand-link.tsx`'s logo relies on that). Decision (FUT-2805): an
+ * unset axis borrows the set one (a square); neither set, both take the
+ * theme's field height; both set stays unchanged. `resolve` is `innerLength`
+ * (skeleton) or `sxLength` (the container). A RELATIVE single axis
+ * ({@link isRelativeLength}) cannot borrow the same way: it keeps its value
+ * and squares up via `aspectRatio: '1 / 1'`, the other axis explicitly
+ * `'auto'` (never `undefined` — `Skeleton`'s own default, a fixed `40`,
+ * would silently win otherwise).
+ */
+const placeholderAxis = (theme: Theme, width: Length, height: Length, resolve: LengthResolver): AxisPair => {
   const w = emptyToUnset(width);
-  // `height` (unlike `width`) always arrives already defaulted to the
-  // literal `'auto'` (`LAZY_IMAGE_DEFAULTS`, `LazyImage.hooks.ts`) whenever a
-  // caller left it unset — resolved, that is indistinguishable from an
-  // explicit `height="auto"`, and no distinction is needed: both mean "no
-  // fixed height was requested", so both count as unset here.
+  // `height` always arrives defaulted to the literal `'auto'` when unset
+  // (`LAZY_IMAGE_DEFAULTS`) — indistinguishable from an explicit `"auto"`,
+  // and no distinction is needed: both mean "no fixed height requested".
   const h = height === 'auto' ? undefined : emptyToUnset(height);
+
   if (w === undefined && h === undefined) {
     const field = fieldHeight(theme);
     return { width: field, height: field };
   }
-  const borrowed = w === undefined ? h : w;
-  const resolvedWidth = resolve(theme, w === undefined ? borrowed : w);
-  const resolvedHeight = resolve(theme, h === undefined ? borrowed : h);
-  return { width: resolvedWidth, height: resolvedHeight };
+  if (h === undefined) {
+    if (isRelativeLength(w)) return { width: resolve(theme, w), height: 'auto', aspectRatio: '1 / 1' };
+    const resolved = resolve(theme, w);
+    return { width: resolved, height: resolved };
+  }
+  if (w === undefined) {
+    if (isRelativeLength(h)) return { width: 'auto', height: resolve(theme, h), aspectRatio: '1 / 1' };
+    const resolved = resolve(theme, h);
+    return { width: resolved, height: resolved };
+  }
+  return { width: resolve(theme, w), height: resolve(theme, h) };
 };
 
 /**
  * `ImageContainer`'s own axis: the ordinary `orDefault(...,'auto')` in every
  * state, except a ReactNode `fallback` while showing — the one case where
- * the container itself is the only thing that CAN fix its collapse
- * (`FallbackContainer` is `position: absolute`, so it never feeds the
- * container's own shrink-to-fit/auto-height, whatever size it is given).
- * Every other state already has real in-flow content to size it, so
- * touching this there too would touch the LOADED real image's own box.
+ * the container is the only thing that CAN fix its own collapse
+ * (`FallbackContainer` is `position: absolute`, never feeding shrink-to-fit).
  */
-const containerAxisFor = (
-  theme: Theme,
-  props: ResolvedLazyImageProps,
-  hasError: boolean,
-): { width: string | undefined; height: string | undefined } => {
+const containerAxisFor = (theme: Theme, props: ResolvedLazyImageProps, hasError: boolean): AxisPair => {
   const { width, height, fallback } = props;
   const needsPlaceholderSize = hasError && Boolean(fallback) && typeof fallback !== 'string';
   return needsPlaceholderSize
@@ -176,11 +181,10 @@ interface IndicatorProps {
 
 const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
   const theme = useTheme();
-  // FUT-2805: replaces the old, separate `orDefault(width,'100%')` /
-  // `orDefault(height,'auto')` — both literal fallbacks a shrink-to-fit
-  // `ImageContainer` (its own `width`/`height: auto` when unset) had nothing
-  // to resolve against, which is what collapsed this to exactly 0.
-  const { width, height } = placeholderAxis(theme, props.width, props.height, innerLength);
+  // FUT-2805: replaces the old literal `'100%'`/`'auto'` fallbacks, which
+  // collapsed to 0 in a shrink-to-fit `ImageContainer` with nothing to
+  // resolve against.
+  const { width, height, aspectRatio } = placeholderAxis(theme, props.width, props.height, innerLength);
   return (
     <Skeleton
       // FUT-2774 #5: `skeletonProps.variant` was typed but never read — the
@@ -188,6 +192,7 @@ const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
       variant={props.skeletonProps.variant ?? 'rectangular'}
       width={width}
       height={height}
+      style={aspectRatio ? { aspectRatio } : undefined}
       // FUT-2774 #5: `||` reads a caller's `false` the same as "unset", so
       // `skeletonProps.animation={false}` could never turn the animation off.
       animation={props.skeletonProps.animation ?? 'pulse'}
@@ -293,14 +298,9 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
   return (
     <FallbackContainer
       sx={{
-        // FUT-2774 #4 (see `emptyToUnset`); the collapse this used to leave
-        // unresolved is fixed by `LazyImage` giving `ImageContainer` ITSELF a
-        // size now (see `containerAxisFor`/`placeholderAxis`) — this box is
-        // `position: absolute` and never fed that ancestor's own
-        // shrink-to-fit width or auto height, no matter what size it is given
-        // here, so it still just fills whatever the (no-longer-collapsing)
-        // container is: `sx.width`/`height` omitted (falling through to
-        // `FallbackContainer`'s own `100%`/`100%`) when unset, same as before.
+        // FUT-2774 #4 (see `emptyToUnset`); the collapse is fixed by
+        // `LazyImage` giving `ImageContainer` ITSELF a size now
+        // (`containerAxisFor`) — this `position: absolute` box just fills it.
         width: innerLength(theme, emptyToUnset(width)),
         height: innerLength(theme, orDefault(height, 'auto')),
         borderRadius: styleLength(theme, borderRadius),
@@ -356,6 +356,7 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
       sx={{
         width: containerAxis.width,
         height: containerAxis.height,
+        aspectRatio: containerAxis.aspectRatio,
         // The same px length the image gets (`metrics`): in `sx` a bare number
         // would be a multiple of `shape.borderRadius`, and this box clips (FUT-2656).
         borderRadius: metrics.borderRadius,
