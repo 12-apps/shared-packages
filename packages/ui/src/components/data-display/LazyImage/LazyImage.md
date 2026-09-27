@@ -180,8 +180,30 @@ wrapping element, rounded to match the image:
 |------|------|---------|-------------|
 | `src` | `string` | - | **Required.** Image source URL |
 | `alt` | `string` | - | **Required.** Alternative text for accessibility |
-| `width` | `number \| string` | - | Image width. A number above 1 is design px; a number above 0 and up to 1 is a fraction of the parent, as in `sx` (`0.5` is `50%`); a string is any CSS length |
+| `width` | `number \| string` | - | Image width. A number above 1 is design px; a number above 0 and up to 1 is a fraction of the parent, as in `sx` (`0.5` is `50%`); a string is any CSS length. Unset lets the real image size itself naturally — but the loading skeleton and a `ReactNode` `fallback` borrow the other axis when only it is set (a square), or the theme's field height when neither is (FUT-2805) |
 | `height` | `number \| string` | `'auto'` | Image height, read like `width`. A fractional height takes effect only when the parent has a definite height |
+
+> **The placeholder's own default, when only one axis is set (FUT-2805).**
+> The loading skeleton and a `ReactNode` `fallback` never leave both their own
+> axes unresolved — never the real (loaded) image, which always sizes itself
+> naturally from `width`/`height` exactly as documented above.
+>
+> - A **DEFINITE** set axis (a plain design-px number, or an absolute CSS
+>   length string) borrows straight onto the unset one: a square in real
+>   px/rem — e.g. `width={120}` alone gives the skeleton `120×120`.
+> - A **RELATIVE** set axis (a fraction in `(0, 1]`, or a `%` string) cannot
+>   be copied onto the other one the same way — a width-percentage and a
+>   height-percentage measure against two different boxes, so copying the
+>   value would re-create the exact 0-height/0-width collapse this default
+>   exists to fix. Instead, the set axis keeps its own value and the box
+>   squares up through CSS `aspectRatio: '1 / 1'`, with the other axis left
+>   `auto` — e.g. `width="100%"` alone gives the skeleton `width: 100%;
+>   height: auto; aspect-ratio: 1 / 1`, a square exactly as wide as its
+>   (now non-collapsing) container.
+> - With **neither** axis set, both take the theme's field height
+>   (`theme.fieldHeight`, through `fieldHeight()`/`rem()` — never a raw px).
+> - With **both** set, nothing above applies: the placeholder renders exactly
+>   as its own explicit `width`/`height` say, unchanged.
 
 ### Loading Props
 
