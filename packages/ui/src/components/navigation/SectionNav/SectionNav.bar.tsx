@@ -27,7 +27,11 @@ export function sectionNavBarInset(theme: Parameters<typeof rem>[0]): string {
 }
 
 /**
- * One slot: icon over label, current when `active`, a count on the icon.
+ * One slot: icon over label, a count on the icon.
+ *
+ * `current` is the page the viewer is on and is what `aria-current` reports;
+ * `lit` is only how the slot looks, and goes out while a sheet is open so the
+ * bar shows where the thumb is. Opening a sheet is `aria-expanded`'s to say.
  *
  * A destination is a link; the "more" slot is a button that opens its sheet.
  * Either way the whole slot is the target, so a thumb landing on the label
@@ -37,7 +41,8 @@ function Slot({
   label,
   icon,
   count,
-  active,
+  current,
+  lit,
   copy,
   testId,
   control,
@@ -46,7 +51,8 @@ function Slot({
   label: string;
   icon: ReactNode;
   count: number | undefined;
-  active: boolean;
+  current: boolean;
+  lit: boolean;
   copy: SectionNavCopy;
   testId: string;
   control: Record<string, unknown>;
@@ -56,8 +62,9 @@ function Slot({
   return (
     <Box
       {...control}
-      aria-current={active ? 'page' : undefined}
+      aria-current={current ? 'page' : undefined}
       aria-expanded={expanded}
+      data-lit={lit ? 'true' : undefined}
       data-testid={testId}
       sx={{
         ...CONTROL_RESET,
@@ -70,10 +77,10 @@ function Slot({
         justifyContent: 'center',
         gap: 0.25,
         position: 'relative',
-        color: active ? 'primary.main' : 'text.secondary',
+        color: lit ? 'primary.main' : 'text.secondary',
         // The current slot is marked by more than its colour: a short rule on
         // its top edge, so the state survives a colour-blind reading.
-        '&[aria-current="page"]::before': {
+        '&[data-lit="true"]::before': {
           content: '""',
           position: 'absolute',
           top: 0,
@@ -96,7 +103,7 @@ function Slot({
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           lineHeight: 1.3,
-          fontWeight: active ? 700 : 400,
+          fontWeight: lit ? 700 : 400,
         }}
       >
         {label}
@@ -145,7 +152,8 @@ function BarSlotView({
         label={more.label}
         icon={more.icon}
         count={menuCount(more)}
-        active={open === 'more' || (open === null && menuActive(more))}
+        current={false}
+        lit={open === 'more' || (open === null && menuActive(more))}
         expanded={open === 'more'}
         copy={copy}
         testId={`${dataTestId}-more`}
@@ -160,7 +168,8 @@ function BarSlotView({
       label={destination.label}
       icon={destination.icon}
       count={destination.badge}
-      active={open === null && destination.active === true}
+      current={destination.active === true}
+      lit={open === null && destination.active === true}
       copy={copy}
       testId={`${dataTestId}-dest-${destination.id}`}
       control={controlProps({ href: destination.href, linkComponent, onClick: close })}
@@ -194,6 +203,7 @@ export function SectionNavBar({
           flex: 'none',
           display: 'flex',
           alignItems: 'stretch',
+          boxSizing: 'border-box',
           height: sectionNavBarInset(theme),
           paddingBottom: 'env(safe-area-inset-bottom)',
           borderTop: `1px solid ${theme.palette.divider}`,
@@ -208,7 +218,7 @@ export function SectionNavBar({
       >
         {barSlots(destinations, more !== undefined, primary !== undefined).map((slot) => (
           <BarSlotView
-            key={slot.kind === 'destination' ? slot.destination.id : slot.kind}
+            key={slot.kind === 'destination' ? `dest-${slot.destination.id}` : `menu-${slot.kind}`}
             slot={slot}
             primary={primary}
             more={more}

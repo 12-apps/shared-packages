@@ -6,9 +6,11 @@ import React from 'react';
 
 import { EN_US_SECTION_NAV_COPY } from '../../../en-US.navigation';
 
+import { sxRem } from '../../../tokens/scales';
+
 import { SectionNav } from './SectionNav';
 import { RaisedActionButton } from './SectionNav.primary';
-import { DESTINATIONS, MORE, PRIMARY, PhoneFrame } from './__stories__/fixtures';
+import { DESTINATIONS, MORE, PRIMARY, PhoneFrame, RailFrame } from './__stories__/fixtures';
 
 const meta: Meta<typeof SectionNav> = {
   title: 'Navigation/SectionNav',
@@ -66,16 +68,16 @@ export const Rail: Story = {
     back: { label: 'Back', href: '#home', icon: <ArrowBackIcon /> },
   },
   render: (args) => (
-    <Box sx={{ width: 240, height: 560, border: 1, borderColor: 'divider' }}>
+    <RailFrame>
       <SectionNav {...args} />
-    </Box>
+    </RailFrame>
   ),
 };
 
 /** The raised button alone, for a bar the host already draws. */
 export const RaisedButtonInAHostBar: Story = {
   render: () => (
-    <Box sx={{ width: 360, display: 'flex', alignItems: 'stretch', gap: 1, pt: 3, px: 1, pb: 1, borderTop: 1, borderColor: 'divider' }}>
+    <Box sx={{ width: sxRem(360), display: 'flex', alignItems: 'stretch', gap: 1, pt: 3, px: 1, pb: 1, borderTop: 1, borderColor: 'divider' }}>
       <Box sx={{ flex: 1, textAlign: 'center' }}>Menu</Box>
       <Box sx={{ flex: 1, textAlign: 'center' }}>Tab</Box>
       <RaisedActionButton label="Add" icon={<AddIcon />} onClick={() => undefined} />

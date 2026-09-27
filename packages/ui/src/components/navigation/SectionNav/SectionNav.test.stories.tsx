@@ -5,7 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { EN_US_SECTION_NAV_COPY } from '../../../en-US.navigation';
 
 import { SectionNav } from './SectionNav';
-import { DESTINATIONS, MORE, PRIMARY, PhoneFrame } from './__stories__/fixtures';
+import { DESTINATIONS, MORE, PRIMARY, PhoneFrame, RailFrame } from './__stories__/fixtures';
 
 const meta: Meta<typeof SectionNav> = {
   title: 'Navigation/SectionNav/Tests',
@@ -92,9 +92,9 @@ export const RailListsEverything: Story = {
   name: 'Rail: the way back, the destinations and every entry are all visible',
   args: { layout: 'rail', back: { label: 'Back', href: '#home' }, heading: 'Operations' },
   render: (args) => (
-    <div style={{ width: 240, height: 560 }}>
+    <RailFrame>
       <SectionNav {...args} />
-    </div>
+    </RailFrame>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

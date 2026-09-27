@@ -67,7 +67,7 @@ export function controlProps({
   linkComponent,
 }: {
   href: string | undefined;
-  onClick: () => void;
+  onClick?: () => void;
   linkComponent: ElementType | undefined;
 }): Record<string, unknown> {
   if (href !== undefined) return { component: linkComponent ?? 'a', href, onClick };

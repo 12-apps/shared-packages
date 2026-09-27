@@ -169,31 +169,38 @@ export function SectionNavSheet({
       height="auto"
       dataTestId={testId}
       paperSx={{
-        borderTopLeftRadius: theme.shape.borderRadius * 3,
-        borderTopRightRadius: theme.shape.borderRadius * 3,
+        borderTopLeftRadius: rem(theme, Number(theme.shape.borderRadius) * 3),
+        borderTopRightRadius: rem(theme, Number(theme.shape.borderRadius) * 3),
         maxHeight: `calc(85dvh - ${bottomOffset})`,
         bottom: bottomOffset,
       }}
     >
-      <DrawerHeader onClose={onClose} closeLabel={copy.close} dataTestId={`${testId}-header`}>
-        {menu.title}
-      </DrawerHeader>
-      <DrawerContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {menu.groups.map((group) => (
-            <SheetGroup
-              key={group.id}
-              group={group}
-              linkComponent={linkComponent}
-              copy={copy}
-              testId={testId}
-              onDone={onClose}
-            />
-          ))}
-        </Box>
-      </DrawerContent>
+      {/* The library Drawer names nothing: the dialog role and its name live
+          here, around everything the focus trap holds. */}
+      <Box
+        role="dialog"
+        aria-modal="true"
+        aria-label={menu.title}
+        sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+      >
+        <DrawerHeader onClose={onClose} closeLabel={copy.close} dataTestId={`${testId}-header`}>
+          {menu.title}
+        </DrawerHeader>
+        <DrawerContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {menu.groups.map((group) => (
+              <SheetGroup
+                key={group.id}
+                group={group}
+                linkComponent={linkComponent}
+                copy={copy}
+                testId={testId}
+                onDone={onClose}
+              />
+            ))}
+          </Box>
+        </DrawerContent>
+      </Box>
     </Drawer>
   );
 }
-
-export { ListEntry };

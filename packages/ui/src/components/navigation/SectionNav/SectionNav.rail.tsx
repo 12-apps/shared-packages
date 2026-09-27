@@ -163,7 +163,7 @@ export function SectionNavRail({
     >
       {back ? (
         <Box
-          {...controlProps({ href: back.href, linkComponent, onClick: () => undefined })}
+          {...controlProps({ href: back.href, linkComponent })}
           data-testid={`${dataTestId}-back`}
           sx={{
             ...CONTROL_RESET,
@@ -196,7 +196,7 @@ export function SectionNavRail({
           active={destination.active === true}
           copy={copy}
           testId={`${dataTestId}-dest-${destination.id}`}
-          control={controlProps({ href: destination.href, linkComponent, onClick: () => undefined })}
+          control={controlProps({ href: destination.href, linkComponent })}
         />
       ))}
       {primary ? (

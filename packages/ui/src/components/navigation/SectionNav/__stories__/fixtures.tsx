@@ -14,6 +14,8 @@ import TableRestaurantOutlinedIcon from '@mui/icons-material/TableRestaurantOutl
 import Box from '@mui/material/Box/index.js';
 import React from 'react';
 
+import { sxRem } from '../../../../tokens/scales';
+
 import type { SectionNavDestination, SectionNavMenu } from '../SectionNav.types';
 
 /**
@@ -84,9 +86,9 @@ export function PhoneFrame({ children }: { children: React.ReactNode }): React.R
   return (
     <Box
       sx={{
-        width: 360,
+        width: sxRem(360),
         maxWidth: '100%',
-        height: 640,
+        height: sxRem(640),
         display: 'flex',
         flexDirection: 'column',
         border: 1,
@@ -102,3 +104,8 @@ export function PhoneFrame({ children }: { children: React.ReactNode }): React.R
   );
 }
 
+
+/** A desktop-column-sized frame for the rail. */
+export function RailFrame({ children }: { children: React.ReactNode }): React.ReactElement {
+  return <Box sx={{ width: sxRem(240), height: sxRem(560), border: 1, borderColor: 'divider' }}>{children}</Box>;
+}

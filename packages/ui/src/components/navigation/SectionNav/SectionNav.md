@@ -39,7 +39,10 @@ screen.
   is the sum of its entries' badges.
 - **back**, **heading**: the rail only.
 - **linkComponent**: the element every `href` renders through, for example a
-  router adapter taking `href`. It defaults to a plain `<a>`.
+  router adapter taking `href`. It defaults to a plain `<a>`. The adapter must
+  pass on `className` (the styling), `onClick` (a sheet entry closes its sheet
+  through it), `aria-current` and `data-testid`; one that drops `onClick`
+  leaves the sheet open after the navigation.
 - **copy**: `SectionNavCopy` (`close`, `badge(count)`), REQUIRED. The component
   carries no words. `PT_BR_SECTION_NAV_COPY` and `EN_US_SECTION_NAV_COPY` are
   named packs; `SECTION_NAV_COPY` is the locale pack.
@@ -64,8 +67,15 @@ full height, the phone's safe area included. Reserve it at the foot of the
 content, so nothing the page floats (a toast, a receipt) lands under the bar.
 
 The bar rises above a modal backdrop only while one of its OWN sheets is open,
-so its button can close what it opened. The rest of the time a dialog the page
-opens sits above it.
+so a pointer can close the sheet from the button that opened it. The rest of
+the time a dialog the page opens sits above it. The sheet is a modal dialog
+named by the menu's `title`: while it is open, focus stays inside it, and
+Escape or the sheet's own close button is the way out for a keyboard or a
+screen reader.
+
+`aria-current="page"` stays on the destination the viewer is on, sheet open or
+not. While a sheet is open only the LOOK moves to its slot (`data-lit`), and
+the slot reports the sheet through `aria-expanded`.
 
 ## RaisedActionButton
 

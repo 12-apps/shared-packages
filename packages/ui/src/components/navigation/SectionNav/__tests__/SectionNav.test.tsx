@@ -141,6 +141,46 @@ describe('SectionNav bar', () => {
     expect(screen.getByTestId('section-nav-more-sheet-entry-queue')).toHaveAttribute('href', '/queue');
   });
 
+  it('opens each sheet as a modal dialog named by its title, which Escape closes', () => {
+    const { primary, more } = menus();
+    render(
+      <SectionNav
+        layout="bar"
+        label="Operations"
+        destinations={DESTINATIONS}
+        primary={primary}
+        more={more}
+        copy={EN_US_SECTION_NAV_COPY}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('section-nav-primary'));
+    const dialog = screen.getByRole('dialog', { name: 'Create now' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.getByTestId('section-nav-primary')).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(screen.getByTestId('section-nav-more'));
+    expect(screen.getByRole('dialog', { name: 'More' })).toHaveAttribute('aria-modal', 'true');
+  });
+
+  it('keeps aria-current on the page the viewer is on while a sheet is open', () => {
+    const { more } = menus();
+    render(
+      <SectionNav layout="bar" label="Operations" destinations={DESTINATIONS} more={more} copy={EN_US_SECTION_NAV_COPY} />,
+    );
+    const floor = screen.getByTestId('section-nav-dest-floor');
+    const moreSlot = screen.getByTestId('section-nav-more');
+    expect(floor).toHaveAttribute('data-lit', 'true');
+
+    fireEvent.click(moreSlot);
+    // Only the look moves to the open slot; the page the viewer is on does not.
+    expect(floor).toHaveAttribute('aria-current', 'page');
+    expect(floor).not.toHaveAttribute('data-lit');
+    expect(moreSlot).toHaveAttribute('data-lit', 'true');
+    expect(moreSlot).not.toHaveAttribute('aria-current');
+  });
+
   it('renders links through the host link component', () => {
     const HostLink = forwardRef<HTMLAnchorElement, AnchorHTMLAttributes<HTMLAnchorElement>>(function HostLink(
       { href, ...rest },
