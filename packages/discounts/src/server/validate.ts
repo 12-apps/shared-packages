@@ -63,6 +63,11 @@ export interface DiscountWriteInput {
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
+  /**
+   * Only a buyer's FIRST purchase at the store (FUT-2825). Optional for the
+   * reason `schedule` is; omitted = false.
+   */
+  firstOrderOnly?: boolean;
   stackable: boolean;
   active: boolean;
   /** Target category ids — read only when `scope === "CATEGORY"`. */
@@ -235,6 +240,8 @@ export interface DiscountScalars {
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
+  /** Only a buyer's first purchase at the store. Always false on a COMBO. */
+  firstOrderOnly: boolean;
   stackable: boolean;
   active: boolean;
 }
@@ -292,9 +299,19 @@ export function toDiscountScalars(
     minSubtotalCents: input.minSubtotalCents,
     usageLimit: input.usageLimit,
     perBuyerLimit: input.perBuyerLimit,
+    firstOrderOnly: firstOrderOnlyOf(input),
     stackable: input.stackable,
     active: input.active,
   };
+}
+
+/**
+ * A combo keeps its own rules (FUT-2825): the form never offers the condition
+ * there, and a body that sends it anyway is folded to false, the way a code
+ * left behind by flipping the trigger is folded to null.
+ */
+function firstOrderOnlyOf(input: DiscountWriteInput): boolean {
+  return input.scope !== "COMBO" && input.firstOrderOnly === true;
 }
 
 /**
@@ -322,6 +339,7 @@ export interface DiscountWriteBody {
   minSubtotalCents?: number | null;
   usageLimit?: number | null;
   perBuyerLimit?: number | null;
+  firstOrderOnly?: boolean;
   stackable: boolean;
   active: boolean;
   categoryIds?: string[];
@@ -357,6 +375,7 @@ export function toDiscountWriteInput(body: DiscountWriteBody): DiscountWriteInpu
     minSubtotalCents: orNull(body.minSubtotalCents),
     usageLimit: orNull(body.usageLimit),
     perBuyerLimit: orNull(body.perBuyerLimit),
+    firstOrderOnly: body.firstOrderOnly === true,
     stackable: body.stackable,
     active: body.active,
     categoryIds: orEmpty(body.categoryIds),

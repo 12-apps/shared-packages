@@ -9,6 +9,7 @@ import {
   type DensityLevel,
   type ResolvedDensity,
 } from './density.core';
+import { chipDensityOverrides, iconButtonDensityOverrides } from './density-overrides';
 import { fieldOverrides, mergeMuiComponents } from './field-height';
 import { DEFAULT_FIELD_RADIUS } from './field-radius.core';
 
@@ -70,12 +71,15 @@ export function useDensity(): ResolvedDensity {
  * agree on the type scale and disagree on the one number three components key
  * their own layout off.
  *
- * `components` is the matching MUI-native override (`fieldOverrides`) for a
- * HOST's own bare `TextField`/`Select`, mirroring `muiThemeOptionsFrom`'s own
- * `components: mergeMuiComponents(fieldOverrides(...))`. It carries ONLY the
- * field overrides this function knows about (`MuiOutlinedInput`'s `root`,
- * `input` and `notchedOutline`; `MuiInputLabel`'s `outlined`) — a host with
- * ITS OWN overrides for OTHER components merges them in with
+ * `components` is the matching MUI-native override (`fieldOverrides`, plus
+ * FUT-2766's `iconButtonDensityOverrides`/`chipDensityOverrides`) for a HOST's
+ * own bare `TextField`/`Select`/`IconButton`/`Chip`, mirroring
+ * `muiThemeOptionsFrom`'s own `components: mergeMuiComponents(...)`. It
+ * carries ONLY the overrides this function knows about (`MuiOutlinedInput`'s
+ * `root`, `input` and `notchedOutline`; `MuiInputLabel`'s `outlined`;
+ * `MuiIconButton`'s `root`/`sizeSmall`/`sizeLarge`; `MuiChip`'s
+ * `root`/`sizeSmall`/`label`/`labelSmall`) — a host with ITS OWN overrides for
+ * OTHER components merges them in with
  * `mergeMuiComponents(densityThemeOptions(density).components, hostOverrides)`,
  * which keeps a component only ONE side touches untouched. For a component
  * BOTH sides style, the merge is by INNER key (`root`/`input`/…): a key only
@@ -129,6 +133,10 @@ export function densityThemeOptions(
     typography: { fontSize: densityFontSize(factor) },
     spacing: densitySpacingUnit(factor),
     fieldHeight,
-    components: mergeMuiComponents(fieldOverrides(fieldRadius, fieldHeight)),
+    components: mergeMuiComponents(
+      fieldOverrides(fieldRadius, fieldHeight),
+      iconButtonDensityOverrides(),
+      chipDensityOverrides(),
+    ),
   };
 }

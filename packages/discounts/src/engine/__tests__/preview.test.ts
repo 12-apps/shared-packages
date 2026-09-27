@@ -153,6 +153,13 @@ const UNAVAILABLE: [string, Partial<DiscountRule>][] = [
   ["out of per-buyer redemptions", { perBuyerLimit: 1, buyerUsageCount: 1 }],
 ];
 
+describe("a first-purchase promotion (FUT-2825)", () => {
+  it("is never badged: the menu cannot know the buyer", () => {
+    const welcome = { ...ITEM_20, id: "welcome", firstOrderOnly: true };
+    expect(preview([welcome])).toBeNull();
+  });
+});
+
 describe("D6: an unavailable discount is not badged", () => {
   it.each(UNAVAILABLE)("does not badge a discount that is %s", (_label, overrides) => {
     expect(preview([percentRule(20, { ...ITEM_20, ...overrides })])).toBeNull();

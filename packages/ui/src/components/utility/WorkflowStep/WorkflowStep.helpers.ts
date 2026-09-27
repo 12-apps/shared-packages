@@ -172,3 +172,28 @@ export const progressValueText = (
   const step = steps[currentStep];
   return step === undefined ? position : `${position}: ${step.title}`;
 };
+
+export interface ProgressValueRange {
+  max?: number;
+  now?: number;
+}
+
+/**
+ * The progressbar's `aria-valuemax`/`aria-valuenow` pair (FUT-2773). With no
+ * steps at all there is no meaningful range to report — a `role="progressbar"`
+ * with zero steps has nothing to measure, and WAI-ARIA's own value attributes
+ * are optional for exactly this case (an indeterminate progressbar omits
+ * `aria-valuenow`) — so both are left out rather than asserting the invalid
+ * range `aria-valuemax={-1}` with `aria-valuenow={0}`. Otherwise `currentStep`
+ * is clamped to `[0, steps.length - 1]` so the reported value never falls
+ * outside `[aria-valuemin, aria-valuemax]`, however far `currentStep` strays.
+ */
+export const progressValueRange = (
+  steps: readonly WorkflowStepItem[],
+  currentStep: number,
+): ProgressValueRange => {
+  if (steps.length === 0) return {};
+
+  const max = steps.length - 1;
+  return { max, now: Math.min(Math.max(currentStep, 0), max) };
+};
