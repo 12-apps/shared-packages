@@ -129,12 +129,18 @@ export const BasicInteraction: Story = {
   },
 };
 
+// `onChange`/`onSubmit` are the mock test double for this story's OWN form
+// content, not props of `Sheet` — putting them on `args` no longer type-checks
+// now that `args` is checked against `Sheet`'s real props. Module-scoped mocks
+// (the same lifetime `fn()` in `args` would have had) keep everything else
+// about the story unchanged.
+const formOnChange = fn();
+const formOnSubmit = fn();
+
 export const FormInteraction: Story = {
   name: '📝 Form Interaction Test',
   args: {
     title: 'Form Sheet',
-    onChange: fn(),
-    onSubmit: fn(),
     onOpenChange: fn(),
     onOpen: fn(),
     onClose: fn(),
@@ -154,11 +160,11 @@ export const FormInteraction: Story = {
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
-              args.onChange?.(e);
+              formOnChange(e);
             }}
             fullWidth
           />
-          <Button data-testid="submit-button" variant="contained" onClick={() => args.onSubmit?.()}>
+          <Button data-testid="submit-button" variant="contained" onClick={() => formOnSubmit()}>
             Submit
           </Button>
         </Stack>
@@ -171,7 +177,7 @@ export const FormInteraction: Story = {
       </TestWrapper>
     );
   },
-  play: async ({ canvasElement, args, step }) => {
+  play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
@@ -190,10 +196,8 @@ export const FormInteraction: Story = {
       await waitFor(() => {
         expect(input).toHaveValue('Test input value');
       });
-      // The onChange prop should have been called
-      if (args.onChange) {
-        await expect(args.onChange).toHaveBeenCalled();
-      }
+      // The form's own onChange handler should have been called
+      await expect(formOnChange).toHaveBeenCalled();
     });
 
     await step('Clear input field', async () => {
@@ -205,7 +209,7 @@ export const FormInteraction: Story = {
     await step('Submit form', async () => {
       const submitButton = body.getByTestId('submit-button');
       await userEvent.click(submitButton);
-      await expect(args.onSubmit).toHaveBeenCalled();
+      await expect(formOnSubmit).toHaveBeenCalled();
     });
   },
 };
@@ -381,8 +385,6 @@ export const ScreenReader: Story = {
   args: {
     title: 'Accessible Sheet',
     description: 'Sheet with ARIA attributes',
-    'aria-label': 'Settings panel',
-    'aria-describedby': 'sheet-description',
     onOpenChange: fn(),
     onOpen: fn(),
     onClose: fn(),

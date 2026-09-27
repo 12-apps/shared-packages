@@ -247,7 +247,7 @@ export const FormInteraction: Story = {
           // Extract percentage value
           const percentMatch = textContent.match(/(\d+)%/);
           if (percentMatch) {
-            const value = parseInt(percentMatch[1]);
+            const value = parseInt(percentMatch[1] ?? '0');
             seenValues.add(value);
           }
 
@@ -882,7 +882,7 @@ export const ResponsiveDesign: Story = {
           if (backgroundColor && backgroundColor.includes('rgba')) {
             const rgbaMatch = backgroundColor.match(/rgba\(([^)]+)\)/);
             if (rgbaMatch) {
-              const values = rgbaMatch[1].split(',').map((v) => v.trim());
+              const values = (rgbaMatch[1] ?? '').split(',').map((v) => v.trim());
               const opacity = parseFloat(values[3] || '1');
 
               if (opacity < 0.2) {
