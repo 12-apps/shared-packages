@@ -128,6 +128,73 @@ const useClickAway = (
   }, [active, inside, onAway]);
 };
 
+/**
+ * Elements the card's OWN content portals to `document.body` while the card
+ * is open — a MUI `Select`'s menu, a nested `Popover`, a `DropdownMenu` — so a
+ * press inside one of them counts as inside the card, not away (FUT-2776).
+ * `content` is arbitrary and unknown to the card, so nothing here is keyed to
+ * a particular control: ANY overlay that mounts to `document.body` while the
+ * card is open is tracked the same way, with no per-control allowlist to keep
+ * growing as new nested-portal cases show up.
+ *
+ * The check `useClickAway` makes has to be synchronous, at `pointerdown`'s
+ * CAPTURE phase (see below), which runs before this same event could ever
+ * reach a React handler's bubble dispatch — so nothing here can "watch" the
+ * decisive press itself. Instead a `MutationObserver` records `document.body`
+ * membership as it changes, and `takeRecords()` drains that observer's queue
+ * on demand: unlike its callback (a microtask), it reads whatever the
+ * observer has already recorded synchronously, so a portal that mounted a
+ * moment earlier in the very same interaction is seen immediately, with
+ * nothing to await.
+ */
+const usePortalOwnership = (active: boolean) => {
+  const rootsRef = React.useRef<Set<Element>>(new Set());
+  const observerRef = React.useRef<MutationObserver | null>(null);
+
+  React.useEffect(() => {
+    if (!active) return undefined;
+
+    const observer = new MutationObserver(() => {
+      // Draining happens on demand, in `owned()` below — an empty callback
+      // still lets the browser queue records for `takeRecords()` to read.
+    });
+    observer.observe(document.body, { childList: true });
+    observerRef.current = observer;
+
+    return () => {
+      observer.disconnect();
+      observerRef.current = null;
+      rootsRef.current.clear();
+    };
+  }, [active]);
+
+  return React.useCallback((): ReadonlyArray<Element> => {
+    observerRef.current?.takeRecords().forEach((record) => {
+      record.addedNodes.forEach((node) => {
+        if (node instanceof Element) rootsRef.current.add(node);
+      });
+      record.removedNodes.forEach((node) => {
+        if (node instanceof Element) rootsRef.current.delete(node);
+      });
+    });
+    return Array.from(rootsRef.current);
+  }, []);
+};
+
+/** The trigger, the card's own box, and anything its content portalled out. */
+const useInsideCard = (
+  active: boolean,
+  anchorEl: HTMLElement | null,
+  contentRef: React.MutableRefObject<HTMLDivElement | null>,
+) => {
+  const ownedPortalRoots = usePortalOwnership(active);
+
+  return React.useCallback(
+    () => [anchorEl, contentRef.current, ...ownedPortalRoots()],
+    [anchorEl, contentRef, ownedPortalRoots],
+  );
+};
+
 /** Whatever is still pending when the card unmounts is cancelled with it. */
 const useClearOnUnmount = (...refs: TimerRef[]) => {
   React.useEffect(
@@ -225,7 +292,7 @@ export const useHoverCard = ({
     exitTimeoutRef,
   });
 
-  const insideCard = React.useCallback(() => [anchorEl, contentRef.current], [anchorEl]);
+  const insideCard = useInsideCard(isOpen, anchorEl, contentRef);
 
   useEscapeKey(isOpen, handleClose);
   useClickAway(isOpen, insideCard, handleClose);

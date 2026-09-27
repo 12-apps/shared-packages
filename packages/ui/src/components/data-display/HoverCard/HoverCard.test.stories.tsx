@@ -1,5 +1,9 @@
 import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
+import FormControl from '@mui/material/FormControl/index.js';
+import InputLabel from '@mui/material/InputLabel/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Select from '@mui/material/Select/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
@@ -929,5 +933,110 @@ export const Integration: Story = {
 
       await userEvent.unhover(trigger);
     });
+  },
+};
+
+// Test 12: A press inside a nested portal (a MUI Select's own menu) does not
+// close the card, but a press truly outside it — even with that menu still
+// open — does (FUT-2776).
+export const NestedPortalClickAway: Story = {
+  render: () => (
+    <Stack spacing={2} alignItems="flex-start">
+      <HoverCard
+        title="Preferências"
+        description="Escolha uma opção"
+        loadingText="Carregando…"
+        enterDelay={100}
+        exitDelay={0}
+        trigger={<Button>Abrir cartão</Button>}
+      >
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel id="nested-portal-select-label">Opção</InputLabel>
+          <Select
+            labelId="nested-portal-select-label"
+            label="Opção"
+            defaultValue=""
+            data-testid="nested-portal-select"
+          >
+            <MenuItem value="a">Opção A</MenuItem>
+            <MenuItem value="b">Opção B</MenuItem>
+          </Select>
+        </FormControl>
+      </HoverCard>
+      <Button data-testid="nested-portal-outside">Fora do cartão</Button>
+    </Stack>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await step('Open the card by hovering its trigger', async () => {
+      // `HoverCard.tsx` clones its `trigger` prop with the DEFAULT testid
+      // ('hover-card-trigger'), overriding whatever the caller sets — see
+      // `triggerProps` — so this queries that default, not a custom one.
+      const trigger = await canvas.findByTestId('hover-card-trigger');
+      await userEvent.hover(trigger);
+
+      await waitFor(
+        () => {
+          expect(body.getByText('Preferências')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step("Open the nested Select — its menu portals to document.body", async () => {
+      const combobox = body.getByRole('combobox', { name: /Opção/i });
+      await userEvent.click(combobox);
+
+      await waitFor(
+        () => {
+          expect(body.getByRole('listbox')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step('Picking an option inside that nested portal keeps the card open', async () => {
+      const option = body.getByRole('option', { name: 'Opção B' });
+      await userEvent.click(option);
+
+      // The Select closes its OWN menu on selection — that still works —
+      // but the card behind it (the thing under test) must not have closed.
+      await waitFor(
+        () => {
+          expect(body.queryByRole('listbox')).not.toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+
+      expect(body.getByText('Preferências')).toBeInTheDocument();
+      expect(body.getByRole('combobox', { name: /Opção/i })).toHaveTextContent('Opção B');
+    });
+
+    await step(
+      'A press truly outside the card and its nested portal still closes both, with the nested portal still open',
+      async () => {
+        const combobox = body.getByRole('combobox', { name: /Opção/i });
+        await userEvent.click(combobox);
+        await waitFor(
+          () => {
+            expect(body.getByRole('listbox')).toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+
+        const outside = await canvas.findByTestId('nested-portal-outside');
+        await userEvent.click(outside);
+
+        await waitFor(
+          () => {
+            expect(body.queryByText('Preferências')).not.toBeInTheDocument();
+            expect(body.queryByRole('listbox')).not.toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
   },
 };
