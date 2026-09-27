@@ -28,6 +28,8 @@ function edgesOf(polygons: readonly Point[][]): Edge[] {
     polygon.forEach((a, i) => {
       const b = polygon[(i + 1) % polygon.length] ?? a;
       if (a[1] === b[1]) return;
+      // A non-finite coordinate (an overflowing transform) cannot be scanned.
+      if (![a[0], a[1], b[0], b[1]].every(Number.isFinite)) return;
       edges.push(
         a[1] < b[1]
           ? { x0: a[0], y0: a[1], x1: b[0], y1: b[1], dir: 1 }

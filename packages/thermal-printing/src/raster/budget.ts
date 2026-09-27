@@ -55,6 +55,9 @@ export class Budget {
   }
 
   spend(units: number): void {
+    // A NaN or negative charge would poison the running total and switch the
+    // cap off for every shape after it, so an unmeasurable cost is refused.
+    if (!(units >= 0 && Number.isFinite(units))) throw new BudgetExceeded("too complex to fill");
     this.work += units;
     if (this.work > MAX_FILL_WORK) throw new BudgetExceeded("too complex to fill");
   }

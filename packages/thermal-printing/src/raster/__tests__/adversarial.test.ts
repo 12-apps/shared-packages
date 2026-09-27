@@ -56,6 +56,22 @@ describe("rasterizeSvg on hostile input", () => {
     expect(raster.data.length).toBe(0);
   });
 
+  it.each([
+    ["an overflowing rotation", 'transform="rotate(1e308)"'],
+    ["stacked translations", 'transform="translate(1e308) translate(1e308) translate(-1e308)"'],
+    ["an overflowing scale", 'transform="scale(1e308) scale(1e308)"'],
+  ])("still refuses full-canvas shapes after one with %s", (_label, poison) => {
+    const full = '<path d="M0 0H1V1H0Z"/>'.repeat(3_000);
+    const svg = `<svg viewBox="0 0 1 1"><path d="M0 0L1 1L0 2Z" ${poison}/>${full}</svg>`;
+
+    const raster = guarded(() => rasterizeSvg(svg, { width: 576 }));
+
+    // A non-finite shape once poisoned the running cost with NaN and switched
+    // the cap off for every shape after it (FUT-2784 review).
+    expect(raster.unsupported).toEqual(["too complex to fill"]);
+    expect(raster.data.length).toBe(0);
+  });
+
   it("refuses an explicit width or height past the cap", () => {
     expect(rasterizeSvg('<svg viewBox="0 0 1 1"/>', { width: 5_000 }).unsupported).toEqual(["output too large"]);
     expect(rasterizeSvg('<svg viewBox="0 0 1 1"/>', { width: 8, height: 5_000 }).unsupported).toEqual([
