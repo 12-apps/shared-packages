@@ -720,6 +720,15 @@ Components for site and app navigation.
 **Location**: `src/components/navigation/Pagination`
 **Docs**: `src/components/navigation/Pagination/Pagination.md`
 
+### SectionNav
+**Purpose**: A section's own navigation — the few screens one kind of work moves between
+**Use Cases**: A phone bottom bar for a work area (a shift, a till, a field app); the same destinations as a rail on a wide screen
+**Features**: `bar` (destinations with counts, a `more` sheet, a raised `primary` action in the middle opening its own sheet) and `rail` (a way back, destinations, every menu listed); router-agnostic links via `linkComponent`; copy as a required prop
+**Also exports**: `RaisedActionButton` — the raised round action alone, for a bar the host already draws
+**Types**: `SectionNavProps`, `SectionNavDestination`, `SectionNavMenu`, `SectionNavGroup`, `SectionNavEntry`, `SectionNavCopy`
+**Location**: `src/components/navigation/SectionNav`
+**Docs**: `src/components/navigation/SectionNav/SectionNav.md`
+
 ### Tabs
 **Purpose**: Tab navigation for content sections
 **Use Cases**: Content organization, settings panels, multi-view interfaces
@@ -886,7 +895,7 @@ const CustomCard = ({ children, ...props }) => (
 | Select from list | Select, Autocomplete | RadioGroup (few options) |
 | Display data table | Table | DataGrid (advanced features) |
 | Show progress | Progress | Stepper (multi-step) |
-| Navigation | NavigationMenu, Tabs | Breadcrumbs (hierarchy) |
+| Navigation | NavigationMenu, Tabs, SectionNav | Breadcrumbs (hierarchy) |
 | Modal dialog | Dialog, Modal | Sheet (side panel) |
 | Display code | Code | CodeEditor (editable) |
 | Load more items | InfiniteScroll | Pagination |
@@ -923,15 +932,15 @@ Documentation files include:
 - **Feedback**: 6 components
 - **Form**: 25 components
 - **Layout**: 15 components
-- **Navigation**: 7 components
+- **Navigation**: 8 components
 - **Typography**: 5 components
 - **Utility**: 7 components
 
-**Total**: 92 components available for reuse
+**Total**: 93 components available for reuse
 
 ---
 
-**Last Updated**: 2026-09-26
+**Last Updated**: 2026-09-27
 **Version**: 1.2.0
 
 > **Note**: This catalog is auto-generated from the component directory structure. Always verify component availability by checking the actual source files and Storybook.
