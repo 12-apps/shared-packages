@@ -305,7 +305,10 @@ describe('switchDensityOverrides', () => {
       height: theme.typography.pxToRem(38),
       padding: theme.typography.pxToRem(12),
     });
-    expect(slot(overrides, 'MuiSwitch', 'switchBase', theme)).toEqual({ padding: theme.typography.pxToRem(9) });
+    expect(slot(overrides, 'MuiSwitch', 'switchBase', theme)).toEqual({
+      padding: theme.typography.pxToRem(9),
+      '&.Mui-checked': { transform: `translateX(${theme.typography.pxToRem(20)})` },
+    });
     expect(slot(overrides, 'MuiSwitch', 'thumb', theme)).toEqual({
       width: theme.typography.pxToRem(20),
       height: theme.typography.pxToRem(20),
@@ -319,7 +322,10 @@ describe('switchDensityOverrides', () => {
       width: theme.typography.pxToRem(40),
       height: theme.typography.pxToRem(24),
       padding: theme.typography.pxToRem(7),
-      '& .MuiSwitch-switchBase': { padding: theme.typography.pxToRem(4) },
+      '& .MuiSwitch-switchBase': {
+        padding: theme.typography.pxToRem(4),
+        '&.Mui-checked': { transform: `translateX(${theme.typography.pxToRem(16)})` },
+      },
       '& .MuiSwitch-thumb': { width: theme.typography.pxToRem(16), height: theme.typography.pxToRem(16) },
     });
   });
@@ -332,13 +338,19 @@ describe('switchDensityOverrides', () => {
       height: '2.375rem', // 38 / 16
       padding: '0.75rem', // 12 / 16
     });
-    expect(slot(overrides, 'MuiSwitch', 'switchBase', theme)).toEqual({ padding: '0.5625rem' }); // 9 / 16
+    expect(slot(overrides, 'MuiSwitch', 'switchBase', theme)).toEqual({
+      padding: '0.5625rem', // 9 / 16
+      '&.Mui-checked': { transform: 'translateX(1.25rem)' }, // 20 / 16
+    });
     expect(slot(overrides, 'MuiSwitch', 'thumb', theme)).toEqual({ width: '1.25rem', height: '1.25rem' }); // 20 / 16
     expect(slot(overrides, 'MuiSwitch', 'sizeSmall', theme)).toEqual({
       width: '2.5rem', // 40 / 16
       height: '1.5rem', // 24 / 16
       padding: '0.4375rem', // 7 / 16
-      '& .MuiSwitch-switchBase': { padding: '0.25rem' }, // 4 / 16
+      '& .MuiSwitch-switchBase': {
+        padding: '0.25rem', // 4 / 16
+        '&.Mui-checked': { transform: 'translateX(1rem)' }, // 16 / 16
+      },
       '& .MuiSwitch-thumb': { width: '1rem', height: '1rem' }, // 16 / 16
     });
   });
@@ -351,9 +363,15 @@ describe('switchDensityOverrides', () => {
       height: '2.1375rem', // 38 * 0.9 / 16
       padding: '0.675rem', // 12 * 0.9 / 16
     });
-    expect(slot(overrides, 'MuiSwitch', 'switchBase', theme)).toEqual({ padding: '0.50625rem' }); // 9 * 0.9 / 16
+    expect(slot(overrides, 'MuiSwitch', 'switchBase', theme)).toEqual({
+      padding: '0.50625rem', // 9 * 0.9 / 16
+      '&.Mui-checked': { transform: 'translateX(1.125rem)' }, // 20 * 0.9 / 16
+    });
     const small = slot(overrides, 'MuiSwitch', 'sizeSmall', theme);
-    expect(small['& .MuiSwitch-switchBase']).toEqual({ padding: '0.225rem' }); // 4 * 0.9 / 16
+    expect(small['& .MuiSwitch-switchBase']).toEqual({
+      padding: '0.225rem', // 4 * 0.9 / 16
+      '&.Mui-checked': { transform: 'translateX(0.9rem)' }, // 16 * 0.9 / 16
+    });
     expect(small['& .MuiSwitch-thumb']).toEqual({ width: '0.9rem', height: '0.9rem' }); // 16 * 0.9 / 16
   });
 
@@ -413,6 +431,70 @@ describe('switchDensityOverrides', () => {
       expect(getComputedStyle(at(bases, 1)).padding).toBe(theme.typography.pxToRem(4));
       expect(getComputedStyle(at(thumbs, 0)).width).toBe(theme.typography.pxToRem(20));
       expect(getComputedStyle(at(thumbs, 1)).width).toBe(theme.typography.pxToRem(16));
+    });
+  });
+
+  /**
+   * FUT-2767 (adversarial-review fix, blocking issue 1) — the CHECKED thumb's
+   * own travel distance is a bare `translateX(20px)`/`translateX(16px)`
+   * literal baked into `SwitchSwitchBase`'s own base style and `SwitchRoot`'s
+   * `size: 'small'` variant respectively (`Switch.js`), never run through
+   * `pxToRem` — so at `density: 'compact'` the track/padding/thumb this file
+   * already scales all shrink ×0.9 while the checked thumb kept travelling
+   * the FULL, unscaled distance, overshooting the now-smaller track. This
+   * describe block is the render-level proof this file's other `describe`
+   * blocks already give every other number: an UNTHEMED render measures MUI's
+   * own bare-px literal, and a render WITH `switchDensityOverrides()` under a
+   * COMPACT theme measures the scaled `rem` string instead — not just the
+   * style-object shape (`toEqual` above already covers that), the actual
+   * computed value a real DOM node reports.
+   */
+  describe('the checked thumb\'s own transform scales with density (blocking issue 1)', () => {
+    it('an unthemed, CHECKED Switch renders the bare translateX(20px)/translateX(16px) MUI ships', async () => {
+      const { render } = await import('@testing-library/react');
+      const Switch = (await import('@mui/material/Switch/index.js')).default;
+      const { ThemeProvider } = await import('@mui/material/styles/index.js');
+      const React = await import('react');
+      const theme = createTheme();
+      const { container } = render(
+        React.createElement(
+          ThemeProvider,
+          { theme },
+          React.createElement(Switch, { checked: true, onChange: () => {} }),
+          React.createElement(Switch, { checked: true, onChange: () => {}, size: 'small' }),
+        ),
+      );
+      const bases = container.querySelectorAll('.MuiSwitch-switchBase');
+      expect(bases).toHaveLength(2);
+      expect(getComputedStyle(at(bases, 0)).transform).toBe('translateX(20px)');
+      expect(getComputedStyle(at(bases, 1)).transform).toBe('translateX(16px)');
+    });
+
+    it('this file\'s override renders the SCALED translateX at a compact fontSize, not MUI\'s bare 20px/16px', async () => {
+      const { render } = await import('@testing-library/react');
+      const Switch = (await import('@mui/material/Switch/index.js')).default;
+      const { ThemeProvider } = await import('@mui/material/styles/index.js');
+      const React = await import('react');
+      const theme = createTheme({
+        typography: { fontSize: densityFontSize(0.9) },
+        components: switchDensityOverrides(),
+      });
+      const { container } = render(
+        React.createElement(
+          ThemeProvider,
+          { theme },
+          React.createElement(Switch, { checked: true, onChange: () => {} }),
+          React.createElement(Switch, { checked: true, onChange: () => {}, size: 'small' }),
+        ),
+      );
+      const bases = container.querySelectorAll('.MuiSwitch-switchBase');
+      const mediumTransform = getComputedStyle(at(bases, 0)).transform;
+      const smallTransform = getComputedStyle(at(bases, 1)).transform;
+      // NOT MUI's bare, unscaled literal — the overshoot this fix exists for.
+      expect(mediumTransform).not.toBe('translateX(20px)');
+      expect(smallTransform).not.toBe('translateX(16px)');
+      expect(mediumTransform).toBe(`translateX(${theme.typography.pxToRem(20)})`);
+      expect(smallTransform).toBe(`translateX(${theme.typography.pxToRem(16)})`);
     });
   });
 });

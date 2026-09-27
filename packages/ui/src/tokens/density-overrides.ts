@@ -180,10 +180,35 @@ export function chipDensityOverrides(): Components<Theme> {
 /**
  * CHECKBOX / RADIO / SWITCH GEOMETRY, DENSITY-AWARE (FUT-2767).
  *
- * `Checkbox`/`Radio`/`Switch` are MUI's own components, unwrapped, same as
- * `IconButton`/`Chip` above — `@12-apps/ui`'s own wrappers (`components/
- * form/Checkbox`, `Radio`, `Switch`) forward straight to `MuiCheckbox`/
- * `MuiRadio`/`MuiSwitch` for geometry and add only palette/label `sx`.
+ * `Checkbox`/`Radio`/`Switch` are MUI's own components, unwrapped — but
+ * **only two of the three `@12-apps/ui` wrappers actually forward their
+ * geometry to MUI**, corrected here after an earlier revision of this doc
+ * comment claimed all three did.
+ *
+ * - `Checkbox.tsx`'s `StyledCheckbox` and `RadioGroup.variants.tsx`'s
+ *   `DefaultRadios` (the ONLY variant rendering a raw `<Radio>` — `cards`/
+ *   `buttons`/`segments` draw custom controls, outside this ticket) set NO
+ *   `padding` of their own, so `checkboxRadioDensityOverrides()` reaches
+ *   both directly — confirmed by a real render, same computed padding as
+ *   raw `MuiCheckbox`/`MuiRadio` at both densities
+ *   (`density-overrides.test.stories.tsx`'s `ui-checkbox`/`ui-radio-group`).
+ * - `Switch.styles.ts`'s `switchSx` is DIFFERENT: it draws root/switchBase/
+ *   thumb geometry itself, per instance, from its own `SWITCH_SIZES` table
+ *   (`Switch.metrics.ts`), every number already through `rem(theme, px)`.
+ *   `Switch.parts.tsx`'s `StyledSwitch = styled(MuiSwitch, {...})(...)`
+ *   composes these as an OUTER wrapper class whose nested `& .MuiSwitch-
+ *   switchBase`/`& .MuiSwitch-thumb` selectors are a TWO-class compound —
+ *   higher specificity than this file's `MuiSwitch.styleOverrides.
+ *   switchBase`/`thumb`, which compose onto a single-class generated class.
+ *   `switchDensityOverrides()` therefore has **NO effect on `@12-apps/ui`'s
+ *   own `<Switch>`** — it only reaches a raw `@mui/material/Switch` consumer
+ *   (a host's own `Table.tsx` density-toggle column, say). Not a gap:
+ *   `switchSx` already reacts to `theme.typography.fontSize` on its own —
+ *   including the CHECKED thumb's own travel distance, computed as
+ *   `rem(theme, width - thumbSize - padding * 2)` from the SAME per-instance
+ *   geometry, so it moves consistently with no help from this file.
+ *   Confirmed by measurement, both sizes, both states, both densities
+ *   (`ui-switch-*` cases); documented at `Switch.md`'s "Density" section.
  *
  * **The ticket's open question — does a `MuiSwitchBase` theme override reach
  * `Checkbox`/`Radio` at all? — is NO, verified two ways.** `Checkbox`/`Radio`
@@ -252,10 +277,30 @@ export function chipDensityOverrides(): Components<Theme> {
  *   text (later wins at matching two-class specificity) rather than trying
  *   to out-specificity it from a different slot.
  *
+ * **The checked thumb's own travel distance is a FOURTH literal, found only
+ * on adversarial review of the PR this doc comment first shipped in.**
+ * `SwitchSwitchBase`'s base style bakes in `&.Mui-checked { transform:
+ * translateX(20px) }` (medium), and `SwitchRoot`'s `size: 'small'` variant
+ * nests the same at `16px` — both bare, never run through `pxToRem`, so at
+ * `density: 'compact'` the checked thumb kept travelling the FULL, unscaled
+ * distance while the track around it shrank ×0.9 — a visible overshoot.
+ * `switchSwitchBasePadding`/`switchSizeSmall` each now carry their own
+ * `&.${switchClasses.checked}` rule (`translateX(rem(theme, 20))`/`rem(theme,
+ * 16)`), composed onto the SAME generated class, in the SAME position
+ * `padding` already occupies — so it wins by the identical mechanism, not a
+ * new one. Proven at the pixel level, both sizes/densities: `switch-md-
+ * checked`/`switch-sm-checked` measure the thumb's final position against
+ * the track's own edge, not just the transform string.
+ *
  * At `density: 'normal'` every number above computes back to the literal it
  * replaces (`rem(theme, 9)` is `0.5625rem`, `9px` at the 16px root — no
  * visible change), the same geometry-neutral guarantee `iconButtonDensity
- * Overrides`/`chipDensityOverrides` give above.
+ * Overrides`/`chipDensityOverrides` give above. The same non-default-
+ * `fontSize` caveat those two give applies here unchanged: `rem()` only ever
+ * reads `theme.typography.fontSize`, so a host adopting
+ * `checkboxRadioDensityOverrides`/`switchDensityOverrides` standalone moves
+ * every number here by that one coefficient, same as everything else `rem()`
+ * touches.
  */
 
 const checkboxRadioRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 9) });
@@ -280,7 +325,20 @@ const switchRootGeometry = ({ theme }: { theme: Theme }): CSSObject => ({
   height: rems(theme, 14 + 12 * 2),
   padding: rem(theme, 12),
 });
-const switchSwitchBasePadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 9) });
+const switchSwitchBasePadding = ({ theme }: { theme: Theme }): CSSObject => ({
+  padding: rem(theme, 9),
+  // FUT-2767 (adversarial-review fix) — `SwitchSwitchBase`'s OWN base style
+  // (`Switch.js`, medium) bakes in `&.Mui-checked { transform:
+  // translateX(20px) }`, a bare literal never run through `pxToRem` — at
+  // `density: 'compact'` the track/padding/thumb above all shrink ×0.9 but
+  // this offset stayed at a full 20px, so the checked thumb overshot the now-
+  // smaller track. Composed onto the SAME generated class as that base style,
+  // AFTER it (`createStyled` composes `styleThemeOverrides` after a slot's
+  // own base/variants — see the module doc comment), so this nested rule
+  // wins at the SAME (two-class, `.<hash>.Mui-checked`) specificity, the same
+  // mechanism this function's own `padding` line already relies on.
+  [`&.${switchClasses.checked}`]: { transform: `translateX(${rem(theme, 20)})` },
+});
 const switchThumbSize = ({ theme }: { theme: Theme }): CSSObject => ({
   width: rem(theme, 20),
   height: rem(theme, 20),
@@ -293,7 +351,18 @@ const switchSizeSmall = ({ theme }: { theme: Theme }): CSSObject => ({
   // overrides above, inserted as part of THIS SAME generated class — see the
   // module doc comment for why a flat override cannot reach these at
   // `size="small"` on its own.
-  [`& .${switchClasses.switchBase}`]: { padding: rem(theme, 4) },
+  [`& .${switchClasses.switchBase}`]: {
+    padding: rem(theme, 4),
+    // Same overshoot as medium's, at `size="small"`'s OWN literal
+    // (`SwitchRoot`'s baked-in `size: 'small'` variant, `Switch.js`:
+    // `translateX(16px)`). Nested one level deeper so the compiled selector
+    // is `.<root-hash> .MuiSwitch-switchBase.Mui-checked` — the same THREE-
+    // class descendant compound MUI's own baked-in small variant uses for
+    // this rule, composed after it in the same generated class, so it wins
+    // at matching specificity the same way the sibling `padding: rem(theme,
+    // 4)` line above already does.
+    [`&.${switchClasses.checked}`]: { transform: `translateX(${rem(theme, 16)})` },
+  },
   [`& .${switchClasses.thumb}`]: { width: rem(theme, 16), height: rem(theme, 16) },
 });
 

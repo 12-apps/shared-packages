@@ -10,6 +10,9 @@ import { expect, within } from 'storybook/test';
 
 import { densityThemeOptions } from './density';
 import type { DensityLevel } from './density.core';
+import { Checkbox as UiCheckbox } from '../components/form/Checkbox/Checkbox';
+import { RadioGroup as UiRadioGroup } from '../components/form/RadioGroup/RadioGroup';
+import { Switch as UiSwitch } from '../components/form/Switch/Switch';
 
 /**
  * FUT-2766/FUT-2767 — `IconButton`/`Chip`/`Checkbox`/`Radio`/`Switch`
@@ -98,6 +101,35 @@ function DensityGeometryShowcase({ density }: { density: DensityLevel }) {
         <span data-testid="switch-sm">
           <Switch size="small" aria-label="small switch" />
         </span>
+        {/* CHECKED (blocking issue 1): `Switch.js` bakes the checked thumb's
+            OWN offset (`translateX(20px)`/`translateX(16px)`) into a bare
+            literal never run through `pxToRem` — the flat/nested `padding`
+            fixes above do not exercise it at all. `checked`/no `onChange` is
+            an established pattern in this package's own `Switch.test.stories
+            .tsx` for a static, uncontrolled snapshot. */}
+        <span data-testid="switch-md-checked">
+          <Switch checked aria-label="checked medium switch" />
+        </span>
+        <span data-testid="switch-sm-checked">
+          <Switch size="small" checked aria-label="checked small switch" />
+        </span>
+        {/* `@12-apps/ui`'s OWN wrappers (blocking issue 2) — Checkbox/
+            RadioGroup forward geometry straight to MUI (confirmed in
+            `density-overrides.ts`'s module doc comment), so this file's
+            theme override reaches them the same as the raw `Checkbox`/
+            `Radio` above; Switch draws its OWN geometry per instance,
+            already through `rem()`, so `switchDensityOverrides()` never
+            reaches it AT ALL — it already scales on its own, including its
+            own checked thumb offset. `dataTestId` on `Checkbox`/`RadioGroup`
+            lands directly on `.MuiCheckbox-root`/`.MuiRadio-root`; on
+            `Switch` it lands on the hidden `<input>` (see `Switch.parts.tsx`),
+            so `uiSwitchRootFor` below walks up to `.MuiSwitch-root`. */}
+        <UiCheckbox dataTestId="ui-checkbox" aria-label="ui checkbox" />
+        <UiRadioGroup dataTestId="ui-radio-group" options={[{ value: 'a', label: 'A' }]} />
+        <UiSwitch dataTestId="ui-switch-md" aria-label="ui medium switch" />
+        <UiSwitch dataTestId="ui-switch-md-checked" checked aria-label="ui medium switch checked" />
+        <UiSwitch size="sm" dataTestId="ui-switch-sm" aria-label="ui small switch" />
+        <UiSwitch size="sm" dataTestId="ui-switch-sm-checked" checked aria-label="ui small switch checked" />
       </div>
     </ThemeProvider>
   );
@@ -171,6 +203,39 @@ function pxNumber(value: string): number {
  */
 function expectPxClose(actual: string, expectedPx: number): void {
   expect(Math.abs(pxNumber(actual) - expectedPx)).toBeLessThan(LAYOUT_UNIT);
+}
+
+/**
+ * `@12-apps/ui`'s own `<Switch>` `dataTestId` lands on the hidden `<input>`
+ * (`Switch.parts.tsx`'s `SwitchControl`), not the root — walk up to the root
+ * MUI itself renders through, the same element `switchRootIn`/`switchBaseOf`/
+ * `thumbOf` already query for the raw `<Switch>` above.
+ */
+function uiSwitchRootFor(canvas: ReturnType<typeof within>, testId: string): HTMLElement {
+  const input = canvas.getByTestId(testId);
+  const root = input.closest('.MuiSwitch-root');
+  if (root === null) throw new Error(`${testId}: no .MuiSwitch-root ancestor`);
+  return root as HTMLElement;
+}
+
+/**
+ * The CHECKED thumb's own gap from the track's right (inner) edge —
+ * `getBoundingClientRect` on both, not a `transform` string compare, because
+ * what a caller's pointer lands on is real, laid-out geometry, not CSS text.
+ * By design (both raw MUI and `@12-apps/ui`'s own `Switch`) this gap equals
+ * the switchBase's OWN padding at that size/density — the SAME inset the
+ * thumb rests at from the TRACK's left edge when unchecked, mirrored: proven
+ * once analytically in the FUT-2767 doc comment, and here at the pixel level.
+ * A derived (subtracted) length compounds TWO independently-rounded
+ * `LayoutUnit` quantisations, so its own tolerance is double `expectPxClose`'s
+ * single-measurement one.
+ */
+function checkedGapFromRight(track: Element, thumb: Element): number {
+  return track.getBoundingClientRect().right - thumb.getBoundingClientRect().right;
+}
+
+function expectGapClose(actualPx: number, expectedPx: number): void {
+  expect(Math.abs(actualPx - expectedPx)).toBeLessThan(2 * LAYOUT_UNIT);
 }
 
 export const NormalIsGeometryNeutral: Story = {
@@ -263,6 +328,61 @@ export const NormalIsGeometryNeutral: Story = {
     const thumbSm = computed(thumbOf(switchSmWrap));
     expectPxClose(thumbSm.width, 16);
     expectPxClose(thumbSm.height, 16);
+
+    // CHECKED (blocking issue 1): the thumb's gap from the track's own right
+    // edge equals switchBase's OWN padding at that size (9px medium, 4px
+    // small) — the design mirrors the unchecked LEFT inset, proven above.
+    const switchMdChecked = canvas.getByTestId('switch-md-checked');
+    expectGapClose(
+      checkedGapFromRight(switchRootIn(switchMdChecked), thumbOf(switchMdChecked)),
+      9,
+    );
+    const switchSmChecked = canvas.getByTestId('switch-sm-checked');
+    expectGapClose(
+      checkedGapFromRight(switchRootIn(switchSmChecked), thumbOf(switchSmChecked)),
+      4,
+    );
+
+    // `@12-apps/ui`'s OWN Checkbox/RadioGroup (blocking issue 2): the SAME
+    // 9px padding as raw MuiCheckbox/MuiRadio above — the theme override
+    // reaches them because neither wrapper draws its own padding.
+    const uiCheckbox = computed(canvas.getByTestId('ui-checkbox'));
+    expectPxClose(uiCheckbox.paddingTop, 9);
+    expectPxClose(uiCheckbox.paddingLeft, 9);
+    const uiRadio = computed(canvas.getByTestId('ui-radio-group-radio-0'));
+    expectPxClose(uiRadio.paddingTop, 9);
+    expectPxClose(uiRadio.paddingLeft, 9);
+
+    // `@12-apps/ui`'s OWN Switch (blocking issue 2): its OWN design numbers
+    // (`SWITCH_SIZES.md`/`.sm`, `Switch.metrics.ts`), NOT MUI's 58×38/40×24 —
+    // this file's `switchDensityOverrides()` never reaches it (see the
+    // module doc comment), so at `density: 'normal'` these render exactly
+    // the literal design px, unclobbered.
+    const uiSwitchMdRoot = uiSwitchRootFor(canvas, 'ui-switch-md');
+    expectPxClose(computed(uiSwitchMdRoot).width, 50);
+    expectPxClose(computed(uiSwitchMdRoot).height, 26);
+    expectPxClose(computed(switchBaseOf(uiSwitchMdRoot)).paddingTop, 1);
+    expectPxClose(computed(thumbOf(uiSwitchMdRoot)).width, 22);
+
+    const uiSwitchSmRoot = uiSwitchRootFor(canvas, 'ui-switch-sm');
+    expectPxClose(computed(uiSwitchSmRoot).width, 42);
+    expectPxClose(computed(uiSwitchSmRoot).height, 22);
+    expectPxClose(computed(switchBaseOf(uiSwitchSmRoot)).paddingTop, 1);
+    expectPxClose(computed(thumbOf(uiSwitchSmRoot)).width, 18);
+
+    // `@12-apps/ui`'s OWN checked thumb: the SAME gap-equals-padding design,
+    // computed from `Switch.metrics.ts`'s OWN table (`width - thumbSize -
+    // padding * 2`, `Switch.styles.ts`'s `switchBaseSx`), not MUI's numbers.
+    const uiSwitchMdCheckedRoot = uiSwitchRootFor(canvas, 'ui-switch-md-checked');
+    expectGapClose(
+      checkedGapFromRight(uiSwitchMdCheckedRoot, thumbOf(uiSwitchMdCheckedRoot)),
+      1,
+    );
+    const uiSwitchSmCheckedRoot = uiSwitchRootFor(canvas, 'ui-switch-sm-checked');
+    expectGapClose(
+      checkedGapFromRight(uiSwitchSmCheckedRoot, thumbOf(uiSwitchSmCheckedRoot)),
+      1,
+    );
   },
 };
 
@@ -345,5 +465,63 @@ export const CompactScalesByPoint9: Story = {
     const thumbSm = computed(thumbOf(switchSmWrap));
     expectPxClose(thumbSm.width, 14.4); // 16 * 0.9
     expectPxClose(thumbSm.height, 14.4);
+
+    // CHECKED (blocking issue 1) — the regression this fix exists for: the
+    // gap must scale to 8.1/3.6 (9/4 × 0.9), NOT stay pinned at the unscaled
+    // 9/4 (or worse) an un-scaled `translateX(20px)`/`translateX(16px)` would
+    // give once the track around it has already shrunk — the overshoot this
+    // PR fixes. `checked-transform.md` in the doc comment above proves the
+    // arithmetic; this is the pixel-level proof in a real layout engine.
+    const switchMdChecked = canvas.getByTestId('switch-md-checked');
+    expectGapClose(
+      checkedGapFromRight(switchRootIn(switchMdChecked), thumbOf(switchMdChecked)),
+      8.1, // 9 * 0.9
+    );
+    const switchSmChecked = canvas.getByTestId('switch-sm-checked');
+    expectGapClose(
+      checkedGapFromRight(switchRootIn(switchSmChecked), thumbOf(switchSmChecked)),
+      3.6, // 4 * 0.9
+    );
+
+    // `@12-apps/ui`'s OWN Checkbox/RadioGroup: 9px × 0.9, same as raw above.
+    const uiCheckbox = computed(canvas.getByTestId('ui-checkbox'));
+    expectPxClose(uiCheckbox.paddingTop, 8.1);
+    expectPxClose(uiCheckbox.paddingLeft, 8.1);
+    const uiRadio = computed(canvas.getByTestId('ui-radio-group-radio-0'));
+    expectPxClose(uiRadio.paddingTop, 8.1);
+    expectPxClose(uiRadio.paddingLeft, 8.1);
+
+    // `@12-apps/ui`'s OWN Switch: its OWN design numbers × 0.9 — proving the
+    // wrapper scales with density ENTIRELY ON ITS OWN, with no help from
+    // `switchDensityOverrides()` (which never reaches it — see the module
+    // doc comment on `density-overrides.ts`), because every one of its
+    // dimensions was ALREADY written through `rem(theme, px)` before this
+    // ticket existed.
+    const uiSwitchMdRoot = uiSwitchRootFor(canvas, 'ui-switch-md');
+    expectPxClose(computed(uiSwitchMdRoot).width, 45); // 50 * 0.9
+    expectPxClose(computed(uiSwitchMdRoot).height, 23.4); // 26 * 0.9
+    expectPxClose(computed(switchBaseOf(uiSwitchMdRoot)).paddingTop, 0.9); // 1 * 0.9
+    expectPxClose(computed(thumbOf(uiSwitchMdRoot)).width, 19.8); // 22 * 0.9
+
+    const uiSwitchSmRoot = uiSwitchRootFor(canvas, 'ui-switch-sm');
+    expectPxClose(computed(uiSwitchSmRoot).width, 37.8); // 42 * 0.9
+    expectPxClose(computed(uiSwitchSmRoot).height, 19.8); // 22 * 0.9
+    expectPxClose(computed(switchBaseOf(uiSwitchSmRoot)).paddingTop, 0.9); // 1 * 0.9
+    expectPxClose(computed(thumbOf(uiSwitchSmRoot)).width, 16.2); // 18 * 0.9
+
+    // `@12-apps/ui`'s OWN checked thumb, scaled ×0.9 — including the travel
+    // DISTANCE itself (`width - thumbSize - padding * 2`, computed fresh from
+    // the ALREADY-scaled geometry, so it moves consistently with everything
+    // around it — no separate fix needed, unlike the raw MUI case above).
+    const uiSwitchMdCheckedRoot = uiSwitchRootFor(canvas, 'ui-switch-md-checked');
+    expectGapClose(
+      checkedGapFromRight(uiSwitchMdCheckedRoot, thumbOf(uiSwitchMdCheckedRoot)),
+      0.9, // 1 * 0.9
+    );
+    const uiSwitchSmCheckedRoot = uiSwitchRootFor(canvas, 'ui-switch-sm-checked');
+    expectGapClose(
+      checkedGapFromRight(uiSwitchSmCheckedRoot, thumbOf(uiSwitchSmCheckedRoot)),
+      0.9, // 1 * 0.9
+    );
   },
 };
