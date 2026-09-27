@@ -19,6 +19,22 @@ import {
 } from './RadioGroup.styles';
 import type { SurfaceFlags } from './RadioGroup.styles';
 import type { RadioOption, RadioGroupProps } from './RadioGroup.types';
+import { muiSize } from '../../../tokens/vocabulary';
+
+/**
+ * MUI's own `Radio` types `size` as `'small' | 'medium'` only — unlike
+ * `Checkbox`, which already accepts `'large'` — even though at runtime the
+ * glyph (`RadioButtonIcon`, an `SvgIcon`) reads whatever `size` it is given as
+ * its own `fontSize` and draws it (`icon.props.fontSize ?? size`). So `'large'`
+ * already renders correctly; MUI's public type just never advertised it. This
+ * is the MUI-documented way to extend an `OverridableStringUnion` prop rather
+ * than widening it with a cast, and it changes no runtime behaviour.
+ */
+declare module '@mui/material/Radio' {
+  interface RadioPropsSizeOverrides {
+    large: true;
+  }
+}
 
 const StyledFormLabel = styled(FormLabel, {
   shouldForwardProp: (prop) => !['glass', 'error'].includes(prop as string),
@@ -98,6 +114,7 @@ export const DefaultRadios: React.FC<VariantProps> = ({
   options,
   value,
   color,
+  size,
   direction,
   showDescriptions,
   dataTestId,
@@ -122,6 +139,7 @@ export const DefaultRadios: React.FC<VariantProps> = ({
         control={
           <Radio
             color={muiRadioColor(color)}
+            size={muiSize(size)}
             data-testid={testId(dataTestId, `radio-${index}`)}
           />
         }
