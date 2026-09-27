@@ -5,6 +5,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { SectionOnboarding } from './SectionOnboarding';
+import { PT_BR_SECTION_ONBOARDING_COPY } from '../../../pt-BR';
 
 const MockForm = () => (
   <TextField label="Token do PagBank" type="password" data-testid="mock-form-field" />
@@ -178,9 +179,9 @@ export const ConfiguredWithoutChildrenHidesToggle: Story = {
         status="configured"
         title="PagBank"
         configuredSummary={<Chip label="Ativo" color="success" size="small" />}
-        startLabel="Começar"
-        editLabel="Editar"
-        collapseLabel="Ocultar"
+        startLabel={PT_BR_SECTION_ONBOARDING_COPY.start}
+        editLabel={PT_BR_SECTION_ONBOARDING_COPY.edit}
+        collapseLabel={PT_BR_SECTION_ONBOARDING_COPY.collapse}
       />
     </Box>
   ),

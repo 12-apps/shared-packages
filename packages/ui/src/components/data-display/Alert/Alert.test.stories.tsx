@@ -5,6 +5,7 @@ import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Alert } from './Alert';
+import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
 import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Alert> = {
@@ -206,7 +207,7 @@ export const AllVariantsVisual: Story = {
             title={`${variant.charAt(0).toUpperCase() + variant.slice(1)} Alert`}
             description={`This is a ${variant} alert with all features enabled`}
             closable
-            closeLabel={`Fechar alerta de ${variant}`}
+            closeLabel={PT_BR_DATA_STATE_COPY.dismissAlert}
             showIcon
             data-testid={`alert-${variant}`}
           />
@@ -559,7 +560,7 @@ const FormIntegrationComponent = () => {
           title="Success"
           description={alertMessage}
           closable
-          closeLabel="Fechar alerta"
+          closeLabel={PT_BR_DATA_STATE_COPY.dismissAlert}
           onClose={() => setShowAlert(false)}
           data-testid="form-alert"
         />
