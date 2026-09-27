@@ -104,38 +104,58 @@ const useEscapeKey = (active: boolean, onEscape: () => void) => {
  * Touch has no mouse-leave, and MUI's own click-away was the popover's
  * backdrop, which `pointer-events: none` on the popover root (so the page
  * under an open card stays usable) takes out of play. So this listens on the
- * document itself, in the BUBBLE phase — the last stop a native `pointerdown`
- * reaches, after every capture-phase and bubble-phase handler anywhere in the
- * tree has already run, INCLUDING `useCardOwnership`'s capture-phase marker
- * below (FUT-2776: see that hook for why this ordering, not "cannot be
- * swallowed by a `stopPropagation` further in", now drives the phase choice).
+ * document itself, in the CAPTURE phase, where a `stopPropagation` further in
+ * — including one a nested control (or something entirely unrelated to the
+ * card) calls on its OWN bubble — cannot swallow it (FUT-2776 adversarial
+ * review: a bubble-phase listener here was tried and reverted; see below).
  * It only observes: no `preventDefault`, so the tap or click still reaches
  * whatever it landed on. Attached while open, removed on close and on
  * unmount.
+ *
+ * That capture placement is exactly what makes the decision impossible to
+ * make SYNCHRONOUSLY, though: `document` is the outermost node on the
+ * capture path, so this handler fires before React's own capture dispatch
+ * even starts — before `useCardOwnership`'s marker on the card's content
+ * root (also capture, but on a node further down the same tree) has had a
+ * chance to run for this same event. So the decision is deferred with
+ * `queueMicrotask`: capture-then-bubble for the WHOLE native dispatch runs
+ * synchronously to completion (including that marker) before any queued
+ * microtask gets a turn, so by the time this one runs, the marker has
+ * already recorded whatever it was going to for this press. `activeRef`
+ * guards the now-deferred read against the card having since closed or
+ * unmounted (its own mouseleave/exit-delay path, Escape, or a re-render this
+ * same microtask queue interleaves with).
  */
 const useClickAway = (
   active: boolean,
   inside: () => ReadonlyArray<Element | null>,
-  consumeOwnPress: () => boolean,
+  ownsEvent: (event: Event) => boolean,
   onAway: () => void,
 ) => {
+  const activeRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (!active) return;
+    if (!active) return undefined;
+    activeRef.current = true;
 
     const handlePointerDown = (event: globalThis.PointerEvent) => {
-      // Read (and reset) UNCONDITIONALLY: a stale `true` left over from a
-      // press this listener never got to see (e.g. one dispatched while the
-      // card was closed) must not leak into the next one.
-      const ownedByReactTree = consumeOwnPress();
-      const target = event.target as Node | null;
-      const ownedByDom = Boolean(target) && inside().some((el) => el?.contains(target));
-      if (ownedByReactTree || ownedByDom) return;
-      onAway();
+      queueMicrotask(() => {
+        if (!activeRef.current) return;
+
+        const target = event.target as Node | null;
+        const ownedByReactTree = ownsEvent(event);
+        const ownedByDom = Boolean(target) && inside().some((el) => el?.contains(target));
+        if (ownedByReactTree || ownedByDom) return;
+        onAway();
+      });
     };
 
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [active, inside, consumeOwnPress, onAway]);
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => {
+      activeRef.current = false;
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [active, inside, ownsEvent, onAway]);
 };
 
 /**
@@ -151,38 +171,37 @@ const useClickAway = (
  * still fires for a press inside a portal the card's content renders, and
  * NEVER fires for a press inside an unrelated one mounted by something that
  * is not a descendant of the card in the REACT tree — ownership, not timing.
- * That is the whole fix: the previous approach (a `MutationObserver` on
+ * That is the whole fix: the ORIGINAL approach (a `MutationObserver` on
  * `document.body`) treated ANY element appended to the body while the card
  * was open as inside, so an unrelated Snackbar, dev overlay or Popover that
  * happened to mount at the same time stopped closing the card too.
  *
- * The marker itself must run at CAPTURE, on an ANCESTOR of everything the
- * card's content can render (including anything it portals out): capture
- * runs top-down and completes, for the WHOLE tree, before bubbling begins,
- * so it is immune to a nested control calling `stopPropagation` during ITS
- * OWN bubble — that would only cut off propagation on the way back up, after
- * our ancestor capture handler already ran. `useClickAway`'s document
- * listener reads the flag from its OWN bubble-phase handler, which is why it
- * moved off capture: a capture-phase listener on `document` is the outermost
- * node in the capture path, so it would fire BEFORE this marker even could —
- * a bubble-phase listener on `document` is the innermost point of the bubble
- * path instead, so it is guaranteed to run last, after this marker's capture
- * pass has already set the flag for the same event.
+ * Tracked per NATIVE EVENT OBJECT in a `WeakSet`, not a boolean flag: a
+ * boolean stayed `true` forever once a press set it whose NATIVE propagation
+ * then got stopped before reaching `useClickAway`'s own (bubble-phase, in
+ * that earlier revision) listener — common for anything that treats the
+ * press as its own gesture — so the marker never got consumed, and the
+ * NEXT, genuinely outside press read a STALE `true` and stayed open
+ * (FUT-2776, caught on adversarial review of the first fix here). Keying on
+ * the event itself instead needs no consuming step and cannot go stale: a
+ * `WeakSet` entry only ever answers for the ONE dispatch that created it,
+ * and nothing outside this closure keeps a reference to a past pointerdown
+ * once `useClickAway`'s microtask for it has run, so the entry is simply
+ * garbage from then on.
  */
 const useCardOwnership = () => {
-  const pressedInsideRef = React.useRef(false);
+  const ownedEventsRef = React.useRef<WeakSet<Event>>(new WeakSet());
 
-  const markInside = React.useCallback(() => {
-    pressedInsideRef.current = true;
+  const markInside = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
+    ownedEventsRef.current.add(event.nativeEvent);
   }, []);
 
-  const consume = React.useCallback(() => {
-    const wasInside = pressedInsideRef.current;
-    pressedInsideRef.current = false;
-    return wasInside;
-  }, []);
+  const ownsEvent = React.useCallback(
+    (event: Event) => ownedEventsRef.current.has(event),
+    [],
+  );
 
-  return { markInside, consume };
+  return { markInside, ownsEvent };
 };
 
 /** The trigger and the card's own box — a plain DOM containment check. */
@@ -304,10 +323,10 @@ export const useHoverCard = ({
   });
 
   const insideCard = useInsideCard(anchorEl, contentRef);
-  const { markInside, consume } = useCardOwnership();
+  const { markInside, ownsEvent } = useCardOwnership();
 
   useEscapeKey(isOpen, handleClose);
-  useClickAway(isOpen, insideCard, consume, handleClose);
+  useClickAway(isOpen, insideCard, ownsEvent, handleClose);
   useClearOnUnmount(enterTimeoutRef, exitTimeoutRef);
 
   return {

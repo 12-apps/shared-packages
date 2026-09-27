@@ -3,6 +3,7 @@ import Button from '@mui/material/Button/index.js';
 import FormControl from '@mui/material/FormControl/index.js';
 import InputLabel from '@mui/material/InputLabel/index.js';
 import MenuItem from '@mui/material/MenuItem/index.js';
+import Popover from '@mui/material/Popover/index.js';
 import Select from '@mui/material/Select/index.js';
 import Snackbar from '@mui/material/Snackbar/index.js';
 import Stack from '@mui/material/Stack/index.js';
@@ -1132,5 +1133,107 @@ export const UnrelatedPortalClickAway: Story = {
         { timeout: 1000 },
       );
     });
+  },
+};
+
+// Test 14: A control inside the card's OWN nested portal that stops native
+// pointerdown propagation must not leave anything stale behind: the NEXT
+// press, genuinely outside the card, still closes it (FUT-2776 adversarial
+// review — real-Chromium companion to the unit test of the same name). The
+// first revision of this fix used a boolean "was the last press inside" flag
+// that was only cleared by a bubble-phase document listener; a stopped press
+// never reached that listener, so the flag stayed `true` and leaked into the
+// next, truly outside press.
+export const StoppingNestedPortalClickAway: Story = {
+  render: function StoppingNestedPortalClickAwayRender() {
+    const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
+
+    return (
+      <Stack spacing={2} alignItems="flex-start">
+        <HoverCard
+          title="Preferências"
+          description="Escolha uma opção"
+          loadingText="Carregando…"
+          enterDelay={100}
+          exitDelay={0}
+          trigger={<Button>Abrir cartão</Button>}
+        >
+          <Button
+            data-testid="open-nested-menu"
+            onClick={(event) => setMenuAnchor(event.currentTarget)}
+          >
+            Abrir menu aninhado
+          </Button>
+          <Popover open={Boolean(menuAnchor)} anchorEl={menuAnchor}>
+            <Button
+              data-testid="stops-propagation-option"
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              Opção que para a propagação
+            </Button>
+          </Popover>
+        </HoverCard>
+        <Button data-testid="stopping-nested-outside">Fora do cartão</Button>
+      </Stack>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await step('Open the card by hovering its trigger', async () => {
+      const trigger = await canvas.findByTestId('hover-card-trigger');
+      await userEvent.hover(trigger);
+
+      await waitFor(
+        () => {
+          expect(body.getByText('Preferências')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step("Open the nested menu, inside the card's own content", async () => {
+      const openMenu = body.getByTestId('open-nested-menu');
+      await userEvent.click(openMenu);
+
+      await waitFor(
+        () => {
+          expect(body.getByTestId('stops-propagation-option')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step(
+      'Pressing the option that stops propagation keeps the card open — it is owned by the card',
+      async () => {
+        const option = body.getByTestId('stops-propagation-option');
+        fireEvent.pointerDown(option);
+
+        await waitFor(
+          () => {
+            expect(body.getByText('Preferências')).toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
+
+    await step(
+      'A later, genuinely outside press still closes the card: the stopped press left nothing stale behind',
+      async () => {
+        const outside = await canvas.findByTestId('stopping-nested-outside');
+        fireEvent.pointerDown(outside);
+        fireEvent.click(outside);
+
+        await waitFor(
+          () => {
+            expect(body.queryByText('Preferências')).not.toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
   },
 };
