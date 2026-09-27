@@ -61,6 +61,7 @@ export {
   sliderDensityOverrides,
   tabDensityOverrides,
   tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
   toggleButtonDensityOverrides,
 } from './density-overrides';
 

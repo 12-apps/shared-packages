@@ -49,12 +49,37 @@ import type { DensityLevel } from './density.core';
  * measurement (`PaginationItem` `size="small"`) that pins the bound at one
  * full unit rather than half.
  *
- * FUT-2768 adds `ToggleButton`/`Tab`/`TableCell`/`PaginationItem`/`Slider` to
- * the SAME showcase and the SAME two stories — one render, one `play`,
- * proving all seven components this file now covers (FUT-2766's two plus
- * FUT-2768's five — `Avatar` is a dead no-op for this package's own call
- * sites and is not shipped, see `density-overrides.ts`'s own doc comment)
- * stay geometry-neutral together, the way a real page renders them.
+ * FUT-2768 adds `ToggleButton`/`Tab`/`Tabs`' indicator/`TableCell`/
+ * `PaginationItem`/`Slider` to the SAME showcase and the SAME two stories —
+ * one render, one `play`, proving all eight components this file now covers
+ * (FUT-2766's two plus FUT-2768's six — `Avatar` is a dead no-op for this
+ * package's own call sites and is not shipped, see `density-overrides.ts`'s
+ * own doc comment) stay geometry-neutral together, the way a real page
+ * renders them.
+ *
+ * This file proves the numbers against BARE `@mui/material` components.
+ * Whether each override actually REACHES `@12-apps/ui`'s OWN wrapper around
+ * that component (`Toggle`/`ToggleGroup`, `Tabs`, `Table`, `Pagination`,
+ * `Slider`, `Avatar`) is a SEPARATE question — a wrapper's own styling can
+ * block a theme override harmlessly (already density-aware on its own terms)
+ * or leave a real gap for the override to fill, and source-reading alone
+ * cannot tell which; `density-wrapper-reach.test.stories.tsx` renders the
+ * PRODUCT'S OWN components and measures both directions.
+ *
+ * **State-dependent literals this file deliberately leaves unscaled**
+ * (a FUT-2767-review pass, the same one that added the `Tabs` indicator
+ * above): `Slider.js`'s thumb hover/active/`Mui-focusVisible` ring
+ * (`boxShadow: '0px 0px 0px 8px rgba(...)'`, replacing the thumb's box-shadow
+ * OUTRIGHT for that state, one CSS property with no way to override only the
+ * spread) and its value-label position anchor (`top: '-10px'` horizontal,
+ * `right: '30px'`/`'20px'` vertical/vertical+small). Scaling the ring would
+ * mean re-deriving MUI's own per-palette-colour `alpha()` maths in this file
+ * just to change one number in it — far riskier than the padding/size
+ * literals this ticket actually ships; the offset is a position anchor MUI
+ * itself does not vary by `size` at all except that one vertical+small
+ * combo, out of this ticket's own literal catalog. Both are measured, not
+ * merely un-overridden, in `NormalIsGeometryNeutral`/`CompactScalesByPoint9`
+ * below — proving the decision was checked, not missed.
  */
 
 function themeFor(density: DensityLevel) {
@@ -89,7 +114,12 @@ function DensityGeometryShowcase({ density }: { density: DensityLevel }) {
           <span />
         </ToggleButton>
 
-        <Tabs value={0} onChange={() => undefined} aria-label="density showcase tabs">
+        <Tabs
+          data-testid="tabs-root"
+          value={0}
+          onChange={() => undefined}
+          aria-label="density showcase tabs"
+        >
           <Tab data-testid="tab-plain" label="Tab" />
           <Tab data-testid="tab-icon-label" icon={<span data-testid="tab-icon-glyph" />} label="Icon tab" />
         </Tabs>
@@ -130,6 +160,17 @@ function DensityGeometryShowcase({ density }: { density: DensityLevel }) {
         </div>
         <div style={{ width: 120 }}>
           <Slider data-testid="slider-sm" defaultValue={30} size="small" aria-label="small slider" />
+        </div>
+        {/* `valueLabelDisplay="on"` forces `.MuiSlider-valueLabel` into the DOM
+            without needing a real hover/drag — isolated from `slider-md`/`-sm`
+            above so it does not change what those two already assert. */}
+        <div style={{ width: 120, paddingTop: 24 }}>
+          <Slider
+            data-testid="slider-value-label"
+            defaultValue={30}
+            valueLabelDisplay="on"
+            aria-label="slider with a forced value label"
+          />
         </div>
       </div>
     </ThemeProvider>
@@ -175,6 +216,20 @@ const LAYOUT_UNIT = 1 / 64;
 function pxNumber(value: string): number {
   const match = /^(-?\d+(?:\.\d+)?)px$/.exec(value);
   if (match === null) throw new Error(`not a px length: "${value}"`);
+  return Number(match[1]);
+}
+
+/**
+ * The thumb's hover/active/`Mui-focusVisible` ring is `boxShadow: '0px 0px 0px
+ * Npx rgba(...)'` — REPLACING the thumb's box-shadow outright for that state
+ * (`Slider.js`'s own per-colour `variants` entry), not composed with anything
+ * else on the SAME element (the resting-state elevation shadow lives on
+ * `::before`, a different box) — so the zero-offset, zero-blur shape is found
+ * directly rather than assumed to be the only shadow layer.
+ */
+function ringSpreadPx(boxShadow: string): number {
+  const match = /0px 0px 0px ([\d.]+)px/.exec(boxShadow);
+  if (match === null) throw new Error(`no zero-offset ring shadow found in: "${boxShadow}"`);
   return Number(match[1]);
 }
 
@@ -263,6 +318,11 @@ export const NormalIsGeometryNeutral: Story = {
     expectPxClose(tabIconLabel.paddingTop, 9);
     expectPxClose(tabIconLabel.paddingBottom, 9);
 
+    // Tabs indicator: 2px thick, MUI's own literal (`Tabs.js`'s `TabsIndicator`).
+    const tabsIndicator = canvas.getByTestId('tabs-root').querySelector('.MuiTabs-indicator');
+    if (tabsIndicator === null) throw new Error('MuiTabs-indicator not found');
+    expectPxClose(computed(tabsIndicator).height, 2);
+
     // TableCell: 16px default, '6px 16px' at small, '0 12px 0 16px' on the
     // small+checkbox combo.
     const cellDefault = computed(canvas.getByTestId('cell-default'));
@@ -306,6 +366,30 @@ export const NormalIsGeometryNeutral: Story = {
     if (thumbMd === null) throw new Error('MuiSlider-thumb not found');
     expectPxClose(computed(thumbMd).width, 20);
     expectPxClose(computed(thumbMd).height, 20);
+
+    // Thumb ring, deliberately NOT scaled — `.Mui-focusVisible` is a real
+    // class MUI itself toggles on interaction; setting it directly reads the
+    // same CSS rule without needing a trusted pointer event (this is a state
+    // CHECK, not an interaction-order fix — the trusted-input rule in
+    // AGENT-RULES.md is about event/microtask ordering, not about this).
+    // `box-shadow` is a TRANSITIONED property (`Slider.js`'s own
+    // `transitions.create(['box-shadow', ...])`) — reading it synchronously
+    // right after the class change would catch the transition's START value
+    // (the old one), not its target, so the inline `transition: 'none'`
+    // (higher specificity than the class-based rule) removes the animation
+    // for this one read.
+    (thumbMd as HTMLElement).style.transition = 'none';
+    thumbMd.classList.add('Mui-focusVisible');
+    expect(ringSpreadPx(computed(thumbMd).boxShadow)).toBe(8);
+    thumbMd.classList.remove('Mui-focusVisible');
+    (thumbMd as HTMLElement).style.transition = '';
+
+    // Value-label offset, also deliberately NOT scaled — MUI's own position
+    // anchor for the bubble above the thumb, forced into the DOM by
+    // `valueLabelDisplay="on"` (`slider-value-label`, no drag needed).
+    const valueLabel = canvas.getByTestId('slider-value-label').querySelector('.MuiSlider-valueLabel');
+    if (valueLabel === null) throw new Error('MuiSlider-valueLabel not found');
+    expectPxClose(computed(valueLabel).top, -10);
 
     const sliderSm = canvas.getByTestId('slider-sm');
     const railSm = sliderSm.querySelector('.MuiSlider-rail');
@@ -373,6 +457,11 @@ export const CompactScalesByPoint9: Story = {
     expectPxClose(tabIconLabel.paddingTop, 8.1); // 9 * 0.9
     expectPxClose(tabIconLabel.paddingBottom, 8.1);
 
+    // Tabs indicator
+    const tabsIndicator = canvas.getByTestId('tabs-root').querySelector('.MuiTabs-indicator');
+    if (tabsIndicator === null) throw new Error('MuiTabs-indicator not found');
+    expectPxClose(computed(tabsIndicator).height, 1.8); // 2 * 0.9
+
     // TableCell
     const cellDefault = computed(canvas.getByTestId('cell-default'));
     expectPxClose(cellDefault.paddingTop, 14.4); // 16 * 0.9
@@ -409,6 +498,20 @@ export const CompactScalesByPoint9: Story = {
     if (thumbMd === null) throw new Error('MuiSlider-thumb not found');
     expectPxClose(computed(thumbMd).width, 18); // 20 * 0.9
     expectPxClose(computed(thumbMd).height, 18);
+
+    // Ring/value-label: STILL 8px/-10px at `compact` — the point of these two
+    // assertions is that they do NOT move with density, unlike everything
+    // else in this story. `transition: 'none'` for the same reason as the
+    // Normal story above.
+    (thumbMd as HTMLElement).style.transition = 'none';
+    thumbMd.classList.add('Mui-focusVisible');
+    expect(ringSpreadPx(computed(thumbMd).boxShadow)).toBe(8);
+    thumbMd.classList.remove('Mui-focusVisible');
+    (thumbMd as HTMLElement).style.transition = '';
+
+    const valueLabel = canvas.getByTestId('slider-value-label').querySelector('.MuiSlider-valueLabel');
+    if (valueLabel === null) throw new Error('MuiSlider-valueLabel not found');
+    expectPxClose(computed(valueLabel).top, -10);
 
     const sliderSm = canvas.getByTestId('slider-sm');
     const railSm = sliderSm.querySelector('.MuiSlider-rail');

@@ -189,66 +189,39 @@ export function chipDensityOverrides(): Components<Theme> {
  * theme value composes with MUI's baked-in `variants` instead of replacing
  * them outright:
  *
- * - `ToggleButton` (`ToggleButton.js`): `padding: 11/7/15` at
- *   medium(root)/small/large (`:49,110,118`) — the SAME
- *   `root`/`sizeSmall`/`sizeLarge` shape as `iconButtonDensityOverrides`;
- *   `fontSize` at small/large stays MUI's own, this file owns `padding` only.
- * - `Tab` (`Tab.js`): `minHeight: 48`, `padding: '12px 16px'` on the root
- *   (`:52,54`, the two-value shorthand via `rems()`). The icon+label combo
- *   (`minHeight: 72`, `paddingTop`/`Bottom: 9`, `:78-80`) is a SEPARATE
- *   MUI-baked variant gated on `ownerState.icon && ownerState.label` —
- *   `Tab.js`'s own `overridesResolver` exposes exactly that gate as the
- *   `labelIcon` key, so this file's `labelIcon` override reaches the SAME
- *   tabs. (`wrapped`, a different prop, only sets `fontSize` — nothing here.)
- * - `TableCell` (`TableCell.js`): `padding: 16` on the root (`:50`), `'6px
- *   16px'` at `size="small"` (`:81`, key `sizeSmall`), and — NESTED inside
- *   that same small-size variant, not a separate key — `'0 12px 0 16px'` on
- *   the small+checkbox-padding combo (`:85`,
- *   `& .${tableCellClasses.paddingCheckbox}`; the general, size-unconditional
- *   checkbox padding, `'0 0 0 4px'`/`width: 48`, is a different literal,
- *   outside this ticket, and untouched, as is `width: 24` here — a later
- *   same-selector rule only touches the properties it sets). `@12-apps/ui`'s
- *   own `Table` (FUT-2769) draws its `.MuiTableCell-root` padding through a
- *   selector NESTED under its styled root (`Table.styles.ts`), TWO classes —
- *   higher specificity than this single-class override, so `Table` keeps its
- *   own cell padding at ANY density, theme- or prop-sourced. This file only
- *   reaches a BARE `<TableCell>`, not one rendered through `Table`.
- * - `PaginationItem` (`PaginationItem.js`): `minWidth/height: 32/26/40` at
- *   medium(root)/small/large (`:105-106,149-150,160-161`) on the numbered/
- *   prev-next/first-last button. The ellipsis (`…`, `PaginationItemEllipsis`)
- *   shares the SAME theme name/slot and `minWidth` but has NO `height` of its
- *   own (`'auto'`), so `height` is gated on `ownerState.type` being neither
- *   `'start-ellipsis'` nor `'end-ellipsis'` — the values `PaginationItem.js`
- *   itself reads to pick which of the two styled components renders.
- *   Skipping the gate would force a height onto the ellipsis — Lesson 1.
- * - `Slider` (`Slider.js`): rail `height: 4/2` at `orientation="horizontal"`
- *   (the default)/`size="small"` (`:70`) — figures on `SliderRoot` itself
- *   (`SliderRail`'s own CSS is `height: 'inherit'`), gated on
- *   `ownerState.orientation` because the SAME key answers for EITHER axis:
- *   MUI's own variants set `height` for horizontal and `width` for vertical,
- *   leaving the OTHER dimension at `'100%'` — writing both unconditionally
- *   would clobber whichever one the variant means to leave full-length.
- *   Thumb `20×20`/`12×12` (root/`thumbSizeSmall`, `:250-251,291-292`) is
- *   square at both sizes and not orientation-dependent, so no gate needed.
- *   `@12-apps/ui`'s own `Slider` (`Slider.styles.ts`'s `sliderSx`) already
- *   sets rail/thumb size unconditionally through `rem()` and never forwards
- *   MUI's `size` prop — a no-op THERE (it simply never matches), but this
- *   still reaches a BARE `@mui/material` `<Slider size="small">`, real
- *   public API `Avatar` has none of (below).
+ * - `ToggleButton`: `padding: 11/7/15` at medium(root)/small/large — same
+ *   `root`/`sizeSmall`/`sizeLarge` shape as `iconButtonDensityOverrides`.
+ * - `Tab`: `minHeight: 48`, `padding: '12px 16px'` on the root (via `rems()`).
+ *   The icon+label combo (`minHeight: 72`, `paddingTop`/`Bottom: 9`) is a
+ *   SEPARATE MUI variant gated on `ownerState.icon && ownerState.label`,
+ *   exposed as the `labelIcon` key.
+ * - `TableCell`: `padding: 16` on the root, `'6px 16px'` at small, nested
+ *   inside it `'0 12px 0 16px'` on the small+checkbox combo
+ *   (`& .${tableCellClasses.paddingCheckbox}`). `@12-apps/ui`'s own `Table`
+ *   (FUT-2769) draws cell padding two classes deep under its styled root —
+ *   higher specificity, so it always wins; this reaches a BARE `<TableCell>`.
+ * - `PaginationItem`: `minWidth/height: 32/26/40` at medium(root)/small/large.
+ *   The ellipsis shares the SAME slot and `minWidth` but has NO `height` of
+ *   its own (`'auto'`), gated on `ownerState.type` being neither
+ *   `'start-ellipsis'` nor `'end-ellipsis'` — skipping it would force a
+ *   height onto the ellipsis (Lesson 1).
+ * - `Slider`: rail `height: 4/2` at `orientation="horizontal"`/`size="small"`
+ *   — gated on `ownerState.orientation` since the SAME key answers for
+ *   EITHER axis (MUI sets `height` horizontal / `width` vertical, leaving
+ *   the other `'100%'`). Thumb `20×20`/`12×12` is square at both sizes, no
+ *   gate needed. `@12-apps/ui`'s own `Slider` already sets rail/thumb size
+ *   unconditionally through `rem()` and never forwards `size` — a no-op
+ *   THERE, but this still reaches a BARE `<Slider>`. The thumb's
+ *   hover/active/`Mui-focusVisible` ring and the value-label offset were also
+ *   checked and left OUT on purpose — measured in that story file's own doc.
  *
- * `Avatar` is NOT in this file. `@12-apps/ui`'s own `Avatar`
- * (`Avatar.view.tsx`) wraps `MuiAvatar` in a `StyledAvatar` that ALREADY sets
- * `width`/`height` through `rem(theme, boxPx(size))` (`Avatar.metrics.ts`'s
- * `AVATAR_SIZES.md.box`, `40` — MUI's own literal), at a higher specificity
- * than any `MuiAvatar.styleOverrides.root` this file could add (a
- * `styled(MuiAvatar, …)` wrapper's css composes after MUI's, the way
- * `StyledTable` already overrides every other MUI literal here). A
- * `MuiAvatar` override would be dead code for every call site this
- * initiative chases — the Done-when's own escape hatch — so it ships none.
+ * `Avatar` is NOT in this file: `@12-apps/ui`'s own `Avatar` wraps `MuiAvatar`
+ * in a `StyledAvatar` that ALREADY sets `width`/`height` through
+ * `rem(theme, boxPx(size))` (`40` at `md`), higher specificity than any
+ * `MuiAvatar.styleOverrides.root` — dead code for every call site this
+ * initiative reaches (the Done-when's own escape hatch), so it ships none.
  *
- * Every value here is geometry-neutral at `density: 'normal'`, and each
- * style-override slot is a MODULE-LEVEL function, by the same construction
- * as `iconButtonDensityOverrides`/`chipDensityOverrides` above.
+ * Geometry-neutral at `normal`; each slot a MODULE-LEVEL function, as above.
  */
 
 const toggleButtonRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 11) });
@@ -390,6 +363,37 @@ export function sliderDensityOverrides(): Components<Theme> {
         sizeSmall: sliderSmallGeometry,
         thumb: sliderThumbGeometry,
         thumbSizeSmall: sliderThumbSmallGeometry,
+      },
+    },
+  };
+}
+
+/**
+ * `MuiTabs`' own indicator thickness (`height: 2` horizontal, `width: 2`
+ * vertical) — one short of `Tab` in the ticket's own literal list, added
+ * after a FUT-2767-review pass over state/orientation-gated literals; same
+ * orientation gate as the Slider rail. `@12-apps/ui`'s own `Tabs` draws its
+ * OWN 3px indicator through `rem()` already, blocking THIS override there —
+ * `tabDensityOverrides` reaches `Tab.root`'s `minHeight` instead (both
+ * measured in `density-wrapper-reach.test.stories.tsx`).
+ */
+interface TabsIndicatorOwnerStateForOverrides {
+  orientation?: 'horizontal' | 'vertical';
+}
+type TabsIndicatorStyleFn = (props: {
+  theme: Theme;
+  ownerState?: TabsIndicatorOwnerStateForOverrides;
+}) => CSSObject;
+
+const tabsIndicatorAxisAt: TabsIndicatorStyleFn = ({ theme, ownerState }) =>
+  ownerState?.orientation === 'vertical' ? { width: rem(theme, 2) } : { height: rem(theme, 2) };
+
+/** `MuiTabs`' own indicator thickness, by orientation. */
+export function tabsIndicatorDensityOverrides(): Components<Theme> {
+  return {
+    MuiTabs: {
+      styleOverrides: {
+        indicator: tabsIndicatorAxisAt,
       },
     },
   };

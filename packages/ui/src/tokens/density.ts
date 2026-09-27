@@ -16,6 +16,7 @@ import {
   sliderDensityOverrides,
   tabDensityOverrides,
   tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
   toggleButtonDensityOverrides,
 } from './density-overrides';
 import { fieldOverrides, mergeMuiComponents } from './field-height';
@@ -82,17 +83,17 @@ export function useDensity(): ResolvedDensity {
  * `components` is the matching MUI-native override (`fieldOverrides`, plus
  * FUT-2766's `iconButtonDensityOverrides`/`chipDensityOverrides` and
  * FUT-2768's `toggleButtonDensityOverrides`/`tabDensityOverrides`/
- * `tableCellDensityOverrides`/`paginationItemDensityOverrides`/
- * `sliderDensityOverrides`) for a HOST's own bare `TextField`/`Select`/
- * `IconButton`/`Chip`/`ToggleButton`/`Tab`/`TableCell`/`Pagination`/`Slider`,
- * mirroring `muiThemeOptionsFrom`'s own `components:
- * mergeMuiComponents(...)`. It carries ONLY the overrides this function
- * knows about (`MuiOutlinedInput`'s `root`, `input` and `notchedOutline`;
- * `MuiInputLabel`'s `outlined`; `MuiIconButton`'s
+ * `tabsIndicatorDensityOverrides`/`tableCellDensityOverrides`/
+ * `paginationItemDensityOverrides`/`sliderDensityOverrides`) for a HOST's own
+ * bare `TextField`/`Select`/`IconButton`/`Chip`/`ToggleButton`/`Tab`/`Tabs`/
+ * `TableCell`/`Pagination`/`Slider`, mirroring `muiThemeOptionsFrom`'s own
+ * `components: mergeMuiComponents(...)`. It carries ONLY the overrides this
+ * function knows about (`MuiOutlinedInput`'s `root`, `input` and
+ * `notchedOutline`; `MuiInputLabel`'s `outlined`; `MuiIconButton`'s
  * `root`/`sizeSmall`/`sizeLarge`; `MuiChip`'s
  * `root`/`sizeSmall`/`label`/`labelSmall`; `MuiToggleButton`'s
- * `root`/`sizeSmall`/`sizeLarge`; `MuiTab`'s `root`/`labelIcon`;
- * `MuiTableCell`'s `root`/`sizeSmall`; `MuiPaginationItem`'s
+ * `root`/`sizeSmall`/`sizeLarge`; `MuiTab`'s `root`/`labelIcon`; `MuiTabs`'s
+ * `indicator`; `MuiTableCell`'s `root`/`sizeSmall`; `MuiPaginationItem`'s
  * `root`/`sizeSmall`/`sizeLarge`; `MuiSlider`'s
  * `root`/`sizeSmall`/`thumb`/`thumbSizeSmall`) — a host with ITS OWN
  * overrides for OTHER components merges them in with
@@ -155,6 +156,7 @@ export function densityThemeOptions(
       chipDensityOverrides(),
       toggleButtonDensityOverrides(),
       tabDensityOverrides(),
+      tabsIndicatorDensityOverrides(),
       tableCellDensityOverrides(),
       paginationItemDensityOverrides(),
       sliderDensityOverrides(),

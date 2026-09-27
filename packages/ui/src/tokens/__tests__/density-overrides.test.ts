@@ -10,6 +10,7 @@ import {
   sliderDensityOverrides,
   tabDensityOverrides,
   tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
   toggleButtonDensityOverrides,
 } from '../density-overrides';
 
@@ -43,6 +44,7 @@ type AnyDensityOverrides =
   | ReturnType<typeof chipDensityOverrides>
   | ReturnType<typeof toggleButtonDensityOverrides>
   | ReturnType<typeof tabDensityOverrides>
+  | ReturnType<typeof tabsIndicatorDensityOverrides>
   | ReturnType<typeof tableCellDensityOverrides>
   | ReturnType<typeof paginationItemDensityOverrides>
   | ReturnType<typeof sliderDensityOverrides>;
@@ -54,6 +56,7 @@ function slot(
     | 'MuiChip'
     | 'MuiToggleButton'
     | 'MuiTab'
+    | 'MuiTabs'
     | 'MuiTableCell'
     | 'MuiPaginationItem'
     | 'MuiSlider',
@@ -278,6 +281,50 @@ describe('tabDensityOverrides', () => {
     const a = tabDensityOverrides();
     const b = tabDensityOverrides();
     expect(a.MuiTab?.styleOverrides?.labelIcon).toBe(b.MuiTab?.styleOverrides?.labelIcon);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('tabsIndicatorDensityOverrides', () => {
+  it('writes indicator HEIGHT for the default (horizontal) orientation as rem(theme, 2) — the literal Tabs.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme)).toEqual({ height: theme.typography.pxToRem(2) });
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme, { orientation: 'horizontal' })).toEqual({
+      height: theme.typography.pxToRem(2),
+    });
+  });
+
+  /**
+   * FUT-2768 — MUI's OWN vertical variant sets `width: 2` and leaves
+   * `height: '100%'` (from that SAME variant) alone; an override that wrote
+   * BOTH unconditionally would clobber the vertical indicator's full-length
+   * axis, the same Lesson-1 clobber the Slider rail override avoids.
+   */
+  it('writes indicator WIDTH — not height — for a vertical Tabs', () => {
+    const theme = createTheme();
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme, { orientation: 'vertical' })).toEqual({
+      width: theme.typography.pxToRem(2),
+    });
+  });
+
+  it('is a true no-op at the default theme: 2px, the exact literal it replaces', () => {
+    const theme = createTheme();
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme)).toEqual({ height: '0.125rem' }); // 2 / 16
+  });
+
+  it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+    const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme)).toEqual({ height: '0.1125rem' }); // 2 * 0.9 / 16
+  });
+
+  it('two separately-built override sets are the SAME function references', () => {
+    const a = tabsIndicatorDensityOverrides();
+    const b = tabsIndicatorDensityOverrides();
+    expect(a.MuiTabs?.styleOverrides?.indicator).toBe(b.MuiTabs?.styleOverrides?.indicator);
     expect(a).toEqual(b);
   });
 });

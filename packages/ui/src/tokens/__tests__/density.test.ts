@@ -334,14 +334,14 @@ describe('densityThemeOptions and muiThemeOptionsFrom agree on the MuiIconButton
 });
 
 /**
- * FUT-2768 — `ToggleButton`/`Tab`/`TableCell`/`PaginationItem`/`Slider`
+ * FUT-2768 — `ToggleButton`/`Tab`/`Tabs`/`TableCell`/`PaginationItem`/`Slider`
  * geometry, the same parity standard as the FUT-2766 block above: the
  * standalone (`densityThemeOptions`) and `UiProvider` (`muiThemeOptionsFrom`)
  * paths must produce IDENTICAL override objects, not just identical numbers.
  */
 describe('densityThemeOptions and muiThemeOptionsFrom agree on the FUT-2768 overrides', () => {
   it.each(['compact', 'normal', 'comfortable', 0.95] as const)(
-    'density=%s: identical styleOverrides for all five components on both paths',
+    'density=%s: identical styleOverrides for all six components on both paths',
     (density) => {
       const standaloneComponents = densityThemeOptions(density).components;
       const viaUiThemeComponents = muiThemeOptionsFrom(createUiTheme({ density })).components;
@@ -359,6 +359,11 @@ describe('densityThemeOptions and muiThemeOptionsFrom agree on the FUT-2768 over
         expect(standaloneComponents?.[name]).toEqual(viaUiThemeComponents?.[name]);
       }
 
+      // `MuiTabs` styles the `indicator` slot, not `root` — checked separately
+      // from the loop above, same PRESENT-not-just-equal standard.
+      expect(standaloneComponents?.MuiTabs?.styleOverrides?.indicator).toBeTypeOf('function');
+      expect(standaloneComponents?.MuiTabs).toEqual(viaUiThemeComponents?.MuiTabs);
+
       // End to end: a theme built from either path renders the same computed
       // style object for a slot each of the five adds.
       const standaloneTheme = createTheme(densityThemeOptions(density));
@@ -373,6 +378,13 @@ describe('densityThemeOptions and muiThemeOptionsFrom agree on the FUT-2768 over
         paddingBottom: standaloneTheme.typography.pxToRem(9),
       });
       expect(tabLabelIcon?.({ theme: standaloneTheme })).toEqual(tabLabelIcon?.({ theme: viaUiThemeTheme }));
+
+      const tabsIndicator = standaloneTheme.components?.MuiTabs?.styleOverrides?.indicator as
+        | ((props: { theme: typeof standaloneTheme }) => Record<string, unknown>)
+        | undefined;
+      expect(typeof tabsIndicator).toBe('function');
+      expect(tabsIndicator?.({ theme: standaloneTheme })).toEqual({ height: standaloneTheme.typography.pxToRem(2) });
+      expect(tabsIndicator?.({ theme: standaloneTheme })).toEqual(tabsIndicator?.({ theme: viaUiThemeTheme }));
     },
   );
 });

@@ -8,6 +8,7 @@ import {
   sliderDensityOverrides,
   tabDensityOverrides,
   tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
   toggleButtonDensityOverrides,
 } from '../tokens/density-overrides';
 import { densityFontSize, resolveDensityFactor } from '../tokens/density';
@@ -154,15 +155,16 @@ export function muiThemeOptionsFrom(ui: UiTheme): ThemeOptions {
     fieldRadius: ui.radius.field,
     fieldHeight: ui.fieldHeight,
     // Additive: FUT-2766 added IconButton's/Chip's overrides; this PR
-    // (FUT-2768) adds ToggleButton/Tab/TableCell/PaginationItem/Slider's.
-    // FUT-2767 (Button/Checkbox/Radio/Switch), the remaining sibling, adds
-    // its own source here the same way when it lands.
+    // (FUT-2768) adds ToggleButton/Tab/Tabs' indicator/TableCell/
+    // PaginationItem/Slider's. FUT-2767 (Button/Checkbox/Radio/Switch), the
+    // remaining sibling, adds its own source here the same way when it lands.
     components: mergeMuiComponents(
       fieldOverrides(ui.radius.field, ui.fieldHeight),
       iconButtonDensityOverrides(),
       chipDensityOverrides(),
       toggleButtonDensityOverrides(),
       tabDensityOverrides(),
+      tabsIndicatorDensityOverrides(),
       tableCellDensityOverrides(),
       paginationItemDensityOverrides(),
       sliderDensityOverrides(),
