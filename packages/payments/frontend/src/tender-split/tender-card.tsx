@@ -51,6 +51,7 @@ export function TenderChoice<T extends string>({
         gap: 0.75,
         p: 1.5,
         minHeight: 74,
+        container: 'tender-card / inline-size',
         textAlign: 'left',
         borderRadius: CARD_RADIUS,
         border: 1.5,
@@ -102,6 +103,7 @@ export function PickedTender<T extends string>({
         gap: 1,
         p: 1.5,
         minWidth: 0,
+        container: 'tender-card / inline-size',
         borderRadius: CARD_RADIUS,
         border: 1.5,
         borderColor: 'primary.main',
@@ -182,15 +184,34 @@ function AmountField({
   );
 }
 
+/**
+ * The glyph and the name. Side by side on a card with room; on a narrow one
+ * (a 320px phone halves to ~88px) the glyph goes on top, beside the remove
+ * control, so the name gets the whole width and breaks only between words.
+ */
 function TenderHeading<T extends string>({ tender }: { tender: TenderOption<T> }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 3, minWidth: 0 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 0.75,
+        minWidth: 0,
+        '@container tender-card (min-width: 120px)': {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 1,
+          pr: 3,
+        },
+      }}
+    >
       {tender.icon === null ? null : (
         <Box component="span" aria-hidden sx={{ display: 'flex', color: 'primary.main' }}>
           {tender.icon}
         </Box>
       )}
-      <Typography component="span" sx={{ fontWeight: 500, overflowWrap: 'anywhere' }}>
+      <Typography component="span" sx={{ fontWeight: 500, overflowWrap: 'break-word' }}>
         {tender.label}
       </Typography>
     </Box>
