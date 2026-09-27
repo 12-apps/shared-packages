@@ -18,6 +18,17 @@ export interface CommandPaletteCopy {
   tryAnotherTerm: string;
 }
 
+/**
+ * `SectionNav`'s own words — only the chrome it draws around the host's
+ * destinations. Every destination and menu label is the host's, per prop.
+ */
+export interface SectionNavCopy {
+  /** The open primary trigger's accessible name, and the sheet's close button. */
+  close: string;
+  /** A badge's accessible name — "3 pending", for a count of 3. */
+  badge: (count: number) => string;
+}
+
 /** The breadcrumb's overflow control, in its two spellings. */
 export interface BreadcrumbCopy {
   showMore: string;

@@ -29,6 +29,7 @@ import type {
   ChromeCopy,
   CodeEditorCopy,
   CommandPaletteCopy,
+  SectionNavCopy,
   ConfirmActionCopy,
   DataGridCopy,
   DataStateCopy,
@@ -132,6 +133,10 @@ export const SETTING_SWITCH_COPY = pack<SettingSwitchCopy>(
 export const COMMAND_PALETTE_COPY = pack<CommandPaletteCopy>(
   pt.PT_BR_COMMAND_PALETTE_COPY,
   en.EN_US_COMMAND_PALETTE_COPY,
+);
+export const SECTION_NAV_COPY = pack<SectionNavCopy>(
+  pt.PT_BR_SECTION_NAV_COPY,
+  en.EN_US_SECTION_NAV_COPY,
 );
 export const BREADCRUMB_COPY = pack<BreadcrumbCopy>(
   pt.PT_BR_BREADCRUMB_COPY,
