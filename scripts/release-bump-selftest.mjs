@@ -248,10 +248,17 @@ const EXPECTED = [
   ['feat(cart): rebuild the API\n\nRELEASE-MAJOR: every port moves', 'major', 'the RELEASE-MAJOR marker'],
   ['feat(cart)!: x\n\nRELEASE-MAJOR: deliberate', 'major', 'the marker wins over a mere `!`'],
 
-  ['feat(cart): add a port', 'minor', 'an ordinary feat'],
+  // THIS BRANCH IS A MAINTENANCE LINE, and there an ordinary feat is a PATCH.
+  // Its range is `<major>.<minor>.x`, so semantic-release refuses any minor cut
+  // from it (EINVALIDNEXTVERSION) — a backported feat read as a minor never
+  // reaches the registry at all. The configs here add `feat -> patch` so a
+  // backport ships the one way the line can take it. On main a feat is still a
+  // minor. The breaking rows above are unchanged, so a breaking backport is
+  // still a minor here, and is still refused, loudly.
+  ['feat(cart): add a port', 'patch', 'an ordinary feat, on a maintenance line'],
   ['fix(cart): correct the total', 'patch', 'an ordinary fix'],
   ['chore(cart): tidy the imports', null, 'a chore, which releases nothing'],
-  ['feat(cart): mentions a BREAKING CHANGE: mid-line', 'minor', 'a mid-line mention is not a footer'],
+  ['feat(cart): mentions a BREAKING CHANGE: mid-line', 'patch', 'a mid-line mention is not a footer'],
 ];
 
 for (const [message, expected, why] of EXPECTED) {
