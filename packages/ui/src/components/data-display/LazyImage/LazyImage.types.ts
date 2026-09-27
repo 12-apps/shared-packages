@@ -20,6 +20,15 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
    * container's parent, as in `sx`: `0.5` is `50%`. The container takes it and
    * the image, its skeleton and its fallback fill the container.
    * A string is any CSS length and passes through untouched.
+   *
+   * Left unset, the real (loaded) image sizes itself naturally — but the
+   * loading skeleton and a `ReactNode` `fallback` never leave BOTH axes
+   * unresolved: an unset axis borrows the one that IS set (a square
+   * placeholder) when it is a DEFINITE length; a RELATIVE one (a fraction, or
+   * a `%` string) squares up through CSS `aspectRatio` instead, since copying
+   * a percentage onto the other axis would measure against the wrong box.
+   * With neither set, both take the theme's field height (FUT-2805; see
+   * `LazyImage.md`'s own note for the exact rule).
    */
   width?: number | string;
 
@@ -30,6 +39,10 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
    * the image, its skeleton and its fallback fill the container. A fractional
    * height takes effect only when the parent has a definite height.
    * A string is any CSS length and passes through untouched.
+   *
+   * Left unset, the real (loaded) image sizes itself naturally (`'auto'`) —
+   * the loading skeleton and a `ReactNode` `fallback` follow `width`'s own
+   * note instead (FUT-2805).
    */
   height?: number | string;
 
