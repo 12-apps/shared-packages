@@ -1,6 +1,7 @@
 import type { PaletteColor, Theme, ThemeOptions } from '@mui/material/styles/index.js';
 
 import { cssLengthToPx, cssTrackingToEm } from '../tokens/css-units';
+import { chipDensityOverrides, iconButtonDensityOverrides } from '../tokens/density-overrides';
 import { densityFontSize, resolveDensityFactor } from '../tokens/density';
 import { resolveFieldHeight } from '../tokens/field-height.core';
 import { fieldOverrides, mergeMuiComponents } from '../tokens/field-height';
@@ -144,10 +145,14 @@ export function muiThemeOptionsFrom(ui: UiTheme): ThemeOptions {
     shape: { borderRadius: ui.radius.md },
     fieldRadius: ui.radius.field,
     fieldHeight: ui.fieldHeight,
-    // Additive: children 2–4 (FUT-2766–2768) each add one more source here as
-    // their own geometry overrides land — this PR wires the merge helper to
-    // `fieldOverrides` alone, since no geometry override exists yet.
-    components: mergeMuiComponents(fieldOverrides(ui.radius.field, ui.fieldHeight)),
+    // Additive: children 3/4 (FUT-2767/2768) each add one more source here as
+    // their own geometry overrides land — this PR (FUT-2766) adds IconButton's
+    // and Chip's.
+    components: mergeMuiComponents(
+      fieldOverrides(ui.radius.field, ui.fieldHeight),
+      iconButtonDensityOverrides(),
+      chipDensityOverrides(),
+    ),
     spacing: ui.spacingUnit,
     density: ui.density,
     typography: {
