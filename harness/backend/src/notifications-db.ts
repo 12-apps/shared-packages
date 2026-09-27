@@ -53,6 +53,7 @@ interface NotificationSqlRow {
   id: string;
   user_id: string;
   client_id: string | null;
+  side: string | null;
   type: string;
   category: string;
   title: string;
@@ -68,6 +69,7 @@ const notificationRow = (row: NotificationSqlRow): NotificationRow => ({
   id: row.id,
   userId: row.user_id,
   clientId: row.client_id,
+  side: row.side,
   type: row.type,
   category: row.category,
   title: row.title,
@@ -118,6 +120,12 @@ function disjunction(branches: NotificationWhereBranch[], params: Params): strin
   return arms.length > 0 ? `(${arms.join(' OR ')})` : 'FALSE';
 }
 
+/** The side, by the same rule as `clientIdCondition`: `null` is a value. */
+function sideCondition(side: NotificationWhereBranch['side'], params: Params): string | null {
+  if (side === undefined) return null;
+  return side === null ? 'side IS NULL' : `side = ${params.add(side)}`;
+}
+
 /**
  * One filter BRANCH, translated — recursively, and that is what changed.
  *
@@ -141,6 +149,7 @@ function branchWhere(where: NotificationWhereBranch, params: Params): string {
     where.userId !== undefined ? `user_id = ${params.add(where.userId)}` : null,
     where.readAt === null ? 'read_at IS NULL' : null,
     clientIdCondition(where.clientId, params),
+    sideCondition(where.side, params),
     idCondition(where.id, params),
     createdAtCondition(where.createdAt, params),
     ...(where.AND ?? []).map((branch) => `(${branchWhere(branch, params)})`),
@@ -160,9 +169,9 @@ function notificationDelegate(sql: SqlRunner): NotificationDelegate {
       const params = new Params();
       const { rows } = await sql.query<NotificationSqlRow>(
         `INSERT INTO notifications
-           (id, user_id, client_id, type, category, title, body, link, data, updated_at)
+           (id, user_id, client_id, side, type, category, title, body, link, data, updated_at)
          VALUES (${params.add(randomUUID())}, ${params.add(data.userId)},
-                 ${params.add(data.clientId)}, ${params.add(data.type)},
+                 ${params.add(data.clientId)}, ${params.add(data.side)}, ${params.add(data.type)},
                  ${params.add(data.category)}, ${params.add(data.title)},
                  ${params.add(data.body)}, ${params.add(data.link)},
                  ${params.add(JSON.stringify(data.data))}::jsonb, NOW())

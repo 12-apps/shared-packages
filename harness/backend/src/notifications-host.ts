@@ -35,6 +35,7 @@ import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 import { notificationsDb } from './notifications-db';
 import { createOutboxLatch, type OutboxLatch } from './notifications-latch';
 import { harnessControls } from './notifications-controls';
+import { ACTOR_HEADER, SIDE_HEADER, harnessActor, sideOf } from './notifications-sides';
 
 /** The mounted surface's type — inferred, so the host keeps its exact shape. */
 export type HarnessNotifications = ReturnType<typeof notificationsHost>;
@@ -70,9 +71,6 @@ export const NOTIFICATION_PEOPLE: readonly {
 ];
 
 const CONTACTS = new Map(NOTIFICATION_PEOPLE.map((person) => [person.id, person]));
-
-/** The header a spec sets to act as someone else; the SPA acts as the owner. */
-const ACTOR_HEADER = 'x-notifications-user';
 
 /**
  * The host's domain events. These are the part that deliberately does NOT port:
@@ -317,6 +315,7 @@ function apiConfig(pg: PGlite, outbox: OutboxEntry[], latch: OutboxLatch) {
     channelPolicy: (clientId: string, channels: readonly string[]) =>
       clientId === NOTIFICATIONS_TENANT_FREE_ID ? [] : [...channels],
     audience: audienceDirectory(pg),
+    sideOf,
   };
 }
 
@@ -389,8 +388,7 @@ export function notificationsHost(pg: PGlite): ReturnType<typeof createWireApiNo
     router: honoRouterFor(wired.routes, (c) => {
       // The SPA sends no header and acts as the seeded owner; a spec that needs
       // another vantage sets one, and `anonymous` exercises the 401 path.
-      const userId = c.req.header(ACTOR_HEADER) ?? 'owner-1';
-      return userId === 'anonymous' ? null : { userId };
+      return harnessActor(c.req.header(ACTOR_HEADER), c.req.header(SIDE_HEADER));
     }),
     harnessRoutes: harnessControls(surface as never, outbox, latch),
     outbox,

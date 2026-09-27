@@ -30,13 +30,28 @@ import type {
 export type NotificationScope = string | undefined;
 
 /**
- * `clientId IN (<scope>, NULL)`, as a filter branch — or nothing at all.
- *
- * A disjunction rather than an `in`, because SQL `IN` never matches NULL and
- * the NULL rows are precisely the ones that must survive every scope.
+ * The SIDE of the business the reader is asking as (`customer`, `staff` — the
+ * host's vocabulary), resolved by the host from which app is asking. Absent =
+ * every side, exactly as before.
  */
-function scopeBranch(scope: NotificationScope): NotificationWhereBranch[] {
-  return scope === undefined ? [] : [{ OR: [{ clientId: scope }, { clientId: null }] }];
+export type NotificationSide = string | undefined;
+
+/**
+ * `clientId IN (<scope>, NULL)` and `side IN (<side>, NULL)`, as filter
+ * branches the caller AND-s — each omitted when its scope is absent.
+ *
+ * Disjunctions rather than an `in`, because SQL `IN` never matches NULL and
+ * the NULL rows (platform-wide, unclassified) are precisely the ones that must
+ * survive every scope. Separate branches, because two `OR`s on one object
+ * would overwrite each other.
+ */
+function scopeBranch(scope: NotificationScope, side?: NotificationSide): NotificationWhereBranch[] {
+  return [
+    ...(scope === undefined ? [] : [{ OR: [{ clientId: scope }, { clientId: null }] }]),
+    // An unclassified row (`side IS NULL`) belongs to every side's reader, the
+    // way a platform-wide row belongs to every store's.
+    ...(side === undefined ? [] : [{ OR: [{ side }, { side: null }] }]),
+  ];
 }
 
 export interface ListNotificationsInput {
@@ -62,9 +77,10 @@ export interface NotificationInboxStore {
     userId: string,
     input?: ListNotificationsInput,
     scope?: NotificationScope,
+    side?: NotificationSide,
   ): Promise<ListNotificationsResult>;
   /** Scoped with `list`, or the badge and the list it sits over disagree. */
-  unreadCount(userId: string, scope?: NotificationScope): Promise<number>;
+  unreadCount(userId: string, scope?: NotificationScope, side?: NotificationSide): Promise<number>;
   markRead(userId: string, ids: readonly string[]): Promise<number>;
   /**
    * Scoped too, and this one is a WRITE.
@@ -78,7 +94,7 @@ export interface NotificationInboxStore {
    * the scope rule rather than contradicting it — those rows are one person's,
    * not one store's.
    */
-  markAllRead(userId: string, scope?: NotificationScope): Promise<number>;
+  markAllRead(userId: string, scope?: NotificationScope, side?: NotificationSide): Promise<number>;
   softDelete(userId: string, ids: readonly string[]): Promise<number>;
 }
 
@@ -108,6 +124,7 @@ function pageWhere(
   filter: ListNotificationsInput['filter'],
   anchor: NotificationPageAfter | undefined,
   scope: NotificationScope,
+  side: NotificationSide,
 ): NotificationWhere {
   // Two DISJUNCTIONS have to hold at once — the page boundary and the store
   // scope — so they are AND-ed rather than merged. A second `OR` key on this
@@ -126,7 +143,7 @@ function pageWhere(
           },
         ]
       : []),
-    ...scopeBranch(scope),
+    ...scopeBranch(scope, side),
   ];
   return {
     userId,
@@ -142,8 +159,12 @@ function pageWhere(
  * about which rows are in scope, and two copies of the same object literal is
  * how a badge ends up saying 3 over a list of 2.
  */
-function unreadWhere(userId: string, scope: NotificationScope): NotificationWhere {
-  const scoped = scopeBranch(scope);
+function unreadWhere(
+  userId: string,
+  scope: NotificationScope,
+  side: NotificationSide,
+): NotificationWhere {
+  const scoped = scopeBranch(scope, side);
   return {
     userId,
     deletedAt: null,
@@ -155,7 +176,7 @@ function unreadWhere(userId: string, scope: NotificationScope): NotificationWher
 export function createInboxStore(db: NotificationsDbProvider): NotificationInboxStore {
   return {
     /** The owner's inbox, newest first, keyset-paginated, deleted excluded. */
-    async list(userId, input = {}, scope) {
+    async list(userId, input = {}, scope, side) {
       const client = await db();
       const limit = Math.min(Math.max(input.limit ?? DEFAULT_PAGE, 1), MAX_PAGE);
       const anchor = input.cursor
@@ -163,7 +184,7 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
         : undefined;
       if (input.cursor && !anchor) return { items: [], nextCursor: null };
       const rows = await client.notification.findMany({
-        where: pageWhere(userId, input.filter, anchor, scope),
+        where: pageWhere(userId, input.filter, anchor, scope, side),
         // `id` tie-breaks equal timestamps so pages never skip/repeat.
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit + 1,
@@ -176,9 +197,9 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
     },
 
     /** Unread badge count (non-deleted, unread). */
-    async unreadCount(userId, scope) {
+    async unreadCount(userId, scope, side) {
       const client = await db();
-      return client.notification.count({ where: unreadWhere(userId, scope) });
+      return client.notification.count({ where: unreadWhere(userId, scope, side) });
     },
 
     /**
@@ -197,10 +218,10 @@ export function createInboxStore(db: NotificationsDbProvider): NotificationInbox
     },
 
     /** Mark every unread notification of the owner read ("mark all"). */
-    async markAllRead(userId, scope) {
+    async markAllRead(userId, scope, side) {
       const client = await db();
       const result = await client.notification.updateMany({
-        where: unreadWhere(userId, scope),
+        where: unreadWhere(userId, scope, side),
         data: { readAt: new Date() },
       });
       return result.count;
