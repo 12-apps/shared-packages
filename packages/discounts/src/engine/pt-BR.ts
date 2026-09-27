@@ -33,6 +33,7 @@ export const PT_BR_DISCOUNT_REJECTION_COPY: DiscountRejectionCopy = {
   MIN_SUBTOTAL_NOT_MET: `Este cupom exige um pedido mínimo de ${MIN_SUBTOTAL_TOKEN}.`,
   USAGE_LIMIT_REACHED: "Este cupom já atingiu o limite de uso.",
   BUYER_LIMIT_REACHED: "Você já usou este cupom.",
+  NOT_FIRST_ORDER: "Só vale na primeira compra nesta loja.",
   NO_ELIGIBLE_ITEMS: "Este cupom não vale para os itens do seu carrinho.",
   COMBO_NOT_MATCHED: "Seu carrinho ainda não tem todos os itens deste combo.",
   ZERO_VALUE: "Este cupom não vale para os itens do seu carrinho.",

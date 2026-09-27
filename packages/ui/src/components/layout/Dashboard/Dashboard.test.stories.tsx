@@ -28,13 +28,15 @@ const Composed = ({ onExport = fn() }: { onExport?: (id: string) => void }) => (
   <Dashboard activeFilterCount={2}>
     <Dashboard.Breadcrumb items={[{ label: 'Admin', href: '#' }, { label: 'Products' }]} />
     <Dashboard.Header title="Products">
-      <Dashboard.Info title="About Products">Manage your catalog.</Dashboard.Info>
-      <Dashboard.FilterToggle />
-      <Dashboard.Settings title="Product settings">
+      <Dashboard.Info title="About Products" ariaLabel="Informações da página">
+        Manage your catalog.
+      </Dashboard.Info>
+      <Dashboard.FilterToggle hideLabel="Ocultar filtros" showLabel="Mostrar filtros" />
+      <Dashboard.Settings title="Product settings" ariaLabel="Configurações">
         <Typography>In development.</Typography>
       </Dashboard.Settings>
       <Dashboard.Spacer />
-      <Dashboard.Export onExport={onExport} />
+      <Dashboard.Export onExport={onExport} label="Exportar" />
       <Dashboard.Action>
         <Button variant="contained">New product</Button>
       </Dashboard.Action>

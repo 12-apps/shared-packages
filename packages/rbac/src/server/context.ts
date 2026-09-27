@@ -215,10 +215,11 @@ export interface RbacServerConfig<
   /** The host's user directory (roster identity). */
   directory: RbacUserDirectory;
   /**
-   * Roles the roster may hand out as a member's BASE role
-   * (`PATCH /team/:userId`). ENFORCED before governance: a name outside the
-   * set is the wire's 400. Defaults to the non-owner template names — a
-   * custom role is additive (`POST /team/:userId/roles`), never a base.
+   * The SYSTEM (template) roles the roster may hand out — through an invite,
+   * any number at once, and through the legacy `PATCH /team/:userId` swap.
+   * ENFORCED before governance: a system name outside the set is the wire's
+   * 400. Defaults to the non-owner template names. It is a set of roles that
+   * may be granted, never a cap on how many one member holds.
    */
   assignableBaseRoles?: readonly string[];
   /**

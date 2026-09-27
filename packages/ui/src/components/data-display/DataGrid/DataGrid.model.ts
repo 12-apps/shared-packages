@@ -15,11 +15,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 
 import { rem, remPx } from '../../../tokens/relative';
+import { useDensity, type DensityLevel } from '../../../tokens/density';
 
 import { processRows } from './DataGrid.rows';
 import type {
   DataGridProps,
   GridColumn,
+  GridDensity,
   GridFilter,
   GridSort,
   SortDirection,
@@ -50,6 +52,13 @@ export interface VisibleRange {
 /** Everything the render needs, and nothing it has to derive. */
 export interface DataGridModel<T extends Record<string, unknown>> {
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /**
+   * The density this render actually used: `props.density`, else the
+   * theme-driven default (FUT-2769, {@link mapThemeToGridDensity}). The same
+   * value `rowHeight` was scaled by — read it here rather than re-deriving it,
+   * so the reported default and the geometry can never disagree.
+   */
+  density: GridDensity;
   /** A row's height as CSS: the design height, density applied, through `rem`. */
   rowHeight: string;
   /**
@@ -80,6 +89,21 @@ function densityHeight(base: number, density: DataGridProps['density']): number 
   if (density === 'compact') return Math.max(base * 0.8, 32);
   if (density === 'spacious') return base * 1.2;
   return base;
+}
+
+/**
+ * The theme's density level, aliased to `GridDensity` (FUT-2769 — umbrella
+ * Decision 7, non-breaking): `GridDensity`'s three names are not the theme's
+ * three names, so this is an alias table rather than a verbatim read.
+ * `'normal'` (the theme's own default, and what a theme with no density at
+ * all resolves to) maps to `'comfortable'` — today's literal default,
+ * unchanged — so the mapping is a no-op exactly when nothing about density
+ * has been said.
+ */
+export function mapThemeToGridDensity(level: DensityLevel): GridDensity {
+  if (level === 'compact') return 'compact';
+  if (level === 'comfortable') return 'spacious';
+  return 'comfortable';
 }
 
 /** The rows this render should show, with every client-mode step resolved. */
@@ -292,11 +316,15 @@ export function useDataGridModel<T extends Record<string, unknown>>(
 ): DataGridModel<T> {
   const { columns } = props;
   const theme = useTheme();
+  const themeDensity = useDensity();
   const containerRef = useRef<HTMLDivElement>(null);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const { sortBy, filters, setInternalSortBy } = useSortAndFilter(props);
+  // An explicit `density` prop wins; otherwise the theme's own level, aliased
+  // to this grid's three names (FUT-2769).
+  const density = props.density ?? mapThemeToGridDensity(themeDensity.level ?? 'normal');
   // 52 design px unless the caller says; the density scales it, then the type scale does.
-  const designRowHeight = densityHeight(props.rowHeight ?? 52, props.density);
+  const designRowHeight = densityHeight(props.rowHeight ?? 52, density);
   const rowPitch = remPx(theme, designRowHeight);
   const columnMap = useMemo(
     () => new Map(columns.map((column) => [column.id, column])),
@@ -311,6 +339,7 @@ export function useDataGridModel<T extends Record<string, unknown>>(
 
   return {
     containerRef,
+    density,
     rowHeight: rem(theme, designRowHeight),
     rowPitch,
     visibleColumns,

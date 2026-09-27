@@ -309,7 +309,7 @@ describe("DataViews scopes", () => {
     const { server } = harness();
     renderGrid({ scopes: SCOPES, server, rowActions: [{ id: "x", label: "X", onSelect: vi.fn() }] });
 
-    fireEvent.click(screen.getByLabelText("Select all rows"));
+    fireEvent.click(screen.getByLabelText("Selecionar todas as linhas"));
     await waitFor(() => expect(screen.getByTestId("pagamentos-clear-all")).toBeInTheDocument());
 
     fireEvent.click(tab("recusados"));

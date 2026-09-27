@@ -45,6 +45,11 @@ interface PillControlProps<T extends Record<string, unknown>> {
   onClearField: (fieldId: string) => void;
   onOpenChange?: (open: boolean) => void;
   testIdPrefix: string;
+  /**
+   * Overrides the `<prefix>-filter-<id>` test id — the "Mais" panel keys its
+   * fields `<prefix>-more-<id>` so a spec can tell which surface it drove.
+   */
+  testId?: string;
   /** `stacked` in the filter panel, `pill` on the inline bar. */
   layout?: "stacked" | "pill";
 }
@@ -70,10 +75,10 @@ export function PillControl<T extends Record<string, unknown>>({
   onClearField,
   onOpenChange,
   testIdPrefix,
+  testId = `${testIdPrefix}-filter-${fieldId}`,
   layout = "pill",
 }: PillControlProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
-  const testId = `${testIdPrefix}-filter-${fieldId}`;
   if (pill.control === "category") {
     return (
       <CategorySelect

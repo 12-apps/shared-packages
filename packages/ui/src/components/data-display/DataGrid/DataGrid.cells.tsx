@@ -24,6 +24,7 @@ import { rem } from '../../../tokens/relative';
 import { cellValue } from './DataGrid.rows';
 import type { DataGridModel } from './DataGrid.model';
 import type { DataGridProps, GridColumn, GridSort } from './DataGrid.types';
+import type { DataGridCopy } from '../../../copy';
 
 /** The glyph for a column's current sort state — unsorted included. */
 function SortIcon({ dir }: { dir: GridSort['dir'] | undefined }): React.JSX.Element {
@@ -68,6 +69,7 @@ export interface HeaderCellProps<T extends Record<string, unknown>> {
   /** The header row's height, as CSS. */
   headerHeight: string;
   onSort: (columnId: string) => void;
+  copy: DataGridCopy;
 }
 
 export function HeaderCell<T extends Record<string, unknown>>({
@@ -77,6 +79,7 @@ export function HeaderCell<T extends Record<string, unknown>>({
   stickyHeader,
   headerHeight,
   onSort,
+  copy,
 }: HeaderCellProps<T>): React.JSX.Element {
   const theme = useTheme();
   const content = column.headerCell ? column.headerCell(column) : column.header;
@@ -109,7 +112,7 @@ export function HeaderCell<T extends Record<string, unknown>>({
             '&:hover': { backgroundColor: 'transparent', opacity: 0.8 },
           }}
           endIcon={<SortIcon dir={sort?.dir} />}
-          aria-label={column.ariaLabel ?? `Sort by ${String(column.header)}`}
+          aria-label={column.ariaLabel ?? copy.sortBy(String(column.header))}
         >
           {content}
         </Button>
@@ -206,7 +209,7 @@ function RowControls<T extends Record<string, unknown>>({
           <Checkbox
             checked={isSelected}
             onChange={(event) => model.onToggleRow(rowId, event.target.checked)}
-            inputProps={{ 'aria-label': `Select row ${index + 1}` }}
+            inputProps={{ 'aria-label': props.copy.selectRow(index + 1) }}
           />
         </TableCell>
       )}
@@ -224,8 +227,8 @@ function RowControls<T extends Record<string, unknown>>({
               aria-expanded={isExpanded}
               aria-label={
                 isExpanded
-                  ? (expansion.collapseLabel ?? 'Collapse row')
-                  : (expansion.expandLabel ?? 'Expand row')
+                  ? (expansion.collapseLabel ?? props.copy.collapseRow)
+                  : (expansion.expandLabel ?? props.copy.expandRow)
               }
               data-slot="expand-toggle"
             >

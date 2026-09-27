@@ -1,4 +1,8 @@
 {
+  "packages/ui/src/components/layout/SettingsLayout/SettingsSectionChips.scroll.ts — raw-length ×3": {
+    "kind": "exempt",
+    "why": "detectRtlScrollType's throwaway, off-screen probe div (FUT-2775): the pixel values are the feature-detection MECHANISM (inner box wider than outer, so there is something to scroll, held far off-screen), not a drawn size — they carry no visual density and must not track the theme's spacing scale"
+  },
   "packages/ui/src/components/data-display/Chart/chart-axis.ts — raw-number-length ×1": {
     "kind": "exempt",
     "why": "tickMargin is a parameter that already holds getSizeStyles' remPx value; the scanner cannot trace a relative value through a function parameter"

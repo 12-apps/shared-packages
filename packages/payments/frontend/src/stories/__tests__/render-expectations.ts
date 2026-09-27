@@ -155,6 +155,10 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["payment-paid", "payment-receipt"],
     text: ["Pedido confirmado"],
   },
+  "Screens/StatusPaidWithHostHero": {
+    testIds: ["payment-paid", "payment-paid-hero", "payment-receipt"],
+    text: ["Pedido confirmado"],
+  },
   "Screens/StatusFailed": {
     testIds: ["payment-failed"],
     text: ["Nenhum valor foi cobrado. Você pode tentar novamente."],
@@ -649,5 +653,18 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // package defect the story documents, not a contract.
   "Headless/ChargeRefusedAndReset": {
     text: ["Provedor ativo aurora", "taxId", "Tentar de novo"],
+  },
+
+  // ----------------------------------------------------------- TenderSplit
+  // At rest nothing is picked: every tender is a card, the bar names the
+  // whole bill as missing, and the confirm asks for a first tender.
+  "TenderSplit/PtBr": {
+    testIds: ["tender-split-option-CASH", "tender-split-option-PIX", "tender-split-confirm"],
+    text: ["Falta R$ 444,40", "Escolha a forma"],
+    absentTestIds: ["tender-split-change"],
+  },
+  "TenderSplit/EnUs": {
+    testIds: ["tender-split-option-CASH", "tender-split-confirm"],
+    text: ["Left $82.00", "Pick a method"],
   },
 };

@@ -21,7 +21,7 @@
 import { render, screen } from '@testing-library/react';
 import type { JSX } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { composePermissions, labelsOf } from '../core/compose';
 import { definePermissionContribution } from '../core/contribution';
@@ -29,6 +29,25 @@ import { createWebRbac } from '../react/create-web-rbac';
 import { createRbacLabels } from '../react/labels';
 import { PT_BR_RBAC_WEB_COPY } from '../react/pt-BR';
 import { RBAC_PERMISSIONS } from '../permissions';
+
+// FUT-2778: profiled rather than assumed a slow step exists. The one test
+// that gets close to the default 5s budget — "renders a role`s label in the
+// reader`s language", the suite's only full `TeamScreen` mount through
+// `createWebRbac` — has no isolable offender: no slow `beforeEach`, and its
+// `findByText` is the same one-line wait every other (fast) test in this
+// suite uses. What is expensive is diffuse: composing the catalog, building
+// the RBAC context and rendering the roster's MUI `DataGrid` all synchronously
+// ahead of that wait, in jsdom.
+//
+// Reproduced under synthetic CPU contention on this box (4 cores): unloaded
+// that test runs in ~450ms; at this ticket's observed CI load (~23) it threw
+// `Test timed out in 5000ms` while every other test in the file stayed
+// proportionally fast — the cost scales with load, not with one bad line.
+// Fallback per the ticket's Decision: widen the budget for this file only,
+// never quarantine (every test here keeps running, every push). 30s matches
+// this repo's other real-timer-heavy suite (`packages/payments/frontend`'s
+// `testTimeout: 30_000`, same reasoning).
+vi.setConfig({ testTimeout: 30_000 });
 
 /** The demo library's own domain, in both of the languages it serves. */
 const PT_BR_SHELVES = {

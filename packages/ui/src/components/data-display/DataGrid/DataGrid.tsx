@@ -19,7 +19,7 @@ import type React from 'react';
 import { GridBody, GridHeader } from './DataGrid.body';
 import { useDataGridModel } from './DataGrid.model';
 import { DataGridEmpty, DataGridError, DataGridLoading } from './DataGrid.states';
-import type { DataGridProps } from './DataGrid.types';
+import type { DataGridProps, GridDensity } from './DataGrid.types';
 
 /**
  * The chrome every render needs, with the defaults resolved ONCE.
@@ -28,7 +28,10 @@ import type { DataGridProps } from './DataGrid.types';
  * a dozen branches: the gate counted them, correctly, as complexity the render
  * did not need to carry.
  */
-function resolveChrome<T extends Record<string, unknown>>(props: DataGridProps<T>): {
+function resolveChrome<T extends Record<string, unknown>>(
+  props: DataGridProps<T>,
+  density: GridDensity,
+): {
   dataAttrs: Record<string, unknown>;
   placeholder: {
     dataTestId?: string;
@@ -43,7 +46,9 @@ function resolveChrome<T extends Record<string, unknown>>(props: DataGridProps<T
   return {
     dataAttrs: {
       'data-ui': 'datagrid',
-      'data-density': props.density ?? 'comfortable',
+      // The SAME resolved density the row-height geometry used (FUT-2769) —
+      // not re-derived here, so this attribute can never disagree with it.
+      'data-density': density,
       'data-size-mode': props.sizeMode ?? 'auto',
       'data-virtual-rows': props.virtualizeRows ?? true,
       'data-virtual-cols': props.virtualizeColumns ?? false,
@@ -51,7 +56,7 @@ function resolveChrome<T extends Record<string, unknown>>(props: DataGridProps<T
     },
     placeholder: {
       dataTestId,
-      ariaLabel: props.ariaLabel ?? 'Data grid',
+      ariaLabel: props.ariaLabel ?? props.copy.gridLabel,
       className,
       style,
       // Only the DOM-safe leftovers reach the element: every grid-specific prop
@@ -65,7 +70,7 @@ export const DataGrid = <T extends Record<string, unknown> = Record<string, unkn
   props: DataGridProps<T>,
 ): React.JSX.Element => {
   const model = useDataGridModel(props);
-  const { dataAttrs, placeholder } = resolveChrome(props);
+  const { dataAttrs, placeholder } = resolveChrome(props, model.density);
 
   if (props.loading) return <DataGridLoading {...placeholder} />;
   if (props.error) return <DataGridError {...placeholder} error={props.error} />;
@@ -117,6 +122,7 @@ export const DataGrid = <T extends Record<string, unknown> = Record<string, unkn
  * none reaches the DOM — the check that would have caught `emptyText` missing.
  */
 export const GRID_ONLY_PROPS = [
+  'copy',
   'rows',
   'columns',
   'getRowId',

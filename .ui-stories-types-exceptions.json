@@ -28,7 +28,6 @@
   "packages/ui/src/components/data-display/Table/Table.stories.tsx ×47": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/data-display/Table/Table.test.stories.tsx ×14": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/data-display/Timeline/Timeline.test.stories.tsx ×39": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
-  "packages/ui/src/components/data-display/TimingDiagram/TimingDiagram.test.stories.tsx ×1": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/data-display/Tooltip/Tooltip.test.stories.tsx ×2": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/feedback/ConfirmAction/ConfirmAction.test.stories.tsx ×3": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",
   "packages/ui/src/components/feedback/Dialog/Dialog.test.stories.tsx ×17": "grandfathered: pre-existing type error in a story that predates the stories type-check lane (FUT-2699)",

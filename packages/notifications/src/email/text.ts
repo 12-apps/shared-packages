@@ -19,7 +19,10 @@ import type { EmailDocument } from './template';
  * Not a courtesy. Every major spam filter scores a `text/html` part with no
  * `text/plain` twin, and a watch, a terminal client and a screen reader in
  * plain-text mode show this and nothing else. It is rendered from the SAME
- * object, so it cannot say less than the HTML does.
+ * object, so it cannot say less than the HTML does — with one deliberate
+ * exception: the `hero` image is left out. It is decoration beside a heading
+ * that already says everything, and its alt text read out in a text part is
+ * noise, which is how mail clients treat a blocked image too.
  */
 export function renderEmailText(document: EmailDocument): string {
   const blocks = [

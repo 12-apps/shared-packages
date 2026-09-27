@@ -55,7 +55,7 @@ function HeaderControls<T extends Record<string, unknown>>({
                     : [],
                 )
               }
-              inputProps={{ 'aria-label': 'Select all rows' }}
+              inputProps={{ 'aria-label': props.copy.selectAllRows }}
             />
           )}
         </TableCell>
@@ -98,6 +98,7 @@ export function GridHeader<T extends Record<string, unknown>>(
             stickyHeader={stickyHeader}
             headerHeight={headerHeight}
             onSort={model.onSort}
+            copy={props.copy}
           />
         ))}
       </TableRow>

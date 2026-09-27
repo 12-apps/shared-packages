@@ -1,7 +1,9 @@
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
+import { PT_BR_DATA_GRID_COPY, PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
+import { resolveDensityFactor } from '../../../tokens/density';
 import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
 
@@ -47,6 +49,7 @@ const meta: Meta<typeof DataGrid> = {
   component: DataGrid,
   args: {
     emptyText: PT_BR_DATA_STATE_COPY.empty,
+    copy: PT_BR_DATA_GRID_COPY,
   },
   parameters: {
     layout: 'fullscreen',
@@ -137,7 +140,7 @@ export const ClientSortingTest: Story = {
 
     await step('Should sort by name ascending', async () => {
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       expect(nameHeader).toHaveAttribute('aria-sort', 'none');
 
       await userEvent.click(sortButton);
@@ -151,7 +154,7 @@ export const ClientSortingTest: Story = {
 
     await step('Should sort by name descending on second click', async () => {
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       await userEvent.click(sortButton);
       await waitFor(
         () => {
@@ -163,7 +166,7 @@ export const ClientSortingTest: Story = {
 
     await step('Should clear sort on third click', async () => {
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       await userEvent.click(sortButton);
       await waitFor(
         () => {
@@ -189,7 +192,7 @@ export const ServerSortingTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Should call onRequestData when sorting', async () => {
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       await userEvent.click(sortButton);
 
       await waitFor(() => {
@@ -223,7 +226,7 @@ export const SingleSelectionTest: Story = {
       expect(checkboxes.length).toBeGreaterThan(0);
 
       const firstRowCheckbox = checkboxes[0]; // Should be first row checkbox in single mode
-      expect(firstRowCheckbox).toHaveAttribute('aria-label', 'Select row 1');
+      expect(firstRowCheckbox).toHaveAttribute('aria-label', PT_BR_DATA_GRID_COPY.selectRow(1));
 
       await userEvent.click(firstRowCheckbox);
 
@@ -282,6 +285,10 @@ export const MultiSelectionTest: Story = {
     await step('Should support select all functionality', async () => {
       const checkboxes = canvas.getAllByRole('checkbox');
       const headerCheckbox = checkboxes[0];
+      expect(headerCheckbox).toHaveAttribute(
+        'aria-label',
+        PT_BR_DATA_GRID_COPY.selectAllRows,
+      );
 
       await userEvent.click(headerCheckbox);
 
@@ -323,7 +330,7 @@ export const KeyboardNavigationTest: Story = {
 
     await step('Should allow keyboard interaction with interactive elements', async () => {
       // Test that sortable headers can be activated with keyboard
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       expect(sortButton).toBeInTheDocument();
 
       // Test that checkboxes can be focused and activated
@@ -354,7 +361,7 @@ export const RowExpansionTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Should expand row when clicking expand button', async () => {
-      const expandButtons = canvas.getAllByLabelText(/expand row/i);
+      const expandButtons = canvas.getAllByLabelText(/expandir linha/i);
       const firstExpandButton = expandButtons[0];
 
       await userEvent.click(firstExpandButton);
@@ -365,7 +372,7 @@ export const RowExpansionTest: Story = {
     });
 
     await step('Should collapse row when clicking collapse button', async () => {
-      const collapseButton = canvas.getByLabelText(/collapse row/i);
+      const collapseButton = canvas.getByLabelText(/recolher linha/i);
       await userEvent.click(collapseButton);
 
       const expansion = canvas.queryByTestId('expansion-1');
@@ -604,7 +611,28 @@ export const EdgeCasesTest: Story = {
   },
 };
 
-// 17. Integration Tests
+// 17. Default Copy Fallback Test — no `ariaLabel` given, so the grid's own
+// accessible name must fall back to `copy.gridLabel` rather than an English
+// literal.
+export const DefaultCopyFallbackTest: Story = {
+  name: 'Test: Default Copy Fallbacks',
+  args: {
+    // Cast the same way every other story here would need to (FUT-2699's
+    // stories-types lane): `Meta<typeof DataGrid>` infers `args` over the
+    // component's default `Record<string, unknown>`, which `TestRow` (a
+    // plain interface, no index signature) is not directly assignable to.
+    rows: generateTestData(3) as unknown as Record<string, unknown>[],
+    columns: testColumns as unknown as GridColumn<Record<string, unknown>>[],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const grid = canvas.getByRole('grid', { name: PT_BR_DATA_GRID_COPY.gridLabel });
+    expect(grid).toBeInTheDocument();
+  },
+};
+
+// 18. Integration Tests
 export const IntegrationTest: Story = {
   name: 'Test: Integration',
   args: {
@@ -635,13 +663,60 @@ export const IntegrationTest: Story = {
       expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
 
       // Test expansion
-      const expandButtons = canvas.getAllByLabelText(/expand row/i);
+      const expandButtons = canvas.getAllByLabelText(/expandir linha/i);
       await userEvent.click(expandButtons[0]);
 
       // All features should work together
       expect(checkboxes[1]).toBeChecked();
       expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
       expect(canvas.getByText('Expanded: User 1')).toBeInTheDocument();
+    });
+  },
+};
+
+// A row type that satisfies `DataGrid`'s own `T extends Record<string, unknown>`
+// (unlike `TestRow`, which `Meta<typeof DataGrid>` already widens for every
+// OTHER story here through `args` — a pre-existing, grandfathered mismatch,
+// `.ui-stories-types-exceptions.json`, FUT-2699's ratchet). That ratchet only
+// SHRINKS, so this story is rendered explicitly, `<DataGrid<ThemeDensityRow>
+// .../>`, against the real generic component instead of through `args`.
+interface ThemeDensityRow extends Record<string, unknown> {
+  id: number;
+  name: string;
+}
+
+const themeDensityRows: ThemeDensityRow[] = [
+  { id: 1, name: 'Ana' },
+  { id: 2, name: 'Bruno' },
+];
+
+const themeDensityColumns: GridColumn<ThemeDensityRow>[] = [
+  { id: 'id', header: 'ID', accessor: 'id', type: 'number' },
+  { id: 'name', header: 'Name', accessor: 'name', type: 'text' },
+];
+
+// 18. Theme-driven density default (FUT-2769): with no explicit `density`
+// prop, the theme's own level picks the grid's default through the alias
+// table (`mapThemeToGridDensity`) — 'compact' theme level ⇒ 'compact' grid.
+export const ThemeDensityDefaultTest: Story = {
+  name: 'Test: Theme-driven density default',
+  render: () => (
+    <ThemeProvider theme={createTheme({ density: resolveDensityFactor('compact') })}>
+      <DataGrid<ThemeDensityRow>
+        rows={themeDensityRows}
+        columns={themeDensityColumns}
+        ariaLabel="Theme-densitied data grid"
+        emptyText={PT_BR_DATA_STATE_COPY.empty}
+        copy={PT_BR_DATA_GRID_COPY}
+      />
+    </ThemeProvider>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Should default to the theme-mapped density with no density prop', async () => {
+      const grid = canvas.getByRole('grid');
+      expect(grid).toHaveAttribute('data-density', 'compact');
     });
   },
 };

@@ -35,6 +35,15 @@ interface AutocompleteState<T> {
   setJustCompletedGhost: Setter<boolean>;
   userClosedDropdown: boolean;
   setUserClosedDropdown: Setter<boolean>;
+  /**
+   * Mirrors `userClosedDropdown`, set synchronously wherever the state is
+   * (see {@link setDeliberateClose}). An effect scheduled by one render and
+   * flushed after a LATER render has already changed this flag reads a
+   * stale, closed-over `userClosedDropdown` — but `.current` on a ref is
+   * dereferenced live, so it always reflects the latest write regardless of
+   * which render's closure is doing the reading (FUT-2780).
+   */
+  userClosedDropdownRef: React.RefObject<boolean>;
   inputRef: React.RefObject<HTMLInputElement | null>;
   listRef: React.RefObject<HTMLUListElement | null>;
   debounceRef: React.RefObject<number | undefined>;
@@ -50,6 +59,7 @@ function useAutocompleteState<T>(value: string, suggestions: T[]): AutocompleteS
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [justCompletedGhost, setJustCompletedGhost] = useState(false);
   const [userClosedDropdown, setUserClosedDropdown] = useState(false);
+  const userClosedDropdownRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
   const debounceRef = useRef<number | undefined>(undefined);
@@ -57,8 +67,19 @@ function useAutocompleteState<T>(value: string, suggestions: T[]): AutocompleteS
     open, setOpen, activeIndex, setActiveIndex, ghost, setGhost, inputValue, setInputValue,
     composition, setComposition, filteredSuggestions, setFilteredSuggestions, isInputFocused,
     setIsInputFocused, justCompletedGhost, setJustCompletedGhost, userClosedDropdown,
-    setUserClosedDropdown, inputRef, listRef, debounceRef,
+    setUserClosedDropdown, userClosedDropdownRef, inputRef, listRef, debounceRef,
   };
+}
+
+/**
+ * Set the "this close was deliberate" flag in both the ref effects read
+ * synchronously (live, even from a stale closure) and the state the rest of
+ * the component reads for render — every call site that touches
+ * `userClosedDropdown` goes through this so the two never drift (FUT-2780).
+ */
+function setDeliberateClose<T>(s: AutocompleteState<T>, closed: boolean): void {
+  s.userClosedDropdownRef.current = closed;
+  s.setUserClosedDropdown(closed);
 }
 
 // ---- effects (one tiny hook each; explicit params keep deps complete) --------
@@ -101,17 +122,17 @@ function useLoadingOpen(
   isLoading: boolean,
   inputValue: string,
   disabled: boolean,
-  userClosedDropdown: boolean,
+  userClosedDropdownRef: React.RefObject<boolean>,
   setOpen: Setter<boolean>,
   setActiveIndex: Setter<number>,
 ): void {
   useEffect(() => {
-    if (isLoading && inputValue.trim().length > 0 && !disabled && !userClosedDropdown) setOpen(true);
+    if (isLoading && inputValue.trim().length > 0 && !disabled && !userClosedDropdownRef.current) setOpen(true);
     if (disabled) {
       setOpen(false);
       setActiveIndex(-1);
     }
-  }, [isLoading, inputValue, disabled, userClosedDropdown, setOpen, setActiveIndex]);
+  }, [isLoading, inputValue, disabled, userClosedDropdownRef, setOpen, setActiveIndex]);
 }
 
 /** Inputs to the auto-open check, all primitive/stable so effect deps stay complete. */
@@ -120,7 +141,7 @@ interface AutoOpenArgs {
   isInputFocused: boolean;
   composition: boolean;
   justCompletedGhost: boolean;
-  userClosedDropdown: boolean;
+  userClosedDropdownRef: React.RefObject<boolean>;
   activeIndex: number;
   setOpen: Setter<boolean>;
   setActiveIndex: Setter<number>;
@@ -133,7 +154,7 @@ function maybeAutoOpen(a: AutoOpenArgs, hasResults: boolean): void {
     a.isInputFocused &&
     !a.composition &&
     !a.justCompletedGhost &&
-    !a.userClosedDropdown;
+    !a.userClosedDropdownRef.current;
   if (!canAutoOpen) return;
   a.setOpen(true);
   if (hasResults && a.activeIndex === -1) a.setActiveIndex(0);
@@ -146,7 +167,7 @@ function useLocalFilter<T>(p: AutocompleteProps<T>, s: AutocompleteState<T>): vo
   const async = Boolean(p.async);
   const {
     inputValue, isInputFocused, composition, justCompletedGhost, userClosedDropdown, activeIndex,
-    setFilteredSuggestions, setOpen, setActiveIndex,
+    setFilteredSuggestions, setOpen, setActiveIndex, userClosedDropdownRef,
   } = s;
   useEffect(() => {
     const suggestions = propSuggestions ?? [];
@@ -157,12 +178,17 @@ function useLocalFilter<T>(p: AutocompleteProps<T>, s: AutocompleteState<T>): vo
     const filtered = filterSuggestions(suggestions, inputValue, matchMode, getLabel);
     setFilteredSuggestions(filtered);
     maybeAutoOpen(
-      { inputValue, isInputFocused, composition, justCompletedGhost, userClosedDropdown, activeIndex, setOpen, setActiveIndex },
+      { inputValue, isInputFocused, composition, justCompletedGhost, userClosedDropdownRef, activeIndex, setOpen, setActiveIndex },
       filtered.length > 0,
     );
+    // `userClosedDropdown` (state) stays a dependency so this effect still
+    // reruns on every change of it, same as before — only the VALUE read
+    // inside `maybeAutoOpen` moved to the ref (see `userClosedDropdownRef`'s
+    // doc comment).
   }, [
     propSuggestions, inputValue, async, getLabel, matchMode, isInputFocused, composition,
     justCompletedGhost, userClosedDropdown, activeIndex, setFilteredSuggestions, setOpen, setActiveIndex,
+    userClosedDropdownRef,
   ]);
 }
 
@@ -189,7 +215,7 @@ function commitMultiSelect<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteS
   if (!current.some((sel) => getKey(sel) === getKey(item))) p.onSelectedItemsChange?.([...current, item]);
   s.setInputValue('');
   onChange('');
-  s.setUserClosedDropdown(false);
+  setDeliberateClose(s, false);
 }
 
 function commitSingleSelect<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState<T>, onChange: (v: string) => void): void {
@@ -219,6 +245,14 @@ function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState
   // commitMultiSelect already clears inputValue and resets the flag itself,
   // so the empty-input branch of the filter effect keeps the list closed.
   const isSingleSelectPick = isLink || !p.multiple;
+  // Cancel a still-pending keystroke debounce BEFORE dispatching the pick, so
+  // no branch below — including `openLink`, which never touches `onChange`
+  // at all — can leave it armed to fire the STALE pre-pick text later
+  // (FUT-2779 #1). `commitSingleSelect`/`commitMultiSelect` already clear it
+  // as a side effect of calling the same `debouncedOnChange`; this makes it
+  // unconditional so a `link` pick (which skips `onChange` entirely) is
+  // covered too.
+  if (s.debounceRef.current) window.clearTimeout(s.debounceRef.current);
   commitPick(item, isLink ? (url as string) : null, p, s, onChange);
   s.setOpen(false);
   s.setActiveIndex(-1);
@@ -227,8 +261,11 @@ function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState
   // Set LAST so a re-fired `onFocus` cannot clear the flag. The close itself
   // relies on the input never blurring during a pick (the option's
   // `onMouseDown` preventDefault, and Enter keeps focus): `onFocus` reopens a
-  // non-empty input directly, without reading this flag.
-  if (isSingleSelectPick) s.setUserClosedDropdown(true);
+  // non-empty input directly, without reading this flag. The REF half is set
+  // in the same synchronous tick as the pick, so an effect scheduled by an
+  // earlier keystroke — and still pending when this runs — reads the
+  // up-to-date value instead of the one it closed over (FUT-2780).
+  if (isSingleSelectPick) setDeliberateClose(s, true);
 }
 
 function buildKeyContext<T>(
@@ -244,7 +281,8 @@ function buildKeyContext<T>(
     multiple: Boolean(p.multiple), selectedItems: p.selectedItems ?? [],
     getLabel: p.getLabel ?? defaultGetLabel,
     getSuggestionType: p.getSuggestionType ?? defaultGetSuggestionType,
-    setOpen: s.setOpen, setActiveIndex: s.setActiveIndex, setUserClosedDropdown: s.setUserClosedDropdown,
+    setOpen: s.setOpen, setActiveIndex: s.setActiveIndex,
+    setUserClosedDropdown: (closed: boolean) => setDeliberateClose(s, closed),
     setInputValue: s.setInputValue, setGhost: s.setGhost, setJustCompletedGhost: s.setJustCompletedGhost,
     debouncedOnChange: onChange, selectItem, onSelectedItemsChange: p.onSelectedItemsChange,
   };
@@ -287,7 +325,7 @@ export function useAutocomplete<T>(p: AutocompleteProps<T>): AutocompleteView<T>
     Boolean(p.isLoading),
     s.inputValue,
     Boolean(p.disabled),
-    s.userClosedDropdown,
+    s.userClosedDropdownRef,
     s.setOpen,
     s.setActiveIndex,
   );
@@ -315,11 +353,20 @@ export function useAutocomplete<T>(p: AutocompleteProps<T>): AutocompleteView<T>
       s.setInputValue(e.target.value);
       debouncedOnChange(e.target.value);
       if (!s.open || s.filteredSuggestions.length === 0) s.setActiveIndex(-1);
-      s.setUserClosedDropdown(false);
+      setDeliberateClose(s, false);
     },
+    // Unconditionally reopens on a non-empty input, unguarded by
+    // `userClosedDropdownRef` — plausible on a touch device that blurs the
+    // input on `touchstart` before a tap's own `click`/`mousedown` reaches the
+    // option (FUT-2779 #2). Checked under Playwright touch emulation
+    // (`hasTouch`/`isMobile` context, both the `.tap()` API and raw CDP
+    // `Input.dispatchTouchEvent` at the option's coordinates) against this
+    // Chromium build: `document.activeElement` never left the input across
+    // the touch, so the reopen never happened — not reproduced, left
+    // unguarded per the ticket's decision rather than fixed blind.
     onFocus: (): void => {
       s.setIsInputFocused(true);
-      s.setUserClosedDropdown(false);
+      setDeliberateClose(s, false);
       if (!s.inputValue.trim()) return;
       s.setOpen(true);
       if (s.filteredSuggestions.length > 0 && s.activeIndex === -1) s.setActiveIndex(0);
@@ -330,7 +377,7 @@ export function useAutocomplete<T>(p: AutocompleteProps<T>): AutocompleteView<T>
     onClickAway: (): void => {
       s.setOpen(false);
       s.setActiveIndex(-1);
-      s.setUserClosedDropdown(true);
+      setDeliberateClose(s, true);
     },
   };
 }

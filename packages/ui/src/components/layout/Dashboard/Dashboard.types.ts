@@ -52,24 +52,32 @@ export interface DashboardHeaderProps {
 
 /** Props for `<Dashboard.Info>` — an `[i]` popover summarising the page. */
 export interface DashboardInfoProps {
-  /** Popover heading. Defaults to `"About this page"`. */
-  title?: ReactNode;
+  /** Popover heading. REQUIRED — the fallback was the English "About this page". */
+  title: ReactNode;
   /** Popover body content. */
   children: ReactNode;
-  /** Accessible label for the trigger. Defaults to `"Page information"`. */
-  ariaLabel?: string;
+  /** Accessible label for the trigger. REQUIRED — the fallback was the English "Page information". */
+  ariaLabel: string;
 }
 
 /** Props for `<Dashboard.FilterToggle>` — the funnel icon. */
 export interface DashboardFilterToggleProps {
-  /** Accessible label. Defaults to a show/hide string based on state. */
-  ariaLabel?: string;
+  /**
+   * Accessible label while `<Dashboard.Filters>` is expanded. REQUIRED — the
+   * fallback was the English "Hide filters".
+   */
+  hideLabel: string;
+  /**
+   * Accessible label while `<Dashboard.Filters>` is collapsed. REQUIRED — the
+   * fallback was the English "Show filters".
+   */
+  showLabel: string;
 }
 
 /** Shared props for both modes of `<Dashboard.Settings>`. */
 interface DashboardSettingsBaseProps {
-  /** Accessible label for the trigger. Defaults to `"Settings"`. */
-  ariaLabel?: string;
+  /** Accessible label for the trigger. REQUIRED — the fallback was the English "Settings". */
+  ariaLabel: string;
 }
 
 /**
@@ -79,8 +87,8 @@ interface DashboardSettingsBaseProps {
 export interface DashboardSettingsDialogProps extends DashboardSettingsBaseProps {
   /** The dialog's close button — a glyph with no visible label. REQUIRED. */
   closeLabel: string;
-  /** Dialog title. Defaults to `"Settings"`. */
-  title?: ReactNode;
+  /** Dialog title. REQUIRED — the fallback was the English "Settings". */
+  title: ReactNode;
   /** Dialog body. */
   children: ReactNode;
   href?: never;
@@ -132,8 +140,10 @@ export interface DashboardExportProps {
   formats?: DashboardExportFormat[];
   /** Invoked with the chosen format id. */
   onExport: (formatId: string) => void;
-  /** Button label. Defaults to `"Export"`. */
-  label?: ReactNode;
+  /**
+   * Button label. REQUIRED — the fallback was the English "Export" (FUT-2568).
+   */
+  label: ReactNode;
 }
 
 /** Props for `<Dashboard.Action>` — a slot for a primary/secondary button. */
