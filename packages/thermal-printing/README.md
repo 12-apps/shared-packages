@@ -238,7 +238,7 @@ and a document over any cap is **refused** — a 0 × 0 result with the reason i
 | output, `MAX_RASTER_WIDTH` × `MAX_RASTER_HEIGHT` | 576 × 2048 dots (checked before allocating, including a height derived from the viewBox) | `output too large` |
 | shapes, `MAX_SHAPES` | 4096 | `too many shapes` |
 | flattened vertices, `MAX_PATH_POINTS` | 250 000 | `too many path points` |
-| scan-conversion work, `MAX_FILL_WORK` | 20 000 000 units (edges considered, n log n per sub-row, plus pixels touched) | `too complex to fill` |
+| scan-conversion work, `MAX_FILL_WORK` | 50 000 000 units, **estimated from the edges before any row is filled** (edge sub-rows × log₂ edges, plus 5 per bounding-box pixel — an upper bound on the real work) | `too complex to fill` |
 
 The document is read by a hand-written linear scanner (no backtracking regular
 expressions, so no crafted comment, attribute or number can make parsing

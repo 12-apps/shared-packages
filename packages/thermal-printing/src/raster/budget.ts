@@ -22,11 +22,14 @@ export const MAX_SHAPES = 4096;
 export const MAX_PATH_POINTS = 250_000;
 
 /**
- * Units of scan-conversion work per document: one per edge considered and one
- * per pixel touched, on every sub-row of every shape. A full-width 576 × 2048
- * logo built from a few dozen shapes spends a few million.
+ * Units of scan-conversion work per document, as ESTIMATED from the edges
+ * before any row is filled (an upper bound on the real work; see
+ * `estimateFillWork` in `./fill`): edge visits per sub-row times the sort's
+ * log factor, plus five units per pixel of each shape's bounding box. A
+ * full-width logo 300 dots tall can stack about sixty shapes that each cover
+ * all of it; real artwork, whose shapes cover a fraction each, far more.
  */
-export const MAX_FILL_WORK = 20_000_000;
+export const MAX_FILL_WORK = 50_000_000;
 
 /** Thrown inside the rasteriser when a budget runs out; caught by `rasterizeSvg`. */
 export class BudgetExceeded extends Error {
@@ -52,6 +55,9 @@ export class Budget {
   }
 
   spend(units: number): void {
+    // A NaN or negative charge would poison the running total and switch the
+    // cap off for every shape after it, so an unmeasurable cost is refused.
+    if (!(units >= 0 && Number.isFinite(units))) throw new BudgetExceeded("too complex to fill");
     this.work += units;
     if (this.work > MAX_FILL_WORK) throw new BudgetExceeded("too complex to fill");
   }
