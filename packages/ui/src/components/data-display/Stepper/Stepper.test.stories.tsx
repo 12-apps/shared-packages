@@ -74,7 +74,7 @@ export const StateChangeTest: Story = {
         const stepIndex = defaultSteps.findIndex((s) => s.id === stepId);
         const newCompleted = new Set(completed);
         for (let i = 0; i < stepIndex; i++) {
-          newCompleted.add(defaultSteps[i].id);
+          newCompleted.add(defaultSteps[i]!.id);
         }
         setCompleted(newCompleted);
       };
@@ -513,7 +513,7 @@ export const Integration: Story = {
         const stepIndex = defaultSteps.findIndex((s) => s.id === stepId);
         const newCompleted = new Set(completed);
         for (let i = 0; i < stepIndex; i++) {
-          newCompleted.add(defaultSteps[i].id);
+          newCompleted.add(defaultSteps[i]!.id);
         }
         setCompleted(newCompleted);
       };
