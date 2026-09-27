@@ -29,8 +29,14 @@ const DIALOG_STATIC_PROPS = {
   // second, non-modal `role="dialog"` this component sets of its own accord
   // — duplicating (and, as a static English literal, contradicting) the name
   // the Paper already carries.
+  //
+  // For the same reason, `role` is deliberately NOT set here (FUT-2861):
+  // `Dialog` destructures `aria-labelledby` and `aria-modal` by name and
+  // applies them to the Paper alongside its own hard-coded `role="dialog"`,
+  // but `role` itself is not one of the props it destructures — a `role`
+  // passed here falls into `...other` and lands a second, unlabelled
+  // `role="dialog"` on the outer Modal root instead of the Paper.
   'aria-labelledby': 'lightbox-title',
-  role: 'dialog',
   'aria-modal': 'true',
 } as const;
 
