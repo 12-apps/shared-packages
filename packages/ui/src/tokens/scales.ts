@@ -49,6 +49,10 @@ export {
   resolveDensityFactor,
   useDensity,
 } from './density';
+// The IconButton/Chip geometry overrides density threads through both
+// consumption paths (FUT-2766) — exported standalone too, for a host that
+// wants JUST these two components' overrides without the rest of density.
+export { chipDensityOverrides, iconButtonDensityOverrides } from './density-overrides';
 
 export interface Accent {
   main: string;

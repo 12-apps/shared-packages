@@ -1,7 +1,11 @@
 import { alpha } from '../../../tokens/color';
 import { EFFECT_GLOW } from '../../../tokens/ink.core';
+import { muiSize } from '../../../tokens/vocabulary';
+import type { SizeValue } from '../../../tokens/vocabulary';
 
-import type { CheckboxVariant } from './Checkbox.base';
+import type { CheckboxSize, CheckboxVariant } from './Checkbox.base';
+
+export type { CheckboxSize } from './Checkbox.base';
 
 /**
  * THE NUMBERS BOTH `Checkbox` RENDERERS DRAW WITH.
@@ -17,12 +21,36 @@ import type { CheckboxVariant } from './Checkbox.base';
 /** MUI's `SwitchBase`: 9px of padding around the glyph, at every size. */
 export const CHECKBOX_PADDING = 9;
 
-/** `SvgIcon`'s own three steps. MUI passes the `size` prop straight to the glyph. */
-export const CHECKBOX_GLYPH_SIZES = { small: 20, medium: 24, large: 35 } as const;
-export type CheckboxSize = keyof typeof CHECKBOX_GLYPH_SIZES;
+/**
+ * `SvgIcon`'s own three steps. MUI passes the `size` prop straight to the
+ * glyph. Typed against {@link CheckboxSize} (declared in `Checkbox.base.ts`,
+ * the contract file, since it is part of the public prop type) rather than the
+ * other way around, so a step added to one and not the other fails here.
+ */
+export const CHECKBOX_GLYPH_SIZES: Record<CheckboxSize, number> = { small: 20, medium: 24, large: 35 };
 
 export const glyphSize = (size: CheckboxSize | undefined): number =>
   CHECKBOX_GLYPH_SIZES[size ?? 'medium'] ?? CHECKBOX_GLYPH_SIZES.medium;
+
+/**
+ * `size` at the MUI boundary.
+ *
+ * A `SizeValue` is translated via `muiSize()` — the pattern `Chip`/`Button`/
+ * `Carousel` already follow. MUI's own deprecated word (see
+ * {@link CheckboxSize}) is passed through UNCHANGED rather than re-derived,
+ * so a caller who has not migrated renders at exactly the size it always has —
+ * translating it through `muiSize()` too would not change any of the three
+ * words' own geometry, but passing it through untouched is the one route that
+ * cannot drift from what "unchanged" already means. `undefined` stays
+ * `undefined`, so a caller who names no size keeps MUI's own default.
+ */
+export const resolveCheckboxSize = (
+  size: SizeValue | CheckboxSize | undefined,
+): CheckboxSize | undefined => {
+  if (size === undefined) return undefined;
+  if (size === 'small' || size === 'medium' || size === 'large') return size;
+  return muiSize(size);
+};
 
 /**
  * The three glyphs MUI draws, by state.

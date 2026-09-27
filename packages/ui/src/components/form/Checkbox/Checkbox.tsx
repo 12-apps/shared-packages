@@ -17,6 +17,7 @@ import {
   CHECKBOX_TRANSITION_MS,
   CHECKBOX_VARIANT,
   effectInk,
+  resolveCheckboxSize,
 } from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types';
 import { splitTestId } from '../../../platform/test-id';
@@ -126,6 +127,7 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
       glow,
       pulse,
       disabled,
+      size,
       ...others
     } = resolveCheckboxProps(rawProps);
     const theme = useTheme();
@@ -142,6 +144,7 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
           glow={glow}
           pulse={pulse}
           disabled={isDisabled}
+          size={resolveCheckboxSize(size)}
           data-testid={dataTestId || 'checkbox'}
           {...props}
         />

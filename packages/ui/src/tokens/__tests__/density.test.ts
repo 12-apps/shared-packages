@@ -294,3 +294,41 @@ describe('densityThemeOptions — fieldHeight and the field components agree wit
     },
   );
 });
+
+/**
+ * FUT-2766 — `IconButton`/`Chip` geometry, on the SAME two paths the
+ * `fieldHeight` describe block above already holds to the same standard: a
+ * host that builds `createTheme()` directly (`densityThemeOptions`) and a
+ * host that goes through `createUiTheme`/`UiProvider` (`muiThemeOptionsFrom`)
+ * must agree, not just on the numbers `iconButtonDensityOverrides`/
+ * `chipDensityOverrides` compute, but on the OVERRIDE OBJECTS themselves —
+ * both call the same module-level style functions, so `toEqual` (which checks
+ * function values by reference) is the stronger, correct assertion here.
+ */
+describe('densityThemeOptions and muiThemeOptionsFrom agree on the MuiIconButton/MuiChip overrides', () => {
+  it.each(['compact', 'normal', 'comfortable', 0.95] as const)(
+    'density=%s: identical MuiIconButton and MuiChip styleOverrides on both paths',
+    (density) => {
+      const standaloneComponents = densityThemeOptions(density).components;
+      const viaUiThemeComponents = muiThemeOptionsFrom(createUiTheme({ density })).components;
+
+      // Both are PRESENT — not just equal because both are undefined, which a
+      // reverted/unwired `components:` merge would also satisfy.
+      expect(standaloneComponents?.MuiIconButton?.styleOverrides?.root).toBeTypeOf('function');
+      expect(standaloneComponents?.MuiChip?.styleOverrides?.label).toBeTypeOf('function');
+      expect(standaloneComponents?.MuiIconButton).toEqual(viaUiThemeComponents?.MuiIconButton);
+      expect(standaloneComponents?.MuiChip).toEqual(viaUiThemeComponents?.MuiChip);
+
+      // End to end: a theme built from either path renders the same computed
+      // style object for every slot this PR adds.
+      const standaloneTheme = createTheme(densityThemeOptions(density));
+      const viaUiThemeTheme = createTheme(muiThemeOptionsFrom(createUiTheme({ density })));
+      const iconRoot = standaloneTheme.components?.MuiIconButton?.styleOverrides?.root as
+        | ((props: { theme: typeof standaloneTheme }) => Record<string, unknown>)
+        | undefined;
+      expect(typeof iconRoot).toBe('function');
+      expect(iconRoot?.({ theme: standaloneTheme })).toEqual({ padding: standaloneTheme.typography.pxToRem(8) });
+      expect(iconRoot?.({ theme: standaloneTheme })).toEqual(iconRoot?.({ theme: viaUiThemeTheme }));
+    },
+  );
+});

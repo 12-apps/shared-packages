@@ -1,10 +1,8 @@
 import type { GestureResponderEvent, StyleProp, ViewProps, ViewStyle } from 'react-native';
 
 import type { CheckboxBaseProps } from './Checkbox.base';
-import type { CheckboxSize } from './Checkbox.metrics';
 
-export type { CheckboxBaseProps, CheckboxVariant } from './Checkbox.base';
-export type { CheckboxSize } from './Checkbox.metrics';
+export type { CheckboxBaseProps, CheckboxSize, CheckboxVariant } from './Checkbox.base';
 
 /**
  * The change a native `Checkbox` reports: the `{ target: { checked } }` shape
@@ -19,8 +17,6 @@ export type CheckboxProps = CheckboxBaseProps &
   Omit<ViewProps, keyof CheckboxBaseProps | 'style'> & {
     checked?: boolean;
     defaultChecked?: boolean;
-    /** MUI's own words for the glyph's size, which is what this component takes. */
-    size?: CheckboxSize;
     onChange?: (event: CheckboxChangeEvent, checked: boolean) => void;
     /** Both spellings fire, as `Button`'s do. */
     onClick?: (event: GestureResponderEvent) => void;

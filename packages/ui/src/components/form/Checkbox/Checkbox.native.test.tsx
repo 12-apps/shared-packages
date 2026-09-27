@@ -112,6 +112,32 @@ describe('Checkbox (native)', () => {
     );
   });
 
+  it('translates the house SizeValue to the same glyph pixels as MUI\'s own word (FUT-2771)', () => {
+    render(
+      <>
+        <Checkbox dataTestId="xs" size="xs" />
+        <Checkbox dataTestId="sm2" size="sm" />
+        <Checkbox dataTestId="md2" size="md" />
+        <Checkbox dataTestId="lg" size="lg" />
+        <Checkbox dataTestId="xl" size="xl" />
+      </>,
+    );
+    const widths = screen
+      .getAllByTestId(`icon-${CHECKBOX_GLYPH.unchecked}`)
+      .map((icon) => icon.getAttribute('width'));
+
+    // xs/sm both draw MUI's `small` (20px), md draws `medium` (24px), lg/xl
+    // both draw `large` (35px) — the same collapse `muiSize()` gives every
+    // other sized component, not a bespoke mapping for this one.
+    expect(widths).toEqual([
+      String(CHECKBOX_GLYPH_SIZES.small),
+      String(CHECKBOX_GLYPH_SIZES.small),
+      String(CHECKBOX_GLYPH_SIZES.medium),
+      String(CHECKBOX_GLYPH_SIZES.large),
+      String(CHECKBOX_GLYPH_SIZES.large),
+    ]);
+  });
+
   it('rounds and scales the glyph box for the two other variants', () => {
     render(
       <>

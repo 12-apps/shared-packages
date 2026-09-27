@@ -1,6 +1,7 @@
 import { useState, type JSX } from 'react';
 
 import { required } from '@12-apps/forms-core';
+import { Alert } from '@12-apps/ui/data-display/Alert';
 import { Checkbox } from '@12-apps/ui/form/Checkbox';
 import {
   Fields,
@@ -14,30 +15,46 @@ import { Text } from '@12-apps/ui/typography/Text';
 import type { TeamScreenCopy } from './copy';
 import type { RbacLabels } from './labels';
 
-/** The values the e-mail + base-role form holds. Strings, as the container wants. */
+/** The values the e-mail form holds. Strings, as the container wants. */
 export interface InviteFormValues extends Record<string, string> {
   email: string;
-  role: string;
 }
 
 /**
- * What one invite asks for: an address, the base role it grants, and any
- * additive custom roles.
+ * What one invite asks for: an address and the roles it grants.
  *
- * The base role is a SINGLE value rather than one entry in a set, which is the
- * one place this differs from `RoleEditDialog`'s unified checklist and is
- * deliberate. Editing an existing member starts from whatever they already
- * hold, so "exactly one system role" is a rule a selection can break and the
- * dialog warns when it does. An invite starts from nothing, so the same rule is
- * better kept by CONSTRUCTION — a control that cannot express zero or two — than
- * by a warning over a submit the person then has to fix.
+ * The picker is ONE checklist over every role the tenant can assign — system
+ * and custom alike, as many as the inviter ticks, all of them if they want —
+ * exactly like the role editor an existing member opens. Person × role × tenant
+ * is N×M×J; nothing about an invite ranks one role above the others.
+ *
+ * The wire still carries it as `role` + `customRoles`, so an invites port that
+ * predates this keeps working: `role` is the first SYSTEM role ticked (absent
+ * when none was), and `customRoles` is every other role ticked, of any kind.
+ * A host grants all of them, additively.
  */
 export interface InviteSelection {
   email: string;
-  /** The system role the membership gets. Always exactly one. */
-  role: string;
-  /** The tenant's own roles, granted on top. May be empty. */
+  /** The first system role ticked, or undefined when every pick is custom. */
+  role?: string;
+  /** Every other role ticked — system or custom. May be empty. */
   customRoles: string[];
+}
+
+/** Split a ticked set into the wire's two fields, in the screen's order. */
+export function toInviteSelection(
+  email: string,
+  picked: ReadonlySet<string>,
+  systemRoles: readonly string[],
+  customRoles: readonly string[],
+): InviteSelection {
+  const ordered = [...systemRoles, ...customRoles].filter((name) => picked.has(name));
+  const role = systemRoles.find((name) => picked.has(name));
+  return {
+    email,
+    ...(role ? { role } : {}),
+    customRoles: ordered.filter((name) => name !== role),
+  };
 }
 
 interface InviteFormBodyProps {
@@ -45,16 +62,17 @@ interface InviteFormBodyProps {
   labels: RbacLabels;
   systemRoles: readonly string[];
   customRoles: readonly string[];
+  /** The role ticked when the form opens. The inviter may add any others. */
   defaultRole: string;
   onSubmit: (selection: InviteSelection) => Promise<void>;
 }
 
 /**
  * The form itself. Mounted under the remount key, so BOTH halves of the
- * selection — the container's fields and the custom-role set below — are
- * cleared by the same gesture. Holding the checkbox state a level up would
- * leave last invite's custom roles ticked on the next one, which is the
- * dangerous direction: the address changes and the grant silently does not.
+ * selection — the container's fields and the role set below — are cleared by
+ * the same gesture. Holding the checkbox state a level up would leave last
+ * invite's roles ticked on the next one, which is the dangerous direction: the
+ * address changes and the grant silently does not.
  */
 function InviteFormBody({
   copy,
@@ -64,7 +82,9 @@ function InviteFormBody({
   defaultRole,
   onSubmit,
 }: InviteFormBodyProps): JSX.Element {
-  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [picked, setPicked] = useState<Set<string>>(
+    () => new Set(defaultRole ? [defaultRole] : []),
+  );
 
   const toggle = (name: string, checked: boolean): void => {
     setPicked((prev) => {
@@ -75,38 +95,51 @@ function InviteFormBody({
     });
   };
 
+  const group = (
+    title: string,
+    names: readonly string[],
+    labelFor: (name: string) => string,
+  ): JSX.Element => (
+    <div>
+      <Text variant="caption" as="p" color="secondary">
+        {title}
+      </Text>
+      <Stack>
+        {names.map((name) => (
+          <Checkbox
+            key={name}
+            label={labelFor(name)}
+            checked={picked.has(name)}
+            data-testid={`invite-role-opt-${name}`}
+            onChange={(_event, checked) => toggle(name, checked)}
+          />
+        ))}
+      </Stack>
+    </div>
+  );
+
   return (
     <FormContainer<InviteFormValues>
-      initialValues={{ email: '', role: defaultRole }}
-      schema={{ email: [required()], role: [required()] }}
-      onSubmit={(values) =>
-        onSubmit({ email: values.email, role: values.role, customRoles: [...picked] })
-      }
+      initialValues={{ email: '' }}
+      schema={{ email: [required()] }}
+      onSubmit={async (values) => {
+        // An invite that grants nothing is refused on screen, where the warning
+        // above already says why — never posted and turned down by the server.
+        if (picked.size === 0) return;
+        await onSubmit(toInviteSelection(values.email, picked, systemRoles, customRoles));
+      }}
       dataTestId="invite-form"
     >
       <Fields.TextField name="email" label={copy.inviteEmailLabel} />
-      <Fields.SelectField
-        name="role"
-        label={copy.inviteRoleLabel}
-        options={systemRoles.map((name) => ({ value: name, label: labels.roleLabel(name) }))}
-      />
-      {customRoles.length > 0 && (
-        <div>
-          <Text variant="caption" as="p" color="secondary">
-            {copy.inviteCustomRolesTitle}
-          </Text>
-          <Stack>
-            {customRoles.map((name) => (
-              <Checkbox
-                key={name}
-                label={name}
-                checked={picked.has(name)}
-                data-testid={`invite-role-opt-${name}`}
-                onChange={(_event, checked) => toggle(name, checked)}
-              />
-            ))}
-          </Stack>
-        </div>
+      {group(copy.inviteRoleLabel, systemRoles, labels.roleLabel)}
+      {customRoles.length > 0 &&
+        group(copy.inviteCustomRolesTitle, customRoles, (name) => name)}
+      {picked.size === 0 && (
+        <Alert
+          variant="warning"
+          description={copy.inviteNoRole}
+          data-testid="invite-no-role"
+        />
       )}
       <Text variant="caption" as="span">
         {copy.inviteHint}
@@ -118,7 +151,7 @@ function InviteFormBody({
 }
 
 /**
- * Grant access by e-mail address, at a role the inviter picks.
+ * Grant access by e-mail address, at the roles the inviter picks.
  *
  * The hint under the fields is not decoration: an address WITHOUT an account
  * produces a pending invite rather than a member, and a form that did not say so

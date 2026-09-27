@@ -88,6 +88,7 @@ export const StepRow: React.FC<StepRowProps> = ({
           orientation={orientation}
           variant={variant}
           color={color}
+          animated={animated}
           data-testid={`${dataTestId}-connector-${index}`}
         />
       )}
