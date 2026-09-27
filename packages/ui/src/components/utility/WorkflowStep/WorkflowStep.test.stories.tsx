@@ -436,9 +436,13 @@ export const PerStepDisabledClickTest: Story = {
     expect(disabledIndicator).toHaveAttribute('aria-disabled', 'true');
 
     await userEvent.click(disabledIndicator);
+    // eslint-disable-next-line test-flakiness/no-focus-check -- tabIndex="-1" keeps Tab away from a disabled step; focusing it directly is the only way to prove Enter/Space do nothing
     disabledIndicator.focus();
+    await waitFor(() => expect(disabledIndicator).toHaveFocus());
     await userEvent.keyboard('{Enter}');
+    // eslint-disable-next-line test-flakiness/no-focus-check -- same: the disabled step is unreachable by Tab
     disabledIndicator.focus();
+    await waitFor(() => expect(disabledIndicator).toHaveFocus());
     await userEvent.keyboard(' ');
 
     expect(args.onStepClick).not.toHaveBeenCalled();
