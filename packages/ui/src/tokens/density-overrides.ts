@@ -1,3 +1,4 @@
+import { chipClasses } from '@mui/material/Chip/index.js';
 import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { rem } from './relative';
@@ -62,10 +63,26 @@ interface ChipOwnerStateForOverrides {
  * untouched — while the SAME entry DOES leak onto `.MuiChip-root` (`999px`),
  * confirming theme `variants` is a ROOT-slot-only mechanism for this
  * component; (2) a nested `.MuiChip-label` selector written from the ROOT
- * slot is a HIGHER-specificity rule (two classes) than the label's own
- * single-class rule, so it wins regardless of source order — the same
- * technique `ChipRoot`'s OWN style already uses for its avatar/icon/
- * delete-icon sub-parts (`& .${chipClasses.avatar}`, etc., in `Chip.js`).
+ * slot is a HIGHER-specificity rule (two classes, `0,2,0`) than the label's
+ * own single-class rule (`0,1,0`), so it wins regardless of source order —
+ * the same technique `ChipRoot`'s OWN style already uses for its avatar/
+ * icon/delete-icon sub-parts (`& .${chipClasses.avatar}`, etc., in
+ * `Chip.js`), and read through the SAME `chipClasses` MUI's own `Chip.js`
+ * generates the real DOM class from, not a hand-typed copy of it.
+ *
+ * **That same higher specificity also outranks a HOST's own theming.** A
+ * host writing `theme.components.MuiChip.styleOverrides.label` for its own
+ * reasons (`0,1,0`) does not win against the outlined rule here (`0,2,0`) —
+ * not a bug specific to this file, `ChipLabel`'s OWN baked-in outlined
+ * variant already outranked a plain `styleOverrides.label` the same way,
+ * before this file existed. A host that needs to change OUTLINED label
+ * padding specifically cannot do it through `styleOverrides.label`/
+ * `labelSmall` at all; it reaches it through `sx` (a per-instance override,
+ * highest specificity of all) or its OWN `MuiChip.styleOverrides.root`
+ * function written out in full — `mergeMuiComponents` replaces `root`
+ * WHOLESALE when both sides set it (see `./density.ts`'s own doc comment),
+ * so a host adding to it must restate `chipRootHeight`'s own height logic
+ * alongside its outlined-label change, not merely add a sibling key.
  *
  * The avatar/icon/delete-icon sub-slots (margins, sizes) and IconButton's
  * `edge="start"`/`"end"` negative margins are DELIBERATELY untouched by this
@@ -124,7 +141,14 @@ const chipRootHeight = ({
     // (two classes vs one) — wins over `chipLabelPadding`/`chipLabelSmallPadding`
     // below regardless of stylesheet insertion order. See the module doc
     // comment for why this must live here and not on the label slot itself.
-    style['& .MuiChip-label'] = { paddingLeft: rem(theme, px), paddingRight: rem(theme, px) };
+    // `chipClasses.label`, not a hand-typed `.MuiChip-label` string — the same
+    // module `Chip.js`'s own root style reads for its avatar/icon/delete-icon
+    // selectors, so this tracks whatever `Chip.js` itself puts on the label
+    // element rather than a separately-maintained copy of it. A host that
+    // calls `ClassNameGenerator.configure` before any `MuiChip` module loads
+    // renames the real class; a literal string would silently stop matching
+    // it, `chipClasses.label` cannot.
+    style[`& .${chipClasses.label}`] = { paddingLeft: rem(theme, px), paddingRight: rem(theme, px) };
   }
   return style;
 };
