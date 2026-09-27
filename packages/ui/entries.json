@@ -123,6 +123,7 @@
   "navigation/DropdownMenu": "src/components/navigation/DropdownMenu/index.ts",
   "navigation/NavigationMenu": "src/components/navigation/NavigationMenu/index.ts",
   "navigation/Pagination": "src/components/navigation/Pagination/index.ts",
+  "navigation/SectionNav": "src/components/navigation/SectionNav/index.ts",
   "navigation/Tabs": "src/components/navigation/Tabs/index.ts",
   "typography/Blockquote": "src/components/typography/Blockquote/index.ts",
   "typography/Code": "src/components/typography/Code/index.ts",
