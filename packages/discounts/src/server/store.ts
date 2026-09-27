@@ -44,6 +44,11 @@ export interface DiscountRecord {
   minSubtotalCents: number | null;
   usageLimit: number | null;
   perBuyerLimit: number | null;
+  /**
+   * Only a buyer's first purchase at the store (FUT-2825). OPTIONAL for the
+   * reason `schedule` is: a host without the column answers the same record.
+   */
+  firstOrderOnly?: boolean;
   usageCount: number;
   stackable: boolean;
   active: boolean;

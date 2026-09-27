@@ -102,6 +102,9 @@ function isTeasable(rule: DiscountRule, now: Date, localNow: LocalClock | null):
  */
 function isTeasableShape(rule: DiscountRule): boolean {
   if (rule.trigger !== "AUTOMATIC" || !rule.active || rule.scope === "ORDER") return false;
+  // A first-purchase rule is never teased: a card cannot know the buyer, and a
+  // returning one would be promised a price the cart refuses (FUT-2825).
+  if (rule.firstOrderOnly === true) return false;
   return rule.schedule !== null && rule.schedule !== undefined;
 }
 
