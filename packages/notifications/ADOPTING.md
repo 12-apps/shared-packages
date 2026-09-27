@@ -298,8 +298,13 @@ sweep — endpoints and screens included.
     A host with a HAND-WRITTEN database adapter (rule 4) has one more thing to
     carry: `side` is a new column on both tables and a new field on the rows,
     the create/upsert arguments and `TransportRecipient`, and the push `where`
-    gains an `AND` key for the side rule beside the store rule's `OR`. A Prisma
-    client needs nothing — the shapes pass straight through.
+    gains an `AND` key for the side rule beside the store rule's `OR`. Left
+    out, the adapter fails to COMPILE on the new required fields; the one silent
+    gap is a `where` mapper that drops the `AND` key, which pushes every side
+    (never another store's). A Prisma client needs no code — the shapes pass
+    straight through — but it does need the column: sync the partial and the
+    migration, regenerate and migrate BEFORE the bumped package serves traffic,
+    or every emit throws on the unknown `side` argument.
 
 ## The minimum host
 

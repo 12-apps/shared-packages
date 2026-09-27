@@ -30,10 +30,20 @@ import type {
 export type NotificationScope = string | undefined;
 
 /**
- * `clientId IN (<scope>, NULL)`, as a filter branch — or nothing at all.
+ * The SIDE of the business the reader is asking as (`customer`, `staff` — the
+ * host's vocabulary), resolved by the host from which app is asking. Absent =
+ * every side, exactly as before.
+ */
+export type NotificationSide = string | undefined;
+
+/**
+ * `clientId IN (<scope>, NULL)` and `side IN (<side>, NULL)`, as filter
+ * branches the caller AND-s — each omitted when its scope is absent.
  *
- * A disjunction rather than an `in`, because SQL `IN` never matches NULL and
- * the NULL rows are precisely the ones that must survive every scope.
+ * Disjunctions rather than an `in`, because SQL `IN` never matches NULL and
+ * the NULL rows (platform-wide, unclassified) are precisely the ones that must
+ * survive every scope. Separate branches, because two `OR`s on one object
+ * would overwrite each other.
  */
 function scopeBranch(scope: NotificationScope, side?: NotificationSide): NotificationWhereBranch[] {
   return [
@@ -43,13 +53,6 @@ function scopeBranch(scope: NotificationScope, side?: NotificationSide): Notific
     ...(side === undefined ? [] : [{ OR: [{ side }, { side: null }] }]),
   ];
 }
-
-/**
- * The SIDE of the business the reader is asking as (`customer`, `staff` — the
- * host's vocabulary), resolved by the host from which app is asking. Absent =
- * every side, exactly as before.
- */
-export type NotificationSide = string | undefined;
 
 export interface ListNotificationsInput {
   /** `unread` narrows to unread rows; default lists all non-deleted. */

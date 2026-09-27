@@ -153,6 +153,24 @@ describe('the inbox, read as one side', () => {
     expect(bodies(page.items)).toEqual(['Seu pedido está pronto A']);
   });
 
+  it('holds both scopes on page two, beside the cursor anchor', async () => {
+    // Three clauses AND-ed only from page TWO onward — the case a single-page
+    // read never reaches.
+    for (const code of ['1', '2', '3']) await emit('order.ready', code, STORE_A);
+    await emit('order.new', 'S', STORE_A);
+    await emit('order.ready', 'B', 'client-b');
+
+    const first = await api.inbox.list(USER, { limit: 2 }, STORE_A, 'customer');
+    const second = await api.inbox.list(USER, { limit: 2, cursor: first.nextCursor ?? '' }, STORE_A, 'customer');
+
+    expect(bodies([...first.items, ...second.items])).toEqual([
+      'Seu pedido está pronto 1',
+      'Seu pedido está pronto 2',
+      'Seu pedido está pronto 3',
+    ]);
+    expect(second.nextCursor).toBeNull();
+  });
+
   it('leaves the other side unread when “mark all” is pressed in one app', async () => {
     await seedSides();
 
