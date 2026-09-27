@@ -849,3 +849,57 @@ export const SearchAndLinkSuggestions: Story = {
     });
   },
 };
+
+/**
+ * FUT-2779 #2: a touch-driven pick still closes the list.
+ *
+ * The ticket worried a touch device that blurs the focused input on
+ * `touchstart` could refocus it mid-pick and reopen the list via `onFocus`
+ * (which does not read `userClosedDropdownRef`). That blur-on-touchstart
+ * quirk was investigated separately with Playwright touch emulation
+ * (`hasTouch`/`isMobile` context, both `.tap()` and raw CDP
+ * `Input.dispatchTouchEvent`) and never reproduced in this Chromium build —
+ * `document.activeElement` stayed on the input throughout, so there was
+ * nothing left to guard against.
+ *
+ * This story is the runnable half of that record: it runs in the SAME real
+ * Chromium `test-storybook` drives everything else in, and picks a suggestion
+ * with `userEvent.pointer`'s touch pointer (`[TouchA]` — a real, native
+ * `PointerEvent`/compat `MouseEvent` sequence tagged `pointerType: 'touch'`,
+ * not a plain mouse click), then asserts the outcome a mouse pick already
+ * gets (FUT-2763/FUT-2780): the list closes and the input holds the picked
+ * label. A passing regression guard, not a reproduction — if this Chromium
+ * build ever DOES start blurring on touch, `onFocus`'s unconditional reopen
+ * would make this the first thing to go red.
+ */
+export const TouchPick: Story = {
+  name: '👆 Touch Pick (FUT-2779 #2)',
+  render: () => (
+    <AutocompleteWrapper suggestions={stringSuggestions} placeholder="Tap a fruit..." />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByRole('combobox');
+
+    await userEvent.click(input);
+    await userEvent.type(input, 'ap');
+
+    const listbox = await canvas.findByRole('listbox');
+    await expect(listbox).toBeInTheDocument();
+    const options = canvas.getAllByRole('option');
+    const firstOption = options[0];
+    if (!firstOption) throw new Error('expected at least one option in the listbox');
+    await expect(firstOption).toHaveTextContent('Apple');
+
+    // A real touch pointer (not a mouse click): dispatches `pointerdown` with
+    // `pointerType: 'touch'`, then on release the browser-accurate
+    // mousedown/mouseup/click compatibility sequence `Autocomplete`'s option
+    // actually listens to (it has no dedicated touch handler, same as a real
+    // mobile browser deriving click from a tap).
+    await userEvent.pointer({ keys: '[TouchA]', target: firstOption });
+
+    await waitFor(() => expect(input).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() => expect(canvas.queryByRole('listbox')).not.toBeInTheDocument());
+    await expect(input).toHaveValue('Apple');
+  },
+};

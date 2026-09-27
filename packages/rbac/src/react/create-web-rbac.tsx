@@ -204,7 +204,6 @@ function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       copy={parts.copy}
       breadcrumb={parts.config.breadcrumbs?.team}
       onOpenMember={parts.config.navigate?.member}
-      roleModel={parts.config.roleModel}
       extraColumns={parts.config.teamExtraColumns}
       rowActionIds={parts.config.teamRowActionIds}
     />

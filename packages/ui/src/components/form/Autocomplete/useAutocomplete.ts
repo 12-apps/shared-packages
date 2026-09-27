@@ -245,6 +245,14 @@ function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState
   // commitMultiSelect already clears inputValue and resets the flag itself,
   // so the empty-input branch of the filter effect keeps the list closed.
   const isSingleSelectPick = isLink || !p.multiple;
+  // Cancel a still-pending keystroke debounce BEFORE dispatching the pick, so
+  // no branch below — including `openLink`, which never touches `onChange`
+  // at all — can leave it armed to fire the STALE pre-pick text later
+  // (FUT-2779 #1). `commitSingleSelect`/`commitMultiSelect` already clear it
+  // as a side effect of calling the same `debouncedOnChange`; this makes it
+  // unconditional so a `link` pick (which skips `onChange` entirely) is
+  // covered too.
+  if (s.debounceRef.current) window.clearTimeout(s.debounceRef.current);
   commitPick(item, isLink ? (url as string) : null, p, s, onChange);
   s.setOpen(false);
   s.setActiveIndex(-1);
@@ -347,6 +355,15 @@ export function useAutocomplete<T>(p: AutocompleteProps<T>): AutocompleteView<T>
       if (!s.open || s.filteredSuggestions.length === 0) s.setActiveIndex(-1);
       setDeliberateClose(s, false);
     },
+    // Unconditionally reopens on a non-empty input, unguarded by
+    // `userClosedDropdownRef` — plausible on a touch device that blurs the
+    // input on `touchstart` before a tap's own `click`/`mousedown` reaches the
+    // option (FUT-2779 #2). Checked under Playwright touch emulation
+    // (`hasTouch`/`isMobile` context, both the `.tap()` API and raw CDP
+    // `Input.dispatchTouchEvent` at the option's coordinates) against this
+    // Chromium build: `document.activeElement` never left the input across
+    // the touch, so the reopen never happened — not reproduced, left
+    // unguarded per the ticket's decision rather than fixed blind.
     onFocus: (): void => {
       s.setIsInputFocused(true);
       setDeliberateClose(s, false);

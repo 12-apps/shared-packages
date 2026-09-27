@@ -169,7 +169,13 @@ function Actions({
   return (
     <Box sx={{ display: 'flex', justifyContent: onCancel ? 'space-between' : 'flex-end', gap: 1 }}>
       {onCancel ? (
-        <Button variant="text" color="inherit" onClick={onCancel} data-testid={`${testId}-cancel`}>
+        <Button
+          variant="text"
+          color="inherit"
+          onClick={onCancel}
+          data-testid={`${testId}-cancel`}
+          sx={{ textTransform: 'none' }}
+        >
           {copy.cancel}
         </Button>
       ) : null}
@@ -178,6 +184,9 @@ function Actions({
         disabled={onConfirm === null}
         onClick={onConfirm ?? undefined}
         data-testid={`${testId}-confirm`}
+        // The confirm reads a sentence with a figure in it — "Falta R$ 2,00" —
+        // which MUI's default capitals would shout.
+        sx={{ textTransform: 'none' }}
       >
         {label}
       </Button>

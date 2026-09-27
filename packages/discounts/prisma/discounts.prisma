@@ -109,6 +109,9 @@ model Discount {
   // Redemptions allowed across every buyer, and per buyer. Null = no cap.
   usageLimit           Int?      @map("usage_limit")
   perBuyerLimit        Int?      @map("per_buyer_limit")
+  // Only a buyer's FIRST purchase at the store (FUT-2825). Who that is, is the
+  // host's answer: this package never reads an order.
+  firstOrderOnly       Boolean   @default(false) @map("first_order_only")
   usageCount           Int       @default(0) @map("usage_count")
   // When false this rule stacks with nothing: if it wins it is the only one
   // applied to the order ("best single discount wins").
