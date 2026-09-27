@@ -1,7 +1,15 @@
 import type { PaletteColor, Theme, ThemeOptions } from '@mui/material/styles/index.js';
 
 import { cssLengthToPx, cssTrackingToEm } from '../tokens/css-units';
-import { chipDensityOverrides, iconButtonDensityOverrides } from '../tokens/density-overrides';
+import {
+  chipDensityOverrides,
+  iconButtonDensityOverrides,
+  paginationItemDensityOverrides,
+  sliderDensityOverrides,
+  tabDensityOverrides,
+  tableCellDensityOverrides,
+  toggleButtonDensityOverrides,
+} from '../tokens/density-overrides';
 import { densityFontSize, resolveDensityFactor } from '../tokens/density';
 import { resolveFieldHeight } from '../tokens/field-height.core';
 import { fieldOverrides, mergeMuiComponents } from '../tokens/field-height';
@@ -145,13 +153,19 @@ export function muiThemeOptionsFrom(ui: UiTheme): ThemeOptions {
     shape: { borderRadius: ui.radius.md },
     fieldRadius: ui.radius.field,
     fieldHeight: ui.fieldHeight,
-    // Additive: children 3/4 (FUT-2767/2768) each add one more source here as
-    // their own geometry overrides land — this PR (FUT-2766) adds IconButton's
-    // and Chip's.
+    // Additive: FUT-2766 added IconButton's/Chip's overrides; this PR
+    // (FUT-2768) adds ToggleButton/Tab/TableCell/PaginationItem/Slider's.
+    // FUT-2767 (Button/Checkbox/Radio/Switch), the remaining sibling, adds
+    // its own source here the same way when it lands.
     components: mergeMuiComponents(
       fieldOverrides(ui.radius.field, ui.fieldHeight),
       iconButtonDensityOverrides(),
       chipDensityOverrides(),
+      toggleButtonDensityOverrides(),
+      tabDensityOverrides(),
+      tableCellDensityOverrides(),
+      paginationItemDensityOverrides(),
+      sliderDensityOverrides(),
     ),
     spacing: ui.spacingUnit,
     density: ui.density,

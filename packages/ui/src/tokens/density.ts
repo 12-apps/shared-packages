@@ -9,7 +9,15 @@ import {
   type DensityLevel,
   type ResolvedDensity,
 } from './density.core';
-import { chipDensityOverrides, iconButtonDensityOverrides } from './density-overrides';
+import {
+  chipDensityOverrides,
+  iconButtonDensityOverrides,
+  paginationItemDensityOverrides,
+  sliderDensityOverrides,
+  tabDensityOverrides,
+  tableCellDensityOverrides,
+  toggleButtonDensityOverrides,
+} from './density-overrides';
 import { fieldOverrides, mergeMuiComponents } from './field-height';
 import { DEFAULT_FIELD_RADIUS } from './field-radius.core';
 
@@ -72,14 +80,22 @@ export function useDensity(): ResolvedDensity {
  * their own layout off.
  *
  * `components` is the matching MUI-native override (`fieldOverrides`, plus
- * FUT-2766's `iconButtonDensityOverrides`/`chipDensityOverrides`) for a HOST's
- * own bare `TextField`/`Select`/`IconButton`/`Chip`, mirroring
- * `muiThemeOptionsFrom`'s own `components: mergeMuiComponents(...)`. It
- * carries ONLY the overrides this function knows about (`MuiOutlinedInput`'s
- * `root`, `input` and `notchedOutline`; `MuiInputLabel`'s `outlined`;
- * `MuiIconButton`'s `root`/`sizeSmall`/`sizeLarge`; `MuiChip`'s
- * `root`/`sizeSmall`/`label`/`labelSmall`) — a host with ITS OWN overrides for
- * OTHER components merges them in with
+ * FUT-2766's `iconButtonDensityOverrides`/`chipDensityOverrides` and
+ * FUT-2768's `toggleButtonDensityOverrides`/`tabDensityOverrides`/
+ * `tableCellDensityOverrides`/`paginationItemDensityOverrides`/
+ * `sliderDensityOverrides`) for a HOST's own bare `TextField`/`Select`/
+ * `IconButton`/`Chip`/`ToggleButton`/`Tab`/`TableCell`/`Pagination`/`Slider`,
+ * mirroring `muiThemeOptionsFrom`'s own `components:
+ * mergeMuiComponents(...)`. It carries ONLY the overrides this function
+ * knows about (`MuiOutlinedInput`'s `root`, `input` and `notchedOutline`;
+ * `MuiInputLabel`'s `outlined`; `MuiIconButton`'s
+ * `root`/`sizeSmall`/`sizeLarge`; `MuiChip`'s
+ * `root`/`sizeSmall`/`label`/`labelSmall`; `MuiToggleButton`'s
+ * `root`/`sizeSmall`/`sizeLarge`; `MuiTab`'s `root`/`labelIcon`;
+ * `MuiTableCell`'s `root`/`sizeSmall`; `MuiPaginationItem`'s
+ * `root`/`sizeSmall`/`sizeLarge`; `MuiSlider`'s
+ * `root`/`sizeSmall`/`thumb`/`thumbSizeSmall`) — a host with ITS OWN
+ * overrides for OTHER components merges them in with
  * `mergeMuiComponents(densityThemeOptions(density).components, hostOverrides)`,
  * which keeps a component only ONE side touches untouched. For a component
  * BOTH sides style, the merge is by INNER key (`root`/`input`/…): a key only
@@ -137,6 +153,11 @@ export function densityThemeOptions(
       fieldOverrides(fieldRadius, fieldHeight),
       iconButtonDensityOverrides(),
       chipDensityOverrides(),
+      toggleButtonDensityOverrides(),
+      tabDensityOverrides(),
+      tableCellDensityOverrides(),
+      paginationItemDensityOverrides(),
+      sliderDensityOverrides(),
     ),
   };
 }

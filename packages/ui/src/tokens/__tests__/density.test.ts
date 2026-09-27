@@ -332,3 +332,47 @@ describe('densityThemeOptions and muiThemeOptionsFrom agree on the MuiIconButton
     },
   );
 });
+
+/**
+ * FUT-2768 — `ToggleButton`/`Tab`/`TableCell`/`PaginationItem`/`Slider`
+ * geometry, the same parity standard as the FUT-2766 block above: the
+ * standalone (`densityThemeOptions`) and `UiProvider` (`muiThemeOptionsFrom`)
+ * paths must produce IDENTICAL override objects, not just identical numbers.
+ */
+describe('densityThemeOptions and muiThemeOptionsFrom agree on the FUT-2768 overrides', () => {
+  it.each(['compact', 'normal', 'comfortable', 0.95] as const)(
+    'density=%s: identical styleOverrides for all five components on both paths',
+    (density) => {
+      const standaloneComponents = densityThemeOptions(density).components;
+      const viaUiThemeComponents = muiThemeOptionsFrom(createUiTheme({ density })).components;
+
+      for (const name of [
+        'MuiToggleButton',
+        'MuiTab',
+        'MuiTableCell',
+        'MuiPaginationItem',
+        'MuiSlider',
+      ] as const) {
+        // PRESENT — not just equal because both are undefined, which a
+        // reverted/unwired `components:` merge would also satisfy.
+        expect(standaloneComponents?.[name]?.styleOverrides?.root).toBeTypeOf('function');
+        expect(standaloneComponents?.[name]).toEqual(viaUiThemeComponents?.[name]);
+      }
+
+      // End to end: a theme built from either path renders the same computed
+      // style object for a slot each of the five adds.
+      const standaloneTheme = createTheme(densityThemeOptions(density));
+      const viaUiThemeTheme = createTheme(muiThemeOptionsFrom(createUiTheme({ density })));
+      const tabLabelIcon = standaloneTheme.components?.MuiTab?.styleOverrides?.labelIcon as
+        | ((props: { theme: typeof standaloneTheme }) => Record<string, unknown>)
+        | undefined;
+      expect(typeof tabLabelIcon).toBe('function');
+      expect(tabLabelIcon?.({ theme: standaloneTheme })).toEqual({
+        minHeight: standaloneTheme.typography.pxToRem(72),
+        paddingTop: standaloneTheme.typography.pxToRem(9),
+        paddingBottom: standaloneTheme.typography.pxToRem(9),
+      });
+      expect(tabLabelIcon?.({ theme: standaloneTheme })).toEqual(tabLabelIcon?.({ theme: viaUiThemeTheme }));
+    },
+  );
+});

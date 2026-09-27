@@ -1,7 +1,8 @@
 import { chipClasses } from '@mui/material/Chip/index.js';
+import { tableCellClasses } from '@mui/material/TableCell/index.js';
 import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js';
 
-import { rem } from './relative';
+import { rem, rems } from './relative';
 
 /** The `ownerState` fields `MuiChip`'s two styled slots (root, label) both receive. */
 interface ChipOwnerStateForOverrides {
@@ -171,6 +172,224 @@ export function chipDensityOverrides(): Components<Theme> {
         sizeSmall: chipSmallHeight,
         label: chipLabelPadding,
         labelSmall: chipLabelSmallPadding,
+      },
+    },
+  };
+}
+
+/**
+ * TOGGLEBUTTON / TAB / TABLECELL / PAGINATIONITEM / SLIDER GEOMETRY,
+ * DENSITY-AWARE (FUT-2768).
+ *
+ * The remainder of the fixed-px geometry the density audit catalogued, none
+ * of it hard-coded in `@12-apps/ui`'s own source. Verified against the
+ * installed `@mui/material@6.5.0` source; each goes through the SAME
+ * per-size/per-slot `overridesResolver` key MUI itself resolves
+ * (`iconButtonDensityOverrides`/`chipDensityOverrides`'s own mechanism), so a
+ * theme value composes with MUI's baked-in `variants` instead of replacing
+ * them outright:
+ *
+ * - `ToggleButton` (`ToggleButton.js`): `padding: 11/7/15` at
+ *   medium(root)/small/large (`:49,110,118`) — the SAME
+ *   `root`/`sizeSmall`/`sizeLarge` shape as `iconButtonDensityOverrides`;
+ *   `fontSize` at small/large stays MUI's own, this file owns `padding` only.
+ * - `Tab` (`Tab.js`): `minHeight: 48`, `padding: '12px 16px'` on the root
+ *   (`:52,54`, the two-value shorthand via `rems()`). The icon+label combo
+ *   (`minHeight: 72`, `paddingTop`/`Bottom: 9`, `:78-80`) is a SEPARATE
+ *   MUI-baked variant gated on `ownerState.icon && ownerState.label` —
+ *   `Tab.js`'s own `overridesResolver` exposes exactly that gate as the
+ *   `labelIcon` key, so this file's `labelIcon` override reaches the SAME
+ *   tabs. (`wrapped`, a different prop, only sets `fontSize` — nothing here.)
+ * - `TableCell` (`TableCell.js`): `padding: 16` on the root (`:50`), `'6px
+ *   16px'` at `size="small"` (`:81`, key `sizeSmall`), and — NESTED inside
+ *   that same small-size variant, not a separate key — `'0 12px 0 16px'` on
+ *   the small+checkbox-padding combo (`:85`,
+ *   `& .${tableCellClasses.paddingCheckbox}`; the general, size-unconditional
+ *   checkbox padding, `'0 0 0 4px'`/`width: 48`, is a different literal,
+ *   outside this ticket, and untouched, as is `width: 24` here — a later
+ *   same-selector rule only touches the properties it sets). `@12-apps/ui`'s
+ *   own `Table` (FUT-2769) draws its `.MuiTableCell-root` padding through a
+ *   selector NESTED under its styled root (`Table.styles.ts`), TWO classes —
+ *   higher specificity than this single-class override, so `Table` keeps its
+ *   own cell padding at ANY density, theme- or prop-sourced. This file only
+ *   reaches a BARE `<TableCell>`, not one rendered through `Table`.
+ * - `PaginationItem` (`PaginationItem.js`): `minWidth/height: 32/26/40` at
+ *   medium(root)/small/large (`:105-106,149-150,160-161`) on the numbered/
+ *   prev-next/first-last button. The ellipsis (`…`, `PaginationItemEllipsis`)
+ *   shares the SAME theme name/slot and `minWidth` but has NO `height` of its
+ *   own (`'auto'`), so `height` is gated on `ownerState.type` being neither
+ *   `'start-ellipsis'` nor `'end-ellipsis'` — the values `PaginationItem.js`
+ *   itself reads to pick which of the two styled components renders.
+ *   Skipping the gate would force a height onto the ellipsis — Lesson 1.
+ * - `Slider` (`Slider.js`): rail `height: 4/2` at `orientation="horizontal"`
+ *   (the default)/`size="small"` (`:70`) — figures on `SliderRoot` itself
+ *   (`SliderRail`'s own CSS is `height: 'inherit'`), gated on
+ *   `ownerState.orientation` because the SAME key answers for EITHER axis:
+ *   MUI's own variants set `height` for horizontal and `width` for vertical,
+ *   leaving the OTHER dimension at `'100%'` — writing both unconditionally
+ *   would clobber whichever one the variant means to leave full-length.
+ *   Thumb `20×20`/`12×12` (root/`thumbSizeSmall`, `:250-251,291-292`) is
+ *   square at both sizes and not orientation-dependent, so no gate needed.
+ *   `@12-apps/ui`'s own `Slider` (`Slider.styles.ts`'s `sliderSx`) already
+ *   sets rail/thumb size unconditionally through `rem()` and never forwards
+ *   MUI's `size` prop — a no-op THERE (it simply never matches), but this
+ *   still reaches a BARE `@mui/material` `<Slider size="small">`, real
+ *   public API `Avatar` has none of (below).
+ *
+ * `Avatar` is NOT in this file. `@12-apps/ui`'s own `Avatar`
+ * (`Avatar.view.tsx`) wraps `MuiAvatar` in a `StyledAvatar` that ALREADY sets
+ * `width`/`height` through `rem(theme, boxPx(size))` (`Avatar.metrics.ts`'s
+ * `AVATAR_SIZES.md.box`, `40` — MUI's own literal), at a higher specificity
+ * than any `MuiAvatar.styleOverrides.root` this file could add (a
+ * `styled(MuiAvatar, …)` wrapper's css composes after MUI's, the way
+ * `StyledTable` already overrides every other MUI literal here). A
+ * `MuiAvatar` override would be dead code for every call site this
+ * initiative chases — the Done-when's own escape hatch — so it ships none.
+ *
+ * Every value here is geometry-neutral at `density: 'normal'`, and each
+ * style-override slot is a MODULE-LEVEL function, by the same construction
+ * as `iconButtonDensityOverrides`/`chipDensityOverrides` above.
+ */
+
+const toggleButtonRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 11) });
+const toggleButtonSmallPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 7) });
+const toggleButtonLargePadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 15) });
+
+/** `MuiToggleButton`'s own padding, at every size MUI has. */
+export function toggleButtonDensityOverrides(): Components<Theme> {
+  return {
+    MuiToggleButton: {
+      styleOverrides: {
+        root: toggleButtonRootPadding,
+        sizeSmall: toggleButtonSmallPadding,
+        sizeLarge: toggleButtonLargePadding,
+      },
+    },
+  };
+}
+
+const tabRootGeometry = ({ theme }: { theme: Theme }): CSSObject => ({
+  minHeight: rem(theme, 48),
+  padding: rems(theme, 12, 16),
+});
+const tabLabelIconGeometry = ({ theme }: { theme: Theme }): CSSObject => ({
+  minHeight: rem(theme, 72),
+  paddingTop: rem(theme, 9),
+  paddingBottom: rem(theme, 9),
+});
+
+/** `MuiTab`'s own root height/padding, and the icon+label combo's taller box. */
+export function tabDensityOverrides(): Components<Theme> {
+  return {
+    MuiTab: {
+      styleOverrides: {
+        root: tabRootGeometry,
+        labelIcon: tabLabelIconGeometry,
+      },
+    },
+  };
+}
+
+const tableCellRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 16) });
+const tableCellSmallPadding = ({ theme }: { theme: Theme }): CSSObject => ({
+  padding: rems(theme, 6, 16),
+  // Nested, not a separate override key — MUI's own small-size variant nests
+  // the checkbox-padding combo the same way (`TableCell.js`'s own `variants`
+  // entry for `size: 'small'`). `tableCellClasses.paddingCheckbox`, not a
+  // hand-typed `.MuiTableCell-paddingCheckbox` string, for the same reason
+  // `chipClasses.label` is used above.
+  [`&.${tableCellClasses.paddingCheckbox}`]: {
+    padding: rems(theme, 0, 12, 0, 16),
+  },
+});
+
+/**
+ * `MuiTableCell`'s own default/small padding, and small's own nested
+ * checkbox-padding combo. Reaches a BARE `<TableCell>` only — see the module
+ * doc comment for why `@12-apps/ui`'s own `Table` (FUT-2769) is unaffected.
+ */
+export function tableCellDensityOverrides(): Components<Theme> {
+  return {
+    MuiTableCell: {
+      styleOverrides: {
+        root: tableCellRootPadding,
+        sizeSmall: tableCellSmallPadding,
+      },
+    },
+  };
+}
+
+/** The `ownerState` field that tells the ellipsis item apart from a real button. */
+interface PaginationItemOwnerStateForOverrides {
+  type?: 'page' | 'first' | 'last' | 'start-ellipsis' | 'end-ellipsis' | 'previous' | 'next';
+}
+type PaginationItemStyleFn = (props: {
+  theme: Theme;
+  ownerState?: PaginationItemOwnerStateForOverrides;
+}) => CSSObject;
+
+const isPaginationEllipsis = (type: PaginationItemOwnerStateForOverrides['type']): boolean =>
+  type === 'start-ellipsis' || type === 'end-ellipsis';
+
+/** `minWidth` always; `height` only off the ellipsis, which has none of its own. */
+function paginationItemGeometryAt(px: number): PaginationItemStyleFn {
+  return ({ theme, ownerState }) => {
+    const style: CSSObject = { minWidth: rem(theme, px) };
+    if (!isPaginationEllipsis(ownerState?.type)) style.height = rem(theme, px);
+    return style;
+  };
+}
+const paginationItemRootGeometry = paginationItemGeometryAt(32);
+const paginationItemSmallGeometry = paginationItemGeometryAt(26);
+const paginationItemLargeGeometry = paginationItemGeometryAt(40);
+
+/**
+ * `MuiPaginationItem`'s own `minWidth`/`height`, at every size MUI has —
+ * `height` skipped on the ellipsis item, which has none of its own (`auto`).
+ */
+export function paginationItemDensityOverrides(): Components<Theme> {
+  return {
+    MuiPaginationItem: {
+      styleOverrides: {
+        root: paginationItemRootGeometry,
+        sizeSmall: paginationItemSmallGeometry,
+        sizeLarge: paginationItemLargeGeometry,
+      },
+    },
+  };
+}
+
+/** The `ownerState` field that tells which axis the rail's `height`/`4` reads as. */
+interface SliderOwnerStateForOverrides {
+  orientation?: 'horizontal' | 'vertical';
+}
+type SliderStyleFn = (props: { theme: Theme; ownerState?: SliderOwnerStateForOverrides }) => CSSObject;
+
+/** The rail's `4`/`2` reads as `height` for a horizontal slider, `width` for a vertical one. */
+function sliderRailAxisAt(px: number): SliderStyleFn {
+  return ({ theme, ownerState }) =>
+    ownerState?.orientation === 'vertical' ? { width: rem(theme, px) } : { height: rem(theme, px) };
+}
+const sliderRootGeometry = sliderRailAxisAt(4);
+const sliderSmallGeometry = sliderRailAxisAt(2);
+const sliderThumbGeometry = ({ theme }: { theme: Theme }): CSSObject => ({
+  width: rem(theme, 20),
+  height: rem(theme, 20),
+});
+const sliderThumbSmallGeometry = ({ theme }: { theme: Theme }): CSSObject => ({
+  width: rem(theme, 12),
+  height: rem(theme, 12),
+});
+
+/** `MuiSlider`'s own rail thickness (root/sizeSmall) and thumb box (thumb/thumbSizeSmall). */
+export function sliderDensityOverrides(): Components<Theme> {
+  return {
+    MuiSlider: {
+      styleOverrides: {
+        root: sliderRootGeometry,
+        sizeSmall: sliderSmallGeometry,
+        thumb: sliderThumbGeometry,
+        thumbSizeSmall: sliderThumbSmallGeometry,
       },
     },
   };
