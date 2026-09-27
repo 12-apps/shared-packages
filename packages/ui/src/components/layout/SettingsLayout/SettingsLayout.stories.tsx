@@ -179,10 +179,23 @@ export const NoIcons: Story = {
   },
 };
 
-/** Below `md` the rail stacks full-width above the panel. */
+/**
+ * Below `md` the rail stacks full-width above the panel.
+ *
+ * `defaultViewport` names a key from THIS project's own viewport scale
+ * (`.storybook/preview.tsx`'s `options`: `xxs`/`xs`/`sm`/`md`/`lg`/`xlg`/`xxl`
+ * — replacing Storybook's ~40-device stock list on purpose). This story, and
+ * `DrilldownIndex`/`DrilldownSection` below, used to name the STOCK key
+ * `'mobile1'`, which matches nothing in that list, so the viewport addon had
+ * nothing to switch to and the canvas rendered at whatever width was already
+ * selected — never the narrow phone width these stories are named for
+ * (FUT-2778). `xxs` (320px) is this component's own canonical narrow-width
+ * fixture: `SettingsLayout.test.stories.tsx`'s drilldown-strip play functions
+ * already pin their wrapper to 320px for the same "phone" scenario.
+ */
 export const Responsive: Story = {
   parameters: {
-    viewport: { defaultViewport: 'mobile1' },
+    viewport: { defaultViewport: 'xxs' },
   },
   render: () => (
     <Box sx={{ p: 2, minHeight: 480 }}>
@@ -235,7 +248,8 @@ export const SituationMarkers: Story = {
  * still mounted — only `display` moved — so the wide width shows it instead.
  */
 export const DrilldownIndex: Story = {
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  // 'xxs', not the stock 'mobile1' this project doesn't ship — see Responsive above (FUT-2778).
+  parameters: { viewport: { defaultViewport: 'xxs' } },
   render: () => (
     <Box sx={{ p: 2, minHeight: 480 }}>
       <SettingsLayout
@@ -261,7 +275,8 @@ export const DrilldownIndex: Story = {
  * section, however the visitor arrived.
  */
 export const DrilldownSection: Story = {
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  // 'xxs', not the stock 'mobile1' this project doesn't ship — see Responsive above (FUT-2778).
+  parameters: { viewport: { defaultViewport: 'xxs' } },
   render: () => (
     <Box sx={{ p: 2, minHeight: 480 }}>
       <SettingsLayout
