@@ -182,21 +182,23 @@ export const NoIcons: Story = {
 /**
  * Below `md` the rail stacks full-width above the panel.
  *
- * `defaultViewport` names a key from THIS project's own viewport scale
- * (`.storybook/preview.tsx`'s `options`: `xxs`/`xs`/`sm`/`md`/`lg`/`xlg`/`xxl`
- * — replacing Storybook's ~40-device stock list on purpose). This story, and
- * `DrilldownIndex`/`DrilldownSection` below, used to name the STOCK key
- * `'mobile1'`, which matches nothing in that list, so the viewport addon had
- * nothing to switch to and the canvas rendered at whatever width was already
+ * Storybook 9 moved viewport selection to `globals.viewport.value` — the
+ * `parameters.viewport.defaultViewport` shape this story (and
+ * `DrilldownIndex`/`DrilldownSection` below) used to set is not read by
+ * `storybook@9.1.20` at all (the string appears nowhere in its `dist`), so it
+ * silently did nothing and the canvas rendered at whatever width was already
  * selected — never the narrow phone width these stories are named for
- * (FUT-2778). `xxs` (320px) is this component's own canonical narrow-width
- * fixture: `SettingsLayout.test.stories.tsx`'s drilldown-strip play functions
- * already pin their wrapper to 320px for the same "phone" scenario.
+ * (FUT-2778). Fixed the same way `AppHeader.stories.tsx`'s `Phone` story and
+ * `Form.stories.tsx`'s `SixRowsOnTheSmallestPhone` already do: a `globals`
+ * key on the story, naming a key from THIS project's own viewport scale
+ * (`.storybook/preview.tsx`'s `options`: `xxs`/`xs`/`sm`/`md`/`lg`/`xlg`/`xxl`
+ * — replacing Storybook's ~40-device stock list on purpose). `xxs` (320px) is
+ * this component's own canonical narrow-width fixture:
+ * `SettingsLayout.test.stories.tsx`'s drilldown-strip play functions already
+ * pin their wrapper to 320px for the same "phone" scenario.
  */
 export const Responsive: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'xxs' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ p: 2, minHeight: 480 }}>
       <SettingsLayout title="Settings" groups={GROUPS} activeItemId="profile">
@@ -248,8 +250,9 @@ export const SituationMarkers: Story = {
  * still mounted — only `display` moved — so the wide width shows it instead.
  */
 export const DrilldownIndex: Story = {
-  // 'xxs', not the stock 'mobile1' this project doesn't ship — see Responsive above (FUT-2778).
-  parameters: { viewport: { defaultViewport: 'xxs' } },
+  // globals.viewport.value: 'xxs' — parameters.viewport.defaultViewport is
+  // dead in Storybook 9; see Responsive above (FUT-2778).
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ p: 2, minHeight: 480 }}>
       <SettingsLayout
@@ -275,8 +278,9 @@ export const DrilldownIndex: Story = {
  * section, however the visitor arrived.
  */
 export const DrilldownSection: Story = {
-  // 'xxs', not the stock 'mobile1' this project doesn't ship — see Responsive above (FUT-2778).
-  parameters: { viewport: { defaultViewport: 'xxs' } },
+  // globals.viewport.value: 'xxs' — parameters.viewport.defaultViewport is
+  // dead in Storybook 9; see Responsive above (FUT-2778).
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ p: 2, minHeight: 480 }}>
       <SettingsLayout
