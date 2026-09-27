@@ -5,4 +5,5 @@ export * from './ContextMenu';
 export * from './DropdownMenu';
 export * from './NavigationMenu';
 export * from './Pagination';
+export * from './SectionNav';
 export * from './Tabs';

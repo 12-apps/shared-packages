@@ -608,6 +608,10 @@
       "types": "./dist/types/components/navigation/Pagination/index.d.ts",
       "default": "./dist/navigation/Pagination.js"
     },
+    "./navigation/SectionNav": {
+      "types": "./dist/types/components/navigation/SectionNav/index.d.ts",
+      "default": "./dist/navigation/SectionNav.js"
+    },
     "./navigation/Tabs": {
       "types": "./dist/types/components/navigation/Tabs/index.d.ts",
       "default": "./dist/navigation/Tabs.js"

@@ -15,6 +15,7 @@ import {
   parsePushEndpointBody,
   parsePushEndpointQuery,
   parsePushSubscriptionBody,
+  type NotificationsActor,
   type NotificationsRoute,
 } from './context';
 import type { NotificationContactDirectory } from './db';
@@ -74,6 +75,9 @@ async function channelAvailability(
     email: contact?.email ?? null,
     phone: contact?.phone ?? null,
     clientId: scopeClientId,
+    // Availability asks whether a channel CAN carry anything at all, not a
+    // particular notification, so it narrows by no side.
+    side: null,
     pushSubscriptionCount: 1,
   };
   return Object.fromEntries(
@@ -104,6 +108,15 @@ async function preferencesPayload(
   return { preferences, availability, categories: [...deps.categories] };
 }
 
+/**
+ * The side a subscription registered by this actor is stamped with: its own
+ * `pushSide` when the host set one (`null` = every side), else the side it
+ * reads its inbox as, else every side.
+ */
+function pushSideOf(actor: NotificationsActor): string | null {
+  return actor.pushSide !== undefined ? actor.pushSide : (actor.scopeSide ?? null);
+}
+
 function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
   return [
     {
@@ -115,6 +128,7 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
             actor.userId,
             parseListQuery(query, messagesOf(deps, locale)),
             actor.scopeClientId,
+            actor.scopeSide,
           ),
         ),
       ),
@@ -124,7 +138,9 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
       path: '/notifications/unread-count',
       handle: guarded(async ({ actor }) =>
         // Polled by the SPAs, so it stays a single indexed COUNT.
-        ok({ count: await deps.inbox.unreadCount(actor.userId, actor.scopeClientId) }),
+        ok({
+          count: await deps.inbox.unreadCount(actor.userId, actor.scopeClientId, actor.scopeSide),
+        }),
       ),
     },
     {
@@ -134,7 +150,7 @@ function inboxRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
         const target = parseMarkReadBody(body, messagesOf(deps, locale));
         const updated =
           'all' in target
-            ? await deps.inbox.markAllRead(actor.userId, actor.scopeClientId)
+            ? await deps.inbox.markAllRead(actor.userId, actor.scopeClientId, actor.scopeSide)
             : await deps.inbox.markRead(actor.userId, target.ids);
         // Only when something actually flipped. This endpoint is idempotent, so
         // a re-send of an already-read id reports `updated: 0` and has changed
@@ -217,6 +233,7 @@ function pushRoutes(deps: NotificationRoutesDeps): NotificationsRoute[] {
           // The HOST's resolved origin, never the body's — a caller cannot
           // choose which store's app their browser counts as.
           clientId: actor.scopeClientId ?? null,
+          side: pushSideOf(actor),
           ...input,
           ...(userAgent ? { userAgent } : {}),
         });
