@@ -126,11 +126,18 @@ describe('HoverCard: click-away', () => {
     expect(openCards()).toBe(0);
   });
 
-  it('listens only while open, in the capture phase, and stops on close and on unmount', () => {
+  it('listens only while open, in the bubble phase, and stops on close and on unmount', () => {
     const add = vi.spyOn(document, 'addEventListener');
     const remove = vi.spyOn(document, 'removeEventListener');
+    // Bubble, not capture (FUT-2776): the ownership marker on the card's own
+    // content root runs at capture, on an ancestor of anything the card's
+    // content renders or portals out, so this listener has to run LAST — the
+    // bubble phase's own last stop — to be sure that marker already ran for
+    // the same press. See `useCardOwnership` and `useClickAway` in
+    // `HoverCard.hooks.ts`.
     const pointerdown = (spy: typeof add) =>
-      spy.mock.calls.filter(([type, , options]) => type === 'pointerdown' && options === true).length;
+      spy.mock.calls.filter(([type, , options]) => type === 'pointerdown' && options !== true)
+        .length;
 
     const { trigger, unmount } = renderCard();
     expect(pointerdown(add)).toBe(0);

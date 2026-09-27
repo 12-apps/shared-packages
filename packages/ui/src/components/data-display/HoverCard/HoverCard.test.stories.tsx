@@ -4,6 +4,7 @@ import FormControl from '@mui/material/FormControl/index.js';
 import InputLabel from '@mui/material/InputLabel/index.js';
 import MenuItem from '@mui/material/MenuItem/index.js';
 import Select from '@mui/material/Select/index.js';
+import Snackbar from '@mui/material/Snackbar/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
@@ -1047,5 +1048,89 @@ export const NestedPortalClickAway: Story = {
         );
       },
     );
+  },
+};
+
+// Test 13: An UNRELATED portal — not anything the card's own content renders
+// — that mounts to `document.body` only AFTER the card is already open must
+// NOT be treated as inside it: a press inside it closes the card like any
+// other outside press (FUT-2776 adversarial-review fix). The old
+// `MutationObserver` approach tracked body membership by TIMING, so a
+// Snackbar, a dev overlay or another component's Popover mounting at the
+// same time stopped closing the card too — this pins that it no longer does.
+export const UnrelatedPortalClickAway: Story = {
+  render: function UnrelatedPortalClickAwayRender() {
+    const [snackbarOpen, setSnackbarOpen] = React.useState(false);
+
+    return (
+      <Stack spacing={2} alignItems="flex-start">
+        <HoverCard
+          title="Preferências"
+          description="Escolha uma opção"
+          loadingText="Carregando…"
+          enterDelay={100}
+          exitDelay={0}
+          trigger={<Button>Abrir cartão</Button>}
+        >
+          <Typography>Conteúdo do cartão</Typography>
+        </HoverCard>
+        <Button data-testid="mount-unrelated-portal" onClick={() => setSnackbarOpen(true)}>
+          Mostrar aviso não relacionado
+        </Button>
+        <Snackbar
+          open={snackbarOpen}
+          message="Aviso não relacionado ao cartão"
+          action={
+            <Button data-testid="unrelated-portal-action" color="secondary" size="small">
+              Ação
+            </Button>
+          }
+        />
+      </Stack>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await step('Open the card by hovering its trigger', async () => {
+      const trigger = await canvas.findByTestId('hover-card-trigger');
+      await userEvent.hover(trigger);
+
+      await waitFor(
+        () => {
+          expect(body.getByText('Preferências')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step(
+      "Mount an UNRELATED portal (a Snackbar, not the card's own content) while the card is open",
+      async () => {
+        const mountButton = await canvas.findByTestId('mount-unrelated-portal');
+        await userEvent.click(mountButton);
+
+        await waitFor(
+          () => {
+            expect(body.getByTestId('unrelated-portal-action')).toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
+
+    await step('A press inside that unrelated portal still closes the card', async () => {
+      const action = body.getByTestId('unrelated-portal-action');
+      fireEvent.pointerDown(action);
+      fireEvent.click(action);
+
+      await waitFor(
+        () => {
+          expect(body.queryByText('Preferências')).not.toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
   },
 };

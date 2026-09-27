@@ -108,7 +108,7 @@ The HoverCard component displays additional information in a card-style popup wh
 
 - The component supports keyboard navigation (Escape key to close)
 - The card is dismissed by moving the pointer off the trigger and the card (after `exitDelay`), by Escape, or by a tap or click anywhere outside them. The outside press still reaches what it landed on: the page under an open card stays usable
-- Nested portal content is supported: if `children` opens something of its own in a portal — a MUI `Select`'s menu, a nested `Popover`, a `DropdownMenu` — a press inside it counts as inside the card too, so picking an option there does not dismiss the card. No extra wiring is needed for this; it works for anything the content portals to `document.body` while the card is open
+- Nested portal content is supported: if `children` opens something of its own in a portal — a MUI `Select`'s menu, a nested `Popover`, a `DropdownMenu` — a press inside it counts as inside the card too, so picking an option there does not dismiss the card. No extra wiring is needed for this; it works for anything the card's OWN content renders, portalled or not — ownership is by React tree membership, not by when something happened to mount to `document.body`, so an unrelated portal (a Snackbar, a dev overlay, another component's Popover) that mounts while the card is open is not treated as inside it, and a press there still closes the card like any other outside press
 - Proper ARIA attributes are applied to the popover
 - Focus management is handled automatically
 - Touch support for mobile devices can be enabled/disabled

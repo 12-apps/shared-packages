@@ -16,6 +16,7 @@
  * `Popover` or a `DropdownMenu` in its place needs no separate wiring.
  */
 import MenuItem from '@mui/material/MenuItem/index.js';
+import Popover from '@mui/material/Popover/index.js';
 import Select from '@mui/material/Select/index.js';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
@@ -79,6 +80,51 @@ function openNestedSelect() {
   fireEvent.mouseDown(combobox as Element);
 }
 
+/**
+ * An UNRELATED portal — not anything the card's own `content` renders — that
+ * mounts to `document.body` only once its own `anchorEl` state is set, so the
+ * test controls exactly when it appears relative to the card opening. It is
+ * a sibling of the card in the React tree, never a descendant.
+ */
+function UnrelatedPortalHarness() {
+  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+
+  return (
+    <>
+      <HoverCard
+        title="Preferências"
+        loadingText="Carregando…"
+        enterDelay={ENTER}
+        exitDelay={0}
+        trigger={<button type="button">gatilho</button>}
+      >
+        conteúdo do cartão
+      </HoverCard>
+      <button
+        type="button"
+        data-testid="mount-unrelated-portal"
+        onClick={(event) => setAnchorEl(event.currentTarget)}
+      >
+        montar aviso
+      </button>
+      <Popover open={Boolean(anchorEl)} anchorEl={anchorEl}>
+        <button type="button" data-testid="unrelated-portal-button">
+          ação do aviso
+        </button>
+      </Popover>
+    </>
+  );
+}
+
+function renderCardWithUnrelatedPortal() {
+  const { unmount } = render(<UnrelatedPortalHarness />);
+  return {
+    trigger: screen.getByTestId('hover-card-trigger'),
+    mountUnrelatedPortal: screen.getByTestId('mount-unrelated-portal'),
+    unmount,
+  };
+}
+
 describe('HoverCard: click-away inside a nested portal', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -124,6 +170,30 @@ describe('HoverCard: click-away inside a nested portal', () => {
     expect(screen.getByRole('listbox')).toBeInTheDocument();
 
     fireEvent.pointerDown(outside);
+    runTimers();
+
+    expect(openCards()).toBe(0);
+  });
+
+  /**
+   * NEGATIVE (FUT-2776 adversarial review): the fix must attribute a press by
+   * OWNERSHIP — is the pressed element part of the card's own React tree? —
+   * not by TIMING. An unrelated portal (a Snackbar, a dev overlay, another
+   * component's Popover) that happens to mount to `document.body` while the
+   * card is open is not the card's, and a press inside it must still close
+   * the card, exactly like any other outside press.
+   */
+  it('a pointerdown inside an UNRELATED portal mounted while the card is open still closes it', () => {
+    const { trigger, mountUnrelatedPortal } = renderCardWithUnrelatedPortal();
+    openByHover(trigger);
+
+    // Mounted AFTER the card is already open — the same timing a
+    // timing-based "everything appended to body while open is inside" check
+    // would (wrongly) treat as owned by the card.
+    fireEvent.click(mountUnrelatedPortal);
+    const unrelatedButton = screen.getByTestId('unrelated-portal-button');
+
+    fireEvent.pointerDown(unrelatedButton);
     runTimers();
 
     expect(openCards()).toBe(0);

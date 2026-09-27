@@ -104,110 +104,96 @@ const useEscapeKey = (active: boolean, onEscape: () => void) => {
  * Touch has no mouse-leave, and MUI's own click-away was the popover's
  * backdrop, which `pointer-events: none` on the popover root (so the page
  * under an open card stays usable) takes out of play. So this listens on the
- * document itself, in the CAPTURE phase, where a `stopPropagation` further in
- * cannot swallow it. It only observes: no `preventDefault`, so the tap or
- * click still reaches whatever it landed on. Attached while open, removed on
- * close and on unmount.
+ * document itself, in the BUBBLE phase — the last stop a native `pointerdown`
+ * reaches, after every capture-phase and bubble-phase handler anywhere in the
+ * tree has already run, INCLUDING `useCardOwnership`'s capture-phase marker
+ * below (FUT-2776: see that hook for why this ordering, not "cannot be
+ * swallowed by a `stopPropagation` further in", now drives the phase choice).
+ * It only observes: no `preventDefault`, so the tap or click still reaches
+ * whatever it landed on. Attached while open, removed on close and on
+ * unmount.
  */
 const useClickAway = (
   active: boolean,
   inside: () => ReadonlyArray<Element | null>,
+  consumeOwnPress: () => boolean,
   onAway: () => void,
 ) => {
   React.useEffect(() => {
     if (!active) return;
 
     const handlePointerDown = (event: globalThis.PointerEvent) => {
+      // Read (and reset) UNCONDITIONALLY: a stale `true` left over from a
+      // press this listener never got to see (e.g. one dispatched while the
+      // card was closed) must not leak into the next one.
+      const ownedByReactTree = consumeOwnPress();
       const target = event.target as Node | null;
-      if (target && inside().some((el) => el?.contains(target))) return;
+      const ownedByDom = Boolean(target) && inside().some((el) => el?.contains(target));
+      if (ownedByReactTree || ownedByDom) return;
       onAway();
     };
 
-    document.addEventListener('pointerdown', handlePointerDown, true);
-    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
-  }, [active, inside, onAway]);
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [active, inside, consumeOwnPress, onAway]);
 };
 
 /**
- * Elements the card's OWN content portals to `document.body` while the card
- * is open — a MUI `Select`'s menu, a nested `Popover`, a `DropdownMenu` — so a
- * press inside one of them counts as inside the card, not away (FUT-2776).
- * `content` is arbitrary and unknown to the card, so nothing here is keyed to
- * a particular control: ANY overlay that mounts to `document.body` while the
- * card is open is tracked the same way, with no per-control allowlist to keep
- * growing as new nested-portal cases show up.
+ * Whether the pointerdown `useClickAway` is about to look at started inside
+ * the card's OWN React tree — a MUI `Select`'s menu, a nested `Popover`, a
+ * `DropdownMenu` the card's `content` renders — even when that control's DOM
+ * node is not a descendant of the card's box at all, because it portalled
+ * itself out near `document.body` (FUT-2776).
  *
- * The check `useClickAway` makes has to be synchronous, at `pointerdown`'s
- * CAPTURE phase (see below), which runs before this same event could ever
- * reach a React handler's bubble dispatch — so nothing here can "watch" the
- * decisive press itself. Instead a `MutationObserver` records `document.body`
- * membership as it changes, and `takeRecords()` drains that observer's queue
- * on demand: unlike its callback (a microtask), it reads whatever the
- * observer has already recorded synchronously, so a portal that mounted a
- * moment earlier in the very same interaction is seen immediately, with
- * nothing to await.
+ * React re-parents a portal's events to bubble AND capture through its OWNING
+ * React tree, not the DOM tree it renders into (see the React docs on
+ * `createPortal`), so an `onPointerDownCapture` on the card's own content root
+ * still fires for a press inside a portal the card's content renders, and
+ * NEVER fires for a press inside an unrelated one mounted by something that
+ * is not a descendant of the card in the REACT tree — ownership, not timing.
+ * That is the whole fix: the previous approach (a `MutationObserver` on
+ * `document.body`) treated ANY element appended to the body while the card
+ * was open as inside, so an unrelated Snackbar, dev overlay or Popover that
+ * happened to mount at the same time stopped closing the card too.
+ *
+ * The marker itself must run at CAPTURE, on an ANCESTOR of everything the
+ * card's content can render (including anything it portals out): capture
+ * runs top-down and completes, for the WHOLE tree, before bubbling begins,
+ * so it is immune to a nested control calling `stopPropagation` during ITS
+ * OWN bubble — that would only cut off propagation on the way back up, after
+ * our ancestor capture handler already ran. `useClickAway`'s document
+ * listener reads the flag from its OWN bubble-phase handler, which is why it
+ * moved off capture: a capture-phase listener on `document` is the outermost
+ * node in the capture path, so it would fire BEFORE this marker even could —
+ * a bubble-phase listener on `document` is the innermost point of the bubble
+ * path instead, so it is guaranteed to run last, after this marker's capture
+ * pass has already set the flag for the same event.
  */
-const usePortalOwnership = (active: boolean) => {
-  const rootsRef = React.useRef<Set<Element>>(new Set());
-  const observerRef = React.useRef<MutationObserver | null>(null);
+const useCardOwnership = () => {
+  const pressedInsideRef = React.useRef(false);
 
-  // Applied from BOTH paths that can hand us records: the observer's own
-  // callback (a microtask the browser schedules and drains on its own,
-  // whether or not anything ever reads `takeRecords()` — a callback that
-  // did nothing with them would silently lose exactly the mutations that
-  // happened with a gap before the press, i.e. every REAL one) and
-  // `takeRecords()` itself, for whatever a press's own synchronous check
-  // catches before that microtask has had its turn.
-  const applyRecords = React.useCallback((records: MutationRecord[]) => {
-    records.forEach((record) => {
-      record.addedNodes.forEach((node) => {
-        if (node instanceof Element) rootsRef.current.add(node);
-      });
-      record.removedNodes.forEach((node) => {
-        if (node instanceof Element) rootsRef.current.delete(node);
-      });
-    });
+  const markInside = React.useCallback(() => {
+    pressedInsideRef.current = true;
   }, []);
 
-  React.useEffect(() => {
-    if (!active) return undefined;
+  const consume = React.useCallback(() => {
+    const wasInside = pressedInsideRef.current;
+    pressedInsideRef.current = false;
+    return wasInside;
+  }, []);
 
-    const observer = new MutationObserver(applyRecords);
-    // `subtree: true`: some hosts route every overlay through ONE persistent
-    // container they mount once (rather than each Modal/Popover appending
-    // its own new child straight to `document.body`), so a nested portal's
-    // arrival can be a deeper mutation, not a top-level one. `.contains()`
-    // below still finds it either way.
-    observer.observe(document.body, { childList: true, subtree: true });
-    observerRef.current = observer;
-
-    return () => {
-      observer.disconnect();
-      observerRef.current = null;
-      rootsRef.current.clear();
-    };
-  }, [active, applyRecords]);
-
-  return React.useCallback((): ReadonlyArray<Element> => {
-    const pending = observerRef.current?.takeRecords();
-    if (pending) applyRecords(pending);
-    return Array.from(rootsRef.current);
-  }, [applyRecords]);
+  return { markInside, consume };
 };
 
-/** The trigger, the card's own box, and anything its content portalled out. */
+/** The trigger and the card's own box — a plain DOM containment check. */
 const useInsideCard = (
-  active: boolean,
   anchorEl: HTMLElement | null,
   contentRef: React.MutableRefObject<HTMLDivElement | null>,
-) => {
-  const ownedPortalRoots = usePortalOwnership(active);
-
-  return React.useCallback(
-    () => [anchorEl, contentRef.current, ...ownedPortalRoots()],
-    [anchorEl, contentRef, ownedPortalRoots],
+) =>
+  React.useCallback(
+    () => [anchorEl, contentRef.current],
+    [anchorEl, contentRef],
   );
-};
 
 /** Whatever is still pending when the card unmounts is cancelled with it. */
 const useClearOnUnmount = (...refs: TimerRef[]) => {
@@ -227,34 +213,22 @@ interface HoverCardTimingInput {
   onClose?: () => void;
 }
 
+type VisibilityInput = Omit<HoverCardTimingInput, 'touchEnabled'>;
+
 /**
- * When the card is open, and the delays that decide it.
+ * The open/close state and its two timers, split out of `useHoverCard` so
+ * that composing it with click-away, escape and ownership reads as one flat
+ * list rather than one long function.
  *
- * Three timers are in play: the enter delay before opening, the exit delay
- * before closing (so the pointer can travel from the trigger onto the card
- * without dismissing it), and the long-press timer on touch. Each cancels the
- * others' pending work, which is why they live together.
+ * The enter delay before opening and the exit delay before closing (so the
+ * pointer can travel from the trigger onto the card without dismissing it)
+ * each cancel the other's pending work, which is why they live together.
  */
-export const useHoverCard = ({
-  disabled,
-  touchEnabled,
-  enterDelay,
-  exitDelay,
-  onOpen,
-  onClose,
-}: HoverCardTimingInput) => {
+const useCardVisibility = ({ disabled, enterDelay, exitDelay, onOpen, onClose }: VisibilityInput) => {
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isTouchDevice, setIsTouchDevice] = React.useState(false);
   const enterTimeoutRef = React.useRef<number | undefined>(undefined);
   const exitTimeoutRef = React.useRef<number | undefined>(undefined);
-  /** The card's own box, inside the popover paper: a press here is not "away". */
-  const contentRef = React.useRef<HTMLDivElement | null>(null);
-
-  // Probed in an effect, not during render, so SSR and hydration stay intact.
-  React.useEffect(() => {
-    setIsTouchDevice('ontouchstart' in window);
-  }, []);
 
   const openCard = React.useCallback(
     (trigger: HTMLElement) => {
@@ -297,6 +271,29 @@ export const useHoverCard = ({
     onClose?.();
   }, [onClose]);
 
+  return { anchorEl, isOpen, openCard, closeCard, handleClose, enterTimeoutRef, exitTimeoutRef };
+};
+
+export const useHoverCard = ({
+  disabled,
+  touchEnabled,
+  enterDelay,
+  exitDelay,
+  onOpen,
+  onClose,
+}: HoverCardTimingInput) => {
+  const [isTouchDevice, setIsTouchDevice] = React.useState(false);
+  /** The card's own box, inside the popover paper: a press here is not "away". */
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+
+  const { anchorEl, isOpen, openCard, closeCard, handleClose, enterTimeoutRef, exitTimeoutRef } =
+    useCardVisibility({ disabled, enterDelay, exitDelay, onOpen, onClose });
+
+  // Probed in an effect, not during render, so SSR and hydration stay intact.
+  React.useEffect(() => {
+    setIsTouchDevice('ontouchstart' in window);
+  }, []);
+
   const { triggerHandlers, cardHandlers } = useHoverHandlers({
     isTouchDevice,
     touchEnabled,
@@ -306,11 +303,21 @@ export const useHoverCard = ({
     exitTimeoutRef,
   });
 
-  const insideCard = useInsideCard(isOpen, anchorEl, contentRef);
+  const insideCard = useInsideCard(anchorEl, contentRef);
+  const { markInside, consume } = useCardOwnership();
 
   useEscapeKey(isOpen, handleClose);
-  useClickAway(isOpen, insideCard, handleClose);
+  useClickAway(isOpen, insideCard, consume, handleClose);
   useClearOnUnmount(enterTimeoutRef, exitTimeoutRef);
 
-  return { anchorEl, isOpen, handleClose, triggerHandlers, cardHandlers, contentRef };
+  return {
+    anchorEl,
+    isOpen,
+    handleClose,
+    triggerHandlers,
+    cardHandlers,
+    contentRef,
+    /** Wire onto the card's content root as `onPointerDownCapture` (FUT-2776). */
+    onContentPointerDownCapture: markInside,
+  };
 };
