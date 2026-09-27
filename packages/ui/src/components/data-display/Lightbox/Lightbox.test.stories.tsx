@@ -318,7 +318,7 @@ export const ZoomAndPan: Story = {
         // Matrix with scale > 1 will have values > 1 in first and fourth positions
         const matrixMatch = style.transform.match(/matrix\(([^,]+),/);
         if (matrixMatch) {
-          const scaleValue = parseFloat(matrixMatch[1]);
+          const scaleValue = parseFloat(matrixMatch[1] ?? '0');
           expect(scaleValue).toBeGreaterThan(1);
         }
       });
@@ -510,7 +510,7 @@ export const EdgeCases: Story = {
 
 // 10. Single Image Tests
 export const SingleImageGallery: Story = {
-  render: () => <LightboxTestWrapper items={[testImages[0]]} showControls={true} />,
+  render: () => <LightboxTestWrapper items={[testImages[0]!]} showControls={true} />,
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 

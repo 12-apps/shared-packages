@@ -89,10 +89,10 @@ export const StateChange: Story = {
     const secondaryButton = canvas.getByRole('button', { name: 'Secondary Action' });
 
     await userEvent.click(primaryButton);
-    expect(args.actions![0].onClick).toHaveBeenCalledTimes(1);
+    expect(args.actions![0]!.onClick).toHaveBeenCalledTimes(1);
 
     await userEvent.click(secondaryButton);
-    expect(args.actions![1].onClick).toHaveBeenCalledTimes(1);
+    expect(args.actions![1]!.onClick).toHaveBeenCalledTimes(1);
   },
 };
 
@@ -143,7 +143,7 @@ export const KeyboardNavigation: Story = {
     // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would fire the handler under assertion
     action1.focus();
     await userEvent.keyboard('{Enter}');
-    expect(args.actions![0].onClick).toHaveBeenCalledTimes(1);
+    expect(args.actions![0]!.onClick).toHaveBeenCalledTimes(1);
 
     // Test Space key on dismiss button. Focused rather than clicked for the
     // same reason: a click is itself a dismiss.
@@ -396,7 +396,7 @@ export const Performance: Story = {
     // Click first 3 dismiss buttons
     const dismissCount = Math.min(3, allDismissButtons.length);
     for (let i = 0; i < dismissCount; i++) {
-      await userEvent.click(allDismissButtons[i]);
+      await userEvent.click(allDismissButtons[i]!);
       // The old wait here had an empty body, so it was a fixed delay with a
       // waitFor's name on it. Waiting for the banner count to actually drop is
       // both the real signal and the assertion.
@@ -483,7 +483,7 @@ export const EdgeCases: Story = {
     expect(manyActionsBanner).toBeInTheDocument();
 
     if (manyActionsBanner) {
-      const actionButtons = within(manyActionsBanner).getAllByRole('button');
+      const actionButtons = within(manyActionsBanner as HTMLElement).getAllByRole('button');
       expect(actionButtons).toHaveLength(4);
     }
   },

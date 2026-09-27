@@ -28,7 +28,14 @@ const meta: Meta<typeof Alert> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+// `StoryObj<typeof meta>` collapses `Story['args']` to `never` here: `Alert`'s
+// props (`AlertBase & AlertDismiss`, `AlertDismiss` itself a union keyed on
+// `closable`) survive `React.ComponentProps<typeof Alert>` intact, but
+// Storybook's own `Meta`/`StoryObj` args-extraction loses that union once it
+// goes through `meta`'s type — a known incompatibility between CSF3's typing
+// and a forwardRef component whose props are a discriminated union, not a
+// mistake in this story. Typing `Story` off the component directly avoids it.
+type Story = StoryObj<typeof Alert>;
 
 // Interaction Tests
 export const BasicInteraction: Story = {
@@ -199,6 +206,7 @@ export const AllVariantsVisual: Story = {
             title={`${variant.charAt(0).toUpperCase() + variant.slice(1)} Alert`}
             description={`This is a ${variant} alert with all features enabled`}
             closable
+            closeLabel={`Fechar alerta de ${variant}`}
             showIcon
             data-testid={`alert-${variant}`}
           />
@@ -551,6 +559,7 @@ const FormIntegrationComponent = () => {
           title="Success"
           description={alertMessage}
           closable
+          closeLabel="Fechar alerta"
           onClose={() => setShowAlert(false)}
           data-testid="form-alert"
         />
