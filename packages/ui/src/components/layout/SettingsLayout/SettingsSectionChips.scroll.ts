@@ -39,6 +39,13 @@ const SCROLL_DELTA_EPSILON = 2;
  */
 const POINTER_MOVE_EPSILON = 2;
 
+/**
+ * How long a key, sideways wheel or pan stays armed through a scroll the strip
+ * made itself (FUT-2848): a busy thread can finish a re-centre before the key's
+ * scroll ticks once. Past this it lapses, so a later clamp is not the visitor.
+ */
+const NUDGE_FRESH_MS = 1000;
+
 interface VisitorScrollWatch {
   /** True once the visitor has moved the strip themselves. */
   hasScrolled: () => boolean;
@@ -79,6 +86,9 @@ interface WatchState {
   pointer: boolean;
   touch: boolean;
   nudged: boolean;
+  /** When `nudged` was set (`Date.now()` ms), and whether it outlived an own verdict. */
+  nudgedAt: number;
+  nudgeKept: boolean;
   undecided: boolean;
   scrolled: boolean;
   aimed: number;
@@ -177,6 +187,11 @@ export function toRawScrollLeft(strip: HTMLElement, physical: number): number {
   return physical;
 }
 
+/** Whether the gesture that armed `nudged` happened within {@link NUDGE_FRESH_MS}. */
+function nudgeIsFresh(state: WatchState): boolean {
+  return Date.now() - state.nudgedAt <= NUDGE_FRESH_MS;
+}
+
 /** Whether the strip came to rest where it last aimed itself — clamped as the browser would. */
 function restsOnAim(strip: HTMLElement, aimed: number): boolean {
   const reachable = Math.min(aimed, strip.scrollWidth - strip.clientWidth);
@@ -222,15 +237,18 @@ function createGestureListeners(state: WatchState): { onStrip: Listeners; onView
     state.touch = false;
     state.touchDownAt = Number.NaN;
   };
-  const onPointerCancel = (): void => {
+  const nudge = (): void => {
     state.nudged = true;
+    state.nudgedAt = Date.now();
+    state.nudgeKept = false;
+  };
+  const onPointerCancel = (): void => {
+    nudge();
     onPointerUp();
   };
-  const onKeydown = (): void => {
-    state.nudged = true;
-  };
+  const onKeydown = nudge;
   const onWheel = (event: Event): void => {
-    if (horizontalDelta(event) !== 0) state.nudged = true;
+    if (horizontalDelta(event) !== 0) nudge();
   };
   return {
     onStrip: [
@@ -250,6 +268,31 @@ function createGestureListeners(state: WatchState): { onStrip: Listeners; onView
       ['touchcancel', onTouchEnd],
     ],
   };
+}
+
+/**
+ * Judge the scroll under judgement once the strip rests. Only a scroll UNDER
+ * JUDGEMENT disarms: Chromium can fire `scrollend` for the strip's own scroll
+ * cut off by another BEFORE that one's first `scroll`, and disarming there
+ * would hand the visitor's scroll to nobody.
+ */
+function settleJudgement(strip: HTMLElement, state: WatchState): void {
+  if (!state.undecided) return;
+  state.undecided = false;
+  const own = restsOnAim(strip, state.aimed);
+  if (!own) state.scrolled = true;
+  // The strip's own scroll does not use up a gesture armed moments ago: the
+  // scroll that gesture causes may still be on its way (FUT-2848).
+  state.nudgeKept = own && nudgeIsFresh(state);
+  if (!state.nudgeKept) state.nudged = false;
+  state.settled();
+}
+
+/** A gesture kept through the strip's own scroll lapses once stale (FUT-2848). */
+function dropStaleNudge(state: WatchState): void {
+  if (!state.nudgeKept || nudgeIsFresh(state)) return;
+  state.nudged = false;
+  state.nudgeKept = false;
 }
 
 /**
@@ -291,6 +334,8 @@ export function watchVisitorScroll(strip: HTMLElement): VisitorScrollWatch {
     pointer: false,
     touch: false,
     nudged: false,
+    nudgedAt: Number.NaN,
+    nudgeKept: false,
     undecided: false,
     scrolled: false,
     aimed: Number.NaN,
@@ -302,17 +347,7 @@ export function watchVisitorScroll(strip: HTMLElement): VisitorScrollWatch {
     touchDownAt: Number.NaN,
     touchMoved: false,
   };
-  const settle = (): void => {
-    // Only a scroll that was UNDER JUDGEMENT disarms. Chromium can end the
-    // strip's own smooth scroll with a `scrollend` when another scroll cuts it
-    // off, fired BEFORE that scroll's first `scroll` (seen with an instant one);
-    // disarming there would hand the visitor's scroll to nobody.
-    if (!state.undecided) return;
-    state.undecided = false;
-    state.nudged = false;
-    if (!restsOnAim(strip, state.aimed)) state.scrolled = true;
-    state.settled();
-  };
+  const settle = (): void => settleJudgement(strip, state);
   const onScroll = (): void => {
     const now = physicalScrollLeft(strip);
     const movedFarEnough = Math.abs(now - state.lastScrollLeft) > SCROLL_DELTA_EPSILON;
@@ -324,6 +359,7 @@ export function watchVisitorScroll(strip: HTMLElement): VisitorScrollWatch {
     // arm under a delta-only check (`pointerMoved`/`touchMoved` rules that out);
     // a pointer that drifts a sub-epsilon amount while resting would arm under
     // a moved-only check with no delta floor (`movedFarEnough` rules that out).
+    dropStaleNudge(state);
     const pointerDrag = state.pointer && state.pointerMoved && movedFarEnough;
     const touchDrag = state.touch && state.touchMoved && movedFarEnough;
     // `nudged` (a keypress, a sideways wheel, the browser taking the pointer
