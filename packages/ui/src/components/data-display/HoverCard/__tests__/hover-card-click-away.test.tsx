@@ -17,10 +17,16 @@
  * `document` is the outermost node on the capture path, so this listener
  * fires BEFORE the card's own `onPointerDownCapture` ownership marker further
  * down the same tree gets its turn. `useClickAway` defers with
- * `queueMicrotask`, which runs once the whole native capture-then-bubble
- * dispatch (marker included) has finished. Every assertion below that follows
- * a `fireEvent.pointerDown` that this listener is meant to evaluate awaits
- * `flushClickAway()` first, to give that microtask its turn.
+ * `setTimeout(0)`, NOT `queueMicrotask`: a microtask queued from a
+ * capture-phase listener runs BEFORE the rest of the capture dispatch for
+ * TRUSTED input (a real press, or Playwright's `page.mouse`), so it would
+ * read the marker before `onPointerDownCapture` ever sets it — the very bug
+ * this hook exists to fix. A macrotask is not part of either kind of
+ * dispatch, so it always runs after the marker, trusted or not (see
+ * `useClickAway`'s own comment in `HoverCard.hooks.ts` for the measured
+ * ordering). Every assertion below that follows a `fireEvent.pointerDown`
+ * that this listener is meant to evaluate awaits `flushClickAway()` first, to
+ * give that deferred timer its turn.
  *
  * The long-press cases pin a second bug on the same path: the touch timer read
  * `event.currentTarget` after React had nulled it, so a long-pressed card
@@ -64,18 +70,19 @@ const runTimers = () => {
 };
 
 /**
- * Gives `useClickAway`'s deferred `queueMicrotask` its turn. Fake timers
- * (`vi.useFakeTimers`) do not fake microtasks, so a real `Promise` tick is
- * enough — but it has to happen inside `act` so the resulting `setState`
- * (via `handleClose`) is flushed before the next assertion reads the DOM.
+ * Gives `useClickAway`'s deferred `setTimeout(0)` decision its turn. Fake
+ * timers (`vi.useFakeTimers`) fake `setTimeout`, so `runOnlyPendingTimers`
+ * runs it directly — no real `Promise` tick needed now that the deferral is
+ * a macrotask, not a microtask (FUT-2776 third review: a microtask read the
+ * ownership marker before it was set for trusted input; see
+ * `useClickAway`'s comment in `HoverCard.hooks.ts`).
  */
 const flushClickAway = async () => {
-  await act(async () => {
-    await Promise.resolve();
-  });
+  // The click-away decision's own deferred timer.
+  runTimers();
   // The popover unmounts its content only once MUI's exit transition ends,
-  // which runs on a (fake) timer of its own — a SEPARATE tick from the
-  // microtask above that decides whether to close at all.
+  // which runs on a SEPARATE (fake) timer of its own, scheduled only once
+  // the state update above has taken effect.
   runTimers();
 };
 

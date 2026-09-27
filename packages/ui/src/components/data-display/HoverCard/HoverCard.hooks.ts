@@ -113,18 +113,41 @@ const useEscapeKey = (active: boolean, onEscape: () => void) => {
  * unmount.
  *
  * That capture placement is exactly what makes the decision impossible to
- * make SYNCHRONOUSLY, though: `document` is the outermost node on the
- * capture path, so this handler fires before React's own capture dispatch
- * even starts — before `useCardOwnership`'s marker on the card's content
- * root (also capture, but on a node further down the same tree) has had a
- * chance to run for this same event. So the decision is deferred with
- * `queueMicrotask`: capture-then-bubble for the WHOLE native dispatch runs
- * synchronously to completion (including that marker) before any queued
- * microtask gets a turn, so by the time this one runs, the marker has
- * already recorded whatever it was going to for this press. `activeRef`
- * guards the now-deferred read against the card having since closed or
- * unmounted (its own mouseleave/exit-delay path, Escape, or a re-render this
- * same microtask queue interleaves with).
+ * make SYNCHRONOUSLY: `document` is the outermost node on the capture path,
+ * so this handler fires before React's own capture dispatch even starts —
+ * before `useCardOwnership`'s marker on the card's content root (also
+ * capture, but on a node further down the same tree) has had a chance to run
+ * for this same event. So the decision is deferred — but NOT to a microtask:
+ * a microtask here reads the marker before it is set for TRUSTED input (a
+ * real press, or Playwright's `page.mouse`), which is the very bug this hook
+ * exists to fix (FUT-2776, third-review adversarial probe, measured with
+ * real Chromium and `page.mouse.down()`):
+ *
+ *   TRUSTED:  doc-capture-sync → doc-capture-microtask (marker unset) → inner-capture (sets marker)
+ *   SCRIPT:   doc-capture-sync → inner-capture (sets marker) → doc-capture-microtask (marker set)
+ *
+ * Chromium runs any microtasks queued by a capture-phase listener BEFORE
+ * dispatching to the next listener on the path when the event is trusted —
+ * so a microtask queued here runs before `useCardOwnership`'s capture
+ * listener further down the tree ever gets a turn, and the ownership check
+ * always reads empty. A script-dispatched event (`fireEvent`, `userEvent` in
+ * jsdom, or in a Storybook `play` function) instead completes its WHOLE
+ * capture-then-bubble dispatch before any microtask runs — which is why
+ * every test under the microtask version passed and the bug still shipped.
+ * A macrotask (`setTimeout(0)`) is not part of the event dispatch under
+ * EITHER kind of input, so it always runs after the whole dispatch — marker
+ * included — regardless of trusted vs. script. That ordering is what this
+ * hook now relies on.
+ *
+ * `sessionRef` replaces a plain boolean: it is a fresh object assigned each
+ * time the card opens (this effect's mount), so a `setTimeout` callback
+ * queued for a press during one open session can tell whether it is still
+ * that SAME session by comparing against the ref, not just whether the card
+ * happens to be open again — the card closing and reopening while a stale
+ * timeout is still pending must not let that timeout act on the new session.
+ * Every scheduled timeout is also tracked so a close or unmount can cancel
+ * whatever is still pending, rather than letting it fire against a card that
+ * is no longer there to close.
  */
 const useClickAway = (
   active: boolean,
@@ -132,27 +155,36 @@ const useClickAway = (
   ownsEvent: (event: Event) => boolean,
   onAway: () => void,
 ) => {
-  const activeRef = React.useRef(false);
+  const sessionRef = React.useRef<object | null>(null);
+  const pendingRef = React.useRef<Set<number>>(new Set());
 
   React.useEffect(() => {
     if (!active) return undefined;
-    activeRef.current = true;
+
+    const session = {};
+    sessionRef.current = session;
 
     const handlePointerDown = (event: globalThis.PointerEvent) => {
-      queueMicrotask(() => {
-        if (!activeRef.current) return;
+      const timeoutId = window.setTimeout(() => {
+        pendingRef.current.delete(timeoutId);
+        // Stale: this session closed (or a newer one opened) before this
+        // press's decision could run.
+        if (sessionRef.current !== session) return;
 
         const target = event.target as Node | null;
         const ownedByReactTree = ownsEvent(event);
         const ownedByDom = Boolean(target) && inside().some((el) => el?.contains(target));
         if (ownedByReactTree || ownedByDom) return;
         onAway();
-      });
+      }, 0);
+      pendingRef.current.add(timeoutId);
     };
 
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => {
-      activeRef.current = false;
+      sessionRef.current = null;
+      pendingRef.current.forEach((id) => window.clearTimeout(id));
+      pendingRef.current.clear();
       document.removeEventListener('pointerdown', handlePointerDown, true);
     };
   }, [active, inside, ownsEvent, onAway]);
@@ -186,8 +218,9 @@ const useClickAway = (
  * the event itself instead needs no consuming step and cannot go stale: a
  * `WeakSet` entry only ever answers for the ONE dispatch that created it,
  * and nothing outside this closure keeps a reference to a past pointerdown
- * once `useClickAway`'s microtask for it has run, so the entry is simply
- * garbage from then on.
+ * once `useClickAway`'s deferred (`setTimeout(0)`, not a microtask — see that
+ * hook for why) check for it has run, so the entry is simply garbage from
+ * then on.
  */
 const useCardOwnership = () => {
   const ownedEventsRef = React.useRef<WeakSet<Event>>(new WeakSet());

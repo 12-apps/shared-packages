@@ -1237,3 +1237,72 @@ export const StoppingNestedPortalClickAway: Story = {
     );
   },
 };
+
+// Test 15: TRUSTED-POINTER REGRESSION GUARD (FUT-2776, third review). A real
+// user picking an option in the card's own nested `Select` must not close
+// the card — the production bug this whole ticket is about. This story has
+// deliberately NO `play` function: `play` runs through `@testing-library`'s
+// `userEvent`/`fireEvent`, which — even inside a real browser — are
+// SCRIPT-dispatched events, indistinguishable here from jsdom. Only a
+// TRUSTED, OS-level pointer (what Playwright's `page.mouse` drives through
+// the browser's real input pipeline, via CDP) reproduces the bug: Chromium
+// runs a microtask queued by a capture-phase listener BEFORE the rest of
+// that same dispatch for trusted input, but always finishes the whole
+// dispatch first for script-dispatched input, trusted or not otherwise. An
+// earlier revision of `useClickAway` deferred with `queueMicrotask` and
+// passed every test here — including `StoppingNestedPortalClickAway` above
+// — while still closing the card on a real user's press, because every one
+// of those presses is script-dispatched. `parameters.trustedPointerRegression`
+// below is read by `.storybook/test-runner.ts`'s `postVisit` hook, which
+// drives the whole interaction with `page.mouse` instead: open the card,
+// open its nested `Select`, click an option, assert the card is STILL open,
+// then click truly outside and assert it closed. See that hook for the
+// actual assertions; this story only renders the fixture.
+export const TrustedPointerNestedSelectClickAway: Story = {
+  parameters: {
+    trustedPointerRegression: true,
+  },
+  render: function TrustedPointerNestedSelectClickAwayRender() {
+    return (
+      <Stack spacing={2} alignItems="flex-start">
+        <HoverCard
+          title="Preferências"
+          description="Escolha uma opção"
+          loadingText="Carregando…"
+          enterDelay={0}
+          exitDelay={0}
+          trigger={<Button>Abrir cartão</Button>}
+        >
+          <FormControl style={{ minWidth: 180 }}>
+            <InputLabel id="trusted-nested-select-label">Opção</InputLabel>
+            <Select
+              labelId="trusted-nested-select-label"
+              label="Opção"
+              data-testid="trusted-nested-select"
+              defaultValue=""
+            >
+              <MenuItem value="a" data-testid="trusted-nested-select-option-a">
+                Opção A
+              </MenuItem>
+              <MenuItem value="b" data-testid="trusted-nested-select-option-b">
+                Opção B
+              </MenuItem>
+            </Select>
+          </FormControl>
+        </HoverCard>
+        {/*
+          Fixed and pinned to a far corner, deliberately: a REAL `page.mouse`
+          click hit-tests at a screen coordinate, unlike `fireEvent`, which
+          targets a DOM node directly regardless of what visually sits on
+          top of it. The card's own popover can render anywhere near the
+          trigger depending on placement and viewport, so this button has to
+          be somewhere it provably never overlaps, not merely "elsewhere in
+          the layout".
+        */}
+        <Button data-testid="trusted-nested-outside" style={{ position: 'fixed', top: 16, right: 16 }}>
+          Fora do cartão
+        </Button>
+      </Stack>
+    );
+  },
+};

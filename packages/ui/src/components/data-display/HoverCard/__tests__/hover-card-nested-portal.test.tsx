@@ -68,21 +68,22 @@ const runTimers = () => {
 };
 
 /**
- * Gives `useClickAway`'s deferred `queueMicrotask` its turn (FUT-2776: the
- * document listener is capture-phase, which fires before the card's own
+ * Gives `useClickAway`'s deferred `setTimeout(0)` decision its turn (FUT-2776:
+ * the document listener is capture-phase, which fires before the card's own
  * `onPointerDownCapture` ownership marker further down the tree, so the
- * decision is deferred to a microtask that runs once the whole native
- * dispatch — marker included — has finished). Fake timers do not fake
- * microtasks, so a real `Promise` tick is enough, wrapped in `act` so the
- * resulting `setState` is flushed before the next assertion.
+ * decision is deferred). It is a macrotask, not a microtask — a microtask
+ * queued from a capture-phase listener runs BEFORE the rest of the capture
+ * dispatch for TRUSTED input, so it would read the marker before it is set
+ * (see `useClickAway`'s comment in `HoverCard.hooks.ts` for the measured
+ * ordering). Fake timers fake `setTimeout`, so `runOnlyPendingTimers` gives
+ * it its turn directly.
  */
 const flushClickAway = async () => {
-  await act(async () => {
-    await Promise.resolve();
-  });
+  // The click-away decision's own deferred timer.
+  runTimers();
   // The popover unmounts its content only once MUI's exit transition ends,
-  // which runs on a (fake) timer of its own — a SEPARATE tick from the
-  // microtask above that decides whether to close at all.
+  // which runs on a SEPARATE (fake) timer of its own, scheduled only once
+  // the state update above has taken effect.
   runTimers();
 };
 
