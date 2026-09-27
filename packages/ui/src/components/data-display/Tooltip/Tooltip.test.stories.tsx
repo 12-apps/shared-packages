@@ -874,7 +874,7 @@ export const PerformanceTest: Story = {
       // version wrapped it in a 500ms budget on top of that. What this step can
       // honestly assert is that a tooltip trigger inside the container still
       // responds to hover.
-      const [firstItem] = canvas.getAllByTestId(/item-/);
+      const firstItem = canvas.getAllByTestId(/item-/)[0]!;
       await userEvent.hover(firstItem);
       await userEvent.unhover(firstItem);
       await expect(firstItem).toBeInTheDocument();
