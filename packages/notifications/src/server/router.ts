@@ -177,7 +177,6 @@ async function applyPolicy(
   }
 }
 
-/** Run the commit observer without ever letting it reach the caller. */
 /**
  * The type's side, or `null`. A resolver that THROWS degrades to unclassified
  * (every reader sees it) rather than failing the emit: a notification that
@@ -193,6 +192,7 @@ function sideFor(deps: NotificationRouterDeps, type: string): string | null {
   }
 }
 
+/** Run the commit observer without ever letting it reach the caller. */
 function announce(deps: NotificationRouterDeps, notification: CommittedNotification): void {
   if (!deps.onCommitted) return;
   try {

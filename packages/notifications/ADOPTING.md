@@ -295,6 +295,12 @@ sweep — endpoints and screens included.
     `NULL`. A host that sets neither sees no change at all — which is also what
     every row written before these columns existed reads as.
 
+    A host with a HAND-WRITTEN database adapter (rule 4) has one more thing to
+    carry: `side` is a new column on both tables and a new field on the rows,
+    the create/upsert arguments and `TransportRecipient`, and the push `where`
+    gains an `AND` key for the side rule beside the store rule's `OR`. A Prisma
+    client needs nothing — the shapes pass straight through.
+
 ## The minimum host
 
 ```ts

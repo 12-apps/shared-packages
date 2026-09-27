@@ -827,7 +827,7 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
 
 describe('the side a reader asks as, over real rows', () => {
   // The harness host classifies `order.paid` as the customer's and `stock.low`
-  // as the staff's (`SIDES` in src/notifications-host.ts); `x-notifications-side`
+  // as the staff's (`SIDES` in src/notifications-sides.ts); `x-notifications-side`
   // stands in for the host resolving which app is asking.
   async function inboxAs(side: string): Promise<string[]> {
     const response = await backend.app.request('/api/account/notifications', {
@@ -867,6 +867,38 @@ describe('the side a reader asks as, over real rows', () => {
     expect(staff).toContain(stock);
     expect(staff).not.toContain(paid);
     expect(everything).toEqual(expect.arrayContaining([paid, stock]));
+  });
+
+  it('pushes each side only to the apps that serve it, over real SQL', async () => {
+    // The fan-out's side rule is SQL here (`reachWhere`), not the in-memory
+    // double: a customer notification must reach the customer app and the
+    // side-less one, never the staff app — and the reverse.
+    const register = async (endpoint: string, side?: string): Promise<void> => {
+      const response = await backend.app.request('/api/account/push-subscriptions', {
+        method: 'POST',
+        headers: {
+          ...headers('owner-1'),
+          ...(side === undefined ? {} : { 'x-notifications-side': side }),
+        },
+        body: JSON.stringify({ endpoint, keys: { p256dh: 'p', auth: 'a' } }),
+      });
+      expect(response.status).toBe(200);
+    };
+    await register('https://push.harness.test/customer', 'customer');
+    await register('https://push.harness.test/staff', 'staff');
+    await register('https://push.harness.test/both');
+
+    await emit({ type: 'order.paid', payload: { code: 'S-3' } });
+    await emit({ type: 'stock.low', payload: { item: 'Farinha' } });
+
+    const pushes = (await outbox()).filter((entry) => entry.channel === 'WEB_PUSH');
+    const reached = (text: string): string[] =>
+      pushes
+        .filter((entry) => entry.payload.includes(text))
+        .map((entry) => entry.destination.split('/').pop() ?? '')
+        .sort();
+    expect(reached('Pedido S-3 pago.')).toEqual(['both', 'customer']);
+    expect(reached('Farinha está acabando.')).toEqual(['both', 'staff']);
   });
 
   it('stamps a push subscription registered from one side’s app', async () => {

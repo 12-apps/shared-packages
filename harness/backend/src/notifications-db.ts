@@ -120,6 +120,12 @@ function disjunction(branches: NotificationWhereBranch[], params: Params): strin
   return arms.length > 0 ? `(${arms.join(' OR ')})` : 'FALSE';
 }
 
+/** The side, by the same rule as `clientIdCondition`: `null` is a value. */
+function sideCondition(side: NotificationWhereBranch['side'], params: Params): string | null {
+  if (side === undefined) return null;
+  return side === null ? 'side IS NULL' : `side = ${params.add(side)}`;
+}
+
 /**
  * One filter BRANCH, translated — recursively, and that is what changed.
  *
@@ -135,12 +141,6 @@ function disjunction(branches: NotificationWhereBranch[], params: Params): strin
  * the anchor stopped matching. It is recognised by SHAPE now instead of by
  * index, which is the only part that moved.
  */
-/** The side, by the same rule as `clientIdCondition`: `null` is a value. */
-function sideCondition(side: NotificationWhereBranch['side'], params: Params): string | null {
-  if (side === undefined) return null;
-  return side === null ? 'side IS NULL' : `side = ${params.add(side)}`;
-}
-
 function branchWhere(where: NotificationWhereBranch, params: Params): string {
   // Built in one ordered pass, because `params.add` NUMBERS the placeholders as
   // it goes: the order these arms are evaluated in is the order the values bind
