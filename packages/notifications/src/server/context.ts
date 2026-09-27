@@ -37,6 +37,24 @@ export interface NotificationsActor {
    * another.
    */
   scopeClientId?: string;
+  /**
+   * The SIDE of the business this request's app serves (`customer`, `staff` —
+   * the host's vocabulary, as stamped on notifications by `sideOf`), again
+   * resolved by the host and never read from the request.
+   *
+   * Like `scopeClientId` it only NARROWS the caller's own inbox — the list, the
+   * badge and "mark all read" answer rows of this side plus unclassified ones —
+   * and it is the side a push subscription registered here is stamped with,
+   * unless `pushSide` says otherwise. Absent = every side, as before.
+   */
+  scopeSide?: string;
+  /**
+   * The side stamped on a push subscription this actor registers, when it must
+   * differ from `scopeSide`. `null` stamps NO side, so the browser receives
+   * every side: a host that has not yet shipped an app for one side keeps that
+   * side's alerts reaching somebody. Absent = `scopeSide`.
+   */
+  pushSide?: string | null;
 }
 
 /** One request, already authenticated and routed by the host. */

@@ -71,6 +71,18 @@ export type NotificationChannelPolicy = (
 /** How the host defers dispatch of one already-committed notification. */
 export type NotificationDispatchScheduler = (notificationId: string) => Promise<void>;
 
+/**
+ * Which SIDE of the business a notification TYPE is for — the host's
+ * vocabulary (`customer`, `staff`), or `null` when the host has not classified
+ * that type.
+ *
+ * Keyed by type rather than declared on the generator because generators also
+ * arrive from OTHER packages' blueprints (a team invite from `@12-apps/rbac`),
+ * whose contract this package does not own; the host is the one party that
+ * knows every type it registered, as it is for `categories`.
+ */
+export type NotificationSideResolver = (type: string) => string | null;
+
 /** One committed inbox record, as the commit observer sees it. */
 export interface CommittedNotification {
   notificationId: string;
@@ -115,6 +127,7 @@ interface NotificationRouterDeps extends NotificationDispatchDeps {
   channelPolicy?: NotificationChannelPolicy;
   scheduleDispatch?: NotificationDispatchScheduler;
   onCommitted?: NotificationCommittedListener;
+  sideOf?: NotificationSideResolver;
 }
 
 export interface NotificationRouter {
@@ -165,6 +178,21 @@ async function applyPolicy(
 }
 
 /** Run the commit observer without ever letting it reach the caller. */
+/**
+ * The type's side, or `null`. A resolver that THROWS degrades to unclassified
+ * (every reader sees it) rather than failing the emit: a notification that
+ * reaches one app too many is recoverable, one that was never written is not.
+ */
+function sideFor(deps: NotificationRouterDeps, type: string): string | null {
+  if (!deps.sideOf) return null;
+  try {
+    return deps.sideOf(type) ?? null;
+  } catch (error) {
+    deps.logger.error(`[notifications] sideOf failed for ${type}; leaving it unclassified:`, error);
+    return null;
+  }
+}
+
 function announce(deps: NotificationRouterDeps, notification: CommittedNotification): void {
   if (!deps.onCommitted) return;
   try {
@@ -229,6 +257,7 @@ async function commit(
   category: string,
   content: { title: string; body: string; link?: string; data?: Record<string, unknown> },
   channels: NotificationChannel[],
+  side: string | null,
 ): Promise<{ id: string; userId: string; clientId: string | null }> {
   const client = await deps.db();
   return client.$transaction(async (tx) => {
@@ -236,6 +265,7 @@ async function commit(
       data: {
         userId: event.recipient.userId,
         clientId: event.recipient.clientId ?? null,
+        side,
         type: event.type,
         category,
         title: content.title,
@@ -279,10 +309,12 @@ export function createNotificationRouter(deps: NotificationRouterDeps): Notifica
         Loading first also means a notification addressed to nobody now throws
         before any content is built, which is the cheaper order anyway.
       */
+      const side = sideFor(deps, event.type);
       const recipient = await loadRecipient(
         deps,
         event.recipient.userId,
         event.recipient.clientId ?? null,
+        side,
       );
       if (!recipient) throw new UnknownNotificationRecipientError(event.recipient.userId);
 
@@ -291,7 +323,14 @@ export function createNotificationRouter(deps: NotificationRouterDeps): Notifica
       const content = generator.generate(event.payload as never, { locale: recipient.locale });
 
       const channels = await resolveChannels(deps, event, generator, recipient);
-      const notification = await commit(deps, event, generator.category, content, channels);
+      const notification = await commit(
+        deps,
+        event,
+        generator.category,
+        content,
+        channels,
+        side,
+      );
 
       // AFTER the transaction, never inside it: a subscriber woken by an event
       // published mid-transaction would re-read and not find the row it was told

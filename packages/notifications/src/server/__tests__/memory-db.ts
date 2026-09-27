@@ -68,6 +68,7 @@ function matches(row: NotificationRow, where: NotificationWhereBranch): boolean 
   if (where.userId !== undefined && row.userId !== where.userId) return false;
   if (where.readAt === null && row.readAt !== null) return false;
   if (where.clientId !== undefined && row.clientId !== where.clientId) return false;
+  if (where.side !== undefined && row.side !== where.side) return false;
   if (typeof where.id === 'string' && row.id !== where.id) return false;
   if (where.id !== undefined && typeof where.id !== 'string') {
     if ('in' in where.id && !where.id.in.includes(row.id)) return false;
@@ -102,8 +103,11 @@ function live(rows: NotificationRow[], where: NotificationWhere): NotificationRo
  */
 function reachable(row: PushSubscriptionRow, where: PushSubscriptionWhere): boolean {
   if (row.userId !== where.userId) return false;
-  if (where.OR === undefined) return true;
-  return where.OR.some((arm) => row.clientId === arm.clientId);
+  if (where.OR !== undefined && !where.OR.some((arm) => row.clientId === arm.clientId)) {
+    return false;
+  }
+  // The side rule, AND-ed: each member is one more disjunction the row must meet.
+  return (where.AND ?? []).every((rule) => rule.OR.some((arm) => row.side === arm.side));
 }
 
 /**

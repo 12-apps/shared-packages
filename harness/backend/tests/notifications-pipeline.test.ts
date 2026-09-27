@@ -824,3 +824,66 @@ describe('adopted through @12-apps/wiring, not through the per-package adapter',
     expect(renderWiringReport(backend.hosts.notifications.report)).toContain(NOTIFICATIONS_MOUNT_PATH);
   });
 });
+
+describe('the side a reader asks as, over real rows', () => {
+  // The harness host classifies `order.paid` as the customer's and `stock.low`
+  // as the staff's (`SIDES` in src/notifications-host.ts); `x-notifications-side`
+  // stands in for the host resolving which app is asking.
+  async function inboxAs(side: string): Promise<string[]> {
+    const response = await backend.app.request('/api/account/notifications', {
+      headers: { ...headers('owner-1'), 'x-notifications-side': side },
+    });
+    expect(response.status).toBe(200);
+    return (await json<{ data: InboxPage }>(response)).data.items.map((item) => item.body);
+  }
+
+  it('stamps each row with the side its type resolves to', async () => {
+    const paid = await emit({ type: 'order.paid', payload: { code: 'S-1' } });
+    const stock = await emit({ type: 'stock.low', payload: { item: 'Farinha' } });
+
+    const { rows } = await backend.pg.query<{ id: string; side: string | null }>(
+      `SELECT id, side FROM notifications WHERE id = ANY($1)`,
+      [[paid.notificationId, stock.notificationId]],
+    );
+    const sides = Object.fromEntries(rows.map((row) => [row.id, row.side]));
+    expect(sides[paid.notificationId]).toBe('customer');
+    expect(sides[stock.notificationId]).toBe('staff');
+  });
+
+  it('lists only the side asked for, and every side when none is named', async () => {
+    // The reset seeds unclassified rows too; those belong to every side, so the
+    // assertion is about the two classified rows, not the length of the page.
+    await emit({ type: 'order.paid', payload: { code: 'S-2' } });
+    await emit({ type: 'stock.low', payload: { item: 'Farinha' } });
+    const paid = 'Pedido S-2 pago.';
+    const stock = 'Farinha está acabando.';
+
+    const customer = await inboxAs('customer');
+    const staff = await inboxAs('staff');
+    const everything = (await inbox()).items.map((item) => item.body);
+
+    expect(customer).toContain(paid);
+    expect(customer).not.toContain(stock);
+    expect(staff).toContain(stock);
+    expect(staff).not.toContain(paid);
+    expect(everything).toEqual(expect.arrayContaining([paid, stock]));
+  });
+
+  it('stamps a push subscription registered from one side’s app', async () => {
+    const response = await backend.app.request('/api/account/push-subscriptions', {
+      method: 'POST',
+      headers: { ...headers('owner-1'), 'x-notifications-side': 'staff' },
+      body: JSON.stringify({
+        endpoint: 'https://push.example.com/side-staff',
+        keys: { p256dh: 'p', auth: 'a' },
+      }),
+    });
+    expect(response.status).toBe(200);
+
+    const { rows } = await backend.pg.query<{ side: string | null }>(
+      `SELECT side FROM push_subscriptions WHERE endpoint = $1`,
+      ['https://push.example.com/side-staff'],
+    );
+    expect(rows[0]?.side).toBe('staff');
+  });
+});

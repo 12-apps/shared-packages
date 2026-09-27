@@ -274,6 +274,27 @@ sweep — endpoints and screens included.
     bump, not the defence — it does not help a host whose cookie is
     `SameSite=None` and whose attacker can send `application/json`.
 
+14. **One person, several apps: narrow by STORE and by SIDE.** A host that
+    installs more than one app per person — one per store's origin, or a
+    customer app beside a staff app — answers each with only its own rows.
+    Both scopes are set by `resolveActor`, from whatever tells the host which app
+    is asking (its hostname, its route, a header its own app sends). Neither can
+    WIDEN anything: each only narrows a read that is already the caller's own,
+    so the worst a forged value can do is hide or re-sort the caller's own rows:
+
+    | actor field | narrows | a row with `NULL` there |
+    |---|---|---|
+    | `scopeClientId` | inbox, badge, "mark all read"; stamps a push subscription's `client_id` | is platform-wide, and every store sees it |
+    | `scopeSide` | the same, by `notifications.side`; stamps `push_subscriptions.side` | is unclassified, and every side sees it |
+    | `pushSide` | only the stamp: `null` registers a browser that receives EVERY side | — |
+
+    A notification's side comes from `sideOf(type)` on the server config, in
+    your vocabulary (`customer`, `staff`); a type it does not name stays
+    unclassified. The push fan-out applies both rules: a subscription receives
+    a notification when its store and its side each either match or are
+    `NULL`. A host that sets neither sees no change at all — which is also what
+    every row written before these columns existed reads as.
+
 ## The minimum host
 
 ```ts
