@@ -43,6 +43,7 @@ export const BasicInteraction: Story = {
     return (
       <Box width={600}>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="basic-table"
           columns={basicColumns}
           data={testData}
@@ -68,8 +69,8 @@ export const BasicInteraction: Story = {
 
     // Test selection functionality
     const checkboxes = canvas.getAllByRole('checkbox');
-    const selectAllCheckbox = checkboxes[0];
-    const firstRowCheckbox = checkboxes[1];
+    const selectAllCheckbox = checkboxes[0]!;
+    const firstRowCheckbox = checkboxes[1]!;
 
     // Initially nothing selected
     await expect(selectAllCheckbox).not.toBeChecked();
@@ -100,6 +101,7 @@ export const FormInteraction: Story = {
           Selected: {selectedRows.join(', ')}
         </Typography>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="form-table"
           columns={basicColumns}
           data={testData}
@@ -119,11 +121,11 @@ export const FormInteraction: Story = {
 
     // Check that first row checkbox is checked
     const checkboxes = canvas.getAllByRole('checkbox');
-    const firstRowCheckbox = checkboxes[1];
+    const firstRowCheckbox = checkboxes[1]!;
     await expect(firstRowCheckbox).toBeChecked();
 
     // Test select all
-    const selectAllCheckbox = checkboxes[0];
+    const selectAllCheckbox = checkboxes[0]!;
     await userEvent.click(selectAllCheckbox);
 
     await waitFor(() => {
@@ -137,6 +139,7 @@ export const KeyboardNavigation: Story = {
     return (
       <Box width={600}>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="keyboard-table"
           columns={basicColumns}
           data={testData}
@@ -162,6 +165,7 @@ export const ScreenReader: Story = {
     return (
       <Box width={600}>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="accessible-table"
           columns={basicColumns}
           data={testData}
@@ -191,6 +195,7 @@ export const FocusManagement: Story = {
       <Box width={600}>
         <button data-testid="before">Before</button>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="focus-table"
           columns={basicColumns}
           data={testData}
@@ -218,6 +223,7 @@ export const ResponsiveDesign: Story = {
     return (
       <Box maxWidth={400}>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="responsive-table"
           columns={basicColumns}
           data={testData}
@@ -241,6 +247,7 @@ export const ThemeVariations: Story = {
     return (
       <Box>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="theme-table"
           columns={basicColumns}
           data={testData}
@@ -262,6 +269,7 @@ export const VisualStates: Story = {
     return (
       <Box>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="loading-table"
           columns={basicColumns}
           data={[]}
@@ -294,6 +302,7 @@ export const Performance: Story = {
     return (
       <Box height={300}>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="performance-table"
           columns={basicColumns}
           data={data}
@@ -345,6 +354,7 @@ export const Integration: Story = {
           Selected: {selectedRows.length} rows
         </Typography>
         <Table
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
           data-testid="integration-table"
           columns={basicColumns}
           data={testData}
@@ -364,7 +374,7 @@ export const Integration: Story = {
     await expect(table).toBeVisible();
 
     // Test selection
-    const selectAllCheckbox = canvas.getAllByRole('checkbox')[0];
+    const selectAllCheckbox = canvas.getAllByRole('checkbox')[0]!;
     await userEvent.click(selectAllCheckbox);
 
     await waitFor(() => {

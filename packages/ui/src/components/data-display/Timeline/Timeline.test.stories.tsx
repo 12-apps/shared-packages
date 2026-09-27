@@ -88,7 +88,7 @@ export const BasicInteraction: Story = {
 
     // Test clicking on timeline items
     const firstItem = timelineItems[0];
-    await userEvent.click(firstItem);
+    await userEvent.click(firstItem!);
     await expect(args.onItemClick).toHaveBeenCalledWith(sampleItems[0]);
     await expect(args.onItemClick).toHaveBeenCalledTimes(1);
 
@@ -103,11 +103,11 @@ export const BasicInteraction: Story = {
     await expect(expandButtons.length).toBeGreaterThan(0);
 
     // Initially collapsed - description should not be visible
-    const firstDescription = sampleItems[0].description!;
+    const firstDescription = sampleItems[0]!.description!;
     await waitFor(() => expect(canvas.queryByText(firstDescription)).not.toBeVisible());
 
     // Click to expand
-    await userEvent.click(expandButtons[0]);
+    await userEvent.click(expandButtons[0]!);
 
     // Wait for expansion animation and verify description is now visible
     await waitFor(() => {
@@ -116,11 +116,11 @@ export const BasicInteraction: Story = {
 
     // Verify the expand button rotated (indicates expanded state)
     // Check the computed style includes rotation (will be a matrix in computed styles)
-    const buttonStyle = window.getComputedStyle(expandButtons[0]);
+    const buttonStyle = window.getComputedStyle(expandButtons[0]!);
     await expect(buttonStyle.transform).not.toBe('none');
 
     // Click to collapse
-    await userEvent.click(expandButtons[0]);
+    await userEvent.click(expandButtons[0]!);
 
     // Wait for collapse animation
     await waitFor(() => {
@@ -130,8 +130,8 @@ export const BasicInteraction: Story = {
     // Verify the expand button rotated back
     // The collapsed state should not have the same transform as when expanded
     await waitFor(() => {
-      const _collapsedButtonStyle = window.getComputedStyle(expandButtons[0]);
-      const _expandedButtonStyle = window.getComputedStyle(expandButtons[0]);
+      const _collapsedButtonStyle = window.getComputedStyle(expandButtons[0]!);
+      const _expandedButtonStyle = window.getComputedStyle(expandButtons[0]!);
       // Just verify the animation has completed - description is not visible
       expect(canvas.queryByText(firstDescription)).not.toBeVisible();
     });
@@ -172,8 +172,8 @@ export const FormInteraction: Story = {
 
     // Test each action button
     for (let i = 0; i < actionButtons.length; i++) {
-      const button = actionButtons[i];
-      const expectedLabel = `Action ${args.items[i].id}`;
+      const button = actionButtons[i]!;
+      const expectedLabel = `Action ${args.items[i]?.id}`;
       
       // Verify button has correct label
       await expect(button).toHaveTextContent(expectedLabel);
@@ -182,14 +182,14 @@ export const FormInteraction: Story = {
       await userEvent.click(button);
       
       // Verify the corresponding onClick was called
-      await expect(args.items[i].action?.onClick).toHaveBeenCalledTimes(1);
+      await expect(args.items[i]?.action?.onClick).toHaveBeenCalledTimes(1);
       
       // Reset for next iteration
-      (args.items[i].action?.onClick as Mock)?.mockClear?.();
+      (args.items[i]?.action?.onClick as Mock)?.mockClear?.();
     }
 
     // Test that action button clicks don't trigger item click
-    const firstActionButton = actionButtons[0];
+    const firstActionButton = actionButtons[0]!;
     const itemClickMock = fn();
     args.onItemClick = itemClickMock;
     
@@ -236,31 +236,31 @@ export const KeyboardNavigation: Story = {
 
     // Test Tab navigation through timeline cards
     // Find the first expand button and click it to test expansion
-    await userEvent.click(expandButtons[0]);
+    await userEvent.click(expandButtons[0]!);
     await waitFor(() => {
-      const description = canvas.getByText(sampleItems[0].description!);
+      const description = canvas.getByText(sampleItems[0]!.description!);
       expect(description).toBeVisible();
     }, { timeout: 3000 });
 
     // Verify button rotation indicates expanded state (transform will be a matrix in computed styles)
-    const expandedButtonStyle = window.getComputedStyle(expandButtons[0]);
+    const expandedButtonStyle = window.getComputedStyle(expandButtons[0]!);
     await expect(expandedButtonStyle.transform).not.toBe('none');
 
     // Test action button with keyboard
     const actionButton = canvas.getByRole('button', { name: /View Details/i });
     await userEvent.click(actionButton);
-    await expect(args.items[0].action?.onClick).toHaveBeenCalledTimes(1);
+    await expect(args.items[0]?.action?.onClick).toHaveBeenCalledTimes(1);
 
     // Click expand button to collapse
-    await userEvent.click(expandButtons[0]);
+    await userEvent.click(expandButtons[0]!);
     await waitFor(() => {
-      const description = canvas.queryByText(sampleItems[0].description!);
+      const description = canvas.queryByText(sampleItems[0]!.description!);
       expect(description).not.toBeVisible();
     }, { timeout: 3000 });
 
     // Test clicking card with Enter key
     // Click the card instead since cards aren't naturally focusable
-    await userEvent.click(cards[1]);
+    await userEvent.click(cards[1]!);
     await expect(args.onItemClick).toHaveBeenCalledWith(sampleItems[1]);
   },
 };
@@ -317,7 +317,7 @@ export const ScreenReader: Story = {
     for (let i = 0; i < dots.length; i++) {
       const dot = dots[i] as HTMLElement;
       const item = sampleItems[i];
-      if (item.color) {
+      if (item?.color) {
         const style = window.getComputedStyle(dot);
         await expect(style.background).toContain('gradient');
       }
@@ -358,14 +358,14 @@ export const FocusManagement: Story = {
     await waitFor(() => expect(expandButtons[0]).toHaveFocus());
 
     // Click to expand
-    await userEvent.click(expandButtons[0]);
+    await userEvent.click(expandButtons[0]!);
 
     // Focus should remain on the button after expansion
     await waitFor(() => expect(expandButtons[0]).toHaveFocus());
 
     // Wait for expansion to complete
     await waitFor(() => {
-      const description = canvas.getByText(sampleItems[0].description!);
+      const description = canvas.getByText(sampleItems[0]!.description!);
       expect(description).toBeVisible();
     }, { timeout: 3000 });
 
@@ -375,14 +375,14 @@ export const FocusManagement: Story = {
     // Clicking focuses the button, so the pre-focus only asserted focus() works.
     await userEvent.click(actionButton);
     await waitFor(() => expect(actionButton).toHaveFocus());
-    await expect(args.items[0].action?.onClick).toHaveBeenCalled();
+    await expect(args.items[0]?.action?.onClick).toHaveBeenCalled();
 
     // Test focus on card click
-    await userEvent.click(cards[0]);
+    await userEvent.click(cards[0]!);
     await expect(args.onItemClick).toHaveBeenCalled();
 
     // Test focus trap prevention (focus can move outside component)
-    const lastExpandButton = expandButtons[expandButtons.length - 1];
+    const lastExpandButton = expandButtons[expandButtons.length - 1]!;
 
     // Walk the keyboard to the last expand button, then once more: focus has to
     // leave the timeline rather than wrap back into it.
@@ -393,13 +393,13 @@ export const FocusManagement: Story = {
     await waitFor(() => expect(lastExpandButton).not.toHaveFocus());
 
     // Clicking the second item's expand button focuses it and keeps focus there.
-    await userEvent.click(expandButtons[1]);
+    await userEvent.click(expandButtons[1]!);
     await waitFor(() => expect(expandButtons[1]).toHaveFocus());
     
     // Verify multiple items can be expanded simultaneously
     await waitFor(() => {
-      const firstDescription = canvas.getByText(sampleItems[0].description!);
-      const secondDescription = canvas.getByText(sampleItems[1].description!);
+      const firstDescription = canvas.getByText(sampleItems[0]!.description!);
+      const secondDescription = canvas.getByText(sampleItems[1]!.description!);
       expect(firstDescription).toBeVisible();
       expect(secondDescription).toBeVisible();
     }, { timeout: 3000 });
@@ -472,7 +472,7 @@ export const ResponsiveDesign: Story = {
     }
 
     // Test touch interactions work on mobile
-    const firstCard = items[0];
+    const firstCard = items[0]!;
     await userEvent.click(firstCard);
     
     // Expand buttons should be large enough for touch
@@ -523,7 +523,7 @@ export const ThemeVariations: Story = {
       await expect(style.background).toContain('gradient');
       
       // Verify custom color is used if provided
-      if (item.color) {
+      if (item?.color) {
         // Check box-shadow uses the custom color
         await expect(style.boxShadow).toBeTruthy();
       }
@@ -603,7 +603,7 @@ export const VisualStates: Story = {
     await expect(cards).toHaveLength(expectedItemCount);
 
     // Test hover state on cards - verify cursor is set for interactivity
-    const firstCard = cards[0];
+    const firstCard = cards[0]!;
     const initialStyle = window.getComputedStyle(firstCard);
     await expect(initialStyle.cursor).toBe('pointer');
 
@@ -723,9 +723,9 @@ export const Performance: Story = {
 
     // Click multiple items quickly. No wall-clock budget: a 1s ceiling on three
     // clicks measures how loaded the runner is, not how the component performs.
-    await userEvent.click(items[0]);
-    await userEvent.click(items[10]);
-    await userEvent.click(items[20]);
+    await userEvent.click(items[0]!);
+    await userEvent.click(items[10]!);
+    await userEvent.click(items[20]!);
     
     // Verify clicks were registered
     await expect(args.onItemClick).toHaveBeenCalledTimes(3);
@@ -819,7 +819,7 @@ export const EdgeCases: Story = {
     }, { timeout: 3000 });
 
     // Test empty title and timestamp handling
-    const emptyItemCard = items[1];
+    const emptyItemCard = items[1]!;
     expect(emptyItemCard).toBeInTheDocument();
 
     await userEvent.click(emptyItemCard);
@@ -889,7 +889,7 @@ export const Integration: Story = {
 
     // 4. Test all interactive features work together
     const cards = await canvas.findAllByRole('article');
-    await userEvent.click(cards[0]);
+    await userEvent.click(cards[0]!);
     expect(args.onItemClick).toHaveBeenCalledWith(sampleItems[0]);
     expect(args.onItemClick).toHaveBeenCalledTimes(1);
 
@@ -899,17 +899,17 @@ export const Integration: Story = {
     });
 
     if (expandButtons.length > 0) {
-      await userEvent.click(expandButtons[0]);
+      await userEvent.click(expandButtons[0]!);
       // Wait for description to appear and become visible (animations take time)
       await waitFor(async () => {
-        const description = await canvas.findByText(sampleItems[0].description!);
+        const description = await canvas.findByText(sampleItems[0]!.description!);
         expect(description).toBeVisible();
       }, { timeout: 3000 });
 
       // Find and click the action button that is now visible
       const actionButton = await canvas.findByRole('button', { name: /View Details/i });
       await userEvent.click(actionButton);
-      expect(sampleItems[0].action?.onClick).toHaveBeenCalled();
+      expect(sampleItems[0]?.action?.onClick).toHaveBeenCalled();
     }
 
     // 6. Verify all visual elements are properly rendered, waiting for each one.

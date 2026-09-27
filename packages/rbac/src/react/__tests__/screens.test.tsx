@@ -13,6 +13,34 @@ import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { RolesScreen } from '../roles-screen';
 import { TeamScreen } from '../team-screen';
 
+// FUT-2778: this suite timed out under CI load, a different one of its 23
+// tests each time — never the same one twice, which is itself the signature
+// of a diffuse cost rather than one bad test. Profiled rather than assumed:
+// mounting `RolesScreen`/`TeamScreen` runs full MUI `DataGrid` rows, kebab
+// menus, a `Select` and confirm `Dialog`s, and MUI's Popover/Menu/Select
+// transitions run on REAL timers — there is no isolable slow `beforeEach` or
+// one overbroad `waitFor` to fix; every test in the file pays this cost, in
+// proportion to how many of those it mounts.
+//
+// Reproduced (not assumed) under synthetic CPU contention on this box (4
+// cores): unloaded, the file's slowest test ("sends the roles the inviter
+// picked…") runs in ~725ms; at a sustained loadavg of ~23 — the load this
+// ticket's CI observation names — 4 of the 23 tests threw
+// `Test timed out in 5000ms`, and which 4 varied between runs (once it was
+// the two invite-flow tests and the cancel-invite test; the same run also
+// caught "reports a DEFERRED grant"). All 23 tests slow down together,
+// roughly 4-6x at a moderate load and past the 5s budget at CI's observed
+// load — not one test scaling out of line with the rest. Sustained,
+// stacked contention (both this file's own 20+ mounts AND another suite
+// competing for the same 4 cores for minutes) pushed one case past 20s too,
+// so the margin below matches this repo's other real-timer-heavy suite
+// (`packages/payments/frontend`'s 30_000, same reasoning).
+//
+// The fallback the ticket allows for exactly this case: no isolated slow step
+// found, so the budget widens for this file only (never a
+// `flaky-quarantine.json` entry — every test here still runs, every push).
+vi.setConfig({ testTimeout: 30_000 });
+
 /**
  * The packaged screens' affordance gating and destructive-write discipline:
  * `useCan` HIDES what the actor may not do, every destructive act sits behind a
@@ -564,7 +592,7 @@ describe('the invite flow', () => {
     });
   });
 
-  it('sends the roles the inviter picked, base and custom together', async () => {
+  it('sends every role the inviter picked, two system roles and a custom one', async () => {
     const api = apiStub({
       teamContext: vi.fn(async () => ({
         customRolesByMember: [],
@@ -583,28 +611,38 @@ describe('the invite flow', () => {
     fireEvent.change(within(form).getByRole('textbox'), {
       target: { value: 'garcom@example.com' },
     });
-    // The base role is a SELECT — one value by construction, so an invite can
-    // never name zero or two system roles the way the edit dialog can.
-    const select = screen.getByTestId('total-form-field-role');
-    fireEvent.mouseDown(within(select).getByRole('combobox'));
-    // The demo catalog's own word for CLERK, spelled out rather than resolved
-    // through the shared `LABELS` — the picker renders a LABEL and posts an id,
-    // and a test that derived the label from the same map would pass even if
-    // the two came apart.
-    const clerk = 'Atendente de balcão';
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: clerk })).toBeTruthy();
-    });
-    fireEvent.click(screen.getByRole('option', { name: clerk }));
-    // ...and the tenant's own roles ride on top, from `teamContext`.
+    // One checklist over EVERY role: the default (BRANCH_LEAD) stays ticked,
+    // a second system role joins it, and the tenant's own role rides along —
+    // person × role × tenant is N×M×J, so an invite may carry them all.
+    fireEvent.click(screen.getByTestId('invite-role-opt-CLERK'));
     fireEvent.click(screen.getByTestId('invite-role-opt-Voluntário'));
     fireEvent.submit(form);
 
     await waitFor(() => {
       expect(api.inviteMember).toHaveBeenCalledWith('garcom@example.com', {
-        role: 'CLERK',
-        customRoles: ['Voluntário'],
+        role: 'BRANCH_LEAD',
+        customRoles: ['CLERK', 'Voluntário'],
       });
+    });
+  });
+
+  it('refuses an invite with no role ticked, on screen', async () => {
+    const api = apiStub();
+    mountTeam(api, ['team:manage']);
+    fireEvent.click(await screen.findByTestId('add-admin-button'));
+    const form = await screen.findByTestId('invite-form');
+    fireEvent.change(within(form).getByRole('textbox'), {
+      target: { value: 'ninguem@example.com' },
+    });
+    fireEvent.click(screen.getByTestId('invite-role-opt-BRANCH_LEAD'));
+    await waitFor(() => {
+      expect(screen.getByTestId('invite-no-role')).toBeTruthy();
+    });
+    fireEvent.submit(form);
+    // Refused on screen, never posted: the warning stays and nothing is sent.
+    await waitFor(() => {
+      expect(screen.getByTestId('invite-no-role')).toBeTruthy();
+      expect(api.inviteMember).not.toHaveBeenCalled();
     });
   });
 

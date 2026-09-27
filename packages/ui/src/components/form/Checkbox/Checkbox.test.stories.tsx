@@ -179,3 +179,63 @@ export const Integration: Story = {
     });
   },
 };
+
+/**
+ * `size` SPEAKS THE HOUSE `SizeValue` VOCABULARY (FUT-2771).
+ *
+ * `xs`/`sm` collapse onto the same glyph MUI's own `small` draws, `md` onto
+ * `medium`, `lg`/`xl` onto `large` — the same collapse `muiSize()` gives every
+ * other sized component. MUI's own deprecated words stay the geometry's source
+ * of truth here, so a regression in either direction (the new vocabulary
+ * drifting from it, or the deprecated words themselves moving) fails this.
+ */
+export const SizeVocabulary: Story = {
+  name: '📐 Size Vocabulary Test',
+  render: () => (
+    <Stack direction="row" spacing={2} flexWrap="wrap">
+      <Checkbox dataTestId="size-xs" size="xs" defaultChecked />
+      <Checkbox dataTestId="size-sm" size="sm" defaultChecked />
+      <Checkbox dataTestId="size-md" size="md" defaultChecked />
+      <Checkbox dataTestId="size-lg" size="lg" defaultChecked />
+      <Checkbox dataTestId="size-xl" size="xl" defaultChecked />
+      <Checkbox dataTestId="size-legacy-small" size="small" defaultChecked />
+      <Checkbox dataTestId="size-legacy-medium" size="medium" defaultChecked />
+      <Checkbox dataTestId="size-legacy-large" size="large" defaultChecked />
+    </Stack>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    const glyphWidth = (testId: string): number => {
+      const svg = canvas.getByTestId(testId).querySelector('svg');
+      if (!svg) throw new Error(`no glyph rendered for ${testId}`);
+      return svg.getBoundingClientRect().width;
+    };
+
+    // Chromium rounds layout to 1/64px, so these compare with 0 fractional
+    // digits (±0.5px) rather than as exact strings or exact floats.
+    await step('xs and sm draw the same glyph MUI’s own small draws', async () => {
+      const small = glyphWidth('size-legacy-small');
+      await expect(glyphWidth('size-xs')).toBeCloseTo(small, 0);
+      await expect(glyphWidth('size-sm')).toBeCloseTo(small, 0);
+    });
+
+    await step('md draws the same glyph MUI’s own medium draws', async () => {
+      await expect(glyphWidth('size-md')).toBeCloseTo(glyphWidth('size-legacy-medium'), 0);
+    });
+
+    await step('lg and xl draw the same glyph MUI’s own large draws', async () => {
+      const large = glyphWidth('size-legacy-large');
+      await expect(glyphWidth('size-lg')).toBeCloseTo(large, 0);
+      await expect(glyphWidth('size-xl')).toBeCloseTo(large, 0);
+    });
+
+    await step('the three MUI steps stay visibly distinct from each other', async () => {
+      const small = glyphWidth('size-legacy-small');
+      const medium = glyphWidth('size-legacy-medium');
+      const large = glyphWidth('size-legacy-large');
+      await expect(medium).toBeGreaterThan(small);
+      await expect(large).toBeGreaterThan(medium);
+    });
+  },
+};

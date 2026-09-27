@@ -15,6 +15,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 import type { DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
+import { FirstOrderField } from "./first-order-field";
 import type { DiscountFormPayload, DiscountsApiClient, DiscountWireRecord, WireTargetGroup } from "./api";
 import type { DiscountsWebCopy } from "./copy";
 import {
@@ -51,10 +52,16 @@ import type { DiscountsFormatters } from "./format";
  * `setFieldErrors` and paints the same inputs red.
  */
 
+/** A stored rule's first-purchase switch (FUT-2825); off for a new rule and an older record. */
+function savedFirstOrderOnly(editing: DiscountWireRecord | null): boolean {
+  return editing !== null && editing.firstOrderOnly === true;
+}
+
 /** The values `total-form` cannot hold, kept beside it and merged at submit. */
 function useNonStringState(editing: DiscountWireRecord | null) {
   const [active, setActive] = useState<boolean>(editing?.active ?? true);
   const [stackable, setStackable] = useState<boolean>(editing?.stackable ?? true);
+  const [firstOrderOnly, setFirstOrderOnly] = useState<boolean>(() => savedFirstOrderOnly(editing));
   const [categoryIds, setCategoryIds] = useState<string[]>(editing?.categoryIds ?? []);
   const [menuItemIds, setMenuItemIds] = useState<string[]>(editing?.menuItemIds ?? []);
   // The combo's groups are the third array, and the one whose ORDER matters:
@@ -81,6 +88,7 @@ function useNonStringState(editing: DiscountWireRecord | null) {
   return {
     active,
     stackable,
+    firstOrderOnly,
     categoryIds,
     menuItemIds,
     comboRequirements,
@@ -88,6 +96,7 @@ function useNonStringState(editing: DiscountWireRecord | null) {
     schedule,
     setActive,
     setStackable,
+    setFirstOrderOnly,
     setCategoryIds,
     setMenuItemIds,
     setComboRequirements,
@@ -153,6 +162,7 @@ function makeSubmit(
       ...typeAndScopeFor(values),
       ...targets,
       stackable: extra.stackable,
+      firstOrderOnly: extra.firstOrderOnly,
       active: extra.active,
     };
     const result = editing
@@ -211,6 +221,11 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
           onScheduleEnabledChange={extra.setScheduleEnabled}
         />
         <LimitFields copy={copy} currencyField={currencyField} />
+        <FirstOrderField
+          copy={copy}
+          checked={extra.firstOrderOnly}
+          onChange={extra.setFirstOrderOnly}
+        />
         <DiscountSwitches
           copy={copy}
           active={extra.active}

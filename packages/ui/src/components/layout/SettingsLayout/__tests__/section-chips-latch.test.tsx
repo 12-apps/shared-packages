@@ -22,7 +22,7 @@
  * still latch correctly, whether or not it overlaps the strip's own scroll.
  */
 import { waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { watchVisitorScroll } from '../SettingsSectionChips.scroll';
 
@@ -162,3 +162,77 @@ describe('watchVisitorScroll: the false-latch shapes FUT-2775 names', () => {
     }
   });
 });
+
+/**
+ * A KEY PRESS THE STRIP'S OWN SCROLL FINISHED UNDER (FUT-2848).
+ *
+ * A visitor presses an arrow key on the strip; before the scroll it causes has
+ * ticked once, a resize re-centres the strip — and on a busy main thread that
+ * re-centre's smooth scroll can be COMPLETE by its first tick, so it comes to
+ * rest on its own aim and is judged the strip's own. That verdict used to
+ * disarm the key press, and the key's scroll — still to come — went unclaimed:
+ * the next resize re-centred the strip away from where the visitor put it.
+ */
+describe('watchVisitorScroll: a key press outlives an own scroll judged under it', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("claims the key's scroll that follows a re-centre which rested on its aim", async () => {
+    const strip = makeStrip();
+    try {
+      const visitor = watchVisitorScroll(strip);
+      try {
+        strip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+        // The re-centre, already at rest by its first tick.
+        visitor.beforeOwnScroll(113);
+        tickScroll(strip, 113);
+        strip.dispatchEvent(new Event('scrollend'));
+        await waitFor(() => expect(visitor.isUndecided()).toBe(false));
+        // Judged the strip's own, rightly.
+        expect(visitor.hasScrolled()).toBe(false);
+
+        // Then the key's own scroll, back to the start.
+        tickScroll(strip, 60);
+        tickScroll(strip, 0);
+        strip.dispatchEvent(new Event('scrollend'));
+
+        await waitFor(() => expect(visitor.hasScrolled()).toBe(true));
+      } finally {
+        visitor.detach();
+      }
+    } finally {
+      strip.remove();
+    }
+  });
+
+  it('lets a key press go once it is stale, so a later clamp is not read as the visitor', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-27T12:00:00.000Z'));
+    const strip = makeStrip();
+    try {
+      const visitor = watchVisitorScroll(strip);
+      try {
+        strip.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+        visitor.beforeOwnScroll(113);
+        tickScroll(strip, 113);
+        strip.dispatchEvent(new Event('scrollend'));
+        await waitFor(() => expect(visitor.isUndecided()).toBe(false));
+
+        // Long after the key press, the browser clamps the strip short of its
+        // aim (its content shrank). Nobody touched it.
+        vi.setSystemTime(new Date('2026-09-27T12:00:05.000Z'));
+        tickScroll(strip, 90);
+        strip.dispatchEvent(new Event('scrollend'));
+
+        await waitFor(() => expect(visitor.isUndecided()).toBe(false));
+        expect(visitor.hasScrolled()).toBe(false);
+      } finally {
+        visitor.detach();
+      }
+    } finally {
+      strip.remove();
+    }
+  });
+});
+

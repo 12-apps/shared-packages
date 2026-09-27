@@ -16,7 +16,21 @@ import type { DataViewColumn, FilterFieldConfig, RangeFieldConfig } from "../dat
  * smaller pills had room for, and a roomier one kept pills that overflowed.
  *
  * jsdom has no ResizeObserver, so the bar width is whatever the fake reports.
+ *
+ * FUT-2778: this file has timed out under CI load. Profiled rather than
+ * assumed a slow step exists — there is only ONE render helper (`inlineAt`),
+ * called 2 and then 8 times by the two tests below, and no `beforeEach`; the
+ * cost is the render itself (a full `DataViewsGrid`, in jsdom, per call), not
+ * one overbroad wait. Reproduced under synthetic CPU contention on this box
+ * (4 cores): unloaded the two tests run in ~360ms/~590ms; at this ticket's
+ * observed CI load (~23) both threw `Test timed out in 5000ms` — the second
+ * test literally 4x its own budget (its 8 renders share the one test's
+ * clock). Fallback per the ticket's Decision: widen the budget for this file
+ * only, never quarantine (both tests keep running, every push). 30s matches
+ * this repo's other real-timer-heavy suite (`packages/payments/frontend`'s
+ * `testTimeout: 30_000`, same reasoning).
  */
+vi.setConfig({ testTimeout: 30_000 });
 
 interface Row extends Record<string, unknown> {
   id: string;
