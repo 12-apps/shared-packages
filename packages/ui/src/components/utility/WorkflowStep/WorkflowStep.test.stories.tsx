@@ -362,3 +362,25 @@ export const IntegrationTest: Story = {
     expect(canvas.getByText('First step description')).toBeInTheDocument();
   },
 };
+
+export const ContentCursorTest: Story = {
+  args: {
+    steps: interactiveSteps,
+    currentStep: 0,
+    interactive: true,
+    'data-testid': 'workflow',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // The content block is inert (FUT-2773): it has no click handling of its
+    // own, so its cursor must not claim to be clickable, whatever `interactive`
+    // says. The indicator is the step's one interactive element and keeps its
+    // pointer cursor.
+    const content = canvas.getByTestId('workflow-content-0');
+    expect(getComputedStyle(content).cursor).not.toBe('pointer');
+
+    const indicator = canvas.getByTestId('workflow-indicator-0');
+    expect(getComputedStyle(indicator).cursor).toBe('pointer');
+  },
+};

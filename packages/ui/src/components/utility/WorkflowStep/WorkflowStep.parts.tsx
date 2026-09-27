@@ -123,14 +123,17 @@ const StepContent = styled(Box, {
   orientation: WorkflowStepProps['orientation'];
   interactive: boolean;
   disabled: boolean;
-}>(({ theme, orientation, interactive, disabled }) => ({
+}>(({ theme, orientation, disabled }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: orientation === 'vertical' ? 'flex-start' : 'center',
   textAlign: orientation === 'vertical' ? 'left' : 'center',
   marginTop: orientation === 'vertical' ? theme.spacing(1) : theme.spacing(0.5),
   marginLeft: orientation === 'horizontal' ? theme.spacing(1) : 0,
-  cursor: interactive && !disabled ? 'pointer' : 'default',
+  // Inert (FUT-2773): the content block has no click handling of its own —
+  // the indicator is the step's one interactive element — so its cursor
+  // never claims to be clickable, whatever `interactive` says.
+  cursor: 'default',
   minWidth: 0,
   flex: 1,
 
@@ -295,7 +298,10 @@ const StepConnectorComponent = forwardRef<HTMLDivElement, StepConnectorProps>(({
   orientation,
   variant,
   color,
-  animated,
+  // Defaults to the connector's own prior, unconditional behaviour (FUT-2773):
+  // an external caller building a `StepConnectorProps` value that predates
+  // this field keeps the transition it always had.
+  animated = true,
   'data-testid': dataTestId,
 }, ref) => (
   <StepConnector

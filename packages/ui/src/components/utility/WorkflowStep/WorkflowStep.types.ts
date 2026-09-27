@@ -117,7 +117,14 @@ export interface StepConnectorProps {
   orientation: WorkflowStepOrientation;
   variant: WorkflowStepVariant;
   color: WorkflowStepColor;
-  animated: boolean;
+  /**
+   * Gates the connector's colour transition (FUT-2773), the same way the
+   * indicator's already did. Optional and defaults to `true` — the
+   * connector's own prior, unconditional behaviour — so an external caller
+   * that already builds a `StepConnectorProps`-typed value without this
+   * field keeps rendering exactly as it did before this field existed.
+   */
+  animated?: boolean;
   'data-testid'?: string;
 }
 
@@ -126,10 +133,12 @@ export interface StepConnectorProps {
  */
 export interface StepContentProps {
   step: WorkflowStepItem;
+  /** @deprecated Unused since FUT-2773 — the content block is inert and no longer keyed off it. */
   index: number;
   orientation: WorkflowStepOrientation;
   interactive: boolean;
   disabled: boolean;
+  /** @deprecated Unused since FUT-2773 — the content block is inert and never calls this itself; the indicator is the step's one interactive element. */
   onClick?: (index: number, step: WorkflowStepItem) => void;
   'data-testid'?: string;
 }

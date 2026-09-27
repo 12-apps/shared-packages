@@ -17,12 +17,18 @@
  * longer asserted unclamped for an out-of-range `currentStep` — the value is
  * clamped to the valid step range, and with no steps at all both attributes
  * are omitted rather than describing an invalid range (`0 > -1`).
+ *
+ * `StepConnectorProps.animated` is OPTIONAL (a public type, so a required
+ * field would have been a breaking change shipped as a patch/minor under this
+ * repo's commit-driven release rules). Omitting it must default to the
+ * connector's own prior, unconditional behaviour: always animated.
  */
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { render, screen } from '@testing-library/react';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { WorkflowStep } from '../WorkflowStep';
+import { StepConnectorComponent } from '../WorkflowStep.parts';
 import type { WorkflowStepItem } from '../WorkflowStep.types';
 
 const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -88,6 +94,22 @@ describe('WorkflowStep DOM props', () => {
 
     renderWorkflow({ steps: twoSteps, currentStep: 0, animated: false });
     expect(getComputedStyle(screen.getByTestId('workflow-connector-0')).transition).toBe('none');
+  });
+
+  it('keeps the connector animated when a caller omits the optional `animated` field entirely', () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <StepConnectorComponent
+          isCompleted={false}
+          orientation="horizontal"
+          variant="default"
+          color="primary"
+          data-testid="connector"
+        />
+      </ThemeProvider>,
+    );
+
+    expect(getComputedStyle(screen.getByTestId('connector')).transition).not.toBe('none');
   });
 });
 
