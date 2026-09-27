@@ -15,17 +15,23 @@ import { chipDensityOverrides, iconButtonDensityOverrides } from '../density-ove
  * `density-overrides.test.stories.tsx`.
  */
 
-type StyleFn = (props: { theme: Theme }) => Record<string, unknown>;
+interface ChipOwnerStateArg {
+  variant?: 'filled' | 'outlined';
+  size?: 'small' | 'medium';
+}
+
+type StyleFn = (props: { theme: Theme; ownerState?: ChipOwnerStateArg }) => Record<string, unknown>;
 
 function slot(
   overrides: ReturnType<typeof iconButtonDensityOverrides> | ReturnType<typeof chipDensityOverrides>,
   component: 'MuiIconButton' | 'MuiChip',
   key: string,
   theme: Theme,
+  ownerState?: ChipOwnerStateArg,
 ): Record<string, unknown> {
   const fn = (overrides[component]?.styleOverrides as Record<string, StyleFn> | undefined)?.[key];
   if (typeof fn !== 'function') throw new Error(`${component}.${key} is not a style-override function`);
-  return fn({ theme });
+  return fn({ theme, ownerState });
 }
 
 describe('iconButtonDensityOverrides', () => {
@@ -97,5 +103,67 @@ describe('chipDensityOverrides', () => {
     const b = chipDensityOverrides();
     expect(a.MuiChip?.styleOverrides?.label).toBe(b.MuiChip?.styleOverrides?.label);
     expect(a).toEqual(b);
+  });
+
+  /**
+   * FUT-2766 follow-up (adversarial review) — the OUTLINED variant's own
+   * label padding (`11`/`7`, ChipLabel's baked-in `variants`, `Chip.js`) is a
+   * DIFFERENT number from filled's `12`/`8` and must not be clobbered by the
+   * `label`/`labelSmall` overrides above, which apply unconditionally. The
+   * fix lives on the ROOT slot (see the module doc comment for why a
+   * `components.MuiChip.variants` entry cannot reach the label slot at all).
+   */
+  describe('the outlined variant keeps its OWN label padding (11/7), not filled its 12/8', () => {
+    it('root carries a nested .MuiChip-label rule for outlined, at both sizes, as rem(theme, px)', () => {
+      const theme = createTheme();
+      const overrides = chipDensityOverrides();
+      expect(slot(overrides, 'MuiChip', 'root', theme, { variant: 'outlined' })).toEqual({
+        height: theme.typography.pxToRem(32),
+        '& .MuiChip-label': {
+          paddingLeft: theme.typography.pxToRem(11),
+          paddingRight: theme.typography.pxToRem(11),
+        },
+      });
+      expect(slot(overrides, 'MuiChip', 'root', theme, { variant: 'outlined', size: 'small' })).toEqual({
+        height: theme.typography.pxToRem(32),
+        '& .MuiChip-label': {
+          paddingLeft: theme.typography.pxToRem(7),
+          paddingRight: theme.typography.pxToRem(7),
+        },
+      });
+    });
+
+    it('is a true no-op at the default theme: 11px/7px, the exact literals ChipLabel bakes in for outlined', () => {
+      const theme = createTheme();
+      const overrides = chipDensityOverrides();
+      expect(slot(overrides, 'MuiChip', 'root', theme, { variant: 'outlined' })['& .MuiChip-label']).toEqual({
+        paddingLeft: '0.6875rem', // 11px / 16
+        paddingRight: '0.6875rem',
+      });
+      expect(
+        slot(overrides, 'MuiChip', 'root', theme, { variant: 'outlined', size: 'small' })['& .MuiChip-label'],
+      ).toEqual({
+        paddingLeft: '0.4375rem', // 7px / 16
+        paddingRight: '0.4375rem',
+      });
+    });
+
+    it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+      const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+      const overrides = chipDensityOverrides();
+      expect(slot(overrides, 'MuiChip', 'root', theme, { variant: 'outlined' })['& .MuiChip-label']).toEqual({
+        paddingLeft: '0.61875rem', // 11 * 0.9 / 16
+        paddingRight: '0.61875rem',
+      });
+    });
+
+    it('a FILLED chip (no variant, or variant: "filled") gets no nested label rule at all — root is just the height', () => {
+      const theme = createTheme();
+      const overrides = chipDensityOverrides();
+      expect(slot(overrides, 'MuiChip', 'root', theme)).toEqual({ height: theme.typography.pxToRem(32) });
+      expect(slot(overrides, 'MuiChip', 'root', theme, { variant: 'filled' })).toEqual({
+        height: theme.typography.pxToRem(32),
+      });
+    });
   });
 });

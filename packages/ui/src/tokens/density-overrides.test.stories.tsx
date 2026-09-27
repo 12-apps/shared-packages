@@ -60,6 +60,8 @@ function DensityGeometryShowcase({ density }: { density: DensityLevel }) {
         </IconButton>
         <Chip data-testid="chip-md" label="Chip" />
         <Chip data-testid="chip-sm" label="Chip" size="small" />
+        <Chip data-testid="chip-md-outlined" label="Chip" variant="outlined" />
+        <Chip data-testid="chip-sm-outlined" label="Chip" variant="outlined" size="small" />
       </div>
     </ThemeProvider>
   );
@@ -138,6 +140,20 @@ export const NormalIsGeometryNeutral: Story = {
     const labelSm = computed(labelOf(chipSm));
     expectPxClose(labelSm.paddingLeft, 8);
     expectPxClose(labelSm.paddingRight, 8);
+
+    // Outlined Chip: label padding is 11px/7px (medium/small) — ONE px
+    // tighter than filled's 12px/8px, MUI's own literal for the variant
+    // (`ChipLabel`'s baked-in `variants`, `Chip.js`) — and must NOT collapse
+    // to filled's numbers (the bug an earlier revision of this file had).
+    const chipMdOutlined = canvas.getByTestId('chip-md-outlined');
+    const labelMdOutlined = computed(labelOf(chipMdOutlined));
+    expectPxClose(labelMdOutlined.paddingLeft, 11);
+    expectPxClose(labelMdOutlined.paddingRight, 11);
+
+    const chipSmOutlined = canvas.getByTestId('chip-sm-outlined');
+    const labelSmOutlined = computed(labelOf(chipSmOutlined));
+    expectPxClose(labelSmOutlined.paddingLeft, 7);
+    expectPxClose(labelSmOutlined.paddingRight, 7);
   },
 };
 
@@ -169,5 +185,16 @@ export const CompactScalesByPoint9: Story = {
     const labelSm = computed(labelOf(chipSm));
     expectPxClose(labelSm.paddingLeft, 7.2); // 8 * 0.9
     expectPxClose(labelSm.paddingRight, 7.2);
+
+    // Outlined Chip: 11px/7px × 0.9, same as every other number here.
+    const chipMdOutlined = canvas.getByTestId('chip-md-outlined');
+    const labelMdOutlined = computed(labelOf(chipMdOutlined));
+    expectPxClose(labelMdOutlined.paddingLeft, 9.9); // 11 * 0.9
+    expectPxClose(labelMdOutlined.paddingRight, 9.9);
+
+    const chipSmOutlined = canvas.getByTestId('chip-sm-outlined');
+    const labelSmOutlined = computed(labelOf(chipSmOutlined));
+    expectPxClose(labelSmOutlined.paddingLeft, 6.3); // 7 * 0.9
+    expectPxClose(labelSmOutlined.paddingRight, 6.3);
   },
 };

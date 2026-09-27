@@ -2,6 +2,12 @@ import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js
 
 import { rem } from './relative';
 
+/** The `ownerState` fields `MuiChip`'s two styled slots (root, label) both receive. */
+interface ChipOwnerStateForOverrides {
+  variant?: 'filled' | 'outlined';
+  size?: 'small' | 'medium';
+}
+
 /**
  * ICONBUTTON / CHIP GEOMETRY, DENSITY-AWARE (FUT-2766).
  *
@@ -34,14 +40,47 @@ import { rem } from './relative';
  * `fontSize: 14` renders to the same computed px as the literal `8` it
  * replaces.
  *
- * Out of scope (the ticket's own Decision draws the line here): the
- * OUTLINED chip's own label padding (`11`/`7`) is baked into `ChipLabel`'s
- * `variants` array with no matching `styleOverrides` key MUI's
- * `overridesResolver` forwards (only `label`/`labelSmall` are, i.e. the
- * FILLED numbers) — reaching it would need `components.MuiChip.variants`,
- * a different mechanism, for two numbers the Done-when does not test. Same
- * for the avatar/icon/delete-icon sub-slots: real override keys, but neither
- * in the Done-when nor exercised by a call site this initiative is chasing.
+ * **The OUTLINED chip's own label padding (`11`/`7`, one px tighter than
+ * filled's `12`/`8`) is a SEPARATE number this file must not clobber** — a
+ * bug an earlier revision of this file had (a `styleOverrides.label`/
+ * `labelSmall` of `12`/`8` unconditionally wins for EVERY variant, because
+ * `ChipLabel`'s own `overridesResolver` (`Chip.js`) returns
+ * `[styles.label, styles[label${size}]]` with no variant check at all, and
+ * `@mui/system`'s `createStyled` composes `styleThemeOverrides` AFTER the
+ * slot's own base styles/variants — so a theme `styleOverrides.label` always
+ * outranks `ChipLabel`'s own baked-in `{ props: { variant: 'outlined' },
+ * style: { paddingLeft: 11, ... } }`, at ANY density, not just a scaled one).
+ * Fixed by putting the outlined fix on the ROOT slot instead, as a nested
+ * `.MuiChip-label` selector inside `styleOverrides.root` itself, keyed on
+ * `ownerState.variant`/`.size` — proven correct two ways: (1) a probe render
+ * confirmed the naive `components.MuiChip.variants` route CANNOT reach the
+ * label slot at all — `createStyled`'s `skipVariantsResolver` defaults to
+ * `true` for every slot but `'Root'`, so a theme-level `variants` entry is
+ * simply never evaluated for `ChipLabel`, proven by rendering an outlined
+ * Chip against a `components.MuiChip.variants` entry set to an absurd
+ * `999px` and reading `.MuiChip-label`'s OWN computed style: still `11px`,
+ * untouched — while the SAME entry DOES leak onto `.MuiChip-root` (`999px`),
+ * confirming theme `variants` is a ROOT-slot-only mechanism for this
+ * component; (2) a nested `.MuiChip-label` selector written from the ROOT
+ * slot is a HIGHER-specificity rule (two classes) than the label's own
+ * single-class rule, so it wins regardless of source order — the same
+ * technique `ChipRoot`'s OWN style already uses for its avatar/icon/
+ * delete-icon sub-parts (`& .${chipClasses.avatar}`, etc., in `Chip.js`).
+ *
+ * The avatar/icon/delete-icon sub-slots (margins, sizes) and IconButton's
+ * `edge="start"`/`"end"` negative margins are DELIBERATELY untouched by this
+ * file — real override keys exist, but none is in the ticket's Done-when nor
+ * exercised by a call site this initiative is chasing, so they stay MUI's
+ * own literals at every density (including `compact`/`comfortable` — they do
+ * NOT scale here; a future ticket that needs them scaled adds its own
+ * override, the way `field-height.ts`'s siblings each own one slot).
+ *
+ * A host that adopts `iconButtonDensityOverrides`/`chipDensityOverrides`
+ * standalone (the `@12-apps/ui/tokens` export, no density channel involved)
+ * sees the SAME scaling from its own `typography.fontSize` alone — `rem()`
+ * only ever reads that one theme number, so a theme with a non-default
+ * `fontSize` (set directly, with no `density` in the picture at all) moves
+ * these numbers exactly as it moves everything else written through `rem()`.
  *
  * Each slot below is a MODULE-LEVEL function, not a closure built fresh inside
  * `iconButtonDensityOverrides`/`chipDensityOverrides` — the same reason
@@ -68,7 +107,27 @@ export function iconButtonDensityOverrides(): Components<Theme> {
   };
 }
 
-const chipRootHeight = ({ theme }: { theme: Theme }): CSSObject => ({ height: rem(theme, 32) });
+/** MUI's own outlined-label paddings (`ChipLabel`'s baked-in `variants`, `Chip.js`). */
+const CHIP_OUTLINED_LABEL_PADDING = { medium: 11, small: 7 } as const;
+
+const chipRootHeight = ({
+  theme,
+  ownerState,
+}: {
+  theme: Theme;
+  ownerState?: ChipOwnerStateForOverrides;
+}): CSSObject => {
+  const style: CSSObject = { height: rem(theme, 32) };
+  if (ownerState?.variant === 'outlined') {
+    const px = CHIP_OUTLINED_LABEL_PADDING[ownerState.size === 'small' ? 'small' : 'medium'];
+    // Higher CSS specificity than `.MuiChip-label`'s own single-class rule
+    // (two classes vs one) — wins over `chipLabelPadding`/`chipLabelSmallPadding`
+    // below regardless of stylesheet insertion order. See the module doc
+    // comment for why this must live here and not on the label slot itself.
+    style['& .MuiChip-label'] = { paddingLeft: rem(theme, px), paddingRight: rem(theme, px) };
+  }
+  return style;
+};
 const chipSmallHeight = ({ theme }: { theme: Theme }): CSSObject => ({ height: rem(theme, 24) });
 const chipLabelPadding = ({ theme }: { theme: Theme }): CSSObject => ({
   paddingLeft: rem(theme, 12),
