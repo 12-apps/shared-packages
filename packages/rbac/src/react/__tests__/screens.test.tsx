@@ -13,6 +13,34 @@ import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { RolesScreen } from '../roles-screen';
 import { TeamScreen } from '../team-screen';
 
+// FUT-2778: this suite timed out under CI load, a different one of its 23
+// tests each time — never the same one twice, which is itself the signature
+// of a diffuse cost rather than one bad test. Profiled rather than assumed:
+// mounting `RolesScreen`/`TeamScreen` runs full MUI `DataGrid` rows, kebab
+// menus, a `Select` and confirm `Dialog`s, and MUI's Popover/Menu/Select
+// transitions run on REAL timers — there is no isolable slow `beforeEach` or
+// one overbroad `waitFor` to fix; every test in the file pays this cost, in
+// proportion to how many of those it mounts.
+//
+// Reproduced (not assumed) under synthetic CPU contention on this box (4
+// cores): unloaded, the file's slowest test ("sends the roles the inviter
+// picked…") runs in ~725ms; at a sustained loadavg of ~23 — the load this
+// ticket's CI observation names — 4 of the 23 tests threw
+// `Test timed out in 5000ms`, and which 4 varied between runs (once it was
+// the two invite-flow tests and the cancel-invite test; the same run also
+// caught "reports a DEFERRED grant"). All 23 tests slow down together,
+// roughly 4-6x at a moderate load and past the 5s budget at CI's observed
+// load — not one test scaling out of line with the rest. Sustained,
+// stacked contention (both this file's own 20+ mounts AND another suite
+// competing for the same 4 cores for minutes) pushed one case past 20s too,
+// so the margin below matches this repo's other real-timer-heavy suite
+// (`packages/payments/frontend`'s 30_000, same reasoning).
+//
+// The fallback the ticket allows for exactly this case: no isolated slow step
+// found, so the budget widens for this file only (never a
+// `flaky-quarantine.json` entry — every test here still runs, every push).
+vi.setConfig({ testTimeout: 30_000 });
+
 /**
  * The packaged screens' affordance gating and destructive-write discipline:
  * `useCan` HIDES what the actor may not do, every destructive act sits behind a
