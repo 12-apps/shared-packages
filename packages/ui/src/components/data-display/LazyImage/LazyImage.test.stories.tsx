@@ -1,33 +1,30 @@
 import Box from '@mui/material/Box/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 
 import { LazyImage } from './LazyImage';
+import { DEFAULT_FIELD_HEIGHT, FIELD_HEIGHT_SCALE } from '../../../tokens/field-height.core';
 
 /**
  * FUT-2774's two "unverified" sizing claims, checked in a REAL BROWSER — the
  * only tier that runs actual CSS layout rather than jsdom's literal style
- * strings. Both requests are intercepted in `.storybook/test-runner.ts`, so
- * the loading/error state each story needs is deterministic rather than a
- * race against the real network.
+ * strings. Both reproduced (Chromium, 2026-09-26) and were recorded here as
+ * permanent characterization stories asserting TODAY's collapsed `0` — see
+ * FUT-2805 for the full root-cause writeup.
  *
- * BOTH claims reproduced (Chromium, 2026-09-26, via this Storybook build) —
- * see each story below for what was actually observed. They share one root
- * cause: `ImageContainer` is `display: inline-block` with an unresolved own
- * `width`/`height` whenever the caller leaves that axis unset, and in either
- * story its only content at measurement time cannot give it a size (an
- * absolutely-positioned fallback contributes nothing to shrink-to-fit; a
- * `width: 100%` skeleton inside a `width: auto` parent resolves as `auto`,
- * i.e. zero). `orDefault` (FUT-2669) only replaces an unset/empty VALUE with
- * a fallback — it cannot fix a default VALUE (`'auto'`/`'100%'`) that itself
- * has nothing to resolve against. A real fix means giving `ImageContainer` a
- * non-collapsing size on this axis when unset — a deliberate default (a fixed
- * px floor, a different `display`, …), which is a design decision beyond this
- * ticket's mechanical guards. Per the ticket's own Decision, this is recorded
- * here rather than fixed blind; both stories characterize TODAY's behaviour
- * so an accidental change to either shows up as a failure here, not silence.
- * Follow-up: FUT-2805.
+ * FUT-2805's Decision (2026-09-27) fixed both, for the PLACEHOLDER only (the
+ * loading skeleton and the `ReactNode` error fallback) — never the loaded
+ * real image, which keeps sizing itself from `metrics` exactly as FUT-2774
+ * left it (`brand-link.tsx`'s logo relies on an unset width sizing the real
+ * `<img>` naturally). An unset axis now borrows the set one (height = width,
+ * or width = height — a square placeholder); with neither set, both take the
+ * theme's field height (`theme.fieldHeight`, through the existing
+ * `fieldHeight()`/`rem()` helpers). The two stories below are REWRITTEN to
+ * assert that fixed, non-zero behaviour instead of the old collapse. The
+ * three stories after them prove the flip side: a loaded real image's own
+ * geometry is untouched by this default, for a width-only, a height-only and
+ * a neither-set caller alike.
  */
 const meta: Meta<typeof LazyImage> = {
   title: 'Media/LazyImage/Tests',
@@ -41,6 +38,17 @@ type Story = StoryObj<typeof meta>;
 
 const NEVER_RESOLVES = 'https://lazyimage-fut2774.invalid/never-resolves.png';
 const ALWAYS_ERRORS = 'https://lazyimage-fut2774.invalid/always-errors.png';
+
+/**
+ * A tiny (120×80, so clearly non-square and distinct from any plausible
+ * field-height default) opaque PNG, inline as a `data:` URI — it decodes with
+ * no network request at all, so a story using it loads deterministically
+ * without `.storybook/test-runner.ts`'s route interception.
+ */
+const LOADS_IMMEDIATELY =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAABQCAIAAABd+SbeAAAAg0lEQVR42u3QQQ0AAAgEoOtkScMZyhbOBxsJSPVwIApEi0a0aNEWRItGtGjRFkSLRrRo0YgWjWjRohEtGtGiRSNaNKJFi0a0aESLFo1o0YgWLRrRohEtWjSiRSNatGhEi0a0aNGIFo1o0aIRLRrRokUjWjSiRYtGtGhEixaNaNGI/mMBAXhJ2KHxSr8AAAAASUVORK5CYII=';
+const NATURAL_WIDTH = 120;
+const NATURAL_HEIGHT = 80;
 
 /**
  * The rectangle of `element` as actually painted: its own box, intersected
@@ -69,21 +77,35 @@ function visibleRect(element: Element, root: Element): DOMRect {
   return clippedRect(element.getBoundingClientRect(), element.parentElement, root);
 }
 
+/**
+ * The theme's field height in real px, measured the same way the component
+ * derives it (`fieldHeightRem`, at the `'md'` step) rather than a hard-coded
+ * number — this Storybook's theme (`.storybook/preview.tsx`) is a plain MUI
+ * `createTheme`, so `theme.fieldHeight` is unset and `DEFAULT_FIELD_HEIGHT`
+ * is what resolves; reading the root font size rather than assuming `16`
+ * keeps this from silently drifting if that ever changes.
+ */
+function expectedFieldHeightPx(): number {
+  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return DEFAULT_FIELD_HEIGHT * FIELD_HEIGHT_SCALE.md * rootPx;
+}
+
+// Chromium rounds sub-pixel layout to 1/64px; comparisons below use this
+// instead of exact equality (per this package's own story-test convention).
+const PX_TOLERANCE = 0.6;
+
 export const UnsetWidthSkeletonInAutoWidthBox: Story = {
-  // The "unverified, carried over" claim under item #5: an unset `width`
-  // defaults `SkeletonIndicator` to the literal `'100%'`, inside
-  // `ImageContainer` (`display: inline-block`, itself `width: auto` when
-  // `width` is unset) — a percentage width inside a shrink-to-fit parent.
+  // FUT-2774 #5, FIXED by FUT-2805: an unset `width` (and here `height` too —
+  // neither axis is passed) used to default `SkeletonIndicator` to the
+  // literal `'100%'`/`'auto'`, inside `ImageContainer` (`display:
+  // inline-block`, itself `width: auto` when `width` is unset) — a
+  // percentage width inside a shrink-to-fit parent resolved to exactly 0.
   //
-  // CONFIRMED REPRODUCING (Chromium, 2026-09-26): the skeleton's rendered
-  // width is exactly 0, not merely small — CSS resolves the child's
-  // percentage as `auto` for the parent's own shrink-to-fit computation, and
-  // an `auto`-width child with no content of its own is 0. NOT fixed in this
-  // ticket (see the file header): flagged as a follow-up (FUT-2805) rather
-  // than picking a new default size blind. Not reached by any known
-  // origin-host call site today — every one sets an explicit `width`
-  // (checked 2026-09-26).
-  name: '🔬 FUT-2774 #5: skeleton width, LazyImage width unset',
+  // FIXED (Chromium): with neither axis set, the Decision gives the skeleton
+  // both dimensions from the theme's field height — a square, non-zero
+  // placeholder — which also lets `ImageContainer`'s own shrink-to-fit width
+  // resolve from the skeleton's now-definite size instead of collapsing.
+  name: '🔬 FUT-2805: skeleton, LazyImage width+height unset (fixed, was #5)',
   args: {
     src: NEVER_RESOLVES,
     alt: 'probe',
@@ -93,30 +115,34 @@ export const UnsetWidthSkeletonInAutoWidthBox: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const skeleton = await canvas.findByTestId('skel-probe-skeleton');
+    const rect = skeleton.getBoundingClientRect();
+    const expected = expectedFieldHeightPx();
 
-    await expect(skeleton.getBoundingClientRect().width).toBe(0);
+    await expect(rect.width).toBeGreaterThan(0);
+    expect(rect.height).toBeGreaterThan(0);
+    // A square placeholder at the theme's field height (neither axis set).
+    expect(Math.abs(rect.width - rect.height)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(rect.width - expected)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(rect.height - expected)).toBeLessThan(PX_TOLERANCE);
   },
 };
 
 export const UnsetHeightFallbackClipping: Story = {
-  // #4: an unset `height` resolves to the literal `'auto'` and reached
-  // `ErrorFallback`'s `sx.height` unguarded (now routed through `orDefault`,
-  // matching `SkeletonIndicator` — see LazyImage.tsx). With no in-flow content
-  // left once `hasError` is true (the real `<img>` and the loading indicator
-  // are both gone), `ImageContainer`'s own `height: auto` has nothing to size
-  // against — and its `overflow: hidden` then clips its
-  // absolutely-positioned `FallbackContainer` child to that collapsed box.
+  // FUT-2774 #4, FIXED by FUT-2805: with `state.hasError` true, the real
+  // `<img>` and the loading indicator are both gone, so `ImageContainer`
+  // (`overflow: hidden`) had NO in-flow content to size itself from — its
+  // `height: auto` (and, with neither axis set here, its `width: auto` too)
+  // collapsed to 0, clipping the absolutely-positioned `FallbackContainer`
+  // entirely away even though the fallback's own content had a real,
+  // nonzero natural size.
   //
-  // CONFIRMED REPRODUCING (Chromium, 2026-09-26): the container's own height
-  // is exactly 0, the fallback content itself has a nonzero natural height,
-  // and the content's VISIBLE (clipped) height is 0 — it is on the page but
-  // entirely invisible. The `orDefault` fix does not change this (it only
-  // normalizes an explicit `height=""` to the same `'auto'` `SkeletonIndicator`
-  // already uses); the collapse itself is not fixed in this ticket, for the
-  // same reason as FUT-2774 #5 above — follow-up: FUT-2805. Not reached by
-  // any known origin-host call site today — `menu-card-media.tsx`'s
-  // ReactNode fallback sets an explicit `height="100%"` (checked 2026-09-26).
-  name: '🔬 FUT-2774 #4: ReactNode fallback, LazyImage height unset',
+  // FIXED (Chromium): with neither axis set, the Decision sizes
+  // `ImageContainer` ITSELF (the one thing here that can, since
+  // `FallbackContainer` is `position: absolute` and never feeds its
+  // ancestor's shrink-to-fit/auto-height no matter its own size) from the
+  // theme's field height — a square — so `overflow: hidden` no longer clips
+  // the fallback's content to nothing.
+  name: '🔬 FUT-2805: ReactNode fallback, LazyImage width+height unset (fixed, was #4)',
   args: {
     src: ALWAYS_ERRORS,
     alt: 'probe',
@@ -133,11 +159,137 @@ export const UnsetHeightFallbackClipping: Story = {
     const canvas = within(canvasElement);
     const container = await canvas.findByTestId('fallback-probe');
     const content = await canvas.findByTestId('fallback-probe-content');
+    const expected = expectedFieldHeightPx();
 
-    expect(container.getBoundingClientRect().height).toBe(0);
-    expect(content.getBoundingClientRect().height).toBeGreaterThan(0);
+    const containerRect = container.getBoundingClientRect();
+    await expect(containerRect.height).toBeGreaterThan(0);
+    expect(containerRect.width).toBeGreaterThan(0);
+    expect(Math.abs(containerRect.width - expected)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(containerRect.height - expected)).toBeLessThan(PX_TOLERANCE);
 
+    const contentRect = content.getBoundingClientRect();
+    expect(contentRect.height).toBeGreaterThan(0);
+
+    // No longer clipped to nothing: at least SOME of the fallback's content
+    // is now visible inside the container's (no-longer-collapsed) box — a
+    // fixed field-height square is not a promise that every caller's content
+    // fits inside it without any clipping at all (this one, at 40×40, does
+    // wrap and get clipped a little narrower than its own unclipped size —
+    // it is simply no longer clipped to NOTHING, which is the collapse this
+    // ticket fixes).
     const visible = visibleRect(content, canvasElement);
-    await expect(visible.height).toBe(0);
+    await expect(visible.height).toBeGreaterThan(0);
+    expect(visible.height).toBeLessThanOrEqual(contentRect.height + PX_TOLERANCE);
+  },
+};
+
+/**
+ * The loaded real `<img>`'s own rendered box, waiting for `onLoad` to have
+ * actually fired (`isLoaded` flips `state.isLoading` false, which is what
+ * `showLoading`/the fade rely on) rather than a fixed timeout.
+ */
+async function loadedImageRect(canvasElement: HTMLElement, testId: string): Promise<DOMRect> {
+  const canvas = within(canvasElement);
+  const img = (await canvas.findByTestId(`${testId}-img`)) as HTMLImageElement;
+  await waitFor(() => expect(img.complete && img.naturalWidth > 0).toBe(true));
+  return img.getBoundingClientRect();
+}
+
+export const WidthOnlyLoadedImageSizesNaturally: Story = {
+  // FUT-2805's Decision applies the new default to the PLACEHOLDER only —
+  // never the loaded real image, which keeps sizing from `metrics` exactly
+  // as before (FUT-2774's `emptyToUnset`): an unset height stays `auto` and
+  // the image scales proportionally from its own intrinsic aspect ratio, NOT
+  // forced square to match the set width (what a naive "borrow the other
+  // axis" applied to the real image too would have done).
+  name: '🔬 FUT-2805: width-only caller, loaded image keeps its natural aspect',
+  args: {
+    src: LOADS_IMMEDIATELY,
+    alt: 'probe',
+    lazy: false,
+    fadeIn: false,
+    loadingState: 'none',
+    width: 200,
+    'data-testid': 'width-only-probe',
+  },
+  play: async ({ canvasElement }) => {
+    const rect = await loadedImageRect(canvasElement, 'width-only-probe');
+    const expectedHeight = 200 * (NATURAL_HEIGHT / NATURAL_WIDTH);
+
+    expect(Math.abs(rect.width - 200)).toBeLessThan(PX_TOLERANCE);
+    // NOT forced to 200 (a square placeholder) — the image's own aspect ratio.
+    expect(Math.abs(rect.height - expectedHeight)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(rect.height - rect.width)).toBeGreaterThan(PX_TOLERANCE);
+  },
+};
+
+export const HeightOnlyLoadedImageSizesNaturally: Story = {
+  name: '🔬 FUT-2805: height-only caller, loaded image keeps its natural aspect',
+  args: {
+    src: LOADS_IMMEDIATELY,
+    alt: 'probe',
+    lazy: false,
+    fadeIn: false,
+    loadingState: 'none',
+    height: 100,
+    'data-testid': 'height-only-probe',
+  },
+  play: async ({ canvasElement }) => {
+    const rect = await loadedImageRect(canvasElement, 'height-only-probe');
+    const expectedWidth = 100 * (NATURAL_WIDTH / NATURAL_HEIGHT);
+
+    expect(Math.abs(rect.height - 100)).toBeLessThan(PX_TOLERANCE);
+    // NOT forced to 100 (a square placeholder) — the image's own aspect ratio.
+    expect(Math.abs(rect.width - expectedWidth)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(rect.width - rect.height)).toBeGreaterThan(PX_TOLERANCE);
+  },
+};
+
+export const NeitherSetLoadedImageSizesIntrinsically: Story = {
+  // The sharpest proof: with NEITHER axis set, the placeholder default would
+  // be a `fieldHeight` square — but the loaded real image is sized from its
+  // own intrinsic 120×80, not forced to that square, once it has loaded.
+  name: '🔬 FUT-2805: neither set, loaded image keeps its intrinsic size (not the field-height square)',
+  args: {
+    src: LOADS_IMMEDIATELY,
+    alt: 'probe',
+    lazy: false,
+    fadeIn: false,
+    loadingState: 'none',
+    'data-testid': 'neither-set-probe',
+  },
+  play: async ({ canvasElement }) => {
+    const rect = await loadedImageRect(canvasElement, 'neither-set-probe');
+    const fieldHeightPx = expectedFieldHeightPx();
+
+    expect(Math.abs(rect.width - NATURAL_WIDTH)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(rect.height - NATURAL_HEIGHT)).toBeLessThan(PX_TOLERANCE);
+    // Distinct from the field-height square the PLACEHOLDER would have used.
+    expect(Math.abs(rect.width - fieldHeightPx)).toBeGreaterThan(PX_TOLERANCE);
+    expect(Math.abs(rect.height - fieldHeightPx)).toBeGreaterThan(PX_TOLERANCE);
+  },
+};
+
+export const BothAxesSetSkeletonUnchanged: Story = {
+  // "A caller that sets both axes renders exactly as today" (the Decision's
+  // own geometry-neutral guarantee) — for the code path this ticket actually
+  // touches, `SkeletonIndicator`'s own default: both explicit, non-square
+  // values must pass straight through, not get borrowed/overridden.
+  name: '🔬 FUT-2805: both axes set, skeleton geometry-neutral',
+  args: {
+    src: NEVER_RESOLVES,
+    alt: 'probe',
+    lazy: false,
+    width: 200,
+    height: 100,
+    'data-testid': 'both-set-probe',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const skeleton = await canvas.findByTestId('both-set-probe-skeleton');
+    const rect = skeleton.getBoundingClientRect();
+
+    expect(Math.abs(rect.width - 200)).toBeLessThan(PX_TOLERANCE);
+    expect(Math.abs(rect.height - 100)).toBeLessThan(PX_TOLERANCE);
   },
 };

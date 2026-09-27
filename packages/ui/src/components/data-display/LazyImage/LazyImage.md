@@ -180,7 +180,7 @@ wrapping element, rounded to match the image:
 |------|------|---------|-------------|
 | `src` | `string` | - | **Required.** Image source URL |
 | `alt` | `string` | - | **Required.** Alternative text for accessibility |
-| `width` | `number \| string` | - | Image width. A number above 1 is design px; a number above 0 and up to 1 is a fraction of the parent, as in `sx` (`0.5` is `50%`); a string is any CSS length |
+| `width` | `number \| string` | - | Image width. A number above 1 is design px; a number above 0 and up to 1 is a fraction of the parent, as in `sx` (`0.5` is `50%`); a string is any CSS length. Unset lets the real image size itself naturally — but the loading skeleton and a `ReactNode` `fallback` borrow the other axis when only it is set (a square), or the theme's field height when neither is (FUT-2805) |
 | `height` | `number \| string` | `'auto'` | Image height, read like `width`. A fractional height takes effect only when the parent has a definite height |
 
 ### Loading Props
