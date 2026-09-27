@@ -19,7 +19,6 @@ import type { RoleMenuContext } from './role-actions-menu';
 import type { RoleSeedDefault } from './role-grid-config';
 import type { RolesScreenProps } from './roles-screen';
 import type { TeamExtraColumn } from './team-grid-config';
-import type { RoleModel } from './team-role-dialog';
 import type { RbacTransport } from './transport';
 
 /** Which language the permission and role LABELS read in — the host's hook. */
@@ -73,8 +72,6 @@ export interface RbacWebConfig<P extends string = string> {
   gatePermissions?: { manageRoles?: string; manageTeam?: string; readRoles?: string };
   /** See {@link TeamScreenProps.defaultInviteRole}. */
   defaultInviteRole?: string;
-  /** See {@link RoleModel}. Defaults to `base+custom`. */
-  roleModel?: RoleModel;
   /** Roster columns this package cannot build — {@link TeamExtraColumn}. */
   teamExtraColumns?: readonly TeamExtraColumn[];
   /** Which ⋮ entries the roster offers, by id. Absent, all of them. */
