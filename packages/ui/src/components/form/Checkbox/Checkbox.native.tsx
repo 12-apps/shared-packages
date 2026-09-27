@@ -22,6 +22,7 @@ import {
   CHECKBOX_VARIANT,
   effectInk,
   glyphSize,
+  resolveCheckboxSize,
 } from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types.native';
 import { Icon } from '../../../icons/Icon.native';
@@ -199,7 +200,7 @@ export const Checkbox = React.forwardRef<View, CheckboxProps>((rawProps, ref) =>
       glow={glow}
       ripple={ripple}
       variant={variant}
-      size={glyphSize(size)}
+      size={glyphSize(resolveCheckboxSize(size))}
       label={label}
       onToggle={toggle}
       rest={withoutTestIdProps(others) as Record<string, unknown>}

@@ -55,6 +55,7 @@ import { Checkbox } from '@/components/form/Checkbox';
 | glow | `boolean` | `false` | Enable glow animation |
 | pulse | `boolean` | `false` | Enable pulse animation |
 | disabled | `boolean` | `false` | Disable the checkbox |
+| size | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'` | MUI's `'medium'` | The house size vocabulary, translated to MUI's own size at the boundary. MUI's own words (`'small' \| 'medium' \| 'large'`) still work but are **deprecated** — migrate to the house vocabulary; removed in the next major version. |
 | data-testid | `string` | - | Custom test ID for testing |
 
 Plus all standard MUI Checkbox props (checked, onChange, indeterminate, etc.)
