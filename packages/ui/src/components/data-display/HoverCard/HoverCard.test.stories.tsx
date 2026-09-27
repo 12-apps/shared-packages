@@ -9,7 +9,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { HoverCard } from './HoverCard';
 
@@ -999,7 +999,15 @@ export const NestedPortalClickAway: Story = {
 
     await step('Picking an option inside that nested portal keeps the card open', async () => {
       const option = body.getByRole('option', { name: 'Opção B' });
-      await userEvent.click(option);
+      // A targeted dispatch, not `userEvent.click`: user-event also computes
+      // a realistic hover transition between the previous and the new
+      // target, and since the trigger sits right above the card in this
+      // layout, that transition's own mouseenter can re-open the card on its
+      // own — masking exactly the bug this step exists to catch. A plain
+      // `pointerdown` (matching `useClickAway`'s own listener) plus `click`
+      // (the option's own selection) isolates the ONE press under test.
+      fireEvent.pointerDown(option);
+      fireEvent.click(option);
 
       // The Select closes its OWN menu on selection — that still works —
       // but the card behind it (the thing under test) must not have closed.
@@ -1027,7 +1035,8 @@ export const NestedPortalClickAway: Story = {
         );
 
         const outside = await canvas.findByTestId('nested-portal-outside');
-        await userEvent.click(outside);
+        fireEvent.pointerDown(outside);
+        fireEvent.click(outside);
 
         await waitFor(
           () => {

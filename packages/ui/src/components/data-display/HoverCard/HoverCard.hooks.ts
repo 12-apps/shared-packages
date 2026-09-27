@@ -151,25 +151,15 @@ const usePortalOwnership = (active: boolean) => {
   const rootsRef = React.useRef<Set<Element>>(new Set());
   const observerRef = React.useRef<MutationObserver | null>(null);
 
-  React.useEffect(() => {
-    if (!active) return undefined;
-
-    const observer = new MutationObserver(() => {
-      // Draining happens on demand, in `owned()` below — an empty callback
-      // still lets the browser queue records for `takeRecords()` to read.
-    });
-    observer.observe(document.body, { childList: true });
-    observerRef.current = observer;
-
-    return () => {
-      observer.disconnect();
-      observerRef.current = null;
-      rootsRef.current.clear();
-    };
-  }, [active]);
-
-  return React.useCallback((): ReadonlyArray<Element> => {
-    observerRef.current?.takeRecords().forEach((record) => {
+  // Applied from BOTH paths that can hand us records: the observer's own
+  // callback (a microtask the browser schedules and drains on its own,
+  // whether or not anything ever reads `takeRecords()` — a callback that
+  // did nothing with them would silently lose exactly the mutations that
+  // happened with a gap before the press, i.e. every REAL one) and
+  // `takeRecords()` itself, for whatever a press's own synchronous check
+  // catches before that microtask has had its turn.
+  const applyRecords = React.useCallback((records: MutationRecord[]) => {
+    records.forEach((record) => {
       record.addedNodes.forEach((node) => {
         if (node instanceof Element) rootsRef.current.add(node);
       });
@@ -177,8 +167,32 @@ const usePortalOwnership = (active: boolean) => {
         if (node instanceof Element) rootsRef.current.delete(node);
       });
     });
-    return Array.from(rootsRef.current);
   }, []);
+
+  React.useEffect(() => {
+    if (!active) return undefined;
+
+    const observer = new MutationObserver(applyRecords);
+    // `subtree: true`: some hosts route every overlay through ONE persistent
+    // container they mount once (rather than each Modal/Popover appending
+    // its own new child straight to `document.body`), so a nested portal's
+    // arrival can be a deeper mutation, not a top-level one. `.contains()`
+    // below still finds it either way.
+    observer.observe(document.body, { childList: true, subtree: true });
+    observerRef.current = observer;
+
+    return () => {
+      observer.disconnect();
+      observerRef.current = null;
+      rootsRef.current.clear();
+    };
+  }, [active, applyRecords]);
+
+  return React.useCallback((): ReadonlyArray<Element> => {
+    const pending = observerRef.current?.takeRecords();
+    if (pending) applyRecords(pending);
+    return Array.from(rootsRef.current);
+  }, [applyRecords]);
 };
 
 /** The trigger, the card's own box, and anything its content portalled out. */
