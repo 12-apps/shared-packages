@@ -3,6 +3,7 @@ import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.j
 import { useState, type ElementType, type ReactNode } from 'react';
 
 import type { SectionNavCopy } from '../../../copy';
+import { stackedOverlayZIndex } from '../../../tokens/layers';
 import { rem } from '../../../tokens/scales';
 
 import { barSlots, destinationState, isMenu, menuActive, menuCount, type BarSlot } from './SectionNav.helpers';
@@ -289,9 +290,11 @@ export function SectionNavBar({
           // Above the backdrop ONLY while one of its own sheets is open, so the
           // primary button can close what it opened. Raised all the time it
           // would sit over every dialog the page opens, and on a small phone a
-          // dialog's own footer is exactly where the bar is.
+          // dialog's own footer is exactly where the bar is. `stackedOverlayZIndex`,
+          // not `zIndex.modal + 1`: a host lifting a bottom Drawer clear of a
+          // stacked sheet catches this bar's OWN sheets too.
           position: 'relative',
-          zIndex: open === null ? 'auto' : theme.zIndex.modal + 1,
+          zIndex: open === null ? 'auto' : stackedOverlayZIndex(theme) + 1,
         }}
       >
         {barSlots(destinations, more !== undefined, primary !== undefined).map((slot) => (
