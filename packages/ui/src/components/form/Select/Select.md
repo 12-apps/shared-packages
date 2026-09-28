@@ -81,6 +81,22 @@ the option's value in its own type. The test ids keep their spelling.
 - Pass `noOptionsText` — the library ships no copy, so unset means an empty list
   says nothing.
 
+## `MenuSelect`: the menu alone, for a screen that counts bytes
+
+`Select` decides at render time, so it imports the searchable engine (MUI
+`Autocomplete`, and the `Chip` it pulls in) wherever it is used, even for a
+two-option menu. `MenuSelect` has the same props, events and test ids and never
+searches, so a module importing only it lets the bundler drop that engine:
+
+```tsx
+import { MenuSelect } from '@12-apps/ui/form/Select';
+
+<MenuSelect label="Dia" options={days} value={day} onChange={onDay} />
+```
+
+Use it on a page with a load budget when the list is short or ordered (days,
+languages). Anywhere else, `Select` is the default.
+
 ## Visual Variants
 
 ### Default

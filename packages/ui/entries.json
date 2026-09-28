@@ -90,6 +90,7 @@
   "form/RadioGroup": "src/components/form/RadioGroup/index.ts",
   "form/RichTextEditor": "src/components/form/RichTextEditor/index.ts",
   "form/SearchPalette": "src/components/form/SearchPalette/index.ts",
+  "form/MenuSelect": "src/components/form/Select/menu.ts",
   "form/Select": "src/components/form/Select/index.ts",
   "form/Slider": "src/components/form/Slider/index.ts",
   "form/Switch": "src/components/form/Switch/index.ts",

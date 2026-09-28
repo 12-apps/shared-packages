@@ -444,6 +444,10 @@
       "types": "./dist/types/components/form/SearchPalette/index.d.ts",
       "default": "./dist/form/SearchPalette.js"
     },
+    "./form/MenuSelect": {
+      "types": "./dist/types/components/form/Select/menu.d.ts",
+      "default": "./dist/form/MenuSelect.js"
+    },
     "./form/Select": {
       "react-native": {
         "types": "./dist/types-native/components/form/Select/index.native.d.ts",
