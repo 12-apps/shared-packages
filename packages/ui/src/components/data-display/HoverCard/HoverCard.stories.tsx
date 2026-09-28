@@ -604,11 +604,7 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Stack spacing={3} alignItems="center" sx={{ p: 2 }}>
       <Typography variant="h6">Responsive HoverCard</Typography>

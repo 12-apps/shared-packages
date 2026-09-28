@@ -204,11 +204,7 @@ export const DarkMode: Story = {
 
 // Mobile responsive example
 export const MobileResponsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <LightboxWrapper items={sampleImages} thumbnails={true} triggerText="Open on Mobile" />
   ),

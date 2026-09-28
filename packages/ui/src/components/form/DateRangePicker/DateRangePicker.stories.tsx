@@ -164,7 +164,7 @@ export const WithoutQuickRanges: Story = {
  * leaves the numbers unreadable.
  */
 export const Narrow: Story = {
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Stack sx={{ width: 390, border: '1px dashed', borderColor: 'divider', p: 1 }}>
       <Demo numberOfMonths={1} />

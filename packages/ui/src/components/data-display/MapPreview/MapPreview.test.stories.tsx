@@ -194,11 +194,7 @@ export const FocusManagement: Story = {
 // 6. Responsive Design Tests
 export const ResponsiveDesign: Story = {
   render: () => <MapPreview copy={PT_BR_MAP_PREVIEW_COPY} center={defaultCenter} height="300px" showControls={true} />,
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
