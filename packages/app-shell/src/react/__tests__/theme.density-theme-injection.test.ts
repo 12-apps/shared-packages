@@ -16,12 +16,11 @@ type ThemeModule = typeof import('../theme');
 describe('createAppTheme: density with no densityTheme (FUT-3008)', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
   let createAppTheme: ThemeModule['createAppTheme'];
-  const originalNodeEnv = process.env.NODE_ENV;
 
   // The once-only flag is module state, so every case imports a FRESH module:
   // otherwise whichever case warned first would silence the rest.
   beforeEach(async () => {
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.resetModules();
     ({ createAppTheme } = await import('../theme'));
@@ -29,7 +28,7 @@ describe('createAppTheme: density with no densityTheme (FUT-3008)', () => {
 
   afterEach(() => {
     warnSpy.mockRestore();
-    process.env.NODE_ENV = originalNodeEnv;
+    vi.unstubAllEnvs();
   });
 
   it('builds exactly the no-density theme, field by field, and warns once naming the missing option', () => {
@@ -62,7 +61,7 @@ describe('createAppTheme: density with no densityTheme (FUT-3008)', () => {
   });
 
   it('stays silent in production', () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     createAppTheme('light', { density: 'compact' });
 

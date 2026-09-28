@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
  * FUT-3008 — `createAppTheme`'s density branch used to call `@12-apps/ui/tokens`'s
  * own `densityThemeOptions` directly, which pulled `density.ts` and the three
  * `density-overrides*` modules onto the critical path of every host that imports
- * `createAppTheme` — including one that never sets a density at all (Future
- * Pay's storefront, whose bundle budget this broke: 12-apps/future-pay#2157).
+ * `createAppTheme` — including one that never sets a density at all (one
+ * adopter's storefront, whose bundle budget this broke).
  *
  * `AppThemeOptions.densityTheme` now carries the implementation in, and this
  * package refers to `densityThemeOptions` only by TYPE. This is a SOURCE-level
