@@ -2,6 +2,8 @@ import Box from '@mui/material/Box/index.js';
 import Divider from '@mui/material/Divider/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Stack from '@mui/material/Stack/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
@@ -35,38 +37,19 @@ const meta: Meta<typeof Heading> = {
       options: HEADING_LEVELS,
       description: 'Scale step to draw, when it differs from the rank (defaults to level)',
     },
-    variant: {
-      control: { type: 'select' },
-      options: ['default', 'display', 'gradient', 'outlined'],
-      description: 'Visual style variant',
-    },
     color: {
       control: { type: 'select' },
       options: COLOR_VALUES,
       description: 'Heading color',
     },
-    align: {
-      control: { type: 'select' },
-      options: ['left', 'center', 'right'],
-      description: 'Text alignment',
-    },
     weight: {
       control: { type: 'select' },
-      options: ['light', 'regular', 'medium', 'semibold', 'bold', 'black'],
+      options: ['light', 'normal', 'medium', 'semibold', 'bold'],
       description: 'Font weight',
     },
-    transform: {
-      control: { type: 'select' },
-      options: ['none', 'uppercase', 'lowercase', 'capitalize'],
-      description: 'Text transformation',
-    },
-    decorated: {
+    gradient: {
       control: 'boolean',
-      description: 'Add decorative elements',
-    },
-    underlined: {
-      control: 'boolean',
-      description: 'Add underline decoration',
+      description: "Paint the glyphs with the colour's two-stop gradient",
     },
   },
 };
@@ -77,36 +60,38 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     children: 'Default Heading',
-    level: 1,
+    level: 'h1',
   },
 };
 
 export const HeadingLevels: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Heading level={1}>Heading Level 1 - Page Title</Heading>
-      <Heading level={2}>Heading Level 2 - Section Title</Heading>
-      <Heading level={3}>Heading Level 3 - Subsection</Heading>
-      <Heading level={4}>Heading Level 4 - Sub-subsection</Heading>
-      <Heading level={5}>Heading Level 5 - Minor Heading</Heading>
-      <Heading level={6}>Heading Level 6 - Smallest Heading</Heading>
+      <Heading level="h1">Heading Level 1 - Page Title</Heading>
+      <Heading level="h2">Heading Level 2 - Section Title</Heading>
+      <Heading level="h3">Heading Level 3 - Subsection</Heading>
+      <Heading level="h4">Heading Level 4 - Sub-subsection</Heading>
+      <Heading level="h5">Heading Level 5 - Minor Heading</Heading>
+      <Heading level="h6">Heading Level 6 - Smallest Heading</Heading>
     </Stack>
   ),
 };
 
+// `variant="default" | "display" | "gradient" | "outlined"` never existed on
+// `Heading` — the ONLY style knobs are `size` (draw at a different scale step
+// than the rank), the `gradient` boolean, and (for a look this component has
+// no name for, like an outline) plain `style`.
 export const DisplayVariants: Story = {
   render: () => (
     <Stack spacing={3}>
-      <Heading level={1} variant="default">
-        Default Heading Style
-      </Heading>
-      <Heading level={1} variant="display">
+      <Heading level="h1">Default Heading Style</Heading>
+      <Heading level="h1" size="display">
         Display Heading Style
       </Heading>
-      <Heading level={1} variant="gradient">
+      <Heading level="h1" gradient>
         Gradient Heading Style
       </Heading>
-      <Heading level={1} variant="outlined">
+      <Heading level="h1" style={{ WebkitTextStroke: '1px currentColor', color: 'transparent' }}>
         Outlined Heading Style
       </Heading>
     </Stack>
@@ -128,9 +113,9 @@ export const ColoredHeadings: Story = {
           {color.charAt(0).toUpperCase() + color.slice(1)} Color Heading
         </Heading>
       ))}
-      {/* `inherit` was a prop that did nothing; the `sx` is what painted this white. */}
+      {/* `inherit` was a prop that did nothing; the `style` is what painted this white. */}
       <Box sx={{ bgcolor: 'primary.main', p: 2 }}>
-        <Heading level="h2" sx={{ color: 'white' }}>
+        <Heading level="h2" style={{ color: 'white' }}>
           Inherited Color Heading
         </Heading>
       </Box>
@@ -138,22 +123,28 @@ export const ColoredHeadings: Story = {
   ),
 };
 
+// `decorated`/`underlined` never existed on `Heading` either — there is no
+// built-in decoration beyond `gradient`. The look each example names is real
+// CSS on the `style` prop `Heading` does forward (plain `HTMLAttributes`).
+const DECORATION_STYLE = { borderBottom: '3px solid currentColor', paddingBottom: '0.25em' };
+const UNDERLINE_STYLE = { textDecoration: 'underline' } as const;
+
 export const DecoratedHeadings: Story = {
   render: () => (
     <Stack spacing={4}>
-      <Heading level={2} decorated>
+      <Heading level="h2" style={DECORATION_STYLE}>
         Heading with Decorative Elements
       </Heading>
 
-      <Heading level={2} underlined>
+      <Heading level="h2" style={UNDERLINE_STYLE}>
         Underlined Heading
       </Heading>
 
-      <Heading level={2} decorated underlined color="primary">
+      <Heading level="h2" color="primary" style={{ ...DECORATION_STYLE, ...UNDERLINE_STYLE }}>
         Decorated and Underlined
       </Heading>
 
-      <Heading level={1} variant="gradient" decorated>
+      <Heading level="h1" gradient style={DECORATION_STYLE}>
         Gradient with Decoration
       </Heading>
     </Stack>
@@ -164,19 +155,19 @@ export const AlignmentOptions: Story = {
   render: () => (
     <Stack spacing={3}>
       <Paper sx={{ p: 3 }}>
-        <Heading level={3} align="left">
+        <Heading level="h3" style={{ textAlign: 'left' }}>
           Left Aligned Heading
         </Heading>
       </Paper>
 
       <Paper sx={{ p: 3 }}>
-        <Heading level={3} align="center">
+        <Heading level="h3" style={{ textAlign: 'center' }}>
           Center Aligned Heading
         </Heading>
       </Paper>
 
       <Paper sx={{ p: 3 }}>
-        <Heading level={3} align="right">
+        <Heading level="h3" style={{ textAlign: 'right' }}>
           Right Aligned Heading
         </Heading>
       </Paper>
@@ -187,22 +178,24 @@ export const AlignmentOptions: Story = {
 export const FontWeights: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Heading level={3} weight="light">
+      <Heading level="h3" weight="light">
         Light Weight Heading
       </Heading>
-      <Heading level={3} weight="regular">
+      <Heading level="h3" weight="normal">
         Regular Weight Heading
       </Heading>
-      <Heading level={3} weight="medium">
+      <Heading level="h3" weight="medium">
         Medium Weight Heading
       </Heading>
-      <Heading level={3} weight="semibold">
+      <Heading level="h3" weight="semibold">
         Semibold Weight Heading
       </Heading>
-      <Heading level={3} weight="bold">
+      <Heading level="h3" weight="bold">
         Bold Weight Heading
       </Heading>
-      <Heading level={3} weight="black">
+      {/* `black` (900) is heavier than the vocabulary's own `bold` — real CSS
+          on `style`, since `weight` itself only goes up to `bold`. */}
+      <Heading level="h3" weight="bold" style={{ fontWeight: 900 }}>
         Black Weight Heading
       </Heading>
     </Stack>
@@ -212,34 +205,34 @@ export const FontWeights: Story = {
 export const PageHierarchy: Story = {
   render: () => (
     <Stack spacing={3}>
-      <Heading level={1} variant="display" decorated>
+      <Heading level="h1" size="display" style={DECORATION_STYLE}>
         Main Page Title
       </Heading>
 
       <Divider />
 
-      <Heading level={2} color="primary">
+      <Heading level="h2" color="primary">
         Section 1: Introduction
       </Heading>
       <Box sx={{ pl: 2 }}>
-        <Heading level={3}>1.1 Overview</Heading>
+        <Heading level="h3">1.1 Overview</Heading>
         <Box sx={{ pl: 2 }}>
-          <Heading level={4} color="neutral">
+          <Heading level="h4" color="neutral">
             1.1.1 Background
           </Heading>
-          <Heading level={4} color="neutral">
+          <Heading level="h4" color="neutral">
             1.1.2 Objectives
           </Heading>
         </Box>
-        <Heading level={3}>1.2 Scope</Heading>
+        <Heading level="h3">1.2 Scope</Heading>
       </Box>
 
-      <Heading level={2} color="primary">
+      <Heading level="h2" color="primary">
         Section 2: Implementation
       </Heading>
       <Box sx={{ pl: 2 }}>
-        <Heading level={3}>2.1 Technical Details</Heading>
-        <Heading level={3}>2.2 Timeline</Heading>
+        <Heading level="h3">2.1 Technical Details</Heading>
+        <Heading level="h3">2.2 Timeline</Heading>
       </Box>
     </Stack>
   ),
@@ -249,24 +242,23 @@ export const MarketingHeaders: Story = {
   render: () => (
     <Stack spacing={4} alignItems="center">
       <Heading
-        level={1}
-        variant="gradient"
-        align="center"
+        level="h1"
+        gradient
         weight="bold"
-        sx={{ fontSize: { xs: '2rem', md: '3rem' } }}
+        style={{ textAlign: 'center', fontSize: 'clamp(2rem, 5vw, 3rem)' }}
       >
         Welcome to the Future
       </Heading>
 
-      <Heading level={2} align="center" color="neutral" weight="light">
+      <Heading level="h2" color="neutral" weight="light" style={{ textAlign: 'center' }}>
         Innovate • Create • Transform
       </Heading>
 
       <Paper sx={{ p: 4, textAlign: 'center', maxWidth: 600 }}>
-        <Heading level={3} variant="display" decorated>
+        <Heading level="h3" size="display" style={DECORATION_STYLE}>
           🚀 Launch Your Ideas
         </Heading>
-        <Heading level={4} color="neutral" weight="regular">
+        <Heading level="h4" color="neutral" weight="normal">
           Start building amazing products today
         </Heading>
       </Paper>
@@ -277,24 +269,24 @@ export const MarketingHeaders: Story = {
 export const BlogPostHeader: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Heading level={6} color="primary" transform="uppercase">
+      <Heading level="h6" color="primary" style={{ textTransform: 'uppercase' }}>
         Technology
       </Heading>
-      <Heading level={1} weight="bold">
+      <Heading level="h1" weight="bold">
         The Rise of Artificial Intelligence in Modern Web Development
       </Heading>
-      <Heading level={4} color="neutral" weight="regular">
+      <Heading level="h4" color="neutral" weight="normal">
         How AI is transforming the way we build and deploy applications
       </Heading>
       <Divider sx={{ my: 2 }} />
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-        <Heading level={6} color="neutral">
+        <Heading level="h6" color="neutral">
           By Jane Doe
         </Heading>
-        <Heading level={6} color="neutral">
+        <Heading level="h6" color="neutral">
           •
         </Heading>
-        <Heading level={6} color="neutral">
+        <Heading level="h6" color="neutral">
           5 min read
         </Heading>
       </Box>
@@ -302,63 +294,60 @@ export const BlogPostHeader: Story = {
   ),
 };
 
-export const ResponsiveHeadings: Story = {
-  render: () => (
+// `Heading`'s own props (`style`, via plain `HTMLAttributes`) take ONE value,
+// not a breakpoint map — so each responsive story below reads the theme
+// itself, through `useMediaQuery`, and hands the component a single value
+// already resolved for the current viewport.
+const useHeadingBreakpoints = () => {
+  const theme = useTheme();
+  return {
+    isSm: useMediaQuery(theme.breakpoints.up('sm')),
+    isMd: useMediaQuery(theme.breakpoints.up('md')),
+    isLg: useMediaQuery(theme.breakpoints.up('lg')),
+  };
+};
+
+const ResponsiveHeadingsComponent = () => {
+  const { isSm, isMd, isLg } = useHeadingBreakpoints();
+  const fontSize = isLg ? '3rem' : isMd ? '2.5rem' : isSm ? '2rem' : '1.5rem';
+
+  return (
     <Stack spacing={3}>
-      <Heading
-        level={1}
-        sx={{
-          fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem', lg: '3rem' },
-        }}
-      >
+      <Heading level="h1" style={{ fontSize }}>
         Responsive Heading Size
       </Heading>
 
-      <Heading
-        level={2}
-        sx={{
-          display: { xs: 'none', md: 'block' },
-        }}
-      >
-        Desktop Only Heading
-      </Heading>
+      {isMd && <Heading level="h2">Desktop Only Heading</Heading>}
+
+      {!isMd && <Heading level="h2">Mobile Only Heading</Heading>}
 
       <Heading
-        level={2}
-        sx={{
-          display: { xs: 'block', md: 'none' },
-        }}
-      >
-        Mobile Only Heading
-      </Heading>
-
-      <Heading
-        level={3}
-        sx={{
-          textAlign: { xs: 'center', md: 'left' },
-          color: { xs: 'primary.main', md: 'text.primary' },
-        }}
+        level="h3"
+        color={isMd ? undefined : 'primary'}
+        style={{ textAlign: isMd ? 'left' : 'center' }}
       >
         Adaptive Alignment and Color
       </Heading>
     </Stack>
-  ),
+  );
+};
+
+export const ResponsiveHeadings: Story = {
+  render: () => <ResponsiveHeadingsComponent />,
 };
 
 // Required story exports for validation
 export const AllVariants: Story = {
   render: () => (
     <Stack spacing={3}>
-      <Heading level={1} variant="default">
-        Default Variant
-      </Heading>
-      <Heading level={1} variant="display">
+      <Heading level="h1">Default Variant</Heading>
+      <Heading level="h1" size="display">
         Display Variant
       </Heading>
-      <Heading level={1} variant="gradient">
+      <Heading level="h1" gradient>
         Gradient Variant
       </Heading>
-      <Heading level={1} variant="outlined">
+      <Heading level="h1" style={{ WebkitTextStroke: '1px currentColor', color: 'transparent' }}>
         Outlined Variant
       </Heading>
     </Stack>
@@ -368,12 +357,12 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Heading level={1}>Level 1 Heading</Heading>
-      <Heading level={2}>Level 2 Heading</Heading>
-      <Heading level={3}>Level 3 Heading</Heading>
-      <Heading level={4}>Level 4 Heading</Heading>
-      <Heading level={5}>Level 5 Heading</Heading>
-      <Heading level={6}>Level 6 Heading</Heading>
+      <Heading level="h1">Level 1 Heading</Heading>
+      <Heading level="h2">Level 2 Heading</Heading>
+      <Heading level="h3">Level 3 Heading</Heading>
+      <Heading level="h4">Level 4 Heading</Heading>
+      <Heading level="h5">Level 5 Heading</Heading>
+      <Heading level="h6">Level 6 Heading</Heading>
     </Stack>
   ),
 };
@@ -381,84 +370,98 @@ export const AllSizes: Story = {
 export const AllStates: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Heading level={2}>Normal State</Heading>
-      <Heading level={2} color="primary">
+      <Heading level="h2">Normal State</Heading>
+      <Heading level="h2" color="primary">
         Primary Color
       </Heading>
-      <Heading level={2} color="secondary">
+      <Heading level="h2" color="secondary">
         Secondary Color
       </Heading>
-      <Heading level={2} color="neutral">
+      <Heading level="h2" color="neutral">
         Text Secondary
       </Heading>
-      <Heading level={2} decorated>
+      <Heading level="h2" style={DECORATION_STYLE}>
         Decorated State
       </Heading>
-      <Heading level={2} underlined>
+      <Heading level="h2" style={UNDERLINE_STYLE}>
         Underlined State
       </Heading>
     </Stack>
   ),
 };
 
+// `Heading` has no `component`/`as` override — every instance renders its own
+// `h1`…`h6` tag, so "Focusable Heading Button" stays an `h3`, made focusable
+// and interactive with `tabIndex` and real hover/focus state (`sx`'s
+// `&:hover`/`&:focus` have no `style`-prop equivalent, so each is tracked with
+// `useState` and resolved to a plain `style` object).
+const HoverHeading = () => {
+  const theme = useTheme();
+  const [hovered, setHovered] = React.useState(false);
+
+  return (
+    <Heading
+      level="h3"
+      style={{
+        cursor: 'pointer',
+        color: hovered ? theme.palette.primary.main : undefined,
+        transition: 'color 0.2s ease-in-out',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      Hover to Change Color
+    </Heading>
+  );
+};
+
+const FocusableHeading = () => {
+  const theme = useTheme();
+  const [focused, setFocused] = React.useState(false);
+
+  return (
+    <Heading
+      level="h3"
+      tabIndex={0}
+      style={{
+        cursor: 'pointer',
+        outline: focused ? `2px solid ${theme.palette.primary.main}` : 'none',
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    >
+      Focusable Heading
+    </Heading>
+  );
+};
+
 export const InteractiveStates: Story = {
   render: () => (
     <Stack spacing={3}>
-      <Heading level={3}>Static Heading</Heading>
-      <Heading
-        level={3}
-        sx={{
-          cursor: 'pointer',
-          '&:hover': { color: 'primary.main' },
-          transition: 'color 0.2s ease-in-out',
-        }}
-      >
-        Hover to Change Color
-      </Heading>
-      <Heading
-        level={3}
-        component="button"
-        sx={{
-          border: 'none',
-          background: 'none',
-          cursor: 'pointer',
-          '&:focus': { outline: '2px solid', outlineColor: 'primary.main' },
-        }}
-      >
-        Focusable Heading Button
-      </Heading>
+      <Heading level="h3">Static Heading</Heading>
+      <HoverHeading />
+      <FocusableHeading />
     </Stack>
   ),
 };
 
-export const Responsive: Story = {
-  render: () => (
+const ResponsiveComponent = () => {
+  const { isMd } = useHeadingBreakpoints();
+
+  return (
     <Stack spacing={3}>
       <Heading
-        level={1}
-        sx={{
-          fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem', lg: '3rem' },
-          textAlign: { xs: 'center', md: 'left' },
-        }}
+        level="h1"
+        style={{ fontSize: isMd ? '2.5rem' : '1.5rem', textAlign: isMd ? 'left' : 'center' }}
       >
         Responsive Heading
       </Heading>
-      <Heading
-        level={2}
-        sx={{
-          display: { xs: 'none', md: 'block' },
-        }}
-      >
-        Desktop Only
-      </Heading>
-      <Heading
-        level={2}
-        sx={{
-          display: { xs: 'block', md: 'none' },
-        }}
-      >
-        Mobile Only
-      </Heading>
+      {isMd && <Heading level="h2">Desktop Only</Heading>}
+      {!isMd && <Heading level="h2">Mobile Only</Heading>}
     </Stack>
-  ),
+  );
+};
+
+export const Responsive: Story = {
+  render: () => <ResponsiveComponent />,
 };

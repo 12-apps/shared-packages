@@ -98,6 +98,7 @@ const DefaultComponent = () => {
           Open Basic Modal
         </Button>
         <StackedModal
+          backLabel="Voltar"
           open={open}
           onClose={() => setOpen(false)}
           navigationTitle="Basic Modal"
@@ -159,6 +160,7 @@ const GlassMorphismComponent = () => {
         </Box>
 
         <StackedModal
+          backLabel="Voltar"
           open={open}
           onClose={() => setOpen(false)}
           glass={true}
@@ -226,6 +228,7 @@ const MultiLevelStackingComponent = () => {
 
         {/* Level 1 Modal */}
         <StackedModal
+          backLabel="Voltar"
           open={firstOpen}
           onClose={() => setFirstOpen(false)}
           glass={true}
@@ -269,6 +272,7 @@ const MultiLevelStackingComponent = () => {
 
         {/* Level 2 Modal */}
         <StackedModal
+          backLabel="Voltar"
           open={secondOpen}
           onClose={() => setSecondOpen(false)}
           navigationTitle="Step 2: Configuration"
@@ -304,6 +308,7 @@ const MultiLevelStackingComponent = () => {
 
         {/* Level 3 Modal */}
         <StackedModal
+          backLabel="Voltar"
           open={thirdOpen}
           onClose={() => setThirdOpen(false)}
           navigationTitle="Step 3: Features"
@@ -341,6 +346,7 @@ const MultiLevelStackingComponent = () => {
 
         {/* Level 4 Modal */}
         <StackedModal
+          backLabel="Voltar"
           open={fourthOpen}
           onClose={() => setFourthOpen(false)}
           navigationTitle="Step 4: Review"
@@ -405,9 +411,9 @@ const MultiLevelStackingComponent = () => {
                     Features
                   </Typography>
                   <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Chip label="Authentication" size="sm" />
-                    <Chip label="Database" size="sm" />
-                    <Chip label="Testing" size="sm" />
+                    <Chip label="Authentication" size="small" />
+                    <Chip label="Database" size="small" />
+                    <Chip label="Testing" size="small" />
                   </Stack>
                 </Box>
               </Stack>
@@ -454,6 +460,7 @@ export const MobileResponsive: Story = {
           </Button>
 
           <StackedModal
+            backLabel="Voltar"
             open={open}
             onClose={() => setOpen(false)}
             navigationTitle="Mobile Optimized"
@@ -540,6 +547,7 @@ const AsyncContentLoadingComponent = () => {
         </Card>
 
         <StackedModal
+          backLabel="Voltar"
           open={open}
           onClose={() => setOpen(false)}
           navigationTitle="User Management"
@@ -582,14 +590,14 @@ const AsyncContentLoadingComponent = () => {
                         <TableCell>
                           <Chip
                             label={user.role}
-                            size="sm"
+                            size="small"
                             color={user.role === 'Admin' ? 'primary' : 'default'}
                           />
                         </TableCell>
                         <TableCell>
                           <Chip
                             label={user.status}
-                            size="sm"
+                            size="small"
                             color={user.status === 'Active' ? 'success' : 'default'}
                           />
                         </TableCell>
@@ -612,6 +620,7 @@ const AsyncContentLoadingComponent = () => {
 
         {/* Add User Modal */}
         <StackedModal
+          backLabel="Voltar"
           open={addUserOpen}
           onClose={() => setAddUserOpen(false)}
           navigationTitle="Add New User"
@@ -706,6 +715,7 @@ const CustomActionsComponent = () => {
         </Button>
 
         <StackedModal
+          backLabel="Voltar"
           open={open}
           onClose={() => setOpen(false)}
           navigationTitle="Advanced Settings"
@@ -826,6 +836,7 @@ const ComplexWorkflowComponent = () => {
         </Card>
 
         <StackedModal
+          backLabel="Voltar"
           open={open}
           onClose={() => {
             setOpen(false);
@@ -972,6 +983,7 @@ const ComplexWorkflowComponent = () => {
 
             {/* Nested Modal for Additional Contact */}
             <StackedModal
+              backLabel="Voltar"
               open={nestedOpen}
               onClose={() => setNestedOpen(false)}
               navigationTitle="Additional Contact"
@@ -1053,6 +1065,7 @@ const PerformanceDemoComponent = () => {
 
         {modals.map((isOpen, index) => (
           <StackedModal
+            backLabel="Voltar"
             key={index}
             open={isOpen}
             onClose={() => closeModal(index)}
@@ -1157,6 +1170,7 @@ const RTLSupportComponent = () => {
         </Card>
 
         <StackedModal
+          backLabel="Voltar"
           open={open}
           onClose={() => setOpen(false)}
           navigationTitle={rtl ? 'نموذج مع دعم RTL' : 'Modal with RTL Support'}
@@ -1250,6 +1264,7 @@ const AccessibilityShowcaseComponent = () => {
         )}
 
         <StackedModal
+          backLabel="Voltar"
           open={open}
           onClose={() => {
             setOpen(false);
@@ -1358,6 +1373,7 @@ const AllVariantsComponent = () => {
       </Stack>
 
       <StackedModal
+        backLabel="Voltar"
         open={basicOpen}
         onClose={() => setBasicOpen(false)}
         navigationTitle="Basic Variant"
@@ -1368,6 +1384,7 @@ const AllVariantsComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={glassOpen}
         onClose={() => setGlassOpen(false)}
         glass
@@ -1379,6 +1396,7 @@ const AllVariantsComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={loadingOpen}
         onClose={() => setLoadingOpen(false)}
         loading
@@ -1425,7 +1443,7 @@ const AllSizesComponent = () => {
       </Stack>
 
       <StackedModal
-        backLabel="Back"
+        backLabel="Voltar"
         open={wideOpen}
         onClose={() => setWideOpen(false)}
         navigationTitle="Wide Panel"
@@ -1439,6 +1457,7 @@ const AllSizesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={smallOpen}
         onClose={() => setSmallOpen(false)}
         navigationTitle="Small Size"
@@ -1450,6 +1469,7 @@ const AllSizesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={mediumOpen}
         onClose={() => setMediumOpen(false)}
         navigationTitle="Medium Size"
@@ -1461,6 +1481,7 @@ const AllSizesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={largeOpen}
         onClose={() => setLargeOpen(false)}
         navigationTitle="Large Size"
@@ -1472,6 +1493,7 @@ const AllSizesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={fullscreenOpen}
         onClose={() => setFullscreenOpen(false)}
         navigationTitle="Fullscreen"
@@ -1513,6 +1535,7 @@ const AllStatesComponent = () => {
       </Stack>
 
       <StackedModal
+        backLabel="Voltar"
         open={normalOpen}
         onClose={() => setNormalOpen(false)}
         navigationTitle="Normal State"
@@ -1523,6 +1546,7 @@ const AllStatesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={loadingOpen}
         onClose={() => setLoadingOpen(false)}
         loading
@@ -1535,6 +1559,7 @@ const AllStatesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={errorOpen}
         onClose={() => setErrorOpen(false)}
         navigationTitle="Error State"
@@ -1548,6 +1573,7 @@ const AllStatesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={disabledActionsOpen}
         onClose={() => setDisabledActionsOpen(false)}
         navigationTitle="Disabled Actions"
@@ -1591,6 +1617,7 @@ const InteractiveStatesComponent = () => {
       </Button>
 
       <StackedModal
+        backLabel="Voltar"
         open={formOpen}
         onClose={() => setFormOpen(false)}
         navigationTitle="Interactive Form"
@@ -1641,6 +1668,7 @@ const InteractiveStatesComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         navigationTitle="Success"
@@ -1696,6 +1724,7 @@ const ResponsiveComponent = () => {
       </Stack>
 
       <StackedModal
+        backLabel="Voltar"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         navigationTitle="Mobile Modal"
@@ -1721,6 +1750,7 @@ const ResponsiveComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={tabletOpen}
         onClose={() => setTabletOpen(false)}
         navigationTitle="Tablet Modal"
@@ -1748,6 +1778,7 @@ const ResponsiveComponent = () => {
       </StackedModal>
 
       <StackedModal
+        backLabel="Voltar"
         open={desktopOpen}
         onClose={() => setDesktopOpen(false)}
         navigationTitle="Desktop Modal"

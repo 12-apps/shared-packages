@@ -861,8 +861,8 @@ function OrderDetail(): React.JSX.Element {
           <Box component="span">R$ 312,50</Box>
         </Box>
         <Box sx={{ display: "flex", gap: 1, mt: 1, justifyContent: "flex-end" }}>
-          <Button size="sm" variant="outlined">Recuperar</Button>
-          <Button size="sm" variant="outlined">Ver cliente</Button>
+          <Button size="sm" variant="outline">Recuperar</Button>
+          <Button size="sm" variant="outline">Ver cliente</Button>
         </Box>
       </Box>
     </Box>
