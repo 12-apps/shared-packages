@@ -425,3 +425,40 @@ describe('densityThemeOptions and muiThemeOptionsFrom agree on the FUT-2768 over
     },
   );
 });
+
+/**
+ * FUT-2967 — `densityThemeOptions` widens to also report `fieldRadius`, and
+ * `MuiToggleButton.root` (fixed at the source, `density-overrides.navigation.ts`)
+ * carries BOTH the field radius and the density padding, so a bare
+ * `<ToggleButton>` never loses its corner to a theme built with a density.
+ */
+describe('densityThemeOptions also reports fieldRadius, and MuiToggleButton.root carries both (FUT-2967)', () => {
+  it('reports the field radius it was given (3rd argument), defaulting to DEFAULT_FIELD_RADIUS', () => {
+    expect(densityThemeOptions('compact').fieldRadius).toBe(DEFAULT_FIELD_RADIUS);
+    expect(densityThemeOptions('compact', undefined, 12).fieldRadius).toBe(12);
+  });
+
+  it("densityThemeOptions('compact').components.MuiToggleButton.styleOverrides.root carries both the field borderRadius and the density padding", () => {
+    const options = densityThemeOptions('compact');
+    const theme = createTheme(options);
+    const root = options.components?.MuiToggleButton?.styleOverrides?.root as
+      | ((props: { theme: typeof theme }) => Record<string, unknown>)
+      | undefined;
+    expect(typeof root).toBe('function');
+    expect(root?.({ theme })).toEqual({
+      padding: theme.typography.pxToRem(11),
+      borderRadius: DEFAULT_FIELD_RADIUS,
+    });
+  });
+
+  it("a host's own field radius (3rd argument) reaches MuiToggleButton.root too, not only the fields", () => {
+    const options = densityThemeOptions('compact', undefined, 12);
+    const theme = createTheme(options);
+    const root = options.components?.MuiToggleButton?.styleOverrides?.root as
+      | ((props: { theme: typeof theme }) => Record<string, unknown>)
+      | undefined;
+    expect(root?.({ theme })).toEqual({ padding: theme.typography.pxToRem(11), borderRadius: 12 });
+    // The field itself agrees with ToggleButton on the same radius.
+    expect(options.components?.MuiOutlinedInput?.styleOverrides?.root).toEqual({ borderRadius: 12 });
+  });
+});

@@ -1,6 +1,7 @@
 import { tableCellClasses } from '@mui/material/TableCell/index.js';
 import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js';
 
+import { fieldRadius } from './field-radius';
 import { rem, rems } from './relative';
 
 /**
@@ -16,7 +17,9 @@ import { rem, rems } from './relative';
  * them outright:
  *
  * - `ToggleButton`: `padding: 11/7/15` at medium(root)/small/large — same
- *   `root`/`sizeSmall`/`sizeLarge` shape as `iconButtonDensityOverrides`.
+ *   `root`/`sizeSmall`/`sizeLarge` shape as `iconButtonDensityOverrides`. The
+ *   `root` slot ALSO carries `theme.fieldRadius` (FUT-2967, `field-radius.ts`)
+ *   — see the note at the end of this docblock.
  * - `Tab`: `minHeight: 48`, `padding: '12px 16px'` on the root (via `rems()`).
  *   The icon+label combo (`minHeight: 72`, `paddingTop`/`Bottom: 9`) is a
  *   SEPARATE MUI variant, exposed as the `labelIcon` key.
@@ -46,10 +49,32 @@ import { rem, rems } from './relative';
  * `rem(theme, boxPx(size))` (`40` at `md`) — higher specificity than any
  * `MuiAvatar.styleOverrides.root`, dead code here, so it ships none.
  *
- * Geometry-neutral at `normal`; each slot a MODULE-LEVEL function, as above.
+ * PADDING is geometry-neutral at `normal` — the same 11/7/15 literals
+ * `ToggleButton.js` hard-codes; each slot a MODULE-LEVEL function, as above.
+ *
+ * `MuiToggleButton.root` is the one exception, and it is NOT neutral even at
+ * `normal` (FUT-2967): `fieldRadiusOverrides` (`field-radius.ts`) and this
+ * callback both style `MuiToggleButton.root` — the radius override's own
+ * `{ borderRadius }` and this one's `{ padding }` — and a `styleOverrides`
+ * slot two sources touch is replaced WHOLESALE by whichever is spread last
+ * (`mergeMuiComponents`), so a theme built with density silently dropped the
+ * field radius off a bare `<ToggleButton>` the moment density's `root`
+ * callback (this one) was the later source. Fixed AT THE SOURCE rather than
+ * in the merge: this MODULE-LEVEL callback (still a single, stable reference,
+ * so two builds still compare equal) reads `theme.fieldRadius` itself and
+ * returns the corner alongside the padding, so there is no second `root`
+ * value for a later merge to lose. The consequence is deliberate and worth
+ * naming: a host that applies ONLY `toggleButtonDensityOverrides()` to a
+ * plain MUI theme now gets the FIELD radius (8px, `DEFAULT_FIELD_RADIUS`) on
+ * `<ToggleButton>`, not MUI's own `shape.borderRadius` (4px) — matching the
+ * fields beside it, not a MUI default nothing else in this package still
+ * draws with.
  */
 
-const toggleButtonRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 11) });
+const toggleButtonRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({
+  padding: rem(theme, 11),
+  borderRadius: fieldRadius(theme),
+});
 const toggleButtonSmallPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 7) });
 const toggleButtonLargePadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 15) });
 
