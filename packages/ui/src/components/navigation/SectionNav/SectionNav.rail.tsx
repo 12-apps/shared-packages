@@ -16,6 +16,7 @@ import {
   destinationControl,
   focusRing,
 } from './SectionNav.parts';
+import { RailCreateMenu } from './SectionNav.railCreate';
 import type {
   SectionNavAction,
   SectionNavBack,
@@ -114,9 +115,10 @@ function RailHeading({ children }: { children: ReactNode }): React.JSX.Element {
 }
 
 /**
- * A menu's groups, listed under its title — nothing folded away on a wide
- * screen. A `disabled` menu has no trigger here to refuse, so every row of it
- * is inert instead.
+ * The `more` menu's groups, listed under its title — the rail has room for the
+ * places it holds. A `disabled` menu has no trigger here to refuse, so every
+ * row of it is inert instead. (`primary` folds behind one button instead —
+ * `RailCreateMenu`.)
  */
 function RailMenu({
   menu,
@@ -262,8 +264,9 @@ function RailDestination({
 }
 
 /**
- * The wide-screen layout: a vertical rail — the way back, the destinations,
- * then every menu's entries.
+ * The wide-screen layout: a vertical rail — the way back, the heading, a
+ * `primary` menu as one button that opens it (FUT-3015), the destinations, a
+ * `primary` action as a row, then `more` listed in full.
  *
  * It fills the column the host gives it and scrolls on its own, like the
  * sidebar it stands in for.
@@ -300,6 +303,9 @@ export function SectionNavRail({
     >
       {back ? <RailBack back={back} linkComponent={linkComponent} testId={`${dataTestId}-back`} /> : null}
       {heading ? <RailHeading>{heading}</RailHeading> : null}
+      {isMenu(primary) ? (
+        <RailCreateMenu menu={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
+      ) : null}
       {destinations.map((destination) => (
         <RailDestination
           key={destination.id}
@@ -311,9 +317,6 @@ export function SectionNavRail({
       ))}
       {primary && !isMenu(primary) ? (
         <RailAction action={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
-      ) : null}
-      {isMenu(primary) ? (
-        <RailMenu menu={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
       ) : null}
       {more ? <RailMenu menu={more} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-more`} /> : null}
     </Box>

@@ -218,10 +218,10 @@ describe('SectionNav rail', () => {
     );
     expect(screen.getByTestId('section-nav-back')).toHaveAttribute('href', '/home');
     expect(screen.getByTestId('section-nav-dest-floor')).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByTestId('section-nav-primary-entry-delivery')).toBeInTheDocument();
     expect(screen.getByTestId('section-nav-more-entry-queue')).toHaveAttribute('href', '/queue');
-    // Nothing is folded behind a trigger on a wide screen: the menu is a listed section.
-    expect(screen.getByTestId('section-nav-primary').tagName).toBe('SECTION');
+    // More is listed; the create menu is folded behind one button (FUT-3015).
+    expect(screen.getByTestId('section-nav-more').tagName).toBe('SECTION');
+    expect(screen.queryByTestId('section-nav-primary-entry-delivery')).toBeNull();
   });
 });
 

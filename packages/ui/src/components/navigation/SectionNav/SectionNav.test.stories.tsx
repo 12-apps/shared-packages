@@ -89,7 +89,7 @@ export const MoreRollsUpItsCounts: Story = {
 };
 
 export const RailListsEverything: Story = {
-  name: 'Rail: the way back, the destinations and every entry are all visible',
+  name: 'Rail: the way back, the destinations and More are listed; Create opens from one button',
   args: { layout: 'rail', back: { label: 'Back', href: '#home' }, heading: 'Operations' },
   render: (args) => (
     <RailFrame>
@@ -100,7 +100,11 @@ export const RailListsEverything: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId('section-nav-back')).toBeVisible();
     await expect(canvas.getByTestId('section-nav-dest-board')).toHaveAttribute('aria-current', 'page');
-    await expect(canvas.getByTestId('section-nav-primary-entry-pause')).toBeVisible();
     await expect(canvas.getByTestId('section-nav-more-entry-queue')).toBeVisible();
+    // The create menu is one button until it is opened (FUT-3015).
+    await expect(canvas.queryByTestId('section-nav-primary-entry-pause')).toBeNull();
+    await userEvent.click(canvas.getByTestId('section-nav-primary'));
+    const body = within(canvasElement.ownerDocument.body);
+    await waitFor(() => expect(body.getByTestId('section-nav-primary-entry-pause')).toBeVisible());
   },
 };
