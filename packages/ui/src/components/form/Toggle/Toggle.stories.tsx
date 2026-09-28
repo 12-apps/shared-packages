@@ -91,6 +91,7 @@ const VariantsComponent = () => {
           Default
         </Typography>
         <Toggle
+          value="bold"
           variant="default"
           icon={<Bold size={16} />}
           selected={states.default}
@@ -105,6 +106,7 @@ const VariantsComponent = () => {
           Outline
         </Typography>
         <Toggle
+          value="italic"
           variant="outline"
           color="secondary"
           icon={<Italic size={16} />}
@@ -120,6 +122,7 @@ const VariantsComponent = () => {
           Soft
         </Typography>
         <Toggle
+          value="underline"
           variant="soft"
           color="success"
           icon={<Underline size={16} />}
@@ -167,6 +170,7 @@ const ColorsComponent = () => {
       {COLOR_VALUES.map((color) => (
         <Toggle
           key={color}
+          value={color}
           color={color}
           icon={icons[color]}
           selected={states[color]}
@@ -200,6 +204,7 @@ const SizesComponent = () => {
             {size.toUpperCase()}:
           </Typography>
           <Toggle
+            value={size}
             size={size}
             icon={
               <Star
@@ -248,6 +253,7 @@ const SpecialEffectsComponent = () => {
           Glass Morphism
         </Typography>
         <Toggle
+          value="glass"
           glass
           icon={<Moon size={16} />}
           selected={states.glass}
@@ -262,6 +268,7 @@ const SpecialEffectsComponent = () => {
           Gradient
         </Typography>
         <Toggle
+          value="gradient"
           gradient
           color="secondary"
           icon={<Sun size={16} />}
@@ -277,6 +284,7 @@ const SpecialEffectsComponent = () => {
           Glow Effect
         </Typography>
         <Toggle
+          value="glow"
           glow
           color="success"
           icon={<Star size={16} />}
@@ -292,6 +300,7 @@ const SpecialEffectsComponent = () => {
           Combined Effects
         </Typography>
         <Toggle
+          value="combined"
           glass
           gradient
           glow
@@ -323,6 +332,7 @@ const ActionButtonsComponent = () => {
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
       <Toggle
+        value="like"
         variant="soft"
         color="danger"
         icon={<Heart size={16} />}
@@ -333,6 +343,7 @@ const ActionButtonsComponent = () => {
       </Toggle>
 
       <Toggle
+        value="bookmark"
         variant="outline"
         color="warning"
         icon={<Bookmark size={16} />}
@@ -343,6 +354,7 @@ const ActionButtonsComponent = () => {
       </Toggle>
 
       <Toggle
+        value="share"
         variant="soft"
         color="secondary"
         icon={<Share2 size={16} />}
@@ -353,6 +365,7 @@ const ActionButtonsComponent = () => {
       </Toggle>
 
       <Toggle
+        value="download"
         variant="outline"
         color="success"
         icon={<Download size={16} />}
@@ -378,6 +391,7 @@ const MediaControlsComponent = () => {
   return (
     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
       <Toggle
+        value="play"
         size="lg"
         color="primary"
         icon={states.play ? <Pause size={20} /> : <Play size={20} />}
@@ -386,6 +400,7 @@ const MediaControlsComponent = () => {
       />
 
       <Toggle
+        value="sound"
         size="md"
         color="secondary"
         variant="soft"
@@ -406,19 +421,19 @@ export const MediaControls: Story = {
 export const DisabledState: Story = {
   render: () => (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-      <Toggle disabled icon={<Settings size={16} />}>
+      <Toggle value="disabled-default" disabled icon={<Settings size={16} />}>
         Disabled Default
       </Toggle>
 
-      <Toggle disabled selected icon={<Star size={16} />} color="warning">
+      <Toggle value="disabled-selected" disabled selected icon={<Star size={16} />} color="warning">
         Disabled Selected
       </Toggle>
 
-      <Toggle disabled variant="outline" color="secondary">
+      <Toggle value="disabled-outline" disabled variant="outline" color="secondary">
         Disabled Outline
       </Toggle>
 
-      <Toggle disabled variant="soft" color="success">
+      <Toggle value="disabled-soft" disabled variant="soft" color="success">
         Disabled Soft
       </Toggle>
     </Box>
@@ -462,6 +477,7 @@ const AllStatesComponent = () => {
           Normal:
         </Typography>
         <Toggle
+          value="normal"
           selected={states.normal}
           onChange={() => setStates((prev) => ({ ...prev, normal: !prev.normal }))}
           icon={<Heart size={16} />}
@@ -475,6 +491,7 @@ const AllStatesComponent = () => {
           Selected:
         </Typography>
         <Toggle
+          value="selected"
           selected={states.selected}
           onChange={() => setStates((prev) => ({ ...prev, selected: !prev.selected }))}
           icon={<Star size={16} />}
@@ -488,7 +505,7 @@ const AllStatesComponent = () => {
         <Typography variant="body2" sx={{ minWidth: '120px' }}>
           Disabled:
         </Typography>
-        <Toggle disabled selected={states.disabled} icon={<Settings size={16} />}>
+        <Toggle value="disabled" disabled selected={states.disabled} icon={<Settings size={16} />}>
           Disabled State
         </Toggle>
       </Box>
@@ -498,6 +515,7 @@ const AllStatesComponent = () => {
           Disabled + Selected:
         </Typography>
         <Toggle
+          value="disabled-selected-state"
           disabled
           selected={states.disabledSelected}
           icon={<ThumbsUp size={16} />}
@@ -526,6 +544,7 @@ const InteractiveStatesComponent = () => {
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Toggle
+          value="interactive"
           selected={selected}
           onChange={() => setSelected(!selected)}
           icon={<Heart size={16} />}
@@ -535,6 +554,7 @@ const InteractiveStatesComponent = () => {
         </Toggle>
 
         <Toggle
+          value="outline-interactive"
           variant="outline"
           selected={selected}
           onChange={() => setSelected(!selected)}
@@ -545,6 +565,7 @@ const InteractiveStatesComponent = () => {
         </Toggle>
 
         <Toggle
+          value="soft-interactive"
           variant="soft"
           selected={selected}
           onChange={() => setSelected(!selected)}
@@ -555,6 +576,7 @@ const InteractiveStatesComponent = () => {
         </Toggle>
 
         <Toggle
+          value="glow-interactive"
           glow
           selected={selected}
           onChange={() => setSelected(!selected)}
@@ -591,6 +613,7 @@ const ResponsiveComponent = () => {
       >
         {/* Scalar: `size` never accepted a breakpoint map. */}
         <Toggle
+          value="responsive-size"
           selected={selected}
           onChange={() => setSelected(!selected)}
           icon={<Heart size={16} />}
@@ -600,6 +623,7 @@ const ResponsiveComponent = () => {
         </Toggle>
 
         <Toggle
+          value="auto-width"
           variant="outline"
           selected={selected}
           onChange={() => setSelected(!selected)}
@@ -609,6 +633,7 @@ const ResponsiveComponent = () => {
         </Toggle>
 
         <Toggle
+          value="custom-width"
           variant="soft"
           selected={selected}
           onChange={() => setSelected(!selected)}
@@ -624,6 +649,7 @@ const ResponsiveComponent = () => {
           Full-width on mobile:
         </Typography>
         <Toggle
+          value="mobile-full-width"
           selected={selected}
           onChange={() => setSelected(!selected)}
           icon={<Download size={16} />}

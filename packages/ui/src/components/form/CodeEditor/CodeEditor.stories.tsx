@@ -613,7 +613,7 @@ export const ReadOnlyMode: Story = {
       <Alert severity="info">
         This editor is in read-only mode. Users can view and copy but cannot edit.
       </Alert>
-      <CodeEditor copy={PT_BR_CODE_EDITOR_COPY} {...args} />
+      <CodeEditor {...args} />
     </Stack>
   ),
 };

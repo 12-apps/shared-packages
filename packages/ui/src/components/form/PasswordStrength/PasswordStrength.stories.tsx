@@ -119,7 +119,18 @@ const AllVariantsComponent = () => {
           <Typography variant="subtitle2" gutterBottom>
             Detailed View
           </Typography>
-          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value={password} variant="detailed" showStrengthLabel={true} />
+          {/* There is no `detailed` variant — only linear/circular/steps.
+              The detailed LOOK is the linear meter plus its own opt-in
+              requirements checklist and suggestions, which is what this
+              shows instead. */}
+          <PasswordStrength
+            copy={PT_BR_PASSWORD_STRENGTH_COPY}
+            value={password}
+            variant="linear"
+            showStrengthLabel={true}
+            showRequirements
+            showSuggestions
+          />
         </Paper>
       </Box>
     </Stack>

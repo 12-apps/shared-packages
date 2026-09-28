@@ -157,6 +157,7 @@ const ColorsComponent = () => {
     secondary: '',
     success: '',
     warning: '',
+    info: '',
     danger: '',
     neutral: '',
   });

@@ -41,7 +41,7 @@ export const FullComposition: Story = {
           Manage your catalog: create products, set prices, and control stock visibility.
         </Dashboard.Info>
         <Dashboard.FilterToggle hideLabel="Ocultar filtros" showLabel="Mostrar filtros" />
-        <Dashboard.Settings title="Product settings" ariaLabel="Configurações">
+        <Dashboard.Settings title="Product settings" ariaLabel="Configurações" closeLabel="Fechar">
           <Typography>In development — coming in the next version.</Typography>
         </Dashboard.Settings>
         <Dashboard.Spacer />

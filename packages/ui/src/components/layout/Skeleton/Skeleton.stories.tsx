@@ -207,7 +207,7 @@ export const ProfileCardSkeleton: Story = {
         subheader={<Skeleton variant="text" width="40%" />}
       />
       <CardContent>
-        <Skeleton variant="rectangular" height={200} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={200} style={{ marginBottom: 16 }} />
         <Skeleton variant="text" />
         <Skeleton variant="text" width="80%" />
         <Skeleton variant="text" width="60%" />
@@ -495,13 +495,13 @@ export const AdvancedProfileCard: Story = {
           <CardHeader title="Regular Skeleton" sx={{ pb: 1 }} />
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-              <Skeleton variant="circular" width={60} height={60} sx={{ mr: 2 }} />
+              <Skeleton variant="circular" width={60} height={60} style={{ marginRight: 16 }} />
               <Box sx={{ flex: 1 }}>
                 <Skeleton variant="text" width="70%" />
                 <Skeleton variant="text" width="50%" />
               </Box>
             </Box>
-            <Skeleton variant="rectangular" height={150} sx={{ mb: 2 }} />
+            <Skeleton variant="rectangular" height={150} style={{ marginBottom: 16 }} />
             <Skeleton variant="text" count={3} />
           </CardContent>
         </Card>
@@ -516,7 +516,7 @@ export const AdvancedProfileCard: Story = {
                 variant="circular"
                 width={60}
                 height={60}
-                sx={{ mr: 2 }}
+                style={{ marginRight: 16 }}
                 shimmer
                 intensity="high"
               />
@@ -528,7 +528,7 @@ export const AdvancedProfileCard: Story = {
             <Skeleton
               variant="rectangular"
               height={150}
-              sx={{ mb: 2 }}
+              style={{ marginBottom: 16 }}
               shimmer
               borderRadius={12}
               intensity="high"
@@ -639,7 +639,7 @@ export const Responsive: Story = {
           <Skeleton variant="text" width="80%" />
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Skeleton variant="circular" width={32} height={32} />
-            <Skeleton variant="text" sx={{ flex: 1 }} />
+            <Skeleton variant="text" style={{ flex: 1 }} />
           </Box>
         </Stack>
       </Box>

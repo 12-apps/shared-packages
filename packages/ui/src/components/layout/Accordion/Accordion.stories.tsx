@@ -6,11 +6,30 @@ import Settings from '@mui/icons-material/Settings';
 import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import Stack from '@mui/material/Stack/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Accordion, AccordionActions,AccordionDetails, AccordionSummary } from './Accordion';
+
+// `AccordionSummary` doesn't take `sx` (its own internal `sx` — the hover,
+// focus and icon-rotation rules — is set AFTER spreading the caller's other
+// props, so a passed-through `sx` would silently replace it rather than
+// merge). `styled()` composes an extra class instead, so it layers on top of
+// the component's own styling rather than fighting it.
+const ResponsiveAccordionSummary = styled(AccordionSummary)(({ theme }) => ({
+  flexDirection: 'row',
+  '& .MuiAccordionSummary-expandIconWrapper': {
+    transform: 'none',
+  },
+  [theme.breakpoints.up('md')]: {
+    flexDirection: 'row-reverse',
+    '& .MuiAccordionSummary-expandIconWrapper': {
+      transform: 'rotate(90deg)',
+    },
+  },
+}));
 
 const meta: Meta<typeof Accordion> = {
   title: 'Layout/Accordion',
@@ -399,7 +418,8 @@ export const EmptyState: Story = {
           <Typography>Empty Content Accordion</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          {/* Intentionally empty to test empty state handling */}
+          {/* Intentionally empty (`null`) to test empty state handling — `children` is required, so it must be given explicitly rather than left off. */}
+          {null}
         </AccordionDetails>
       </Accordion>
 
@@ -643,17 +663,9 @@ export const Responsive: Story = {
             flexDirection: { md: 'column' },
           }}
         >
-          <AccordionSummary
-            expandIcon={<ExpandMore />}
-            sx={{
-              flexDirection: { xs: 'row', md: 'row-reverse' },
-              '& .MuiAccordionSummary-expandIconWrapper': {
-                transform: { xs: 'none', md: 'rotate(90deg)' },
-              },
-            }}
-          >
+          <ResponsiveAccordionSummary expandIcon={<ExpandMore />}>
             <Typography>Layout Changes</Typography>
-          </AccordionSummary>
+          </ResponsiveAccordionSummary>
           <AccordionDetails>
             <Box
               sx={{

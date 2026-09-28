@@ -28,6 +28,17 @@ const meta: Meta<typeof VirtualList> = {
 export default meta;
 type Story = StoryObj<typeof VirtualList>;
 
+/** The shape every story's fixtures put in `item.data` — `VirtualListItem.data` is `unknown` by
+ * design (the component doesn't know or care what a caller renders), so a story reads it back
+ * through this narrowing accessor rather than indexing the untyped field directly. */
+interface VirtualListItemData {
+  name: string;
+  description: string;
+  avatar: string;
+}
+
+const itemData = (item: VirtualListItem): VirtualListItemData => item.data as VirtualListItemData;
+
 // Generate sample data
 const generateItems = (count: number): VirtualListItem[] => Array.from({ length: count }, (_, i) => ({
     id: i,
@@ -68,9 +79,9 @@ export const Default: Story = {
             <Box key={item.id} style={style}>
               <ListItem>
                 <ListItemAvatar>
-                  <Avatar src={item.data.avatar} />
+                  <Avatar src={itemData(item).avatar} />
                 </ListItemAvatar>
-                <ListItemText primary={item.data.name} secondary={item.data.description} />
+                <ListItemText primary={itemData(item).name} secondary={itemData(item).description} />
               </ListItem>
             </Box>
           )}
@@ -100,9 +111,9 @@ export const AllVariants: Story = {
               <Box key={item.id} style={style}>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar>{item.id + 1}</Avatar>
+                    <Avatar>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary="Fixed height item" />
+                  <ListItemText primary={itemData(item).name} secondary="Fixed height item" />
                 </ListItem>
               </Box>
             )}
@@ -122,13 +133,13 @@ export const AllVariants: Story = {
               <Box key={item.id} style={style}>
                 <ListItem sx={{ alignItems: 'flex-start' }}>
                   <ListItemAvatar>
-                    <Avatar>{item.id + 1}</Avatar>
+                    <Avatar>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
                   <ListItemText
-                    primary={item.data.name}
+                    primary={itemData(item).name}
                     secondary={
                       <Typography variant="body2" color="text.secondary">
-                        {item.data.description}
+                        {itemData(item).description}
                       </Typography>
                     }
                   />
@@ -165,8 +176,8 @@ export const AllVariants: Story = {
                   textAlign: 'center',
                 }}
               >
-                <Avatar src={item.data.avatar} sx={{ mb: 1 }} />
-                <Typography variant="body2">{item.data.name}</Typography>
+                <Avatar src={itemData(item).avatar} sx={{ mb: 1 }} />
+                <Typography variant="body2">{itemData(item).name}</Typography>
               </Box>
             )}
           />
@@ -195,9 +206,9 @@ export const AllSizes: Story = {
               <Box key={item.id} style={style}>
                 <ListItem dense>
                   <ListItemAvatar>
-                    <Avatar size="sm">{item.id + 1}</Avatar>
+                    <Avatar>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
-                  <ListItemText primary={`Item ${item.id + 1}`} />
+                  <ListItemText primary={`Item ${Number(item.id) + 1}`} />
                 </ListItem>
               </Box>
             )}
@@ -217,9 +228,9 @@ export const AllSizes: Story = {
               <Box key={item.id} style={style}>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar>{item.id + 1}</Avatar>
+                    <Avatar>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary="Medium size" />
+                  <ListItemText primary={itemData(item).name} secondary="Medium size" />
                 </ListItem>
               </Box>
             )}
@@ -239,11 +250,11 @@ export const AllSizes: Story = {
               <Box key={item.id} style={style}>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar src={item.data.avatar} sx={{ width: 56, height: 56 }} />
+                    <Avatar src={itemData(item).avatar} sx={{ width: 56, height: 56 }} />
                   </ListItemAvatar>
                   <ListItemText
-                    primary={<Typography variant="h6">{item.data.name}</Typography>}
-                    secondary={<Typography variant="body2">{item.data.description}</Typography>}
+                    primary={<Typography variant="h6">{itemData(item).name}</Typography>}
+                    secondary={<Typography variant="body2">{itemData(item).description}</Typography>}
                   />
                 </ListItem>
               </Box>
@@ -276,9 +287,9 @@ export const AllStates: Story = {
               <Box key={item.id} style={style}>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar>{item.id + 1}</Avatar>
+                    <Avatar>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
-                  <ListItemText primary={item.data.name} />
+                  <ListItemText primary={itemData(item).name} />
                 </ListItem>
               </Box>
             )}
@@ -415,9 +426,9 @@ export const InteractiveStates: Story = {
                   }}
                 >
                   <ListItemAvatar>
-                    <Avatar>{item.id + 1}</Avatar>
+                    <Avatar>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary="Hover to see effect" />
+                  <ListItemText primary={itemData(item).name} secondary="Hover to see effect" />
                 </ListItem>
               </Box>
             )}
@@ -436,18 +447,17 @@ export const InteractiveStates: Story = {
             renderItem={({ item, style }) => (
               <Box key={item.id} style={style}>
                 <ListItem
-                  disabled
                   sx={{
                     opacity: 0.6,
                     cursor: 'not-allowed',
                   }}
                 >
                   <ListItemAvatar>
-                    <Avatar sx={{ filter: 'grayscale(100%)', opacity: 0.7 }}>{item.id + 1}</Avatar>
+                    <Avatar sx={{ filter: 'grayscale(100%)', opacity: 0.7 }}>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={
-                      <Typography sx={{ color: 'text.disabled' }}>{item.data.name}</Typography>
+                      <Typography sx={{ color: 'text.disabled' }}>{itemData(item).name}</Typography>
                     }
                     secondary="Disabled item"
                   />
@@ -509,9 +519,9 @@ export const Responsive: Story = {
               <Box key={item.id} style={style}>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar src={item.data.avatar} />
+                    <Avatar src={itemData(item).avatar} />
                   </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary="Responsive list item" />
+                  <ListItemText primary={itemData(item).name} secondary="Responsive list item" />
                 </ListItem>
               </Box>
             )}
@@ -532,9 +542,9 @@ export const Responsive: Story = {
                 <Box key={item.id} style={style}>
                   <ListItem dense>
                     <ListItemAvatar>
-                      <Avatar size="sm">{item.id + 1}</Avatar>
+                      <Avatar>{Number(item.id) + 1}</Avatar>
                     </ListItemAvatar>
-                    <ListItemText primary={`Item ${item.id + 1}`} />
+                    <ListItemText primary={`Item ${Number(item.id) + 1}`} />
                   </ListItem>
                 </Box>
               )}
@@ -554,9 +564,9 @@ export const Responsive: Story = {
                 <Box key={item.id} style={style}>
                   <ListItem>
                     <ListItemAvatar>
-                      <Avatar>{item.id + 1}</Avatar>
+                      <Avatar>{Number(item.id) + 1}</Avatar>
                     </ListItemAvatar>
-                    <ListItemText primary={item.data.name} secondary={item.data.description} />
+                    <ListItemText primary={itemData(item).name} secondary={itemData(item).description} />
                   </ListItem>
                 </Box>
               )}
@@ -583,9 +593,9 @@ export const FixedHeightList: Story = {
             <Box key={item.id} style={style}>
               <ListItem>
                 <ListItemAvatar>
-                  <Avatar src={item.data.avatar} />
+                  <Avatar src={itemData(item).avatar} />
                 </ListItemAvatar>
-                <ListItemText primary={item.data.name} secondary={item.data.description} />
+                <ListItemText primary={itemData(item).name} secondary={itemData(item).description} />
               </ListItem>
             </Box>
           )}
@@ -610,13 +620,13 @@ export const VariableHeightList: Story = {
             <Box key={item.id} style={style}>
               <ListItem sx={{ alignItems: 'flex-start' }}>
                 <ListItemAvatar>
-                  <Avatar src={item.data.avatar} />
+                  <Avatar src={itemData(item).avatar} />
                 </ListItemAvatar>
                 <ListItemText
-                  primary={item.data.name}
+                  primary={itemData(item).name}
                   secondary={
                     <Typography variant="body2" color="text.secondary">
-                      {item.data.description}
+                      {itemData(item).description}
                     </Typography>
                   }
                 />
@@ -658,12 +668,12 @@ export const GridLayout: Story = {
                 textAlign: 'center',
               }}
             >
-              <Avatar src={item.data.avatar} sx={{ width: 56, height: 56, mb: 1 }} />
+              <Avatar src={itemData(item).avatar} sx={{ width: 56, height: 56, mb: 1 }} />
               <Typography variant="body2" fontWeight="bold">
-                {item.data.name}
+                {itemData(item).name}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Grid Item #{item.id + 1}
+                Grid Item #{Number(item.id) + 1}
               </Typography>
             </Box>
           )}
@@ -695,11 +705,11 @@ export const LargeDataset: Story = {
               <Box key={item.id} style={style}>
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar>{item.id + 1}</Avatar>
+                    <Avatar>{Number(item.id) + 1}</Avatar>
                   </ListItemAvatar>
                   <ListItemText
-                    primary={`Item ${item.id + 1}`}
-                    secondary={`Performance test item #${item.id + 1}`}
+                    primary={`Item ${Number(item.id) + 1}`}
+                    secondary={`Performance test item #${Number(item.id) + 1}`}
                   />
                 </ListItem>
               </Box>
@@ -735,7 +745,7 @@ export const LargeDataset: Story = {
                   fontWeight: 'bold',
                 }}
               >
-                #{item.id + 1}
+                #{Number(item.id) + 1}
               </Box>
             )}
           />
@@ -786,14 +796,14 @@ export const CustomStyles: Story = {
                 }}
               >
                 <Avatar
-                  src={item.data.avatar}
+                  src={itemData(item).avatar}
                   sx={{
                     border: '2px solid rgba(255,255,255,0.3)',
                   }}
                 />
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 'bold' }}>
-                    {item.data.name}
+                    {itemData(item).name}
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                     Glass morphism style • Item {index + 1}
@@ -935,9 +945,9 @@ export const HoverState: Story = {
                 }}
               >
                 <ListItemAvatar>
-                  <Avatar src={item.data.avatar} />
+                  <Avatar src={itemData(item).avatar} />
                 </ListItemAvatar>
-                <ListItemText primary={item.data.name} secondary="Hover to see effect" />
+                <ListItemText primary={itemData(item).name} secondary="Hover to see effect" />
               </ListItem>
             </Box>
           )}
@@ -961,7 +971,6 @@ export const DisabledState: Story = {
           renderItem={({ item, style }) => (
             <Box key={item.id} style={style}>
               <ListItem
-                disabled
                 sx={{
                   opacity: 0.6,
                   cursor: 'not-allowed',
@@ -972,7 +981,7 @@ export const DisabledState: Story = {
               >
                 <ListItemAvatar>
                   <Avatar
-                    src={item.data.avatar}
+                    src={itemData(item).avatar}
                     sx={{
                       filter: 'grayscale(100%)',
                       opacity: 0.7,
@@ -981,7 +990,7 @@ export const DisabledState: Story = {
                 </ListItemAvatar>
                 <ListItemText
                   primary={
-                    <Typography sx={{ color: 'text.disabled' }}>{item.data.name}</Typography>
+                    <Typography sx={{ color: 'text.disabled' }}>{itemData(item).name}</Typography>
                   }
                   secondary={<Typography sx={{ color: 'text.disabled' }}>Disabled item</Typography>}
                 />

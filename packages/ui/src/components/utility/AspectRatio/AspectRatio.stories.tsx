@@ -408,7 +408,7 @@ export const Responsive: Story = {
           <AspectRatio key={i} variant="4:3">
             <DemoContent
               title={`Item ${i + 1}`}
-              color={['#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#d32f2f', '#0288d1'][i]}
+              color={['#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#d32f2f', '#0288d1'][i] ?? '#1976d2'}
             />
           </AspectRatio>
         ))}

@@ -340,8 +340,15 @@ export const AllSizes: Story = {
 };
 
 // AllStates story - different transition states
+interface TransitionStatesDemo {
+  entering: boolean;
+  entered: boolean;
+  exiting: boolean;
+  exited: boolean;
+}
+
 const AllStatesComponent = () => {
-  const [states, setStates] = useState({
+  const [states, setStates] = useState<TransitionStatesDemo>({
     entering: true,
     entered: true,
     exiting: false,
@@ -354,7 +361,7 @@ const AllStatesComponent = () => {
         <Typography variant="h6" gutterBottom>
           Transition States
         </Typography>
-        {Object.entries(states).map(([state, active]) => (
+        {(Object.entries(states) as [keyof TransitionStatesDemo, boolean][]).map(([state, active]) => (
           <Button
             key={state}
             variant={active ? 'contained' : 'outlined'}

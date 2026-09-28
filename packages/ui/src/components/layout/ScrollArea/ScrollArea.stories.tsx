@@ -9,10 +9,19 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { ScrollArea } from './ScrollArea';
+import { PT_BR_CHROME_COPY } from '../../../pt-BR';
 
-const meta: Meta<typeof ScrollArea> = {
+const meta = {
   title: 'Layout/ScrollArea',
   component: ScrollArea,
+  args: {
+    // Every story shares these so one that never overrides `regionLabel`, or
+    // renders its own JSX through `render` instead of `args` at all, still
+    // satisfies the component's two REQUIRED props at the type level. A
+    // `render`-based story's actual markup ignores this `children` default.
+    regionLabel: PT_BR_CHROME_COPY.scrollRegion,
+    children: null,
+  },
   parameters: {
     layout: 'centered',
     docs: {
@@ -72,7 +81,7 @@ const meta: Meta<typeof ScrollArea> = {
       description: 'Loading state',
     },
   },
-};
+} satisfies Meta<typeof ScrollArea>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -220,6 +229,7 @@ export const WithScrollToTop: Story = {
     width: 400,
     height: 300,
     scrollToTopButton: true,
+    scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     scrollToTopThreshold: 50,
     children: <ScrollableContent lines={100} />,
   },
@@ -292,6 +302,7 @@ export const WithListContent: Story = {
     width: 400,
     height: 400,
     scrollToTopButton: true,
+    scrollToTopLabel: PT_BR_CHROME_COPY.scrollToTop,
     children: <ListContent />,
   },
 };
@@ -454,15 +465,17 @@ export const AllStates: Story = {
         
         <Box>
           <Typography variant="caption" color="text.secondary">Empty</Typography>
-          <ScrollArea regionLabel="Área rolável" 
-            width={300} 
+          <ScrollArea regionLabel="Área rolável"
+            width={300}
             height={200}
             emptyContent={
               <Box sx={{ textAlign: 'center', p: 3 }}>
                 <Typography color="text.secondary">No content</Typography>
               </Box>
             }
-          />
+          >
+            {null}
+          </ScrollArea>
         </Box>
       </Box>
     </Box>
@@ -491,7 +504,14 @@ export const InteractiveStates: Story = {
         
         <Box>
           <Typography variant="caption" color="text.secondary">With Scroll-to-Top</Typography>
-          <ScrollArea regionLabel="Área rolável" width={300} height={200} scrollToTopButton scrollToTopThreshold={50}>
+          <ScrollArea
+            regionLabel="Área rolável"
+            width={300}
+            height={200}
+            scrollToTopButton
+            scrollToTopLabel={PT_BR_CHROME_COPY.scrollToTop}
+            scrollToTopThreshold={50}
+          >
             <ScrollableContent lines={30} />
           </ScrollArea>
         </Box>
@@ -515,9 +535,11 @@ export const Responsive: Story = {
 
         <Box sx={{ flex: 1 }}>
           <Typography variant="caption" color="text.secondary">Responsive height</Typography>
+          {/* `height` takes a number or a CSS string, not a breakpoint map — a
+              `clamp()` string is how this component actually goes responsive. */}
           <ScrollArea regionLabel="Área rolável"
             width="100%"
-            height={{ xs: 200, sm: 300, md: 400 }}
+            height="clamp(200px, 40vw, 400px)"
             sx={{ bgcolor: 'background.paper' }}
           >
             <ScrollableContent lines={30} />

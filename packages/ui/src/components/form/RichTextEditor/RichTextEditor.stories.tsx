@@ -1,8 +1,17 @@
 import Box from '@mui/material/Box/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { RichTextEditor } from './RichTextEditor';
+
+// `RichTextEditor` forwards only `className` — no `sx` — so the glass
+// morphism treatment below goes through `styled(RichTextEditor)`.
+const GlassRichTextEditor = styled(RichTextEditor)({
+  backdropFilter: 'blur(10px)',
+  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+});
 
 const meta: Meta<typeof RichTextEditor> = {
   title: 'Form/RichTextEditor',
@@ -190,15 +199,10 @@ const GlassEffectWrapper = () => {
         p: 2,
       }}
     >
-      <RichTextEditor
+      <GlassRichTextEditor
         value={value}
         onChange={setValue}
         placeholder="Glass morphism editor..."
-        sx={{
-          backdropFilter: 'blur(10px)',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-        }}
       />
     </Box>
   );

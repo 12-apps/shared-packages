@@ -283,7 +283,9 @@ export const ComplexForm: Story = {
         <FormField name="bio" label="Biography" helperText="Tell us about yourself">
           <Textarea
             placeholder="I am a software developer with 5 years of experience..."
-            rows={4}
+            variant="autosize"
+            minRows={4}
+            maxRows={4}
           />
         </FormField>
 
@@ -611,7 +613,7 @@ export const InteractiveStates: Story = {
         </FormField>
 
         <FormField name="textarea" label="Text Area">
-          <Textarea placeholder="Enter long text..." rows={3} />
+          <Textarea placeholder="Enter long text..." variant="autosize" minRows={3} maxRows={3} />
         </FormField>
 
         <FormField name="checkbox">
@@ -673,7 +675,7 @@ export const Responsive: Story = {
         </FormField>
 
         <FormField name="address" label="Address">
-          <Textarea placeholder="Enter your address..." rows={2} />
+          <Textarea placeholder="Enter your address..." variant="autosize" minRows={2} maxRows={2} />
         </FormField>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={3}>
