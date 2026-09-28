@@ -35,6 +35,7 @@
 
 import type { AnyWebManifest } from '@12-apps/wiring';
 
+import { createPreviewWebImpersonation } from '../react/create-preview-web-impersonation';
 import { createWebImpersonation } from '../react/create-web-impersonation';
 
 /** The OPERATOR surface: the banner plus the start dialog it gates. */
@@ -58,8 +59,15 @@ export const impersonationWebManifest = {
  * declares `surface` and no `areas` at all. Two manifests rather than one for
  * the same reason the server half has two — the mounts differ in audience and
  * authority, and a single manifest could not express the difference.
+ *
+ * Its factory is `createPreviewWebImpersonation`, not the operator one with the
+ * dialog left out: the operator factory names the dialog's chunk whatever its
+ * config, so a tenant app built from it carried the picker as a lazy chunk it
+ * could never open — and whatever that chunk shared with the eager path (the
+ * searchable select's MUI `Chip`, on the storefront) was split into a request
+ * of its own on every page.
  */
 export const impersonationPreviewWebManifest = {
   name: '@12-apps/impersonation-preview',
-  surface: { create: createWebImpersonation },
+  surface: { create: createPreviewWebImpersonation },
 } as const satisfies AnyWebManifest;

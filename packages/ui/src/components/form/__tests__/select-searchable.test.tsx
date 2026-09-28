@@ -11,7 +11,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Select } from '../Select';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { MenuSelect, Select } from '../Select';
 
 const few = (count: number) =>
   Array.from({ length: count }, (_, index) => ({ value: `p${index}`, label: `Pessoa ${index}` }));
@@ -129,6 +132,25 @@ describe('Select — searchable past five options', () => {
     unmount();
     render(<Select options={few(9)} searchable={false} label="B" value="" onChange={vi.fn()} data-testid="b" />);
     expect(searchInput(screen.getByTestId('b'))).toBeNull();
+  });
+
+  it('MenuSelect stays a menu whatever the count, with the same change shape', async () => {
+    const onChange = vi.fn();
+    render(<MenuSelect options={few(9)} label="Dia" name="day" value="" onChange={onChange} data-testid="m" />);
+    expect(searchInput(screen.getByTestId('m'))).toBeNull();
+    fireEvent.mouseDown(within(screen.getByTestId('m')).getByRole('combobox'));
+    const listbox = await screen.findByRole('listbox');
+    fireEvent.click(within(listbox).getByTestId('m-option-p4'));
+    expect(onChange.mock.calls[0]![0].target).toMatchObject({ value: 'p4' });
+  });
+
+  it("MenuSelect's module imports no part of the searchable engine", () => {
+    // The whole point of `@12-apps/ui/form/MenuSelect`: a bundle taking it must
+    // not reach MUI Autocomplete through it, directly or via Select.searchable.
+    // The claim is about what the FILE says, so it reads the real file.
+    // eslint-disable-next-line test-flakiness/no-unmocked-fs
+    const source = readFileSync(resolve(__dirname, '../Select/Select.menu.tsx'), 'utf8');
+    expect(source).not.toMatch(/from ['"][^'"]*(Autocomplete|Select\.searchable|\.\/Select['"])/);
   });
 
   it('keeps the menu for `multiple`, which a search box cannot hold', () => {
