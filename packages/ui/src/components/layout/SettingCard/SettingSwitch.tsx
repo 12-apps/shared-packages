@@ -7,7 +7,8 @@ import { SR_ONLY_SX } from '../../form/Label/Label.styles';
 
 import { useAsyncSwitch } from './SettingCard.hooks';
 import { PendingSpinner, SaveError, SettingHeader, partTestId } from './SettingCard.parts';
-import { descriptionStyles } from './SettingCard.styles';
+import { clampStyles, descriptionStyles } from './SettingCard.styles';
+import { useSummaryInfo } from './SettingCard.summary';
 import type { SettingToggleProps } from './SettingCard.types';
 
 /** Everything the switch-driven cards share, minus the surface each draws around it. */
@@ -46,6 +47,7 @@ export const SettingSwitchBlock: React.FC<
   SettingSwitchBlockProps & { ids: SettingSwitchIds; state: ReturnType<typeof useAsyncSwitch> }
 > = ({ title, headingLevel = 'h3', icon, summary, copy, disabled, dataTestId, ids, state }) => {
   const theme = useTheme();
+  const clamp = useSummaryInfo({ summary, label: copy.moreInfo ?? title, dataTestId });
   const { shown, saving, error, flip } = state;
   const describedBy = [summary != null ? ids.summaryId : null, error ? ids.errorId : null]
     .filter(Boolean)
@@ -76,10 +78,17 @@ export const SettingSwitchBlock: React.FC<
         icon={icon}
         labelFor={ids.inputId}
         trailing={control}
+        info={clamp.info}
         dataTestId={dataTestId}
       />
       {summary != null && (
-        <Box component="p" id={ids.summaryId} sx={descriptionStyles(theme)} data-testid={partTestId(dataTestId, 'summary')}>
+        <Box
+          component="p"
+          ref={clamp.ref}
+          id={ids.summaryId}
+          sx={{ ...descriptionStyles(theme), ...clampStyles }}
+          data-testid={partTestId(dataTestId, 'summary')}
+        >
           {summary}
         </Box>
       )}

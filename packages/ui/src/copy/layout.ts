@@ -33,6 +33,12 @@ export interface SettingCardCopy {
   learnMore: string;
   /** Shown when the save rejected and the host's `formatError` gave no sentence of its own. */
   saveFailed: string;
+  /**
+   * The accessible name of the [i] beside the title while the summary is cut to
+   * two lines. Optional so a host's own copy object keeps compiling; without it
+   * the [i] is named after the card's title.
+   */
+  moreInfo?: string;
 }
 
 /**
@@ -44,4 +50,6 @@ export interface SettingSwitchCopy {
   saving: string;
   /** Shown when the save rejected and the host's `formatError` gave no sentence of its own. */
   saveFailed: string;
+  /** The [i]'s accessible name — see `SettingCardCopy.moreInfo`. */
+  moreInfo?: string;
 }

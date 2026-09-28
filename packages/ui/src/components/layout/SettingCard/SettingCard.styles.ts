@@ -78,17 +78,29 @@ export const titleStyles = (theme: Theme): CSSObject => ({
   overflowWrap: 'anywhere',
 });
 
-/** The one line a closed card shows. Long values end in an ellipsis, not a second line. */
+/** The most lines a card's summary shows before the rest goes behind the [i]. */
+export const SUMMARY_MAX_LINES = 2;
+
+/**
+ * Two lines at most, cut with an ellipsis. Visual only: the whole sentence stays
+ * in the DOM, so a switch that is `aria-describedby` it still reads all of it.
+ */
+export const clampStyles: CSSObject = {
+  display: '-webkit-box',
+  WebkitLineClamp: SUMMARY_MAX_LINES,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+};
+
+/** A closed card's value: two lines at most, the rest behind the [i]. */
 export const summaryStyles = (theme: Theme): CSSObject => ({
   ...theme.typography.body2,
   color: theme.palette.text.secondary,
   margin: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+  ...clampStyles,
 });
 
-/** A switch card's explanation, which may wrap: it is read, not scanned. */
+/** A switch card's explanation; `SettingSwitchBlock` clamps it (see `clampStyles`). */
 export const descriptionStyles = (theme: Theme): CSSObject => ({
   ...theme.typography.body2,
   color: theme.palette.text.secondary,

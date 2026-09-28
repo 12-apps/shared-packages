@@ -28,6 +28,8 @@ interface HeaderProps {
   trailing?: React.ReactNode;
   /** Renders the title as a `<label>` for this control instead of a heading. */
   labelFor?: string;
+  /** Beside the title, after the status pill — the [i] while the summary is cut. */
+  info?: React.ReactNode;
   dataTestId?: string;
 }
 
@@ -46,6 +48,7 @@ export const SettingHeader: React.FC<HeaderProps> = ({
   status,
   trailing,
   labelFor,
+  info,
   dataTestId,
 }) => {
   const theme = useTheme();
@@ -75,6 +78,7 @@ export const SettingHeader: React.FC<HeaderProps> = ({
             dataTestId={partTestId(dataTestId, 'status')}
           />
         )}
+        {info}
       </Box>
       {trailing}
     </Box>

@@ -23,9 +23,11 @@ export const PT_BR_SETTING_CARD_COPY: SettingCardCopy = {
   saving: "Salvando…",
   learnMore: "Saiba mais",
   saveFailed: "Não foi possível salvar. Tente novamente.",
+  moreInfo: "Ver o texto inteiro",
 };
 
 export const PT_BR_SETTING_SWITCH_COPY: SettingSwitchCopy = {
   saving: "Salvando…",
   saveFailed: "Não foi possível salvar. Tente novamente.",
+  moreInfo: "Ver o texto inteiro",
 };

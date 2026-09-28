@@ -2,7 +2,7 @@ import MuiTooltip from '@mui/material/Tooltip/index.js';
 import { styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { resolveTooltipProps, usePinnedTooltip } from './InteractiveTooltip.hooks';
+import { resolveTooltipProps, useHoverOpen, usePinnedTooltip } from './InteractiveTooltip.hooks';
 import {
   arrowColor,
   emphasisStyles,
@@ -58,6 +58,8 @@ export const InteractiveTooltip = React.forwardRef<HTMLDivElement, InteractiveTo
       onUnpin,
       className,
       children,
+      onOpen,
+      onClose,
       ...props
     } = resolveTooltipProps(rawProps);
 
@@ -66,6 +68,7 @@ export const InteractiveTooltip = React.forwardRef<HTMLDivElement, InteractiveTo
       onPin,
       onUnpin,
     });
+    const hover = useHoverOpen(isPinned, onOpen, onClose);
 
     // Determine which content to show
     const tooltipContent = isPinned ? pinnedContent : hoverContent;
@@ -94,7 +97,9 @@ export const InteractiveTooltip = React.forwardRef<HTMLDivElement, InteractiveTo
           glow={glow}
           pulse={pulse}
           title={tooltipContent}
-          open={isPinned ? isControlledOpen : undefined}
+          open={isPinned ? isControlledOpen : hover.open}
+          onOpen={hover.onOpen}
+          onClose={hover.onClose}
           enterDelay={isPinned ? 0 : 100}
           leaveDelay={0}
           disableHoverListener={isPinned}

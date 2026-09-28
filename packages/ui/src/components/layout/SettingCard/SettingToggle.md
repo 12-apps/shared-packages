@@ -28,7 +28,7 @@ import { SettingToggle } from '@12-apps/ui/layout/SettingCard';
 | `title` | `string` | **required** | The switch's `<label>` — its accessible name, and a tap target far larger than the track. |
 | `checked` | `boolean` | **required** | The persisted value. |
 | `onChange` | `(checked: boolean) => void \| Promise<unknown>` | **required** | Persist a flip. See below. |
-| `summary` | `ReactNode` | — | Explanation under the title; the switch is `aria-describedby` it. |
+| `summary` | `ReactNode` | — | Explanation under the title; the switch is `aria-describedby` it. Two lines at most — while it is cut, an [i] beside the title shows the rest. The whole text stays in the DOM, so the description a screen reader hears is complete. |
 | `variant` | `'card' \| 'row'` | `'card'` | `row` drops the surface — for a dependent row inside a [`SettingGroup`](./SettingGroup.md). |
 | `disabled` | `boolean` | `false` | Disables the switch. Also disabled inside a `SettingGroup` whose main switch is off. |
 | `formatError` | `(error: unknown) => string \| undefined` | — | The sentence for a rejected save; `undefined` falls back to `copy.saveFailed`. |
