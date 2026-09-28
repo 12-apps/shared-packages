@@ -405,7 +405,7 @@ export const NotificationBadges: Story = {
       <Badge badgeContent={4} color="primary">
         <Avatar icon={<Email />} />
       </Badge>
-      <Badge badgeContent={12} color="danger">
+      <Badge badgeContent={12} color="error">
         <Avatar icon={<Notifications />} />
       </Badge>
       <Badge variant="dot" color="success">

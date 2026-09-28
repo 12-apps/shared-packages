@@ -50,6 +50,36 @@ function MyComponent() {
 - `glow`: Whether to show glow effect on hover/focus
 - `pulse`: Whether to show pulse animation
 - `fullWidth`: Whether select should take full width of container
+- `searchable`: Force the search box on (`true`) or the menu on (`false`); unset, it follows the option count (see below)
+- `noOptionsText`: The host's sentence the search box shows when nothing matches the typed text
+
+## Six options or more: a search box
+
+Up to **five** options the select opens a menu. From **six** on it becomes the
+searchable dropdown — the same engine as `CreatableSelect` (MUI `Autocomplete`):
+the field is a text box that filters the options as you type, and the list
+stops at `SELECT_SEARCH.listMaxHeight` (about six rows) and scrolls, instead of
+growing to the height of the viewport.
+
+The props stay the same: `options`, `value`/`defaultValue`, `label`,
+`placeholder`, `helperText`, `error`, `name`, `required`, disabled options,
+variants and sizes. `onChange` still receives `{ target: { value, name } }` with
+the option's value in its own type. The test ids keep their spelling.
+
+**What does change — and breaks tests written against the menu:**
+
+- `{dataTestId}-select` (and `role="combobox"`) is now the search `<input>`,
+  not the menu's display `<div>`. The selected label is its VALUE, not its
+  text: assert with `toHaveValue('Garçom')` / `input.value`, not `toHaveText`.
+- `onChange`'s event is a plain `{ target }` object (no `preventDefault`), and
+  its second argument is `null` rather than the clicked `MenuItem`.
+- Opening it with a click or `mouseDown` on the combobox still works; typing
+  filters only while the input has real focus.
+
+- `searchable` overrides the count either way.
+- `multiple` and `renderValue` always keep the menu: a search box holds one value.
+- Pass `noOptionsText` — the library ships no copy, so unset means an empty list
+  says nothing.
 
 ## Visual Variants
 
@@ -138,7 +168,7 @@ The Select component includes `data-testid` attributes for reliable testing:
 | Test ID | Element | Description |
 |---------|---------|-------------|
 | `{dataTestId}` | FormControl | Root FormControl wrapper element |
-| `{dataTestId}-select` | Select element | The MUI Select component |
+| `{dataTestId}-select` | Select element | The MUI Select component (the search `<input>` from six options on) |
 | `{dataTestId}-option-{value}` | Menu items | Individual option elements (one per option) |
 
 **Default Test IDs (when no dataTestId prop provided):**

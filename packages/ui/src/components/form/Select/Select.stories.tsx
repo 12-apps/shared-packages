@@ -139,7 +139,9 @@ export const WithManyOptions: Story = {
     ],
     label: 'Country',
     placeholder: 'Select a country',
-    helperText: 'Scroll to see all options',
+    // Six options or more: the field is a search box over a bounded list.
+    helperText: 'Type to filter — more than five options become a search box',
+    noOptionsText: 'No country matches',
   },
 };
 

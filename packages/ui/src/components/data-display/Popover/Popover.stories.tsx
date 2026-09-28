@@ -1,6 +1,6 @@
 import Button from '@mui/material/Button/index.js';
 import List from '@mui/material/List/index.js';
-import ListItem from '@mui/material/ListItem/index.js';
+import ListItemButton from '@mui/material/ListItemButton/index.js';
 import ListItemText from '@mui/material/ListItemText/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
@@ -106,18 +106,18 @@ export const ComplexContent: Story = {
           Menu Options
         </Typography>
         <List dense>
-          <ListItem button>
+          <ListItemButton>
             <ListItemText primary="Profile Settings" />
-          </ListItem>
-          <ListItem button>
+          </ListItemButton>
+          <ListItemButton>
             <ListItemText primary="Account Security" />
-          </ListItem>
-          <ListItem button>
+          </ListItemButton>
+          <ListItemButton>
             <ListItemText primary="Notifications" />
-          </ListItem>
-          <ListItem button>
+          </ListItemButton>
+          <ListItemButton>
             <ListItemText primary="Sign Out" />
-          </ListItem>
+          </ListItemButton>
         </List>
       </div>
     </PopoverDemo>

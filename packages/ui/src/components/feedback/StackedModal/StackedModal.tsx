@@ -62,7 +62,7 @@ type ResolvedProps = StackedModalProps & { modalId: string };
 const StackedModalPanel: FC<ResolvedProps> = (props) => {
   const {
     open, onClose, glass, navigationTitle, backLabel, hideClose, children, actions, modalId,
-    closeOnClickOutside, closeOnEsc, loading, loadingText, fullScreen, maxWidth, disableBackdrop,
+    closeOnClickOutside, closeOnEsc, loading, loadingText, fullScreen, maxWidth, size, disableBackdrop,
     disableFocusTrap, keepMounted, rtl, dataTestId,
     'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy, ...otherProps
   } = props;
@@ -95,6 +95,7 @@ const StackedModalPanel: FC<ResolvedProps> = (props) => {
       glass={glass}
       rtl={rtl}
       customMaxWidth={maxWidth}
+      panelSize={size}
       TransitionComponent={SlideTransition}
       maxWidth={maxWidth}
       disableEscapeKeyDown={!closeOnEsc}
