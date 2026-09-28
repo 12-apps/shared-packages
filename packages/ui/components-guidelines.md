@@ -243,8 +243,11 @@ rather than deep-merging it.
 
 A `styleOverrides` callback already gets `{ theme }` and can read
 `theme.density` directly; `useDensity()` is for a component that needs the
-level in its own render logic instead (`Table`/`DataGrid`/`DataViews` each read
-it once to source their own `density` prop's default — FUT-2769).
+level in its own render logic instead (`DataGrid` reads it once to source its
+own `density` prop's default, FUT-2769 — `Table` and `DataViews` do NOT: a
+theme density scales their geometry exactly once, through `rem()`, so their
+own discrete density stays `'normal'`/`'cozy'` unless the caller passes one or
+a viewer has one stored, FUT-2886).
 
 **Not yet scaled**: MUI's own fixed-px primitives (`IconButton`, `Chip`,
 `Checkbox`, `Radio`, `Switch`, `ToggleButton`, `Tabs`, `TableCell`,

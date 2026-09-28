@@ -118,7 +118,10 @@ export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   // Advanced Features
   
   /**
-   * The density of the table rows
+   * The density of the table rows. Defaults to `'normal'` — NOT the host
+   * theme's density: a theme density still scales row height, but only once,
+   * through `rem()` (`resolveTableDensity`, FUT-2886). Pass this explicitly
+   * for a deliberate, per-table density on top of that.
    */
   density?: TableDensity;
   

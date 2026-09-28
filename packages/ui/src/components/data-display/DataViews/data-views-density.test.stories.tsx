@@ -9,14 +9,16 @@ import { DataViewsGrid } from "./DataViewsGrid";
 import type { DataViewColumn } from "./data-views-types";
 
 /**
- * `DATAVIEWS` DEFAULTS ITS DENSITY FROM THE THEME (FUT-2769).
+ * `DATAVIEWS`' DENSITY DOES NOT DEFAULT FROM THE THEME (FUT-2886).
  *
- * `DataViewsDensity`'s three names ('compact' | 'cozy' | 'comfortable') are
- * not the theme's ('compact' | 'normal' | 'comfortable'), so the default goes
- * through an alias table (`mapThemeToDataViewsDensity`,
- * `data-views-layout-context.tsx`). The STORED per-viewer preference
- * (`localStorage['dataviews:density']`) still wins over it — unchanged from
- * today, only the app-level constant is new.
+ * FUT-2769 aliased the theme's density level to `DataViewsDensity`'s three
+ * names ('compact' | 'cozy' | 'comfortable', not the theme's own 'compact' |
+ * 'normal' | 'comfortable') through `mapThemeToDataViewsDensity`
+ * (`data-views-layout-context.tsx`). That default is reverted: with nothing
+ * stored, `DataViewsLayoutProvider` is always 'cozy' — today's literal,
+ * unchanged — whatever the theme's density says. The STORED per-viewer
+ * preference (`localStorage['dataviews:density']`) still wins, unchanged from
+ * today.
  */
 
 interface Row extends Record<string, unknown> {
@@ -69,22 +71,22 @@ const meta: Meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const ThemeDensityDefault: Story = {
-  name: "Test: Theme-driven density default",
+export const ThemeDoesNotDefaultDensity: Story = {
+  name: "Test: A theme density no longer defaults DataViews' own density",
   render: () => <Screen prefix="theme-density" theme={createTheme({ density: resolveDensityFactor("compact") })} />,
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
-    await step("Renders at the theme's compact default — nothing stored for this viewer", async () => {
+    await step("Stays 'cozy' under a compact theme — nothing stored for this viewer", async () => {
       await openDisplayTab(canvas, "theme-density");
       await waitFor(() =>
-        expect(body().getByTestId("theme-density-density-compact")).toHaveAttribute("aria-pressed", "true"),
+        expect(body().getByTestId("theme-density-density-cozy")).toHaveAttribute("aria-pressed", "true"),
       );
     });
   },
 };
 
 export const StoredPreferenceWinsOverTheme: Story = {
-  name: "Test: Stored preference still wins over the theme",
+  name: "Test: Stored preference still wins over the theme (regression guard)",
   // `DataViewsLayoutProvider`'s `density` state is seeded by a `useState` LAZY
   // INITIALIZER, which reads `localStorage` once, at MOUNT. Setting it inside
   // `play` runs too late — the story has already mounted by then — so a

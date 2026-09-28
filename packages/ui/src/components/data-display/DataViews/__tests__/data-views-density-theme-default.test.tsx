@@ -7,21 +7,21 @@ import { DataViewsGrid } from "../DataViewsGrid";
 import type { DataViewColumn } from "../data-views-types";
 
 /**
- * `DataViews`' DEFAULT DENSITY COMES FROM THE THEME (FUT-2769).
+ * `DataViews`' DENSITY DOES NOT DEFAULT FROM THE THEME (FUT-2886).
  *
- * `DataViewsDensity` ('compact' | 'cozy' | 'comfortable') is not the theme's
- * three names, so the default goes through an alias table
- * (`mapThemeToDataViewsDensity`, `data-views-layout-context.tsx`):
+ * FUT-2769 aliased the theme's density level to `DataViewsDensity` through
+ * `mapThemeToDataViewsDensity` ('compact' ⇒ 'compact', 'comfortable' ⇒
+ * 'comfortable', anything else ⇒ 'cozy'). Combined with the density's own
+ * `rem()`-scaled row height (`DENSITY_ROW_PADDING`), that scaled a DataViews
+ * table's rows the same way `Table`'s did: twice under a themed density —
+ * once by picking a DIFFERENT discrete density, and again through the
+ * theme's own type-scale factor.
  *
- * | theme.density.level (or unset ⇒ 'normal') | DataViews default |
- * | -- | -- |
- * | compact     | compact     |
- * | normal      | cozy (today's literal — unchanged) |
- * | comfortable | comfortable |
- *
- * The STORED per-viewer preference (`dataviews:density` in `localStorage`)
- * still wins over the theme default, unchanged from today — only the
- * app-level constant is new.
+ * The fix: `DataViewsLayoutProvider`'s own discrete density is always
+ * `'cozy'` (today's literal, unchanged) unless something is STORED for this
+ * viewer — `mapThemeToDataViewsDensity` and the `useDensity()` read it
+ * sourced its default from are both gone. A theme density still scales row
+ * height, but only ONCE, through `rem()`.
  */
 
 interface Row extends Record<string, unknown> {
@@ -61,8 +61,8 @@ async function openDisplayTab(prefix: string): Promise<void> {
 
 beforeEach(() => window.localStorage.clear());
 
-describe("DataViews' density defaults from the theme", () => {
-  it("stays 'cozy' (today's literal) with no theme density at all", async () => {
+describe("DataViews' density no longer defaults from the theme (FUT-2886)", () => {
+  it("stays 'cozy' with no theme density at all", async () => {
     renderGrid("produtos", themeAt(undefined));
     await openDisplayTab("produtos");
     await waitFor(() =>
@@ -78,39 +78,36 @@ describe("DataViews' density defaults from the theme", () => {
     );
   });
 
-  it("maps theme density 'compact' to DataViews' own 'compact'", async () => {
+  it("stays 'cozy' under a 'compact' theme — no longer aliased to DataViews' own 'compact'", async () => {
     renderGrid("produtos", themeAt("compact"));
     await openDisplayTab("produtos");
     await waitFor(() =>
-      expect(screen.getByTestId("produtos-density-compact")).toHaveAttribute("aria-pressed", "true"),
+      expect(screen.getByTestId("produtos-density-cozy")).toHaveAttribute("aria-pressed", "true"),
     );
   });
 
-  it("maps theme density 'comfortable' to DataViews' own 'comfortable'", async () => {
+  it("stays 'cozy' under a 'comfortable' theme — no longer aliased to DataViews' own 'comfortable'", async () => {
     renderGrid("produtos", themeAt("comfortable"));
     await openDisplayTab("produtos");
     await waitFor(() =>
-      expect(screen.getByTestId("produtos-density-comfortable")).toHaveAttribute("aria-pressed", "true"),
+      expect(screen.getByTestId("produtos-density-cozy")).toHaveAttribute("aria-pressed", "true"),
     );
   });
 
-  it("lets a stored per-viewer preference win over the theme default", async () => {
+  it("stays 'cozy' for a raw numeric theme density — it names no level", async () => {
+    renderGrid("produtos", createTheme({ density: resolveDensityFactor(1.5) }));
+    await openDisplayTab("produtos");
+    await waitFor(() =>
+      expect(screen.getByTestId("produtos-density-cozy")).toHaveAttribute("aria-pressed", "true"),
+    );
+  });
+
+  it("lets a stored per-viewer preference win over any theme (regression guard)", async () => {
     window.localStorage.setItem(STORAGE_KEY, "comfortable");
     renderGrid("produtos", themeAt("compact"));
     await openDisplayTab("produtos");
     await waitFor(() =>
       expect(screen.getByTestId("produtos-density-comfortable")).toHaveAttribute("aria-pressed", "true"),
-    );
-  });
-
-  it("stays 'cozy' for a raw numeric theme density — it names no level", async () => {
-    // resolveDensityFactor(1.5) => { factor: 1.5 }, no `.level` at all (a
-    // repository setting a raw numeric density, not a named one); the alias
-    // table is keyed off `.level`, so this is the 'normal' row: 'cozy'.
-    renderGrid("produtos", createTheme({ density: resolveDensityFactor(1.5) }));
-    await openDisplayTab("produtos");
-    await waitFor(() =>
-      expect(screen.getByTestId("produtos-density-cozy")).toHaveAttribute("aria-pressed", "true"),
     );
   });
 });
