@@ -35,6 +35,7 @@ interface OwnerStateArg {
   size?: string;
   type?: string;
   orientation?: string;
+  padding?: string;
 }
 
 type StyleFn = (props: { theme: Theme; ownerState?: OwnerStateArg }) => Record<string, unknown>;
@@ -334,6 +335,24 @@ describe('tableCellDensityOverrides', () => {
     const theme = createTheme();
     const overrides = tableCellDensityOverrides();
     expect(slot(overrides, 'MuiTableCell', 'root', theme)).toEqual({ padding: theme.typography.pxToRem(16) });
+    // Same at the explicit default — `undefined` and `'normal'` must agree.
+    expect(slot(overrides, 'MuiTableCell', 'root', theme, { padding: 'normal' })).toEqual({
+      padding: theme.typography.pxToRem(16),
+    });
+  });
+
+  /**
+   * FUT-2861 adversarial review — a REAL render found `root`'s unconditional
+   * padding clobbering `TableCell.js`'s own `checkbox`/`none` variants at the
+   * default (medium) size, the SAME Lesson-1 shape the ellipsis fix above
+   * exists for, missed here. Both variants keep MUI's own UNSCALED literal —
+   * this file writes NOTHING for them, so nothing composes over it.
+   */
+  it("writes NOTHING for root at padding='checkbox'/'none' — MUI's own unscaled variant must win", () => {
+    const theme = createTheme();
+    const overrides = tableCellDensityOverrides();
+    expect(slot(overrides, 'MuiTableCell', 'root', theme, { padding: 'checkbox' })).toEqual({});
+    expect(slot(overrides, 'MuiTableCell', 'root', theme, { padding: 'none' })).toEqual({});
   });
 
   it('writes sizeSmall padding, and a nested paddingCheckbox rule inside it, as rem(theme, px)', () => {
@@ -347,6 +366,22 @@ describe('tableCellDensityOverrides', () => {
         padding: `0 ${theme.typography.pxToRem(12)} 0 ${theme.typography.pxToRem(16)}`,
       },
     });
+  });
+
+  /**
+   * FUT-2861 audit follow-up: `sizeSmall`'s own unconditional `padding` had
+   * the SAME clobber for `padding="none"` at `size="small"` — MUI's own
+   * `variants` array resolves that combo to `padding: 0` (the `none` entry
+   * comes AFTER `size: 'small'`'s in array order), which an unconditional
+   * `sizeSmall` rule overrode. The nested checkbox rule stays (harmless — it
+   * only matches an element that ALSO carries the checkbox class), but the
+   * top-level `padding` key must be absent so MUI's own `0` is not clobbered.
+   */
+  it("skips the top-level padding at sizeSmall + padding='none' too", () => {
+    const theme = createTheme();
+    const overrides = tableCellDensityOverrides();
+    const result = slot(overrides, 'MuiTableCell', 'sizeSmall', theme, { padding: 'none' });
+    expect(result.padding).toBeUndefined();
   });
 
   it('is a true no-op at the default theme: the exact literals TableCell.js hard-codes', () => {

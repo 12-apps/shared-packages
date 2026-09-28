@@ -134,6 +134,18 @@ function DensityGeometryShowcase({ density }: { density: DensityLevel }) {
               <TableCell data-testid="cell-small-checkbox" size="small" padding="checkbox">
                 <span />
               </TableCell>
+              {/* FUT-2861 adversarial review — `padding="checkbox"`/`"none"` at
+                  the DEFAULT (medium) size, and `"none"` at `size="small"`:
+                  the combos the unconditional root/sizeSmall rule clobbered. */}
+              <TableCell data-testid="cell-checkbox" padding="checkbox">
+                <span />
+              </TableCell>
+              <TableCell data-testid="cell-none" padding="none">
+                None
+              </TableCell>
+              <TableCell data-testid="cell-small-none" size="small" padding="none">
+                Small none
+              </TableCell>
             </tr>
           </tbody>
         </table>
@@ -337,6 +349,22 @@ export const NormalIsGeometryNeutral: Story = {
     expectPxClose(cellSmallCheckbox.paddingBottom, 0);
     expectPxClose(cellSmallCheckbox.paddingLeft, 16);
 
+    // FUT-2861: `padding="checkbox"`/`"none"` at the DEFAULT size, and
+    // `"none"` at `size="small"`, keep MUI's OWN unscaled literal at every
+    // density — this file writes nothing for them, on purpose (module doc).
+    const cellCheckbox = computed(canvas.getByTestId('cell-checkbox'));
+    expectPxClose(cellCheckbox.width, 48);
+    expectPxClose(cellCheckbox.paddingTop, 0);
+    expectPxClose(cellCheckbox.paddingRight, 0);
+    expectPxClose(cellCheckbox.paddingBottom, 0);
+    expectPxClose(cellCheckbox.paddingLeft, 4);
+    const cellNone = computed(canvas.getByTestId('cell-none'));
+    expectPxClose(cellNone.paddingTop, 0);
+    expectPxClose(cellNone.paddingLeft, 0);
+    const cellSmallNone = computed(canvas.getByTestId('cell-small-none'));
+    expectPxClose(cellSmallNone.paddingTop, 0);
+    expectPxClose(cellSmallNone.paddingLeft, 0);
+
     // PaginationItem: 32px/26px/40px minWidth+height (medium/small/large).
     const pageMd = computed(canvas.getByTestId('page-md'));
     expectPxClose(pageMd.minWidth, 32);
@@ -474,6 +502,21 @@ export const CompactScalesByPoint9: Story = {
     expectPxClose(cellSmallCheckbox.paddingRight, 10.8); // 12 * 0.9
     expectPxClose(cellSmallCheckbox.paddingBottom, 0);
     expectPxClose(cellSmallCheckbox.paddingLeft, 14.4); // 16 * 0.9
+
+    // FUT-2861: STILL 48px/0/0/0/4px and 0 at `compact` — MUI's own literal,
+    // untouched by density on purpose, unlike everything else in this story.
+    const cellCheckbox = computed(canvas.getByTestId('cell-checkbox'));
+    expectPxClose(cellCheckbox.width, 48);
+    expectPxClose(cellCheckbox.paddingTop, 0);
+    expectPxClose(cellCheckbox.paddingRight, 0);
+    expectPxClose(cellCheckbox.paddingBottom, 0);
+    expectPxClose(cellCheckbox.paddingLeft, 4);
+    const cellNone = computed(canvas.getByTestId('cell-none'));
+    expectPxClose(cellNone.paddingTop, 0);
+    expectPxClose(cellNone.paddingLeft, 0);
+    const cellSmallNone = computed(canvas.getByTestId('cell-small-none'));
+    expectPxClose(cellSmallNone.paddingTop, 0);
+    expectPxClose(cellSmallNone.paddingLeft, 0);
 
     // PaginationItem
     const pageMd = computed(canvas.getByTestId('page-md'));

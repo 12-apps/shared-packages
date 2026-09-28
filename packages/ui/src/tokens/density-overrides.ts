@@ -193,33 +193,32 @@ export function chipDensityOverrides(): Components<Theme> {
  *   `root`/`sizeSmall`/`sizeLarge` shape as `iconButtonDensityOverrides`.
  * - `Tab`: `minHeight: 48`, `padding: '12px 16px'` on the root (via `rems()`).
  *   The icon+label combo (`minHeight: 72`, `paddingTop`/`Bottom: 9`) is a
- *   SEPARATE MUI variant gated on `ownerState.icon && ownerState.label`,
- *   exposed as the `labelIcon` key.
+ *   SEPARATE MUI variant, exposed as the `labelIcon` key.
  * - `TableCell`: `padding: 16` on the root, `'6px 16px'` at small, nested
- *   inside it `'0 12px 0 16px'` on the small+checkbox combo
- *   (`& .${tableCellClasses.paddingCheckbox}`). `@12-apps/ui`'s own `Table`
- *   (FUT-2769) draws cell padding two classes deep under its styled root —
- *   higher specificity, so it always wins; this reaches a BARE `<TableCell>`.
+ *   inside it `'0 12px 0 16px'` on the small+checkbox combo — all gated on
+ *   `ownerState.padding === 'normal'` (MUI's default): `checkbox`/`none` are
+ *   separate variants with their OWN unscaled padding (`'0 0 0 4px'`/`0`) an
+ *   unconditional rule clobbered at every size but small (FUT-2861 review —
+ *   the SAME Lesson-1 clobber the ellipsis fix above avoids, missed here).
+ *   `@12-apps/ui`'s own `Table` (FUT-2769) wins regardless (two classes deep
+ *   under its styled root); this reaches a BARE `<TableCell>`.
  * - `PaginationItem`: `minWidth/height: 32/26/40` at medium(root)/small/large.
  *   The ellipsis shares the SAME slot and `minWidth` but has NO `height` of
  *   its own (`'auto'`), gated on `ownerState.type` being neither
  *   `'start-ellipsis'` nor `'end-ellipsis'` — skipping it would force a
  *   height onto the ellipsis (Lesson 1).
  * - `Slider`: rail `height: 4/2` at `orientation="horizontal"`/`size="small"`
- *   — gated on `ownerState.orientation` since the SAME key answers for
- *   EITHER axis (MUI sets `height` horizontal / `width` vertical, leaving
- *   the other `'100%'`). Thumb `20×20`/`12×12` is square at both sizes, no
- *   gate needed. `@12-apps/ui`'s own `Slider` already sets rail/thumb size
- *   unconditionally through `rem()` and never forwards `size` — a no-op
- *   THERE, but this still reaches a BARE `<Slider>`. The thumb's
- *   hover/active/`Mui-focusVisible` ring and the value-label offset were also
- *   checked and left OUT on purpose — measured in that story file's own doc.
+ *   — gated on `ownerState.orientation` since the SAME key answers for either
+ *   axis (MUI sets `height` horizontal / `width` vertical, leaving the other
+ *   `'100%'`). Thumb `20×20`/`12×12` needs no gate. `@12-apps/ui`'s own
+ *   `Slider` already sets rail/thumb size through `rem()` and never forwards
+ *   `size` — a no-op THERE, reaches a BARE `<Slider>`. The thumb's ring and
+ *   the value-label offset were checked and left OUT — that story's own doc.
  *
  * `Avatar` is NOT in this file: `@12-apps/ui`'s own `Avatar` wraps `MuiAvatar`
  * in a `StyledAvatar` that ALREADY sets `width`/`height` through
- * `rem(theme, boxPx(size))` (`40` at `md`), higher specificity than any
- * `MuiAvatar.styleOverrides.root` — dead code for every call site this
- * initiative reaches (the Done-when's own escape hatch), so it ships none.
+ * `rem(theme, boxPx(size))` (`40` at `md`) — higher specificity than any
+ * `MuiAvatar.styleOverrides.root`, dead code here, so it ships none.
  *
  * Geometry-neutral at `normal`; each slot a MODULE-LEVEL function, as above.
  */
@@ -263,24 +262,25 @@ export function tabDensityOverrides(): Components<Theme> {
   };
 }
 
-const tableCellRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 16) });
-const tableCellSmallPadding = ({ theme }: { theme: Theme }): CSSObject => ({
-  padding: rems(theme, 6, 16),
-  // Nested, not a separate override key — MUI's own small-size variant nests
-  // the checkbox-padding combo the same way (`TableCell.js`'s own `variants`
-  // entry for `size: 'small'`). `tableCellClasses.paddingCheckbox`, not a
-  // hand-typed `.MuiTableCell-paddingCheckbox` string, for the same reason
-  // `chipClasses.label` is used above.
-  [`&.${tableCellClasses.paddingCheckbox}`]: {
-    padding: rems(theme, 0, 12, 0, 16),
-  },
-});
+interface TableCellOwnerStateForOverrides {
+  padding?: 'normal' | 'checkbox' | 'none';
+}
+type TableCellStyleFn = (props: { theme: Theme; ownerState?: TableCellOwnerStateForOverrides }) => CSSObject;
+const isDefaultTableCellPadding = (padding: TableCellOwnerStateForOverrides['padding']): boolean =>
+  padding === undefined || padding === 'normal';
 
-/**
- * `MuiTableCell`'s own default/small padding, and small's own nested
- * checkbox-padding combo. Reaches a BARE `<TableCell>` only — see the module
- * doc comment for why `@12-apps/ui`'s own `Table` (FUT-2769) is unaffected.
- */
+const tableCellRootPadding: TableCellStyleFn = ({ theme, ownerState }) =>
+  isDefaultTableCellPadding(ownerState?.padding) ? { padding: rem(theme, 16) } : {};
+
+const tableCellSmallPadding: TableCellStyleFn = ({ theme, ownerState }) => {
+  const style: CSSObject = {
+    [`&.${tableCellClasses.paddingCheckbox}`]: { padding: rems(theme, 0, 12, 0, 16) },
+  };
+  if (isDefaultTableCellPadding(ownerState?.padding)) style.padding = rems(theme, 6, 16);
+  return style;
+};
+
+/** Reaches a BARE `<TableCell>` only — module doc comment above. */
 export function tableCellDensityOverrides(): Components<Theme> {
   return {
     MuiTableCell: {
