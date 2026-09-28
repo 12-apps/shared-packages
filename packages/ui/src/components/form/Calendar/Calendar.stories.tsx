@@ -341,9 +341,7 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ width: '100%', maxWidth: 400 }}>
       <Calendar ariaLabel="Calendário" selectionMode="single" />

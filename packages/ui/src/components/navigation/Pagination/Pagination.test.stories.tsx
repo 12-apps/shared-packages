@@ -219,11 +219,7 @@ export const ResponsiveDesign: Story = {
     variant: 'default',
     onChange: fn(),
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 

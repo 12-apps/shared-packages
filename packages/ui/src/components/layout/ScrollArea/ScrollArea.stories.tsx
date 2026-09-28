@@ -501,9 +501,6 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'responsive' },
-  },
   render: () => (
     <Box sx={{ width: '100%', p: 2 }}>
       <Typography variant="h6" gutterBottom>Responsive ScrollArea</Typography>

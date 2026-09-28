@@ -341,11 +341,6 @@ export const Responsive: Story = {
       </Box>
     </Box>
   ),
-  parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
-  },
 };
 
 export const MegaMenu: Story = {

@@ -591,9 +591,7 @@ export const ResponsiveDesign: Story = {
       <ResponsiveDesignTest />
     </TestWrapper>
   ),
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement.ownerDocument.body);
     const localCanvas = within(canvasElement);

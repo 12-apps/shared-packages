@@ -1037,8 +1037,5 @@ export const Responsive: Story = {
         story: 'Responsive resizable container that adapts to different viewport sizes.',
       },
     },
-    viewport: {
-      defaultViewport: 'responsive',
-    },
   },
 };

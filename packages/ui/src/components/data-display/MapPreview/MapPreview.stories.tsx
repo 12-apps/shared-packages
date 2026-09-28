@@ -314,9 +314,10 @@ export const Mobile: Story = {
   },
   parameters: {
     viewport: {
-      defaultViewport: 'iphone6',
+      options: { iphone6: { name: 'iPhone 6', styles: { width: '375px', height: '667px' }, type: 'mobile' } },
     },
   },
+  globals: { viewport: { value: 'iphone6', isRotated: false } },
 };
 
 export const Tablet: Story = {
@@ -329,9 +330,10 @@ export const Tablet: Story = {
   },
   parameters: {
     viewport: {
-      defaultViewport: 'ipad',
+      options: { ipad: { name: 'iPad', styles: { width: '768px', height: '1024px' }, type: 'tablet' } },
     },
   },
+  globals: { viewport: { value: 'ipad', isRotated: false } },
 };
 
 export const LoadingState: Story = {
