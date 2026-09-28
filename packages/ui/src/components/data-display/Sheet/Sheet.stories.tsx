@@ -479,7 +479,7 @@ export const WithList: Story = {
               <Chip
                 label={item.status}
                 color={item.status === 'active' ? 'success' : 'default'}
-                size="sm"
+                size="small"
               />
             </ListItem>
           ))}

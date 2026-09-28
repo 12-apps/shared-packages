@@ -440,6 +440,80 @@ export const RelativeHeightFallbackContainerSquare: Story = {
  * (`.storybook/test-runner.ts`), so this exercises the actual code path a
  * `retryOnError` caller relies on, rather than a synthetic one.
  */
+/**
+ * FUT-2869 (adversarial review of FUT-2805 #693): `isRelativeLength` only
+ * recognised a bare trailing `%` or a numeric fraction — a `%` nested inside
+ * a compound expression was invisible to it, so `width="calc(100% - 8px)"`
+ * alone was classified DEFINITE and borrowed onto height literally, which
+ * against an auto-height containing block computes to 0 (CSS 10.5) — the
+ * exact collapse FUT-2805 closed, unfixed for this input shape. The unit
+ * tests (`lazy-image-relative-axis.test.tsx`) prove the emitted CSS; this
+ * story proves the LAYOUT it produces in a real browser, inside the exact
+ * auto-height parent the bug report names.
+ */
+export const RelativeWidthCalcSkeletonSquareInAutoHeightParent: Story = {
+  name: '🔬 FUT-2869: skeleton, LazyImage width="calc(100% - 8px)" alone, auto-height parent',
+  args: {
+    src: NEVER_RESOLVES,
+    alt: 'probe',
+    lazy: false,
+    width: 'calc(100% - 8px)',
+    'data-testid': 'rel-width-calc-probe',
+  },
+  render: (args) => (
+    // A definite-WIDTH, auto-HEIGHT parent — pre-fix, the borrowed
+    // `height: calc(100% - 8px)` resolved against this exact auto height and
+    // collapsed to 0.
+    <Box sx={{ width: 300 }}>
+      <LazyImage {...args} />
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const skeleton = await canvas.findByTestId('rel-width-calc-probe-skeleton');
+    const rect = skeleton.getBoundingClientRect();
+
+    await expect(rect.width).toBeGreaterThan(0);
+    expect(rect.height).toBeGreaterThan(0);
+    // Squared via `aspectRatio`, not a collapsed borrowed `calc()` height.
+    expect(Math.abs(rect.width - rect.height)).toBeLessThan(PX_TOLERANCE);
+  },
+};
+
+/**
+ * FUT-2869's "Done when": a real-Chromium story for a relative HEIGHT alone
+ * on the skeleton, inside a parent with a DEFINITE height (so the percentage
+ * actually resolves to something, rather than proving only the no-collapse
+ * side already covered by `RelativeHeightFallbackContainerSquare` for the
+ * fallback container).
+ */
+export const RelativeHeightPercentSkeletonSquareInDefiniteHeightParent: Story = {
+  name: '🔬 FUT-2869: skeleton, LazyImage height="50%" alone, definite-height parent',
+  args: {
+    src: NEVER_RESOLVES,
+    alt: 'probe',
+    lazy: false,
+    height: '50%',
+    'data-testid': 'rel-height-pct-probe',
+  },
+  render: (args) => (
+    <Box sx={{ height: 400 }}>
+      <LazyImage {...args} />
+    </Box>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const skeleton = await canvas.findByTestId('rel-height-pct-probe-skeleton');
+    const rect = skeleton.getBoundingClientRect();
+
+    await expect(rect.height).toBeGreaterThan(0);
+    expect(rect.width).toBeGreaterThan(0);
+    // Squared via `aspectRatio`, its side the resolved (50%-of-400px) height —
+    // not a percentage width borrowed onto a different containing block.
+    expect(Math.abs(rect.width - rect.height)).toBeLessThan(PX_TOLERANCE);
+  },
+};
+
 export const RetryTransitionRelativeAxisNoCollapse: Story = {
   name: '🔬 FUT-2805 follow-up: retryOnError + relative width alone, skeleton → loaded never collapses',
   args: {

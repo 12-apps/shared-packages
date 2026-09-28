@@ -216,7 +216,7 @@ export const States: Story = {
         <BaseCard aspectRatio="4:3" title="Selecionada" selected onToggleSelect={() => {}} />
       </Box>
       <Box sx={{ width: 180 }}>
-        <BaseCard aspectRatio="4:3" title="Desativada" dimmed onToggleSelect={() => {}} />
+        <BaseCard aspectRatio="4:3" title="Desativada" state="disabled" onToggleSelect={() => {}} />
       </Box>
     </Box>
   ),
