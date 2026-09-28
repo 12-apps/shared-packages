@@ -1,4 +1,5 @@
 import { columnsFor, printableDotsFor, type RasterImage, type TicketLine } from "../index";
+import { DOTS_PER_MM } from "../sizes";
 import { rasterToDataUri } from "./bitmap";
 
 export { rasterToDataUri } from "./bitmap";
@@ -21,9 +22,9 @@ export { rasterToDataUri } from "./bitmap";
  * twice and verified on two kinds of hardware.
  *
  * So the fixed-width layout stays authoritative for BOTH, and this renders it
- * in a monospace column of exactly the same width. What the browser adds is
- * only what a browser is for: real accents with no code page, and the operating
- * system's print dialog.
+ * in a monospace column of exactly the same width — the printable width of the
+ * roll, never more. What the browser adds is only what a browser is for: real
+ * accents with no code page, and the operating system's print dialog.
  */
 
 
@@ -46,19 +47,24 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"]/g, (char) => ENTITIES[char] ?? char);
 }
 
-/** The legacy character-mode styles, matching what ESC/POS does with the same line. */
+/**
+ * The legacy character-mode styles, matching what ESC/POS does with the same line.
+ *
+ * `double` is double HEIGHT only, exactly as the ESC/POS encoder does it. A
+ * `font-size:2em` would double the width too and push a 48-column line half off
+ * the roll, so the glyphs are stretched vertically and the line reserves the
+ * second line's height below it.
+ */
 const STYLE: Readonly<Record<TicketLine["emphasis"], string>> = {
   normal: "",
   bold: "font-weight:700",
-  // Double HEIGHT only, exactly as the ESC/POS encoder does it — a doubled
-  // width would rewrap the headline at half the columns the layout used.
-  double: "font-weight:700;font-size:2em;line-height:1.1",
+  double: "font-weight:700;transform:scaleY(2);transform-origin:top;margin-bottom:1.25em",
 };
 
 /**
  * A sized line's font size, relative to the body's Font A column.
  *
- * The body is exactly `columnsFor(paperWidthMm)` characters wide, so a size
+ * The body holds exactly `columnsFor(paperWidthMm)` characters, so a size
  * whose column count is N must set its glyphs at (body columns / N) of the body
  * size to fit N of them in the same width. That is the whole mapping: the page
  * reproduces the printer's column counts, and the ratio between sizes follows —
@@ -97,31 +103,82 @@ function textLineHtml(line: TicketLine, paperWidthMm: number): string {
 }
 
 /**
- * A picture line, at the width it will have on paper.
+ * A picture line, at exactly one image pixel per printer dot.
  *
- * The body is `columnsFor(paperWidthMm)` characters wide and stands for the
- * printable width, `printableDotsFor(paperWidthMm)` dots — 12 dots per
- * character on either roll — so a raster N dots wide is N / 12 characters wide
- * here, whatever the screen's pixel density. `pixelated` keeps the dots square
- * when that scales up, which is what makes this an honest preview of the paper.
+ * A raster N dots wide is N / 8 mm wide on paper (203 dpi), so that is its
+ * width here: the print path then maps each pixel onto one dot, with no
+ * fractional scale for a driver to round into missing rows. `pixelated` keeps
+ * the dots square and unsmoothed — a thermal head has no grey to smooth into —
+ * and `max-width` keeps a raster wider than the roll inside it rather than off
+ * its edge.
  */
-function imageLineHtml(line: TicketLine, raster: RasterImage, paperWidthMm: number): string {
-  const dotsPerColumn = printableDotsFor(paperWidthMm) / columnsFor(paperWidthMm);
-  const width = Number((raster.width / dotsPerColumn).toFixed(4));
+function imageLineHtml(line: TicketLine, raster: RasterImage): string {
+  const width = Number((raster.width / DOTS_PER_MM).toFixed(3));
   const margin = line.align === "center" ? "0 auto" : "0";
   return (
     `<div><img alt="" src="${rasterToDataUri(raster)}" ` +
-    `style="display:block;margin:${margin};width:${width}ch;image-rendering:pixelated"></div>`
+    `style="display:block;margin:${margin};width:${width}mm;max-width:100%;height:auto;image-rendering:pixelated"></div>`
   );
+}
+
+/**
+ * The advance of one monospace glyph, in em. Courier New, Liberation Mono and
+ * Cousine are exactly 0.6; DejaVu Sans Mono and Menlo are 0.602.
+ */
+const GLYPH_ADVANCE_EM = 0.6;
+
+/**
+ * The share of the printable width a full line may take. The 2 % left over
+ * absorbs a fallback font slightly wider than 0.6 em and the text stroke below,
+ * so the last column never reaches the edge the head cannot print.
+ */
+const FILL = 0.98;
+
+/**
+ * How much every glyph is thickened, in millimetres — about one printer dot.
+ *
+ * A thermal head prints black or nothing. A regular-weight Courier stem at this
+ * size is under one dot wide, so the renderer draws it as grey anti-aliasing and
+ * the driver dithers the grey into a faded, broken line. Stroking the outline in
+ * the text's own colour widens every stem past a dot, so it prints solid; bold
+ * stays visibly heavier because it starts heavier.
+ */
+const STROKE_MM = 0.12;
+
+/**
+ * The document's page style: the body is exactly the roll's PRINTABLE width —
+ * 72 mm of an 80 mm roll, 48 mm of a 58 mm one — and the type is sized so the
+ * layout's column count fills it.
+ *
+ * Millimetres, not `ch` at a pixel size. `48ch` of 12 px Courier is 91 mm, and a
+ * print path either shrinks that to the page or clips what the head cannot
+ * reach: on a Bematech MP-4200 the left edge printed whole and the amounts at
+ * the right edge went missing. Sized from the printable width, one column is
+ * 1.5 mm — the printer's own Font A cell — and the last one ends where the
+ * head does.
+ *
+ * Pure black on white, set rather than inherited: a thermal head has no grey.
+ */
+function pageStyle(paperWidthMm: number): string {
+  const printableMm = printableDotsFor(paperWidthMm) / DOTS_PER_MM;
+  const fontMm = Number(((printableMm / (columnsFor(paperWidthMm) * GLYPH_ADVANCE_EM)) * FILL).toFixed(3));
+  return [
+    "@page{margin:0}",
+    "html{background:#fff}",
+    `body{margin:0;padding:0;width:${printableMm}mm;font-family:'Courier New','Liberation Mono',Cousine,monospace;` +
+      `font-size:${fontMm}mm;line-height:1.25;white-space:pre;color:#000;background:#fff;` +
+      `-webkit-text-stroke-width:${STROKE_MM}mm;-webkit-text-stroke-color:currentColor;` +
+      "-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+  ].join("");
 }
 
 /**
  * Render a ticket as a standalone document.
  *
- * `ch` units rather than millimetres: the layout already decided the ticket is
- * N columns wide, so the page is N characters wide by construction and a
- * printer driver's own margins cannot rewrap it. `@page { margin: 0 }` is what
- * stops the driver adding an inch of letter-paper margin to a receipt roll.
+ * The layout already decided the ticket is N columns wide; the page is the
+ * printable width and the type fills it with exactly N (see {@link pageStyle}).
+ * `@page { margin: 0 }` is what stops the driver adding an inch of
+ * letter-paper margin to a receipt roll.
  *
  * `lang` is the document's language tag. It buys nothing visual on a monospace
  * roll, but it is what a screen reader and the browser's own hyphenation read,
@@ -133,20 +190,14 @@ export function renderTicketHtml(
   paperWidthMm: number,
   lang = "en",
 ): string {
-  const columns = columnsFor(paperWidthMm);
   const body = lines
     .map((line) =>
-      line.image === undefined
-        ? textLineHtml(line, paperWidthMm)
-        : imageLineHtml(line, line.image, paperWidthMm),
+      line.image === undefined ? textLineHtml(line, paperWidthMm) : imageLineHtml(line, line.image),
     )
     .join("");
   return [
     `<!doctype html><html lang="${escapeHtml(lang)}"><head><meta charset="utf-8">`,
-    "<style>",
-    "@page{margin:0}",
-    `body{margin:0;font-family:'Courier New',monospace;font-size:12px;line-height:1.25;width:${columns}ch;white-space:pre}`,
-    "</style></head><body>",
+    `<style>${pageStyle(paperWidthMm)}</style></head><body>`,
     body,
     "</body></html>",
   ].join("");

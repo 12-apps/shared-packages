@@ -59,7 +59,7 @@ mount.
 |---|---|
 | `@12-apps/thermal-printing` | The line model — `TicketLine`, `columnsFor`, `wrap`, `line`, `centered`, `rule`, `field`, `PAPER_WIDTHS_MM`, and the [reference-sheet vocabulary](#the-vocabulary-four-sizes-bands-boxes-rows-pictures): `textLines`, `band`, `box`, `row`, `image`, `LINE_SIZES`, `printableDotsFor`, `textWidth`. Pure, isomorphic. |
 | `…/escpos` | `encodeTicket(lines)` → `Uint8Array`. Initialise, CP850, align, emphasise, font and magnification, reverse, line spacing, `GS v 0` raster, feed, partial cut. |
-| `…/html` | `renderTicketHtml(lines, paperWidthMm, lang?)` → a standalone document sized in `ch`, with `@page { margin: 0 }`. `rasterToDataUri(raster)` → the 1-bit picture as a `data:` URI, for a preview. |
+| `…/html` | `renderTicketHtml(lines, paperWidthMm, lang?)` → a standalone document exactly the roll's printable width (72 mm of 80, 48 mm of 58), pure black on white, with `@page { margin: 0 }`. `rasterToDataUri(raster)` → the 1-bit picture as a `data:` URI, for a preview. |
 | `…/raster` | `rasterizeSvg(svg, { width })` → RGBA at the printer's dot size; `toMonochrome(rgba, options?)` → a printable 1-bit `RasterImage`. Pure, isomorphic, no canvas and no native module. |
 | `…/net` | `sendToNetworkPrinter(host, port, bytes, options?)`. Node-only (`node:net`), never throws, structured failures. |
 | `…/routing` | `printerRoute(printers)` / `printerFor(route, destinationId)` — per-destination with a default, generic over your own printer rows. |
@@ -127,9 +127,14 @@ count — so width and height are magnified together, and a glyph that is only
 taller (which reads as condensed) is avoided.
 
 The HTML document reproduces the column counts rather than the point sizes: the
-body is `columnsFor(paperWidthMm)` characters wide, and a size with N columns is
-set at (body columns / N) em — `small` 0.75em, `large` 1.5em, `xlarge` 2em on 80
-mm. A line wraps at the same place on screen as on paper.
+body is the printable width in millimetres (72 mm on 80 mm, 48 mm on 58 mm) with
+its type sized so `columnsFor(paperWidthMm)` characters fill it — one column is
+1.5 mm, the printer's own Font A cell — and a size with N columns is set at
+(body columns / N) em — `small` 0.75em, `large` 1.5em, `xlarge` 2em on 80 mm. A
+line wraps at the same place on screen as on paper, and nothing reaches the
+margin the head cannot print. Text is pure black, stroked about one dot thicker
+so a regular-weight stem prints solid rather than as dithered grey; a picture is
+drawn at one image pixel per dot (`width / 8` mm), unsmoothed.
 
 `LINE_SIZE_METRICS` and `FONT_CELL_DOTS` export the table, for a host that wants
 to draw its own preview.
