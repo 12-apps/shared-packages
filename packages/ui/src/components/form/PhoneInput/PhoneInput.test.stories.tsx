@@ -207,12 +207,12 @@ export const FocusManagement: Story = {
 export const ResponsiveDesign: Story = {
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
       },
-      defaultViewport: 'mobile',
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const menuScope = within(document.body);

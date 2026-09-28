@@ -278,8 +278,8 @@ const message = "Hello, screen reader users!";`}
 export const ResponsiveDesign: Story = {
   parameters: {
     docs: { description: { story: 'Tests responsive behavior across different viewport sizes.' } },
-    viewport: { defaultViewport: 'mobile1' },
   },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ width: '100%', p: 2 }}>
       <Code data-testid="responsive-block" variant="block" copyable language="css">

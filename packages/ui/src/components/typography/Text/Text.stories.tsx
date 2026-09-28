@@ -411,8 +411,6 @@ const ResponsiveComponent = () => {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => <ResponsiveComponent />,
 };

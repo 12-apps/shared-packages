@@ -475,15 +475,15 @@ export const ResponsiveDesign: Story = {
   ),
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' }, type: 'mobile' },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' }, type: 'tablet' },
         desktop: { name: 'Desktop', styles: { width: '1200px', height: '800px' }, type: 'desktop' },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: { viewports: [375, 768, 1200], delay: 300 },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 

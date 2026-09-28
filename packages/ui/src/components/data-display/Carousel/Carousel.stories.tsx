@@ -572,11 +572,6 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
-  },
   render: () => {
     // `Carousel`'s own props (`height`, `showArrows`, `showThumbnails`) each take
     // ONE value, not a breakpoint map — so the breakpoint switch below reads the

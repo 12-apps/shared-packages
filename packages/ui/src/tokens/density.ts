@@ -9,7 +9,12 @@ import {
   type DensityLevel,
   type ResolvedDensity,
 } from './density.core';
-import { chipDensityOverrides, iconButtonDensityOverrides } from './density-overrides';
+import {
+  checkboxRadioDensityOverrides,
+  chipDensityOverrides,
+  iconButtonDensityOverrides,
+  switchDensityOverrides,
+} from './density-overrides';
 import { fieldOverrides, mergeMuiComponents } from './field-height';
 import { DEFAULT_FIELD_RADIUS } from './field-radius.core';
 
@@ -72,13 +77,16 @@ export function useDensity(): ResolvedDensity {
  * their own layout off.
  *
  * `components` is the matching MUI-native override (`fieldOverrides`, plus
- * FUT-2766's `iconButtonDensityOverrides`/`chipDensityOverrides`) for a HOST's
- * own bare `TextField`/`Select`/`IconButton`/`Chip`, mirroring
- * `muiThemeOptionsFrom`'s own `components: mergeMuiComponents(...)`. It
- * carries ONLY the overrides this function knows about (`MuiOutlinedInput`'s
- * `root`, `input` and `notchedOutline`; `MuiInputLabel`'s `outlined`;
- * `MuiIconButton`'s `root`/`sizeSmall`/`sizeLarge`; `MuiChip`'s
- * `root`/`sizeSmall`/`label`/`labelSmall`) — a host with ITS OWN overrides for
+ * FUT-2766's `iconButtonDensityOverrides`/`chipDensityOverrides` and
+ * FUT-2767's `checkboxRadioDensityOverrides`/`switchDensityOverrides`) for a
+ * HOST's own bare `TextField`/`Select`/`IconButton`/`Chip`/`Checkbox`/
+ * `Radio`/`Switch`, mirroring `muiThemeOptionsFrom`'s own `components:
+ * mergeMuiComponents(...)`. It carries ONLY the overrides this function knows
+ * about (`MuiOutlinedInput`'s `root`, `input` and `notchedOutline`;
+ * `MuiInputLabel`'s `outlined`; `MuiIconButton`'s `root`/`sizeSmall`/
+ * `sizeLarge`; `MuiChip`'s `root`/`sizeSmall`/`label`/`labelSmall`;
+ * `MuiCheckbox`'s and `MuiRadio`'s `root`; `MuiSwitch`'s
+ * `root`/`switchBase`/`thumb`/`sizeSmall`) — a host with ITS OWN overrides for
  * OTHER components merges them in with
  * `mergeMuiComponents(densityThemeOptions(density).components, hostOverrides)`,
  * which keeps a component only ONE side touches untouched. For a component
@@ -137,6 +145,8 @@ export function densityThemeOptions(
       fieldOverrides(fieldRadius, fieldHeight),
       iconButtonDensityOverrides(),
       chipDensityOverrides(),
+      checkboxRadioDensityOverrides(),
+      switchDensityOverrides(),
     ),
   };
 }

@@ -60,11 +60,7 @@ export const ResponsiveDesign: Story = {
     open: true,
     items: [{ id: '1', label: 'Home', action: fn() }],
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile',
-    },
-  },
+  globals: { viewport: { value: 'xs', isRotated: false } },
   play: async ({ step }) => {
     await step('Check responsive layout', async () => {
       const dialog = document.querySelector('[role="dialog"]');
