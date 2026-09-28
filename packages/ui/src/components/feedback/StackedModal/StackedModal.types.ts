@@ -6,6 +6,13 @@ export type ModalPanelRole = 'primary' | 'secondary' | 'background';
 /** The breakpoint the panel's width is capped at, or `false` for uncapped. */
 export type PanelMaxWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false;
 
+/**
+ * How much of the viewport the top panel takes from `sm` up. `wide` is for a
+ * dense editor that lays out two columns inside the panel, which the default
+ * 60vw starves on a laptop.
+ */
+export type PanelSize = 'default' | 'wide';
+
 export interface StackedModalProps {
   /** The back arrow's accessible name — it carries a glyph only. REQUIRED. */
   backLabel: string;
@@ -43,6 +50,8 @@ export interface StackedModalProps {
   fullScreen?: boolean;
   /** Maximum width of the modal */
   maxWidth?: PanelMaxWidth;
+  /** Viewport share of the top panel — `wide` gives a dense editor more room */
+  size?: PanelSize;
   /** Disable the backdrop click behavior */
   disableBackdrop?: boolean;
   /** Disable focus trap functionality */
