@@ -70,13 +70,15 @@ const runTrustedPointerNestedSelectRegression = async (page: Page) => {
   // button, rather than racing the Select's own close animation.
   await page.waitForSelector('[role="listbox"]', { state: 'detached', timeout: 2000 });
 
+  // Closing is the thing that SHOULD happen here, so wait for it rather than
+  // sampling once after a fixed delay: the deferred close decision plus the
+  // card's own exit transition outran 300ms on a loaded CI runner (FUT-2882).
   await trustedClick(page, 'trusted-nested-outside');
-  await page.waitForTimeout(300);
-  assert.equal(
-    await content.isVisible(),
-    false,
-    'a TRUSTED press truly outside the card must still close it',
-  );
+  const closed = await content
+    .waitFor({ state: 'hidden', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  assert.equal(closed, true, 'a TRUSTED press truly outside the card must still close it');
 };
 
 /**

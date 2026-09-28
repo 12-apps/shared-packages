@@ -232,19 +232,19 @@ const StepIndicatorComponent = forwardRef<HTMLDivElement, StepIndicatorProps>(({
   const isDisabled = Boolean(disabled || step.disabled);
 
   const handleClick = useCallback(() => {
-    if (interactive && !disabled && onClick) {
+    if (interactive && !isDisabled && onClick) {
       onClick(index, step);
     }
-  }, [interactive, disabled, onClick, index, step]);
+  }, [interactive, isDisabled, onClick, index, step]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (interactive && !disabled && (event.key === 'Enter' || event.key === ' ')) {
+    if (interactive && !isDisabled && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();
       if (onClick) {
         onClick(index, step);
       }
     }
-  }, [interactive, disabled, onClick, index, step]);
+  }, [interactive, isDisabled, onClick, index, step]);
 
   const renderIndicatorContent = () => {
     if (isError && errorIcon) {
