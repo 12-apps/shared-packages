@@ -146,7 +146,8 @@ export const WithSelection: Story = {
  * line, and the document must not scroll sideways.
  */
 export const NarrowSelectionOverflow: Story = {
-  parameters: { viewport: { defaultViewport: 'mobile1' }, layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen' },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ px: 2, py: 1.25, borderTop: 1, borderBottom: 1, borderColor: 'divider' }}>
       <ContentToolbar

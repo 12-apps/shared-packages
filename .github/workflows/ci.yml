@@ -923,6 +923,19 @@ jobs:
         run: |
           set -o pipefail
           pnpm quality:ui-stories-types 2>&1 | tee ui-stories-types.log
+      # The viewport-key gate (FUT-2864): `parameters.viewport.defaultViewport`
+      # is dead in this Storybook (SB9 reads `globals.viewport.value`
+      # instead), and a `globals.viewport.value` naming a key `preview.tsx`
+      # never defines is exactly as silent a no-op. Pure static source scan —
+      # no build, no ledger, every finding is new debt from the day this
+      # landed. Runs here rather than in a job of its own for the same reason
+      # the stories-types gate does: the checkout and install above are
+      # already paid for.
+      - name: Viewport key gate
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm quality:viewport-key 2>&1 | tee viewport-key.log
 
   # The only gate that sees what a CONSUMER sees. Every other job above runs
   # inside the pnpm workspace, where a sibling import resolves whether or not the

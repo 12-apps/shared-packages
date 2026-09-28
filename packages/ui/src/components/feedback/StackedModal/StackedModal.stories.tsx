@@ -430,11 +430,7 @@ export const MultiLevelStacking: Story = {
 
 // Mobile responsive bottom sheet
 export const MobileResponsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => {
     const MobileDemo = () => {
       const [open, setOpen] = useState(false);
@@ -1769,13 +1765,13 @@ const ResponsiveComponent = () => {
 export const Responsive: Story = {
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
         desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px' } },
       },
-      defaultViewport: 'mobile',
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => <ResponsiveComponent />,
 };

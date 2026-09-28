@@ -511,14 +511,14 @@ export const InteractiveStates: Story = {
 export const Responsive: Story = {
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
         desktop: { name: 'Desktop', styles: { width: '1024px', height: '768px' } },
       },
-      defaultViewport: 'mobile',
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => (
     <Stack spacing={4}>
       <Typography variant="h6">Responsive Behavior</Typography>

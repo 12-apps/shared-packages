@@ -109,11 +109,7 @@ export const ResponsiveDesign: Story = {
       expect(chip).toBeVisible();
     });
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
 };
 
 export const ThemeVariations: Story = {

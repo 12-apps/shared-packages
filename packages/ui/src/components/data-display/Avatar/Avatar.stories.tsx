@@ -508,11 +508,7 @@ export const InteractiveStates: Story = {
 
 export const Responsive: Story = {
   name: '📱 Responsive',
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ width: '100%', p: 2 }}>
       <Stack spacing={2}>

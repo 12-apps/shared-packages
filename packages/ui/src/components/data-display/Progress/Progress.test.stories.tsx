@@ -689,7 +689,7 @@ export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -706,13 +706,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => (
     <Box sx={{ p: 2, maxWidth: '100%' }}>
       <Typography variant="h6" sx={{ mb: 3 }}>

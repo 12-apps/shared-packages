@@ -768,9 +768,4 @@ const ResponsiveComponent = () => {
 
 export const Responsive: Story = {
   render: () => <ResponsiveComponent />,
-  parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
-  },
 };
