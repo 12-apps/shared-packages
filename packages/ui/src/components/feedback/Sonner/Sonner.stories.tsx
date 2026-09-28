@@ -60,8 +60,8 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => (
     <>
-      <Toaster position="bottom-right" />
-      <Button variant="contained" onClick={() => toast('This is a default toast notification')}>
+      <Toaster dismissLabel="Fechar" position="bottom-right" />
+      <Button variant="contained" onClick={() => toast.toast('This is a default toast notification')}>
         Show Toast
       </Button>
     </>
@@ -71,9 +71,9 @@ export const Default: Story = {
 export const ToastTypes: Story = {
   render: () => (
     <>
-      <Toaster richColors closeButton />
+      <Toaster dismissLabel="Fechar" richColors closeButton />
       <Stack spacing={2}>
-        <Button variant="contained" onClick={() => toast('Default toast message')}>
+        <Button variant="contained" onClick={() => toast.toast('Default toast message')}>
           Default Toast
         </Button>
 
@@ -120,7 +120,7 @@ const ToastPositionsComponent = () => {
 
   return (
     <>
-      <Toaster position={position} />
+      <Toaster dismissLabel="Fechar" position={position} />
       <Stack spacing={3}>
         <Typography variant="h6">Toast Position</Typography>
 
@@ -129,7 +129,7 @@ const ToastPositionsComponent = () => {
             variant={position === 'top-left' ? 'contained' : 'outlined'}
             onClick={() => {
               setPosition('top-left');
-              toast('Top Left Position');
+              toast.toast('Top Left Position');
             }}
           >
             Top Left
@@ -139,7 +139,7 @@ const ToastPositionsComponent = () => {
             variant={position === 'top-center' ? 'contained' : 'outlined'}
             onClick={() => {
               setPosition('top-center');
-              toast('Top Center Position');
+              toast.toast('Top Center Position');
             }}
           >
             Top Center
@@ -149,7 +149,7 @@ const ToastPositionsComponent = () => {
             variant={position === 'top-right' ? 'contained' : 'outlined'}
             onClick={() => {
               setPosition('top-right');
-              toast('Top Right Position');
+              toast.toast('Top Right Position');
             }}
           >
             Top Right
@@ -159,7 +159,7 @@ const ToastPositionsComponent = () => {
             variant={position === 'bottom-left' ? 'contained' : 'outlined'}
             onClick={() => {
               setPosition('bottom-left');
-              toast('Bottom Left Position');
+              toast.toast('Bottom Left Position');
             }}
           >
             Bottom Left
@@ -169,7 +169,7 @@ const ToastPositionsComponent = () => {
             variant={position === 'bottom-center' ? 'contained' : 'outlined'}
             onClick={() => {
               setPosition('bottom-center');
-              toast('Bottom Center Position');
+              toast.toast('Bottom Center Position');
             }}
           >
             Bottom Center
@@ -179,7 +179,7 @@ const ToastPositionsComponent = () => {
             variant={position === 'bottom-right' ? 'contained' : 'outlined'}
             onClick={() => {
               setPosition('bottom-right');
-              toast('Bottom Right Position');
+              toast.toast('Bottom Right Position');
             }}
           >
             Bottom Right
@@ -197,12 +197,12 @@ export const ToastPositions: Story = {
 export const CustomToasts: Story = {
   render: () => (
     <>
-      <Toaster richColors />
+      <Toaster dismissLabel="Fechar" richColors />
       <Stack spacing={2}>
         <Button
           variant="contained"
           onClick={() =>
-            toast('Event has been created', {
+            toast.toast('Event has been created', {
               description: 'Monday, January 3rd at 6:00pm',
               action: {
                 label: 'Undo',
@@ -237,7 +237,7 @@ export const CustomToasts: Story = {
 export const PromiseToast: Story = {
   render: () => (
     <>
-      <Toaster richColors />
+      <Toaster dismissLabel="Fechar" richColors />
       <Stack spacing={2}>
         <Button
           variant="contained"
@@ -285,12 +285,12 @@ export const PromiseToast: Story = {
 export const ActionToasts: Story = {
   render: () => (
     <>
-      <Toaster closeButton richColors />
+      <Toaster dismissLabel="Fechar" closeButton richColors />
       <Stack spacing={2}>
         <Button
           variant="contained"
           onClick={() => {
-            toast('Message deleted', {
+            toast.toast('Message deleted', {
               action: {
                 label: 'Undo',
                 onClick: () => toast.success('Message restored'),
@@ -318,7 +318,7 @@ export const ActionToasts: Story = {
         <Button
           variant="contained"
           onClick={() => {
-            toast('New version available', {
+            toast.toast('New version available', {
               action: {
                 label: 'Update Now',
                 onClick: () => toast.loading('Updating...'),
@@ -337,25 +337,25 @@ export const ActionToasts: Story = {
 export const DurationControl: Story = {
   render: () => (
     <>
-      <Toaster />
+      <Toaster dismissLabel="Fechar" />
       <Stack spacing={2}>
         <Button
           variant="outlined"
-          onClick={() => toast('Quick toast (2 seconds)', { duration: 2000 })}
+          onClick={() => toast.toast('Quick toast (2 seconds)', { duration: 2000 })}
         >
           2 Second Toast
         </Button>
 
         <Button
           variant="outlined"
-          onClick={() => toast('Standard toast (4 seconds)', { duration: 4000 })}
+          onClick={() => toast.toast('Standard toast (4 seconds)', { duration: 4000 })}
         >
           4 Second Toast
         </Button>
 
         <Button
           variant="outlined"
-          onClick={() => toast('Long toast (10 seconds)', { duration: 10000 })}
+          onClick={() => toast.toast('Long toast (10 seconds)', { duration: 10000 })}
         >
           10 Second Toast
         </Button>
@@ -363,9 +363,9 @@ export const DurationControl: Story = {
         <Button
           variant="outlined"
           onClick={() => {
-            const id = toast('Persistent toast - click to dismiss', {
+            const id = toast.toast('Persistent toast - click to dismiss', {
               duration: Infinity,
-              onClick: () => toast.dismiss(id),
+              action: { label: 'Dispensar', onClick: () => toast.dismiss(id) },
             });
           }}
         >
@@ -392,7 +392,7 @@ export const FormFeedback: Story = {
 
     return (
       <>
-        <Toaster richColors position="top-center" />
+        <Toaster dismissLabel="Fechar" richColors position="top-center" />
         <Paper sx={{ p: 3, maxWidth: 400 }}>
           <Typography variant="h6" gutterBottom>
             Contact Form
@@ -422,7 +422,7 @@ export const FormFeedback: Story = {
 export const MultipleToasts: Story = {
   render: () => (
     <>
-      <Toaster expand richColors />
+      <Toaster dismissLabel="Fechar" expand richColors />
       <Stack spacing={2}>
         <Button
           variant="contained"
@@ -439,10 +439,10 @@ export const MultipleToasts: Story = {
         <Button
           variant="outlined"
           onClick={() => {
-            toast('First notification');
-            window.setTimeout(() => toast('Second notification'), 500);
-            window.setTimeout(() => toast('Third notification'), 1000);
-            window.setTimeout(() => toast('Fourth notification'), 1500);
+            toast.toast('First notification');
+            window.setTimeout(() => toast.toast('Second notification'), 500);
+            window.setTimeout(() => toast.toast('Third notification'), 1000);
+            window.setTimeout(() => toast.toast('Fourth notification'), 1500);
           }}
         >
           Staggered Toasts
@@ -467,7 +467,7 @@ const ThemedToastsComponent = () => {
         minHeight: 300,
       }}
     >
-      <Toaster theme={theme} richColors />
+      <Toaster dismissLabel="Fechar" theme={theme} richColors />
 
       <Stack spacing={3}>
         <Stack direction="row" spacing={2}>
@@ -523,9 +523,9 @@ export const ThemedToasts: Story = {
 export const AllVariants: Story = {
   render: () => (
     <>
-      <Toaster richColors closeButton />
+      <Toaster dismissLabel="Fechar" richColors closeButton />
       <Stack spacing={2} direction="row" flexWrap="wrap">
-        <Button variant="contained" onClick={() => toast('Default toast')}>
+        <Button variant="contained" onClick={() => toast.toast('Default toast')}>
           Default
         </Button>
         <Button variant="contained" color="success" onClick={() => toast.success('Success!')}>
@@ -551,15 +551,15 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <>
-      <Toaster />
+      <Toaster dismissLabel="Fechar" />
       <Stack spacing={2}>
-        <Button variant="outlined" onClick={() => toast('Compact', { duration: 3000 })}>
+        <Button variant="outlined" onClick={() => toast.toast('Compact', { duration: 3000 })}>
           Default Size
         </Button>
         <Button
           variant="outlined"
           onClick={() =>
-            toast('Toast with description', {
+            toast.toast('Toast with description', {
               description: 'This is additional information',
               duration: 3000,
             })
@@ -570,7 +570,7 @@ export const AllSizes: Story = {
         <Button
           variant="outlined"
           onClick={() =>
-            toast('Toast with action', {
+            toast.toast('Toast with action', {
               action: { label: 'Undo', onClick: () => {} },
               duration: 3000,
             })
@@ -586,9 +586,9 @@ export const AllSizes: Story = {
 export const AllStates: Story = {
   render: () => (
     <>
-      <Toaster richColors closeButton />
+      <Toaster dismissLabel="Fechar" richColors closeButton />
       <Stack spacing={2}>
-        <Button variant="outlined" onClick={() => toast('Normal state toast')}>
+        <Button variant="outlined" onClick={() => toast.toast('Normal state toast')}>
           Normal
         </Button>
         <Button
@@ -609,7 +609,7 @@ export const AllStates: Story = {
         >
           Loading → Error
         </Button>
-        <Button variant="outlined" onClick={() => toast('Hoverable toast', { duration: 10000 })}>
+        <Button variant="outlined" onClick={() => toast.toast('Hoverable toast', { duration: 10000 })}>
           Hover to Pause
         </Button>
       </Stack>
@@ -620,23 +620,23 @@ export const AllStates: Story = {
 export const InteractiveStates: Story = {
   render: () => (
     <>
-      <Toaster closeButton richColors />
+      <Toaster dismissLabel="Fechar" closeButton richColors />
       <Stack spacing={2}>
         <Button
           variant="contained"
-          onClick={() =>
-            toast('Click to dismiss', {
+          onClick={() => {
+            const id = toast.toast('Click to dismiss', {
               duration: Infinity,
-              onClick: (t) => toast.dismiss(t.id),
-            })
-          }
+              action: { label: 'Dispensar', onClick: () => toast.dismiss(id) },
+            });
+          }}
         >
           Clickable Toast
         </Button>
         <Button
           variant="contained"
           onClick={() =>
-            toast('Toast with action', {
+            toast.toast('Toast with action', {
               action: {
                 label: 'Undo',
                 onClick: () => toast.success('Undone!'),
@@ -649,7 +649,7 @@ export const InteractiveStates: Story = {
         <Button
           variant="contained"
           onClick={() =>
-            toast('Dismissible toast', {
+            toast.toast('Dismissible toast', {
               duration: 10000,
             })
           }
@@ -668,10 +668,10 @@ export const Responsive: Story = {
   globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <>
-      <Toaster position="bottom-center" />
+      <Toaster dismissLabel="Fechar" position="bottom-center" />
       <Stack spacing={2}>
         <Typography variant="body2">Test on different screen sizes:</Typography>
-        <Button variant="contained" onClick={() => toast('Mobile responsive toast')}>
+        <Button variant="contained" onClick={() => toast.toast('Mobile responsive toast')}>
           Show Toast (Mobile)
         </Button>
         <Button
@@ -687,9 +687,9 @@ export const Responsive: Story = {
         <Button
           variant="contained"
           onClick={() => {
-            toast('First toast');
-            toast('Second toast');
-            toast('Third toast');
+            toast.toast('First toast');
+            toast.toast('Second toast');
+            toast.toast('Third toast');
           }}
         >
           Multiple Toasts

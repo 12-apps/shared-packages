@@ -201,6 +201,7 @@ export const Sticky: Story = {
   render: () => (
     <Box>
       <Banner
+        dismissLabel="Fechar"
         variant="warning"
         title="Important Notice"
         description="This banner will stick to the top when you scroll."
@@ -251,24 +252,28 @@ export const AllVariants: Story = {
   render: () => (
     <Stack spacing={2} sx={{ p: 2 }}>
       <Banner
+        dismissLabel="Fechar"
         variant="info"
         title="Information"
         description="Informational message for users"
         dismissible
       />
       <Banner
+        dismissLabel="Fechar"
         variant="success"
         title="Success"
         description="Operation completed successfully"
         dismissible
       />
       <Banner
+        dismissLabel="Fechar"
         variant="warning"
         title="Warning"
         description="Please review before proceeding"
         dismissible
       />
       <Banner
+        dismissLabel="Fechar"
         variant="critical"
         title="Critical Error"
         description="Immediate action required"
@@ -282,14 +287,14 @@ export const AllVariants: Story = {
 export const ContentVariations: Story = {
   render: () => (
     <Stack spacing={2} sx={{ p: 2 }}>
-      <Banner variant="info" title="Title Only Banner" />
-      <Banner variant="success" description="Description only, no title provided" />
-      <Banner variant="warning" title="With Custom Content">
+      <Banner dismissLabel="Fechar" variant="info" title="Title Only Banner" />
+      <Banner dismissLabel="Fechar" variant="success" description="Description only, no title provided" />
+      <Banner dismissLabel="Fechar" variant="warning" title="With Custom Content">
         <Typography variant="body2" sx={{ mt: 1 }}>
           Custom content can be added as children to provide more flexibility in layout and styling.
         </Typography>
       </Banner>
-      <Banner variant="info" title="Empty Content Test" description="" />
+      <Banner dismissLabel="Fechar" variant="info" title="Empty Content Test" description="" />
     </Stack>
   ),
 };
@@ -304,6 +309,7 @@ const RealWorldExamplesComponent = () => {
     <Stack spacing={2} sx={{ p: 2 }}>
       {showCookie && (
         <Banner
+          dismissLabel="Fechar"
           variant="info"
           icon={<Cookie />}
           title="Cookie Notice"
@@ -319,6 +325,7 @@ const RealWorldExamplesComponent = () => {
 
       {showMaintenance && (
         <Banner
+          dismissLabel="Fechar"
           variant="warning"
           icon={<Update />}
           title="Scheduled Maintenance"
@@ -331,6 +338,7 @@ const RealWorldExamplesComponent = () => {
 
       {showPromo && (
         <Banner
+          dismissLabel="Fechar"
           variant="success"
           icon={<Payment />}
           title="Special Offer!"
@@ -345,6 +353,7 @@ const RealWorldExamplesComponent = () => {
       )}
 
       <Banner
+        dismissLabel="Fechar"
         variant="critical"
         icon={<Security />}
         title="Security Alert"
@@ -385,6 +394,7 @@ export const AccessibilityFocus: Story = {
         These banners are fully accessible with proper ARIA attributes and keyboard navigation
       </Typography>
       <Banner
+        dismissLabel="Fechar"
         variant="info"
         title="Accessible Info Banner"
         description="This banner uses role='status' and aria-live='polite' for screen readers"
@@ -392,6 +402,7 @@ export const AccessibilityFocus: Story = {
         actions={[{ label: 'Action Button', onClick: fn(), variant: 'primary' }]}
       />
       <Banner
+        dismissLabel="Fechar"
         variant="critical"
         title="Urgent Critical Banner"
         description="This critical banner uses role='alert' and aria-live='assertive' for immediate announcement"
@@ -408,6 +419,7 @@ export const MultipleBanners: Story = {
     <Stack spacing={1} sx={{ p: 2 }}>
       {Array.from({ length: 8 }, (_, i) => (
         <Banner
+          dismissLabel="Fechar"
           key={i}
           variant={(['info', 'success', 'warning', 'critical'] as const)[i % 4]}
           title={`Banner ${i + 1}`}
@@ -426,13 +438,15 @@ export const MultipleBanners: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Stack spacing={2} sx={{ p: 2 }}>
-      <Banner variant="info" title="Standard Banner" description="Standard size banner message" />
+      <Banner dismissLabel="Fechar" variant="info" title="Standard Banner" description="Standard size banner message" />
       <Banner
+        dismissLabel="Fechar"
         variant="success"
         title="Success Banner"
         description="Standard size success message"
       />
       <Banner
+        dismissLabel="Fechar"
         variant="warning"
         title="Warning Banner"
         description="Standard size warning message"
@@ -444,10 +458,10 @@ export const AllSizes: Story = {
 export const AllStates: Story = {
   render: () => (
     <Stack spacing={2} sx={{ p: 2 }}>
-      <Banner variant="info" title="Info State" description="Information banner state" />
-      <Banner variant="success" title="Success State" description="Success banner state" />
-      <Banner variant="warning" title="Warning State" description="Warning banner state" />
-      <Banner variant="critical" title="Critical State" description="Critical error banner state" />
+      <Banner dismissLabel="Fechar" variant="info" title="Info State" description="Information banner state" />
+      <Banner dismissLabel="Fechar" variant="success" title="Success State" description="Success banner state" />
+      <Banner dismissLabel="Fechar" variant="warning" title="Warning State" description="Warning banner state" />
+      <Banner dismissLabel="Fechar" variant="critical" title="Critical State" description="Critical error banner state" />
     </Stack>
   ),
 };
@@ -455,14 +469,16 @@ export const AllStates: Story = {
 export const InteractiveStates: Story = {
   render: () => (
     <Stack spacing={2} sx={{ p: 2 }}>
-      <Banner variant="info" title="Standard Banner" description="Non-interactive banner" />
+      <Banner dismissLabel="Fechar" variant="info" title="Standard Banner" description="Non-interactive banner" />
       <Banner
+        dismissLabel="Fechar"
         variant="success"
         title="Dismissible Banner"
         description="Click the X to close"
         dismissible
       />
       <Banner
+        dismissLabel="Fechar"
         variant="warning"
         title="With Actions"
         description="Banner with action buttons"
@@ -472,6 +488,7 @@ export const InteractiveStates: Story = {
         ]}
       />
       <Banner
+        dismissLabel="Fechar"
         variant="critical"
         title="Full Interactive"
         description="Dismissible with actions"
@@ -487,6 +504,7 @@ export const Responsive: Story = {
     <Box>
       <Stack spacing={2} sx={{ p: 2 }}>
         <Banner
+          dismissLabel="Fechar"
           variant="info"
           title="Responsive Banner"
           description="This banner adapts to different screen sizes and container widths"
@@ -498,6 +516,7 @@ export const Responsive: Story = {
         />
         <Box sx={{ maxWidth: 600 }}>
           <Banner
+            dismissLabel="Fechar"
             variant="success"
             title="Medium Container"
             description="Banner in a medium-width container"
@@ -507,6 +526,7 @@ export const Responsive: Story = {
         </Box>
         <Box sx={{ maxWidth: 400 }}>
           <Banner
+            dismissLabel="Fechar"
             variant="warning"
             title="Narrow Container"
             description="Banner in a narrow container adapts layout for mobile"
@@ -515,6 +535,7 @@ export const Responsive: Story = {
         </Box>
         <Box sx={{ maxWidth: 300 }}>
           <Banner
+            dismissLabel="Fechar"
             variant="critical"
             title="Very Narrow"
             description="Actions stack on mobile"
