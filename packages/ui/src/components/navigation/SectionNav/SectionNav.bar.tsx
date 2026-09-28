@@ -212,17 +212,9 @@ export function SectionNavBar({
           // Above the backdrop ONLY while one of its own sheets is open, so the
           // primary button can close what it opened. Raised all the time it
           // would sit over every dialog the page opens, and on a small phone a
-          // dialog's own footer is exactly where the bar is.
-          //
-          // `stackedOverlayZIndex` rather than a plain `zIndex.modal + 1`: a
-          // host that lifts a bottom `Drawer` clear of a stacked sheet (see the
-          // token's own docblock) matches EVERY bottom-anchored Drawer by its
-          // paper class, including this bar's own — it cannot tell "a form's
-          // Drawer trapped under a sheet" from "this bar's sheet" apart. Once a
-          // host does that, `zIndex.modal + 1` stops being high enough and the
-          // sheet's backdrop paints over the bar — dimming it grey and slicing
-          // through the raised primary button. The bar has to clear the SAME
-          // ceiling its own sheets can be lifted to, one step higher.
+          // dialog's own footer is exactly where the bar is. `stackedOverlayZIndex`,
+          // not `zIndex.modal + 1`: a host lifting a bottom Drawer clear of a
+          // stacked sheet catches this bar's OWN sheets too.
           position: 'relative',
           zIndex: open === null ? 'auto' : stackedOverlayZIndex(theme) + 1,
         }}
