@@ -36,7 +36,7 @@ const control = (root: HTMLElement): HTMLElement =>
 export const BasicInteraction: Story = {
   name: '🧪 Basic Interaction Test',
   args: {
-    'data-testid': 'basic-switch',
+    dataTestId: 'basic-switch',
     onChange: fn(),
     onClick: fn(),
     onFocus: fn(),
@@ -70,7 +70,7 @@ export const BasicInteraction: Story = {
 export const KeyboardInteraction: Story = {
   name: '⌨️ Keyboard Interaction Test',
   args: {
-    'data-testid': 'keyboard-switch',
+    dataTestId: 'keyboard-switch',
     label: 'Keyboard accessible switch',
     onChange: fn(),
     onFocus: fn(),
@@ -156,7 +156,7 @@ export const ControlTypeTest: Story = {
   tags: ['native-skip'],
   name: '🏷️ Control Type Test',
   args: {
-    'data-testid': 'typed-switch',
+    dataTestId: 'typed-switch',
     label: 'Typed switch',
     onFocus: fn(),
     // Clicking the <label> below activates its associated control, which
@@ -189,7 +189,7 @@ export const ControlTypeTest: Story = {
 export const AccessibilityTest: Story = {
   name: '♿ Accessibility Test',
   args: {
-    'data-testid': 'accessible-switch',
+    dataTestId: 'accessible-switch',
     label: 'Accessible switch',
     description: 'This switch has proper accessibility attributes',
     'aria-label': 'Toggle notifications',

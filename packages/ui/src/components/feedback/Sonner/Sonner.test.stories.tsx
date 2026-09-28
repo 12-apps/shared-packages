@@ -27,7 +27,7 @@ type Story = StoryObj<typeof meta>;
 
 // Test wrapper component with toast functionality
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <SonnerProvider>{children}</SonnerProvider>
+  <SonnerProvider dismissLabel="Fechar">{children}</SonnerProvider>
 );
 
 // Basic interaction test component
@@ -910,7 +910,9 @@ export const Integration: Story = {
         () => {
           const completionToast = canvas.queryByText('Step 4: Integration test completed');
           // Test passes if either the toast is visible or the test has completed (button re-enabled)
-          const testCompleted = !integrationBtn.disabled && integrationBtn.textContent === 'Run Integration Test';
+          const testCompleted =
+            !integrationBtn.hasAttribute('disabled') &&
+            integrationBtn.textContent === 'Run Integration Test';
           expect(completionToast || testCompleted).toBeTruthy();
         },
         { timeout: 1000 },

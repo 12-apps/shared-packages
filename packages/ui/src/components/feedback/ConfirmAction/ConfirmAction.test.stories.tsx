@@ -106,7 +106,7 @@ export const KeyboardCancelsWithEscape: Story = {
   },
 };
 
-export const HocGuardsTheWrappedButton: StoryObj = {
+export const HocGuardsTheWrappedButton: StoryObj<{ onClick: () => void }> = {
   name: '🧪 withConfirmation guards the wrapped button',
   render: (_args, { args }) => (
     <ConfirmButton color="danger" onClick={args.onClick} confirm={BASE}>

@@ -6,6 +6,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import React from 'react';
 
+import { must } from '../../../test-utils/must';
+
 import { Heading } from './Heading';
 import { COLOR_VALUES } from '../../../tokens/scales';
 
@@ -221,7 +223,7 @@ const IntegrationTestComponent = () => {
             {tabs[selectedTab]} Content
           </Heading>
           <Heading level="h4" weight="normal" data-testid="tab-subheading">
-            This is the content for {tabs[selectedTab].toLowerCase()}
+            This is the content for {must(tabs[selectedTab]).toLowerCase()}
           </Heading>
         </Box>
       </Paper>
@@ -465,43 +467,22 @@ export const ResponsiveDesign: Story = {
   globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Stack spacing={2} data-testid="responsive-container">
-      <Heading
-        level="h1"
-        sx={{
-          fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-        }}
-        data-testid="responsive-h1"
-      >
+      {/* `Heading` has no `sx` prop — every size goes through the theme
+          vocabulary, not an ad hoc `sx` override — so a plain, non-responsive
+          `style` stands in; the play function only checks presence. */}
+      <Heading level="h1" style={{ fontSize: '2.5rem' }} data-testid="responsive-h1">
         Responsive H1
       </Heading>
 
-      <Heading
-        level="h2"
-        sx={{
-          display: { xs: 'none', md: 'block' },
-        }}
-        data-testid="desktop-only-h2"
-      >
+      <Heading level="h2" style={{ display: 'block' }} data-testid="desktop-only-h2">
         Desktop Only H2
       </Heading>
 
-      <Heading
-        level="h2"
-        sx={{
-          display: { xs: 'block', md: 'none' },
-        }}
-        data-testid="mobile-only-h2"
-      >
+      <Heading level="h2" style={{ display: 'block' }} data-testid="mobile-only-h2">
         Mobile Only H2
       </Heading>
 
-      <Heading
-        level="h3"
-        sx={{
-          textAlign: { xs: 'center', md: 'left' },
-        }}
-        data-testid="adaptive-alignment-h3"
-      >
+      <Heading level="h3" style={{ textAlign: 'center' }} data-testid="adaptive-alignment-h3">
         Adaptive Alignment H3
       </Heading>
     </Stack>
@@ -715,7 +696,7 @@ export const Performance: Story = {
 export const EdgeCases: Story = {
   render: () => (
     <Stack spacing={2} data-testid="edge-cases-container">
-      <Heading level="h1" data-testid="empty-content"></Heading>
+      <Heading level="h1" data-testid="empty-content">{''}</Heading>
 
       <Heading level="h2" data-testid="very-long-content">
         This is a very long heading that should wrap properly and maintain readability even when the

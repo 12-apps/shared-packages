@@ -802,7 +802,7 @@ export const EdgeCases: Story = {
     });
 
     await step('Long text overflow handling', async () => {
-      const longTextInput = canvas.getByTestId('long-text');
+      const longTextInput = canvas.getByTestId('long-text') as HTMLInputElement;
       await expect(longTextInput.value).toContain('This is a very long text');
 
       // Input should handle overflow gracefully

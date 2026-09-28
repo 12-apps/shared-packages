@@ -13,6 +13,8 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { ContextMenu } from './ContextMenu';
 import type { ContextMenuItem } from './ContextMenu.types';
 
@@ -174,7 +176,7 @@ export const BasicInteraction: Story = {
     await userEvent.click(copyItem);
 
     // Verify onClick was called and menu closed
-    expect(testMenuItems[0].onClick).toHaveBeenCalled();
+    expect(must(testMenuItems[0]).onClick).toHaveBeenCalled();
 
     // Menu should be closed
     await waitFor(() => {
@@ -278,7 +280,7 @@ export const ScreenReader: Story = {
     // Verify each menu item is accessible
     menuItems.forEach((item, index) => {
       expect(item).toHaveAttribute('role', 'menuitem');
-      expect(item).toHaveTextContent(testMenuItems[index].label);
+      expect(item).toHaveTextContent(must(testMenuItems[index]).label);
     });
 
     // Close menu

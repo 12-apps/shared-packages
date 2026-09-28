@@ -83,7 +83,7 @@ export const SelectionCallback: Story = {
   name: '🖱️ Selection Callback Test',
   args: { onSelectItem: fn() },
   render: (args) => (
-    <SettingsLayout title="Settings" groups={GROUPS} activeItemId="profile" {...args}>
+    <SettingsLayout {...args} title="Settings" groups={GROUPS} activeItemId="profile">
       {panel}
     </SettingsLayout>
   ),
