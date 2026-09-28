@@ -4,6 +4,7 @@
  */
 export { MenuSelect } from './Select.menu';
 export type {
+  MenuSelectProps,
   SelectBaseProps,
   SelectOption,
   SelectProps,

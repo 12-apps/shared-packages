@@ -5,7 +5,7 @@ import MuiSelect from '@mui/material/Select/index.js';
 import React from 'react';
 
 import { formControlSize, SelectFieldControl } from './Select.styles';
-import type { SelectProps } from './Select.types';
+import type { MenuSelectProps, SelectProps } from './Select.types';
 
 import { splitTestId } from '../../../platform/test-id';
 import { asFieldSize } from '../../../tokens/field-height';
@@ -138,9 +138,14 @@ MenuField.displayName = 'MenuField';
  * brings) into a bundle. Same props, events and test ids as `Select`, so a call site
  * can switch between the two without touching anything else.
  */
-export const MenuSelect = React.forwardRef<HTMLDivElement, SelectProps>((props, ref) => {
-  // The searchable path's own props: nothing for MUI's Select to receive.
-  const { searchable: _searchable, noOptionsText: _noOptionsText, ...menuProps } = props;
+export const MenuSelect = React.forwardRef<HTMLDivElement, MenuSelectProps>((props, ref) => {
+  // `Select` hands its whole props over, so the searchable path's own two can
+  // still arrive at runtime: nothing for MUI's Select to receive.
+  const {
+    searchable: _searchable,
+    noOptionsText: _noOptionsText,
+    ...menuProps
+  } = props as SelectProps;
   return <MenuField {...menuProps} ref={ref} />;
 });
 
