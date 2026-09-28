@@ -3,7 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { scrim } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 import { dynamicViewportHeight } from '../../../utils/viewport';
-import type { ModalPanelRole, PanelMaxWidth } from './StackedModal.types';
+import type { ModalPanelRole, PanelMaxWidth, PanelSize } from './StackedModal.types';
 
 /** Props that drive the panel's look but must not reach the DOM. */
 export interface PanelStyleProps {
@@ -12,10 +12,11 @@ export interface PanelStyleProps {
   glass?: boolean;
   rtl?: boolean;
   customMaxWidth?: PanelMaxWidth;
+  panelSize?: PanelSize;
 }
 
 /** Style-only props, filtered out before they can land on a DOM node. */
-export const STYLE_ONLY_PROPS = ['modalRole', 'isAnimating', 'glass', 'rtl', 'customMaxWidth'];
+export const STYLE_ONLY_PROPS = ['modalRole', 'isAnimating', 'glass', 'rtl', 'customMaxWidth', 'panelSize'];
 
 /** MUI breakpoint names mapped to the pixel width they cap the panel at. */
 const MAX_WIDTH_PX: Record<Exclude<PanelMaxWidth, false>, number> = {
@@ -79,6 +80,18 @@ const primaryPanelStyles = (theme: Theme, capPx: number | null): CSSObject => ({
   [theme.breakpoints.up(2200)]: panelWidth(theme, '40vw', capPx),
 });
 
+/**
+ * `size="wide"`: 90vw up to `xl`, 75vw above it, 60vw on ultra-wide screens.
+ * At 1280 that is ~1150px instead of 768px — room for a form column beside a
+ * fixed ~350px sidebar — while a sliver of the page behind stays visible.
+ */
+const widePrimaryPanelStyles = (theme: Theme, capPx: number | null): CSSObject => ({
+  [theme.breakpoints.down('sm')]: panelWidth(theme, '100%', capPx),
+  [theme.breakpoints.between('sm', 'xl')]: panelWidth(theme, '90vw', capPx),
+  [theme.breakpoints.up('xl')]: panelWidth(theme, '75vw', capPx),
+  [theme.breakpoints.up(2200)]: panelWidth(theme, '60vw', capPx),
+});
+
 /** Panels below the top one expand to full width, producing the GTM stacking effect. */
 const secondaryPanelStyles = (): CSSObject => ({
   width: '100vw !important',
@@ -91,8 +104,15 @@ const secondaryPanelStyles = (): CSSObject => ({
   transform: 'scale(1)',
 });
 
-const rolePanelStyles = (theme: Theme, role: ModalPanelRole | undefined, capPx: number | null): CSSObject => {
-  if (role === 'primary') return primaryPanelStyles(theme, capPx);
+const rolePanelStyles = (
+  theme: Theme,
+  role: ModalPanelRole | undefined,
+  capPx: number | null,
+  size?: PanelSize,
+): CSSObject => {
+  if (role === 'primary') {
+    return size === 'wide' ? widePrimaryPanelStyles(theme, capPx) : primaryPanelStyles(theme, capPx);
+  }
   if (role === 'secondary') return secondaryPanelStyles();
   // Background modals stay mounted but hidden, for performance.
   if (role === 'background') return { display: 'none' };
@@ -133,7 +153,7 @@ const panelStyles = (theme: Theme, props: PanelStyleProps): CSSObject => {
   const capPx = cap(props.customMaxWidth);
   return {
     ...panelBaseStyles(theme),
-    ...rolePanelStyles(theme, props.modalRole, capPx),
+    ...rolePanelStyles(theme, props.modalRole, capPx, props.panelSize),
     ...glassStyles(theme, props.glass, props.modalRole),
     ...animationStyles(props.isAnimating, props.modalRole),
   };
