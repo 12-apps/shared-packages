@@ -5,8 +5,24 @@ import type { ElementType, ReactNode } from 'react';
 import type { SectionNavCopy } from '../../../copy';
 import { rem } from '../../../tokens/scales';
 
-import { Box, CONTROL_RESET, CountedIcon, controlProps, focusRing } from './SectionNav.parts';
-import type { SectionNavMenu, SectionNavProps } from './SectionNav.types';
+import { destinationState, isMenu } from './SectionNav.helpers';
+import {
+  Box,
+  CONTROL_RESET,
+  CountedIcon,
+  NOT_LIVE,
+  SlotIcon,
+  controlProps,
+  destinationControl,
+  focusRing,
+} from './SectionNav.parts';
+import type {
+  SectionNavAction,
+  SectionNavBack,
+  SectionNavDestination,
+  SectionNavMenu,
+  SectionNavProps,
+} from './SectionNav.types';
 
 /**
  * One rail row: icon, label, and the count at the far end.
@@ -14,6 +30,10 @@ import type { SectionNavMenu, SectionNavProps } from './SectionNav.types';
  * Destinations and menu entries draw the same row — in the rail there is room
  * for everything, so the difference between "a place" and "an action" is the
  * section it sits in, not its shape.
+ *
+ * `active` is the look; `current` is what `aria-current` reports, and is a
+ * link's claim only — an action row that is ON says so with `aria-pressed`,
+ * which arrives in `control`. Omitted, `current` follows `active`.
  */
 function RailRow({
   label,
@@ -21,24 +41,29 @@ function RailRow({
   icon,
   count,
   active,
+  current = active,
   copy,
   testId,
   control,
+  loading = false,
 }: {
   label: string;
   description?: string;
   icon: ReactNode;
   count: number | undefined;
   active: boolean;
+  current?: boolean;
   copy: SectionNavCopy;
   testId: string;
   control: Record<string, unknown>;
+  loading?: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
   return (
     <Box
       {...control}
-      aria-current={active ? 'page' : undefined}
+      aria-current={current ? 'page' : undefined}
+      aria-busy={loading || undefined}
       data-testid={testId}
       sx={{
         ...CONTROL_RESET,
@@ -56,9 +81,15 @@ function RailRow({
         bgcolor: active ? 'action.selected' : 'transparent',
         '&:hover': { bgcolor: active ? 'action.selected' : 'action.hover' },
         '& svg': { color: 'primary.main', fontSize: rem(theme, 20) },
+        [NOT_LIVE]: { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
       }}
     >
-      <CountedIcon icon={icon} count={count} label={copy.badge} testId={`${testId}-badge`} />
+      <CountedIcon
+        icon={<SlotIcon icon={icon} loading={loading} />}
+        count={count}
+        label={copy.badge}
+        testId={`${testId}-badge`}
+      />
       <Box component="span" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Typography component="span" variant="body2" sx={{ fontWeight: active ? 700 : 500 }}>
           {label}
@@ -82,7 +113,11 @@ function RailHeading({ children }: { children: ReactNode }): React.JSX.Element {
   );
 }
 
-/** A menu's groups, listed under its title — nothing folded away on a wide screen. */
+/**
+ * A menu's groups, listed under its title — nothing folded away on a wide
+ * screen. A `disabled` menu has no trigger here to refuse, so every row of it
+ * is inert instead.
+ */
 function RailMenu({
   menu,
   linkComponent,
@@ -113,13 +148,116 @@ function RailMenu({
               count={entry.badge}
               active={entry.active === true}
               copy={copy}
-              testId={`${testId}-entry-${entry.id}`}
-              control={controlProps({ href: entry.href, linkComponent, onClick: () => entry.onSelect?.() })}
+              testId={entry.dataTestId ?? `${testId}-entry-${entry.id}`}
+              control={controlProps({
+                href: entry.href,
+                linkComponent,
+                inert: menu.disabled === true || entry.disabled === true,
+                onClick: () => entry.onSelect?.(),
+              })}
             />
           ))}
         </Box>
       ))}
     </Box>
+  );
+}
+
+/** The way back out of the section, at the top of the rail. */
+function RailBack({
+  back,
+  linkComponent,
+  testId,
+}: {
+  back: SectionNavBack;
+  linkComponent: ElementType | undefined;
+  testId: string;
+}): React.JSX.Element {
+  const theme = useTheme();
+  return (
+    <Box
+      {...controlProps({ href: back.href, linkComponent })}
+      data-testid={testId}
+      sx={{
+        ...CONTROL_RESET,
+        ...focusRing(theme),
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1.25,
+        py: 0.75,
+        mb: 0.5,
+        borderRadius: 1,
+        color: 'text.secondary',
+        '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+        '& svg': { fontSize: rem(theme, 20) },
+      }}
+    >
+      {back.icon}
+      <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
+        {back.label}
+      </Typography>
+    </Box>
+  );
+}
+
+/** A primary that ACTS, as one row: there is no sheet to list on a wide screen. */
+function RailAction({
+  action,
+  linkComponent,
+  copy,
+  testId,
+}: {
+  action: SectionNavAction;
+  linkComponent: ElementType | undefined;
+  copy: SectionNavCopy;
+  testId: string;
+}): React.JSX.Element {
+  return (
+    <RailRow
+      label={action.label}
+      icon={action.icon}
+      count={undefined}
+      active={false}
+      copy={copy}
+      testId={action.dataTestId ?? testId}
+      loading={action.loading === true}
+      control={controlProps({
+        href: undefined,
+        linkComponent,
+        inert: action.disabled === true,
+        busy: action.loading === true,
+        onClick: action.onSelect,
+      })}
+    />
+  );
+}
+
+/** A destination as a row: a link, or an action (a toggle when it carries `active`). */
+function RailDestination({
+  destination,
+  linkComponent,
+  copy,
+  testId,
+}: {
+  destination: SectionNavDestination;
+  linkComponent: ElementType | undefined;
+  copy: SectionNavCopy;
+  testId: string;
+}): React.JSX.Element {
+  const { current, lit } = destinationState(destination);
+  return (
+    <RailRow
+      label={destination.label}
+      icon={destination.icon}
+      count={destination.badge}
+      active={lit}
+      current={current}
+      copy={copy}
+      testId={testId}
+      loading={destination.loading === true}
+      control={destinationControl(destination, linkComponent, () => destination.onSelect?.())}
+    />
   );
 }
 
@@ -144,7 +282,6 @@ export function SectionNavRail({
   Pick<SectionNavProps, 'primary' | 'more' | 'back' | 'heading'> & {
     linkComponent: ElementType | undefined;
   }): React.JSX.Element {
-  const theme = useTheme();
   return (
     <Box
       component="nav"
@@ -161,45 +298,21 @@ export function SectionNavRail({
         bgcolor: 'background.paper',
       }}
     >
-      {back ? (
-        <Box
-          {...controlProps({ href: back.href, linkComponent })}
-          data-testid={`${dataTestId}-back`}
-          sx={{
-            ...CONTROL_RESET,
-            ...focusRing(theme),
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            px: 1.25,
-            py: 0.75,
-            mb: 0.5,
-            borderRadius: 1,
-            color: 'text.secondary',
-            '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
-            '& svg': { fontSize: rem(theme, 20) },
-          }}
-        >
-          {back.icon}
-          <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
-            {back.label}
-          </Typography>
-        </Box>
-      ) : null}
+      {back ? <RailBack back={back} linkComponent={linkComponent} testId={`${dataTestId}-back`} /> : null}
       {heading ? <RailHeading>{heading}</RailHeading> : null}
       {destinations.map((destination) => (
-        <RailRow
+        <RailDestination
           key={destination.id}
-          label={destination.label}
-          icon={destination.icon}
-          count={destination.badge}
-          active={destination.active === true}
+          destination={destination}
+          linkComponent={linkComponent}
           copy={copy}
-          testId={`${dataTestId}-dest-${destination.id}`}
-          control={controlProps({ href: destination.href, linkComponent })}
+          testId={destination.dataTestId ?? `${dataTestId}-dest-${destination.id}`}
         />
       ))}
-      {primary ? (
+      {primary && !isMenu(primary) ? (
+        <RailAction action={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
+      ) : null}
+      {isMenu(primary) ? (
         <RailMenu menu={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
       ) : null}
       {more ? <RailMenu menu={more} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-more`} /> : null}

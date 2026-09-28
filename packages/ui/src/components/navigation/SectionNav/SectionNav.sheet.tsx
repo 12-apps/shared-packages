@@ -25,13 +25,14 @@ function GridEntry({ entry, linkComponent, copy, testId, onDone }: EntryProps): 
       {...controlProps({
         href: entry.href,
         linkComponent,
+        inert: entry.disabled === true,
         onClick: () => {
           entry.onSelect?.();
           onDone();
         },
       })}
       aria-current={entry.active ? 'page' : undefined}
-      data-testid={`${testId}-entry-${entry.id}`}
+      data-testid={entry.dataTestId ?? `${testId}-entry-${entry.id}`}
       sx={{
         ...CONTROL_RESET,
         ...focusRing(theme),
@@ -48,6 +49,7 @@ function GridEntry({ entry, linkComponent, copy, testId, onDone }: EntryProps): 
         bgcolor: entry.active ? 'action.selected' : 'action.hover',
         color: entry.active ? 'primary.main' : 'text.primary',
         '& svg': { color: 'primary.main' },
+        '&:disabled': { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
       }}
     >
       <CountedIcon icon={entry.icon} count={entry.badge} label={copy.badge} testId={`${testId}-badge-${entry.id}`} />
@@ -66,13 +68,14 @@ function ListEntry({ entry, linkComponent, copy, testId, onDone }: EntryProps): 
       {...controlProps({
         href: entry.href,
         linkComponent,
+        inert: entry.disabled === true,
         onClick: () => {
           entry.onSelect?.();
           onDone();
         },
       })}
       aria-current={entry.active ? 'page' : undefined}
-      data-testid={`${testId}-entry-${entry.id}`}
+      data-testid={entry.dataTestId ?? `${testId}-entry-${entry.id}`}
       sx={{
         ...CONTROL_RESET,
         ...focusRing(theme),
@@ -87,6 +90,7 @@ function ListEntry({ entry, linkComponent, copy, testId, onDone }: EntryProps): 
         textAlign: 'start',
         bgcolor: entry.active ? 'action.selected' : 'action.hover',
         '& svg': { color: 'primary.main' },
+        '&:disabled': { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
       }}
     >
       <CountedIcon icon={entry.icon} count={entry.badge} label={copy.badge} testId={`${testId}-badge-${entry.id}`} />

@@ -10,7 +10,7 @@ import { sxRem } from '../../../tokens/scales';
 
 import { SectionNav } from './SectionNav';
 import { RaisedActionButton } from './SectionNav.primary';
-import { DESTINATIONS, MORE, PRIMARY, PhoneFrame, RailFrame } from './__stories__/fixtures';
+import { ACTIONS, DESTINATIONS, MORE, PAY_ALL, PRIMARY, PhoneFrame, RailFrame } from './__stories__/fixtures';
 
 const meta: Meta<typeof SectionNav> = {
   title: 'Navigation/SectionNav',
@@ -53,6 +53,19 @@ export const Bar: Story = {
 /** No primary action: the destinations and `more` share the row evenly. */
 export const BarWithoutPrimary: Story = {
   args: { primary: undefined },
+  render: (args) => (
+    <PhoneFrame>
+      <SectionNav {...args} />
+    </PhoneFrame>
+  ),
+};
+
+/**
+ * A bar of VERBS: action slots (one disabled, one lit), a raised primary that
+ * acts on tap with its label under it, and `more` as a sheet of actions.
+ */
+export const ActionBar: Story = {
+  args: { label: 'Settle the bill', destinations: ACTIONS, primary: PAY_ALL },
   render: (args) => (
     <PhoneFrame>
       <SectionNav {...args} />

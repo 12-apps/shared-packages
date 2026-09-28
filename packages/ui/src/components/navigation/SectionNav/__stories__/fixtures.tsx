@@ -16,7 +16,7 @@ import React from 'react';
 
 import { sxRem } from '../../../../tokens/scales';
 
-import type { SectionNavDestination, SectionNavMenu } from '../SectionNav.types';
+import type { SectionNavAction, SectionNavDestination, SectionNavMenu } from '../SectionNav.types';
 
 /**
  * The stories' example section, shared by the showcase and the interaction
@@ -109,3 +109,23 @@ export function PhoneFrame({ children }: { children: React.ReactNode }): React.R
 export function RailFrame({ children }: { children: React.ReactNode }): React.ReactElement {
   return <Box sx={{ width: sxRem(240), height: sxRem(560), border: 1, borderColor: 'divider' }}>{children}</Box>;
 }
+
+/**
+ * A screen's ACTIONS pinned at its foot — the same bar, drawn with verbs: a
+ * bill being settled, one person at a time.
+ *
+ * `split` is DIMMED — it cannot be done yet, and a tap still reaches the host
+ * so it can say why. `equal` is a TOGGLE that is on: `aria-pressed`, never
+ * `aria-current`, because an action is not a page.
+ */
+export const ACTIONS: SectionNavDestination[] = [
+  { id: 'split', label: 'Split', icon: <ReceiptLongOutlinedIcon />, onSelect: () => undefined, dimmed: true },
+  { id: 'equal', label: 'Equally', icon: <GroupsOutlinedIcon />, onSelect: () => undefined, active: true },
+  { id: 'person', label: 'Person', icon: <AddIcon />, onSelect: () => undefined },
+];
+
+export const PAY_ALL: SectionNavAction = {
+  label: 'Pay all',
+  icon: <StorefrontOutlinedIcon />,
+  onSelect: () => undefined,
+};

@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import type { ElementType, ReactNode } from 'react';
 
@@ -6,6 +7,7 @@ import { rem } from '../../../tokens/scales';
 import { Badge } from '../../data-display/Badge';
 
 import { shownCount } from './SectionNav.helpers';
+import type { SectionNavDestination } from './SectionNav.types';
 
 /**
  * An icon with its count on the shoulder.
@@ -59,19 +61,74 @@ export function focusRing(theme: Theme): SxProps<Theme> {
  * `href`, a button for an `onSelect`.
  *
  * Returned as props for a `Box`, so the control stays ONE interactive
- * element — never a button wrapped around a link.
+ * element — never a button wrapped around a link. Whatever it would lead to,
+ * a control that is not live is a BUTTON: a link cannot be disabled, and one
+ * that looks dimmed but still navigates is the lie this rules out.
+ *
+ * - `inert` — a native `disabled` button: no focus, no click.
+ * - `busy` — a write is in flight: `aria-disabled`, still focusable, and the
+ *   click is dropped, so the keyboard keeps its place until the write answers.
+ * - `dimmed` — `aria-disabled`, still focusable, and the click STILL runs, so
+ *   the host can explain why the act cannot be done now.
  */
 export function controlProps({
   href,
   onClick,
   linkComponent,
+  inert = false,
+  busy = false,
+  dimmed = false,
 }: {
   href: string | undefined;
   onClick?: () => void;
   linkComponent: ElementType | undefined;
+  inert?: boolean;
+  busy?: boolean;
+  dimmed?: boolean;
 }): Record<string, unknown> {
+  if (inert) return { component: 'button', type: 'button', disabled: true };
+  if (busy) return { component: 'button', type: 'button', 'aria-disabled': 'true' };
+  if (dimmed) return { component: 'button', type: 'button', 'aria-disabled': 'true', onClick };
   if (href !== undefined) return { component: linkComponent ?? 'a', href, onClick };
   return { component: 'button', type: 'button', onClick };
+}
+
+/**
+ * A destination's control: `controlProps` from its own state, plus
+ * `aria-pressed` when it is an action slot that is a toggle. A link reports
+ * where the viewer is through `aria-current` instead — the row draws that.
+ */
+export function destinationControl(
+  destination: SectionNavDestination,
+  linkComponent: ElementType | undefined,
+  onClick: () => void,
+): Record<string, unknown> {
+  return {
+    ...controlProps({
+      href: destination.href,
+      linkComponent,
+      inert: destination.disabled === true,
+      busy: destination.loading === true,
+      dimmed: destination.dimmed === true,
+      onClick,
+    }),
+    'aria-pressed': destination.href === undefined ? destination.active : undefined,
+  };
+}
+
+/**
+ * The selector for a control drawn as not live: natively disabled, or
+ * `aria-disabled` (in flight, or dimmed) and still focusable.
+ */
+export const NOT_LIVE = '&:disabled, &[aria-disabled="true"]';
+
+/**
+ * The icon, or the spinner that stands in for it while the slot's write is in
+ * flight — the same box, so the label under it does not move.
+ */
+export function SlotIcon({ icon, loading }: { icon: ReactNode; loading: boolean }): React.JSX.Element {
+  if (!loading) return <>{icon}</>;
+  return <CircularProgress size="1em" color="inherit" thickness={5} data-testid="section-nav-spinner" />;
 }
 
 /** The base reset every clickable in the nav shares: no underline, no button chrome. */
@@ -83,6 +140,7 @@ export const CONTROL_RESET = {
   textDecoration: 'none',
   cursor: 'pointer',
   margin: 0,
+  [NOT_LIVE]: { cursor: 'default' },
 } as const;
 
 export { Box };
