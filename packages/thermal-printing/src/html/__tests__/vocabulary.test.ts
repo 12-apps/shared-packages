@@ -17,7 +17,7 @@ describe("legacy tickets", () => {
 
     expect(bodyOf(html)).toBe(
       '<div style="font-weight:700">A</div>' +
-        '<div style="font-weight:700;font-size:2em;line-height:1.1;text-align:center">B</div>' +
+        '<div style="font-weight:700;transform:scaleY(2);transform-origin:top;margin-bottom:1.25em;text-align:center">B</div>' +
         "<div>&nbsp;</div>",
     );
   });
@@ -77,20 +77,21 @@ describe("row", () => {
 describe("image", () => {
   const raster = { width: 576, height: 2, data: new Uint8Array(72 * 2).fill(0xff) };
 
-  it("inlines the raster as a data URI, sized to the roll in characters", () => {
+  it("inlines the raster as a data URI, one image pixel per printer dot", () => {
     const html = bodyOf(renderTicketHtml([image(raster)], 80));
 
     expect(html).toContain('src="data:image/bmp;base64,');
-    // 576 dots on an 80 mm roll is the whole printable width: 48 columns.
-    expect(html).toContain("width:48ch");
+    // 576 dots at 8 dots/mm is 72 mm: the whole printable width of an 80 mm roll.
+    expect(html).toContain("width:72mm");
     expect(html).toContain("margin:0 auto");
     expect(html).toContain("image-rendering:pixelated");
   });
 
-  it("scales by 12 dots per character on either roll", () => {
+  it("is as wide on either roll as its dots are, and never wider than the roll", () => {
     const small = { width: 96, height: 1, data: new Uint8Array(12) };
 
-    expect(renderTicketHtml([image(small, "left")], 58)).toContain("width:8ch");
+    expect(renderTicketHtml([image(small, "left")], 58)).toContain("width:12mm;max-width:100%");
+    expect(renderTicketHtml([image(small, "left")], 80)).toContain("width:12mm;max-width:100%");
     expect(renderTicketHtml([image(small, "left")], 58)).toContain("margin:0;");
   });
 });
@@ -111,6 +112,24 @@ describe("rasterToDataUri", () => {
     expect([...bmp.slice(54, 62)]).toEqual([0xff, 0xff, 0xff, 0, 0, 0, 0, 0]);
     // Rows padded to 4 bytes and stored bottom-up: row 1 first, then row 0.
     expect([...bmp.slice(62)]).toEqual([0b0100_0000, 0, 0, 0, 0b1010_0000, 0, 0, 0]);
+  });
+
+  it("keeps every row of a tall picture: no row is lost or blanked", () => {
+    // A logo-sized raster whose every row differs, so a dropped, shifted or
+    // blank row — the white bands seen on paper — cannot hide.
+    const width = 300;
+    const height = 240;
+    const rowBytes = Math.ceil(width / 8);
+    const data = new Uint8Array(rowBytes * height);
+    for (let y = 0; y < height; y += 1) data.fill((y * 37 + 11) & 0xff, y * rowBytes, (y + 1) * rowBytes);
+    const bmp = decode(rasterToDataUri({ width, height, data }));
+    const stride = Math.ceil(rowBytes / 4) * 4;
+
+    expect(bmp.length).toBe(62 + stride * height);
+    for (let y = 0; y < height; y += 1) {
+      const stored = bmp.slice(62 + (height - 1 - y) * stride, 62 + (height - 1 - y) * stride + rowBytes);
+      expect([...stored]).toEqual([...data.slice(y * rowBytes, (y + 1) * rowBytes)]);
+    }
   });
 });
 

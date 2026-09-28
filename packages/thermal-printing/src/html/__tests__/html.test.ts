@@ -18,9 +18,38 @@ const line = (text: string, emphasis: TicketLine["emphasis"] = "normal"): Ticket
 });
 
 describe("renderTicketHtml", () => {
-  it("sizes the page in CHARACTERS, so a driver's margins cannot rewrap it", () => {
-    expect(renderTicketHtml([line("ok")], 58)).toContain("width:32ch");
-    expect(renderTicketHtml([line("ok")], 80)).toContain("width:48ch");
+  it("sizes the page to the roll's PRINTABLE width, not the paper's", () => {
+    expect(renderTicketHtml([line("ok")], 58)).toContain("width:48mm");
+    expect(renderTicketHtml([line("ok")], 80)).toContain("width:72mm");
+    expect(renderTicketHtml([line("ok")], 80)).not.toMatch(/width:\d+ch/);
+  });
+
+  it.each([
+    [58, 32, 48],
+    [80, 48, 72],
+  ])("sets %smm type so %s columns fit inside %smm, with room to spare", (paper, columns, printable) => {
+    const fontMm = Number(/font-size:([\d.]+)mm/.exec(renderTicketHtml([line("ok")], paper))?.[1]);
+    // A monospace glyph advances 0.6 em (Courier New, Liberation Mono); one a
+    // little wider (DejaVu Sans Mono, 0.602 em) must still fit.
+    expect(columns * 0.6 * fontMm).toBeLessThanOrEqual(printable);
+    expect(columns * 0.602 * fontMm).toBeLessThanOrEqual(printable);
+    // …and the line still fills the roll: no more than 3 % left unused.
+    expect(columns * 0.6 * fontMm).toBeGreaterThan(printable * 0.97);
+  });
+
+  it("prints pure black on white, never a grey a thermal head would dither", () => {
+    const html = renderTicketHtml([line("ok")], 80);
+
+    expect(html).toContain("color:#000");
+    expect(html).toContain("background:#fff");
+    expect(html).not.toMatch(/opacity|rgba?\(|#(?!000\b|fff\b)[0-9a-f]{3,6}\b/i);
+  });
+
+  it("thickens every stem past one printer dot, in the text's own colour", () => {
+    const html = renderTicketHtml([line("ok")], 80);
+
+    expect(html).toContain("-webkit-text-stroke-width:0.12mm");
+    expect(html).toContain("-webkit-text-stroke-color:currentColor");
   });
 
   it("kills the page margin a driver would otherwise add to a receipt roll", () => {
@@ -48,6 +77,9 @@ describe("renderTicketHtml", () => {
   it("matches the ESC/POS encoder: double height, never double width", () => {
     const html = renderTicketHtml([line("MESA 12", "double")], 80);
 
-    expect(html).toContain("font-size:2em");
+    // A doubled font size doubles the width too, and a full line runs off the roll.
+    expect(html).not.toContain("font-size:2em");
+    expect(html).toContain("transform:scaleY(2)");
+    expect(html).toContain("margin-bottom:1.25em");
   });
 });

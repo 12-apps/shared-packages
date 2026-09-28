@@ -11,7 +11,7 @@ import { BrowserWindow, type Session } from "electron";
  * `silent: true` and a named device: no flag, no dialog, and the machine
  * chooses WHICH printer.
  *
- * The document is typically `./html`'s output — sized in `ch`,
+ * The document is typically `./html`'s output — the printable width in mm,
  * `@page { margin: 0 }` — and printing one means rendering it, in an
  * offscreen window created, loaded, printed and destroyed per ticket. A reused
  * window would carry the previous ticket's layout state into the next, and
