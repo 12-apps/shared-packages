@@ -8,4 +8,4 @@ export {
   useModalStack as useStackedModal,
 } from './StackedModal';
 
-export type { StackedModalProps } from './StackedModal.types';
+export type { PanelSize, StackedModalProps } from './StackedModal.types';
