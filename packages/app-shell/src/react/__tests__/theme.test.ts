@@ -424,7 +424,7 @@ describe('createAppTheme with a density (FUT-2967)', () => {
       // Named `builtTheme`, not `theme`: an `it.each` callback confuses this
       // repo's flakiness lint into treating a same-named `const` elsewhere in
       // the file as shared state (a known false positive with `.each`).
-      const builtTheme = createAppTheme('light', { density });
+      const builtTheme = createAppTheme('light', { density, densityTheme: densityThemeOptions });
       const expectedOptions = densityThemeOptions(density);
       const expectedTheme = createTheme(expectedOptions);
 
@@ -435,18 +435,18 @@ describe('createAppTheme with a density (FUT-2967)', () => {
   );
 
   it('sets theme.density to the resolved factor', () => {
-    expect(createAppTheme('light', { density: 'compact' }).density).toEqual({ level: 'compact', factor: 0.9 });
-    expect(createAppTheme('light', { density: 0.85 }).density).toEqual({ factor: 0.85 });
+    expect(createAppTheme('light', { density: 'compact', densityTheme: densityThemeOptions }).density).toEqual({ level: 'compact', factor: 0.9 });
+    expect(createAppTheme('light', { density: 0.85, densityTheme: densityThemeOptions }).density).toEqual({ factor: 0.85 });
   });
 
   it("a repository's own densityFactors override reaches createAppTheme too", () => {
-    const theme = createAppTheme('light', { density: 'compact', densityFactors: { compact: 0.8 } });
+    const theme = createAppTheme('light', { density: 'compact', densityFactors: { compact: 0.8 }, densityTheme: densityThemeOptions });
     expect(theme.density).toEqual({ level: 'compact', factor: 0.8 });
     expect(theme.spacing(1)).toBe('6.4px');
   });
 
   it('carries the density MuiOutlinedInput/MuiChip/MuiToggleButton components', () => {
-    const theme = createAppTheme('light', { density: 'compact' });
+    const theme = createAppTheme('light', { density: 'compact', densityTheme: densityThemeOptions });
     expect(theme.components?.MuiChip?.styleOverrides?.root).toBeTypeOf('function');
     expect(theme.components?.MuiToggleButton?.styleOverrides?.root).toBeTypeOf('function');
     expect(theme.components?.MuiOutlinedInput?.styleOverrides?.root).toEqual({ borderRadius: 8 });
@@ -456,6 +456,7 @@ describe('createAppTheme with a density (FUT-2967)', () => {
     const theme = createAppTheme('light', {
       density: 'compact',
       components: { MuiChip: { styleOverrides: { label: { paddingLeft: 99 } } } },
+      densityTheme: densityThemeOptions,
     });
     // The host's own slot wins...
     expect(theme.components?.MuiChip?.styleOverrides?.label).toEqual({ paddingLeft: 99 });
@@ -471,6 +472,7 @@ describe('createAppTheme with a density (FUT-2967)', () => {
     const theme = createAppTheme('light', {
       density: 'compact',
       components: { MuiButton: { defaultProps: { disableRipple: true }, variants: [soft] } },
+      densityTheme: densityThemeOptions,
     });
     expect(theme.components?.MuiButton?.defaultProps).toEqual({ disableRipple: true });
     expect(theme.components?.MuiButton?.variants).toEqual([soft]);
@@ -478,7 +480,7 @@ describe('createAppTheme with a density (FUT-2967)', () => {
 
   it('an explicit fieldHeight wins over density, for theme.fieldHeight and for MuiOutlinedInput.input', () => {
     const explicit = 3;
-    const theme = createAppTheme('light', { density: 'compact', fieldHeight: explicit });
+    const theme = createAppTheme('light', { density: 'compact', fieldHeight: explicit, densityTheme: densityThemeOptions });
     expect(theme.fieldHeight).toBe(explicit);
     expect(theme.components?.MuiOutlinedInput?.styleOverrides?.input).toEqual(
       fieldHeightOverrides(explicit).MuiOutlinedInput?.styleOverrides?.input,
@@ -488,8 +490,8 @@ describe('createAppTheme with a density (FUT-2967)', () => {
   it('an explicit fieldHeight that happens to MATCH the density one does not force in fieldHeightOverrides redundantly', () => {
     // 'normal' density fieldHeight is 2.5, today's default — an explicit 2.5
     // is not a DIFFERENT height, so this is just the density path unchanged.
-    const theme = createAppTheme('light', { density: 'normal', fieldHeight: 2.5 });
-    const withoutExplicit = createAppTheme('light', { density: 'normal' });
+    const theme = createAppTheme('light', { density: 'normal', fieldHeight: 2.5, densityTheme: densityThemeOptions });
+    const withoutExplicit = createAppTheme('light', { density: 'normal', densityTheme: densityThemeOptions });
     expect(theme.fieldHeight).toBe(withoutExplicit.fieldHeight);
     expect(theme.components?.MuiOutlinedInput?.styleOverrides?.input).toEqual(
       withoutExplicit.components?.MuiOutlinedInput?.styleOverrides?.input,
@@ -501,6 +503,7 @@ describe('createAppTheme with a density (FUT-2967)', () => {
       density: 'compact',
       fieldHeight: 3,
       components: { MuiOutlinedInput: { styleOverrides: { input: { padding: 'custom' } } } },
+      densityTheme: densityThemeOptions,
     });
     expect(theme.components?.MuiOutlinedInput?.styleOverrides?.input).toEqual({ padding: 'custom' });
   });

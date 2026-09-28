@@ -2,7 +2,6 @@ import { createTheme, type Theme } from '@12-apps/ui/mui/styles';
 import {
   DEFAULT_FIELD_HEIGHT,
   DEFAULT_FIELD_RADIUS,
-  densityThemeOptions,
   fieldHeightOverrides,
   fieldOverrides,
   mergeMuiComponents,
@@ -257,6 +256,43 @@ function themePalette(
 }
 
 /**
+ * Are we running outside production? A missing `densityTheme` fails loudly only here.
+ *
+ * `process.env.NODE_ENV` is spelled out in full on purpose: that exact
+ * expression is what a host bundler's define replaces (Vite in dev and build,
+ * webpack, esbuild), and a browser has no `process` to read. A
+ * `typeof process` guard would answer "production" in every browser, dev
+ * server included. The `catch` covers a host that neither defines it nor has
+ * a `process`: no warning, never a crash.
+ */
+function isDevelopment(): boolean {
+  try {
+    return process.env.NODE_ENV !== 'production';
+  } catch {
+    return false;
+  }
+}
+
+let warnedMissingDensityTheme = false;
+
+/**
+ * `density` was set with no {@link AppThemeOptions.densityTheme} to apply it
+ * with. {@link createAppTheme} builds the no-density theme regardless — this
+ * is only the nudge toward the option that was missing. Development only,
+ * once per process: a host that always forgets it does not get spammed on
+ * every theme rebuild (every render, in the common case of building the theme
+ * inline).
+ */
+function warnMissingDensityTheme(): void {
+  if (!isDevelopment() || warnedMissingDensityTheme) return;
+  warnedMissingDensityTheme = true;
+  console.warn(
+    "createAppTheme: `density` was set but `densityTheme` was not, so no density was applied. " +
+      "Pass densityTheme: densityThemeOptions from '@12-apps/ui/tokens' alongside `density` to apply it.",
+  );
+}
+
+/**
  * Whether an explicit field height differs from the one density derives, and
  * the height that wins — its own function so {@link createAppTheme}'s density
  * branch reads as one thought instead of three chained `?:`/`??`/`!==`.
@@ -277,14 +313,19 @@ function effectiveFieldHeight(
  * composes, later winning per slot (`mergeMuiComponents`): density's own,
  * then `fieldHeightOverrides` ONLY when an explicit height differs from
  * density's, then the host's own {@link AppThemeOptions.components}.
+ *
+ * `densityTheme` is the host-supplied implementation
+ * ({@link AppThemeOptions.densityTheme}) — this module never imports
+ * `densityThemeOptions` itself, only its type.
  */
 function densityAppTheme(
   mode: ThemeMode,
   options: AppThemeOptions,
   density: DensityLevel | number,
+  densityTheme: NonNullable<AppThemeOptions['densityTheme']>,
   fieldRadius: number,
 ): Theme {
-  const densityOptions = densityThemeOptions(density, options.densityFactors, fieldRadius);
+  const densityOptions = densityTheme(density, options.densityFactors, fieldRadius);
   const { height, explicitDiffers } = effectiveFieldHeight(
     options.fieldHeight,
     densityOptions.fieldHeight ?? DEFAULT_FIELD_HEIGHT,
@@ -318,11 +359,18 @@ function densityAppTheme(
  *
  * **No {@link AppThemeOptions.density}: unchanged.** Today's code path,
  * byte-for-byte — the release's whole compatibility guarantee. A density
- * hands off to {@link densityAppTheme}, whose own docblock has that half.
+ * WITH a {@link AppThemeOptions.densityTheme} hands off to
+ * {@link densityAppTheme}, whose own docblock has that half. A density with
+ * no `densityTheme` falls through to this same no-density path and warns
+ * once in development — there is no implementation to build it from, and
+ * this factory never imports one on its own.
  */
 export function createAppTheme(mode: ThemeMode = 'light', options: AppThemeOptions = {}): Theme {
-  const { fieldRadius = DEFAULT_FIELD_RADIUS, density } = options;
-  if (density !== undefined) return densityAppTheme(mode, options, density, fieldRadius);
+  const { fieldRadius = DEFAULT_FIELD_RADIUS, density, densityTheme } = options;
+  if (density !== undefined) {
+    if (densityTheme) return densityAppTheme(mode, options, density, densityTheme, fieldRadius);
+    warnMissingDensityTheme();
+  }
 
   const { fieldHeight = DEFAULT_FIELD_HEIGHT } = options;
   return createTheme({

@@ -337,6 +337,18 @@ sync, no migration to replay, and no `prisma:sync-*:check` for this package.
   bright lime comes back as a deeper lime, because one tone has to serve both text
   and background; `palette.primary.light` keeps their exact hex for decoration.
   Your own tokens are design decisions already made and are painted as given.
+- **`density` alone applies nothing — pass `densityTheme` too.** `createAppTheme`
+  refers to the density IMPLEMENTATION only by TYPE, so a host that never sets a
+  density never has `density.ts` or the `density-overrides*` modules in its
+  bundle. Import the implementation yourself and pass both:
+  ```ts
+  import { densityThemeOptions } from '@12-apps/ui/tokens';
+
+  createAppTheme('light', { density: 'compact', densityTheme: densityThemeOptions });
+  ```
+  `density` with no `densityTheme` builds the no-density theme and
+  `console.warn`s once, in development, naming the missing option — it does not
+  throw, and it does not reach for the implementation on its own.
 - **`theme.density` changes how `theme.components` merges hosts' overrides.**
   With no `density`, `theme: { components }` REPLACES a whole MUI component
   entry — your `MuiChip` entirely displaces the factory's, slot and all. With a

@@ -1,5 +1,5 @@
 import { createTheme } from '@12-apps/ui/mui/styles';
-import type { DensityLevel } from '@12-apps/ui/tokens';
+import type { densityThemeOptions, DensityLevel } from '@12-apps/ui/tokens';
 
 /**
  * The public shape {@link AppThemeOptions} takes, split out of `./theme` for
@@ -181,4 +181,28 @@ export interface AppThemeOptions {
   density?: DensityLevel | number;
   /** A repository's own factor for a named level, overriding the built-in table — see {@link density}. */
   densityFactors?: Partial<Record<DensityLevel, number>>;
+  /**
+   * The density IMPLEMENTATION: `@12-apps/ui/tokens`'s own `densityThemeOptions`,
+   * passed in by the host. This package refers to it only by TYPE
+   * (`typeof densityThemeOptions`, this key's own type) — never as a value — so a
+   * host that never sets a {@link density} never pulls `density.ts` or any of the
+   * `density-overrides*` modules onto its bundle's first paint. Before this key,
+   * `createAppTheme` called `densityThemeOptions` directly, and a bundler cannot
+   * drop that branch just because it never runs — those modules shipped eagerly
+   * to every host, whether or not it renders a density at all.
+   *
+   * A host that wants density imports `densityThemeOptions` itself and passes it
+   * here, alongside {@link density}:
+   *
+   * ```ts
+   * import { densityThemeOptions } from '@12-apps/ui/tokens';
+   *
+   * createAppTheme('light', { density: 'compact', densityTheme: densityThemeOptions });
+   * ```
+   *
+   * {@link density} with no `densityTheme` builds exactly the no-density theme
+   * and `console.warn`s once, in development, naming the missing option — it
+   * does NOT throw, and does NOT apply density from anywhere else.
+   */
+  densityTheme?: typeof densityThemeOptions;
 }
