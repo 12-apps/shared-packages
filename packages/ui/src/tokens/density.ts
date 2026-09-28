@@ -147,13 +147,19 @@ export function densityThemeOptions(
   density: DensityLevel | number,
   factors?: Partial<Record<DensityLevel, number>>,
   fieldRadius: number = DEFAULT_FIELD_RADIUS,
-): Pick<ThemeOptions, 'typography' | 'spacing' | 'fieldHeight' | 'components'> {
+): Pick<ThemeOptions, 'typography' | 'spacing' | 'fieldHeight' | 'fieldRadius' | 'components'> {
   const { factor } = resolveDensityFactor(density, factors);
   const fieldHeight = densityFieldHeight(factor);
   return {
     typography: { fontSize: densityFontSize(factor) },
     spacing: densitySpacingUnit(factor),
     fieldHeight,
+    // A standalone host (never `createUiTheme`/`UiProvider`) that draws its
+    // OWN, non-default radius states it through this 3rd argument; reporting
+    // it back here (FUT-2967) lets `@12-apps/app-shell`'s `createAppTheme`
+    // spread this object's OWN `fieldRadius` into its `createTheme()` call
+    // instead of tracking the number separately — the two can never disagree.
+    fieldRadius,
     components: mergeMuiComponents(
       fieldOverrides(fieldRadius, fieldHeight),
       iconButtonDensityOverrides(),

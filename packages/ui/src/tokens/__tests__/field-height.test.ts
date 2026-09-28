@@ -1,3 +1,4 @@
+import type { Components, Theme } from '@mui/material/styles/index.js';
 import { describe, expect, it } from 'vitest';
 
 import { mergeMuiComponents } from '../field-height';
@@ -45,5 +46,53 @@ describe('mergeMuiComponents', () => {
 
   it('no sources at all is the empty override set', () => {
     expect(mergeMuiComponents()).toEqual({});
+  });
+});
+
+/**
+ * FUT-2967 — the merge used to drop `defaultProps` and `variants` entirely: a
+ * plain `Object.assign` over `styleOverrides` alone left a host's own
+ * `MuiButton.defaultProps`/`variants` on the floor the moment a density (or
+ * any other) source also touched `MuiButton`. These pin the three keys the
+ * merge must carry, side by side with the wholesale `styleOverrides` rule
+ * above, which is unchanged.
+ */
+describe('mergeMuiComponents — defaultProps, variants and other keys (FUT-2967)', () => {
+  it('shallow-merges defaultProps, the later source winning per key', () => {
+    const a: Components<Theme> = { MuiButton: { defaultProps: { disableRipple: true, size: 'small' } } };
+    const b: Components<Theme> = { MuiButton: { defaultProps: { size: 'large' } } };
+    const merged = mergeMuiComponents(a, b);
+    expect(merged.MuiButton?.defaultProps).toEqual({ disableRipple: true, size: 'large' });
+  });
+
+  it('concatenates variants, earlier source first', () => {
+    const soft = { props: { variant: 'text' as const }, style: { opacity: 0.9 } };
+    const ghost = { props: { variant: 'outlined' as const }, style: { opacity: 0.5 } };
+    const a: Components<Theme> = { MuiButton: { variants: [soft] } };
+    const b: Components<Theme> = { MuiButton: { variants: [ghost] } };
+    expect(mergeMuiComponents(a, b).MuiButton?.variants).toEqual([soft, ghost]);
+  });
+
+  it('a component styled by only one source keeps its defaultProps/variants untouched', () => {
+    const soft = { props: { variant: 'text' as const }, style: { opacity: 0.9 } };
+    const a: Components<Theme> = { MuiButton: { defaultProps: { disableRipple: true }, variants: [soft] } };
+    const b: Components<Theme> = { MuiChip: { styleOverrides: { root: { height: 32 } } } };
+    const merged = mergeMuiComponents(a, b);
+    expect(merged.MuiButton?.defaultProps).toEqual({ disableRipple: true });
+    expect(merged.MuiButton?.variants).toEqual([soft]);
+  });
+
+  it('still replaces a shared styleOverrides slot wholesale alongside a merged defaultProps', () => {
+    const a: Components<Theme> = {
+      MuiButton: { defaultProps: { disableRipple: true }, styleOverrides: { root: { borderRadius: 8 } } },
+    };
+    const b: Components<Theme> = {
+      MuiButton: { defaultProps: { size: 'large' }, styleOverrides: { root: { borderRadius: 4 } } },
+    };
+    const merged = mergeMuiComponents(a, b);
+    // defaultProps: shallow-merged, later wins per key.
+    expect(merged.MuiButton?.defaultProps).toEqual({ disableRipple: true, size: 'large' });
+    // styleOverrides: the shared `root` key is REPLACED wholesale by the later source.
+    expect(merged.MuiButton?.styleOverrides?.root).toEqual({ borderRadius: 4 });
   });
 });

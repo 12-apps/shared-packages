@@ -15,6 +15,7 @@ import {
   tabsIndicatorDensityOverrides,
   toggleButtonDensityOverrides,
 } from '../density-overrides';
+import { DEFAULT_FIELD_RADIUS } from '../field-radius.core';
 
 /**
  * FUT-2766 — `IconButton`/`Chip` geometry through the theme's density knob.
@@ -533,18 +534,30 @@ describe('switchDensityOverrides', () => {
 });
 
 describe('toggleButtonDensityOverrides', () => {
-  it('writes root/sizeSmall/sizeLarge padding as rem(theme, px) — the literals ToggleButton.js hard-codes', () => {
+  it('writes root/sizeSmall/sizeLarge padding as rem(theme, px) — the literals ToggleButton.js hard-codes — and the field radius onto root (FUT-2967)', () => {
     const theme = createTheme();
     const overrides = toggleButtonDensityOverrides();
-    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({ padding: theme.typography.pxToRem(11) });
+    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({
+      padding: theme.typography.pxToRem(11),
+      borderRadius: DEFAULT_FIELD_RADIUS,
+    });
     expect(slot(overrides, 'MuiToggleButton', 'sizeSmall', theme)).toEqual({ padding: theme.typography.pxToRem(7) });
     expect(slot(overrides, 'MuiToggleButton', 'sizeLarge', theme)).toEqual({ padding: theme.typography.pxToRem(15) });
   });
 
-  it('is a true no-op at the default theme: 11px/7px/15px, the exact literals it replaces', () => {
+  /**
+   * FUT-2967: the `root` slot is no longer a true no-op at the default theme —
+   * it now also carries the field radius (8px), replacing MUI's own
+   * `shape.borderRadius` (4px) on a bare `<ToggleButton>`. `sizeSmall`/
+   * `sizeLarge` are untouched and stay exact no-ops.
+   */
+  it('at the default theme: padding is the exact 11px/7px/15px literals it replaces; root also gains the field radius', () => {
     const theme = createTheme();
     const overrides = toggleButtonDensityOverrides();
-    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({ padding: '0.6875rem' }); // 11 / 16
+    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({
+      padding: '0.6875rem', // 11 / 16
+      borderRadius: DEFAULT_FIELD_RADIUS, // 8, NOT MUI's own shape.borderRadius (4)
+    });
     expect(slot(overrides, 'MuiToggleButton', 'sizeSmall', theme)).toEqual({ padding: '0.4375rem' }); // 7 / 16
     expect(slot(overrides, 'MuiToggleButton', 'sizeLarge', theme)).toEqual({ padding: '0.9375rem' }); // 15 / 16
   });
@@ -552,7 +565,17 @@ describe('toggleButtonDensityOverrides', () => {
   it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
     const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
     const overrides = toggleButtonDensityOverrides();
-    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({ padding: '0.61875rem' }); // 11 * 0.9 / 16
+    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toMatchObject({ padding: '0.61875rem' }); // 11 * 0.9 / 16
+  });
+
+  it("follows the theme's own fieldRadius on root when one is set, falling back to DEFAULT_FIELD_RADIUS otherwise", () => {
+    const withRadius = createTheme({ fieldRadius: 12 });
+    const withoutRadius = createTheme();
+    const overrides = toggleButtonDensityOverrides();
+    expect(slot(overrides, 'MuiToggleButton', 'root', withRadius)).toMatchObject({ borderRadius: 12 });
+    expect(slot(overrides, 'MuiToggleButton', 'root', withoutRadius)).toMatchObject({
+      borderRadius: DEFAULT_FIELD_RADIUS,
+    });
   });
 
   it('two separately-built override sets are the SAME function references', () => {

@@ -1,59 +1,44 @@
 import { createTheme, type Theme } from '@12-apps/ui/mui/styles';
-import { DEFAULT_FIELD_HEIGHT, DEFAULT_FIELD_RADIUS, fieldOverrides } from '@12-apps/ui/tokens';
+import {
+  DEFAULT_FIELD_HEIGHT,
+  DEFAULT_FIELD_RADIUS,
+  densityThemeOptions,
+  fieldHeightOverrides,
+  fieldOverrides,
+  mergeMuiComponents,
+  resolveDensityFactor,
+  type DensityLevel,
+} from '@12-apps/ui/tokens';
 
 import { brandHex, DEFAULT_SURFACES as CORE_SURFACES, readableInk, separateFromBrand } from '../core/brand-palette';
 
+// `AppThemeOptions` and its supporting types live in `./theme-options` — see
+// that module's own docblock for why. The publicly re-exported ones (this
+// package's `react/index.ts` names each) are re-exported here so the import
+// path an adopter already writes (`from '@12-apps/app-shell/react'`) is
+// unchanged; `ModeSurfaces`/`SemanticTokens` were never part of that public
+// surface and stay a plain (type-only) import, used internally below.
+export {
+  DEFAULT_THEME_TOKENS,
+  type AppThemeOptions,
+  type ModeTokens,
+  type PaletteOverride,
+  type ThemeMode,
+} from './theme-options';
+import type { AppThemeOptions, ModeSurfaces, ModeTokens, PaletteOverride, SemanticTokens, ThemeMode } from './theme-options';
+import { DEFAULT_THEME_TOKENS as DEFAULT_TOKENS } from './theme-options';
+
 /**
- * What `createTheme` accepts under `components`, derived from the function
- * rather than imported.
- *
- * `@12-apps/ui/mui/styles` does not re-export `ThemeOptions`, and reaching past it
- * to `@mui/material/styles` would give this module a second route to MUI that
- * the rest of the package deliberately does not have. Deriving it is also the
- * tighter statement: the type is defined as "whatever the factory below takes",
- * so it cannot drift from it.
+ * The shape `mergeMuiComponents` itself takes, derived the same way
+ * {@link AppThemeOptions.components} is (see `./theme-options`). The two
+ * describe the same runtime shape — MUI's `Components<Theme>` for THIS
+ * package's `Theme` — but `createTheme` is overloaded onto a slightly
+ * different `Theme` instantiation, so a value typed as one needs this cast to
+ * reach the other.
  */
-type ThemeComponents = NonNullable<Parameters<typeof createTheme>[0]>['components'];
-
-/** Supported color-scheme modes for the app theme. */
-export type ThemeMode = 'light' | 'dark';
-
-/** A primary/secondary color token pair for a single mode. */
-export interface ModeTokens {
-  primary: string;
-  secondary: string;
-}
+type MergeableComponents = Parameters<typeof mergeMuiComponents>[number];
 
 /**
- * The PLATFORM's own colour tokens, per mode.
- *
- * These are the default, not a rule: a host's design tokens are a host's own, so
- * {@link AppThemeOptions.tokens} replaces them. The defaults are the pair the
- * three SPAs this was extracted from ship, mirrored from `@12-apps/ui`'s Storybook
- * preview — keep them in sync if the design tokens change there.
- */
-export const DEFAULT_THEME_TOKENS: Record<ThemeMode, ModeTokens> = {
-  light: { primary: '#6366F1', secondary: '#8B5CF6' },
-  dark: { primary: '#818CF8', secondary: '#A78BFA' },
-};
-
-/**
- * A tenant's palette override. Either color may be absent — a tenant that set
- * only a primary keeps the platform secondary rather than losing it.
- */
-export interface PaletteOverride {
-  primary?: string | null;
-  secondary?: string | null;
-}
-
-/**
- * The page a tenant's text is read against, per mode — the DEFAULT, not a rule.
- *
- * Replaceable through {@link AppThemeOptions.surface}, and it has to be: the WCAG
- * correction in `brandRole` is computed against this hex, so a host whose page is a
- * tinted card gets a tenant seed corrected to ≥4.5:1 against a background it does not
- * use — and the guarantee `brandRole` advertises as structural quietly stops holding.
- *
  * ## THE CORE'S BINDING, not a copy of it
  *
  * The core owns both values and this entry has always published the name, so
@@ -116,17 +101,6 @@ const SEMANTIC_ANCHORS = {
   info: '#0288d1',
 } as const;
 
-/** The four meanings, as a host may state them. Any subset. */
-export type SemanticTokens = Partial<Record<keyof typeof SEMANTIC_ANCHORS, string>>;
-
-/** The two grounds MUI paints: the page, and anything raised off it. */
-export interface ModeSurfaces {
-  /** The page itself. */
-  default: string;
-  /** A card, a sheet, a menu — anything sitting on the page. */
-  paper: string;
-}
-
 /**
  * The four meanings — the host's where it stated one, this package's otherwise,
  * and moved out of the brand's way when the brand lands on one.
@@ -182,101 +156,6 @@ function semantics(
     error: role('error'),
     info: role('info'),
   };
-}
-
-/** What {@link createAppTheme} takes beyond the mode. */
-export interface AppThemeOptions {
-  /** A tenant's white-label seed. Corrected for legibility before it is painted. */
-  override?: PaletteOverride | null;
-  /** The host's own platform tokens. Defaults to {@link DEFAULT_THEME_TOKENS}. */
-  tokens?: Partial<Record<ThemeMode, ModeTokens>>;
-  /**
-   * The page a tenant's text is actually read against, per mode. Defaults to
-   * {@link DEFAULT_SURFACES}.
-   *
-   * Pass it if your app's background is not white in light mode (or not `#121212` in
-   * dark): it is the hex the legibility correction is computed against, so a wrong one
-   * lands the tenant's text under the 4.5:1 floor on the surface you really paint.
-   */
-  surface?: Partial<Record<ThemeMode, string>>;
-  /**
-   * The grounds this app paints, per mode — the page and anything raised off it.
-   *
-   * Without this the factory hands MUI a palette with no `background`, so MUI
-   * fills in its own neutrals: `#fff` on `#fff` in light, `#121212` on `#1e1e1e`
-   * in dark. A host whose page is not one of those had exactly one way out, and
-   * it was the wrong one: paint `body` from a `MuiCssBaseline` override and leave
-   * `palette.background.default` saying something else. That is not a cosmetic
-   * mismatch — `background.default` and `background.paper` are the tokens sticky
-   * headers, empty states and scroll shadows read to MATCH the page, so every one
-   * of them matches a page the app does not have. The seam stays invisible until
-   * one of them lands next to the real ground.
-   *
-   * Setting it also spares the host the second half of that workaround, which is
-   * that `body` is not the only ground: the overscroll gutter and the area behind
-   * a short page are the browser's, and they follow `html`, which no palette
-   * reaches.
-   *
-   * Partial per mode, like {@link tokens}: state the mode you actually paint and
-   * the other keeps MUI's default rather than inheriting a colour meant for the
-   * opposite scheme.
-   */
-  background?: Partial<Record<ThemeMode, ModeSurfaces>>;
-  /**
-   * The hairline this app rules with, per mode.
-   *
-   * Its own key rather than part of {@link background} because it is not a
-   * ground — MUI derives `divider` from its neutral greys, so a warm or tinted
-   * palette gets a cold line between every table row, list item and card while
-   * everything on either side of it is correct. Small, everywhere, and invisible
-   * in review precisely because a 1px rule is what nobody looks at.
-   */
-  divider?: Partial<Record<ThemeMode, string>>;
-  /**
-   * This app's own four meanings, per mode. Any subset.
-   *
-   * The defaults are MUI's anchors, which is the right answer for most hosts and
-   * is why this is optional. Pass it when the product has DECIDED what danger
-   * looks like — a warm palette whose danger must not be the same red as its
-   * primary, a design system that owns its own green.
-   *
-   * A semantic stated here is used verbatim: it is never rotated away from the
-   * brand, on the same principle that {@link tokens} are never corrected. The
-   * rotation guards the anchors this package supplies, which no host has
-   * approved; a hex the host wrote down is a decision, and the factory does not
-   * get to move it.
-   */
-  semantics?: Partial<Record<ThemeMode, SemanticTokens>>;
-  /**
-   * The host's own MUI component overrides, merged into the theme this builds.
-   *
-   * REQUIRED to exist, even though it is optional to pass, and the reason is
-   * that a theme is not only a palette. A host arrives here with `styleOverrides`
-   * and `defaultProps` of its own — a glass treatment on `MuiAlert`, a radius on
-   * `MuiButton` — and before this key the only way to keep them was to not use
-   * this factory at all. Which is to say: the factory silently encoded "no host
-   * needs component overrides", and that was true of exactly the one host it was
-   * extracted from.
-   *
-   * The failure it produced was the quiet kind. Adopting the shell dropped the
-   * overrides with no type error and no test failure — the theme is still a valid
-   * theme, the app still renders, and the only symptom is that a component stops
-   * looking the way the product designed it, everywhere at once.
-   *
-   * Merged UNDER nothing: these win. The factory owns the palette (that is what
-   * the legibility correction is for), and the host owns how its components are
-   * drawn.
-   */
-  components?: ThemeComponents;
-  /**
-   * The field corner (px) and height (multiples of the default font size).
-   * Default 8px and 2.5rem. `@12-apps/ui`'s fields read both; the factory also
-   * puts MUI's own outlined fields, buttons and toggles on them, under any
-   * host entry in {@link components}.
-   */
-  fieldRadius?: number;
-  /** See {@link fieldRadius}. */
-  fieldHeight?: number;
 }
 
 /**
@@ -364,7 +243,7 @@ function themePalette(
   background?: ModeSurfaces;
   divider?: string;
 } {
-  const tokens = options.tokens?.[mode] ?? DEFAULT_THEME_TOKENS[mode];
+  const tokens = options.tokens?.[mode] ?? DEFAULT_TOKENS[mode];
   const background = options.background?.[mode];
   const { override } = options;
 
@@ -378,6 +257,55 @@ function themePalette(
 }
 
 /**
+ * Whether an explicit field height differs from the one density derives, and
+ * the height that wins — its own function so {@link createAppTheme}'s density
+ * branch reads as one thought instead of three chained `?:`/`??`/`!==`.
+ */
+function effectiveFieldHeight(
+  explicitHeight: number | undefined,
+  densityHeight: number,
+): { height: number; explicitDiffers: boolean } {
+  if (explicitHeight === undefined) return { height: densityHeight, explicitDiffers: false };
+  return { height: explicitHeight, explicitDiffers: explicitHeight !== densityHeight };
+}
+
+/**
+ * The density branch of {@link createAppTheme} — one `createTheme()` call, per
+ * `@12-apps/ui`'s own `densityThemeOptions` docblock (MUI only runs
+ * `createSpacing`/`createTypography` on its FIRST argument). `theme.density`
+ * is set afterwards so `useDensity()` and the data views read it. `components`
+ * composes, later winning per slot (`mergeMuiComponents`): density's own,
+ * then `fieldHeightOverrides` ONLY when an explicit height differs from
+ * density's, then the host's own {@link AppThemeOptions.components}.
+ */
+function densityAppTheme(
+  mode: ThemeMode,
+  options: AppThemeOptions,
+  density: DensityLevel | number,
+  fieldRadius: number,
+): Theme {
+  const densityOptions = densityThemeOptions(density, options.densityFactors, fieldRadius);
+  const { height, explicitDiffers } = effectiveFieldHeight(
+    options.fieldHeight,
+    densityOptions.fieldHeight ?? DEFAULT_FIELD_HEIGHT,
+  );
+
+  const theme = createTheme({
+    palette: themePalette(mode, options),
+    fieldRadius,
+    ...densityOptions,
+    fieldHeight: height,
+    components: mergeMuiComponents(
+      densityOptions.components ?? {},
+      ...(explicitDiffers ? [fieldHeightOverrides(height)] : []),
+      (options.components ?? {}) as MergeableComponents,
+    ),
+  });
+  theme.density = resolveDensityFactor(density, options.densityFactors);
+  return theme;
+}
+
+/**
  * Build an MUI theme for the given mode using the shared design tokens.
  *
  * `override` lets a white-labelled host swap the palette while keeping every other
@@ -387,9 +315,16 @@ function themePalette(
  *
  * `components` is the host's, laid over the field-radius overrides — see
  * {@link AppThemeOptions.components} and {@link AppThemeOptions.fieldRadius}.
+ *
+ * **No {@link AppThemeOptions.density}: unchanged.** Today's code path,
+ * byte-for-byte — the release's whole compatibility guarantee. A density
+ * hands off to {@link densityAppTheme}, whose own docblock has that half.
  */
 export function createAppTheme(mode: ThemeMode = 'light', options: AppThemeOptions = {}): Theme {
-  const { fieldRadius = DEFAULT_FIELD_RADIUS, fieldHeight = DEFAULT_FIELD_HEIGHT } = options;
+  const { fieldRadius = DEFAULT_FIELD_RADIUS, density } = options;
+  if (density !== undefined) return densityAppTheme(mode, options, density, fieldRadius);
+
+  const { fieldHeight = DEFAULT_FIELD_HEIGHT } = options;
   return createTheme({
     palette: themePalette(mode, options),
     fieldRadius,

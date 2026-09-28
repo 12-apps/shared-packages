@@ -126,16 +126,63 @@ export function fieldHeightOverrides(height: number = DEFAULT_FIELD_HEIGHT): Com
  * top-level objects would drop every override but the last source's for a
  * component two sources both style (`fieldOverrides` below merges exactly
  * two; density's geometry overrides, FUT-2766–2768, add more).
+ *
+ * `styleOverrides` keeps the rule above, wholesale by inner slot key, with NO
+ * new closures — a slot's value is taken by reference from whichever source
+ * set it last, never wrapped, so two theme builds from the same options still
+ * compare equal (see `mergeMuiComponents`'s own suite).
+ *
+ * Three more keys survive the merge (FUT-2967), where they used to be
+ * silently dropped the moment a SECOND source styled the same component —
+ * exactly the shape density (FUT-2766–2768) and a host's own `components`
+ * both touching one component now takes:
+ *
+ *   - `defaultProps` — a SHALLOW merge, the later source winning per key
+ *     (the same precedence `styleOverrides` uses per slot, one level up);
+ *   - `variants` — every source's array CONCATENATED, earlier first, so a
+ *     host's own variant and a density/base one coexist rather than one
+ *     replacing the other;
+ *   - any OTHER top-level key on a component entry — taken from the later
+ *     source, the same "later wins" rule `styleOverrides` applies per slot,
+ *     just one level up, for a component key this function does not know the
+ *     shape of.
+ *
+ * A component only ONE source names keeps whatever that source gave it
+ * unchanged — `styleOverrides` alone if that is all it had, `defaultProps`/
+ * `variants` alone if that is all it had.
  */
 export function mergeMuiComponents(...sources: Components<Theme>[]): Components<Theme> {
-  type Entry = { styleOverrides?: Record<string, unknown> };
+  type Entry = {
+    styleOverrides?: Record<string, unknown>;
+    defaultProps?: Record<string, unknown>;
+    variants?: unknown[];
+    [key: string]: unknown;
+  };
   const maps = sources as unknown as Record<string, Entry>[];
   const names = new Set(maps.flatMap((map) => Object.keys(map)));
   return Object.fromEntries(
-    [...names].map((name) => [
-      name,
-      { styleOverrides: Object.assign({}, ...maps.map((map) => map[name]?.styleOverrides)) },
-    ]),
+    [...names].map((name) => {
+      const entries = maps.map((map) => map[name]).filter((entry): entry is Entry => entry !== undefined);
+      const styleOverrides = Object.assign({}, ...entries.map((entry) => entry.styleOverrides));
+      const defaultProps = Object.assign({}, ...entries.map((entry) => entry.defaultProps));
+      const variants = entries.flatMap((entry) => entry.variants ?? []);
+      const rest = entries.reduce<Record<string, unknown>>((acc, entry) => {
+        for (const key of Object.keys(entry)) {
+          if (key === 'styleOverrides' || key === 'defaultProps' || key === 'variants') continue;
+          acc[key] = entry[key];
+        }
+        return acc;
+      }, {});
+      return [
+        name,
+        {
+          ...rest,
+          styleOverrides,
+          ...(Object.keys(defaultProps).length > 0 ? { defaultProps } : {}),
+          ...(variants.length > 0 ? { variants } : {}),
+        },
+      ];
+    }),
   ) as Components<Theme>;
 }
 

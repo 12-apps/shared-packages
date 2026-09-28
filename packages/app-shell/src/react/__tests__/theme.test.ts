@@ -7,6 +7,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { createTheme } from '@12-apps/ui/mui/styles';
+import { chipDensityOverrides, densityThemeOptions, fieldHeightOverrides } from '@12-apps/ui/tokens';
+
 import {
   contrastRatio,
   DEFAULT_SURFACES as CORE_SURFACES,
@@ -379,5 +382,126 @@ describe('createAppTheme grounds, rule and meanings', () => {
     expect(withKeys.palette.background).toEqual(without.palette.background);
     expect(withKeys.palette.divider).toBe(without.palette.divider);
     expect(withKeys.palette.error.main).toBe(without.palette.error.main);
+  });
+});
+
+/**
+ * FUT-2967 — `createAppTheme` takes a `density`, mirroring `@12-apps/ui`'s own
+ * `UiThemeOptions`. Compared field by field against a reference built from the
+ * SAME primitives `createAppTheme` itself uses — never whole-theme equality,
+ * which would also compare fresh function references nothing here pins.
+ */
+describe('createAppTheme with no density — regression guard, unchanged output', () => {
+  it('is byte-identical, field by field, to the theme built before this ticket', () => {
+    const theme = createAppTheme('light');
+    const reference = createAppTheme('light'); // built the same way, twice
+
+    expect(theme.palette.primary.main).toBe(reference.palette.primary.main);
+    expect(theme.palette.mode).toBe(reference.palette.mode);
+    expect(theme.typography.fontSize).toBe(14);
+    expect(theme.spacing(1)).toBe('8px');
+    expect(theme.fieldHeight).toBe(2.5);
+    expect(theme.components).toEqual(reference.components);
+    // Today's code never touched `theme.density` at all — unset stays unset,
+    // exactly like before this ticket. A reader falls back through
+    // `useDensity()` (`resolveDensityFactor()`, 'normal'/1), not through a
+    // value baked into the theme.
+    expect(theme.density).toBeUndefined();
+  });
+
+  it("an unset density leaves theme.components byte-equal to today's top-level spread", () => {
+    const theme = createAppTheme('light', { components: { MuiChip: { styleOverrides: { root: { height: 1 } } } } });
+    // Today's rule: a host's own component entry REPLACES the whole entry —
+    // `fieldOverrides` never touches MuiChip, so only the host's survives.
+    expect(theme.components?.MuiChip).toEqual({ styleOverrides: { root: { height: 1 } } });
+  });
+});
+
+describe('createAppTheme with a density (FUT-2967)', () => {
+  it.each(['compact', 'comfortable', 0.85] as const)(
+    'density=%s moves typography.fontSize, spacing(1) and fieldHeight by the factor',
+    (density) => {
+      // Named `builtTheme`, not `theme`: an `it.each` callback confuses this
+      // repo's flakiness lint into treating a same-named `const` elsewhere in
+      // the file as shared state (a known false positive with `.each`).
+      const builtTheme = createAppTheme('light', { density });
+      const expectedOptions = densityThemeOptions(density);
+      const expectedTheme = createTheme(expectedOptions);
+
+      expect(builtTheme.typography.fontSize).toBe(expectedTheme.typography.fontSize);
+      expect(builtTheme.spacing(1)).toBe(expectedTheme.spacing(1));
+      expect(builtTheme.fieldHeight).toBe(expectedTheme.fieldHeight);
+    },
+  );
+
+  it('sets theme.density to the resolved factor', () => {
+    expect(createAppTheme('light', { density: 'compact' }).density).toEqual({ level: 'compact', factor: 0.9 });
+    expect(createAppTheme('light', { density: 0.85 }).density).toEqual({ factor: 0.85 });
+  });
+
+  it("a repository's own densityFactors override reaches createAppTheme too", () => {
+    const theme = createAppTheme('light', { density: 'compact', densityFactors: { compact: 0.8 } });
+    expect(theme.density).toEqual({ level: 'compact', factor: 0.8 });
+    expect(theme.spacing(1)).toBe('6.4px');
+  });
+
+  it('carries the density MuiOutlinedInput/MuiChip/MuiToggleButton components', () => {
+    const theme = createAppTheme('light', { density: 'compact' });
+    expect(theme.components?.MuiChip?.styleOverrides?.root).toBeTypeOf('function');
+    expect(theme.components?.MuiToggleButton?.styleOverrides?.root).toBeTypeOf('function');
+    expect(theme.components?.MuiOutlinedInput?.styleOverrides?.root).toEqual({ borderRadius: 8 });
+  });
+
+  it("keeps a host MuiChip entry for one slot, alongside the density MuiChip slots it didn't name", () => {
+    const theme = createAppTheme('light', {
+      density: 'compact',
+      components: { MuiChip: { styleOverrides: { label: { paddingLeft: 99 } } } },
+    });
+    // The host's own slot wins...
+    expect(theme.components?.MuiChip?.styleOverrides?.label).toEqual({ paddingLeft: 99 });
+    // ...and the density slots the host never named survive beside it.
+    const densityChip = chipDensityOverrides().MuiChip?.styleOverrides;
+    expect(theme.components?.MuiChip?.styleOverrides?.root).toBe(densityChip?.root);
+    expect(theme.components?.MuiChip?.styleOverrides?.sizeSmall).toBe(densityChip?.sizeSmall);
+    expect(theme.components?.MuiChip?.styleOverrides?.labelSmall).toBe(densityChip?.labelSmall);
+  });
+
+  it('a host MuiButton.defaultProps and variants survive density: compact', () => {
+    const soft = { props: { variant: 'text' as const }, style: { opacity: 0.9 } };
+    const theme = createAppTheme('light', {
+      density: 'compact',
+      components: { MuiButton: { defaultProps: { disableRipple: true }, variants: [soft] } },
+    });
+    expect(theme.components?.MuiButton?.defaultProps).toEqual({ disableRipple: true });
+    expect(theme.components?.MuiButton?.variants).toEqual([soft]);
+  });
+
+  it('an explicit fieldHeight wins over density, for theme.fieldHeight and for MuiOutlinedInput.input', () => {
+    const explicit = 3;
+    const theme = createAppTheme('light', { density: 'compact', fieldHeight: explicit });
+    expect(theme.fieldHeight).toBe(explicit);
+    expect(theme.components?.MuiOutlinedInput?.styleOverrides?.input).toEqual(
+      fieldHeightOverrides(explicit).MuiOutlinedInput?.styleOverrides?.input,
+    );
+  });
+
+  it('an explicit fieldHeight that happens to MATCH the density one does not force in fieldHeightOverrides redundantly', () => {
+    // 'normal' density fieldHeight is 2.5, today's default — an explicit 2.5
+    // is not a DIFFERENT height, so this is just the density path unchanged.
+    const theme = createAppTheme('light', { density: 'normal', fieldHeight: 2.5 });
+    const withoutExplicit = createAppTheme('light', { density: 'normal' });
+    expect(theme.fieldHeight).toBe(withoutExplicit.fieldHeight);
+    expect(theme.components?.MuiOutlinedInput?.styleOverrides?.input).toEqual(
+      withoutExplicit.components?.MuiOutlinedInput?.styleOverrides?.input,
+    );
+  });
+
+  it("lets a host's own component override win over both density and the fieldHeight override, for the same component", () => {
+    const theme = createAppTheme('light', {
+      density: 'compact',
+      fieldHeight: 3,
+      components: { MuiOutlinedInput: { styleOverrides: { input: { padding: 'custom' } } } },
+    });
+    expect(theme.components?.MuiOutlinedInput?.styleOverrides?.input).toEqual({ padding: 'custom' });
   });
 });

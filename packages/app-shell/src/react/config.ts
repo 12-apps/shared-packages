@@ -55,7 +55,11 @@ export interface WebAppShellConfig {
   /** Where `createApiAppShell` is mounted. Defaults to `/api`. */
   apiBase?: string;
   brand: ShellBrand;
-  /** Colour scheme and the tenant's white-label seed. */
+  /**
+   * Colour scheme and the tenant's white-label seed. Also takes
+   * `AppThemeOptions.density` (`./theme`'s own docblock) — see the package
+   * README for the host-merge semantics that changes when it is set.
+   */
   theme?: AppThemeOptions & { mode?: ThemeMode };
   /** Where a caught render crash is reported. REQUIRED. */
   onCrash: RouteCrashReporter;
