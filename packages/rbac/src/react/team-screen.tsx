@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type JSX } from 'react';
+import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useServerDataViews } from '@12-apps/app-shell/react';
@@ -87,6 +87,34 @@ export interface TeamScreenProps {
   breadcrumb?: readonly { label: string; href?: string }[];
   /** Open one member's profile. Absent when the host routes no profile screen. */
   onOpenMember?: (userId: string) => void;
+  /**
+   * The host asks for the invite dialog — its own "Adicionar à equipe" entry,
+   * elsewhere in its chrome, landing here. While true the dialog opens (for a
+   * viewer who may manage the team; nobody else has a dialog to open) and
+   * {@link onInviteRequestHandled} fires, so the host can drop whatever carried
+   * the request (a URL param) and a reload does not reopen it.
+   */
+  inviteRequested?: boolean;
+  onInviteRequestHandled?: () => void;
+}
+
+/**
+ * Honour a host's {@link TeamScreenProps.inviteRequested}. A viewer who may not
+ * manage the team gets the request acknowledged and nothing opened: the button
+ * is not theirs either.
+ */
+function useInviteRequest(
+  props: TeamScreenProps,
+  canManage: boolean,
+  actions: ReturnType<typeof useTeamActions>,
+): void {
+  const { inviteRequested, onInviteRequestHandled } = props;
+  const { openForm } = actions;
+  useEffect(() => {
+    if (!inviteRequested) return;
+    if (canManage) openForm();
+    onInviteRequestHandled?.();
+  }, [inviteRequested, canManage, openForm, onInviteRequestHandled]);
 }
 
 /**
@@ -174,6 +202,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
   const search = teamSearch(searchParams);
   const data = useTeamData(api, search, copy.teamScreen.loadFailed);
   const actions = useTeamActions(api, copy, data.refresh);
+  useInviteRequest(props, canManage, actions);
   const [visibleRows, setVisibleRows] = useState<TeamRow[]>([]);
 
   const { customRoles, inviteRoles, editor, removeConfirm, cancelInviteConfirm, rowActions } =
