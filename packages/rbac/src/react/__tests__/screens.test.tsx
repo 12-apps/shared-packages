@@ -444,19 +444,21 @@ describe('a person holds a SET of roles', () => {
     mountTeam(api, ['team:manage']);
     // The row rendered, and the additive role came from the CONTEXT read — so
     // the set was derived from base + customs, exactly as before it existed.
+    // LABELLED, like the base chip beside it (FUT-2923) — not the raw key.
     await waitFor(() => {
       expect(screen.getByTestId('status-chef-1')).toBeTruthy();
-      expect(screen.getByText('CLERK')).toBeTruthy();
+      expect(screen.getByText(LABELS.roleLabel('CLERK'))).toBeTruthy();
     });
   });
 
   it('renders every role a person holds when there is no base', async () => {
     mountTeam(setModelApi(['HEAD_LIBRARIAN', 'CONSERVATOR']), ['team:manage']);
     // Two roles, neither promoted over the other — the model named no winner,
-    // so both are drawn the same way the additive ones always were.
+    // so both are drawn the same way the additive ones always were, LABELLED
+    // rather than by their raw key (FUT-2923).
     await waitFor(() => {
-      expect(screen.getByText('HEAD_LIBRARIAN')).toBeTruthy();
-      expect(screen.getByText('CONSERVATOR')).toBeTruthy();
+      expect(screen.getByText(LABELS.roleLabel('HEAD_LIBRARIAN'))).toBeTruthy();
+      expect(screen.getByText(LABELS.roleLabel('CONSERVATOR'))).toBeTruthy();
     });
   });
 
@@ -468,7 +470,7 @@ describe('a person holds a SET of roles', () => {
     // No kebab at all: TeamActionsMenu renders nothing when every action is
     // withheld, which is what owner protection does to this row.
     await waitFor(() => {
-      expect(screen.getByText('CLERK')).toBeTruthy();
+      expect(screen.getByText(LABELS.roleLabel('CLERK'))).toBeTruthy();
       expect(screen.queryByTestId('team-actions-op-1')).toBeNull();
     });
   });
