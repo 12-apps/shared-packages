@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,Mock,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { AddressAutocomplete } from './AddressAutocomplete';
 import { PT_BR_ADDRESS_AUTOCOMPLETE_COPY } from '../../../pt-BR';
 
@@ -702,7 +704,7 @@ export const IntegrationTest: Story = {
       // Verify full address details were extracted
       await waitFor(() => {
         const calls = (args.onSelect as Mock).mock.calls;
-        const lastCall = calls[calls.length - 1][0];
+        const lastCall = must(calls[calls.length - 1])[0];
         expect(lastCall).toMatchObject({
           formatted: expect.stringContaining('Pine Boulevard'),
           street: expect.stringContaining('Pine Boulevard'),

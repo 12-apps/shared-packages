@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, Mock, userEvent, waitFor, within } from 'storybook/test';
+
+import { must } from '../../../test-utils/must';
 
 import { PhoneInput } from './PhoneInput';
 import { PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR';
@@ -52,7 +54,7 @@ export const BasicInteraction: Story = {
     // Verify onChange was called with each keystroke
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalled();
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[0]).toContain('5551234567');
     });
 
@@ -273,7 +275,9 @@ export const ThemeVariations: Story = {
 
     const styles = window.getComputedStyle(inputRoot!);
     // Glass effect should have backdrop blur
-    expect(styles.backdropFilter || styles.webkitBackdropFilter).toMatch(/blur/);
+    expect(
+      styles.backdropFilter || styles.getPropertyValue('-webkit-backdrop-filter'),
+    ).toMatch(/blur/);
 
     // Check hover effect
     await userEvent.hover(inputRoot!);
@@ -434,7 +438,7 @@ export const CountryCodeSelection: Story = {
 
     // Verify onChange called with German country code
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('DE');
     }, { timeout: 3000 });
   },
@@ -479,8 +483,8 @@ export const PhoneNumberFormatting: Story = {
 
     // Verify validation status in onChange
     await waitFor(() => {
-      const calls = args.onChange.mock.calls;
-      const lastCall = calls[calls.length - 1];
+      const calls = (args.onChange as Mock).mock.calls;
+      const lastCall = must(calls[calls.length - 1]);
       expect(lastCall[1]).toBe(true); // Should be valid
     }, { timeout: 3000 });
   },
@@ -527,7 +531,7 @@ export const Integration: Story = {
     // Verify onChange was called with country change
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalled();
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('US'); // Country code should be US
     }, { timeout: 3000 });
 
@@ -578,7 +582,7 @@ export const EnhancedValidation: Story = {
 
     // Verify onChange called with validation result
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[1]).toBe(true); // Should be valid
       expect(lastCall[2]).toBe('US'); // Country code
     });
@@ -606,7 +610,7 @@ export const AutoCountryDetection: Story = {
 
     // Verify onChange called with German country
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('DE');
     }, { timeout: 3000 });
 
@@ -622,7 +626,7 @@ export const AutoCountryDetection: Story = {
 
     // Verify onChange called with UK country
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('GB');
     }, { timeout: 3000 });
   },
@@ -667,7 +671,7 @@ export const ExtendedCountrySupport: Story = {
 
     // Verify onChange called with Singapore country code
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('SG');
     }, { timeout: 3000 });
   },

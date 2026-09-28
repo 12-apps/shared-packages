@@ -79,7 +79,7 @@ export const FormInteraction: Story = {
   render: (args) => (
     <FormControl component="fieldset">
       <FormLabel component="legend">File Upload</FormLabel>
-      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} {...args} />
+      <UploadButton {...args} />
     </FormControl>
   ),
   args: {
@@ -206,7 +206,7 @@ export const ScreenReaderTest: Story = {
   args: {
     onSelect: fn(),
     helperText: 'Maximum file size is 5MB',
-    'aria-label': 'Upload your document',
+    label: 'Upload your document',
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

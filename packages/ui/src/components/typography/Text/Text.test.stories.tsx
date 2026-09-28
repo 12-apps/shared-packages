@@ -4,6 +4,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Text } from './Text';
 
 const meta: Meta<typeof Text> = {
@@ -147,7 +149,7 @@ export const KeyboardNavigation: Story = {
     ];
 
     // Test initial focus
-    await userEvent.click(focusableTexts[0]);
+    await userEvent.click(must(focusableTexts[0]));
     await waitFor(() => expect(focusableTexts[0]).toHaveFocus());
 
     // Test Tab navigation between elements
@@ -336,18 +338,17 @@ export const ResponsiveDesign: Story = {
   render: () => (
     <Box sx={{ width: '100%', maxWidth: '320px' }}>
       <Stack spacing={2}>
-        <Text
-          data-testid="responsive-text"
-          sx={{
-            fontSize: { xs: '0.875rem', sm: '1rem', md: '1.125rem' },
-          }}
-        >
+        {/* `Text` has no `sx` prop — every size goes through the theme
+            vocabulary (`size`), not an ad hoc `sx` override — so a plain,
+            non-responsive `style` stands in here; the assertions below only
+            check presence, not the exact breakpoint values. */}
+        <Text data-testid="responsive-text" style={{ fontSize: '1.125rem' }}>
           Responsive text that scales with screen size
         </Text>
-        <Text data-testid="mobile-only" sx={{ display: { xs: 'block', md: 'none' } }}>
+        <Text data-testid="mobile-only" style={{ display: 'block' }}>
           Mobile only text
         </Text>
-        <Text data-testid="desktop-only" sx={{ display: { xs: 'none', md: 'block' } }}>
+        <Text data-testid="desktop-only" style={{ display: 'block' }}>
           Desktop only text
         </Text>
         <Text data-testid="body-responsive">Regular body text that adapts to screen size</Text>
@@ -526,8 +527,8 @@ export const Performance: Story = {
     // component: in a real browser it swung past its 1 MB budget (2.9 MB) with
     // no code change (FUT-2619). Node identity is what a leak would break.
     for (let i = 0; i < 10; i++) {
-      await userEvent.hover(textElements[0]);
-      await userEvent.unhover(textElements[0]);
+      await userEvent.hover(must(textElements[0]));
+      await userEvent.unhover(must(textElements[0]));
     }
 
     const afterHover = canvas.getAllByText(/Performance text/);
@@ -597,7 +598,7 @@ export const EdgeCases: Story = {
   },
   render: () => (
     <Stack spacing={2}>
-      <Text data-testid="empty-text"></Text>
+      <Text data-testid="empty-text">{''}</Text>
       <Text data-testid="long-word">
         supercalifragilisticexpialidociousantidisestablishmentarianism
       </Text>
@@ -749,12 +750,8 @@ export const Responsive: Story = {
     viewport: { defaultViewport: 'mobile1' },
   },
   render: () => (
-    <Text
-      sx={{
-        fontSize: { xs: '0.875rem', sm: '1rem', md: '1.125rem' },
-        lineHeight: { xs: 1.4, sm: 1.5, md: 1.6 },
-      }}
-    >
+    // `Text` has no `sx` prop — see the note on `ResponsiveDesign` above.
+    <Text style={{ fontSize: '1.125rem', lineHeight: 1.6 }}>
       This text adapts to different screen sizes
     </Text>
   ),

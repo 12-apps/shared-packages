@@ -103,6 +103,7 @@ export const ControlledState: Story = {
           Toggle HoverCard (Controlled)
         </Button>
         <HoverCard
+          loadingText="Carregando…"
           title="Controlled HoverCard"
           description="This is controlled externally"
           onOpen={() => {
@@ -348,6 +349,7 @@ export const ResponsiveDesign: Story = {
     <Box sx={{ p: 2 }}>
       <Stack spacing={2}>
         <HoverCard
+          loadingText="Carregando…"
           title="Responsive HoverCard"
           description="This adapts to different screen sizes"
           maxWidth={300}
@@ -400,6 +402,7 @@ export const ThemeVariations: Story = {
       <Stack direction="row" spacing={4}>
         <ThemeProvider theme={lightTheme}>
           <HoverCard
+            loadingText="Carregando…"
             title="Light Theme"
             description="Card in light mode"
             variant="default"
@@ -414,6 +417,7 @@ export const ThemeVariations: Story = {
         <ThemeProvider theme={darkTheme}>
           <Box sx={{ bgcolor: 'grey.900', p: 2, borderRadius: 1 }}>
             <HoverCard
+              loadingText="Carregando…"
               title="Dark Theme"
               description="Card in dark mode"
               variant="default"
@@ -479,6 +483,7 @@ export const VisualStates: Story = {
   render: () => (
     <Stack direction="row" spacing={3} alignItems="center">
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         title="Default State"
         description="Standard appearance"
@@ -490,6 +495,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="glass"
         title="Glass Effect"
         description="Glassmorphism style"
@@ -501,6 +507,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         glow={true}
         title="Glow Effect"
@@ -513,6 +520,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         pulse={true}
         title="Pulse Effect"
@@ -525,6 +533,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         disabled={true}
         title="Disabled"
@@ -631,6 +640,7 @@ export const Performance: Story = {
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
         {items.map((item) => (
           <HoverCard
+            loadingText="Carregando…"
             key={item.id}
             title={item.title}
             description={item.description}
@@ -696,6 +706,7 @@ export const EdgeCases: Story = {
   render: () => (
     <Stack spacing={3}>
       <HoverCard
+        loadingText="Carregando…"
         title="Very Long Title That Should Wrap Properly in the HoverCard Component"
         description="This is an extremely long description that tests how the hover card handles text overflow and wrapping. It should display properly without breaking the layout or causing any visual issues in the component."
         maxWidth={250}
@@ -706,15 +717,16 @@ export const EdgeCases: Story = {
         <Button data-testid="long-content">Long Content</Button>
       </HoverCard>
 
-      <HoverCard title="" description="" enterDelay={100} onOpen={fn()} onClose={fn()}>
+      <HoverCard title="" description="" loadingText="Carregando…" enterDelay={100} onOpen={fn()} onClose={fn()}>
         <Button data-testid="empty-content">Empty Content</Button>
       </HoverCard>
 
-      <HoverCard loading={true} enterDelay={100} onOpen={fn()} onClose={fn()}>
+      <HoverCard loading={true} loadingText="Carregando…" enterDelay={100} onOpen={fn()} onClose={fn()}>
         <Button data-testid="loading-state">Loading State</Button>
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         title="With Custom Loading"
         loading={true}
         loadingComponent={<Typography>Custom Loading...</Typography>}
@@ -726,6 +738,7 @@ export const EdgeCases: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         title="Touch Enabled"
         description="Works on touch devices"
         touchEnabled={true}
@@ -818,6 +831,7 @@ export const Integration: Story = {
   render: () => (
     <Stack spacing={3}>
       <HoverCard
+        loadingText="Carregando…"
         variant="detailed"
         title="User Profile"
         description="Senior Developer"
@@ -829,7 +843,7 @@ export const Integration: Story = {
         </Button>
       </HoverCard>
 
-      <HoverCard title="Card with Actions" enterDelay={100}>
+      <HoverCard title="Card with Actions" loadingText="Carregando…" enterDelay={100}>
         <Button data-testid="with-actions">Hover for Actions</Button>
         <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
           <Button size="small" variant="contained">
@@ -843,6 +857,7 @@ export const Integration: Story = {
 
       <Box sx={{ position: 'relative' }}>
         <HoverCard
+          loadingText="Carregando…"
           title="Positioned Element"
           description="Testing with different positions"
           placement="right"
@@ -855,7 +870,7 @@ export const Integration: Story = {
         </HoverCard>
       </Box>
 
-      <HoverCard variant="glass" title="Different Animations" animation="scale" enterDelay={100}>
+      <HoverCard variant="glass" title="Different Animations" loadingText="Carregando…" animation="scale" enterDelay={100}>
         <Button data-testid="with-animation">Scale Animation</Button>
       </HoverCard>
     </Stack>

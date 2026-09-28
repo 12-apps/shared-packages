@@ -12,6 +12,7 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import List from '@mui/material/List/index.js';
 import ListItem from '@mui/material/ListItem/index.js';
+import ListItemButton from '@mui/material/ListItemButton/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
@@ -20,6 +21,7 @@ import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { PT_BR_CHROME_COPY } from '../../../pt-BR';
 import { ScrollArea } from './ScrollArea';
+import type { ScrollAreaProps } from './ScrollArea.types';
 
 const meta: Meta<typeof ScrollArea> = {
   title: 'Layout/ScrollArea/Tests',
@@ -39,7 +41,15 @@ const meta: Meta<typeof ScrollArea> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+// `ScrollAreaProps` is `ScrollAreaBase & (scrollToTopButton-discriminated
+// union)`. Storybook's `StoryObj<typeof meta>` computes a story's args by
+// intersecting `ComponentProps<Component>` with the meta's own inferred args
+// type and simplifying the result (`@storybook/react`'s `public-types`) —
+// for this component that computation collapses to `never`, so every story's
+// `args` (regardless of shape) fails with "not assignable to type 'never'".
+// Naming the props type directly (`StoryObj<ScrollAreaProps>`) skips that
+// path and types `args` as `Partial<ScrollAreaProps>`, as intended.
+type Story = StoryObj<ScrollAreaProps>;
 
 // Helper to generate content
 const generateContent = (lines: number) => (
@@ -176,8 +186,10 @@ export const KeyboardNavigation: Story = {
     children: (
       <List>
         {Array.from({ length: 30 }, (_, i) => (
-          <ListItem key={i} button tabIndex={0} data-testid={`item-${i}`}>
-            <Typography>Item {i + 1}</Typography>
+          <ListItem key={i} disablePadding>
+            <ListItemButton tabIndex={0} data-testid={`item-${i}`}>
+              <Typography>Item {i + 1}</Typography>
+            </ListItemButton>
           </ListItem>
         ))}
       </List>
@@ -363,9 +375,15 @@ export const ThemeVariations: Story = {
   },
   render: (args) => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="default" data-testid="scroll-area" />
-      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="overlay" data-testid="scroll-area-overlay" />
-      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="glass" data-testid="scroll-area-glass" />
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="default" data-testid="scroll-area">
+        {args.children}
+      </ScrollArea>
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="overlay" data-testid="scroll-area-overlay">
+        {args.children}
+      </ScrollArea>
+      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} variant="glass" data-testid="scroll-area-glass">
+        {args.children}
+      </ScrollArea>
     </Box>
   ),
   play: async ({ canvasElement }) => {
@@ -413,7 +431,15 @@ export const VisualStates: Story = {
       <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} loading data-testid="scroll-area-loading">
         {generateContent(10)}
       </ScrollArea>
-      <ScrollArea regionLabel={PT_BR_CHROME_COPY.scrollRegion} {...args} emptyContent="No content" data-testid="scroll-area-empty" />
+      <ScrollArea
+        regionLabel={PT_BR_CHROME_COPY.scrollRegion}
+        {...args}
+        emptyContent="No content"
+        data-testid="scroll-area-empty"
+      >
+        {/* No children on purpose: ScrollAreaContent falls back to `emptyContent` only when `children` is falsy. */}
+        {null}
+      </ScrollArea>
     </Box>
   ),
   play: async ({ canvasElement }) => {

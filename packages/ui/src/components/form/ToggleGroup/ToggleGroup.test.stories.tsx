@@ -18,6 +18,8 @@ import {
 import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { ToggleGroup } from './ToggleGroup';
 import { SIZE_VALUES } from '../../../tokens/scales';
 
@@ -90,7 +92,7 @@ export const BasicInteraction: Story = {
     expect(toggleButtons).toHaveLength(3);
 
     // Test clicking a button
-    await userEvent.click(toggleButtons[0]);
+    await userEvent.click(must(toggleButtons[0]));
 
     // Verify button state changes 
     await waitFor(() => {
@@ -113,8 +115,8 @@ export const FormInteraction: Story = {
     const toggleButtons = canvas.getAllByRole('button');
 
     // Test multiple selection
-    await userEvent.click(toggleButtons[0]); // Bold
-    await userEvent.click(toggleButtons[2]); // Underline
+    await userEvent.click(must(toggleButtons[0])); // Bold
+    await userEvent.click(must(toggleButtons[2])); // Underline
 
     // Verify both calls were made
     await waitFor(() => {
@@ -122,7 +124,7 @@ export const FormInteraction: Story = {
     });
 
     // Test deselection
-    await userEvent.click(toggleButtons[0]); // Unselect Bold
+    await userEvent.click(must(toggleButtons[0])); // Unselect Bold
 
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalledTimes(3);
@@ -140,7 +142,7 @@ export const KeyboardNavigation: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
 
-    const firstButton = canvas.getAllByRole('button')[0];
+    const firstButton = must(canvas.getAllByRole('button')[0]);
 
     // Focus the first button without activating it — a click here would
     // fire onChange itself, and the assertions below count the calls made
@@ -195,7 +197,7 @@ export const ScreenReader: Story = {
       expect(button).toHaveAttribute('aria-pressed');
 
       // Verify accessible names
-      const option = themeOptions[index];
+      const option = must(themeOptions[index]);
       expect(button).toHaveAccessibleName(expect.stringContaining(option.label));
     });
   },
@@ -605,7 +607,7 @@ export const GlowEffectTest: Story = {
     const glassButtons = within(glassGroup).getAllByRole('button');
     
     // Click a button and verify glass effect is maintained
-    await userEvent.click(glassButtons[1]);
+    await userEvent.click(must(glassButtons[1]));
     
     await waitFor(() => {
       const updatedStyles = window.getComputedStyle(glassGroup);
@@ -616,10 +618,10 @@ export const GlowEffectTest: Story = {
 
     // Test that gradient effect works on selected button
     const gradientButtons = within(glassGradientGroup).getAllByRole('button');
-    await userEvent.click(gradientButtons[0]);
+    await userEvent.click(must(gradientButtons[0]));
     
     await waitFor(() => {
-      const buttonStyles = window.getComputedStyle(gradientButtons[0]);
+      const buttonStyles = window.getComputedStyle(must(gradientButtons[0]));
       // Selected button should have gradient (linear-gradient in background)
       expect(buttonStyles.background).toContain('linear-gradient');
     });
@@ -700,7 +702,7 @@ export const Integration: Story = {
     const alignmentGroup = canvas.getByTestId('alignment-group');
     const alignButtons = within(alignmentGroup).getAllByRole('button');
 
-    await userEvent.click(alignButtons[1]); // Center align
+    await userEvent.click(must(alignButtons[1])); // Center align
 
     const previewText = canvas.getByTestId('preview-text');
     await waitFor(() => {
@@ -712,13 +714,13 @@ export const Integration: Story = {
     const formattingGroup = canvas.getByTestId('formatting-group');
     const formatButtons = within(formattingGroup).getAllByRole('button');
 
-    await userEvent.click(formatButtons[0]); // Bold
+    await userEvent.click(must(formatButtons[0])); // Bold
     await waitFor(() => {
       const styles = window.getComputedStyle(previewText);
       expect(styles.fontWeight).toBe('700');
     });
 
-    await userEvent.click(formatButtons[1]); // Italic
+    await userEvent.click(must(formatButtons[1])); // Italic
     await waitFor(() => {
       const styles = window.getComputedStyle(previewText);
       expect(styles.fontStyle).toBe('italic');

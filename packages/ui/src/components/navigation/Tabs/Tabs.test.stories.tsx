@@ -8,8 +8,11 @@ import Settings from '@mui/icons-material/Settings';
 import Box from '@mui/material/Box/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { FocusEventHandler, SyntheticEvent } from 'react';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
+
+import { must } from '../../../test-utils/must';
 
 import { PT_BR_CHROME_COPY } from '../../../pt-BR';
 import { Tabs } from './Tabs';
@@ -30,13 +33,19 @@ const meta: Meta<typeof Tabs> = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+// Most tests here drive `Tabs` through `TabsTestWrapper` below, whose props
+// add the callback spies (`onChangeCallback`, …) that `TabsProps` itself
+// doesn't have. Naming that type directly (rather than `StoryObj<typeof
+// meta>`, which only knows `TabsProps`) types `args` to match what those
+// stories actually pass; the few that drive `<Tabs>` directly keep `Story`.
+type WrapperStory = StoryObj<TabsTestWrapperProps>;
 
 // Test wrapper component
 interface TabsTestWrapperProps extends Partial<TabsProps> {
-  onChangeCallback?: typeof fn;
-  onTabCloseCallback?: typeof fn;
-  onFocusCallback?: typeof fn;
-  onBlurCallback?: typeof fn;
+  onChangeCallback?: (event: SyntheticEvent, tabId: string) => void;
+  onTabCloseCallback?: (tabId: string) => void;
+  onFocusCallback?: FocusEventHandler<HTMLDivElement>;
+  onBlurCallback?: FocusEventHandler<HTMLDivElement>;
   initialValue?: string;
 }
 
@@ -63,6 +72,12 @@ const TabsTestWrapper = ({
     <Box sx={{ width: 600, minHeight: 300 }}>
       <Tabs
         {...props}
+        // Every caller in this file supplies `items` and `closeTabLabel` (the
+        // latter via `meta.args`) — `Partial<TabsProps>` only makes the
+        // *type* optional, so these defaults are a type-safety net for
+        // `TabsProps`'s required fields, not real fallbacks.
+        items={props.items ?? []}
+        closeTabLabel={props.closeTabLabel ?? PT_BR_CHROME_COPY.closeTab}
         value={value}
         onChange={handleChange}
         onTabClose={handleTabClose}
@@ -138,7 +153,7 @@ const itemsWithIcons: TabItem[] = [
 ];
 
 // 1. Basic Interaction Test
-export const BasicInteraction: Story = {
+export const BasicInteraction: WrapperStory = {
   name: '🧪 Basic Interaction Test',
   args: {
     items: basicTestItems,
@@ -200,7 +215,7 @@ export const BasicInteraction: Story = {
 };
 
 // 2. Keyboard Navigation Test
-export const KeyboardNavigation: Story = {
+export const KeyboardNavigation: WrapperStory = {
   name: '⌨️ Keyboard Navigation Test',
   args: {
     items: basicTestItems,
@@ -325,7 +340,7 @@ export const ClosableTabsTest: Story = {
   },
   render: (args) => {
     const ClosableTabsWrapper = () => {
-      const [tabs, setTabs] = useState(args.items);
+      const [tabs, setTabs] = useState(must(args.items));
       const [value, setValue] = useState('tab1');
 
       const handleChange = (event: React.SyntheticEvent, tabId: string) => {
@@ -337,9 +352,9 @@ export const ClosableTabsTest: Story = {
         const newTabs = tabs.filter((tab) => tab.id !== tabId);
         setTabs(newTabs);
         if (value === tabId && newTabs.length > 0) {
-          setValue(newTabs[0].id);
+          setValue(must(newTabs[0]).id);
         }
-        args.onTabClose(tabId);
+        must(args.onTabClose)(tabId);
       };
 
       return (
@@ -372,7 +387,7 @@ export const ClosableTabsTest: Story = {
     await step('Close a tab', async () => {
       // Get the first close button
       const closeButtons = canvas.getAllByRole('button', { name: PT_BR_CHROME_COPY.closeTab });
-      const firstCloseButton = closeButtons[0];
+      const firstCloseButton = must(closeButtons[0]);
 
       // Click close button
       await userEvent.click(firstCloseButton);
@@ -396,7 +411,7 @@ export const ClosableTabsTest: Story = {
 };
 
 // 4. Badge Test
-export const BadgeTest: Story = {
+export const BadgeTest: WrapperStory = {
   name: '🔴 Badge Test',
   args: {
     items: [
@@ -457,7 +472,7 @@ export const BadgeTest: Story = {
       await expect(dashboardTab).toBeInTheDocument();
 
       // Dashboard tab should not contain any badge numbers
-      const dashboardContainer = dashboardTab.closest('[role="tab"]');
+      const dashboardContainer = dashboardTab.closest<HTMLElement>('[role="tab"]');
       const badgeInDashboard = dashboardContainer
         ? within(dashboardContainer).queryByText(/^(5|99)$/)
         : null;
@@ -467,7 +482,7 @@ export const BadgeTest: Story = {
 };
 
 // 5. Disabled Tabs Test
-export const DisabledTabsTest: Story = {
+export const DisabledTabsTest: WrapperStory = {
   name: '🚫 Disabled Tabs Test',
   args: {
     items: [
@@ -516,7 +531,9 @@ export const DisabledTabsTest: Story = {
 
       // Try to click but expect it to fail gracefully due to pointer-events: none
       try {
-        await userEvent.click(disabledTab, { skipPointerEventsCheck: true });
+        // `skipPointerEventsCheck` was renamed to `pointerEventsCheck` (a
+        // level, not a boolean); `0` is `PointerEventsCheckLevel.Never`.
+        await userEvent.click(disabledTab, { pointerEventsCheck: 0 });
       } catch {
         // Expected to fail due to pointer-events: none
       }
@@ -539,7 +556,7 @@ export const DisabledTabsTest: Story = {
 };
 
 // 6. Variant Test
-export const VariantTest: Story = {
+export const VariantTest: WrapperStory = {
   name: '🎨 Variant Test',
   args: {
     items: itemsWithIcons,
@@ -579,7 +596,7 @@ export const VariantTest: Story = {
 };
 
 // 7. Size Variation Test
-export const SizeVariationTest: Story = {
+export const SizeVariationTest: WrapperStory = {
   name: '📏 Size Variation Test',
   args: {
     items: basicTestItems,
@@ -636,7 +653,7 @@ export const SizeVariationTest: Story = {
 };
 
 // 8. Scrollable Tabs Test
-export const ScrollableTabsTest: Story = {
+export const ScrollableTabsTest: WrapperStory = {
   name: '📜 Scrollable Tabs Test',
   args: {
     scrollable: true,
@@ -713,7 +730,7 @@ export const ScrollableTabsTest: Story = {
 };
 
 // 9. Animation Test
-export const AnimationTest: Story = {
+export const AnimationTest: WrapperStory = {
   name: '🎬 Animation Test',
   args: {
     items: basicTestItems,
@@ -761,7 +778,7 @@ export const AnimationTest: Story = {
 };
 
 // 10. Persist Content Test
-export const PersistContentTest: Story = {
+export const PersistContentTest: WrapperStory = {
   name: '💾 Persist Content Test',
   args: {
     items: [
@@ -817,7 +834,7 @@ export const PersistContentTest: Story = {
 };
 
 // 11. Loading State Test
-export const LoadingStateTest: Story = {
+export const LoadingStateTest: WrapperStory = {
   name: '⏳ Loading State Test',
   args: {
     items: basicTestItems,
@@ -843,7 +860,7 @@ export const LoadingStateTest: Story = {
 };
 
 // 12. Accessibility Test
-export const AccessibilityTest: Story = {
+export const AccessibilityTest: WrapperStory = {
   name: '♿ Accessibility Test',
   args: {
     items: itemsWithIcons,
@@ -906,7 +923,7 @@ export const AccessibilityTest: Story = {
 };
 
 // 13. Color Theme Test
-export const ColorThemeTest: Story = {
+export const ColorThemeTest: WrapperStory = {
   name: '🎨 Color Theme Test',
   args: {
     items: basicTestItems,
@@ -942,7 +959,7 @@ export const ColorThemeTest: Story = {
 };
 
 // 14. Full Width Test
-export const FullWidthTest: Story = {
+export const FullWidthTest: WrapperStory = {
   name: '↔️ Full Width Test',
   args: {
     items: basicTestItems.slice(0, 2),
@@ -969,7 +986,7 @@ export const FullWidthTest: Story = {
 };
 
 // 15. Centered Tabs Test
-export const CenteredTabsTest: Story = {
+export const CenteredTabsTest: WrapperStory = {
   name: '🎯 Centered Tabs Test',
   args: {
     items: basicTestItems.slice(0, 2),
@@ -996,7 +1013,7 @@ export const CenteredTabsTest: Story = {
 };
 
 // 16. Edge Cases Test
-export const EdgeCasesTest: Story = {
+export const EdgeCasesTest: WrapperStory = {
   name: '🔧 Edge Cases Test',
   args: {
     items: [
@@ -1042,7 +1059,7 @@ export const EdgeCasesTest: Story = {
       await expect(specialTab).toBeInTheDocument();
 
       // Handle empty label
-      const emptyTab = tabs[0];
+      const emptyTab = must(tabs[0]);
       await expect(emptyTab).toBeInTheDocument();
       // Even with empty label, tab should be clickable
       await userEvent.click(emptyTab);
@@ -1052,7 +1069,7 @@ export const EdgeCasesTest: Story = {
 };
 
 // 17. Custom Indicator Color Test
-export const CustomIndicatorColorTest: Story = {
+export const CustomIndicatorColorTest: WrapperStory = {
   name: '🖌️ Custom Indicator Color Test',
   args: {
     items: basicTestItems,
@@ -1076,7 +1093,7 @@ export const CustomIndicatorColorTest: Story = {
 };
 
 // 18. Dividers Test
-export const DividersTest: Story = {
+export const DividersTest: WrapperStory = {
   name: '│ Dividers Test',
   args: {
     items: basicTestItems,
@@ -1149,7 +1166,7 @@ export const IntegrationTest: Story = {
   },
   render: (args) => {
     const IntegrationWrapper = () => {
-      const [items, setItems] = useState(args.items);
+      const [items, setItems] = useState(must(args.items));
       const [value, setValue] = useState('home');
 
       const handleChange = (event: React.SyntheticEvent, tabId: string) => {
@@ -1161,9 +1178,9 @@ export const IntegrationTest: Story = {
         const newItems = items.filter((item) => item.id !== tabId);
         setItems(newItems);
         if (value === tabId && newItems.length > 0) {
-          setValue(newItems[0].id);
+          setValue(must(newItems[0]).id);
         }
-        args.onTabClose(tabId);
+        must(args.onTabClose)(tabId);
       };
 
       return (
@@ -1212,7 +1229,7 @@ export const IntegrationTest: Story = {
 
     await step('Close the settings tab', async () => {
       const closeButtons = canvas.getAllByRole('button', { name: PT_BR_CHROME_COPY.closeTab });
-      const settingsCloseButton = closeButtons[0];
+      const settingsCloseButton = must(closeButtons[0]);
 
       await userEvent.click(settingsCloseButton);
 

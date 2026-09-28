@@ -6,6 +6,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Dialog, DialogActions,DialogContent, DialogHeader } from './Dialog';
 
 const meta: Meta<typeof Dialog> = {
@@ -27,18 +29,32 @@ const meta: Meta<typeof Dialog> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// A `DialogActions` button this wrapper re-targets to its own `handleClose`.
+interface ClonableButtonProps {
+  'data-testid'?: string;
+  onClick?: () => void;
+}
+
 // Test wrapper component
+interface TestDialogWrapperProps {
+  children: React.ReactNode;
+  onOpen?: () => void;
+  onClose?: () => void;
+  [key: string]: unknown;
+}
+// `TestDialogWrapper` owns `onOpen` itself (fired when its own button opens
+// the dialog) rather than forwarding it to `Dialog`, which has no such prop —
+// naming its props type directly (rather than `StoryObj<typeof meta>`, which
+// only knows `DialogProps`) types every story's `args` to match what it
+// actually passes.
+type WrapperStory = StoryObj<TestDialogWrapperProps>;
+
 const TestDialogWrapper = ({
   children,
   onOpen = fn(),
   onClose = fn(),
   ...args
-}: {
-  children: React.ReactNode;
-  onOpen?: () => void;
-  onClose?: () => void;
-  [key: string]: unknown;
-}) => {
+}: TestDialogWrapperProps) => {
   const [open, setOpen] = useState(false);
 
   const handleOpen = () => {
@@ -58,14 +74,17 @@ const TestDialogWrapper = ({
       </Button>
       <Dialog {...args} open={open} onClose={handleClose}>
         {React.Children.map(children, (child) => {
-          if (React.isValidElement(child) && child.type === DialogActions) {
+          if (
+            React.isValidElement<{ children?: React.ReactNode }>(child) &&
+            child.type === DialogActions
+          ) {
             // Clone DialogActions and add onClick handlers to buttons
             return React.cloneElement(
               child,
               {},
               React.Children.map(child.props.children, (button) => {
                 if (
-                  React.isValidElement(button) &&
+                  React.isValidElement<ClonableButtonProps>(button) &&
                   (button.props['data-testid'] === 'cancel-button' ||
                     button.props['data-testid'] === 'close-modal-button' ||
                     button.props['data-testid'] === 'force-close-button')
@@ -84,7 +103,7 @@ const TestDialogWrapper = ({
 };
 
 // 1. Basic Interaction Tests
-export const BasicInteraction: Story = {
+export const BasicInteraction: WrapperStory = {
   name: '🧪 Basic Interaction Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -159,7 +178,7 @@ export const BasicInteraction: Story = {
 };
 
 // 2. Keyboard Navigation Test
-export const KeyboardNavigation: Story = {
+export const KeyboardNavigation: WrapperStory = {
   name: '⌨️ Keyboard Navigation Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -249,7 +268,7 @@ export const KeyboardNavigation: Story = {
 };
 
 // 3. Screen Reader Test
-export const ScreenReaderTest: Story = {
+export const ScreenReaderTest: WrapperStory = {
   name: '🔊 Screen Reader Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -316,7 +335,7 @@ export const ScreenReaderTest: Story = {
 };
 
 // 4. Focus Management Test
-export const FocusManagement: Story = {
+export const FocusManagement: WrapperStory = {
   /*
    * On open, the web `Dialog` moves focus to the first tabbable descendant of
    * the `role="dialog"` paper — or the paper itself when it holds nothing
@@ -434,7 +453,7 @@ export const FocusManagement: Story = {
 };
 
 // 5. Visual States Test
-export const VisualStates: Story = {
+export const VisualStates: WrapperStory = {
   name: '👁️ Visual States Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -513,7 +532,7 @@ export const VisualStates: Story = {
 };
 
 // 6. Performance Test
-export const PerformanceTest: Story = {
+export const PerformanceTest: WrapperStory = {
   name: '⚡ Performance Test',
   render: (args) => {
     const items = Array.from({ length: 100 }, (_, i) => ({
@@ -601,14 +620,14 @@ export const PerformanceTest: Story = {
 };
 
 // 7. Edge Cases Test
-export const EdgeCases: Story = {
+export const EdgeCases: WrapperStory = {
   name: '🔧 Edge Cases Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
       <DialogHeader
         title="Edge Cases Test Dialog with Very Long Title That Should Handle Overflow Gracefully"
         subtitle="This is a very long subtitle that tests how the dialog handles overflow content and maintains proper layout and accessibility standards"
-        showCloseButton={args.showCloseButton}
+        showCloseButton={args.showCloseButton as boolean | undefined}
       />
       <DialogContent data-testid="edge-case-content">
         <Typography data-testid="long-text">
@@ -678,7 +697,7 @@ export const EdgeCases: Story = {
       await expect(dialogContent).toBeInTheDocument();
 
       // Dialog should maintain proper dimensions
-      const dialogRect = dialog.getBoundingClientRect();
+      const dialogRect = must(dialog).getBoundingClientRect();
       await expect(dialogRect.width).toBeGreaterThan(0);
       await expect(dialogRect.height).toBeGreaterThan(0);
     });
@@ -697,7 +716,7 @@ export const EdgeCases: Story = {
 };
 
 // 8. Persistent Dialog Test
-export const PersistentDialogTest: Story = {
+export const PersistentDialogTest: WrapperStory = {
   name: '🔒 Persistent Dialog Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -784,7 +803,7 @@ export const PersistentDialogTest: Story = {
 };
 
 // 9. Responsive Design Test
-export const ResponsiveDesign: Story = {
+export const ResponsiveDesign: WrapperStory = {
   name: '📱 Responsive Design Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -827,7 +846,7 @@ export const ResponsiveDesign: Story = {
 
     await step('Test mobile dialog layout', async () => {
       const dialog = document.querySelector('[role="dialog"]');
-      const dialogRect = dialog.getBoundingClientRect();
+      const dialogRect = must(dialog).getBoundingClientRect();
 
       // Measured against the body, which is the box the dialog is actually laid
       // out in — window.innerWidth includes any scrollbar, so the same dialog
@@ -842,7 +861,7 @@ export const ResponsiveDesign: Story = {
 };
 
 // 10. Theme Variations Test
-export const ThemeVariations: Story = {
+export const ThemeVariations: WrapperStory = {
   name: '🎨 Theme Variations Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -885,7 +904,7 @@ export const ThemeVariations: Story = {
 
     await step('Verify theme-aware styling', async () => {
       const dialog = document.querySelector('[role="dialog"]');
-      const computedStyle = window.getComputedStyle(dialog);
+      const computedStyle = window.getComputedStyle(must(dialog));
 
       // Dialog should have proper background color
       await expect(computedStyle.backgroundColor).toBeDefined();
@@ -895,7 +914,7 @@ export const ThemeVariations: Story = {
 };
 
 // 11. Integration Test
-export const Integration: Story = {
+export const Integration: WrapperStory = {
   name: '🔗 Integration Test',
   render: (args) => {
     const [nestedOpen, setNestedOpen] = useState(false);

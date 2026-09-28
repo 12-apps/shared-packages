@@ -3,6 +3,8 @@ import Save from '@mui/icons-material/Save';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Button } from './Button';
 
 const meta: Meta<typeof Button> = {
@@ -31,7 +33,7 @@ export const BasicInteraction: Story = {
     onBlur: fn(),
     onMouseEnter: fn(),
     onMouseLeave: fn(),
-    'data-testid': 'basic-button',
+    dataTestId: 'basic-button',
   },
   play: async ({ canvasElement, step, args }) => {
     const canvas = within(canvasElement);
@@ -62,7 +64,7 @@ export const VariantSwitching: Story = {
   name: '🔄 Variant Switching Test',
   args: {
     children: 'Dynamic Button',
-    'data-testid': 'variant-button',
+    dataTestId: 'variant-button',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -82,7 +84,7 @@ export const LoadingStateTest: Story = {
   args: {
     children: 'Loading Button',
     loading: true,
-    'data-testid': 'loading-button',
+    dataTestId: 'loading-button',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -116,7 +118,7 @@ export const KeyboardNavigation: Story = {
     onFocus: fn(),
     onBlur: fn(),
     onKeyDown: fn(),
-    'data-testid': 'keyboard-button',
+    dataTestId: 'keyboard-button',
   },
   parameters: {
     a11y: {
@@ -165,7 +167,7 @@ export const ScreenReaderTest: Story = {
     children: 'Screen Reader Button',
     'aria-label': 'Custom accessible label',
     'aria-describedby': 'button-description',
-    'data-testid': 'sr-button',
+    dataTestId: 'sr-button',
   },
   render: (args) => (
     <>
@@ -207,7 +209,7 @@ export const DisabledAccessibility: Story = {
     onFocus: fn(),
     onBlur: fn(),
     onKeyDown: fn(),
-    'data-testid': 'disabled-button',
+    dataTestId: 'disabled-button',
   },
   play: async ({ canvasElement, step, args }) => {
     const canvas = within(canvasElement);
@@ -250,7 +252,7 @@ export const VisualStates: Story = {
   args: {
     children: 'Visual Test Button',
     variant: 'solid', // Explicitly set to solid to ensure hover transform works
-    'data-testid': 'visual-button',
+    dataTestId: 'visual-button',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -330,7 +332,7 @@ export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   args: {
     children: 'Responsive Button',
-    'data-testid': 'responsive-button',
+    dataTestId: 'responsive-button',
   },
   parameters: {
     viewport: {
@@ -466,7 +468,7 @@ export const PerformanceTest: Story = {
 
     await step('Test rapid interactions', async () => {
       const buttons = canvas.getAllByTestId(/perf-button-/);
-      const sampleButton = buttons[0];
+      const sampleButton = must(buttons[0]);
 
       // Simulate rapid hover/unhover
       for (let i = 0; i < 5; i++) {
@@ -492,7 +494,7 @@ export const IconIntegration: Story = {
     onClick: fn(),
     onFocus: fn(),
     onBlur: fn(),
-    'data-testid': 'icon-button',
+    dataTestId: 'icon-button',
   },
   play: async ({ canvasElement, step, args }) => {
     const canvas = within(canvasElement);
@@ -520,7 +522,7 @@ export const LoadingWithIcon: Story = {
     children: 'Processing...',
     icon: <Delete data-testid="delete-icon" />,
     loading: true,
-    'data-testid': 'loading-icon-button',
+    dataTestId: 'loading-icon-button',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);

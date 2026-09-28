@@ -83,7 +83,7 @@ const AccessibilityContent = () => (
 export const BasicInteraction: Story = {
   name: '🧪 Basic Interaction Test',
   args: {
-    'data-testid': 'container-component',
+    dataTestId: 'container-component',
     children: <InteractiveContent onClick={fn()} />,
   },
   play: async ({ canvasElement, step }) => {
@@ -123,7 +123,7 @@ export const ContainerVariantInteraction: Story = {
   name: '🔄 Container Variant State Test',
   args: {
     variant: 'default',
-    'data-testid': 'variant-container',
+    dataTestId: 'variant-container',
     children: (
       <Box>
         <Typography data-testid="variant-indicator">Default variant active</Typography>
@@ -157,7 +157,7 @@ export const ContainerVariantInteraction: Story = {
 export const KeyboardNavigation: Story = {
   name: '⌨️ Keyboard Navigation Test',
   args: {
-    'data-testid': 'keyboard-container',
+    dataTestId: 'keyboard-container',
     children: (
       <Box>
         <Button data-testid="first-focusable" variant="contained" sx={{ mr: 2 }}>
@@ -236,7 +236,7 @@ export const ScreenReaderTest: Story = {
   args: {
     'aria-label': 'Test container',
     'aria-describedby': 'description-id',
-    'data-testid': 'container',
+    dataTestId: 'container',
     children: <AccessibilityContent />,
   },
   play: async ({ canvasElement, step }) => {
@@ -277,7 +277,7 @@ export const ScreenReaderTest: Story = {
 export const FocusManagement: Story = {
   name: '🎯 Focus Management Test',
   args: {
-    'data-testid': 'focus-container',
+    dataTestId: 'focus-container',
     children: (
       <Box>
         <Button data-testid="trigger-button" variant="contained" sx={{ mb: 2 }}>
@@ -331,7 +331,7 @@ export const ResponsiveDesign: Story = {
   args: {
     responsive: true,
     padding: 'lg',
-    'data-testid': 'responsive-container',
+    dataTestId: 'responsive-container',
     children: (
       <Card>
         <CardContent>
@@ -396,7 +396,7 @@ export const ResponsiveDesign: Story = {
 export const ThemeVariations: Story = {
   name: '🎨 Theme Variations Test',
   args: {
-    'data-testid': 'themed-container',
+    dataTestId: 'themed-container',
     sx: {
       backgroundColor: 'background.paper',
       color: 'text.primary',
@@ -449,7 +449,7 @@ export const ThemeVariations: Story = {
 export const VisualStates: Story = {
   name: '👁️ Visual States Test',
   args: {
-    'data-testid': 'visual-states-container',
+    dataTestId: 'visual-states-container',
     children: (
       <Box>
         <Paper 
@@ -535,7 +535,7 @@ export const VisualStates: Story = {
 export const PerformanceTest: Story = {
   name: '⚡ Performance Test',
   args: {
-    'data-testid': 'performance-container',
+    dataTestId: 'performance-container',
     children: (
       <Box>
         {Array.from({ length: 100 }, (_, i) => (
@@ -585,7 +585,7 @@ export const PerformanceTest: Story = {
 export const EdgeCases: Story = {
   name: '🔧 Edge Cases Test',
   args: {
-    'data-testid': 'edge-case-container',
+    dataTestId: 'edge-case-container',
     children: (
       <Box>
         <Box data-testid="empty-state" sx={{ mb: 2, p: 2, border: '2px dashed #ccc' }}>
@@ -665,7 +665,7 @@ export const EdgeCases: Story = {
 export const IntegrationTest: Story = {
   name: '🔗 Integration Test',
   args: {
-    'data-testid': 'integration-container',
+    dataTestId: 'integration-container',
     variant: 'padded',
     maxWidth: 'md',
     children: (

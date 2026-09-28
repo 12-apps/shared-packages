@@ -16,6 +16,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Drawer, DrawerContent,DrawerHeader } from './Drawer';
 
 const meta: Meta<typeof Drawer> = {
@@ -396,7 +398,7 @@ export const FocusManagement: Story = {
     expect(secondItem).toBeInTheDocument();
     expect(closeButton).toBeInTheDocument();
 
-    await userEvent.click(firstItem);
+    await userEvent.click(must(firstItem));
     await waitFor(() => expect(document.activeElement).toBe(firstItem));
 
     await userEvent.tab();
@@ -406,7 +408,7 @@ export const FocusManagement: Story = {
     await waitFor(() => expect(document.activeElement).toBe(closeButton));
 
     // Close drawer and verify focus returns
-    await userEvent.click(closeButton);
+    await userEvent.click(must(closeButton));
 
     await waitFor(() => {
       expect(document.querySelector('h6')).not.toBeInTheDocument();
@@ -480,7 +482,7 @@ export const ResponsiveDesign: Story = {
     // Test drawer renders properly (look in document since MUI renders in portal)
     const drawer = document.querySelector('[data-testid="responsive-drawer"]');
     expect(drawer).toBeInTheDocument();
-    const drawerPaper = drawer.querySelector('.MuiDrawer-paper');
+    const drawerPaper = must(drawer).querySelector('.MuiDrawer-paper');
     expect(drawerPaper).toBeInTheDocument();
 
     // Test drawer content is accessible (look in document since it's in portal)
@@ -624,14 +626,14 @@ export const ThemeVariations: Story = {
     await waitFor(() => {
       const glassDrawer = document.querySelector('[data-testid="theme-glass-drawer"]');
       expect(glassDrawer).toBeInTheDocument();
-      const glassTitle = glassDrawer.querySelector('h6');
+      const glassTitle = must(glassDrawer).querySelector('h6');
       expect(glassTitle).toBeInTheDocument();
       expect(glassTitle).toHaveTextContent('Glass Theme');
     });
 
     // Test glass drawer styling
     const glassDrawerElement = document.querySelector('[data-testid="theme-glass-drawer"]');
-    const glassDrawerPaper = glassDrawerElement.querySelector('.MuiDrawer-paper');
+    const glassDrawerPaper = must(glassDrawerElement).querySelector('.MuiDrawer-paper');
     expect(glassDrawerPaper).toBeInTheDocument();
   },
 };
@@ -758,7 +760,7 @@ export const VisualStates: Story = {
     expect(leftDrawer).toBeInTheDocument();
 
     await waitFor(() => {
-      const leftTitle = leftDrawer.querySelector('h6');
+      const leftTitle = must(leftDrawer).querySelector('h6');
       expect(leftTitle).toBeInTheDocument();
       expect(leftTitle).toHaveTextContent('Left Drawer');
     });
@@ -770,7 +772,7 @@ export const VisualStates: Story = {
     await waitFor(() => {
       const rightDrawer = document.querySelector('[data-testid="visual-right-drawer"]');
       expect(rightDrawer).toBeInTheDocument();
-      const rightTitle = rightDrawer.querySelector('h6');
+      const rightTitle = must(rightDrawer).querySelector('h6');
       expect(rightTitle).toBeInTheDocument();
       expect(rightTitle).toHaveTextContent('Right Drawer');
     });
@@ -782,7 +784,7 @@ export const VisualStates: Story = {
     await waitFor(() => {
       const topDrawer = document.querySelector('[data-testid="visual-top-drawer"]');
       expect(topDrawer).toBeInTheDocument();
-      const topTitle = topDrawer.querySelector('h6');
+      const topTitle = must(topDrawer).querySelector('h6');
       expect(topTitle).toBeInTheDocument();
       expect(topTitle).toHaveTextContent('Top Drawer');
     });
@@ -794,7 +796,7 @@ export const VisualStates: Story = {
     await waitFor(() => {
       const bottomDrawer = document.querySelector('[data-testid="visual-bottom-drawer"]');
       expect(bottomDrawer).toBeInTheDocument();
-      const bottomTitle = bottomDrawer.querySelector('h6');
+      const bottomTitle = must(bottomDrawer).querySelector('h6');
       expect(bottomTitle).toBeInTheDocument();
       expect(bottomTitle).toHaveTextContent('Bottom Drawer');
     });
@@ -883,7 +885,7 @@ export const Performance: Story = {
     await userEvent.click(button100);
 
     await waitFor(() => {
-      const title = performanceDrawer.querySelector('h6');
+      const title = must(performanceDrawer).querySelector('h6');
       expect(title).toBeInTheDocument();
       expect(title).toHaveTextContent('Performance Test (100 items)');
     });
@@ -961,7 +963,10 @@ export const EdgeCases: Story = {
             <DrawerHeader onClose={() => toggleState('empty')}>
               <Typography variant="h6">Empty Drawer</Typography>
             </DrawerHeader>
-            <DrawerContent>{/* Intentionally empty content */}</DrawerContent>
+            <DrawerContent>
+              {/* Intentionally empty content */}
+              {null}
+            </DrawerContent>
           </Drawer>
 
           {/* No Header Drawer */}
@@ -1040,7 +1045,7 @@ export const EdgeCases: Story = {
     expect(emptyDrawer).toBeInTheDocument();
 
     await waitFor(() => {
-      const emptyTitle = emptyDrawer.querySelector('h6');
+      const emptyTitle = must(emptyDrawer).querySelector('h6');
       expect(emptyTitle).toBeInTheDocument();
       expect(emptyTitle).toHaveTextContent('Empty Drawer');
     });
@@ -1067,7 +1072,7 @@ export const EdgeCases: Story = {
       expect(longContentDrawer).toBeInTheDocument();
       const longText = document.querySelector('[data-testid="edge-long-text"]');
       expect(longText).toBeInTheDocument();
-      expect(longText.textContent?.length).toBeGreaterThan(100);
+      expect(must(longText).textContent?.length).toBeGreaterThan(100);
     });
 
     // Test persistent drawer
@@ -1077,7 +1082,7 @@ export const EdgeCases: Story = {
     await waitFor(() => {
       const persistentDrawer = document.querySelector('[data-testid="edge-persistent-drawer"]');
       expect(persistentDrawer).toBeInTheDocument();
-      const persistentTitle = persistentDrawer.querySelector('h6');
+      const persistentTitle = must(persistentDrawer).querySelector('h6');
       expect(persistentTitle).toBeInTheDocument();
       expect(persistentTitle).toHaveTextContent('Persistent Drawer');
     });
@@ -1090,7 +1095,7 @@ export const EdgeCases: Story = {
       const persistentDrawer = document.querySelector('[data-testid="edge-persistent-drawer"]');
       // For persistent drawers, check if it's hidden rather than removed from DOM
       if (persistentDrawer) {
-        const drawerPaper = persistentDrawer.querySelector('.MuiDrawer-paper');
+        const drawerPaper = persistentDrawer.querySelector<HTMLElement>('.MuiDrawer-paper');
         const isHidden =
           drawerPaper &&
           (drawerPaper.style.visibility === 'hidden' ||
@@ -1293,7 +1298,7 @@ export const Integration: Story = {
 
     // Test navigation to dashboard
     const dashboardItem = document.querySelector('[data-testid="integration-nav-dashboard"]');
-    await userEvent.click(dashboardItem);
+    await userEvent.click(must(dashboardItem));
 
     await waitFor(() => {
       const dashboardOverview = canvas.getByText('Dashboard Overview');
@@ -1311,7 +1316,7 @@ export const Integration: Story = {
     );
     expect(notificationBadge).toBeInTheDocument();
 
-    await userEvent.click(notificationsItem);
+    await userEvent.click(must(notificationsItem));
 
     await waitFor(() => {
       const notificationCenter = canvas.getByText('Notification Center');
@@ -1328,7 +1333,7 @@ export const Integration: Story = {
 
     // Test drawer closing
     const closeButton = document.querySelector('button[aria-label*="close" i]');
-    await userEvent.click(closeButton);
+    await userEvent.click(must(closeButton));
 
     await waitFor(() => {
       const appName = Array.from(document.querySelectorAll('*')).find(
