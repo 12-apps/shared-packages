@@ -1,15 +1,19 @@
 /**
- * `DataGrid`'S DEFAULT DENSITY COMES FROM THE THEME (FUT-2769).
+ * `DataGrid`'S DENSITY NO LONGER DEFAULTS FROM THE THEME (FUT-2886).
  *
- * `GridDensity` ('compact' | 'comfortable' | 'spacious') is not the theme's
- * three names, so the default goes through an alias table
- * (`mapThemeToGridDensity`, `DataGrid.model.ts`):
+ * FUT-2769 defaulted `density` from `useDensity()` through an alias table
+ * (`mapThemeToGridDensity`) — `props.density ?? mapThemeToGridDensity(theme.density.level
+ * ?? 'normal')` — which combined with `densityHeight`'s own discrete
+ * per-density row-height table (0.8x compact / 1.2x spacious) to scale row
+ * height TWICE under a themed density: the alias table picked a DIFFERENT
+ * discrete `GridDensity`, and `rem()` then scaled THAT row height again by
+ * the same theme's `typography.fontSize` factor.
  *
- * | theme.density.level (or unset ⇒ 'normal') | DataGrid.density default |
- * | -- | -- |
- * | compact     | compact    |
- * | normal      | comfortable (today's literal — unchanged) |
- * | comfortable | spacious   |
+ * The fix (mirroring Table's own FUT-2886 fix): with no `density` prop, the
+ * grid's own discrete density is always `'comfortable'` — the grid's normal
+ * density, `mapThemeToGridDensity('normal')`'s own former result — never
+ * re-picked from the theme. A theme density still scales row height, but
+ * only ONCE, through the `rem()` a comfortable-density row is drawn with.
  *
  * `data-density` is the grid's own reported default (`DataGrid.tsx`'s
  * `resolveChrome`), fed by the SAME resolved value the row-height geometry
@@ -45,8 +49,8 @@ function renderGrid(theme: ReturnType<typeof themeAt>, density?: GridDensity) {
   );
 }
 
-describe("DataGrid's density defaults from the theme", () => {
-  it("stays 'comfortable' (today's literal) with no theme density at all", () => {
+describe("DataGrid's density no longer defaults from the theme (FUT-2886)", () => {
+  it("stays 'comfortable' with no theme density at all", () => {
     renderGrid(themeAt(undefined));
     expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'comfortable');
   });
@@ -56,26 +60,23 @@ describe("DataGrid's density defaults from the theme", () => {
     expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'comfortable');
   });
 
-  it("maps theme density 'compact' to the grid's own 'compact'", () => {
+  it("stays 'comfortable' under a 'compact' theme with no density prop — no longer re-picked from the theme", () => {
     renderGrid(themeAt('compact'));
-    expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'compact');
+    expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'comfortable');
   });
 
-  it("maps theme density 'comfortable' to the grid's own 'spacious'", () => {
+  it("stays 'comfortable' under a 'comfortable' theme with no density prop — same single-scale rule", () => {
     renderGrid(themeAt('comfortable'));
-    expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'spacious');
-  });
-
-  it('lets an explicit density prop win over the theme', () => {
-    renderGrid(themeAt('compact'), 'spacious');
-    expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'spacious');
+    expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'comfortable');
   });
 
   it("stays 'comfortable' for a raw numeric theme density — it names no level", () => {
-    // resolveDensityFactor(1.5) => { factor: 1.5 }, no `.level` at all (a
-    // repository setting a raw numeric density, not a named one); the alias
-    // table is keyed off `.level`, so this is the 'normal' row: 'comfortable'.
     renderGrid(createTheme({ density: resolveDensityFactor(1.5) }));
     expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'comfortable');
+  });
+
+  it('lets an explicit density prop win over any theme (regression guard)', () => {
+    renderGrid(themeAt('compact'), 'spacious');
+    expect(screen.getByRole('grid')).toHaveAttribute('data-density', 'spacious');
   });
 });

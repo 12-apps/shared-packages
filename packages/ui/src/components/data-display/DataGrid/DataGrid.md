@@ -165,7 +165,7 @@ export interface DataGridProps<T = any> extends React.HTMLAttributes<HTMLElement
 
   /** Sizing, density, and layout */
   sizeMode?: GridSizeMode; // auto | fixed | fill
-  density?: GridDensity; // compact | comfortable | spacious
+  density?: GridDensity; // compact | comfortable | spacious; defaults to 'comfortable', never the theme (FUT-2886)
   rowHeight?: number; // default row height (px)
   headerHeight?: number; // default header height (px)
   footerHeight?: number; // optional
@@ -302,6 +302,17 @@ Use Requisio tokens only:
 - Focus: `--rs-focus-ring`
 - Elevation (optional for sticky header shadow): `--rs-shadow-sm`
 - Density mapping adjusts `rowHeight`, paddings, and font sizes.
+
+**A theme density scales a grid once, through `rem()`** (FUT-2886). With no
+`density` prop, the grid's own discrete density stays `'comfortable'` no
+matter what the host theme's density is set to — it is NOT re-picked from the
+theme. The theme's density factor still applies, exactly the way it scales
+every other size on the page, so a compact theme still gives smaller rows
+(≈0.9× the unthemed default) and a comfortable one still gives taller ones
+(≈1.1×); it does so by scaling the `'comfortable'` row through `rem()`, not by
+swapping in a different discrete row-height table (`'compact'`'s 0.8× or
+`'spacious'`'s 1.2×). Pass `density` explicitly for a deliberate, second,
+per-grid choice on top of that.
 
 Dark mode:
 
