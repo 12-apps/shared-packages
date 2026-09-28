@@ -103,3 +103,83 @@ describe('LazyImage relative single-axis placeholder sizing (FUT-2805 follow-up)
     expect(skeleton.aspectRatio).toBe('');
   });
 });
+
+// FUT-2869 (adversarial review of FUT-2805 #693): `isRelativeLength` only
+// recognised a bare trailing `%` or a numeric fraction — a `%` nested inside
+// a compound expression (`calc()`) was invisible to it, so `width="calc(100%
+// - 8px)"` alone was classified DEFINITE and borrowed onto height literally
+// (`height: calc(100% - 8px)`), which against an auto-height containing block
+// computes to 0 (CSS 10.5) — the exact collapse FUT-2805 closed, unfixed for
+// this input shape. Fixed: a `%` ANYWHERE in the string (including inside
+// `calc()`/`min()`/`max()`/`clamp()`) is relative, and squares via
+// `aspectRatio` instead of being borrowed.
+describe('LazyImage relative single-axis: a % nested in calc()/viewport units (FUT-2869)', () => {
+  it('squares a calc() width containing a %, not borrowed onto height literally, on the skeleton', () => {
+    renderImage({ width: 'calc(100% - 8px)' });
+    const skeleton = styleOf('pic-skeleton');
+    expect(skeleton.width).toBe('calc(100% - 8px)');
+    // Not `calc(100% - 8px)` borrowed onto height — that is the collapse this
+    // ticket fixes. `auto` lets `aspectRatio` size it instead.
+    expect(skeleton.height).toBe('auto');
+    expect(skeleton.aspectRatio).toBe('1/1');
+  });
+
+  it('squares a calc() height containing a %, not borrowed onto width literally, on the skeleton', () => {
+    renderImage({ height: 'calc(50% - 8px)' });
+    const skeleton = styleOf('pic-skeleton');
+    expect(skeleton.height).toBe('calc(50% - 8px)');
+    expect(skeleton.width).toBe('auto');
+    expect(skeleton.aspectRatio).toBe('1/1');
+  });
+
+  // FUT-2869's Decision: a viewport unit (`vw`/`vh`/`vmin`/`vmax`) alone also
+  // squares, not borrows — see `isRelativeLength`'s own comment in
+  // `LazyImage.tsx` for why (it never collapses to 0 the way a borrowed `%`
+  // does, but borrowing it is still not the square the component promises
+  // whenever the container isn't exactly the viewport's own size).
+  it('squares a vw width, not borrowed onto height literally, on the skeleton', () => {
+    renderImage({ width: '50vw' });
+    const skeleton = styleOf('pic-skeleton');
+    expect(skeleton.width).toBe('50vw');
+    expect(skeleton.height).toBe('auto');
+    expect(skeleton.aspectRatio).toBe('1/1');
+  });
+
+  it('leaves a calc() width alone when height is ALSO set (no aspectRatio)', () => {
+    renderImage({ width: 'calc(100% - 8px)', height: 200 });
+    const skeleton = styleOf('pic-skeleton');
+    expect(skeleton.width).toBe('calc(100% - 8px)');
+    expect(skeleton.height).toBe('12.5rem');
+    expect(skeleton.aspectRatio).toBe('');
+  });
+
+  // Review follow-up: the dynamic/small/large viewport units (`dvh`/`svw`/
+  // `lvmin`/…) and the container-query units (`cqw`/`cqh`/`cqi`/`cqb`/`cqmin`/
+  // `cqmax`) depend on something outside the length too (the dynamic viewport,
+  // or the nearest queried container) — the same rule as `%` and `vw`/`vh`/
+  // `vmin`/`vmax`, so they square the same way.
+  it('squares a dvh height, not borrowed onto width literally, on the skeleton', () => {
+    renderImage({ height: '100dvh' });
+    const skeleton = styleOf('pic-skeleton');
+    expect(skeleton.height).toBe('100dvh');
+    expect(skeleton.width).toBe('auto');
+    expect(skeleton.aspectRatio).toBe('1/1');
+  });
+
+  // jsdom's `cssstyle` does not parse container-query units at all (unlike
+  // `%`/`vw`/`dvh`, which it accepts) — an inline `width: '50cqw'` is REJECTED
+  // at the property-setter level and never reaches the DOM either as computed
+  // style or as the raw `style` attribute, in a fixed OR unfixed `LazyImage`
+  // alike. So the emitted width string itself cannot be asserted here (a real
+  // browser does keep it — see the `RelativeCqwWidthSkeletonSquare` story).
+  // What jsdom CAN show, and what actually distinguishes fixed from unfixed,
+  // is the SQUARING decision: `height`/`aspectRatio` are computed in JS from
+  // `isRelativeLength('50cqw')` alone, entirely before the (jsdom-rejected)
+  // width string is ever handed to the DOM.
+  it('squares a cqw width (via height/aspectRatio — jsdom drops the cqw value itself)', () => {
+    renderImage({ width: '50cqw' });
+    const skeleton = styleOf('pic-skeleton');
+    expect(skeleton.height).toBe('auto');
+    expect(skeleton.aspectRatio).toBe('1/1');
+  });
+});
