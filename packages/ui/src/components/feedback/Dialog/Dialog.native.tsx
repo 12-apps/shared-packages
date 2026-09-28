@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { hasSpacingSlot, withDialogDefaults } from './Dialog.helpers';
-import { dialogBackdrop, dialogLook } from './Dialog.look.native';
+import { dialogBackdrop, dialogKeyboardLift, dialogLook } from './Dialog.look.native';
 import { DIALOG_BODY_PADDING_UNITS, DIALOG_PULSE } from './Dialog.metrics';
 import type { DialogProps } from './Dialog.types.native';
 import {
@@ -12,6 +12,7 @@ import {
   DialogTitledContext,
   dialogBodyTextStyle,
 } from './DialogParts.native';
+import { useKeyboardOverlap } from '../../../platform/keyboard-overlap.native';
 import { PulseRing } from '../../../platform/pulse-ring.native';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { renderTextChildren } from '../../../platform/text-children';
@@ -106,9 +107,18 @@ export function Dialog(rawProps: DialogProps): React.JSX.Element {
   // backdrop and Escape (which `Modal` routes through `onRequestClose`).
   const dismiss = persistent ? undefined : onClose;
 
+  // Edge-to-edge defeats the `SOFT_INPUT_ADJUST_RESIZE` that `Modal` asks for,
+  // so the window never shrinks for the keyboard and nothing else moves the
+  // paper: the overlay measures how much of it the keyboard covers and takes
+  // that off the paper's room itself (FUT-3021).
+  const keyboard = useKeyboardOverlap();
+
   return (
     <Modal visible={open} transparent onRequestClose={dismiss} {...modalProps}>
-      <View style={look.overlay}>
+      <View
+        style={[look.overlay, dialogKeyboardLift(theme, variant, keyboard.overlap)]}
+        onLayout={keyboard.onLayout}
+      >
         <Pressable
           aria-hidden
           tabIndex={-1}
