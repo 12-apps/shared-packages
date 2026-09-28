@@ -598,7 +598,7 @@ Components for structuring and organizing page layouts.
 ### SettingCard
 **Purpose**: One setting, summarised while closed and edited in place
 **Use Cases**: Settings screens — any value with a title, a current state and a small form behind an Edit
-**Features**: Closed title + status pill + one-line summary + Edit; opens in place (no modal/route) around the host form with a "learn more" disclosure and Cancel/Save; async save with a pending state, stays open and shows the error on rejection (`formatError` for host sentences); Cancel/Escape discard; focus moves into the card on open and back to Edit on close; controlled or uncontrolled; spans the full row of a grid while open; required `copy` (no shipped words)
+**Features**: Closed title + status pill + a summary of at most two lines (an [i] beside the title holds the rest) + Edit; opens in place (no modal/route) around the host form with a "learn more" disclosure and Cancel/Save; async save with a pending state, stays open and shows the error on rejection (`formatError` for host sentences); Cancel/Escape discard; focus moves into the card on open and back to Edit on close; controlled or uncontrolled; spans the full row of a grid while open; required `copy` (no shipped words)
 **Types**: `SettingCardProps`, `SettingCardCopy`, `SettingStatus`, `SettingErrorFormatter`, `SettingSaveResult`
 **Location**: `src/components/layout/SettingCard`
 **Docs**: `src/components/layout/SettingCard/SettingCard.md`

@@ -7,6 +7,7 @@ import { Button } from '../../form/Button';
 import { useSettingCard } from './SettingCard.hooks';
 import { LearnMore, PendingSpinner, SaveError, SettingHeader, partTestId } from './SettingCard.parts';
 import { SETTING_CARD_OPEN_ATTR, actionsStyles, summaryStyles, surfaceStyles, withCallerSx } from './SettingCard.styles';
+import { SummaryInfo, useClamped } from './SettingCard.summary';
 import type { SettingCardCopy, SettingCardProps } from './SettingCard.types';
 
 interface OpenBodyProps {
@@ -82,7 +83,8 @@ const OpenBody: React.FC<OpenBodyProps> = ({
 /**
  * A setting, summarised while closed and edited in place.
  *
- * Closed: title, status pill, a one-line summary and Edit. Edit opens the card
+ * Closed: title, status pill, a summary of at most two lines (an [i] beside the
+ * title holds the rest) and Edit. Edit opens the card
  * where it is — no dialog, no route — around the host's form, a "learn more"
  * disclosure and Cancel / Save. Save may be async: the card holds its saving
  * state while the promise is pending, closes when it resolves, and stays open
@@ -133,6 +135,7 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const card = useSettingCard(props);
+  const clamp = useClamped();
   const { open } = card;
 
   return (
@@ -153,6 +156,11 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
         headingLevel={headingLevel}
         icon={icon}
         status={status}
+        info={
+          !open && clamp.clamped && summary != null ? (
+            <SummaryInfo label={copy.moreInfo ?? title} summary={summary} dataTestId={dataTestId} />
+          ) : null
+        }
         trailing={
           open ? null : (
             <EditTrigger
@@ -169,7 +177,7 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
         dataTestId={dataTestId}
       />
       {!open && summary != null && (
-        <Box component="p" sx={summaryStyles} data-testid={partTestId(dataTestId, 'summary')}>
+        <Box component="p" ref={clamp.ref} sx={summaryStyles} data-testid={partTestId(dataTestId, 'summary')}>
           {summary}
         </Box>
       )}

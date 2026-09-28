@@ -51,7 +51,7 @@ const [draft, setDraft] = useState<number | null>(saved);
 | `title` | `string` | **required** | The setting's name. A heading, and the accessible name of the card's region. |
 | `onSave` | `() => void \| Promise<unknown>` | **required** | Persist the draft. See *Saving* below. |
 | `children` | `ReactNode` | **required** | The form. Rendered only while open. |
-| `summary` | `ReactNode` | — | The one line a closed card shows. Ends in an ellipsis rather than wrapping. |
+| `summary` | `ReactNode` | — | What a closed card shows under its title: two lines at most, then an ellipsis. While it is cut, an [i] beside the title shows the whole text (hover, or a click/tap that pins it). |
 | `status` | `{ label: string; color?: ColorValue }` | — | The pill beside the title. `label` is always shown, so colour never carries the meaning alone. |
 | `learnMore` | `ReactNode` | — | Longer explanation behind a disclosure in the open card. Omit for no disclosure. |
 | `onCancel` | `() => void` | — | The card closed without saving. Reset the host's draft here. |

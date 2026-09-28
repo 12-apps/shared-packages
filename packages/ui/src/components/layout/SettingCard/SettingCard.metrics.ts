@@ -13,6 +13,11 @@ export const SETTING_CARD = {
   groupRuleWidth: 2,
   /** The narrowest a grid column gets by default. */
   gridMinColumnWidth: 320,
+  /** The widest the [i]'s full-summary tooltip gets. */
+  infoMaxWidth: 360,
+  /** The [i]'s keyboard focus ring: its width, and its gap from the glyph. */
+  infoFocusRingWidth: 2,
+  infoFocusRingOffset: 2,
 } as const;
 
 /** The grid's default gap, in theme SPACING units (not px): what `sx`'s `gap: 2` means. */

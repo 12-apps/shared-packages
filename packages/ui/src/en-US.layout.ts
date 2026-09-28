@@ -23,9 +23,11 @@ export const EN_US_SETTING_CARD_COPY: SettingCardCopy = {
   saving: "Saving…",
   learnMore: "Learn more",
   saveFailed: "Could not save. Please try again.",
+  moreInfo: "Show the full text",
 };
 
 export const EN_US_SETTING_SWITCH_COPY: SettingSwitchCopy = {
   saving: "Saving…",
   saveFailed: "Could not save. Please try again.",
+  moreInfo: "Show the full text",
 };
