@@ -1131,6 +1131,35 @@ export const ChipStripKeepsKeyScrollARecentreRaced: Story = {
   },
 };
 
+// TRUSTED-KEYDOWN REGRESSION GUARD (FUT-2862). Both stories below have
+// deliberately NO `play`: every event `play` would dispatch — even inside a
+// real browser, via `userEvent`/`fireEvent` — is SCRIPT-dispatched, so it
+// proves nothing about which keys the BROWSER itself scrolls this strip for.
+// `parameters.trustedKeydownRegression` is read by `.storybook/test-runner.ts`'s
+// `postVisit` hook, which drives the whole interaction with `page.keyboard`
+// instead — a real, OS-level key press through Chromium's own input pipeline,
+// same mechanism `TrustedPointerNestedSelectClickAway` (HoverCard) uses for
+// `page.mouse`. Same fixture as `ChipStripKeepsKeyScrollARecentreRaced` above
+// (`opensOn="hours"`): the strip settles on its own, then the story focuses
+// the first chip and races a trusted key press against the re-centre that
+// `resolve-profile` causes. `runTrustedKeydownRegression` in the hook asserts
+// the outcome; see that hook for the mechanics.
+export const ChipStripTrustedTabDuringOwnScrollDoesNotLatch: Story = {
+  name: '⌨️✅ Trusted Tab During Own Scroll Does Not Latch Test',
+  parameters: {
+    trustedKeydownRegression: 'Tab',
+  },
+  render: () => <VisitorScrolledStrip opensOn="hours" />,
+};
+
+export const ChipStripTrustedArrowLeftDuringOwnScrollLatches: Story = {
+  name: '⌨️🔒 Trusted ArrowLeft During Own Scroll Latches Test',
+  parameters: {
+    trustedKeydownRegression: 'ArrowLeft',
+  },
+  render: () => <VisitorScrolledStrip opensOn="hours" />,
+};
+
 // ---------------------------------------------------------------------------
 // FUT-2775 — RTL centring, and the last chip's clearance from the clip edge.
 // ---------------------------------------------------------------------------

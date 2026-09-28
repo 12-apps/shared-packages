@@ -79,6 +79,82 @@ const runTrustedPointerNestedSelectRegression = async (page: Page) => {
   );
 };
 
+/**
+ * FUT-2862: the SettingsLayout chip strip's visitor lock must arm only for a
+ * key whose BROWSER DEFAULT ACTION actually scrolls the strip. A script
+ * dispatch (`fireEvent`/`userEvent`, even inside a real browser) never has a
+ * default action to begin with, so no `play` function can prove which keys
+ * genuinely move it — only a real, OS-level key press through Chromium's own
+ * input pipeline can. Driven here with `page.keyboard`, on the
+ * `ChipStripKeepsKeyScrollARecentreRaced` fixture (`opensOn="hours"`,
+ * `SettingsLayout.test.stories.tsx`): the strip settles on its own mount
+ * re-centre first, then the story focuses the strip's first chip.
+ *
+ * `mode` is `parameters.trustedKeydownRegression` on the story. For
+ * `'ArrowLeft'`: press it (its default action moves `scrollLeft`, verified
+ * live — see `STRIP_SCROLLING_KEYS` in `SettingsSectionChips.scroll.ts`),
+ * record where that leaves the strip, then widen the content
+ * (`resolve-profile`) and assert the strip did NOT move again — the widening
+ * would otherwise re-centre it onto the open chip, which is exactly the latch
+ * this key must produce. For `'Tab'`: press it (a focus change, no scroll),
+ * widen the content, and assert the open ("hours") chip DID end up back in
+ * view — proving `Tab` armed nothing and the re-centre ran normally.
+ */
+const runTrustedKeydownRegression = async (page: Page, mode: string) => {
+  const strip = page.getByTestId('settings-chips');
+  const openChip = page.getByTestId('settings-chip-hours');
+  const stripScrollLeft = () => strip.evaluate((el) => el.scrollLeft);
+
+  // The strip's own mount re-centre settles before anything else happens.
+  await page.waitForFunction(() => {
+    const el = document.querySelector('[data-testid="settings-chips"]');
+    return el instanceof HTMLElement && el.scrollLeft > 0;
+  });
+  await page.waitForTimeout(400);
+
+  // Focus the first chip — same target the untrusted story dispatches its
+  // keydown on (`strip.firstElementChild`) — so a real key's default action
+  // has a scrollable ancestor (this strip) to apply to.
+  await strip.locator(':scope > *').first().focus();
+
+  if (mode === 'ArrowLeft') {
+    const before = await stripScrollLeft();
+    // Several presses: a real browser's own per-press step is small (this
+    // file does not assume its exact size), so one press might not move the
+    // strip far enough to tell apart from measurement noise.
+    for (let i = 0; i < 15; i += 1) {
+      // eslint-disable-next-line no-await-in-loop -- each press must land before the next; a real key repeat is sequential, not concurrent
+      await page.keyboard.press('ArrowLeft');
+    }
+    await page.waitForTimeout(400);
+    const afterArrow = await stripScrollLeft();
+    assert.notEqual(afterArrow, before, 'FUT-2862: ArrowLeft did not move the strip at all — precondition failed');
+
+    await page.getByTestId('resolve-profile').click();
+    await page.waitForTimeout(700);
+    const final = await stripScrollLeft();
+    assert.equal(
+      final,
+      afterArrow,
+      `FUT-2862: a TRUSTED ArrowLeft did not latch — the strip moved from ${afterArrow} to ${final} after the content widened`,
+    );
+    return;
+  }
+
+  await page.keyboard.press(mode);
+  await page.getByTestId('resolve-profile').click();
+  await page.waitForTimeout(700);
+
+  const chipBox = await openChip.boundingBox();
+  const stripBox = await strip.boundingBox();
+  assert.ok(chipBox, 'FUT-2862: could not measure the open chip');
+  assert.ok(stripBox, 'FUT-2862: could not measure the strip');
+  assert.ok(
+    chipBox.x >= stripBox.x - 1 && chipBox.x + chipBox.width <= stripBox.x + stripBox.width + 1,
+    `FUT-2862: a TRUSTED '${mode}' false-latched the strip — it did not re-centre onto the open chip`,
+  );
+};
+
 // CodeEditor's Monaco now loads from this package's own `monaco-editor`
 // dependency, bundled by whatever Vite entry calls `configureCodeEditor`
 // (`.storybook/preview.tsx`, and any host — see CodeEditor.md), instead of
@@ -124,9 +200,15 @@ const config: TestRunnerConfig = {
 
   async postVisit(page, context) {
     const storyContext = await getStoryContext(page, context);
-    if (!storyContext.parameters?.trustedPointerRegression) return;
+    if (storyContext.parameters?.trustedPointerRegression) {
+      await runTrustedPointerNestedSelectRegression(page);
+      return;
+    }
 
-    await runTrustedPointerNestedSelectRegression(page);
+    const trustedKeydownKey = storyContext.parameters?.trustedKeydownRegression;
+    if (typeof trustedKeydownKey === 'string') {
+      await runTrustedKeydownRegression(page, trustedKeydownKey);
+    }
   },
 };
 

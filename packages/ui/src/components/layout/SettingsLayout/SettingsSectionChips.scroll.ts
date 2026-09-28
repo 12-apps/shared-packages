@@ -1,8 +1,7 @@
 /**
- * Telling the strip's own scrolls from the visitor's (FUT-2606).
- *
- * Split from `SettingsSectionChips.tsx` so the chips stay a component file and
- * the rule for "who moved the strip" can be read in one place.
+ * Telling the strip's own scrolls from the visitor's (FUT-2606). Split from
+ * `SettingsSectionChips.tsx` so the chips stay a component file and the rule
+ * for "who moved the strip" can be read in one place.
  */
 
 /**
@@ -13,11 +12,10 @@
 const LANDED_SLACK = 1;
 
 /**
- * Where `scrollend` is missing: how long the strip has to go without a `scroll`
- * before it counts as settled. Generous on purpose — a busy main thread can go
- * several frames between ticks of a smooth scroll, and judging one mid-flight
- * would read the strip's own animation as the visitor's. Too long only delays a
- * re-centre; too short can latch the strip for good.
+ * Where `scrollend` is missing: how long the strip goes without a `scroll`
+ * before it counts as settled — generous, since a busy thread can go several
+ * frames between smooth-scroll ticks and judging one mid-flight would read
+ * the strip's own animation as the visitor's. Too short can latch it for good.
  */
 const QUIET_BEFORE_SETTLED_MS = 250;
 
@@ -25,7 +23,6 @@ const QUIET_BEFORE_SETTLED_MS = 250;
  * How much `scrollLeft` has to move, tick to tick, before a `scroll` event is
  * even a CANDIDATE for arming (FUT-2775). Below this, a browser's own rounding
  * or a repeated event carrying no real motion cannot arm anything by itself.
- *
  * This alone does not stop the false latch the ticket describes: the strip's
  * own `scrollTo` produces real per-tick deltas well past this line, same as a
  * drag would. It only rules out a scroll event that moved nothing.
@@ -33,16 +30,15 @@ const QUIET_BEFORE_SETTLED_MS = 250;
 const SCROLL_DELTA_EPSILON = 2;
 
 /**
- * How far a pointer or touch has to travel from where it went down before it
- * counts as having MOVED, rather than merely resting (FUT-2775). Below this,
- * an held-still finger's sub-pixel tremor does not count as a drag.
+ * How far a pointer/touch must travel from where it went down to count as
+ * MOVED, not merely resting (FUT-2775) — below this, a held tremor isn't a drag.
  */
 const POINTER_MOVE_EPSILON = 2;
 
 /**
  * How long a key, sideways wheel or pan stays armed through a scroll the strip
- * made itself (FUT-2848): a busy thread can finish a re-centre before the key's
- * scroll ticks once. Past this it lapses, so a later clamp is not the visitor.
+ * made itself (FUT-2848) — a busy thread can finish a re-centre before the
+ * key's scroll ticks once; past this it lapses, so a later clamp isn't the visitor.
  */
 const NUDGE_FRESH_MS = 1000;
 
@@ -81,6 +77,8 @@ function horizontalDelta(event: Event): number {
   if (!(event instanceof WheelEvent)) return 0;
   return event.deltaX !== 0 ? event.deltaX : event.shiftKey ? event.deltaY : 0;
 }
+
+const STRIP_SCROLLING_KEYS = new Set(['ArrowLeft', 'ArrowRight']); // verified live in Chromium (FUT-2862)
 
 interface WatchState {
   pointer: boolean;
@@ -246,7 +244,9 @@ function createGestureListeners(state: WatchState): { onStrip: Listeners; onView
     nudge();
     onPointerUp();
   };
-  const onKeydown = nudge;
+  const onKeydown = (event: Event): void => {
+    if (event instanceof KeyboardEvent && STRIP_SCROLLING_KEYS.has(event.key)) nudge();
+  };
   const onWheel = (event: Event): void => {
     if (horizontalDelta(event) !== 0) nudge();
   };
@@ -304,9 +304,9 @@ function dropStaleNudge(state: WatchState): void {
  *
  * - a finger held on the strip (`touchstart` until `touchend`) — a drag;
  * - a pointer held on it (`pointerdown` until `pointerup`);
- * - a key press, a SIDEWAYS wheel, or the browser taking a pointer over to pan
- *   it (`pointercancel`), each armed until the next scroll under judgement has
- *   been judged — whoever's it turns out to be.
+ * - a strip-scrolling key press (`STRIP_SCROLLING_KEYS`, FUT-2862), a SIDEWAYS
+ *   wheel, or the browser taking a pointer over to pan it (`pointercancel`),
+ *   each armed until the next scroll under judgement has been judged.
  *
  * and the verdict waits until the strip comes to REST (`scrollend`, or a quiet
  * spell where the browser has no `scrollend`): it is the visitor's only if the
