@@ -31,13 +31,22 @@ const searchInput = (root: HTMLElement): HTMLInputElement | null =>
   root.querySelector('input[role="combobox"]');
 
 /**
+ * Wait for the search box. It is fetched on demand (`React.lazy`), so the first
+ * frame shows the menu select holding its place.
+ */
+async function ready(testId: string): Promise<HTMLInputElement> {
+  await waitFor(() => expect(searchInput(screen.getByTestId(testId))).not.toBeNull());
+  return searchInput(screen.getByTestId(testId))!;
+}
+
+/**
  * Type into the search box as a user does. MUI's Autocomplete filters only
  * while its input is the focused element, so the focus is a real `.focus()`
  * (the pattern `autocomplete-closes-after-pick.test.tsx` uses), not a
  * synthetic event.
  */
 async function typeInto(testId: string, text: string): Promise<void> {
-  const input = searchInput(screen.getByTestId(testId))!;
+  const input = await ready(testId);
   await act(async () => {
     // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- real focus: Autocomplete filters only while its input is document.activeElement
     input.focus();
@@ -46,6 +55,7 @@ async function typeInto(testId: string, text: string): Promise<void> {
 }
 
 async function open(testId: string): Promise<HTMLElement> {
+  await ready(testId);
   fireEvent.mouseDown(within(screen.getByTestId(testId)).getByRole('combobox'));
   return screen.findByRole('listbox');
 }
@@ -56,9 +66,16 @@ describe('Select — searchable past five options', () => {
     expect(searchInput(screen.getByTestId('s'))).toBeNull();
   });
 
-  it('becomes a search box from six options on', () => {
+  it('holds the field with the menu select while the search box loads', async () => {
+    render(<Select options={few(6)} label="Pessoa" value="pessoa" onChange={vi.fn()} data-testid="s" />);
+    // First frame: the field and its label are already there, before the fetch.
+    expect(screen.getByTestId('s')).toHaveTextContent('Pessoa');
+    await ready('s');
+  });
+
+  it('becomes a search box from six options on', async () => {
     render(<Select options={few(6)} label="Pessoa" value="" onChange={vi.fn()} data-testid="s" />);
-    expect(searchInput(screen.getByTestId('s'))).not.toBeNull();
+    await ready('s');
     expect(screen.getByTestId('s-select')).toBe(searchInput(screen.getByTestId('s')));
   });
 
@@ -92,7 +109,7 @@ describe('Select — searchable past five options', () => {
   it('shows the chosen option in the field and keeps a disabled one unpickable', async () => {
     const onChange = vi.fn();
     render(<Select options={STAFF} label="Pessoa" value="bruno" onChange={onChange} data-testid="s" />);
-    expect(searchInput(screen.getByTestId('s'))!.value).toBe('Bruno Carvalho');
+    expect((await ready('s')).value).toBe('Bruno Carvalho');
     const listbox = await open('s');
     const carla = within(listbox).getByTestId('s-option-carla');
     expect(carla).toHaveAttribute('aria-disabled', 'true');
@@ -121,11 +138,11 @@ describe('Select — searchable past five options', () => {
     expect(await screen.findByText('Ninguém com esse nome')).toBeInTheDocument();
   });
 
-  it('lets `searchable` override the count either way', () => {
+  it('lets `searchable` override the count either way', async () => {
     const { unmount } = render(
       <Select options={few(3)} searchable label="A" value="" onChange={vi.fn()} data-testid="a" />,
     );
-    expect(searchInput(screen.getByTestId('a'))).not.toBeNull();
+    await ready('a');
     unmount();
     render(<Select options={few(9)} searchable={false} label="B" value="" onChange={vi.fn()} data-testid="b" />);
     expect(searchInput(screen.getByTestId('b'))).toBeNull();
@@ -136,7 +153,7 @@ describe('Select — searchable past five options', () => {
     expect(searchInput(screen.getByTestId('c'))).toBeNull();
   });
 
-  it('sizes a field that does not fill its row to its longest option, and keeps sx and className', () => {
+  it('sizes a field that does not fill its row to its longest option, and keeps sx and className', async () => {
     render(
       <Select
         options={STAFF}
@@ -149,6 +166,7 @@ describe('Select — searchable past five options', () => {
         data-testid="s"
       />,
     );
+    await ready('s');
     const root = screen.getByTestId('s');
     // "Gustavo Rezende" is 15 characters: MUI's input alone is `width: 0`.
     expect(root.style.minWidth).toBe('calc(15ch + 4.5rem)');
@@ -177,7 +195,7 @@ describe('Select — searchable past five options', () => {
 
   it('works uncontrolled from defaultValue, and names its input for a native form', async () => {
     render(<Select options={STAFF} label="Pessoa" name="person" defaultValue="ana" data-testid="s" />);
-    const input = searchInput(screen.getByTestId('s'))!;
+    const input = await ready('s');
     expect(input.value).toBe('Ana Souza');
     expect(input.name).toBe('person');
     const listbox = await open('s');
@@ -185,8 +203,9 @@ describe('Select — searchable past five options', () => {
     expect(searchInput(screen.getByTestId('s'))!.value).toBe('Diego Lima');
   });
 
-  it('marks a disabled field aria-disabled, as the menu did', () => {
+  it('marks a disabled field aria-disabled, as the menu did', async () => {
     render(<Select options={STAFF} disabled label="Pessoa" value="" onChange={vi.fn()} data-testid="s" />);
+    await ready('s');
     expect(screen.getByTestId('s-select')).toHaveAttribute('aria-disabled', 'true');
   });
 });

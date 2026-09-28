@@ -4,7 +4,7 @@ import MenuItem from '@mui/material/MenuItem/index.js';
 import MuiSelect from '@mui/material/Select/index.js';
 import React from 'react';
 
-import { SearchableSelect, shouldSearch } from './Select.searchable';
+import { shouldSearch } from './Select.search-rule';
 import { formControlSize, SelectFieldControl } from './Select.styles';
 import type { SelectProps } from './Select.types';
 
@@ -133,11 +133,40 @@ MenuSelect.displayName = 'MenuSelect';
  * search box over a list of bounded height (`Select.searchable.tsx`), with the
  * same props, events and test ids either way. `searchable` overrides the count.
  */
-export const Select = React.forwardRef<HTMLDivElement, SelectProps>((props, ref) => {
-  if (shouldSearch(props)) return <SearchableSelect {...props} ref={ref} />;
+/** The menu select given everything but the searchable path's own props. */
+const PlainSelect = React.forwardRef<HTMLDivElement, SelectProps>((props, ref) => {
   // The searchable path's own props: nothing for MUI's Select to receive.
   const { searchable: _searchable, noOptionsText: _noOptionsText, ...menuProps } = props;
   return <MenuSelect {...menuProps} ref={ref} />;
+});
+
+PlainSelect.displayName = 'PlainSelect';
+
+/**
+ * The search box, fetched only by a select that needs one.
+ *
+ * A static import put MUI `Autocomplete` (~29 KB) into every bundle that renders
+ * any `Select`, a menu of two options included: a storefront checkout grew past
+ * its page-load budget on the upgrade alone. A chunk that fails to load — the
+ * previous deploy's hash, gone — degrades to the menu select, which has the same
+ * props, events and test ids, rather than taking the screen down with it.
+ */
+const SearchableSelect = React.lazy(() =>
+  import('./Select.searchable').then(
+    (module) => ({ default: module.SearchableSelect }),
+    () => ({ default: PlainSelect }),
+  ),
+);
+
+export const Select = React.forwardRef<HTMLDivElement, SelectProps>((props, ref) => {
+  if (!shouldSearch(props)) return <PlainSelect {...props} ref={ref} />;
+  // The menu select holds the field's place while the search box loads, so the
+  // label, value and size are on screen from the first frame.
+  return (
+    <React.Suspense fallback={<PlainSelect {...props} ref={ref} />}>
+      <SearchableSelect {...props} ref={ref} />
+    </React.Suspense>
+  );
 });
 
 Select.displayName = 'Select';

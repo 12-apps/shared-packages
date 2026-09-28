@@ -6,7 +6,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import React from 'react';
 
-import { SEARCHABLE_MIN_OPTIONS, SELECT_SEARCH } from './Select.metrics';
+import { SELECT_SEARCH } from './Select.metrics';
 import { formControlSize, SelectFieldControl } from './Select.styles';
 import type { SelectOption, SelectProps } from './Select.types';
 
@@ -32,13 +32,6 @@ import { rem } from '../../../tokens/relative';
  * It cannot be cleared (a `Select` has no "none" either — its placeholder is
  * disabled), and it never accepts text that is not an option.
  */
-
-/** Whether `props` should render as a search box. */
-export function shouldSearch(props: SelectProps): boolean {
-  if (props.multiple || props.renderValue) return false;
-  if (props.searchable !== undefined) return props.searchable;
-  return props.options.length >= SEARCHABLE_MIN_OPTIONS;
-}
 
 /**
  * The change MUI's `Select` would have emitted: handlers read
