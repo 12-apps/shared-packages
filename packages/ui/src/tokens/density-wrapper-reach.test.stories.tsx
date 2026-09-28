@@ -55,12 +55,13 @@ import type { DensityLevel } from './density.core';
  *   `NormalMatchesEachWrappersOwnDesign`/`CompactScalesEachWrapperByItsOwnRule`
  *   below prove the ×1/×0.9 pair the SAME way this ticket's bare-MUI stories
  *   do.
- * - `Table`: FUT-2769 already gives it a from-the-theme density default and
- *   its OWN discrete per-level cell-padding/row-height table
- *   (`Table.styles.ts`), read off `theme.density`, nested two classes deep —
- *   higher specificity than this ticket's single-class `MuiTableCell`
- *   override, so it always wins regardless. Proven again here for the
- *   PRODUCT path specifically. `Tabs`' own INDICATOR is the same shape: its
+ * - `Table`: its OWN discrete per-level cell-padding/row-height table
+ *   (`Table.styles.ts`), read off its `density` prop (`'normal'` unless the
+ *   caller says otherwise — FUT-2886 reverted the from-the-theme default
+ *   FUT-2769 gave it), nested two classes deep — higher specificity than this
+ *   ticket's single-class `MuiTableCell` override, so it always wins
+ *   regardless. Proven again here for the PRODUCT path specifically. `Tabs`'
+ *   own INDICATOR is the same shape: its
  *   default (`variant="default"`) styling sets `& .MuiTabs-indicator {
  *   height: rem(theme, 3) }` unconditionally (`Tabs.styles.ts`'s
  *   `compactVariantStyles`), a nested two-class selector that outranks this
@@ -206,8 +207,9 @@ export const NormalMatchesEachWrappersOwnDesign: Story = {
     if (!tabsIndicator) throw new Error('MuiTabs-indicator not found');
     expectPxClose(computed(tabsIndicator).height, 3);
 
-    // Table: FUT-2769's own theme-density default, unaffected by this ticket
-    // — 52px row height at normal, the literal it shipped before FUT-2768.
+    // Table: 'normal' is its own density default regardless of the theme
+    // (FUT-2886) — 52px row height at this theme's own 'normal' density,
+    // unaffected by this ticket.
     const cell = canvas.getAllByRole('cell')[0];
     if (!cell) throw new Error('table cell not found');
     expectPxClose(computed(cell).height, 52);
@@ -289,17 +291,19 @@ export const CompactScalesEachWrapperByItsOwnRule: Story = {
     if (!tabsIndicator) throw new Error('MuiTabs-indicator not found');
     expectPxClose(computed(tabsIndicator).height, 2.7); // 3 * 0.9
 
-    // Table: FUT-2769's own compact row height is the DISCRETE design value
-    // 36 (not `52 * 0.9`) — but that literal ALSO goes through `rem()`
-    // against THIS theme's own reduced `typography.fontSize` (the SAME
-    // density mechanism this ticket's overrides read), so the two compound:
-    // 36 * 0.9 = 32.4, not a bare 36px. `table-density-theme-default.test.tsx`
-    // proves the discrete-36 half in isolation (a `theme.density` with no
-    // `typography.fontSize` change); this proves the PRODUCT path, where both
-    // apply together.
+    // Table: no `density` prop is passed, so its own discrete density stays
+    // 'normal' (52 design px) regardless of the theme (FUT-2886 — reverted
+    // FUT-2769's from-the-theme default, which re-picked the DISCRETE 36px
+    // compact row here and then scaled it AGAIN by this same theme's
+    // `typography.fontSize` factor: 36 * 0.9 = 32.4, a double scale). The
+    // theme's factor is now the ONLY thing that still scales it, through the
+    // `rem()` a 'normal' row is drawn with: 52 * 0.9 = 46.8.
+    // `table-density-theme-default.test.tsx` proves the same rule against
+    // jsdom; this proves the PRODUCT path, where `rem()` and this file's own
+    // theme construction (`themeFor`, via `createUiTheme`) apply together.
     const cell = canvas.getAllByRole('cell')[0];
     if (!cell) throw new Error('table cell not found');
-    expectPxClose(computed(cell).height, 32.4); // 36 * 0.9
+    expectPxClose(computed(cell).height, 46.8); // 52 * 0.9
 
     // Pagination: default size has no wrapper rule either — same story as
     // Tabs, this ticket's override is what shrinks it.

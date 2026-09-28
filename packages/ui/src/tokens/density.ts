@@ -58,9 +58,15 @@ declare module '@mui/material/styles' {
  * The theme's resolved density — a plain theme read, not a step-shifting
  * resolver (`size` stays hierarchy; see `./density.core.ts`). A `styleOverrides`
  * callback already gets `{ theme }` and can read `theme.density` directly;
- * this is for a component that needs the level in its own render logic
- * (`Table`/`DataGrid`/`DataViews` each read it once to source their own
- * `density` prop's default).
+ * this is for a component that needs the level in its own render logic.
+ *
+ * No table component sources its own discrete density from this any more
+ * (FUT-2886, reverting FUT-2769's half of it for `Table`, `DataViews` AND
+ * `DataGrid`): a theme density scales a table's row geometry exactly once,
+ * through `rem()`, rather than also re-picking a discrete `density` from the
+ * theme on top of it — see `resolveTableDensity` (`Table.helpers.ts`),
+ * `DEFAULT_DENSITY` (`data-views-layout-context.tsx`), and `DataGrid.model.ts`'s
+ * `useDataGridModel` (`props.density ?? 'comfortable'`).
  *
  * Falls back to `resolveDensityFactor()` (`'normal'`, factor `1`) for a bare
  * MUI theme built without `createUiTheme`/`muiThemeOptionsFrom`.

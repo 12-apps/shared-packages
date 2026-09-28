@@ -23,6 +23,20 @@ instead (`defaultProps` shallow-merged, `variants` concatenated) — see
 `AppThemeOptions.density`'s own docblock and [ADOPTING.md](./ADOPTING.md) before
 combining a density with your own component overrides.
 
+**`density` alone does nothing — pass `densityTheme` too.** This package refers
+to the density IMPLEMENTATION only by type, so a host that never sets a density
+never ships its modules on the first paint. A host that wants density imports
+the implementation itself and passes both:
+
+```ts
+import { densityThemeOptions } from '@12-apps/ui/tokens';
+
+createAppTheme('light', { density: 'compact', densityTheme: densityThemeOptions });
+```
+
+`density` with no `densityTheme` builds the no-density theme and
+`console.warn`s once, in development, naming the missing option.
+
 ## Why it is a package
 
 Three SPAs cannot share nothing, so they share a private package — and a private

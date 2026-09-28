@@ -7,7 +7,6 @@ import GridViewOutlinedIcon from "@mui/icons-material/GridViewOutlined";
 import { Slider } from "../../form/Slider";
 import { Box } from "../../../mui/Box";
 import { sxRem } from "../../../tokens/relative";
-import { useDensity, type DensityLevel } from "../../../tokens/density";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { DATA_VIEWS_LAYOUTS, type DataViewsLayout } from "./data-views-types";
@@ -168,20 +167,18 @@ function isDensity(value: unknown): value is DataViewsDensity {
 }
 
 /**
- * The theme's density level, aliased to `DataViewsDensity` (FUT-2769 —
- * umbrella Decision 7, non-breaking): `DataViewsDensity`'s three names are not
- * the theme's three names, so this is an alias table rather than a verbatim
- * read. `'normal'` (the theme's own default, and what a theme with no density
- * at all resolves to) maps to `'cozy'` — today's literal default, unchanged —
- * so the mapping is a no-op exactly when nothing about density has been said.
- * The STORED per-viewer preference still wins over this default, unchanged
+ * `density`'s default with nothing stored and nothing passed (FUT-2886,
+ * reverting FUT-2769's own half of this): always `'cozy'` — today's literal,
+ * unchanged — never sourced from `useDensity()`. FUT-2769 aliased the theme's
+ * level to this density through `mapThemeToDataViewsDensity`, which — like
+ * `Table`'s own theme default — made a theme scale a DataViews table's row
+ * height twice: once by picking a DIFFERENT discrete density, and again
+ * through the `rem()` that density's own row height is drawn with. A theme
+ * density now scales a DataViews table's rows exactly ONCE, through `rem()`;
+ * the STORED per-viewer preference still wins over this default, unchanged
  * from today (below).
  */
-export function mapThemeToDataViewsDensity(level: DensityLevel): DataViewsDensity {
-  if (level === 'compact') return 'compact';
-  if (level === 'comfortable') return 'comfortable';
-  return 'cozy';
-}
+const DEFAULT_DENSITY: DataViewsDensity = 'cozy';
 
 /** The remembered density, or undefined (no window, no value, junk). */
 function readStoredDensity(): DataViewsDensity | undefined {
@@ -275,20 +272,16 @@ export function DataViewsLayoutProvider({
   children,
 }: LayoutProviderProps): React.JSX.Element {
   const availability = { canUseCards, canUseList, canUseBoard };
-  // Read once, outside the lazy initializer below: a hook cannot be called
-  // from inside one (FUT-2769 — the theme is only a fallback when nothing is
-  // stored, same precedence as before this ticket).
-  const themeDensity = useDensity();
   const [layout, setLayoutState] = useState<DataViewsLayout>(() =>
     pinLayout(
       viewLayout ?? (ignoreStoredLayout ? undefined : readStoredLayout()) ?? defaultLayout,
       availability,
     ),
   );
+  // `DEFAULT_DENSITY` ('cozy'), never the theme (FUT-2886 — see that
+  // constant's own doc comment): the stored per-viewer preference still wins.
   const [density, setDensityState] = useState<DataViewsDensity>(
-    () =>
-      (ignoreStoredLayout ? undefined : readStoredDensity()) ??
-      mapThemeToDataViewsDensity(themeDensity.level ?? "normal"),
+    () => (ignoreStoredLayout ? undefined : readStoredDensity()) ?? DEFAULT_DENSITY,
   );
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   // A newly applied view carrying a layout switches to it (its reference-change

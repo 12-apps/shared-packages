@@ -178,6 +178,17 @@ const columns = [
 - **normal** - Standard padding (default)
 - **comfortable** - Extra padding for improved readability
 
+**A theme density scales a table once, through `rem()`.** With no `density`
+prop, the table's own discrete density stays `'normal'` no matter what the
+host theme's density is set to — it is NOT re-picked from the theme. The
+theme's density factor still applies, exactly the way it scales every other
+size on the page, so a compact theme still gives smaller rows (≈0.9× normal)
+and a comfortable one still gives taller ones (≈1.1× normal); it does so by
+scaling the `'normal'` row through `rem()`, not by swapping in a different
+discrete row-height table. Pass `density` explicitly (or let a viewer's stored
+DataViews preference apply it) for a deliberate, second, per-table choice on
+top of that.
+
 ## Accessibility
 
 - Proper `role="table"` attributes

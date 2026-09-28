@@ -3,7 +3,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { PT_BR_DATA_GRID_COPY, PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
-import { resolveDensityFactor } from '../../../tokens/density';
+import { Box } from '../../../mui/Box';
+import { muiThemeOptionsFrom } from '../../../provider/mui-bridge';
+import { createUiTheme } from '../../../tokens/theme';
+import { resolveDensityFactor, type DensityLevel } from '../../../tokens/density';
 import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
 
@@ -690,11 +693,12 @@ const themeDensityColumns: GridColumn<ThemeDensityRow>[] = [
   { id: 'name', header: 'Name', accessor: 'name', type: 'text' },
 ];
 
-// 18. Theme-driven density default (FUT-2769): with no explicit `density`
-// prop, the theme's own level picks the grid's default through the alias
-// table (`mapThemeToGridDensity`) — 'compact' theme level ⇒ 'compact' grid.
+// 18. A THEME DENSITY NO LONGER PICKS THE GRID'S OWN DISCRETE DENSITY (FUT-2886):
+// with no explicit `density` prop, the grid's own density stays `'comfortable'`
+// (the grid's normal density) no matter what the theme's level is — it is not
+// re-picked through the old alias table (`mapThemeToGridDensity`, removed).
 export const ThemeDensityDefaultTest: Story = {
-  name: 'Test: Theme-driven density default',
+  name: 'Test: Theme density no longer picks the grid density',
   render: () => (
     <ThemeProvider theme={createTheme({ density: resolveDensityFactor('compact') })}>
       <DataGrid<ThemeDensityRow>
@@ -709,9 +713,107 @@ export const ThemeDensityDefaultTest: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Should default to the theme-mapped density with no density prop', async () => {
+    await step("Stays 'comfortable' under a compact theme, with no density prop", async () => {
       const grid = canvas.getByRole('grid');
-      expect(grid).toHaveAttribute('data-density', 'compact');
+      expect(grid).toHaveAttribute('data-density', 'comfortable');
+    });
+  },
+};
+
+// 19. A THEME DENSITY SCALES A GRID'S ROWS ONCE, THROUGH `rem()` (FUT-2886).
+//
+// FUT-2769 defaulted `density` itself from the theme (`mapThemeToGridDensity`),
+// which combined with `densityHeight`'s own discrete per-density row-height
+// table to scale row height TWICE under a themed density. With no `density`
+// prop, the grid's own discrete density is now always 'comfortable' — the
+// theme's factor is the ONLY thing that still scales it, applied once by the
+// `rem()` a comfortable row is drawn with: 0.9× at compact, 1.1× at
+// comfortable, ±1px. This is a real-Chromium measurement
+// (`getBoundingClientRect`) because jsdom does not lay out a row tall enough
+// to catch a sub-pixel compounding bug the way a real browser does;
+// `grid-density-theme-default.test.tsx` proves the discrete half of the same
+// rule (`data-density` stays `'comfortable'`) against jsdom.
+//
+// `createTheme({ density: resolveDensityFactor(level) })` — the pattern
+// `ThemeDensityDefaultTest` above uses — only sets `theme.density`, not
+// `typography.fontSize`: it proves which discrete density a component PICKS,
+// but nothing here actually scales through `rem()` on that theme. This story
+// is about the SCALING half, so it needs the real density theme builder
+// (`createUiTheme` + `muiThemeOptionsFrom`, the same pair Table's own
+// `ThemeDensityScalesRowHeightOnce` story uses).
+function densityTheme(level: DensityLevel) {
+  return createTheme(muiThemeOptionsFrom(createUiTheme({ density: level })));
+}
+
+/** A grid's first body row's rendered height, in a real browser. */
+function gridRowHeightPx(scope: HTMLElement): number {
+  const row = within(scope)
+    .getAllByRole('row')
+    .find((candidate) => !candidate.closest('[data-slot="header"]'));
+  if (!row) throw new Error('grid row not found');
+  return row.getBoundingClientRect().height;
+}
+
+const scaleRows: ThemeDensityRow[] = [{ id: 1, name: 'Ana' }];
+const scaleColumns: GridColumn<ThemeDensityRow>[] = [
+  { id: 'name', header: 'Nome', accessor: 'name' },
+];
+
+export const ThemeDensityScalesRowHeightOnce: Story = {
+  name: 'Test: A theme density scales row height once',
+  render: function ThemeDensityScalesRowHeightOnceGrid() {
+    return (
+      <Box display="flex" gap={4} alignItems="flex-start">
+        <ThemeProvider theme={densityTheme('compact')}>
+          <Box width={220} data-testid="density-compact">
+            <DataGrid<ThemeDensityRow>
+              rows={scaleRows}
+              columns={scaleColumns}
+              ariaLabel="Compact-themed data grid"
+              emptyText={PT_BR_DATA_STATE_COPY.empty}
+              copy={PT_BR_DATA_GRID_COPY}
+            />
+          </Box>
+        </ThemeProvider>
+        <ThemeProvider theme={densityTheme('normal')}>
+          <Box width={220} data-testid="density-normal">
+            <DataGrid<ThemeDensityRow>
+              rows={scaleRows}
+              columns={scaleColumns}
+              ariaLabel="Normal-themed data grid"
+              emptyText={PT_BR_DATA_STATE_COPY.empty}
+              copy={PT_BR_DATA_GRID_COPY}
+            />
+          </Box>
+        </ThemeProvider>
+        <ThemeProvider theme={densityTheme('comfortable')}>
+          <Box width={220} data-testid="density-comfortable">
+            <DataGrid<ThemeDensityRow>
+              rows={scaleRows}
+              columns={scaleColumns}
+              ariaLabel="Comfortable-themed data grid"
+              emptyText={PT_BR_DATA_STATE_COPY.empty}
+              copy={PT_BR_DATA_GRID_COPY}
+            />
+          </Box>
+        </ThemeProvider>
+      </Box>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Measures each theme, at the same (unset) density prop', async () => {
+      const normal = gridRowHeightPx(canvas.getByTestId('density-normal'));
+      const compact = gridRowHeightPx(canvas.getByTestId('density-compact'));
+      const comfortable = gridRowHeightPx(canvas.getByTestId('density-comfortable'));
+
+      // Today's unfixed code re-picks a DIFFERENT discrete density ('compact'
+      // ⇒ 0.8x, 'comfortable' theme ⇒ 'spacious' ⇒ 1.2x) AND scales it by the
+      // theme's factor on top — failing both of these by a wide margin, not
+      // by a rounding error.
+      await expect(Math.abs(compact - normal * 0.9)).toBeLessThanOrEqual(1);
+      await expect(Math.abs(comfortable - normal * 1.1)).toBeLessThanOrEqual(1);
     });
   },
 };

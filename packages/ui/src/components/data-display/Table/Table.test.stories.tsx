@@ -6,7 +6,9 @@ import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
-import { resolveDensityFactor } from '../../../tokens/density';
+import { muiThemeOptionsFrom } from '../../../provider/mui-bridge';
+import { createUiTheme } from '../../../tokens/theme';
+import type { DensityLevel } from '../../../tokens/density';
 import { Table } from './Table';
 import type { ColumnConfig } from './Table.types';
 
@@ -596,33 +598,82 @@ export const HeaderResizeRepaints: Story = {
   },
 };
 
-// 13. Theme-driven density default (FUT-2769): `TableDensity` is a verbatim
-// match for the theme's `DensityLevel`, so with no explicit `density` prop the
-// theme's own compact level becomes the table's default — no alias table.
-export const ThemeDensityDefault: Story = {
-  name: 'Test: Theme-driven density default',
-  render: () => (
-    <ThemeProvider theme={createTheme({ density: resolveDensityFactor('compact') })}>
-      <Box width={600}>
-        <Table
-          data-testid="theme-density-table"
-          columns={basicColumns}
-          data={testData}
-          emptyText="Nenhum dado"
-        />
+// 13. A THEME DENSITY SCALES A TABLE'S ROWS ONCE, THROUGH `rem()` (FUT-2886).
+//
+// FUT-2769 defaulted `density` itself from the theme, which combined with
+// `Table.styles.ts`'s own discrete per-density row-height table to scale row
+// height TWICE under a themed density (36 * 0.9 = 32.4px at compact, not a
+// clean 0.9× of anything). With no `density` prop, a table's own discrete
+// density is now always 'normal' — the theme's factor is the ONLY thing that
+// still scales it, applied once by the `rem()` a normal row is drawn with:
+// 0.9× at compact, 1.1× at comfortable, ±1px. This is a real-Chromium
+// measurement (`getBoundingClientRect`) because jsdom does not lay out a row
+// tall enough to catch a sub-pixel compounding bug the way a real browser
+// does; `table-density-theme-default.test.tsx` proves the same rule against
+// jsdom by reading the CSS the table declares instead.
+// `createTheme({ density: resolveDensityFactor(level) })` — the pattern the
+// OTHER density-default stories in this repo use — only sets `theme.density`
+// (the field `useDensity()` reads), NOT `typography.fontSize`: it proves
+// which discrete density a component PICKS, but nothing here actually scales
+// through `rem()` on that theme. This story is about the SCALING half, so it
+// needs the real density theme builder (`createUiTheme` + `muiThemeOptionsFrom`,
+// the same pair `density-wrapper-reach.test.stories.tsx`'s own `themeFor`
+// uses), which also sets `typography.fontSize`/`spacing`/`fieldHeight`.
+function densityTheme(level: DensityLevel) {
+  return createTheme(muiThemeOptionsFrom(createUiTheme({ density: level })));
+}
+
+/** A Table's first body cell's rendered height, in a real browser. */
+function rowHeightPx(scope: HTMLElement): number {
+  const cell = within(scope).getAllByRole('cell')[0];
+  if (!cell) throw new Error('table cell not found');
+  return cell.getBoundingClientRect().height;
+}
+
+// One short-text column, wide enough it never wraps at any density's font
+// size (`density-wrapper-reach.test.stories.tsx`'s own Table showcase uses
+// the same shape) — a wrapped cell would grow past the density's own row
+// height for a reason that has nothing to do with density, breaking the
+// exact 0.9×/1.1× ratio this story measures.
+const oneColumn: ColumnConfig[] = [{ key: 'name', label: 'Nome' }];
+const oneRow = [{ id: 1, name: 'Ana' }];
+
+export const ThemeDensityScalesRowHeightOnce: Story = {
+  name: 'Test: A theme density scales row height once',
+  render: function ThemeDensityScalesRowHeightOnceTable() {
+    return (
+      <Box display="flex" gap={4} alignItems="flex-start">
+        <ThemeProvider theme={densityTheme('compact')}>
+          <Box width={200} data-testid="density-compact">
+            <Table columns={oneColumn} data={oneRow} emptyText="Nenhum dado" />
+          </Box>
+        </ThemeProvider>
+        <ThemeProvider theme={densityTheme('normal')}>
+          <Box width={200} data-testid="density-normal">
+            <Table columns={oneColumn} data={oneRow} emptyText="Nenhum dado" />
+          </Box>
+        </ThemeProvider>
+        <ThemeProvider theme={densityTheme('comfortable')}>
+          <Box width={200} data-testid="density-comfortable">
+            <Table columns={oneColumn} data={oneRow} emptyText="Nenhum dado" />
+          </Box>
+        </ThemeProvider>
       </Box>
-    </ThemeProvider>
-  ),
+    );
+  },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step("Renders the theme's compact rows with no density prop given", async () => {
-      const cell = canvas.getAllByRole('cell')[0]!;
-      // Compact's row height is 36 design px; today's unthemed default (52,
-      // 'normal') would fail this — see `table-density-theme-default.test.tsx`
-      // for the same proof against jsdom.
-      const height = Number.parseFloat(globalThis.getComputedStyle(cell).height);
-      await expect(height).toBeCloseTo(36, 0);
+    await step('Measures each theme, at the same (unset) density prop', async () => {
+      const normal = rowHeightPx(canvas.getByTestId('density-normal'));
+      const compact = rowHeightPx(canvas.getByTestId('density-compact'));
+      const comfortable = rowHeightPx(canvas.getByTestId('density-comfortable'));
+
+      // Today's unfixed code re-picks a DIFFERENT discrete row (36 design px
+      // at compact, 68 at comfortable) AND scales it by the theme's factor —
+      // failing both of these by a wide margin, not by a rounding error.
+      await expect(Math.abs(compact - normal * 0.9)).toBeLessThanOrEqual(1);
+      await expect(Math.abs(comfortable - normal * 1.1)).toBeLessThanOrEqual(1);
     });
   },
 };

@@ -158,7 +158,13 @@ export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAt
 
   /** Sizing, density, and layout */
   sizeMode?: GridSizeMode; // auto | fixed | fill
-  density?: GridDensity; // compact | comfortable | spacious
+  /**
+   * compact | comfortable | spacious. Defaults to `'comfortable'` — NOT the
+   * host theme's density: a theme density still scales row height, but only
+   * once, through `rem()` (FUT-2886). Pass this explicitly for a deliberate,
+   * per-grid density on top of that.
+   */
+  density?: GridDensity;
   /** Row height (default 52) — design px, scaled with the theme's type scale; `density` scales it first. */
   rowHeight?: number;
   /** Header row height (default 56) — design px, scaled with the theme's type scale. */

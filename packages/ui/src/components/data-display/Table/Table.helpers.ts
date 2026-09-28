@@ -3,7 +3,6 @@ import type { Theme } from '@mui/material/styles/index.js';
 import type React from 'react';
 
 import { rem } from '../../../tokens/relative';
-import type { DensityLevel } from '../../../tokens/density';
 
 import type { TableDensity, TableProps } from './Table.types';
 
@@ -15,16 +14,23 @@ import type { TableDensity, TableProps } from './Table.types';
 export const tableRowHeight = (rowHeight: number | undefined): number => rowHeight ?? 52;
 
 /**
- * `density`'s default (FUT-2769): the caller's own prop, else the theme's
- * level — `'normal'` for a theme with no density at all (`useDensity()`'s own
- * fallback) or an unnamed numeric one. `TableDensity` is a verbatim match for
- * the theme's `DensityLevel`, so no alias table is needed, unlike `DataGrid`'s
- * `mapThemeToGridDensity` or `DataViews`' `mapThemeToDataViewsDensity`.
+ * `density`'s default (FUT-2886, reverting FUT-2769's half of this): the
+ * caller's own `density` prop, else `'normal'` — never the theme's level.
+ *
+ * FUT-2769 defaulted this from `useDensity()`, which combined with
+ * `Table.styles.ts`'s own discrete per-density row-height table
+ * (`densityConfig.rowHeightPx`, already 36/52/68) to scale row height TWICE
+ * under a themed density: that table picked the discrete height for the
+ * theme's level, and the `rem()` it is drawn through then scaled it AGAIN by
+ * the same theme's `typography.fontSize` factor — a compact theme gave
+ * `36 * 0.9 = 32.4px` rows, not a clean `0.9×` of anything. A theme density
+ * now scales a table's rows exactly ONCE, through `rem()`: `density` alone
+ * picks the discrete row-height table, and the theme's factor is applied on
+ * top of THAT by `rem()`, giving `52 * 0.9` under a compact theme rather than
+ * a second discrete step.
  */
-export const resolveTableDensity = (
-  explicit: TableDensity | undefined,
-  themeLevel: DensityLevel | undefined,
-): TableDensity => explicit ?? themeLevel ?? 'normal';
+export const resolveTableDensity = (explicit: TableDensity | undefined): TableDensity =>
+  explicit ?? 'normal';
 
 /** The scroll box's height: a number is design px, 400 unless the caller says otherwise. */
 const scrollHeight = (theme: Theme, containerHeight: number | string | undefined): string => {
@@ -84,12 +90,13 @@ export const virtualHeight = (p: TableProps): number | undefined =>
     ? p.containerHeight
     : undefined;
 
-// `density` is NOT here (FUT-2769): `TableDensity` is a verbatim match for
-// the theme's `DensityLevel`, so `Table.tsx` resolves it itself —
-// `props.density ?? (useDensity().level ?? 'normal')` — reading the theme
-// requires a hook, which this module-level constant cannot call. At
-// `theme.density` unset, or its level `'normal'`, that reproduces this
-// object's OTHER defaults' shape exactly: today's literal `'normal'`.
+// `density` is NOT here (kept in `resolveTableDensity` instead, FUT-2886):
+// this object's OTHER defaults are read at the module level, before any
+// props exist, while `density`'s default is `explicit ?? 'normal'` — a
+// two-argument fallback that reads just as well next to `Table.tsx`'s own
+// assignment as it would spread from here. No theme read is involved any
+// more (FUT-2769's `useDensity()` default was reverted): a table's own
+// discrete density is always `'normal'` unless the caller says otherwise.
 export const TABLE_DEFAULTS: Partial<TableProps> = {
   variant: 'default',
   stripeColor: 'neutral',

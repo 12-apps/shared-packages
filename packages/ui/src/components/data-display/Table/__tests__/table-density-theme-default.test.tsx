@@ -1,17 +1,25 @@
 /**
- * `Table`'S DEFAULT DENSITY COMES FROM THE THEME (FUT-2769).
+ * `Table`'S DENSITY DOES NOT DEFAULT FROM THE THEME (FUT-2886).
  *
- * `TableDensity` is a verbatim match for the theme's `DensityLevel` — same
- * three names, same order — so no alias table is needed: the default becomes
- * `props.density ?? (useDensity().level ?? 'normal')`. At `theme.density`
- * unset, or its level `'normal'`, this reproduces today's literal default
- * (`'normal'`) exactly. An explicit `density` prop always wins.
+ * FUT-2769 defaulted `density` from `useDensity()` — `props.density ??
+ * (useDensity().level ?? 'normal')` — which combined with `Table.styles.ts`'s
+ * OWN discrete per-density row-height table (36 / 52 / 68 design px) to scale
+ * row height TWICE under a themed density: a compact theme picked the
+ * discrete 36px row AND then had that 36 scaled again by the same theme's
+ * `typography.fontSize` factor through `rem()` — `36 * 0.9 = 32.4px`, not a
+ * clean `0.9×` of anything (found by the adversarial review of FUT-2768,
+ * shipped by FUT-2769).
+ *
+ * The fix: `Table`'s own discrete density is always `'normal'` unless the
+ * caller passes `density` explicitly — it no longer reads `useDensity()` at
+ * all. A theme density still scales row height, but only ONCE, through the
+ * `rem()` a normal-density row is drawn with: `52 * 0.9` under a compact
+ * theme, `52 * 1.1` under a comfortable one.
  *
  * jsdom does not lay out, so density is proven the same way
  * `table-theme-scale.test.tsx` proves the type scale: by reading the row
- * height `Table.styles.ts` actually WRITES on a body cell (36 / 52 / 68
- * design px for compact / normal / comfortable), converted from the `rem`
- * string it is declared in back to px with the same ratio `remPx` uses.
+ * height `Table.styles.ts` actually WRITES on a body cell, converted from the
+ * `rem` string it is declared in back to px with the same ratio `remPx` uses.
  */
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { render, screen } from '@testing-library/react';
@@ -25,7 +33,8 @@ import type { ColumnConfig } from '../Table.types';
 const columns: ColumnConfig[] = [{ key: 'name', label: 'Nome' }];
 const data = [{ id: 1, name: 'Ana' }];
 
-const ROW_HEIGHT_PX = { compact: 36, normal: 52, comfortable: 68 } as const;
+/** `'normal'`'s own discrete row height (design px) — the only one this file expects. */
+const NORMAL_ROW_HEIGHT_PX = 52;
 
 function themeAt(level?: DensityLevel) {
   return createTheme(level ? { density: resolveDensityFactor(level) } : {});
@@ -48,43 +57,46 @@ function renderTable(theme: ReturnType<typeof themeAt>, density?: DensityLevel) 
   );
 }
 
-describe("Table's density defaults from the theme", () => {
-  it("stays 'normal' (today's literal) with no theme density at all", () => {
+/** Row height at 'normal', scaled by this theme's own `rem()` factor. */
+const expectedNormalPx = (theme: ReturnType<typeof themeAt>) => remPx(theme, NORMAL_ROW_HEIGHT_PX);
+
+describe("Table's density no longer defaults from the theme (FUT-2886)", () => {
+  it('stays normal with no theme density at all', () => {
     const theme = themeAt(undefined);
     renderTable(theme);
-    expect(cellHeightPx(theme)).toBeCloseTo(remPx(theme, ROW_HEIGHT_PX.normal), 6);
+    expect(cellHeightPx(theme)).toBeCloseTo(expectedNormalPx(theme), 6);
   });
 
-  it("stays 'normal' when the theme's own density level is 'normal' — the no-op case", () => {
+  it("stays normal when the theme's own density level is 'normal' — the no-op case", () => {
     const theme = themeAt('normal');
     renderTable(theme);
-    expect(cellHeightPx(theme)).toBeCloseTo(remPx(theme, ROW_HEIGHT_PX.normal), 6);
+    expect(cellHeightPx(theme)).toBeCloseTo(expectedNormalPx(theme), 6);
   });
 
-  it("defaults to 'compact' when the theme's density level is 'compact'", () => {
+  it("stays normal under a 'compact' theme with no density prop — scaled ONCE by rem(), not re-picked from a discrete table", () => {
     const theme = themeAt('compact');
     renderTable(theme);
-    expect(cellHeightPx(theme)).toBeCloseTo(remPx(theme, ROW_HEIGHT_PX.compact), 6);
+    expect(cellHeightPx(theme)).toBeCloseTo(expectedNormalPx(theme), 6);
   });
 
-  it("defaults to 'comfortable' when the theme's density level is 'comfortable'", () => {
+  it("stays normal under a 'comfortable' theme with no density prop — same single-scale rule", () => {
     const theme = themeAt('comfortable');
     renderTable(theme);
-    expect(cellHeightPx(theme)).toBeCloseTo(remPx(theme, ROW_HEIGHT_PX.comfortable), 6);
+    expect(cellHeightPx(theme)).toBeCloseTo(expectedNormalPx(theme), 6);
   });
 
-  it('lets an explicit density prop win over a denser theme', () => {
-    const theme = themeAt('compact');
-    renderTable(theme, 'comfortable');
-    expect(cellHeightPx(theme)).toBeCloseTo(remPx(theme, ROW_HEIGHT_PX.comfortable), 6);
-  });
-
-  it("falls back to 'normal' for a raw numeric theme density — it names no level", () => {
-    // resolveDensityFactor(1.5) => { factor: 1.5 }, no `.level` at all (a
-    // repository setting a raw numeric density, not a named one); the ticket's
-    // alias tables are keyed off `.level`, so this is the 'normal' row.
+  it('stays normal for a raw numeric theme density — it names no level', () => {
     const theme = createTheme({ density: resolveDensityFactor(1.5) });
     renderTable(theme);
-    expect(cellHeightPx(theme)).toBeCloseTo(remPx(theme, ROW_HEIGHT_PX.normal), 6);
+    expect(cellHeightPx(theme)).toBeCloseTo(expectedNormalPx(theme), 6);
+  });
+
+  it('lets an explicit density prop win over any theme (regression guard)', () => {
+    const theme = themeAt('compact');
+    renderTable(theme, 'comfortable');
+    // 68 is 'comfortable's own discrete row height, scaled by the compact
+    // theme's rem() factor on top — the explicit prop still picks the
+    // discrete row, exactly as before this ticket.
+    expect(cellHeightPx(theme)).toBeCloseTo(remPx(theme, 68), 6);
   });
 });
