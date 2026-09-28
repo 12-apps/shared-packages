@@ -268,9 +268,7 @@ export const MobileResponsive: Story = {
       </Box>
     ),
   ],
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
 };
 
 // Interactive example

@@ -93,6 +93,7 @@ export async function loadRecipient(
   deps: NotificationDispatchDeps,
   userId: string,
   clientId: string | null,
+  side: string | null,
 ): Promise<TransportRecipient | null> {
   const contact = await deps.contacts.getContact(userId);
   if (!contact) return null;
@@ -105,10 +106,11 @@ export async function loadRecipient(
     // that is what lets a generator apply its own default in one place.
     ...(contact.locale === undefined ? {} : { locale: contact.locale }),
     clientId,
+    side,
     // SCOPED, and this is what keeps `supports()` honest: it gates on this
     // number, so an unscoped count would enqueue a WEB_PUSH delivery for a
     // notification no reachable subscription exists for.
-    pushSubscriptionCount: await deps.pushSubscriptions.count(userId, clientId),
+    pushSubscriptionCount: await deps.pushSubscriptions.count(userId, clientId, side),
   };
 }
 
@@ -230,7 +232,12 @@ export async function dispatchOne(
 
   // The STORED column, so the retry sweep scopes identically to the first
   // attempt — anything less would let a retry leak what the first send withheld.
-  const recipient = await loadRecipient(deps, notification.userId, notification.clientId);
+  const recipient = await loadRecipient(
+    deps,
+    notification.userId,
+    notification.clientId,
+    notification.side,
+  );
   if (!recipient) {
     await abandonUnreachable(deps, client, queued, notification.userId);
     return 0;

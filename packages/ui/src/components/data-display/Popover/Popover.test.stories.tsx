@@ -509,11 +509,7 @@ export const FocusManagement: Story = {
 
 // 6. Responsive Design Tests
 export const ResponsiveDesign: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <>
       <PopoverTestWrapper maxWidth={280}>

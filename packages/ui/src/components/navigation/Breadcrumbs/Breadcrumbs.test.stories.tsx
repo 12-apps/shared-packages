@@ -446,7 +446,7 @@ export const ResponsiveDesign: Story = {
   },
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -463,13 +463,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 

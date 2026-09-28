@@ -262,9 +262,7 @@ export const ResponsiveDesign: Story = {
     activeId: 'step2',
     completed: new Set(['step1']),
   },
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   decorators: [
     (Story) => (
       <Box sx={{ width: 320, height: 400 }}>

@@ -583,6 +583,32 @@ expect(gradientTrack).toHaveStyle({ background: expect.stringContaining('gradien
 19. **Custom Dimensions** - Test trackWidth and trackHeight props
 20. **Animations** - Test animated prop and animation effects
 
+## Density
+
+Every dimension `Switch` draws — the track's width/height, the switchBase's
+own padding, the thumb's size, and the CHECKED thumb's own travel distance —
+comes from `SWITCH_SIZES` (`Switch.metrics.ts`) written through `rem(theme,
+px)` (`Switch.styles.ts`'s `switchSx`/`switchBaseSx`), the same vocabulary
+every other size in this package uses (`tokens/relative.ts`). So `Switch`
+already scales with a theme's density (`theme.typography.fontSize`) with no
+help from `@12-apps/ui/tokens`' `switchDensityOverrides()` — that override
+targets bare `MuiSwitch.styleOverrides`, which this component's own `sx`
+(applied via `styled(MuiSwitch, ...)` in `Switch.parts.tsx`) always outranks,
+so it never reaches this component at all (it exists for a raw
+`@mui/material/Switch` consumer instead, such as a host's own `Table.tsx`
+density-toggle column).
+
+This is why `Switch`'s numbers (`xs`/`sm`/`md`/`lg`/`xl`) are its OWN design
+scale, not MUI's `size="small"`/`"medium"` literals — and why a density change
+(`density: 'compact'`, factor 0.9) shrinks every one of them, including the
+checked thumb's own offset, with no separate wiring: FUT-2767's own
+real-Chromium proof (`tokens/density-overrides.test.stories.tsx`'s
+`ui-switch-*` cases) measures a `size="md"` switch at 45×23.4 (from
+50×26 at `density: 'normal'`) with the checked thumb's gap from the track's
+own edge shrinking from 1px to 0.9px in lock-step — not staying pinned at a
+now-oversized offset the way an UN-scaled `transform: translateX(20px)`
+would.
+
 ## Related Components
 
 - Checkbox - For multi-select scenarios

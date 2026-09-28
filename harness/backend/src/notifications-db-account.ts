@@ -78,6 +78,7 @@ interface SubscriptionSqlRow {
   p256dh: string;
   auth: string;
   client_id: string | null;
+  side: string | null;
   user_agent: string | null;
 }
 
@@ -88,6 +89,7 @@ const subscriptionRow = (row: SubscriptionSqlRow): PushSubscriptionRow => ({
   p256dh: row.p256dh,
   auth: row.auth,
   clientId: row.client_id,
+  side: row.side,
   userAgent: row.user_agent,
 });
 
@@ -100,12 +102,21 @@ const subscriptionRow = (row: SubscriptionSqlRow): PushSubscriptionRow => ({
  * `OR` on the filter means nobody narrowed, and every row of the owner's counts.
  */
 function reachWhere(where: PushSubscriptionWhere, params: Params): string {
-  const owner = `user_id = ${params.add(where.userId)}`;
-  if (where.OR === undefined) return owner;
-  const arms = where.OR.map((arm) =>
-    arm.clientId === null ? 'client_id IS NULL' : `client_id = ${params.add(arm.clientId)}`,
-  );
-  return `${owner} AND (${arms.join(' OR ')})`;
+  const conditions = [`user_id = ${params.add(where.userId)}`];
+  if (where.OR !== undefined) {
+    const arms = where.OR.map((arm) =>
+      arm.clientId === null ? 'client_id IS NULL' : `client_id = ${params.add(arm.clientId)}`,
+    );
+    conditions.push(`(${arms.join(' OR ')})`);
+  }
+  // The side rule, AND-ed, with the same NULL-is-a-value reading.
+  for (const rule of where.AND ?? []) {
+    const arms = rule.OR.map((arm) =>
+      arm.side === null ? 'side IS NULL' : `side = ${params.add(arm.side)}`,
+    );
+    conditions.push(`(${arms.join(' OR ')})`);
+  }
+  return conditions.join(' AND ');
 }
 
 export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
@@ -140,20 +151,21 @@ export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
     async upsert({ where, create, update }) {
       const params = new Params();
       const { rows } = await sql.query<SubscriptionSqlRow>(
-        // `client_id` is listed on BOTH halves. The column list here is
+        // `client_id` and `side` are listed on BOTH halves. The column list here is
         // literal, so a new column that is added to the seam and forgotten in
         // this statement writes NULL for ever with nothing failing to compile.
         `INSERT INTO push_subscriptions
-           (id, user_id, endpoint, p256dh, auth, client_id, user_agent, updated_at)
+           (id, user_id, endpoint, p256dh, auth, client_id, side, user_agent, updated_at)
          VALUES (${params.add(randomUUID())}, ${params.add(create.userId)},
                  ${params.add(where.endpoint)}, ${params.add(create.p256dh)},
                  ${params.add(create.auth)}, ${params.add(create.clientId)},
-                 ${params.add(create.userAgent)}, NOW())
+                 ${params.add(create.side)}, ${params.add(create.userAgent)}, NOW())
          ON CONFLICT (endpoint) DO UPDATE
            SET user_id = ${params.add(update.userId)},
                p256dh = ${params.add(update.p256dh)},
                auth = ${params.add(update.auth)},
                client_id = ${params.add(update.clientId)},
+               side = ${params.add(update.side)},
                user_agent = ${params.add(update.userAgent)},
                updated_at = NOW()
          RETURNING *`,

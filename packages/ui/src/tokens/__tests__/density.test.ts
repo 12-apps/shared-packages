@@ -334,6 +334,43 @@ describe('densityThemeOptions and muiThemeOptionsFrom agree on the MuiIconButton
 });
 
 /**
+ * FUT-2767 — `Checkbox`/`Radio`/`Switch` geometry, the SAME parity standard
+ * as the FUT-2766 block above: `densityThemeOptions` (standalone) and
+ * `muiThemeOptionsFrom` (`createUiTheme`/`UiProvider`) must produce the SAME
+ * `MuiCheckbox`/`MuiRadio`/`MuiSwitch` override objects, not just the same
+ * numbers.
+ */
+describe('densityThemeOptions and muiThemeOptionsFrom agree on the MuiCheckbox/MuiRadio/MuiSwitch overrides', () => {
+  it.each(['compact', 'normal', 'comfortable', 0.95] as const)(
+    'density=%s: identical MuiCheckbox/MuiRadio/MuiSwitch styleOverrides on both paths',
+    (density) => {
+      const standaloneComponents = densityThemeOptions(density).components;
+      const viaUiThemeComponents = muiThemeOptionsFrom(createUiTheme({ density })).components;
+
+      // Both are PRESENT — not just equal because both are undefined, which a
+      // reverted/unwired `components:` merge would also satisfy.
+      expect(standaloneComponents?.MuiCheckbox?.styleOverrides?.root).toBeTypeOf('function');
+      expect(standaloneComponents?.MuiRadio?.styleOverrides?.root).toBeTypeOf('function');
+      expect(standaloneComponents?.MuiSwitch?.styleOverrides?.sizeSmall).toBeTypeOf('function');
+      expect(standaloneComponents?.MuiCheckbox).toEqual(viaUiThemeComponents?.MuiCheckbox);
+      expect(standaloneComponents?.MuiRadio).toEqual(viaUiThemeComponents?.MuiRadio);
+      expect(standaloneComponents?.MuiSwitch).toEqual(viaUiThemeComponents?.MuiSwitch);
+
+      // End to end: a theme built from either path renders the same computed
+      // style object for every slot this PR adds.
+      const standaloneTheme = createTheme(densityThemeOptions(density));
+      const viaUiThemeTheme = createTheme(muiThemeOptionsFrom(createUiTheme({ density })));
+      const checkboxRoot = standaloneTheme.components?.MuiCheckbox?.styleOverrides?.root as
+        | ((props: { theme: typeof standaloneTheme }) => Record<string, unknown>)
+        | undefined;
+      expect(typeof checkboxRoot).toBe('function');
+      expect(checkboxRoot?.({ theme: standaloneTheme })).toEqual({ padding: standaloneTheme.typography.pxToRem(9) });
+      expect(checkboxRoot?.({ theme: standaloneTheme })).toEqual(checkboxRoot?.({ theme: viaUiThemeTheme }));
+    },
+  );
+});
+
+/**
  * FUT-2768 — `ToggleButton`/`Tab`/`Tabs`/`TableCell`/`PaginationItem`/`Slider`
  * geometry, the same parity standard as the FUT-2766 block above: the
  * standalone (`densityThemeOptions`) and `UiProvider` (`muiThemeOptionsFrom`)

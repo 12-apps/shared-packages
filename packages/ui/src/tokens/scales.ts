@@ -50,15 +50,17 @@ export {
   useDensity,
 } from './density';
 // The IconButton/Chip geometry overrides density threads through both
-// consumption paths (FUT-2766) — exported standalone too, for a host that
-// wants JUST these two components' overrides without the rest of density.
-// FUT-2768 adds ToggleButton/Tab/TableCell/PaginationItem/Slider's the same
-// way.
+// consumption paths (FUT-2766), and Checkbox/Radio/Switch's (FUT-2767) and
+// ToggleButton/Tab/TableCell/PaginationItem/Slider's (FUT-2768) — exported
+// standalone too, for a host that wants just these components' overrides
+// without the rest of density.
 export {
+  checkboxRadioDensityOverrides,
   chipDensityOverrides,
   iconButtonDensityOverrides,
   paginationItemDensityOverrides,
   sliderDensityOverrides,
+  switchDensityOverrides,
   tabDensityOverrides,
   tableCellDensityOverrides,
   tabsIndicatorDensityOverrides,
