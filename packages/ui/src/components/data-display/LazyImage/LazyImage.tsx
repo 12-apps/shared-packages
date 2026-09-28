@@ -104,13 +104,13 @@ const emptyToUnset = (value: Length): Length => (value === '' ? undefined : valu
 /** A length, already resolved to CSS — {@link innerLength} or {@link sxLength}. */
 type LengthResolver = (theme: Theme, value: Length) => string | undefined;
 
-/**
- * Whether a length is a PERCENTAGE (a numeric {@link isFraction} or a `%`
- * string) — copying it onto the OTHER axis re-creates this ticket's own
- * collapse either way (width%/height% measure different boxes; Chromium-confirmed).
- */
+// A number + `%`/`vw`/`vh`/`vmin`/`vmax` anywhere in a string, even nested in
+// `calc()`/`min()`/`max()`/`clamp()`, e.g. `calc(100% - 8px)`, `min(50vw, 200px)`.
+const RELATIVE_LENGTH_UNIT = /[\d.]+(?:%|vw|vh|vmin|vmax)(?![a-zA-Z])/;
+// RELATIVE: {@link isFraction}, or that unit anywhere — borrowing it onto the
+// OTHER axis re-creates this collapse (viewport units square too, `LazyImage.md`).
 const isRelativeLength = (value: Length): boolean =>
-  isFraction(value) || (typeof value === 'string' && value.trim().endsWith('%'));
+  isFraction(value) || (typeof value === 'string' && RELATIVE_LENGTH_UNIT.test(value));
 
 /** A resolved axis pair; `aspectRatio` is set when the OTHER axis comes from CSS, not a length. */
 type AxisPair = { width: string | undefined; height: string | undefined; aspectRatio?: string };
