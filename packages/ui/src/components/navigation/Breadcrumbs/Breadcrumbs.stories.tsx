@@ -421,11 +421,7 @@ export const Responsive: Story = {
     collapseBehavior: 'menu',
     elevation: 2,
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
 };
 
 // Accessibility showcase

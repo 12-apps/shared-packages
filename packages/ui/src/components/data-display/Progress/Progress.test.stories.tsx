@@ -247,7 +247,7 @@ export const FormInteraction: Story = {
           // Extract percentage value
           const percentMatch = textContent.match(/(\d+)%/);
           if (percentMatch) {
-            const value = parseInt(percentMatch[1]);
+            const value = parseInt(percentMatch[1] ?? '0');
             seenValues.add(value);
           }
 
@@ -689,7 +689,7 @@ export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -706,13 +706,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => (
     <Box sx={{ p: 2, maxWidth: '100%' }}>
       <Typography variant="h6" sx={{ mb: 3 }}>
@@ -882,7 +882,7 @@ export const ResponsiveDesign: Story = {
           if (backgroundColor && backgroundColor.includes('rgba')) {
             const rgbaMatch = backgroundColor.match(/rgba\(([^)]+)\)/);
             if (rgbaMatch) {
-              const values = rgbaMatch[1].split(',').map((v) => v.trim());
+              const values = (rgbaMatch[1] ?? '').split(',').map((v) => v.trim());
               const opacity = parseFloat(values[3] || '1');
 
               if (opacity < 0.2) {

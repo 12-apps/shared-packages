@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { WorkflowStep } from './WorkflowStep';
+import { StepIndicatorComponent } from './WorkflowStep.parts';
 import type { WorkflowStepItem } from './WorkflowStep.types';
 
 const meta: Meta<typeof WorkflowStep> = {
@@ -203,11 +204,7 @@ export const ResponsiveDesign: Story = {
     currentStep: 1,
     orientation: 'horizontal',
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -360,6 +357,105 @@ export const IntegrationTest: Story = {
     // Verify all step content is present
     expect(canvas.getByText('Step One')).toBeInTheDocument();
     expect(canvas.getByText('First step description')).toBeInTheDocument();
+  },
+};
+
+// Fixed values used directly by `render` below (not read back out of
+// `args.steps` by index): under this project's `noUncheckedIndexedAccess`,
+// `args.steps[n]` types as `WorkflowStepItem | undefined`, which the two
+// `StepIndicatorComponent`s below cannot accept for a required `step` prop.
+const perStepDisabledSteps: [WorkflowStepItem, WorkflowStepItem] = [
+  { title: 'Pedido', description: 'First step', status: 'current', disabled: true },
+  { title: 'Pagamento', description: 'Second step', status: 'pending' },
+];
+
+export const PerStepDisabledClickTest: Story = {
+  // `WorkflowStep`'s own `handleStepClick` (`WorkflowStep.tsx`) has always
+  // re-checked `step.disabled` itself, so driving the full component here
+  // could not observe the defect this ticket fixes — that outer re-check
+  // papers over `StepIndicatorComponent`'s own gating. `render` bypasses the
+  // public wrapper and exercises `StepIndicatorComponent` directly, the
+  // surface `handleClick`/`handleKeyDown` actually live on, with a plain
+  // `onClick` mock that carries no such second check.
+  args: {
+    steps: perStepDisabledSteps,
+    interactive: true,
+    onStepClick: fn(),
+  },
+  render: (args) => (
+    <div style={{ display: 'flex', gap: 16 }}>
+      <StepIndicatorComponent
+        step={perStepDisabledSteps[0]}
+        index={0}
+        isActive={false}
+        isCompleted={false}
+        isError={false}
+        variant="default"
+        color="primary"
+        size="md"
+        showNumbers
+        showIcons={false}
+        interactive={Boolean(args.interactive)}
+        animated={false}
+        disabled={Boolean(args.disabled)}
+        onClick={args.onStepClick}
+        data-testid="disabled-indicator"
+      />
+      <StepIndicatorComponent
+        step={perStepDisabledSteps[1]}
+        index={1}
+        isActive={false}
+        isCompleted={false}
+        isError={false}
+        variant="default"
+        color="primary"
+        size="md"
+        showNumbers
+        showIcons={false}
+        interactive={Boolean(args.interactive)}
+        animated={false}
+        disabled={Boolean(args.disabled)}
+        onClick={args.onStepClick}
+        data-testid="enabled-indicator"
+      />
+    </div>
+  ),
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // The first indicator's step is per-step disabled: it already announces
+    // it (tabIndex="-1", aria-disabled="true", regression coverage from
+    // FUT-2773), and clicking or activating it by keyboard must not run
+    // onClick either.
+    const disabledIndicator = canvas.getByTestId('disabled-indicator');
+    expect(disabledIndicator).toHaveAttribute('tabIndex', '-1');
+    expect(disabledIndicator).toHaveAttribute('aria-disabled', 'true');
+
+    await userEvent.click(disabledIndicator);
+    // eslint-disable-next-line test-flakiness/no-focus-check -- tabIndex="-1" keeps Tab away from a disabled step; focusing it directly is the only way to prove Enter/Space do nothing
+    disabledIndicator.focus();
+    await waitFor(() => expect(disabledIndicator).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    // eslint-disable-next-line test-flakiness/no-focus-check -- same: the disabled step is unreachable by Tab
+    disabledIndicator.focus();
+    await waitFor(() => expect(disabledIndicator).toHaveFocus());
+    await userEvent.keyboard(' ');
+
+    expect(args.onStepClick).not.toHaveBeenCalled();
+
+    // The second indicator's step is not disabled at all: click and keyboard
+    // activation must still reach onClick.
+    const enabledIndicator = canvas.getByTestId('enabled-indicator');
+    expect(enabledIndicator).not.toHaveAttribute('aria-disabled');
+
+    await userEvent.click(enabledIndicator);
+
+    await waitFor(() => {
+      expect(args.onStepClick).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ title: 'Pagamento' }),
+      );
+    });
   },
 };
 

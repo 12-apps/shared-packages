@@ -8,7 +8,7 @@ import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
 
 // Test data interface
-interface TestRow {
+interface TestRow extends Record<string, unknown> {
   id: number;
   name: string;
   email: string;
@@ -25,10 +25,10 @@ const generateTestData = (count: number): TestRow[] => Array.from({ length: coun
     role: i % 2 === 0 ? 'Engineer' : 'Designer',
     status: (i % 2 === 0 ? 'active' : 'inactive') as 'active' | 'inactive',
     salary: 50000 + i * 1000,
-    joinDate: new Date(2020, i % 12, 1).toISOString().split('T')[0],
+    joinDate: new Date(2020, i % 12, 1).toISOString().split('T')[0] ?? '',
   }));
 
-const testColumns: GridColumn<TestRow>[] = [
+const testColumns: GridColumn<Record<string, unknown>>[] = [
   { id: 'id', header: 'ID', accessor: 'id', type: 'number', width: 80 },
   {
     id: 'name',
@@ -225,7 +225,7 @@ export const SingleSelectionTest: Story = {
       const checkboxes = canvas.getAllByRole('checkbox');
       expect(checkboxes.length).toBeGreaterThan(0);
 
-      const firstRowCheckbox = checkboxes[0]; // Should be first row checkbox in single mode
+      const firstRowCheckbox = checkboxes[0]!; // Should be first row checkbox in single mode
       expect(firstRowCheckbox).toHaveAttribute('aria-label', PT_BR_DATA_GRID_COPY.selectRow(1));
 
       await userEvent.click(firstRowCheckbox);
@@ -233,7 +233,7 @@ export const SingleSelectionTest: Story = {
       // Check that the onChangeSelected callback was called with the correct row ID
       await waitFor(
         () => {
-          expect(args.selection.onChangeSelected).toHaveBeenCalledWith([1]); // Row ID should be 1
+          expect(args.selection!.onChangeSelected).toHaveBeenCalledWith([1]); // Row ID should be 1
         },
         { timeout: 3000 },
       );
@@ -241,19 +241,19 @@ export const SingleSelectionTest: Story = {
 
     await step('Should deselect when clicking another row in single mode', async () => {
       const checkboxes = canvas.getAllByRole('checkbox');
-      const firstRowCheckbox = checkboxes[0];
-      const secondRowCheckbox = checkboxes[1];
+      const firstRowCheckbox = checkboxes[0]!;
+      const secondRowCheckbox = checkboxes[1]!;
 
       // Click first row
       await userEvent.click(firstRowCheckbox);
       await waitFor(() => {
-        expect(args.selection.onChangeSelected).toHaveBeenCalledWith([1]);
+        expect(args.selection!.onChangeSelected).toHaveBeenCalledWith([1]);
       });
 
       // Click second row - should deselect first and select second
       await userEvent.click(secondRowCheckbox);
       await waitFor(() => {
-        expect(args.selection.onChangeSelected).toHaveBeenCalledWith([2]);
+        expect(args.selection!.onChangeSelected).toHaveBeenCalledWith([2]);
       });
     });
   },
@@ -272,8 +272,8 @@ export const MultiSelectionTest: Story = {
 
     await step('Should allow multiple row selection', async () => {
       const checkboxes = canvas.getAllByRole('checkbox');
-      const firstRowCheckbox = checkboxes[1]; // Skip header checkbox
-      const secondRowCheckbox = checkboxes[2];
+      const firstRowCheckbox = checkboxes[1]!; // Skip header checkbox
+      const secondRowCheckbox = checkboxes[2]!;
 
       await userEvent.click(firstRowCheckbox);
       await userEvent.click(secondRowCheckbox);
@@ -284,7 +284,7 @@ export const MultiSelectionTest: Story = {
 
     await step('Should support select all functionality', async () => {
       const checkboxes = canvas.getAllByRole('checkbox');
-      const headerCheckbox = checkboxes[0];
+      const headerCheckbox = checkboxes[0]!;
       expect(headerCheckbox).toHaveAttribute(
         'aria-label',
         PT_BR_DATA_GRID_COPY.selectAllRows,
@@ -320,7 +320,7 @@ export const KeyboardNavigationTest: Story = {
       expect(grid).toBeInTheDocument();
 
       // Verify grid is accessible via keyboard
-      const firstCell = canvas.getAllByRole('gridcell')[0];
+      const firstCell = canvas.getAllByRole('gridcell')[0]!;
       expect(firstCell).toBeInTheDocument();
 
       // Test that cells can be focused
@@ -336,7 +336,7 @@ export const KeyboardNavigationTest: Story = {
       // Test that checkboxes can be focused and activated
       const checkboxes = canvas.getAllByRole('checkbox');
       if (checkboxes.length > 0) {
-        const firstCheckbox = checkboxes[0];
+        const firstCheckbox = checkboxes[0]!;
         await userEvent.click(firstCheckbox);
         await waitFor(() => expect(document.activeElement).toBe(firstCheckbox));
       }
@@ -351,8 +351,10 @@ export const RowExpansionTest: Story = {
     rows: generateTestData(3),
     columns: testColumns,
     expansion: {
-      render: (row: TestRow) => (
-        <div data-testid={`expansion-${row.id}`}>Details for {row.name}</div>
+      render: (row: Record<string, unknown>) => (
+        <div data-testid={`expansion-${(row as TestRow).id}`}>
+          Details for {(row as TestRow).name}
+        </div>
       ),
     },
     ariaLabel: 'Row expansion data grid',
@@ -362,7 +364,7 @@ export const RowExpansionTest: Story = {
 
     await step('Should expand row when clicking expand button', async () => {
       const expandButtons = canvas.getAllByLabelText(/expandir linha/i);
-      const firstExpandButton = expandButtons[0];
+      const firstExpandButton = expandButtons[0]!;
 
       await userEvent.click(firstExpandButton);
 
@@ -509,9 +511,7 @@ export const StickyHeaderTest: Story = {
 // 13. Responsive Design Tests
 export const ResponsiveDesignTest: Story = {
   name: 'Test: Responsive Design',
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   args: {
     rows: generateTestData(10),
     columns: testColumns,
@@ -617,12 +617,8 @@ export const EdgeCasesTest: Story = {
 export const DefaultCopyFallbackTest: Story = {
   name: 'Test: Default Copy Fallbacks',
   args: {
-    // Cast the same way every other story here would need to (FUT-2699's
-    // stories-types lane): `Meta<typeof DataGrid>` infers `args` over the
-    // component's default `Record<string, unknown>`, which `TestRow` (a
-    // plain interface, no index signature) is not directly assignable to.
-    rows: generateTestData(3) as unknown as Record<string, unknown>[],
-    columns: testColumns as unknown as GridColumn<Record<string, unknown>>[],
+    rows: generateTestData(3),
+    columns: testColumns,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -641,7 +637,7 @@ export const IntegrationTest: Story = {
     selection: { mode: 'multi' },
     sorting: { mode: 'client', defaultSortBy: [{ id: 'name', dir: 'asc' }] },
     expansion: {
-      render: (row: TestRow) => <div>Expanded: {row.name}</div>,
+      render: (row: Record<string, unknown>) => <div>Expanded: {(row as TestRow).name}</div>,
     },
     virtualizeRows: true,
     stickyHeader: true,
@@ -656,7 +652,7 @@ export const IntegrationTest: Story = {
 
       // Test selection
       const checkboxes = canvas.getAllByRole('checkbox');
-      await userEvent.click(checkboxes[1]);
+      await userEvent.click(checkboxes[1]!);
 
       // Test sorting
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
@@ -664,7 +660,7 @@ export const IntegrationTest: Story = {
 
       // Test expansion
       const expandButtons = canvas.getAllByLabelText(/expandir linha/i);
-      await userEvent.click(expandButtons[0]);
+      await userEvent.click(expandButtons[0]!);
 
       // All features should work together
       expect(checkboxes[1]).toBeChecked();
@@ -674,12 +670,11 @@ export const IntegrationTest: Story = {
   },
 };
 
-// A row type that satisfies `DataGrid`'s own `T extends Record<string, unknown>`
-// (unlike `TestRow`, which `Meta<typeof DataGrid>` already widens for every
-// OTHER story here through `args` — a pre-existing, grandfathered mismatch,
-// `.ui-stories-types-exceptions.json`, FUT-2699's ratchet). That ratchet only
-// SHRINKS, so this story is rendered explicitly, `<DataGrid<ThemeDensityRow>
-// .../>`, against the real generic component instead of through `args`.
+// A row type that satisfies `DataGrid`'s own `T extends Record<string, unknown>`.
+// This story needs its own `<ThemeProvider>` wrapper (to set the density
+// level), which `args` has no slot for, so it renders explicitly against the
+// real generic component, `<DataGrid<ThemeDensityRow> .../>`, rather than
+// through `args`.
 interface ThemeDensityRow extends Record<string, unknown> {
   id: number;
   name: string;

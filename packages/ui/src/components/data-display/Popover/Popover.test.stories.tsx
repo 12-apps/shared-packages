@@ -509,11 +509,7 @@ export const FocusManagement: Story = {
 
 // 6. Responsive Design Tests
 export const ResponsiveDesign: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <>
       <PopoverTestWrapper maxWidth={280}>
@@ -615,7 +611,7 @@ export const ThemeVariations: Story = {
       expect(triggers).toHaveLength(3);
 
       // Test default variant
-      await userEvent.click(triggers[0]);
+      await userEvent.click(triggers[0]!);
       await waitFor(() => {
         // Use document queries for portal-rendered content
         const content = document.querySelector('[data-testid="default-content"]');
@@ -638,7 +634,7 @@ export const ThemeVariations: Story = {
       });
 
       // Test glass variant
-      await userEvent.click(triggers[1]);
+      await userEvent.click(triggers[1]!);
       await waitFor(() => {
         // Use document queries for portal-rendered content
         const content = document.querySelector('[data-testid="glass-content"]');
@@ -648,7 +644,9 @@ export const ThemeVariations: Story = {
         // Verify glass variant has backdrop filter
         const paper = content?.closest('.MuiPaper-root') as HTMLElement;
         if (paper) {
-          const computedStyle = window.getComputedStyle(paper);
+          const computedStyle = window.getComputedStyle(paper) as CSSStyleDeclaration & {
+            webkitBackdropFilter?: string;
+          };
           // Glass variant should have backdrop-filter
           expect(computedStyle.backdropFilter || computedStyle.webkitBackdropFilter).toBeTruthy();
         }
@@ -661,7 +659,7 @@ export const ThemeVariations: Story = {
       });
 
       // Test arrow variant
-      await userEvent.click(triggers[2]);
+      await userEvent.click(triggers[2]!);
       await waitFor(() => {
         // Use document queries for portal-rendered content
         const content = document.querySelector('[data-testid="arrow-content"]');
@@ -718,7 +716,7 @@ export const VisualStates: Story = {
       expect(triggers).toHaveLength(3);
 
       // Test glow effect
-      await userEvent.click(triggers[0]);
+      await userEvent.click(triggers[0]!);
       await waitFor(() => {
         // Use document queries for portal-rendered content
         const content = document.querySelector('[data-testid="glow-content"]');
@@ -740,7 +738,7 @@ export const VisualStates: Story = {
       });
 
       // Test pulse effect
-      await userEvent.click(triggers[1]);
+      await userEvent.click(triggers[1]!);
       await waitFor(() => {
         // Use document queries for portal-rendered content
         const content = document.querySelector('[data-testid="pulse-content"]');
@@ -762,7 +760,7 @@ export const VisualStates: Story = {
       });
 
       // Test both effects combined
-      await userEvent.click(triggers[2]);
+      await userEvent.click(triggers[2]!);
       await waitFor(() => {
         // Use document queries for portal-rendered content
         const content = document.querySelector('[data-testid="both-effects-content"]');
@@ -940,7 +938,7 @@ export const EdgeCases: Story = {
 
     await step('Should handle empty content gracefully', async () => {
       const triggers = canvas.getAllByTestId('popover-trigger');
-      await userEvent.click(triggers[0]);
+      await userEvent.click(triggers[0]!);
 
       await waitFor(() => {
         // Use document queries for portal-rendered content
@@ -960,7 +958,7 @@ export const EdgeCases: Story = {
 
     await step('Should handle long content with proper text wrapping', async () => {
       const triggers = canvas.getAllByTestId('popover-trigger');
-      await userEvent.click(triggers[1]);
+      await userEvent.click(triggers[1]!);
 
       await waitFor(() => {
         // Use document queries for portal-rendered content
@@ -983,7 +981,7 @@ export const EdgeCases: Story = {
 
     await step('Should handle content without maxWidth constraint', async () => {
       const triggers = canvas.getAllByTestId('popover-trigger');
-      await userEvent.click(triggers[2]);
+      await userEvent.click(triggers[2]!);
 
       await waitFor(() => {
         // Use document queries for portal-rendered content
@@ -1003,7 +1001,7 @@ export const EdgeCases: Story = {
 
     await step('Should handle zero maxWidth edge case', async () => {
       const triggers = canvas.getAllByTestId('popover-trigger');
-      await userEvent.click(triggers[3]);
+      await userEvent.click(triggers[3]!);
 
       await waitFor(() => {
         // Use document queries for portal-rendered content

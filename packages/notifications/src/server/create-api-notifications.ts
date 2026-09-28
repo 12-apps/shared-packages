@@ -32,6 +32,7 @@ import {
   type NotificationCommittedListener,
   type NotificationDispatchScheduler,
   type NotificationRouter,
+  type NotificationSideResolver,
 } from './router';
 import {
   createTransportRegistry,
@@ -93,6 +94,13 @@ export interface NotificationsServerConfig {
   channelDefaults?: Partial<ChannelRow>;
   /** The tenant plan gate, answered per emit. */
   channelPolicy?: NotificationChannelPolicy;
+  /**
+   * Which SIDE each notification type is for (`customer`, `staff` — your
+   * vocabulary). Stored on every row, it lets an actor's `scopeSide` narrow the
+   * inbox and a subscription's `side` narrow the push fan-out. Absent, or
+   * answering `null`, leaves a type unclassified: every reader sees it.
+   */
+  sideOf?: NotificationSideResolver;
   /** Hand dispatch to a real queue instead of the in-process detached send. */
   scheduleDispatch?: NotificationDispatchScheduler;
   /**
@@ -165,6 +173,27 @@ const consoleLogger: NotificationLogger = {
   error: (message, ...meta) => console.error(message, ...meta),
 };
 
+/**
+ * The permission fan-out, or a function that REFUSES with the reason when the
+ * host passed no `audience` directory — an emit that silently reached nobody
+ * would be indistinguishable from nobody holding the permission.
+ */
+function permissionFanOut(
+  config: NotificationsServerConfig,
+  router: NotificationRouter,
+  logger: NotificationLogger,
+): NotifyByPermission {
+  const audience = config.audience;
+  if (audience) return createNotifyByPermission({ router, directory: audience, logger });
+  return () =>
+    Promise.reject(
+      new Error(
+        'notifyByPermission() needs an `audience` directory — pass the host authorization ' +
+          'engine to createApiNotifications({ audience }).',
+      ),
+    );
+}
+
 export function createApiNotifications(config: NotificationsServerConfig): ApiNotifications {
   /**
    * The SOURCE travels; nothing is resolved here.
@@ -208,19 +237,11 @@ export function createApiNotifications(config: NotificationsServerConfig): ApiNo
       channelPolicy: config.channelPolicy,
       scheduleDispatch: config.scheduleDispatch,
       onCommitted: config.onCommitted,
+      sideOf: config.sideOf,
     }),
   });
 
-  const audience = config.audience;
-  const notifyByPermission: NotifyByPermission = audience
-    ? createNotifyByPermission({ router, directory: audience, logger })
-    : () =>
-        Promise.reject(
-          new Error(
-            'notifyByPermission() needs an `audience` directory — pass the host authorization ' +
-              'engine to createApiNotifications({ audience }).',
-          ),
-        );
+  const notifyByPermission = permissionFanOut(config, router, logger);
 
   return {
     routes: notificationRoutes({

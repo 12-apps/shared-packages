@@ -35,6 +35,8 @@ export interface NotificationRow {
   id: string;
   userId: string;
   clientId: string | null;
+  /** The side this row is for (`customer`, `staff` — host vocabulary); `null` = unclassified. */
+  side: string | null;
   type: string;
   category: string;
   title: string;

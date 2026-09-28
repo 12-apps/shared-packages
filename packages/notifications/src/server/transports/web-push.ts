@@ -103,6 +103,8 @@ export interface WebPushSubscriptionSource {
   list(
     userId: string,
     notificationClientId?: string | null,
+    /** The notification's side; `null` for an unclassified one, which every app receives. */
+    notificationSide?: string | null,
   ): Promise<{ id: string; endpoint: string; p256dh: string; auth: string }[]>;
   prune(id: string): Promise<void>;
 }
@@ -172,7 +174,7 @@ export function webPushTransport(
     supports: (recipient: TransportRecipient) => recipient.pushSubscriptionCount > 0,
     format: formatWebPush,
     async send(message, recipient) {
-      const rows = await subscriptions.list(recipient.userId, recipient.clientId);
+      const rows = await subscriptions.list(recipient.userId, recipient.clientId, recipient.side);
       if (rows.length === 0) throw new Error('Recipient no longer has push subscriptions.');
       const payload = JSON.stringify(message);
       let delivered = 0;

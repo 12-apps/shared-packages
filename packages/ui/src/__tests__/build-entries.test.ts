@@ -88,8 +88,9 @@ describe("the build emits one module per component", () => {
     expect(internal.length).toBeGreaterThan(0);
     // Pinned on purpose: a public subpath is a published promise, so adding or
     // removing one should be a visible edit here. 142 → 144 added
-    // `form/NumberField` and `layout/SettingCard` (FUT-2823).
-    expect(Object.keys(entries).length - internal.length).toBe(144);
+    // `form/NumberField` and `layout/SettingCard` (FUT-2823); 144 → 145 added
+    // `navigation/SectionNav`.
+    expect(Object.keys(entries).length - internal.length).toBe(145);
   });
 
   it("builds no story or spec — each would drag a test runner into dist", () => {

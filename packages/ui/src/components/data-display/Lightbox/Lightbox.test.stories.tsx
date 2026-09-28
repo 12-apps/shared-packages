@@ -318,7 +318,7 @@ export const ZoomAndPan: Story = {
         // Matrix with scale > 1 will have values > 1 in first and fourth positions
         const matrixMatch = style.transform.match(/matrix\(([^,]+),/);
         if (matrixMatch) {
-          const scaleValue = parseFloat(matrixMatch[1]);
+          const scaleValue = parseFloat(matrixMatch[1] ?? '0');
           expect(scaleValue).toBeGreaterThan(1);
         }
       });
@@ -510,7 +510,7 @@ export const EdgeCases: Story = {
 
 // 10. Single Image Tests
 export const SingleImageGallery: Story = {
-  render: () => <LightboxTestWrapper items={[testImages[0]]} showControls={true} />,
+  render: () => <LightboxTestWrapper items={[testImages[0]!]} showControls={true} />,
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
@@ -617,6 +617,38 @@ const itemsWithNoAlt: LightboxItem[] = [
     type: 'video',
   },
 ];
+
+// 14. A single, labelled dialog role (FUT-2861) — MUI's outer Modal root used
+// to inherit this component's own static `role: 'dialog'`, alongside the
+// Paper's own `role="dialog"`, so an open Lightbox exposed two dialog-role
+// elements, the outer one unlabelled. Queried through `document.body`
+// because the Lightbox is portalled — its markup does not live under
+// `canvasElement`.
+export const SingleLabelledDialogRole: Story = {
+  render: () => <LightboxTestWrapper />,
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await step('Should open lightbox', async () => {
+      const openButton = canvas.getByTestId('open-lightbox');
+      await userEvent.click(openButton);
+
+      await waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).toBeInTheDocument();
+      });
+    });
+
+    await step('Should expose exactly one role="dialog" element, with an accessible name', async () => {
+      await waitFor(() => {
+        const dialogs = body.getAllByRole('dialog');
+        expect(dialogs).toHaveLength(1);
+        expect(dialogs[0]).toHaveAccessibleName();
+        expect(dialogs[0]).toHaveAttribute('aria-labelledby', 'lightbox-title');
+      });
+    });
+  },
+};
 
 export const MediaFallbacks: Story = {
   render: () => <LightboxTestWrapper items={itemsWithNoAlt} thumbnails={true} />,

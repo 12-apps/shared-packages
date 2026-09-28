@@ -27,6 +27,7 @@ import type { NotificationRow } from '../wire';
 export interface NotificationCreateData {
   userId: string;
   clientId: string | null;
+  side: string | null;
   type: string;
   category: string;
   title: string;
@@ -77,6 +78,7 @@ export interface NotificationWhereBranch {
   readAt?: null;
   /** `null` matches the platform-wide rows that travel with every store scope. */
   clientId?: string | null;
+  side?: string | null;
   OR?: NotificationWhereBranch[];
   AND?: NotificationWhereBranch[];
 }
@@ -208,6 +210,8 @@ export interface PushSubscriptionRow {
   auth: string;
   /** The origin this browser registered on; `null` = the platform origin. */
   clientId: string | null;
+  /** The side this browser's app serves; `null` = every side. */
+  side: string | null;
   userAgent: string | null;
 }
 
@@ -221,6 +225,16 @@ export interface PushSubscriptionRow {
 export interface PushSubscriptionWhere {
   userId: string;
   OR?: [{ clientId: null }, { clientId: string }];
+  /**
+   * The SIDE rule, AND-ed with the store rule above: the row's `side` is NULL
+   * (its app serves every side) or equals the notification's. The same
+   * NULL-arm-is-load-bearing reasoning applies.
+   *
+   * Its own key rather than folded into `OR`, so an adapter written against
+   * the store rule alone keeps enforcing that rule unchanged — it can only fail
+   * to narrow by side, never stop narrowing by store.
+   */
+  AND?: [{ OR: [{ side: null }, { side: string }] }];
 }
 
 export interface PushSubscriptionDelegate {
@@ -241,6 +255,7 @@ export interface PushSubscriptionDelegate {
       p256dh: string;
       auth: string;
       clientId: string | null;
+      side: string | null;
       userAgent: string | null;
     };
     update: {
@@ -248,6 +263,7 @@ export interface PushSubscriptionDelegate {
       p256dh: string;
       auth: string;
       clientId: string | null;
+      side: string | null;
       userAgent: string | null;
     };
   }): Promise<PushSubscriptionRow>;

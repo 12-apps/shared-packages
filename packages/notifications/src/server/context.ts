@@ -23,8 +23,11 @@ import { NOTIFICATION_CHANNELS, type NotificationChannel } from '../types';
 export interface NotificationsActor {
   userId: string;
   /**
-   * The store whose ORIGIN this request arrived on, resolved by the
-   * HOST from the hostname — never read from the body or the query.
+   * The store whose app this request comes from, resolved by the HOST —
+   * this surface never reads it from the body or the query itself. A host
+   * whose stores each have their own ORIGIN resolves it from the hostname; any
+   * signal of which app is asking will do (its route, a header its own app
+   * sends), because of what follows.
    *
    * The paragraph above still holds: this is not a tenant the surface
    * authorizes against, it is a NARROWING of a read that is already the
@@ -37,6 +40,26 @@ export interface NotificationsActor {
    * another.
    */
   scopeClientId?: string;
+  /**
+   * The SIDE of the business this request's app serves (`customer`, `staff` —
+   * the host's vocabulary, as stamped on notifications by `sideOf`), again
+   * resolved by the HOST rather than by this surface — from the route, the
+   * hostname, or a header the app sends. A request value is fine here: a
+   * forged side can only hide or re-sort the caller's own rows.
+   *
+   * Like `scopeClientId` it only NARROWS the caller's own inbox — the list, the
+   * badge and "mark all read" answer rows of this side plus unclassified ones —
+   * and it is the side a push subscription registered here is stamped with,
+   * unless `pushSide` says otherwise. Absent = every side, as before.
+   */
+  scopeSide?: string;
+  /**
+   * The side stamped on a push subscription this actor registers, when it must
+   * differ from `scopeSide`. `null` stamps NO side, so the browser receives
+   * every side: a host that has not yet shipped an app for one side keeps that
+   * side's alerts reaching somebody. Absent = `scopeSide`.
+   */
+  pushSide?: string | null;
 }
 
 /** One request, already authenticated and routed by the host. */

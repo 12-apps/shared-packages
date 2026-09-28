@@ -386,9 +386,6 @@ export const AllVariants: Story = {
       />
     </Stack>
   ),
-  parameters: {
-    viewport: { defaultViewport: 'responsive' },
-  },
 };
 
 export const AllSizes: Story = {
@@ -404,9 +401,6 @@ export const AllSizes: Story = {
       />
     </Stack>
   ),
-  parameters: {
-    viewport: { defaultViewport: 'responsive' },
-  },
 };
 
 export const AllStates: Story = {
@@ -435,9 +429,6 @@ export const AllStates: Story = {
       />
     </Stack>
   ),
-  parameters: {
-    viewport: { defaultViewport: 'responsive' },
-  },
 };
 
 const InteractiveStatesComponent = () => {
@@ -469,9 +460,6 @@ const InteractiveStatesComponent = () => {
 
 export const InteractiveStates: Story = {
   render: () => <InteractiveStatesComponent />,
-  parameters: {
-    viewport: { defaultViewport: 'responsive' },
-  },
 };
 
 export const Responsive: Story = {
@@ -496,7 +484,4 @@ export const Responsive: Story = {
       </Box>
     </Stack>
   ),
-  parameters: {
-    viewport: { defaultViewport: 'responsive' },
-  },
 };

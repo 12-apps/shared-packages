@@ -74,7 +74,7 @@ export const StateChangeTest: Story = {
         const stepIndex = defaultSteps.findIndex((s) => s.id === stepId);
         const newCompleted = new Set(completed);
         for (let i = 0; i < stepIndex; i++) {
-          newCompleted.add(defaultSteps[i].id);
+          newCompleted.add(defaultSteps[i]!.id);
         }
         setCompleted(newCompleted);
       };
@@ -262,9 +262,7 @@ export const ResponsiveDesign: Story = {
     activeId: 'step2',
     completed: new Set(['step1']),
   },
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   decorators: [
     (Story) => (
       <Box sx={{ width: 320, height: 400 }}>
@@ -513,7 +511,7 @@ export const Integration: Story = {
         const stepIndex = defaultSteps.findIndex((s) => s.id === stepId);
         const newCompleted = new Set(completed);
         for (let i = 0; i < stepIndex; i++) {
-          newCompleted.add(defaultSteps[i].id);
+          newCompleted.add(defaultSteps[i]!.id);
         }
         setCompleted(newCompleted);
       };

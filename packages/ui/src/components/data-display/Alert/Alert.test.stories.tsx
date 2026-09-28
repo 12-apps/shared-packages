@@ -5,6 +5,7 @@ import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
 import { Alert } from './Alert';
+import { PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
 import { COLOR_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Alert> = {
@@ -28,7 +29,14 @@ const meta: Meta<typeof Alert> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+// `StoryObj<typeof meta>` collapses `Story['args']` to `never` here: `Alert`'s
+// props (`AlertBase & AlertDismiss`, `AlertDismiss` itself a union keyed on
+// `closable`) survive `React.ComponentProps<typeof Alert>` intact, but
+// Storybook's own `Meta`/`StoryObj` args-extraction loses that union once it
+// goes through `meta`'s type — a known incompatibility between CSF3's typing
+// and a forwardRef component whose props are a discriminated union, not a
+// mistake in this story. Typing `Story` off the component directly avoids it.
+type Story = StoryObj<typeof Alert>;
 
 // Interaction Tests
 export const BasicInteraction: Story = {
@@ -199,6 +207,7 @@ export const AllVariantsVisual: Story = {
             title={`${variant.charAt(0).toUpperCase() + variant.slice(1)} Alert`}
             description={`This is a ${variant} alert with all features enabled`}
             closable
+            closeLabel={PT_BR_DATA_STATE_COPY.dismissAlert}
             showIcon
             data-testid={`alert-${variant}`}
           />
@@ -241,7 +250,7 @@ export const ResponsiveDesign: Story = {
   },
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -258,13 +267,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
@@ -551,6 +560,7 @@ const FormIntegrationComponent = () => {
           title="Success"
           description={alertMessage}
           closable
+          closeLabel={PT_BR_DATA_STATE_COPY.dismissAlert}
           onClose={() => setShowAlert(false)}
           data-testid="form-alert"
         />

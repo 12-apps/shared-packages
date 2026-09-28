@@ -552,14 +552,14 @@ export const ResponsiveDesign: Story = {
   },
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
         desktop: { name: 'Desktop', styles: { width: '1024px', height: '768px' } },
       },
-      defaultViewport: 'desktop',
     },
   },
+  globals: { viewport: { value: 'desktop', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const mobileToggle = canvas.getByTestId('mobile-toggle');

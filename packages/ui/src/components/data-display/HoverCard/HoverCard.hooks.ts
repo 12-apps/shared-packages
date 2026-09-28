@@ -105,28 +105,147 @@ const useEscapeKey = (active: boolean, onEscape: () => void) => {
  * backdrop, which `pointer-events: none` on the popover root (so the page
  * under an open card stays usable) takes out of play. So this listens on the
  * document itself, in the CAPTURE phase, where a `stopPropagation` further in
- * cannot swallow it. It only observes: no `preventDefault`, so the tap or
- * click still reaches whatever it landed on. Attached while open, removed on
- * close and on unmount.
+ * — including one a nested control (or something entirely unrelated to the
+ * card) calls on its OWN bubble — cannot swallow it (FUT-2776 adversarial
+ * review: a bubble-phase listener here was tried and reverted; see below).
+ * It only observes: no `preventDefault`, so the tap or click still reaches
+ * whatever it landed on. Attached while open, removed on close and on
+ * unmount.
+ *
+ * That capture placement is exactly what makes the decision impossible to
+ * make SYNCHRONOUSLY: `document` is the outermost node on the capture path,
+ * so this handler fires before React's own capture dispatch even starts —
+ * before `useCardOwnership`'s marker on the card's content root (also
+ * capture, but on a node further down the same tree) has had a chance to run
+ * for this same event. So the decision is deferred — but NOT to a microtask:
+ * a microtask here reads the marker before it is set for TRUSTED input (a
+ * real press, or Playwright's `page.mouse`), which is the very bug this hook
+ * exists to fix (FUT-2776, third-review adversarial probe, measured with
+ * real Chromium and `page.mouse.down()`):
+ *
+ *   TRUSTED:  doc-capture-sync → doc-capture-microtask (marker unset) → inner-capture (sets marker)
+ *   SCRIPT:   doc-capture-sync → inner-capture (sets marker) → doc-capture-microtask (marker set)
+ *
+ * Chromium runs any microtasks queued by a capture-phase listener BEFORE
+ * dispatching to the next listener on the path when the event is trusted —
+ * so a microtask queued here runs before `useCardOwnership`'s capture
+ * listener further down the tree ever gets a turn, and the ownership check
+ * always reads empty. A script-dispatched event (`fireEvent`, `userEvent` in
+ * jsdom, or in a Storybook `play` function) instead completes its WHOLE
+ * capture-then-bubble dispatch before any microtask runs — which is why
+ * every test under the microtask version passed and the bug still shipped.
+ * A macrotask (`setTimeout(0)`) is not part of the event dispatch under
+ * EITHER kind of input, so it always runs after the whole dispatch — marker
+ * included — regardless of trusted vs. script. That ordering is what this
+ * hook now relies on.
+ *
+ * `sessionRef` replaces a plain boolean: it is a fresh object assigned each
+ * time the card opens (this effect's mount), so a `setTimeout` callback
+ * queued for a press during one open session can tell whether it is still
+ * that SAME session by comparing against the ref, not just whether the card
+ * happens to be open again — the card closing and reopening while a stale
+ * timeout is still pending must not let that timeout act on the new session.
+ * Every scheduled timeout is also tracked so a close or unmount can cancel
+ * whatever is still pending, rather than letting it fire against a card that
+ * is no longer there to close.
  */
 const useClickAway = (
   active: boolean,
   inside: () => ReadonlyArray<Element | null>,
+  ownsEvent: (event: Event) => boolean,
   onAway: () => void,
 ) => {
+  const sessionRef = React.useRef<object | null>(null);
+  const pendingRef = React.useRef<Set<number>>(new Set());
+
   React.useEffect(() => {
-    if (!active) return;
+    if (!active) return undefined;
+
+    const session = {};
+    sessionRef.current = session;
 
     const handlePointerDown = (event: globalThis.PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && inside().some((el) => el?.contains(target))) return;
-      onAway();
+      const timeoutId = window.setTimeout(() => {
+        pendingRef.current.delete(timeoutId);
+        // Stale: this session closed (or a newer one opened) before this
+        // press's decision could run.
+        if (sessionRef.current !== session) return;
+
+        const target = event.target as Node | null;
+        const ownedByReactTree = ownsEvent(event);
+        const ownedByDom = Boolean(target) && inside().some((el) => el?.contains(target));
+        if (ownedByReactTree || ownedByDom) return;
+        onAway();
+      }, 0);
+      pendingRef.current.add(timeoutId);
     };
 
     document.addEventListener('pointerdown', handlePointerDown, true);
-    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
-  }, [active, inside, onAway]);
+    return () => {
+      sessionRef.current = null;
+      pendingRef.current.forEach((id) => window.clearTimeout(id));
+      pendingRef.current.clear();
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [active, inside, ownsEvent, onAway]);
 };
+
+/**
+ * Whether the pointerdown `useClickAway` is about to look at started inside
+ * the card's OWN React tree — a MUI `Select`'s menu, a nested `Popover`, a
+ * `DropdownMenu` the card's `content` renders — even when that control's DOM
+ * node is not a descendant of the card's box at all, because it portalled
+ * itself out near `document.body` (FUT-2776).
+ *
+ * React re-parents a portal's events to bubble AND capture through its OWNING
+ * React tree, not the DOM tree it renders into (see the React docs on
+ * `createPortal`), so an `onPointerDownCapture` on the card's own content root
+ * still fires for a press inside a portal the card's content renders, and
+ * NEVER fires for a press inside an unrelated one mounted by something that
+ * is not a descendant of the card in the REACT tree — ownership, not timing.
+ * That is the whole fix: the ORIGINAL approach (a `MutationObserver` on
+ * `document.body`) treated ANY element appended to the body while the card
+ * was open as inside, so an unrelated Snackbar, dev overlay or Popover that
+ * happened to mount at the same time stopped closing the card too.
+ *
+ * Tracked per NATIVE EVENT OBJECT in a `WeakSet`, not a boolean flag: a
+ * boolean stayed `true` forever once a press set it whose NATIVE propagation
+ * then got stopped before reaching `useClickAway`'s own (bubble-phase, in
+ * that earlier revision) listener — common for anything that treats the
+ * press as its own gesture — so the marker never got consumed, and the
+ * NEXT, genuinely outside press read a STALE `true` and stayed open
+ * (FUT-2776, caught on adversarial review of the first fix here). Keying on
+ * the event itself instead needs no consuming step and cannot go stale: a
+ * `WeakSet` entry only ever answers for the ONE dispatch that created it,
+ * and nothing outside this closure keeps a reference to a past pointerdown
+ * once `useClickAway`'s deferred (`setTimeout(0)`, not a microtask — see that
+ * hook for why) check for it has run, so the entry is simply garbage from
+ * then on.
+ */
+const useCardOwnership = () => {
+  const ownedEventsRef = React.useRef<WeakSet<Event>>(new WeakSet());
+
+  const markInside = React.useCallback((event: React.PointerEvent<HTMLElement>) => {
+    ownedEventsRef.current.add(event.nativeEvent);
+  }, []);
+
+  const ownsEvent = React.useCallback(
+    (event: Event) => ownedEventsRef.current.has(event),
+    [],
+  );
+
+  return { markInside, ownsEvent };
+};
+
+/** The trigger and the card's own box — a plain DOM containment check. */
+const useInsideCard = (
+  anchorEl: HTMLElement | null,
+  contentRef: React.MutableRefObject<HTMLDivElement | null>,
+) =>
+  React.useCallback(
+    () => [anchorEl, contentRef.current],
+    [anchorEl, contentRef],
+  );
 
 /** Whatever is still pending when the card unmounts is cancelled with it. */
 const useClearOnUnmount = (...refs: TimerRef[]) => {
@@ -146,34 +265,22 @@ interface HoverCardTimingInput {
   onClose?: () => void;
 }
 
+type VisibilityInput = Omit<HoverCardTimingInput, 'touchEnabled'>;
+
 /**
- * When the card is open, and the delays that decide it.
+ * The open/close state and its two timers, split out of `useHoverCard` so
+ * that composing it with click-away, escape and ownership reads as one flat
+ * list rather than one long function.
  *
- * Three timers are in play: the enter delay before opening, the exit delay
- * before closing (so the pointer can travel from the trigger onto the card
- * without dismissing it), and the long-press timer on touch. Each cancels the
- * others' pending work, which is why they live together.
+ * The enter delay before opening and the exit delay before closing (so the
+ * pointer can travel from the trigger onto the card without dismissing it)
+ * each cancel the other's pending work, which is why they live together.
  */
-export const useHoverCard = ({
-  disabled,
-  touchEnabled,
-  enterDelay,
-  exitDelay,
-  onOpen,
-  onClose,
-}: HoverCardTimingInput) => {
+const useCardVisibility = ({ disabled, enterDelay, exitDelay, onOpen, onClose }: VisibilityInput) => {
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isTouchDevice, setIsTouchDevice] = React.useState(false);
   const enterTimeoutRef = React.useRef<number | undefined>(undefined);
   const exitTimeoutRef = React.useRef<number | undefined>(undefined);
-  /** The card's own box, inside the popover paper: a press here is not "away". */
-  const contentRef = React.useRef<HTMLDivElement | null>(null);
-
-  // Probed in an effect, not during render, so SSR and hydration stay intact.
-  React.useEffect(() => {
-    setIsTouchDevice('ontouchstart' in window);
-  }, []);
 
   const openCard = React.useCallback(
     (trigger: HTMLElement) => {
@@ -216,6 +323,29 @@ export const useHoverCard = ({
     onClose?.();
   }, [onClose]);
 
+  return { anchorEl, isOpen, openCard, closeCard, handleClose, enterTimeoutRef, exitTimeoutRef };
+};
+
+export const useHoverCard = ({
+  disabled,
+  touchEnabled,
+  enterDelay,
+  exitDelay,
+  onOpen,
+  onClose,
+}: HoverCardTimingInput) => {
+  const [isTouchDevice, setIsTouchDevice] = React.useState(false);
+  /** The card's own box, inside the popover paper: a press here is not "away". */
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+
+  const { anchorEl, isOpen, openCard, closeCard, handleClose, enterTimeoutRef, exitTimeoutRef } =
+    useCardVisibility({ disabled, enterDelay, exitDelay, onOpen, onClose });
+
+  // Probed in an effect, not during render, so SSR and hydration stay intact.
+  React.useEffect(() => {
+    setIsTouchDevice('ontouchstart' in window);
+  }, []);
+
   const { triggerHandlers, cardHandlers } = useHoverHandlers({
     isTouchDevice,
     touchEnabled,
@@ -225,11 +355,21 @@ export const useHoverCard = ({
     exitTimeoutRef,
   });
 
-  const insideCard = React.useCallback(() => [anchorEl, contentRef.current], [anchorEl]);
+  const insideCard = useInsideCard(anchorEl, contentRef);
+  const { markInside, ownsEvent } = useCardOwnership();
 
   useEscapeKey(isOpen, handleClose);
-  useClickAway(isOpen, insideCard, handleClose);
+  useClickAway(isOpen, insideCard, ownsEvent, handleClose);
   useClearOnUnmount(enterTimeoutRef, exitTimeoutRef);
 
-  return { anchorEl, isOpen, handleClose, triggerHandlers, cardHandlers, contentRef };
+  return {
+    anchorEl,
+    isOpen,
+    handleClose,
+    triggerHandlers,
+    cardHandlers,
+    contentRef,
+    /** Wire onto the card's content root as `onPointerDownCapture` (FUT-2776). */
+    onContentPointerDownCapture: markInside,
+  };
 };
