@@ -80,6 +80,137 @@ const runTrustedPointerNestedSelectRegression = async (page: Page) => {
 };
 
 /**
+ * Poll `read()` until it stops changing for `quietMs`, or give up at
+ * `timeoutMs` and return whatever it last read. A POSITIVE wait — for an
+ * in-flight animation (the strip's own smooth `scrollTo`) to finish — belongs
+ * here, polling, rather than behind one fixed delay plus a single sample:
+ * FUT-2882 found that exact shape flakes under a loaded CI runner, because
+ * the animation's real length is outside this file's control.
+ */
+async function waitForSettled(read: () => Promise<number>, timeoutMs = 5000, quietMs = 200): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let last = await read();
+  let lastChangedAt = Date.now();
+  while (Date.now() < deadline) {
+    // eslint-disable-next-line no-await-in-loop -- polling is sequential by nature: each read must follow the previous
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+    // eslint-disable-next-line no-await-in-loop -- see above
+    const current = await read();
+    if (current !== last) {
+      last = current;
+      lastChangedAt = Date.now();
+    } else if (Date.now() - lastChangedAt >= quietMs) {
+      return last;
+    }
+  }
+  return last;
+}
+
+/** Whether `chipTestId`'s element ends up fully inside `stripTestId`'s visible box, polled. */
+async function waitForChipInside(page: Page, stripTestId: string, chipTestId: string): Promise<boolean> {
+  return page
+    .waitForFunction(
+      ({ stripTestId: sid, chipTestId: cid }) => {
+        const strip = document.querySelector(`[data-testid="${sid}"]`);
+        const chip = document.querySelector(`[data-testid="${cid}"]`);
+        if (!(strip instanceof HTMLElement) || !(chip instanceof HTMLElement)) return false;
+        const stripBox = strip.getBoundingClientRect();
+        const chipBox = chip.getBoundingClientRect();
+        return chipBox.left >= stripBox.left - 1 && chipBox.right <= stripBox.right + 1;
+      },
+      { stripTestId, chipTestId },
+      { timeout: 5000 },
+    )
+    .then(() => true)
+    .catch(() => false);
+}
+
+/**
+ * `mode: 'ArrowLeft'` half of {@link runTrustedKeydownRegression} (split out
+ * for `max-lines-per-function`). Presses it several times (a real browser's
+ * own per-press step is small — this file does not assume its exact size, so
+ * one press might not clear measurement noise), then widens the content and
+ * asserts the strip did NOT move again — widening would otherwise re-centre
+ * it onto the open chip, exactly the latch this key must produce. Whether it
+ * moved AGAIN is a NEGATIVE claim (no "it happened" state to poll for), so
+ * this keeps one short, commented fixed wait; everything else here polls.
+ */
+async function runTrustedArrowLeftRegression(page: Page, strip: ReturnType<Page['getByTestId']>) {
+  const stripScrollLeft = () => strip.evaluate((el) => el.scrollLeft);
+  const before = await stripScrollLeft();
+  for (let i = 0; i < 15; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- each press must land before the next; a real key repeat is sequential, not concurrent
+    await page.keyboard.press('ArrowLeft');
+  }
+  const afterArrow = await waitForSettled(stripScrollLeft);
+  assert.notEqual(afterArrow, before, 'FUT-2862: ArrowLeft did not move the strip at all — precondition failed');
+
+  await page.getByTestId('resolve-profile').click();
+  // NEGATIVE claim (the strip must NOT move again) — nothing to poll for, so
+  // one short, generous, explained fixed wait: long enough for the re-centre
+  // this content widening would otherwise cause to have started and moved
+  // the strip at least once, if the latch had failed to hold.
+  await page.waitForTimeout(800);
+  const final = await stripScrollLeft();
+  assert.equal(
+    final,
+    afterArrow,
+    `FUT-2862: a TRUSTED ArrowLeft did not latch — the strip moved from ${afterArrow} to ${final} after the content widened`,
+  );
+}
+
+/** One key, pressed once, asserted not to move `stripScrollLeft()` after a short settle (a NEGATIVE claim). */
+async function assertKeyDoesNotScroll(
+  page: Page,
+  key: string,
+  stripScrollLeft: () => Promise<number>,
+  focusedWhat: string,
+) {
+  const before = await stripScrollLeft();
+  await page.keyboard.press(key);
+  await page.waitForTimeout(300);
+  const after = await stripScrollLeft();
+  assert.equal(after, before, `FUT-2862: '${key}' moved the strip (${focusedWhat}) — the allow-list assumes it never does`);
+}
+
+/**
+ * `mode: 'NonScrollingKeys'` half of {@link runTrustedKeydownRegression}:
+ * locks the allow-list's own premise. Presses `Home`, `End`, `PageUp` and
+ * `PageDown` — verified live, in a throwaway Chromium probe, to have NO
+ * default scroll action on this `overflowY: hidden` strip — first on a
+ * focused chip, then (if it can even take focus — this strip carries no
+ * `tabIndex`) on the strip itself, and asserts `scrollLeft` never moves. If a
+ * future Chromium starts scrolling the inline axis on one of these keys,
+ * this fails loudly instead of quietly re-breaking the fix's own premise.
+ */
+async function runTrustedNonScrollingKeysRegression(page: Page, strip: ReturnType<Page['getByTestId']>) {
+  const stripScrollLeft = () => strip.evaluate((el) => el.scrollLeft);
+  const nonScrollingKeys = ['Home', 'End', 'PageUp', 'PageDown'];
+  for (const key of nonScrollingKeys) {
+    // eslint-disable-next-line no-await-in-loop -- one key at a time, sequential by nature
+    await assertKeyDoesNotScroll(page, key, stripScrollLeft, 'chip focused');
+  }
+
+  // This strip carries no `tabIndex` (`SettingsSectionChips.tsx`), so it is
+  // not itself keyboard-focusable in today's markup — `.focus()` on it is a
+  // no-op and `document.activeElement` stays the chip. Skip the strip-focus
+  // half rather than assert against markup this file does not own; the
+  // moment the strip DOES become focusable, this starts covering it too.
+  const stripTookFocus = await strip.evaluate((el) => {
+    el.focus();
+    return document.activeElement === el;
+  });
+  if (!stripTookFocus) return;
+
+  for (const key of nonScrollingKeys) {
+    // eslint-disable-next-line no-await-in-loop -- one key at a time, sequential by nature
+    await assertKeyDoesNotScroll(page, key, stripScrollLeft, 'strip itself focused');
+  }
+}
+
+/**
  * FUT-2862: the SettingsLayout chip strip's visitor lock must arm only for a
  * key whose BROWSER DEFAULT ACTION actually scrolls the strip. A script
  * dispatch (`fireEvent`/`userEvent`, even inside a real browser) never has a
@@ -90,27 +221,23 @@ const runTrustedPointerNestedSelectRegression = async (page: Page) => {
  * `SettingsLayout.test.stories.tsx`): the strip settles on its own mount
  * re-centre first, then the story focuses the strip's first chip.
  *
- * `mode` is `parameters.trustedKeydownRegression` on the story. For
- * `'ArrowLeft'`: press it (its default action moves `scrollLeft`, verified
- * live — see `STRIP_SCROLLING_KEYS` in `SettingsSectionChips.scroll.ts`),
- * record where that leaves the strip, then widen the content
- * (`resolve-profile`) and assert the strip did NOT move again — the widening
- * would otherwise re-centre it onto the open chip, which is exactly the latch
- * this key must produce. For `'Tab'`: press it (a focus change, no scroll),
- * widen the content, and assert the open ("hours") chip DID end up back in
- * view — proving `Tab` armed nothing and the re-centre ran normally.
+ * `mode` is `parameters.trustedKeydownRegression` on the story: `'ArrowLeft'`
+ * and `'NonScrollingKeys'` are handled by the two helpers above; anything
+ * else (`'Tab'`) is pressed once (a focus change, no scroll) here, then the
+ * content widens and this polls for the open ("hours") chip to land back in
+ * view — proving the key armed nothing and the re-centre ran normally.
  */
 const runTrustedKeydownRegression = async (page: Page, mode: string) => {
   const strip = page.getByTestId('settings-chips');
-  const openChip = page.getByTestId('settings-chip-hours');
   const stripScrollLeft = () => strip.evaluate((el) => el.scrollLeft);
 
-  // The strip's own mount re-centre settles before anything else happens.
+  // The strip's own mount re-centre starts, then runs to rest — both polled,
+  // not sampled once after a fixed delay (FUT-2882).
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-testid="settings-chips"]');
     return el instanceof HTMLElement && el.scrollLeft > 0;
   });
-  await page.waitForTimeout(400);
+  await waitForSettled(stripScrollLeft);
 
   // Focus the first chip — same target the untrusted story dispatches its
   // keydown on (`strip.firstElementChild`) — so a real key's default action
@@ -118,39 +245,20 @@ const runTrustedKeydownRegression = async (page: Page, mode: string) => {
   await strip.locator(':scope > *').first().focus();
 
   if (mode === 'ArrowLeft') {
-    const before = await stripScrollLeft();
-    // Several presses: a real browser's own per-press step is small (this
-    // file does not assume its exact size), so one press might not move the
-    // strip far enough to tell apart from measurement noise.
-    for (let i = 0; i < 15; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- each press must land before the next; a real key repeat is sequential, not concurrent
-      await page.keyboard.press('ArrowLeft');
-    }
-    await page.waitForTimeout(400);
-    const afterArrow = await stripScrollLeft();
-    assert.notEqual(afterArrow, before, 'FUT-2862: ArrowLeft did not move the strip at all — precondition failed');
-
-    await page.getByTestId('resolve-profile').click();
-    await page.waitForTimeout(700);
-    const final = await stripScrollLeft();
-    assert.equal(
-      final,
-      afterArrow,
-      `FUT-2862: a TRUSTED ArrowLeft did not latch — the strip moved from ${afterArrow} to ${final} after the content widened`,
-    );
+    await runTrustedArrowLeftRegression(page, strip);
+    return;
+  }
+  if (mode === 'NonScrollingKeys') {
+    await runTrustedNonScrollingKeysRegression(page, strip);
     return;
   }
 
   await page.keyboard.press(mode);
   await page.getByTestId('resolve-profile').click();
-  await page.waitForTimeout(700);
-
-  const chipBox = await openChip.boundingBox();
-  const stripBox = await strip.boundingBox();
-  assert.ok(chipBox, 'FUT-2862: could not measure the open chip');
-  assert.ok(stripBox, 'FUT-2862: could not measure the strip');
-  assert.ok(
-    chipBox.x >= stripBox.x - 1 && chipBox.x + chipBox.width <= stripBox.x + stripBox.width + 1,
+  const chipReCentred = await waitForChipInside(page, 'settings-chips', 'settings-chip-hours');
+  assert.equal(
+    chipReCentred,
+    true,
     `FUT-2862: a TRUSTED '${mode}' false-latched the strip — it did not re-centre onto the open chip`,
   );
 };

@@ -1131,7 +1131,7 @@ export const ChipStripKeepsKeyScrollARecentreRaced: Story = {
   },
 };
 
-// TRUSTED-KEYDOWN REGRESSION GUARD (FUT-2862). Both stories below have
+// TRUSTED-KEYDOWN REGRESSION GUARD (FUT-2862). All three stories below have
 // deliberately NO `play`: every event `play` would dispatch — even inside a
 // real browser, via `userEvent`/`fireEvent` — is SCRIPT-dispatched, so it
 // proves nothing about which keys the BROWSER itself scrolls this strip for.
@@ -1156,6 +1156,18 @@ export const ChipStripTrustedArrowLeftDuringOwnScrollLatches: Story = {
   name: '⌨️🔒 Trusted ArrowLeft During Own Scroll Latches Test',
   parameters: {
     trustedKeydownRegression: 'ArrowLeft',
+  },
+  render: () => <VisitorScrolledStrip opensOn="hours" />,
+};
+
+// Locks the allow-list's own premise: `Home`/`End`/`PageUp`/`PageDown` were
+// left off `STRIP_SCROLLING_KEYS` because a real Chromium was verified to
+// give them no default scroll action on this strip. If a future Chromium
+// changes that, this fails instead of the fix quietly re-breaking.
+export const ChipStripTrustedNonScrollingKeysNeverMoveIt: Story = {
+  name: '⌨️🚫 Trusted Home/End/PageUp/PageDown Never Move The Strip Test',
+  parameters: {
+    trustedKeydownRegression: 'NonScrollingKeys',
   },
   render: () => <VisitorScrolledStrip opensOn="hours" />,
 };
