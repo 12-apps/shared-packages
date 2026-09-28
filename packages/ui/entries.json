@@ -84,6 +84,7 @@
   "form/InputOTP": "src/components/form/InputOTP/index.ts",
   "form/Label": "src/components/form/Label/index.ts",
   "form/Menubar": "src/components/form/Menubar/index.ts",
+  "form/MenuSelect": "src/components/form/Select/menu.ts",
   "form/NumberField": "src/components/form/NumberField/index.ts",
   "form/PasswordStrength": "src/components/form/PasswordStrength/index.ts",
   "form/PhoneInput": "src/components/form/PhoneInput/index.ts",
