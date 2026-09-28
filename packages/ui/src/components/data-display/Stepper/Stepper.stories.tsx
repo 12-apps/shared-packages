@@ -268,9 +268,7 @@ export const MobileResponsive: Story = {
       </Box>
     ),
   ],
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
 };
 
 // Interactive example
@@ -286,7 +284,8 @@ export const Interactive = () => {
     const newCompleted = new Set(completed);
 
     for (let i = 0; i < currentIndex; i++) {
-      newCompleted.add(defaultSteps[i].id);
+      const step = defaultSteps[i];
+      if (step) newCompleted.add(step.id);
     }
 
     setCompleted(newCompleted);
@@ -310,7 +309,7 @@ export const Interactive = () => {
 
       <Box>
         <Typography variant="body2" gutterBottom>
-          Current Step: <Chip label={activeId} size="sm" />
+          Current Step: <Chip label={activeId} size="small" />
         </Typography>
         <Typography variant="body2">
           Completed: {Array.from(completed).join(', ') || 'None'}

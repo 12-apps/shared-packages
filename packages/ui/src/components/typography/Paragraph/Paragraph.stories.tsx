@@ -213,9 +213,9 @@ export const Responsive: Story = {
         <Paper sx={{ p: 2 }}>
           <h4>Responsive Behavior</h4>
           <Paragraph
-            sx={{
-              fontSize: { xs: '14px', sm: '16px', md: '18px' },
-              lineHeight: { xs: 1.5, md: 1.7 },
+            style={{
+              fontSize: 'clamp(14px, 2.5vw, 18px)',
+              lineHeight: 1.6,
             }}
           >
             This paragraph adjusts its font size and line height based on screen size for optimal
@@ -253,7 +253,7 @@ export const WithCustomStyling: Story = {
           <h4>Custom Styling Examples</h4>
           <Paragraph
             variant="lead"
-            sx={{
+            style={{
               textAlign: 'center',
               background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
               WebkitBackgroundClip: 'text',
@@ -265,12 +265,12 @@ export const WithCustomStyling: Story = {
           </Paragraph>
 
           <Paragraph
-            sx={{
+            style={{
               border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 2,
-              backgroundColor: 'grey.50',
+              borderColor: 'rgba(0, 0, 0, 0.12)',
+              borderRadius: 16,
+              padding: 16,
+              backgroundColor: '#fafafa',
             }}
           >
             This paragraph has a custom border and background, making it stand out from the rest of

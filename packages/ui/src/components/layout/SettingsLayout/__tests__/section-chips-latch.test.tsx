@@ -173,6 +173,85 @@ describe('watchVisitorScroll: the false-latch shapes FUT-2775 names', () => {
  * disarm the key press, and the key's scroll — still to come — went unclaimed:
  * the next resize re-centred the strip away from where the visitor put it.
  */
+/**
+ * A BARE KEYDOWN MUST NOT ARM THE LOCK (FUT-2862).
+ *
+ * `onKeydown` used to be `nudge` itself — every keydown that bubbled to the
+ * strip armed `nudged`, `Tab`/`Enter`/`Space` included, though none of them
+ * scrolls this strip. Reusing the exact fixture the pointer case above
+ * constructs on purpose (`beforeOwnScroll(200)`, then the strip's own smooth
+ * scroll ticking short of its aim by more than `LANDED_SLACK`): a keydown for
+ * a NON-scrolling key must leave `hasScrolled()` `false`, the same as a
+ * resting pointer does. `ArrowLeft`, the one verified strip-scrolling key
+ * (`ChipStripKeepsKeyScrollARecentreRaced`), must still arm it — the guard
+ * that the fix does not remove real arrow-key scroll detection.
+ */
+describe('watchVisitorScroll: a keydown only arms the lock for a strip-scrolling key (FUT-2862)', () => {
+  // Three explicit `it(...)` calls, not `it.each`: `eslint-plugin-test-flakiness`'s
+  // `no-test-isolation` rule only recognises `it(...)`/`test(...)`/`specify(...)` —
+  // a CallExpression whose callee is a plain Identifier. `it.each([...])(...)`'s
+  // outer callee is itself a CallExpression, so the rule misreads every `const`
+  // this callback declares as DESCRIBE-scoped shared state, not test-scoped
+  // local state, and false-flags `strip`/`visitor` throughout the file.
+  for (const key of ['Tab', 'Enter', 'Space']) {
+    it(`does not latch on a bare '${key}' keydown through the strip's OWN scrollTo landing short of its aim`, async () => {
+      const strip = makeStrip();
+      try {
+        const visitor = watchVisitorScroll(strip);
+        try {
+          visitor.beforeOwnScroll(200);
+          strip.dispatchEvent(new KeyboardEvent('keydown', { key }));
+
+          tickScroll(strip, 60);
+          tickScroll(strip, 140);
+          tickScroll(strip, 204);
+          strip.dispatchEvent(new Event('scrollend'));
+
+          await waitFor(() => {
+            // Positive first: the scenario really ran, 4px short of aim.
+            // eslint-disable-next-line test-flakiness/no-viewport-dependent -- a detached mock's own `scrollLeft`, pinned by this file, not a real viewport read
+            expect(strip.scrollLeft).toBe(204);
+            // On today's (unfixed) code this reads `true`: `onKeydown` armed
+            // `nudged` unconditionally, so `restsOnAim` reading `false` for a
+            // strip 4px short of its 200 aim latches a gesture nobody made.
+            expect(visitor.hasScrolled()).toBe(false);
+          });
+        } finally {
+          visitor.detach();
+        }
+      } finally {
+        strip.remove();
+      }
+    });
+  }
+
+  it("still latches a real ArrowLeft through the strip's OWN scrollTo landing short of its aim", async () => {
+    const strip = makeStrip();
+    try {
+      const visitor = watchVisitorScroll(strip);
+      try {
+        visitor.beforeOwnScroll(200);
+        strip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+
+        tickScroll(strip, 60);
+        tickScroll(strip, 140);
+        tickScroll(strip, 204);
+        strip.dispatchEvent(new Event('scrollend'));
+
+        await waitFor(() => {
+          // eslint-disable-next-line test-flakiness/no-viewport-dependent -- a detached mock's own `scrollLeft`, pinned by this file, not a real viewport read
+          expect(strip.scrollLeft).toBe(204);
+          expect(visitor.hasScrolled()).toBe(true);
+        });
+      } finally {
+        visitor.detach();
+      }
+    } finally {
+      strip.remove();
+    }
+  });
+});
+
 describe('watchVisitorScroll: a key press outlives an own scroll judged under it', () => {
   afterEach(() => {
     vi.useRealTimers();

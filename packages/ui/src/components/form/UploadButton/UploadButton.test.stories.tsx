@@ -256,9 +256,7 @@ export const ResponsiveDesign: Story = {
   args: {
     onSelect: fn(),
   },
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const uploadButton = canvas.getByRole('button');

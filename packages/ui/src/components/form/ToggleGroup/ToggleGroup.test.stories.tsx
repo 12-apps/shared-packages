@@ -245,9 +245,7 @@ export const ResponsiveDesign: Story = {
     options: formatOptions,
     size: 'md',
   },
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 

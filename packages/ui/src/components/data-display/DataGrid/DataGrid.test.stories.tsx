@@ -511,9 +511,7 @@ export const StickyHeaderTest: Story = {
 // 13. Responsive Design Tests
 export const ResponsiveDesignTest: Story = {
   name: 'Test: Responsive Design',
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   args: {
     rows: generateTestData(10),
     columns: testColumns,

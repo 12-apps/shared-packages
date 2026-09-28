@@ -305,9 +305,7 @@ export const FocusManagement: Story = {
 
 // Responsive Design Tests
 export const ResponsiveDesign: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -746,9 +744,7 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     // `Text` has no `sx` prop — see the note on `ResponsiveDesign` above.
     <Text style={{ fontSize: '1.125rem', lineHeight: 1.6 }}>

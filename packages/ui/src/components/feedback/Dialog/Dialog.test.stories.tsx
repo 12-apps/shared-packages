@@ -826,11 +826,7 @@ export const ResponsiveDesign: WrapperStory = {
     onOpen: fn(),
     onClose: fn(),
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 

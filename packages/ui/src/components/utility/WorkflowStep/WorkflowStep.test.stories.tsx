@@ -204,11 +204,7 @@ export const ResponsiveDesign: Story = {
     currentStep: 1,
     orientation: 'horizontal',
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
