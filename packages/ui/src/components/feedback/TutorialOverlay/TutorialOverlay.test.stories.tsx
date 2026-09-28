@@ -440,7 +440,7 @@ export const PerformanceTest: Story = {
       target: i % 2 === 0 ? '#test-card' : '#test-input',
       title: `Step ${i + 1}`,
       content: `This is step ${i + 1} of ${stepCount} steps.`,
-      position: (i % 2 === 0 ? 'bottom' : 'top') as const,
+      position: i % 2 === 0 ? ('bottom' as const) : ('top' as const),
     }));
 
     return (

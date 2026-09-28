@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Calendar } from './Calendar';
 import type { DateRange } from './Calendar.types';
 
@@ -124,13 +126,13 @@ export const RangeInteractionTest: Story = {
 
     if (clickableDates.length >= 2) {
       // Click first date (start)
-      await userEvent.click(clickableDates[5]);
+      await userEvent.click(must(clickableDates[5]));
 
       // Hover over second date to see preview
-      await userEvent.hover(clickableDates[10]);
+      await userEvent.hover(must(clickableDates[10]));
 
       // Click second date (end)
-      await userEvent.click(clickableDates[10]);
+      await userEvent.click(must(clickableDates[10]));
 
       // Verify range selection
       await waitFor(() => {
@@ -382,19 +384,19 @@ export const EdgeCases: Story = {
 
     if (clickableDates.length >= 3) {
       // Try to select same day range (should be prevented)
-      await userEvent.click(clickableDates[5]);
-      await userEvent.click(clickableDates[5]);
+      await userEvent.click(must(clickableDates[5]));
+      await userEvent.click(must(clickableDates[5]));
 
       // Verify same day range is not allowed
       // (implementation should prevent this selection)
 
       // Test minimum range length constraint
-      await userEvent.click(clickableDates[5]);
-      await userEvent.click(clickableDates[6]); // Only 1 day gap, should be invalid
+      await userEvent.click(must(clickableDates[5]));
+      await userEvent.click(must(clickableDates[6])); // Only 1 day gap, should be invalid
 
       // Test valid range
-      await userEvent.click(clickableDates[5]);
-      await userEvent.click(clickableDates[8]); // 3+ days, should be valid
+      await userEvent.click(must(clickableDates[5]));
+      await userEvent.click(must(clickableDates[8])); // 3+ days, should be valid
 
       await waitFor(() => {
         expect(clickableDates[5]).toHaveAttribute('aria-selected', 'true');
@@ -436,7 +438,7 @@ export const IntegrationTest: Story = {
     expect(calendars).toHaveLength(2);
 
     // Test interaction with first calendar
-    const firstCalendarButtons = within(calendars[0]).getAllByRole('gridcell');
+    const firstCalendarButtons = within(must(calendars[0])).getAllByRole('gridcell');
     const firstClickable = firstCalendarButtons.find(
       (button) =>
         !button.getAttribute('aria-disabled') &&
@@ -452,7 +454,7 @@ export const IntegrationTest: Story = {
     }
 
     // Test interaction with second calendar
-    const secondCalendarButtons = within(calendars[1]).getAllByRole('gridcell');
+    const secondCalendarButtons = within(must(calendars[1])).getAllByRole('gridcell');
     const secondClickables = secondCalendarButtons.filter(
       (button) =>
         !button.getAttribute('aria-disabled') &&
@@ -461,8 +463,8 @@ export const IntegrationTest: Story = {
     );
 
     if (secondClickables.length >= 2) {
-      await userEvent.click(secondClickables[5]);
-      await userEvent.click(secondClickables[10]);
+      await userEvent.click(must(secondClickables[5]));
+      await userEvent.click(must(secondClickables[10]));
 
       await waitFor(() => {
         expect(secondClickables[5]).toHaveAttribute('aria-selected', 'true');

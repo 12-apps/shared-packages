@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { WorkflowStep } from './WorkflowStep';
 import { StepIndicatorComponent } from './WorkflowStep.parts';
 import type { WorkflowStepItem } from './WorkflowStep.types';
@@ -78,7 +80,7 @@ export const StateChangeTest: Story = {
     // Find the second step indicator (should be pending initially). The
     // indicator is now the step's only button (FUT-2773) — the content block
     // is inert — so button index 1 is the second step's indicator.
-    const step2Button = canvas.getAllByRole('button')[1];
+    const step2Button = must(canvas.getAllByRole('button')[1]);
     expect(step2Button).toBeInTheDocument();
 
     // Click on step 2
@@ -111,7 +113,7 @@ export const KeyboardNavigation: Story = {
     expect(stepButtons).toHaveLength(3); // 3 steps, one button (the indicator) each (FUT-2773)
 
     // Focus on first step indicator (index 0)
-    await userEvent.click(stepButtons[0]);
+    await userEvent.click(must(stepButtons[0]));
     await waitFor(() => expect(stepButtons[0]).toHaveFocus());
 
     // Press Enter key
@@ -128,7 +130,7 @@ export const KeyboardNavigation: Story = {
     });
 
     // Test Space key on second step indicator (index 1)
-    await userEvent.click(stepButtons[1]);
+    await userEvent.click(must(stepButtons[1]));
     await userEvent.keyboard(' ');
 
     await waitFor(() => {
@@ -343,7 +345,7 @@ export const IntegrationTest: Story = {
 
     // Check interaction works - click on third step indicator (index 2: one button per step, FUT-2773)
     const stepButtons = canvas.getAllByRole('button');
-    await userEvent.click(stepButtons[2]);
+    await userEvent.click(must(stepButtons[2]));
 
     await waitFor(() => {
       expect(args.onStepClick).toHaveBeenCalledWith(

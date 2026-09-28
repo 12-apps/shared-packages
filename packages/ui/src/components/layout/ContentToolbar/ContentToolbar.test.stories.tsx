@@ -42,6 +42,9 @@ export const SelectAndClear: Story = {
     const [selected, setSelected] = useState<Set<string>>(new Set());
     return (
       <ContentToolbar
+        selectAllText="Selecionar tudo"
+        clearAllText="Limpar seleção"
+        selectAllLabel="Selecionar todos os itens"
         hasSelection={selected.size > 0}
         selectedCount={selected.size}
         selectAll={() => setSelected(new Set(['a', 'b', 'c']))}
@@ -76,12 +79,18 @@ export const SortByInteraction: Story = {
     const [field, setField] = useState('name');
     return (
       <ContentToolbar
+        selectAllText="Selecionar tudo"
+        clearAllText="Limpar seleção"
+        selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
         selectAll={fn()}
         clearSelection={fn()}
         rightControls={
           <SortByDropdown
+            orderHeading="Ordem"
+            sortHeading="Ordenar por"
+            triggerPrefix="Ordenar por"
             fields={SORT_FIELDS}
             activeField={field}
             activeOrder="asc"
@@ -115,12 +124,18 @@ export const ContentTypeMultiSelect: Story = {
     const [types, setTypes] = useState<Set<string>>(new Set());
     return (
       <ContentToolbar
+        selectAllText="Selecionar tudo"
+        clearAllText="Limpar seleção"
+        selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
         selectAll={fn()}
         clearSelection={fn()}
         rightControls={
           <MultiSelectDropdown
+            extraOptionsHeading="Opções"
+            clearText="Limpar"
+            clearLabel="Limpar seleção"
             label="Content Type"
             options={CONTENT_TYPES}
             selected={types}
@@ -171,12 +186,18 @@ export const MultiSelectSearch: Story = {
     const [types, setTypes] = useState<Set<string>>(new Set());
     return (
       <ContentToolbar
+        selectAllText="Selecionar tudo"
+        clearAllText="Limpar seleção"
+        selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
         selectAll={fn()}
         clearSelection={fn()}
         rightControls={
           <MultiSelectDropdown
+            extraOptionsHeading="Opções"
+            clearText="Limpar"
+            clearLabel="Limpar seleção"
             label="Categoria"
             options={CATEGORY_TYPES}
             selected={types}
@@ -231,6 +252,9 @@ export const FilterTriggerActiveDot: Story = {
     const [open, setOpen] = useState(false);
     return (
       <ContentToolbar
+        selectAllText="Selecionar tudo"
+        clearAllText="Limpar seleção"
+        selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
         selectAll={fn()}

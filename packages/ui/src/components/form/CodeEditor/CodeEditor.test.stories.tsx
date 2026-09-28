@@ -4,6 +4,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { CodeEditor } from './CodeEditor';
 import { PT_BR_CODE_EDITOR_COPY } from '../../../pt-BR';
 
@@ -43,7 +45,8 @@ export const BasicInteraction: Story = {
       () => {
         const editor = canvasElement.querySelector('.monaco-editor');
         const hasTextContent = canvasElement.querySelector('.view-lines .view-line');
-        return expect(editor).toBeInTheDocument() && expect(hasTextContent).toBeInTheDocument();
+        expect(editor).toBeInTheDocument();
+        expect(hasTextContent).toBeInTheDocument();
       },
       { timeout: 8000 },
     );
@@ -111,7 +114,7 @@ export const BasicInteraction: Story = {
       expect(args.onChange).toHaveBeenCalled();
       const mockFn = args.onChange as ReturnType<typeof fn>;
       const calls = mockFn.mock.calls;
-      const lastCall = calls[calls.length - 1];
+      const lastCall = must(calls[calls.length - 1]);
       expect(lastCall[0]).toContain('// function fibonacci(n) {');
     });
 
@@ -543,7 +546,7 @@ export const EdgeCases: Story = {
 
     // Test JSON syntax highlighting with proper timing
     await waitFor(() => {
-      const jsonEditor = canvasElement.querySelectorAll('.monaco-editor')[1];
+      const jsonEditor = must(canvasElement.querySelectorAll('.monaco-editor')[1]);
       const jsonTokens = jsonEditor.querySelectorAll('.mtk1, .mtk5, .mtk8');
       return expect(jsonTokens.length).toBeGreaterThan(0);
     }, { timeout: 3000 });

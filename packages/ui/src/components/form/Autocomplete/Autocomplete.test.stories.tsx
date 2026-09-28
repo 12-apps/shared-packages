@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Autocomplete } from './Autocomplete';
 import type { AutocompleteProps } from './Autocomplete.types';
 import { PT_BR_AUTOCOMPLETE_COPY } from '../../../pt-BR';
@@ -52,20 +54,24 @@ const meta: Meta<typeof Autocomplete> = {
 export default meta;
 type Story = StoryObj<typeof Autocomplete>;
 
-// Test Component wrapper for controlled state
-const AutocompleteWrapper = (props: Partial<AutocompleteProps<Person | string>>) => {
-  const [value, setValue] = useState(props.value || '');
-  const [selectedItems, setSelectedItems] = useState(props.selectedItems || []);
+// Test Component wrapper for controlled state. Generic over `T`, same as
+// `Autocomplete` itself: a fixed `Person | string` union let a story's own
+// `Person`-only (or `string`-only) callbacks — `getKey`, `getLabel`, … — fail
+// contravariance, since they'd need to accept the OTHER member too.
+const AutocompleteWrapper = <T,>(props: Partial<AutocompleteProps<T>>) => {
+  const [value, setValue] = useState(props.value ?? '');
+  const [selectedItems, setSelectedItems] = useState<T[]>(props.selectedItems ?? []);
 
   return (
     <div style={{ padding: '20px', minHeight: '200px' }}>
-      <Autocomplete
+      <Autocomplete<T>
         copy={PT_BR_AUTOCOMPLETE_COPY}
         {...props}
         value={value}
         onChange={setValue}
         selectedItems={selectedItems}
         onSelectedItemsChange={setSelectedItems}
+        suggestions={props.suggestions ?? []}
       />
     </div>
   );
@@ -687,7 +693,7 @@ export const ResponsiveDesign: Story = {
     expect(options.length).toBeGreaterThan(0);
 
     // Test mobile-friendly interaction
-    const firstOption = options[0];
+    const firstOption = must(options[0]);
     await userEvent.click(firstOption);
 
     // Should select the option

@@ -647,7 +647,7 @@ export const ThemeVariations: Story = {
       const computedStyle = window.getComputedStyle(glassSelect);
 
       // Glass variant should have backdrop filter
-      await expect(computedStyle.backdropFilter || computedStyle.webkitBackdropFilter).toBeTruthy();
+      await expect(computedStyle.backdropFilter || computedStyle.getPropertyValue('-webkit-backdrop-filter')).toBeTruthy();
     });
   },
 };

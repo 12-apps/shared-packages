@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { InputOTP } from './InputOTP';
+import type { InputOTPProps } from './InputOTP.types';
 
 const meta: Meta<typeof InputOTP> = {
   title: 'Form/InputOTP/Tests',
@@ -34,33 +37,33 @@ export const BasicInteraction: Story = {
     expect(inputs).toHaveLength(6);
 
     // Type digits into inputs
-    await userEvent.type(inputs[0], '1');
+    await userEvent.type(must(inputs[0]), '1');
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalledWith('1');
     });
 
-    await userEvent.type(inputs[1], '2');
+    await userEvent.type(must(inputs[1]), '2');
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalledWith('12');
     });
 
     // Complete the OTP
-    await userEvent.type(inputs[2], '3');
-    await userEvent.type(inputs[3], '4');
-    await userEvent.type(inputs[4], '5');
-    await userEvent.type(inputs[5], '6');
+    await userEvent.type(must(inputs[2]), '3');
+    await userEvent.type(must(inputs[3]), '4');
+    await userEvent.type(must(inputs[4]), '5');
+    await userEvent.type(must(inputs[5]), '6');
 
     await waitFor(() => {
       expect(args.onComplete).toHaveBeenCalledWith('123456');
     });
 
     // Verify all inputs have correct values
-    expect(inputs[0]).toHaveValue('1');
-    expect(inputs[1]).toHaveValue('2');
-    expect(inputs[2]).toHaveValue('3');
-    expect(inputs[3]).toHaveValue('4');
-    expect(inputs[4]).toHaveValue('5');
-    expect(inputs[5]).toHaveValue('6');
+    expect(must(inputs[0])).toHaveValue('1');
+    expect(must(inputs[1])).toHaveValue('2');
+    expect(must(inputs[2])).toHaveValue('3');
+    expect(must(inputs[3])).toHaveValue('4');
+    expect(must(inputs[4])).toHaveValue('5');
+    expect(must(inputs[5])).toHaveValue('6');
   },
 };
 
@@ -79,23 +82,23 @@ export const FormInteraction: Story = {
     const inputs = canvas.getAllByRole('textbox');
 
     // Test alphanumeric input
-    await userEvent.type(inputs[0], 'A');
+    await userEvent.type(must(inputs[0]), 'A');
     expect(args.onChange).toHaveBeenCalledWith('A');
 
-    await userEvent.type(inputs[1], '1');
+    await userEvent.type(must(inputs[1]), '1');
     expect(args.onChange).toHaveBeenCalledWith('A1');
 
-    await userEvent.type(inputs[2], 'B');
+    await userEvent.type(must(inputs[2]), 'B');
     expect(args.onChange).toHaveBeenCalledWith('A1B');
 
-    await userEvent.type(inputs[3], '2');
+    await userEvent.type(must(inputs[3]), '2');
     expect(args.onChange).toHaveBeenCalledWith('A1B2');
     expect(args.onComplete).toHaveBeenCalledWith('A1B2');
 
     // Test that numeric-only characters are rejected in numeric mode
-    await userEvent.clear(inputs[0]);
-    await userEvent.type(inputs[0], '@'); // Should be rejected
-    expect(inputs[0]).toHaveValue('');
+    await userEvent.clear(must(inputs[0]));
+    await userEvent.type(must(inputs[0]), '@'); // Should be rejected
+    expect(must(inputs[0])).toHaveValue('');
   },
 };
 
@@ -114,55 +117,59 @@ export const KeyboardNavigation: Story = {
 
     // First input should be focused if autoFocus is true
     await waitFor(() => {
-      expect(inputs[0]).toHaveFocus();
+      expect(must(inputs[0])).toHaveFocus();
     });
 
     // Type and move forward
-    await userEvent.type(inputs[0], '1');
+    await userEvent.type(must(inputs[0]), '1');
     await waitFor(() => {
       // Verify the input value was set
-      expect(inputs[0]).toHaveValue('1');
+      expect(must(inputs[0])).toHaveValue('1');
     });
 
     // Test arrow key navigation
     await userEvent.keyboard('{ArrowLeft}');
     await waitFor(() => {
       // Just verify the first input can receive focus via arrow keys
-      expect(inputs[0]).toBeInTheDocument();
+      expect(must(inputs[0])).toBeInTheDocument();
     });
 
     await userEvent.keyboard('{ArrowRight}');
     await waitFor(() => {
       // Verify right arrow key works
-      expect(inputs[1]).toBeInTheDocument();
+      expect(must(inputs[1])).toBeInTheDocument();
     });
 
     // Test backspace navigation - click on third input and then backspace
-    await userEvent.click(inputs[2]);
+    await userEvent.click(must(inputs[2]));
     await userEvent.keyboard('{Backspace}');
     await waitFor(() => {
       // Verify inputs are functional after backspace
-      expect(inputs[0]).toBeEnabled();
+      expect(must(inputs[0])).toBeEnabled();
     });
 
     // Test tab navigation
-    await userEvent.click(inputs[0]);
+    await userEvent.click(must(inputs[0]));
     await userEvent.tab();
     await waitFor(() => {
       // Verify tab moves focus to next focusable element
-      expect(inputs[1]).toBeInTheDocument();
+      expect(must(inputs[1])).toBeInTheDocument();
     });
   },
 };
 
 // Test 4: Screen Reader
 export const ScreenReader: Story = {
+  // `InputOTPProps` does not declare `aria-label`, but the component spreads
+  // unmatched props (`...rest`) onto its container `Box`, so it is forwarded
+  // at runtime — this args object documents that passthrough, not a
+  // component defect.
   args: {
     variant: 'numeric',
     length: 4,
     color: 'primary',
     'aria-label': 'Enter verification code',
-  },
+  } as InputOTPProps & { 'aria-label': string },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const inputs = canvas.getAllByRole('textbox');
@@ -179,7 +186,7 @@ export const ScreenReader: Story = {
     }
 
     // Test ARIA attributes
-    const container = inputs[0].closest('[role], div');
+    const container = must(inputs[0]).closest('[role], div');
     if (container) {
       expect(container).toBeInTheDocument();
     }
@@ -201,33 +208,33 @@ export const FocusManagement: Story = {
 
     // Auto-focus first input
     await waitFor(() => {
-      expect(inputs[0]).toHaveFocus();
+      expect(must(inputs[0])).toHaveFocus();
     });
 
     // Focus moves forward on input
-    await userEvent.type(inputs[0], '1');
+    await userEvent.type(must(inputs[0]), '1');
     await waitFor(() => {
-      expect(inputs[1]).toHaveFocus();
+      expect(must(inputs[1])).toHaveFocus();
     });
 
     // Focus moves forward on paste (single digit at a time)
-    await userEvent.type(inputs[1], '2');
+    await userEvent.type(must(inputs[1]), '2');
     await waitFor(() => {
-      expect(inputs[2]).toHaveFocus();
+      expect(must(inputs[2])).toHaveFocus();
     });
 
     // Complete remaining digits
-    await userEvent.type(inputs[2], '3');
+    await userEvent.type(must(inputs[2]), '3');
     await waitFor(() => {
-      expect(inputs[3]).toHaveFocus();
+      expect(must(inputs[3])).toHaveFocus();
     });
 
-    await userEvent.type(inputs[3], '4');
+    await userEvent.type(must(inputs[3]), '4');
     await waitFor(() => {
-      expect(inputs[4]).toHaveFocus();
+      expect(must(inputs[4])).toHaveFocus();
     });
 
-    await userEvent.type(inputs[4], '5');
+    await userEvent.type(must(inputs[4]), '5');
     await waitFor(() => {
       expect(args.onChange).toHaveBeenLastCalledWith('12345');
       expect(args.onComplete).toHaveBeenCalledWith('12345');
@@ -255,13 +262,13 @@ export const ResponsiveDesign: Story = {
     });
 
     // Test touch interaction
-    await userEvent.click(inputs[0]);
-    await waitFor(() => expect(inputs[0]).toHaveFocus());
+    await userEvent.click(must(inputs[0]));
+    await waitFor(() => expect(must(inputs[0])).toHaveFocus());
 
-    await userEvent.type(inputs[0], '1');
+    await userEvent.type(must(inputs[0]), '1');
     await waitFor(() => {
       // Verify input value was set after typing
-      expect(inputs[0]).toHaveValue('1');
+      expect(must(inputs[0])).toHaveValue('1');
     });
   },
 };
@@ -284,11 +291,11 @@ export const ThemeVariations: Story = {
     expect(inputs).toHaveLength(4);
 
     // Test glass and gradient effects don't break functionality
-    await userEvent.type(inputs[0], '1');
-    expect(inputs[0]).toHaveValue('1');
+    await userEvent.type(must(inputs[0]), '1');
+    expect(must(inputs[0])).toHaveValue('1');
 
-    await userEvent.type(inputs[1], '2');
-    expect(inputs[1]).toHaveValue('2');
+    await userEvent.type(must(inputs[1]), '2');
+    expect(must(inputs[1])).toHaveValue('2');
 
     // Check visual states
     inputs.forEach((input) => {
@@ -312,25 +319,25 @@ export const VisualStates: Story = {
     const inputs = canvas.getAllByRole('textbox');
 
     // Test masked variant - values should show as dots
-    await userEvent.type(inputs[0], '1');
+    await userEvent.type(must(inputs[0]), '1');
     await waitFor(() => {
-      expect(inputs[0]).toHaveValue('•');
+      expect(must(inputs[0])).toHaveValue('•');
       expect(args.onChange).toHaveBeenCalledWith('1');
     });
 
-    await userEvent.type(inputs[1], '2');
+    await userEvent.type(must(inputs[1]), '2');
     await waitFor(() => {
-      expect(inputs[1]).toHaveValue('•');
+      expect(must(inputs[1])).toHaveValue('•');
       expect(args.onChange).toHaveBeenCalledWith('12');
     });
 
     // Test hover state
-    await userEvent.hover(inputs[2]);
-    expect(inputs[2]).toBeVisible();
+    await userEvent.hover(must(inputs[2]));
+    expect(must(inputs[2])).toBeVisible();
 
     // Test focus state
-    await userEvent.click(inputs[3]);
-    await waitFor(() => expect(inputs[3]).toHaveFocus());
+    await userEvent.click(must(inputs[3]));
+    await waitFor(() => expect(must(inputs[3])).toHaveFocus());
   },
 };
 
@@ -348,7 +355,7 @@ export const Performance: Story = {
 
     // Rapid input simulation
     for (let i = 0; i < inputs.length; i++) {
-      await userEvent.type(inputs[i], String(i + 1));
+      await userEvent.type(must(inputs[i]), String(i + 1));
     }
 
     // Verify all changes were captured
@@ -370,35 +377,35 @@ export const EdgeCases: Story = {
     const inputs = canvas.getAllByRole('textbox');
 
     // Test invalid input rejection (letters in numeric mode)
-    await userEvent.click(inputs[0]);
-    await userEvent.type(inputs[0], 'A');
-    expect(inputs[0]).toHaveValue('');
+    await userEvent.click(must(inputs[0]));
+    await userEvent.type(must(inputs[0]), 'A');
+    expect(must(inputs[0])).toHaveValue('');
 
     // Test max length enforcement
-    await userEvent.type(inputs[0], '1');
-    expect(inputs[0]).toHaveValue('1');
+    await userEvent.type(must(inputs[0]), '1');
+    expect(must(inputs[0])).toHaveValue('1');
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalled();
     });
 
     // Test additional characters are ignored
-    await userEvent.type(inputs[0], '23');
-    expect(inputs[0]).toHaveValue('1');
+    await userEvent.type(must(inputs[0]), '23');
+    expect(must(inputs[0])).toHaveValue('1');
 
     // Test empty backspace behavior
-    await userEvent.click(inputs[1]);
+    await userEvent.click(must(inputs[1]));
     await userEvent.keyboard('{Backspace}');
     await waitFor(() => {
-      expect(inputs[0]).toHaveFocus();
+      expect(must(inputs[0])).toHaveFocus();
     });
 
     // Test completion callback with full sequence
-    await userEvent.type(inputs[0], '1');
-    await userEvent.type(inputs[1], '2');
-    await userEvent.type(inputs[2], '3');
-    await userEvent.type(inputs[3], '4');
-    await userEvent.type(inputs[4], '5');
-    await userEvent.type(inputs[5], '6');
+    await userEvent.type(must(inputs[0]), '1');
+    await userEvent.type(must(inputs[1]), '2');
+    await userEvent.type(must(inputs[2]), '3');
+    await userEvent.type(must(inputs[3]), '4');
+    await userEvent.type(must(inputs[4]), '5');
+    await userEvent.type(must(inputs[5]), '6');
 
     await waitFor(() => {
       expect(args.onComplete).toHaveBeenCalledWith('123456');
@@ -430,13 +437,13 @@ export const Integration: Story = {
 
     // Auto-focus verification
     await waitFor(() => {
-      expect(inputs[0]).toHaveFocus();
+      expect(must(inputs[0])).toHaveFocus();
     });
 
     // Type complete OTP
     const otp = '123456';
     for (let i = 0; i < otp.length; i++) {
-      await userEvent.type(inputs[i], otp[i]);
+      await userEvent.type(must(inputs[i]), must(otp[i]));
     }
 
     // Verify completion
@@ -447,7 +454,7 @@ export const Integration: Story = {
 
     // Clear and re-enter
     for (let i = 0; i < inputs.length; i++) {
-      await userEvent.clear(inputs[i]);
+      await userEvent.clear(must(inputs[i]));
     }
 
     // Verify cleared state
@@ -456,12 +463,12 @@ export const Integration: Story = {
     });
 
     // Test error state change
-    const container = inputs[0].closest('div');
+    const container = must(inputs[0]).closest('div');
     expect(container).toBeInTheDocument();
 
     // Final state verification
-    expect(inputs[0]).toBeEnabled();
-    expect(inputs[0]).toBeVisible();
+    expect(must(inputs[0])).toBeEnabled();
+    expect(must(inputs[0])).toBeVisible();
   },
 };
 
@@ -578,7 +585,7 @@ export const TestIDWithoutDataTestIdProp: Story = {
     });
 
     // Functionality should still work
-    await userEvent.type(inputs[0], '1');
-    expect(inputs[0]).toHaveValue('1');
+    await userEvent.type(must(inputs[0]), '1');
+    expect(must(inputs[0])).toHaveValue('1');
   },
 };

@@ -15,7 +15,12 @@ const meta: Meta<typeof NotificationStatusNotice> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+// `NotificationStatusNoticeProps` collapses `StoryObj<typeof meta>`'s `args`
+// to `never` (the same `@storybook/react` `Meta`/`StoryObj` computation that
+// affects other components with a discriminated-union-shaped prop type).
+// Naming the component itself takes a different, working branch of that
+// conditional type.
+type Story = StoryObj<typeof NotificationStatusNotice>;
 
 export const EnableCallsTheHost: Story = {
   name: '🧪 Disabled: the action asks the host',

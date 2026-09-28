@@ -111,7 +111,7 @@ export const GlassAndGradientTest: Story = {
       await expect(card).toBeInTheDocument();
       const styles = window.getComputedStyle(card);
       // Glass cards should have backdrop filter
-      await expect(styles.backdropFilter || styles.webkitBackdropFilter).toContain('blur');
+      await expect(styles.backdropFilter || styles.getPropertyValue('-webkit-backdrop-filter')).toContain('blur');
     });
 
     await step('Verify gradient variant', async () => {
@@ -753,6 +753,7 @@ export const EdgeCasesTest: Story = {
     <Stack spacing={2}>
       <Card data-testid="empty-card" sx={{ width: 300, minHeight: 100 }}>
         {/* Empty card */}
+        {null}
       </Card>
       <Card data-testid="overflow-card" sx={{ width: 200, height: 100, overflow: 'hidden' }}>
         <CardContent>
@@ -1135,9 +1136,9 @@ export const IntegrationWithOtherComponentsTest: Story = {
         <Stack spacing={1}>
           <Typography variant="body1">Full-stack developer with 5 years of experience</Typography>
           <Stack direction="row" spacing={1}>
-            <Chip label="React" size="sm" />
-            <Chip label="TypeScript" size="sm" />
-            <Chip label="Node.js" size="sm" />
+            <Chip label="React" size="small" />
+            <Chip label="TypeScript" size="small" />
+            <Chip label="Node.js" size="small" />
           </Stack>
         </Stack>
       </CardContent>
