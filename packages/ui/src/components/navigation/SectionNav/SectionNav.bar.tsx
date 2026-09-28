@@ -3,6 +3,7 @@ import { useTheme } from '@mui/material/styles/index.js';
 import { useState, type ElementType, type ReactNode } from 'react';
 
 import type { SectionNavCopy } from '../../../copy';
+import { stackedOverlayZIndex } from '../../../tokens/layers';
 import { rem } from '../../../tokens/scales';
 
 import { barSlots, menuActive, menuCount, type BarSlot } from './SectionNav.helpers';
@@ -212,8 +213,18 @@ export function SectionNavBar({
           // primary button can close what it opened. Raised all the time it
           // would sit over every dialog the page opens, and on a small phone a
           // dialog's own footer is exactly where the bar is.
+          //
+          // `stackedOverlayZIndex` rather than a plain `zIndex.modal + 1`: a
+          // host that lifts a bottom `Drawer` clear of a stacked sheet (see the
+          // token's own docblock) matches EVERY bottom-anchored Drawer by its
+          // paper class, including this bar's own — it cannot tell "a form's
+          // Drawer trapped under a sheet" from "this bar's sheet" apart. Once a
+          // host does that, `zIndex.modal + 1` stops being high enough and the
+          // sheet's backdrop paints over the bar — dimming it grey and slicing
+          // through the raised primary button. The bar has to clear the SAME
+          // ceiling its own sheets can be lifted to, one step higher.
           position: 'relative',
-          zIndex: open === null ? 'auto' : theme.zIndex.modal + 1,
+          zIndex: open === null ? 'auto' : stackedOverlayZIndex(theme) + 1,
         }}
       >
         {barSlots(destinations, more !== undefined, primary !== undefined).map((slot) => (
