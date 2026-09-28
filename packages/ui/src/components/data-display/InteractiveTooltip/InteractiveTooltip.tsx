@@ -58,8 +58,16 @@ export const InteractiveTooltip = React.forwardRef<HTMLDivElement, InteractiveTo
       onUnpin,
       className,
       children,
+      onOpen,
+      onClose,
       ...props
     } = resolveTooltipProps(rawProps);
+
+    // ALWAYS controlled. It used to pass `open={undefined}` while hovering and
+    // a boolean once pinned, which MUI reports as a component switching from
+    // uncontrolled to controlled on the first pin. Hover now drives a state of
+    // its own through MUI's onOpen/onClose, and the pin overrides it.
+    const [hoverOpen, setHoverOpen] = React.useState(false);
 
     const { isPinned, isControlledOpen, wrapperRef, handleClick } = usePinnedTooltip({
       clickable,
@@ -94,7 +102,15 @@ export const InteractiveTooltip = React.forwardRef<HTMLDivElement, InteractiveTo
           glow={glow}
           pulse={pulse}
           title={tooltipContent}
-          open={isPinned ? isControlledOpen : undefined}
+          open={isPinned ? isControlledOpen : hoverOpen}
+          onOpen={(event) => {
+            setHoverOpen(true);
+            onOpen?.(event);
+          }}
+          onClose={(event) => {
+            setHoverOpen(false);
+            onClose?.(event);
+          }}
           enterDelay={isPinned ? 0 : 100}
           leaveDelay={0}
           disableHoverListener={isPinned}
