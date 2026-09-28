@@ -1,5 +1,8 @@
 import { BrowserWindow, type Session } from "electron";
 
+import { measureBody } from "./measure";
+import { pageSizeFor, rollFor, type PageSizeMicrons } from "./page";
+
 /**
  * `@12-apps/thermal-printing/electron` — putting an HTML ticket on a printer
  * attached to THIS machine, with no dialog.
@@ -16,6 +19,10 @@ import { BrowserWindow, type Session } from "electron";
  * offscreen window created, loaded, printed and destroyed per ticket. A reused
  * window would carry the previous ticket's layout state into the next, and
  * the failure would be a wrong ticket rather than no ticket.
+ *
+ * The page is always NAMED, and it is the roll (FUT-3009). With no `pageSize`,
+ * Electron asks the driver for an A4 sheet, and the paper then depends on how
+ * that driver fits a 210 mm page onto an 80 mm roll. See `./page`.
  *
  * `electron` is an optional peer: only this subpath imports it.
  */
@@ -45,6 +52,12 @@ export interface PrintHtmlOptions {
   /** The OS device name; `null` is the system default printer. */
   deviceName: string | null;
   /**
+   * The roll's width in mm: 80 or 58. Omitted: the narrowest roll whose
+   * printable width holds the rendered body, which for `./html`'s output is
+   * the roll it was laid out for.
+   */
+  paperWidthMm?: number;
+  /**
    * The session (partition) to render in. Omitted: Electron's default. A
    * ticket loaded as a `data:` URL with scripts off needs no cookies, but a
    * host may keep every window it opens in its own partition.
@@ -64,6 +77,9 @@ export async function printHtml(options: PrintHtmlOptions): Promise<void> {
     webPreferences: {
       ...(options.session === undefined ? {} : { session: options.session }),
       offscreen: true,
+      // Zoom 1, whatever a host's session remembers for data: URLs. The size on
+      // paper is the page's alone.
+      zoomFactor: 1,
       nodeIntegration: false,
       contextIsolation: true,
       // A ticket is markup the host rendered, but it may carry other people's
@@ -76,7 +92,9 @@ export async function printHtml(options: PrintHtmlOptions): Promise<void> {
     // file would have to be cleaned up on a path that can throw between
     // writing and deleting it.
     await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(options.html)}`);
-    await printWindow(window, options.deviceName);
+    const body = await measureBody(window.webContents);
+    const paperWidthMm = options.paperWidthMm ?? rollFor(body.widthMm);
+    await printWindow(window, options.deviceName, pageSizeFor(paperWidthMm, body));
   } finally {
     // `destroy`, not `close`: an offscreen window has nobody to answer a
     // close, and a leaked one holds a renderer process for the life of the
@@ -85,14 +103,30 @@ export async function printHtml(options: PrintHtmlOptions): Promise<void> {
   }
 }
 
-/** Print one loaded window, and reject when the operating system says no. */
-function printWindow(window: BrowserWindow, deviceName: string | null): Promise<void> {
+/**
+ * Print one loaded window on a page of the given size, and reject when the
+ * operating system says no.
+ *
+ * `printableArea` places the ticket where the head starts. With `none`, a
+ * driver that reports a 4 mm unprintable margin loses the ticket's left 4 mm.
+ * A driver that reports no margin gets the same placement either way.
+ * `scaleFactor` and `landscape` are Electron's defaults, stated so that
+ * nothing implicit is left between the page and the paper.
+ */
+function printWindow(
+  window: BrowserWindow,
+  deviceName: string | null,
+  pageSize: PageSizeMicrons,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     window.webContents.print(
       {
         silent: true,
         printBackground: true,
-        margins: { marginType: "none" },
+        pageSize,
+        margins: { marginType: "printableArea" },
+        scaleFactor: 100,
+        landscape: false,
         ...(deviceName === null ? {} : { deviceName }),
       },
       (success, failureReason) => {
