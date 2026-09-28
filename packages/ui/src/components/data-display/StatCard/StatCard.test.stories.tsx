@@ -194,7 +194,7 @@ export const LoadingStateTest: Story = {
 
 export const ResponsiveDesign: Story = {
   name: '🧪 Responsive Design — tiles stack in a narrow grid',
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box
       sx={{

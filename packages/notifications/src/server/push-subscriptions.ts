@@ -1,6 +1,6 @@
 import type { NotificationLogger } from '../types';
 
-import type { NotificationsDbProvider, PushSubscriptionWhere } from './db';
+import type { NotificationsDbProvider, PushSubscriptionRow, PushSubscriptionWhere } from './db';
 import type { WebPushSubscriptionSource } from './transports/web-push';
 
 /**
@@ -21,6 +21,11 @@ export interface PushSubscriptionInput {
    * value, never anything the caller sent. Absent/null = the platform origin.
    */
   clientId?: string | null;
+  /**
+   * Which SIDE this browser's app serves (`customer`, `staff` — host
+   * vocabulary), again the host's resolved value. Absent/null = every side.
+   */
+  side?: string | null;
 }
 
 /**
@@ -48,9 +53,24 @@ export interface PushSubscriptionInput {
 function reachableBy(
   userId: string,
   notificationClientId?: string | null,
+  notificationSide?: string | null,
 ): PushSubscriptionWhere {
-  if (notificationClientId === undefined || notificationClientId === null) return { userId };
-  return { userId, OR: [{ clientId: null }, { clientId: notificationClientId }] };
+  const where: PushSubscriptionWhere = { userId };
+  if (notificationClientId !== undefined && notificationClientId !== null) {
+    where.OR = [{ clientId: null }, { clientId: notificationClientId }];
+  }
+  // The same rule on the other axis: an app that serves every side (`side IS
+  // NULL`) receives everything, and an unclassified notification reaches every
+  // app — so a host that never classifies sees no change at all.
+  if (notificationSide !== undefined && notificationSide !== null) {
+    where.AND = [{ OR: [{ side: null }, { side: notificationSide }] }];
+  }
+  return where;
+}
+
+/** What the transport needs of a row to encrypt and send: nothing about its scope. */
+function sendable(row: PushSubscriptionRow): { id: string; endpoint: string; p256dh: string; auth: string } {
+  return { id: row.id, endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth };
 }
 
 export interface PushSubscriptionStore extends WebPushSubscriptionSource {
@@ -81,7 +101,11 @@ export interface PushSubscriptionStore extends WebPushSubscriptionSource {
    * attempt before writing DEAD — a FAILED row for something that was never
    * undeliverable, only out of scope.
    */
-  count(userId: string, notificationClientId?: string | null): Promise<number>;
+  count(
+    userId: string,
+    notificationClientId?: string | null,
+    notificationSide?: string | null,
+  ): Promise<number>;
   /**
    * Whether THIS endpoint is currently registered to THIS user.
    *
@@ -122,6 +146,7 @@ export function createPushSubscriptionStore(
           p256dh: input.keys.p256dh,
           auth: input.keys.auth,
           clientId: input.clientId ?? null,
+          side: input.side ?? null,
           userAgent: input.userAgent ?? null,
         },
         // Re-stamped on every save, so the same browser moving between a store's
@@ -133,6 +158,7 @@ export function createPushSubscriptionStore(
           p256dh: input.keys.p256dh,
           auth: input.keys.auth,
           clientId: input.clientId ?? null,
+          side: input.side ?? null,
           userAgent: input.userAgent ?? null,
         },
       });
@@ -143,9 +169,11 @@ export function createPushSubscriptionStore(
       await client.pushSubscription.deleteMany({ where: { userId, endpoint } });
     },
 
-    async count(userId, notificationClientId) {
+    async count(userId, notificationClientId, notificationSide) {
       const client = await db();
-      return client.pushSubscription.count({ where: reachableBy(userId, notificationClientId) });
+      return client.pushSubscription.count({
+        where: reachableBy(userId, notificationClientId, notificationSide),
+      });
     },
 
     async isRegisteredTo(userId, endpoint) {
@@ -154,17 +182,12 @@ export function createPushSubscriptionStore(
       return row?.userId === userId;
     },
 
-    async list(userId, notificationClientId) {
+    async list(userId, notificationClientId, notificationSide) {
       const client = await db();
       const rows = await client.pushSubscription.findMany({
-        where: reachableBy(userId, notificationClientId),
+        where: reachableBy(userId, notificationClientId, notificationSide),
       });
-      return rows.map((row) => ({
-        id: row.id,
-        endpoint: row.endpoint,
-        p256dh: row.p256dh,
-        auth: row.auth,
-      }));
+      return rows.map(sendable);
     },
 
     async prune(id) {

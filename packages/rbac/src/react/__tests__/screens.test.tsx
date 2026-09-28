@@ -673,3 +673,15 @@ describe('the invite flow', () => {
     });
   });
 });
+
+describe('header slot', () => {
+  it('renders the title and "new role" above the grid, not below it', async () => {
+    mountRoles(apiStub(), ['roles:manage']);
+    const create = await screen.findByTestId('add-role-button');
+    const grid = await screen.findByTestId('roles-grid');
+    // `Dashboard` ranks its direct children by a marker on their type; an
+    // unmarked wrapper sinks below the body. The DOM order is the claim — a
+    // keyboard reaches whatever comes first.
+    expect(create.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});

@@ -353,9 +353,6 @@ export const Responsive: Story = {
     </Stack>
   ),
   parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
     chromatic: {
       viewports: [320, 768, 1200],
     },

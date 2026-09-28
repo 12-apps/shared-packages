@@ -82,6 +82,29 @@ const capOf = (theme: Theme, maxWidth: number | undefined): string => {
   return cap <= 1 && cap !== 0 ? `${cap * 100}%` : rem(theme, cap);
 };
 
+/** The clone-onto-`trigger` vs. wrap-in-a-`span` choice, pulled out of the component so its body stays readable. */
+const buildTriggerElement = (
+  trigger: HoverCardProps['trigger'],
+  triggerHandlers: ReturnType<typeof useHoverCard>['triggerHandlers'],
+  disabled: boolean,
+  dataTestId: string | undefined,
+  children: React.ReactNode,
+) => {
+  const triggerProps = {
+    ...triggerHandlers,
+    style: { cursor: disabled ? 'default' : 'pointer' },
+    'data-testid': dataTestId ? `${dataTestId}-trigger` : 'hover-card-trigger',
+  };
+
+  return trigger ? (
+    React.cloneElement(trigger, triggerProps)
+  ) : (
+    <span {...triggerProps} style={{ display: 'inline-block', ...triggerProps.style }}>
+      {children}
+    </span>
+  );
+};
+
 export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props, ref) => {
   const {
     variant, glow, pulse, title, description, avatar, trigger, placement, showArrow,
@@ -90,7 +113,15 @@ export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props
     ...rest
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
 
-  const { anchorEl, isOpen, handleClose, triggerHandlers, cardHandlers, contentRef } = useHoverCard({
+  const {
+    anchorEl,
+    isOpen,
+    handleClose,
+    triggerHandlers,
+    cardHandlers,
+    contentRef,
+    onContentPointerDownCapture,
+  } = useHoverCard({
     disabled,
     touchEnabled,
     enterDelay,
@@ -99,20 +130,7 @@ export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props
     onClose,
   });
 
-  const triggerProps = {
-    ...triggerHandlers,
-    style: { cursor: disabled ? 'default' : 'pointer' },
-    'data-testid': dataTestId ? `${dataTestId}-trigger` : 'hover-card-trigger',
-  };
-
-  const triggerElement = trigger ? (
-    React.cloneElement(trigger, triggerProps)
-  ) : (
-    <span {...triggerProps} style={{ display: 'inline-block', ...triggerProps.style }}>
-      {children}
-    </span>
-  );
-
+  const triggerElement = buildTriggerElement(trigger, triggerHandlers, disabled, dataTestId, children);
   const padding = CONTENT_PADDING[variant] ?? 2;
 
   return (
@@ -133,7 +151,11 @@ export const HoverCard = React.forwardRef<HTMLDivElement, HoverCardProps>((props
         slotProps={{ paper: { style: { pointerEvents: 'auto' } } }}
         {...rest}
       >
-        <Box ref={contentRef} sx={{ position: 'relative' }}>
+        <Box
+          ref={contentRef}
+          onPointerDownCapture={onContentPointerDownCapture}
+          sx={{ position: 'relative' }}
+        >
           {showArrow && <ArrowContainer placement={placement} offset={offset} />}
           <StyledCard
             customVariant={variant}

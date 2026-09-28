@@ -146,6 +146,7 @@ describe('the inbox wire shape', () => {
     id: 'n1',
     userId: 'u1',
     clientId: 'c1',
+    side: null,
     type: 'order.paid',
     category: 'orders',
     title: 'Pagamento confirmado',

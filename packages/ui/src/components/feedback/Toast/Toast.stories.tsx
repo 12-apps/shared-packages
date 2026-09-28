@@ -539,9 +539,6 @@ const ResponsiveComponent = () => {
 export const Responsive: Story = {
   render: () => <ResponsiveComponent />,
   parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
     docs: {
       description: {
         story: 'Toast notifications adapt to different screen sizes and positions.',
