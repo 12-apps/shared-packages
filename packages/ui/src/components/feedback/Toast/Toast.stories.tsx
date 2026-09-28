@@ -289,7 +289,7 @@ const PromiseHandlingComponent = () => {
     promise(failingPromise, {
       loading: 'Processing (will fail)...',
       success: "This won't show",
-      error: (error: Error) => `Error: ${error.message}`,
+      error: (error: unknown) => `Error: ${error instanceof Error ? error.message : String(error)}`,
     });
   };
 

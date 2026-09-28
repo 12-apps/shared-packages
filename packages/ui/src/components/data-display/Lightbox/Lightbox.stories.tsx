@@ -110,7 +110,7 @@ export const Default: Story = {
 };
 
 export const SingleImage: Story = {
-  render: () => <LightboxWrapper items={[sampleImages[0]]} triggerText="Open Single Image" />,
+  render: () => <LightboxWrapper items={sampleImages.slice(0, 1)} triggerText="Open Single Image" />,
 };
 
 export const WithFilmstrip: Story = {
@@ -232,7 +232,7 @@ export const AllSizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 4 }}>
       <Typography variant="h6">All Sizes (Gallery sizes)</Typography>
-      <LightboxWrapper items={[sampleImages[0]]} triggerText="Single Item" />
+      <LightboxWrapper items={sampleImages.slice(0, 1)} triggerText="Single Item" />
       <LightboxWrapper items={sampleImages.slice(0, 2)} triggerText="Two Items" />
       <LightboxWrapper items={sampleImages} triggerText="Multiple Items" />
       <LightboxWrapper

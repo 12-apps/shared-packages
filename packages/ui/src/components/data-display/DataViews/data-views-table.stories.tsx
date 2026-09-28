@@ -297,7 +297,7 @@ function renderPedidoCard(row: PedidoRow, selection: DataViewCardSelection): Rea
       title={row.pedido}
       subtitle={`${row.cliente} · ${row.total}`}
       selected={selection.selected}
-      onToggleSelect={selection.toggle}
+      onToggleSelect={selection.onToggleSelect}
       imageFallback={<Box sx={{ fontSize: "1.5rem" }}>🧾</Box>}
     >
       <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>

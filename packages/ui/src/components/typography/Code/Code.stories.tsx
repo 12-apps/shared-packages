@@ -389,7 +389,7 @@ $ npm run dev
   ➜  press h to show help`}
       </Code>
 
-      <Code variant="terminal">
+      <Code variant="highlight">
         {`$ git status
 On branch main
 Your branch is up to date with 'origin/main'.
@@ -637,7 +637,7 @@ export const LongCodeWithWrap: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Without wrapping (scrollable)
         </Typography>
-        <Code variant="block" language="javascript" wrap={false}>
+        <Code variant="block" language="javascript">
           {`const veryLongVariableName = "This is a very long string that would normally cause horizontal scrolling in the code block without wrapping enabled";`}
         </Code>
       </Box>
@@ -646,7 +646,7 @@ export const LongCodeWithWrap: Story = {
         <Typography variant="subtitle2" gutterBottom>
           With wrapping enabled
         </Typography>
-        <Code variant="block" language="javascript" wrap={true}>
+        <Code variant="block" language="javascript" style={{ whiteSpace: 'pre-wrap' }}>
           {`const veryLongVariableName = "This is a very long string that will wrap to the next line when wrapping is enabled in the code block";`}
         </Code>
       </Box>

@@ -13,7 +13,7 @@ import React from 'react';
 import { Alert } from './Alert';
 import { COLOR_VALUES } from '../../../tokens/scales';
 
-const meta: Meta<typeof Alert> = {
+const meta = {
   title: 'Feedback/Alert',
   component: Alert,
   parameters: {
@@ -99,7 +99,7 @@ const meta: Meta<typeof Alert> = {
       },
     },
   },
-};
+} satisfies Meta<typeof Alert>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -180,6 +180,7 @@ export const Closable: Story = {
   args: {
     variant: 'info',
     closable: true,
+    closeLabel: 'Fechar o aviso',
     title: 'Notification',
     children: 'This alert can be closed by clicking the X button.',
   },
@@ -218,19 +219,19 @@ export const WithGlowAndPulse: Story = {
 export const AllVariants: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Alert variant="info" title="Information" closable>
+      <Alert variant="info" title="Information" closable closeLabel="Fechar o aviso">
         This is an informational message with important details.
       </Alert>
-      <Alert variant="success" title="Success" closable>
+      <Alert variant="success" title="Success" closable closeLabel="Fechar o aviso">
         Your action was completed successfully!
       </Alert>
-      <Alert variant="warning" title="Warning" closable>
+      <Alert variant="warning" title="Warning" closable closeLabel="Fechar o aviso">
         Please review your settings before continuing.
       </Alert>
-      <Alert variant="danger" title="Error" closable>
+      <Alert variant="danger" title="Error" closable closeLabel="Fechar o aviso">
         An error occurred while processing your request.
       </Alert>
-      <Alert variant="glass" title="Glass Effect" closable>
+      <Alert variant="glass" title="Glass Effect" closable closeLabel="Fechar o aviso">
         This alert uses glassmorphism design with backdrop blur.
       </Alert>
     </Stack>
@@ -246,6 +247,7 @@ export const Interactive: Story = {
         title="Interactive Demo"
         glow
         closable
+        closeLabel="Fechar o aviso"
         onClose={() => {
           /** do nothing */
         }}
@@ -255,7 +257,7 @@ export const Interactive: Story = {
       <Alert variant="warning" pulse icon={<MuiWarning />} title="Attention">
         This alert pulses to grab your attention.
       </Alert>
-      <Alert variant="glass" glow pulse title="Combined Effects" closable>
+      <Alert variant="glass" glow pulse title="Combined Effects" closable closeLabel="Fechar o aviso">
         Glass morphism with glow and pulse effects combined.
       </Alert>
     </Stack>
@@ -269,6 +271,7 @@ export const GradientVariant: Story = {
     title: 'Gradient Alert',
     description: 'This alert features a beautiful gradient background with shimmer effect',
     closable: true,
+    closeLabel: 'Fechar o aviso',
     color: 'primary',
   },
 };
@@ -282,6 +285,7 @@ export const WithActions: Story = {
         title="System Update Available"
         description="A new version is available. Update now to get the latest features and improvements."
         closable
+        closeLabel="Fechar o aviso"
       >
         <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
           <Button size="small" variant="contained" color="info">
@@ -298,6 +302,7 @@ export const WithActions: Story = {
         title="Security Alert"
         description="Unusual activity detected on your account"
         closable
+        closeLabel="Fechar o aviso"
       >
         <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
           <Button size="small" variant="contained" color="warning">
@@ -320,6 +325,7 @@ export const LongContent: Story = {
     description:
       'We have updated our terms of service to better protect your privacy and improve our services. These changes include enhanced data protection measures, clearer explanations of how we use your information, and new rights regarding your personal data. Please review the updated terms carefully as they affect your use of our services.',
     closable: true,
+    closeLabel: 'Fechar o aviso',
   },
 };
 
@@ -369,6 +375,7 @@ export const AccessibilityFocus: Story = {
         description="This alert uses aria-live='polite' for screen readers"
         showIcon
         closable
+        closeLabel="Fechar o aviso"
       />
       <Alert
         variant="danger"
@@ -376,6 +383,7 @@ export const AccessibilityFocus: Story = {
         description="This critical alert uses aria-live='assertive' for immediate announcement"
         showIcon
         closable
+        closeLabel="Fechar o aviso"
       />
     </Stack>
   ),
@@ -396,6 +404,7 @@ const RealWorldExamplesComponent = () => {
           description="You have 3 new messages and 5 pending tasks"
           icon={<Star />}
           closable
+          closeLabel="Fechar o aviso"
           onClose={() => setShowWelcome(false)}
         />
       )}
@@ -406,6 +415,7 @@ const RealWorldExamplesComponent = () => {
           title="Cookie Notice"
           description="We use cookies to enhance your experience"
           closable
+          closeLabel="Fechar o aviso"
           onClose={() => setShowNotification(false)}
         >
           <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
@@ -464,9 +474,11 @@ export const MultipleAlerts: Story = {
             }
             title={`Alert ${i + 1}`}
             description={`This is alert number ${i + 1} in the list`}
-            closable={i % 2 === 0}
             glow={i % 3 === 0}
             pulse={i % 5 === 0}
+            {...(i % 2 === 0
+              ? { closable: true as const, closeLabel: 'Fechar o aviso' }
+              : { closable: false as const })}
           />
         ))}
       </Stack>
@@ -516,7 +528,7 @@ export const InteractiveStates: Story = {
   render: () => (
     <Stack spacing={2}>
       <Alert variant="info" title="Standard Alert" description="Non-interactive alert" />
-      <Alert variant="success" title="Closable Alert" description="Click the X to close" closable />
+      <Alert variant="success" title="Closable Alert" description="Click the X to close" closable closeLabel="Fechar o aviso" />
       <Alert variant="warning" title="Glow Effect" description="Alert with glow effect" glow />
       <Alert variant="danger" title="Pulse Effect" description="Alert with pulse animation" pulse />
       <Alert
@@ -524,6 +536,7 @@ export const InteractiveStates: Story = {
         title="Combined Effects"
         description="Closable with glow and pulse"
         closable
+        closeLabel="Fechar o aviso"
         glow
         pulse
       />
@@ -540,6 +553,7 @@ export const Responsive: Story = {
           title="Responsive Alert"
           description="This alert adapts to different screen sizes and container widths"
           closable
+          closeLabel="Fechar o aviso"
         />
         <Box sx={{ maxWidth: 400 }}>
           <Alert
@@ -547,6 +561,7 @@ export const Responsive: Story = {
             title="Narrow Container"
             description="Alert in a constrained width container"
             closable
+            closeLabel="Fechar o aviso"
           />
         </Box>
         <Box sx={{ maxWidth: 200 }}>

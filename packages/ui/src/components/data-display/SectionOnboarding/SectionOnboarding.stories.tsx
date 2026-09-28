@@ -8,6 +8,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 
 import { SectionOnboarding } from './SectionOnboarding';
+import { PT_BR_SECTION_ONBOARDING_COPY } from '../../../pt-BR.shared';
 
 const PaymentIllustration = () => (
   <SvgIcon sx={{ fontSize: 72, color: 'primary.main' }}>
@@ -115,7 +116,7 @@ export const Configured: Story = {
     configuredTitle: 'PagBank conectado',
     configuredSummary: (
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
-        <Chip label="Ativo" color="success" size="sm" />
+        <Chip label="Ativo" color="success" size="small" />
         <Typography variant="body2" color="text.secondary">
           Ambiente: Produção
         </Typography>
@@ -142,12 +143,18 @@ export const AllStates: Story = {
         illustration={<PaymentIllustration />}
         steps={SETUP_STEPS}
         primaryAction={{ label: 'Começar configuração', onClick: fn() }}
+        startLabel={PT_BR_SECTION_ONBOARDING_COPY.start}
+        editLabel={PT_BR_SECTION_ONBOARDING_COPY.edit}
+        collapseLabel={PT_BR_SECTION_ONBOARDING_COPY.collapse}
       />
       <SectionOnboarding
         status="in-progress"
         title="Conectar conta PagBank"
         steps={SETUP_STEPS}
         activeStepId="connect"
+        startLabel={PT_BR_SECTION_ONBOARDING_COPY.start}
+        editLabel={PT_BR_SECTION_ONBOARDING_COPY.edit}
+        collapseLabel={PT_BR_SECTION_ONBOARDING_COPY.collapse}
       >
         <MockForm />
       </SectionOnboarding>
@@ -155,7 +162,10 @@ export const AllStates: Story = {
         status="configured"
         title="PagBank"
         configuredTitle="PagBank conectado"
-        configuredSummary={<Chip label="Ativo — Produção" color="success" size="sm" />}
+        configuredSummary={<Chip label="Ativo — Produção" color="success" size="small" />}
+        startLabel={PT_BR_SECTION_ONBOARDING_COPY.start}
+        editLabel={PT_BR_SECTION_ONBOARDING_COPY.edit}
+        collapseLabel={PT_BR_SECTION_ONBOARDING_COPY.collapse}
       >
         <MockForm />
       </SectionOnboarding>
