@@ -104,11 +104,11 @@ const emptyToUnset = (value: Length): Length => (value === '' ? undefined : valu
 /** A length, already resolved to CSS — {@link innerLength} or {@link sxLength}. */
 type LengthResolver = (theme: Theme, value: Length) => string | undefined;
 
-// A number + `%`/`vw`/`vh`/`vmin`/`vmax` anywhere in a string, even nested in
-// `calc()`/`min()`/`max()`/`clamp()`, e.g. `calc(100% - 8px)`, `min(50vw, 200px)`.
-const RELATIVE_LENGTH_UNIT = /[\d.]+(?:%|vw|vh|vmin|vmax)(?![a-zA-Z])/;
+// A number + `%`, a (small/large/dynamic) viewport unit, or a container-query
+// unit, anywhere in a string, even nested in `calc()`/`min()`/`max()`/`clamp()`.
+const RELATIVE_LENGTH_UNIT = /[\d.]+(?:%|[dsl]?v(?:w|h|i|b|min|max)|cq(?:w|h|i|b|min|max))(?![a-zA-Z])/;
 // RELATIVE: {@link isFraction}, or that unit anywhere — borrowing it onto the
-// OTHER axis re-creates this collapse (viewport units square too, `LazyImage.md`).
+// OTHER axis re-creates this collapse (all these units square, `LazyImage.md`).
 const isRelativeLength = (value: Length): boolean =>
   isFraction(value) || (typeof value === 'string' && RELATIVE_LENGTH_UNIT.test(value));
 

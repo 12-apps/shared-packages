@@ -206,22 +206,29 @@ wrapping element, rounded to match the image:
 >     alone — a `%` still measures against the containing block no matter what
 >     it is wrapped in, and borrowing it onto the other axis still collapses
 >     to 0 against an auto-height parent), or
->   - it has a viewport unit (`vw`/`vh`/`vmin`/`vmax`) anywhere in the string
->     (FUT-2869: `width="50vw"` alone squares too — see below for why).
+>   - it has a viewport unit — `vw`/`vh`/`vmin`/`vmax`, or the small/large/
+>     dynamic variants `svw`/`svh`/`svmin`/`svmax`, `lvw`/`lvh`/`lvmin`/
+>     `lvmax`, `dvw`/`dvh`/`dvmin`/`dvmax`, or the logical `vi`/`vb` — anywhere
+>     in the string (FUT-2869: `width="50vw"` alone squares too — see below for
+>     why), or
+>   - it has a container-query unit — `cqw`/`cqh`/`cqi`/`cqb`/`cqmin`/`cqmax` —
+>     anywhere in the string: it depends on the nearest queried container, not
+>     the length itself, exactly the reasoning below.
 >
->   **Why viewport units square instead of borrow (FUT-2869's Decision).** A
->   viewport unit does not collapse to 0 the way a borrowed `%` does — it
->   resolves against the viewport, not the parent, so a literally-borrowed
->   `height: 50vw` is merely some non-zero length. But it is still wrong: the
->   component's own promise for a single set axis is a SQUARE placeholder, and
->   a viewport length borrowed onto the other axis is a square only when the
->   container happens to be exactly the viewport's own size — the moment it
->   isn't (any padding, sidebar, or max-width layout — the ordinary case),
->   `width: 50vw` next to a borrowed `height: 50vw` is visibly not square.
->   Squaring costs nothing extra (the same `aspectRatio` mechanism `%` already
->   uses) and keeps one rule — "does this length depend on anything outside
->   itself" — for every relative unit, instead of one rule for `%` and a
->   different one for viewport units.
+>   **Why viewport and container-query units square instead of borrow
+>   (FUT-2869's Decision).** Neither collapses to 0 the way a borrowed `%`
+>   does — a viewport unit resolves against the viewport, a container-query
+>   unit against its queried container, so a literally-borrowed `height: 50vw`
+>   is merely some non-zero length. But it is still wrong: the component's own
+>   promise for a single set axis is a SQUARE placeholder, and a length
+>   borrowed onto the other axis is a square only when the thing it measures
+>   against (the viewport, or the queried container) happens to be exactly the
+>   SAME size as `LazyImage`'s own container — the moment it isn't (any
+>   padding, sidebar, or max-width layout — the ordinary case), `width: 50vw`
+>   next to a borrowed `height: 50vw` is visibly not square. Squaring costs
+>   nothing extra (the same `aspectRatio` mechanism `%` already uses) and keeps
+>   one rule — "does this length depend on anything outside itself" — for
+>   every relative unit, instead of a different rule per unit family.
 > - With **neither** axis set, both take the theme's field height
 >   (`theme.fieldHeight`, through `fieldHeight()`/`rem()` — never a raw px).
 > - With **both** set, nothing above applies: the placeholder renders exactly
