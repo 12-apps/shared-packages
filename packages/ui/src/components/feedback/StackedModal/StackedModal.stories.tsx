@@ -1402,6 +1402,7 @@ const AllSizesComponent = () => {
   const [mediumOpen, setMediumOpen] = useState(false);
   const [largeOpen, setLargeOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [wideOpen, setWideOpen] = useState(false);
 
   return (
     <>
@@ -1418,7 +1419,24 @@ const AllSizesComponent = () => {
         <Button variant="contained" onClick={() => setFullscreenOpen(true)}>
           Fullscreen Modal
         </Button>
+        <Button variant="contained" onClick={() => setWideOpen(true)}>
+          Wide Panel
+        </Button>
       </Stack>
+
+      <StackedModal
+        backLabel="Back"
+        open={wideOpen}
+        onClose={() => setWideOpen(false)}
+        navigationTitle="Wide Panel"
+        size="wide"
+      >
+        <StackedModalContent>
+          <Typography>
+            Wide panel content (size: wide — 90vw up to xl, 75vw above, for a two-column editor)
+          </Typography>
+        </StackedModalContent>
+      </StackedModal>
 
       <StackedModal
         open={smallOpen}

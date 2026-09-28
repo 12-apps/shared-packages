@@ -109,16 +109,19 @@ describe("StackedModal size", () => {
     renderModal();
     await screen.findByTestId("viewport-modal-header");
     const css = injectedCss();
-    expect(css).toContain("60vw");
-    expect(css).not.toContain("90vw");
+    expect(css).toMatch(/max-width:\s*60vw/);
+    // The wide keyframes are always registered; the SETTLED width is what differs.
+    expect(css).not.toMatch(/max-width:\s*90vw/);
   });
 
   it("gives a wide panel 90vw up to xl and 75vw above it", async () => {
     renderModal(undefined, "wide");
     await screen.findByTestId("viewport-modal-header");
     const css = injectedCss();
-    expect(css).toContain("90vw");
-    expect(css).toContain("75vw");
+    expect(css).toMatch(/max-width:\s*90vw/);
+    expect(css).toMatch(/max-width:\s*75vw/);
+    // The keyframes a wide panel animates with end where it settles, or it snaps.
+    expect(css).toContain("contractModalWide");
   });
 
   it("does not forward the size to the DOM", async () => {

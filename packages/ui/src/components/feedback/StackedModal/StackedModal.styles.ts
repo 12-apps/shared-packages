@@ -38,6 +38,12 @@ const ANIMATION_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
   primary: 'contractModal 300ms ease-in-out forwards',
 };
 
+/** A wide panel settles at 90vw, so its keyframes must end there too, or it snaps. */
+const WIDE_ANIMATION_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
+  secondary: 'expandModalWide 300ms ease-in-out forwards',
+  primary: 'contractModalWide 300ms ease-in-out forwards',
+};
+
 // Animation endpoints use the common lg width (60vw); the role styles set the
 // exact per-breakpoint width once the animation settles.
 const KEYFRAMES: CSSObject = {
@@ -48,6 +54,14 @@ const KEYFRAMES: CSSObject = {
   '@keyframes contractModal': {
     from: { width: '100vw', transform: 'translateX(0)' },
     to: { width: '60vw', transform: 'translateX(0)' },
+  },
+  '@keyframes expandModalWide': {
+    from: { width: '90vw', transform: 'translateX(0)' },
+    to: { width: '100vw', transform: 'translateX(0)' },
+  },
+  '@keyframes contractModalWide': {
+    from: { width: '100vw', transform: 'translateX(0)' },
+    to: { width: '90vw', transform: 'translateX(0)' },
   },
 };
 
@@ -129,8 +143,10 @@ const glassStyles = (theme: Theme, glass?: boolean, role?: ModalPanelRole): CSSO
       }
     : {};
 
-const animationStyles = (isAnimating?: boolean, role?: ModalPanelRole): CSSObject =>
-  isAnimating ? { animation: (role && ANIMATION_BY_ROLE[role]) ?? 'none' } : {};
+const animationStyles = (isAnimating?: boolean, role?: ModalPanelRole, size?: PanelSize): CSSObject => {
+  const byRole = size === 'wide' ? WIDE_ANIMATION_BY_ROLE : ANIMATION_BY_ROLE;
+  return isAnimating ? { animation: (role && byRole[role]) ?? 'none' } : {};
+};
 
 const panelBaseStyles = (theme: Theme): CSSObject => ({
   margin: 0,
@@ -155,7 +171,7 @@ const panelStyles = (theme: Theme, props: PanelStyleProps): CSSObject => {
     ...panelBaseStyles(theme),
     ...rolePanelStyles(theme, props.modalRole, capPx, props.panelSize),
     ...glassStyles(theme, props.glass, props.modalRole),
-    ...animationStyles(props.isAnimating, props.modalRole),
+    ...animationStyles(props.isAnimating, props.modalRole, props.panelSize),
   };
 };
 
