@@ -22,7 +22,7 @@ import {
  * `MuiSwitch`/`MuiTableCell` onto the critical path of every host that
  * imports `densityThemeOptions` — including one that never renders a
  * density at all (`@12-apps/app-shell`'s `createAppTheme`,
- * `12-apps/future-pay`'s `pnpm quality:eager`, FUT-2967).
+ * one adopter's critical-path gate, FUT-2967).
  *
  * This file has two independent guards:
  *
