@@ -194,7 +194,11 @@ export function teamExportColumns(
       header: copy.exportHeaders.customRoles,
       // Every role BUT the base, so a host with no base exports all of them
       // here rather than silently dropping the ones the bag never held.
-      value: (row) => row.roles.filter((name) => name !== row.role).join(', '),
+      value: (row) =>
+        row.roles
+          .filter((name) => name !== row.role)
+          .map((name) => labels.roleLabel(name))
+          .join(', '),
     },
     { header: copy.exportHeaders.status, value: (row) => status[row.status] },
   ];
@@ -226,7 +230,13 @@ function RolesCell({ row, labels }: { row: TeamRow; labels: RbacLabels }): JSX.E
         />
       )}
       {rest.map((role) => (
-        <Chip key={role} label={role} size="sm" variant="outlined" color="neutral" />
+        <Chip
+          key={role}
+          label={labels.roleLabel(role)}
+          size="sm"
+          variant="outlined"
+          color="neutral"
+        />
       ))}
     </Stack>
   );
@@ -290,7 +300,7 @@ export function teamColumns(
       accessor: (row) =>
         [
           ...(row.role === '' ? [] : [labels.roleLabel(row.role)]),
-          ...row.roles.filter((name) => name !== row.role),
+          ...row.roles.filter((name) => name !== row.role).map((name) => labels.roleLabel(name)),
         ].join(', '),
       cell: ({ row }) => <RolesCell row={row} labels={labels} />,
     },
