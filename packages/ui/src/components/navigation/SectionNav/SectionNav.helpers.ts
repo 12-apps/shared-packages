@@ -54,3 +54,13 @@ export function barSlots(
 export function isMenu(primary: SectionNavMenu | SectionNavAction | undefined): primary is SectionNavMenu {
   return primary !== undefined && 'groups' in primary;
 }
+
+/**
+ * How a destination reads. `current` is `aria-current="page"` and belongs to a
+ * LINK only — an action slot that is ON reports `aria-pressed` instead. `lit`
+ * is the look, and a `dimmed` slot is never lit: it says "not now".
+ */
+export function destinationState(destination: SectionNavDestination): { current: boolean; lit: boolean } {
+  const active = destination.active === true;
+  return { current: active && destination.href !== undefined, lit: active && destination.dimmed !== true };
+}

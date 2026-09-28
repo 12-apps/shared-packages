@@ -4,10 +4,14 @@ import type { ReactNode } from 'react';
 
 import { rem } from '../../../tokens/scales';
 
-import { Box, CONTROL_RESET, SlotIcon, focusRing } from './SectionNav.parts';
+import { Box, CONTROL_RESET, NOT_LIVE, SlotIcon, focusRing } from './SectionNav.parts';
 
 export interface RaisedActionButtonProps {
-  /** The button's accessible name — it has no visible label. */
+  /**
+   * The button's accessible name. Drawn under the button only when
+   * `captioned`; the caption is hidden from assistive tech, so the name is
+   * read once either way.
+   */
   label: string;
   icon: ReactNode;
   onClick: () => void;
@@ -24,9 +28,13 @@ export interface RaisedActionButtonProps {
    * bar of places can leave its one action to the icon.
    */
   captioned?: boolean;
-  /** Dimmed and not operable. */
+  /** Dimmed and not operable: a native `disabled` button. */
   disabled?: boolean;
-  /** A write it started is in flight: a spinner replaces the icon, and it is inert. */
+  /**
+   * A write it started is in flight: a spinner replaces the icon, it reports
+   * `aria-busy` and `aria-disabled`, and a tap is ignored. It stays focusable,
+   * so the keyboard does not lose its place while the write answers.
+   */
   loading?: boolean;
   dataTestId?: string;
 }
@@ -36,8 +44,9 @@ export interface RaisedActionButtonProps {
  * the row that is an ACTION rather than a place.
  *
  * Lifted half out of the bar so it reads as different in kind from the tabs
- * beside it, and unlabelled so it costs the row less width than a tab: that
- * width is what lets a bar keep four labelled tabs AND this button at 320px.
+ * beside it. Uncaptioned it costs the row less width than a tab: that width is
+ * what lets a bar keep four labelled tabs AND this button at 320px. A bar of
+ * verbs captions it, naming the act under the button.
  *
  * `SectionNav` draws it for its `primary` menu. It is exported on its own for
  * a bar the host already draws — drop it between two tabs, in a flex row.
@@ -55,7 +64,6 @@ export function RaisedActionButton({
 }: RaisedActionButtonProps): React.JSX.Element {
   const theme = useTheme();
   const expanded = open === true;
-  const inert = disabled || loading;
   return (
     <Box
       sx={{
@@ -70,9 +78,7 @@ export function RaisedActionButton({
       <Box
         component="button"
         type="button"
-        onClick={onClick}
-        disabled={inert}
-        aria-busy={loading || undefined}
+        {...raisedState({ onClick, disabled, loading })}
         aria-label={expanded && closeLabel ? closeLabel : label}
         aria-expanded={open}
         data-testid={dataTestId}
@@ -80,9 +86,31 @@ export function RaisedActionButton({
       >
         <SlotIcon icon={icon} loading={loading} />
       </Box>
-      {captioned ? <RaisedCaption label={label} inert={inert} /> : null}
+      {captioned ? <RaisedCaption label={label} inert={disabled || loading} /> : null}
     </Box>
   );
+}
+
+/**
+ * The button's operability. Only `disabled` is native: an in-flight button
+ * keeps its focus, reports `aria-busy` and `aria-disabled`, and drops the click.
+ */
+function raisedState({
+  onClick,
+  disabled,
+  loading,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  loading: boolean;
+}): Record<string, unknown> {
+  const busy = loading && !disabled;
+  return {
+    onClick: busy ? undefined : onClick,
+    disabled,
+    'aria-disabled': busy ? 'true' : undefined,
+    'aria-busy': loading || undefined,
+  };
 }
 
 /**
@@ -119,7 +147,7 @@ function raisedSx(theme: Theme, expanded: boolean): SxProps<Theme> {
     bgcolor: 'primary.main',
     color: 'primary.contrastText',
     boxShadow: theme.shadows[6],
-    '&:disabled': { cursor: 'default', bgcolor: 'action.disabledBackground', color: 'text.disabled', boxShadow: 'none' },
+    [NOT_LIVE]: { cursor: 'default', bgcolor: 'action.disabledBackground', color: 'text.disabled', boxShadow: 'none' },
     '& svg': {
       fontSize: rem(theme, 26),
       transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shorter }),

@@ -17,11 +17,30 @@ export interface SectionNavDestination {
   label: string;
   icon: ReactNode;
   href?: string;
-  /** What the slot does, for an action slot. Ignored while `disabled` or `loading`. */
+  /**
+   * What the slot does, for an action slot. Ignored while `disabled` or
+   * `loading`; still called while `dimmed`.
+   */
   onSelect?: () => void;
-  /** Drawn dimmed and not operable: the act exists here, and cannot be done now. */
+  /**
+   * Drawn dimmed and not operable: the act exists here, and cannot be done
+   * now. A native `disabled` button — a tap does nothing, and `onSelect` is
+   * not called.
+   */
   disabled?: boolean;
-  /** A write this slot started is in flight — a spinner replaces the icon and the slot is inert. */
+  /**
+   * Drawn exactly like `disabled`, but still TAPPABLE: for an act the screen
+   * cannot do now and should EXPLAIN when tapped. It reports
+   * `aria-disabled="true"`, stays focusable, never lights up, and its
+   * `onSelect` still fires so the host can answer with a message (why not,
+   * and what would make it possible).
+   */
+  dimmed?: boolean;
+  /**
+   * A write this slot started is in flight — a spinner replaces the icon, the
+   * slot reports `aria-busy` and `aria-disabled`, and a tap is ignored. It
+   * stays focusable, so the keyboard does not lose its place mid-write.
+   */
   loading?: boolean;
   /**
    * The control's own `data-testid`, in place of the one the nav derives. For
@@ -34,7 +53,11 @@ export interface SectionNavDestination {
    * different claims and neither is a number.
    */
   badge?: number;
-  /** The destination the viewer is on. The host decides; the nav never reads the URL. */
+  /**
+   * For a link: the destination the viewer is on (`aria-current="page"`). For
+   * an action slot: a toggle that is ON (`aria-pressed`). The host decides;
+   * the nav never reads the URL.
+   */
   active?: boolean;
 }
 
@@ -91,7 +114,7 @@ export interface SectionNavMenu {
   /** The sheet's heading, and the rail section's. */
   title: string;
   groups: SectionNavGroup[];
-  /** The trigger is drawn dimmed and does not open. */
+  /** The trigger is drawn dimmed and does not open; in the rail every row of it is inert. */
   disabled?: boolean;
   /**
    * The control's own `data-testid`, in place of the one the nav derives. For
@@ -109,7 +132,9 @@ export interface SectionNavAction {
   label: string;
   icon: ReactNode;
   onSelect: () => void;
+  /** A native `disabled` button: a tap does nothing. */
   disabled?: boolean;
+  /** In flight: a spinner, `aria-busy`, `aria-disabled`; focusable, and a tap is ignored. */
   loading?: boolean;
   /**
    * The control's own `data-testid`, in place of the one the nav derives. For

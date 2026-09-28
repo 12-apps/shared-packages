@@ -5,8 +5,17 @@ import { useState, type ElementType, type ReactNode } from 'react';
 import type { SectionNavCopy } from '../../../copy';
 import { rem } from '../../../tokens/scales';
 
-import { barSlots, isMenu, menuActive, menuCount, type BarSlot } from './SectionNav.helpers';
-import { Box, CONTROL_RESET, CountedIcon, SlotIcon, controlProps, focusRing } from './SectionNav.parts';
+import { barSlots, destinationState, isMenu, menuActive, menuCount, type BarSlot } from './SectionNav.helpers';
+import {
+  Box,
+  CONTROL_RESET,
+  CountedIcon,
+  NOT_LIVE,
+  SlotIcon,
+  controlProps,
+  destinationControl,
+  focusRing,
+} from './SectionNav.parts';
 import { RaisedActionButton } from './SectionNav.primary';
 import { SectionNavSheet } from './SectionNav.sheet';
 import type { SectionNavAction, SectionNavDestination, SectionNavMenu, SectionNavProps } from './SectionNav.types';
@@ -29,14 +38,17 @@ export function sectionNavBarInset(theme: Parameters<typeof rem>[0]): string {
 /**
  * One slot: icon over label, a count on the icon.
  *
- * `current` is the page the viewer is on and is what `aria-current` reports;
- * `lit` is only how the slot looks, and goes out while a sheet is open so the
- * bar shows where the thumb is. Opening a sheet is `aria-expanded`'s to say.
+ * `current` is the page the viewer is on and is what `aria-current` reports —
+ * a link's claim only; an action slot that is ON says so with `aria-pressed`,
+ * which arrives in `control`. `lit` is only how the slot looks, and goes out
+ * while a sheet is open so the bar shows where the thumb is. Opening a sheet
+ * is `aria-expanded`'s to say.
  *
  * A destination is a link or an action; the "more" slot is a button that
  * opens its sheet. Either way the whole slot is the target, so a thumb landing
- * on the label lands on the control. A `disabled` or `loading` slot is a
- * disabled button, dimmed — the act is still where the hand expects it.
+ * on the label lands on the control. A `disabled` slot is a disabled button,
+ * dimmed — the act is still where the hand expects it. A `loading` or
+ * `dimmed` slot is drawn the same and stays focusable (`aria-disabled`).
  */
 function Slot({
   label,
@@ -123,7 +135,7 @@ function slotSx(theme: Theme, lit: boolean): SxProps<Theme> {
       bgcolor: 'primary.main',
     },
     '& svg': { fontSize: rem(theme, 22) },
-    '&:disabled': { color: 'text.disabled' },
+    [NOT_LIVE]: { color: 'text.disabled' },
   } as SxProps<Theme>;
 }
 
@@ -198,7 +210,7 @@ function MoreSlot({ more, context }: { more: SectionNavMenu; context: SlotContex
   );
 }
 
-/** A destination: a link, or an action slot. */
+/** A destination: a link, or an action slot (a toggle when it carries `active`). */
 function DestinationSlot({
   destination,
   context,
@@ -206,25 +218,20 @@ function DestinationSlot({
   destination: SectionNavDestination;
   context: SlotContext;
 }): React.JSX.Element {
-  const active = destination.active === true;
+  const { current, lit } = destinationState(destination);
   return (
     <Slot
       label={destination.label}
       icon={destination.icon}
       count={destination.badge}
-      current={active}
-      lit={context.open === null && active}
+      current={current}
+      lit={context.open === null && lit}
       copy={context.copy}
       testId={destination.dataTestId ?? `${context.dataTestId}-dest-${destination.id}`}
       loading={destination.loading === true}
-      control={controlProps({
-        href: destination.href,
-        linkComponent: context.linkComponent,
-        inert: destination.disabled === true || destination.loading === true,
-        onClick: () => {
-          context.close();
-          destination.onSelect?.();
-        },
+      control={destinationControl(destination, context.linkComponent, () => {
+        context.close();
+        destination.onSelect?.();
       })}
     />
   );

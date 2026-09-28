@@ -81,7 +81,9 @@ describe('SectionNav action slots', () => {
     ]);
     expect(screen.getByTestId('bar-split')).toBeDisabled();
     const busy = screen.getByTestId('bar-equal');
-    expect(busy).toBeDisabled();
+    // In flight stays focusable: aria-disabled, never native disabled.
+    expect(busy).not.toBeDisabled();
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(within(busy).getByTestId('section-nav-spinner')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('bar-split'));

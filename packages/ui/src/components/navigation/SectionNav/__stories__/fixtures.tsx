@@ -113,9 +113,13 @@ export function RailFrame({ children }: { children: React.ReactNode }): React.Re
 /**
  * A screen's ACTIONS pinned at its foot — the same bar, drawn with verbs: a
  * bill being settled, one person at a time.
+ *
+ * `split` is DIMMED — it cannot be done yet, and a tap still reaches the host
+ * so it can say why. `equal` is a TOGGLE that is on: `aria-pressed`, never
+ * `aria-current`, because an action is not a page.
  */
 export const ACTIONS: SectionNavDestination[] = [
-  { id: 'split', label: 'Split', icon: <ReceiptLongOutlinedIcon />, onSelect: () => undefined, disabled: true },
+  { id: 'split', label: 'Split', icon: <ReceiptLongOutlinedIcon />, onSelect: () => undefined, dimmed: true },
   { id: 'equal', label: 'Equally', icon: <GroupsOutlinedIcon />, onSelect: () => undefined, active: true },
   { id: 'person', label: 'Person', icon: <AddIcon />, onSelect: () => undefined },
 ];

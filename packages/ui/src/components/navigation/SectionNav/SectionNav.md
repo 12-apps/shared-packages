@@ -31,8 +31,8 @@ screen.
 - **layout**: `'bar' | 'rail'`.
 - **label**: the navigation landmark's accessible name.
 - **destinations**: `SectionNavDestination[]`, each with `id`, `label`, `icon`,
-  `href` OR `onSelect`, `badge?`, `active?`, `disabled?`, `loading?` and
-  `dataTestId?`.
+  `href` OR `onSelect`, `badge?`, `active?`, `disabled?`, `dimmed?`,
+  `loading?` and `dataTestId?`.
 - **primary**: a `SectionNavMenu` (`label`, `icon`, `title`, `groups`) or a
   `SectionNavAction` (`label`, `icon`, `onSelect`, `disabled?`, `loading?`). In
   the bar it is the raised button. A menu opens its sheet, and the button's name
@@ -58,14 +58,26 @@ The same bar pins a SCREEN's actions at its foot: give destinations an
 places and a bar of verbs are one component, so they cannot drift into two
 looks one tap apart.
 
-- `disabled` draws the slot dimmed and makes it a disabled button, even when it
-  carries an `href`: a link cannot be disabled, and one that looks dimmed but
-  still navigates is a lie.
-- `loading` replaces the icon with a spinner, sets `aria-busy`, and makes the
-  slot inert until the write it started answers.
-- `active` lights an action slot the way it lights the current page. Use it for
-  a toggle that is ON.
-- A menu entry, and a whole menu (the `more` slot), can be `disabled` too.
+- `disabled` draws the slot dimmed and makes it a native disabled button, even
+  when it carries an `href`: a link cannot be disabled, and one that looks
+  dimmed but still navigates is a lie. A tap does nothing; `onSelect` is not
+  called.
+- `dimmed` is for an act the screen cannot do now but should EXPLAIN when
+  tapped. It is drawn exactly like `disabled` (the `text.disabled` colour) and
+  reports `aria-disabled="true"`, but it is NOT natively disabled: it stays
+  focusable, its `onSelect` still fires, and the host answers with a message
+  (why not, and what would make it possible). It is never lit.
+- `loading` replaces the icon with a spinner and reports `aria-busy` and
+  `aria-disabled="true"` until the write it started answers. It stays
+  focusable, so the keyboard keeps its place, and a tap is ignored. The same
+  holds for a loading action `primary`. Native `disabled` is used only for
+  `disabled`.
+- `active` on an action slot marks a TOGGLE that is on: it lights the slot and
+  reports `aria-pressed="true"` (`false` when `active: false`). Only a link
+  reports `aria-current="page"`; an action is not a page.
+- A menu entry, and a whole menu, can be `disabled` too. In the bar a disabled
+  menu's trigger is inert and opens no sheet; in the rail, where the menu is
+  listed rather than behind a trigger, every row of it is inert.
 - `dataTestId` on a destination, entry, action or menu replaces the id the nav
   would derive, for a host whose suites already drive their own.
 
@@ -102,6 +114,9 @@ the slot reports the sheet through `aria-expanded`.
 
 The raised round button on its own, for a host that already draws its own bar:
 drop it between two tabs in a flex row. Without `open` it is a plain action.
+With `captioned` its label is drawn under it, hidden from assistive tech so
+the button is named once. `disabled` is native; `loading` keeps it focusable
+with `aria-busy` and `aria-disabled`, and drops the click.
 With `open` it reports `aria-expanded`, takes `closeLabel` as its name, and its
 icon turns 45° while open.
 
