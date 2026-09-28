@@ -318,7 +318,7 @@ export const WithCustomTrigger: Story = {
         label: 'Add to favorites',
         icon: <Star />,
         color: 'warning' as const,
-        action: () => {
+        onClick: () => {
           /** do nothing */
         },
       },

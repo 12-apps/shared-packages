@@ -1,11 +1,32 @@
 import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined';
 import PhotoCameraOutlined from '@mui/icons-material/PhotoCameraOutlined';
 import Box from '@mui/material/Box/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { action } from 'storybook/actions';
 
 import { UploadButton } from './UploadButton';
 import { PT_BR_UPLOAD_BUTTON_COPY } from '../../../pt-BR';
+
+// `UploadButton` forwards only `className` — no `sx`, no `style` — so custom
+// CSS (a size override, a hover/focus treatment, a full-width layout) goes
+// through `styled(UploadButton)`.
+const SmallUploadButton = styled(UploadButton)({ fontSize: '0.75rem', padding: '4px 8px' });
+const LargeUploadButton = styled(UploadButton)({ fontSize: '1.125rem', padding: '12px 24px' });
+const HoverLiftUploadButton = styled(UploadButton)({
+  '&:hover': {
+    transform: 'translateY(-2px)',
+    transition: 'transform 0.2s',
+  },
+});
+const FocusRingUploadButton = styled(UploadButton)(({ theme }) => ({
+  '&:focus-visible': {
+    outline: '2px solid',
+    outlineColor: theme.palette.primary.main,
+    outlineOffset: 2,
+  },
+}));
+const FullWidthUploadButton = styled(UploadButton)({ width: '100%' });
 
 const meta: Meta<typeof UploadButton> = {
   args: { copy: PT_BR_UPLOAD_BUTTON_COPY },
@@ -289,19 +310,17 @@ export const AllVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
+      <SmallUploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
         label="Small"
         onSelect={action('small-selected')}
-        sx={{ fontSize: '0.75rem', padding: '4px 8px' }}
       />
-      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
-        label="Medium" 
+      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
+        label="Medium"
         onSelect={action('medium-selected')}
       />
-      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
+      <LargeUploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
         label="Large"
         onSelect={action('large-selected')}
-        sx={{ fontSize: '1.125rem', padding: '12px 24px' }}
       />
     </Box>
   )
@@ -322,26 +341,13 @@ export const AllStates: Story = {
 export const InteractiveStates: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
-        label="Hover Me" 
+      <HoverLiftUploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
+        label="Hover Me"
         onSelect={action('hover-selected')}
-        sx={{ 
-          '&:hover': { 
-            transform: 'translateY(-2px)',
-            transition: 'transform 0.2s'
-          }
-        }}
       />
-      <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
-        label="Focus Me" 
+      <FocusRingUploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
+        label="Focus Me"
         onSelect={action('focus-selected')}
-        sx={{
-          '&:focus-visible': {
-            outline: '2px solid',
-            outlineColor: 'primary.main',
-            outlineOffset: 2
-          }
-        }}
       />
     </Box>
   )
@@ -351,10 +357,9 @@ export const Responsive: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, width: '100%' }}>
       <Box sx={{ flex: 1 }}>
-        <UploadButton copy={PT_BR_UPLOAD_BUTTON_COPY} 
+        <FullWidthUploadButton copy={PT_BR_UPLOAD_BUTTON_COPY}
           label="Mobile First"
           onSelect={action('mobile-selected')}
-          sx={{ width: '100%' }}
         />
       </Box>
       <Box sx={{ flex: 1 }}>

@@ -7,6 +7,8 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
+import type { CountryCode } from 'libphonenumber-js';
+
 import { PhoneInput } from './PhoneInput';
 import { PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR';
 
@@ -27,12 +29,12 @@ const meta: Meta<typeof PhoneInput> = {
   argTypes: {
     variant: {
       control: { type: 'select' },
-      options: ['outlined', 'filled', 'standard'],
+      options: ['outlined', 'filled', 'glass'],
       description: 'Input field variant',
     },
-    defaultCountry: {
+    countryCode: {
       control: 'text',
-      description: 'Default country code (e.g., "US", "GB")',
+      description: 'Starting country (e.g., "US", "GB")',
     },
     label: {
       control: 'text',
@@ -54,7 +56,7 @@ const meta: Meta<typeof PhoneInput> = {
       control: 'boolean',
       description: 'Show error state',
     },
-    helperText: {
+    helper: {
       control: 'text',
       description: 'Helper text below input',
     },
@@ -69,11 +71,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const DefaultComponent = () => {
+  // Uncontrolled: the field owns its own text, so the story reads it back
+  // through `onChange` rather than feeding a `value` prop back in.
   const [value, setValue] = React.useState('');
 
   return (
     <Box sx={{ maxWidth: 400 }}>
-      <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} value={value} onChange={setValue} label="Phone Number" defaultCountry="US" />
+      <PhoneInput
+        copy={PT_BR_PHONE_INPUT_COPY}
+        onChange={(newValue) => setValue(newValue)}
+        label="Phone Number"
+        countryCode="US"
+      />
       {value && (
         <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
           Value: {value}
@@ -89,7 +98,7 @@ export const Default: Story = {
 
 export const InternationalNumbers: Story = {
   render: () => {
-    const countries = [
+    const countries: Array<{ code: CountryCode; name: string; example: string }> = [
       { code: 'US', name: 'United States', example: '+1 (555) 123-4567' },
       { code: 'GB', name: 'United Kingdom', example: '+44 20 7123 4567' },
       { code: 'FR', name: 'France', example: '+33 1 23 45 67 89' },
@@ -108,12 +117,12 @@ export const InternationalNumbers: Story = {
               <Typography variant="subtitle2" gutterBottom>
                 {country.name}
               </Typography>
+              {/* No `size` prop — the component only ever renders at one size; `fullWidth` is its one layout knob. */}
               <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
-                defaultCountry={country.code}
+                countryCode={country.code}
                 placeholder={country.example}
                 label="Phone"
                 variant="outlined"
-                size="small"
                 fullWidth
               />
             </Paper>
@@ -127,18 +136,18 @@ export const InternationalNumbers: Story = {
 const WithValidationComponent = () => {
   const [phone, setPhone] = React.useState('');
   const [error, setError] = React.useState(false);
-  const [helperText, setHelperText] = React.useState('');
+  const [errorMessage, setErrorMessage] = React.useState('');
 
   const validatePhone = (value: string) => {
     // Simple validation - check if it has at least 10 digits
     const digitsOnly = value.replace(/\D/g, '');
     if (digitsOnly.length < 10) {
       setError(true);
-      setHelperText('Please enter a valid phone number');
+      setErrorMessage('Please enter a valid phone number');
       return false;
     }
     setError(false);
-    setHelperText('');
+    setErrorMessage('');
     return true;
   };
 
@@ -153,7 +162,6 @@ const WithValidationComponent = () => {
       <Typography variant="h6">Phone Validation Example</Typography>
 
       <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
-        value={phone}
         onChange={(value) => {
           setPhone(value);
           if (value) validatePhone(value);
@@ -161,8 +169,8 @@ const WithValidationComponent = () => {
         label="Contact Number"
         required
         error={error}
-        helperText={helperText}
-        defaultCountry="US"
+        errorMessage={errorMessage}
+        countryCode="US"
       />
 
       <Button variant="contained" onClick={handleSubmit} disabled={!phone || error}>
@@ -206,18 +214,16 @@ const ContactFormComponent = () => {
           />
 
           <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
-            value={formData.phone}
             onChange={(value) => setFormData({ ...formData, phone: value })}
             label="Primary Phone"
             required
-            defaultCountry="US"
+            countryCode="US"
           />
 
           <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
-            value={formData.alternatePhone}
             onChange={(value) => setFormData({ ...formData, alternatePhone: value })}
             label="Alternate Phone (Optional)"
-            defaultCountry="US"
+            countryCode="US"
           />
         </Stack>
       </Paper>
@@ -238,6 +244,16 @@ export const ContactForm: Story = {
 };
 
 export const DifferentVariants: Story = {
+  parameters: {
+    docs: {
+      description: {
+        // `standard` was never a real variant here — the component only ever
+        // supported outlined/filled/glass — so this example now shows the
+        // three that actually exist instead of documenting one that doesn't.
+        story: 'The three real input variants: outlined, filled, and glass.',
+      },
+    },
+  },
   render: () => (
       <Stack spacing={3}>
         <Typography variant="h6">Input Variants</Typography>
@@ -245,21 +261,21 @@ export const DifferentVariants: Story = {
         <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
           label="Outlined"
           variant="outlined"
-          defaultCountry="US"
+          countryCode="US"
           placeholder="+1 (555) 000-0000"
         />
 
         <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
           label="Filled"
           variant="filled"
-          defaultCountry="US"
+          countryCode="US"
           placeholder="+1 (555) 000-0000"
         />
 
         <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
-          label="Standard"
-          variant="standard"
-          defaultCountry="US"
+          label="Glass"
+          variant="glass"
+          countryCode="US"
           placeholder="+1 (555) 000-0000"
         />
       </Stack>
@@ -267,19 +283,30 @@ export const DifferentVariants: Story = {
 };
 
 export const WithCountryRestrictions: Story = {
+  parameters: {
+    docs: {
+      description: {
+        // The component never re-gained a country allow-list after this was
+        // written — `onlyCountries` isn't a prop. The picker always offers
+        // every country; a region-specific field can only steer its STARTING
+        // selection via `countryCode`, which is what this example now shows.
+        story:
+          "There is no country allow-list — the picker always lists every country. `countryCode` only sets which one is preselected, so a region-specific field steers the starting point and explains the expectation in its own helper text.",
+      },
+    },
+  },
   render: () => (
       <Stack spacing={3}>
         <Typography variant="h6">Regional Phone Numbers</Typography>
 
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
-            North America Only
+            North America
           </Typography>
           <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             label="Phone"
-            defaultCountry="US"
-            onlyCountries={['US', 'CA', 'MX']}
-            helperText="US, Canada, and Mexico only"
+            countryCode="US"
+            helper="Starts on the US — pick Canada or Mexico from the list if needed"
           />
         </Paper>
 
@@ -289,9 +316,8 @@ export const WithCountryRestrictions: Story = {
           </Typography>
           <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             label="Phone"
-            defaultCountry="FR"
-            onlyCountries={['FR', 'DE', 'IT', 'ES', 'NL', 'BE']}
-            helperText="EU countries only"
+            countryCode="FR"
+            helper="Starts on France — any EU country can be picked from the list"
           />
         </Paper>
 
@@ -301,9 +327,8 @@ export const WithCountryRestrictions: Story = {
           </Typography>
           <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
             label="Phone"
-            defaultCountry="JP"
-            onlyCountries={['JP', 'CN', 'KR', 'SG', 'AU', 'NZ']}
-            helperText="APAC region only"
+            countryCode="JP"
+            helper="Starts on Japan — any APAC country can be picked from the list"
           />
         </Paper>
       </Stack>
@@ -311,11 +336,20 @@ export const WithCountryRestrictions: Story = {
 };
 
 export const DisabledAndReadOnly: Story = {
+  parameters: {
+    docs: {
+      description: {
+        // There is no `readOnly` prop — `disabled` is the only way to stop
+        // editing, and it also greys the field out. This example shows the
+        // one state the component actually has, rather than a second one it
+        // does not.
+        story: '`disabled` is the only non-editable state the component supports — there is no separate read-only look.',
+      },
+    },
+  },
   render: () => (
       <Stack spacing={3}>
-        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Disabled" defaultCountry="US" value="+1 (555) 123-4567" disabled />
-
-        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Read Only" defaultCountry="GB" value="+44 20 7123 4567" readOnly />
+        <PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Disabled" countryCode="US" defaultValue="+1 (555) 123-4567" disabled />
       </Stack>
     ),
 };
@@ -341,10 +375,9 @@ const EmergencyContactsComponent = () => {
             {contact.name}
           </Typography>
           <PhoneInput copy={PT_BR_PHONE_INPUT_COPY}
-            value={contact.phone}
             onChange={(value) => updateContact(contact.id, value)}
             label="Phone Number"
-            defaultCountry="US"
+            countryCode="US"
             required={contact.id === 1}
             fullWidth
           />

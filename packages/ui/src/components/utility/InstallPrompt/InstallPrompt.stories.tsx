@@ -5,7 +5,20 @@ import { useEffect } from 'react';
 
 import { InstallPrompt } from './InstallPrompt';
 import type { BeforeInstallPromptEvent } from './InstallPrompt.types';
+import type { InstallPromptCopy } from '../../../copy';
 import { PT_BR_INSTALL_PROMPT_COPY } from '../../../pt-BR';
+
+/**
+ * `title`, `installLabel` and `dismissLabel` moved into the required `copy`
+ * prop — they are no longer props of their own. A story that wants custom
+ * wording builds its own `copy` object instead of overriding them directly.
+ */
+const LOCALISED_INSTALL_PROMPT_COPY: InstallPromptCopy = {
+  ...PT_BR_INSTALL_PROMPT_COPY,
+  title: 'Instalar o FutureDrink',
+  installLabel: 'Instalar',
+  dismissLabel: 'Dispensar',
+};
 
 /**
  * The component listens for a browser event that Storybook will never fire, so
@@ -73,11 +86,10 @@ const WithDescriptionComponent = () => {
   useSyntheticInstallEvent();
 
   return (
-    <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY}
+    <InstallPrompt
+      copy={PT_BR_INSTALL_PROMPT_COPY}
       storageKey="sb-install-described"
-      title="Install FutureDrink"
-      description="Order faster next time — the menu opens straight from your home screen."
-      installLabel="Install"
+      description="Peça mais rápido na próxima visita, direto da tela de início."
     />
   );
 };
@@ -91,17 +103,15 @@ const LocalisedComponent = () => {
   useSyntheticInstallEvent();
 
   return (
-    <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY}
+    <InstallPrompt
+      copy={LOCALISED_INSTALL_PROMPT_COPY}
       storageKey="sb-install-ptbr"
-      title="Instalar o FutureDrink"
       description="Peça mais rápido na próxima visita, direto da tela de início."
-      installLabel="Instalar"
-      dismissLabel="Dispensar"
     />
   );
 };
 
-/** Every string is a prop; this package ships no locale of its own. */
+/** Every string comes from `copy`; this package ships no locale of its own. */
 export const Localised: Story = {
   render: () => <LocalisedComponent />,
 };

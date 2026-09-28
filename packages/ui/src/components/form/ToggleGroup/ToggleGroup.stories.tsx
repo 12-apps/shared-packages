@@ -149,7 +149,7 @@ const VariantsComponent = () => {
           color="success"
           options={themeOptions}
           value={exclusiveValue}
-          onChange={(event, value) => setExclusiveValue(value || themeOptions[0].value)}
+          onChange={(event, value) => setExclusiveValue(value || themeOptions[0]?.value || '')}
         />
       </Box>
     </Box>
@@ -166,6 +166,7 @@ const ColorsComponent = () => {
     secondary: '',
     success: '',
     warning: '',
+    info: '',
     danger: '',
     neutral: '',
   });

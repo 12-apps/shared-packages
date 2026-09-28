@@ -296,7 +296,7 @@ export const ColorVariations: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Default Color
         </Typography>
-        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} color="default" variant="elevated" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} variant="elevated" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>

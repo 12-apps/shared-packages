@@ -1,6 +1,8 @@
 import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Typography from '@mui/material/Typography/index.js';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Spacer } from './Spacer';
@@ -446,8 +448,19 @@ export const InteractiveStates: Story = {
   },
 };
 
-export const Responsive: Story = {
-  render: () => (
+/**
+ * `height` takes a single `number | string`, not a per-breakpoint object — so
+ * a responsive height is chosen in JS (via `useMediaQuery`) and passed as one
+ * plain value, the same way any other responsive PROP (as opposed to `sx`)
+ * would be driven.
+ */
+const ResponsiveComponent = () => {
+  const theme = useTheme();
+  const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
+  const isSmUp = useMediaQuery(theme.breakpoints.up('sm'));
+  const customHeight = isMdUp ? 60 : isSmUp ? 40 : 20;
+
+  return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
       <Typography variant="h6">Responsive Behavior</Typography>
 
@@ -485,12 +498,19 @@ export const Responsive: Story = {
         <Typography variant="subtitle2">Custom responsive dimensions</Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <DemoBox>Top</DemoBox>
-          <Spacer height={{ xs: 20, sm: 40, md: 60 }} />
+          <Spacer height={customHeight} />
           <DemoBox>Bottom</DemoBox>
         </Box>
+        <Typography variant="caption" color="text.secondary">
+          (`height` is one value; pick it per breakpoint with `useMediaQuery`)
+        </Typography>
       </Box>
     </Box>
-  ),
+  );
+};
+
+export const Responsive: Story = {
+  render: () => <ResponsiveComponent />,
   parameters: {
     docs: { disable: true },
     viewport: {
