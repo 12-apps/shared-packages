@@ -15,6 +15,7 @@
  * promises, not knobs for a caller to turn.
  */
 export { createWebImpersonation } from './create-web-impersonation';
+export { createPreviewWebImpersonation } from './create-preview-web-impersonation';
 export type {
   ImpersonationDialogConfig,
   ImpersonationWebConfig,

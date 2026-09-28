@@ -2,22 +2,16 @@ import type { ComponentType } from 'react';
 
 import type { ImpersonationTenant, PreviewSubject } from '../core/types';
 
-import {
-  bindImpersonationBanner,
-  type ImpersonationBannerProps,
-} from './banner';
+import type { ImpersonationBannerProps } from './banner';
 import type {
   ImpersonationAppOption,
   ImpersonationDialogProps,
 } from './dialog';
 import { lazyImpersonationDialog, prefetchImpersonationDialog } from './dialog-lazy';
 import type { ImpersonationLabels } from './labels';
-import {
-  startImpersonation,
-  type ImpersonationEndpoints,
-  type ImpersonationStartResult,
-} from './session-control';
-import { httpImpersonationTransport, type ImpersonationTransport } from './transport';
+import type { ImpersonationStartResult } from './session-control';
+import type { ImpersonationTransport } from './transport';
+import { bindWebImpersonationBase } from './web-impersonation-base';
 
 /**
  * The one thing this package exposes to a FRONTEND host.
@@ -116,24 +110,7 @@ export interface WebImpersonation {
 export function createWebImpersonation(
   config: ImpersonationWebConfig,
 ): WebImpersonation {
-  const endpoints: ImpersonationEndpoints = {
-    transport: config.transport ?? httpImpersonationTransport(),
-    platformPath: config.platformPath,
-    tenantPath: config.tenantPath,
-    onEnd: config.onEnd,
-  };
-
-  const banner = bindImpersonationBanner({
-    endpoints,
-    labels: config.labels.banner,
-    onSessionChange: config.onSessionChange,
-  });
-
-  const startPreview: WebImpersonation['startPreview'] = (request) =>
-    startImpersonation(endpoints, {
-      path: config.tenantPath(request.tenantSlug),
-      body: request.previewOf,
-    });
+  const { endpoints, banner, startPreview } = bindWebImpersonationBase(config);
 
   const dialogLabels = config.labels.dialog;
   const dialogConfig = config.dialog;
