@@ -27,7 +27,6 @@ const meta: Meta<typeof Dialog> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
 
 // A `DialogActions` button this wrapper re-targets to its own `handleClose`.
 interface ClonableButtonProps {
@@ -42,12 +41,16 @@ interface TestDialogWrapperProps {
   onClose?: () => void;
   [key: string]: unknown;
 }
-// `TestDialogWrapper` owns `onOpen` itself (fired when its own button opens
-// the dialog) rather than forwarding it to `Dialog`, which has no such prop —
-// naming its props type directly (rather than `StoryObj<typeof meta>`, which
-// only knows `DialogProps`) types every story's `args` to match what it
-// actually passes.
-type WrapperStory = StoryObj<TestDialogWrapperProps>;
+// Most stories drive `Dialog` through `TestDialogWrapper` below, whose props
+// add `onOpen` (fired when its own button opens the dialog) — `DialogProps`
+// has no such prop. Naming its props type directly (rather than
+// `StoryObj<typeof meta>`, which only knows `DialogProps`) types `args` to
+// match what those stories actually pass; the few stories that drive
+// `<Dialog>` directly set no `args`, so the wider type costs them nothing.
+// One name (`Story`), not two: `scripts/native-parity.mjs` counts native
+// shared-story coverage by matching the literal `: Story` annotation, so a
+// second type name here would silently drop stories from that ledger.
+type Story = StoryObj<TestDialogWrapperProps>;
 
 const TestDialogWrapper = ({
   children,
@@ -103,7 +106,7 @@ const TestDialogWrapper = ({
 };
 
 // 1. Basic Interaction Tests
-export const BasicInteraction: WrapperStory = {
+export const BasicInteraction: Story = {
   name: '🧪 Basic Interaction Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -178,7 +181,7 @@ export const BasicInteraction: WrapperStory = {
 };
 
 // 2. Keyboard Navigation Test
-export const KeyboardNavigation: WrapperStory = {
+export const KeyboardNavigation: Story = {
   name: '⌨️ Keyboard Navigation Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -268,7 +271,7 @@ export const KeyboardNavigation: WrapperStory = {
 };
 
 // 3. Screen Reader Test
-export const ScreenReaderTest: WrapperStory = {
+export const ScreenReaderTest: Story = {
   name: '🔊 Screen Reader Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -335,7 +338,7 @@ export const ScreenReaderTest: WrapperStory = {
 };
 
 // 4. Focus Management Test
-export const FocusManagement: WrapperStory = {
+export const FocusManagement: Story = {
   /*
    * On open, the web `Dialog` moves focus to the first tabbable descendant of
    * the `role="dialog"` paper — or the paper itself when it holds nothing
@@ -453,7 +456,7 @@ export const FocusManagement: WrapperStory = {
 };
 
 // 5. Visual States Test
-export const VisualStates: WrapperStory = {
+export const VisualStates: Story = {
   name: '👁️ Visual States Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -532,7 +535,7 @@ export const VisualStates: WrapperStory = {
 };
 
 // 6. Performance Test
-export const PerformanceTest: WrapperStory = {
+export const PerformanceTest: Story = {
   name: '⚡ Performance Test',
   render: (args) => {
     const items = Array.from({ length: 100 }, (_, i) => ({
@@ -620,7 +623,7 @@ export const PerformanceTest: WrapperStory = {
 };
 
 // 7. Edge Cases Test
-export const EdgeCases: WrapperStory = {
+export const EdgeCases: Story = {
   name: '🔧 Edge Cases Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -716,7 +719,7 @@ export const EdgeCases: WrapperStory = {
 };
 
 // 8. Persistent Dialog Test
-export const PersistentDialogTest: WrapperStory = {
+export const PersistentDialogTest: Story = {
   name: '🔒 Persistent Dialog Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -803,7 +806,7 @@ export const PersistentDialogTest: WrapperStory = {
 };
 
 // 9. Responsive Design Test
-export const ResponsiveDesign: WrapperStory = {
+export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -857,7 +860,7 @@ export const ResponsiveDesign: WrapperStory = {
 };
 
 // 10. Theme Variations Test
-export const ThemeVariations: WrapperStory = {
+export const ThemeVariations: Story = {
   name: '🎨 Theme Variations Test',
   render: (args) => (
     <TestDialogWrapper {...args}>
@@ -910,7 +913,7 @@ export const ThemeVariations: WrapperStory = {
 };
 
 // 11. Integration Test
-export const Integration: WrapperStory = {
+export const Integration: Story = {
   name: '🔗 Integration Test',
   render: (args) => {
     const [nestedOpen, setNestedOpen] = useState(false);

@@ -32,13 +32,16 @@ const meta: Meta<typeof Tabs> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
 // Most tests here drive `Tabs` through `TabsTestWrapper` below, whose props
 // add the callback spies (`onChangeCallback`, …) that `TabsProps` itself
 // doesn't have. Naming that type directly (rather than `StoryObj<typeof
 // meta>`, which only knows `TabsProps`) types `args` to match what those
-// stories actually pass; the few that drive `<Tabs>` directly keep `Story`.
-type WrapperStory = StoryObj<TabsTestWrapperProps>;
+// stories actually pass; the few that drive `<Tabs>` directly still work,
+// since `TabsTestWrapperProps extends Partial<TabsProps>`.
+// One name (`Story`), not two: `scripts/native-parity.mjs` counts native
+// shared-story coverage by matching the literal `: Story` annotation, so a
+// second type name here would silently drop stories from that ledger.
+type Story = StoryObj<TabsTestWrapperProps>;
 
 // Test wrapper component
 interface TabsTestWrapperProps extends Partial<TabsProps> {
@@ -153,7 +156,7 @@ const itemsWithIcons: TabItem[] = [
 ];
 
 // 1. Basic Interaction Test
-export const BasicInteraction: WrapperStory = {
+export const BasicInteraction: Story = {
   name: '🧪 Basic Interaction Test',
   args: {
     items: basicTestItems,
@@ -215,7 +218,7 @@ export const BasicInteraction: WrapperStory = {
 };
 
 // 2. Keyboard Navigation Test
-export const KeyboardNavigation: WrapperStory = {
+export const KeyboardNavigation: Story = {
   name: '⌨️ Keyboard Navigation Test',
   args: {
     items: basicTestItems,
@@ -338,14 +341,14 @@ export const ClosableTabsTest: Story = {
       },
     ],
   },
-  render: (args) => {
+  render: (args: TabsTestWrapperProps) => {
     const ClosableTabsWrapper = () => {
       const [tabs, setTabs] = useState(must(args.items));
       const [value, setValue] = useState('tab1');
 
       const handleChange = (event: React.SyntheticEvent, tabId: string) => {
         setValue(tabId);
-        args.onChange(event, tabId);
+        must(args.onChange)(event, tabId);
       };
 
       const handleTabClose = (tabId: string) => {
@@ -362,6 +365,7 @@ export const ClosableTabsTest: Story = {
           <Tabs
             {...args}
             items={tabs}
+            closeTabLabel={args.closeTabLabel ?? PT_BR_CHROME_COPY.closeTab}
             value={value}
             onChange={handleChange}
             onTabClose={handleTabClose}
@@ -411,7 +415,7 @@ export const ClosableTabsTest: Story = {
 };
 
 // 4. Badge Test
-export const BadgeTest: WrapperStory = {
+export const BadgeTest: Story = {
   name: '🔴 Badge Test',
   args: {
     items: [
@@ -482,7 +486,7 @@ export const BadgeTest: WrapperStory = {
 };
 
 // 5. Disabled Tabs Test
-export const DisabledTabsTest: WrapperStory = {
+export const DisabledTabsTest: Story = {
   name: '🚫 Disabled Tabs Test',
   args: {
     items: [
@@ -556,7 +560,7 @@ export const DisabledTabsTest: WrapperStory = {
 };
 
 // 6. Variant Test
-export const VariantTest: WrapperStory = {
+export const VariantTest: Story = {
   name: '🎨 Variant Test',
   args: {
     items: itemsWithIcons,
@@ -596,7 +600,7 @@ export const VariantTest: WrapperStory = {
 };
 
 // 7. Size Variation Test
-export const SizeVariationTest: WrapperStory = {
+export const SizeVariationTest: Story = {
   name: '📏 Size Variation Test',
   args: {
     items: basicTestItems,
@@ -653,7 +657,7 @@ export const SizeVariationTest: WrapperStory = {
 };
 
 // 8. Scrollable Tabs Test
-export const ScrollableTabsTest: WrapperStory = {
+export const ScrollableTabsTest: Story = {
   name: '📜 Scrollable Tabs Test',
   args: {
     scrollable: true,
@@ -730,7 +734,7 @@ export const ScrollableTabsTest: WrapperStory = {
 };
 
 // 9. Animation Test
-export const AnimationTest: WrapperStory = {
+export const AnimationTest: Story = {
   name: '🎬 Animation Test',
   args: {
     items: basicTestItems,
@@ -778,7 +782,7 @@ export const AnimationTest: WrapperStory = {
 };
 
 // 10. Persist Content Test
-export const PersistContentTest: WrapperStory = {
+export const PersistContentTest: Story = {
   name: '💾 Persist Content Test',
   args: {
     items: [
@@ -834,7 +838,7 @@ export const PersistContentTest: WrapperStory = {
 };
 
 // 11. Loading State Test
-export const LoadingStateTest: WrapperStory = {
+export const LoadingStateTest: Story = {
   name: '⏳ Loading State Test',
   args: {
     items: basicTestItems,
@@ -860,7 +864,7 @@ export const LoadingStateTest: WrapperStory = {
 };
 
 // 12. Accessibility Test
-export const AccessibilityTest: WrapperStory = {
+export const AccessibilityTest: Story = {
   name: '♿ Accessibility Test',
   args: {
     items: itemsWithIcons,
@@ -923,7 +927,7 @@ export const AccessibilityTest: WrapperStory = {
 };
 
 // 13. Color Theme Test
-export const ColorThemeTest: WrapperStory = {
+export const ColorThemeTest: Story = {
   name: '🎨 Color Theme Test',
   args: {
     items: basicTestItems,
@@ -959,7 +963,7 @@ export const ColorThemeTest: WrapperStory = {
 };
 
 // 14. Full Width Test
-export const FullWidthTest: WrapperStory = {
+export const FullWidthTest: Story = {
   name: '↔️ Full Width Test',
   args: {
     items: basicTestItems.slice(0, 2),
@@ -986,7 +990,7 @@ export const FullWidthTest: WrapperStory = {
 };
 
 // 15. Centered Tabs Test
-export const CenteredTabsTest: WrapperStory = {
+export const CenteredTabsTest: Story = {
   name: '🎯 Centered Tabs Test',
   args: {
     items: basicTestItems.slice(0, 2),
@@ -1013,7 +1017,7 @@ export const CenteredTabsTest: WrapperStory = {
 };
 
 // 16. Edge Cases Test
-export const EdgeCasesTest: WrapperStory = {
+export const EdgeCasesTest: Story = {
   name: '🔧 Edge Cases Test',
   args: {
     items: [
@@ -1069,7 +1073,7 @@ export const EdgeCasesTest: WrapperStory = {
 };
 
 // 17. Custom Indicator Color Test
-export const CustomIndicatorColorTest: WrapperStory = {
+export const CustomIndicatorColorTest: Story = {
   name: '🖌️ Custom Indicator Color Test',
   args: {
     items: basicTestItems,
@@ -1093,7 +1097,7 @@ export const CustomIndicatorColorTest: WrapperStory = {
 };
 
 // 18. Dividers Test
-export const DividersTest: WrapperStory = {
+export const DividersTest: Story = {
   name: '│ Dividers Test',
   args: {
     items: basicTestItems,
@@ -1164,14 +1168,14 @@ export const IntegrationTest: Story = {
       },
     ],
   },
-  render: (args) => {
+  render: (args: TabsTestWrapperProps) => {
     const IntegrationWrapper = () => {
       const [items, setItems] = useState(must(args.items));
       const [value, setValue] = useState('home');
 
       const handleChange = (event: React.SyntheticEvent, tabId: string) => {
         setValue(tabId);
-        args.onChange(event, tabId);
+        must(args.onChange)(event, tabId);
       };
 
       const handleTabClose = (tabId: string) => {
@@ -1188,6 +1192,7 @@ export const IntegrationTest: Story = {
           <Tabs
             {...args}
             items={items}
+            closeTabLabel={args.closeTabLabel ?? PT_BR_CHROME_COPY.closeTab}
             value={value}
             onChange={handleChange}
             onTabClose={handleTabClose}
