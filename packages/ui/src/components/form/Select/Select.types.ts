@@ -20,19 +20,4 @@ export interface SelectProps
    * Test ID for testing purposes
    */
   'data-testid'?: string;
-  /**
-   * Draw the field as a search box that filters the options as you type,
-   * with a list of bounded height.
-   *
-   * Left unset, it follows the option count: a list longer than
-   * {@link SEARCHABLE_MIN_OPTIONS} - 1 options searches, a shorter one opens
-   * as a plain menu. `multiple` and `renderValue` always keep the menu.
-   */
-  searchable?: boolean;
-  /**
-   * What the searchable list says when nothing matches the typed text. The
-   * host's sentence: this library ships no copy. Unset, the empty list shows
-   * no message.
-   */
-  noOptionsText?: string;
 }

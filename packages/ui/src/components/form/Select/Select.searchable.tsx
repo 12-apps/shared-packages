@@ -1,6 +1,8 @@
 import Autocomplete from '@mui/material/Autocomplete/index.js';
 import type { AutocompleteRenderInputParams } from '@mui/material/Autocomplete/index.js';
 import type { SelectChangeEvent } from '@mui/material/Select/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import React from 'react';
 
@@ -61,116 +63,141 @@ function renderOption(
 
 interface FieldProps {
   params: AutocompleteRenderInputParams;
-  label: SelectProps['label'];
-  placeholder: SelectProps['placeholder'];
-  helperText: SelectProps['helperText'];
-  error: SelectProps['error'];
+  field: Pick<SelectProps, 'label' | 'placeholder' | 'helperText' | 'error' | 'name' | 'required' | 'autoFocus' | 'onBlur' | 'onFocus'>;
   ariaLabel: string | undefined;
+  disabled: boolean | undefined;
   triggerTestId: string;
 }
 
-function renderField({
-  params,
-  label,
-  placeholder,
-  helperText,
-  error,
-  ariaLabel,
-  triggerTestId,
-}: FieldProps): React.JSX.Element {
+function renderField({ params, field, ariaLabel, disabled, triggerTestId }: FieldProps): React.JSX.Element {
   return (
     <TextField
       {...params}
-      label={label}
-      placeholder={placeholder}
-      helperText={helperText}
-      error={error}
+      label={field.label}
+      placeholder={field.placeholder}
+      helperText={field.helperText}
+      error={field.error}
+      name={field.name}
+      required={field.required}
+      autoFocus={field.autoFocus}
+      onBlur={field.onBlur as React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement> | undefined}
+      onFocus={field.onFocus as React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement> | undefined}
+      // The menu drew its placeholder under a shrunk label (`displayEmpty`);
+      // a floating label left down would hide it until focus.
+      slotProps={field.placeholder ? { inputLabel: { shrink: true } } : undefined}
       inputProps={{
         ...params.inputProps,
         'aria-label': ariaLabel,
+        // The menu's display div carried `aria-disabled`; the input keeps it.
+        'aria-disabled': disabled ? true : undefined,
         'data-testid': triggerTestId,
       }}
     />
   );
 }
 
-export const SearchableSelect = React.forwardRef<HTMLDivElement, SelectProps>(
-  (
-    {
-      variant,
-      options,
-      label,
-      helperText,
-      fullWidth = true,
-      size,
-      error,
-      placeholder,
-      glow,
-      pulse,
-      value,
-      onChange,
-      disabled,
-      name,
-      noOptionsText,
-      'aria-label': ariaLabel,
-      ...rest
-    },
-    ref,
-  ) => {
-    const { testId: dataTestId } = splitTestId(rest);
-    const optionTestId = (optionValue: SelectOption['value']): string =>
-      dataTestId ? `${dataTestId}-option-${optionValue}` : `option-${optionValue}`;
-    const selected = options.find((option) => String(option.value) === String(value ?? '')) ?? null;
+/**
+ * The option the field shows, KEPT STABLE while it is the same one.
+ *
+ * Consumers build `options` inline (`xs.map(...)`), so a fresh `find` returns a
+ * new object on every parent render, which MUI reads as a changed value and
+ * answers by resetting the typed text — a refetch mid-search wiped the query.
+ * Uncontrolled use (`defaultValue`, no `value`) keeps its own state, as MUI's
+ * Select did.
+ */
+function useSelectedOption(
+  options: SelectOption[],
+  value: unknown,
+  defaultValue: unknown,
+): [SelectOption | null, (next: SelectOption) => void] {
+  const [own, setOwn] = React.useState<unknown>(defaultValue ?? '');
+  const current = value === undefined ? own : value;
+  const match = options.find((option) => String(option.value) === String(current ?? '')) ?? null;
+  const key = match === null ? null : `${String(match.value)}\u0000${match.label}\u0000${match.disabled === true}`;
+  // Keyed on the option's identity, not the object `find` just returned.
+  const stable = React.useMemo(() => match, [key]);
+  return [stable, (next) => setOwn(next.value)];
+}
 
-    return (
-      <SelectFieldControl
-        fullWidth={fullWidth}
+/**
+ * A field that does not fill its row sizes to its longest option, the way the
+ * menu sized to its selected text: MUI's Autocomplete input is `width: 0`, so
+ * without this a `fullWidth={false}` select collapsed to its arrow.
+ */
+function intrinsicWidth(
+  theme: Theme,
+  options: SelectOption[],
+  fullWidth: boolean,
+): React.CSSProperties | undefined {
+  if (fullWidth) return undefined;
+  const longest = options.reduce((max, option) => Math.max(max, option.label.length), 0);
+  // The label in `ch`, plus the field's inline padding and the arrow's slot.
+  return { minWidth: `calc(${longest}ch + ${rem(theme, SELECT_SEARCH.fieldChrome)})` };
+}
+
+export const SearchableSelect = React.forwardRef<HTMLDivElement, SelectProps>((props, ref) => {
+  const { variant, options, fullWidth = true, size, error, glow, pulse, value, defaultValue } = props;
+  const { onChange, disabled, name, noOptionsText, sx, className, style, id } = props;
+  const { testId: dataTestId } = splitTestId(props as unknown as Record<string, unknown>);
+  const [selected, setOwn] = useSelectedOption(options, value, defaultValue);
+  const theme = useTheme();
+  const optionTestId = (optionValue: SelectOption['value']): string =>
+    dataTestId ? `${dataTestId}-option-${optionValue}` : `option-${optionValue}`;
+
+  return (
+    <SelectFieldControl
+      fullWidth={fullWidth}
+      size={formControlSize(size)}
+      error={error}
+      customVariant={variant}
+      fieldSize={asFieldSize(size)}
+      glow={glow}
+      pulse={pulse}
+      ref={ref}
+      sx={sx}
+      className={className}
+      style={{ ...intrinsicWidth(theme, options, fullWidth), ...style }}
+      data-testid={dataTestId}
+    >
+      <Autocomplete<SelectOption, false, true, false>
+        id={id}
+        value={selected as SelectOption}
+        options={options}
+        disabled={disabled}
+        disableClearable
+        autoHighlight
+        handleHomeEndKeys
         size={formControlSize(size)}
-        error={error}
-        customVariant={variant}
-        fieldSize={asFieldSize(size)}
-        glow={glow}
-        pulse={pulse}
-        ref={ref}
-        data-testid={dataTestId}
-      >
-        <Autocomplete<SelectOption, false, true, false>
-          value={selected as SelectOption}
-          options={options}
-          disabled={disabled}
-          disableClearable
-          autoHighlight
-          openOnFocus
-          handleHomeEndKeys
-          size={formControlSize(size)}
-          noOptionsText={noOptionsText ?? null}
-          getOptionLabel={(option) => option.label}
-          getOptionDisabled={(option) => option.disabled === true}
-          isOptionEqualToValue={(option, current) => String(option.value) === String(current.value)}
-          onChange={(_event, next) => onChange?.(selectChange(next.value, name), null)}
-          renderOption={(props, option) => renderOption(props, option, optionTestId)}
-          slotProps={{
-            // Above stacked sheets and dialogs, as `CreatableSelect` does.
-            popper: { sx: { zIndex: stackedOverlayZIndex } },
-            // THE bounded height: MUI's own default is 40vh, which on a tall
-            // screen is the whole page again.
-            listbox: { sx: (theme) => ({ maxHeight: rem(theme, SELECT_SEARCH.listMaxHeight) }) },
-          }}
-          renderInput={(params) =>
-            renderField({
-              params,
-              label,
-              placeholder,
-              helperText,
-              error,
-              ariaLabel,
-              triggerTestId: dataTestId ? `${dataTestId}-select` : 'select',
-            })
-          }
-        />
-      </SelectFieldControl>
-    );
-  },
-);
+        noOptionsText={noOptionsText ?? null}
+        getOptionLabel={(option) => option.label}
+        // Two people may share a name; the value is what tells them apart.
+        getOptionKey={(option) => String(option.value)}
+        getOptionDisabled={(option) => option.disabled === true}
+        isOptionEqualToValue={(option, current) => String(option.value) === String(current.value)}
+        onChange={(_event, next) => {
+          setOwn(next);
+          onChange?.(selectChange(next.value, name), null);
+        }}
+        renderOption={(optionProps, option) => renderOption(optionProps, option, optionTestId)}
+        slotProps={{
+          // Above stacked sheets and dialogs, as `CreatableSelect` does.
+          popper: { sx: { zIndex: stackedOverlayZIndex } },
+          // THE bounded height: MUI's own default is 40vh, which on a tall
+          // screen is the whole page again.
+          listbox: { sx: (theme) => ({ maxHeight: rem(theme, SELECT_SEARCH.listMaxHeight) }) },
+        }}
+        renderInput={(params) =>
+          renderField({
+            params,
+            field: props,
+            ariaLabel: props['aria-label'],
+            disabled,
+            triggerTestId: dataTestId ? `${dataTestId}-select` : 'select',
+          })
+        }
+      />
+    </SelectFieldControl>
+  );
+});
 
 SearchableSelect.displayName = 'SearchableSelect';

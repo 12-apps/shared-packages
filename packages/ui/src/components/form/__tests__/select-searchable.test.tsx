@@ -135,4 +135,58 @@ describe('Select — searchable past five options', () => {
     render(<Select options={few(9)} multiple label="C" value={[]} onChange={vi.fn()} data-testid="c" />);
     expect(searchInput(screen.getByTestId('c'))).toBeNull();
   });
+
+  it('sizes a field that does not fill its row to its longest option, and keeps sx and className', () => {
+    render(
+      <Select
+        options={STAFF}
+        fullWidth={false}
+        sx={{ marginTop: 3 }}
+        className="agenda"
+        label="Dia"
+        value="ana"
+        onChange={vi.fn()}
+        data-testid="s"
+      />,
+    );
+    const root = screen.getByTestId('s');
+    // "Gustavo Rezende" is 15 characters: MUI's input alone is `width: 0`.
+    expect(root.style.minWidth).toBe('calc(15ch + 4.5rem)');
+    expect(root).toHaveClass('agenda');
+  });
+
+  it('keeps what is typed when the parent re-renders with a fresh options array', async () => {
+    const fresh = () => structuredClone(STAFF);
+    const { rerender } = render(
+      <Select options={fresh()} label="Pessoa" value="ana" onChange={vi.fn()} data-testid="s" />,
+    );
+    await typeInto('s', 'Gus');
+    rerender(<Select options={fresh()} label="Pessoa" value="ana" onChange={vi.fn()} data-testid="s" />);
+    expect(searchInput(screen.getByTestId('s'))!.value).toBe('Gus');
+  });
+
+  it('keys options by value, so two people with one name do not collide', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const twins = [...STAFF, { value: 'ana-2', label: 'Ana Souza' }];
+    render(<Select options={twins} label="Pessoa" value="" onChange={vi.fn()} data-testid="s" />);
+    const listbox = await open('s');
+    expect(within(listbox).getByTestId('s-option-ana-2')).toBeInTheDocument();
+    expect(errors.mock.calls.flat().join(' ')).not.toContain('same key');
+    errors.mockRestore();
+  });
+
+  it('works uncontrolled from defaultValue, and names its input for a native form', async () => {
+    render(<Select options={STAFF} label="Pessoa" name="person" defaultValue="ana" data-testid="s" />);
+    const input = searchInput(screen.getByTestId('s'))!;
+    expect(input.value).toBe('Ana Souza');
+    expect(input.name).toBe('person');
+    const listbox = await open('s');
+    fireEvent.click(within(listbox).getByTestId('s-option-diego'));
+    expect(searchInput(screen.getByTestId('s'))!.value).toBe('Diego Lima');
+  });
+
+  it('marks a disabled field aria-disabled, as the menu did', () => {
+    render(<Select options={STAFF} disabled label="Pessoa" value="" onChange={vi.fn()} data-testid="s" />);
+    expect(screen.getByTestId('s-select')).toHaveAttribute('aria-disabled', 'true');
+  });
 });

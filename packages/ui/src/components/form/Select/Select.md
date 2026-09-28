@@ -61,11 +61,20 @@ the field is a text box that filters the options as you type, and the list
 stops at `SELECT_SEARCH.listMaxHeight` (about six rows) and scrolls, instead of
 growing to the height of the viewport.
 
-Nothing changes at the call site: the same `options`, `value`, `label`,
-`placeholder`, `helperText`, `error`, `disabled` options, variants and sizes, and
-`onChange` still receives `{ target: { value, name } }` with the option's value
-in its own type. The test ids keep their spelling, with `{dataTestId}-select` on
-the search `<input>` (which carries `role="combobox"`).
+The props stay the same: `options`, `value`/`defaultValue`, `label`,
+`placeholder`, `helperText`, `error`, `name`, `required`, disabled options,
+variants and sizes. `onChange` still receives `{ target: { value, name } }` with
+the option's value in its own type. The test ids keep their spelling.
+
+**What does change — and breaks tests written against the menu:**
+
+- `{dataTestId}-select` (and `role="combobox"`) is now the search `<input>`,
+  not the menu's display `<div>`. The selected label is its VALUE, not its
+  text: assert with `toHaveValue('Garçom')` / `input.value`, not `toHaveText`.
+- `onChange`'s event is a plain `{ target }` object (no `preventDefault`), and
+  its second argument is `null` rather than the clicked `MenuItem`.
+- Opening it with a click or `mouseDown` on the combobox still works; typing
+  filters only while the input has real focus.
 
 - `searchable` overrides the count either way.
 - `multiple` and `renderValue` always keep the menu: a search box holds one value.

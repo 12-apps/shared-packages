@@ -104,4 +104,9 @@ export const SEARCHABLE_MIN_OPTIONS = 6;
 export const SELECT_SEARCH = {
   /** px — six 40px rows and half of the seventh. */
   listMaxHeight: 260,
+  /**
+   * px — what a field that does not fill its row adds to its longest label:
+   * the input's inline padding and the arrow's slot.
+   */
+  fieldChrome: 72,
 } as const;
