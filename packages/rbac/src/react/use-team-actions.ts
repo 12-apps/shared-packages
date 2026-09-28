@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { useRowConfirm, type RowConfirm } from '@12-apps/ui/data-display/CardKit';
 
@@ -25,6 +25,8 @@ export interface TeamActions {
   dismissNotice: () => void;
   showForm: boolean;
   toggleForm: () => void;
+  /** Open the invite dialog (never closes it) — what a host's own "invite" entry calls. */
+  openForm: () => void;
   formKey: number;
   invite: (selection: InviteSelection) => Promise<void>;
   remove: (userId: string) => Promise<void>;
@@ -41,6 +43,8 @@ export function useTeamActions(
   const [notice, setNotice] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  // Stable, so a host effect that depends on it runs when the REQUEST changes.
+  const openForm = useCallback(() => setShowForm(true), []);
 
   async function invite(selection: InviteSelection): Promise<void> {
     setError(null);
@@ -99,6 +103,7 @@ export function useTeamActions(
     dismissNotice: () => setNotice(false),
     showForm,
     toggleForm: () => setShowForm((open) => !open),
+    openForm,
     formKey,
     invite,
     remove,

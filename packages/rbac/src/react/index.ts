@@ -13,6 +13,7 @@ export {
   createWebRbac,
   type RbacLocaleHook,
   type RbacWebConfig,
+  type TeamScreenRequest,
   type WebRbac,
 } from './create-web-rbac';
 export type {

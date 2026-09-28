@@ -681,6 +681,22 @@ describe('the invite flow', () => {
   });
 });
 
+describe('a host asks for the invite dialog (FUT-2972)', () => {
+  it('opens it for a manager, and says the request was handled', async () => {
+    const handled = vi.fn();
+    mountTeam(apiStub(), ['team:manage'], { inviteRequested: true, onInviteRequestHandled: handled });
+    expect(await screen.findByTestId('invite-form')).toBeTruthy();
+    await waitFor(() => expect(handled).toHaveBeenCalled());
+  });
+
+  it('opens nothing for a viewer who may not manage the team, and still acknowledges', async () => {
+    const handled = vi.fn();
+    mountTeam(apiStub(), ['team:read'], { inviteRequested: true, onInviteRequestHandled: handled });
+    await waitFor(() => expect(handled).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('invite-form')).toBeNull());
+  });
+});
+
 describe('header slot', () => {
   it('renders the title and "new role" above the grid, not below it', async () => {
     mountRoles(apiStub(), ['roles:manage']);
