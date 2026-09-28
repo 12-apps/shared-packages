@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box/index.js';
 import Radio from '@mui/material/Radio/index.js';
+import type { RadioProps } from '@mui/material/Radio/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
@@ -709,7 +710,9 @@ export const SizeVocabulary: Story = {
       <RadioGroup options={[{ value: 'a', label: 'unset' }]} dataTestId="rg-unset" />
       <Radio data-testid="mui-small" size="small" />
       <Radio data-testid="mui-medium" size="medium" />
-      <Radio data-testid="mui-large" size="large" />
+      {/* MUI types Radio's size as small | medium only, though its glyph draws
+          'large' at 35px; the same one-site cast DefaultRadios uses. */}
+      <Radio data-testid="mui-large" size={'large' as RadioProps['size']} />
     </Stack>
   ),
   play: async ({ canvasElement, step }) => {
