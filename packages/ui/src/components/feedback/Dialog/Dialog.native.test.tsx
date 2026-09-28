@@ -1,10 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
-import { Text as RNText } from 'react-native';
-import { describe, expect, it, vi } from 'vitest';
+import { Keyboard, Text as RNText, type EmitterSubscription, type KeyboardEvent } from 'react-native';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Dialog } from './Dialog.native';
-import { dialogBackdrop, dialogLook, dialogRadius, type DialogLookArgs } from './Dialog.look.native';
+import {
+  dialogBackdrop,
+  dialogKeyboardLift,
+  dialogLook,
+  dialogRadius,
+  type DialogLookArgs,
+} from './Dialog.look.native';
 import { DIALOG_MAX_WIDTH, DIALOG_PAPER_SHADOW } from './Dialog.metrics';
 import {
   DialogActions,
@@ -335,5 +341,136 @@ describe('Dialog (native)', () => {
       </UiProvider>,
     );
     expect(screen.getByTestId('dark')).toHaveStyle({ backgroundColor: 'rgb(18, 18, 18)' });
+  });
+});
+
+/**
+ * The soft keyboard (FUT-3021). `Modal` asks Android for
+ * `SOFT_INPUT_ADJUST_RESIZE`, which edge-to-edge defeats: the window keeps its
+ * full height and the keyboard is drawn over the paper's bottom — where the
+ * actions are. The overlay measures the overlap itself and takes it off the
+ * paper's room.
+ *
+ * Driven through the same two pipes a device uses: `Keyboard`'s events, and the
+ * overlay's `onLayout`, which react-native-web measures from a ResizeObserver
+ * and the element's offset box — neither of which jsdom lays out, so both are
+ * supplied here with the numbers of a 640dp-tall phone.
+ */
+describe('Dialog (native) under the soft keyboard (FUT-3021)', () => {
+  const WINDOW = 640;
+  const KEYBOARD = 300;
+
+  type KeyboardListener = (event: KeyboardEvent) => void;
+  const keyboardListeners = new Map<string, KeyboardListener>();
+  const layout: { notify?: ResizeObserverCallback } = {};
+
+  /** react-native-web builds ONE observer for every `onLayout`, on first use. */
+  class LayoutObserver {
+    constructor(notify: ResizeObserverCallback) {
+      layout.notify = notify;
+    }
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+
+  beforeAll(() => {
+    vi.stubGlobal('ResizeObserver', LayoutObserver);
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  beforeEach(() => {
+    keyboardListeners.clear();
+    vi.spyOn(Keyboard, 'addListener').mockImplementation((name, listener) => {
+      keyboardListeners.set(name, listener);
+      return { remove: () => keyboardListeners.delete(name) } as unknown as EmitterSubscription;
+    });
+  });
+
+  afterEach(() => {
+    vi.mocked(Keyboard.addListener).mockRestore();
+  });
+
+  /** The overlay is the paper's parent: the box whose padding bounds it. */
+  function overlayOf(testId: string): HTMLElement {
+    return screen.getByTestId(testId).parentElement as HTMLElement;
+  }
+
+  /**
+   * Lays the overlay out `height` tall, as the modal's window would.
+   * react-native-web measures on the next tick, so every assertion that needs
+   * the answer waits for it.
+   */
+  function layOut(overlay: HTMLElement, height: number): void {
+    Object.defineProperty(overlay, 'offsetHeight', { configurable: true, value: height });
+    act(() => {
+      layout.notify?.([{ target: overlay } as unknown as ResizeObserverEntry], {} as ResizeObserver);
+    });
+  }
+
+  function keyboard(event: 'keyboardDidShow' | 'keyboardDidHide', screenY = WINDOW): void {
+    const endCoordinates = { screenX: 0, screenY, width: 360, height: WINDOW - screenY };
+    act(() => {
+      keyboardListeners.get(event)?.({ endCoordinates } as KeyboardEvent);
+    });
+  }
+
+  /** The height the paper may fill: the overlay less its own padding. */
+  function room(overlay: HTMLElement, height: number): number {
+    const style = getComputedStyle(overlay);
+    return height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  }
+
+  it('takes the keyboard off the paper\'s room, and gives it back when it goes', async () => {
+    render(
+      <Dialog open title="Código" dataTestId="d">
+        <DialogContent>corpo</DialogContent>
+        <DialogActions>ações</DialogActions>
+      </Dialog>,
+    );
+    const overlay = overlayOf('d');
+    layOut(overlay, WINDOW);
+    const before = room(overlay, WINDOW);
+    expect(before).toBe(WINDOW - 2 * 16);
+
+    keyboard('keyboardDidShow', WINDOW - KEYBOARD);
+    await waitFor(() => expect(room(overlay, WINDOW)).toBe(before - KEYBOARD));
+    // The margin above the keyboard is the one the paper keeps from any edge.
+    expect(overlay).toHaveStyle({ paddingBottom: `${16 + KEYBOARD}px` });
+
+    keyboard('keyboardDidHide');
+    await waitFor(() => expect(room(overlay, WINDOW)).toBe(before));
+  });
+
+  it('lifts nothing when the window already ends at the keyboard', async () => {
+    // A host that is not edge-to-edge still gets its window resized, so the
+    // overlay already stops at the keyboard: lifting it again would halve the
+    // room for no reason.
+    render(
+      <Dialog open dataTestId="resized">
+        <DialogContent>corpo</DialogContent>
+      </Dialog>,
+    );
+    const overlay = overlayOf('resized');
+    keyboard('keyboardDidShow', WINDOW - KEYBOARD);
+
+    // Over a window that did NOT shrink, the keyboard is lifted — so the zero
+    // below is the arithmetic, not a pipe that never delivered.
+    layOut(overlay, WINDOW);
+    await waitFor(() => expect(room(overlay, WINDOW)).toBe(WINDOW - 2 * 16 - KEYBOARD));
+
+    layOut(overlay, WINDOW - KEYBOARD);
+    await waitFor(() => expect(room(overlay, WINDOW - KEYBOARD)).toBe(WINDOW - KEYBOARD - 2 * 16));
+  });
+
+  it('keeps the variant\'s own margin, and none for the papers that fill the screen', () => {
+    expect(dialogKeyboardLift(theme, 'default', 0)).toBeNull();
+    expect(dialogKeyboardLift(theme, 'default', KEYBOARD)).toEqual({ paddingBottom: 16 + KEYBOARD });
+    expect(dialogKeyboardLift(theme, 'glass', KEYBOARD)).toEqual({ paddingBottom: 16 + KEYBOARD });
+    expect(dialogKeyboardLift(theme, 'fullscreen', KEYBOARD)).toEqual({ paddingBottom: KEYBOARD });
+    expect(dialogKeyboardLift(theme, 'drawer', KEYBOARD)).toEqual({ paddingBottom: KEYBOARD });
   });
 });
