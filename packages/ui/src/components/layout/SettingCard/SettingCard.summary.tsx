@@ -14,7 +14,7 @@ import { partTestId } from './SettingCard.parts';
  * string's length, because what fits depends on the width the card is GIVEN.
  * Re-measured whenever the element resizes, so a card that widens drops its [i].
  */
-export const useClamped = (): { ref: (node: HTMLElement | null) => void; clamped: boolean } => {
+export const useClamped = (content?: unknown): { ref: (node: HTMLElement | null) => void; clamped: boolean } => {
   const [node, setNode] = useState<HTMLElement | null>(null);
   const [clamped, setClamped] = useState(false);
   const ref = useCallback((next: HTMLElement | null) => setNode(next), []);
@@ -27,7 +27,9 @@ export const useClamped = (): { ref: (node: HTMLElement | null) => void; clamped
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [node]);
+    // `content` too: a summary that grows from two lines to three inside the
+    // same clamped height fires no resize, so the text changing re-measures.
+  }, [node, content]);
 
   return { ref, clamped };
 };
@@ -75,4 +77,24 @@ export const SummaryInfo: React.FC<{ label: string; summary: React.ReactNode; da
       </Box>
     </InteractiveTooltip>
   );
+};
+
+/**
+ * The summary's measuring ref, and the [i] for the header while it is cut —
+ * `null` when there is no summary, it fits, or `show` is false (an open card).
+ */
+export const useSummaryInfo = ({
+  summary,
+  show = true,
+  label,
+  dataTestId,
+}: {
+  summary: React.ReactNode;
+  show?: boolean;
+  label: string;
+  dataTestId?: string;
+}): { ref: (node: HTMLElement | null) => void; info: React.ReactNode } => {
+  const { ref, clamped } = useClamped(summary);
+  const visible = show && clamped && summary != null;
+  return { ref, info: visible ? <SummaryInfo label={label} summary={summary} dataTestId={dataTestId} /> : null };
 };

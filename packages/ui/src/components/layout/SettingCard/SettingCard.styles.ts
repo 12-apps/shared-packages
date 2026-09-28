@@ -78,7 +78,6 @@ export const titleStyles = (theme: Theme): CSSObject => ({
   overflowWrap: 'anywhere',
 });
 
-/** The one line a closed card shows. Long values end in an ellipsis, not a second line. */
 /** The most lines a card's summary shows before the rest goes behind the [i]. */
 export const SUMMARY_MAX_LINES = 2;
 

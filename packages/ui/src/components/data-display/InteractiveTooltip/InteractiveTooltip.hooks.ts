@@ -97,3 +97,39 @@ export const usePinnedTooltip = ({ clickable, onPin, onUnpin }: PinOptions) => {
 
   return { isPinned, isControlledOpen, wrapperRef, handleClick };
 };
+
+type OnOpen = NonNullable<InteractiveTooltipProps['onOpen']>;
+type OnClose = NonNullable<InteractiveTooltipProps['onClose']>;
+
+/**
+ * The hover half of the tooltip's open state, so the MUI Tooltip is controlled
+ * from its first render (FUT-3013). It used to receive `open={undefined}` while
+ * hovering and a boolean once pinned, which MUI reports as a component switching
+ * from uncontrolled to controlled on the first click. The caller's own
+ * onOpen/onClose still run.
+ *
+ * Unpinning also closes it: the hover listeners are off while pinned, so a
+ * hover state left `true` from before the pin would otherwise keep the tooltip
+ * open after the click outside that unpinned it.
+ */
+export const useHoverOpen = (
+  isPinned: boolean,
+  onOpen?: OnOpen,
+  onClose?: OnClose,
+): { open: boolean; onOpen: OnOpen; onClose: OnClose } => {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!isPinned) setOpen(false);
+  }, [isPinned]);
+  return {
+    open,
+    onOpen: (event) => {
+      setOpen(true);
+      onOpen?.(event);
+    },
+    onClose: (event) => {
+      setOpen(false);
+      onClose?.(event);
+    },
+  };
+};

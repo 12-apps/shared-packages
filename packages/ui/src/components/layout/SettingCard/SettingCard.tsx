@@ -7,7 +7,7 @@ import { Button } from '../../form/Button';
 import { useSettingCard } from './SettingCard.hooks';
 import { LearnMore, PendingSpinner, SaveError, SettingHeader, partTestId } from './SettingCard.parts';
 import { SETTING_CARD_OPEN_ATTR, actionsStyles, summaryStyles, surfaceStyles, withCallerSx } from './SettingCard.styles';
-import { SummaryInfo, useClamped } from './SettingCard.summary';
+import { useSummaryInfo } from './SettingCard.summary';
 import type { SettingCardCopy, SettingCardProps } from './SettingCard.types';
 
 interface OpenBodyProps {
@@ -135,8 +135,8 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const card = useSettingCard(props);
-  const clamp = useClamped();
   const { open } = card;
+  const clamp = useSummaryInfo({ summary, show: !open, label: copy.moreInfo ?? title, dataTestId });
 
   return (
     <Box
@@ -156,11 +156,7 @@ export const SettingCard = forwardRef<HTMLElement, SettingCardProps>(function Se
         headingLevel={headingLevel}
         icon={icon}
         status={status}
-        info={
-          !open && clamp.clamped && summary != null ? (
-            <SummaryInfo label={copy.moreInfo ?? title} summary={summary} dataTestId={dataTestId} />
-          ) : null
-        }
+        info={clamp.info}
         trailing={
           open ? null : (
             <EditTrigger

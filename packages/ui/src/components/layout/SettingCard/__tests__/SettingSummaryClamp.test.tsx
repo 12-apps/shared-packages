@@ -46,7 +46,7 @@ describe('the summary clamp', () => {
     expect(screen.getByTestId('toggle-summary')).toHaveTextContent(LONG);
   });
 
-  it('draws no [i] when the summary fits', () => {
+  it('draws no [i] when the summary fits', async () => {
     stubLayout(false);
     render(
       <SettingToggle
@@ -58,7 +58,9 @@ describe('the summary clamp', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Show the full text' })).toBeNull();
+    // The summary is there, so the absence below is about the [i] alone.
+    expect(screen.getByText('Short.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show the full text' })).toBeNull());
   });
 
   it('offers the [i] on a closed card, and drops it while the card is open', async () => {

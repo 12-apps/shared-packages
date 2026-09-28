@@ -8,7 +8,7 @@ import { SR_ONLY_SX } from '../../form/Label/Label.styles';
 import { useAsyncSwitch } from './SettingCard.hooks';
 import { PendingSpinner, SaveError, SettingHeader, partTestId } from './SettingCard.parts';
 import { clampStyles, descriptionStyles } from './SettingCard.styles';
-import { SummaryInfo, useClamped } from './SettingCard.summary';
+import { useSummaryInfo } from './SettingCard.summary';
 import type { SettingToggleProps } from './SettingCard.types';
 
 /** Everything the switch-driven cards share, minus the surface each draws around it. */
@@ -47,7 +47,7 @@ export const SettingSwitchBlock: React.FC<
   SettingSwitchBlockProps & { ids: SettingSwitchIds; state: ReturnType<typeof useAsyncSwitch> }
 > = ({ title, headingLevel = 'h3', icon, summary, copy, disabled, dataTestId, ids, state }) => {
   const theme = useTheme();
-  const clamp = useClamped();
+  const clamp = useSummaryInfo({ summary, label: copy.moreInfo ?? title, dataTestId });
   const { shown, saving, error, flip } = state;
   const describedBy = [summary != null ? ids.summaryId : null, error ? ids.errorId : null]
     .filter(Boolean)
@@ -78,11 +78,7 @@ export const SettingSwitchBlock: React.FC<
         icon={icon}
         labelFor={ids.inputId}
         trailing={control}
-        info={
-          clamp.clamped && summary != null ? (
-            <SummaryInfo label={copy.moreInfo ?? title} summary={summary} dataTestId={dataTestId} />
-          ) : null
-        }
+        info={clamp.info}
         dataTestId={dataTestId}
       />
       {summary != null && (
