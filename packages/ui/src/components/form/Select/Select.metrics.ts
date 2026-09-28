@@ -88,3 +88,20 @@ export {
   INPUT_GRADIENT as SELECT_GRADIENT,
   INPUT_PULSE as SELECT_PULSE,
 } from '../Input/Input.metrics';
+
+/**
+ * WHEN A `Select` BECOMES A SEARCH BOX, AND HOW TALL ITS LIST MAY GROW.
+ *
+ * Past five options a menu stops being scannable at a glance and starts being
+ * scrolled — and MUI's menu grows to the viewport's height to show them all, so
+ * a staff picker covered the whole screen. From six options on the field turns
+ * into the searchable dropdown (`CreatableSelect`'s engine, MUI `Autocomplete`)
+ * and its list stops at {@link SELECT_SEARCH.listMaxHeight}: about six rows,
+ * the seventh cut in half so the list reads as scrollable.
+ */
+export const SEARCHABLE_MIN_OPTIONS = 6;
+
+export const SELECT_SEARCH = {
+  /** px — six 40px rows and half of the seventh. */
+  listMaxHeight: 260,
+} as const;

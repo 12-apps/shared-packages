@@ -50,6 +50,27 @@ function MyComponent() {
 - `glow`: Whether to show glow effect on hover/focus
 - `pulse`: Whether to show pulse animation
 - `fullWidth`: Whether select should take full width of container
+- `searchable`: Force the search box on (`true`) or the menu on (`false`); unset, it follows the option count (see below)
+- `noOptionsText`: The host's sentence the search box shows when nothing matches the typed text
+
+## Six options or more: a search box
+
+Up to **five** options the select opens a menu. From **six** on it becomes the
+searchable dropdown — the same engine as `CreatableSelect` (MUI `Autocomplete`):
+the field is a text box that filters the options as you type, and the list
+stops at `SELECT_SEARCH.listMaxHeight` (about six rows) and scrolls, instead of
+growing to the height of the viewport.
+
+Nothing changes at the call site: the same `options`, `value`, `label`,
+`placeholder`, `helperText`, `error`, `disabled` options, variants and sizes, and
+`onChange` still receives `{ target: { value, name } }` with the option's value
+in its own type. The test ids keep their spelling, with `{dataTestId}-select` on
+the search `<input>` (which carries `role="combobox"`).
+
+- `searchable` overrides the count either way.
+- `multiple` and `renderValue` always keep the menu: a search box holds one value.
+- Pass `noOptionsText` — the library ships no copy, so unset means an empty list
+  says nothing.
 
 ## Visual Variants
 
@@ -138,7 +159,7 @@ The Select component includes `data-testid` attributes for reliable testing:
 | Test ID | Element | Description |
 |---------|---------|-------------|
 | `{dataTestId}` | FormControl | Root FormControl wrapper element |
-| `{dataTestId}-select` | Select element | The MUI Select component |
+| `{dataTestId}-select` | Select element | The MUI Select component (the search `<input>` from six options on) |
 | `{dataTestId}-option-{value}` | Menu items | Individual option elements (one per option) |
 
 **Default Test IDs (when no dataTestId prop provided):**
