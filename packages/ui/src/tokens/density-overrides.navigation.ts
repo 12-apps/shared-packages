@@ -1,4 +1,4 @@
-import { tableCellClasses } from '@mui/material/TableCell/index.js';
+import generateUtilityClass from '@mui/material/generateUtilityClass/index.js';
 import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { fieldRadius } from './field-radius';
@@ -123,9 +123,22 @@ const isDefaultTableCellPadding = (padding: TableCellOwnerStateForOverrides['pad
 const tableCellRootPadding: TableCellStyleFn = ({ theme, ownerState }) =>
   isDefaultTableCellPadding(ownerState?.padding) ? { padding: rem(theme, 16) } : {};
 
+/**
+ * Built with `generateUtilityClass`, not imported from
+ * `@mui/material/TableCell`'s own `tableCellClasses` — the same generated
+ * string (`TableCell.js` builds `tableCellClasses` from this exact helper),
+ * but without pulling `MuiTableCell` onto the critical path of every host
+ * that imports `densityThemeOptions`, the same reason `density-overrides.ts`'s
+ * `CHIP_LABEL` and `density-overrides.selection.ts`'s `SWITCH_*` constants
+ * are built this way instead of read off the component's own classes module
+ * (FUT-2993). It also honours a host's own `ClassNameGenerator.configure`,
+ * which a hand-typed `.MuiTableCell-paddingCheckbox` string would not.
+ */
+const TABLE_CELL_PADDING_CHECKBOX = generateUtilityClass('MuiTableCell', 'paddingCheckbox');
+
 const tableCellSmallPadding: TableCellStyleFn = ({ theme, ownerState }) => {
   const style: CSSObject = {
-    [`&.${tableCellClasses.paddingCheckbox}`]: { padding: rems(theme, 0, 12, 0, 16) },
+    [`&.${TABLE_CELL_PADDING_CHECKBOX}`]: { padding: rems(theme, 0, 12, 0, 16) },
   };
   if (isDefaultTableCellPadding(ownerState?.padding)) style.padding = rems(theme, 6, 16);
   return style;

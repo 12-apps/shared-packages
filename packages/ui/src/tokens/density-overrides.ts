@@ -1,4 +1,4 @@
-import { chipClasses } from '@mui/material/Chip/index.js';
+import generateUtilityClass from '@mui/material/generateUtilityClass/index.js';
 import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { rem } from './relative';
@@ -81,8 +81,13 @@ interface ChipOwnerStateForOverrides {
  * own single-class rule (`0,1,0`), so it wins regardless of source order —
  * the same technique `ChipRoot`'s OWN style already uses for its avatar/
  * icon/delete-icon sub-parts (`& .${chipClasses.avatar}`, etc., in
- * `Chip.js`), and read through the SAME `chipClasses` MUI's own `Chip.js`
- * generates the real DOM class from, not a hand-typed copy of it.
+ * `Chip.js`), and built the same way `Chip.js` itself builds that class:
+ * `generateUtilityClass('MuiChip', 'label')`, MUI's own public helper
+ * (`@mui/material/generateUtilityClass`), not a hand-typed copy of it and not
+ * `chipClasses` — importing `chipClasses` pulls in `@mui/material/Chip`
+ * itself, which puts `MuiChip` on the critical path of every host that
+ * imports `densityThemeOptions`, including one that never renders a density
+ * at all (FUT-2993).
  *
  * **That same higher specificity also outranks a HOST's own theming.** A
  * host writing `theme.components.MuiChip.styleOverrides.label` for its own
@@ -121,6 +126,15 @@ interface ChipOwnerStateForOverrides {
  * make them differ on nothing but identity.
  */
 
+/**
+ * Built with `generateUtilityClass`, not imported from `@mui/material/Chip`'s
+ * own `chipClasses` — the same generated string (`Chip.js` builds
+ * `chipClasses` from this exact helper), but without pulling `MuiChip` onto
+ * the critical path of every host that imports `densityThemeOptions` (see the
+ * module doc comment, and FUT-2993).
+ */
+const CHIP_LABEL = generateUtilityClass('MuiChip', 'label');
+
 const iconButtonRootPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 8) });
 const iconButtonSmallPadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 5) });
 const iconButtonLargePadding = ({ theme }: { theme: Theme }): CSSObject => ({ padding: rem(theme, 12) });
@@ -155,14 +169,16 @@ const chipRootHeight = ({
     // (two classes vs one) — wins over `chipLabelPadding`/`chipLabelSmallPadding`
     // below regardless of stylesheet insertion order. See the module doc
     // comment for why this must live here and not on the label slot itself.
-    // `chipClasses.label`, not a hand-typed `.MuiChip-label` string — the same
-    // module `Chip.js`'s own root style reads for its avatar/icon/delete-icon
-    // selectors, so this tracks whatever `Chip.js` itself puts on the label
-    // element rather than a separately-maintained copy of it. A host that
-    // calls `ClassNameGenerator.configure` before any `MuiChip` module loads
-    // renames the real class; a literal string would silently stop matching
-    // it, `chipClasses.label` cannot.
-    style[`& .${chipClasses.label}`] = { paddingLeft: rem(theme, px), paddingRight: rem(theme, px) };
+    // `CHIP_LABEL` (`generateUtilityClass('MuiChip', 'label')`), not a
+    // hand-typed `.MuiChip-label` string — the same helper `Chip.js`'s own
+    // root style reads for its avatar/icon/delete-icon selectors (via
+    // `chipClasses`), so this tracks whatever `Chip.js` itself puts on the
+    // label element rather than a separately-maintained copy of it. A host
+    // that calls `ClassNameGenerator.configure` before any `MuiChip` module
+    // loads renames the real class; a literal string would silently stop
+    // matching it, `generateUtilityClass` cannot — and unlike `chipClasses`,
+    // it does so without importing `@mui/material/Chip` at all (FUT-2993).
+    style[`& .${CHIP_LABEL}`] = { paddingLeft: rem(theme, px), paddingRight: rem(theme, px) };
   }
   return style;
 };
