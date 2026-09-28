@@ -3,6 +3,7 @@ export { sectionNavBarInset } from './SectionNav.bar';
 export { RaisedActionButton } from './SectionNav.primary';
 export type { RaisedActionButtonProps } from './SectionNav.primary';
 export type {
+  SectionNavAction,
   SectionNavBack,
   SectionNavDestination,
   SectionNavEntry,

@@ -5,8 +5,9 @@ import type { ElementType, ReactNode } from 'react';
 import type { SectionNavCopy } from '../../../copy';
 import { rem } from '../../../tokens/scales';
 
-import { Box, CONTROL_RESET, CountedIcon, controlProps, focusRing } from './SectionNav.parts';
-import type { SectionNavMenu, SectionNavProps } from './SectionNav.types';
+import { isMenu } from './SectionNav.helpers';
+import { Box, CONTROL_RESET, CountedIcon, SlotIcon, controlProps, focusRing } from './SectionNav.parts';
+import type { SectionNavAction, SectionNavBack, SectionNavMenu, SectionNavProps } from './SectionNav.types';
 
 /**
  * One rail row: icon, label, and the count at the far end.
@@ -24,6 +25,7 @@ function RailRow({
   copy,
   testId,
   control,
+  loading = false,
 }: {
   label: string;
   description?: string;
@@ -33,12 +35,14 @@ function RailRow({
   copy: SectionNavCopy;
   testId: string;
   control: Record<string, unknown>;
+  loading?: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
   return (
     <Box
       {...control}
       aria-current={active ? 'page' : undefined}
+      aria-busy={loading || undefined}
       data-testid={testId}
       sx={{
         ...CONTROL_RESET,
@@ -46,6 +50,7 @@ function RailRow({
         display: 'flex',
         alignItems: 'center',
         gap: 1.5,
+        '&:disabled': { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
         width: '100%',
         minHeight: rem(theme, 40),
         px: 1.25,
@@ -58,7 +63,12 @@ function RailRow({
         '& svg': { color: 'primary.main', fontSize: rem(theme, 20) },
       }}
     >
-      <CountedIcon icon={icon} count={count} label={copy.badge} testId={`${testId}-badge`} />
+      <CountedIcon
+        icon={<SlotIcon icon={icon} loading={loading} />}
+        count={count}
+        label={copy.badge}
+        testId={`${testId}-badge`}
+      />
       <Box component="span" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Typography component="span" variant="body2" sx={{ fontWeight: active ? 700 : 500 }}>
           {label}
@@ -113,13 +123,87 @@ function RailMenu({
               count={entry.badge}
               active={entry.active === true}
               copy={copy}
-              testId={`${testId}-entry-${entry.id}`}
-              control={controlProps({ href: entry.href, linkComponent, onClick: () => entry.onSelect?.() })}
+              testId={entry.dataTestId ?? `${testId}-entry-${entry.id}`}
+              control={controlProps({
+                href: entry.href,
+                linkComponent,
+                inert: entry.disabled === true,
+                onClick: () => entry.onSelect?.(),
+              })}
             />
           ))}
         </Box>
       ))}
     </Box>
+  );
+}
+
+/** The way back out of the section, at the top of the rail. */
+function RailBack({
+  back,
+  linkComponent,
+  testId,
+}: {
+  back: SectionNavBack;
+  linkComponent: ElementType | undefined;
+  testId: string;
+}): React.JSX.Element {
+  const theme = useTheme();
+  return (
+    <Box
+      {...controlProps({ href: back.href, linkComponent })}
+      data-testid={testId}
+      sx={{
+        ...CONTROL_RESET,
+        ...focusRing(theme),
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1.25,
+        py: 0.75,
+        mb: 0.5,
+        borderRadius: 1,
+        color: 'text.secondary',
+        '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+        '& svg': { fontSize: rem(theme, 20) },
+      }}
+    >
+      {back.icon}
+      <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
+        {back.label}
+      </Typography>
+    </Box>
+  );
+}
+
+/** A primary that ACTS, as one row: there is no sheet to list on a wide screen. */
+function RailAction({
+  action,
+  linkComponent,
+  copy,
+  testId,
+}: {
+  action: SectionNavAction;
+  linkComponent: ElementType | undefined;
+  copy: SectionNavCopy;
+  testId: string;
+}): React.JSX.Element {
+  return (
+    <RailRow
+      label={action.label}
+      icon={action.icon}
+      count={undefined}
+      active={false}
+      copy={copy}
+      testId={action.dataTestId ?? testId}
+      loading={action.loading === true}
+      control={controlProps({
+        href: undefined,
+        linkComponent,
+        inert: action.disabled === true || action.loading === true,
+        onClick: action.onSelect,
+      })}
+    />
   );
 }
 
@@ -144,7 +228,6 @@ export function SectionNavRail({
   Pick<SectionNavProps, 'primary' | 'more' | 'back' | 'heading'> & {
     linkComponent: ElementType | undefined;
   }): React.JSX.Element {
-  const theme = useTheme();
   return (
     <Box
       component="nav"
@@ -161,31 +244,7 @@ export function SectionNavRail({
         bgcolor: 'background.paper',
       }}
     >
-      {back ? (
-        <Box
-          {...controlProps({ href: back.href, linkComponent })}
-          data-testid={`${dataTestId}-back`}
-          sx={{
-            ...CONTROL_RESET,
-            ...focusRing(theme),
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            px: 1.25,
-            py: 0.75,
-            mb: 0.5,
-            borderRadius: 1,
-            color: 'text.secondary',
-            '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
-            '& svg': { fontSize: rem(theme, 20) },
-          }}
-        >
-          {back.icon}
-          <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
-            {back.label}
-          </Typography>
-        </Box>
-      ) : null}
+      {back ? <RailBack back={back} linkComponent={linkComponent} testId={`${dataTestId}-back`} /> : null}
       {heading ? <RailHeading>{heading}</RailHeading> : null}
       {destinations.map((destination) => (
         <RailRow
@@ -195,11 +254,20 @@ export function SectionNavRail({
           count={destination.badge}
           active={destination.active === true}
           copy={copy}
-          testId={`${dataTestId}-dest-${destination.id}`}
-          control={controlProps({ href: destination.href, linkComponent })}
+          testId={destination.dataTestId ?? `${dataTestId}-dest-${destination.id}`}
+          loading={destination.loading === true}
+          control={controlProps({
+            href: destination.href,
+            linkComponent,
+            inert: destination.disabled === true || destination.loading === true,
+            onClick: destination.onSelect,
+          })}
         />
       ))}
-      {primary ? (
+      {primary && !isMenu(primary) ? (
+        <RailAction action={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
+      ) : null}
+      {isMenu(primary) ? (
         <RailMenu menu={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
       ) : null}
       {more ? <RailMenu menu={more} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-more`} /> : null}

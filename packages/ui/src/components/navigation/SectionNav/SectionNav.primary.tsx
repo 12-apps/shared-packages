@@ -1,9 +1,10 @@
-import { useTheme } from '@mui/material/styles/index.js';
+import Typography from '@mui/material/Typography/index.js';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import type { ReactNode } from 'react';
 
 import { rem } from '../../../tokens/scales';
 
-import { Box, CONTROL_RESET, focusRing } from './SectionNav.parts';
+import { Box, CONTROL_RESET, SlotIcon, focusRing } from './SectionNav.parts';
 
 export interface RaisedActionButtonProps {
   /** The button's accessible name — it has no visible label. */
@@ -18,6 +19,15 @@ export interface RaisedActionButtonProps {
   open?: boolean;
   /** The name it takes while `open` — the same control closes what it opened. REQUIRED with `open`. */
   closeLabel?: string;
+  /**
+   * Draw `label` under the button. A bar of VERBS names the act it is for; a
+   * bar of places can leave its one action to the icon.
+   */
+  captioned?: boolean;
+  /** Dimmed and not operable. */
+  disabled?: boolean;
+  /** A write it started is in flight: a spinner replaces the icon, and it is inert. */
+  loading?: boolean;
   dataTestId?: string;
 }
 
@@ -38,44 +48,83 @@ export function RaisedActionButton({
   onClick,
   open,
   closeLabel,
+  captioned = false,
+  disabled = false,
+  loading = false,
   dataTestId = 'raised-action',
 }: RaisedActionButtonProps): React.JSX.Element {
   const theme = useTheme();
-  const size = rem(theme, 52);
   const expanded = open === true;
+  const inert = disabled || loading;
   return (
-    <Box sx={{ flex: 'none', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', px: 0.5 }}>
+    <Box
+      sx={{
+        flex: 'none',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        px: 0.5,
+      }}
+    >
       <Box
         component="button"
         type="button"
         onClick={onClick}
+        disabled={inert}
+        aria-busy={loading || undefined}
         aria-label={expanded && closeLabel ? closeLabel : label}
         aria-expanded={open}
         data-testid={dataTestId}
-        sx={{
-          ...CONTROL_RESET,
-          ...focusRing(theme),
-          width: size,
-          height: size,
-          // Lifted half out of the bar: the one control that is not a place.
-          marginTop: rem(theme, -18),
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: 'primary.main',
-          color: 'primary.contrastText',
-          boxShadow: theme.shadows[6],
-          '& svg': {
-            fontSize: rem(theme, 26),
-            transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shorter }),
-            transform: expanded ? 'rotate(45deg)' : 'none',
-          },
-          '@media (prefers-reduced-motion: reduce)': { '& svg': { transition: 'none' } },
-        }}
+        sx={raisedSx(theme, expanded)}
       >
-        {icon}
+        <SlotIcon icon={icon} loading={loading} />
       </Box>
+      {captioned ? <RaisedCaption label={label} inert={inert} /> : null}
     </Box>
   );
+}
+
+/**
+ * The label under a captioned button. Hidden from assistive tech: the button
+ * already carries the same words as its name, and reading them twice is noise.
+ */
+function RaisedCaption({ label, inert }: { label: string; inert: boolean }): React.JSX.Element {
+  return (
+    <Typography
+      component="span"
+      variant="caption"
+      aria-hidden
+      sx={{ lineHeight: 1.3, mt: 0.25, whiteSpace: 'nowrap', color: inert ? 'text.disabled' : 'text.primary' }}
+    >
+      {label}
+    </Typography>
+  );
+}
+
+/** The round button: lifted half out of the bar, its icon turning while what it opened is open. */
+function raisedSx(theme: Theme, expanded: boolean): SxProps<Theme> {
+  const size = rem(theme, 52);
+  return {
+    ...CONTROL_RESET,
+    ...focusRing(theme),
+    width: size,
+    height: size,
+    // Lifted half out of the bar: the one control that is not a place.
+    marginTop: rem(theme, -18),
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    bgcolor: 'primary.main',
+    color: 'primary.contrastText',
+    boxShadow: theme.shadows[6],
+    '&:disabled': { cursor: 'default', bgcolor: 'action.disabledBackground', color: 'text.disabled', boxShadow: 'none' },
+    '& svg': {
+      fontSize: rem(theme, 26),
+      transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shorter }),
+      transform: expanded ? 'rotate(45deg)' : 'none',
+    },
+    '@media (prefers-reduced-motion: reduce)': { '& svg': { transition: 'none' } },
+  } as SxProps<Theme>;
 }

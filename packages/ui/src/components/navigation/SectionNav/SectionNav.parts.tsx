@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import type { ElementType, ReactNode } from 'react';
 
@@ -59,19 +60,33 @@ export function focusRing(theme: Theme): SxProps<Theme> {
  * `href`, a button for an `onSelect`.
  *
  * Returned as props for a `Box`, so the control stays ONE interactive
- * element — never a button wrapped around a link.
+ * element — never a button wrapped around a link. An `inert` control is a
+ * disabled BUTTON whatever it would lead to: a link cannot be disabled, and
+ * one that looks dimmed but still navigates is the lie this rules out.
  */
 export function controlProps({
   href,
   onClick,
   linkComponent,
+  inert = false,
 }: {
   href: string | undefined;
   onClick?: () => void;
   linkComponent: ElementType | undefined;
+  inert?: boolean;
 }): Record<string, unknown> {
+  if (inert) return { component: 'button', type: 'button', disabled: true };
   if (href !== undefined) return { component: linkComponent ?? 'a', href, onClick };
   return { component: 'button', type: 'button', onClick };
+}
+
+/**
+ * The icon, or the spinner that stands in for it while the slot's write is in
+ * flight — the same box, so the label under it does not move.
+ */
+export function SlotIcon({ icon, loading }: { icon: ReactNode; loading: boolean }): React.JSX.Element {
+  if (!loading) return <>{icon}</>;
+  return <CircularProgress size="1em" color="inherit" thickness={5} data-testid="section-nav-spinner" />;
 }
 
 /** The base reset every clickable in the nav shares: no underline, no button chrome. */
@@ -83,6 +98,7 @@ export const CONTROL_RESET = {
   textDecoration: 'none',
   cursor: 'pointer',
   margin: 0,
+  '&:disabled': { cursor: 'default' },
 } as const;
 
 export { Box };

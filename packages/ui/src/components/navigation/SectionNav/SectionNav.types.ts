@@ -3,14 +3,31 @@ import type { ElementType, ReactNode } from 'react';
 import type { SectionNavCopy } from '../../../copy';
 
 /**
- * One place the section leads to — a bar slot on a phone, a row in the rail.
+ * One slot of the section — a bar slot on a phone, a row in the rail.
+ *
+ * A slot either LEADS somewhere (`href`, rendered through `linkComponent`) or
+ * DOES something (`onSelect`), the way a menu entry does. A bar of places is a
+ * section's navigation; a bar of verbs is a screen's actions pinned at its
+ * foot, and it is the same bar, so the two cannot be drawn two ways. Give a
+ * slot one or the other.
  */
 export interface SectionNavDestination {
   /** Stable key. Also the suffix of the slot's `data-testid`. */
   id: string;
   label: string;
   icon: ReactNode;
-  href: string;
+  href?: string;
+  /** What the slot does, for an action slot. Ignored while `disabled` or `loading`. */
+  onSelect?: () => void;
+  /** Drawn dimmed and not operable: the act exists here, and cannot be done now. */
+  disabled?: boolean;
+  /** A write this slot started is in flight — a spinner replaces the icon and the slot is inert. */
+  loading?: boolean;
+  /**
+   * The control's own `data-testid`, in place of the one the nav derives. For
+   * a host whose suites already drive an id of their own shape.
+   */
+  dataTestId?: string;
   /**
    * How many things behind this destination wait on the viewer. `0` and
    * `undefined` render no badge — "nothing waiting" and "not known yet" are
@@ -37,6 +54,13 @@ export interface SectionNavEntry {
   onSelect?: () => void;
   badge?: number;
   active?: boolean;
+  /** Drawn dimmed and not operable — a print already on its way, an act this state refuses. */
+  disabled?: boolean;
+  /**
+   * The control's own `data-testid`, in place of the one the nav derives. For
+   * a host whose suites already drive an id of their own shape.
+   */
+  dataTestId?: string;
 }
 
 /** A titled run of entries inside a menu. */
@@ -67,6 +91,31 @@ export interface SectionNavMenu {
   /** The sheet's heading, and the rail section's. */
   title: string;
   groups: SectionNavGroup[];
+  /** The trigger is drawn dimmed and does not open. */
+  disabled?: boolean;
+  /**
+   * The control's own `data-testid`, in place of the one the nav derives. For
+   * a host whose suites already drive an id of their own shape.
+   */
+  dataTestId?: string;
+}
+
+/**
+ * The raised primary as a plain ACTION rather than a menu: one act, done on
+ * tap. Its label is drawn under the button, because a bar of verbs names the
+ * act it is for rather than leaving it to an icon.
+ */
+export interface SectionNavAction {
+  label: string;
+  icon: ReactNode;
+  onSelect: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  /**
+   * The control's own `data-testid`, in place of the one the nav derives. For
+   * a host whose suites already drive an id of their own shape.
+   */
+  dataTestId?: string;
 }
 
 /** The way out of the section, drawn at the top of the rail. */
@@ -88,8 +137,11 @@ export interface SectionNavProps {
   /** The navigation landmark's accessible name. */
   label: string;
   destinations: SectionNavDestination[];
-  /** The raised action in the middle of the bar. */
-  primary?: SectionNavMenu;
+  /**
+   * The raised button in the middle of the bar: a menu it opens as a sheet,
+   * or an action it does on tap (drawn with its label under it).
+   */
+  primary?: SectionNavMenu | SectionNavAction;
   /** The last slot of the bar. Its badge is the sum of its entries' badges. */
   more?: SectionNavMenu;
   /** Rail only: the way back out of the section. */

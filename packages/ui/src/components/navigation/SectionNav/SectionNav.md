@@ -31,10 +31,13 @@ screen.
 - **layout**: `'bar' | 'rail'`.
 - **label**: the navigation landmark's accessible name.
 - **destinations**: `SectionNavDestination[]`, each with `id`, `label`, `icon`,
-  `href`, `badge?` and `active?`.
-- **primary**: a `SectionNavMenu` (`label`, `icon`, `title`, `groups`). In the
-  bar it is the raised button, whose name becomes `copy.close` while its sheet
-  is open.
+  `href` OR `onSelect`, `badge?`, `active?`, `disabled?`, `loading?` and
+  `dataTestId?`.
+- **primary**: a `SectionNavMenu` (`label`, `icon`, `title`, `groups`) or a
+  `SectionNavAction` (`label`, `icon`, `onSelect`, `disabled?`, `loading?`). In
+  the bar it is the raised button. A menu opens its sheet, and the button's name
+  becomes `copy.close` while it is open. An action runs on tap and its label is
+  drawn under the button.
 - **more**: a `SectionNavMenu`. In the bar it is the last slot, and its badge
   is the sum of its entries' badges.
 - **back**, **heading**: the rail only.
@@ -47,6 +50,24 @@ screen.
   carries no words. `PT_BR_SECTION_NAV_COPY` and `EN_US_SECTION_NAV_COPY` are
   named packs; `SECTION_NAV_COPY` is the locale pack.
 - **dataTestId**: the prefix for every test id (`section-nav`).
+
+## A bar of verbs
+
+The same bar pins a SCREEN's actions at its foot: give destinations an
+`onSelect` instead of an `href`, and `primary` a `SectionNavAction`. A bar of
+places and a bar of verbs are one component, so they cannot drift into two
+looks one tap apart.
+
+- `disabled` draws the slot dimmed and makes it a disabled button, even when it
+  carries an `href`: a link cannot be disabled, and one that looks dimmed but
+  still navigates is a lie.
+- `loading` replaces the icon with a spinner, sets `aria-busy`, and makes the
+  slot inert until the write it started answers.
+- `active` lights an action slot the way it lights the current page. Use it for
+  a toggle that is ON.
+- A menu entry, and a whole menu (the `more` slot), can be `disabled` too.
+- `dataTestId` on a destination, entry, action or menu replaces the id the nav
+  would derive, for a host whose suites already drive their own.
 
 A menu's **groups** carry `entries`. Each entry has an `href` (a link) or an
 `onSelect` (an action). `layout: 'grid'` draws three tiles across in the sheet;

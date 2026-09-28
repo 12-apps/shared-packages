@@ -1,4 +1,4 @@
-import type { SectionNavDestination, SectionNavMenu } from './SectionNav.types';
+import type { SectionNavAction, SectionNavDestination, SectionNavMenu } from './SectionNav.types';
 
 /** A count worth drawing: positive and finite. Zero and "unknown" draw nothing. */
 export function shownCount(count: number | undefined): number | undefined {
@@ -48,4 +48,9 @@ export function barSlots(
   if (hasMore) slots.push({ kind: 'more' });
   if (hasPrimary) slots.splice(Math.floor(slots.length / 2), 0, { kind: 'primary' });
   return slots;
+}
+
+/** A primary that opens a sheet, as opposed to one that acts on tap. */
+export function isMenu(primary: SectionNavMenu | SectionNavAction | undefined): primary is SectionNavMenu {
+  return primary !== undefined && 'groups' in primary;
 }

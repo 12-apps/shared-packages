@@ -723,9 +723,9 @@ Components for site and app navigation.
 ### SectionNav
 **Purpose**: A section's own navigation — the few screens one kind of work moves between
 **Use Cases**: A phone bottom bar for a work area (a shift, a till, a field app); the same destinations as a rail on a wide screen
-**Features**: `bar` (destinations with counts, a `more` sheet, a raised `primary` action in the middle opening its own sheet) and `rail` (a way back, destinations, every menu listed); router-agnostic links via `linkComponent`; copy as a required prop
+**Features**: `bar` (destinations with counts, a `more` sheet, a raised `primary` action in the middle opening its own sheet) and `rail` (a way back, destinations, every menu listed); router-agnostic links via `linkComponent`; copy as a required prop; also a bar of VERBS pinned at a screen's foot — action slots (`onSelect`, `disabled`, `loading`), a raised `primary` that acts on tap with its label under it, disabled menu entries, host-owned `dataTestId`s
 **Also exports**: `RaisedActionButton` — the raised round action alone, for a bar the host already draws
-**Types**: `SectionNavProps`, `SectionNavDestination`, `SectionNavMenu`, `SectionNavGroup`, `SectionNavEntry`, `SectionNavCopy`
+**Types**: `SectionNavProps`, `SectionNavDestination`, `SectionNavAction`, `SectionNavMenu`, `SectionNavGroup`, `SectionNavEntry`, `SectionNavCopy`
 **Location**: `src/components/navigation/SectionNav`
 **Docs**: `src/components/navigation/SectionNav/SectionNav.md`
 
