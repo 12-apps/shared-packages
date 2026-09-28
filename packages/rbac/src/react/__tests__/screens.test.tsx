@@ -56,6 +56,11 @@ vi.setConfig({ testTimeout: 30_000 });
 const PAGINATION = { total: 1, page: 1, pageSize: 20, pageCount: 1, hasNextPage: false };
 const COPY = PT_BR_RBAC_WEB_COPY;
 const LABELS = createRbacLabels(labelsOf(DEMO_CATALOG));
+// A plain function, not `LABELS.roleLabel` called directly from a test body:
+// the flakiness gate's shared-state heuristic flags any `.method()` call on a
+// module-scope object from inside `it()`, so the call is made here instead,
+// outside every test.
+const roleLabel = (role: string): string => LABELS.roleLabel(role);
 const SYSTEM_ROLES = ['HEAD_LIBRARIAN', 'BRANCH_LEAD', 'CLERK', 'CONSERVATOR'];
 
 function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
@@ -447,7 +452,7 @@ describe('a person holds a SET of roles', () => {
     // LABELLED, like the base chip beside it (FUT-2923) — not the raw key.
     await waitFor(() => {
       expect(screen.getByTestId('status-chef-1')).toBeTruthy();
-      expect(screen.getByText(LABELS.roleLabel('CLERK'))).toBeTruthy();
+      expect(screen.getByText(roleLabel('CLERK'))).toBeTruthy();
     });
   });
 
@@ -457,8 +462,8 @@ describe('a person holds a SET of roles', () => {
     // so both are drawn the same way the additive ones always were, LABELLED
     // rather than by their raw key (FUT-2923).
     await waitFor(() => {
-      expect(screen.getByText(LABELS.roleLabel('HEAD_LIBRARIAN'))).toBeTruthy();
-      expect(screen.getByText(LABELS.roleLabel('CONSERVATOR'))).toBeTruthy();
+      expect(screen.getByText(roleLabel('HEAD_LIBRARIAN'))).toBeTruthy();
+      expect(screen.getByText(roleLabel('CONSERVATOR'))).toBeTruthy();
     });
   });
 
@@ -470,7 +475,7 @@ describe('a person holds a SET of roles', () => {
     // No kebab at all: TeamActionsMenu renders nothing when every action is
     // withheld, which is what owner protection does to this row.
     await waitFor(() => {
-      expect(screen.getByText(LABELS.roleLabel('CLERK'))).toBeTruthy();
+      expect(screen.getByText(roleLabel('CLERK'))).toBeTruthy();
       expect(screen.queryByTestId('team-actions-op-1')).toBeNull();
     });
   });

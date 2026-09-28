@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { labelsOf } from "../../core/compose";
@@ -36,15 +36,15 @@ const labels = createRbacLabels(labelsOf(DEMO_CATALOG));
 const copy = PT_BR_RBAC_WEB_COPY.teamTable;
 
 function rolesColumnOf(labelsArg = labels) {
-  const column = teamColumns(labelsArg, copy).find(
+  const found = teamColumns(labelsArg, copy).find(
     (c) => c.id === "customRoles",
   );
-  if (!column) throw new Error("customRoles column not found");
-  return column;
+  if (!found) throw new Error("customRoles column not found");
+  return found;
 }
 
 describe("teamColumns roles cell", () => {
-  it("translates every additional SEEDED role, not just the base one", () => {
+  it("translates every additional SEEDED role, not just the base one", async () => {
     const column = rolesColumnOf();
     render(
       <>
@@ -60,7 +60,9 @@ describe("teamColumns roles cell", () => {
     expect(screen.getByText("Atendente de balcão")).toBeDefined();
     // A tenant CUSTOM role has no catalog word and keeps its own name.
     expect(screen.getByText("Voluntário")).toBeDefined();
-    expect(screen.queryByText("CLERK")).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText("CLERK")).toBeNull();
+    });
   });
 
   it("translates the same roles in the column's own text accessor", () => {
