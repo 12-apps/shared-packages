@@ -1,4 +1,4 @@
-import { switchClasses } from '@mui/material/Switch/index.js';
+import generateUtilityClass from '@mui/material/generateUtilityClass/index.js';
 import type { Components, CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { rem, rems } from './relative';
@@ -94,14 +94,17 @@ import { rem, rems } from './relative';
  *   (one class) cannot out-specificity it, so at `size="small"` it would
  *   silently keep rendering MUI's unthemed `4px`/`16×16` at every density,
  *   the click target and thumb staying full-size while the track around them
- *   shrank. Fixed the same way: `sizeSmall`'s OWN nested `& .${switchClasses
- *   .switchBase}` / `& .${switchClasses.thumb}` rules, read through
- *   `switchClasses` (not a hand-typed selector string) for the same
- *   `ClassNameGenerator.configure` reason `chipClasses` is above, inserted
- *   as part of the SAME `sizeSmall` override object so they land AFTER
- *   `SwitchRoot`'s own baked-in small variant in the generated class's CSS
- *   text (later wins at matching two-class specificity) rather than trying
- *   to out-specificity it from a different slot.
+ *   shrank. Fixed the same way: `sizeSmall`'s OWN nested `& .${SWITCH_SWITCH_
+ *   BASE}` / `& .${SWITCH_THUMB}` rules, built with `generateUtilityClass`
+ *   (not a hand-typed selector string) for the same `ClassNameGenerator
+ *   .configure` reason `density-overrides.ts`'s `CHIP_LABEL` is — and, unlike
+ *   reading `switchClasses` off `@mui/material/Switch` itself, without
+ *   putting `MuiSwitch` on the critical path of every host that imports
+ *   `densityThemeOptions` (FUT-2993) — inserted as part of the SAME
+ *   `sizeSmall` override object so they land AFTER `SwitchRoot`'s own baked-in
+ *   small variant in the generated class's CSS text (later wins at matching
+ *   two-class specificity) rather than trying to out-specificity it from a
+ *   different slot.
  *
  * **The checked thumb's own travel distance is a FOURTH literal, found only
  * on adversarial review of the PR this doc comment first shipped in.**
@@ -111,7 +114,7 @@ import { rem, rems } from './relative';
  * `density: 'compact'` the checked thumb kept travelling the FULL, unscaled
  * distance while the track around it shrank ×0.9 — a visible overshoot.
  * `switchSwitchBasePadding`/`switchSizeSmall` each now carry their own
- * `&.${switchClasses.checked}` rule (`translateX(rem(theme, 20))`/`rem(theme,
+ * `&.${SWITCH_CHECKED}` rule (`translateX(rem(theme, 20))`/`rem(theme,
  * 16)`), composed onto the SAME generated class, in the SAME position
  * `padding` already occupies — so it wins by the identical mechanism, not a
  * new one. Proven at the pixel level, both sizes/densities: `switch-md-
@@ -146,6 +149,20 @@ export function checkboxRadioDensityOverrides(): Components<Theme> {
   };
 }
 
+/**
+ * Built with `generateUtilityClass`, not imported from `@mui/material/Switch`'s
+ * own `switchClasses` — the same generated strings (`Switch.js` builds
+ * `switchClasses` from this exact helper), but without pulling `MuiSwitch`
+ * onto the critical path of every host that imports `densityThemeOptions`
+ * (see the module doc comment, and FUT-2993). `SWITCH_CHECKED` is a GLOBAL
+ * state slot (`generateUtilityClass`'s `globalStateClasses` table), so it
+ * resolves to `Mui-checked`, not `MuiSwitch-checked` — the same string
+ * `switchClasses.checked` gives.
+ */
+const SWITCH_SWITCH_BASE = generateUtilityClass('MuiSwitch', 'switchBase');
+const SWITCH_THUMB = generateUtilityClass('MuiSwitch', 'thumb');
+const SWITCH_CHECKED = generateUtilityClass('MuiSwitch', 'checked');
+
 const switchRootGeometry = ({ theme }: { theme: Theme }): CSSObject => ({
   width: rems(theme, 34 + 12 * 2),
   height: rems(theme, 14 + 12 * 2),
@@ -163,7 +180,7 @@ const switchSwitchBasePadding = ({ theme }: { theme: Theme }): CSSObject => ({
   // own base/variants — see the module doc comment), so this nested rule
   // wins at the SAME (two-class, `.<hash>.Mui-checked`) specificity, the same
   // mechanism this function's own `padding` line already relies on.
-  [`&.${switchClasses.checked}`]: { transform: `translateX(${rem(theme, 20)})` },
+  [`&.${SWITCH_CHECKED}`]: { transform: `translateX(${rem(theme, 20)})` },
 });
 const switchThumbSize = ({ theme }: { theme: Theme }): CSSObject => ({
   width: rem(theme, 20),
@@ -177,7 +194,7 @@ const switchSizeSmall = ({ theme }: { theme: Theme }): CSSObject => ({
   // overrides above, inserted as part of THIS SAME generated class — see the
   // module doc comment for why a flat override cannot reach these at
   // `size="small"` on its own.
-  [`& .${switchClasses.switchBase}`]: {
+  [`& .${SWITCH_SWITCH_BASE}`]: {
     padding: rem(theme, 4),
     // Same overshoot as medium's, at `size="small"`'s OWN literal
     // (`SwitchRoot`'s baked-in `size: 'small'` variant, `Switch.js`:
@@ -187,9 +204,9 @@ const switchSizeSmall = ({ theme }: { theme: Theme }): CSSObject => ({
     // this rule, composed after it in the same generated class, so it wins
     // at matching specificity the same way the sibling `padding: rem(theme,
     // 4)` line above already does.
-    [`&.${switchClasses.checked}`]: { transform: `translateX(${rem(theme, 16)})` },
+    [`&.${SWITCH_CHECKED}`]: { transform: `translateX(${rem(theme, 16)})` },
   },
-  [`& .${switchClasses.thumb}`]: { width: rem(theme, 16), height: rem(theme, 16) },
+  [`& .${SWITCH_THUMB}`]: { width: rem(theme, 16), height: rem(theme, 16) },
 });
 
 /**
