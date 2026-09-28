@@ -451,7 +451,7 @@ Components for user input and form interactions.
 ### Select
 **Purpose**: Dropdown selection
 **Use Cases**: Single/multiple choice, filters, settings
-**Features**: Search, groups, custom rendering, validation
+**Features**: Menu up to five options; from six on, automatically a search box over a height-bounded list (`CreatableSelect`'s engine) with the same props and events — `searchable` overrides, `noOptionsText` is the host's no-match sentence; groups, custom rendering, validation
 **Location**: `src/components/form/Select`
 **Docs**: `src/components/form/Select/Select.md`
 
