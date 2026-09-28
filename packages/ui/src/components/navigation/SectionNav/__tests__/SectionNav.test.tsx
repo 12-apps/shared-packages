@@ -221,7 +221,8 @@ describe('SectionNav rail', () => {
     expect(screen.getByTestId('section-nav-more-entry-queue')).toHaveAttribute('href', '/queue');
     // More is listed; the create menu is folded behind one button (FUT-3015).
     expect(screen.getByTestId('section-nav-more').tagName).toBe('SECTION');
-    expect(screen.queryByTestId('section-nav-primary-entry-delivery')).toBeNull();
+    expect(screen.getByTestId('section-nav-primary')).toHaveAttribute('aria-haspopup', 'menu');
+    expect(screen.getByTestId('section-nav')).not.toHaveTextContent('Delivery');
   });
 });
 

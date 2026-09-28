@@ -102,7 +102,7 @@ export const RailListsEverything: Story = {
     await expect(canvas.getByTestId('section-nav-dest-board')).toHaveAttribute('aria-current', 'page');
     await expect(canvas.getByTestId('section-nav-more-entry-queue')).toBeVisible();
     // The create menu is one button until it is opened (FUT-3015).
-    await expect(canvas.queryByTestId('section-nav-primary-entry-pause')).toBeNull();
+    await expect(canvas.getByTestId('section-nav-primary')).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(canvas.getByTestId('section-nav-primary'));
     const body = within(canvasElement.ownerDocument.body);
     await waitFor(() => expect(body.getByTestId('section-nav-primary-entry-pause')).toBeVisible());

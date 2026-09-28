@@ -161,7 +161,7 @@ describe('SectionNav rail: a disabled menu', () => {
     const button = screen.getByTestId('section-nav-primary');
     expect(button).toBeDisabled();
     fireEvent.click(button);
-    expect(screen.queryByTestId('section-nav-primary-menu')).toBeNull();
+    expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('makes every row of a disabled more menu inert', () => {

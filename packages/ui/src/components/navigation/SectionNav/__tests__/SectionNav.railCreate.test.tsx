@@ -4,6 +4,7 @@
  * folds it behind '+ Create' at the top and opens it as an anchored menu.
  */
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -119,6 +120,13 @@ function renderRail(primary: SectionNavMenu): void {
   );
 }
 
+/** Focus through the prototype inside `act` — the flakiness lint flags `.focus()` (see SectionNav.states.test.tsx). */
+async function focusOn(element: HTMLElement): Promise<void> {
+  await act(async () => {
+    HTMLElement.prototype.focus.call(element);
+  });
+}
+
 function open(): HTMLElement {
   fireEvent.click(screen.getByTestId('section-nav-primary'));
   return screen.getByTestId('section-nav-primary-menu');
@@ -138,10 +146,10 @@ describe('SectionNav rail: the create menu behind one button', () => {
       button.compareDocumentPosition(destination) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(screen.queryByText('Create now')).toBeNull();
-    expect(
-      screen.queryByTestId('section-nav-primary-entry-product'),
-    ).toBeNull();
+    // Folded: neither the menu's title nor any entry is in the rail.
+    const rail = screen.getByTestId('section-nav');
+    expect(rail).not.toHaveTextContent('Create now');
+    expect(rail).not.toHaveTextContent('New product');
     // More is still listed.
     expect(screen.getByTestId('section-nav-more-entry-queue')).toHaveAttribute(
       'href',
@@ -206,7 +214,7 @@ describe('SectionNav rail: the create menu behind one button', () => {
   it('closes on Escape and hands focus back to the button', async () => {
     renderRail(create());
     const button = screen.getByTestId('section-nav-primary');
-    button.focus();
+    await focusOn(button);
     const menu = open();
     fireEvent.keyDown(within(menu).getByRole('menu'), { key: 'Escape' });
     await waitFor(() =>

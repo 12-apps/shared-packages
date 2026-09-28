@@ -15,6 +15,7 @@ import type { SectionNavEntry, SectionNavMenu } from './SectionNav.types';
 
 /** One entry of the open menu: a link through the host's router, or an act. */
 function entryItem(
+  groupId: string,
   entry: SectionNavEntry,
   linkComponent: ElementType | undefined,
   copy: SectionNavCopy,
@@ -25,13 +26,15 @@ function entryItem(
     entry.href === undefined || entry.disabled === true
       ? {}
       : { component: linkComponent ?? 'a', href: entry.href };
+  const itemTestId = entry.dataTestId ?? `${testId}-entry-${entry.id}`;
   return (
     <MenuItem
-      key={entry.id}
+      key={`${groupId}:${entry.id}`}
       {...link}
       disabled={entry.disabled === true}
       selected={entry.active === true}
-      data-testid={entry.dataTestId ?? `${testId}-entry-${entry.id}`}
+      aria-current={entry.active === true ? 'page' : undefined}
+      data-testid={itemTestId}
       onClick={() => {
         entry.onSelect?.();
         close();
@@ -43,7 +46,7 @@ function entryItem(
           icon={entry.icon}
           count={entry.badge}
           label={copy.badge}
-          testId={`${testId}-entry-${entry.id}-badge`}
+          testId={`${itemTestId}-badge`}
         />
       </ListItemIcon>
       <ListItemText
@@ -90,22 +93,16 @@ export function RailCreateMenu({
   const open = anchor !== null;
   const close = (): void => setAnchor(null);
   const paperTestId: Record<string, string> = { 'data-testid': `${testId}-menu` };
-  const items: ReactNode[] = [];
-  for (const group of menu.groups) {
-    if (group.title) {
-      items.push(
-        <ListSubheader
-          key={`${group.id}-title`}
-          disableSticky
-          sx={{ lineHeight: 2.5, bgcolor: 'transparent' }}
-        >
-          {group.title}
-        </ListSubheader>,
-      );
-    }
-    for (const entry of group.entries)
-      items.push(entryItem(entry, linkComponent, copy, testId, close));
-  }
+  // One flat list: MUI's MenuList walks its direct children, so a group's
+  // subheader and entries cannot sit inside a wrapper.
+  const items: ReactNode[] = menu.groups.flatMap((group) => [
+    group.title ? (
+      <ListSubheader key={`${group.id}-title`} disableSticky sx={{ lineHeight: 2.5, bgcolor: 'transparent' }}>
+        {group.title}
+      </ListSubheader>
+    ) : null,
+    ...group.entries.map((entry) => entryItem(group.id, entry, linkComponent, copy, testId, close)),
+  ]);
   return (
     <>
       <Button
