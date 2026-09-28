@@ -5,7 +5,13 @@ import {
   checkboxRadioDensityOverrides,
   chipDensityOverrides,
   iconButtonDensityOverrides,
+  paginationItemDensityOverrides,
+  sliderDensityOverrides,
   switchDensityOverrides,
+  tabDensityOverrides,
+  tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
+  toggleButtonDensityOverrides,
 } from '../tokens/density-overrides';
 import { densityFontSize, resolveDensityFactor } from '../tokens/density';
 import { resolveFieldHeight } from '../tokens/field-height.core';
@@ -150,15 +156,21 @@ export function muiThemeOptionsFrom(ui: UiTheme): ThemeOptions {
     shape: { borderRadius: ui.radius.md },
     fieldRadius: ui.radius.field,
     fieldHeight: ui.fieldHeight,
-    // Additive: child 4 (FUT-2768) adds one more source here as its own
-    // geometry overrides land — FUT-2766 added IconButton's and Chip's, this
-    // PR (FUT-2767) adds Checkbox/Radio's and Switch's.
+    // Additive: FUT-2766 added IconButton's/Chip's overrides, FUT-2767 added
+    // Checkbox/Radio's and Switch's, and this PR (FUT-2768) adds
+    // ToggleButton/Tab/Tabs' indicator/TableCell/PaginationItem/Slider's.
     components: mergeMuiComponents(
       fieldOverrides(ui.radius.field, ui.fieldHeight),
       iconButtonDensityOverrides(),
       chipDensityOverrides(),
       checkboxRadioDensityOverrides(),
       switchDensityOverrides(),
+      toggleButtonDensityOverrides(),
+      tabDensityOverrides(),
+      tabsIndicatorDensityOverrides(),
+      tableCellDensityOverrides(),
+      paginationItemDensityOverrides(),
+      sliderDensityOverrides(),
     ),
     spacing: ui.spacingUnit,
     density: ui.density,

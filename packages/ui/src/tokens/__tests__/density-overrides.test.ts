@@ -7,7 +7,13 @@ import {
   checkboxRadioDensityOverrides,
   chipDensityOverrides,
   iconButtonDensityOverrides,
+  paginationItemDensityOverrides,
+  sliderDensityOverrides,
   switchDensityOverrides,
+  tabDensityOverrides,
+  tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
+  toggleButtonDensityOverrides,
 } from '../density-overrides';
 
 /**
@@ -25,13 +31,28 @@ interface ChipOwnerStateArg {
   size?: 'small' | 'medium';
 }
 
-type StyleFn = (props: { theme: Theme; ownerState?: ChipOwnerStateArg }) => Record<string, unknown>;
+/** The `ownerState` shapes every FUT-2768 override reads, unioned for the shared `slot` helper. */
+interface OwnerStateArg {
+  variant?: string;
+  size?: string;
+  type?: string;
+  orientation?: string;
+  padding?: string;
+}
 
-type AnyOverrides =
+type StyleFn = (props: { theme: Theme; ownerState?: OwnerStateArg }) => Record<string, unknown>;
+
+type AnyDensityOverrides =
   | ReturnType<typeof iconButtonDensityOverrides>
   | ReturnType<typeof chipDensityOverrides>
   | ReturnType<typeof checkboxRadioDensityOverrides>
-  | ReturnType<typeof switchDensityOverrides>;
+  | ReturnType<typeof switchDensityOverrides>
+  | ReturnType<typeof toggleButtonDensityOverrides>
+  | ReturnType<typeof tabDensityOverrides>
+  | ReturnType<typeof tabsIndicatorDensityOverrides>
+  | ReturnType<typeof tableCellDensityOverrides>
+  | ReturnType<typeof paginationItemDensityOverrides>
+  | ReturnType<typeof sliderDensityOverrides>;
 
 /** `nodeList[index]`, but throws instead of returning `undefined` (`noUncheckedIndexedAccess`). */
 function at(nodeList: NodeListOf<Element>, index: number): Element {
@@ -41,13 +62,25 @@ function at(nodeList: NodeListOf<Element>, index: number): Element {
 }
 
 function slot(
-  overrides: AnyOverrides,
-  component: 'MuiIconButton' | 'MuiChip' | 'MuiCheckbox' | 'MuiRadio' | 'MuiSwitch',
+  overrides: AnyDensityOverrides,
+  component:
+    | 'MuiIconButton'
+    | 'MuiChip'
+    | 'MuiCheckbox'
+    | 'MuiRadio'
+    | 'MuiSwitch'
+    | 'MuiToggleButton'
+    | 'MuiTab'
+    | 'MuiTabs'
+    | 'MuiTableCell'
+    | 'MuiPaginationItem'
+    | 'MuiSlider',
   key: string,
   theme: Theme,
-  ownerState?: ChipOwnerStateArg,
+  ownerState?: ChipOwnerStateArg | OwnerStateArg,
 ): Record<string, unknown> {
-  const fn = (overrides[component]?.styleOverrides as Record<string, StyleFn> | undefined)?.[key];
+  const componentOverrides = overrides as Record<string, { styleOverrides?: Record<string, StyleFn> } | undefined>;
+  const fn = componentOverrides[component]?.styleOverrides?.[key];
   if (typeof fn !== 'function') throw new Error(`${component}.${key} is not a style-override function`);
   return fn({ theme, ownerState });
 }
@@ -496,5 +529,353 @@ describe('switchDensityOverrides', () => {
       expect(mediumTransform).toBe(`translateX(${theme.typography.pxToRem(20)})`);
       expect(smallTransform).toBe(`translateX(${theme.typography.pxToRem(16)})`);
     });
+  });
+});
+
+describe('toggleButtonDensityOverrides', () => {
+  it('writes root/sizeSmall/sizeLarge padding as rem(theme, px) — the literals ToggleButton.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = toggleButtonDensityOverrides();
+    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({ padding: theme.typography.pxToRem(11) });
+    expect(slot(overrides, 'MuiToggleButton', 'sizeSmall', theme)).toEqual({ padding: theme.typography.pxToRem(7) });
+    expect(slot(overrides, 'MuiToggleButton', 'sizeLarge', theme)).toEqual({ padding: theme.typography.pxToRem(15) });
+  });
+
+  it('is a true no-op at the default theme: 11px/7px/15px, the exact literals it replaces', () => {
+    const theme = createTheme();
+    const overrides = toggleButtonDensityOverrides();
+    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({ padding: '0.6875rem' }); // 11 / 16
+    expect(slot(overrides, 'MuiToggleButton', 'sizeSmall', theme)).toEqual({ padding: '0.4375rem' }); // 7 / 16
+    expect(slot(overrides, 'MuiToggleButton', 'sizeLarge', theme)).toEqual({ padding: '0.9375rem' }); // 15 / 16
+  });
+
+  it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+    const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+    const overrides = toggleButtonDensityOverrides();
+    expect(slot(overrides, 'MuiToggleButton', 'root', theme)).toEqual({ padding: '0.61875rem' }); // 11 * 0.9 / 16
+  });
+
+  it('two separately-built override sets are the SAME function references', () => {
+    const a = toggleButtonDensityOverrides();
+    const b = toggleButtonDensityOverrides();
+    expect(a.MuiToggleButton?.styleOverrides?.root).toBe(b.MuiToggleButton?.styleOverrides?.root);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('tabDensityOverrides', () => {
+  it('writes root minHeight/padding as rem(theme, px)/rems(theme, 12, 16) — the literals Tab.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = tabDensityOverrides();
+    expect(slot(overrides, 'MuiTab', 'root', theme)).toEqual({
+      minHeight: theme.typography.pxToRem(48),
+      padding: `${theme.typography.pxToRem(12)} ${theme.typography.pxToRem(16)}`,
+    });
+  });
+
+  it('writes labelIcon (the icon+label combo) minHeight/paddingTop/paddingBottom as rem(theme, px)', () => {
+    const theme = createTheme();
+    const overrides = tabDensityOverrides();
+    expect(slot(overrides, 'MuiTab', 'labelIcon', theme)).toEqual({
+      minHeight: theme.typography.pxToRem(72),
+      paddingTop: theme.typography.pxToRem(9),
+      paddingBottom: theme.typography.pxToRem(9),
+    });
+  });
+
+  it('is a true no-op at the default theme: the exact literals Tab.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = tabDensityOverrides();
+    expect(slot(overrides, 'MuiTab', 'root', theme)).toEqual({ minHeight: '3rem', padding: '0.75rem 1rem' }); // 48/16, 12/16 16/16
+    expect(slot(overrides, 'MuiTab', 'labelIcon', theme)).toEqual({
+      minHeight: '4.5rem', // 72 / 16
+      paddingTop: '0.5625rem', // 9 / 16
+      paddingBottom: '0.5625rem',
+    });
+  });
+
+  it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+    const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+    const overrides = tabDensityOverrides();
+    expect(slot(overrides, 'MuiTab', 'root', theme)).toEqual({ minHeight: '2.7rem', padding: '0.675rem 0.9rem' });
+    expect(slot(overrides, 'MuiTab', 'labelIcon', theme)).toEqual({
+      minHeight: '4.05rem',
+      paddingTop: '0.50625rem',
+      paddingBottom: '0.50625rem',
+    });
+  });
+
+  it('two separately-built override sets are the SAME function references', () => {
+    const a = tabDensityOverrides();
+    const b = tabDensityOverrides();
+    expect(a.MuiTab?.styleOverrides?.labelIcon).toBe(b.MuiTab?.styleOverrides?.labelIcon);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('tabsIndicatorDensityOverrides', () => {
+  it('writes indicator HEIGHT for the default (horizontal) orientation as rem(theme, 2) — the literal Tabs.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme)).toEqual({ height: theme.typography.pxToRem(2) });
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme, { orientation: 'horizontal' })).toEqual({
+      height: theme.typography.pxToRem(2),
+    });
+  });
+
+  /**
+   * FUT-2768 — MUI's OWN vertical variant sets `width: 2` and leaves
+   * `height: '100%'` (from that SAME variant) alone; an override that wrote
+   * BOTH unconditionally would clobber the vertical indicator's full-length
+   * axis, the same Lesson-1 clobber the Slider rail override avoids.
+   */
+  it('writes indicator WIDTH — not height — for a vertical Tabs', () => {
+    const theme = createTheme();
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme, { orientation: 'vertical' })).toEqual({
+      width: theme.typography.pxToRem(2),
+    });
+  });
+
+  it('is a true no-op at the default theme: 2px, the exact literal it replaces', () => {
+    const theme = createTheme();
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme)).toEqual({ height: '0.125rem' }); // 2 / 16
+  });
+
+  it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+    const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+    const overrides = tabsIndicatorDensityOverrides();
+    expect(slot(overrides, 'MuiTabs', 'indicator', theme)).toEqual({ height: '0.1125rem' }); // 2 * 0.9 / 16
+  });
+
+  it('two separately-built override sets are the SAME function references', () => {
+    const a = tabsIndicatorDensityOverrides();
+    const b = tabsIndicatorDensityOverrides();
+    expect(a.MuiTabs?.styleOverrides?.indicator).toBe(b.MuiTabs?.styleOverrides?.indicator);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('tableCellDensityOverrides', () => {
+  it('writes root padding as rem(theme, 16) — the literal TableCell.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = tableCellDensityOverrides();
+    expect(slot(overrides, 'MuiTableCell', 'root', theme)).toEqual({ padding: theme.typography.pxToRem(16) });
+    // Same at the explicit default — `undefined` and `'normal'` must agree.
+    expect(slot(overrides, 'MuiTableCell', 'root', theme, { padding: 'normal' })).toEqual({
+      padding: theme.typography.pxToRem(16),
+    });
+  });
+
+  /**
+   * FUT-2861 adversarial review — a REAL render found `root`'s unconditional
+   * padding clobbering `TableCell.js`'s own `checkbox`/`none` variants at the
+   * default (medium) size, the SAME Lesson-1 shape the ellipsis fix above
+   * exists for, missed here. Both variants keep MUI's own UNSCALED literal —
+   * this file writes NOTHING for them, so nothing composes over it.
+   */
+  it("writes NOTHING for root at padding='checkbox'/'none' — MUI's own unscaled variant must win", () => {
+    const theme = createTheme();
+    const overrides = tableCellDensityOverrides();
+    expect(slot(overrides, 'MuiTableCell', 'root', theme, { padding: 'checkbox' })).toEqual({});
+    expect(slot(overrides, 'MuiTableCell', 'root', theme, { padding: 'none' })).toEqual({});
+  });
+
+  it('writes sizeSmall padding, and a nested paddingCheckbox rule inside it, as rem(theme, px)', () => {
+    const theme = createTheme();
+    const overrides = tableCellDensityOverrides();
+    expect(slot(overrides, 'MuiTableCell', 'sizeSmall', theme)).toEqual({
+      padding: `${theme.typography.pxToRem(6)} ${theme.typography.pxToRem(16)}`,
+      '&.MuiTableCell-paddingCheckbox': {
+        // `rems()` renders a `0` entry as the bare literal, not `pxToRem(0)`
+        // (`'0rem'`) — see `tokens/relative.ts`'s own doc comment.
+        padding: `0 ${theme.typography.pxToRem(12)} 0 ${theme.typography.pxToRem(16)}`,
+      },
+    });
+  });
+
+  /**
+   * FUT-2861 audit follow-up: `sizeSmall`'s own unconditional `padding` had
+   * the SAME clobber for `padding="none"` at `size="small"` — MUI's own
+   * `variants` array resolves that combo to `padding: 0` (the `none` entry
+   * comes AFTER `size: 'small'`'s in array order), which an unconditional
+   * `sizeSmall` rule overrode. The nested checkbox rule stays (harmless — it
+   * only matches an element that ALSO carries the checkbox class), but the
+   * top-level `padding` key must be absent so MUI's own `0` is not clobbered.
+   */
+  it("skips the top-level padding at sizeSmall + padding='none' too", () => {
+    const theme = createTheme();
+    const overrides = tableCellDensityOverrides();
+    const result = slot(overrides, 'MuiTableCell', 'sizeSmall', theme, { padding: 'none' });
+    expect(result.padding).toBeUndefined();
+  });
+
+  it('is a true no-op at the default theme: the exact literals TableCell.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = tableCellDensityOverrides();
+    expect(slot(overrides, 'MuiTableCell', 'root', theme)).toEqual({ padding: '1rem' }); // 16 / 16
+    const small = slot(overrides, 'MuiTableCell', 'sizeSmall', theme);
+    expect(small.padding).toBe('0.375rem 1rem'); // '6px 16px'
+    expect((small['&.MuiTableCell-paddingCheckbox'] as { padding: string }).padding).toBe('0 0.75rem 0 1rem'); // '0 12px 0 16px'
+  });
+
+  it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+    const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+    const overrides = tableCellDensityOverrides();
+    expect(slot(overrides, 'MuiTableCell', 'root', theme)).toEqual({ padding: '0.9rem' }); // 16 * 0.9 / 16
+  });
+
+  it('two separately-built override sets are the SAME function references', () => {
+    const a = tableCellDensityOverrides();
+    const b = tableCellDensityOverrides();
+    expect(a.MuiTableCell?.styleOverrides?.sizeSmall).toBe(b.MuiTableCell?.styleOverrides?.sizeSmall);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('paginationItemDensityOverrides', () => {
+  it('writes root/sizeSmall/sizeLarge minWidth AND height for a page item, as rem(theme, px)', () => {
+    const theme = createTheme();
+    const overrides = paginationItemDensityOverrides();
+    expect(slot(overrides, 'MuiPaginationItem', 'root', theme, { type: 'page' })).toEqual({
+      minWidth: theme.typography.pxToRem(32),
+      height: theme.typography.pxToRem(32),
+    });
+    expect(slot(overrides, 'MuiPaginationItem', 'sizeSmall', theme, { type: 'page' })).toEqual({
+      minWidth: theme.typography.pxToRem(26),
+      height: theme.typography.pxToRem(26),
+    });
+    expect(slot(overrides, 'MuiPaginationItem', 'sizeLarge', theme, { type: 'page' })).toEqual({
+      minWidth: theme.typography.pxToRem(40),
+      height: theme.typography.pxToRem(40),
+    });
+  });
+
+  it('previous/next/first/last items get the SAME geometry as a page item — not just "page"', () => {
+    const theme = createTheme();
+    const overrides = paginationItemDensityOverrides();
+    for (const type of ['previous', 'next', 'first', 'last'] as const) {
+      expect(slot(overrides, 'MuiPaginationItem', 'root', theme, { type })).toEqual({
+        minWidth: theme.typography.pxToRem(32),
+        height: theme.typography.pxToRem(32),
+      });
+    }
+  });
+
+  /**
+   * FUT-2768 — the ellipsis (`…`) shares `MuiPaginationItem`'s theme name/slot
+   * with the numbered button but draws NO explicit height of its own
+   * (`height: 'auto'` in `PaginationItem.js`'s `PaginationItemEllipsis`).
+   * Setting an explicit height on it would replace that auto-sized line
+   * height with a fixed box — the Lesson-1 clobber this override must not
+   * reproduce.
+   */
+  it('the ellipsis keeps minWidth but gets NO height — it has none of its own to override', () => {
+    const theme = createTheme();
+    const overrides = paginationItemDensityOverrides();
+    expect(slot(overrides, 'MuiPaginationItem', 'root', theme, { type: 'start-ellipsis' })).toEqual({
+      minWidth: theme.typography.pxToRem(32),
+    });
+    expect(slot(overrides, 'MuiPaginationItem', 'root', theme, { type: 'end-ellipsis' })).toEqual({
+      minWidth: theme.typography.pxToRem(32),
+    });
+    expect(slot(overrides, 'MuiPaginationItem', 'sizeSmall', theme, { type: 'start-ellipsis' })).toEqual({
+      minWidth: theme.typography.pxToRem(26),
+    });
+  });
+
+  it('is a true no-op at the default theme: 32px/26px/40px, the exact literals it replaces', () => {
+    const theme = createTheme();
+    const overrides = paginationItemDensityOverrides();
+    expect(slot(overrides, 'MuiPaginationItem', 'root', theme, { type: 'page' })).toEqual({
+      minWidth: '2rem', // 32 / 16
+      height: '2rem',
+    });
+    expect(slot(overrides, 'MuiPaginationItem', 'sizeSmall', theme, { type: 'page' })).toEqual({
+      minWidth: '1.625rem', // 26 / 16
+      height: '1.625rem',
+    });
+  });
+
+  it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+    const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+    const overrides = paginationItemDensityOverrides();
+    expect(slot(overrides, 'MuiPaginationItem', 'root', theme, { type: 'page' })).toEqual({
+      minWidth: '1.8rem', // 32 * 0.9 / 16
+      height: '1.8rem',
+    });
+  });
+
+  it('two separately-built override sets are the SAME function references', () => {
+    const a = paginationItemDensityOverrides();
+    const b = paginationItemDensityOverrides();
+    expect(a.MuiPaginationItem?.styleOverrides?.root).toBe(b.MuiPaginationItem?.styleOverrides?.root);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('sliderDensityOverrides', () => {
+  it('writes root/sizeSmall HEIGHT for a horizontal slider (the default) as rem(theme, px)', () => {
+    const theme = createTheme();
+    const overrides = sliderDensityOverrides();
+    expect(slot(overrides, 'MuiSlider', 'root', theme)).toEqual({ height: theme.typography.pxToRem(4) });
+    expect(slot(overrides, 'MuiSlider', 'root', theme, { orientation: 'horizontal' })).toEqual({
+      height: theme.typography.pxToRem(4),
+    });
+    expect(slot(overrides, 'MuiSlider', 'sizeSmall', theme)).toEqual({ height: theme.typography.pxToRem(2) });
+  });
+
+  /**
+   * FUT-2768 — MUI's OWN baked-in variant for `orientation: 'vertical'` sets
+   * `width: 4` and leaves `height: '100%'` (from that SAME variant) alone; an
+   * override that wrote BOTH `height` and `width` unconditionally would
+   * clobber the vertical slider's own full-length axis. Confirms the gate.
+   */
+  it('writes root/sizeSmall WIDTH — not height — for a vertical slider', () => {
+    const theme = createTheme();
+    const overrides = sliderDensityOverrides();
+    expect(slot(overrides, 'MuiSlider', 'root', theme, { orientation: 'vertical' })).toEqual({
+      width: theme.typography.pxToRem(4),
+    });
+    expect(slot(overrides, 'MuiSlider', 'sizeSmall', theme, { orientation: 'vertical' })).toEqual({
+      width: theme.typography.pxToRem(2),
+    });
+  });
+
+  it('writes thumb/thumbSizeSmall width AND height as rem(theme, px) — square at both sizes', () => {
+    const theme = createTheme();
+    const overrides = sliderDensityOverrides();
+    expect(slot(overrides, 'MuiSlider', 'thumb', theme)).toEqual({
+      width: theme.typography.pxToRem(20),
+      height: theme.typography.pxToRem(20),
+    });
+    expect(slot(overrides, 'MuiSlider', 'thumbSizeSmall', theme)).toEqual({
+      width: theme.typography.pxToRem(12),
+      height: theme.typography.pxToRem(12),
+    });
+  });
+
+  it('is a true no-op at the default theme: the exact literals Slider.js hard-codes', () => {
+    const theme = createTheme();
+    const overrides = sliderDensityOverrides();
+    expect(slot(overrides, 'MuiSlider', 'root', theme)).toEqual({ height: '0.25rem' }); // 4 / 16
+    expect(slot(overrides, 'MuiSlider', 'sizeSmall', theme)).toEqual({ height: '0.125rem' }); // 2 / 16
+    expect(slot(overrides, 'MuiSlider', 'thumb', theme)).toEqual({ width: '1.25rem', height: '1.25rem' }); // 20/16
+    expect(slot(overrides, 'MuiSlider', 'thumbSizeSmall', theme)).toEqual({ width: '0.75rem', height: '0.75rem' }); // 12/16
+  });
+
+  it('scales at a compact fontSize (factor 0.9) exactly as far as pxToRem does', () => {
+    const theme = createTheme({ typography: { fontSize: densityFontSize(0.9) } });
+    const overrides = sliderDensityOverrides();
+    expect(slot(overrides, 'MuiSlider', 'root', theme)).toEqual({ height: '0.225rem' }); // 4 * 0.9 / 16
+    expect(slot(overrides, 'MuiSlider', 'thumb', theme)).toEqual({ width: '1.125rem', height: '1.125rem' }); // 20*0.9/16
+  });
+
+  it('two separately-built override sets are the SAME function references', () => {
+    const a = sliderDensityOverrides();
+    const b = sliderDensityOverrides();
+    expect(a.MuiSlider?.styleOverrides?.thumb).toBe(b.MuiSlider?.styleOverrides?.thumb);
+    expect(a).toEqual(b);
   });
 });
