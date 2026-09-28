@@ -350,11 +350,7 @@ export const ResponsiveDesign: Story = {
     variant: 'horizontal',
     items: testItems.slice(0, 5),
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   decorators: [
     (Story) => (
       <Box>

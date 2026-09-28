@@ -285,9 +285,9 @@ export const FocusManagement: Story = {
 export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   parameters: {
-    viewport: { defaultViewport: 'mobile1' },
     chromatic: { viewports: [375] },
   },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => {
     const TestComponent = createTestComponent();
     return <TestComponent />;

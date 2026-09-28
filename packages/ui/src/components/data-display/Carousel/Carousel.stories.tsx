@@ -583,11 +583,6 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
-  },
   render: () => (
     <Box>
       <Typography variant="h6" gutterBottom>
