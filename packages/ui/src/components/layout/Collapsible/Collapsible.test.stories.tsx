@@ -291,7 +291,7 @@ export const EdgeCases: Story = {
           <Typography variant="h6">Empty Content</Typography>
         </CollapsibleTrigger>
         <Collapsible open={true} data-testid="empty-collapsible">
-          <CollapsibleContent></CollapsibleContent>
+          <CollapsibleContent>{null}</CollapsibleContent>
         </Collapsible>
       </Card>
     </Stack>

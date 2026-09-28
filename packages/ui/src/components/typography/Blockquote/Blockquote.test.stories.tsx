@@ -340,7 +340,10 @@ export const EdgeCases: Story = {
       <Blockquote author="Unicode Author: 你好世界" source="Unicode Source: مرحبا بالعالم">
         Unicode content: Lorem ipsum 你好 مرحبا 🌍
       </Blockquote>
-      <Blockquote>{/* Empty content test */}</Blockquote>
+      <Blockquote>
+        {/* Empty content test */}
+        {null}
+      </Blockquote>
     </Stack>
   ),
   play: async ({ canvasElement }) => {

@@ -511,13 +511,15 @@ export const IntegrationTest: Story = {
       <Card sx={{ maxWidth: 400 }} data-testid="integration-card">
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Skeleton variant="circular" width={40} height={40} sx={{ mr: 2 }} />
+            {/* `Skeleton` has no `sx` — only `style`, which does not read the
+                theme's spacing scale, so this is a fixed px margin. */}
+            <Skeleton variant="circular" width={40} height={40} style={{ marginRight: 16 }} />
             <Box sx={{ flex: 1 }}>
               <Skeleton variant="text" width="70%" />
               <Skeleton variant="text" width="50%" />
             </Box>
           </Box>
-          <Skeleton variant="rectangular" height={200} sx={{ mb: 2 }} />
+          <Skeleton variant="rectangular" height={200} style={{ marginBottom: 16 }} />
           <Box>
             <Skeleton variant="text" />
             <Skeleton variant="text" width="80%" />

@@ -82,7 +82,7 @@ export const BasicInteraction: Story = {
     children: 'Interactive Label',
     htmlFor: 'test-input',
     onClick: fn(),
-    'data-testid': 'interactive-label',
+    dataTestId: 'interactive-label',
   },
   play: async ({ canvasElement, step, args }) => {
     const canvas = within(canvasElement);
@@ -119,7 +119,7 @@ export const RequiredFieldTest: Story = {
     children: 'Required Field',
     required: true,
     asteriskPlacement: 'end',
-    'data-testid': 'required-label',
+    dataTestId: 'required-label',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -286,7 +286,7 @@ export const ScreenReaderTest: Story = {
     tooltip: 'Additional information about this field',
     'aria-label': 'Accessible form label',
     'aria-describedby': 'helper-text',
-    'data-testid': 'accessible-label',
+    dataTestId: 'accessible-label',
   },
   render: (args) => (
     <Stack spacing={1}>
@@ -331,7 +331,7 @@ export const ScreenReaderOnlyTest: Story = {
     children: 'This label is only for screen readers',
     srOnly: true,
     htmlFor: 'sr-only-input',
-    'data-testid': 'sr-only-label',
+    dataTestId: 'sr-only-label',
   },
   render: (args) => (
     <Box>
@@ -493,7 +493,7 @@ export const ThemeVariations: Story = {
       const glassLabel = canvas.getByText('Glass with Glow');
       const computedStyle = window.getComputedStyle(glassLabel);
       // Glass effect uses backdrop-filter
-      expect(computedStyle.backdropFilter || computedStyle.webkitBackdropFilter).toBeDefined();
+      expect(computedStyle.backdropFilter || computedStyle.getPropertyValue('-webkit-backdrop-filter')).toBeDefined();
     });
   },
 };
@@ -887,7 +887,7 @@ export const TooltipIntegration: Story = {
     tooltip: 'This is additional information about the label',
     icon: <InfoIcon fontSize="small" />,
     iconPosition: 'end',
-    'data-testid': 'tooltip-label',
+    dataTestId: 'tooltip-label',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);

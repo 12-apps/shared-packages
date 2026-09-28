@@ -38,7 +38,7 @@ const Installable = ({ storageKey }: { storageKey: string }) => {
     dispatchInstallEvent();
   }, [storageKey]);
 
-  return <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} storageKey={storageKey} title="Install this app" />;
+  return <InstallPrompt copy={PT_BR_INSTALL_PROMPT_COPY} storageKey={storageKey} />;
 };
 
 // ================================

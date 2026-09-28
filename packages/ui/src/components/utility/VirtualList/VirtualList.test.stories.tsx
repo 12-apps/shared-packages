@@ -3,6 +3,7 @@ import Avatar from '@mui/material/Avatar/index.js';
 import Box from '@mui/material/Box/index.js';
 import ListItem from '@mui/material/ListItem/index.js';
 import ListItemAvatar from '@mui/material/ListItemAvatar/index.js';
+import ListItemButton from '@mui/material/ListItemButton/index.js';
 import ListItemText from '@mui/material/ListItemText/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Skeleton from '@mui/material/Skeleton/index.js';
@@ -26,6 +27,16 @@ const meta: Meta<typeof VirtualList> = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+// `VirtualListItem.data` is `unknown` (the component has no opinion on row
+// shape); every story here fills it with this same fixture shape, so a single
+// assertion type documents it instead of leaving `unknown` unnarrowed at each
+// read.
+interface TestItemData {
+  name: string;
+  description: string;
+  avatar: string;
+}
 
 // Helper functions
 const generateItems = (count: number): VirtualListItem[] => Array.from({ length: count }, (_, i) => ({
@@ -122,9 +133,9 @@ const SimpleItemRenderer = ({
   <Box key={item.id} style={style} data-testid={`virtual-item-${index}`}>
     <ListItem>
       <ListItemAvatar>
-        <Avatar src={item.data.avatar} />
+        <Avatar src={(item.data as TestItemData).avatar} />
       </ListItemAvatar>
-      <ListItemText primary={item.data.name} secondary={item.data.description} />
+      <ListItemText primary={(item.data as TestItemData).name} secondary={(item.data as TestItemData).description} />
     </ListItem>
   </Box>
 );
@@ -154,12 +165,12 @@ const GridItemRenderer = ({
       textAlign: 'center',
     }}
   >
-    <Avatar src={item.data.avatar} sx={{ width: 56, height: 56, mb: 1 }} />
+    <Avatar src={(item.data as TestItemData).avatar} sx={{ width: 56, height: 56, mb: 1 }} />
     <Typography variant="body2" fontWeight="bold">
-      {item.data.name}
+      {(item.data as TestItemData).name}
     </Typography>
     <Typography variant="caption" color="text.secondary">
-      Grid Item #{item.id + 1}
+      Grid Item #{Number(item.id) + 1}
     </Typography>
   </Box>
 );
@@ -350,9 +361,9 @@ export const KeyboardNavigation: Story = {
                 }}
               >
                 <ListItemAvatar>
-                  <Avatar src={item.data.avatar} />
+                  <Avatar src={(item.data as TestItemData).avatar} />
                 </ListItemAvatar>
-                <ListItemText primary={item.data.name} secondary={item.data.description} />
+                <ListItemText primary={(item.data as TestItemData).name} secondary={(item.data as TestItemData).description} />
               </ListItem>
             </Box>
           )}
@@ -417,17 +428,16 @@ export const ScreenReader: Story = {
             <Box key={item.id} style={style}>
               <ListItem
                 role="listitem"
-                aria-label={`Item ${index + 1}: ${item.data.name}`}
+                aria-label={`Item ${index + 1}: ${(item.data as TestItemData).name}`}
                 data-testid={`screen-reader-item-${index}`}
               >
                 <ListItemAvatar>
-                  <Avatar src={item.data.avatar} alt={`Avatar for ${item.data.name}`} />
+                  <Avatar src={(item.data as TestItemData).avatar} alt={`Avatar for ${(item.data as TestItemData).name}`} />
                 </ListItemAvatar>
-                <ListItemText primary={item.data.name} secondary={item.data.description} />
+                <ListItemText primary={(item.data as TestItemData).name} secondary={(item.data as TestItemData).description} />
               </ListItem>
             </Box>
           )}
-          role="list"
           aria-label="Virtual scrollable list"
           data-testid="screen-reader-list"
         />
@@ -475,18 +485,22 @@ export const FocusManagement: Story = {
             itemHeight={60}
             renderItem={({ item, index, style }) => (
               <Box key={item.id} style={style}>
-                <ListItem
-                  button
-                  tabIndex={0}
-                  data-testid={`focus-item-${index}`}
-                  onFocus={(e) => {
-                    e.currentTarget.scrollIntoView({ block: 'nearest' });
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Avatar src={item.data.avatar} />
-                  </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary={item.data.description} />
+                <ListItem disablePadding>
+                  <ListItemButton
+                    tabIndex={0}
+                    data-testid={`focus-item-${index}`}
+                    onFocus={(e) => {
+                      e.currentTarget.scrollIntoView({ block: 'nearest' });
+                    }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar src={(item.data as TestItemData).avatar} />
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={(item.data as TestItemData).name}
+                      secondary={(item.data as TestItemData).description}
+                    />
+                  </ListItemButton>
                 </ListItem>
               </Box>
             )}
@@ -545,12 +559,12 @@ export const ResponsiveDesign: Story = {
               <Box key={item.id} style={style}>
                 <ListItem sx={{ px: 1 }}>
                   <ListItemAvatar>
-                    <Avatar src={item.data.avatar} sx={{ width: 32, height: 32 }} />
+                    <Avatar src={(item.data as TestItemData).avatar} sx={{ width: 32, height: 32 }} />
                   </ListItemAvatar>
                   <ListItemText
                     primary={
                       <Typography variant="body2" noWrap>
-                        {item.data.name}
+                        {(item.data as TestItemData).name}
                       </Typography>
                     }
                   />
@@ -576,9 +590,9 @@ export const ResponsiveDesign: Story = {
               <Box key={item.id} style={style}>
                 <ListItem sx={{ px: 3 }}>
                   <ListItemAvatar>
-                    <Avatar src={item.data.avatar} sx={{ width: 48, height: 48 }} />
+                    <Avatar src={(item.data as TestItemData).avatar} sx={{ width: 48, height: 48 }} />
                   </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary={item.data.description} />
+                  <ListItemText primary={(item.data as TestItemData).name} secondary={(item.data as TestItemData).description} />
                 </ListItem>
               </Box>
             )}
@@ -649,10 +663,10 @@ export const ThemeVariations: Story = {
               <Box key={item.id} style={style}>
                 <ListItem sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                   <ListItemAvatar>
-                    <Avatar src={item.data.avatar} />
+                    <Avatar src={(item.data as TestItemData).avatar} />
                   </ListItemAvatar>
                   <ListItemText
-                    primary={<Typography color="text.primary">{item.data.name}</Typography>}
+                    primary={<Typography color="text.primary">{(item.data as TestItemData).name}</Typography>}
                     secondary={
                       <Typography color="text.secondary" variant="body2">
                         Light theme item
@@ -680,10 +694,10 @@ export const ThemeVariations: Story = {
               <Box key={item.id} style={style}>
                 <ListItem sx={{ borderBottom: '1px solid rgba(255,255,255,0.12)', color: 'white' }}>
                   <ListItemAvatar>
-                    <Avatar src={item.data.avatar} />
+                    <Avatar src={(item.data as TestItemData).avatar} />
                   </ListItemAvatar>
                   <ListItemText
-                    primary={<Typography sx={{ color: 'white' }}>{item.data.name}</Typography>}
+                    primary={<Typography sx={{ color: 'white' }}>{(item.data as TestItemData).name}</Typography>}
                     secondary={
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)' }} variant="body2">
                         Dark theme item
@@ -766,7 +780,7 @@ export const VisualStates: Story = {
             renderItem={({ item, style }) => (
               <Box key={item.id} style={style}>
                 <ListItem>
-                  <ListItemText primary={item.data?.name} />
+                  <ListItemText primary={(item.data as TestItemData | undefined)?.name} />
                 </ListItem>
               </Box>
             )}
@@ -944,9 +958,9 @@ export const EdgeCases: Story = {
               <Box key={item.id} style={style} data-testid={`variable-item-${index}`}>
                 <ListItem sx={{ alignItems: 'flex-start' }}>
                   <ListItemAvatar>
-                    <Avatar src={item.data.avatar} />
+                    <Avatar src={(item.data as TestItemData).avatar} />
                   </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary={item.data.description} />
+                  <ListItemText primary={(item.data as TestItemData).name} secondary={(item.data as TestItemData).description} />
                 </ListItem>
               </Box>
             )}
@@ -1040,15 +1054,19 @@ export const Integration: Story = {
             itemHeight={60}
             renderItem={({ item, index, style }) => (
               <Box key={item.id} style={style} data-testid={`integration-item-${index}`}>
-                <ListItem
-                  button
-                  onClick={() => {
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Avatar src={item.data.avatar} />
-                  </ListItemAvatar>
-                  <ListItemText primary={item.data.name} secondary={`List item ${index + 1}`} />
+                <ListItem disablePadding>
+                  <ListItemButton
+                    onClick={() => {
+                    }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar src={(item.data as TestItemData).avatar} />
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={(item.data as TestItemData).name}
+                      secondary={`List item ${index + 1}`}
+                    />
+                  </ListItemButton>
                 </ListItem>
               </Box>
             )}
@@ -1087,7 +1105,7 @@ export const Integration: Story = {
                 }}
               >
                 <Typography variant="body2" color="white">
-                  #{item.id + 1}
+                  #{Number(item.id) + 1}
                 </Typography>
               </Box>
             )}

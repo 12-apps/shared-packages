@@ -4,6 +4,8 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect,within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Separator } from './Separator';
 import { SIZE_VALUES } from '../../../tokens/scales';
 
@@ -557,7 +559,7 @@ export const VerticalLabelledRules: Story = {
       await expect(rules).toHaveLength(2);
       const [first, second] = rules.map(heightOf);
       await expect(first).toBeGreaterThanOrEqual(MIN_RULE_PX);
-      await expect(second).toBeCloseTo(first, 0);
+      await expect(second).toBeCloseTo(must(first), 0);
     });
 
     await step('An explicit length wins exactly', async () => {

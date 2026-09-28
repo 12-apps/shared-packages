@@ -578,7 +578,7 @@ export const VisualStates: Story = {
       const glassToast = document.querySelector('[role="alert"]');
       if (glassToast) {
         const computedStyle = window.getComputedStyle(glassToast);
-        expect(computedStyle.backdropFilter || computedStyle.webkitBackdropFilter).toBeTruthy();
+        expect(computedStyle.backdropFilter || computedStyle.getPropertyValue('-webkit-backdrop-filter')).toBeTruthy();
       }
     });
   },

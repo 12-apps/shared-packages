@@ -5,6 +5,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Code } from './Code';
 
 const meta: Meta<typeof Code> = {
@@ -214,7 +216,7 @@ export const KeyboardNavigation: Story = {
       expect(buttons.length).toBeGreaterThan(0);
 
       // Focus the first button (which should be the copy button)
-      const copyButton = buttons[0];
+      const copyButton = must(buttons[0]);
       await userEvent.click(copyButton);
       await waitFor(() => expect(copyButton).toHaveFocus());
 
@@ -563,7 +565,7 @@ export const Performance: Story = {
       expect(mockWriteText).toHaveBeenCalledTimes(1);
 
       // Verify the copied content includes all lines
-      const copiedContent = mockWriteText.mock.calls[0][0];
+      const copiedContent = must(mockWriteText.mock.calls[0])[0];
       expect(copiedContent).toContain('line1');
       expect(copiedContent).toContain('line100');
     });

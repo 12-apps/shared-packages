@@ -6,6 +6,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Dialog, DialogActions,DialogContent, DialogHeader } from './Dialog';
 
 const meta: Meta<typeof Dialog> = {
@@ -25,20 +27,37 @@ const meta: Meta<typeof Dialog> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+
+// A `DialogActions` button this wrapper re-targets to its own `handleClose`.
+interface ClonableButtonProps {
+  'data-testid'?: string;
+  onClick?: () => void;
+}
 
 // Test wrapper component
+interface TestDialogWrapperProps {
+  children: React.ReactNode;
+  onOpen?: () => void;
+  onClose?: () => void;
+  [key: string]: unknown;
+}
+// Most stories drive `Dialog` through `TestDialogWrapper` below, whose props
+// add `onOpen` (fired when its own button opens the dialog) — `DialogProps`
+// has no such prop. Naming its props type directly (rather than
+// `StoryObj<typeof meta>`, which only knows `DialogProps`) types `args` to
+// match what those stories actually pass; the few stories that drive
+// `<Dialog>` directly set no `args`, so the wider type costs them nothing.
+// One name (`Story`), not two: `scripts/native-parity.mjs` counts native
+// shared-story coverage by matching the literal `: Story` annotation, so a
+// second type name here would silently drop stories from that ledger.
+type Story = StoryObj<TestDialogWrapperProps>;
+
 const TestDialogWrapper = ({
   children,
   onOpen = fn(),
   onClose = fn(),
   ...args
-}: {
-  children: React.ReactNode;
-  onOpen?: () => void;
-  onClose?: () => void;
-  [key: string]: unknown;
-}) => {
+}: TestDialogWrapperProps) => {
   const [open, setOpen] = useState(false);
 
   const handleOpen = () => {
@@ -58,14 +77,17 @@ const TestDialogWrapper = ({
       </Button>
       <Dialog {...args} open={open} onClose={handleClose}>
         {React.Children.map(children, (child) => {
-          if (React.isValidElement(child) && child.type === DialogActions) {
+          if (
+            React.isValidElement<{ children?: React.ReactNode }>(child) &&
+            child.type === DialogActions
+          ) {
             // Clone DialogActions and add onClick handlers to buttons
             return React.cloneElement(
               child,
               {},
               React.Children.map(child.props.children, (button) => {
                 if (
-                  React.isValidElement(button) &&
+                  React.isValidElement<ClonableButtonProps>(button) &&
                   (button.props['data-testid'] === 'cancel-button' ||
                     button.props['data-testid'] === 'close-modal-button' ||
                     button.props['data-testid'] === 'force-close-button')
@@ -608,7 +630,7 @@ export const EdgeCases: Story = {
       <DialogHeader
         title="Edge Cases Test Dialog with Very Long Title That Should Handle Overflow Gracefully"
         subtitle="This is a very long subtitle that tests how the dialog handles overflow content and maintains proper layout and accessibility standards"
-        showCloseButton={args.showCloseButton}
+        showCloseButton={args.showCloseButton as boolean | undefined}
       />
       <DialogContent data-testid="edge-case-content">
         <Typography data-testid="long-text">
@@ -678,7 +700,7 @@ export const EdgeCases: Story = {
       await expect(dialogContent).toBeInTheDocument();
 
       // Dialog should maintain proper dimensions
-      const dialogRect = dialog.getBoundingClientRect();
+      const dialogRect = must(dialog).getBoundingClientRect();
       await expect(dialogRect.width).toBeGreaterThan(0);
       await expect(dialogRect.height).toBeGreaterThan(0);
     });
@@ -823,7 +845,7 @@ export const ResponsiveDesign: Story = {
 
     await step('Test mobile dialog layout', async () => {
       const dialog = document.querySelector('[role="dialog"]');
-      const dialogRect = dialog.getBoundingClientRect();
+      const dialogRect = must(dialog).getBoundingClientRect();
 
       // Measured against the body, which is the box the dialog is actually laid
       // out in — window.innerWidth includes any scrollbar, so the same dialog
@@ -881,7 +903,7 @@ export const ThemeVariations: Story = {
 
     await step('Verify theme-aware styling', async () => {
       const dialog = document.querySelector('[role="dialog"]');
-      const computedStyle = window.getComputedStyle(dialog);
+      const computedStyle = window.getComputedStyle(must(dialog));
 
       // Dialog should have proper background color
       await expect(computedStyle.backgroundColor).toBeDefined();

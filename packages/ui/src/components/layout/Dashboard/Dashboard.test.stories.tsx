@@ -32,7 +32,7 @@ const Composed = ({ onExport = fn() }: { onExport?: (id: string) => void }) => (
         Manage your catalog.
       </Dashboard.Info>
       <Dashboard.FilterToggle hideLabel="Ocultar filtros" showLabel="Mostrar filtros" />
-      <Dashboard.Settings title="Product settings" ariaLabel="Configurações">
+      <Dashboard.Settings title="Product settings" ariaLabel="Configurações" closeLabel="Fechar">
         <Typography>In development.</Typography>
       </Dashboard.Settings>
       <Dashboard.Spacer />

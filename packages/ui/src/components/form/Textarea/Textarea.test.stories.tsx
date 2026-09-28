@@ -17,7 +17,16 @@ const meta: Meta<typeof Textarea> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+// `TextareaProps` is `TextareaBaseProps & (variant-discriminated union over
+// richEditorCopy)`. Storybook's `StoryObj<typeof meta>` computes a story's
+// args by intersecting `ComponentProps<Component>` with the meta's own
+// inferred args type (`@storybook/react`'s `public-types`) — for this
+// component that computation collapses to `never`, so every story's `args`
+// fails with "not assignable to type 'never'". Naming the component itself
+// (`StoryObj<typeof Textarea>`, rather than `StoryObj<typeof meta>` or the
+// bare props type) takes the `TMetaOrCmpOrArgs extends ComponentType`
+// branch, which types `args` correctly and keeps `play`/`decorators` typed.
+type Story = StoryObj<typeof Textarea>;
 
 // 1. Basic Interaction Tests
 export const BasicInteraction: Story = {

@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { RichTextEditor } from './RichTextEditor';
 
 const meta: Meta<typeof RichTextEditor> = {
@@ -336,7 +338,7 @@ export const VisualStates: Story = {
     expect(editors).toHaveLength(3);
 
     // Test normal editor
-    const normalEditor = editors[0];
+    const normalEditor = must(editors[0]);
     await userEvent.click(normalEditor);
     await userEvent.type(normalEditor, 'Test');
     await expect(normalEditor).toContainHTML('Test');
@@ -346,7 +348,7 @@ export const VisualStates: Story = {
     expect(disabledEditor).toHaveAttribute('contenteditable', 'false');
 
     // Test readonly editor
-    const readOnlyEditor = editors[2];
+    const readOnlyEditor = must(editors[2]);
     expect(readOnlyEditor).toHaveAttribute('contenteditable', 'false');
     expect(readOnlyEditor.innerHTML).toContain('Read-only state');
   },
@@ -466,17 +468,17 @@ export const Integration: Story = {
     expect(editors).toHaveLength(2);
 
     // Test first editor
-    const editor1 = editors[0];
-    const boldButton1 = canvas.getAllByLabelText('Bold')[0];
+    const editor1 = must(editors[0]);
+    const boldButton1 = must(canvas.getAllByLabelText('Bold')[0]);
 
     await userEvent.click(editor1);
     await userEvent.type(editor1, 'First editor');
     await userEvent.click(boldButton1);
 
     // Test second editor
-    const editor2 = editors[1];
+    const editor2 = must(editors[1]);
     const listButtons = canvas.getAllByLabelText('Bulleted List');
-    const listButton = listButtons[1]; // Second editor's button
+    const listButton = must(listButtons[1]); // Second editor's button
 
     await userEvent.click(editor2);
     await userEvent.type(editor2, 'Second editor');

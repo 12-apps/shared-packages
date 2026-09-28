@@ -5,7 +5,9 @@ import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Banknote, CreditCard, Globe, Heart, Shield,Smartphone, Star, Zap } from 'lucide-react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, Mock, userEvent, waitFor, within } from 'storybook/test';
+
+import { must } from '../../../test-utils/must';
 
 import { RadioGroup } from './RadioGroup';
 
@@ -94,7 +96,7 @@ export const BasicInteraction: Story = {
       await userEvent.click(firstRadio);
       await expect(args.onChange).toHaveBeenCalledTimes(1);
       // Check that onChange was called - the first argument can be either a SyntheticEvent or a plain object
-      const firstCall = args.onChange.mock.calls[0];
+      const firstCall = must((args.onChange as Mock).mock.calls[0]);
       await expect(firstCall[1]).toBe('option1');
 
       // Verify testIds for individual radio buttons
@@ -108,7 +110,7 @@ export const BasicInteraction: Story = {
       await userEvent.click(secondRadio);
       await expect(args.onChange).toHaveBeenCalledTimes(2);
       // Check that onChange was called with the correct value
-      const secondCall = args.onChange.mock.calls[1];
+      const secondCall = must((args.onChange as Mock).mock.calls[1]);
       await expect(secondCall[1]).toBe('option2');
     });
   },
@@ -123,7 +125,7 @@ export const CardInteraction: Story = {
     label: 'Payment Method',
     value: '',
     onChange: fn(),
-    'data-testid': 'card-radio-group',
+    dataTestId: 'card-radio-group',
   },
   play: async ({ canvasElement, args, step }) => {
     const canvas = within(canvasElement);
@@ -141,7 +143,7 @@ export const CardInteraction: Story = {
       if (cardContainer) {
         await userEvent.click(cardContainer);
         await expect(args.onChange).toHaveBeenCalledTimes(1);
-        const firstCall = args.onChange.mock.calls[0];
+        const firstCall = must((args.onChange as Mock).mock.calls[0]);
         await expect(firstCall[1]).toBe('card');
       }
     });
@@ -169,7 +171,7 @@ export const ButtonInteraction: Story = {
     value: '',
     onChange: fn(),
     color: 'primary',
-    'data-testid': 'button-radio-group',
+    dataTestId: 'button-radio-group',
   },
   play: async ({ canvasElement, args, step }) => {
     const canvas = within(canvasElement);
@@ -201,7 +203,7 @@ export const SegmentInteraction: Story = {
     options: priorityOptions,
     value: '',
     onChange: fn(),
-    'data-testid': 'segment-radio-group',
+    dataTestId: 'segment-radio-group',
   },
   play: async ({ canvasElement, args, step }) => {
     const canvas = within(canvasElement);
@@ -411,7 +413,7 @@ export const ResponsiveDesign: Story = {
       await expect(cards).toHaveLength(4);
 
       // Cards should be stacked vertically on mobile
-      const container = cards[0].closest('[class*="MuiBox"]');
+      const container = must(cards[0]).closest('[class*="MuiBox"]');
       if (container) {
         const computedStyle = window.getComputedStyle(container);
         // On mobile, direction should be column
@@ -637,7 +639,7 @@ export const PerformanceTest: Story = {
 
       // Verify onChange was called with the correct value
       await expect(args.onChange).toHaveBeenCalled();
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       await expect(lastCall[1]).toBe('option-49'); // Option 50 has index 49
     });
   },
@@ -681,7 +683,7 @@ export const IntegrationTest: Story = {
       if (cardContainer) {
         await userEvent.click(cardContainer);
         await expect(args.onChange).toHaveBeenCalled();
-        const firstCall = args.onChange.mock.calls[0];
+        const firstCall = must((args.onChange as Mock).mock.calls[0]);
         await expect(firstCall[1]).toBe('card');
       }
     });

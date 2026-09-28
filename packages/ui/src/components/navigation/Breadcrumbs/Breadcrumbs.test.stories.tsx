@@ -8,6 +8,8 @@ import Settings from '@mui/icons-material/Settings';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Breadcrumbs } from './Breadcrumbs';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
 import { PT_BR_BREADCRUMB_COPY } from '../../../pt-BR';
@@ -119,11 +121,11 @@ export const BasicInteraction: Story = {
       const allLinks = canvas.getAllByRole('link');
       if (allLinks.length > 1) {
         // Click the second link if available
-        await userEvent.click(allLinks[1]);
+        await userEvent.click(must(allLinks[1]));
         // Verify the appropriate onClick handler was called
         const secondItem = args.items.find(
           (item: BreadcrumbItem, index: number) =>
-            index > 0 && item.onClick && allLinks[1].textContent?.includes(item.label),
+            index > 0 && item.onClick && must(allLinks[1]).textContent?.includes(item.label),
         );
         if (secondItem?.onClick) {
           await expect(secondItem.onClick).toHaveBeenCalledTimes(1);
@@ -148,7 +150,7 @@ export const BasicInteraction: Story = {
 
       // If we can find the last item text
       if (allTexts.length > 0) {
-        const lastItemText = allTexts[allTexts.length - 1];
+        const lastItemText = must(allTexts[allTexts.length - 1]);
 
         // Verify it's not a link (current page shouldn't be clickable)
         const parentLink = lastItemText.closest('a');
@@ -274,7 +276,7 @@ export const KeyboardNavigation: Story = {
     });
 
     await step('Focus visible on keyboard navigation', async () => {
-      const link = canvas.getAllByRole('link')[0];
+      const link = must(canvas.getAllByRole('link')[0]);
       // Focus is already on the first link from the previous step.
       await waitFor(() => expect(link).toHaveFocus());
 
@@ -400,7 +402,7 @@ export const FocusManagement: Story = {
     await step('Focus restoration after interaction', async () => {
       const links = canvas.getAllByRole('link');
       // Find a link with "products" or use the first available link
-      const link = links.find((l) => l.textContent?.toLowerCase().includes('products')) || links[0];
+      const link = links.find((l) => l.textContent?.toLowerCase().includes('products')) ?? must(links[0]);
 
       await expect(link).toBeInTheDocument();
 
@@ -480,7 +482,7 @@ export const ResponsiveDesign: Story = {
       // Font size should be legible regardless of the runner's window size. The
       // old `window.innerWidth <= 768` guard meant this assertion simply did not
       // run on a wider viewport, so the story silently tested nothing there.
-      const computedStyle = window.getComputedStyle(items[0]);
+      const computedStyle = window.getComputedStyle(must(items[0]));
       const fontSize = parseFloat(computedStyle.fontSize);
       await expect(fontSize).toBeGreaterThanOrEqual(14);
     });
@@ -605,8 +607,9 @@ export const VisualStates: Story = {
 
     await step('Hover state', async () => {
       const links = canvas.queryAllByRole('link');
-      const hoverLink =
-        links.find((l) => l.textContent?.toLowerCase().includes('hover')) ?? links[0];
+      const hoverLink = must(
+        links.find((l) => l.textContent?.toLowerCase().includes('hover')) ?? links[0],
+      );
 
       // baseline
       const before = window.getComputedStyle(hoverLink);
@@ -657,7 +660,7 @@ export const PerformanceTest: Story = {
 
       // Simulate rapid interactions
       for (let i = 0; i < Math.min(3, links.length); i++) {
-        await userEvent.hover(links[i]);
+        await userEvent.hover(must(links[i]));
         await waitFor(() => {
           expect(links[i]).toBeInTheDocument();
         });
@@ -957,7 +960,7 @@ export const ColorSchemeTest: Story = {
   name: '🎨 Color Scheme Test',
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} color="default" variant="elevated" />
+      <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} color="neutral" variant="elevated" />
       <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} color="primary" variant="elevated" />
       <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={basicItems} color="secondary" variant="elevated" />
     </div>
@@ -998,15 +1001,15 @@ export const SizeVariationTest: Story = {
       const navigations = canvas.getAllByRole('navigation');
       await expect(navigations).toHaveLength(3);
 
-      const firstLinks = navigations.map((nav) => within(nav).getAllByRole('link')[0]);
+      const firstLinks = navigations.map((nav) => must(within(nav).getAllByRole('link')[0]));
       const fontSizes = firstLinks.map((link) => {
         const style = window.getComputedStyle(link);
         return parseFloat(style.fontSize);
       });
 
       // Sizes should be different
-      await expect(fontSizes[0]).toBeLessThan(fontSizes[1]);
-      await expect(fontSizes[1]).toBeLessThan(fontSizes[2]);
+      await expect(must(fontSizes[0])).toBeLessThan(must(fontSizes[1]));
+      await expect(must(fontSizes[1])).toBeLessThan(must(fontSizes[2]));
     });
   },
 };

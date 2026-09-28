@@ -4,6 +4,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Slider } from './Slider';
 import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
@@ -188,8 +190,8 @@ export const FormInteraction: Story = {
       const sliders = canvas.getAllByRole('slider');
       expect(sliders).toHaveLength(2);
 
-      const volumeSlider = sliders[0]; // First slider is Volume
-      const brightnessSlider = sliders[1]; // Second slider is Brightness
+      const volumeSlider = must(sliders[0]); // First slider is Volume
+      const brightnessSlider = must(sliders[1]); // Second slider is Brightness
 
       expect(volumeSlider).toBeInTheDocument();
       expect(brightnessSlider).toBeInTheDocument();
