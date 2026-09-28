@@ -20,7 +20,7 @@ action, the sheets, and the rail's sections.
 | `layout` | draws | menus |
 |---|---|---|
 | `bar` | a bottom row: the destinations, `more` last, `primary` raised in the middle | open as bottom sheets over the page, stopping above the bar |
-| `rail` | a vertical list: `back`, `heading`, the destinations, then each menu | listed under their `title`: nothing is folded on a wide screen |
+| `rail` | a vertical list: `back`, `heading`, a `primary` menu as one button, the destinations, then `more` | `primary` opens as a menu anchored to its button (named by `title`); `more` is listed under its `title` |
 
 Which layout to use is the HOST's call. A bar beside a sidebar is two
 navigations competing for one glance, and only the host knows what else is on
@@ -76,8 +76,9 @@ looks one tap apart.
   reports `aria-pressed="true"` (`false` when `active: false`). Only a link
   reports `aria-current="page"`; an action is not a page.
 - A menu entry, and a whole menu, can be `disabled` too. In the bar a disabled
-  menu's trigger is inert and opens no sheet; in the rail, where the menu is
-  listed rather than behind a trigger, every row of it is inert.
+  menu's trigger is inert and opens no sheet. In the rail a disabled `primary`
+  is a disabled button, and a disabled `more`, listed rather than behind a
+  trigger, has every row inert.
 - `dataTestId` on a destination, entry, action or menu replaces the id the nav
   would derive, for a host whose suites already drive their own.
 
@@ -124,4 +125,6 @@ icon turns 45° while open.
 
 `<prefix>-dest-<id>`, `<prefix>-primary`, `<prefix>-more`,
 `<prefix>-{primary,more}-sheet`, `<prefix>-{primary,more}-sheet-entry-<id>` (bar),
-`<prefix>-{primary,more}-entry-<id>` (rail), and `<prefix>-back`.
+`<prefix>-{primary,more}-entry-<id>` (rail; a `primary` entry exists once its
+menu is open), `<prefix>-primary-menu` (the rail's open `primary` menu), and
+`<prefix>-back`.

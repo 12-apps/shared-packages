@@ -103,9 +103,9 @@ export interface SectionNavGroup {
 /**
  * A menu the nav opens: the centred primary action, or the "more" slot.
  *
- * On a phone it opens as a bottom sheet over the page. In the rail there is
- * room for everything, so its groups are listed under `title` instead of
- * hiding behind a trigger.
+ * On a phone it opens as a bottom sheet over the page. In the rail, `more`
+ * is listed under `title`, and `primary` is one button at the top that opens
+ * its groups as an anchored menu named by `title` (FUT-3015).
  */
 export interface SectionNavMenu {
   /** The trigger's accessible name, and the visible label of the "more" slot. */
@@ -155,8 +155,9 @@ export interface SectionNavProps {
    * `bar` — a bottom tab bar for a phone: the destinations, `more` as the last
    * slot, and `primary` as a raised button in the middle.
    *
-   * `rail` — a vertical list for a wide screen, with `back` and `heading` on
-   * top and every menu's entries listed rather than folded away.
+   * `rail` — a vertical list for a wide screen: `back` and `heading` on top,
+   * a `primary` menu as one button that opens it, the destinations, and
+   * `more`'s entries listed.
    */
   layout: 'bar' | 'rail';
   /** The navigation landmark's accessible name. */

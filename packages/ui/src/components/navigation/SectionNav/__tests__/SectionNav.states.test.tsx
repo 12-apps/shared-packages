@@ -156,11 +156,19 @@ describe('SectionNav bar: primary and sheet gaps', () => {
 });
 
 describe('SectionNav rail: a disabled menu', () => {
-  it.each(['primary', 'more'] as const)('makes every row of a disabled %s menu inert', (slot) => {
+  it('draws a disabled primary menu as a disabled button that opens nothing', () => {
+    renderNav('rail', [], { primary: menu({ disabled: true }) });
+    const button = screen.getByTestId('section-nav-primary');
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('makes every row of a disabled more menu inert', () => {
     const onSelect = vi.fn();
-    renderNav('rail', [], { [slot]: menu({ disabled: true }, onSelect) });
-    const delivery = screen.getByTestId(`section-nav-${slot}-entry-delivery`);
-    const queue = screen.getByTestId(`section-nav-${slot}-entry-queue`);
+    renderNav('rail', [], { more: menu({ disabled: true }, onSelect) });
+    const delivery = screen.getByTestId('section-nav-more-entry-delivery');
+    const queue = screen.getByTestId('section-nav-more-entry-queue');
     expect(delivery).toBeDisabled();
     expect(queue).toBeDisabled();
     expect(queue).not.toHaveAttribute('href');
