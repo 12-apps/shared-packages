@@ -18,7 +18,7 @@ import { createRbacLabels, type RbacLabels } from './labels';
 import { MemberScreen } from './member-screen';
 import type { RoleSeedDefault } from './role-grid-config';
 import { RolesScreen } from './roles-screen';
-import { TeamScreen } from './team-screen';
+import { TeamScreen, type TeamScreenProps } from './team-screen';
 import { httpRbacTransport } from './transport';
 import type { RbacLocaleHook, RbacWebConfig } from './web-config';
 
@@ -44,12 +44,16 @@ export type { RbacWebConfig, RbacLocaleHook } from './web-config';
 /** The "no locale wired" implementation: nobody said, on every render. */
 const noLocale: RbacLocaleHook = () => undefined;
 
+/** What a host may still pass the bound roster: its request to open the invite dialog. */
+export type TeamScreenRequest = Pick<TeamScreenProps, 'inviteRequested' | 'onInviteRequestHandled'>;
+
 export interface WebRbac {
   /** The whole surface: Papéis + Equipe behind the package's own tabs. */
   page: ComponentType;
   /** The screens individually, for hosts that route them themselves. */
   RolesScreen: ComponentType;
-  TeamScreen: ComponentType;
+  /** Takes the host's invite request — see {@link TeamScreenProps.inviteRequested}. */
+  TeamScreen: ComponentType<TeamScreenRequest>;
   /** One member's profile, at `/team/:userId` — the route the roster's rows open. */
   MemberScreen: ComponentType;
 }
@@ -191,7 +195,13 @@ function BoundRolesScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
   );
 }
 
-function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
+function BoundTeamScreen({
+  parts,
+  request,
+}: {
+  parts: SurfaceParts;
+  request?: TeamScreenRequest;
+}): JSX.Element {
   const labels = parts.useLabels();
   return (
     <TeamScreen
@@ -206,6 +216,8 @@ function BoundTeamScreen({ parts }: { parts: SurfaceParts }): JSX.Element {
       onOpenMember={parts.config.navigate?.member}
       extraColumns={parts.config.teamExtraColumns}
       rowActionIds={parts.config.teamRowActionIds}
+      inviteRequested={request?.inviteRequested}
+      onInviteRequestHandled={request?.onInviteRequestHandled}
     />
   );
 }
@@ -281,9 +293,9 @@ export function createWebRbac<P extends string = string>(
         <BoundRolesScreen parts={parts} />
       </WithPermissions>
     ),
-    TeamScreen: () => (
+    TeamScreen: (request: TeamScreenRequest) => (
       <WithPermissions parts={parts}>
-        <BoundTeamScreen parts={parts} />
+        <BoundTeamScreen parts={parts} request={request} />
       </WithPermissions>
     ),
     MemberScreen: () => (
