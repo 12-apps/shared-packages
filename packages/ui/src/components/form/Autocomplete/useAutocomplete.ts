@@ -218,10 +218,17 @@ function commitMultiSelect<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteS
   setDeliberateClose(s, false);
 }
 
-function commitSingleSelect<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState<T>, onChange: (v: string) => void): void {
+/**
+ * A single-select pick's own correction must land in the same tick as
+ * `setInputValue(label)`, not up to `debounceMs` later — so it calls
+ * `p.onChange` DIRECTLY rather than going through `debouncedOnChange`
+ * (FUT-2860). `commitMultiSelect` is unaffected: it keeps calling the
+ * debounced `onChange('')`, per the ticket's own decision.
+ */
+function commitSingleSelect<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState<T>): void {
   const label = (p.getLabel ?? defaultGetLabel)(item);
   s.setInputValue(label);
-  onChange(label);
+  p.onChange(label);
 }
 
 /** Apply a pick: open a link suggestion, or commit a search one to the input. */
@@ -234,7 +241,7 @@ function commitPick<T>(
 ): void {
   if (linkUrl !== null) (p.openLink ?? defaultOpenLink)(linkUrl, item);
   else if (p.multiple) commitMultiSelect(item, p, s, onChange);
-  else commitSingleSelect(item, p, s, onChange);
+  else commitSingleSelect(item, p, s);
 }
 
 function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState<T>, onChange: (v: string) => void): void {
@@ -248,10 +255,10 @@ function runSelectItem<T>(item: T, p: AutocompleteProps<T>, s: AutocompleteState
   // Cancel a still-pending keystroke debounce BEFORE dispatching the pick, so
   // no branch below — including `openLink`, which never touches `onChange`
   // at all — can leave it armed to fire the STALE pre-pick text later
-  // (FUT-2779 #1). `commitSingleSelect`/`commitMultiSelect` already clear it
-  // as a side effect of calling the same `debouncedOnChange`; this makes it
-  // unconditional so a `link` pick (which skips `onChange` entirely) is
-  // covered too.
+  // (FUT-2779 #1). `commitMultiSelect` already clears it as a side effect of
+  // calling the same `debouncedOnChange`; `commitSingleSelect` bypasses that
+  // path entirely now (FUT-2860), so this cancel is what covers IT and a
+  // `link` pick (which skips `onChange` entirely) alike.
   if (s.debounceRef.current) window.clearTimeout(s.debounceRef.current);
   commitPick(item, isLink ? (url as string) : null, p, s, onChange);
   s.setOpen(false);
