@@ -8,7 +8,7 @@
  * same `onChange(event)` shape with the value's own type, disabled options,
  * the test ids, and an explicit `searchable` overriding the count.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Select } from '../Select';
@@ -30,6 +30,21 @@ const STAFF = [
 const searchInput = (root: HTMLElement): HTMLInputElement | null =>
   root.querySelector('input[role="combobox"]');
 
+/**
+ * Type into the search box as a user does. MUI's Autocomplete filters only
+ * while its input is the focused element, so the focus is a real `.focus()`
+ * (the pattern `autocomplete-closes-after-pick.test.tsx` uses), not a
+ * synthetic event.
+ */
+async function typeInto(testId: string, text: string): Promise<void> {
+  const input = searchInput(screen.getByTestId(testId))!;
+  await act(async () => {
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- real focus: Autocomplete filters only while its input is document.activeElement
+    input.focus();
+  });
+  fireEvent.change(input, { target: { value: text } });
+}
+
 async function open(testId: string): Promise<HTMLElement> {
   fireEvent.mouseDown(within(screen.getByTestId(testId)).getByRole('combobox'));
   return screen.findByRole('listbox');
@@ -49,9 +64,7 @@ describe('Select — searchable past five options', () => {
 
   it('filters the list by what is typed', async () => {
     render(<Select options={STAFF} label="Pessoa" value="" onChange={vi.fn()} data-testid="s" />);
-    const input = searchInput(screen.getByTestId('s'))!;
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'dieg' } });
+    await typeInto('s', 'dieg');
     const listbox = await screen.findByRole('listbox');
     await waitFor(() => expect(within(listbox).getAllByRole('option')).toHaveLength(1));
     expect(within(listbox).getByTestId('s-option-diego')).toHaveTextContent('Diego Lima');
@@ -104,9 +117,7 @@ describe('Select — searchable past five options', () => {
         data-testid="s"
       />,
     );
-    const input = searchInput(screen.getByTestId('s'))!;
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'zzz' } });
+    await typeInto('s', 'zzz');
     expect(await screen.findByText('Ninguém com esse nome')).toBeInTheDocument();
   });
 

@@ -61,9 +61,6 @@ const MenuSelect = React.forwardRef<HTMLDivElement, SelectProps>(
       pulse,
       value,
       'aria-label': ariaLabel,
-      // The searchable path's own props: nothing for MUI's Select to receive.
-      searchable: _searchable,
-      noOptionsText: _noOptionsText,
       ...rest
     },
     ref,
@@ -136,8 +133,11 @@ MenuSelect.displayName = 'MenuSelect';
  * search box over a list of bounded height (`Select.searchable.tsx`), with the
  * same props, events and test ids either way. `searchable` overrides the count.
  */
-export const Select = React.forwardRef<HTMLDivElement, SelectProps>((props, ref) =>
-  shouldSearch(props) ? <SearchableSelect {...props} ref={ref} /> : <MenuSelect {...props} ref={ref} />,
-);
+export const Select = React.forwardRef<HTMLDivElement, SelectProps>((props, ref) => {
+  if (shouldSearch(props)) return <SearchableSelect {...props} ref={ref} />;
+  // The searchable path's own props: nothing for MUI's Select to receive.
+  const { searchable: _searchable, noOptionsText: _noOptionsText, ...menuProps } = props;
+  return <MenuSelect {...menuProps} ref={ref} />;
+});
 
 Select.displayName = 'Select';
