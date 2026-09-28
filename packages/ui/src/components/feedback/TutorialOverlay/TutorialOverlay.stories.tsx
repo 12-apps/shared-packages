@@ -11,6 +11,7 @@ import React from 'react';
 import { action } from 'storybook/actions';
 
 import { TutorialOverlay } from './TutorialOverlay';
+import type { TutorialStep } from './TutorialOverlay.types';
 import { PT_BR_TUTORIAL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TutorialOverlay> = {
@@ -32,11 +33,6 @@ const meta: Meta<typeof TutorialOverlay> = {
       control: { type: 'select' },
       options: ['tooltip', 'modal', 'highlight', 'spotlight'],
       description: 'Tutorial overlay style',
-    },
-    position: {
-      control: { type: 'select' },
-      options: ['top', 'bottom', 'left', 'right', 'center'],
-      description: 'Position relative to target',
     },
     showProgress: {
       control: 'boolean',
@@ -147,34 +143,34 @@ export const Default: Story = {
 const OnboardingFlowComponent = () => {
   const [startOnboarding, setStartOnboarding] = React.useState(false);
 
-  const onboardingSteps = [
+  const onboardingSteps: TutorialStep[] = [
     {
       id: '1',
       target: '#create-project',
       title: 'Create Your First Project',
       content: 'Click here to create your first project and get started.',
-      action: 'Click to Continue',
+      action: { label: 'Click to Continue', onClick: action('step-1-continue') },
     },
     {
       id: '2',
       target: '#invite-team',
       title: 'Invite Team Members',
       content: 'Collaborate with your team by inviting them to your project.',
-      action: 'Next',
+      action: { label: 'Next', onClick: action('step-2-next') },
     },
     {
       id: '3',
       target: '#customize',
       title: 'Customize Your Workspace',
       content: 'Make it yours! Customize themes, layouts, and preferences.',
-      action: 'Next',
+      action: { label: 'Next', onClick: action('step-3-next') },
     },
     {
       id: '4',
       target: '#explore',
       title: 'Explore Features',
       content: 'Discover all the powerful features available to you.',
-      action: 'Finish',
+      action: { label: 'Finish', onClick: action('step-4-finish') },
     },
   ];
 

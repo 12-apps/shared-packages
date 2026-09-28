@@ -267,7 +267,7 @@ export const PullQuotes: Story = {
         labore et dolore magna aliqua.
       </p>
 
-      <Blockquote variant="citation" color="primary" sx={{ my: 4 }}>
+      <Blockquote variant="citation" color="primary" style={{ marginTop: 32, marginBottom: 32 }}>
         "This is a pull quote that highlights a key point from the article"
       </Blockquote>
 
@@ -279,7 +279,7 @@ export const PullQuotes: Story = {
       <Blockquote
         variant="bordered"
         color="secondary"
-        sx={{ float: 'right', width: '40%', ml: 3, my: 2 }}
+        style={{ float: 'right', width: '40%', marginLeft: 24, marginTop: 16, marginBottom: 16 }}
       >
         A floating pull quote that wraps with the text
       </Blockquote>

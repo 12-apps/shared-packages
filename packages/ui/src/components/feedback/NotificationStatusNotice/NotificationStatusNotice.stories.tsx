@@ -17,7 +17,7 @@ const CHROME_DESKTOP_STEPS = notificationUnblockSteps(PT_BR_NOTIFICATION_UNBLOCK
   platform: 'desktop',
 });
 
-const meta: Meta<typeof NotificationStatusNotice> = {
+const meta = {
   title: 'Feedback/NotificationStatusNotice',
   component: NotificationStatusNotice,
   parameters: {
@@ -30,7 +30,7 @@ const meta: Meta<typeof NotificationStatusNotice> = {
     },
   },
   tags: ['autodocs'],
-};
+} satisfies Meta<typeof NotificationStatusNotice>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -100,12 +100,13 @@ export const LongText: Story = {
 };
 
 export const AllStatuses: Story = {
+  args: Enabled.args,
   render: () => (
     <Stack spacing={2}>
-      <NotificationStatusNotice {...(Enabled.args as never)} dataTestId="enabled" />
-      <NotificationStatusNotice {...(Disabled.args as never)} dataTestId="disabled" />
-      <NotificationStatusNotice {...(Blocked.args as never)} dataTestId="blocked" />
-      <NotificationStatusNotice {...(Unavailable.args as never)} dataTestId="unavailable" />
+      <NotificationStatusNotice {...Enabled.args} dataTestId="enabled" />
+      <NotificationStatusNotice {...Disabled.args} dataTestId="disabled" />
+      <NotificationStatusNotice {...Blocked.args} dataTestId="blocked" />
+      <NotificationStatusNotice {...Unavailable.args} dataTestId="unavailable" />
     </Stack>
   ),
 };

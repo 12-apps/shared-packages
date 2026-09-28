@@ -1,7 +1,12 @@
 import type { PaletteColor, Theme, ThemeOptions } from '@mui/material/styles/index.js';
 
 import { cssLengthToPx, cssTrackingToEm } from '../tokens/css-units';
-import { chipDensityOverrides, iconButtonDensityOverrides } from '../tokens/density-overrides';
+import {
+  checkboxRadioDensityOverrides,
+  chipDensityOverrides,
+  iconButtonDensityOverrides,
+  switchDensityOverrides,
+} from '../tokens/density-overrides';
 import { densityFontSize, resolveDensityFactor } from '../tokens/density';
 import { resolveFieldHeight } from '../tokens/field-height.core';
 import { fieldOverrides, mergeMuiComponents } from '../tokens/field-height';
@@ -145,13 +150,15 @@ export function muiThemeOptionsFrom(ui: UiTheme): ThemeOptions {
     shape: { borderRadius: ui.radius.md },
     fieldRadius: ui.radius.field,
     fieldHeight: ui.fieldHeight,
-    // Additive: children 3/4 (FUT-2767/2768) each add one more source here as
-    // their own geometry overrides land — this PR (FUT-2766) adds IconButton's
-    // and Chip's.
+    // Additive: child 4 (FUT-2768) adds one more source here as its own
+    // geometry overrides land — FUT-2766 added IconButton's and Chip's, this
+    // PR (FUT-2767) adds Checkbox/Radio's and Switch's.
     components: mergeMuiComponents(
       fieldOverrides(ui.radius.field, ui.fieldHeight),
       iconButtonDensityOverrides(),
       chipDensityOverrides(),
+      checkboxRadioDensityOverrides(),
+      switchDensityOverrides(),
     ),
     spacing: ui.spacingUnit,
     density: ui.density,
