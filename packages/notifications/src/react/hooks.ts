@@ -169,6 +169,11 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
  * to live is worth one read. The first live after mount is not a return: the
  * mount effect has just read, and reading again there was the duplicate. This
  * mirrors the consent dialog's re-ask in `@12-apps/app-shell`.
+ *
+ * The cost, accepted: an event published between the mount read and the first
+ * live (about a second on a slow link) is not heard, so the badge catches up at
+ * the next reconcile, a focus, or a later event. That is the reconcile interval
+ * at worst, and a hint is best-effort by contract anyway.
  */
 function useReadOnRelive(store: InboxStore, enabled: boolean, live: boolean): void {
   // A container, mutated in place: live since mount, and dropped since then.
