@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import {
   BADGE_POLL_MS,
@@ -129,26 +129,61 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
     if (enabled) store.invalidate();
   });
 
+  // Two effects, split on purpose. This one reads once on mount and
+  // holds the subscription and the focus re-read, so it must NOT be keyed on
+  // `relaxed`: when it was, the host's channel coming up re-ran it and read the
+  // count a second time on every cold page load.
   useEffect(() => {
     if (!enabled) return;
     store.refreshBadge();
     const unsubscribe = subscribe?.(() => store.invalidate());
-    // A live channel relaxes the poll to the reconcile interval; without one it
-    // stays the 60 s poll.
+    const onFocus = (): void => store.refreshBadge();
+    globalThis.addEventListener?.('focus', onFocus);
+    return () => {
+      globalThis.removeEventListener?.('focus', onFocus);
+      unsubscribe?.();
+    };
+  }, [store, enabled, subscribe]);
+
+  // The cadence. A live channel relaxes the poll to the reconcile interval;
+  // without one it stays the 60 s poll. Keyed on `store` and `enabled` too, since
+  // it reads both and a disabled bell must not tick.
+  useEffect(() => {
+    if (!enabled) return;
     const interval = setInterval(
       () => store.refreshBadge(),
       relaxed ? BADGE_RECONCILE_MS : BADGE_POLL_MS,
     );
-    const onFocus = (): void => store.refreshBadge();
-    globalThis.addEventListener?.('focus', onFocus);
-    return () => {
-      clearInterval(interval);
-      globalThis.removeEventListener?.('focus', onFocus);
-      unsubscribe?.();
-    };
-  }, [store, enabled, subscribe, relaxed]);
+    return () => clearInterval(interval);
+  }, [store, enabled, relaxed]);
+
+  useReadOnRelive(store, enabled, options.live === true);
 
   return state;
+}
+
+/**
+ * Read once more when the host's channel comes BACK after a drop.
+ *
+ * Whatever was pushed while the stream was down is lost by contract, so a return
+ * to live is worth one read. The first live after mount is not a return: the
+ * mount effect has just read, and reading again there was the duplicate. This
+ * mirrors the consent dialog's re-ask in `@12-apps/app-shell`.
+ */
+function useReadOnRelive(store: InboxStore, enabled: boolean, live: boolean): void {
+  // A container, mutated in place: live since mount, and dropped since then.
+  const seen = useRef({ live: false, dropped: false });
+  useEffect(() => {
+    const memory = seen.current;
+    if (!live) {
+      if (memory.live) memory.dropped = true;
+      return;
+    }
+    const back = memory.dropped;
+    memory.live = true;
+    memory.dropped = false;
+    if (back && enabled) store.refreshBadge();
+  }, [store, enabled, live]);
 }
 
 /**

@@ -48,6 +48,7 @@ function mountBadge(options: { live?: boolean }) {
   return {
     reads: (): number => get.mock.calls.filter(([path]) => path === UNREAD_PATH).length,
     dropChannel: (): void => rerender({ live: false }),
+    setLive: (live: boolean): void => rerender({ live }),
   };
 }
 
@@ -102,5 +103,38 @@ describe('the badge cadence', () => {
     await elapse(BADGE_POLL_MS);
 
     expect(reads()).toBe(afterDrop + 1);
+  });
+});
+
+/**
+ * The host's channel coming up, going down, and coming back.
+ *
+ * The first `live` after mount is not news: the mount has just read, and a
+ * second read there happened on every cold page load. A return after a drop is
+ * news, because whatever was pushed while the stream was down is lost.
+ */
+describe('the badge and the channel coming back', () => {
+  it('does not read again when the channel first comes up', async () => {
+    const badge = mountBadge({ live: false });
+    await elapse(0);
+    expect(badge.reads()).toBe(1);
+
+    badge.setLive(true);
+    await elapse(0);
+
+    expect(badge.reads()).toBe(1);
+  });
+
+  it('reads exactly once more when the channel comes back after a drop', async () => {
+    const badge = mountBadge({ live: true });
+    await elapse(0);
+    expect(badge.reads()).toBe(1);
+
+    badge.setLive(false);
+    await elapse(0);
+    badge.setLive(true);
+    await elapse(0);
+
+    expect(badge.reads()).toBe(2);
   });
 });

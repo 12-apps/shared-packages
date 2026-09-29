@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, type JSX } from 'react';
+import { Suspense, lazy, useEffect, useRef, type JSX } from 'react';
 
 import type { AppShellCopySource } from '../../core/copy';
 import { stripTrailingSlashes } from '../../core/paths';
@@ -59,14 +59,38 @@ export type ConsentSignalHook = (onSignal: () => void) => { connected: boolean }
  * that decides, exactly as it is on mount. Which is also why the seam is allowed to
  * be absent — a host with no event system simply gets the mount-time fetch, and
  * nothing here degrades quietly into claiming to be live.
+ *
+ * ## A RE-connect, not the first connect
+ *
+ * The deploy case is a stream that was up, dropped, and came back. The FIRST
+ * `connected` after mount is not that: it lands a second or two after
+ * {@link useTermsConsent}'s own mount fetch and asked the same question again, on
+ * every cold page load, for every signed-in user. So the re-ask waits for a drop
+ * seen since mount, and a hook that mounts already connected asks nothing extra.
+ *
+ * The cost, accepted: a terms bump deployed in the window between the mount answer
+ * and the first connect (a second or two on a slow 3G link) is missed until the next
+ * reconnect, a pushed hint, or a reload. The guard's own error still reaches that
+ * user, which is where they were before this dialog existed.
  */
 function useConsentStream(refresh: () => Promise<void>, useSignal?: ConsentSignalHook): void {
   // Hooks may not be called conditionally, so the no-op stands in for an absent
   // seam rather than the call site branching on it.
   const hook = useSignal ?? noSignal;
   const { connected } = hook(() => void refresh());
+  // A container, mutated in place: whether the channel has been connected since
+  // mount, and whether it has dropped since then.
+  const seen = useRef({ connected: false, dropped: false });
   useEffect(() => {
-    if (connected) void refresh();
+    const memory = seen.current;
+    if (!connected) {
+      if (memory.connected) memory.dropped = true;
+      return;
+    }
+    const reconnected = memory.dropped;
+    memory.connected = true;
+    memory.dropped = false;
+    if (reconnected) void refresh();
   }, [connected, refresh]);
 }
 

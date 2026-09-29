@@ -3,6 +3,7 @@ import { topicServes } from "./subscription-registry";
 import type {
   RealtimeMessage,
   RealtimeStatus,
+  RealtimeTransport,
   RealtimeTransportConfig,
   WireSourceFactory,
 } from "./types";
@@ -121,6 +122,23 @@ export class SharedRealtimeChannel {
    * round trip, never a real outage.
    */
   private resubscribing = false;
+  /**
+   * The wire the last channel settled on, handed to the next one.
+   *
+   * A channel demotes from `ws` to `sse` when the socket never opens, and on `sse`
+   * the union is maintained by REOPENING (`canSend` is false). Each reopen used to
+   * start a fresh `RealtimeChannel` on `ws` again, so every topic change repeated the
+   * failed socket attempt — and that attempt's `disconnected` is not a `connecting`,
+   * so `resubscribing` did not hide it. Every consumer read it as a real drop and
+   * re-asked: measured on a storefront's first page load, one extra
+   * consent check and two extra unread-count reads on every step that widened the
+   * union after demoting.
+   *
+   * Sticky for this object's life, which is the documented bound: a NEW
+   * `SharedRealtimeChannel` (a fresh page, or the worker's next group) tries `ws`
+   * again.
+   */
+  private wire: RealtimeTransport = "ws";
 
   constructor(private readonly options: SharedRealtimeChannelOptions) {}
 
@@ -147,6 +165,7 @@ export class SharedRealtimeChannel {
 
   private teardown(): void {
     this.generation += 1;
+    if (this.channel) this.wire = this.channel.wire;
     this.channel?.close();
     this.channel = null;
     this.attached = [];
@@ -173,6 +192,7 @@ export class SharedRealtimeChannel {
       transport: this.options.transport,
       createSource: this.options.createSource,
       random: this.options.random,
+      wire: this.wire,
       onMessage: (message) => {
         if (isCurrent()) this.options.onMessage(message);
       },
