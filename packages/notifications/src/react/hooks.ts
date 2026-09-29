@@ -129,10 +129,10 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
     if (enabled) store.invalidate();
   });
 
-  // Two effects, split on purpose. This one reads once on mount and
-  // holds the subscription and the focus re-read, so it must NOT be keyed on
-  // `relaxed`: when it was, the host's channel coming up re-ran it and read the
-  // count a second time on every cold page load.
+  // Two effects, split on purpose. This first one makes the mount read and owns
+  // the subscription and the focus re-read. It must NOT be keyed on `relaxed`:
+  // when it was, the host's channel coming up re-ran it and read the count a
+  // second time on every cold page load.
   useEffect(() => {
     if (!enabled) return;
     store.refreshBadge();
@@ -175,6 +175,14 @@ function useReadOnRelive(store: InboxStore, enabled: boolean, live: boolean): vo
   const seen = useRef({ live: false, dropped: false });
   useEffect(() => {
     const memory = seen.current;
+    // A disabled bell (nobody signed in) forgets the channel's history: signing
+    // back in makes its own mount read, and the channel coming up after it is a
+    // first live, not a return.
+    if (!enabled) {
+      memory.live = false;
+      memory.dropped = false;
+      return;
+    }
     if (!live) {
       if (memory.live) memory.dropped = true;
       return;
@@ -182,7 +190,7 @@ function useReadOnRelive(store: InboxStore, enabled: boolean, live: boolean): vo
     const back = memory.dropped;
     memory.live = true;
     memory.dropped = false;
-    if (back && enabled) store.refreshBadge();
+    if (back) store.refreshBadge();
   }, [store, enabled, live]);
 }
 
