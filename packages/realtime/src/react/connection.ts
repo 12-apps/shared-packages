@@ -343,10 +343,9 @@ export class RealtimeChannel {
     // One-way and once: SSE is fully functional, so a demoted channel is degraded in
     // no way a consumer can observe.
     //
-    // The escape hatch is "a NEW `SharedRealtimeChannel` tries `ws` again"; the channel
-    // it reopens to change the union inherits `sse` through `wire` instead (see there).
-    // That is not the same as "a fresh page load" on the arrangement this package now
-    // prefers. In the in-page
+    // The escape hatch is "a NEW `SharedRealtimeChannel` tries `ws` again" (a reopen
+    // inherits `sse` through `wire`), and that is not the same as "a fresh page load"
+    // on the arrangement this package now prefers. In the in-page
     // host the two coincide. Under the SharedWorker the channel lives in the WORKER,
     // which survives as long as any port is attached — so one tab parked open keeps a
     // demoted channel across reloads of every other tab, and only closing the last tab
