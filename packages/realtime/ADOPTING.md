@@ -342,7 +342,9 @@ to SSE once, permanently for that CHANNEL's life. In the page, a reload is a new
 the worker the channel outlives page loads — the worker survives as long as any port is
 attached — so one tab parked open keeps a demoted channel across reloads of every other tab,
 and only closing the last tab on that endpoint retries the socket. SSE is fully functional,
-so the impact is bounded; it is simply not "a fresh page load tries `ws` again" here.
+so the impact is bounded; it is simply not "a fresh page load tries `ws` again" here. The
+same holds for the channel a topic change reopens: it starts on the wire its predecessor
+settled on, so a demoted union stays on SSE rather than failing the socket once per change.
 
 ## Minimal host (Hono)
 

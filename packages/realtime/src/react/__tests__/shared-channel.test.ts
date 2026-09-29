@@ -428,6 +428,26 @@ describe("SharedRealtimeChannel — the SSE path", () => {
     events.channel.close();
   });
 
+  it("keeps a DEMOTED channel on sse when it reopens, so a widen does not replay the socket", async () => {
+    const events = harness({ sse: true });
+    events.channel.setTopics(["consent"]);
+    // The socket never opens (no gateway behind `/ws`): the channel demotes to the stream.
+    events.wire.live().onerror?.({});
+    await settle();
+    await goLive(events);
+
+    events.channel.setTopics(["consent", "notifications"]);
+    await settle();
+    await goLive(events);
+
+    // The reopen starts where its predecessor ended up. On `ws` it would fail again and
+    // announce a `disconnected` the resubscribe does not hide.
+    expect(events.wire.built.map((entry) => entry.transport)).toEqual(["ws", "sse", "sse"]);
+    const sinceLive = events.statuses.slice(events.statuses.indexOf("connected"));
+    expect(sinceLive.filter((status) => status !== "connected")).toEqual([]);
+    events.channel.close();
+  });
+
   it("does NOT reopen for a union change past the ticket cap", async () => {
     const events = harness({ sse: true });
     events.channel.setTopics(topicList(MAX_TOPICS_PER_TICKET));

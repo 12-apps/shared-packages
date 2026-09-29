@@ -39,15 +39,18 @@ function recordingTransport() {
  * The badge, mounted on a store of its own, and the two things a case does
  * with it: count the reads it made, and tell it the channel dropped.
  */
-function mountBadge(options: { live?: boolean }) {
+function mountBadge(options: { live?: boolean; enabled?: boolean }) {
   const { transport, get } = recordingTransport();
   const store = createInboxStore(createNotificationsApiClient(API_BASE, transport));
-  const { rerender } = renderHook((props: { live?: boolean }) => useUnreadCount(store, props), {
-    initialProps: options,
-  });
+  const { rerender } = renderHook(
+    (props: { live?: boolean; enabled?: boolean }) => useUnreadCount(store, props),
+    { initialProps: options },
+  );
   return {
     reads: (): number => get.mock.calls.filter(([path]) => path === UNREAD_PATH).length,
     dropChannel: (): void => rerender({ live: false }),
+    setLive: (live: boolean): void => rerender({ live }),
+    setSession: (props: { live: boolean; enabled: boolean }): void => rerender(props),
   };
 }
 
@@ -102,5 +105,54 @@ describe('the badge cadence', () => {
     await elapse(BADGE_POLL_MS);
 
     expect(reads()).toBe(afterDrop + 1);
+  });
+});
+
+/**
+ * The host's channel coming up, going down, and coming back.
+ *
+ * The first `live` after mount is not news: the mount has just read, and a
+ * second read there happened on every cold page load. A return after a drop is
+ * news, because whatever was pushed while the stream was down is lost.
+ */
+describe('the badge and the channel coming back', () => {
+  it('does not read again when the channel first comes up', async () => {
+    const badge = mountBadge({ live: false });
+    await elapse(0);
+    expect(badge.reads()).toBe(1);
+
+    badge.setLive(true);
+    await elapse(0);
+
+    expect(badge.reads()).toBe(1);
+  });
+
+  it('reads exactly once more when the channel comes back after a drop', async () => {
+    const badge = mountBadge({ live: true });
+    await elapse(0);
+    expect(badge.reads()).toBe(1);
+
+    badge.setLive(false);
+    await elapse(0);
+    badge.setLive(true);
+    await elapse(0);
+
+    expect(badge.reads()).toBe(2);
+  });
+
+  it('treats the channel after a sign-out and sign-in as a first live, not a return', async () => {
+    const badge = mountBadge({ live: true, enabled: true });
+    await elapse(0);
+
+    // Signed out: the bell is disabled and the session-scoped channel drops.
+    badge.setSession({ live: false, enabled: false });
+    await elapse(0);
+    // Signed back in: the mount read, then the channel coming up.
+    badge.setSession({ live: false, enabled: true });
+    await elapse(0);
+    badge.setSession({ live: true, enabled: true });
+    await elapse(0);
+
+    expect(badge.reads()).toBe(2);
   });
 });
