@@ -15,6 +15,10 @@ const sentry = vi.hoisted(() => ({
   getClient: vi.fn(() => undefined as unknown),
   setTag: vi.fn(),
   withScope: vi.fn(),
+  withStreamedSpan: vi.fn((callback: unknown) => callback),
+  addIntegration: vi.fn(),
+  spanStreamingIntegration: vi.fn(() => ({ name: "SpanStreaming" })),
+  webVitalsIntegration: vi.fn(() => ({ name: "WebVitals" })),
 }));
 
 vi.mock("@sentry/react", () => sentry);
@@ -58,6 +62,7 @@ beforeEach(() => {
   resetObservabilityForTests();
   sentry.init.mockClear();
   sentry.captureException.mockClear();
+  sentry.addIntegration.mockClear();
   sentry.getClient.mockReturnValue(undefined);
 });
 
@@ -91,6 +96,28 @@ describe("loadObservabilityConfig", () => {
     serveConfig(jsonReply({ dsn: 42 }));
     await expect(loadObservabilityConfig("super-admin")).resolves.toBeNull();
   });
+
+  it("reads an ABSENT performance rate as 0 — an older backend must not switch errors off", async () => {
+    serveConfig(jsonReply({ dsn: "https://k@o1.ingest.sentry.io/1", environment: "prd", release: "" }));
+    const config = await loadObservabilityConfig("storefront");
+    expect(config).not.toBeNull();
+    expect(config?.tracesSampleRate).toBe(0);
+  });
+
+  it("carries a served performance rate through", async () => {
+    serveConfig(
+      jsonReply({ dsn: "https://k@o1.ingest.sentry.io/1", environment: "prd", release: "", tracesSampleRate: 1 }),
+    );
+    await expect(loadObservabilityConfig("storefront")).resolves.toMatchObject({ tracesSampleRate: 1 });
+  });
+
+  it.each([["1"], [2], [-0.5], [Number.NaN], [null]])(
+    "rejects a PRESENT but malformed performance rate (%s)",
+    async (tracesSampleRate) => {
+      serveConfig(jsonReply({ dsn: "https://k@o1.ingest.sentry.io/1", environment: "prd", release: "", tracesSampleRate }));
+      await expect(loadObservabilityConfig("storefront")).resolves.toBeNull();
+    },
+  );
 });
 
 describe("startObservability", () => {
@@ -137,6 +164,33 @@ describe("startObservability", () => {
     expect(options.tracesSampleRate).toBe(0);
     // Replay would record the checkout form. Enabling it is a separate decision.
     expect(options.integrations).toBeUndefined();
+  });
+
+  it("streams performance spans, through the scrubbing hook, when a rate is served", async () => {
+    serveConfig(
+      jsonReply({ dsn: "https://k@o1.ingest.sentry.io/7", environment: "prd", release: "", tracesSampleRate: 1 }),
+    );
+    await startObservability("storefront");
+
+    const options = sentry.init.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(options.tracesSampleRate).toBe(1);
+    // Client-wide: every span then leaves through beforeSendSpan, never through
+    // beforeSendTransaction, which is why the scrub lives on that one hook.
+    expect(options.traceLifecycle).toBe("stream");
+    expect(typeof options.beforeSendSpan).toBe("function");
+    expect(sentry.withStreamedSpan).toHaveBeenCalled();
+    // After load (jsdom's document is already complete), both integrations the
+    // vitals need arrive: the recorder AND the one that sends a streamed span.
+    await vi.waitFor(() => expect(sentry.addIntegration).toHaveBeenCalledTimes(2));
+    expect(sentry.addIntegration).toHaveBeenCalledWith({ name: "SpanStreaming" });
+    expect(sentry.addIntegration).toHaveBeenCalledWith({ name: "WebVitals" });
+  });
+
+  it("installs no performance integration when no rate is served", async () => {
+    serveConfig(jsonReply({ dsn: "https://k@o1.ingest.sentry.io/7", environment: "prd", release: "" }));
+    await startObservability("storefront");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sentry.addIntegration).not.toHaveBeenCalled();
   });
 
   it("reports an error thrown BEFORE the config arrived", async () => {

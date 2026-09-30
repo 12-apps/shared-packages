@@ -28,6 +28,13 @@ interface ObservabilityConfig {
   dsn: string;
   environment: string;
   release: string;
+  /**
+   * Share of sessions whose performance spans (Web Vitals) are sent, 0 to 1.
+   * OPTIONAL on the wire and 0 when absent: an older backend, or one mid-way
+   * through a rolling deploy, must not turn error reporting off by omitting a
+   * field that only concerns performance.
+   */
+  tracesSampleRate: number;
 }
 
 /**
@@ -40,13 +47,21 @@ interface ObservabilityConfig {
  */
 const TIMEOUT_MS = 5_000;
 
-function isConfig(value: unknown): value is ObservabilityConfig {
+/** The wire shape: `tracesSampleRate` may be missing, never malformed. */
+type WireConfig = Omit<ObservabilityConfig, "tracesSampleRate"> & { tracesSampleRate?: number };
+
+/** A rate is a finite number from 0 to 1; anything else is a malformed body. */
+const isRate = (value: unknown): boolean =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+
+function isConfig(value: unknown): value is WireConfig {
   if (value === null || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   return (
     typeof record.dsn === "string" &&
     typeof record.environment === "string" &&
-    typeof record.release === "string"
+    typeof record.release === "string" &&
+    (record.tracesSampleRate === undefined || isRate(record.tracesSampleRate))
   );
 }
 
@@ -73,7 +88,8 @@ export async function loadObservabilityConfig(
     });
     if (!response.ok) return null;
     const payload = (await response.json()) as { data?: unknown };
-    return isConfig(payload.data) ? payload.data : null;
+    if (!isConfig(payload.data)) return null;
+    return { ...payload.data, tracesSampleRate: payload.data.tracesSampleRate ?? 0 };
   } catch {
     // Offline, aborted, or a body that was not JSON. All the same answer.
     return null;

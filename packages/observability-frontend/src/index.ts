@@ -37,6 +37,7 @@ import { useEffect } from "react";
 import { DEFAULT_CONFIG_ENDPOINT, loadObservabilityConfig, type ObservabilityApp } from "./config";
 import { shouldReport, SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
 import { scrub, scrubUrl } from "./scrub";
+import { scrubSpan } from "./span-scrub";
 
 export type { ObservabilityApp } from "./config";
 export { DEFAULT_CONFIG_ENDPOINT } from "./config";
@@ -46,6 +47,7 @@ export {
   type ErrorClassifiers,
 } from "./noise";
 export { scrub, scrubUrl } from "./scrub";
+export { setSpanTextScrubber, resetSpanTextScrubberForTests, type SpanTextScrubber } from "./span-scrub";
 export { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
 
 /** One buffered pre-init failure. */
@@ -174,9 +176,10 @@ export async function startObservability(
     // The SDK's own PII switch, held OFF regardless of DSN. It is what decides
     // whether request bodies, cookies and IP addresses ride along.
     sendDefaultPii: false,
-    // Tracing is billed per span and answers "how slow"; this exists to answer
-    // "what threw". Opt in deliberately, per deployment, if ever.
-    tracesSampleRate: 0,
+    // Tracing is billed per span and answers "how slow"; errors answer "what
+    // threw". The host opts in per app and per deployment through the served
+    // config (FUT-2951); absent, it is 0 and nothing but errors is sent.
+    ...performanceOptions(config.tracesSampleRate),
     // NOTE: Session Replay is deliberately not enabled. The storefront's
     // crashes happen ON the checkout form, and a replay of that screen is a
     // recording of someone's card and CPF. Turning it on is a separate,
@@ -189,6 +192,41 @@ export async function startObservability(
   for (const item of drained) {
     Sentry.captureException(item.error);
   }
+
+  if (config.tracesSampleRate > 0) afterLoad(loadWebVitals);
+}
+
+/**
+ * The client options for a performance rate. At 0 the SDK is exactly what it
+ * was before FUT-2951: no tracing, no span hook. Above 0, spans are STREAMED
+ * — a client-wide setting, so every span leaves through `beforeSendSpan` and
+ * that one hook scrubs them all (see span-scrub.ts).
+ */
+function performanceOptions(rate: number): Partial<Sentry.BrowserOptions> {
+  if (rate <= 0) return { tracesSampleRate: 0 };
+  return {
+    tracesSampleRate: rate,
+    traceLifecycle: "stream",
+    beforeSendSpan: Sentry.withStreamedSpan(scrubSpan),
+  };
+}
+
+/** Run `task` once the page has loaded, and never before the first paint. */
+function afterLoad(task: () => void): void {
+  if (typeof window === "undefined") return;
+  if (document.readyState === "complete") {
+    task();
+    return;
+  }
+  window.addEventListener("load", task, { once: true });
+}
+
+/** Fetch and install the Web Vitals integrations; a failure costs only the vitals. */
+function loadWebVitals(): void {
+  import("./web-vitals").then(
+    ({ installWebVitals }) => installWebVitals(),
+    () => undefined,
+  );
 }
 
 /**

@@ -245,13 +245,14 @@ produces is tagged `self-check` so they filter and delete as a group.
 
 ## The seams
 
-Five, and each exists because getting it wrong is silent.
+Six, and each exists because getting it wrong is silent.
 
 | seam | how the host fills it | what it costs to skip |
 |---|---|---|
 | **app name** | `startObservability(app)`; typed as `string` here, narrow it to a union in the host | nothing, but the union is what makes a typo in `main.tsx` a compile error |
 | **config endpoint** | `startObservability(app, { endpoint })`; defaults to `/api/observability-config` | — |
 | **noise classifiers** | `setErrorClassifiers({ isIgnorableResponse, isStaleChunk })` | the host's routine 4xx and its own chunk-loader errors become issues |
+| **span text rule** | `setSpanTextScrubber(text => …)`, before `startObservability` | on a host whose paths name a tenant, every Web Vitals span carries the tenant in its page name and URL |
 | **crash fallback** | `createRouteErrorBoundary({ fallback, onCrash })` | — |
 | **self-check boundary + lazy wrapper** | `createObservabilityPage({ boundary, lazyComponent })` | the crash button tests a boundary no real page uses |
 
@@ -286,6 +287,29 @@ the errors most worth catching are on the login screen and the first paint.
 The cost is that the SDK starts a round-trip late, which the synchronous
 handlers plus the buffer pay for. The only window left uncovered is "the browser
 could not fetch the entry bundle at all", which no in-page reporter catches.
+
+## Field Web Vitals — only when the config serves a rate
+
+The config endpoint may also answer `tracesSampleRate`, a number from 0 to 1.
+Absent means 0, so an older backend keeps errors on and performance off; a
+present but malformed value rejects the whole config rather than guessing.
+
+With a rate above 0:
+
+- **Every span leaves through `beforeSendSpan`.** `traceLifecycle: "stream"` is
+  a client option, not a per-integration one. Streamed spans never reach
+  `beforeSendTransaction`, so that one hook, wrapped in `withStreamedSpan`, is
+  where the PII rules below run for spans, as `beforeSend` is for errors.
+- **The vitals integrations load after `load`.** `webVitalsIntegration` and
+  `spanStreamingIntegration` come in through a dynamic import once the page has
+  loaded. Measuring the first paint must not delay it. The host's bundler has to
+  keep that chunk lazy: a `manualChunks` rule that pulls every `@sentry` module
+  into one eager chunk pulls these in too.
+- **A span names a page three ways:** its `name`, the `sentry.transaction` and
+  `sentry.segment.name` attributes, and any `*.url` attribute a vital points at.
+  URLs go through `scrubUrl()` first. Then the host's `setSpanTextScrubber` rule
+  runs on the names and on each URL's PATH (never its origin). This package
+  cannot know which path segment names a tenant, so it defaults to no rule.
 
 ## Noise — what must never become an issue
 
