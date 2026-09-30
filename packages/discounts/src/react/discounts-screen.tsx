@@ -115,11 +115,12 @@ function HeaderControls({
 }): JSX.Element {
   return (
     <>
-      <Dashboard.Info title={copy.screen.aboutTitle}>
+      <Dashboard.Info title={copy.screen.aboutTitle} ariaLabel={copy.screen.aboutTitle}>
         {copy.screen.aboutBody}
       </Dashboard.Info>
       <Dashboard.Spacer />
       <Dashboard.Export
+        label={copy.screen.exportAction}
         formats={[
           { id: "csv", label: "CSV (.csv)" },
           { id: "json", label: "JSON (.json)" },

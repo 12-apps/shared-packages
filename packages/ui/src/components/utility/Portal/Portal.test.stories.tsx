@@ -290,7 +290,7 @@ export const StateChange: Story = {
     const canvas = within(canvasElement);
 
     // Test body portal mode (default)
-    let content = document.querySelector('[data-testid="portal-state-content"]');
+    let content = document.querySelector<HTMLElement>('[data-testid="portal-state-content"]');
     expect(content).toBeInTheDocument();
     expect(content?.textContent).toBe('Mode: body');
 
@@ -308,7 +308,7 @@ export const StateChange: Story = {
         'Mode: custom',
       );
     });
-    content = document.querySelector('[data-testid="portal-state-content"]');
+    content = document.querySelector<HTMLElement>('[data-testid="portal-state-content"]');
 
     // Verify it's in the custom container
     expect(canvas.getByTestId('custom-container')).toContainElement(content);
@@ -708,9 +708,11 @@ export const FocusManagement: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // Focus on the trigger button
+    // Focus on the trigger button, without opening the portal yet — a click
+    // here already opens it, and its autoFocus input steals focus back.
     const triggerButton = canvas.getByTestId('focus-trigger');
-    await userEvent.click(triggerButton);
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+    triggerButton.focus();
     await waitFor(() => expect(triggerButton).toHaveFocus());
 
     // Open portal
@@ -1706,7 +1708,7 @@ export const EdgeCases: Story = {
     await userEvent.click(canvas.getByTestId('toggle-edge-portal'));
 
     await waitFor(() => {
-      const portalContent = document.querySelector('[data-testid="edge-portal-content"]');
+      const portalContent = document.querySelector<HTMLElement>('[data-testid="edge-portal-content"]');
       expect(portalContent).toBeInTheDocument();
 
       // Should be in the custom container initially

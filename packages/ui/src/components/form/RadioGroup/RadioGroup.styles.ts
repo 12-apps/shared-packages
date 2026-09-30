@@ -4,6 +4,16 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { glowAnimation, rippleAnimation, scaleAnimation, slideAnimation } from './RadioGroup.animations';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { asFieldSize, FIELD_BORDER_WIDTH, fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
+import { rem, remPx, rems } from '../../../tokens/relative';
+
+/**
+ * The segment track's padding (4px at the design scale); its border is the
+ * field hairline. Its corner is the segments' radius plus both.
+ */
+const segmentTrackPadding = (theme: Theme): string => rem(theme, 4);
 
 interface ColorPalette {
   main: string;
@@ -12,17 +22,8 @@ interface ColorPalette {
   contrastText?: string;
 }
 
-/**
- * `neutral` is not a MUI palette entry, so it is built from the grey ramp. The
- * literal fallbacks cover a theme whose grey ramp has been replaced with one
- * that omits these steps.
- */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey?.[700] || '#616161',
-  dark: theme.palette.grey?.[800] || '#424242',
-  light: theme.palette.grey?.[500] || '#9e9e9e',
-  contrastText: '#fff',
-});
+/** `neutral` is not a MUI palette entry, so it is the controls' neutral tone. */
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 /** `danger` is this component's name for the error palette; the rest map straight through. */
 const namedPalette = (theme: Theme, color: string): ColorPalette => {
@@ -58,7 +59,7 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
     main: palette.main || primary.main,
     dark: palette.dark || palette.main || primary.dark,
     light: palette.light || palette.main || primary.light,
-    contrastText: palette.contrastText || '#fff',
+    contrastText: palette.contrastText || absoluteInk(theme).white,
   };
 };
 
@@ -66,28 +67,28 @@ type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 const pickSize = <T,>(map: Record<SizeKey, T>, size: string): T => map[size as SizeKey] ?? map.md;
 
-const CARD_SIZES: Record<SizeKey, CSSObject> = {
-  xs: { padding: '8px', minHeight: '60px' },
-  sm: { padding: '12px', minHeight: '70px' },
-  md: { padding: '16px', minHeight: '80px' },
-  lg: { padding: '20px', minHeight: '90px' },
-  xl: { padding: '24px', minHeight: '100px' },
+const CARD_SIZES: Record<SizeKey, (theme: Theme) => CSSObject> = {
+  xs: (theme) => ({ padding: rem(theme, 8), minHeight: rem(theme, 60) }),
+  sm: (theme) => ({ padding: rem(theme, 12), minHeight: rem(theme, 70) }),
+  md: (theme) => ({ padding: rem(theme, 16), minHeight: rem(theme, 80) }),
+  lg: (theme) => ({ padding: rem(theme, 20), minHeight: rem(theme, 90) }),
+  xl: (theme) => ({ padding: rem(theme, 24), minHeight: rem(theme, 100) }),
 };
 
-const BUTTON_SIZES: Record<SizeKey, CSSObject> = {
-  xs: { padding: '6px 12px', fontSize: '0.75rem', minHeight: '32px' },
-  sm: { padding: '8px 16px', fontSize: '0.875rem', minHeight: '36px' },
-  md: { padding: '10px 20px', fontSize: '1rem', minHeight: '40px' },
-  lg: { padding: '12px 24px', fontSize: '1.125rem', minHeight: '44px' },
-  xl: { padding: '14px 28px', fontSize: '1.25rem', minHeight: '48px' },
+const BUTTON_SIZES: Record<SizeKey, (theme: Theme) => CSSObject> = {
+  xs: (theme) => ({ padding: rems(theme, 6, 12), fontSize: rem(theme, 12), minHeight: rem(theme, 32) }),
+  sm: (theme) => ({ padding: rems(theme, 8, 16), fontSize: rem(theme, 14), minHeight: rem(theme, 36) }),
+  md: (theme) => ({ padding: rems(theme, 10, 20), fontSize: rem(theme, 16), minHeight: rem(theme, 40) }),
+  lg: (theme) => ({ padding: rems(theme, 12, 24), fontSize: rem(theme, 18), minHeight: rem(theme, 44) }),
+  xl: (theme) => ({ padding: rems(theme, 14, 28), fontSize: rem(theme, 20), minHeight: rem(theme, 48) }),
 };
 
-const SEGMENT_SIZES: Record<SizeKey, CSSObject> = {
-  xs: { padding: '4px 8px', fontSize: '0.75rem' },
-  sm: { padding: '6px 12px', fontSize: '0.875rem' },
-  md: { padding: '8px 16px', fontSize: '1rem' },
-  lg: { padding: '10px 20px', fontSize: '1.125rem' },
-  xl: { padding: '12px 24px', fontSize: '1.25rem' },
+const SEGMENT_SIZES: Record<SizeKey, (theme: Theme) => CSSObject> = {
+  xs: (theme) => ({ padding: rems(theme, 4, 8), fontSize: rem(theme, 12) }),
+  sm: (theme) => ({ padding: rems(theme, 6, 12), fontSize: rem(theme, 14) }),
+  md: (theme) => ({ padding: rems(theme, 8, 16), fontSize: rem(theme, 16) }),
+  lg: (theme) => ({ padding: rems(theme, 10, 20), fontSize: rem(theme, 18) }),
+  xl: (theme) => ({ padding: rems(theme, 12, 24), fontSize: rem(theme, 20) }),
 };
 
 export interface SurfaceFlags {
@@ -106,9 +107,9 @@ export const formLabelSx = (theme: Theme, glass?: boolean, error?: boolean): CSS
   color: error ? theme.palette.error.main : theme.palette.text.primary,
   ...(glass && {
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
-    backdropFilter: 'blur(10px)',
-    padding: '8px 12px',
-    borderRadius: '8px',
+    backdropFilter: `blur(${rem(theme, 10)})`,
+    padding: rems(theme, 8, 12),
+    borderRadius: rem(theme, 8),
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     display: 'inline-block',
   }),
@@ -121,11 +122,11 @@ const cardBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): CSS
   return {
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    border: `2px solid ${selected ? palette.main : fieldEdge(theme)}`,
+    border: `${rem(theme, 2)} solid ${selected ? palette.main : fieldEdge(theme)}`,
     backgroundColor: selected ? alpha(palette.main, 0.05) : theme.palette.background.paper,
     position: 'relative' as const,
     overflow: 'hidden' as const,
-    ...(animated && { animation: `${slideAnimation} 0.4s ease-out` }),
+    ...(animated && { animation: `${slideAnimation(theme)} 0.4s ease-out` }),
     // A radial wash that grows from the centre as the card is selected or hovered.
     '&::before': {
       content: '""',
@@ -142,12 +143,12 @@ const cardBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): CSS
     '&:hover': {
       borderColor: palette.main,
       backgroundColor: alpha(palette.main, 0.02),
-      transform: 'translateY(-2px) scale(1.02)',
-      boxShadow: `${theme.shadows[4]}, 0 10px 30px -5px ${alpha(palette.main, 0.2)}`,
+      transform: `translateY(${rem(theme, -2)}) scale(1.02)`,
+      boxShadow: `${theme.shadows[4]}, 0 ${rems(theme, 10, 30, -5)} ${alpha(palette.main, 0.2)}`,
       '&::before': { width: '120%', height: '120%' },
     },
     '&:active': { transform: 'scale(0.98)' },
-    ...pickSize(CARD_SIZES, customSize),
+    ...pickSize(CARD_SIZES, customSize)(theme),
   };
 };
 
@@ -161,7 +162,7 @@ export const radioCardSx = (theme: Theme, flags: SurfaceFlags): CSSObject => {
       backgroundColor: selected
         ? alpha(palette.main, 0.1)
         : alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     }),
     ...(gradient &&
@@ -171,8 +172,8 @@ export const radioCardSx = (theme: Theme, flags: SurfaceFlags): CSSObject => {
       }),
     ...(glow &&
       selected && {
-        animation: `${glowAnimation} 2s ease-in-out infinite`,
-        boxShadow: `0 0 15px ${alpha(palette.main, 0.4)}`,
+        animation: `${glowAnimation(theme)} 2s ease-in-out infinite`,
+        boxShadow: `0 0 ${rem(theme, 15)} ${alpha(palette.main, 0.4)}`,
       }),
   };
 };
@@ -182,12 +183,12 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
   const { selected, animated, customSize = 'md' } = flags;
 
   return {
-    borderRadius: theme.spacing(1),
+    borderRadius: fieldRadius(theme),
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontWeight: 500,
-    border: `2px solid ${selected ? palette.main : fieldEdge(theme)}`,
+    border: `${FIELD_BORDER_WIDTH}px solid ${selected ? palette.main : fieldEdge(theme)}`,
     backgroundColor: selected ? palette.main : 'transparent',
-    color: selected ? palette.contrastText || '#fff' : theme.palette.text.primary,
+    color: selected ? palette.contrastText || absoluteInk(theme).white : theme.palette.text.primary,
     position: 'relative' as const,
     overflow: 'hidden' as const,
     ...(animated && selected && { animation: `${scaleAnimation} 0.3s ease-out` }),
@@ -200,7 +201,7 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
       width: 0,
       height: 0,
       borderRadius: '50%',
-      backgroundColor: alpha(palette.contrastText || '#fff', 0.3),
+      backgroundColor: alpha(palette.contrastText || absoluteInk(theme).white, 0.3),
       transform: 'translate(-50%, -50%)',
       pointerEvents: 'none' as const,
     },
@@ -212,11 +213,15 @@ const buttonBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): C
     '&:hover': {
       borderColor: palette.main,
       backgroundColor: selected ? palette.dark : alpha(palette.main, 0.1),
-      transform: 'translateY(-1px) scale(1.02)',
-      boxShadow: `0 4px 12px ${alpha(palette.main, 0.2)}`,
+      transform: `translateY(${rem(theme, -1)}) scale(1.02)`,
+      boxShadow: `0 ${rems(theme, 4, 12)} ${alpha(palette.main, 0.2)}`,
     },
     '&:active': { transform: 'scale(0.98)' },
-    ...pickSize(BUTTON_SIZES, customSize),
+    ...pickSize(BUTTON_SIZES, customSize)(theme),
+    // The theme's field height for the size, in place of the table's own.
+    minHeight: fieldHeight(theme, asFieldSize(customSize)),
+    paddingTop: 0,
+    paddingBottom: 0,
   };
 };
 
@@ -230,7 +235,7 @@ export const buttonRadioSx = (theme: Theme, flags: SurfaceFlags): CSSObject => {
       backgroundColor: selected
         ? alpha(palette.main, 0.8)
         : alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     }),
     ...(gradient &&
@@ -249,15 +254,16 @@ export const segmentContainerSx = (
   const palette = getColorFromTheme(theme, customColor);
 
   return {
-    padding: '4px',
-    borderRadius: theme.spacing(1.5),
+    padding: segmentTrackPadding(theme),
+    // Concentric with the segments inside it, which take the field radius.
+    borderRadius: fieldRadius(theme) + remPx(theme, 4) + FIELD_BORDER_WIDTH,
     backgroundColor: glass
       ? alpha(theme.palette.background.paper, 0.1)
       : alpha(palette.main, 0.05),
-    backdropFilter: glass ? 'blur(20px)' : 'none',
-    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+    backdropFilter: glass ? `blur(${rem(theme, 20)})` : 'none',
+    border: `${FIELD_BORDER_WIDTH}px solid ${alpha(theme.palette.divider, 0.2)}`,
     display: 'flex',
-    gap: '2px',
+    gap: rem(theme, 2),
   };
 };
 
@@ -265,13 +271,13 @@ export const segmentContainerSx = (
  * An underline that grows from the centre outwards, and is already full width
  * when the segment is the selected one.
  */
-const segmentUnderline = (color: string, selected: boolean): CSSObject => ({
+const segmentUnderline = (theme: Theme, color: string, selected: boolean): CSSObject => ({
   content: '""',
   position: 'absolute',
   bottom: 0,
   left: selected ? 0 : '50%',
   width: selected ? '100%' : 0,
-  height: '2px',
+  height: rem(theme, 2),
   backgroundColor: color,
   transition: 'all 0.3s ease',
   transform: selected ? 'translateX(0)' : 'translateX(-50%)',
@@ -283,18 +289,18 @@ export const segmentButtonSx = (theme: Theme, flags: SurfaceFlags): CSSObject =>
 
   return {
     flex: 1,
-    borderRadius: theme.spacing(1),
+    borderRadius: fieldRadius(theme),
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontWeight: 500,
     backgroundColor: selected ? theme.palette.background.paper : 'transparent',
     color: selected ? palette.main : theme.palette.text.secondary,
     boxShadow: selected
-      ? `${theme.shadows[2]}, inset 0 1px 3px ${alpha(palette.main, 0.1)}`
+      ? `${theme.shadows[2]}, inset 0 ${rems(theme, 1, 3)} ${alpha(palette.main, 0.1)}`
       : 'none',
     position: 'relative' as const,
     overflow: 'hidden' as const,
     ...(animated && selected && { animation: `${scaleAnimation} 0.3s ease-out` }),
-    '&::before': segmentUnderline(palette.main, Boolean(selected)),
+    '&::before': segmentUnderline(theme, palette.main, Boolean(selected)),
     '&:hover': {
       backgroundColor: selected
         ? theme.palette.background.paper
@@ -303,6 +309,10 @@ export const segmentButtonSx = (theme: Theme, flags: SurfaceFlags): CSSObject =>
       '&::before': { width: '100%', left: 0, transform: 'translateX(0)' },
     },
     '&:active': { transform: 'scale(0.98)' },
-    ...pickSize(SEGMENT_SIZES, customSize),
+    ...pickSize(SEGMENT_SIZES, customSize)(theme),
+    // Each segment is a field; the track around it adds its own inset.
+    minHeight: fieldHeight(theme, asFieldSize(customSize)),
+    paddingTop: 0,
+    paddingBottom: 0,
   };
 };

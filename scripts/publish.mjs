@@ -22,6 +22,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { distTagArgs } from "./lib/dist-tag.mjs";
 import { publishDirs } from "./lib/release-state.mjs";
 
 // Through the helper, so this still resolves when no PUBLISH_DIRS is set —
@@ -63,8 +64,8 @@ const TRANSIENT =
 // `silly` and nothing at the default level, so a job log at default loglevel
 // contains zero lines about the exchange — measured on run 31682461784, where
 // grepping 4,765 lines for oidc/trusted/id-token found only this workflow's own
-// echoed text. The evidence existed; the loglevel threw it away.
-const PUBLISH_ARGS = ["publish", "--access", "public", "--loglevel", "verbose"];
+// echoed text. The evidence existed; the loglevel threw it away. (`--tag`: ./lib/dist-tag.mjs.)
+const PUBLISH_ARGS = ["publish", "--access", "public", "--loglevel", "verbose", ...distTagArgs()];
 
 // Every way npm's OIDC exchange can end, in npm's own words
 // (npm/cli lib/utils/oidc.js — and the workflow runs `npm install -g npm@latest`
@@ -250,7 +251,7 @@ function noCredentialDiagnosis(name, version, output, evidence) {
     "version until a Trusted Publisher is configured.",
     "",
     `Configure one by hand: npmjs.com → ${name} → Settings → Trusted Publisher →`,
-    "GitHub Actions, repository `12-apps/shared-packages`, workflow `ci.yml`.",
+    "GitHub Actions, repository `12-apps/shared-packages`, workflow `cd.yml`.",
     `(https://www.npmjs.com/package/${name}/access)`,
     "",
     "npm said:",
@@ -326,17 +327,14 @@ function summarize(lines) {
 }
 
 // Tell the REST OF THE JOB which packages this run did not get onto the
-// registry. The next step is scripts/verify-released.mjs, whose whole remedy for
-// a tag the registry never received is "delete the tag and re-run" — correct for
-// an orphan left behind by some earlier run, and wrong for one this run just
-// made, because re-cutting the version walks straight back into the failure
-// above. Without this handoff the two steps print opposite advice in the same
-// job summary, and the reader has no way to tell which applies.
+// registry (and, separately, which it DID). scripts/verify-released.mjs's
+// whole remedy for a tag the registry never received is "delete the tag and
+// re-run" — correct for an orphan left by some earlier run, wrong for one this
+// run just made, since re-cutting walks straight back into the failure above.
 //
 // GITHUB_ENV rather than a file: the runner reads it after the step exits
-// (failed or not) and exports it to every later step, which is exactly the
-// lifetime wanted. Outside Actions the variable is simply unset and
-// verify-released.mjs behaves as it always did.
+// (failed or not) and exports it to every later step. Outside Actions the
+// variable is simply unset and the readers behave as they always did.
 function handOff(names, variable) {
   if (!process.env.GITHUB_ENV || names.length === 0) return;
   appendFileSync(process.env.GITHUB_ENV, `${variable}=${names.join(" ")}\n`);
@@ -387,7 +385,7 @@ summarize([
           `to help — the annotation above carries what npm reported about the OIDC ` +
           `exchange, and the commonest answer is a package with no Trusted ` +
           `Publisher (npmjs.com → package → Settings → Trusted Publisher → GitHub ` +
-          `Actions, 12-apps/shared-packages, ci.yml): ${wedged.join(", ")}`,
+          `Actions, 12-apps/shared-packages, cd.yml): ${wedged.join(", ")}`,
       ]
     : []),
   ...(blocked.length > 0 ? [`not attempted, dependency failed: ${blocked.join(", ")}`] : []),
@@ -395,5 +393,7 @@ summarize([
 
 handOff([...missing], "PUBLISH_INCOMPLETE");
 handOff(wedged, "PUBLISH_WEDGED");
+// npm accepted these THIS run — read-after-write lag, not an orphan (lib/release-state.mjs).
+handOff(published, "PUBLISH_ACCEPTED");
 
 if (failed.length + blocked.length > 0) process.exitCode = 1;

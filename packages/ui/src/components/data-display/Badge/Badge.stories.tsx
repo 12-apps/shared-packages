@@ -1079,7 +1079,6 @@ export const Responsive: Story = {
     </Stack>
   ),
   parameters: {
-    viewport: { defaultViewport: 'responsive' },
     docs: {
       description: {
         story: 'Responsive grid layout that adapts to different screen sizes.',

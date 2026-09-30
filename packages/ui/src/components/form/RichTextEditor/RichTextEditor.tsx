@@ -9,6 +9,8 @@ import type { RichTextEditorProps, ToolbarConfig } from './RichTextEditor.types'
 import { RichTextEditorToolbar } from './RichTextEditorToolbar';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { rem } from '../../../tokens/relative';
 
 const DEFAULT_TOOLBAR: Required<Omit<ToolbarConfig, 'customItems'>> & Pick<ToolbarConfig, 'customItems'> = {
   bold: true,
@@ -28,8 +30,7 @@ const RICH_TEXT_DEFAULTS: Partial<RichTextEditorProps> = {
   placeholder: 'Start typing...',
   disabled: false,
   readOnly: false,
-  toolbar: {},
-  height: 300 };
+  toolbar: {} };
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}`
 // still falls back to the default as a destructuring default would.
@@ -41,7 +42,9 @@ const definedProps = (props: RichTextEditorProps): Partial<RichTextEditorProps> 
 // Simple inline formats are a tag swap; lists and the value-carrying formats
 // need their own handling. This was one nine-case switch.
 const editorContentSx = (theme: Theme, disabled: boolean, placeholder?: string, height?: string | number) => ({
-  minHeight: typeof height === 'number' ? `${height}px` : height,
+  // A number is design px, converted here where it is read (300 when the
+  // caller gives none); a string is any CSS length, used as-is.
+  minHeight: typeof height === 'string' ? height : rem(theme, height ?? 300),
   p: 2,
   outline: 'none',
   cursor: disabled ? 'not-allowed' : 'text',
@@ -50,12 +53,12 @@ const editorContentSx = (theme: Theme, disabled: boolean, placeholder?: string, 
     color: theme.palette.text.disabled,
     pointerEvents: 'none' },
   '& p': {
-    margin: '8px 0',
+    margin: `${rem(theme, 8)} 0`,
     '&:first-of-type': { marginTop: 0 },
     '&:last-of-type': { marginBottom: 0 } },
   '& ul, & ol': { marginLeft: theme.spacing(2) },
   '& blockquote': {
-    borderLeft: `4px solid ${theme.palette.primary.main}`,
+    borderLeft: `${rem(theme, 4)} solid ${theme.palette.primary.main}`,
     paddingLeft: theme.spacing(2),
     margin: `${theme.spacing(1)} 0`,
     fontStyle: 'italic',
@@ -65,18 +68,18 @@ const editorContentSx = (theme: Theme, disabled: boolean, placeholder?: string, 
     padding: theme.spacing(1),
     borderRadius: 1,
     fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
-    fontSize: '0.875rem',
+    fontSize: rem(theme, 14),
     overflow: 'auto' },
   '& a': { color: theme.palette.primary.main, textDecoration: 'underline' } });
 
 const shellSx = (theme: Theme, isFocused: boolean, disabled: boolean) => ({
   border: `1px solid ${fieldEdge(theme)}`,
-  borderRadius: 1,
+  borderRadius: fieldRadiusPx(theme),
   overflow: 'hidden',
   transition: 'border-color 0.2s ease-in-out',
   ...(isFocused && {
     borderColor: theme.palette.primary.main,
-    boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}` }),
+    boxShadow: `0 0 0 ${rem(theme, 2)} ${alpha(theme.palette.primary.main, 0.2)}` }),
   ...(disabled && {
     backgroundColor: theme.palette.action.disabledBackground,
     color: theme.palette.text.disabled }) });

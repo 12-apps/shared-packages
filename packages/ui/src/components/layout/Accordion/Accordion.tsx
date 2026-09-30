@@ -6,6 +6,8 @@ import MuiAccordionSummary from '@mui/material/AccordionSummary/index.js';
 import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { rem } from '../../../tokens/relative';
+
 import { accordionVariantStyles } from './Accordion.styles';
 import type { 
   AccordionActionsProps, 
@@ -66,7 +68,7 @@ export const AccordionSummary: React.FC<AccordionSummaryProps> = ({
       disabled={disabled}
       data-testid={testId}
       sx={{
-        minHeight: 56,
+        minHeight: rem(theme, 56),
         '& .MuiAccordionSummary-expandIconWrapper': {
           transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           color: theme.palette.text.secondary,
@@ -82,13 +84,13 @@ export const AccordionSummary: React.FC<AccordionSummaryProps> = ({
           },
         },
         '&.Mui-focusVisible': {
-          outline: `2px solid ${theme.palette.primary.main}`,
-          outlineOffset: 2,
+          outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
+          outlineOffset: rem(theme, 2),
         },
         // Enhanced keyboard navigation styles
         '&:focus-visible': {
-          outline: `2px solid ${theme.palette.primary.main}`,
-          outlineOffset: -2,
+          outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
+          outlineOffset: rem(theme, -2),
         },
       }}
       {...props}
@@ -119,7 +121,7 @@ export const AccordionDetails: React.FC<AccordionDetailsProps> = ({
         '@keyframes fadeInUp': {
           '0%': {
             opacity: 0,
-            transform: 'translateY(8px)',
+            transform: `translateY(${rem(theme, 8)})`,
           },
           '100%': {
             opacity: 1,
@@ -150,12 +152,12 @@ export const AccordionActions: React.FC<AccordionActionsProps> = ({
         padding: theme.spacing(1, 2),
         borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
         backgroundColor: alpha(theme.palette.background.paper, 0.5),
-        backdropFilter: 'blur(8px)',
+        backdropFilter: `blur(${rem(theme, 8)})`,
         // Animate button entries
         '& > *': {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
-            transform: 'translateY(-1px)',
+            transform: `translateY(${rem(theme, -1)})`,
           },
         },
       }}

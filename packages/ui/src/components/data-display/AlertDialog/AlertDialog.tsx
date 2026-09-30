@@ -1,29 +1,30 @@
 import Close from '@mui/icons-material/Close';
 import Error from '@mui/icons-material/Error';
 import Info from '@mui/icons-material/Info';
-import type { ButtonProps } from '@mui/material/Button/index.js';
-import Button from '@mui/material/Button/index.js';
-import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Dialog from '@mui/material/Dialog/index.js';
-import DialogActions from '@mui/material/DialogActions/index.js';
 import DialogContent from '@mui/material/DialogContent/index.js';
 import DialogContentText from '@mui/material/DialogContentText/index.js';
 import DialogTitle from '@mui/material/DialogTitle/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { neutralTones } from '../../../tokens/ink';
+
+import { AlertDialogFooter } from './AlertDialog.parts';
 import type { AlertDialogProps } from './AlertDialog.types';
+import { rem, rems } from '../../../tokens/relative';
 
 // Define pulse animation
-const pulseAnimation = keyframes`
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 15px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 15)} currentColor;
     opacity: 0;
   }
   100% {
@@ -68,13 +69,13 @@ const StyledDialog = styled(Dialog, {
 
     ...(customVariant === 'glass' && {
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     }),
 
     // Glow effect
     ...(glow && !pulse && {
-      boxShadow: `0 0 30px 10px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      boxShadow: `0 0 ${rems(theme, 30, 10)} ${alpha(theme.palette.primary.main, 0.3)} !important`,
       filter: 'brightness(1.05)',
     }),
 
@@ -91,7 +92,7 @@ const StyledDialog = styled(Dialog, {
         borderRadius: 'inherit',
         backgroundColor: theme.palette.primary.main,
         opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
+        animation: `${pulseAnimation(theme)} 2s infinite`,
         pointerEvents: 'none',
         zIndex: -1,
       },
@@ -100,7 +101,7 @@ const StyledDialog = styled(Dialog, {
     // Both glow and pulse
     ...(glow && pulse && {
       position: 'relative',
-      boxShadow: `0 0 30px 10px ${alpha(theme.palette.primary.main, 0.3)} !important`,
+      boxShadow: `0 0 ${rems(theme, 30, 10)} ${alpha(theme.palette.primary.main, 0.3)} !important`,
       filter: 'brightness(1.05)',
       '&::after': {
         content: '""',
@@ -112,7 +113,7 @@ const StyledDialog = styled(Dialog, {
         borderRadius: 'inherit',
         backgroundColor: theme.palette.primary.main,
         opacity: 0.1,
-        animation: `${pulseAnimation} 2s infinite`,
+        animation: `${pulseAnimation(theme)} 2s infinite`,
         pointerEvents: 'none',
         zIndex: -1,
       },
@@ -127,7 +128,7 @@ const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
   paddingRight: theme.spacing(6), // Space for close button
   '& .MuiTypography-root': {
     fontWeight: 600,
-    fontSize: '1.25rem',
+    fontSize: rem(theme, 20),
   },
 }));
 
@@ -136,16 +137,11 @@ const StyledDialogContent = styled(DialogContent)(({ theme }) => ({
   paddingBottom: theme.spacing(2),
 }));
 
-const StyledDialogActions = styled(DialogActions)(({ theme }) => ({
-  padding: theme.spacing(2, 3, 3, 3),
-  gap: theme.spacing(1),
-}));
-
 const CloseButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
   right: theme.spacing(1),
   top: theme.spacing(1),
-  color: theme.palette.grey[500],
+  color: neutralTones(theme).muted,
 }));
 
 /**
@@ -204,11 +200,6 @@ function ariaSlotProps(
   };
 }
 
-/** Both variants render a filled confirm; only the colour distinguishes them. */
-const CONFIRM_BUTTON_VARIANT: ButtonProps['variant'] = 'contained';
-const confirmButtonColor = (variant: AlertDialogProps['variant']): 'error' | 'primary' =>
-  variant === 'destructive' ? 'error' : 'primary';
-
 /** Title row: the variant icon (unless explicitly suppressed with `null`) + the title. */
 function AlertDialogHeader({
   title,
@@ -234,69 +225,6 @@ function AlertDialogHeader({
   );
 }
 
-/** Action row: the optional cancel button and the (variant-coloured) confirm. */
-function AlertDialogFooter({
-  variant,
-  cancelText = 'Cancel',
-  confirmText = 'Confirm',
-  showCancel = true,
-  loading = false,
-  confirmDisabled = false,
-  initialFocus = 'confirm',
-  onCancel,
-  onConfirm,
-  dataTestId,
-}: Pick<
-  AlertDialogProps,
-  | 'variant'
-  | 'cancelText'
-  | 'confirmText'
-  | 'showCancel'
-  | 'loading'
-  | 'confirmDisabled'
-  | 'initialFocus'
-> & {
-  onCancel: () => void;
-  onConfirm: () => void;
-  dataTestId: string;
-}): React.ReactElement {
-  return (
-    <StyledDialogActions data-testid={`${dataTestId}-actions`}>
-      {showCancel && (
-        <Button
-          onClick={onCancel}
-          variant="outlined"
-          color="inherit"
-          disabled={loading}
-          autoFocus={initialFocus === 'cancel'}
-          data-testid={`${dataTestId}-cancel-button`}
-        >
-          {cancelText}
-        </Button>
-      )}
-      <Button
-        onClick={onConfirm}
-        variant={CONFIRM_BUTTON_VARIANT}
-        color={confirmButtonColor(variant)}
-        disabled={confirmDisabled || loading}
-        startIcon={
-          loading ? (
-            <CircularProgress
-              size={16}
-              color="inherit"
-              data-testid={`${dataTestId}-loading-spinner`}
-            />
-          ) : undefined
-        }
-        autoFocus={initialFocus !== 'cancel'}
-        data-testid={`${dataTestId}-confirm-button`}
-      >
-        {confirmText}
-      </Button>
-    </StyledDialogActions>
-  );
-}
-
 export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
   ({
     variant = 'default',
@@ -313,6 +241,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
     loading,
     confirmDisabled,
     initialFocus,
+    emphasis,
     children,
     onClose,
     'data-testid': dataTestId = 'alert-dialog',
@@ -343,12 +272,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
           <Close />
         </CloseButton>
 
-        <AlertDialogHeader
-          title={title}
-          icon={icon}
-          variant={variant}
-          dataTestId={dataTestId}
-        />
+        <AlertDialogHeader title={title} icon={icon} variant={variant} dataTestId={dataTestId} />
 
         <StyledDialogContent data-testid={`${dataTestId}-content`}>
           {description && (
@@ -370,6 +294,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
           loading={loading}
           confirmDisabled={confirmDisabled}
           initialFocus={initialFocus}
+          emphasis={emphasis}
           onCancel={handleCancel}
           onConfirm={() => onConfirm?.()}
           dataTestId={dataTestId}

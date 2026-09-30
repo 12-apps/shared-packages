@@ -23,7 +23,7 @@ import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 
-import { CONTROL_HEIGHT_PX, CONTROL_ROW_SX } from "./lib/report-surface";
+import { CONTROL_HEIGHT, CONTROL_ROW_SX } from "./lib/report-surface";
 import { reportScopeLabels, REPORT_SCOPES, type ReportScope } from "./report-list-filters";
 import { useReportCopy } from "./transport-context";
 
@@ -157,7 +157,7 @@ export function ReportListToolbar({
         size="sm"
         icon={<SmallPlusIcon />}
         onClick={onCreate}
-        sx={{ ml: "auto", height: `${CONTROL_HEIGHT_PX}px`, whiteSpace: "nowrap", flexShrink: 0 }}
+        sx={{ ml: "auto", height: CONTROL_HEIGHT, whiteSpace: "nowrap", flexShrink: 0 }}
         data-testid="reports-new"
       >
         {copy.create}

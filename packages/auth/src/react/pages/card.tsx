@@ -101,6 +101,17 @@ interface AuthCardProps {
   children: ReactNode;
 }
 
+/**
+ * The card lets a descendant stick to the WINDOW.
+ *
+ * MUI's card clips with `overflow: hidden`, and a clipping box is a scroll
+ * container: the sign-up page's `SignupActions` (`./signup-actions`) would then
+ * stick inside a card that never scrolls, which is to say never. Nothing in the
+ * card needs the clip — the content sits inside its padding, well clear of the
+ * rounded corners.
+ */
+const LET_ACTIONS_PIN = { overflow: "visible" } as const;
+
 export function AuthCard({
   title,
   subtitle,
@@ -111,7 +122,11 @@ export function AuthCard({
   return (
     <Container variant="centered" padding="lg" sx={FILL_HOST_SHELL}>
       {branding}
-      <Card variant="elevated" borderRadius="lg" sx={{ width: "100%", maxWidth }}>
+      <Card
+        variant="elevated"
+        borderRadius="lg"
+        sx={{ width: "100%", maxWidth, ...LET_ACTIONS_PIN }}
+      >
         <CardContent>
           <div style={{ ...COLUMN, gap: BLOCK_GAP }}>
             <div style={{ ...COLUMN, gap: TITLE_GAP, textAlign: "center" }}>
@@ -131,9 +146,9 @@ export function AuthCard({
 }
 
 /**
- * The providers, and the divider under them, identical on both pages.
+ * The providers, and the divider between them and the e-mail form.
  *
- * ## The providers come FIRST, above the e-mail form
+ * ## On the login page the providers come FIRST, above the e-mail form
  *
  * They used to sit under it (FUT-873), on the argument that a returning
  * password user should not have to scroll past three large buttons to reach the
@@ -160,23 +175,32 @@ export function AuthCard({
  * floating over the gap. The words are a boundary between two ways in, and a
  * boundary that draws no line reads as a caption for whatever happens to be
  * nearest — which, with the spacing this card used to have, was nothing.
+ *
+ * `dividerFirst` turns the block over, for the one page where the providers
+ * come AFTER the form: sign-up, where they sit under its submit (see
+ * `SignupActions` in `./signup-actions`). The rule then says "ou" between the
+ * two buttons, in the same place relative to both methods as on the login page.
  */
 export function ProviderBlock({
   label,
+  dividerFirst = false,
   children,
 }: {
   label?: string;
+  dividerFirst?: boolean;
   children: ReactNode;
 }): JSX.Element | null {
   if (!children) return null;
+  const divider = label !== undefined && (
+    <Separator size="xs" margin={0} data-testid={PROVIDER_DIVIDER_TEST_ID}>
+      {label}
+    </Separator>
+  );
   return (
     <div style={{ ...COLUMN, gap: PROVIDER_GAP }}>
+      {dividerFirst && divider}
       {children}
-      {label !== undefined && (
-        <Separator size="xs" margin={0} data-testid={PROVIDER_DIVIDER_TEST_ID}>
-          {label}
-        </Separator>
-      )}
+      {!dividerFirst && divider}
     </div>
   );
 }

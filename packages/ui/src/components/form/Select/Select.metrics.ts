@@ -1,6 +1,7 @@
 import type { SelectVariant } from './Select.base';
 import type { InputVariant } from '../Input/Input.base';
 import { ICON_SIZES } from '../../../icons/Icon.types';
+import { ELEVATION_SHADOWS } from '../../../tokens/ink.core';
 import type { UiTheme } from '../../../tokens/theme';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
@@ -68,8 +69,7 @@ export const SELECT_MENU = {
 } as const;
 
 /** MUI's `theme.shadows[8]`, the elevation a `Menu` paper rests at. */
-export const MUI_MENU_SHADOW =
-  '0px 5px 5px -3px rgba(0,0,0,0.2),0px 8px 10px 1px rgba(0,0,0,0.14),0px 3px 14px 2px rgba(0,0,0,0.12)';
+export const MUI_MENU_SHADOW = ELEVATION_SHADOWS[8];
 
 /** The wash behind the option the value currently names. */
 export const selectedWashAlpha = (theme: UiTheme): number =>
@@ -88,3 +88,25 @@ export {
   INPUT_GRADIENT as SELECT_GRADIENT,
   INPUT_PULSE as SELECT_PULSE,
 } from '../Input/Input.metrics';
+
+/**
+ * WHEN A `Select` BECOMES A SEARCH BOX, AND HOW TALL ITS LIST MAY GROW.
+ *
+ * Past five options a menu stops being scannable at a glance and starts being
+ * scrolled — and MUI's menu grows to the viewport's height to show them all, so
+ * a staff picker covered the whole screen. From six options on the field turns
+ * into the searchable dropdown (`CreatableSelect`'s engine, MUI `Autocomplete`)
+ * and its list stops at {@link SELECT_SEARCH.listMaxHeight}: about six rows,
+ * the seventh cut in half so the list reads as scrollable.
+ */
+export const SEARCHABLE_MIN_OPTIONS = 6;
+
+export const SELECT_SEARCH = {
+  /** px — six 40px rows and half of the seventh. */
+  listMaxHeight: 260,
+  /**
+   * px — what a field that does not fill its row adds to its longest label:
+   * the input's inline padding and the arrow's slot.
+   */
+  fieldChrome: 72,
+} as const;

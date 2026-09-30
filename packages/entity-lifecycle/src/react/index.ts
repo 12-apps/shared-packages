@@ -12,6 +12,7 @@ export {
   type EntityLifecycleWebConfig,
   type WebEntityLifecycle,
 } from './create-web-entity-lifecycle';
+export type { ApprovalsScreenHostProps } from './approvals-screen';
 export type {
   ApprovalsCopy,
   DraftBannerCopy,

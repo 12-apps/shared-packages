@@ -6,6 +6,9 @@ import { DescriptionItem, type DescriptionItemProps } from "../DescriptionItem";
 import { RAIL_GAP_PX } from "./list-card-rails";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
+import type { Theme } from "@mui/material/styles/index.js";
+
+import { rem, sxRem } from "../../../tokens/relative";
 
 /**
  * WHAT SITS IN EACH RAIL.
@@ -60,7 +63,7 @@ export function ListCardCaption({
             sx={{
               display: "block",
               lineHeight: 1.2,
-              fontSize: "0.9rem",
+              fontSize: sxRem(14.4),
               color: "inherit",
               textDecoration: "none",
               ...CLAMP,
@@ -104,7 +107,7 @@ function MetaRule(): React.JSX.Element {
         color: "text.disabled",
         opacity: 0.5,
         userSelect: "none",
-        fontSize: "0.875rem",
+        fontSize: sxRem(14),
         // A cancelled row strikes the whole meta cluster, and a struck `|` is a
         // dagger. The rule is punctuation, not data — nothing to void.
         textDecoration: "none",
@@ -149,7 +152,7 @@ export function ListCardMeta({
   return (
     <Box
       data-slot="meta"
-      sx={{
+      sx={(theme) => ({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-evenly",
@@ -160,8 +163,8 @@ export function ListCardMeta({
         whiteSpace: "nowrap",
         ...TABULAR,
         // Rung 1 of the ladder.
-        [`@container (max-width: ${META_BREAK}px)`]: { display: "none" },
-      }}
+        [`@container (max-width: ${rem(theme, META_BREAK)})`]: { display: "none" },
+      })}
     >
       {items.map((item, index) => (
         <Fragment key={`${item.label}-${index}`}>
@@ -208,10 +211,10 @@ export function ListCardMeta({
  * `META_BREAK` the cluster (and its rule) are gone, so the gap comes back —
  * otherwise the value would sit straight against the title.
  */
-const VALUE_FLUSH = {
-  marginLeft: `-${RAIL_GAP_PX}px`,
-  [`@container (max-width: ${META_BREAK}px)`]: { marginLeft: 0 },
-} as const;
+const valueFlush = (theme: Theme) => ({
+  marginLeft: rem(theme, -RAIL_GAP_PX),
+  [`@container (max-width: ${rem(theme, META_BREAK)})`]: { marginLeft: 0 },
+});
 
 /** The value, on its own rail, never truncated and never shunted by the chip. */
 function ListCardValue({ value }: { value: ReactNode }): React.JSX.Element {
@@ -219,7 +222,7 @@ function ListCardValue({ value }: { value: ReactNode }): React.JSX.Element {
     <Text variant="body" size="sm" weight="medium" as="span">
       <Box
         component="span"
-        sx={{ fontSize: "0.875rem", whiteSpace: "nowrap", ...TABULAR }}
+        sx={{ fontSize: sxRem(14), whiteSpace: "nowrap", ...TABULAR }}
       >
         {value}
       </Box>
@@ -304,10 +307,10 @@ export function ListCardTail({
     <>
       <Box
         data-slot="value"
-        sx={{
+        sx={(theme) => ({
           textAlign: "right",
-          ...(separated && value != null ? VALUE_FLUSH : {}),
-        }}
+          ...(separated && value != null ? valueFlush(theme) : {}),
+        })}
         data-testid={testId("value")}
       >
         {value != null && <ListCardValue value={value} />}

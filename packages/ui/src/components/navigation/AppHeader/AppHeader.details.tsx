@@ -3,9 +3,11 @@
 import Box from '@mui/material/Box/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import React from 'react';
 
+import { rem, sxRem } from '../../../tokens/relative';
 import { accentFor } from '../../../tokens/scales';
 import { Sheet } from '../../data-display/Sheet/Sheet';
 import { Button } from '../../form/Button/Button';
@@ -17,15 +19,15 @@ import type {
   AppHeaderDetailsProps,
 } from './AppHeader.types';
 
-/** How wide the dialog presentation grows before it stops. */
-const DIALOG_WIDTH = 460;
+/** How wide the dialog presentation grows before it stops (460 design px). */
+const DIALOG_WIDTH = sxRem(460);
 
 /**
- * Where the smallest phones stop. The theme's scale starts at `xs`/`sm`, so
- * there is no `xxs` breakpoint to ask for — this is that boundary, named once
- * rather than inlined at the place it decides something.
+ * Where the smallest phones stop (360 design px). The theme's scale starts at
+ * `xs`/`sm`, so there is no `xxs` breakpoint to ask for — this is that
+ * boundary, named once rather than inlined at the place it decides something.
  */
-const XXS_MAX_WIDTH = 360;
+const xxsQuery = (theme: Theme): string => `(max-width:${rem(theme, 360 - 0.05)})`;
 
 /**
  * The sheet grows to its content and stops at the viewport; it does not take a
@@ -165,7 +167,7 @@ export const AppHeaderDetails: React.FC<AppHeaderDetailsProps> = ({
 }) => {
   const theme = useTheme();
   const asSheet = usesSheet(presentation, useMediaQuery(theme.breakpoints.down(breakpoint)));
-  const xxs = useMediaQuery(`(max-width:${XXS_MAX_WIDTH - 0.05}px)`);
+  const xxs = useMediaQuery(xxsQuery(theme));
 
   // Split once, not per branch: a STRING subtitle is the panel's own
   // `description` (both surfaces style it as part of their header), anything

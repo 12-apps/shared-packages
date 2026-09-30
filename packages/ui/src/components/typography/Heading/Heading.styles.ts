@@ -3,11 +3,11 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import {
   HEADING_DEFAULT_COLOR,
   HEADING_DEFAULT_WEIGHT,
-  NEUTRAL_GRADIENT_STEPS,
   headingGradient,
   headingWeight,
   stepOf,
 } from './Heading.metrics';
+import { neutralTones } from '../../../tokens/ink';
 import { headingMetrics } from '../../../tokens/typography';
 import type { ColorValue } from '../../../tokens/scales';
 
@@ -54,12 +54,9 @@ const GRADIENT_STOPS: Record<ColorValue, (theme: Theme) => [string, string]> = {
   warning: (theme) => [theme.palette.warning.light, theme.palette.warning.dark],
   info: (theme) => [theme.palette.info.light, theme.palette.info.dark],
   danger: (theme) => [theme.palette.error.light, theme.palette.error.dark],
-  // The grey ramp has no light/dark pair, and every stop on it is
-  // `string | undefined` under `noUncheckedIndexedAccess`.
-  neutral: (theme) => [
-    theme.palette.grey[NEUTRAL_GRADIENT_STEPS.from] ?? '#9e9e9e',
-    theme.palette.grey[NEUTRAL_GRADIENT_STEPS.to] ?? '#212121',
-  ],
+  // The grey ramp has no light/dark pair: the muted tone into the darkest
+  // (`NEUTRAL_GRADIENT_STEPS`, 500 into 900).
+  neutral: (theme) => [neutralTones(theme).muted, neutralTones(theme).inverseSurface],
 };
 
 const gradientFor = (theme: Theme, color: ColorValue) => {

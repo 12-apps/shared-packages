@@ -5,6 +5,7 @@ import IconButton from "@mui/material/IconButton/index.js";
 
 import { Checkbox } from "../../form/Checkbox";
 import { Box } from "../../../mui/Box";
+import { sxRem } from "../../../tokens/relative";
 
 import { DragHandle, useDragItem } from "./data-views-drag";
 import { useDataViewsCopy } from "./data-views-copy-context";
@@ -28,7 +29,7 @@ import { useDataViewsCopy } from "./data-views-copy-context";
  * optical inset is not, so the padding is cancelled with a negative margin and
  * the glyph lands where the row's own padding says it should.
  */
-const CHECKBOX_PAD = "-9px";
+const CHECKBOX_PAD = sxRem(-9);
 
 /** The grip. Its gutter is reserved only when the list says to reserve it. */
 export function DragSlot({

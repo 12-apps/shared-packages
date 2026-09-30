@@ -68,11 +68,25 @@ export interface AlertDialogProps extends Omit<MuiDialogProps, 'variant'> {
   confirmDisabled?: boolean;
 
   /**
-   * Which button owns focus when the dialog opens. Defaults to `confirm`, which
-   * is right for an acknowledgement; a destructive dialog should pass `cancel`
-   * so a stray Enter on the trigger cannot complete the action.
+   * Which button owns focus when the dialog opens. Defaults to the emphasised
+   * one — `confirm`, unless `emphasis="cancel"` — which is right for an
+   * acknowledgement; a destructive dialog should pass `cancel` so a stray Enter
+   * on the trigger cannot complete the action.
    */
   initialFocus?: 'confirm' | 'cancel';
+
+  /**
+   * Which button is the filled, primary one. Defaults to `confirm`. Pass
+   * `cancel` when backing out is the action to steer toward — a "discard what
+   * you wrote?" question, where the confirm is the loss: cancel is then filled
+   * and takes the primary slot (right, or on top once the row stacks), and the
+   * confirm steps down to the neutral outline cancel normally wears — primary
+   * and neutral, whatever the variant. The two buttons then grow to share the
+   * row, so once it stacks each takes its full width; focus opens on the cancel
+   * unless `initialFocus` says otherwise. With `showCancel={false}` it has no
+   * effect: the confirm keeps its default, filled look.
+   */
+  emphasis?: 'confirm' | 'cancel';
 
   /**
    * Optional data-testid attribute for testing

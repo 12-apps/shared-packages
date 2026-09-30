@@ -157,6 +157,7 @@ default from the environment, which is what makes the mount one line:
 | `events` | — | `JobEvents` — dead-letters, completions and removed schedules, for the host to wire to its own notifier / audit / realtime. See below. |
 | `retention` | package default | How long finished jobs are kept: a day of successes, a week of failures. Override for a longer support window. All four numbers must be positive and finite — see the warning below. |
 | `defaultConcurrency` | `5` | Per-queue concurrency when no job on the queue states one. A stated `concurrency: 1` still wins. |
+| `stall` | BullMQ's numbers | `JobStallConfig` — `lockDurationMs` (30 s), `stalledIntervalMs` (30 s) and `maxStalledCount` (1), for every queue and per queue under `queues`. See "When a worker stalls" below. |
 | `db` | — | `() => SweepLeaseDb` — enables `withSweepLease`. Without it the lease throws on first use (loud, never a silent skip). |
 | `installShutdownHooks` | `true` | `SIGTERM`/`SIGINT` drain in-flight jobs (workers only). Off in tests. |
 
@@ -207,6 +208,9 @@ createApiJobs({
 An observer that throws or rejects is logged and swallowed — somebody else's
 code must never be able to fail the job it is watching, nor the reconcile that
 was cleaning up a stale schedule.
+
+`onJobStalled` fires when a running job lost its lock and was put back to run
+again; see the next section.
 
 `onScheduleRemoved` fires only for REMOVAL, not installation. Installation is
 an idempotent upsert that runs on every boot of every worker, so auditing it
@@ -278,6 +282,56 @@ owns the schema folder:
 published as generic, and it closes three fail-open paths that were invisible
 by construction.
 
+### When a worker stalls
+
+A worker holds a lock on every job it runs and renews it every half
+`lockDurationMs`. If its event loop is blocked, the process is paused or Redis
+stops answering for longer than the lock, the lock expires. The worker then
+logs `could not renew lock for job …` and, when the handler returns,
+`Missing lock for job … moveToFinished`, because it can no longer record the
+result. The stalled checker, every `stalledIntervalMs`, finds the job without a
+lock and moves it back to `wait`, and it runs again. **A stall is a re-run,
+never a lost run.** That is one more reason handlers must be idempotent.
+
+What the driver does about it:
+
+- **Every stall is an ERROR line** through the host's logger, naming the job,
+  its run id, how many times it has been started and how many times it has stalled, and it fires
+  `events.onJobStalled`. The two lock errors above stay errors too. The job
+  recovers on its own, but the stall that caused it hits every job on that
+  worker, and it needs looking at.
+- **Every failed attempt is an ERROR line** naming the job, its run id, the
+  attempt out of the budget, and whether it will be retried.
+- **A job that stalls more than `maxStalledCount` times is failed**, as
+  unrecoverable. It lands in the failed set (kept for `retention.failed`) and
+  reaches `onJobFailed` with `terminal: true`, the dead-letter.
+- **Scheduled jobs are bounded too.** BullMQ never applies `maxStalledCount` to
+  a job-scheduler job, so a tick whose handler takes the worker down every time
+  would be restarted forever. The driver sets BullMQ's `maxStartedAttempts` to
+  the queue's largest `attempts` plus `maxStalledCount`. The start that goes
+  over it is failed as a terminal dead-letter, and the next tick of the
+  schedule is a fresh job. One consequence for anyone retrying a failed job by
+  hand: its earlier starts still count toward that cap, so a job retried by
+  hand can be refused as it starts. Retry with
+  `job.retry("failed", { resetAttemptsMade: true, resetAttemptsStarted: true })`
+  to give it a fresh budget.
+
+A queue whose handlers can legitimately hold the event loop for a while (a
+single-flight sweep queue doing batch work, say) can take a longer lock without
+changing the others:
+
+```ts
+createApiJobs({
+  jobs: () => import("./lib/jobs"),
+  stall: { queues: { [SWEEP_QUEUE]: { lockDurationMs: 60_000 } } },
+});
+```
+
+A longer lock is also a slower recovery when a worker really dies, since the
+job is only put back once its lock has expired. Every number is validated:
+`createApiJobs` refuses a bad one at assembly with `InvalidJobStallError`, and
+`createBullMqJobDriver` refuses it again.
+
 ## What changed in behaviour
 
 Nothing was **removed** from the API — every 2.0.0 export still exists with the
@@ -304,6 +358,7 @@ from success.
 | `events?: JobEvents` on `createApiJobs`, and on both driver factories | Dead-letters (`onJobFailed` with `terminal`), completions (`onJobCompleted`) and removed schedules (`onScheduleRemoved`). The package still notifies/audits/publishes nothing itself. |
 | `retention?: JobRetention`, `defaultConcurrency?: number` | The two operational numbers that were hardcoded. The defaults are unchanged (a day / a week; concurrency 5), so omitting them is a no-op. `retention` is validated at assembly and again in the driver — a non-positive window stops bounding the backend rather than shrinking it. |
 | `assertValidRetention`, `InvalidJobRetentionError` | The retention check, exported so a host that assembles its own window can run it. Lives in `core`, so importing it never pulls `bullmq` into a bundle that only enqueues. |
+| `stall?: JobStallConfig`, `events.onJobStalled`, `DEFAULT_STALL_POLICY`, `assertValidStall`, `InvalidJobStallError` | The worker's lock and stall settings, which used to be BullMQ's implicit defaults, now spelled out and configurable per queue. Each stall is reported as an error and to the host. A job, scheduled or not, that keeps stalling is failed as a dead-letter instead of being restarted forever. The defaults are BullMQ's own numbers, so omitting `stall` changes nothing but the new bound on restarts. |
 | `DEFAULT_QUEUE` | The queue name a definition falls back to, exported instead of duplicated as a literal in every host. |
 | `resolveRegisteredJob`, `InvalidJobDefinitionError`, `NoJobsRegisteredError`, `JobsConfigError` | The gate and the three refusals, so a host can catch them by type. |
 

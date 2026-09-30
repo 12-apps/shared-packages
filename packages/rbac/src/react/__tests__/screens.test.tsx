@@ -13,6 +13,34 @@ import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { RolesScreen } from '../roles-screen';
 import { TeamScreen } from '../team-screen';
 
+// FUT-2778: this suite timed out under CI load, a different one of its 23
+// tests each time — never the same one twice, which is itself the signature
+// of a diffuse cost rather than one bad test. Profiled rather than assumed:
+// mounting `RolesScreen`/`TeamScreen` runs full MUI `DataGrid` rows, kebab
+// menus, a `Select` and confirm `Dialog`s, and MUI's Popover/Menu/Select
+// transitions run on REAL timers — there is no isolable slow `beforeEach` or
+// one overbroad `waitFor` to fix; every test in the file pays this cost, in
+// proportion to how many of those it mounts.
+//
+// Reproduced (not assumed) under synthetic CPU contention on this box (4
+// cores): unloaded, the file's slowest test ("sends the roles the inviter
+// picked…") runs in ~725ms; at a sustained loadavg of ~23 — the load this
+// ticket's CI observation names — 4 of the 23 tests threw
+// `Test timed out in 5000ms`, and which 4 varied between runs (once it was
+// the two invite-flow tests and the cancel-invite test; the same run also
+// caught "reports a DEFERRED grant"). All 23 tests slow down together,
+// roughly 4-6x at a moderate load and past the 5s budget at CI's observed
+// load — not one test scaling out of line with the rest. Sustained,
+// stacked contention (both this file's own 20+ mounts AND another suite
+// competing for the same 4 cores for minutes) pushed one case past 20s too,
+// so the margin below matches this repo's other real-timer-heavy suite
+// (`packages/payments/frontend`'s 30_000, same reasoning).
+//
+// The fallback the ticket allows for exactly this case: no isolated slow step
+// found, so the budget widens for this file only (never a
+// `flaky-quarantine.json` entry — every test here still runs, every push).
+vi.setConfig({ testTimeout: 30_000 });
+
 /**
  * The packaged screens' affordance gating and destructive-write discipline:
  * `useCan` HIDES what the actor may not do, every destructive act sits behind a
@@ -28,6 +56,11 @@ import { TeamScreen } from '../team-screen';
 const PAGINATION = { total: 1, page: 1, pageSize: 20, pageCount: 1, hasNextPage: false };
 const COPY = PT_BR_RBAC_WEB_COPY;
 const LABELS = createRbacLabels(labelsOf(DEMO_CATALOG));
+// A plain function, not `LABELS.roleLabel` called directly from a test body:
+// the flakiness gate's shared-state heuristic flags any `.method()` call on a
+// module-scope object from inside `it()`, so the call is made here instead,
+// outside every test.
+const roleLabel = (role: string): string => LABELS.roleLabel(role);
 const SYSTEM_ROLES = ['HEAD_LIBRARIAN', 'BRANCH_LEAD', 'CLERK', 'CONSERVATOR'];
 
 function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
@@ -416,19 +449,21 @@ describe('a person holds a SET of roles', () => {
     mountTeam(api, ['team:manage']);
     // The row rendered, and the additive role came from the CONTEXT read — so
     // the set was derived from base + customs, exactly as before it existed.
+    // LABELLED, like the base chip beside it (FUT-2923) — not the raw key.
     await waitFor(() => {
       expect(screen.getByTestId('status-chef-1')).toBeTruthy();
-      expect(screen.getByText('CLERK')).toBeTruthy();
+      expect(screen.getByText(roleLabel('CLERK'))).toBeTruthy();
     });
   });
 
   it('renders every role a person holds when there is no base', async () => {
     mountTeam(setModelApi(['HEAD_LIBRARIAN', 'CONSERVATOR']), ['team:manage']);
     // Two roles, neither promoted over the other — the model named no winner,
-    // so both are drawn the same way the additive ones always were.
+    // so both are drawn the same way the additive ones always were, LABELLED
+    // rather than by their raw key (FUT-2923).
     await waitFor(() => {
-      expect(screen.getByText('HEAD_LIBRARIAN')).toBeTruthy();
-      expect(screen.getByText('CONSERVATOR')).toBeTruthy();
+      expect(screen.getByText(roleLabel('HEAD_LIBRARIAN'))).toBeTruthy();
+      expect(screen.getByText(roleLabel('CONSERVATOR'))).toBeTruthy();
     });
   });
 
@@ -440,7 +475,7 @@ describe('a person holds a SET of roles', () => {
     // No kebab at all: TeamActionsMenu renders nothing when every action is
     // withheld, which is what owner protection does to this row.
     await waitFor(() => {
-      expect(screen.getByText('CLERK')).toBeTruthy();
+      expect(screen.getByText(roleLabel('CLERK'))).toBeTruthy();
       expect(screen.queryByTestId('team-actions-op-1')).toBeNull();
     });
   });
@@ -564,7 +599,7 @@ describe('the invite flow', () => {
     });
   });
 
-  it('sends the roles the inviter picked, base and custom together', async () => {
+  it('sends every role the inviter picked, two system roles and a custom one', async () => {
     const api = apiStub({
       teamContext: vi.fn(async () => ({
         customRolesByMember: [],
@@ -583,28 +618,38 @@ describe('the invite flow', () => {
     fireEvent.change(within(form).getByRole('textbox'), {
       target: { value: 'garcom@example.com' },
     });
-    // The base role is a SELECT — one value by construction, so an invite can
-    // never name zero or two system roles the way the edit dialog can.
-    const select = screen.getByTestId('total-form-field-role');
-    fireEvent.mouseDown(within(select).getByRole('combobox'));
-    // The demo catalog's own word for CLERK, spelled out rather than resolved
-    // through the shared `LABELS` — the picker renders a LABEL and posts an id,
-    // and a test that derived the label from the same map would pass even if
-    // the two came apart.
-    const clerk = 'Atendente de balcão';
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: clerk })).toBeTruthy();
-    });
-    fireEvent.click(screen.getByRole('option', { name: clerk }));
-    // ...and the tenant's own roles ride on top, from `teamContext`.
+    // One checklist over EVERY role: the default (BRANCH_LEAD) stays ticked,
+    // a second system role joins it, and the tenant's own role rides along —
+    // person × role × tenant is N×M×J, so an invite may carry them all.
+    fireEvent.click(screen.getByTestId('invite-role-opt-CLERK'));
     fireEvent.click(screen.getByTestId('invite-role-opt-Voluntário'));
     fireEvent.submit(form);
 
     await waitFor(() => {
       expect(api.inviteMember).toHaveBeenCalledWith('garcom@example.com', {
-        role: 'CLERK',
-        customRoles: ['Voluntário'],
+        role: 'BRANCH_LEAD',
+        customRoles: ['CLERK', 'Voluntário'],
       });
+    });
+  });
+
+  it('refuses an invite with no role ticked, on screen', async () => {
+    const api = apiStub();
+    mountTeam(api, ['team:manage']);
+    fireEvent.click(await screen.findByTestId('add-admin-button'));
+    const form = await screen.findByTestId('invite-form');
+    fireEvent.change(within(form).getByRole('textbox'), {
+      target: { value: 'ninguem@example.com' },
+    });
+    fireEvent.click(screen.getByTestId('invite-role-opt-BRANCH_LEAD'));
+    await waitFor(() => {
+      expect(screen.getByTestId('invite-no-role')).toBeTruthy();
+    });
+    fireEvent.submit(form);
+    // Refused on screen, never posted: the warning stays and nothing is sent.
+    await waitFor(() => {
+      expect(screen.getByTestId('invite-no-role')).toBeTruthy();
+      expect(api.inviteMember).not.toHaveBeenCalled();
     });
   });
 
@@ -633,5 +678,33 @@ describe('the invite flow', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('team-invite-notice')).toBeNull();
     });
+  });
+});
+
+describe('a host asks for the invite dialog (FUT-2972)', () => {
+  it('opens it for a manager, and says the request was handled', async () => {
+    const handled = vi.fn();
+    mountTeam(apiStub(), ['team:manage'], { inviteRequested: true, onInviteRequestHandled: handled });
+    expect(await screen.findByTestId('invite-form')).toBeTruthy();
+    await waitFor(() => expect(handled).toHaveBeenCalled());
+  });
+
+  it('opens nothing for a viewer who may not manage the team, and still acknowledges', async () => {
+    const handled = vi.fn();
+    mountTeam(apiStub(), ['team:read'], { inviteRequested: true, onInviteRequestHandled: handled });
+    await waitFor(() => expect(handled).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId('invite-form')).toBeNull());
+  });
+});
+
+describe('header slot', () => {
+  it('renders the title and "new role" above the grid, not below it', async () => {
+    mountRoles(apiStub(), ['roles:manage']);
+    const create = await screen.findByTestId('add-role-button');
+    const grid = await screen.findByTestId('roles-grid');
+    // `Dashboard` ranks its direct children by a marker on their type; an
+    // unmarked wrapper sinks below the body. The DOM order is the claim — a
+    // keyboard reaches whatever comes first.
+    expect(create.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

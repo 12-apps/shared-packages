@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
 import { Chip } from '@12-apps/ui/data-display/Chip';
@@ -13,9 +13,10 @@ import { Stack } from '@12-apps/ui/mui/Stack';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { ApprovalRequestWire, ApprovalStatusWire, LifecycleApiClient } from './api';
+import { useApprovalsLoad } from './approvals-load';
 import type { ApprovalsCopy } from './copy';
 import { DATE_TIME, entityTypeLabel, type EntityTypeLabels } from './labels';
-import { LifecycleHttpError, type LifecycleResult } from './transport';
+import type { LifecycleResult } from './transport';
 
 /**
  * Aprovações (12-17) — the parked-change-request inbox of the
@@ -25,6 +26,27 @@ import { LifecycleHttpError, type LifecycleResult } from './transport';
  * note). A 403 (feature off for the tenant) renders a friendly notice. Every
  * sentence comes from the host's {@link ApprovalsCopy}.
  */
+
+/**
+ * What a HOST may hand the screen (FUT-2520) — both optional, so a host that
+ * passes neither renders exactly as before.
+ */
+export interface ApprovalsScreenHostProps {
+  /**
+   * Any change in its value re-reads the current status list in the
+   * BACKGROUND: the rows stay on screen, with no loading state. The value
+   * itself means nothing — a counter bumped on a realtime hint or a window
+   * focus is the intended shape. The mount's first value reads nothing extra.
+   */
+  refreshSignal?: unknown;
+  /**
+   * Called once after each SUCCESSFUL approve or reject (never a refused one),
+   * so the host can refresh its own copy of the queue, such as a nav badge.
+   * A throw or a rejected promise from it is swallowed: it cannot turn the
+   * decision into a failure, and the host's hook reports its own errors.
+   */
+  onDecided?: () => void;
+}
 
 /** The status filter chips, in display order. */
 const STATUS_ORDER: readonly ApprovalStatusWire[] = ['PENDING', 'APPROVED', 'REJECTED'];
@@ -53,8 +75,29 @@ interface DecisionActions {
   reject: (note: string) => Promise<void>;
 }
 
+/**
+ * Tell the host a decision stood. Its hook can never undo that: a throw or a
+ * rejected promise from it is swallowed rather than escaping the click as an
+ * unhandled rejection. The decision is recorded and the list re-reads either
+ * way, and the host's hook owns its own error reporting.
+ */
+function notifyDecided(onDecided: (() => void) | undefined): void {
+  if (!onDecided) return;
+  // Widened to `unknown` so an ASYNC hook's rejection is absorbed too.
+  const hook: () => unknown = onDecided;
+  try {
+    Promise.resolve(hook()).catch(() => undefined);
+  } catch {
+    // A synchronous throw is the host's bug; the decision already stood.
+  }
+}
+
 /** Decision dispatch state: approve, and the note-gated reject dialog. */
-function useDecisionActions(api: LifecycleApiClient, refetch: () => void): DecisionActions {
+function useDecisionActions(
+  api: LifecycleApiClient,
+  refetch: () => void,
+  onDecided: (() => void) | undefined,
+): DecisionActions {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<ApprovalRequestWire | null>(null);
@@ -67,8 +110,10 @@ function useDecisionActions(api: LifecycleApiClient, refetch: () => void): Decis
     setError(null);
     try {
       const result = await dispatch();
-      if (result.ok) refetch();
-      else setError(result.error);
+      if (result.ok) {
+        refetch();
+        notifyDecided(onDecided);
+      } else setError(result.error);
     } finally {
       setBusyId(null);
     }
@@ -221,6 +266,7 @@ function ApprovalsBody({
   status,
   requests,
   refetch,
+  onDecided,
 }: {
   api: LifecycleApiClient;
   labels: EntityTypeLabels;
@@ -229,8 +275,9 @@ function ApprovalsBody({
   status: ApprovalStatusWire;
   requests: ApprovalRequestWire[];
   refetch: () => void;
+  onDecided: (() => void) | undefined;
 }): JSX.Element {
-  const actions = useDecisionActions(api, refetch);
+  const actions = useDecisionActions(api, refetch, onDecided);
 
   return (
     <Stack spacing={1.5} data-testid="approvals-list">
@@ -271,61 +318,21 @@ function ApprovalsBody({
   );
 }
 
-interface ApprovalsLoad {
-  requests: ApprovalRequestWire[] | null;
-  loadError: { status: number | null; message: string } | null;
-  refetch: () => void;
-}
-
-/** The status-scoped inbox read, refetchable after a decision. */
-function useApprovalsLoad(api: LifecycleApiClient, status: ApprovalStatusWire): ApprovalsLoad {
-  const [requests, setRequests] = useState<ApprovalRequestWire[] | null>(null);
-  const [loadError, setLoadError] = useState<ApprovalsLoad['loadError']>(null);
-  const [generation, setGeneration] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    setRequests(null);
-    api
-      .listApprovals(status)
-      .then((payload) => {
-        if (!cancelled) {
-          setRequests(payload.requests);
-          setLoadError(null);
-        }
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setLoadError({
-          status: error instanceof LifecycleHttpError ? error.status : null,
-          message: error instanceof Error ? error.message : String(error),
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api, status, generation]);
-
-  return {
-    requests,
-    loadError,
-    refetch: useCallback(() => setGeneration((value) => value + 1), []),
-  };
-}
-
 export function ApprovalsScreen({
   api,
   labels,
   copy,
   systemActor,
+  refreshSignal,
+  onDecided,
 }: {
   api: LifecycleApiClient;
   labels: EntityTypeLabels;
   copy: ApprovalsCopy;
   systemActor: string;
-}): JSX.Element {
+} & ApprovalsScreenHostProps): JSX.Element {
   const [status, setStatus] = useState<ApprovalStatusWire>('PENDING');
-  const { requests, loadError, refetch } = useApprovalsLoad(api, status);
+  const { requests, loadError, refetch } = useApprovalsLoad(api, status, refreshSignal);
 
   // Feature off for the tenant — a friendly notice instead of an error state.
   const featureOff = loadError !== null && loadError.status === 403;
@@ -369,6 +376,7 @@ export function ApprovalsScreen({
           status={status}
           requests={requests}
           refetch={refetch}
+          onDecided={onDecided}
         />
       )}
     </Stack>

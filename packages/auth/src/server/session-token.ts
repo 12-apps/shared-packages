@@ -31,6 +31,8 @@
 
 import { encode } from '@auth/core/jwt';
 
+import { sessionCookieNameFor } from '../session-cookie';
+
 /** The identity claims a minted session carries. */
 export interface SessionTokenIdentity {
   id: string;
@@ -54,19 +56,27 @@ export interface SessionTokenConfig {
 }
 
 /**
- * Whether Auth.js is using `__Secure-`-prefixed cookies on this deployment.
+ * Whether this deployment is using `__Secure-`-prefixed cookies.
  *
- * Auth.js derives this from the protocol of its resolved base URL, so mirroring
- * that derivation — rather than picking a name — is what keeps the cookie
- * readable by the session handler that has to read it back.
+ * Read twice — by the cookie NAME and by the `Secure` attribute below — and
+ * kept here rather than exported because the second use is a header this entry
+ * point owns. The name's own derivation lives in `../session-cookie`; both read
+ * the same protocol, which is what keeps them from disagreeing.
  */
 function usesSecureCookies(config: SessionTokenConfig): boolean {
   return (config.baseUrl ?? '').startsWith('https://');
 }
 
-/** The cookie name Auth.js reads the session from on this deployment. */
+/**
+ * The cookie name Auth.js reads the session from on this deployment.
+ *
+ * The derivation moved to `../session-cookie` (12-89) so a browser or a desktop
+ * agent can name the cookie without taking `@auth/core/jwt` with it. This entry
+ * point keeps its config-shaped signature, which is what every caller here
+ * already holds.
+ */
 export function sessionCookieName(config: SessionTokenConfig): string {
-  return `${usesSecureCookies(config) ? '__Secure-' : ''}authjs.session-token`;
+  return sessionCookieNameFor(config.baseUrl);
 }
 
 /**

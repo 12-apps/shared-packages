@@ -6,6 +6,7 @@ import GridViewOutlinedIcon from "@mui/icons-material/GridViewOutlined";
 
 import { Slider } from "../../form/Slider";
 import { Box } from "../../../mui/Box";
+import { sxRem } from "../../../tokens/relative";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { DATA_VIEWS_LAYOUTS, type DataViewsLayout } from "./data-views-types";
@@ -41,8 +42,6 @@ const DataViewsLayoutContext = createContext<DataViewsLayoutValue | null>(null);
 
 /** Default card zoom (0–100). */
 const DEFAULT_ZOOM = 35;
-/** The card's width in px at scale 1 — the zoom slider multiplies this. */
-const BASE_CARD_WIDTH = 180;
 /** The size multiplier the zoom slider spans (0.75× to 2×). */
 const CARD_SCALE_RANGE = { min: 0.75, max: 2 } as const;
 
@@ -103,7 +102,7 @@ export const DENSITY_CARD_SCALE: Record<DataViewsDensity, number> = {
   comfortable: 1.4,
 };
 
-/** The width a card aims for: the base width, scaled by zoom, then by density. */
+/** The width a card aims for, in design px: the base width, scaled by zoom, then by density. */
 export function cardTargetWidthFor(zoom: number, density: DataViewsDensity): number {
   return Math.round(cardMinWidthForZoom(zoom) * DENSITY_CARD_SCALE[density]);
 }
@@ -131,7 +130,7 @@ export const DENSITY_BOARD_SCALE: Record<DataViewsDensity, number> = {
 
 /**
  * Map the 0–100 zoom to the card SIZE multiplier. This is the single knob: the
- * card's width is {@link BASE_CARD_WIDTH} × scale and its padding + typography
+ * card's width is its 180 design px × scale and its padding + typography
  * scale by the same factor, so the whole card grows together (scale 2 → twice
  * the size, proportion preserved by the aspect ratio). Passed to a card via
  * `DataViewCardSelection.scale`.
@@ -141,9 +140,13 @@ export function cardScaleForZoom(zoom: number): number {
   return CARD_SCALE_RANGE.min + (clamped / 100) * (CARD_SCALE_RANGE.max - CARD_SCALE_RANGE.min);
 }
 
-/** The card grid's min column width in px = base width × the zoom size multiplier. */
+/**
+ * The card grid's min column width in DESIGN px: the card's width at scale 1 —
+ * 180 — times the zoom size multiplier. Drawn through `rem` where the track is
+ * built (`cardGridTracks`), so it scales with the theme's type scale.
+ */
 export function cardMinWidthForZoom(zoom: number): number {
-  return Math.round(BASE_CARD_WIDTH * cardScaleForZoom(zoom));
+  return Math.round(180 * cardScaleForZoom(zoom));
 }
 
 /** Which layouts this table can actually render. */
@@ -162,6 +165,20 @@ function isLayout(value: unknown): value is DataViewsLayout {
 function isDensity(value: unknown): value is DataViewsDensity {
   return DENSITIES.includes(value as DataViewsDensity);
 }
+
+/**
+ * `density`'s default with nothing stored and nothing passed (FUT-2886,
+ * reverting FUT-2769's own half of this): always `'cozy'` — today's literal,
+ * unchanged — never sourced from `useDensity()`. FUT-2769 aliased the theme's
+ * level to this density through `mapThemeToDataViewsDensity`, which — like
+ * `Table`'s own theme default — made a theme scale a DataViews table's row
+ * height twice: once by picking a DIFFERENT discrete density, and again
+ * through the `rem()` that density's own row height is drawn with. A theme
+ * density now scales a DataViews table's rows exactly ONCE, through `rem()`;
+ * the STORED per-viewer preference still wins over this default, unchanged
+ * from today (below).
+ */
+const DEFAULT_DENSITY: DataViewsDensity = 'cozy';
 
 /** The remembered density, or undefined (no window, no value, junk). */
 function readStoredDensity(): DataViewsDensity | undefined {
@@ -261,8 +278,10 @@ export function DataViewsLayoutProvider({
       availability,
     ),
   );
+  // `DEFAULT_DENSITY` ('cozy'), never the theme (FUT-2886 — see that
+  // constant's own doc comment): the stored per-viewer preference still wins.
   const [density, setDensityState] = useState<DataViewsDensity>(
-    () => (ignoreStoredLayout ? undefined : readStoredDensity()) ?? "cozy",
+    () => (ignoreStoredLayout ? undefined : readStoredDensity()) ?? DEFAULT_DENSITY,
   );
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   // A newly applied view carrying a layout switches to it (its reference-change
@@ -334,8 +353,8 @@ export function DataViewsZoomSlider({ testIdPrefix }: { testIdPrefix: string }):
         color: "text.secondary",
       }}
     >
-      <GridViewOutlinedIcon sx={{ fontSize: 14 }} />
-      <Box sx={{ width: 88, display: "flex", alignItems: "center" }}>
+      <GridViewOutlinedIcon sx={{ fontSize: sxRem(14) }} />
+      <Box sx={{ width: sxRem(88), display: "flex", alignItems: "center" }}>
         <Slider
           size="sm"
           showValue={false}
@@ -348,7 +367,7 @@ export function DataViewsZoomSlider({ testIdPrefix }: { testIdPrefix: string }):
           data-testid={`${testIdPrefix}-card-zoom`}
         />
       </Box>
-      <GridViewOutlinedIcon sx={{ fontSize: 20 }} />
+      <GridViewOutlinedIcon sx={{ fontSize: sxRem(20) }} />
     </Box>
   );
 }

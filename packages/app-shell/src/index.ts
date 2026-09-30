@@ -49,7 +49,13 @@ export {
   TINT_LIGHTNESS,
 } from './core/brand-palette';
 
-export { isChunkLoadError, loadRouteChunk } from './core/chunk-recovery';
+export {
+  clearFreshReloadParam,
+  FRESH_RELOAD_PARAM,
+  isChunkLoadError,
+  loadRouteChunk,
+  reloadOntoCurrentBuild,
+} from './core/chunk-recovery';
 
 export {
   CONSENT_ACCEPT_PATH,

@@ -186,6 +186,33 @@ export interface JobFailedEvent extends JobRunEvent {
   terminal: boolean;
 }
 
+/**
+ * A job whose worker lost its lock before the job finished.
+ *
+ * The worker's event loop or its Redis link stalled for longer than the lock,
+ * so the backend could no longer tell whether anyone was still running the
+ * job. It has been moved back to `wait` and WILL run again: a stall is a
+ * re-run, never a lost run, which is why handlers must be idempotent. A job
+ * that stalls past its budget is failed with `terminal: true` through
+ * {@link JobEvents.onJobFailed}, like any other dead-letter.
+ */
+export interface JobStalledEvent {
+  /** The job's name, or `undefined` when the job was already gone. */
+  name: string | undefined;
+  queue: string;
+  /** The driver's id for the run that stalled. */
+  runId: string;
+  /**
+   * How many times this run had been started when the stall was reported.
+   * Read back after BullMQ moved the job, so it may already count the re-run
+   * that the stall caused.
+   */
+  startedCount: number;
+  maxAttempts: number;
+  /** How many times this run has stalled so far, this one included. */
+  stalledCount: number;
+}
+
 /** A cron schedule that existed in the backend and no longer exists in code. */
 export interface ScheduleRemovedEvent {
   /** The scheduler key, which is the name of the job that installed it. */
@@ -215,6 +242,12 @@ export interface JobEvents {
    */
   onJobFailed?(event: JobFailedEvent): void | Promise<void>;
   /**
+   * A running job lost its lock and was put back to run again. Always worth a
+   * look: the job itself recovers, but the stall that caused it (a blocked
+   * event loop, a Redis link that went quiet) hits every job on that worker.
+   */
+  onJobStalled?(event: JobStalledEvent): void | Promise<void>;
+  /**
    * A schedule was removed from the backend because no code declares it any
    * more. Destructive and unrecoverable from the queue's side, which is why it
    * is the schedule event worth auditing; installation is an idempotent upsert
@@ -239,6 +272,37 @@ export interface JobRetentionWindow {
 export interface JobRetention {
   completed: JobRetentionWindow;
   failed: JobRetentionWindow;
+}
+
+/**
+ * How a worker holds, and gives up, a running job.
+ *
+ * A worker holds a LOCK on every job it runs and renews it every half
+ * `lockDurationMs`. When the renewal cannot happen in time (the event loop was
+ * blocked, the process was paused, Redis did not answer), the lock expires and
+ * the stalled checker, every `stalledIntervalMs`, moves the job back to `wait`
+ * so it runs again. `maxStalledCount` is how many of those re-runs a job gets
+ * before it is failed as a dead-letter instead.
+ */
+export interface JobStallPolicy {
+  /** How long a lock lasts without a renewal. BullMQ's default is 30 s. */
+  lockDurationMs: number;
+  /** How often the stalled checker runs. BullMQ's default is 30 s. */
+  stalledIntervalMs: number;
+  /**
+   * Re-runs after a stall before the job is failed. `0` fails it on its first
+   * stall. BullMQ's default is 1.
+   */
+  maxStalledCount: number;
+}
+
+/**
+ * The host's stall settings: values for every queue, and per-queue values over
+ * them. A long-running or single-flight queue usually wants a longer lock than
+ * a queue of quick sends.
+ */
+export interface JobStallConfig extends Partial<JobStallPolicy> {
+  queues?: Record<string, Partial<JobStallPolicy>>;
 }
 
 /**

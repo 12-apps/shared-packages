@@ -2,7 +2,7 @@ import Box from '@mui/material/Box/index.js';
 import FormHelperText from '@mui/material/FormHelperText/index.js';
 import InputLabel from '@mui/material/InputLabel/index.js';
 import TextareaAutosize from '@mui/material/TextareaAutosize/index.js';
-import { alpha, styled } from '@mui/material/styles/index.js';
+import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React, { lazy, Suspense, useState } from 'react';
 
@@ -31,6 +31,9 @@ const TextareaRichEditor = lazy(async () => ({
 import type { TextareaProps } from './Textarea.types';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { FIELD_BORDER_WIDTH, fieldBorder } from '../../../tokens/field-height';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 // Interface for styled component props
 interface StyledTextareaProps {
@@ -63,17 +66,17 @@ const StyledTextarea = styled(TextareaAutosize, {
   const errorColor = theme.palette.error;
 
   const sizeMap = {
-    xs: { padding: '6px 8px', fontSize: '0.75rem', minHeight: '60px' },
-    sm: { padding: '8px 10px', fontSize: '0.875rem', minHeight: '80px' },
-    md: { padding: '10px 12px', fontSize: '1rem', minHeight: '100px' },
-    lg: { padding: '12px 14px', fontSize: '1.125rem', minHeight: '120px' },
-    xl: { padding: '14px 16px', fontSize: '1.25rem', minHeight: '140px' } };
+    xs: { padding: rems(theme, 6, 8), fontSize: rem(theme, 12), minHeight: rem(theme, 60) },
+    sm: { padding: rems(theme, 8, 10), fontSize: rem(theme, 14), minHeight: rem(theme, 80) },
+    md: { padding: rems(theme, 10, 12), fontSize: rem(theme, 16), minHeight: rem(theme, 100) },
+    lg: { padding: rems(theme, 12, 14), fontSize: rem(theme, 18), minHeight: rem(theme, 120) },
+    xl: { padding: rems(theme, 14, 16), fontSize: rem(theme, 20), minHeight: rem(theme, 140) } };
 
   const baseStyles = {
     width: '100%',
     fontFamily: theme.typography.fontFamily,
-    borderRadius: theme.spacing(1),
-    border: `2px solid ${error ? errorColor.main : fieldEdge(theme)}`,
+    borderRadius: fieldRadius(theme),
+    border: error ? `${FIELD_BORDER_WIDTH}px solid ${errorColor.main}` : fieldBorder(theme),
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
     transition: 'all 0.3s ease',
@@ -89,10 +92,12 @@ const StyledTextarea = styled(TextareaAutosize, {
       borderColor: error ? errorColor.dark : colorPalette.main,
       backgroundColor: alpha(theme.palette.background.paper, 0.8) },
 
+    // Focus is two pixels, like every other field's: the second is an inset
+    // shadow, so the 1px resting border can thicken without the box moving.
     '&:focus': {
       borderColor: error ? errorColor.main : colorPalette.main,
       backgroundColor: theme.palette.background.paper,
-      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` } };
+      boxShadow: `inset 0 0 0 ${FIELD_BORDER_WIDTH}px ${error ? errorColor.main : colorPalette.main}, 0 0 0 ${rem(theme, 3)} ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` } };
 
   // Glass morphism effect
   return {
@@ -107,9 +112,9 @@ const StyledLabel = styled(InputLabel, {
   color: error ? theme.palette.error.main : theme.palette.text.primary,
   ...(glass && {
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
-    backdropFilter: 'blur(10px)',
-    padding: '4px 8px',
-    borderRadius: '4px',
+    backdropFilter: `blur(${rem(theme, 10)})`,
+    padding: rems(theme, 4, 8),
+    borderRadius: rem(theme, 4),
     border: `1px solid ${fieldEdge(theme)}`,
     display: 'inline-block' }) }));
 
@@ -127,8 +132,6 @@ const StyledLabel = styled(InputLabel, {
 // });
 
 // Rich text toolbar styling
-
-const ICON_GUTTER = '40px';
 
 const TEXTAREA_DEFAULTS = {
   variant: 'default',
@@ -186,8 +189,8 @@ const TextareaIcon: React.FC<{
   <Box
     sx={{
       position: 'absolute',
-      top: '12px',
-      ...(iconPosition === 'start' ? { left: '12px' } : { right: '12px' }),
+      top: sxRem(12),
+      ...(iconPosition === 'start' ? { left: sxRem(12) } : { right: sxRem(12) }),
       color: 'text.secondary',
       pointerEvents: 'none',
       zIndex: 1 }}
@@ -224,6 +227,19 @@ function RichVariant({
   );
 }
 
+// Same gap either side; only which side it applies to changes. The previous
+// version had `iconPosition === 'start' ? '40px' : '40px'`, a ternary whose
+// two branches were identical. The icon's gutter is 40px at the design scale.
+function withIconGutter(
+  theme: Theme,
+  style: React.CSSProperties | undefined,
+  hasIcon: boolean,
+  iconPosition: TextareaProps['iconPosition'],
+): React.CSSProperties {
+  if (!hasIcon) return { ...style };
+  return { ...style, [iconPosition === 'start' ? 'paddingLeft' : 'paddingRight']: rem(theme, 40) };
+}
+
 export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
   const {
     variant,
@@ -250,17 +266,12 @@ export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
   // key to optional, which would lose what the variant union already proved.
   const { richEditorCopy } = textareaProps;
 
+  const theme = useTheme();
   const [richTextValue, setRichTextValue] = useState('');
   const hasIcon = Boolean(icon);
   const testId = dataTestId || dataTestIdCamelCase;
 
-  const textareaStyle = {
-    ...style,
-    // Same gap either side; only which side it applies to changes. The previous
-    // version had `iconPosition === 'start' ? '40px' : '40px'`, a ternary whose
-    // two branches were identical.
-    ...(hasIcon && {
-      [iconPosition === 'start' ? 'paddingLeft' : 'paddingRight']: ICON_GUTTER }) };
+  const textareaStyle = withIconGutter(theme, style, hasIcon, iconPosition);
 
   // If rich text variant, use the rich text editor
   if (variant === 'rich' && richEditorCopy) {

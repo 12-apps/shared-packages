@@ -34,6 +34,7 @@ The AlertDialog component provides a modal dialog for alerts, confirmations, and
 | `showCancel`      | `boolean`  | true      | Whether to show the cancel button                 |
 | `confirmDisabled` | `boolean`  | false     | Whether the confirm button is disabled            |
 | `loading`         | `boolean`  | false     | Shows loading state on confirm button             |
+| `emphasis`        | `'confirm' \| 'cancel'` | 'confirm' | Which button is filled and takes the primary slot (right, or top when the row stacks). Use `cancel` when the confirm is the loss, e.g. "discard what you wrote?": the confirm becomes the neutral outline, both buttons grow to share the row, and focus opens on the cancel. Ignored when `showCancel` is false |
 
 ### Visual Props
 
@@ -123,6 +124,35 @@ function DeleteConfirmation() {
   onClose={() => setOpen(false)}
 />
 ```
+
+### Steering Toward Cancel
+
+When confirming throws work away, make keeping it the primary action: the
+filled cancel takes the primary slot and the confirm becomes the neutral
+outline — primary and neutral, even on the destructive variant.
+
+```tsx
+<AlertDialog
+  open={open}
+  variant="destructive"
+  emphasis="cancel"
+  initialFocus="cancel"
+  title="Discard this order?"
+  description="You have already written 3 items."
+  confirmText="Discard"
+  cancelText="Keep writing"
+  onConfirm={handleDiscard}
+  onCancel={() => setOpen(false)}
+  onClose={() => setOpen(false)}
+/>
+```
+
+### Button Layout
+
+The action row wraps whole buttons and never breaks a label inside one. A pair
+that fits keeps its natural widths, pushed to the right; a pair that does not
+stacks, with the primary on top. With `emphasis="cancel"` the two buttons also
+grow to share the row, so stacked they take its full width.
 
 ### Without Cancel Button
 

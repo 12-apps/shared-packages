@@ -265,6 +265,13 @@ Components for providing feedback to users about system state and actions.
 **Location**: `src/components/feedback/Modal`
 **Docs**: `src/components/feedback/Modal/Modal.md`
 
+### NotificationStatusNotice
+**Purpose**: Tell a reader whether this browser will notify them, and offer the one thing they can do about it
+**Use Cases**: A "we will call you" surface (a queue, an order, a delivery) that depends on web push; an account's notification settings
+**Features**: Four statuses — `enabled`, `disabled` (an action that asks for permission), `blocked` ("turn back on" disclosure over the browser-specific steps), `unavailable` (no action); polite live region; `detectNotificationBrowser` + `notificationUnblockSteps` pick the steps from the pt-BR/en-US `NotificationUnblockCopy` packs; every other sentence is the host's
+**Location**: `src/components/feedback/NotificationStatusNotice`
+**Docs**: `src/components/feedback/NotificationStatusNotice/NotificationStatusNotice.md`
+
 ### Sonner
 **Purpose**: Display toast notifications with Sonner library
 **Use Cases**: Success messages, error notifications, quick feedback
@@ -406,6 +413,13 @@ Components for user input and form interactions.
 **Location**: `src/components/form/Menubar`
 **Docs**: `src/components/form/Menubar/Menubar.md`
 
+### NumberField
+**Purpose**: Digits-only numeric input whose value is `number | null` (`null` = empty, never 0 or NaN)
+**Use Cases**: Counts, durations and limits in settings forms — "prepare in 15 min", "keep for 30 days"
+**Features**: `inputMode="numeric"` on the input, non-digit keystrokes refused and pastes reduced to digits, a `suffix` unit drawn inside the field border, ArrowUp/ArrowDown stepping by `step` within `min`/`max` (typing clamped on blur), `role="spinbutton"` with `aria-value*`, every `Input` size and variant
+**Location**: `src/components/form/NumberField`
+**Docs**: `src/components/form/NumberField/NumberField.md`
+
 ### PasswordStrength
 **Purpose**: Password input with strength indicator
 **Use Cases**: Registration, password change, account security
@@ -437,7 +451,7 @@ Components for user input and form interactions.
 ### Select
 **Purpose**: Dropdown selection
 **Use Cases**: Single/multiple choice, filters, settings
-**Features**: Search, groups, custom rendering, validation
+**Features**: Menu up to five options; from six on, automatically a search box over a height-bounded list (`CreatableSelect`'s engine) with the same props and events — `searchable` overrides, `noOptionsText` is the host's no-match sentence; groups, custom rendering, validation
 **Location**: `src/components/form/Select`
 **Docs**: `src/components/form/Select/Select.md`
 
@@ -581,6 +595,35 @@ Components for structuring and organizing page layouts.
 **Location**: `src/components/layout/Separator`
 **Docs**: `src/components/layout/Separator/Separator.md`
 
+### SettingCard
+**Purpose**: One setting, summarised while closed and edited in place
+**Use Cases**: Settings screens — any value with a title, a current state and a small form behind an Edit
+**Features**: Closed title + status pill + a summary of at most two lines (an [i] beside the title holds the rest) + Edit; opens in place (no modal/route) around the host form with a "learn more" disclosure and Cancel/Save; async save with a pending state, stays open and shows the error on rejection (`formatError` for host sentences); Cancel/Escape discard; focus moves into the card on open and back to Edit on close; controlled or uncontrolled; spans the full row of a grid while open; required `copy` (no shipped words)
+**Types**: `SettingCardProps`, `SettingCardCopy`, `SettingStatus`, `SettingErrorFormatter`, `SettingSaveResult`
+**Location**: `src/components/layout/SettingCard`
+**Docs**: `src/components/layout/SettingCard/SettingCard.md`
+
+### SettingToggle
+**Purpose**: A setting that is one switch — flipping it saves at once, no edit state
+**Use Cases**: On/off preferences, feature flags a user controls, dependent rows inside a `SettingGroup` (`variant="row"`)
+**Features**: Async `onChange` with an optimistic flip, spinner and announced "saving" while pending, revert plus error on rejection; never disabled mid-save (focus stays); title is the switch's label and tap target; `card` or flat `row` variant; required `copy`
+**Location**: `src/components/layout/SettingCard` (same subpath as `SettingCard`)
+**Docs**: `src/components/layout/SettingCard/SettingToggle.md`
+
+### SettingGroup
+**Purpose**: ONE subject: a main switch plus dependent settings indented below it
+**Use Cases**: Notifications and their channels, backups and their schedule — rows that mean nothing while the main switch is off. Different subjects are separate cards, never one group
+**Features**: Dependent rows stay rendered but dimmed, `inert` and `aria-disabled` while off, with an `inactiveHint` explaining why; rows activate only once the main switch's save lands; same async switch contract as `SettingToggle`
+**Location**: `src/components/layout/SettingCard` (same subpath as `SettingCard`)
+**Docs**: `src/components/layout/SettingCard/SettingGroup.md`
+
+### SettingGrid
+**Purpose**: Responsive 1/2/3-column layout for setting cards, by the width it is GIVEN
+**Use Cases**: A settings page body, a settings panel beside a rail, half of a split view
+**Features**: CSS container queries (not viewport media queries), `minColumnWidth`/`maxColumns`/`gap`, equal-height cards per row through grid row sizing (no JS measurement), an open `SettingCard` spans the whole row
+**Location**: `src/components/layout/SettingCard` (same subpath as `SettingCard`)
+**Docs**: `src/components/layout/SettingCard/SettingGrid.md`
+
 ### SettingsLayout
 **Purpose**: Two-pane settings shell — searchable grouped rail + central panel
 **Use Cases**: Any "Configuração"/Settings area with many sections and its own routes
@@ -676,6 +719,15 @@ Components for site and app navigation.
 **Features**: Page numbers, first/last, previous/next, page size selector
 **Location**: `src/components/navigation/Pagination`
 **Docs**: `src/components/navigation/Pagination/Pagination.md`
+
+### SectionNav
+**Purpose**: A section's own navigation — the few screens one kind of work moves between
+**Use Cases**: A phone bottom bar for a work area (a shift, a till, a field app); the same destinations as a rail on a wide screen
+**Features**: `bar` (destinations with counts, a `more` sheet, a raised `primary` action in the middle opening its own sheet) and `rail` (a way back, destinations, every menu listed); router-agnostic links via `linkComponent`; copy as a required prop; also a bar of VERBS pinned at a screen's foot — action slots (`onSelect`, `disabled`, `dimmed` — looks disabled but still answers a tap, `loading` — focusable and busy, `active` as a pressed toggle), a raised `primary` that acts on tap with its label under it, disabled menu entries, host-owned `dataTestId`s
+**Also exports**: `RaisedActionButton` — the raised round action alone, for a bar the host already draws
+**Types**: `SectionNavProps`, `SectionNavDestination`, `SectionNavAction`, `SectionNavMenu`, `SectionNavGroup`, `SectionNavEntry`, `SectionNavCopy`
+**Location**: `src/components/navigation/SectionNav`
+**Docs**: `src/components/navigation/SectionNav/SectionNav.md`
 
 ### Tabs
 **Purpose**: Tab navigation for content sections
@@ -843,12 +895,14 @@ const CustomCard = ({ children, ...props }) => (
 | Select from list | Select, Autocomplete | RadioGroup (few options) |
 | Display data table | Table | DataGrid (advanced features) |
 | Show progress | Progress | Stepper (multi-step) |
-| Navigation | NavigationMenu, Tabs | Breadcrumbs (hierarchy) |
+| Navigation | NavigationMenu, Tabs, SectionNav | Breadcrumbs (hierarchy) |
 | Modal dialog | Dialog, Modal | Sheet (side panel) |
 | Display code | Code | CodeEditor (editable) |
 | Load more items | InfiniteScroll | Pagination |
 | File upload | UploadButton | Input (type="file") |
 | Async data states | AsyncStateContainer | LoadingState, ErrorState, EmptyState |
+| Settings screen | SettingCard, SettingToggle in a SettingGrid | SettingGroup (one subject, main switch) |
+| Whole number entry | NumberField | Input (free text) |
 
 ### Component Documentation
 
@@ -876,17 +930,17 @@ Documentation files include:
 
 - **Data Display**: 27 components
 - **Feedback**: 6 components
-- **Form**: 24 components
-- **Layout**: 11 components
-- **Navigation**: 7 components
+- **Form**: 25 components
+- **Layout**: 15 components
+- **Navigation**: 8 components
 - **Typography**: 5 components
 - **Utility**: 7 components
 
-**Total**: 87 components available for reuse
+**Total**: 93 components available for reuse
 
 ---
 
-**Last Updated**: 2025-12-19
-**Version**: 1.1.0
+**Last Updated**: 2026-09-27
+**Version**: 1.2.0
 
 > **Note**: This catalog is auto-generated from the component directory structure. Always verify component availability by checking the actual source files and Storybook.

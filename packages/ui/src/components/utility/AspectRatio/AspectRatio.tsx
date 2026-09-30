@@ -1,7 +1,18 @@
 import Box from '@mui/material/Box/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { AspectRatioProps } from './AspectRatio.types';
+import { rem } from '../../../tokens/relative';
+
+/**
+ * A caller's cap for `sx`: a string as given, a number as design px — except
+ * `≤ 1`, which `sx` has always read as a fraction of the parent.
+ */
+const sxCap = (value: number | string | undefined): string | undefined | ((theme: Theme) => string) =>
+  typeof value === 'number'
+    ? (theme) => (value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value))
+    : value;
 
 export const AspectRatio: React.FC<AspectRatioProps> = ({
   children,
@@ -42,8 +53,8 @@ export const AspectRatio: React.FC<AspectRatioProps> = ({
       sx={{
         position: 'relative',
         width: '100%',
-        maxWidth,
-        maxHeight,
+        maxWidth: sxCap(maxWidth),
+        maxHeight: sxCap(maxHeight),
         ...sx,
       }}
       {...props}

@@ -19,6 +19,7 @@ import {
   sectionHeadSx,
 } from './CategorySelect.styles';
 import type { CategorySelectOption } from './CategorySelect.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** A label with the search hit marked. */
 export function HighlightedName({
@@ -104,7 +105,7 @@ function RowDisclosure({
   'option' | 'expanded' | 'branch' | 'onToggleExpanded' | 'dataTestId' | 'copy'
 >): React.JSX.Element {
   if (!branch) {
-    return <Box sx={{ width: METRICS.chevronButton, flex: '0 0 auto' }} />;
+    return <Box sx={{ width: sxRem(METRICS.chevronButtonPx), flex: '0 0 auto' }} />;
   }
   return (
     <Box
@@ -129,7 +130,7 @@ function RowControl({
   checkState,
   single,
 }: Pick<CategoryTreeRowProps, 'checkState' | 'single'>): React.JSX.Element {
-  if (!checkState) return <Box sx={{ width: METRICS.boxSize, flex: '0 0 auto' }} />;
+  if (!checkState) return <Box sx={{ width: sxRem(METRICS.boxSizePx), flex: '0 0 auto' }} />;
   // Single-select commits the moment a row is chosen, so the control is a radio
   // there: a checkbox would promise the accumulation this mode does not do.
   if (single) return <CategoryRadio on={checkState === 'on'} />;
@@ -181,7 +182,7 @@ export function CategoryTreeRow({
       aria-selected={checkState ? checkState === 'on' : undefined}
       aria-expanded={branch ? expanded : undefined}
       data-testid={rowTestId(dataTestId, depth, option.id)}
-      sx={(theme) => ({ ...rowSx(theme, active, sheet), ...rowIndent(depth) })}
+      sx={(theme) => ({ ...rowSx(theme, active, sheet), ...rowIndent(theme, depth) })}
       onClick={onActivate}
     >
       <RowDisclosure

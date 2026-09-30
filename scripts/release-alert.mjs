@@ -250,11 +250,24 @@ if (!TOKEN || !REPO) {
   process.exit(0);
 }
 
-const { orphans, untagged } = releaseState(publishDirs());
+const { orphans: everyOrphan, untagged } = releaseState(publishDirs());
 // A package first-published earlier in THIS job is untagged by construction and
 // recovers on the next push — the same exemption verify-released.mjs applies, so
 // the alert cannot file an issue for a state that is about to fix itself.
 const bootstrapped = handedOver("FIRST_PUBLISHED");
+// A version THIS run's publish got an `ok` for. Asked the same question
+// verify-released.mjs is, over the same run, so it has to reach the same
+// verdict: an absent version npm just accepted is propagation lag, not a stuck
+// package — see that script's file header for the read-after-write lag this
+// guards against.
+const accepted = handedOver("PUBLISH_ACCEPTED");
+for (const { name, tag, version } of everyOrphan.filter(({ name: n }) => accepted.has(n))) {
+  console.log(
+    `::warning::${name} is tagged ${tag} but ${version} is not on the registry yet — ` +
+      `accepted by npm this run, not yet served; not an orphan — do not delete the tag.`,
+  );
+}
+const orphans = everyOrphan.filter(({ name }) => !accepted.has(name));
 const problems = {
   orphans,
   untagged: untagged.filter(({ name }) => !bootstrapped.has(name)),

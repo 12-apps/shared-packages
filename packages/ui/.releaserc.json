@@ -1,7 +1,12 @@
 {
   "extends": "semantic-release-monorepo",
   "branches": [
-    "main"
+    "main",
+    {
+      "name": "release/ui-6.30.x",
+      "range": "6.30.x",
+      "channel": "ui-6.30.x"
+    }
   ],
   "plugins": [
     [

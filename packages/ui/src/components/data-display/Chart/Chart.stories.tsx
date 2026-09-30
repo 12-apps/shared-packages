@@ -5,7 +5,7 @@ import React from 'react';
 
 import { Chart } from './Chart';
 import type { ChartDataPoint } from './Chart.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Chart> = {
   title: 'Charts/Chart',
@@ -134,7 +134,7 @@ export const AllStates: Story = {
         <Typography variant="h6" gutterBottom>
           Loading State
         </Typography>
-        <Chart loading size="md" />
+        <Chart loading data={[]} size="md" />
       </Box>
       <Box>
         <Typography variant="h6" gutterBottom>
@@ -160,7 +160,6 @@ export const AllStates: Story = {
 
 const InteractiveStatesComponent = () => {
   const [clickedData, setClickedData] = React.useState<string>('');
-  const [hoveredData, setHoveredData] = React.useState<string>('');
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -169,12 +168,9 @@ const InteractiveStatesComponent = () => {
         data={barData}
         xAxisKey="category"
         title="Interactive Chart"
-        subtitle="Click and hover to see interactions"
+        subtitle="Click a bar to see the interaction"
         onClick={(data) => {
           setClickedData(JSON.stringify(data, null, 2));
-        }}
-        onHover={(data) => {
-          setHoveredData(data ? JSON.stringify(data, null, 2) : '');
         }}
       />
       {clickedData && (
@@ -182,14 +178,6 @@ const InteractiveStatesComponent = () => {
           <Typography variant="subtitle2">Clicked Data:</Typography>
           <Typography variant="body2" component="pre" sx={{ fontSize: '0.75rem' }}>
             {clickedData}
-          </Typography>
-        </Box>
-      )}
-      {hoveredData && (
-        <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-          <Typography variant="subtitle2">Hovered Data:</Typography>
-          <Typography variant="body2" component="pre" sx={{ fontSize: '0.75rem' }}>
-            {hoveredData}
           </Typography>
         </Box>
       )}

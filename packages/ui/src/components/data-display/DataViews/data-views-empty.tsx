@@ -5,6 +5,7 @@ import InboxRoundedIcon from "@mui/icons-material/InboxRounded";
 
 import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
+import { sxRem } from "../../../tokens/relative";
 import { Text } from "../../typography/Text";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
@@ -70,7 +71,7 @@ export function DataViewsEmpty({
             </Box>
           </Text>
           <Text variant="caption" as="p">
-            <Box component="span" sx={{ display: "block", mt: 0.5, mb: 2, color: "text.secondary", maxWidth: 380 }}>
+            <Box component="span" sx={{ display: "block", mt: 0.5, mb: 2, color: "text.secondary", maxWidth: sxRem(380) }}>
               {copy.grid.emptyFilteredHint}
             </Box>
           </Text>

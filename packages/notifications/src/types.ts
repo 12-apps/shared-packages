@@ -210,6 +210,15 @@ export interface TransportRecipient {
    * through `supports`/`send` below, and the only constructors are in-package.
    */
   clientId: string | null;
+  /**
+   * The SIDE this notification is for (`customer`, `staff` — host vocabulary),
+   * or `null` when the host did not classify its type.
+   *
+   * Required for the reason {@link TransportRecipient.clientId} is: optional
+   * would fail OPEN, and a forgotten construction site would fan a staff alert
+   * out to every customer app the person has installed.
+   */
+  side: string | null;
 }
 
 /**

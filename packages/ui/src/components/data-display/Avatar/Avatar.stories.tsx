@@ -405,7 +405,7 @@ export const NotificationBadges: Story = {
       <Badge badgeContent={4} color="primary">
         <Avatar icon={<Email />} />
       </Badge>
-      <Badge badgeContent={12} color="danger">
+      <Badge badgeContent={12} color="error">
         <Avatar icon={<Notifications />} />
       </Badge>
       <Badge variant="dot" color="success">
@@ -508,11 +508,7 @@ export const InteractiveStates: Story = {
 
 export const Responsive: Story = {
   name: '📱 Responsive',
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ width: '100%', p: 2 }}>
       <Stack spacing={2}>

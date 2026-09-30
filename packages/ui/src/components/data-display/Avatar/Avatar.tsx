@@ -11,6 +11,7 @@ import {
 } from './Avatar.helpers';
 import { GROUP_MAX, GROUP_OVERLAP, GROUP_HOVER, BORDER_WIDTH } from './Avatar.metrics';
 import type { AvatarProps, ContentType } from './Avatar.types';
+import { rem } from '../../../tokens/relative';
 import { AvatarView, type AvatarViewProps } from './Avatar.view';
 
 /** The node behind the winning content slot; the pick itself is shared. */
@@ -164,13 +165,13 @@ const AvatarGroupContainer = styled('div')<{ overlap?: number }>(({ theme, overl
   display: 'flex',
   alignItems: 'center',
   '& > *': {
-    marginLeft: -overlap,
+    marginLeft: rem(theme, -overlap),
     transition: 'all 0.3s ease',
     position: 'relative',
-    border: `${BORDER_WIDTH}px solid ${theme.palette.background.paper}`,
+    border: `${rem(theme, BORDER_WIDTH)} solid ${theme.palette.background.paper}`,
     '&:hover': {
       zIndex: 100,
-      transform: `scale(${GROUP_HOVER.scale}) translateY(-${GROUP_HOVER.lift}px)`,
+      transform: `scale(${GROUP_HOVER.scale}) translateY(${rem(theme, -GROUP_HOVER.lift)})`,
     },
     '&:first-of-type': {
       marginLeft: 0,

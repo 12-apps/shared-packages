@@ -247,7 +247,7 @@ export const FormInteraction: Story = {
           // Extract percentage value
           const percentMatch = textContent.match(/(\d+)%/);
           if (percentMatch) {
-            const value = parseInt(percentMatch[1]);
+            const value = parseInt(percentMatch[1] ?? '0');
             seenValues.add(value);
           }
 
@@ -522,11 +522,11 @@ export const ScreenReader: Story = {
       await expect(allProgressBars).toHaveLength(2);
 
       // Each should have appropriate labeling
-      allProgressBars.forEach(async (progress) => {
+      for (const progress of allProgressBars) {
         const hasLabel =
           progress.hasAttribute('aria-label') || progress.hasAttribute('aria-labelledby');
         await expect(hasLabel).toBe(true);
-      });
+      }
     });
   },
 };
@@ -689,7 +689,7 @@ export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -706,13 +706,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => (
     <Box sx={{ p: 2, maxWidth: '100%' }}>
       <Typography variant="h6" sx={{ mb: 3 }}>
@@ -882,7 +882,7 @@ export const ResponsiveDesign: Story = {
           if (backgroundColor && backgroundColor.includes('rgba')) {
             const rgbaMatch = backgroundColor.match(/rgba\(([^)]+)\)/);
             if (rgbaMatch) {
-              const values = rgbaMatch[1].split(',').map((v) => v.trim());
+              const values = (rgbaMatch[1] ?? '').split(',').map((v) => v.trim());
               const opacity = parseFloat(values[3] || '1');
 
               if (opacity < 0.2) {
@@ -1101,7 +1101,7 @@ export const ThemeVariations: Story = {
         canvas.getByTestId('theme-neutral'),
       ];
 
-      allThemeProgress.forEach(async (progress) => {
+      for (const progress of allThemeProgress) {
         await expect(progress).toBeVisible();
 
         const progressBar = bar(progress);
@@ -1111,7 +1111,7 @@ export const ThemeVariations: Story = {
           expect(computedStyle.backgroundColor).not.toBe('transparent');
           expect(computedStyle.backgroundColor).not.toBe('');
         }
-      });
+      }
     });
   },
 };
@@ -1775,7 +1775,7 @@ export const EdgeCases: Story = {
         'single-segment-progress',
       ];
 
-      allProgressComponents.forEach(async (testId) => {
+      for (const testId of allProgressComponents) {
         const component = canvas.getByTestId(testId);
         await expect(component).toBeInTheDocument();
         await expect(component).toBeVisible();
@@ -1783,7 +1783,7 @@ export const EdgeCases: Story = {
         // Should not have any error boundaries or broken rendering
         const hasError = component.querySelector('[data-error], .error, [aria-errormessage]');
         expect(hasError).toBeFalsy();
-      });
+      }
     });
   },
 };
@@ -2049,14 +2049,17 @@ export const Integration: Story = {
         { timeout: 5000 },
       );
 
-      // Processing progress should have pulse effect
-      const processingProgress = canvas.getByTestId('processing-progress');
-      const circularSvg = processingProgress.querySelector('.MuiCircularProgress-svg');
-
-      if (circularSvg) {
-        const style = window.getComputedStyle(circularSvg);
-        // Should have animation for pulse
-        expect(style.animation).not.toBe('none');
+      // Processing progress should pulse. The caller's data-testid lands on the
+      // CircularProgress root, which carries the pulse. The old check read its
+      // <svg>, which has no animation: older Chromium serialised that as a long
+      // "none 0s ease …" string, so it passed vacuously; Chrome 149 says "none".
+      // Web only: in the Native lane the same element is a View whose pulse is
+      // an animated opacity, with no CSS animation to read.
+      const processingRoot = canvas.getByTestId('processing-progress');
+      if (processingRoot.classList.contains('MuiCircularProgress-root')) {
+        await waitFor(() => {
+          expect(window.getComputedStyle(processingRoot).animationName).not.toBe('none');
+        });
       }
     });
 
@@ -2096,7 +2099,7 @@ export const Integration: Story = {
         canvas.getByTestId('overall-progress'),
       ];
 
-      allProgressComponents.forEach(async (component) => {
+      for (const component of allProgressComponents) {
         await expect(component).toBeVisible();
         await expect(component).toBeInTheDocument();
 
@@ -2105,7 +2108,7 @@ export const Integration: Story = {
           '.MuiLinearProgress-bar, .MuiCircularProgress-svg, div[style*="display: flex"], div div',
         );
         expect(hasProgressBar).toBeTruthy();
-      });
+      }
     });
   },
 };

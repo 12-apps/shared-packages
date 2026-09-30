@@ -15,6 +15,7 @@
 import { useMemo, type CSSProperties } from "react";
 
 import { createTheme, useTheme, type Theme } from "@12-apps/ui/mui/styles";
+import { fieldHeight } from "@12-apps/ui/tokens";
 
 /** The canvas gap, in px, so a block's flex basis can subtract it exactly. */
 export const GRID_GAP_PX = 16;
@@ -33,8 +34,14 @@ export const CONTROL_RADIUS_PX = 8;
  * One height for every control that shares a row. A 36px button beside a 40px
  * select reads as broken, and the toolbars measured 36.5 / 38.5 / 40 / 44.5 —
  * four heights in one line, none of them chosen.
+ *
+ * It is the THEME's field height (`@12-apps/ui/tokens`' `fieldHeight`, a
+ * multiple of the default font size), not a number of these screens' own: a
+ * report toolbar is a field row like any other, and a private 36px was a second
+ * standard beside the one every field now stands at (FUT-2555). Used as an `sx`
+ * value, it resolves against the theme in force.
  */
-export const CONTROL_HEIGHT_PX = 36;
+export const CONTROL_HEIGHT = fieldHeight;
 
 /**
  * The reports area's surface: what makes the screens look like one product.
@@ -271,15 +278,8 @@ export const SECTION_LABEL_STYLE: CSSProperties = {
  */
 export const EDITOR_SURFACE_SX = {
   ...REPORT_SURFACE_SX,
-  "& .MuiOutlinedInput-root": {
-    height: `${CONTROL_HEIGHT_PX}px`,
-    boxSizing: "border-box",
-    alignItems: "center",
-  },
-  "& .MuiOutlinedInput-input": { paddingTop: 0, paddingBottom: 0 },
-  "& .MuiInputLabel-outlined:not(.MuiInputLabel-shrink)": {
-    transform: "translate(14px, 8px) scale(1)",
-  },
+  // No height, padding or label offset here: `Input` and `Select` stand at the
+  // theme's field height themselves, label centred (FUT-2555).
   '& input[data-testid$="-title"]': { fontSize: "1.125rem", fontWeight: 600 },
   // …and it is not a BOX either. Sized like a title but framed like a field, a
   // block's title slot put an outlined input in the one row that is supposed to
@@ -321,25 +321,15 @@ export function useReportPortalTheme(): Theme {
     () =>
       createTheme(base, {
         components: {
+          // The height and label offset are the fields' own (the theme's
+          // field height, FUT-2555); only the type and the radius are stated.
           MuiOutlinedInput: {
             styleOverrides: {
-              root: {
-                height: CONTROL_HEIGHT_PX,
-                boxSizing: "border-box",
-                alignItems: "center",
-                borderRadius: CONTROL_RADIUS_PX,
-              },
-              input: { paddingTop: 0, paddingBottom: 0, fontSize: "0.875rem" },
+              root: { borderRadius: CONTROL_RADIUS_PX },
+              input: { fontSize: "0.875rem" },
             },
           },
-          MuiInputLabel: {
-            styleOverrides: {
-              root: { fontSize: "0.875rem" },
-              outlined: {
-                "&:not(.MuiInputLabel-shrink)": { transform: "translate(14px, 8px) scale(1)" },
-              },
-            },
-          },
+          MuiInputLabel: { styleOverrides: { root: { fontSize: "0.875rem" } } },
           // The select's inner display box rounds on its own, under the
           // outlined root — 4px, MUI's default, visible at the corners.
           MuiSelect: { styleOverrides: { select: { borderRadius: CONTROL_RADIUS_PX } } },
@@ -368,17 +358,14 @@ export function useReportPortalTheme(): Theme {
 export const PAGE_TITLE_SX = { typography: "h5", fontWeight: 600, m: 0 } as const;
 
 /**
- * The controls in one toolbar row, all exactly {@link CONTROL_HEIGHT_PX} tall.
- *
- * Height alone is not enough for a text field: MUI's input keeps its own
- * vertical padding, so the field would overflow the box it was just given.
- * Zeroing that padding lets the flex row centre the text instead.
+ * The controls in one toolbar row, all exactly {@link CONTROL_HEIGHT} tall. A
+ * text field's own inset is already sized to that height by `@12-apps/ui`, so
+ * only the boxes are pinned here.
  */
 export const CONTROL_ROW_SX = {
   "& .MuiButtonBase-root, & .MuiInputBase-root, & .MuiToggleButtonGroup-root": {
-    height: `${CONTROL_HEIGHT_PX}px`,
-    minHeight: `${CONTROL_HEIGHT_PX}px`,
+    height: CONTROL_HEIGHT,
+    minHeight: CONTROL_HEIGHT,
     boxSizing: "border-box",
   },
-  "& .MuiInputBase-input": { paddingTop: 0, paddingBottom: 0 },
 } as const;

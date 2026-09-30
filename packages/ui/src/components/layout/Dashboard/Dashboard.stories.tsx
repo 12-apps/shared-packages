@@ -37,15 +37,15 @@ export const FullComposition: Story = {
     <Dashboard {...args}>
       <Dashboard.Breadcrumb items={[{ label: 'Admin', href: '#' }, { label: 'Products' }]} />
       <Dashboard.Header title="Products">
-        <Dashboard.Info title="About Products">
+        <Dashboard.Info title="About Products" ariaLabel="Informações da página">
           Manage your catalog: create products, set prices, and control stock visibility.
         </Dashboard.Info>
-        <Dashboard.FilterToggle />
-        <Dashboard.Settings title="Product settings">
+        <Dashboard.FilterToggle hideLabel="Ocultar filtros" showLabel="Mostrar filtros" />
+        <Dashboard.Settings title="Product settings" ariaLabel="Configurações" closeLabel="Fechar">
           <Typography>In development — coming in the next version.</Typography>
         </Dashboard.Settings>
         <Dashboard.Spacer />
-        <Dashboard.Export onExport={fn()} />
+        <Dashboard.Export onExport={fn()} label="Exportar" />
         <Dashboard.Action>
           <Button variant="contained">New product</Button>
         </Dashboard.Action>
@@ -82,7 +82,9 @@ export const WithoutFilters: Story = {
     <Dashboard>
       <Dashboard.Breadcrumb items={[{ label: 'Admin', href: '#' }, { label: 'Team' }]} />
       <Dashboard.Header title="Team">
-        <Dashboard.Info>Invite teammates and manage their roles.</Dashboard.Info>
+        <Dashboard.Info title="Sobre esta página" ariaLabel="Informações da página">
+          Invite teammates and manage their roles.
+        </Dashboard.Info>
       </Dashboard.Header>
       <Dashboard.Body>{table}</Dashboard.Body>
     </Dashboard>
@@ -99,7 +101,7 @@ export const OrderIndependent: Story = {
         <TextField size="small" placeholder="Search…" fullWidth />
       </Dashboard.Filters>
       <Dashboard.Header title="Reordered">
-        <Dashboard.FilterToggle />
+        <Dashboard.FilterToggle hideLabel="Ocultar filtros" showLabel="Mostrar filtros" />
       </Dashboard.Header>
       <Dashboard.Breadcrumb items={[{ label: 'Admin', href: '#' }, { label: 'Reordered' }]} />
     </Dashboard>

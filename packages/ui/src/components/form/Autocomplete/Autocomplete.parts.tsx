@@ -10,17 +10,19 @@ import Paper from '@mui/material/Paper/index.js';
 import Popper from '@mui/material/Popper/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { highlightLabel, type MatchMode } from './Autocomplete.helpers';
 import type { SuggestionItemState, SuggestionType } from './Autocomplete.types';
 import type { AutocompleteCopy } from '../../../copy';
+import { fieldTextFieldStyles } from '../../../tokens/field-height';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const StyledPopper = styled(Popper)(({ theme }) => ({
   zIndex: theme.zIndex.tooltip,
   width: '100%',
-  maxHeight: 300,
+  maxHeight: rem(theme, 300),
   overflow: 'auto',
   // Popper.js writes the computed position (and stamps `data-popper-placement`)
   // in a layout effect that can land AFTER the first paint. Until it does, the
@@ -31,10 +33,10 @@ const StyledPopper = styled(Popper)(({ theme }) => ({
   '&:not([data-popper-placement])': { visibility: 'hidden' },
 }));
 
-const InlineSuggestionDisplay = styled('div')(() => ({
+const InlineSuggestionDisplay = styled('div')(({ theme }) => ({
   position: 'absolute',
   pointerEvents: 'none',
-  left: '14px', // Match TextField padding
+  left: rem(theme, 14), // Match TextField padding
   top: '50%',
   transform: 'translateY(-50%)',
   fontSize: 'inherit',
@@ -106,6 +108,7 @@ export interface AutocompleteInputProps {
 
 /** The combobox text field plus its inline ghost-text overlay. */
 export function AutocompleteInput(props: AutocompleteInputProps): React.JSX.Element {
+  const theme = useTheme();
   const showOverlay = Boolean(props.ghost) && props.showGhost && props.isInputFocused;
   return (
     <Box sx={{ position: 'relative' }}>
@@ -113,6 +116,7 @@ export function AutocompleteInput(props: AutocompleteInputProps): React.JSX.Elem
       <TextField
         ref={props.inputRef}
         fullWidth
+        sx={fieldTextFieldStyles}
         value={props.inputValue}
         onChange={props.onChange}
         onKeyDown={props.onKeyDown}
@@ -126,7 +130,7 @@ export function AutocompleteInput(props: AutocompleteInputProps): React.JSX.Elem
         className={props.inputClassName}
         InputProps={{
           startAdornment: props.startAdornment,
-          endAdornment: props.isLoading ? <CircularProgress size={20} /> : undefined,
+          endAdornment: props.isLoading ? <CircularProgress size={rem(theme, 20)} /> : undefined,
         }}
         inputProps={{
           role: 'combobox',
@@ -190,7 +194,8 @@ export function DefaultSuggestion<T>({
 }): React.JSX.Element {
   const label = getLabel(item);
   const description = getDescription?.(item);
-  const displayLabel = highlightLabel(label, state.query, matchMode);
+  // Each run is a React text child, so the label is escaped however it reads.
+  const segments = highlightLabel(label, state.query, matchMode);
   return (
     <Box
       sx={{
@@ -198,13 +203,26 @@ export function DefaultSuggestion<T>({
         alignItems: 'center',
         gap: 1,
         width: '100%',
-        // Bold the matched prefix (not a yellow <mark> highlight).
+        // Bold every run the query matched, in any match mode but fuzzy — not
+        // only a prefix, even under `startsWith` (not a yellow <mark> highlight).
         '& mark': { backgroundColor: 'transparent', color: 'inherit', fontWeight: 700 },
       }}
     >
       {suggestionTypeIcon(getSuggestionType(item))}
       <ListItemText
-        primary={<span dangerouslySetInnerHTML={{ __html: displayLabel }} />}
+        primary={
+          <span>
+            {segments.map((segment, index) =>
+              // The runs are derived from one label and never reorder, so the
+              // position is a stable key.
+              segment.match ? (
+                <mark key={index}>{segment.text}</mark>
+              ) : (
+                <React.Fragment key={index}>{segment.text}</React.Fragment>
+              ),
+            )}
+          </span>
+        }
         secondary={description}
       />
     </Box>
@@ -213,10 +231,11 @@ export function DefaultSuggestion<T>({
 
 /** A "Loading…" row shown while async suggestions resolve. */
 export function LoadingRow({ label }: { label: string }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <ListItem>
       <Box display="flex" alignItems="center" gap={1}>
-        <CircularProgress size={16} />
+        <CircularProgress size={rem(theme, 16)} />
         <Typography variant="body2" color="text.secondary">
           {label}
         </Typography>
@@ -305,7 +324,7 @@ export function SuggestionListBox<T>({
           role="listbox"
           id={listId}
           dense
-          sx={{ maxHeight: 300, overflow: 'auto' }}
+          sx={{ maxHeight: sxRem(300), overflow: 'auto' }}
           data-testid="suggestions-list"
         >
           {items.map((item, index) => (

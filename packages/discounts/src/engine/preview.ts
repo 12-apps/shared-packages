@@ -60,6 +60,14 @@ import type { DiscountCartLine, DiscountRule } from "./types";
  * screens the same rule against a real `buyerUsageCount` and reports
  * `BUYER_LIMIT_REACHED`, before a single cent is charged.
  *
+ * `firstOrderOnly` (FUT-2825) goes the OTHER way, deliberately. A per-buyer
+ * cap is exhausted by a few; "first purchase only" excludes EVERY returning
+ * buyer, so an optimistic badge would be a wrong price for most of the people
+ * reading the menu. The screen settles it without a special case: a catalog
+ * read passes no `buyerIsFirstTime`, an unknown buyer is not first-time, and
+ * `screenRule` rejects `NOT_FIRST_ORDER` — so no badge. The host advertises the
+ * promotion to the buyers it CAN name as first-time, outside the menu.
+ *
  * Pure, like the rest of the engine: `now` is injected and the rules arrive
  * pre-loaded once per catalog request, never per product.
  */

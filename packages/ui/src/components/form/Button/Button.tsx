@@ -1,11 +1,14 @@
 import MuiButton from '@mui/material/Button/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';
 import { BUTTON_ICON_GLYPH_SIZE } from './Button.metrics';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { rem } from '../../../tokens/relative';
 import {
   buttonEmphasisStyles,
   buttonVariantStyles,
@@ -32,13 +35,13 @@ const StyledButton = styled(MuiButton, {
   return {
     textTransform: 'none',
     fontWeight: 500,
-    borderRadius: theme.spacing(1),
+    borderRadius: fieldRadius(theme),
     transition: 'all 0.3s ease',
     position: 'relative',
     overflow: 'hidden',
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
-    ...buttonEmphasisStyles(colorPalette, glow, pulse),
+    ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
   };
 });
 
@@ -92,10 +95,10 @@ const muiColorFor = (color: NonNullable<ButtonProps['color']>): MuiButtonColor =
  * document order and never by specificity. Inline wins both, and it sits on the
  * one element we already render for this glyph.
  *
- * A number, not `px()`: React writes `font-size: 20px`, which is exactly the
- * declaration MUI was emitting before.
+ * Through the theme's type scale (FUT-2594): `1.25rem` at MUI's defaults, which
+ * is the 20px MUI was emitting before at a 16px root.
  */
-const ICON_GLYPH_STYLE = { fontSize: BUTTON_ICON_GLYPH_SIZE } as const;
+const iconGlyphStyle = (theme: Theme) => ({ fontSize: rem(theme, BUTTON_ICON_GLYPH_SIZE) });
 
 /**
  * An icon and nothing else — the shape that should render square.
@@ -157,11 +160,12 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const ownTestId = resolveTestId(others, 'button');
     const testId = (suffix: string) => childTestId(others, suffix, 'button');
     const props = withoutTestIdProps(others);
+    const theme = useTheme();
 
     // Wrap icon with testId if provided
     const iconWithTestId =
       !loading && icon ? (
-        <span data-testid={testId('icon')} style={ICON_GLYPH_STYLE}>
+        <span data-testid={testId('icon')} style={iconGlyphStyle(theme)}>
           {icon}
         </span>
       ) : undefined;
@@ -196,7 +200,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={mergedClassName}
       >
         {loading ? (
-          <CircularProgress size={16} color="inherit" data-testid={testId('loading')} />
+          <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
         ) : (
           children
         )}

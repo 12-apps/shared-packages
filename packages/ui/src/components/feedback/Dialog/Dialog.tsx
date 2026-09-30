@@ -1,16 +1,17 @@
 import CloseIcon from '@mui/icons-material/Close';
 import Backdrop from '@mui/material/Backdrop/index.js';
 import Box from '@mui/material/Box/index.js';
-import MuiDialog from '@mui/material/Dialog/index.js';
+import MuiDialog, { type DialogProps as MuiDialogProps } from '@mui/material/Dialog/index.js';
 import MuiDialogActions from '@mui/material/DialogActions/index.js';
 import MuiDialogContent from '@mui/material/DialogContent/index.js';
 import MuiDialogTitle from '@mui/material/DialogTitle/index.js';
-import Drawer from '@mui/material/Drawer/index.js';
+import Drawer, { type DrawerProps } from '@mui/material/Drawer/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { focusDialogOnEntered } from './Dialog.focus';
 import { hasSpacingSlot, withDialogDefaults } from './Dialog.helpers';
 import {
   DIALOG_ACTIONS,
@@ -20,6 +21,7 @@ import {
   DIALOG_TITLE,
   DIALOG_TITLED_BODY_PADDING_TOP_UNITS,
 } from './Dialog.metrics';
+import { mergedBackdropSlot, mergedPaperSlot, mergedTransitionSlot } from './Dialog.slots';
 import { backdropSxOf, variantStylesOf } from './Dialog.styles';
 import { childTestId, resolveTestId, slotTestId, withoutTestIdProps } from '../../../platform/test-id';
 import type {
@@ -74,6 +76,102 @@ function bodyOf(children: React.ReactNode, hasTitle: boolean): React.ReactNode {
   return <Box sx={{ ...BODY_SX, pt }}>{children}</Box>;
 }
 
+/**
+ * MUI's `onClose` for either renderer: a `persistent` dialog swallows the
+ * backdrop press and Escape, and the caller's `onClose` is called with no
+ * arguments, as `Dialog.base.ts` promises. The drawer used to get the caller's
+ * raw `onClose` — so it closed when `persistent` said it must not, and was
+ * handed MUI's `(event, reason)` (FUT-2673).
+ */
+function closeHandlerOf(persistent: boolean, onClose: (() => void) | undefined) {
+  return (_event: object, reason: 'backdropClick' | 'escapeKeyDown') => {
+    if (persistent && (reason === 'backdropClick' || reason === 'escapeKeyDown')) {
+      return;
+    }
+    onClose?.();
+  };
+}
+
+/** The looks the Dialog lays under a caller's paper and backdrop props. */
+interface DialogLooks {
+  paperSx: SxProps<Theme>;
+  backdropSx: SxProps<Theme>;
+  testId: string | undefined;
+}
+
+/** What either renderer below takes: the looks, and the dialog's own children. */
+type RendererProps = DialogLooks & { children: React.ReactNode };
+
+/**
+ * Every variant but the drawer: MUI's `Dialog`. The scrim reaches MUI through
+ * `slotProps.backdrop`, not the deprecated `BackdropProps`, and a caller's
+ * backdrop props from either spelling merge over it rather than replacing it
+ * (FUT-2672) — as their paper props merge over the variant's look (FUT-2613).
+ * `slotProps.transition` gives initial focus to the paper (FUT-2696, see
+ * `Dialog.focus.ts` and `Dialog.md`) ahead of a caller's own `onEntered`.
+ */
+function ModalDialog({
+  paperSx,
+  backdropSx,
+  testId,
+  dialogProps,
+  children,
+}: RendererProps & { dialogProps: MuiDialogProps }) {
+  const { PaperProps: callerPaper, BackdropProps: callerBackdrop, TransitionProps: callerTransition, slotProps, ...rest } = dialogProps;
+  return (
+    <MuiDialog
+      {...rest}
+      slotProps={{
+        ...slotProps,
+        paper: mergedPaperSlot(paperSx, testId, callerPaper, slotProps?.paper),
+        backdrop: mergedBackdropSlot(backdropSx, callerBackdrop, slotProps?.backdrop),
+        transition: mergedTransitionSlot(focusDialogOnEntered, callerTransition, slotProps?.transition),
+      }}
+    >
+      {children}
+    </MuiDialog>
+  );
+}
+
+/**
+ * The drawer variant: MUI's `Drawer`, with the variant's look on the Drawer's
+ * OWN paper — on an inner Box it left the paper 0px wide and clipped the panel —
+ * and a caller's paper props merged over it rather than replacing it. The
+ * test id stays on the Drawer root, so the paper carries none of its own.
+ *
+ * The scrim rides the drawer's backdrop exactly as it rides the dialog's, so
+ * `glass` blurs it here too; the paper does not frost (FUT-2673). MUI's
+ * `Drawer` does not merge `BackdropProps` into `slotProps.backdrop` — it takes
+ * one or the other — so both are folded into the one slot here.
+ * `slotProps.transition` gives initial focus the same way `ModalDialog` does
+ * (FUT-2696, see `Dialog.focus.ts` and `Dialog.md` for why the drawer's paper
+ * differs from the modal's paper here and needed the fix less).
+ */
+function DrawerDialog({
+  paperSx,
+  backdropSx,
+  testId,
+  drawerProps,
+  children,
+}: RendererProps & { drawerProps: DrawerProps }) {
+  const { PaperProps: callerPaper, BackdropProps: callerBackdrop, SlideProps: callerTransition, slotProps, ...rest } = drawerProps;
+  return (
+    <Drawer
+      anchor="right"
+      data-testid={testId}
+      {...rest}
+      slotProps={{
+        ...slotProps,
+        paper: mergedPaperSlot(paperSx, undefined, callerPaper, slotProps?.paper),
+        backdrop: mergedBackdropSlot(backdropSx, callerBackdrop, slotProps?.backdrop),
+        transition: mergedTransitionSlot(focusDialogOnEntered, callerTransition, slotProps?.transition),
+      }}
+    >
+      {children}
+    </Drawer>
+  );
+}
+
 export const Dialog: React.FC<DialogProps> = (rawProps) => {
   const {
     children,
@@ -100,16 +198,12 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
   // the same in reverse.
   const testId = resolveTestId(others, 'dialog');
   const props = withoutTestIdProps(others);
-  const paperSx = variantStylesOf(theme, {
-    variant, size, borderRadius, glass, gradient, glow, pulse,
-  });
-
-  const handleClose = (event: object, reason: 'backdropClick' | 'escapeKeyDown') => {
-    if (persistent && (reason === 'backdropClick' || reason === 'escapeKeyDown')) {
-      return;
-    }
-    onClose?.();
+  const looks: DialogLooks = {
+    paperSx: variantStylesOf(theme, { variant, size, borderRadius, glass, gradient, glow, pulse }),
+    backdropSx: backdropSxOf(theme, glass),
+    testId,
   };
+  const handleClose = closeHandlerOf(persistent, onClose);
 
   const header = title ? (
     <DialogHeader
@@ -124,34 +218,27 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
 
   if (variant === 'drawer') {
     return (
-      <Drawer
-        anchor="right"
-        open={open}
-        onClose={onClose}
-        data-testid={testId}
-        {...props}
-      >
-        <Box sx={{ ...paperSx, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {header}
-          {body}
-        </Box>
-      </Drawer>
+      <DrawerDialog {...looks} drawerProps={{ ...props, open, onClose: handleClose }}>
+        {header}
+        {body}
+      </DrawerDialog>
     );
   }
 
   return (
-    <MuiDialog
-      open={open}
-      onClose={handleClose}
-      fullScreen={variant === 'fullscreen'}
-      BackdropComponent={backdrop ? Backdrop : undefined}
-      BackdropProps={{ sx: backdropSxOf(theme, glass) }}
-      PaperProps={{ sx: paperSx, 'data-testid': testId }}
-      {...props}
+    <ModalDialog
+      {...looks}
+      dialogProps={{
+        open,
+        onClose: handleClose,
+        fullScreen: variant === 'fullscreen',
+        BackdropComponent: backdrop ? Backdrop : undefined,
+        ...props,
+      }}
     >
       {header}
       {body}
-    </MuiDialog>
+    </ModalDialog>
   );
 };
 

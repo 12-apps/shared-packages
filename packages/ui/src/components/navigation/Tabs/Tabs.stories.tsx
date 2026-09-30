@@ -43,6 +43,7 @@ import { useState } from 'react';
 
 import { Tabs } from './Tabs';
 import type { TabItem } from './Tabs.types';
+import { PT_BR_CHROME_COPY } from '../../../pt-BR';
 import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Tabs> = {
@@ -187,8 +188,8 @@ const ProfileContent = () => (
           Senior Developer
         </Typography>
         <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-          <Chip size="sm" label="Admin" color="primary" />
-          <Chip size="sm" label="Verified" color="success" />
+          <Chip size="small" label="Admin" color="primary" />
+          <Chip size="small" label="Verified" color="success" />
         </Box>
       </Box>
     </Box>
@@ -271,10 +272,12 @@ const NotificationsContent = () => (
 const TabsWrapper = ({
   initialTab = 'dashboard',
   items,
+  closeTabLabel = PT_BR_CHROME_COPY.closeTab,
   ...props
 }: {
   initialTab?: string;
   items: TabItem[];
+  closeTabLabel?: string;
   [key: string]: unknown;
 }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -283,36 +286,40 @@ const TabsWrapper = ({
     setActiveTab(tabId);
   };
 
-  return <Tabs {...props} value={activeTab} onChange={handleChange} items={items} />;
+  return (
+    <Tabs {...props} value={activeTab} onChange={handleChange} items={items} closeTabLabel={closeTabLabel} />
+  );
 };
 
-const basicTabItems = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: <Dashboard />,
-    content: <DashboardContent />,
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: <Settings />,
-    content: <SettingsContent />,
-  },
-  {
-    id: 'profile',
-    label: 'Profile',
-    icon: <Person />,
-    content: <ProfileContent />,
-  },
-  {
-    id: 'notifications',
-    label: 'Notifications',
-    icon: <Notifications />,
-    badge: 3,
-    content: <NotificationsContent />,
-  },
-];
+// Named, not just indexed, so a story that wants "the profile tab, disabled"
+// doesn't index into an array TypeScript can't prove has that many elements.
+const dashboardTab: TabItem = {
+  id: 'dashboard',
+  label: 'Dashboard',
+  icon: <Dashboard />,
+  content: <DashboardContent />,
+};
+const settingsTab: TabItem = {
+  id: 'settings',
+  label: 'Settings',
+  icon: <Settings />,
+  content: <SettingsContent />,
+};
+const profileTab: TabItem = {
+  id: 'profile',
+  label: 'Profile',
+  icon: <Person />,
+  content: <ProfileContent />,
+};
+const notificationsTab: TabItem = {
+  id: 'notifications',
+  label: 'Notifications',
+  icon: <Notifications />,
+  badge: 3,
+  content: <NotificationsContent />,
+};
+
+const basicTabItems: TabItem[] = [dashboardTab, settingsTab, profileTab, notificationsTab];
 
 export const Default: Story = {
   args: {
@@ -480,8 +487,9 @@ const Component = () => {
   const handleTabClose = (tabId: string) => {
     const newTabs = tabs.filter((tab) => tab.id !== tabId);
     setTabs(newTabs);
-    if (activeTab === tabId && newTabs.length > 0) {
-      setActiveTab(newTabs[0].id);
+    const firstRemaining = newTabs[0];
+    if (activeTab === tabId && firstRemaining) {
+      setActiveTab(firstRemaining.id);
     }
   };
 
@@ -497,6 +505,7 @@ const Component = () => {
         onChange={handleChange}
         items={tabs}
         onTabClose={handleTabClose}
+        closeTabLabel={PT_BR_CHROME_COPY.closeTab}
       />
     </Paper>
   );
@@ -657,10 +666,10 @@ export const DisabledTabs: Story = {
     const items = [
       ...basicTabItems.slice(0, 2),
       {
-        ...basicTabItems[2],
+        ...profileTab,
         disabled: true,
       },
-      basicTabItems[3],
+      notificationsTab,
     ];
     return (
       <Paper elevation={2} sx={{ width: 700, minHeight: 400, p: 2 }}>
@@ -840,9 +849,9 @@ export const AllStates: Story = {
           <TabsWrapper
             variant="pills"
             items={[
-              basicTabItems[0],
-              { ...basicTabItems[1], disabled: true },
-              { ...basicTabItems[2], disabled: true },
+              dashboardTab,
+              { ...settingsTab, disabled: true },
+              { ...profileTab, disabled: true },
             ]}
             initialTab="dashboard"
           />
@@ -871,9 +880,9 @@ export const AllStates: Story = {
           <TabsWrapper
             variant="pills"
             items={[
-              basicTabItems[0],
-              { ...basicTabItems[1], badge: 5 },
-              { ...basicTabItems[2], badge: 99 },
+              dashboardTab,
+              { ...settingsTab, badge: 5 },
+              { ...profileTab, badge: 99 },
             ]}
             initialTab="dashboard"
           />

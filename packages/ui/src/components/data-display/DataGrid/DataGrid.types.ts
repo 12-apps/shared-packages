@@ -1,5 +1,7 @@
 import type React from 'react';
 
+import type { DataGridCopy } from '../../../copy';
+
 export type GridSizeMode = 'auto' | 'fixed' | 'fill';
 export type GridDensity = 'compact' | 'comfortable' | 'spacious';
 export type SortDirection = 'asc' | 'desc' | null;
@@ -18,10 +20,14 @@ export interface GridColumn<T = Record<string, unknown>> {
   accessor?: keyof T | ((row: T) => unknown);
   /** Column type influences default formatting and editors */
   type?: 'text' | 'number' | 'date' | 'datetime' | 'boolean' | 'currency' | 'actions';
-  /** Width hints (px) and min/max constraints */
-  width?: number;
-  minWidth?: number;
-  maxWidth?: number;
+  /**
+   * Width hint and min/max constraints. A number is design px, scaled with the
+   * theme's type scale (1 or less is a fraction of the table, as in `sx`); a
+   * string (`'312px'`, `'20%'`) is used as given.
+   */
+  width?: number | string;
+  minWidth?: number | string;
+  maxWidth?: number | string;
   /** Column is initially hidden */
   hidden?: boolean;
   /** Pin to left/right (sticky) */
@@ -73,6 +79,16 @@ export interface GridRowExpansion<T = Record<string, unknown>> {
   defaultExpandedRowIds?: Array<string | number>;
   /** Row id equality uses `getRowId` */
   onChangeExpanded?: (ids: Array<string | number>) => void;
+  /**
+   * Which rows HAVE a detail. Omitted, every row does. A row it refuses keeps
+   * the (empty) chevron cell, so the columns still line up, but offers no
+   * toggle — a chevron that opens onto nothing is a promise the row cannot keep.
+   */
+  isRowExpandable?: (row: T) => boolean;
+  /** The chevron's accessible name while the row is collapsed. Defaults to `copy.expandRow`. */
+  expandLabel?: string;
+  /** The chevron's accessible name while the row is expanded. Defaults to `copy.collapseRow`. */
+  collapseLabel?: string;
 }
 
 export interface GridSelection {
@@ -124,6 +140,15 @@ export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAt
    * "No data available", on the package every host renders.
    */
   emptyText: string;
+  /**
+   * Every fallback word the grid's own chrome renders — a sortable header's
+   * name, a row's selection checkbox, the select-all checkbox, the expand
+   * chevron's two states, and the grid's own accessible name. REQUIRED — the
+   * fallbacks were English literals with no way to localise them. A caller's
+   * `column.ariaLabel`, `expansion.expandLabel`/`collapseLabel` and the grid's
+   * own `ariaLabel` still win over it wherever both are given.
+   */
+  copy: DataGridCopy;
   /** Dataset (client mode uses this array; server mode renders current page) */
   rows: T[];
   /** Stable row id accessor */
@@ -133,9 +158,17 @@ export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAt
 
   /** Sizing, density, and layout */
   sizeMode?: GridSizeMode; // auto | fixed | fill
-  density?: GridDensity; // compact | comfortable | spacious
-  rowHeight?: number; // default row height (px)
-  headerHeight?: number; // default header height (px)
+  /**
+   * compact | comfortable | spacious. Defaults to `'comfortable'` — NOT the
+   * host theme's density: a theme density still scales row height, but only
+   * once, through `rem()` (FUT-2886). Pass this explicitly for a deliberate,
+   * per-grid density on top of that.
+   */
+  density?: GridDensity;
+  /** Row height (default 52) — design px, scaled with the theme's type scale; `density` scales it first. */
+  rowHeight?: number;
+  /** Header row height (default 56) — design px, scaled with the theme's type scale. */
+  headerHeight?: number;
   footerHeight?: number; // optional
 
   /** Interaction features */

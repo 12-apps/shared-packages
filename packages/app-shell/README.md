@@ -12,6 +12,31 @@ pnpm add @12-apps/app-shell
 
 Adoption contract, the required knobs and the sharp edges: **[ADOPTING.md](./ADOPTING.md)**.
 
+`WebAppShellConfig.theme` (and `createAppTheme` directly) also takes a `density`
+— `'compact' | 'normal' | 'comfortable'` or a raw factor, mirroring
+`@12-apps/ui`'s own `UiThemeOptions.density`. Setting it moves the type scale,
+the spacing unit and the field height together, carries density's own MUI
+component overrides, and sets `theme.density`. It also changes how a host's own
+`theme.components` merges with the factory's: with no density, a host's entry
+for a component REPLACES the whole entry; with one, the two merge by SLOT
+instead (`defaultProps` shallow-merged, `variants` concatenated) — see
+`AppThemeOptions.density`'s own docblock and [ADOPTING.md](./ADOPTING.md) before
+combining a density with your own component overrides.
+
+**`density` alone does nothing — pass `densityTheme` too.** This package refers
+to the density IMPLEMENTATION only by type, so a host that never sets a density
+never ships its modules on the first paint. A host that wants density imports
+the implementation itself and passes both:
+
+```ts
+import { densityThemeOptions } from '@12-apps/ui/tokens';
+
+createAppTheme('light', { density: 'compact', densityTheme: densityThemeOptions });
+```
+
+`density` with no `densityTheme` builds the no-density theme and
+`console.warn`s once, in development, naming the missing option.
+
 ## Why it is a package
 
 Three SPAs cannot share nothing, so they share a private package — and a private

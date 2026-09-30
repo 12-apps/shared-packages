@@ -13,6 +13,11 @@ import { useCallback,useState } from 'react';
 
 import { InfiniteScroll } from './InfiniteScroll';
 
+// Shown by the component's own default loader/end-message — REQUIRED, since
+// the package ships no default copy of its own.
+const LOADING_TEXT = 'Carregando mais...';
+const END_TEXT = 'Você chegou ao fim.';
+
 const meta: Meta<typeof InfiniteScroll> = {
   title: 'Utility/InfiniteScroll',
   component: InfiniteScroll,
@@ -76,7 +81,7 @@ const VerticalScrollComponent = () => {
       </Box>
 
       <Box sx={{ height: 'calc(100% - 80px)', overflow: 'auto' }}>
-        <InfiniteScroll hasMore={hasMore} loading={loading} loadMore={loadMore} threshold={100}>
+        <InfiniteScroll hasMore={hasMore} loading={loading} loadMore={loadMore} threshold={100} loadingText={LOADING_TEXT} endText={END_TEXT}>
           {items.map((item) => (
             <ListItem key={item.id}>
               <ListItemAvatar>
@@ -124,6 +129,8 @@ const CardGridComponent = () => {
         loading={loading}
         loadMore={loadMore}
         threshold={200}
+        loadingText={LOADING_TEXT}
+        endText={END_TEXT}
         loader={
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
@@ -209,6 +216,8 @@ const ReverseScrollComponent = () => {
           loading={loading}
           loadMore={loadMore}
           threshold={50}
+          loadingText={LOADING_TEXT}
+          endText={END_TEXT}
           loader={
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
               <CircularProgress size={20} />
@@ -292,6 +301,8 @@ const HorizontalScrollComponent = () => {
         loadMore={loadMore}
         width="100%"
         threshold={100}
+        loadingText={LOADING_TEXT}
+        endText={END_TEXT}
         loader={
           <Box
             sx={{
@@ -398,7 +409,7 @@ export const AllSizes: Story = {
           Small (300x400)
         </Typography>
         <Box sx={{ height: 'calc(100% - 60px)', overflow: 'auto' }}>
-          <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={50}>
+          <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={50} loadingText={LOADING_TEXT} endText={END_TEXT}>
             {generateItems(0, 10).map((item) => (
               <ListItem key={item.id} dense>
                 <ListItemAvatar>
@@ -418,7 +429,7 @@ export const AllSizes: Story = {
           Medium (500x600)
         </Typography>
         <Box sx={{ height: 'calc(100% - 60px)', overflow: 'auto' }}>
-          <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={100}>
+          <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={100} loadingText={LOADING_TEXT} endText={END_TEXT}>
             {generateItems(0, 15).map((item) => (
               <ListItem key={item.id}>
                 <ListItemAvatar>
@@ -443,7 +454,7 @@ export const AllStates: Story = {
           Default State
         </Typography>
         <Box sx={{ height: 'calc(100% - 60px)', overflow: 'auto' }}>
-          <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={100}>
+          <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={100} loadingText={LOADING_TEXT} endText={END_TEXT}>
             {generateItems(0, 5).map((item) => (
               <ListItem key={item.id}>
                 <ListItemAvatar>
@@ -460,7 +471,7 @@ export const AllStates: Story = {
           Loading State
         </Typography>
         <Box sx={{ height: 'calc(100% - 60px)', overflow: 'auto' }}>
-          <InfiniteScroll hasMore={true} loading={true} loadMore={() => {}} threshold={100}>
+          <InfiniteScroll hasMore={true} loading={true} loadMore={() => {}} threshold={100} loadingText={LOADING_TEXT} endText={END_TEXT}>
             {generateItems(0, 5).map((item) => (
               <ListItem key={item.id}>
                 <ListItemAvatar>
@@ -482,6 +493,8 @@ export const AllStates: Story = {
             loading={false}
             loadMore={() => {}}
             threshold={100}
+            loadingText={LOADING_TEXT}
+            endText={END_TEXT}
             endMessage={
               <Box sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="body2" color="text.secondary">
@@ -511,7 +524,9 @@ export const AllStates: Story = {
             loading={false}
             loadMore={() => {}}
             threshold={100}
-            error={{ message: 'Failed to load more items' }}
+            loadingText={LOADING_TEXT}
+            endText={END_TEXT}
+            error={new Error('Failed to load more items')}
             errorComponent={
               <Box sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="body2" color="error">
@@ -558,7 +573,7 @@ export const Responsive: Story = {
           borderRadius: 2,
         }}
       >
-        <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={100}>
+        <InfiniteScroll hasMore={true} loading={false} loadMore={() => {}} threshold={100} loadingText={LOADING_TEXT} endText={END_TEXT}>
           <Box
             sx={{
               display: 'grid',

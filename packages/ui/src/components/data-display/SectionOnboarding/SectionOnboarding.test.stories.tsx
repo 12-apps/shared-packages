@@ -5,6 +5,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { SectionOnboarding } from './SectionOnboarding';
+import { PT_BR_SECTION_ONBOARDING_COPY } from '../../../pt-BR';
 
 const MockForm = () => (
   <TextField label="Token do PagBank" type="password" data-testid="mock-form-field" />
@@ -84,7 +85,7 @@ export const ConfiguredCollapsesFormBehindToggle: Story = {
     status: 'configured',
     title: 'PagBank',
     configuredTitle: 'PagBank conectado',
-    configuredSummary: <Chip label="Ativo" color="success" size="sm" />,
+    configuredSummary: <Chip label="Ativo" color="success" size="small" />,
     children: <MockForm />,
   },
   play: async ({ canvasElement }) => {
@@ -110,7 +111,7 @@ export const ConfiguredDefaultExpanded: Story = {
   args: {
     status: 'configured',
     title: 'PagBank',
-    configuredSummary: <Chip label="Ativo" color="success" size="sm" />,
+    configuredSummary: <Chip label="Ativo" color="success" size="small" />,
     defaultExpanded: true,
     children: <MockForm />,
   },
@@ -177,7 +178,10 @@ export const ConfiguredWithoutChildrenHidesToggle: Story = {
       <SectionOnboarding
         status="configured"
         title="PagBank"
-        configuredSummary={<Chip label="Ativo" color="success" size="sm" />}
+        configuredSummary={<Chip label="Ativo" color="success" size="small" />}
+        startLabel={PT_BR_SECTION_ONBOARDING_COPY.start}
+        editLabel={PT_BR_SECTION_ONBOARDING_COPY.edit}
+        collapseLabel={PT_BR_SECTION_ONBOARDING_COPY.collapse}
       />
     </Box>
   ),

@@ -16,6 +16,16 @@ import React, {  } from 'react';
 import { useMenuItemState } from './NavigationMenuItem.hooks';
 import { navItemButtonStyles, pulseGlow } from './NavigationMenu.styles';
 import type { NavigationMenuItem } from './NavigationMenu.types';
+import { onMedia, shadowInk, uiInk } from '../../../tokens/ink';
+import { rem, rems, sxRem } from '../../../tokens/relative';
+
+// A numeric or empty-string zero is treated the way the package's own Badge
+// treats a zero count by default (`Badge.helpers.ts`'s `showZero: false`):
+// hidden. `badge && …` prints a bare "0" text node for `badge: 0`, because
+// `0 && …` evaluates to the falsy `0` itself rather than `false`. A caller
+// who wants a visible zero passes the string `'0'`, which is truthy here.
+const hasBadge = (badge: NavigationMenuItem['badge']): boolean =>
+  badge !== undefined && badge !== null && badge !== '' && badge !== 0;
 
 const StyledListItem = styled(ListItem, {
   shouldForwardProp: (prop) => !['variant', 'active', 'size', 'level'].includes(prop as string) })<{ variant?: string; active?: boolean; size?: string; level?: number }>(
@@ -77,12 +87,12 @@ const MenuItemPopover: React.FC<{
           pointerEvents: 'auto',
           mt: 0.5,
           borderRadius: 2,
-          boxShadow: (theme) => `0 12px 40px ${alpha(theme.palette.common.black, 0.15)}`,
+          boxShadow: (theme) => `0 ${rems(theme, 12, 40)} ${shadowInk(theme, 0.15)}`,
           border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           background: (theme) =>
             `linear-gradient(145deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.default, 0.95)} 100%)`,
-          backdropFilter: 'blur(10px)',
-          minWidth: 200 } } }}
+          backdropFilter: (theme) => `blur(${rem(theme, 10)})`,
+          minWidth: sxRem(200) } } }}
   >
     <List sx={{ p: 1 }}>
       {item.children?.map((child) => {
@@ -137,26 +147,28 @@ const MenuItemLabel: React.FC<{
               opacity: 0.7,
               transition: 'all 0.3s ease' } } }}
       />
-      {item.badge && (
+      {hasBadge(item.badge) && (
         <Box
           component="span"
+          data-testid={`navigation-menu-badge-${item.id}`}
           sx={{
             flexShrink: 0,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minWidth: 20,
-            height: 20,
+            minWidth: sxRem(20),
+            height: sxRem(20),
             px: 0.75,
-            borderRadius: '10px',
-            fontSize: '0.75rem',
+            borderRadius: sxRem(10),
+            fontSize: sxRem(12),
             fontWeight: 600,
-            color: '#fff',
-            background: 'linear-gradient(135deg, #ff5252 0%, #ff1744 100%)',
-            boxShadow: '0 2px 8px rgba(255, 23, 68, 0.4)',
-            animation:
+            color: (theme) => onMedia(theme),
+            background: (theme) =>
+              `linear-gradient(135deg, ${uiInk(theme).attention.from} 0%, ${uiInk(theme).attention.to} 100%)`,
+            boxShadow: (theme) => `0 ${rems(theme, 2, 8)} ${alpha(uiInk(theme).attention.glow, 0.4)}`,
+            animation: (theme) =>
               typeof item.badge === 'number' && item.badge > 0
-                ? `${pulseGlow} 2s infinite`
+                ? `${pulseGlow(theme)} 2s infinite`
                 : 'none' }}
         >
           {item.badge}
@@ -226,11 +238,11 @@ const MenuItemContent: React.FC<{
         {item.icon && (
           <ListItemIcon
             sx={{
-              minWidth: collapsed ? 0 : 40,
+              minWidth: collapsed ? 0 : sxRem(40),
               justifyContent: 'center',
               transition: 'all 0.3s ease',
               '& svg': {
-                filter: item.active ? 'drop-shadow(0 2px 8px rgba(0,0,0,0.15))' : 'none',
+                filter: (theme) => (item.active ? `drop-shadow(0 ${rems(theme, 2, 8)} ${shadowInk(theme, 0.15)})` : 'none'),
                 transition: 'all 0.3s ease' } }}
           >
             <Grow in={true} timeout={600}>

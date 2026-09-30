@@ -1,10 +1,11 @@
 import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Fade from '@mui/material/Fade/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { TabPanelProps } from './Tabs.types';
+import { rem } from '../../../tokens/relative';
 
 const TabPanel = styled(Box, {
   shouldForwardProp: (prop) => !['animate', 'persist'].includes(prop as string),
@@ -26,9 +27,15 @@ const LoadingContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 200,
+  minHeight: rem(theme, 200),
   color: theme.palette.text.secondary,
 }));
+
+/** The fallback spinner — a component so it can read the theme its size scales with. */
+const PanelSpinner: React.FC = () => {
+  const theme = useTheme();
+  return <CircularProgress size={rem(theme, 32)} />;
+};
 
 // A loading panel shows the caller's placeholder, or a spinner if there isn't one.
 const panelContent = (
@@ -41,7 +48,7 @@ const panelContent = (
   return (
     loadingComponent || (
       <LoadingContainer>
-        <CircularProgress size={32} />
+        <PanelSpinner />
       </LoadingContainer>
     )
   );

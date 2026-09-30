@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { WorkflowStep } from './WorkflowStep';
+import { StepIndicatorComponent } from './WorkflowStep.parts';
 import type { WorkflowStepItem } from './WorkflowStep.types';
 
 const meta: Meta<typeof WorkflowStep> = {
@@ -74,10 +77,10 @@ export const StateChangeTest: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // Find the second step indicator (should be pending initially)
-    // Since both indicator and content are buttons, we need to find the specific one
-    // Button index 2 should be the second step indicator (0=step1 indicator, 1=step1 content, 2=step2 indicator)
-    const step2Button = canvas.getAllByRole('button')[2];
+    // Find the second step indicator (should be pending initially). The
+    // indicator is now the step's only button (FUT-2773) — the content block
+    // is inert — so button index 1 is the second step's indicator.
+    const step2Button = must(canvas.getAllByRole('button')[1]);
     expect(step2Button).toBeInTheDocument();
 
     // Click on step 2
@@ -107,10 +110,10 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
 
     const stepButtons = canvas.getAllByRole('button');
-    expect(stepButtons).toHaveLength(6); // 3 steps * 2 buttons each (indicator + content)
+    expect(stepButtons).toHaveLength(3); // 3 steps, one button (the indicator) each (FUT-2773)
 
     // Focus on first step indicator (index 0)
-    await userEvent.click(stepButtons[0]);
+    await userEvent.click(must(stepButtons[0]));
     await waitFor(() => expect(stepButtons[0]).toHaveFocus());
 
     // Press Enter key
@@ -126,8 +129,8 @@ export const KeyboardNavigation: Story = {
       );
     });
 
-    // Test Space key on second step indicator (index 2)
-    await userEvent.click(stepButtons[2]);
+    // Test Space key on second step indicator (index 1)
+    await userEvent.click(must(stepButtons[1]));
     await userEvent.keyboard(' ');
 
     await waitFor(() => {
@@ -203,11 +206,7 @@ export const ResponsiveDesign: Story = {
     currentStep: 1,
     orientation: 'horizontal',
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -344,9 +343,9 @@ export const IntegrationTest: Story = {
     expect(canvas.getByText('1')).toBeInTheDocument();
     expect(canvas.getByText('2')).toBeInTheDocument();
 
-    // Check interaction works - click on third step indicator (index 4: 2 buttons per step * 2 = 4)
+    // Check interaction works - click on third step indicator (index 2: one button per step, FUT-2773)
     const stepButtons = canvas.getAllByRole('button');
-    await userEvent.click(stepButtons[4]);
+    await userEvent.click(must(stepButtons[2]));
 
     await waitFor(() => {
       expect(args.onStepClick).toHaveBeenCalledWith(
@@ -360,5 +359,126 @@ export const IntegrationTest: Story = {
     // Verify all step content is present
     expect(canvas.getByText('Step One')).toBeInTheDocument();
     expect(canvas.getByText('First step description')).toBeInTheDocument();
+  },
+};
+
+// Fixed values used directly by `render` below (not read back out of
+// `args.steps` by index): under this project's `noUncheckedIndexedAccess`,
+// `args.steps[n]` types as `WorkflowStepItem | undefined`, which the two
+// `StepIndicatorComponent`s below cannot accept for a required `step` prop.
+const perStepDisabledSteps: [WorkflowStepItem, WorkflowStepItem] = [
+  { title: 'Pedido', description: 'First step', status: 'current', disabled: true },
+  { title: 'Pagamento', description: 'Second step', status: 'pending' },
+];
+
+export const PerStepDisabledClickTest: Story = {
+  // `WorkflowStep`'s own `handleStepClick` (`WorkflowStep.tsx`) has always
+  // re-checked `step.disabled` itself, so driving the full component here
+  // could not observe the defect this ticket fixes — that outer re-check
+  // papers over `StepIndicatorComponent`'s own gating. `render` bypasses the
+  // public wrapper and exercises `StepIndicatorComponent` directly, the
+  // surface `handleClick`/`handleKeyDown` actually live on, with a plain
+  // `onClick` mock that carries no such second check.
+  args: {
+    steps: perStepDisabledSteps,
+    interactive: true,
+    onStepClick: fn(),
+  },
+  render: (args) => (
+    <div style={{ display: 'flex', gap: 16 }}>
+      <StepIndicatorComponent
+        step={perStepDisabledSteps[0]}
+        index={0}
+        isActive={false}
+        isCompleted={false}
+        isError={false}
+        variant="default"
+        color="primary"
+        size="md"
+        showNumbers
+        showIcons={false}
+        interactive={Boolean(args.interactive)}
+        animated={false}
+        disabled={Boolean(args.disabled)}
+        onClick={args.onStepClick}
+        data-testid="disabled-indicator"
+      />
+      <StepIndicatorComponent
+        step={perStepDisabledSteps[1]}
+        index={1}
+        isActive={false}
+        isCompleted={false}
+        isError={false}
+        variant="default"
+        color="primary"
+        size="md"
+        showNumbers
+        showIcons={false}
+        interactive={Boolean(args.interactive)}
+        animated={false}
+        disabled={Boolean(args.disabled)}
+        onClick={args.onStepClick}
+        data-testid="enabled-indicator"
+      />
+    </div>
+  ),
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // The first indicator's step is per-step disabled: it already announces
+    // it (tabIndex="-1", aria-disabled="true", regression coverage from
+    // FUT-2773), and clicking or activating it by keyboard must not run
+    // onClick either.
+    const disabledIndicator = canvas.getByTestId('disabled-indicator');
+    expect(disabledIndicator).toHaveAttribute('tabIndex', '-1');
+    expect(disabledIndicator).toHaveAttribute('aria-disabled', 'true');
+
+    await userEvent.click(disabledIndicator);
+    // eslint-disable-next-line test-flakiness/no-focus-check -- tabIndex="-1" keeps Tab away from a disabled step; focusing it directly is the only way to prove Enter/Space do nothing
+    disabledIndicator.focus();
+    await waitFor(() => expect(disabledIndicator).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    // eslint-disable-next-line test-flakiness/no-focus-check -- same: the disabled step is unreachable by Tab
+    disabledIndicator.focus();
+    await waitFor(() => expect(disabledIndicator).toHaveFocus());
+    await userEvent.keyboard(' ');
+
+    expect(args.onStepClick).not.toHaveBeenCalled();
+
+    // The second indicator's step is not disabled at all: click and keyboard
+    // activation must still reach onClick.
+    const enabledIndicator = canvas.getByTestId('enabled-indicator');
+    expect(enabledIndicator).not.toHaveAttribute('aria-disabled');
+
+    await userEvent.click(enabledIndicator);
+
+    await waitFor(() => {
+      expect(args.onStepClick).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ title: 'Pagamento' }),
+      );
+    });
+  },
+};
+
+export const ContentCursorTest: Story = {
+  args: {
+    steps: interactiveSteps,
+    currentStep: 0,
+    interactive: true,
+    'data-testid': 'workflow',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // The content block is inert (FUT-2773): it has no click handling of its
+    // own, so its cursor must not claim to be clickable, whatever `interactive`
+    // says. The indicator is the step's one interactive element and keeps its
+    // pointer cursor.
+    const content = canvas.getByTestId('workflow-content-0');
+    expect(getComputedStyle(content).cursor).not.toBe('pointer');
+
+    const indicator = canvas.getByTestId('workflow-indicator-0');
+    expect(getComputedStyle(indicator).cursor).toBe('pointer');
   },
 };

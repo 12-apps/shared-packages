@@ -45,6 +45,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DataGrid, GRID_ONLY_PROPS } from '../DataGrid';
 import type { DataGridProps, GridColumn } from '../DataGrid.types';
+import { PT_BR_DATA_GRID_COPY } from '../../../../pt-BR';
 
 interface Row extends Record<string, unknown> {
   id: number;
@@ -75,6 +76,7 @@ describe('Given a grid with rows, when it renders', () => {
         columns={COLUMNS}
         getRowId={(row) => row.id}
         emptyText="Nada por aqui"
+        copy={PT_BR_DATA_GRID_COPY}
         data-testid="grid"
       />,
     );
@@ -97,6 +99,7 @@ const BRANCHING = ['loading', 'error'] as const;
 
 const GRID_CONFIG = {
   emptyText: 'Nada por aqui',
+  copy: PT_BR_DATA_GRID_COPY,
   emptyState: <span>vazio</span>,
   sizeMode: 'fixed',
   density: 'compact',
@@ -156,6 +159,7 @@ describe('Given a grid with no rows, when the empty state renders', () => {
         columns={COLUMNS}
         getRowId={(row) => row.id}
         emptyText="Nada por aqui"
+        copy={PT_BR_DATA_GRID_COPY}
         data-testid="grid"
       />,
     );

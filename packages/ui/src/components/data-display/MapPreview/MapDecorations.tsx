@@ -8,7 +8,9 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { getScaleDistance } from './mapProjection';
-import { BOUNCE_KEYFRAMES } from './mapSurface';
+import { bounceKeyframes } from './mapSurface';
+import { shadowInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
 // Decorative only: these give the mock surface something to look like without
 // standing in for real map data.
@@ -49,7 +51,7 @@ const DecorativePin: FC<{ top: string; left: string }> = ({ top, left }) => {
 
   return (
     <Box sx={{ position: 'absolute', top, left, opacity: 0.6 }}>
-      <PlaceIcon sx={{ fontSize: 20, color: theme.palette.primary.main }} />
+      <PlaceIcon sx={{ fontSize: rem(theme, 20), color: theme.palette.primary.main }} />
     </Box>
   );
 };
@@ -73,15 +75,15 @@ export const MapCentreMarker: FC = () => {
         left: '50%',
         transform: 'translate(-50%, -100%)',
         zIndex: 2,
-        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+        filter: `drop-shadow(${rems(theme, 0, 2, 4)} ${shadowInk(theme, 0.3)})`,
       }}
     >
       <LocationIcon
         sx={{
-          fontSize: 36,
+          fontSize: rem(theme, 36),
           color: theme.palette.error.main,
           animation: 'bounce 2s infinite',
-          '@keyframes bounce': BOUNCE_KEYFRAMES,
+          '@keyframes bounce': bounceKeyframes(theme),
         }}
       />
     </Box>
@@ -103,26 +105,26 @@ export const MapScaleBar: FC<{ zoom: number }> = ({ zoom }) => {
         padding: theme.spacing(0.5, 1),
         background: alpha(theme.palette.background.paper, 0.9),
         borderRadius: theme.shape.borderRadius,
-        fontSize: '0.75rem',
+        fontSize: rem(theme, 12),
         color: theme.palette.text.secondary,
       }}
     >
       <Box
         sx={{
-          width: 40,
-          height: 2,
+          width: rem(theme, 40),
+          height: rem(theme, 2),
           background: theme.palette.text.secondary,
           position: 'relative',
           // The end caps that make the bar read as a measurement.
           '&::before, &::after': {
             content: '""',
             position: 'absolute',
-            width: 2,
-            height: 6,
+            width: rem(theme, 2),
+            height: rem(theme, 6),
             background: theme.palette.text.secondary,
           },
-          '&::before': { left: 0, top: -2 },
-          '&::after': { right: 0, top: -2 },
+          '&::before': { left: 0, top: rem(theme, -2) },
+          '&::after': { right: 0, top: rem(theme, -2) },
         }}
       />
       <Typography variant="caption">{getScaleDistance(zoom)}</Typography>
@@ -139,8 +141,8 @@ export const MapCompass: FC = () => {
         position: 'absolute',
         top: theme.spacing(2),
         left: theme.spacing(2),
-        width: 40,
-        height: 40,
+        width: rem(theme, 40),
+        height: rem(theme, 40),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -150,7 +152,7 @@ export const MapCompass: FC = () => {
       }}
     >
       <NavigationIcon
-        sx={{ fontSize: 24, color: theme.palette.primary.main, transform: 'rotate(-45deg)' }}
+        sx={{ fontSize: rem(theme, 24), color: theme.palette.primary.main, transform: 'rotate(-45deg)' }}
       />
     </Box>
   );

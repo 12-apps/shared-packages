@@ -22,7 +22,9 @@ it themes automatically in light/dark.
 - **Responsive** — below `railBreakpoint` the rail either stacks above the panel
   (`switcher`) or hands the width to a list→detail drilldown (`drilldown`)
 - **Situation markers** per item — host-resolved, with the meaning in text
-- **Section chip strip** on narrow widths, scrolling itself to the open section
+- **Section chip strip** on narrow widths, scrolling itself to the open section —
+  and again when a chip or the strip resizes after mount (a status marker that
+  resolves late, a web font), until the visitor scrolls the strip themselves
 - **Agnostic** — no app-specific content; drive it with any `groups` data
 
 ## The two narrow-width shapes

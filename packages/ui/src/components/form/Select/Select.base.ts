@@ -75,4 +75,19 @@ export interface SelectBaseProps {
   disabled?: boolean;
   testID?: string;
   dataTestId?: string;
+  /**
+   * Draw the field as a search box that filters the options as you type,
+   * with a list of bounded height.
+   *
+   * Left unset, it follows the option count: a list longer than
+   * five options searches (`SEARCHABLE_MIN_OPTIONS`), a shorter one opens
+   * as a plain menu. `multiple` and `renderValue` always keep the menu.
+   */
+  searchable?: boolean;
+  /**
+   * What the searchable list says when nothing matches the typed text. The
+   * host's sentence: this library ships no copy. Unset, the empty list shows
+   * no message.
+   */
+  noOptionsText?: string;
 }

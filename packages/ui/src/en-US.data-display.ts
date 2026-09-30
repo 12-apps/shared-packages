@@ -5,6 +5,7 @@
 import type { DataViewsCopy } from "./components/data-display/DataViews/data-views-copy";
 import type {
   CarouselCopy,
+  DataGridCopy,
   DataStateCopy,
   LightboxCopy,
   MapPreviewCopy,
@@ -26,6 +27,20 @@ export const EN_US_LIGHTBOX_COPY: LightboxCopy = {
   resetZoom: "Reset zoom",
   play: "Start the slideshow",
   pause: "Pause the slideshow",
+  dialogLabel: "Lightbox",
+  itemPosition: (index, total) => `Item ${index} of ${total}`,
+  videoFallback: (index, total) => `Video ${index} of ${total}`,
+  imageFallback: (index, total) => `Image ${index} of ${total}`,
+  thumbnailFallback: (index) => `Thumbnail ${index}`,
+};
+
+export const EN_US_DATA_GRID_COPY: DataGridCopy = {
+  sortBy: (header) => `Sort by ${header}`,
+  selectRow: (rowNumber) => `Select row ${rowNumber}`,
+  selectAllRows: "Select all rows",
+  expandRow: "Expand row",
+  collapseRow: "Collapse row",
+  gridLabel: "Data grid",
 };
 
 export const EN_US_MAP_PREVIEW_COPY: MapPreviewCopy = {
@@ -45,6 +60,13 @@ export const EN_US_CAROUSEL_COPY: CarouselCopy = {
 export const EN_US_TIMING_DIAGRAM_COPY: TimingDiagramCopy = {
   regionLabel: "Timing diagram",
   heading: "Request timing",
+  dns: "DNS Lookup",
+  connect: "Connection",
+  ssl: "SSL/TLS",
+  request: "Request",
+  response: "Response",
+  total: (formatted) => `Total: ${formatted}`,
+  totalTime: (formatted) => `Total Time: ${formatted}`,
 };
 
 export const EN_US_DATA_STATE_COPY: DataStateCopy = {
@@ -161,6 +183,7 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
   },
   tableFilter: EN_US_TABLE_FILTER_COPY,
   grid: {
+    ...EN_US_DATA_GRID_COPY,
     rowActions: "Actions",
     bulkActions: (selectedCount) => `Actions (${selectedCount}) ▾`,
     emptyFilteredTitle: "No results for these filters",

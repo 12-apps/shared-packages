@@ -2,8 +2,10 @@ import Avatar from '@mui/material/Avatar/index.js';
 import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
+
+import { rem, sxRem } from '../../../tokens/relative';
 
 import type { HoverCardProps } from './HoverCard.types';
 
@@ -11,7 +13,7 @@ const LoadingContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: 80,
+  minHeight: rem(theme, 80),
   color: theme.palette.text.secondary,
 }));
 
@@ -39,12 +41,12 @@ const CardAvatar: React.FC<{ avatar: HoverCardProps['avatar'] }> = ({ avatar }) 
   if (!avatar) return null;
 
   if (typeof avatar === 'string') {
-    return <Avatar src={avatar} sx={{ width: 48, height: 48, mr: 2 }} />;
+    return <Avatar src={avatar} sx={{ width: sxRem(48), height: sxRem(48), mr: 2 }} />;
   }
 
   const element = avatar as React.ReactElement<{ sx?: object }>;
   return React.cloneElement(element, {
-    sx: { width: 48, height: 48, mr: 2, ...element.props.sx },
+    sx: { width: sxRem(48), height: sxRem(48), mr: 2, ...element.props.sx },
   });
 };
 
@@ -124,13 +126,14 @@ export const HoverCardContent: React.FC<HoverCardContentProps> = (props) => {
   const { variant, title, description, avatar, loading, loadingComponent, children, dataTestId } =
     props;
   const { loadingText } = props;
+  const theme = useTheme();
 
   if (loading) {
     return (
       <LoadingContainer>
         {loadingComponent || (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CircularProgress size={20} />
+            <CircularProgress size={rem(theme, 20)} />
             <Typography variant="body2">{loadingText}</Typography>
           </Box>
         )}

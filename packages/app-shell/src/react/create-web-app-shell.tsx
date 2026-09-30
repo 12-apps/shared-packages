@@ -79,6 +79,7 @@ import type { Theme } from '@12-apps/ui/mui/styles';
 import { createEmailAuth, createWebAuth } from '@12-apps/auth/react';
 
 import { apiFetch, type ApiFetchOptions } from '../core/api';
+import { clearFreshReloadParam } from '../core/chunk-recovery';
 import { joinApiPath } from '../core/paths';
 import { TermsConsentDialog } from './consent/terms-consent-dialog';
 import { lazyRoute } from './lazy-route';
@@ -173,6 +174,8 @@ export type {
 
 /** Build the browser shell. One call, one config object. */
 export function createWebAppShell(config: WebAppShellConfig): WebAppShell {
+  // Before the router reads the URL: drop a stale-chunk reload's cache-bust mark.
+  clearFreshReloadParam();
   const apiBase = config.apiBase ?? '/api';
   const theme = createAppTheme(config.theme?.mode ?? 'light', config.theme ?? {});
   const authBasePath = config.authBasePath ?? '/api/auth';

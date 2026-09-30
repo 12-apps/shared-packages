@@ -10,11 +10,19 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Pagination } from './Pagination';
+import type { PaginationProps } from './Pagination.types';
 import { SIZE_VALUES } from '../../../tokens/scales';
+
+// `pageSizeLabel` is REQUIRED — it was the hardcoded string `"Show:"` before
+// the component asked every caller for their own word for it.
+const PAGE_SIZE_LABEL = 'Mostrar:';
 
 const meta: Meta<typeof Pagination> = {
   title: 'Navigation/Pagination',
   component: Pagination,
+  args: {
+    pageSizeLabel: PAGE_SIZE_LABEL,
+  },
   parameters: {
     layout: 'centered',
     docs: {
@@ -71,41 +79,36 @@ const meta: Meta<typeof Pagination> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Wrapper component for interactive stories
+// Wrapper component for interactive stories. Its prop type is derived from
+// the real `PaginationProps` (not hand-duplicated) so it can never drift from
+// the component's actual `size`/`color`/`pageSizeLabel` types again.
+type PaginationWrapperProps = Omit<PaginationProps, 'page' | 'onChange' | 'count' | 'pageSizeLabel' | 'ref'> & {
+  initialPage?: number;
+  count?: number;
+  pageSizeLabel?: string;
+};
+
 const PaginationWrapper = ({
   initialPage = 1,
   count = 10,
+  pageSizeLabel = PAGE_SIZE_LABEL,
   ...props
-}: {
-  initialPage?: number;
-  count?: number;
-  page?: number;
-  variant?: 'default' | 'rounded' | 'dots' | 'minimal';
-  size?: 'sm' | 'md' | 'lg';
-  color?: 'primary' | 'secondary' | 'standard';
-  disabled?: boolean;
-  showPageInfo?: boolean;
-  showFirstButton?: boolean;
-  showLastButton?: boolean;
-  boundaryCount?: number;
-  siblingCount?: number;
-  firstIcon?: React.ReactNode;
-  lastIcon?: React.ReactNode;
-  previousIcon?: React.ReactNode;
-  nextIcon?: React.ReactNode;
-  showItemsPerPage?: boolean;
-  itemsPerPage?: number;
-  onItemsPerPageChange?: (value: number) => void;
-  itemsPerPageOptions?: number[];
-  pageInfoFormat?: (page: number, count: number) => string;
-}) => {
+}: PaginationWrapperProps) => {
   const [page, setPage] = useState(initialPage);
 
   const handleChange = (event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
   };
 
-  return <Pagination page={page} count={count} onChange={handleChange} {...props} />;
+  return (
+    <Pagination
+      page={page}
+      count={count}
+      pageSizeLabel={pageSizeLabel}
+      onChange={handleChange}
+      {...props}
+    />
+  );
 };
 
 export const Default: Story = {
@@ -217,6 +220,7 @@ const WithItemsPerPageComponent = () => {
         page={page}
         count={totalPages}
         onChange={handlePageChange}
+        pageSizeLabel={PAGE_SIZE_LABEL}
         showItemsPerPage
         itemsPerPage={itemsPerPage}
         onItemsPerPageChange={handleItemsPerPageChange}
@@ -321,6 +325,7 @@ const AllVariantsComparisonComponent = () => {
             page={pages.default}
             count={8}
             onChange={handleChange('default')}
+            pageSizeLabel={PAGE_SIZE_LABEL}
           />
         </Box>
 
@@ -335,6 +340,7 @@ const AllVariantsComparisonComponent = () => {
             page={pages.rounded}
             count={8}
             onChange={handleChange('rounded')}
+            pageSizeLabel={PAGE_SIZE_LABEL}
           />
         </Box>
 
@@ -344,7 +350,13 @@ const AllVariantsComparisonComponent = () => {
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             Dots
           </Typography>
-          <Pagination variant="dots" page={pages.dots} count={8} onChange={handleChange('dots')} />
+          <Pagination
+            variant="dots"
+            page={pages.dots}
+            count={8}
+            onChange={handleChange('dots')}
+            pageSizeLabel={PAGE_SIZE_LABEL}
+          />
         </Box>
 
         <Divider />
@@ -358,6 +370,7 @@ const AllVariantsComparisonComponent = () => {
             page={pages.minimal}
             count={8}
             onChange={handleChange('minimal')}
+            pageSizeLabel={PAGE_SIZE_LABEL}
           />
         </Box>
       </Box>
@@ -393,6 +406,7 @@ const SizeComparisonComponent = () => {
           page={pages.sm}
           count={6}
           onChange={handleChange('sm')}
+          pageSizeLabel={PAGE_SIZE_LABEL}
         />
       </Box>
 
@@ -406,6 +420,7 @@ const SizeComparisonComponent = () => {
           page={pages.md}
           count={6}
           onChange={handleChange('md')}
+          pageSizeLabel={PAGE_SIZE_LABEL}
         />
       </Box>
 
@@ -419,6 +434,7 @@ const SizeComparisonComponent = () => {
           page={pages.lg}
           count={6}
           onChange={handleChange('lg')}
+          pageSizeLabel={PAGE_SIZE_LABEL}
         />
       </Box>
     </Box>
@@ -488,6 +504,7 @@ const TablePaginationComponent = () => {
           page={page}
           count={totalPages}
           onChange={handlePageChange}
+          pageSizeLabel={PAGE_SIZE_LABEL}
           showItemsPerPage
           itemsPerPage={itemsPerPage}
           onItemsPerPageChange={handleItemsPerPageChange}
@@ -516,28 +533,28 @@ export const AllStates: Story = {
         <Typography variant="caption" color="text.secondary">
           Default State
         </Typography>
-        <PaginationWrapper page={3} count={8} />
+        <PaginationWrapper initialPage={3} count={8} />
       </Box>
 
       <Box>
         <Typography variant="caption" color="text.secondary">
           Disabled State
         </Typography>
-        <PaginationWrapper page={3} count={8} disabled />
+        <PaginationWrapper initialPage={3} count={8} disabled />
       </Box>
 
       <Box>
         <Typography variant="caption" color="text.secondary">
           With Page Info
         </Typography>
-        <PaginationWrapper page={3} count={8} showPageInfo />
+        <PaginationWrapper initialPage={3} count={8} showPageInfo />
       </Box>
 
       <Box>
         <Typography variant="caption" color="text.secondary">
           With First/Last Buttons
         </Typography>
-        <PaginationWrapper page={5} count={10} showFirstButton showLastButton />
+        <PaginationWrapper initialPage={5} count={10} showFirstButton showLastButton />
       </Box>
     </Box>
   ),
@@ -550,7 +567,7 @@ export const InteractiveStates: Story = {
         <Typography variant="caption" color="text.secondary">
           Interactive Pagination (Click to navigate)
         </Typography>
-        <PaginationWrapper page={5} count={10} showFirstButton showLastButton />
+        <PaginationWrapper initialPage={5} count={10} showFirstButton showLastButton />
       </Box>
 
       <Box>
@@ -578,14 +595,14 @@ export const Responsive: Story = {
           <Typography variant="caption" color="text.secondary">
             Full Width
           </Typography>
-          <PaginationWrapper page={10} count={20} showFirstButton showLastButton showPageInfo />
+          <PaginationWrapper initialPage={10} count={20} showFirstButton showLastButton showPageInfo />
         </Paper>
 
         <Paper sx={{ p: 2, maxWidth: 400 }}>
           <Typography variant="caption" color="text.secondary">
             Constrained Width
           </Typography>
-          <PaginationWrapper page={10} count={20} boundaryCount={1} siblingCount={0} />
+          <PaginationWrapper initialPage={10} count={20} boundaryCount={1} siblingCount={0} />
         </Paper>
 
         <Paper sx={{ p: 2, maxWidth: 250 }}>
@@ -594,7 +611,7 @@ export const Responsive: Story = {
           </Typography>
           <PaginationWrapper
             variant="minimal"
-            page={5}
+            initialPage={5}
             count={10}
             boundaryCount={0}
             siblingCount={0}

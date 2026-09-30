@@ -107,6 +107,16 @@ describe('@12-apps/realtime — every published subpath resolves', () => {
     expect(typeof web.realtimeWebManifest.surface.create).toBe('function');
   });
 
+  it('./node — the client for a runtime with no EventSource', async () => {
+    const node = await import('@12-apps/realtime/node');
+    expect(typeof node.createSseSource).toBe('function');
+    expect(typeof node.createNodeChannel).toBe('function');
+    // The polling seams come through here too: a node consumer is bound by the
+    // same contract as a tab — realtime RELAXES a poll, it never replaces one.
+    expect(node.reconcileRefetchInterval('connected', 5_000, 60_000)).toBe(60_000);
+    expect(node.reconcileRefetchInterval('disconnected', 5_000, 60_000)).toBe(5_000);
+  });
+
   it('./package.json — the manifest, and it declares every subpath above', async () => {
     const manifest = (await import('@12-apps/realtime/package.json')) as unknown as {
       default: { exports: Record<string, string>; bin: Record<string, string> };
@@ -122,6 +132,9 @@ describe('@12-apps/realtime — every published subpath resolves', () => {
       './manifest',
       './manifest/server',
       './manifest/web',
+      // The node half of the CLIENT: an event-stream WireSource over `fetch`,
+      // for a runtime with no `EventSource` (a desktop agent, a worker, a CLI).
+      './node',
       './package.json',
       './parity',
       './react',

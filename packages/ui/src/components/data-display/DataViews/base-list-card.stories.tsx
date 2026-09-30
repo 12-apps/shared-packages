@@ -7,8 +7,10 @@ import type { InputType } from "storybook/internal/types";
 import { Button } from "../../form/Button";
 import { DropdownMenu } from "../../navigation/DropdownMenu";
 import { Box } from "../../../mui/Box";
+import { PT_BR_DATA_VIEWS_COPY } from "../../../pt-BR";
 
 import { BaseListCard, type BaseListCardProps } from "./base-list-card";
+import { DataViewsCopyProvider } from "./data-views-copy-context";
 import { DragContainerProvider } from "./data-views-drag";
 import { ListCardGroup } from "./list-card-rails";
 
@@ -131,6 +133,13 @@ const ACTIONS = {
 const meta: Meta<typeof BaseListCard> = {
   title: "Cards/BaseListCard",
   component: BaseListCard,
+  decorators: [
+    (Story) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <Story />
+      </DataViewsCopyProvider>
+    ),
+  ],
   parameters: { layout: "padded" },
   tags: ["autodocs"],
   /**
@@ -852,8 +861,8 @@ function OrderDetail(): React.JSX.Element {
           <Box component="span">R$ 312,50</Box>
         </Box>
         <Box sx={{ display: "flex", gap: 1, mt: 1, justifyContent: "flex-end" }}>
-          <Button size="sm" variant="outlined">Recuperar</Button>
-          <Button size="sm" variant="outlined">Ver cliente</Button>
+          <Button size="sm" variant="outline">Recuperar</Button>
+          <Button size="sm" variant="outline">Ver cliente</Button>
         </Box>
       </Box>
     </Box>

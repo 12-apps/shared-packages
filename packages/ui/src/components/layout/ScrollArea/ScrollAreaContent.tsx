@@ -3,7 +3,7 @@ import { useTheme } from '@mui/material/styles/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 
-const EMPTY_MIN_HEIGHT = 200;
+import { rem } from '../../../tokens/relative';
 
 const EmptyState: FC<{ children: ReactNode }> = ({ children }) => {
   const theme = useTheme();
@@ -15,7 +15,7 @@ const EmptyState: FC<{ children: ReactNode }> = ({ children }) => {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100%',
-        minHeight: EMPTY_MIN_HEIGHT,
+        minHeight: rem(theme, 200),
         color: theme.palette.text.secondary,
       }}
     >

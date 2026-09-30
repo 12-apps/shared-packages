@@ -1,10 +1,14 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
-export const slideIn = keyframes`
+import { modeInk, shadowInk, sheen, uiInk } from '../../../tokens/ink';
+import { EFFECT_GLOW } from '../../../tokens/ink.core';
+import { rem } from '../../../tokens/relative';
+
+export const slideIn = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateX(${rem(theme, -10)});
   }
   to {
     opacity: 1;
@@ -12,31 +16,29 @@ export const slideIn = keyframes`
   }
 `;
 
-export const pulse = keyframes`
+export const pulse = (theme: Theme) => keyframes`
   0% {
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.brandIndigo, 0.4)};
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+    box-shadow: 0 0 0 ${rem(theme, 10)} ${alpha(EFFECT_GLOW.brandIndigo, 0)};
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.brandIndigo, 0)};
   }
 `;
 
 const BAR_VARIANTS: Record<string, (theme: Theme, elevation: number) => CSSObject> = {
   glass: (theme, elevation) => ({
       background:
-        theme.palette.mode === 'dark' ? 'rgba(17, 24, 39, 0.7)' : 'rgba(255, 255, 255, 0.7)',
-      backdropFilter: 'blur(10px)',
-      WebkitBackdropFilter: 'blur(10px)',
-      border: `1px solid ${
-        theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-      }`,
+        theme.palette.mode === 'dark' ? alpha(uiInk(theme).glassSlate, 0.7) : sheen(theme, 0.7),
+      backdropFilter: `blur(${rem(theme, 10)})`,
+      WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
+      border: `1px solid ${alpha(modeInk(theme), 0.1)}`,
       boxShadow:
         theme.palette.mode === 'dark'
-          ? `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-          : `0 ${elevation * 4}px ${elevation * 8}px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)` }),
+          ? `0 ${rem(theme, elevation * 4)} ${rem(theme, elevation * 8)} ${shadowInk(theme, 0.3)}, inset 0 ${rem(theme, 1)} 0 ${sheen(theme, 0.1)}`
+          : `0 ${rem(theme, elevation * 4)} ${rem(theme, elevation * 8)} ${shadowInk(theme, 0.08)}, inset 0 ${rem(theme, 1)} 0 ${sheen(theme, 0.8)}` }),
   elevated: (theme, elevation) => ({
       background: theme.palette.background.paper,
       boxShadow: theme.shadows[elevation] || theme.shadows[1],
@@ -84,7 +86,7 @@ export const breadcrumbsBarStyles = ({
     padding: theme.spacing(size === 'sm' ? 0.75 : size === 'lg' ? 1.5 : 1, 2),
     borderRadius: theme.spacing(visualStyle === 'glass' ? 2 : 1),
   ...barVariantStyles(theme, visualStyle, elevation),
-    animation: `${slideIn} 0.3s ease-out`,
+    animation: `${slideIn(theme)} 0.3s ease-out`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     position: 'relative',
 
@@ -110,11 +112,11 @@ export const breadcrumbsBarStyles = ({
     '&:hover': {
       ...(visualStyle === 'glass' && {
         background:
-          theme.palette.mode === 'dark' ? 'rgba(17, 24, 39, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+          theme.palette.mode === 'dark' ? alpha(uiInk(theme).glassSlate, 0.85) : sheen(theme, 0.85),
         boxShadow:
           theme.palette.mode === 'dark'
-            ? `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.4)`
-            : `0 ${elevation * 6}px ${elevation * 12}px rgba(0, 0, 0, 0.12)` }) } });
+            ? `0 ${rem(theme, elevation * 6)} ${rem(theme, elevation * 12)} ${shadowInk(theme, 0.4)}`
+            : `0 ${rem(theme, elevation * 6)} ${rem(theme, elevation * 12)} ${shadowInk(theme, 0.12)}` }) } });
 
 // The idle glass treatment and the active-crumb treatment are mutually
 // exclusive; keeping them as named pieces takes both branches out of the main
@@ -140,7 +142,7 @@ const linkActiveStyles = (theme: Theme, visualStyle?: string): CSSObject => ({
 
       ...(visualStyle === 'glass' && {
         background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-        animation: `${pulse} 2s infinite` }) });
+        animation: `${pulse(theme)} 2s infinite` }) });
 
 // Hover treatment. The tint is a touch stronger on the glass variant so it still
 // reads against the translucent bar.
@@ -148,7 +150,7 @@ const linkHoverStyles = (theme: Theme, visualStyle?: string): CSSObject => ({
   '&:hover, &[data-hover="true"]': {
       color: theme.palette.primary.main,
       backgroundColor: alpha(theme.palette.primary.main, visualStyle === 'glass' ? 0.1 : 0.08),
-      transform: 'translateY(-1px)',
+      transform: `translateY(${rem(theme, -1)})`,
 
       '&::before': {
         opacity: 1 },
@@ -172,7 +174,7 @@ export const breadcrumbLinkStyles = ({
     alignItems: 'center',
     gap: theme.spacing(0.5),
     textDecoration: 'none',
-    fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
+    fontSize: rem(theme, size === 'sm' ? 14 : size === 'lg' ? 18 : 16),
     fontWeight: active ? 600 : 400,
     color: active ? theme.palette.text.primary : theme.palette.text.secondary,
     padding: theme.spacing(0.5, 0.75),
@@ -192,8 +194,8 @@ export const breadcrumbLinkStyles = ({
       backgroundColor: alpha(theme.palette.primary.main, 0.12) },
 
     '&:focus-visible': {
-      outline: `2px solid ${theme.palette.primary.main}`,
-      outlineOffset: 2,
+      outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
+      outlineOffset: rem(theme, 2),
       backgroundColor: alpha(theme.palette.primary.main, 0.04) },
 
 
@@ -203,7 +205,7 @@ export const breadcrumbLinkStyles = ({
 
     // Mobile responsiveness
     [theme.breakpoints.down('sm')]: {
-      fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
+      fontSize: rem(theme, size === 'lg' ? 16 : size === 'sm' ? 12 : 14),
       padding: theme.spacing(0.375, 0.5) } });
 
 export const sizeIconMap = {

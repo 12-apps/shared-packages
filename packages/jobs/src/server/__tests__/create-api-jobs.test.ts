@@ -658,6 +658,32 @@ describe("createApiJobs — `jobs` may not name nothing", () => {
   });
 });
 
+describe("createApiJobs — the stall settings are checked at assembly (FUT-2480)", () => {
+  it("refuses a negative re-run count, and names the queue", () => {
+    stubBareEnv();
+
+    expect(() =>
+      createApiJobs({
+        jobs: oneJob(),
+        logger: makeLogger().logger,
+        stall: { queues: { sweeps: { maxStalledCount: -1 } } },
+      }),
+    ).toThrow(/queues\.sweeps\.maxStalledCount/);
+  });
+
+  it("accepts a longer lock for one queue", () => {
+    stubBareEnv();
+
+    expect(() =>
+      createApiJobs({
+        jobs: oneJob(),
+        logger: makeLogger().logger,
+        stall: { queues: { sweeps: { lockDurationMs: 60_000 } } },
+      }),
+    ).not.toThrow();
+  });
+});
+
 describe("createApiJobs — retention is checked like every other number", () => {
   // The knob this release adds, and the only configurable number whose bad
   // value is invisible: a NaN or negative window does not shrink retention, it

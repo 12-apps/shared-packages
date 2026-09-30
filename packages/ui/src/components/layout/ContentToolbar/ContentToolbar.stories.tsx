@@ -77,6 +77,9 @@ function ToolbarHarness({ withSelection }: { withSelection: boolean }): React.JS
         </Typography>
       </Box>
       <ContentToolbar
+        selectAllLabel="Selecionar todos"
+        selectAllText="Selecionar todos nesta página"
+        clearAllText="Limpar seleção"
         hasSelection={selected.size > 0}
         selectedCount={selected.size}
         selectAll={() => setSelected(new Set(['a', 'b', 'c', 'd']))}
@@ -90,8 +93,17 @@ function ToolbarHarness({ withSelection }: { withSelection: boolean }): React.JS
         }
         rightControls={
           <>
-            <ViewSelector viewMode={view} onViewModeChange={setView} zoom={zoom} onZoomChange={setZoom} />
+            <ViewSelector
+              cardSizeLabel="Tamanho do cartão"
+              viewMode={view}
+              onViewModeChange={setView}
+              zoom={zoom}
+              onZoomChange={setZoom}
+            />
             <SortByDropdown
+              orderHeading="Ordem"
+              sortHeading="Ordenar por"
+              triggerPrefix="Ordenar por"
               fields={SORT_FIELDS}
               activeField={sortField}
               activeOrder={sortOrder}
@@ -100,6 +112,9 @@ function ToolbarHarness({ withSelection }: { withSelection: boolean }): React.JS
               data-testid="sort-trigger"
             />
             <MultiSelectDropdown
+              extraOptionsHeading="Opções"
+              clearText="Limpar"
+              clearLabel="Limpar seleção"
               label="Content Type"
               options={CONTENT_TYPES}
               selected={types}
@@ -146,7 +161,8 @@ export const WithSelection: Story = {
  * line, and the document must not scroll sideways.
  */
 export const NarrowSelectionOverflow: Story = {
-  parameters: { viewport: { defaultViewport: 'mobile1' }, layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen' },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ px: 2, py: 1.25, borderTop: 1, borderBottom: 1, borderColor: 'divider' }}>
       <ContentToolbar

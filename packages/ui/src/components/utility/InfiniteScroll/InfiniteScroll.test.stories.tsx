@@ -114,6 +114,8 @@ const createTestComponent = (useTestMode = false) => {
           hasMore={hasMore}
           loading={loading}
           loadMore={loadMore}
+          loadingText="Carregando…"
+          endText="Fim da lista"
           testMode={useTestMode}
           testTriggerRef={useTestMode ? triggerRef : undefined}
         >
@@ -285,9 +287,9 @@ export const FocusManagement: Story = {
 export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   parameters: {
-    viewport: { defaultViewport: 'mobile1' },
     chromatic: { viewports: [375] },
   },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => {
     const TestComponent = createTestComponent();
     return <TestComponent />;
@@ -328,7 +330,7 @@ export const VisualStates: Story = {
     <Box>
       <Typography variant="h6">Normal State</Typography>
       <Box sx={{ width: 300, height: 150, overflow: 'auto', border: '1px solid #ccc' }}>
-        <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}}>
+        <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}} loadingText="Carregando…" endText="Fim da lista">
           {generateItems(0, 3).map((item) => (
             <ListItem key={item.id}>
               <ListItemText primary={item.name} />
@@ -355,7 +357,7 @@ export const Performance: Story = {
       <Box>
         <Typography data-testid="render-time">Render time: 15.00ms</Typography>
         <Box sx={{ width: 400, height: 200, overflow: 'auto', border: '1px solid #ccc' }}>
-          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}}>
+          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}} loadingText="Carregando…" endText="Fim da lista">
             {items.map((item) => (
               <ListItem key={item.id} data-testid={`perf-item-${item.id}`}>
                 <ListItemText primary={item.name} />
@@ -386,7 +388,7 @@ export const EdgeCases: Story = {
           sx={{ width: 200, height: 100, border: '1px solid #ccc' }}
           data-testid="empty-container"
         >
-          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}}>
+          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}} loadingText="Carregando…" endText="Fim da lista">
             <Typography sx={{ p: 1 }}>No items</Typography>
           </InfiniteScroll>
         </Box>
@@ -397,7 +399,7 @@ export const EdgeCases: Story = {
           sx={{ width: 200, height: 100, border: '1px solid #ccc' }}
           data-testid="single-container"
         >
-          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}}>
+          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}} loadingText="Carregando…" endText="Fim da lista">
             <ListItem>
               <ListItemText primary="Item 1" />
             </ListItem>
@@ -436,7 +438,7 @@ export const Integration: Story = {
         />
         <Typography data-testid="item-count">{filtered.length} items</Typography>
         <Box sx={{ height: 150, overflow: 'auto', border: '1px solid #ccc' }}>
-          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}}>
+          <InfiniteScroll hasMore={false} loading={false} loadMore={() => {}} loadingText="Carregando…" endText="Fim da lista">
             {filtered.map((item) => (
               <ListItem key={item.id}>
                 <ListItemText primary={item.name} />

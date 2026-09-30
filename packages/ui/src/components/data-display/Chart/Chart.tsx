@@ -2,14 +2,15 @@ import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme, type Theme } from '@mui/material/styles/index.js';
+import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { ChartProps } from './Chart.types';
 import { ChartContainer } from './ChartComposables';
-import { getSizeStyles, getVariantStyles } from './chart-internals';
+import { getSizeStyles, getVariantStyles, plotHeightPx } from './chart-internals';
 import { renderChartByType } from './chart-renderers';
-import { muiColor } from '../../../tokens/scales';
+import { uiInk } from '../../../tokens/ink';
+import { muiColor, rem } from '../../../tokens/scales';
 
 /**
  * Prop-driven Recharts wrapper (line/bar/area/pie/radar/scatter/composed)
@@ -45,7 +46,7 @@ function ChartHeader({ title, subtitle, neon, dataTestId }: HeaderProps): React.
         <Typography
           variant="h6"
           data-testid={`${dataTestId}-title`}
-          sx={{ color: neon ? '#00ffff' : 'text.primary', fontWeight: 600 }}
+          sx={(theme) => ({ color: neon ? uiInk(theme).dataVizNeon.accent : 'text.primary', fontWeight: 600 })}
         >
           {title}
         </Typography>
@@ -54,7 +55,7 @@ function ChartHeader({ title, subtitle, neon, dataTestId }: HeaderProps): React.
         <Typography
           variant="body2"
           data-testid={`${dataTestId}-subtitle`}
-          sx={{ color: neon ? 'rgba(0, 255, 255, 0.7)' : 'text.secondary' }}
+          sx={(theme) => ({ color: neon ? alpha(uiInk(theme).dataVizNeon.accent, 0.7) : 'text.secondary' })}
         >
           {subtitle}
         </Typography>
@@ -65,7 +66,7 @@ function ChartHeader({ title, subtitle, neon, dataTestId }: HeaderProps): React.
 
 export const Chart: React.FC<ChartProps> = (props) => {
   const theme = useTheme();
-  const sizeStyles = getSizeStyles(props.size, props.height);
+  const sizeStyles = getSizeStyles(theme, props.size, props.height);
   const styles = variantSx(theme, props);
   const dataTestId = props['data-testid'] ?? 'chart';
 
@@ -96,8 +97,8 @@ export const Chart: React.FC<ChartProps> = (props) => {
       />
       <ChartContainer
         responsive={props.responsive ?? true}
-        width={props.width ?? '100%'}
-        height={props.fillHeight === true ? '100%' : sizeStyles.height}
+        width={typeof props.width === 'number' ? rem(theme, props.width) : (props.width ?? '100%')}
+        height={props.fillHeight === true ? '100%' : plotHeightPx(props.size, props.height)}
         data-testid={`${dataTestId}-container`}
       >
         {renderChartByType(props, theme)}

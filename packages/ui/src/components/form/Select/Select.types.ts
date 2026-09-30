@@ -21,3 +21,9 @@ export interface SelectProps
    */
   'data-testid'?: string;
 }
+
+/**
+ * `MenuSelect`'s props: `Select`'s, less the two that only the searchable path
+ * reads. A menu that never searches should not accept `searchable` and ignore it.
+ */
+export type MenuSelectProps = Omit<SelectProps, 'searchable' | 'noOptionsText'>;

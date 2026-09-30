@@ -3,12 +3,14 @@ import type { CSSObject, PaletteColor, Theme } from '@mui/material/styles/index.
 
 import type { BannerVariant } from './Banner.types';
 import { ACTIVE, HOVER } from '../Alert/Alert.metrics';
+import { modeInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 // Animations
-export const fadeInSlide = keyframes`
+export const fadeInSlide = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(${rem(theme, -10)});
   }
   to {
     opacity: 1;
@@ -16,13 +18,13 @@ export const fadeInSlide = keyframes`
   }
 `;
 
-const pulseAnimation = keyframes`
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 0.7;
   }
   70% {
-    box-shadow: 0 0 0 8px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 8)} currentColor;
     opacity: 0;
   }
   100% {
@@ -47,7 +49,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
     flexShrink: 0,
     marginTop: theme.spacing(0.25),
     color: colorPalette.main,
-    fontSize: '1.25rem',
+    fontSize: rem(theme, 20),
     display: 'flex',
     alignItems: 'center',
     position: 'relative',
@@ -55,10 +57,10 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
     '&::before': {
       content: '""',
       position: 'absolute',
-      inset: -4,
+      inset: rem(theme, -4),
       borderRadius: '50%',
       background: alpha(colorPalette.main, 0.1),
-      animation: `${pulseAnimation} 3s infinite`,
+      animation: `${pulseAnimation(theme)} 3s infinite`,
     },
   },
 
@@ -71,7 +73,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
   // Title styles
   '.banner-title': {
     fontWeight: 600,
-    fontSize: '1rem',
+    fontSize: rem(theme, 16),
     lineHeight: 1.4,
     marginBottom: theme.spacing(0.5),
     color: colorPalette.dark || colorPalette.main,
@@ -79,7 +81,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
 
   // Description styles  
   '.banner-description': {
-    fontSize: '0.875rem',
+    fontSize: rem(theme, 14),
     lineHeight: 1.5,
     opacity: 0.9,
     color: 'inherit',
@@ -116,8 +118,8 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
 
     '&:focus-visible': {
       opacity: 1,
-      outline: `2px solid ${colorPalette.main}`,
-      outlineOffset: '2px',
+      outline: `${rem(theme, 2)} solid ${colorPalette.main}`,
+      outlineOffset: rem(theme, 2),
     },
   },
 });
@@ -136,7 +138,7 @@ export const bannerPartStyles = (theme: Theme, colorPalette: PaletteColor): CSSO
  */
 /** The same flat inset tint `Alert` paints; see `ACTIVE` for why it is a layer. */
 const tint = (theme: Theme, a: number): string =>
-  `inset 0 0 0 100vmax ${alpha(theme.palette.mode === 'light' ? '#000000' : '#ffffff', a)}`;
+  `inset 0 0 0 100vmax ${alpha(modeInk(theme), a)}`;
 
 export const bannerPointerStates = (theme: Theme): CSSObject => ({
   '&:hover': {

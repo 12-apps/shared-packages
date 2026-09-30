@@ -10,6 +10,9 @@ import MenuItem from '@mui/material/MenuItem/index.js';
 import React, { useState } from 'react';
 
 import type { ColumnVisibilityOption, ColumnsMenuProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 /** One column checkbox row; toggling never closes the menu. */
 function ColumnRow({
@@ -70,14 +73,14 @@ export function ColumnsMenu({
         aria-expanded={open}
         onClick={(event) => setAnchorEl(event.currentTarget)}
         sx={{
-          width: 32,
-          height: 32,
-          borderRadius: 1,
+          width: fieldHeight,
+          height: fieldHeight,
+          borderRadius: fieldRadiusPx,
           color: 'text.secondary',
           bgcolor: open ? 'action.selected' : 'transparent',
         }}
       >
-        <ColumnsIcon sx={{ fontSize: 16 }} />
+        <ColumnsIcon sx={{ fontSize: sxRem(16) }} />
       </IconButton>
       <Menu
         anchorEl={anchorEl}
@@ -85,9 +88,9 @@ export function ColumnsMenu({
         onClose={close}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{ paper: { sx: { minWidth: 200 } } }}
+        slotProps={{ paper: { sx: { minWidth: sxRem(200) } } }}
       >
-        <ListSubheader sx={{ px: 1.5, py: 0.75, fontSize: '0.75rem', fontWeight: 600, color: 'text.primary', lineHeight: 1.5 }}>
+        <ListSubheader sx={{ px: 1.5, py: 0.75, fontSize: sxRem(12), fontWeight: 600, color: 'text.primary', lineHeight: 1.5 }}>
           {title}
         </ListSubheader>
         {columns.map((option) => (

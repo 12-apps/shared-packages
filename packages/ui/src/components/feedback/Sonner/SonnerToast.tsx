@@ -13,23 +13,26 @@ import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { shadowInk } from '../../../tokens/ink';
+import { rem, rems, sxRem } from '../../../tokens/relative';
+
 import type { SonnerItem } from './Sonner.types';
 import type { SonnerProps } from './Sonner.types';
 
-const renderToastIcon = (icon: SonnerProps['icon'], type: SonnerProps['type']) => {
+const renderToastIcon = (theme: Theme, icon: SonnerProps['icon'], type: SonnerProps['type']) => {
   if (icon) return icon;
 
   switch (type) {
     case 'success':
-      return <SuccessIcon sx={{ fontSize: 20, color: 'success.main' }} />;
+      return <SuccessIcon sx={{ fontSize: sxRem(20), color: 'success.main' }} />;
     case 'error':
-      return <ErrorIcon sx={{ fontSize: 20, color: 'error.main' }} />;
+      return <ErrorIcon sx={{ fontSize: sxRem(20), color: 'error.main' }} />;
     case 'warning':
-      return <WarningIcon sx={{ fontSize: 20, color: 'warning.main' }} />;
+      return <WarningIcon sx={{ fontSize: sxRem(20), color: 'warning.main' }} />;
     case 'info':
-      return <InfoIcon sx={{ fontSize: 20, color: 'info.main' }} />;
+      return <InfoIcon sx={{ fontSize: sxRem(20), color: 'info.main' }} />;
     case 'loading':
-      return <CircularProgress size={16} />;
+      return <CircularProgress size={rem(theme, 16)} />;
     default:
       return null;
   }
@@ -69,9 +72,9 @@ const buildToastStyles = (
       return {
         ...baseStyles,
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+        boxShadow: `${rems(theme, 0, 8, 32)} ${shadowInk(theme, 0.1)}`,
       };
 
     case 'minimal':
@@ -80,7 +83,7 @@ const buildToastStyles = (
         backgroundColor: theme.palette.background.default,
         border: 'none',
         boxShadow: 'none',
-        borderLeft: `4px solid ${theme.palette.primary.main}`,
+        borderLeft: `${rem(theme, 4)} solid ${theme.palette.primary.main}`,
         borderRadius: 0,
       };
 
@@ -113,7 +116,7 @@ const ToastContent: React.FC<{
     )}
 
     {description && (
-      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: sxRem(14) }}>
         {description}
       </Typography>
     )}
@@ -137,7 +140,7 @@ const ToastActionButton: React.FC<{
     size="small"
     onClick={action.onClick}
     variant={buttonVariant}
-    sx={{ fontSize: '0.75rem', py: 0.5, px: 1.5 }}
+    sx={{ fontSize: sxRem(12), py: 0.5, px: 1.5 }}
   >
     {action.label}
   </Button>
@@ -175,14 +178,14 @@ export const SonnerToast: React.FC<SonnerItem & { onDismiss: (id: string) => voi
           ...buildToastStyles(theme, variant, visible),
           p: 2,
           mb: 1,
-          minWidth: 356,
-          maxWidth: 400,
+          minWidth: sxRem(356),
+          maxWidth: sxRem(400),
           display: 'flex',
           alignItems: 'flex-start',
           gap: 1.5,
         }}
       >
-        {renderToastIcon(icon, type)}
+        {renderToastIcon(theme, icon, type)}
 
         <ToastContent
           title={title}

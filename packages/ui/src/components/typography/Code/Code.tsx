@@ -7,6 +7,8 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import React, { useState } from 'react';
 
 import type { CodeProps } from './Code.types';
+import { modeInk, neutralTones } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
 const StyledCodeContainer = styled(Box, {
   shouldForwardProp: (prop) =>
@@ -19,17 +21,17 @@ const StyledCodeContainer = styled(Box, {
 }>(({ theme, customVariant = 'inline', customSize = 'md', copyable }) => {
   // Size mapping
   const sizeMap = {
-    xs: { fontSize: '0.75rem', padding: '2px 4px' },
-    sm: { fontSize: '0.8125rem', padding: '3px 6px' },
-    md: { fontSize: '0.875rem', padding: '4px 8px' },
-    lg: { fontSize: '1rem', padding: '6px 12px' },
+    xs: { fontSize: rem(theme, 12), padding: rems(theme, 2, 4) },
+    sm: { fontSize: rem(theme, 13), padding: rems(theme, 3, 6) },
+    md: { fontSize: rem(theme, 14), padding: rems(theme, 4, 8) },
+    lg: { fontSize: rem(theme, 16), padding: rems(theme, 6, 12) },
   };
 
   const blockSizeMap = {
-    xs: { fontSize: '0.75rem', padding: '8px 12px' },
-    sm: { fontSize: '0.8125rem', padding: '12px 16px' },
-    md: { fontSize: '0.875rem', padding: '16px 20px' },
-    lg: { fontSize: '1rem', padding: '20px 24px' },
+    xs: { fontSize: rem(theme, 12), padding: rems(theme, 8, 12) },
+    sm: { fontSize: rem(theme, 13), padding: rems(theme, 12, 16) },
+    md: { fontSize: rem(theme, 14), padding: rems(theme, 16, 20) },
+    lg: { fontSize: rem(theme, 16), padding: rems(theme, 20, 24) },
   };
 
   const baseStyles = {
@@ -55,17 +57,17 @@ const StyledCodeContainer = styled(Box, {
       display: 'block',
       backgroundColor:
         theme.palette.mode === 'dark'
-          ? alpha(theme.palette.grey[900], 0.95)
-          : alpha(theme.palette.grey[100], 0.95),
+          ? alpha(neutralTones(theme).inverseSurface, 0.95)
+          : alpha(neutralTones(theme).surface, 0.95),
       color:
-        theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.text.primary,
+        theme.palette.mode === 'dark' ? modeInk(theme) : theme.palette.text.primary,
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
       overflow: 'auto',
       whiteSpace: 'pre' as const,
       ...blockSizeMap[customSize as keyof typeof blockSizeMap],
       ...(copyable && {
         paddingTop: blockSizeMap[customSize as keyof typeof blockSizeMap].padding.split(' ')[0],
-        paddingRight: '60px',
+        paddingRight: rem(theme, 60),
       }),
     },
     highlight: {
@@ -74,13 +76,13 @@ const StyledCodeContainer = styled(Box, {
       background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
       color: theme.palette.text.primary,
       border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-      borderLeft: `4px solid ${theme.palette.primary.main}`,
+      borderLeft: `${rem(theme, 4)} solid ${theme.palette.primary.main}`,
       overflow: 'auto',
       whiteSpace: 'pre' as const,
       ...blockSizeMap[customSize as keyof typeof blockSizeMap],
       ...(copyable && {
         paddingTop: blockSizeMap[customSize as keyof typeof blockSizeMap].padding.split(' ')[0],
-        paddingRight: '60px',
+        paddingRight: rem(theme, 60),
       }),
     },
   };
@@ -103,24 +105,24 @@ const CopyButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
   top: theme.spacing(1),
   right: theme.spacing(1),
-  width: 32,
-  height: 32,
+  width: rem(theme, 32),
+  height: rem(theme, 32),
   backgroundColor:
     theme.palette.mode === 'dark'
       ? alpha(theme.palette.background.paper, 0.8)
       : theme.palette.background.paper,
-  backdropFilter: theme.palette.mode === 'dark' ? 'blur(8px)' : 'none',
+  backdropFilter: theme.palette.mode === 'dark' ? `blur(${rem(theme, 8)})` : 'none',
   border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
   boxShadow: theme.palette.mode === 'light' ? theme.shadows[1] : 'none',
   '&:hover': {
     backgroundColor:
       theme.palette.mode === 'dark'
         ? alpha(theme.palette.background.paper, 0.9)
-        : theme.palette.grey[100],
+        : neutralTones(theme).surface,
     transform: 'scale(1.05)',
   },
   '& .MuiSvgIcon-root': {
-    fontSize: 16,
+    fontSize: rem(theme, 16),
   },
 }));
 
@@ -128,16 +130,16 @@ const LanguageLabel = styled(Box)(({ theme }) => ({
   position: 'absolute',
   top: theme.spacing(1),
   left: theme.spacing(2),
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 500,
   color: alpha(theme.palette.text.primary, 0.6),
   backgroundColor:
     theme.palette.mode === 'dark'
       ? alpha(theme.palette.background.paper, 0.8)
       : theme.palette.background.paper,
-  padding: '2px 8px',
+  padding: rems(theme, 2, 8),
   borderRadius: theme.shape.borderRadius / 2,
-  backdropFilter: theme.palette.mode === 'dark' ? 'blur(8px)' : 'none',
+  backdropFilter: theme.palette.mode === 'dark' ? `blur(${rem(theme, 8)})` : 'none',
   border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
   boxShadow: theme.palette.mode === 'light' ? theme.shadows[1] : 'none',
 }));

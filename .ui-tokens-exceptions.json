@@ -1,0 +1,146 @@
+{
+  "packages/ui/src/components/layout/SettingsLayout/SettingsSectionChips.scroll.ts — raw-length ×3": {
+    "kind": "exempt",
+    "why": "detectRtlScrollType's throwaway, off-screen probe div (FUT-2775): the pixel values are the feature-detection MECHANISM (inner box wider than outer, so there is something to scroll, held far off-screen), not a drawn size — they carry no visual density and must not track the theme's spacing scale"
+  },
+  "packages/ui/src/components/data-display/Chart/chart-axis.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "tickMargin is a parameter that already holds getSizeStyles' remPx value; the scanner cannot trace a relative value through a function parameter"
+  },
+  "packages/ui/src/components/data-display/Chart/chart-spec-registry.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "copies a spec's design-px size into ChartProps.innerRadius, a public design-px prop that the pie renderer converts through remPx where Recharts reads it"
+  },
+  "packages/ui/src/components/data-display/Chart/chart-spec.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "copies the spec's design-px height into ChartProps.height, a public design-px prop that getSizeStyles converts through remPx where it is read"
+  },
+  "packages/ui/src/components/data-display/Chart/Chart.tsx — raw-jsx-size ×1": {
+    "kind": "exempt",
+    "why": "passes ChartContainer's public height prop in design px; ChartContainer converts it where it reads it (rem for the Box, remPx for Recharts), so converting here would scale it twice"
+  },
+  "packages/ui/src/components/data-display/DataViews/data-views-overflow.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "width is the toolbar's ResizeObserver-measured px width, keyed into the split cache's JSON signature; a runtime measurement, not a design size"
+  },
+  "packages/ui/src/components/data-display/DataViews/list-card-rails.tsx — layout-constant ×1": {
+    "kind": "exempt",
+    "why": "RAIL_GAP is a count of theme spacing units read as an sx columnGap, already relative; only the constant's name trips the layout-constant rule"
+  },
+  "packages/ui/src/components/data-display/LazyImage/LazyImage.hooks.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "threshold is the IntersectionObserver visibility ratio between 0 and 1, not a length; the rule matches the key name only"
+  },
+  "packages/ui/src/components/data-display/Lightbox/LightboxMedia.tsx — raw-length ×2": {
+    "kind": "exempt",
+    "why": "panOffset is a pointer-drag delta measured in screen px at runtime and written back as a translate, not a design size"
+  },
+  "packages/ui/src/components/data-display/MapPreview/MapPreview.constants.ts — raw-number-length ×2": {
+    "kind": "exempt",
+    "why": "HEATMAP_VIEWBOX is an SVG viewBox extent in user units, not a CSS length; the overlay scales with the box it is drawn in"
+  },
+  "packages/ui/src/components/data-display/MapPreview/MapTiles.tsx — raw-length ×2": {
+    "kind": "exempt",
+    "why": "the pan offset is the pointer pixels dragged; the tile grid must follow the cursor exactly at any type scale, so it stays px"
+  },
+  "packages/ui/src/components/data-display/Sheet/Sheet.hooks.ts — raw-length ×2": {
+    "kind": "exempt",
+    "why": "the snap height is window.innerHeight times the snap fraction, measured at runtime and written to the element while dragging"
+  },
+  "packages/ui/src/components/data-display/Sheet/Sheet.hooks.ts — raw-number-length ×3": {
+    "kind": "exempt",
+    "why": "currentHeight is the viewport-measured snap height (window.innerHeight times the snap fraction) carried in state, not a design size"
+  },
+  "packages/ui/src/components/data-display/Sheet/Sheet.styles.ts — raw-number-length ×2": {
+    "kind": "exempt",
+    "why": "currentHeight is the viewport-measured snap height (window.innerHeight times the snap fraction) passed into the styles, not a design size"
+  },
+  "packages/ui/src/components/data-display/Sheet/Sheet.tsx — raw-number-length ×2": {
+    "kind": "exempt",
+    "why": "velocityThreshold is a drag speed in px per ms compared with the pointer's measured speed, and currentHeight is the viewport-measured snap height"
+  },
+  "packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.geometry.ts — raw-number-length ×14": {
+    "kind": "exempt",
+    "why": "tooltip placement arithmetic over getBoundingClientRect and window.innerWidth/innerHeight; the design clearance already arrives through remPx from the hook"
+  },
+  "packages/ui/src/components/feedback/TutorialOverlay/TutorialOverlay.tsx — raw-number-length ×6": {
+    "kind": "exempt",
+    "why": "the spotlight box is the measured target rect plus the remPx clearance, and the tooltip's top/left come from measured rects, not design sizes"
+  },
+  "packages/ui/src/components/form/Autocomplete/Autocomplete.parts.tsx — raw-length ×1": {
+    "kind": "exempt",
+    "why": "the Popper sameWidth modifier copies the anchor input's runtime-measured width (state.rects.reference.width) so the list matches it; a live measurement, not a design size, so it stays px"
+  },
+  "packages/ui/src/components/form/CodeEditor/CodeEditor.helpers.ts — raw-font-size ×1": {
+    "kind": "exempt",
+    "why": "the public fontSize prop is a design-px number (its documented API); buildEditorOptions turns it into a theme-relative size through remPx(theme, fontPx) where Monaco reads it, so the default stays a px number"
+  },
+  "packages/ui/src/components/form/ToggleGroup/ToggleGroup.tsx — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "the glass frame's radius is a px number built from theme values that already scale (the theme's field radius, remPx of its padding, the theme spacing and the hairline), kept numeric so it stays concentric with the buttons it wraps"
+  },
+  "packages/ui/src/components/layout/Box/box-layout.ts — raw-number-length ×3": {
+    "kind": "exempt",
+    "why": "the platform-neutral resolver shared with Box.native (dp on native); radius is theme.radius, and width/height are converted at the web read in Box.tsx"
+  },
+  "packages/ui/src/components/layout/Box/Box.tsx — raw-length ×1": {
+    "kind": "exempt",
+    "why": "spacing, gap, radius and border are already the host MUI theme's own px (read through uiThemeFromMui, the same basis as sx spacing keys); through rem they would scale twice"
+  },
+  "packages/ui/src/components/layout/Card/Card.tsx — raw-jsx-size ×1": {
+    "kind": "exempt",
+    "why": "MUI forwards CardMedia's height to the DOM as an HTML height attribute, which is px-only and ignored by a div; moving it into CSS would change what renders"
+  },
+  "packages/ui/src/components/layout/Collapsible/Collapsible.tsx — raw-number-length ×2": {
+    "kind": "exempt",
+    "why": "the content's runtime-measured scrollHeight, animated as an explicit height; a measurement of the content, not a design size"
+  },
+  "packages/ui/src/components/layout/ContentToolbar/MultiSelectDropdown.tsx — raw-number-length ×3": {
+    "kind": "exempt",
+    "why": "anchorEl.offsetWidth measured at runtime so the menu matches the trigger's width; the design minimum already goes through sxRem"
+  },
+  "packages/ui/src/components/layout/Resizable/Resizable.helpers.ts — raw-number-length ×2": {
+    "kind": "exempt",
+    "why": "the drag result is the start px plus the pointer pixels moved, clamped to bounds already put through remPx; a runtime measurement, not a design size"
+  },
+  "packages/ui/src/components/layout/Resizable/Resizable.tsx — raw-number-length ×2": {
+    "kind": "exempt",
+    "why": "the box's live size is the dragged size in real pixels; its start and clamp come from remPx and the rest is pointer movement"
+  },
+  "packages/ui/src/components/layout/ScrollArea/ScrollArea.tsx — raw-number-length ×4": {
+    "kind": "exempt",
+    "why": "the ResizeObserver contentRect width and height reported to onResize: live measurements of the viewport, not design sizes"
+  },
+  "packages/ui/src/components/layout/ScrollArea/ScrollAreaContent.tsx — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "the measured container width handed to a nested virtual list child; a live measurement, not a design size"
+  },
+  "packages/ui/src/components/layout/SettingsLayout/SettingsSectionChips.tsx — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "a scrollTo({ left }) offset computed from the strip's scrollWidth and clientWidth at runtime, not a design size"
+  },
+  "packages/ui/src/components/layout/Skeleton/Skeleton.helpers.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "spacing: 1 is the Stack spacing-unit default (a theme.spacing multiple) shared by web and native, not a px length"
+  },
+  "packages/ui/src/components/layout/Skeleton/Skeleton.tsx — raw-jsx-size ×2": {
+    "kind": "exempt",
+    "why": "a width or height of 0 is handed to MUI's Skeleton as the number 0, not '0rem': MUI reads a falsy size as 'size from children', and a rem string would be truthy; every other number goes through rem"
+  },
+  "packages/ui/src/components/navigation/AppHeader/AppHeader.tsx — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "the fixed bar's spacer height comes from getBoundingClientRect and a ResizeObserver: the bar's own rendered height, measured at runtime"
+  },
+  "packages/ui/src/components/navigation/CommandPalette/CommandPalette.hooks.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "threshold is Fuse.js's fuzzy-match score between 0 and 1, not a length; the rule matches the key name only"
+  },
+  "packages/ui/src/components/navigation/ContextMenu/ContextMenu.tsx — raw-number-length ×2": {
+    "kind": "exempt",
+    "why": "mouseX/mouseY are the pointer's clientX/clientY from the contextmenu event, passed to the Popover's anchorPosition: viewport coordinates"
+  },
+  "packages/ui/src/components/utility/Overflow/overflow.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "useMeasuredWidth returns the ResizeObserver contentRect width, the live container measurement the fit algorithm prices against"
+  }
+}

@@ -10,6 +10,7 @@ import { MapLayers } from './MapLayers';
 import { MapCoordinates, MapMarkers } from './MapMarkers';
 import { StaticMapView } from './StaticMapView';
 import { useMapPreview } from './useMapPreview';
+import { rem } from '../../../tokens/relative';
 
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
@@ -38,7 +39,8 @@ export const MapPreview: FC<MapPreviewProps> = (componentProps) => {
   const theme = useTheme();
   const { containerRef, view, controls, pointer, search, handleMapClick } = useMapPreview(props);
 
-  const height = controls.isFullscreen ? '100vh' : props.height;
+  // The map's own default height is 400 design px, through the theme's type scale.
+  const height = controls.isFullscreen ? '100vh' : (props.height ?? rem(theme, 400));
   const grabbing = pointer.isDragging || pointer.isPanning;
 
   return (

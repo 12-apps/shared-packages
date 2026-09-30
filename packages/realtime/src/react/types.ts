@@ -82,4 +82,19 @@ export interface RealtimeTransportConfig {
   ticketUrl?: (subscribeUrl: string) => string;
   /** Test seam for the ticket round trip. */
   fetchTicket?: (ticketUrl: string) => Promise<string>;
+  /**
+   * The `WebSocket` implementation, for a runtime that has none.
+   *
+   * Default: the global, which every browser has and a recent Node does. It is
+   * needed because "recent Node" is not the same question as "this process":
+   * Electron 33 bundles Node 20, where the global is still behind a flag, so an
+   * agent on it has `WebSocket === undefined` no matter what the machine's own
+   * `node` would answer. Measured, on Electron 33.4.11: node 20.18.3,
+   * `typeof WebSocket` → `"undefined"`.
+   *
+   * Without this seam that host has no socket at all and silently runs on the
+   * SSE demotion — which is the failure this whole file exists to make
+   * impossible to reach by accident. A host in that position passes `ws`.
+   */
+  webSocket?: typeof WebSocket;
 }

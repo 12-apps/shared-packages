@@ -1,6 +1,7 @@
 export * from './ConfirmAction';
 export * from './Dialog';
 export * from './Modal';
+export * from './NotificationStatusNotice';
 export * from './Sonner';
 export * from './StackedModal';
 export * from './Toast';

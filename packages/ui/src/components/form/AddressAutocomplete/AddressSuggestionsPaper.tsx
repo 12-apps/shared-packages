@@ -4,6 +4,8 @@ import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 
+import { rem } from '../../../tokens/relative';
+
 // The dropdown surface, frosted to match the glass field.
 export const AddressSuggestionsPaper: FC<PaperProps> = (props) => {
   const theme = useTheme();
@@ -16,8 +18,8 @@ export const AddressSuggestionsPaper: FC<PaperProps> = (props) => {
       sx={{
         mt: 1,
         background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
+        WebkitBackdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
       }}
     />

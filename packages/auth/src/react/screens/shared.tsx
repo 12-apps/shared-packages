@@ -1,8 +1,10 @@
-import type { JSX, ReactNode } from "react";
+import { useEffect, useRef, type JSX, type ReactNode, type RefObject } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
+import { Box } from "@12-apps/ui/mui/Box";
+import { useTheme, type Theme } from "@12-apps/ui/mui/styles";
 import { Button } from "@12-apps/ui/form/Button";
-import { Spacer } from "@12-apps/ui/layout/Spacer";
+import { Portal } from "@12-apps/ui/utility/Portal";
 
 import { useScreens } from "./context";
 import { failureMessage, type EmailAuthScreenReason } from "./copy";
@@ -17,11 +19,267 @@ import { failureMessage, type EmailAuthScreenReason } from "./copy";
  */
 
 /**
- * The refusal banner.
+ * Bring a notice into view when it appears, if it appeared off screen.
  *
- * Renders nothing for `null`, so a caller can drop it in unconditionally
- * instead of wrapping it in a fragment-and-spacer each time — which is what
- * pushed three of these components past the size gate.
+ * It wraps the notices that sit in a form's flow: the unverified-e-mail notice
+ * and the sign-up page's host notice. The refusal banner floats instead (see
+ * {@link FailureBanner}), and needs no scrolling.
+ *
+ * A form's notice renders at the TOP of the form and the button that caused it
+ * is at the bottom. On a phone the two are a screen apart: measured at 360×640
+ * on sign-up, the page was scrolled to the submit when "Criar conta" was
+ * tapped, the banner rendered above the window, and nothing on screen changed
+ * except the button going back to enabled. Centred rather than scrolled to the
+ * top edge, because the host's header may be pinned there. Already on screen,
+ * it is left where it is — a banner that jumped the page every time would be its
+ * own problem. The Alert inside carries `role="alert"`, so a screen reader hears
+ * it wherever it is.
+ */
+export function RevealOnAppear({ children }: { children: ReactNode }): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // The refusal itself, not this wrapper: the wrapper has no box of its own.
+    const target = ref.current?.firstElementChild;
+    // jsdom has no `scrollIntoView`; there is no screen to bring it onto there.
+    if (!(target instanceof HTMLElement) || typeof target.scrollIntoView !== "function") return;
+    const { top, bottom } = target.getBoundingClientRect();
+    if (top >= 0 && bottom <= window.innerHeight) return;
+    target.scrollIntoView({ block: "center" });
+  }, []);
+  // `contents`, so the wrapper is never a flex item of its own: a notice that
+  // renders nothing (a dismissed one) must not leave a gap in the card's column.
+  return (
+    <div ref={ref} style={{ display: "contents" }}>
+      {children}
+    </div>
+  );
+}
+
+/** An app bar's height in spacing units: MUI's desktop toolbar, and the storefront's header. */
+const APP_BAR_UNITS = 8;
+
+/** The room above the refusal (below the header) and below it (above a focused control). */
+const GAP_UNITS = 1.5;
+
+/**
+ * How far below the top of the window the refusal floats.
+ *
+ * Under the host's header rather than over it: by default an app bar's height
+ * plus the gap. A host with a different header sets `--auth-refusal-top` on its
+ * root to its own height plus the gap, and a host with no fixed header to the
+ * gap alone.
+ */
+const refusalTop = (theme: Theme): string =>
+  `var(--auth-refusal-top, ${theme.spacing(APP_BAR_UNITS + GAP_UNITS)})`;
+
+/**
+ * The floating layer the refusal sits on.
+ *
+ * Opaque: the host's alert pane is translucent glass, which over a form lets
+ * the words underneath read through the refusal's own. The paper behind it
+ * keeps the host's tint and loses the see-through. The radius is the Alert's
+ * own (`theme.spacing(1.5)`), so no paper corner shows past its rounding.
+ */
+const FLOATING = {
+  position: "fixed",
+  top: refusalTop,
+  left: (theme: Theme) => theme.spacing(2),
+  right: (theme: Theme) => theme.spacing(2),
+  mx: "auto",
+  maxWidth: 440,
+  zIndex: "snackbar",
+  bgcolor: "background.paper",
+  borderRadius: (theme: Theme) => theme.spacing(1.5),
+} as const;
+
+/**
+ * Keep the control a keyboard user moves to clear of the refusal (WCAG 2.4.11).
+ *
+ * The browser scrolls a focused control into view, and a control under the
+ * refusal counts as in view: the refusal is not the window's edge. The root's
+ * `scroll-padding-top` is what says where the view starts, so while the refusal
+ * is up it is the refusal's bottom edge plus the gap. The host's own value comes
+ * back when the refusal goes. The pinned sign-up block reserves its room at the
+ * bottom the same way (`useReserveFocusRoom`, `pages/signup-actions.tsx`).
+ *
+ * Measured before this, sign-up at 320×568 after a weak password: Shift+Tab
+ * from "Criar conta" put focus on the password field with none of it visible,
+ * under the refusal.
+ */
+function useReserveFocusRoomBelow(ref: RefObject<HTMLDivElement | null>): void {
+  const theme = useTheme();
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const root = document.documentElement;
+    const before = root.style.scrollPaddingTop;
+    const gap = theme.spacing(GAP_UNITS);
+    const publish = (): void => {
+      root.style.scrollPaddingTop = `calc(${el.getBoundingClientRect().bottom}px + ${gap})`;
+    };
+    publish();
+    // jsdom has no ResizeObserver; losing it costs the resize case only.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+    observer?.observe(el);
+    return () => {
+      observer?.disconnect();
+      root.style.scrollPaddingTop = before;
+    };
+  }, [ref, theme]);
+}
+
+/**
+ * Whether the refusal hides `control`: whether it is what shows at the
+ * control's middle, where the control's label is. A sliver showing past the
+ * refusal's edge does not show what has focus.
+ *
+ * `elementFromPoint` settles it where the boxes overlap, so a layer opened OVER
+ * the refusal (the account menu, still scaled mid-animation when it takes
+ * focus) is not counted as under it. jsdom has no `elementFromPoint`; there the
+ * boxes alone decide.
+ */
+function hidesMiddleOf(layer: HTMLElement, control: HTMLElement): boolean {
+  const box = control.getBoundingClientRect();
+  const over = layer.getBoundingClientRect();
+  const x = (box.left + box.right) / 2;
+  const y = (box.top + box.bottom) / 2;
+  if (x < over.left || x > over.right || y < over.top || y > over.bottom) return false;
+  if (typeof document.elementFromPoint !== "function") return true;
+  const top = document.elementFromPoint(x, y);
+  return top !== null && layer.contains(top);
+}
+
+/** The control that holds focus, unless it is in the refusal or nowhere. */
+function focusedOutside(layer: HTMLElement): HTMLElement | null {
+  const focused = document.activeElement;
+  if (!(focused instanceof HTMLElement) || focused === document.body) return null;
+  return layer.contains(focused) ? null : focused;
+}
+
+/**
+ * Keep the control with focus in sight while the refusal is up — the half the
+ * scroll padding cannot do on its own (WCAG 2.4.11).
+ *
+ * The padding clears every control the page can scroll to below the refusal.
+ * It does nothing at the top of the page, where a scroll of 0 leaves no room
+ * above: the sign-up name field at 320×568 and 360×640, and the Google button
+ * of a login with no header (at 1280×800 all of it but its bottom 10px). And it
+ * only steers focus that MOVES. So, each a frame late, after the browser's own
+ * scrolling:
+ *
+ * - **Focus moves onto a control the refusal hides.** Whoever went back up to
+ *   fix the form is past the refusal's message, so it closes, as if they had
+ *   closed it.
+ * - **The refusal opens (or grows) over the control that has focus** — Enter
+ *   pressed in the name field. The control is scrolled clear if the page can.
+ *   Where it cannot, focus goes to the refusal, which is what there is to read,
+ *   and comes back to the control when the refusal closes.
+ */
+function useKeepFocusInSight(ref: RefObject<HTMLDivElement | null>, onClose: () => void): void {
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const layer = ref.current;
+    if (!layer) return undefined;
+    let moved = 0;
+    let opened = 0;
+    let returnTo: HTMLElement | null = null;
+    const onFocusIn = (): void => {
+      // Focus went somewhere else by itself: nothing is owed back.
+      if (!layer.contains(document.activeElement)) returnTo = null;
+      cancelAnimationFrame(moved);
+      moved = requestAnimationFrame(() => {
+        const focused = focusedOutside(layer);
+        if (focused && hidesMiddleOf(layer, focused)) close.current();
+      });
+    };
+    // The control that held focus as the refusal opened. Only that one, and only
+    // while it still holds focus: once focus moves, the rule above decides.
+    const heldAtOpen = focusedOutside(layer);
+    const onOpen = (): void => {
+      cancelAnimationFrame(opened);
+      opened = requestAnimationFrame(() => {
+        const held = heldAtOpen;
+        if (!held || document.activeElement !== held || !hidesMiddleOf(layer, held)) return;
+        // jsdom has no `scrollIntoView`; there is no page to scroll there.
+        if (typeof held.scrollIntoView === "function") held.scrollIntoView({ block: "nearest" });
+        if (!hidesMiddleOf(layer, held)) return;
+        // The Alert is focusable (`tabIndex=0`) and is the layer's first stop.
+        const refusal = layer.querySelector<HTMLElement>('[tabindex="0"]');
+        if (!refusal) return;
+        refusal.focus({ preventScroll: true });
+        returnTo = held;
+      });
+    };
+    document.addEventListener("focusin", onFocusIn);
+    // It opens by growing (the Alert's collapse), so its size is what to watch.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onOpen);
+    observer?.observe(layer);
+    onOpen();
+    return () => {
+      cancelAnimationFrame(moved);
+      cancelAnimationFrame(opened);
+      observer?.disconnect();
+      document.removeEventListener("focusin", onFocusIn);
+      // Closed while holding the focus it took: give focus back where it was.
+      const lost = document.activeElement === null || document.activeElement === document.body;
+      if (returnTo?.isConnected && lost) returnTo.focus();
+    };
+  }, [ref]);
+}
+
+/**
+ * The layer itself, in a portal at the end of the document.
+ *
+ * A portal because the refusal's place in the tree is the form's, and the form
+ * is not a place a fixed layer can trust: in a `Stack` it took the column's
+ * spacing as a top margin (forgot and reset password floated it 16px lower),
+ * and an ancestor with a `transform` would pin it to that ancestor instead of
+ * the window.
+ *
+ * The container is named rather than left to `Portal`: without one it renders
+ * into the body first and into a container of its own from the next render on,
+ * and that move remounts the refusal — a new node on the form's first keystroke
+ * after it, which a screen reader may announce again.
+ */
+function FloatingLayer({
+  children,
+  onClose,
+}: {
+  children: ReactNode;
+  onClose: () => void;
+}): JSX.Element | null {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useReserveFocusRoomBelow(ref);
+  useKeepFocusInSight(ref, onClose);
+  // The server has no window for it to float in, and a refusal is a client's answer.
+  if (typeof document === "undefined") return null;
+  return (
+    <Portal container={document.body}>
+      <Box ref={ref} sx={FLOATING} data-testid="auth-failure-layer">
+        {children}
+      </Box>
+    </Portal>
+  );
+}
+
+/**
+ * The refusal banner. It FLOATS: fixed under the host's header, over the page.
+ *
+ * It used to sit in the form's flow, at the top of the form, while the button
+ * that caused it sat at the bottom. On a phone that is a screen apart, so the
+ * banner needed scrolling into view, and it sat 8px from the first field. The
+ * product owner chose the floating banner over the inline one with more room
+ * (FUT-2393). It is on screen wherever the page is scrolled, and nothing in
+ * the form moves when it appears or goes. What it costs: it covers the part of
+ * the page under it until it is closed. That is why it is closable and opaque,
+ * why focus scrolling keeps clear of it ({@link useReserveFocusRoomBelow}), and
+ * why what has focus is kept in sight where scrolling cannot do it
+ * ({@link useKeepFocusInSight}).
+ *
+ * Renders nothing for `null`, so a caller can drop it in unconditionally.
  */
 export function FailureBanner({
   title,
@@ -45,17 +303,18 @@ export function FailureBanner({
         in a pt-BR app, which is exactly what stops these scenarios shipping
         with the library. The reason code is the same in every consumer.
       */}
-      <Alert
-        variant="danger"
-        title={title}
-        description={failureMessage(copy, reason, violations)}
-        closable
-        closeLabel={copy.dismissFailure}
-        onClose={onDismiss}
-        data-testid="auth-failure"
-        data-reason={reason}
-      />
-      <Spacer size="sm" />
+      <FloatingLayer onClose={onDismiss}>
+        <Alert
+          variant="danger"
+          title={title}
+          description={failureMessage(copy, reason, violations)}
+          closable
+          closeLabel={copy.dismissFailure}
+          onClose={onDismiss}
+          data-testid="auth-failure"
+          data-reason={reason}
+        />
+      </FloatingLayer>
     </>
   );
 }

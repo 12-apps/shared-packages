@@ -6,6 +6,8 @@ import type {
   SeparatorSize,
   SeparatorVariant,
 } from './Separator.types';
+import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height.core';
+import { rem } from '../../../tokens/relative';
 
 const THICKNESS_PX: Record<SeparatorSize, number> = {
   xs: 1,
@@ -59,7 +61,7 @@ const gradientBackground = (
 // a parent's border shorthand cannot leak through.
 const borderEdges = (
   isHorizontal: boolean,
-  thickness: number,
+  thickness: string,
   style: 'dashed' | 'dotted' | 'solid',
   color: string,
 ): CSSObject => {
@@ -90,26 +92,110 @@ const borderEdges = (
 type SeparatorStyleArgs = Required<
   Pick<SeparatorProps, 'variant' | 'orientation' | 'size'>
 > &
-  Pick<SeparatorProps, 'color' | 'margin' | 'length'>;
+  Pick<SeparatorProps, 'color' | 'length'> & {
+    /** From {@link separatorBlockMargin}, which both the plain and the labelled separator read. */
+    blockMargin: string;
+  };
+
+/**
+ * The separator's margin, on the axis it separates along only: above and below
+ * a horizontal rule, either side of a vertical one. A margin given as a string
+ * carries its own units; a number is design px, through the type scale.
+ *
+ * The LABELLED separator uses this too. It used to hand the number straight to
+ * `sx.margin`, where a number is SPACING UNITS — `md`'s 16 drew 128px on all
+ * four sides, against 16px above and below for the unlabelled one.
+ */
+export const separatorBlockMargin = (
+  theme: Theme,
+  size: SeparatorSize,
+  margin: number | string | undefined,
+  isHorizontal: boolean,
+): string => {
+  const value = separatorMargin(size, margin);
+  const length = typeof value === 'string' ? value : rem(theme, value);
+  return isHorizontal ? `${length} 0` : `0 ${length}`;
+};
+
+/**
+ * The rule's extent along its axis. It lands in `sx`, which reads a number of 1
+ * or less as a fraction of the parent, and that stays so; any other number is
+ * design px, through the type scale. Unset (or `0`/`''`) is the full run.
+ */
+const ruleLength = (theme: Theme, length: SeparatorProps['length']): string => {
+  if (!length) return '100%';
+  if (typeof length === 'string') return length;
+  return length <= 1 ? `${length * 100}%` : rem(theme, length);
+};
+
+/**
+ * Whether a set `length` is a fraction of the parent rather than a fixed
+ * extent: a number of 1 or less, as {@link ruleLength} reads it, or any string
+ * that carries a percentage (`'50%'`, `'calc(50% - 8px)'`).
+ */
+const isRelativeLength = (length: number | string): boolean =>
+  typeof length === 'number' ? length <= 1 : length.includes('%');
+
+/**
+ * What a labelled separator's rules add to {@link separatorStyles}, and whether
+ * the group stretches to its parent (FUT-2617, FUT-2675).
+ *
+ * A labelled VERTICAL separator is a flex COLUMN — rule, label, rule — and with
+ * no `length` each rule is `height: 100%` of a column whose height is its own
+ * content: both resolved to 0px and only the label showed. So the column
+ * stretches to the row it sits in and the two rules split what the label
+ * leaves, equally (`flex: 1 1 0`), never shorter than a visible minimum.
+ *
+ * A RELATIVE `length` (FUT-2675) resolved against that same content-height
+ * column and drew 0px too. It now means what it means on a horizontal labelled
+ * separator: that fraction of the run. The column stretches as above and each
+ * rule is `length` of it, with no grow and the default shrink, so rule, label
+ * and rule never overflow the row; the same minimum holds, and is all a block
+ * parent (where `align-self` does nothing) gets.
+ *
+ * An ABSOLUTE `length` is exactly that long: no grow, no shrink, no basis, and
+ * the column keeps its content height, centred as before.
+ *
+ * Only the labelled branch reads this. The plain separator keeps
+ * `separatorStyles` as is, since `flex: 1 1 0` there would widen a vertical
+ * separator sitting in a row. The horizontal rules already shrink around the
+ * label in their row, so they are left alone.
+ */
+export const labelledSeparatorLayout = (
+  theme: Theme,
+  isHorizontal: boolean,
+  length: SeparatorProps['length'],
+): { rule: CSSObject; group: CSSObject } => {
+  if (isHorizontal) return { rule: {}, group: {} };
+  if (length && !isRelativeLength(length)) return { rule: { flex: 'none' }, group: {} };
+  return {
+    // Unset, the rules share the run; relative, each is its own fraction of it.
+    // Either way a design 16px floor, as long as the gap beside the label at
+    // the default spacing, so a short or unsized row still shows two rules and
+    // not a word.
+    rule: { flex: length ? '0 1 auto' : '1 1 0', minHeight: rem(theme, 16) },
+    group: { alignSelf: 'stretch' },
+  };
+};
 
 export const separatorStyles = (
   theme: Theme,
-  { variant, orientation, size, color, margin, length }: SeparatorStyleArgs,
+  { variant, orientation, size, color, blockMargin, length }: SeparatorStyleArgs,
 ): CSSObject => {
   const isHorizontal = orientation === 'horizontal';
-  const thickness = separatorThickness(size);
+  // `xs` is the 1px hairline: it stays one device-independent pixel at every
+  // root size, like every other hairline in the package; heavier rules scale.
+  const thicknessPx = separatorThickness(size);
+  const thickness = thicknessPx === FIELD_BORDER_WIDTH ? `${FIELD_BORDER_WIDTH}px` : rem(theme, thicknessPx);
+  const along = ruleLength(theme, length);
   const resolvedColor = color || theme.palette.divider;
-
-  // A margin given as a string carries its own units; a number is pixels.
-  const marginValue = separatorMargin(size, margin);
-  const marginStr = typeof marginValue === 'string' ? marginValue : `${marginValue}px`;
 
   const baseStyles: CSSObject = {
     display: 'flex',
     alignItems: 'center',
-    margin: isHorizontal ? `${marginStr} 0` : `0 ${marginStr}`,
-    width: isHorizontal ? length || '100%' : `${thickness}px`,
-    height: isHorizontal ? `${thickness}px` : length || '100%',
+    margin: blockMargin,
+    width: isHorizontal ? along : thickness,
+    height: isHorizontal ? thickness : along,
     boxSizing: 'border-box',
   };
 

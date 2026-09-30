@@ -8,7 +8,9 @@ import React from 'react';
 
 import { MARKER_PIXELS_PER_DEGREE } from './MapPreview.constants';
 import type { LatLng, MapMarker } from './MapPreview.types';
-import { BOUNCE_KEYFRAMES } from './mapSurface';
+import { bounceKeyframes } from './mapSurface';
+import { shadowInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
 // Kept module-local: styled() components cannot be exported across a module
 // boundary here without tripping TS2742.
@@ -18,8 +20,8 @@ const CoordinatesDisplay = styled(Box)(({ theme }) => ({
   left: theme.spacing(2),
   padding: theme.spacing(1, 1.5),
   background: alpha(theme.palette.background.paper, 0.95),
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  backdropFilter: `blur(${rem(theme, 10)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
   border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
   borderRadius: theme.shape.borderRadius,
   zIndex: 1,
@@ -47,8 +49,8 @@ export const MapMarkers: FC<MapMarkersProps> = ({ markers, centre, animated }) =
             top: '50%',
             left: '50%',
             transform: `translate(
-              ${(markerItem.position.lng - centre.lng) * MARKER_PIXELS_PER_DEGREE}px,
-              ${-(markerItem.position.lat - centre.lat) * MARKER_PIXELS_PER_DEGREE}px
+              ${rem(theme, (markerItem.position.lng - centre.lng) * MARKER_PIXELS_PER_DEGREE)},
+              ${rem(theme, -(markerItem.position.lat - centre.lat) * MARKER_PIXELS_PER_DEGREE)}
             )`,
             zIndex: 3,
             cursor: markerItem.onClick ? 'pointer' : 'default',
@@ -59,11 +61,11 @@ export const MapMarkers: FC<MapMarkersProps> = ({ markers, centre, animated }) =
           <Tooltip title={markerItem.description || markerItem.title || ''}>
             <LocationIcon
               sx={{
-                fontSize: 32,
+                fontSize: rem(theme, 32),
                 color: theme.palette.error.main,
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                filter: `drop-shadow(${rems(theme, 0, 2, 4)} ${shadowInk(theme, 0.3)})`,
                 animation: animated ? 'bounce 2s infinite' : 'none',
-                '@keyframes bounce': BOUNCE_KEYFRAMES,
+                '@keyframes bounce': bounceKeyframes(theme),
               }}
             />
           </Tooltip>

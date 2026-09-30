@@ -4,6 +4,7 @@ import type {
   JobEvents,
   JobLogger,
   JobRetention,
+  JobStallConfig,
 } from "../core/types";
 import type { SweepLeaseDbProvider } from "../lease/sweep-lease";
 
@@ -101,6 +102,13 @@ export interface JobsServerConfig {
    */
   defaultConcurrency?: number;
   /**
+   * How a worker holds a running job, and how many times a job that lost that
+   * hold (a stall) is run again before it is failed. For every queue, with
+   * per-queue values over them. Defaults to BullMQ's own numbers (a 30 s lock,
+   * a 30 s stalled check, one re-run). Validated at assembly.
+   */
+  stall?: JobStallConfig;
+  /**
    * Where the `sweep_leases` table lives — enables `withSweepLease` on the
    * factory's return. Omit it and the lease helper rejects on first use,
    * loudly, because a sweep that silently skipped its lease would be the
@@ -161,6 +169,7 @@ export interface ResolvedConfig {
   events: JobEvents | undefined;
   retention: JobRetention | undefined;
   defaultConcurrency: number | undefined;
+  stall: JobStallConfig | undefined;
 }
 
 /**
@@ -179,5 +188,6 @@ export function resolveConfig(config: JobsServerConfig): ResolvedConfig {
     events: config.events,
     retention: config.retention,
     defaultConcurrency: config.defaultConcurrency,
+    stall: config.stall,
   };
 }

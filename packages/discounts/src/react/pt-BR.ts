@@ -26,6 +26,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     create: "Novo desconto",
     empty: "Nenhum desconto cadastrado.",
     exportFileName: "descontos",
+    exportAction: "Exportar",
     loading: "Carregando descontos…",
     loadFailed: "Não foi possível carregar os descontos",
     retry: "Tentar novamente",
@@ -157,6 +158,9 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     stackable: "Acumulável",
     stackableHint:
       "Quando desligado, esta promoção é exclusiva: se vencer, nenhuma outra é aplicada.",
+    firstOrderOnly: "Só na primeira compra do cliente nesta loja",
+    firstOrderOnlyHint:
+      "Vale só para quem nunca comprou aqui. O preço do cardápio não muda: o desconto aparece no carrinho de quem pode usar.",
     reviewFields: "Revise os campos destacados.",
     saveFailed: "Não foi possível salvar o desconto",
     nameRequired: "Informe o nome da promoção.",

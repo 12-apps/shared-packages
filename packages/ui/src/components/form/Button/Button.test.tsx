@@ -22,22 +22,28 @@ describe('Button (web)', () => {
     expect(screen.getByTestId('go')).not.toHaveAttribute('testID');
   });
 
-  it('pads and types each size from the shared metrics', () => {
+  it('stands at the field height for its size, and types and pads it from the shared metrics', () => {
     render(
       <>
         <Button size="xs" dataTestId="xs">x</Button>
+        <Button size="md" dataTestId="md">x</Button>
         <Button size="xl" dataTestId="xl">x</Button>
       </>,
     );
-    expect(screen.getByTestId('xs')).toHaveStyle({ padding: '2px 8px', fontSize: '0.75rem' });
-    expect(screen.getByTestId('xl')).toHaveStyle({ padding: '12px 24px', fontSize: '1.25rem' });
+    // The height is the theme's field height, a multiple of the default font
+    // size (FUT-2555); the vertical padding goes so the label centres in it.
+    expect(screen.getByTestId('xs')).toHaveStyle({ minHeight: '2rem', padding: '0px 0.5rem', fontSize: '0.75rem' });
+    expect(screen.getByTestId('md')).toHaveStyle({ minHeight: '2.5rem', padding: '0px 1rem' });
+    expect(screen.getByTestId('xl')).toHaveStyle({ minHeight: '3.5rem', padding: '0px 1.5rem', fontSize: '1.25rem' });
   });
 
   it('is square when it carries only an icon', () => {
     render(<Button dataTestId="close" icon={<span>x</span>} />);
     const style = window.getComputedStyle(screen.getByTestId('close'));
-    expect(style.padding).toBe('7px');
-    expect(style.minWidth).toMatch(/^0(px)?$/);
+    // The field height on both sides, no padding round the glyph.
+    expect(style.padding).toMatch(/^0(px)?$/);
+    expect(style.minWidth).toBe('2.5rem');
+    expect(style.minHeight).toBe('2.5rem');
   });
 
   /**
@@ -56,8 +62,8 @@ describe('Button (web)', () => {
         <Button size="xl" dataTestId="xl">x</Button>
       </>,
     );
-    // Five of ours onto three of MUI's, and the padding above still proves the
-    // five are drawn apart.
+    // Five of ours onto three of MUI's, and the heights above still prove the
+    // steps are drawn apart.
     expect(screen.getByTestId('xs').className).toMatch(/MuiButton-sizeSmall/u);
     expect(screen.getByTestId('sm').className).toMatch(/MuiButton-sizeSmall/u);
     expect(screen.getByTestId('md').className).toMatch(/MuiButton-sizeMedium/u);
@@ -86,7 +92,7 @@ describe('Button (web)', () => {
     // the one the glyph inherits from, so pinning it is the mechanism; that the
     // glyph then follows was measured in a browser (see `Button.metrics.ts`).
     for (const id of ['xs', 'xl']) {
-      expect(window.getComputedStyle(screen.getByTestId(`${id}-icon`)).fontSize).toBe('20px');
+      expect(window.getComputedStyle(screen.getByTestId(`${id}-icon`)).fontSize).toBe('1.25rem');
     }
   });
 

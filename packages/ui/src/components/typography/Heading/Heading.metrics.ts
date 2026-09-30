@@ -1,5 +1,6 @@
 import type { HeadingWeight } from './Heading.base';
 import { HEADING_SCALE, type HeadingLevel } from '../../../tokens/heading-scale';
+import { NEUTRAL_RAMP } from '../../../tokens/ink.core';
 import { FONT_WEIGHTS, type UiTheme } from '../../../tokens/theme';
 import type { ColorValue } from '../../../tokens/vocabulary';
 
@@ -77,7 +78,7 @@ export function headingGradientStops(theme: UiTheme, color: ColorValue): [string
     case 'secondary':
       return [theme.palette.secondary.main, theme.palette.primary.main];
     case 'neutral':
-      return [theme.palette.grey[NEUTRAL_GRADIENT_STEPS.from], theme.palette.grey[NEUTRAL_GRADIENT_STEPS.to]];
+      return [NEUTRAL_RAMP[NEUTRAL_GRADIENT_STEPS.from], NEUTRAL_RAMP[NEUTRAL_GRADIENT_STEPS.to]];
     default:
       return [theme.palette[color].light, theme.palette[color].dark];
   }

@@ -4,6 +4,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Pagination } from './Pagination';
 
 const meta: Meta<typeof Pagination> = {
@@ -101,7 +103,7 @@ export const KeyboardNavigation: Story = {
     const canvas = within(canvasElement);
 
     // Focus on the pagination component
-    const firstButton = canvas.getAllByRole('button')[0];
+    const firstButton = must(canvas.getAllByRole('button')[0]);
     await userEvent.click(firstButton);
 
     // Tab through buttons
@@ -188,7 +190,7 @@ export const FocusManagement: Story = {
     const buttons = canvas.getAllByRole('button');
 
     // Test focus on first button
-    const firstButton = buttons[0];
+    const firstButton = must(buttons[0]);
     await userEvent.click(firstButton);
     await waitFor(() => expect(document.activeElement).toBe(firstButton));
 
@@ -219,11 +221,7 @@ export const ResponsiveDesign: Story = {
     variant: 'default',
     onChange: fn(),
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -422,6 +420,7 @@ const IntegrationComponent = () => {
         page={page}
         count={pageCount}
         onChange={(_, newPage) => setPage(newPage)}
+        pageSizeLabel="Itens por página"
         showPageInfo={true}
         showItemsPerPage={true}
         itemsPerPage={itemsPerPage}
@@ -439,6 +438,7 @@ const IntegrationComponent = () => {
           page={page}
           count={pageCount}
           onChange={(_, newPage) => setPage(newPage)}
+          pageSizeLabel="Itens por página"
           variant="rounded"
           size="sm"
         />
@@ -446,12 +446,14 @@ const IntegrationComponent = () => {
           page={page}
           count={pageCount}
           onChange={(_, newPage) => setPage(newPage)}
+          pageSizeLabel="Itens por página"
           variant="dots"
         />
         <Pagination
           page={page}
           count={pageCount}
           onChange={(_, newPage) => setPage(newPage)}
+          pageSizeLabel="Itens por página"
           variant="minimal"
         />
       </Box>
@@ -471,7 +473,7 @@ export const Integration: Story = {
 
     // Test that clicking on one updates the display
     const page2Buttons = canvas.getAllByRole('button', { name: /go to page 2/i });
-    await userEvent.click(page2Buttons[0]);
+    await userEvent.click(must(page2Buttons[0]));
 
     // Check that the display updated
     await waitFor(() => {
@@ -503,7 +505,7 @@ export const Integration: Story = {
 
     // Test first/last buttons
     const lastButtons = canvas.getAllByRole('button', { name: /go to last page/i });
-    await userEvent.click(lastButtons[0]);
+    await userEvent.click(must(lastButtons[0]));
 
     await waitFor(() => {
       const currentPageText = canvas.getByText(/Current Page: 4/i);

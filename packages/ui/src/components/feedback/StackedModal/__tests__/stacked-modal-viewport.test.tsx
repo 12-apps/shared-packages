@@ -46,10 +46,11 @@ function injectedCss(): string {
     .join("");
 }
 
-function renderModal(actions?: React.ReactNode): void {
+function renderModal(actions?: React.ReactNode, size?: "default" | "wide"): void {
   render(
     <StackedModalProvider>
       <StackedModal backLabel="Voltar"
+        size={size}
         open
         onClose={() => undefined}
         navigationTitle="Novo produto"
@@ -100,5 +101,35 @@ describe("StackedModal viewport sizing", () => {
     expect(injectedCss()).toContain(
       "max(16px, calc(16px + env(safe-area-inset-bottom)))",
     );
+  });
+});
+
+describe("StackedModal size", () => {
+  it("keeps the default viewport shares when no size is given", async () => {
+    renderModal();
+    await screen.findByTestId("viewport-modal-header");
+    const css = injectedCss();
+    expect(css).toMatch(/max-width:\s*60vw/);
+    // The wide keyframes are always registered; the SETTLED width is what differs.
+    expect(css).not.toMatch(/max-width:\s*90vw/);
+  });
+
+  it("gives a wide panel 90vw up to xl and 75vw above it", async () => {
+    renderModal(undefined, "wide");
+    await screen.findByTestId("viewport-modal-header");
+    const css = injectedCss();
+    expect(css).toMatch(/max-width:\s*90vw/);
+    expect(css).toMatch(/max-width:\s*75vw/);
+    // The keyframes a wide panel animates with end where it settles, or it snaps.
+    expect(css).toContain("contractModalWide");
+  });
+
+  it("does not forward the size to the DOM", async () => {
+    renderModal(undefined, "wide");
+    const header = await screen.findByTestId("viewport-modal-header");
+    const paper = header.closest(".MuiDialog-paper");
+    expect(paper).toBeInTheDocument();
+    expect(paper?.hasAttribute("panelsize")).toBe(false);
+    expect(paper?.hasAttribute("panelSize")).toBe(false);
   });
 });

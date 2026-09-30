@@ -2,13 +2,15 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import Card from '@mui/material/Card/index.js';
 import CardContent from '@mui/material/CardContent/index.js';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Carousel } from './Carousel';
 import type { CarouselItem } from './Carousel.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 import { PT_BR_CAROUSEL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Carousel> = {
@@ -544,8 +546,7 @@ const InteractiveStatesComponent = () => {
       </Typography>
       <Carousel copy={PT_BR_CAROUSEL_COPY}
         items={imageItems}
-        activeIndex={activeIndex}
-        onIndexChange={(index) => setActiveIndex(index)}
+        onChange={(index) => setActiveIndex(index)}
         onClick={(item, index) => {
           setClickInfo(`Clicked: ${item.title} at index ${index}`);
         }}
@@ -562,18 +563,6 @@ const InteractiveStatesComponent = () => {
           </Typography>
         )}
       </Box>
-      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-        {imageItems.map((_, index) => (
-          <Button
-            key={index}
-            variant={index === activeIndex ? 'contained' : 'outlined'}
-            size="small"
-            onClick={() => setActiveIndex(index)}
-          >
-            {index + 1}
-          </Button>
-        ))}
-      </Box>
     </Box>
   );
 };
@@ -583,38 +572,45 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
-  },
-  render: () => (
-    <Box>
-      <Typography variant="h6" gutterBottom>
-        Responsive Carousel (resize viewport to test)
-      </Typography>
-      <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 600, md: 800, lg: 1000 } }}>
-        {/*
-          `size` is one value, not a breakpoint map — the component has never
-          read one. The neighbouring `height`, `showArrows` and `showThumbnails`
-          props are handed maps here too and are just as unsupported; those are
-          outside this change and still do not type-check.
-        */}
-        <Carousel copy={PT_BR_CAROUSEL_COPY}
-          items={imageItems}
-          height={{ xs: 200, sm: 300, md: 400, lg: 500 }}
-          showArrows={{ xs: false, sm: true }}
-          showIndicators={true}
-          showThumbnails={{ xs: false, md: true }}
-          size="md"
-        />
+  render: () => {
+    // `Carousel`'s own props (`height`, `showArrows`, `showThumbnails`) each take
+    // ONE value, not a breakpoint map — so the breakpoint switch below reads the
+    // theme itself, through `useMediaQuery`, and hands the component a single
+    // value already resolved for the current viewport.
+    const ResponsiveCarousel = () => {
+      const theme = useTheme();
+      const isSm = useMediaQuery(theme.breakpoints.up('sm'));
+      const isMd = useMediaQuery(theme.breakpoints.up('md'));
+      const isLg = useMediaQuery(theme.breakpoints.up('lg'));
+      const height = isLg ? 500 : isMd ? 400 : isSm ? 300 : 200;
+
+      return (
+        <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 600, md: 800, lg: 1000 } }}>
+          <Carousel copy={PT_BR_CAROUSEL_COPY}
+            items={imageItems}
+            height={height}
+            showArrows={isSm}
+            showIndicators={true}
+            showThumbnails={isMd}
+            size="md"
+          />
+        </Box>
+      );
+    };
+
+    return (
+      <Box>
+        <Typography variant="h6" gutterBottom>
+          Responsive Carousel (resize viewport to test)
+        </Typography>
+        <ResponsiveCarousel />
+        <Typography variant="body2" sx={{ mt: 2 }} color="text.secondary">
+          • Mobile (xs): Height 200px, no arrows, no thumbnails
+          <br />
+          • Tablet (sm): Height 300px, with arrows
+          <br />• Desktop (md+): Height 400px+, with thumbnails
+        </Typography>
       </Box>
-      <Typography variant="body2" sx={{ mt: 2 }} color="text.secondary">
-        • Mobile (xs): Height 200px, no arrows, no thumbnails
-        <br />
-        • Tablet (sm): Height 300px, with arrows
-        <br />• Desktop (md+): Height 400px+, with thumbnails
-      </Typography>
-    </Box>
-  ),
+    );
+  },
 };

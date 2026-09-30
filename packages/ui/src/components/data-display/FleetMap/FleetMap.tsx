@@ -1,9 +1,10 @@
 import Box from '@mui/material/Box/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { SR_ONLY_SX } from '../../form/Label/Label.styles';
+import { rem } from '../../../tokens/relative';
 import { EmptyState } from '../EmptyState/EmptyState';
 
 import { FleetBody } from './FleetBody';
@@ -15,8 +16,8 @@ import {
 } from './FleetMap.metrics';
 import type { FleetMapProps } from './FleetMap.types';
 
-/** The map's own default height. Overridable, and never a hardcoded viewport. */
-const DEFAULT_HEIGHT = '420px';
+/** The map's own default height, in design px. Overridable, and never a hardcoded viewport. */
+const defaultHeight = (theme: Theme): string => rem(theme, 420);
 
 /**
  * The reload announcement, and nothing else.
@@ -96,12 +97,13 @@ export const FleetMap: React.FC<FleetMapProps> = React.memo(
     onSelect,
     laggingAfterSeconds = FLEET_DEFAULT_LAGGING_AFTER_SECONDS,
     staleAfterSeconds = FLEET_DEFAULT_STALE_AFTER_SECONDS,
-    height = DEFAULT_HEIGHT,
+    height: heightProp,
     loading = false,
     className,
     dataTestId,
   }) => {
     const theme = useTheme();
+    const height = heightProp ?? defaultHeight(theme);
     const testId = dataTestId || 'fleet-map';
     const headingId = React.useId();
     const { ordered, active, centre, select, markers, onKeyDown } = useFleetMap(

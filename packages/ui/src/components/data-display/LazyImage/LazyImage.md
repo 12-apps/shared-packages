@@ -16,7 +16,7 @@ The LazyImage component optimizes image loading performance by:
 ### Basic Usage
 
 ```tsx
-import { LazyImage } from '@app-services-monitoring/ui';
+import { LazyImage } from '@12-apps/ui';
 
 function App() {
   return (
@@ -42,6 +42,24 @@ function App() {
   height={600}
 />
 ```
+
+The placeholder is a loading state, and only `loadingState="placeholder"` draws
+it — under `skeleton`, `spinner` or `none` the `placeholder` prop is ignored.
+
+- It shows from mount, lazy or not, until the real image settles: its `load`
+  plus `fadeInDuration` (at once when `fadeIn` is off), or its final error once
+  any retries are spent.
+- It sits in the box's flow and gives the box its size. The real image is drawn
+  over it, cropped by `objectFit`, and fades in on top; when the placeholder
+  goes, the real image takes the flow. So a placeholder whose shape differs
+  from the real image's gives the box its shape until the fade ends.
+- A placeholder that fails to load is dropped at once, as if none were set.
+- `onLoad` and `onError` are the real image's only: the placeholder's load
+  never calls `onLoad`, and its failure never calls `onError`.
+- An empty `src` keeps the placeholder up; no empty `<img>` is rendered.
+
+**Give it a width.** With no `width` the placeholder shows at its own size,
+which for a low-res placeholder is usually tiny. Set one, or `width="100%"`.
 
 ### With Error Fallback
 
@@ -117,22 +135,29 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 
 ### With Custom Styles
 
+`sx` here is inline CSS for the `<img>`, not MUI's `sx`, and the image's box
+clips anything painted outside the image. So a shadow or a hover goes on a
+wrapping element, rounded to match the image:
+
 ```tsx
-<LazyImage
-  src="https://example.com/image.jpg"
-  alt="Styled image"
-  width={200}
-  height={200}
-  objectFit="cover"
-  borderRadius={8}
+<Box
   sx={{
+    display: 'inline-flex',
+    borderRadius: (theme) => theme.typography.pxToRem(8),
     boxShadow: 3,
-    '&:hover': {
-      transform: 'scale(1.05)',
-      transition: 'transform 0.3s'
-    }
+    transition: 'transform 0.3s',
+    '&:hover': { transform: 'scale(1.05)' },
   }}
-/>
+>
+  <LazyImage
+    src="https://example.com/image.jpg"
+    alt="Styled image"
+    width={200}
+    height={200}
+    objectFit="cover"
+    borderRadius={8}
+  />
+</Box>
 ```
 
 ### With Callbacks
@@ -155,16 +180,67 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 |------|------|---------|-------------|
 | `src` | `string` | - | **Required.** Image source URL |
 | `alt` | `string` | - | **Required.** Alternative text for accessibility |
-| `width` | `number \| string` | - | Image width |
-| `height` | `number \| string` | `'auto'` | Image height |
+| `width` | `number \| string` | - | Image width. A number above 1 is design px; a number above 0 and up to 1 is a fraction of the parent, as in `sx` (`0.5` is `50%`); a string is any CSS length. Unset lets the real image size itself naturally — but the loading skeleton and a `ReactNode` `fallback` borrow the other axis when only it is set (a square), or the theme's field height when neither is (FUT-2805) |
+| `height` | `number \| string` | `'auto'` | Image height, read like `width`. A fractional height takes effect only when the parent has a definite height |
+
+> **The placeholder's own default, when only one axis is set (FUT-2805).**
+> The loading skeleton and a `ReactNode` `fallback` never leave both their own
+> axes unresolved — never the real (loaded) image, which always sizes itself
+> naturally from `width`/`height` exactly as documented above.
+>
+> - A **DEFINITE** set axis (a plain design-px number, or an absolute CSS
+>   length string) borrows straight onto the unset one: a square in real
+>   px/rem — e.g. `width={120}` alone gives the skeleton `120×120`.
+> - A **RELATIVE** set axis cannot be copied onto the other one the same way —
+>   a width-percentage and a height-percentage measure against two different
+>   boxes, so copying the value would re-create the exact 0-height/0-width
+>   collapse this default exists to fix. Instead, the set axis keeps its own
+>   value and the box squares up through CSS `aspectRatio: '1 / 1'`, with the
+>   other axis left `auto` — e.g. `width="100%"` alone gives the skeleton
+>   `width: 100%; height: auto; aspect-ratio: 1 / 1`, a square exactly as wide
+>   as its (now non-collapsing) container. A length is RELATIVE when:
+>   - it is a fraction in `(0, 1]`, or
+>   - it has a `%` **anywhere** in the string — not only a bare trailing `%`,
+>     but a `%` nested inside `calc()`/`min()`/`max()`/`clamp()` too (FUT-2869:
+>     `width="calc(100% - 8px)"` alone squares, exactly like `width="100%"`
+>     alone — a `%` still measures against the containing block no matter what
+>     it is wrapped in, and borrowing it onto the other axis still collapses
+>     to 0 against an auto-height parent), or
+>   - it has a viewport unit — `vw`/`vh`/`vmin`/`vmax`, or the small/large/
+>     dynamic variants `svw`/`svh`/`svmin`/`svmax`, `lvw`/`lvh`/`lvmin`/
+>     `lvmax`, `dvw`/`dvh`/`dvmin`/`dvmax`, or the logical `vi`/`vb` — anywhere
+>     in the string (FUT-2869: `width="50vw"` alone squares too — see below for
+>     why), or
+>   - it has a container-query unit — `cqw`/`cqh`/`cqi`/`cqb`/`cqmin`/`cqmax` —
+>     anywhere in the string: it depends on the nearest queried container, not
+>     the length itself, exactly the reasoning below.
+>
+>   **Why viewport and container-query units square instead of borrow
+>   (FUT-2869's Decision).** Neither collapses to 0 the way a borrowed `%`
+>   does — a viewport unit resolves against the viewport, a container-query
+>   unit against its queried container, so a literally-borrowed `height: 50vw`
+>   is merely some non-zero length. But it is still wrong: the component's own
+>   promise for a single set axis is a SQUARE placeholder, and a length
+>   borrowed onto the other axis is a square only when the thing it measures
+>   against (the viewport, or the queried container) happens to be exactly the
+>   SAME size as `LazyImage`'s own container — the moment it isn't (any
+>   padding, sidebar, or max-width layout — the ordinary case), `width: 50vw`
+>   next to a borrowed `height: 50vw` is visibly not square. Squaring costs
+>   nothing extra (the same `aspectRatio` mechanism `%` already uses) and keeps
+>   one rule — "does this length depend on anything outside itself" — for
+>   every relative unit, instead of a different rule per unit family.
+> - With **neither** axis set, both take the theme's field height
+>   (`theme.fieldHeight`, through `fieldHeight()`/`rem()` — never a raw px).
+> - With **both** set, nothing above applies: the placeholder renders exactly
+>   as its own explicit `width`/`height` say, unchanged.
 
 ### Loading Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `lazy` | `boolean` | `true` | Enable lazy loading |
-| `loadingState` | `'skeleton' \| 'spinner' \| 'placeholder' \| 'none'` | `'skeleton'` | Type of loading indicator |
-| `placeholder` | `string` | - | Placeholder image URL |
+| `loadingState` | `'skeleton' \| 'spinner' \| 'placeholder' \| 'none'` | `'skeleton'` | Type of loading indicator. `'placeholder'` shows the `placeholder` image until the real image has faded in over it; set a `width` (or `"100%"`) with it |
+| `placeholder` | `string` | - | Low-res image shown while loading, only under `loadingState="placeholder"` (ignored otherwise). See [With Placeholder](#with-placeholder) |
 | `rootMargin` | `string` | `'100px'` | Intersection Observer margin |
 | `threshold` | `number \| number[]` | `0` | Intersection Observer threshold |
 
@@ -200,7 +276,7 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `decoding` | `'async' \| 'sync' \| 'auto'` | `'async'` | Image decoding hint |
-| `loading` | `'eager' \| 'lazy' \| 'auto'` | `'auto'` | Native loading attribute |
+| `loading` | `'eager' \| 'lazy'` | - | Native `loading` attribute; independent of `lazy` (which gates the `IntersectionObserver`) |
 | `fetchPriority` | `'high' \| 'low' \| 'auto'` | - | Fetch priority hint |
 
 ### Customization Props
@@ -209,7 +285,7 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
 |------|------|-------------|
 | `skeletonProps` | `object` | Props for skeleton loader |
 | `spinnerProps` | `object` | Props for spinner loader |
-| `sx` | `CSSProperties` | Additional CSS styles |
+| `sx` | `CSSProperties` | Inline CSS for the `<img>`, not MUI's `sx`. The image's box clips anything painted outside the image, such as a shadow |
 | `className` | `string` | CSS class name |
 | `data-testid` | `string` | Test ID for testing |
 
@@ -256,11 +332,13 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImageIcon';
   height={48}
 />
 
-// For hero images with low-res placeholders
+// For hero images with low-res placeholders — give it a width, or the
+// placeholder shows at its own, tiny, size
 <LazyImage
   src="hero-hd.jpg"
   placeholder="hero-lowres.jpg"
   alt="Hero image"
+  width="100%"
   loadingState="placeholder"
 />
 ```
@@ -307,47 +385,8 @@ The LazyImage component follows accessibility best practices:
 1. **Lazy Loading**: Images load only when needed, reducing initial page load
 2. **Intersection Observer**: Efficient viewport detection with configurable margins
 3. **Progressive Loading**: Support for placeholder images during load
-4. **Retry Logic**: Automatic retry for failed loads with exponential backoff
+4. **Retry Logic**: Automatic retry for failed loads, at a fixed `retryDelay` — the delay does NOT grow between attempts
 5. **Native Loading**: Leverages browser's native lazy loading when available
-
-## Migration from Original LazyImage
-
-If migrating from the original LazyImage in status-site:
-
-```tsx
-// Old usage
-import { LazyImage } from '../components/LazyImage';
-
-<LazyImage
-  src="image.jpg"
-  alt="Description"
-  width={400}
-  height={300}
-  sx={{ borderRadius: 4 }}
-/>
-
-// New usage (fully backward compatible)
-import { LazyImage } from '@app-services-monitoring/ui';
-
-<LazyImage
-  src="image.jpg"
-  alt="Description"
-  width={400}
-  height={300}
-  sx={{ borderRadius: 4 }}
-/>
-```
-
-### New Features Available After Migration
-
-- Error handling with fallback
-- Multiple loading states
-- Retry mechanism
-- Placeholder support
-- Spinner overlay option
-- Event callbacks
-- Better TypeScript support
-- Performance optimizations
 
 ## Related Components
 

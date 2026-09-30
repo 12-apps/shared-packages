@@ -84,12 +84,15 @@ export const Default: Story = {
 };
 
 // Controlled Component Wrapper
-const ControlledAutocomplete = <T = string | Person,>(props: Partial<AutocompleteProps<T>>) => {
+const ControlledAutocomplete = <T = string | Person,>(
+  props: Partial<AutocompleteProps<T>> & Pick<AutocompleteProps<T>, 'suggestions'>,
+) => {
   const [value, setValue] = useState(props.value || '');
   const [selectedItems, setSelectedItems] = useState<T[]>((props.selectedItems || []) as T[]);
 
   return (
     <Autocomplete
+      copy={PT_BR_AUTOCOMPLETE_COPY}
       {...props}
       value={value}
       onChange={setValue}
@@ -192,6 +195,7 @@ const AsyncModeComponent = () => {
 
   return (
     <Autocomplete
+      copy={PT_BR_AUTOCOMPLETE_COPY}
       value={value}
       onChange={handleChange}
       suggestions={suggestions}
@@ -250,6 +254,7 @@ const SearchAndLinkComponent = () => {
   const [value, setValue] = useState('');
   return (
     <Autocomplete<QuickSearchItem>
+      copy={PT_BR_AUTOCOMPLETE_COPY}
       value={value}
       onChange={setValue}
       suggestions={quickSearchItems}
@@ -595,7 +600,7 @@ export const AllStates: Story = {
 
 const InteractiveStatesComponent = () => {
   const [hoverValue, setHoverValue] = useState('');
-  const [focusValue, setFocusValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const [activeValue, setActiveValue] = useState('');
   
   return (
@@ -620,14 +625,20 @@ const InteractiveStatesComponent = () => {
       </div>
       <div>
         <h4>Focus State</h4>
-        <ControlledAutocomplete
-          suggestions={fruits}
-          placeholder="Click to focus..."
-          value={focusValue}
-          onChange={(value) => setFocusValue(value)}
-          onFocus={() => setFocusValue('Focused')}
-          onBlur={() => setFocusValue('')}
-        />
+        {/* `Autocomplete` exposes no `onFocus`/`onBlur` — the wrapping element
+            reads focus instead. Synthetic `focus`/`blur` bubble in React, so a
+            plain `onFocus`/`onBlur` here still fires for the inner input. */}
+        <div
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          style={{
+            border: isFocused ? '2px solid #1976d2' : 'none',
+            padding: '2px',
+            borderRadius: '4px',
+          }}
+        >
+          <ControlledAutocomplete suggestions={fruits} placeholder="Click to focus..." />
+        </div>
       </div>
       <div>
         <h4>Active/Typing State</h4>
@@ -640,10 +651,12 @@ const InteractiveStatesComponent = () => {
       </div>
       <div>
         <h4>Dropdown Open State</h4>
+        {/* No `defaultOpen` prop — the dropdown opens on focus, so `autoFocus`
+            reproduces "open on mount" through the same path a user takes. */}
         <ControlledAutocomplete
           suggestions={fruits}
           placeholder="Click to open dropdown..."
-          defaultOpen={true}
+          autoFocus
         />
       </div>
     </div>

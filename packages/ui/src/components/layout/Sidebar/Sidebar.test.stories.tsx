@@ -454,7 +454,12 @@ export const FocusManagement: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // Test initial focus on first sidebar item
+    // The header's "Hide Sidebar" button precedes the nav items in the DOM,
+    // so it is the real first tab stop.
+    await userEvent.tab();
+    await waitFor(() => expect(canvas.getByTestId('hide-sidebar-button')).toHaveFocus());
+
+    // Test focus on first sidebar item
     const firstItem = canvas.getByTestId('focus-nav-home');
     await userEvent.tab();
     await waitFor(() => expect(firstItem).toHaveFocus());

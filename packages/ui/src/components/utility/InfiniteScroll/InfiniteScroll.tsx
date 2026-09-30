@@ -1,5 +1,8 @@
 import Box from '@mui/material/Box/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
+
+import { rem, remPx } from '../../../tokens/relative';
 
 import { useLoadMore, useSentinel } from './InfiniteScroll.hooks';
 import {
@@ -15,7 +18,7 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
   variant = 'default',
   hasMore,
   loading,
-  threshold = 150,
+  threshold,
   loadMore,
   loader,
   loadingText,
@@ -31,7 +34,10 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
   testMode = false,
   testTriggerRef,
 }) => {
-  const { sentinelRef, isIntersecting } = useSentinel({ testMode, threshold, scrollableTarget });
+  const theme = useTheme();
+  // 150 design px unless the caller says; `rootMargin` only takes px.
+  const rootMargin = `${remPx(theme, threshold ?? 150)}px`;
+  const { sentinelRef, isIntersecting } = useSentinel({ testMode, rootMargin, scrollableTarget });
 
   useLoadMore({
     hasMore,
@@ -56,8 +62,8 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
         ref={sentinelRef}
         data-testid="infinite-scroll-sentinel"
         style={{
-          height: variant === 'horizontal' ? '100%' : '1px',
-          width: variant === 'horizontal' ? '1px' : '100%',
+          height: variant === 'horizontal' ? '100%' : rem(theme, 1),
+          width: variant === 'horizontal' ? rem(theme, 1) : '100%',
         }}
       />
     );
@@ -67,7 +73,7 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
     <Box
       className={className}
       sx={{
-        ...containerStyles(variant, width),
+        ...containerStyles(theme, variant, width),
         ...style,
       }}
     >

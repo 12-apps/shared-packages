@@ -20,6 +20,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Drawer, DrawerContent,DrawerHeader } from './Drawer';
+import type { DrawerVariant } from './Drawer.types';
 
 const meta: Meta<typeof Drawer> = {
   title: 'Overlays/Drawer',
@@ -45,8 +46,8 @@ const meta: Meta<typeof Drawer> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const DefaultComponent = (args: { open: boolean; variant: string; width: number }) => {
-  const [open, setOpen] = useState(args.open);
+const DefaultComponent = (args: { open?: boolean; variant?: DrawerVariant; width?: number | string }) => {
+  const [open, setOpen] = useState(args.open ?? false);
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>

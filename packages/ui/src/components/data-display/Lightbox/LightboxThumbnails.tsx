@@ -1,26 +1,32 @@
 import PlayIcon from '@mui/icons-material/PlayArrow';
 import Box from '@mui/material/Box/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 
 import { thumbnailStripSx } from './Lightbox.constants';
+import { useLightboxCopy } from './lightbox-copy-context';
 import type { LightboxItem } from './Lightbox.types';
+import { onMedia, sheen } from '../../../tokens/ink';
+import { rem, sxRem } from '../../../tokens/relative';
 
-const THUMB_WIDTH = 60;
-const THUMB_HEIGHT = 40;
+/** One filmstrip frame, in design px. */
+const THUMB = { widthPx: 60, heightPx: 40 } as const;
+
+const frame = (theme: Theme, color: string): string => `${rem(theme, 2)} solid ${color}`;
 
 const VideoThumbnail: FC = () => (
   <Box
     sx={{
       width: '100%',
       height: '100%',
-      background: 'rgba(255, 255, 255, 0.1)',
+      background: (theme: Theme) => sheen(theme, 0.1),
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
     }}
   >
-    <PlayIcon sx={{ color: 'white', fontSize: 16 }} />
+    <PlayIcon sx={{ color: onMedia, fontSize: sxRem(16) }} />
   </Box>
 );
 
@@ -36,12 +42,14 @@ export const LightboxThumbnails: FC<LightboxThumbnailsProps> = ({
   currentIndex,
   testId,
   onSelect,
-}) => (
+}) => {
+  const copy = useLightboxCopy();
+  return (
   <Box
     sx={{
       ...thumbnailStripSx,
       position: 'absolute',
-      bottom: 16,
+      bottom: sxRem(16),
       left: '50%',
       transform: 'translateX(-50%)',
       display: 'flex',
@@ -57,14 +65,14 @@ export const LightboxThumbnails: FC<LightboxThumbnailsProps> = ({
         key={`${item.src}-${index}`}
         onClick={() => onSelect(index)}
         sx={{
-          width: THUMB_WIDTH,
-          height: THUMB_HEIGHT,
+          width: sxRem(THUMB.widthPx),
+          height: sxRem(THUMB.heightPx),
           cursor: 'pointer',
-          border: currentIndex === index ? '2px solid white' : '2px solid transparent',
+          border: (theme: Theme) => frame(theme, currentIndex === index ? onMedia(theme) : 'transparent'),
           borderRadius: 0.5,
           overflow: 'hidden',
           flexShrink: 0,
-          '&:hover': { border: '2px solid rgba(255, 255, 255, 0.7)' },
+          '&:hover': { border: (theme: Theme) => frame(theme, sheen(theme, 0.7)) },
         }}
         data-testid={testId(`thumbnail-${index}`)}
       >
@@ -73,11 +81,12 @@ export const LightboxThumbnails: FC<LightboxThumbnailsProps> = ({
         ) : (
           <img
             src={item.src}
-            alt={item.alt || `Thumbnail ${index + 1}`}
+            alt={item.alt || copy.thumbnailFallback(index + 1)}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         )}
       </Box>
     ))}
   </Box>
-);
+  );
+};

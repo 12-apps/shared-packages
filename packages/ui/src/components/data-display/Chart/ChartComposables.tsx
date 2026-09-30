@@ -5,6 +5,8 @@ import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 import { Legend, ResponsiveContainer, Tooltip } from 'recharts';
 
+import { rem, remPx, sxRem } from '../../../tokens/relative';
+
 /**
  * Raw chart composables (Squire's ChartConfig pattern, MUI-themed): a
  * responsive container plus themed tooltip/legend content renderers. The
@@ -19,7 +21,8 @@ export const ChartLegend = Legend;
 
 export interface ChartContainerProps {
   /**
-   * A number of pixels, or a PERCENTAGE of the box this container is given.
+   * A number of pixels (design px, drawn through the theme's type scale), or
+   * a PERCENTAGE of the box this container is given.
    *
    * The difference is not cosmetic: Recharts sizes the chart from the number
    * when it is one and only MEASURES its own box when it is a percentage
@@ -28,6 +31,7 @@ export interface ChartContainerProps {
    * blank space under the plot — until the height is handed over as a percent.
    */
   height: number | `${number}%`;
+  /** Design px when a number, through the type scale; a string is as given. */
   width?: number | string;
   responsive?: boolean;
   children: React.ReactElement;
@@ -42,15 +46,22 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
   children,
   'data-testid': dataTestId,
 }) => {
+  const theme = useTheme();
   if (!responsive) {
+    const box = {
+      width: typeof width === 'number' ? rem(theme, width) : width,
+      height: typeof height === 'number' ? rem(theme, height) : height,
+    };
     return (
-      <Box sx={{ width, height }} data-testid={dataTestId}>
+      <Box sx={box} data-testid={dataTestId}>
         {children}
       </Box>
     );
   }
+  // Recharts takes a number as px and only measures its box for a percentage.
+  const plot = { height: typeof height === 'number' ? remPx(theme, height) : height };
   return (
-    <ResponsiveContainer width="100%" height={height} data-testid={dataTestId}>
+    <ResponsiveContainer width="100%" {...plot} data-testid={dataTestId}>
       {children}
     </ResponsiveContainer>
   );
@@ -94,7 +105,7 @@ export const ChartTooltipContent: React.FC<ChartTooltipContentProps> = ({
         <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Box
             component="span"
-            sx={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: entry.color, flexShrink: 0 }}
+            sx={{ width: sxRem(10), height: sxRem(10), borderRadius: sxRem(2), backgroundColor: entry.color, flexShrink: 0 }}
           />
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {entry.name}
@@ -121,7 +132,7 @@ export const ChartLegendContent: React.FC<ChartLegendContentProps> = ({ payload 
         <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
           <Box
             component="span"
-            sx={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: entry.color, flexShrink: 0 }}
+            sx={{ width: sxRem(10), height: sxRem(10), borderRadius: sxRem(2), backgroundColor: entry.color, flexShrink: 0 }}
           />
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {entry.value}

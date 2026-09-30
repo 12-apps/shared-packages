@@ -1,4 +1,7 @@
+import type { Theme } from '@mui/material/styles/index.js';
+
 import type { ChartDataPoint, ChartProps } from './Chart.types';
+import { remPx } from '../../../tokens/relative';
 
 /**
  * Cartesian axis + bar geometry: the rules that keep a chart readable rather
@@ -25,10 +28,6 @@ import type { ChartDataPoint, ChartProps } from './Chart.types';
 const DEFAULT_MAX_CATEGORY_TICKS = 8;
 /** Category tick labels longer than this are truncated with an ellipsis. */
 const DEFAULT_TICK_LABEL_MAX_CHARS = 12;
-/** Bar corner radius, px. */
-const DEFAULT_BAR_RADIUS = 3;
-/** Cap on a single bar's thickness, px. */
-const DEFAULT_MAX_BAR_WIDTH = 38;
 
 /**
  * Thin a category axis to at most `maxTicks` labels, keeping every nth.
@@ -89,9 +88,9 @@ export interface CartesianAxisConfig {
 
 /** Resolved geometry for bar series. */
 export interface BarGeometry {
-  /** Per-corner radius, top corners only; `0` for stacked segments. */
+  /** Per-corner radius in rendered px, top corners only; `0` for stacked segments. */
   radius: number | [number, number, number, number];
-  /** Cap on a bar's thickness, px — also what keeps bars off the frame. */
+  /** Cap on a bar's thickness in rendered px — also what keeps bars off the frame. */
   maxBarSize: number;
 }
 
@@ -107,12 +106,17 @@ export function resolveAxisConfig(props: ChartProps, tickMargin: number): Cartes
   };
 }
 
-export function resolveBarGeometry(props: ChartProps): BarGeometry {
-  const radius = props.barRadius ?? DEFAULT_BAR_RADIUS;
+/**
+ * The bar geometry Recharts takes as px numbers, from design px through the
+ * type scale: a 3px corner and a 38px thickness cap unless the caller says
+ * otherwise.
+ */
+export function resolveBarGeometry(props: ChartProps, theme: Theme): BarGeometry {
+  const radius = remPx(theme, props.barRadius ?? 3);
   return {
     // A stacked segment rounded on its top corners tears a notch out of the
     // segment above it, so stacks stay square.
     radius: props.stacked ? 0 : [radius, radius, 0, 0],
-    maxBarSize: props.maxBarWidth ?? DEFAULT_MAX_BAR_WIDTH,
+    maxBarSize: remPx(theme, props.maxBarWidth ?? 38),
   };
 }

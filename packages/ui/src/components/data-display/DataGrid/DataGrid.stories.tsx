@@ -2,9 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
+import { PT_BR_DATA_GRID_COPY, PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
 
 // Sample data for stories
-interface SampleRow {
+interface SampleRow extends Record<string, unknown> {
   id: number;
   name: string;
   email: string;
@@ -24,11 +25,11 @@ const generateSampleData = (count: number): SampleRow[] => {
     id: i + 1,
     name: `User ${i + 1}`,
     email: `user${i + 1}@example.com`,
-    role: roles[i % roles.length],
-    status: statuses[i % 2],
+    role: roles[i % roles.length]!,
+    status: statuses[i % 2]!,
     salary: 50000 + (i * 1000) + Math.floor(Math.random() * 20000),
-    joinDate: new Date(2020 + (i % 4), (i % 12), (i % 28) + 1).toISOString().split('T')[0],
-    department: departments[i % departments.length],
+    joinDate: new Date(2020 + (i % 4), (i % 12), (i % 28) + 1).toISOString().split('T')[0]!,
+    department: departments[i % departments.length]!,
   }));
 };
 
@@ -89,7 +90,7 @@ const sampleColumns: GridColumn<SampleRow>[] = [
           color: value === 'active' ? '#2e7d32' : '#d32f2f',
         }}
       >
-        {value}
+        {String(value)}
       </span>
     ),
     enableSort: true,
@@ -102,7 +103,7 @@ const sampleColumns: GridColumn<SampleRow>[] = [
     type: 'currency',
     width: 120,
     minWidth: 100,
-    cell: ({ value }) => `$${value.toLocaleString()}`,
+    cell: ({ value }) => `$${Number(value).toLocaleString()}`,
     enableSort: true,
   },
   {
@@ -126,9 +127,13 @@ const sampleColumns: GridColumn<SampleRow>[] = [
   },
 ];
 
-const meta: Meta<typeof DataGrid> = {
+const meta: Meta<typeof DataGrid<SampleRow>> = {
   title: 'Dashboards/DataGrid',
   component: DataGrid,
+  args: {
+    emptyText: PT_BR_DATA_STATE_COPY.empty,
+    copy: PT_BR_DATA_GRID_COPY,
+  },
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -405,6 +410,8 @@ export const AllSizes: Story = {
       <div style={{ height: '300px' }}>
         <h3>Compact</h3>
         <DataGrid
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
+          copy={PT_BR_DATA_GRID_COPY}
           rows={generateSampleData(50)}
           columns={sampleColumns.slice(0, 4)}
           density="compact"
@@ -414,6 +421,8 @@ export const AllSizes: Story = {
       <div style={{ height: '300px' }}>
         <h3>Comfortable</h3>
         <DataGrid
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
+          copy={PT_BR_DATA_GRID_COPY}
           rows={generateSampleData(50)}
           columns={sampleColumns.slice(0, 4)}
           density="comfortable"
@@ -423,6 +432,8 @@ export const AllSizes: Story = {
       <div style={{ height: '300px' }}>
         <h3>Spacious</h3>
         <DataGrid
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
+          copy={PT_BR_DATA_GRID_COPY}
           rows={generateSampleData(50)}
           columns={sampleColumns.slice(0, 4)}
           density="spacious"
@@ -440,6 +451,8 @@ export const AllStates: Story = {
       <div>
         <h3>Loading State</h3>
         <DataGrid
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
+          copy={PT_BR_DATA_GRID_COPY}
           rows={[]}
           columns={sampleColumns.slice(0, 4)}
           loading={true}
@@ -449,6 +462,8 @@ export const AllStates: Story = {
       <div>
         <h3>Error State</h3>
         <DataGrid
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
+          copy={PT_BR_DATA_GRID_COPY}
           rows={[]}
           columns={sampleColumns.slice(0, 4)}
           error="Connection failed"
@@ -458,6 +473,8 @@ export const AllStates: Story = {
       <div>
         <h3>Empty State</h3>
         <DataGrid
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
+          copy={PT_BR_DATA_GRID_COPY}
           rows={[]}
           columns={sampleColumns.slice(0, 4)}
           ariaLabel="Empty state data grid"
@@ -466,6 +483,8 @@ export const AllStates: Story = {
       <div>
         <h3>With Data</h3>
         <DataGrid
+          emptyText={PT_BR_DATA_STATE_COPY.empty}
+          copy={PT_BR_DATA_GRID_COPY}
           rows={generateSampleData(20)}
           columns={sampleColumns.slice(0, 4)}
           selection={{ mode: 'multi', defaultSelectedRowIds: [1, 3] }}

@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Autocomplete } from './Autocomplete';
 import type { AutocompleteProps } from './Autocomplete.types';
 import { PT_BR_AUTOCOMPLETE_COPY } from '../../../pt-BR';
@@ -52,19 +54,24 @@ const meta: Meta<typeof Autocomplete> = {
 export default meta;
 type Story = StoryObj<typeof Autocomplete>;
 
-// Test Component wrapper for controlled state
-const AutocompleteWrapper = (props: Partial<AutocompleteProps<Person | string>>) => {
-  const [value, setValue] = useState(props.value || '');
-  const [selectedItems, setSelectedItems] = useState(props.selectedItems || []);
+// Test Component wrapper for controlled state. Generic over `T`, same as
+// `Autocomplete` itself: a fixed `Person | string` union let a story's own
+// `Person`-only (or `string`-only) callbacks — `getKey`, `getLabel`, … — fail
+// contravariance, since they'd need to accept the OTHER member too.
+const AutocompleteWrapper = <T,>(props: Partial<AutocompleteProps<T>>) => {
+  const [value, setValue] = useState(props.value ?? '');
+  const [selectedItems, setSelectedItems] = useState<T[]>(props.selectedItems ?? []);
 
   return (
     <div style={{ padding: '20px', minHeight: '200px' }}>
-      <Autocomplete
+      <Autocomplete<T>
+        copy={PT_BR_AUTOCOMPLETE_COPY}
         {...props}
         value={value}
         onChange={setValue}
         selectedItems={selectedItems}
         onSelectedItemsChange={setSelectedItems}
+        suggestions={props.suggestions ?? []}
       />
     </div>
   );
@@ -94,9 +101,13 @@ export const Default: Story = {
     // Now check aria-expanded is true
     await expect(input).toHaveAttribute('aria-expanded', 'true');
 
+    // Filtering runs in a passive effect after `inputValue` changes, so a
+    // same-tick snapshot can still see the previous keystroke's list (the
+    // 4 options 'a' alone matches). Wait for the settled count before
+    // reading the texts.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(2));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(2); // Apple, Grape (both contain "ap")
-    await expect(options[0]).toHaveTextContent('Apple');
+    await expect(options[0]).toHaveTextContent('Apple'); // Apple, Grape (both contain "ap")
     await expect(options[1]).toHaveTextContent('Grape');
   },
 };
@@ -122,8 +133,11 @@ export const WithObjectSuggestions: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
+    // Filtering runs in a passive effect after `inputValue` changes, so a
+    // same-tick snapshot can still see the previous keystroke's list. Wait
+    // for the settled count (John Doe, Bob Johnson) before reading it.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(2));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(2); // John Doe, Bob Johnson
 
     // Test custom rendering with description
     await expect(options[0]).toHaveTextContent('john@example.com - Engineering');
@@ -151,10 +165,13 @@ export const GhostText: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
-    // Test ghost text appears - look for the new inline suggestion pattern
-    // Since we're using the new pattern, check for the presence of the suggestion
+    // Test ghost text appears - look for the new inline suggestion pattern.
+    // Since we're using the new pattern, check for the presence of the
+    // suggestion. Filtering runs in a passive effect after `inputValue`
+    // changes, so wait for the settled count (Apple, Grape both contain
+    // "ap") before reading the texts.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(2));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(2); // Apple, Grape both contain "ap"
     await expect(options[0]).toHaveTextContent('Apple');
 
     // Test that Tab key completes the ghost text
@@ -185,9 +202,11 @@ export const GhostTextArrowRight: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
-    // Verify suggestion appears
+    // Verify suggestion appears. Filtering runs in a passive effect after
+    // `inputValue` changes, so wait for the settled count before reading it
+    // — a fixture change here should not silently arm the same race.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(1));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(1);
     await expect(options[0]).toHaveTextContent('Cherry');
 
     // Test that ArrowRight key completes the ghost text
@@ -384,7 +403,7 @@ export const AsyncLoading: Story = {
     // Check for loading text in dropdown
     await waitFor(
       async () => {
-        const loadingText = canvas.getByText('Loading...');
+        const loadingText = canvas.getByText(PT_BR_AUTOCOMPLETE_COPY.loading);
         await expect(loadingText).toBeInTheDocument();
       },
       { timeout: 1000 },
@@ -413,8 +432,11 @@ export const FuzzyMatchingTest: Story = {
     const listbox = await canvas.findByRole('listbox');
     await expect(listbox).toBeInTheDocument();
 
+    // Filtering runs in a passive effect after `inputValue` changes, so wait
+    // for the settled count before reading it — a fixture change here should
+    // not silently arm the same race.
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(1));
     const options = canvas.getAllByRole('option');
-    await expect(options).toHaveLength(1);
     await expect(options[0]).toHaveTextContent('JavaScript');
   },
 };
@@ -458,7 +480,7 @@ export const NoResults: Story = {
     // Wait for the dropdown to open with no results message
     await waitFor(
       async () => {
-        const noResults = canvas.getByText('No results found');
+        const noResults = canvas.getByText(PT_BR_AUTOCOMPLETE_COPY.noResults);
         await expect(noResults).toBeInTheDocument();
       },
       { timeout: 1000 },
@@ -671,7 +693,7 @@ export const ResponsiveDesign: Story = {
     expect(options.length).toBeGreaterThan(0);
 
     // Test mobile-friendly interaction
-    const firstOption = options[0];
+    const firstOption = must(options[0]);
     await userEvent.click(firstOption);
 
     // Should select the option
@@ -767,6 +789,7 @@ const SearchLinkWrapper = () => {
   return (
     <div style={{ padding: '20px', minHeight: '260px' }}>
       <Autocomplete<SearchLinkItem>
+        copy={PT_BR_AUTOCOMPLETE_COPY}
         value={value}
         onChange={setValue}
         suggestions={searchLinkItems}
@@ -795,9 +818,11 @@ export const SearchAndLinkSuggestions: Story = {
       const listbox = await canvas.findByRole('listbox');
       await expect(listbox).toBeInTheDocument();
 
-      const linkOption = await canvas.findByText('Abrir documentação');
+      // The accessible name concatenates the text across the <mark> runs
+      // highlightLabel wraps each match in, unlike an exact getByText.
+      const linkOption = await canvas.findByRole('option', { name: 'Abrir documentação' });
       // A `link` suggestion renders a leading icon.
-      await expect(linkOption.closest('[role="option"]')?.querySelector('svg')).toBeInTheDocument();
+      await expect(linkOption.querySelector('svg')).toBeInTheDocument();
 
       await userEvent.click(linkOption);
 
@@ -814,7 +839,9 @@ export const SearchAndLinkSuggestions: Story = {
       await userEvent.clear(input);
       await userEvent.type(input, 'produt');
 
-      const searchOption = await canvas.findByText('Produtos');
+      // Same reason as above: the matched run ("Produt") is wrapped in its
+      // own <mark>, so only the accessible name spans the whole label.
+      const searchOption = await canvas.findByRole('option', { name: 'Produtos' });
       await userEvent.click(searchOption);
 
       await expect(input).toHaveValue('Produtos');
@@ -822,6 +849,63 @@ export const SearchAndLinkSuggestions: Story = {
       await expect(canvas.getByTestId('opened-url')).toHaveTextContent(
         'https://example.com/docs',
       );
+      // A search pick ends the search too: the list stays closed until the
+      // user types again (FUT-2763).
+      await waitFor(() => expect(input).toHaveAttribute('aria-expanded', 'false'));
     });
+  },
+};
+
+/**
+ * FUT-2779 #2: a touch-driven pick still closes the list.
+ *
+ * The ticket worried a touch device that blurs the focused input on
+ * `touchstart` could refocus it mid-pick and reopen the list via `onFocus`
+ * (which does not read `userClosedDropdownRef`). That blur-on-touchstart
+ * quirk was investigated separately with Playwright touch emulation
+ * (`hasTouch`/`isMobile` context, both `.tap()` and raw CDP
+ * `Input.dispatchTouchEvent`) and never reproduced in this Chromium build —
+ * `document.activeElement` stayed on the input throughout, so there was
+ * nothing left to guard against.
+ *
+ * This story is the runnable half of that record: it runs in the SAME real
+ * Chromium `test-storybook` drives everything else in, and picks a suggestion
+ * with `userEvent.pointer`'s touch pointer (`[TouchA]` — a real, native
+ * `PointerEvent`/compat `MouseEvent` sequence tagged `pointerType: 'touch'`,
+ * not a plain mouse click), then asserts the outcome a mouse pick already
+ * gets (FUT-2763/FUT-2780): the list closes and the input holds the picked
+ * label. A passing regression guard, not a reproduction — if this Chromium
+ * build ever DOES start blurring on touch, `onFocus`'s unconditional reopen
+ * would make this the first thing to go red.
+ */
+export const TouchPick: Story = {
+  name: '👆 Touch Pick (FUT-2779 #2)',
+  render: () => (
+    <AutocompleteWrapper suggestions={stringSuggestions} placeholder="Tap a fruit..." />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByRole('combobox');
+
+    await userEvent.click(input);
+    await userEvent.type(input, 'ap');
+
+    const listbox = await canvas.findByRole('listbox');
+    await expect(listbox).toBeInTheDocument();
+    const options = canvas.getAllByRole('option');
+    const firstOption = options[0];
+    if (!firstOption) throw new Error('expected at least one option in the listbox');
+    await expect(firstOption).toHaveTextContent('Apple');
+
+    // A real touch pointer (not a mouse click): dispatches `pointerdown` with
+    // `pointerType: 'touch'`, then on release the browser-accurate
+    // mousedown/mouseup/click compatibility sequence `Autocomplete`'s option
+    // actually listens to (it has no dedicated touch handler, same as a real
+    // mobile browser deriving click from a tap).
+    await userEvent.pointer({ keys: '[TouchA]', target: firstOption });
+
+    await waitFor(() => expect(input).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() => expect(canvas.queryByRole('listbox')).not.toBeInTheDocument());
+    await expect(input).toHaveValue('Apple');
   },
 };

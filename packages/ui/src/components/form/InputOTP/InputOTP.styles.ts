@@ -2,6 +2,10 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 interface ColorPalette {
   main: string;
@@ -11,12 +15,7 @@ interface ColorPalette {
 }
 
 /** `neutral` is not a MUI palette entry, so it is built from the grey ramp. */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey[700],
-  dark: theme.palette.grey[800],
-  light: theme.palette.grey[500],
-  contrastText: '#fff',
-});
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 /** `danger` is this component's name for the error palette. */
 const namedPalette = (theme: Theme, color: string): ColorPalette => {
@@ -44,19 +43,19 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
     main: palette.main || primary.main,
     dark: palette.dark || palette.main || primary.dark,
     light: palette.light || palette.main || primary.light,
-    contrastText: palette.contrastText || '#fff',
+    contrastText: palette.contrastText || absoluteInk(theme).white,
   };
 };
 
 type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
-/** Each slot is a square, so width and height always match. */
-const SIZES: Record<SizeKey, { side: string; fontSize: string }> = {
-  xs: { side: '32px', fontSize: '0.75rem' },
-  sm: { side: '40px', fontSize: '0.875rem' },
-  md: { side: '48px', fontSize: '1rem' },
-  lg: { side: '56px', fontSize: '1.125rem' },
-  xl: { side: '64px', fontSize: '1.25rem' },
+/** Each slot's type, in design px. Its side is the theme's field height for the size (a square). */
+const SIZES: Record<SizeKey, { fontPx: number }> = {
+  xs: { fontPx: 12 },
+  sm: { fontPx: 14 },
+  md: { fontPx: 16 },
+  lg: { fontPx: 18 },
+  xl: { fontPx: 20 },
 };
 
 export interface OtpSlotFlags {
@@ -69,7 +68,9 @@ export interface OtpSlotFlags {
 export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
   const { customColor = 'primary', customSize = 'md', glass, gradient } = flags;
   const palette = getColorFromTheme(theme, customColor);
-  const { side, fontSize } = SIZES[customSize as SizeKey] ?? SIZES.md;
+  const { fontPx } = SIZES[customSize as SizeKey] ?? SIZES.md;
+  // A slot is a field: a square of the theme's field height for its size.
+  const side = fieldHeight(theme, asFieldSize(customSize));
 
   return {
     width: side,
@@ -77,24 +78,25 @@ export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
     '& .MuiOutlinedInput-root': {
       width: side,
       height: side,
-      fontSize,
+      fontSize: rem(theme, fontPx),
       fontWeight: 600,
       textAlign: 'center',
-      borderRadius: theme.spacing(1),
+      borderRadius: fieldRadius(theme),
       ...(glass && {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         '& fieldset': { border: `1px solid ${fieldEdge(theme)}` },
       }),
       ...(gradient && {
         '&.Mui-focused fieldset': {
           background: `linear-gradient(135deg, ${palette.main}, ${palette.light})`,
-          borderWidth: '2px',
+          borderWidth: rem(theme, 2),
         },
       }),
       '& input': { textAlign: 'center', padding: 0, fontWeight: 'inherit' },
+      ...(!glass && { '& fieldset': { borderColor: fieldEdge(theme) } }),
       '&:hover fieldset': { borderColor: palette.main },
-      '&.Mui-focused fieldset': { borderColor: palette.main, borderWidth: '2px' },
+      '&.Mui-focused fieldset': { borderColor: palette.main, borderWidth: rem(theme, 2) },
     },
   };
 };

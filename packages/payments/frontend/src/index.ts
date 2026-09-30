@@ -131,6 +131,13 @@ export type {
 } from './components/checkout/screens-copy';
 export { PT_BR_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-pt-BR';
 export { fetchCheckoutConfig } from './components/checkout/client';
+// The host's realtime channel for this buyer (FUT-649): a hint asks `/status`
+// now, and every wait slows to a floor while the channel is live.
+export {
+  CheckoutLiveProvider,
+  DEFAULT_LIVE_INTERVAL_MS,
+  type CheckoutLiveSignal,
+} from './components/checkout/live-context';
 /**
  * The `sessionStorage` key the hosted-checkout return leg parks the raised
  * order under. Public because it is already observable — a spec asserting the

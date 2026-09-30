@@ -287,11 +287,11 @@ export const ScreenReaderAccessibility: Story = {
     const list = canvas.getByRole('list');
     expect(list).toBeInTheDocument();
 
-    // Check badge accessibility
-    const badge = canvas.getByText('5');
-    expect(badge).toBeInTheDocument();
-    // Badge should be in a MUI Badge component (class contains MuiBadge)
-    expect(badge.closest('[class*="MuiBadge"]')).toBeInTheDocument();
+    // Check badge accessibility. The badge is a plain span with no class,
+    // role or test id of its own, so assert it by its text, scoped to the
+    // item it belongs to — not by an MuiBadge class it never had.
+    const ordersItem = canvas.getByRole('link', { name: /Orders/ });
+    expect(within(ordersItem).getByText('5')).toBeInTheDocument();
   },
 };
 
@@ -336,7 +336,11 @@ export const FocusManagement: Story = {
     // which proved only that the DOM honours focus(), never that the component
     // moved it.
     const overviewItem = canvas.getByText('Overview').closest('a, div[role="button"]') as HTMLElement;
-    expect(overviewItem).toBeVisible();
+    // Wait for the submenu's enter transition to settle before asserting
+    // visibility — mid-transition it measures 0 height at opacity 0.
+    await waitFor(() => {
+      expect(overviewItem).toBeVisible();
+    });
   },
 };
 
@@ -346,11 +350,7 @@ export const ResponsiveDesign: Story = {
     variant: 'horizontal',
     items: testItems.slice(0, 5),
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   decorators: [
     (Story) => (
       <Box>
@@ -493,6 +493,12 @@ export const PerformanceTest: Story = {
     // Verify performance by checking if items are properly rendered
     const menuItems = canvas.getAllByText(/Menu Item \d+/);
     expect(menuItems.length).toBeGreaterThan(20);
+
+    // "Menu Item 1" (index 0) is fed `badge: 0` (`i % 5 === 0 ? i : undefined`).
+    // FUT-2701: a falsy-zero badge must not print a bare "0" next to the label.
+    const menuItem1Link = canvas.getByText('Menu Item 1').closest('a');
+    expect(menuItem1Link).toBeTruthy();
+    expect(menuItem1Link).not.toHaveTextContent('0');
 
     // Test scrolling functionality exists
     const menuContainer =
@@ -903,18 +909,17 @@ export const AdvancedKeyboardNavigation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // Focus first menu item
-    // No pre-focus needed: the step below clicks this button directly.
-    const firstMenuItem = canvas.getByText('Dashboard').closest('button');
+    // Focus first menu item. Items with an href render as <a>; the ones
+    // that only expand a submenu (no href), like Analytics below, render as
+    // a div[role="button"] instead — not a <button>.
+    const firstMenuItem = canvas.getByText('Dashboard').closest('a, div[role="button"]') as HTMLElement;
     expect(firstMenuItem).toBeInTheDocument();
 
-    // Test Enter key activation - click the focused button directly
-    if (firstMenuItem) {
-      await userEvent.click(firstMenuItem);
-      await waitFor(() => {
-        expect(canvas.getByTestId('selected-via-keyboard')).toHaveTextContent('Selected: 1');
-      });
-    }
+    // Test Enter key activation - click the focused item directly
+    await userEvent.click(firstMenuItem);
+    await waitFor(() => {
+      expect(canvas.getByTestId('selected-via-keyboard')).toHaveTextContent('Selected: 1');
+    });
 
     // Test Tab navigation
     await userEvent.keyboard('{Tab}');
@@ -923,13 +928,12 @@ export const AdvancedKeyboardNavigation: Story = {
     await userEvent.keyboard('{ArrowDown}');
 
     // Test expanding submenu with Enter
-    const analyticsItem = canvas.getByText('Analytics').closest('button');
-    if (analyticsItem) {
-      await userEvent.click(analyticsItem);
-      await waitFor(() => {
-        expect(canvas.getByText('Overview')).toBeInTheDocument();
-      });
-    }
+    const analyticsItem = canvas.getByText('Analytics').closest('a, div[role="button"]') as HTMLElement;
+    expect(analyticsItem).toBeInTheDocument();
+    await userEvent.click(analyticsItem);
+    await waitFor(() => {
+      expect(canvas.getByText('Overview')).toBeInTheDocument();
+    });
 
     // Test Escape to collapse submenu
     await userEvent.keyboard('{Escape}');

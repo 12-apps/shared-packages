@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { useState } from 'react';
 
 import { NavigationMegaSection } from './NavigationMegaSection';
@@ -8,6 +9,7 @@ import {
   LogoBar,
   NavigationShell } from './NavigationMenu.shell';
 import type { NavigationMenuItem,NavigationMenuProps } from './NavigationMenu.types';
+import { rem } from '../../../tokens/relative';
 
 
 
@@ -40,13 +42,16 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
     },
     ref,
   ) => {
+    const theme = useTheme();
+    // An inline style reads a number as px: a number here is design px.
+    const cap = typeof maxWidth === 'number' ? rem(theme, maxWidth) : maxWidth;
     return (
     <NavigationShell
       ref={ref}
       variant={variant}
       minimal={minimal}
       className={className}
-      style={{ maxWidth, ...style }}
+      style={{ maxWidth: cap, ...style }}
       {...props}
     >
       <Paper
@@ -60,7 +65,7 @@ const MegaMenuLayout = React.forwardRef<HTMLDivElement, MegaMenuLayoutProps>(
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gridTemplateColumns: `repeat(auto-fit, minmax(${rem(theme, 280)}, 1fr))`,
             gap: 3,
             p: 3 }}
         >

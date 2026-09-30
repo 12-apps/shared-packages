@@ -2,6 +2,7 @@
 
 import type { CategorySelectCopy } from "../../../copy";
 import Box from '@mui/material/Box/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 
 import { CaretGlyph } from './CategoryIcons';
 import {
@@ -10,6 +11,7 @@ import {
   triggerCountSx,
   triggerSx,
 } from './CategorySelect.styles';
+import { sxRem } from '../../../tokens/relative';
 
 interface CategoryTriggerProps {
   /** The words this renders. REQUIRED — this package ships no default copy. */
@@ -51,6 +53,7 @@ export function CategoryTrigger({
   dataTestId,
   copy,
 }: CategoryTriggerProps): React.JSX.Element {
+  const theme = useTheme();
   const hasSelection = Boolean(selectionLabel) || (count ?? 0) > 0;
   return (
     <Box
@@ -73,7 +76,7 @@ export function CategoryTrigger({
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          maxWidth: 190,
+          maxWidth: sxRem(190),
           flex: fullWidth ? 1 : '0 1 auto',
           textAlign: 'left',
         }}
@@ -107,7 +110,7 @@ export function CategoryTrigger({
           ×
         </Box>
       )}
-      <CaretGlyph style={triggerChevronSx(open) as React.CSSProperties} />
+      <CaretGlyph style={triggerChevronSx(theme, open) as React.CSSProperties} />
     </Box>
   );
 }

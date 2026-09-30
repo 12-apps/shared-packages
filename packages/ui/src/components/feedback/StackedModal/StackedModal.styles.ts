@@ -1,7 +1,9 @@
 import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import { scrim } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 import { dynamicViewportHeight } from '../../../utils/viewport';
-import type { ModalPanelRole, PanelMaxWidth } from './StackedModal.types';
+import type { ModalPanelRole, PanelMaxWidth, PanelSize } from './StackedModal.types';
 
 /** Props that drive the panel's look but must not reach the DOM. */
 export interface PanelStyleProps {
@@ -10,10 +12,11 @@ export interface PanelStyleProps {
   glass?: boolean;
   rtl?: boolean;
   customMaxWidth?: PanelMaxWidth;
+  panelSize?: PanelSize;
 }
 
 /** Style-only props, filtered out before they can land on a DOM node. */
-export const STYLE_ONLY_PROPS = ['modalRole', 'isAnimating', 'glass', 'rtl', 'customMaxWidth'];
+export const STYLE_ONLY_PROPS = ['modalRole', 'isAnimating', 'glass', 'rtl', 'customMaxWidth', 'panelSize'];
 
 /** MUI breakpoint names mapped to the pixel width they cap the panel at. */
 const MAX_WIDTH_PX: Record<Exclude<PanelMaxWidth, false>, number> = {
@@ -24,14 +27,21 @@ const MAX_WIDTH_PX: Record<Exclude<PanelMaxWidth, false>, number> = {
   xl: 1920,
 };
 
-const BACKDROP_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
-  secondary: 'rgba(0, 0, 0, 0.3)',
-  background: 'rgba(0, 0, 0, 0.1)',
+/** The scrim's opacity behind each receding panel role. */
+const BACKDROP_ALPHA_BY_ROLE: Partial<Record<ModalPanelRole, number>> = {
+  secondary: 0.3,
+  background: 0.1,
 };
 
 const ANIMATION_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
   secondary: 'expandModal 300ms ease-in-out forwards',
   primary: 'contractModal 300ms ease-in-out forwards',
+};
+
+/** A wide panel settles at 90vw, so its keyframes must end there too, or it snaps. */
+const WIDE_ANIMATION_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
+  secondary: 'expandModalWide 300ms ease-in-out forwards',
+  primary: 'contractModalWide 300ms ease-in-out forwards',
 };
 
 // Animation endpoints use the common lg width (60vw); the role styles set the
@@ -45,20 +55,28 @@ const KEYFRAMES: CSSObject = {
     from: { width: '100vw', transform: 'translateX(0)' },
     to: { width: '60vw', transform: 'translateX(0)' },
   },
+  '@keyframes expandModalWide': {
+    from: { width: '90vw', transform: 'translateX(0)' },
+    to: { width: '100vw', transform: 'translateX(0)' },
+  },
+  '@keyframes contractModalWide': {
+    from: { width: '100vw', transform: 'translateX(0)' },
+    to: { width: '90vw', transform: 'translateX(0)' },
+  },
 };
 
 const cap = (customMaxWidth?: PanelMaxWidth): number | null =>
   customMaxWidth ? MAX_WIDTH_PX[customMaxWidth] : null;
 
 /** One breakpoint's width: the viewport share, held under the optional px cap. */
-const panelWidth = (share: string, capPx: number | null): CSSObject =>
+const panelWidth = (theme: Theme, share: string, capPx: number | null): CSSObject =>
   capPx
-    ? { width: `min(${share}, ${capPx}px)`, maxWidth: `${capPx}px` }
+    ? { width: `min(${share}, ${rem(theme, capPx)})`, maxWidth: rem(theme, capPx) }
     : { width: share, maxWidth: share };
 
-const backdropStyles = (modalRole?: ModalPanelRole): CSSObject => ({
-  backgroundColor: (modalRole && BACKDROP_BY_ROLE[modalRole]) ?? 'rgba(0, 0, 0, 0.5)',
-  backdropFilter: modalRole === 'primary' ? 'blur(4px)' : 'none',
+const backdropStyles = (theme: Theme, modalRole?: ModalPanelRole): CSSObject => ({
+  backgroundColor: scrim(theme, (modalRole && BACKDROP_ALPHA_BY_ROLE[modalRole]) ?? 0.5),
+  backdropFilter: modalRole === 'primary' ? `blur(${rem(theme, 4)})` : 'none',
 });
 
 /**
@@ -69,10 +87,23 @@ const backdropStyles = (modalRole?: ModalPanelRole): CSSObject => ({
  * prop, when given, caps it further.
  */
 const primaryPanelStyles = (theme: Theme, capPx: number | null): CSSObject => ({
-  [theme.breakpoints.down('sm')]: panelWidth('100%', capPx),
-  [theme.breakpoints.between('sm', 'lg')]: panelWidth('80vw', capPx),
-  [theme.breakpoints.up('lg')]: panelWidth('60vw', capPx),
-  '@media (min-width:2200px)': panelWidth('40vw', capPx),
+  [theme.breakpoints.down('sm')]: panelWidth(theme, '100%', capPx),
+  [theme.breakpoints.between('sm', 'lg')]: panelWidth(theme, '80vw', capPx),
+  [theme.breakpoints.up('lg')]: panelWidth(theme, '60vw', capPx),
+  // A viewport width, in the theme's breakpoint unit like the three above.
+  [theme.breakpoints.up(2200)]: panelWidth(theme, '40vw', capPx),
+});
+
+/**
+ * `size="wide"`: 90vw up to `xl`, 75vw above it, 60vw on ultra-wide screens.
+ * At 1280 that is ~1150px instead of 768px — room for a form column beside a
+ * fixed ~350px sidebar — while a sliver of the page behind stays visible.
+ */
+const widePrimaryPanelStyles = (theme: Theme, capPx: number | null): CSSObject => ({
+  [theme.breakpoints.down('sm')]: panelWidth(theme, '100%', capPx),
+  [theme.breakpoints.between('sm', 'xl')]: panelWidth(theme, '90vw', capPx),
+  [theme.breakpoints.up('xl')]: panelWidth(theme, '75vw', capPx),
+  [theme.breakpoints.up(2200)]: panelWidth(theme, '60vw', capPx),
 });
 
 /** Panels below the top one expand to full width, producing the GTM stacking effect. */
@@ -87,8 +118,15 @@ const secondaryPanelStyles = (): CSSObject => ({
   transform: 'scale(1)',
 });
 
-const rolePanelStyles = (theme: Theme, role: ModalPanelRole | undefined, capPx: number | null): CSSObject => {
-  if (role === 'primary') return primaryPanelStyles(theme, capPx);
+const rolePanelStyles = (
+  theme: Theme,
+  role: ModalPanelRole | undefined,
+  capPx: number | null,
+  size?: PanelSize,
+): CSSObject => {
+  if (role === 'primary') {
+    return size === 'wide' ? widePrimaryPanelStyles(theme, capPx) : primaryPanelStyles(theme, capPx);
+  }
   if (role === 'secondary') return secondaryPanelStyles();
   // Background modals stay mounted but hidden, for performance.
   if (role === 'background') return { display: 'none' };
@@ -99,14 +137,16 @@ const glassStyles = (theme: Theme, glass?: boolean, role?: ModalPanelRole): CSSO
   glass && role === 'primary'
     ? {
         backgroundColor: alpha(theme.palette.background.paper, 0.85),
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
+        backdropFilter: `blur(${rem(theme, 10)})`,
+        WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
         border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
       }
     : {};
 
-const animationStyles = (isAnimating?: boolean, role?: ModalPanelRole): CSSObject =>
-  isAnimating ? { animation: (role && ANIMATION_BY_ROLE[role]) ?? 'none' } : {};
+const animationStyles = (isAnimating?: boolean, role?: ModalPanelRole, size?: PanelSize): CSSObject => {
+  const byRole = size === 'wide' ? WIDE_ANIMATION_BY_ROLE : ANIMATION_BY_ROLE;
+  return isAnimating ? { animation: (role && byRole[role]) ?? 'none' } : {};
+};
 
 const panelBaseStyles = (theme: Theme): CSSObject => ({
   margin: 0,
@@ -129,16 +169,16 @@ const panelStyles = (theme: Theme, props: PanelStyleProps): CSSObject => {
   const capPx = cap(props.customMaxWidth);
   return {
     ...panelBaseStyles(theme),
-    ...rolePanelStyles(theme, props.modalRole, capPx),
+    ...rolePanelStyles(theme, props.modalRole, capPx, props.panelSize),
     ...glassStyles(theme, props.glass, props.modalRole),
-    ...animationStyles(props.isAnimating, props.modalRole),
+    ...animationStyles(props.isAnimating, props.modalRole, props.panelSize),
   };
 };
 
 /** The full rule set for the sliding panel's Dialog root. */
 export const dialogRootStyles = (theme: Theme, props: PanelStyleProps): CSSObject => ({
   direction: props.rtl ? 'rtl' : 'ltr',
-  '& .MuiBackdrop-root': backdropStyles(props.modalRole),
+  '& .MuiBackdrop-root': backdropStyles(theme, props.modalRole),
   '& .MuiDialog-container': { alignItems: 'flex-start', justifyContent: 'flex-end' },
   '& .MuiDialog-paper': panelStyles(theme, props),
   ...KEYFRAMES,

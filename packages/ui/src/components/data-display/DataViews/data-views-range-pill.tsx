@@ -32,6 +32,10 @@ import {
   rangeChipLabel,
 } from './data-views-range-values';
 import type { RangeFieldConfig, RangeValue } from './data-views-types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
+import { fieldEdge } from '../../../tokens/field-edge';
+import { sxRem } from '../../../tokens/relative';
 
 
 
@@ -124,7 +128,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
         <Typography
           component="p"
           data-testid={`${testId}-inverted`}
-          sx={{ mt: 0.75, fontSize: '0.75rem', color: 'error.main' }}
+          sx={{ mt: 0.75, fontSize: sxRem(12), color: 'error.main' }}
         >
           {copy.filters.rangeInvalid}
         </Typography>
@@ -136,7 +140,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
         <Typography
           component="p"
           data-testid={`${testId}-inclusive`}
-          sx={{ mt: 0.75, fontSize: '0.75rem', color: 'text.disabled' }}
+          sx={{ mt: 0.75, fontSize: sxRem(12), color: 'text.disabled' }}
         >
           {copy.filters.rangeInclusiveNote}
         </Typography>
@@ -180,7 +184,7 @@ function ClearAffordance({
       }}
       sx={{ display: 'inline-flex', borderRadius: 999, p: 0.125, '&:hover': { bgcolor: 'action.selected' } }}
     >
-      <CloseIcon sx={{ fontSize: 14 }} />
+      <CloseIcon sx={{ fontSize: sxRem(14) }} />
     </Box>
   );
 }
@@ -205,7 +209,8 @@ function RangeTrigger<T extends Record<string, unknown>>({
   const inverted = isRangeInverted(value);
   // An INVERTED window gets its own tone rather than the ordinary "applied"
   // one: it is applied, and it matches nothing, and those are different states.
-  const tone = inverted ? 'error.main' : active ? 'primary.main' : 'divider';
+  // At rest the pill draws the one field border (`fieldEdge`).
+  const tone = inverted ? 'error.main' : active ? 'primary.main' : null;
   return (
     <Button
       variant="outlined"
@@ -224,18 +229,18 @@ function RangeTrigger<T extends Record<string, unknown>>({
           <ClearAffordance label={field.label} onClear={() => onChange({})} testId={`${testId}-clear-inline`} />
         ) : undefined
       }
-      endIcon={<ChevronDownIcon sx={{ fontSize: 16 }} />}
+      endIcon={<ChevronDownIcon sx={{ fontSize: sxRem(16) }} />}
       sx={{
-        borderRadius: 999,
-        height: 34,
+        borderRadius: fieldRadiusPx,
+        height: fieldHeight,
         px: 1.5,
-        maxWidth: 280,
+        maxWidth: sxRem(280),
         color: inverted ? 'error.main' : 'text.primary',
         fontWeight: 600,
-        fontSize: '0.8125rem',
+        fontSize: sxRem(13),
         textTransform: 'none',
         whiteSpace: 'nowrap',
-        borderColor: tone,
+        borderColor: (theme) => tone ?? fieldEdge(theme),
         bgcolor: active ? 'action.selected' : 'background.paper',
         '&:hover': {
           borderColor: active ? tone : 'text.primary',
@@ -299,7 +304,7 @@ export function RangePill<T extends Record<string, unknown>>({
             empty grid with no explanation (FUT-668). */}
         {active && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mt: 1.5 }}>
-            <Typography component="span" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+            <Typography component="span" sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>
               {rangeChipLabel(field, value)}
             </Typography>
             <Button
@@ -339,7 +344,7 @@ export function PanelRangeField<T extends Record<string, unknown>>({
   if (field.kind === "day") {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 500, color: "text.secondary" }}>
+        <Typography component="span" sx={{ fontSize: sxRem(12), fontWeight: 500, color: "text.secondary" }}>
           {field.label}
         </Typography>
         <RangeBounds field={field} value={value} onChange={onChange} testId={testId} />

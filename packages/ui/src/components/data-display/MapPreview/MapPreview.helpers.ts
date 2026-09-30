@@ -3,11 +3,11 @@ import { alpha } from '@mui/material/styles/index.js';
 
 import { DEFAULT_ZOOM } from './MapPreview.constants';
 import type { MapPreviewProps } from './MapPreview.types';
+import { rem } from '../../../tokens/relative';
 
 type MapDefaultedKeys =
   | 'markers'
   | 'marker'
-  | 'height'
   | 'interactive'
   | 'zoom'
   | 'mapType'
@@ -26,7 +26,6 @@ export type ResolvedMapPreviewProps = MapPreviewProps &
 const MAP_PREVIEW_DEFAULTS: Pick<MapPreviewProps, MapDefaultedKeys> = {
   markers: [],
   marker: true,
-  height: '400px',
   interactive: false,
   zoom: DEFAULT_ZOOM,
   mapType: 'roadmap',
@@ -56,8 +55,8 @@ export const glassStyles = (variant: MapPreviewProps['variant'], theme: Theme) =
   variant === 'glass'
     ? {
         background: alpha(theme.palette.background.paper, 0.7),
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
+        WebkitBackdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
       }
     : {};

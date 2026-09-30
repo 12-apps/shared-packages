@@ -18,6 +18,9 @@ import type SvgIcon from '@mui/material/SvgIcon/index.js';
 import React, { useState } from 'react';
 
 import type { ViewMode, ViewSelectorProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof SvgIcon }[] = [
   { value: 'grid', label: 'Grid View', icon: GridIcon },
@@ -43,7 +46,7 @@ export function ViewSelector({
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
       {viewMode === 'grid' && (
-        <Box sx={{ width: 96, display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ width: sxRem(96), display: 'flex', alignItems: 'center' }}>
           <Slider
             data-testid="resize-card-slider"
             aria-label={cardSizeLabel}
@@ -66,10 +69,10 @@ export function ViewSelector({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 1, color: 'text.secondary' }}
+        sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 1, borderRadius: fieldRadiusPx, color: 'text.secondary' }}
       >
-        <ActiveIcon sx={{ fontSize: 16 }} />
-        <ChevronDownIcon sx={{ fontSize: 14 }} />
+        <ActiveIcon sx={{ fontSize: sxRem(16) }} />
+        <ChevronDownIcon sx={{ fontSize: sxRem(14) }} />
       </Button>
       <Menu
         anchorEl={anchorEl}
@@ -77,7 +80,7 @@ export function ViewSelector({
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{ paper: { sx: { minWidth: 180 } } }}
+        slotProps={{ paper: { sx: { minWidth: sxRem(180) } } }}
       >
         {VIEW_OPTIONS.map((option) => {
           const OptionIcon = option.icon;
@@ -93,9 +96,9 @@ export function ViewSelector({
               sx={{ gap: 1.5 }}
             >
               <ListItemText>{option.label}</ListItemText>
-              <OptionIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              <OptionIcon sx={{ fontSize: sxRem(16), color: 'text.secondary' }} />
               <ListItemIcon sx={{ minWidth: 'auto !important' }}>
-                <CheckIcon sx={{ fontSize: 16, color: selected ? 'text.primary' : 'transparent' }} />
+                <CheckIcon sx={{ fontSize: sxRem(16), color: selected ? 'text.primary' : 'transparent' }} />
               </ListItemIcon>
             </MenuItem>
           );

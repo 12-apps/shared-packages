@@ -91,6 +91,19 @@ describe("createEmailAuth results", () => {
     });
   });
 
+  it("carries the 503 for mail it cannot send, not a generic failure", async () => {
+    // Verification required and no provider: every address gets the same
+    // answer, and it has its own sentence. Narrowed to `unknown` it read "try
+    // again", which cannot work until somebody configures the mailer.
+    const { impl } = fakeFetch({
+      status: 503,
+      body: { error: "…", reason: "verification-unavailable" },
+    });
+    await expect(
+      createEmailAuth({ fetchImpl: impl }).signUp({ email: "a@b.co", password: "uma senha boa 42" }),
+    ).resolves.toEqual({ ok: false, reason: "verification-unavailable" });
+  });
+
   it("carries the broken password rules through", async () => {
     const { impl } = fakeFetch({
       status: 400,

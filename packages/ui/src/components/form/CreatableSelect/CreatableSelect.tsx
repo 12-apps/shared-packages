@@ -1,6 +1,6 @@
 'use client';
 
-import type { Theme } from '@mui/material/styles/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete/index.js';
 import type { AutocompleteRenderInputParams } from '@mui/material/Autocomplete/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
@@ -13,6 +13,9 @@ import type { CreatableSelectOption, CreatableSelectProps } from './CreatableSel
 import type { SizeValue } from '../../../tokens/scales';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldControlStyles } from '../../../tokens/field-height';
+import { rem, sxRem } from '../../../tokens/relative';
 
 /** Internal option shape: a real option, or the synthetic "create new" row. */
 interface InternalOption extends CreatableSelectOption {
@@ -25,8 +28,8 @@ const CREATE_PREFIX = ' create:';
 
 const filterOptions = createFilterOptions<InternalOption>();
 
-/** How far one nesting level indents a dropdown row, in px. */
-const INDENT_STEP = 16;
+/** A dropdown row's left inset at `depth`: one 16px step per level, plus the first, through the type scale. */
+const rowInset = (theme: Theme, depth: number): string => rem(theme, 16 * (1 + depth));
 
 /** `sm`/`md` → MUI's own scale, the same mapping {@link Input} uses. */
 // All five house stops onto MUI's two. `xs`/`sm` draw small; `md` and up draw
@@ -36,11 +39,12 @@ const MUI_SIZE = { xs: 'small', sm: 'small', md: 'medium', lg: 'medium', xl: 'me
 /** Match the outlined border treatment of `Input` so siblings look identical. */
 const fieldSx = {
   '& .MuiOutlinedInput-root': {
+    borderRadius: fieldRadiusPx,
     '& fieldset': {
       borderColor: (theme: Theme) => fieldEdge(theme),
     },
     '&:hover fieldset': { borderColor: 'primary.main' },
-    '&.Mui-focused fieldset': { borderColor: 'primary.main', borderWidth: 2 },
+    '&.Mui-focused fieldset': { borderColor: 'primary.main', borderWidth: sxRem(2) },
     '&.Mui-error fieldset': { borderColor: 'error.main' },
   },
 } as const;
@@ -77,13 +81,14 @@ function buildFilter(
 function renderIndentedOption(
   props: React.HTMLAttributes<HTMLLIElement>,
   option: InternalOption,
+  theme: Theme,
 ): React.JSX.Element {
   const { key, ...rest } = props as typeof props & { key?: string };
   return (
     <li
       key={key ?? option.value}
       {...rest}
-      style={{ paddingLeft: INDENT_STEP * (1 + (option.depth ?? 0)) }}
+      style={{ paddingLeft: rowInset(theme, option.depth ?? 0) }}
     >
       {option.label}
     </li>
@@ -100,6 +105,7 @@ function renderField(
     loading: boolean;
     size: SizeValue;
     dataTestId: string;
+    theme: Theme;
   },
 ): React.JSX.Element {
   return (
@@ -109,14 +115,14 @@ function renderField(
       placeholder={field.placeholder}
       error={Boolean(field.error)}
       size={MUI_SIZE[field.size]}
-      sx={fieldSx}
+      sx={[fieldSx, (theme) => fieldControlStyles(theme, field.size)]}
       inputProps={{ ...params.inputProps, 'data-testid': `${field.dataTestId}-input` }}
       slotProps={{
         input: {
           ...params.InputProps,
           endAdornment: (
             <>
-              {field.loading ? <CircularProgress color="inherit" size={18} /> : null}
+              {field.loading ? <CircularProgress color="inherit" size={rem(field.theme, 18)} /> : null}
               {params.InputProps.endAdornment}
             </>
           ),
@@ -196,6 +202,7 @@ export function CreatableSelect({
   dataTestId = 'creatable-select',
 }: CreatableSelectProps): React.JSX.Element {
   const inputId = useId();
+  const theme = useTheme();
   const { items, selected } = useInternalOptions(options, value);
 
   return (
@@ -225,11 +232,11 @@ export function CreatableSelect({
         slotProps={{ popper: { sx: { zIndex: stackedOverlayZIndex } } }}
         getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
         isOptionEqualToValue={(option, current) => option.value === current.value}
-        renderOption={renderIndentedOption}
+        renderOption={(props, option) => renderIndentedOption(props, option, theme)}
         filterOptions={buildFilter(onCreate, createOptionLabel)}
         onChange={(_event, next) => handlePick(next, onChange, onCreate)}
         renderInput={(params) =>
-          renderField(params, { inputId, placeholder, error, loading, size, dataTestId })
+          renderField(params, { inputId, placeholder, error, loading, size, dataTestId, theme })
         }
       />
       {error && <FormMessage error dataTestId={`${dataTestId}-message`}>{error}</FormMessage>}

@@ -16,7 +16,8 @@ import {
 } from './Paragraph.metrics';
 import type { ParagraphProps } from './Paragraph.types';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
-import { px } from '../../../tokens/theme';
+import { rem } from '../../../tokens/relative';
+import type { UiTypeStep } from '../../../tokens/theme';
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
@@ -37,17 +38,20 @@ const getColorFromTheme = (theme: Theme, color: string) => {
 
 // Derived from the shared metrics, not restated: the native `Paragraph` reads
 // the same table, so the two renderers cannot disagree on a size.
-const sizeMap: Record<string, { fontSize: string; lineHeight: number }> = Object.fromEntries(
-  Object.entries(PARAGRAPH_SIZES).map(([size, step]) => [
-    size,
-    { fontSize: px(step.fontSize), lineHeight: step.lineHeight },
-  ]),
-);
+// The table keeps the design px; the size is converted where it is read.
+const sizeMap: Readonly<Record<string, UiTypeStep | undefined>> = PARAGRAPH_SIZES;
+
+const sizeStyles = (theme: Theme, customSize: string): CSSObject => {
+  const step = sizeMap[customSize];
+  return step ? { fontSize: rem(theme, step.fontSize), lineHeight: step.lineHeight } : {};
+};
 
 // `lead` and `small` shrink or grow relative to the scale, but only at the
 // default size — an explicit size wins.
-const sizeOverride = (customSize: string, atDefault: number): string | undefined =>
-  customSize === 'md' ? px(atDefault) : sizeMap[customSize]?.fontSize;
+const sizeOverride = (theme: Theme, customSize: string, atDefault: number): string | undefined => {
+  const drawnAt = customSize === 'md' ? atDefault : sizeMap[customSize]?.fontSize;
+  return drawnAt === undefined ? undefined : rem(theme, drawnAt);
+};
 
 const StyledParagraph = styled(Typography, {
   shouldForwardProp: (prop) =>
@@ -63,7 +67,7 @@ const StyledParagraph = styled(Typography, {
     fontFamily: theme.typography.body1.fontFamily,
     margin: `0 0 ${PARAGRAPH_MARGIN_BOTTOM_EM}em 0`,
     transition: 'all 0.2s ease',
-    ...sizeMap[customSize],
+    ...sizeStyles(theme, customSize),
   };
 
   // Variant-specific styles
@@ -77,7 +81,7 @@ const StyledParagraph = styled(Typography, {
       ...baseStyles,
       color: textColor,
       fontWeight: PARAGRAPH_FONT_WEIGHT,
-      fontSize: sizeOverride(customSize, LEAD_FONT_SIZE),
+      fontSize: sizeOverride(theme, customSize, LEAD_FONT_SIZE),
       lineHeight: LEAD_LINE_HEIGHT,
       letterSpacing: `${LEAD_LETTER_SPACING_EM}em`,
     },
@@ -90,7 +94,7 @@ const StyledParagraph = styled(Typography, {
     small: {
       ...baseStyles,
       color: theme.palette.text.secondary,
-      fontSize: sizeOverride(customSize, SMALL_FONT_SIZE),
+      fontSize: sizeOverride(theme, customSize, SMALL_FONT_SIZE),
       fontWeight: PARAGRAPH_FONT_WEIGHT,
       lineHeight: SMALL_LINE_HEIGHT,
     },

@@ -5,6 +5,8 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React, { useMemo } from 'react';
 
+import type { TimingDiagramCopy } from '../../../copy';
+
 import type { TimingData, TimingDiagramProps } from './TimingDiagram.types';
 import type { Phase, PhaseKey, TimingViewProps } from './TimingDiagram.views';
 import {
@@ -13,13 +15,14 @@ import {
   StackedView,
   WaterfallView,
 } from './TimingDiagram.views';
+import { rem } from '../../../tokens/relative';
 
 // Styled components
 const DiagramContainer = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.8)} 100%)`,
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  backdropFilter: `blur(${rem(theme, 10)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
 }));
@@ -38,12 +41,12 @@ const LegendItem = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   gap: theme.spacing(1),
   '& .color': {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
+    width: rem(theme, 12),
+    height: rem(theme, 12),
+    borderRadius: rem(theme, 2),
   },
   '& .label': {
-    fontSize: '0.8rem',
+    fontSize: rem(theme, 12.8),
     color: theme.palette.text.secondary,
   },
 }));
@@ -62,13 +65,13 @@ const calculatePercentages = (data: TimingData): Record<string, number> => {
 
 // A phase with no recorded time never happened — an HTTP request has no SSL
 // handshake, for instance — so it gets no bar and no legend entry.
-const phasesOf = (data: TimingData): Phase[] =>
+const phasesOf = (data: TimingData, copy: TimingDiagramCopy): Phase[] =>
   [
-    { key: 'dns', label: 'DNS Lookup', value: data.dns },
-    { key: 'connect', label: 'Connection', value: data.connect },
-    { key: 'ssl', label: 'SSL/TLS', value: data.ssl },
-    { key: 'request', label: 'Request', value: data.request },
-    { key: 'response', label: 'Response', value: data.response },
+    { key: 'dns', label: copy.dns, value: data.dns },
+    { key: 'connect', label: copy.connect, value: data.connect },
+    { key: 'ssl', label: copy.ssl, value: data.ssl },
+    { key: 'request', label: copy.request, value: data.request },
+    { key: 'response', label: copy.response, value: data.response },
   ].filter((phase) => phase.value !== undefined && phase.value > 0);
 
 const VIEWS: Record<string, FC<TimingViewProps>> = {
@@ -82,13 +85,13 @@ export const TimingDiagram: FC<TimingDiagramProps> = ({
   copy,
   data,
   showLabels = true,
-  height = 40,
+  height,
   animated = true,
   showTooltips = true,
   variant = 'waterfall',
 }) => {
   const percentages = useMemo(() => calculatePercentages(data), [data]);
-  const phases = phasesOf(data);
+  const phases = phasesOf(data, copy);
   const View = VIEWS[variant];
 
   return (
@@ -102,10 +105,12 @@ export const TimingDiagram: FC<TimingDiagramProps> = ({
           phases={phases}
           percentages={percentages}
           data={data}
+          copy={copy}
           animated={animated}
           showLabels={showLabels}
           showTooltips={showTooltips}
-          height={height}
+          // The waterfall's plot height, 40 design px unless the caller says otherwise.
+          plotHeightPx={height ?? 40}
         />
       )}
 
@@ -115,7 +120,7 @@ export const TimingDiagram: FC<TimingDiagramProps> = ({
             <LegendItem key={phase.key}>
               <Box
                 className="color"
-                sx={{ backgroundColor: phaseColors[phase.key as PhaseKey] }}
+                sx={(theme) => ({ backgroundColor: phaseColors(theme)[phase.key as PhaseKey] })}
               />
               <Typography className="label">{phase.label}</Typography>
             </LegendItem>

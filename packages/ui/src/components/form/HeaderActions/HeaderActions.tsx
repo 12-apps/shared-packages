@@ -11,6 +11,7 @@ import React, { useState } from 'react';
 
 import { HeaderButton } from '../HeaderButton';
 import type { HeaderActionItem, HeaderActionsProps } from './HeaderActions.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** Drop the gated-away entries, so everything below can count what is left. */
 function present(
@@ -122,7 +123,7 @@ export function HeaderActions({
                 }}
                 data-testid={action.dataTestId ?? action.id}
               >
-                <ListItemIcon sx={{ minWidth: 32 }}>{action.icon}</ListItemIcon>
+                <ListItemIcon sx={{ minWidth: sxRem(32) }}>{action.icon}</ListItemIcon>
                 <ListItemText>{action.text}</ListItemText>
               </MenuItem>
             ))}

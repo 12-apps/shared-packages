@@ -1,6 +1,8 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
 import type { WorkflowStepItem, WorkflowStepProps } from './WorkflowStep.types';
+import { neutralTones } from '../../../tokens/ink';
+import { paletteKey } from '../../../tokens/scales';
 
 type StepColor = NonNullable<WorkflowStepProps['color']>;
 type StepSize = NonNullable<WorkflowStepProps['size']>;
@@ -21,16 +23,22 @@ interface StepPalette {
   contrastText: string;
 }
 
-/** `neutral` has no MUI palette entry, so its pair is derived from grey. */
+/**
+ * The step's colour pair, keyed through `paletteKey` so `danger` reads MUI's
+ * `error` (the palette has no `danger`). `neutral` lands on `grey`, a ramp with
+ * no `main`, so its pair is derived from the ramp — with the contrast computed,
+ * not assumed.
+ */
 export const stepPalette = (theme: Theme, color?: StepColor): StepPalette => {
-  if (color === 'neutral') {
+  const key = paletteKey(color || 'primary');
+  if (key === 'grey') {
+    const main = neutralTones(theme).emphasis;
     return {
-      main: theme.palette.grey[600],
-      contrastText: theme.palette.getContrastText(theme.palette.grey[600]),
+      main,
+      contrastText: theme.palette.getContrastText(main),
     };
   }
 
-  const key = (color || 'primary') as 'primary' | 'secondary' | 'success' | 'warning' | 'error';
   return theme.palette[key];
 };
 
@@ -83,8 +91,8 @@ export const stepColors = (
   }
 
   return {
-    backgroundColor: theme.palette.grey[300],
-    borderColor: theme.palette.grey[300],
+    backgroundColor: neutralTones(theme).track,
+    borderColor: neutralTones(theme).track,
     textColor: theme.palette.text.secondary,
   };
 };
@@ -149,3 +157,43 @@ export const resolveWorkflowStepProps = (
   props: WorkflowStepProps,
 ): ResolvedWorkflowStepProps =>
   ({ ...WORKFLOW_DEFAULTS, ...definedProps(props) }) as ResolvedWorkflowStepProps;
+
+/**
+ * The progressbar's `aria-valuetext`: `Step N of M: <title>` while `currentStep`
+ * names a step, and `Step N of M` when it does not (past the end, below zero, or
+ * no steps at all), so a screen reader never reads a missing title as
+ * "undefined". The index itself is not clamped (FUT-2671).
+ */
+export const progressValueText = (
+  steps: readonly WorkflowStepItem[],
+  currentStep: number,
+): string => {
+  const position = `Step ${currentStep + 1} of ${steps.length}`;
+  const step = steps[currentStep];
+  return step === undefined ? position : `${position}: ${step.title}`;
+};
+
+export interface ProgressValueRange {
+  max?: number;
+  now?: number;
+}
+
+/**
+ * The progressbar's `aria-valuemax`/`aria-valuenow` pair (FUT-2773). With no
+ * steps at all there is no meaningful range to report — a `role="progressbar"`
+ * with zero steps has nothing to measure, and WAI-ARIA's own value attributes
+ * are optional for exactly this case (an indeterminate progressbar omits
+ * `aria-valuenow`) — so both are left out rather than asserting the invalid
+ * range `aria-valuemax={-1}` with `aria-valuenow={0}`. Otherwise `currentStep`
+ * is clamped to `[0, steps.length - 1]` so the reported value never falls
+ * outside `[aria-valuemin, aria-valuemax]`, however far `currentStep` strays.
+ */
+export const progressValueRange = (
+  steps: readonly WorkflowStepItem[],
+  currentStep: number,
+): ProgressValueRange => {
+  if (steps.length === 0) return {};
+
+  const max = steps.length - 1;
+  return { max, now: Math.min(Math.max(currentStep, 0), max) };
+};

@@ -2,7 +2,7 @@ import Box from '@mui/material/Box/index.js';
 import { styled } from '@mui/material/styles/index.js';
 import React, { forwardRef, useCallback, useMemo } from 'react';
 
-import { resolveWorkflowStepProps, withDerivedStatus } from './WorkflowStep.helpers';
+import { progressValueRange, progressValueText, resolveWorkflowStepProps, withDerivedStatus } from './WorkflowStep.helpers';
 import { StepRow } from './WorkflowStepRow';
 import type { WorkflowStepItem, WorkflowStepProps } from './WorkflowStep.types';
 
@@ -62,6 +62,8 @@ export const WorkflowStep = forwardRef<HTMLDivElement, WorkflowStepProps>((rawPr
     [steps, currentStep],
   );
 
+  const { max: valueMax, now: valueNow } = progressValueRange(steps, currentStep);
+
   return (
     <StepContainer
       ref={ref}
@@ -71,9 +73,9 @@ export const WorkflowStep = forwardRef<HTMLDivElement, WorkflowStepProps>((rawPr
       style={style}
       role="progressbar"
       aria-valuemin={0}
-      aria-valuemax={steps.length - 1}
-      aria-valuenow={currentStep}
-      aria-valuetext={`Step ${currentStep + 1} of ${steps.length}: ${steps[currentStep]?.title}`}
+      aria-valuemax={valueMax}
+      aria-valuenow={valueNow}
+      aria-valuetext={progressValueText(steps, currentStep)}
       data-testid={dataTestId}
       {...other}
     >

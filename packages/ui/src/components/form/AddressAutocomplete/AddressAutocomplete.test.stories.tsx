@@ -1,9 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,Mock,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { AddressAutocomplete } from './AddressAutocomplete';
+import { PT_BR_ADDRESS_AUTOCOMPLETE_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof AddressAutocomplete> = {
+  args: { copy: PT_BR_ADDRESS_AUTOCOMPLETE_COPY },
   title: 'Form/AddressAutocomplete/Tests',
   component: AddressAutocomplete,
   parameters: {
@@ -354,7 +358,7 @@ export const ResponsiveDesignTest: Story = {
   },
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -364,9 +368,9 @@ export const ResponsiveDesignTest: Story = {
           styles: { width: '768px', height: '1024px' },
         },
       },
-      defaultViewport: 'mobile',
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -654,7 +658,7 @@ export const IntegrationTest: Story = {
       await expect(label).toBeInTheDocument();
 
       // Check current location button is present
-      const locationButton = canvas.getByTitle('Use current location');
+      const locationButton = canvas.getByTitle(PT_BR_ADDRESS_AUTOCOMPLETE_COPY.useCurrentLocation);
       await expect(locationButton).toBeInTheDocument();
 
       // Click current location button
@@ -700,7 +704,7 @@ export const IntegrationTest: Story = {
       // Verify full address details were extracted
       await waitFor(() => {
         const calls = (args.onSelect as Mock).mock.calls;
-        const lastCall = calls[calls.length - 1][0];
+        const lastCall = must(calls[calls.length - 1])[0];
         expect(lastCall).toMatchObject({
           formatted: expect.stringContaining('Pine Boulevard'),
           street: expect.stringContaining('Pine Boulevard'),

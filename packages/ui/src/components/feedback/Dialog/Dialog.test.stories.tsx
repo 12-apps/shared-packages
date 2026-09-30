@@ -6,6 +6,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, fireEvent, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Dialog, DialogActions,DialogContent, DialogHeader } from './Dialog';
 
 const meta: Meta<typeof Dialog> = {
@@ -25,20 +27,37 @@ const meta: Meta<typeof Dialog> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+
+// A `DialogActions` button this wrapper re-targets to its own `handleClose`.
+interface ClonableButtonProps {
+  'data-testid'?: string;
+  onClick?: () => void;
+}
 
 // Test wrapper component
+interface TestDialogWrapperProps {
+  children: React.ReactNode;
+  onOpen?: () => void;
+  onClose?: () => void;
+  [key: string]: unknown;
+}
+// Most stories drive `Dialog` through `TestDialogWrapper` below, whose props
+// add `onOpen` (fired when its own button opens the dialog) — `DialogProps`
+// has no such prop. Naming its props type directly (rather than
+// `StoryObj<typeof meta>`, which only knows `DialogProps`) types `args` to
+// match what those stories actually pass; the few stories that drive
+// `<Dialog>` directly set no `args`, so the wider type costs them nothing.
+// One name (`Story`), not two: `scripts/native-parity.mjs` counts native
+// shared-story coverage by matching the literal `: Story` annotation, so a
+// second type name here would silently drop stories from that ledger.
+type Story = StoryObj<TestDialogWrapperProps>;
+
 const TestDialogWrapper = ({
   children,
   onOpen = fn(),
   onClose = fn(),
   ...args
-}: {
-  children: React.ReactNode;
-  onOpen?: () => void;
-  onClose?: () => void;
-  [key: string]: unknown;
-}) => {
+}: TestDialogWrapperProps) => {
   const [open, setOpen] = useState(false);
 
   const handleOpen = () => {
@@ -58,14 +77,17 @@ const TestDialogWrapper = ({
       </Button>
       <Dialog {...args} open={open} onClose={handleClose}>
         {React.Children.map(children, (child) => {
-          if (React.isValidElement(child) && child.type === DialogActions) {
+          if (
+            React.isValidElement<{ children?: React.ReactNode }>(child) &&
+            child.type === DialogActions
+          ) {
             // Clone DialogActions and add onClick handlers to buttons
             return React.cloneElement(
               child,
               {},
               React.Children.map(child.props.children, (button) => {
                 if (
-                  React.isValidElement(button) &&
+                  React.isValidElement<ClonableButtonProps>(button) &&
                   (button.props['data-testid'] === 'cancel-button' ||
                     button.props['data-testid'] === 'close-modal-button' ||
                     button.props['data-testid'] === 'force-close-button')
@@ -318,12 +340,17 @@ export const ScreenReaderTest: Story = {
 // 4. Focus Management Test
 export const FocusManagement: Story = {
   /*
+   * On open, the web `Dialog` moves focus to the first tabbable descendant of
+   * the `role="dialog"` paper — or the paper itself when it holds nothing
+   * focusable — never to `.MuiDialog-container`, which wraps and so sits
+   * OUTSIDE it (FUT-2696; see `Dialog.focus.ts`).
+   *
    * Tried un-skipped and measured: react-native-web's `Modal` does trap and
    * restore focus, but on open the focused node is NOT inside the element
    * carrying `role="dialog"` — the trap's sentinels and the focused content
    * wrapper sit outside it, so `modal.contains(document.activeElement)` is
-   * false there and true on the web, where MUI focuses inside its own paper.
-   * The whole story hangs off that containment, so it stays web-only.
+   * false there. The whole story hangs off that containment, so it stays
+   * web-only.
    */
   tags: ['native-skip'],
   name: '🎯 Focus Management Test',
@@ -369,20 +396,10 @@ export const FocusManagement: Story = {
       });
 
       // Opening the dialog moves focus off the page behind it and into the
-      // modal. MUI parks that initial focus on `.MuiDialog-container`, which
-      // wraps — and so is OUTSIDE — the `[role="dialog"]` paper, hence the
-      // assertion is on the modal root.
-      //
-      // Two things were wrong here: the callback was a non-async arrow
-      // containing `await`, a syntax error that failed the whole Storybook
-      // build; and `expect(document.activeElement).toBeTruthy()` asserted
-      // nothing, since activeElement falls back to <body> and is never null.
+      // dialog itself — the element carrying `role="dialog"`, not MUI's
+      // `.MuiDialog-container` wrapper around it (FUT-2696).
       await waitFor(() => {
         expect(within(document.body).getByTestId('first-modal-element')).toBeInTheDocument();
-        // The dialog itself, not MUI's `.MuiModal-root` wrapper: both renderers
-        // put `role="dialog"` on something, and focus belongs inside it either
-        // way. react-native-web's `Modal` traps and restores focus just as
-        // MUI's does, so the rest of this story is not DOM-only.
         const modal = document.querySelector('[role="dialog"]');
         expect(modal).toBeInTheDocument();
         expect(modal?.contains(document.activeElement)).toBe(true);
@@ -613,7 +630,7 @@ export const EdgeCases: Story = {
       <DialogHeader
         title="Edge Cases Test Dialog with Very Long Title That Should Handle Overflow Gracefully"
         subtitle="This is a very long subtitle that tests how the dialog handles overflow content and maintains proper layout and accessibility standards"
-        showCloseButton={args.showCloseButton}
+        showCloseButton={args.showCloseButton as boolean | undefined}
       />
       <DialogContent data-testid="edge-case-content">
         <Typography data-testid="long-text">
@@ -683,7 +700,7 @@ export const EdgeCases: Story = {
       await expect(dialogContent).toBeInTheDocument();
 
       // Dialog should maintain proper dimensions
-      const dialogRect = dialog.getBoundingClientRect();
+      const dialogRect = must(dialog).getBoundingClientRect();
       await expect(dialogRect.width).toBeGreaterThan(0);
       await expect(dialogRect.height).toBeGreaterThan(0);
     });
@@ -812,11 +829,7 @@ export const ResponsiveDesign: Story = {
     onOpen: fn(),
     onClose: fn(),
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
@@ -832,7 +845,7 @@ export const ResponsiveDesign: Story = {
 
     await step('Test mobile dialog layout', async () => {
       const dialog = document.querySelector('[role="dialog"]');
-      const dialogRect = dialog.getBoundingClientRect();
+      const dialogRect = must(dialog).getBoundingClientRect();
 
       // Measured against the body, which is the box the dialog is actually laid
       // out in — window.innerWidth includes any scrollbar, so the same dialog
@@ -890,7 +903,7 @@ export const ThemeVariations: Story = {
 
     await step('Verify theme-aware styling', async () => {
       const dialog = document.querySelector('[role="dialog"]');
-      const computedStyle = window.getComputedStyle(dialog);
+      const computedStyle = window.getComputedStyle(must(dialog));
 
       // Dialog should have proper background color
       await expect(computedStyle.backgroundColor).toBeDefined();
@@ -986,5 +999,125 @@ export const Integration: Story = {
       const dialogTitle = within(document.body).getByText('Integration Test');
       await expect(dialogTitle).toBeInTheDocument();
     });
+  },
+};
+
+/**
+ * The drawer variant is actually drawn. Its look used to sit on a Box inside
+ * MUI's Drawer, absolutely positioned: the Drawer's paper had no in-flow
+ * content, collapsed to 0px wide, and its overflow clipped the whole panel —
+ * opening a drawer dialog showed a dimmed page and nothing else. Its leading
+ * corners are the theme radius (they were written '16pxpx', which the browser
+ * dropped).
+ */
+export const DrawerIsDrawn: Story = {
+  // DOM-only: it measures MUI's web Drawer paper, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open variant="drawer" size="sm" onClose={fn()} dataTestId="drawer-dialog">
+      <DialogHeader title="Drawer Dialog" subtitle="Slide-in panel" />
+      <DialogContent>
+        <Typography>Content</Typography>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async () => {
+    const body = within(globalThis.document.body);
+    const title = await body.findByText('Drawer Dialog');
+    const paper = title.closest('.MuiDrawer-paper');
+    await expect(paper).not.toBeNull();
+    await waitFor(() => {
+      const rect = (paper as HTMLElement).getBoundingClientRect();
+      // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the panel's width IS the behaviour under test: 0px was the bug
+      expect(rect.width).toBeGreaterThan(300);
+      expect(rect.right).toBeLessThanOrEqual(globalThis.innerWidth);
+      expect(rect.left).toBeGreaterThanOrEqual(0);
+    });
+    const style = globalThis.getComputedStyle(paper as HTMLElement);
+    await expect(style.borderTopLeftRadius).toBe('16px');
+    await expect(style.borderTopRightRadius).toBe('0px');
+  },
+};
+
+/**
+ * Raw children (no `DialogContent`) taller than the drawer scroll with its
+ * paper. The drawer's paper keeps MUI's own `overflow-y: auto`; clipping it to
+ * round the corners would leave everything below the fold unreachable.
+ */
+export const DrawerScrollsRawChildren: Story = {
+  // DOM-only: it measures MUI's web Drawer paper, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open variant="drawer" size="sm" onClose={fn()}>
+      <Box data-testid="drawer-raw-body">
+        {Array.from({ length: 60 }, (_, i) => (
+          <Typography key={i}>Linha {i + 1}</Typography>
+        ))}
+      </Box>
+    </Dialog>
+  ),
+  play: async () => {
+    const body = await within(globalThis.document.body).findByTestId('drawer-raw-body');
+    const paper = body.closest('.MuiDrawer-paper') as HTMLElement;
+    await expect(paper).not.toBeNull();
+    // The panel is as tall as the viewport and 60 lines overflow it at any size;
+    // scrolling it IS the behaviour under test.
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    await waitFor(() => expect(paper.scrollHeight).toBeGreaterThan(paper.clientHeight));
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    paper.scrollTop = paper.scrollHeight;
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- see above
+    await waitFor(() => expect(paper.scrollTop).toBeGreaterThan(0));
+  },
+};
+
+const backdropFilterOf = (): string | undefined => {
+  const backdrop = globalThis.document.querySelector<HTMLElement>('.MuiBackdrop-root');
+  return backdrop ? globalThis.getComputedStyle(backdrop).backdropFilter : undefined;
+};
+
+/**
+ * A caller's backdrop props add to the `glass` scrim rather than replacing it:
+ * the class lands AND the blur stays. They used to replace it whole (FUT-2672).
+ * jsdom does not compute `backdrop-filter`, so this half is checked here;
+ * `dialog-backdrop-props.test.tsx` covers the rest.
+ */
+export const GlassBackdropKeepsItsBlur: Story = {
+  // DOM-only: it measures MUI's web backdrop, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open glass onClose={fn()} BackdropProps={{ className: 'caller-backdrop' }}>
+      <DialogContent>
+        <Typography>Glass</Typography>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async () => {
+    await within(globalThis.document.body).findByText('Glass');
+    await waitFor(() =>
+      expect(globalThis.document.querySelector('.MuiBackdrop-root')).toHaveClass('caller-backdrop'),
+    );
+    await waitFor(() => expect(backdropFilterOf()).toBe('blur(8px)'));
+  },
+};
+
+/**
+ * `glass` blurs the drawer's backdrop too, as it does every other variant's;
+ * the drawer used to set no backdrop props at all (FUT-2673). jsdom does not
+ * compute `backdrop-filter`; `dialog-drawer-backdrop.test.tsx` covers the rest.
+ */
+export const DrawerGlassBackdropIsBlurred: Story = {
+  // DOM-only: it measures MUI's web backdrop, which the native Dialog does not render.
+  tags: ['native-skip'],
+  render: () => (
+    <Dialog open variant="drawer" glass onClose={fn()}>
+      <DialogContent>
+        <Typography>Glass drawer</Typography>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async () => {
+    await within(globalThis.document.body).findByText('Glass drawer');
+    await waitFor(() => expect(backdropFilterOf()).toBe('blur(8px)'));
   },
 };

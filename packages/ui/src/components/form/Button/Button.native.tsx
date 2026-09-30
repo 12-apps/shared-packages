@@ -19,7 +19,6 @@ import {
   BUTTON_FONT_WEIGHT,
   BUTTON_ICON_GAP_UNITS,
   BUTTON_LINE_HEIGHT,
-  BUTTON_RADIUS_UNITS,
   BUTTON_SIZES,
   BUTTON_SPINNER_SIZE,
   BUTTON_WASH_ALPHA,
@@ -28,7 +27,6 @@ import {
   GLASS_BORDER_ALPHA,
   GLOW_INNER_ALPHA,
   GLOW_RADIUS,
-  ICON_ONLY_PADDING,
   PULSE_ALPHA,
   PULSE_DURATION_MS,
   PULSE_SPREAD,
@@ -40,6 +38,8 @@ import type { ButtonProps, ButtonVariant } from './Button.types.native';
 import { renderTextChildren } from '../../../platform/text-children';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
+import { resolveFieldEdge } from '../../../tokens/field-edge.core';
+import { FIELD_BORDER_WIDTH, fieldHeightPx } from '../../../tokens/field-height.core';
 import { alpha } from '../../../tokens/color';
 import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
 import type { UiPaletteColor, UiTheme } from '../../../tokens/theme';
@@ -73,7 +73,15 @@ function paintFor(
   switch (variant) {
     case 'outline':
       return {
-        container: { backgroundColor: 'transparent', borderWidth: 1, borderColor: palette.main },
+        // A neutral outline rests on the one field border, as on the web.
+        container: {
+          backgroundColor: 'transparent',
+          borderWidth: FIELD_BORDER_WIDTH,
+          borderColor:
+            color === 'neutral'
+              ? resolveFieldEdge(theme.palette.divider, theme.palette.background.paper)
+              : palette.main,
+        },
         pressed: { backgroundColor: wash, borderColor: palette.dark },
         label: { color: palette.main },
       };
@@ -132,11 +140,15 @@ function disabledPaint(theme: UiTheme, variant: ButtonVariant): Paint {
 
 function sizeStyle(theme: UiTheme, size: SizeValue, iconOnly: boolean, hasIcon: boolean): ViewStyle {
   const metrics = BUTTON_SIZES[size];
+  // The theme's field height for the size, as on the web: a button stands
+  // level with the field beside it, and an icon-only one is that square.
+  const height = fieldHeightPx(theme.fieldHeight, size);
   if (iconOnly) {
-    return { padding: ICON_ONLY_PADDING[size], minWidth: 0 };
+    return { padding: 0, minWidth: height, minHeight: height };
   }
   return {
-    paddingVertical: metrics.paddingVertical,
+    minHeight: height,
+    paddingVertical: 0,
     paddingHorizontal: metrics.paddingHorizontal,
     minWidth: MIN_WIDTH,
     gap: hasIcon ? theme.spacing(BUTTON_ICON_GAP_UNITS) : undefined,
@@ -214,7 +226,8 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   const iconOnly = !loading && icon != null && children == null;
   const inactive = Boolean(disabled) || loading;
   const paint = inactive ? disabledPaint(theme, variant) : paintFor(theme, variant, color, palette, active);
-  const radius = theme.spacing(BUTTON_RADIUS_UNITS);
+  // The theme's one field radius, so a button and the input beside it agree.
+  const radius = theme.radius.field;
   const metrics = BUTTON_SIZES[size];
   // The web button is `overflow: hidden` (its ripple needs it) unless the pulse
   // ring turns it visible; on native the glow's shadow needs it visible too,

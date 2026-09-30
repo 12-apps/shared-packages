@@ -1,6 +1,22 @@
 import type { PaletteColor, Theme, ThemeOptions } from '@mui/material/styles/index.js';
 
 import { cssLengthToPx, cssTrackingToEm } from '../tokens/css-units';
+import {
+  checkboxRadioDensityOverrides,
+  chipDensityOverrides,
+  iconButtonDensityOverrides,
+  paginationItemDensityOverrides,
+  sliderDensityOverrides,
+  switchDensityOverrides,
+  tabDensityOverrides,
+  tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
+  toggleButtonDensityOverrides,
+} from '../tokens/density-overrides';
+import { densityFontSize, resolveDensityFactor } from '../tokens/density';
+import { resolveFieldHeight } from '../tokens/field-height.core';
+import { fieldOverrides, mergeMuiComponents } from '../tokens/field-height';
+import { fieldRadius } from '../tokens/field-radius';
 import { accentFor } from '../tokens/scales';
 import {
   FONT_WEIGHTS,
@@ -97,7 +113,11 @@ export function uiThemeFromMui(theme: Theme): UiTheme {
     },
     spacing: (units: number) => units * unit,
     spacingUnit: unit,
-    radius: { sm: md / 2, md, lg: md * 2, xl: md * 4, full: 9999 },
+    radius: { sm: md / 2, md, lg: md * 2, xl: md * 4, full: 9999, field: fieldRadius(theme) },
+    fieldHeight: resolveFieldHeight(theme.fieldHeight),
+    // A bare MUI theme (never built through `createUiTheme`/`muiThemeOptionsFrom`)
+    // carries no `theme.density` — read back as `'normal'`, factor `1`.
+    density: theme.density ?? resolveDensityFactor(),
     typography: {
       fontFamily: theme.typography.fontFamily ?? WEB_FONT_FAMILY,
       monospaceFontFamily: WEB_MONOSPACE_FONT_FAMILY,
@@ -134,8 +154,33 @@ export function muiThemeOptionsFrom(ui: UiTheme): ThemeOptions {
       grey: { ...palette.grey },
     },
     shape: { borderRadius: ui.radius.md },
+    fieldRadius: ui.radius.field,
+    fieldHeight: ui.fieldHeight,
+    // Additive: FUT-2766 added IconButton's/Chip's overrides, FUT-2767 added
+    // Checkbox/Radio's and Switch's, and this PR (FUT-2768) adds
+    // ToggleButton/Tab/Tabs' indicator/TableCell/PaginationItem/Slider's.
+    components: mergeMuiComponents(
+      fieldOverrides(ui.radius.field, ui.fieldHeight),
+      iconButtonDensityOverrides(),
+      chipDensityOverrides(),
+      checkboxRadioDensityOverrides(),
+      switchDensityOverrides(),
+      toggleButtonDensityOverrides(),
+      tabDensityOverrides(),
+      tabsIndicatorDensityOverrides(),
+      tableCellDensityOverrides(),
+      paginationItemDensityOverrides(),
+      sliderDensityOverrides(),
+    ),
     spacing: ui.spacingUnit,
-    typography: { fontFamily: ui.typography.fontFamily ?? WEB_FONT_FAMILY },
+    density: ui.density,
+    typography: {
+      fontFamily: ui.typography.fontFamily ?? WEB_FONT_FAMILY,
+      // MUI multiplies every `pxToRem` size by `fontSize / 14` — the lever a
+      // density mode moves (`./tokens/relative.ts`). `htmlFontSize` stays
+      // untouched: that is a reader's own zoom/accessibility setting, not this.
+      fontSize: densityFontSize(ui.density.factor),
+    },
     zIndex: { ...ui.zIndex },
   };
 }

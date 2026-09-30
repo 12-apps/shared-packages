@@ -11,6 +11,8 @@ import React from 'react';
 import { breadcrumbLinkStyles } from './Breadcrumbs.styles';
 import type { BreadcrumbItem } from './Breadcrumbs.types';
 import type { BreadcrumbCopy } from '../../../copy';
+import { sheen, uiInk } from '../../../tokens/ink';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const BreadcrumbLink = styled(Link, {
   shouldForwardProp: (prop) => prop !== 'size' && prop !== 'active' && prop !== 'visualStyle' })<{ size?: string; active?: boolean; visualStyle?: string }>(
@@ -23,7 +25,7 @@ const BreadcrumbText = styled(Typography, {
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(0.5),
-  fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
+  fontSize: rem(theme, size === 'sm' ? 14 : size === 'lg' ? 18 : 16),
   fontWeight: 600,
   color: theme.palette.primary.main,
   padding: theme.spacing(0.5, 0.75),
@@ -32,7 +34,7 @@ const BreadcrumbText = styled(Typography, {
 
   ...(visualStyle === 'glass' && {
     background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-    backdropFilter: 'blur(4px)',
+    backdropFilter: `blur(${rem(theme, 4)})`,
     border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}` }),
 
   '& .breadcrumb-icon': {
@@ -40,7 +42,7 @@ const BreadcrumbText = styled(Typography, {
 
   // Mobile responsiveness
   [theme.breakpoints.down('sm')]: {
-    fontSize: size === 'lg' ? '1rem' : size === 'sm' ? '0.75rem' : '0.875rem',
+    fontSize: rem(theme, size === 'lg' ? 16 : size === 'sm' ? 12 : 14),
     padding: theme.spacing(0.375, 0.5) } }));
 
 // Animated separator wrapper
@@ -60,13 +62,13 @@ const CollapsedItemsPopover: React.FC<{
       sx={{
         background: (theme) =>
           theme.palette.mode === 'dark'
-            ? 'rgba(17, 24, 39, 0.95)'
-            : 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(10px)',
+            ? alpha(uiInk(theme).glassSlate, 0.95)
+            : sheen(theme, 0.95),
+        backdropFilter: (theme) => `blur(${rem(theme, 10)})`,
         borderRadius: 1,
         boxShadow: 3,
         p: 1,
-        minWidth: 150 }}
+        minWidth: sxRem(150) }}
     >
       {items.map((item, index) => (
         <Box

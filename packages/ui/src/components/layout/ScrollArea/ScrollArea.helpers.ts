@@ -10,7 +10,6 @@ type ScrollAreaDefaultedKeys =
   | 'smoothScroll'
   | 'variant'
   | 'scrollToTopButton'
-  | 'scrollToTopThreshold'
   | 'contentPadding'
   | 'alwaysShowScrollbar'
   | 'disabled'
@@ -30,7 +29,6 @@ const SCROLL_AREA_DEFAULTS: Pick<ScrollAreaProps, ScrollAreaDefaultedKeys> = {
   smoothScroll: true,
   variant: 'default',
   scrollToTopButton: false,
-  scrollToTopThreshold: 100,
   contentPadding: 0,
   alwaysShowScrollbar: false,
   disabled: false,

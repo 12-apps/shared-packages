@@ -1,3 +1,4 @@
+import { createTheme } from '@mui/material/styles/index.js';
 import { describe, expect, it } from 'vitest';
 
 import type { ChartDataPoint, ChartProps } from '../Chart.types';
@@ -111,15 +112,15 @@ describe('resolveAxisConfig', () => {
 
 describe('resolveBarGeometry', () => {
   it('rounds the top corners and caps the width by default', () => {
-    expect(resolveBarGeometry({ data: [] })).toEqual({ radius: [3, 3, 0, 0], maxBarSize: 38 });
+    expect(resolveBarGeometry({ data: [] }, createTheme())).toEqual({ radius: [3, 3, 0, 0], maxBarSize: 38 });
   });
 
   it('keeps stacked segments square', () => {
-    expect(resolveBarGeometry({ data: [], stacked: true }).radius).toBe(0);
+    expect(resolveBarGeometry({ data: [], stacked: true }, createTheme()).radius).toBe(0);
   });
 
   it('honours caller overrides', () => {
-    expect(resolveBarGeometry({ data: [], barRadius: 8, maxBarWidth: 64 })).toEqual({
+    expect(resolveBarGeometry({ data: [], barRadius: 8, maxBarWidth: 64 }, createTheme())).toEqual({
       radius: [8, 8, 0, 0],
       maxBarSize: 64,
     });
@@ -133,13 +134,13 @@ describe('axis tick margin', () => {
   // each other at the corner — the collision the visual pass is about.
   it('clears the value label descender at every size', () => {
     for (const size of ['xs', 'sm', 'md', 'lg', 'xl'] as const) {
-      const { fontSize, tickMargin } = getSizeStyles(size);
+      const { fontSize, tickMargin } = getSizeStyles(createTheme(), size);
       const fontPx = Number.parseFloat(fontSize) * 16;
       expect(tickMargin).toBeGreaterThanOrEqual(fontPx * 0.79);
     }
   });
 
   it('keeps an explicit height from disturbing the margin', () => {
-    expect(getSizeStyles('sm', 220)).toEqual({ height: 220, fontSize: '0.875rem', tickMargin: 12 });
+    expect(getSizeStyles(createTheme(), 'sm', 220)).toEqual({ height: 220, fontSize: '0.875rem', tickMargin: 12 });
   });
 });

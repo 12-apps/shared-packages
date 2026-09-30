@@ -42,6 +42,218 @@ Where:
 - [ ] Accessibility attributes (aria-\*, role, etc.)
 - [ ] Theme integration via MUI (web) / `useUiTheme()` (native, when ported)
 - [ ] Responsive design considerations
+- [ ] A field's corner comes from the field radius — never a literal (see below)
+
+### Field Radius
+
+Every **field** — a text input, select, textarea, OTP slot, date or filter
+trigger, toggle, and the buttons that share their rows — is drawn with ONE
+corner: the theme's field radius (default `8`, `DEFAULT_FIELD_RADIUS`). A row
+that mixed MUI's 4px text field, an 8px button and 999px filter pills read as
+three kits glued together; this is the rule that stops it recurring.
+
+| where | read it with |
+|---|---|
+| `styled()` / a `CSSObject` | `fieldRadius(theme)` — a number, in px |
+| `sx` | `fieldRadiusPx` — `sx` multiplies a bare number by `shape.borderRadius` |
+| a composite on MUI's own `TextField` | `fieldRootStyles` — as `styled()` styles or an `sx` entry |
+| native | `theme.radius.field` from `useUiTheme()` |
+
+All are exported from `@12-apps/ui/tokens`, and every field in this package
+reads one of them itself, so it is right under any theme. A host sets the value
+with `createAppTheme(mode, { fieldRadius })` (`@12-apps/app-shell/react`), with
+`createUiTheme({ fieldRadius })`, or with `fieldRadius` on MUI's `createTheme`.
+The two factories also apply `fieldRadiusOverrides(radius)`, which rounds MUI's
+own `OutlinedInput`, `FilledInput`, `Button` and `ToggleButton` — the HOST's bare
+MUI controls. A hand-built `createTheme` wants `components:
+fieldRadiusOverrides(radius)` too, or those keep `shape.borderRadius`.
+
+A wrapper around fields (a segment track, a glass group frame) is not itself a
+field: its corner is the field radius PLUS its inset, so the two stay concentric.
+
+It is NOT `shape.borderRadius`, which is the general radius cards, menus and
+papers multiply. Badges, counters, chips, menus and cards keep that scale.
+
+### Field Height and Border
+
+A field also has ONE height and ONE resting border (FUT-2555).
+
+**Height** is a multiple of the default font size — `rem` on the web, the 16dp
+body size on native — so it grows with the type: `fieldHeight` (default `2.5`,
+40px). `sm` and `md` are that standard; `xs` is `0.8×`, `lg` `1.2×`, `xl` `1.4×`.
+
+| where | read it with |
+|---|---|
+| `sx` / `styled()` | `fieldHeight` (`fieldHeight(theme, size)` for a step) — a `rem` string |
+| a MUI `TextField` / `Select` | `fieldControlStyles(theme, size)`, or `fieldTextFieldStyles` for radius + height + border together |
+| native | `fieldHeightPx(theme.fieldHeight, size)` |
+
+A one-line field is the height; a button is AT LEAST the height with its label
+centred (a label that wraps still grows it); an icon-only button is that square.
+Multiline fields grow with their rows; `filled` and `underline` are not drawn AT
+the field height (their label sits inside the box) but use MUI's small density
+alongside the outlined `md`, so they got shorter with it.
+
+**Border** at rest is `fieldBorder(theme)` — 1px in `fieldEdge`'s colour, never
+`divider` (a row hairline, not a control boundary). Hover, focus and error keep
+their own. A variant that draws a different edge on purpose (`glass`,
+`gradient`, `underline`, a coloured outline button) keeps it; a NEUTRAL outline
+button is a field-row control and rests on the field border.
+
+Hosts set the height with `createAppTheme(mode, { fieldHeight })`,
+`createUiTheme({ fieldHeight })` or `fieldHeight` on MUI's `createTheme`; the
+factories' `fieldOverrides(radius, height)` also put MUI's own outlined fields on
+it.
+
+### Density — no raw values
+
+Every size and colour a component draws is RELATIVE to the theme, so that a
+density mode is one decision in the theme rather than a hunt through every
+component (FUT-2585). `pnpm quality:ui-tokens` enforces it on every pull request.
+
+| you want | write | not |
+|---|---|---|
+| any length — font size, height, width, padding, gap, offset, radius, shadow offset, blur, keyframe distance | `rem(theme, 14)`, `sxRem(14)` in `sx`, `rems(theme, 0, 8, 32)` for a list | `'14px'`, `'0.875rem'`, `fontSize: 14`, `px(14)` |
+| a container width equal to a breakpoint | `rem(theme, theme.breakpoints.values.md)` | `900` |
+| a length JavaScript computes with (row height, overflow cost, cell size) | `remPx(theme, 52)` | `const ROW_HEIGHT = 52` |
+| spacing in `sx` | `p: 2`, `gap: 1` (spacing units are already relative) | — |
+| a colour | a palette role (`text.secondary`, `divider`, `action.hover`, `primary.contrastText`) or a named token from `@12-apps/ui/tokens` | `'#fff'`, `'rgba(0,0,0,.5)'`, `'white'`, `palette.grey[300]` |
+| a length that must BE px (`IntersectionObserver.rootMargin`, a virtualiser's inline offset) | `` `${remPx(theme, 150)}px` `` | `` `${150}px` `` |
+
+`rem(theme, px)` is `theme.typography.pxToRem(px)`: at MUI's defaults it is
+exactly `px / 16` rem, so converting a literal changes nothing on screen, and a
+host that moves `typography.fontSize` scales every size written through it
+(`htmlFontSize` only declares what the root already is). Spacing units in `sx` (`p: 2`) and `theme.spacing()` follow
+`theme.spacing` instead, so a density mode sets BOTH the type scale and the
+spacing unit (and `fieldHeight`). The one literal left is the `1px` hairline
+border (`FIELD_BORDER_WIDTH`).
+
+A number that comes from the layout itself — a pointer-dragged width, a
+virtualiser spacer computed from `remPx` pitches — is already right in px; wrap
+it in `rem()` and it would scale twice. Those are `exempt` ledger entries, each
+with its argument.
+
+`*.metrics.ts` keeps its numbers in px — they are the native renderer's dp —
+and the web reads them through `rem(theme, n)`. Colours are in scope there too.
+
+A raw value that is right and always will be (a CSS mask's opaque stop, a
+gesture's physical swipe distance) goes in `.ui-tokens-exceptions.json` as an
+`exempt` entry WITH a written argument; everything else in that ledger is debt
+that only shrinks.
+
+#### The `density` theme knob (FUT-2764/2765)
+
+Because every size above is already RELATIVE to the theme, a single theme-level
+factor is enough to make the whole package denser or roomier — no component is
+touched, and `size` is untouched too (density SCALES; `size` is HIERARCHY).
+`UiThemeOptions.density?: 'compact' | 'normal' | 'comfortable' | number` — a
+named level, or a raw factor for a repository the three names don't fit (a
+kiosk app, say). `UiThemeOptions.densityFactors?: Partial<Record<'compact' |
+'normal' | 'comfortable', number>>` lets a repository redefine what a named
+level itself means.
+
+Precedence, highest first, and it differs by WHICH path sets the explicit
+option (`UiThemeOptions` itself carries no `typography.fontSize` — only
+`fontFamily`/`monospaceFontFamily` — so "an explicit `fontSize` wins" is never
+a `createUiTheme` rule):
+
+- On the `createUiTheme` path: an explicit `spacingUnit` / `fieldHeight` option
+  (unchanged — these already win over everything below).
+- On the MUI-native path (`densityThemeOptions`'s output, or a host's own
+  `createTheme()` options merged around it): whichever `typography.fontSize` /
+  `spacing` a host's own object literal states LAST wins — ordinary
+  JavaScript object-spread order, not a rule this package enforces. See the
+  worked example below for where that actually has to go.
+
+Below that: a numeric `density` (used as the factor directly, no table
+lookup) > `densityFactors[level]` (a repository's own override) > the
+built-in table:
+
+| level | factor | `typography.fontSize` (base 14) | `spacingUnit` (base 8) | `fieldHeight` (base 2.5, 40px `md`) |
+| --- | --- | --- | --- | --- |
+| `compact` | `0.9` | `12.6` | `7.2` | `2.25` (36px `md`) |
+| `normal` | `1` (no-op) | `14` | `8` | `2.5` (40px `md`, unchanged) |
+| `comfortable` | `1.1` | `15.4` | `8.8` | `2.75` (44px `md`) |
+
+No `density` at all resolves to `'normal'`, factor `1` — today's numbers,
+byte-for-byte; this is why an app that sets nothing sees no visual change. A
+numeric `density` that is not a positive, finite number (`0`, a negative
+number, `NaN`, `Infinity`) falls back to `'normal'` the same way, rather than
+baking a broken factor into every size; a `densityFactors` entry that isn't
+falls back to the BUILT-IN table's value for that same level instead (the
+level itself is still the one asked for — only its factor was unusable).
+
+**Three worked examples, one per repository shape:**
+
+```ts
+// A named level — e.g. a backoffice app that wants everything a size denser.
+createUiTheme({ density: 'compact' });
+
+// No `density` at all — e.g. a customer-facing storefront. Identical to today.
+createUiTheme();
+
+// A raw factor — e.g. a kiosk app whose own hardware needs a value none of
+// the three names fit.
+createUiTheme({ density: 1.15 });
+
+// A repository redefining what "compact" itself means.
+createUiTheme({ density: 'compact', densityFactors: { compact: 0.8 } });
+```
+
+A host that builds MUI's `createTheme()` directly — never calling
+`createUiTheme`/`UiProvider` — uses the standalone entry point instead, which
+gives the same numbers: `typography.fontSize`, `spacing`, `fieldHeight` (the
+key `Input`/`Select`/`Button` all read directly for their own height) and
+`components` (the matching `MuiOutlinedInput`/`MuiInputLabel` override for a
+host's own bare fields — an optional 3rd argument names a non-default field
+radius for that override; density never touches the corner, so it defaults to
+the same one `createUiTheme` itself falls back to).
+
+**Where it goes matters.** `createTheme(options, ...args)` only reprocesses
+`spacing`/`typography` on its FIRST argument — every later argument is
+deep-merged onto the theme those two already built, with no such
+reprocessing. A host with a base theme and a SECOND theme layered on top of it
+(`createTheme(outer, { palette: { ... } })` — the shape a two-theme host, such
+as a backoffice app layering its own palette over a shared base, already
+uses) must apply density where the BASE is built, not spread onto `outer`:
+
+```ts
+import { densityThemeOptions } from '@12-apps/ui/tokens';
+
+// RIGHT — density goes into the base's own construction. A second, layering
+// call on top of it is unaffected: it never restates spacing/typography/
+// fieldHeight/components itself, so they carry over from `base` unchanged,
+// already correctly scaled.
+const base = createTheme({ palette: { primary: { main } }, ...densityThemeOptions('compact') });
+const themed = createTheme(base, { palette: { primary: { main: brand } } });
+
+// WRONG — a second, layering argument onto an ALREADY-BUILT theme does not
+// get reprocessed: `spacing`/`typography.fontSize` overwrite the
+// already-resolved `theme.spacing` function/`pxToRem` ratio instead of
+// rescaling them.
+createTheme(outer, { ...densityThemeOptions('compact') });
+```
+
+A host with its OWN overrides for components density's `fieldOverrides`
+doesn't know about merges them in with `mergeMuiComponents` (also exported
+from `@12-apps/ui/tokens`), which leaves a component only one side touches
+untouched — but replaces a SHARED inner key (e.g. both sides styling
+`MuiOutlinedInput`'s `root`) wholesale with whichever source is passed last,
+rather than deep-merging it.
+
+A `styleOverrides` callback already gets `{ theme }` and can read
+`theme.density` directly; `useDensity()` is for a component that needs the
+level in its own render logic instead — no table component sources its own
+discrete density from it any more (`Table`, `DataViews` and `DataGrid` alike,
+FUT-2886, reverting FUT-2769's default-from-theme half for all three): a
+theme density scales their geometry exactly once, through `rem()`, so their
+own discrete density stays `'normal'`/`'cozy'`/`'comfortable'` unless the
+caller passes one or a viewer has one stored.
+
+**Not yet scaled**: MUI's own fixed-px primitives (`IconButton`, `Chip`,
+`Checkbox`, `Radio`, `Switch`, `ToggleButton`, `Tabs`, `TableCell`,
+`Pagination`, `Slider`, `Avatar`) do not move with `density` yet — that is
+FUT-2766–2768, tracked separately.
 
 ### TypeScript Requirements
 
@@ -69,8 +281,8 @@ are in [NATIVE.md](./NATIVE.md). Two rules matter while building any component,
 ported or not:
 
 - **Numbers live in `X.metrics.ts`**, in px, and the web derives its `rem` from
-  them with `px()`. A size written straight into a `styled()` call is a number the
-  native renderer cannot find.
+  them with `rem(theme, n)` (see "Density — no raw values"). A size written
+  straight into a `styled()` call is a number the native renderer cannot find.
 - **A `*.native.tsx` imports no MUI, emotion or react-dom.** The lint rule and the
   native tsup build both refuse it.
 

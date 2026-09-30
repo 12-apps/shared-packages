@@ -114,6 +114,11 @@ export interface RealtimeChannelOptions {
   /** Test/transport seam; defaults to the browser's implementation. */
   createSource?: WireSourceFactory;
   /**
+   * The wire to try first (default `ws`). A channel replacing one that already demoted
+   * passes `sse`, so it does not repeat a socket attempt its predecessor proved cannot open.
+   */
+  wire?: RealtimeTransport;
+  /**
    * Randomness for the reconnect jitter. Injected so a test can pin the delay; app
    * code leaves it alone.
    */
@@ -156,10 +161,11 @@ export class RealtimeChannel {
   private everConnected = false;
   private failedAttempts = 0;
   /**
-   * The wire this channel is currently attempting. Starts on `ws` and demotes to
-   * `sse` once — permanently for this channel's life — see {@link handleDrop}.
+   * The wire this channel is currently attempting. Starts on `options.wire` (`ws`
+   * unless told otherwise) and demotes to `sse` once — permanently for this
+   * channel's life — see {@link handleDrop}.
    */
-  private transport: RealtimeTransport = "ws";
+  private transport: RealtimeTransport;
   /** Watches for a channel that is open and saying nothing (FUT-657). */
   private readonly silence = new SilenceWatch(
     () => {
@@ -173,8 +179,14 @@ export class RealtimeChannel {
   constructor(private readonly options: RealtimeChannelOptions) {
     this.createSource = options.createSource ?? makeDefaultSourceFactory(options.transport);
     this.random = options.random ?? Math.random;
+    this.transport = options.wire ?? "ws";
     options.onStatusChange?.(this.currentStatus);
     this.connect();
+  }
+
+  /** The wire it is on now: where a replacement channel should start. */
+  get wire(): RealtimeTransport {
+    return this.transport;
   }
 
   /** The current status — also pushed through `onStatusChange`. */
@@ -331,8 +343,9 @@ export class RealtimeChannel {
     // One-way and once: SSE is fully functional, so a demoted channel is degraded in
     // no way a consumer can observe.
     //
-    // The escape hatch is "a NEW CHANNEL tries `ws` again", and that is not the same as
-    // "a fresh page load" on the arrangement this package now prefers. In the in-page
+    // The escape hatch is "a NEW `SharedRealtimeChannel` tries `ws` again" (a reopen
+    // inherits `sse` through `wire`), and that is not the same as "a fresh page load"
+    // on the arrangement this package now prefers. In the in-page
     // host the two coincide. Under the SharedWorker the channel lives in the WORKER,
     // which survives as long as any port is attached — so one tab parked open keeps a
     // demoted channel across reloads of every other tab, and only closing the last tab

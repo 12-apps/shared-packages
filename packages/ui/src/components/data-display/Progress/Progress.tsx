@@ -15,6 +15,7 @@ import {
   pulseAnimation,
 } from './Progress.styles';
 import type { ProgressProps, ProgressSize, ProgressVariant } from './Progress.types';
+import { rem, rems } from '../../../tokens/relative';
 
 const StyledLinearProgress = styled(LinearProgress, {
   shouldForwardProp: (prop) =>
@@ -30,15 +31,15 @@ const StyledLinearProgress = styled(LinearProgress, {
   const sizeStyles = getSizeStyles(customSize);
 
   return {
-    height: sizeStyles.height,
-    borderRadius: sizeStyles.height / 2,
+    height: rem(theme, sizeStyles.heightPx),
+    borderRadius: rem(theme, sizeStyles.heightPx / 2),
     backgroundColor: alpha(colorPalette.main, 0.1),
 
     '& .MuiLinearProgress-bar': {
       borderRadius: 'inherit',
       transition: 'all 0.3s ease',
-      ...barVariantStyles(customVariant, colorPalette),
-      ...barEmphasisStyles(colorPalette, glow, pulse),
+      ...barVariantStyles(theme, customVariant, colorPalette),
+      ...barEmphasisStyles(theme, colorPalette, glow, pulse),
     },
   };
 });
@@ -54,7 +55,7 @@ const StyledCircularProgress = styled(CircularProgress, {
 
   return {
     color: colorPalette.main,
-    ...circularEmphasisStyles(colorPalette, glow, pulse),
+    ...circularEmphasisStyles(theme, colorPalette, glow, pulse),
   };
 });
 
@@ -80,14 +81,15 @@ const SegmentedProgress: React.FC<{
           data-testid={`${dataTestId}-segment-${index}`}
           sx={{
             flex: 1,
-            height: sizeStyles.height,
-            borderRadius: sizeStyles.height / 2,
+            height: rem(theme, sizeStyles.heightPx),
+            // In `sx` a numeric radius is a multiple of `shape.borderRadius` — relative already.
+            borderRadius: sizeStyles.heightPx / 2,
             backgroundColor:
               index < filledSegments ? colorPalette.main : alpha(colorPalette.main, 0.1),
             transition: 'all 0.3s ease',
             ...(glow &&
               index < filledSegments && {
-                boxShadow: `0 0 6px 1px ${alpha(colorPalette.main, 0.4)}`,
+                boxShadow: `${rems(theme, 0, 0, 6, 1)} ${alpha(colorPalette.main, 0.4)}`,
               }),
             ...(pulse &&
               index < filledSegments && {
@@ -154,6 +156,7 @@ const CircularView = React.forwardRef<
     },
     ref,
   ) => {
+    const theme = useTheme();
     const sizeStyles = getSizeStyles(size);
 
     return (
@@ -161,7 +164,7 @@ const CircularView = React.forwardRef<
         <StyledCircularProgress
           variant={value !== undefined ? 'determinate' : 'indeterminate'}
           value={displayValue}
-          size={circularSize || sizeStyles.circularSize}
+          size={rem(theme, circularSize || sizeStyles.circularSizePx)}
           thickness={thickness}
           customColor={color}
           glow={glow}

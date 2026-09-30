@@ -52,9 +52,13 @@ export interface RoleWireSchemas {
     description?: string | null | undefined;
     permissions: '*' | string[];
   }>;
-  /** Body for assigning a member's base role. */
+  /**
+   * Body for `PATCH /team/:userId`: replaces the member's HIGHEST system role
+   * with this one, leaving every other role they hold in place. Kept for API
+   * and MCP callers; the packaged screens grant and revoke per role instead.
+   */
   setMemberRoleBody: z.ZodType<{ role: string }>;
-  /** Body for granting a member an additive custom role. */
+  /** Body for granting a member one more role — system or custom, any number. */
   grantMemberRoleBody: z.ZodType<{ role: string }>;
   /** Body for enabling/disabling a member. */
   setMemberActiveBody: z.ZodType<{ active: boolean }>;
@@ -101,16 +105,10 @@ export function buildWireSchemas<P extends string>(
         .array(z.string().trim().min(1))
         .transform((names) => [...new Set(names)])
         .optional(),
-    })
-      // Custom roles are ADDITIVE to a base role, so naming them without one is
-      // a selection the screen cannot produce and the port could not apply: the
-      // membership row needs a `role`. Refused here rather than defaulted,
-      // because guessing the base role of a grant is exactly the decision that
-      // made every invited address an administrator in the first place.
-      .refine(
-        (input) => input.role !== undefined || (input.customRoles ?? []).length === 0,
-        { path: ['role'] },
-      ) as RoleWireSchemas['inviteBody'],
+      // `customRoles` may stand alone: a person may be invited to custom roles
+      // only, and a system role may ride in it too. Nothing here ranks one role
+      // above another — person × role × tenant is N×M×J.
+    }) as RoleWireSchemas['inviteBody'],
   };
 }
 

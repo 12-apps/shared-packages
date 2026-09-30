@@ -24,6 +24,7 @@ import {
   type DataViewsDensity,
   type DataViewsLayout,
 } from "./data-views-layout-context";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * Two of the three tabs inside the "Exibir" panel — Ordenar and Exibição. The
@@ -73,7 +74,7 @@ function Tile({
         borderRadius: 1,
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.75rem",
+        fontSize: sxRem(12),
         fontWeight: active ? 600 : 400,
         color: active ? "primary.main" : "text.secondary",
         "&:hover": { bgcolor: "action.hover" },
@@ -197,7 +198,7 @@ function SortFieldRow({
         borderRadius: 1,
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.8125rem",
+        fontSize: sxRem(13),
         textAlign: "left",
         fontWeight: active ? 600 : 400,
         color: active ? "primary.main" : "text.primary",
@@ -206,7 +207,7 @@ function SortFieldRow({
     >
       <Box
         component="span"
-        sx={{ height: 6, width: 6, borderRadius: "50%", bgcolor: active ? "primary.main" : "action.disabled" }}
+        sx={{ height: sxRem(6), width: sxRem(6), borderRadius: "50%", bgcolor: active ? "primary.main" : "action.disabled" }}
       />
       <Box component="span" sx={{ flex: 1, minWidth: 0 }}>
         {label}
@@ -231,22 +232,22 @@ function SortFieldRow({
 function densityTiles(
   layout: DataViewsLayout,
   copy: DataViewsCopy,
-): { value: DataViewsDensity; label: string; gap: number; columns: number }[] {
+): { value: DataViewsDensity; label: string; gap: (theme: Theme) => string; columns: number }[] {
   // A layout the pack does not key falls back to the table's words rather
   // than rendering three blank tiles — a host adding a layout should still see
   // a usable control while it writes the labels for it.
   const labels = copy.display.densityLabels[layout] ?? copy.display.densityLabels.table;
   return [
-    { value: "compact", label: labels?.compact ?? "compact", gap: 2, columns: 4 },
-    { value: "cozy", label: labels?.cozy ?? "cozy", gap: 5, columns: 3 },
-    { value: "comfortable", label: labels?.comfortable ?? "comfortable", gap: 8, columns: 2 },
+    { value: "compact", label: labels?.compact ?? "compact", gap: sxRem(2), columns: 4 },
+    { value: "cozy", label: labels?.cozy ?? "cozy", gap: sxRem(5), columns: 3 },
+    { value: "comfortable", label: labels?.comfortable ?? "comfortable", gap: sxRem(8), columns: 2 },
   ];
 }
 
 /** The preview for one density tile, in the terms that layout's density is in. */
 function densityGlyph(
   layout: DataViewsLayout,
-  tile: { gap: number; columns: number },
+  tile: { gap: (theme: Theme) => string; columns: number },
   active: boolean,
 ): React.JSX.Element {
   if (layout === "cards") return <GridGlyph n={tile.columns} active={active} />;

@@ -127,7 +127,7 @@ const basicColumns: ColumnConfig[] = [
     sortable: true,
     priority: 4,
     render: (value) => (
-      <Chip label={value} color={value === 'Active' ? 'success' : 'default'} size="sm" />
+      <Chip label={String(value)} color={value === 'Active' ? 'success' : 'default'} size="small" />
     ),
   },
 ];
@@ -153,7 +153,7 @@ const extendedColumns: ColumnConfig[] = [
     sortable: true,
     priority: 6,
     align: 'right' as const,
-    render: (value) => `$${value.toLocaleString()}`,
+    render: (value) => `$${Number(value).toLocaleString()}`,
   },
   {
     key: 'status',
@@ -161,7 +161,7 @@ const extendedColumns: ColumnConfig[] = [
     sortable: true,
     priority: 7,
     render: (value) => (
-      <Chip label={value} color={value === 'Active' ? 'success' : 'default'} size="sm" />
+      <Chip label={String(value)} color={value === 'Active' ? 'success' : 'default'} size="small" />
     ),
   },
   {
@@ -186,7 +186,7 @@ const extendedColumns: ColumnConfig[] = [
 export const Default: Story = {
   render: () => (
     <TableContainer component={Paper}>
-      <Table>
+      <Table emptyText="Nenhum dado por aqui">
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell>
@@ -205,7 +205,7 @@ export const Default: Story = {
                 <Chip
                   label={row.status}
                   color={row.status === 'Active' ? 'success' : 'default'}
-                  size="sm"
+                  size="small"
                 />
               </TableCell>
             </TableRow>
@@ -223,21 +223,21 @@ export const DensityOptions: Story = {
         <Typography variant="h6" gutterBottom>
           Compact Density
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} density="compact" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} density="compact" />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Normal Density (Default)
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} density="normal" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} density="normal" />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Comfortable Density
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} density="comfortable" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} density="comfortable" />
       </Box>
     </Stack>
   ),
@@ -246,7 +246,7 @@ export const DensityOptions: Story = {
 export const StickyHeader: Story = {
   render: () => (
     <Box height={300}>
-      <Table
+      <Table emptyText="Nenhum dado por aqui"
         columns={extendedColumns}
         data={sampleData.concat(sampleData).concat(sampleData)} // Triple the data for scrolling
         stickyHeader
@@ -266,7 +266,7 @@ export const RowSelection: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Selected rows: {selectedRows.join(', ') || 'None'}
         </Typography>
-        <Table
+        <Table emptyText="Nenhum dado por aqui"
           columns={basicColumns}
           data={sampleData}
           selectable
@@ -296,7 +296,7 @@ export const ColumnSorting: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Sorted by: {sortConfig.key} ({sortConfig.direction})
         </Typography>
-        <Table
+        <Table emptyText="Nenhum dado por aqui"
           columns={extendedColumns}
           data={sortedData}
           sortable
@@ -309,6 +309,17 @@ export const ColumnSorting: Story = {
   },
 };
 
+/**
+ * The virtual path lays columns out fixed (FUT-2668), so a column's `width` is
+ * final: the avatar's is its 32px plus the widest density's side padding, and
+ * the e-mail's fits the longest address.
+ */
+const virtualColumns: ColumnConfig[] = extendedColumns.map((column) => {
+  if (column.key === 'avatar') return { ...column, width: 80 };
+  if (column.key === 'email') return { ...column, width: 240 };
+  return column;
+});
+
 export const VirtualScrolling: Story = {
   render: () => (
     <Box>
@@ -318,8 +329,8 @@ export const VirtualScrolling: Story = {
       <Typography variant="body2" color="text.secondary" gutterBottom>
         Only visible rows are rendered for optimal performance
       </Typography>
-      <Table
-        columns={extendedColumns}
+      <Table emptyText="Nenhum dado por aqui"
+        columns={virtualColumns}
         data={largeDataset}
         virtualScrolling
         rowHeight={52}
@@ -331,13 +342,76 @@ export const VirtualScrolling: Story = {
   ),
 };
 
+/**
+ * The virtual path with the checkbox column and a sticky header (FUT-2668):
+ * every body cell sits in its header's column, and every row is `rowHeight`
+ * tall. Unlike `VirtualScrolling`, this one reads its args, so the variant and
+ * the density can be switched from the controls.
+ */
+export const VirtualScrollingSelectableStickyHeader: Story = {
+  args: {
+    variant: 'default',
+    density: 'normal',
+    rowHeight: 52,
+  },
+  render: function VirtualSelectableTable(args) {
+    const [selectedRows, setSelectedRows] = useState<(string | number)[]>([2, 5]);
+
+    return (
+      <Box>
+        <Typography variant="h6" gutterBottom>
+          Virtual Scrolling - selectable, sticky header
+        </Typography>
+        <Table
+          {...args}
+          emptyText="Nenhum dado"
+          columns={virtualColumns}
+          data={largeDataset}
+          virtualScrolling
+          containerHeight={400}
+          overscan={10}
+          selectable
+          selectedRows={selectedRows}
+          onSelectionChange={setSelectedRows}
+          stickyHeader
+        />
+      </Box>
+    );
+  },
+};
+
+/**
+ * `stickyHeader` + `containerHeight` with `virtualScrolling` (FUT-2677): all
+ * three causes of a header that never stuck are exercised together, at the
+ * exact combination `Table.md`'s "Complete Feature Set" example uses.
+ */
+export const VirtualStickyHeader: Story = {
+  render: () => (
+    <Box>
+      <Typography variant="h6" gutterBottom>
+        Virtual scrolling — sticky header, 300px container
+      </Typography>
+      <Table
+        emptyText="Nenhum dado"
+        columns={virtualColumns}
+        data={largeDataset.slice(0, 200)}
+        virtualScrolling
+        stickyHeader
+        containerHeight={300}
+        overscan={10}
+        variant="striped"
+      />
+    </Box>
+  ),
+};
+
 export const ResponsiveDesign: Story = {
   render: () => (
     <Box>
       <Typography variant="body2" color="text.secondary" gutterBottom>
         Resize your window to see columns hide/show based on priority
       </Typography>
-      <Table
+      <Table emptyText="Nenhum dado por aqui"
         columns={extendedColumns}
         data={sampleData}
         responsive
@@ -371,7 +445,7 @@ export const AllFeaturesCombined: Story = {
           Density: Comfortable | Selection | Sorting | Sticky Header | Responsive | Visual Effects
         </Typography>
         <Box height={400}>
-          <Table
+          <Table emptyText="Nenhum dado por aqui"
             columns={extendedColumns}
             data={sortedData}
             // Visual
@@ -401,12 +475,12 @@ export const AllFeaturesCombined: Story = {
 };
 
 export const LoadingState: Story = {
-  render: () => <Table columns={basicColumns} data={[]} loading variant="default" />,
+  render: () => <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={[]} loading variant="default" />,
 };
 
 export const EmptyState: Story = {
   render: () => (
-    <Table
+    <Table emptyText="Nenhum dado por aqui"
       columns={basicColumns}
       data={[]}
       variant="minimal"
@@ -435,35 +509,35 @@ export const Variants: Story = {
         <Typography variant="h6" gutterBottom>
           Default
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} variant="default" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} variant="default" />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Striped
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} variant="striped" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} variant="striped" />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Glass
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} variant="glass" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} variant="glass" />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Minimal
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} variant="minimal" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} variant="minimal" />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Gradient
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} variant="gradient" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} variant="gradient" />
       </Box>
     </Stack>
   ),
@@ -476,28 +550,28 @@ export const VisualEffects: Story = {
         <Typography variant="h6" gutterBottom>
           With Glow
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} glow />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} glow />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           With Pulse
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} pulse variant="glass" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} pulse variant="glass" />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Glow + Pulse
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} glow pulse />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} glow pulse />
       </Box>
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Hoverable
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 3)} hoverable />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 3)} hoverable />
       </Box>
     </Stack>
   ),
@@ -505,25 +579,26 @@ export const VisualEffects: Story = {
 
 export const CustomRendering: Story = {
   render: () => (
-    <Table
+    <Table emptyText="Nenhum dado por aqui"
       columns={extendedColumns}
       data={sampleData}
       variant="striped"
       renderCell={(value, column, rowData) => {
         // Custom rendering for specific columns
         if (column.key === 'name') {
+          const name = String(value);
           return (
             <Box display="flex" alignItems="center" gap={1}>
-              <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>{value.charAt(0)}</Avatar>
+              <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem' }}>{name.charAt(0)}</Avatar>
               <Typography variant="body2" fontWeight="medium">
-                {value}
+                {name}
               </Typography>
             </Box>
           );
         }
 
         // Fall back to column's render function or default
-        return column.render ? column.render(value, rowData) : value;
+        return column.render ? column.render(value, rowData) : String(value);
       }}
     />
   ),
@@ -538,7 +613,7 @@ export const BackwardCompatibility: Story = {
           Basic Usage (Backward Compatible)
         </Typography>
         <TableContainer component={Paper}>
-          <Table hoverable variant="striped">
+          <Table emptyText="Nenhum dado por aqui" hoverable variant="striped">
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
@@ -557,7 +632,7 @@ export const BackwardCompatibility: Story = {
                     <Chip
                       label={row.status}
                       color={row.status === 'Active' ? 'success' : 'default'}
-                      size="sm"
+                      size="small"
                     />
                   </TableCell>
                 </TableRow>
@@ -581,35 +656,35 @@ export const AllVariants: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Default
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} variant="default" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} variant="default" />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Striped
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} variant="striped" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} variant="striped" />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Glass
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} variant="glass" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} variant="glass" />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Minimal
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} variant="minimal" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} variant="minimal" />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Gradient
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} variant="gradient" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} variant="gradient" />
       </Box>
     </Stack>
   ),
@@ -625,21 +700,21 @@ export const AllSizes: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Compact
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} density="compact" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} density="compact" />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Normal
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} density="normal" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} density="normal" />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Comfortable
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} density="comfortable" />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} density="comfortable" />
       </Box>
     </Stack>
   ),
@@ -655,35 +730,35 @@ export const AllStates: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Default State
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Loading State
         </Typography>
-        <Table columns={basicColumns} data={[]} loading />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={[]} loading />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Empty State
         </Typography>
-        <Table columns={basicColumns} data={[]} />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={[]} />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           With Selection
         </Typography>
-        <Table columns={basicColumns} data={sampleData.slice(0, 2)} selectable selectedRows={[1]} />
+        <Table emptyText="Nenhum dado por aqui" columns={basicColumns} data={sampleData.slice(0, 2)} selectable selectedRows={[1]} />
       </Box>
 
       <Box>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           With Sorting
         </Typography>
-        <Table
+        <Table emptyText="Nenhum dado por aqui"
           columns={basicColumns}
           data={sampleData.slice(0, 2)}
           sortable
@@ -715,7 +790,7 @@ export const InteractiveStates: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Click rows to select, click column headers to sort
         </Typography>
-        <Table
+        <Table emptyText="Nenhum dado por aqui"
           columns={basicColumns}
           data={sortedData}
           hoverable
@@ -751,7 +826,7 @@ export const Responsive: Story = {
             borderRadius: 1,
           }}
         >
-          <Table
+          <Table emptyText="Nenhum dado por aqui"
             columns={extendedColumns}
             data={sampleData.slice(0, 3)}
             responsive
@@ -774,7 +849,7 @@ export const Responsive: Story = {
             borderRadius: 1,
           }}
         >
-          <Table
+          <Table emptyText="Nenhum dado por aqui"
             columns={extendedColumns}
             data={sampleData.slice(0, 3)}
             responsive
@@ -788,7 +863,7 @@ export const Responsive: Story = {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Desktop View (Full Width)
         </Typography>
-        <Table
+        <Table emptyText="Nenhum dado por aqui"
           columns={extendedColumns}
           data={sampleData.slice(0, 3)}
           responsive

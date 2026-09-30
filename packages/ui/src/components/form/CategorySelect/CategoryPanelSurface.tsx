@@ -4,6 +4,7 @@ import Drawer from '@mui/material/Drawer/index.js';
 import Popover from '@mui/material/Popover/index.js';
 
 import { stackedOverlayZIndex } from '../../../tokens/layers';
+import { sxRem } from '../../../tokens/relative';
 
 /** Chrome-free surface props: the panel draws its own border and shadow. */
 const BARE_PAPER = { background: 'transparent', boxShadow: 'none' } as const;
@@ -64,7 +65,7 @@ export function CategoryPanelSurface({
       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
       marginThreshold={8}
       sx={ABOVE_SHEETS}
-      slotProps={{ paper: { sx: { ...BARE_PAPER, marginTop: '6px', overflow: 'visible' } } }}
+      slotProps={{ paper: { sx: { ...BARE_PAPER, marginTop: sxRem(6), overflow: 'visible' } } }}
     >
       {children}
     </Popover>

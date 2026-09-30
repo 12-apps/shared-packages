@@ -8,15 +8,17 @@ import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import type { ContentToolbarProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { sxRem } from '../../../tokens/relative';
 
 const selectionButtonSx = {
   minWidth: 0,
   height: 'auto',
-  borderRadius: 0.5,
+  borderRadius: fieldRadiusPx,
   fontWeight: 600,
   py: 0.5,
   px: 1.5,
-  fontSize: '0.75rem',
+  fontSize: sxRem(12),
   textTransform: 'none',
   color: 'text.primary',
 } as const;
@@ -146,11 +148,11 @@ function SelectionState({
       >
         {clearAllText}
       </Button>
-      <Divider orientation="vertical" flexItem sx={{ height: 16, alignSelf: 'center' }} />
+      <Divider orientation="vertical" flexItem sx={{ height: sxRem(16), alignSelf: 'center' }} />
       <Typography
         component="span"
         data-testid="selected-count-indicator"
-        sx={{ fontSize: '0.875rem', color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
+        sx={{ fontSize: sxRem(14), color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
       >
         {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
       </Typography>
@@ -229,7 +231,7 @@ function BrowsingClusters({
           flexWrap: leadingControls === undefined ? 'wrap' : 'nowrap',
           // Tight (5px) when browsing so the controls fit one line beside the
           // checkbox; roomier (14px) in selection mode where they get their own row.
-          gap: hasSelection ? '14px' : '5px',
+          gap: hasSelection ? sxRem(14) : sxRem(5),
           ml: 'auto',
           mr: edgeAlign ? -1.5 : 0,
           '& > *': { flexShrink: 0 },

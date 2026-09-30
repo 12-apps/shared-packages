@@ -2,16 +2,19 @@ import { alpha, darken, keyframes, lighten } from '@mui/material/styles/index.js
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
-import { inkOver, px } from '../../../tokens/theme';
+import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
+import { inkOver } from '../../../tokens/theme';
 
-// Define pulse animation globally
-const pulseAnimation = keyframes`
+// The pulse ring, its spread through the theme's type scale.
+const pulseAnimation = (theme: Theme) => keyframes`
   0% {
     box-shadow: 0 0 0 0 currentColor;
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 15px currentColor;
+    box-shadow: 0 0 0 ${rem(theme, 15)} currentColor;
     opacity: 0;
   }
   100% {
@@ -34,12 +37,7 @@ const shade = (
 ): string => palette?.[key] || palette?.main || fallback[key];
 
 /** `neutral` has no MUI palette entry, so its four shades come from grey. */
-const neutralPalette = (theme: Theme): ColorPalette => ({
-  main: theme.palette.grey?.[700] || '#616161',
-  dark: theme.palette.grey?.[800] || '#424242',
-  light: theme.palette.grey?.[500] || '#9e9e9e',
-  contrastText: '#fff',
-});
+const neutralPalette = (theme: Theme): ColorPalette => controlNeutral(theme);
 
 export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
   if (color === 'neutral') return neutralPalette(theme);
@@ -61,21 +59,30 @@ export const getColorFromTheme = (theme: Theme, color: string): ColorPalette => 
     main: palette?.main || fallback.main,
     dark: shade(palette, 'dark', fallback),
     light: shade(palette, 'light', fallback),
-    contrastText: palette?.contrastText || '#fff',
+    contrastText: palette?.contrastText || absoluteInk(theme).white,
   };
 };
 
+/** A size's padding and its type in design px, read through the type scale. */
+interface WebButtonSize {
+  paddingYPx: number;
+  paddingXPx: number;
+  fontPx: number;
+}
+
 // Derived from `Button.metrics.ts`, which the native `Button` reads too — one
 // table, so a size cannot differ between the renderers.
-const SIZE_MAP: Record<string, CSSObject> = Object.fromEntries(
+const SIZE_MAP: Record<string, WebButtonSize> = Object.fromEntries(
   Object.entries(BUTTON_SIZES).map(([size, m]) => [
     size,
-    { padding: `${m.paddingVertical}px ${m.paddingHorizontal}px`, fontSize: px(m.fontSize) },
+    { paddingYPx: m.paddingVertical, paddingXPx: m.paddingHorizontal, fontPx: m.fontSize },
   ]),
 );
 
 /** What an unrecognised size falls back to, named so indexing can never be undefined. */
-const DEFAULT_SIZE: CSSObject = SIZE_MAP.md as CSSObject;
+const DEFAULT_SIZE: WebButtonSize = SIZE_MAP.md as WebButtonSize;
+
+const sizeOf = (size: string): WebButtonSize => SIZE_MAP[size] ?? DEFAULT_SIZE;
 
 /**
  * A BUTTON THAT IS ONLY AN ICON IS SQUARE.
@@ -90,20 +97,34 @@ const DEFAULT_SIZE: CSSObject = SIZE_MAP.md as CSSObject;
  * Derived, not declared: a button with an `icon` and no children can only be an
  * icon button, so no consumer has to opt in and none can forget to.
  */
-const ICON_ONLY_PADDING: Record<string, string> = Object.fromEntries(
-  Object.entries(ICON_ONLY_PADDING_PX).map(([size, padding]) => [size, `${padding}px`]),
-);
+const iconOnlyPadding = (theme: Theme, size: string): string => {
+  const bySize: Record<string, number> = ICON_ONLY_PADDING_PX;
+  return rem(theme, bySize[size] ?? ICON_ONLY_PADDING_PX.md);
+};
 
-const iconOnlySize = (size: string): CSSObject => ({
+const iconOnlySize = (theme: Theme, size: string): CSSObject => ({
   minWidth: 0,
-  padding: ICON_ONLY_PADDING[size] ?? ICON_ONLY_PADDING.md,
-  fontSize: SIZE_MAP[size]?.fontSize ?? DEFAULT_SIZE.fontSize,
+  padding: iconOnlyPadding(theme, size),
+  fontSize: rem(theme, sizeOf(size).fontPx),
   '& .MuiButton-startIcon, & .MuiButton-endIcon': { margin: 0 },
 });
 
-/** The size styles for a button, square when it carries nothing but an icon. */
-export const buttonSize = (size: string, iconOnly: boolean): CSSObject =>
-  iconOnly ? iconOnlySize(size) : (SIZE_MAP[size] ?? DEFAULT_SIZE);
+/**
+ * The size styles for a button, square when it carries nothing but an icon.
+ *
+ * The HEIGHT is the theme's field height for the size (`tokens/field-height`),
+ * so a button stands level with the field beside it: the vertical padding goes
+ * and the label is centred in a box at least that tall — a label that wraps
+ * still grows it. An icon-only button is that height on every side.
+ */
+export const buttonSize =
+  (size: string, iconOnly: boolean) =>
+  (theme: Theme): CSSObject => {
+    const height = fieldHeight(theme, asFieldSize(size));
+    if (iconOnly) return { ...iconOnlySize(theme, size), padding: 0, minWidth: height, minHeight: height };
+    const { paddingYPx, paddingXPx, fontPx } = sizeOf(size);
+    return { padding: rems(theme, paddingYPx, paddingXPx), fontSize: rem(theme, fontPx), minHeight: height, paddingTop: 0, paddingBottom: 0 };
+  };
 
 /**
  * MUI centres icons with a negative margin that fights our own padding, so the
@@ -165,7 +186,7 @@ const gradientFor = (theme: Theme, color: string, palette: ColorPalette): string
  * the worse of them.
  */
 const gradientInk = (theme: Theme, color: string, palette: ColorPalette): string =>
-  inkOver(gradientStops(theme, color, palette), palette.contrastText || '#fff');
+  inkOver(gradientStops(theme, color, palette), palette.contrastText || absoluteInk(theme).white);
 
 /**
  * The label colour for the two variants that paint no background of their own.
@@ -192,17 +213,20 @@ const VARIANT_STYLES: Record<
 > = {
   solid: (theme, palette) => ({
     backgroundColor: palette.main,
-    color: palette.contrastText || '#fff',
+    color: palette.contrastText || absoluteInk(theme).white,
     '&:hover': {
       backgroundColor: palette.dark,
-      transform: 'translateY(-2px)',
+      transform: `translateY(${rem(theme, -2)})`,
       boxShadow: theme.shadows[8],
     },
   }),
-  outline: (_theme, palette) => ({
+  // A NEUTRAL outline is a field-row control ("Mais", "Exibir"), so it rests on
+  // the one field border; a coloured outline keeps its colour, which is the
+  // point of asking for one.
+  outline: (theme, palette, color) => ({
     backgroundColor: 'transparent',
     color: palette.main,
-    border: `1px solid ${palette.main}`,
+    border: color === 'neutral' ? fieldBorder(theme) : `1px solid ${palette.main}`,
     '&:hover': {
       backgroundColor: alpha(palette.main, 0.1),
       borderColor: palette.dark,
@@ -229,12 +253,12 @@ const VARIANT_STYLES: Record<
   }),
   glass: (theme, palette) => ({
     backgroundColor: alpha(theme.palette.background.paper, 0.1),
-    backdropFilter: 'blur(20px)',
+    backdropFilter: `blur(${rem(theme, 20)})`,
     border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
     color: palette.main,
     '&:hover': {
       backgroundColor: alpha(theme.palette.background.paper, 0.2),
-      transform: 'translateY(-2px)',
+      transform: `translateY(${rem(theme, -2)})`,
     },
   }),
   gradient: (theme, palette, color) => ({
@@ -242,7 +266,7 @@ const VARIANT_STYLES: Record<
     color: gradientInk(theme, color, palette),
     '&:hover': {
       filter: 'brightness(1.1)',
-      transform: 'translateY(-2px)',
+      transform: `translateY(${rem(theme, -2)})`,
       boxShadow: theme.shadows[12],
     },
   }),
@@ -256,18 +280,18 @@ export const buttonVariantStyles = (
 ): CSSObject => VARIANT_STYLES[variant ?? '']?.(theme, palette, color) ?? {};
 
 // Glow effect - applied with !important to override variant shadows
-const glowStyles = (palette: ColorPalette): CSSObject => ({
-  boxShadow: `0 0 20px 5px ${alpha(palette.main, 0.6)}, 0 0 40px 10px ${alpha(palette.main, 0.3)} !important`,
+const glowStyles = (theme: Theme, palette: ColorPalette): CSSObject => ({
+  boxShadow: `${rems(theme, 0, 0, 20, 5)} ${alpha(palette.main, 0.6)}, ${rems(theme, 0, 0, 40, 10)} ${alpha(palette.main, 0.3)} !important`,
   filter: 'brightness(1.05)',
   '&:hover': {
-    boxShadow: `0 0 25px 8px ${alpha(palette.main, 0.7)}, 0 0 50px 15px ${alpha(palette.main, 0.4)} !important`,
+    boxShadow: `${rems(theme, 0, 0, 25, 8)} ${alpha(palette.main, 0.7)}, ${rems(theme, 0, 0, 50, 15)} ${alpha(palette.main, 0.4)} !important`,
     filter: 'brightness(1.1)',
-    transform: 'translateY(-2px) scale(1.02)',
+    transform: `translateY(${rem(theme, -2)}) scale(1.02)`,
   },
 });
 
 // Pulse animation using pseudo-element
-const pulseStyles = (palette: ColorPalette): CSSObject => ({
+const pulseStyles = (theme: Theme, palette: ColorPalette): CSSObject => ({
   position: 'relative',
   overflow: 'visible',
   '&::after': {
@@ -281,7 +305,7 @@ const pulseStyles = (palette: ColorPalette): CSSObject => ({
     transform: 'translate(-50%, -50%)',
     backgroundColor: palette.main,
     opacity: 0.3,
-    animation: `${pulseAnimation} 2s infinite`,
+    animation: `${pulseAnimation(theme)} 2s infinite`,
     pointerEvents: 'none',
     zIndex: -1,
   },
@@ -292,10 +316,11 @@ const pulseStyles = (palette: ColorPalette): CSSObject => ({
  * out one by one, but each is just the union of whichever flags are set.
  */
 export const buttonEmphasisStyles = (
+  theme: Theme,
   palette: ColorPalette,
   glow?: boolean,
   pulse?: boolean,
 ): CSSObject => ({
-  ...(glow ? glowStyles(palette) : {}),
-  ...(pulse ? pulseStyles(palette) : {}),
+  ...(glow ? glowStyles(theme, palette) : {}),
+  ...(pulse ? pulseStyles(theme, palette) : {}),
 });

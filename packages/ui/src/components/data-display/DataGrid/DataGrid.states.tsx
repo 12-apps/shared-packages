@@ -20,6 +20,8 @@ import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type React from 'react';
 
+import { sxRem } from '../../../tokens/relative';
+
 /** Shared by all three: the same box, the same role, the same id. */
 interface PlaceholderProps {
   dataTestId?: string;
@@ -54,7 +56,7 @@ function Placeholder({
         alignItems: 'center',
         flexDirection: 'column',
         gap: 2,
-        height: 200,
+        height: sxRem(200),
       }}
       aria-label={ariaLabel}
       role="grid"

@@ -11,6 +11,7 @@ export {
   type EntityLifecycleHandle,
   type EntityLifecycleServerConfig,
 } from './create-api-entity-lifecycle';
+export type { ApprovalsChangedListener } from './approvals-changed';
 export type { LifecycleEntityRegistration } from './registration';
 export {
   LifecycleApiError,

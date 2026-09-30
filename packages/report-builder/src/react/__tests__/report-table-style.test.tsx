@@ -189,8 +189,10 @@ describe('report table — the product\'s table style', () => {
 
     expect(cell).not.toBeNull();
     // `density="compact"`, reaching the component — `DataViews` wires
-    // `rowHeight={36} headerHeight={36}` into every list in `apps/admin`.
-    expect(globalThis.getComputedStyle(cell as HTMLElement).height).toBe('36px');
+    // `rowHeight={36} headerHeight={36}` into every list in `apps/admin`. The
+    // table writes that design size through the theme (FUT-2595): 2.25rem is
+    // 36px at a 16px root, and jsdom reports the rem as written.
+    expect(globalThis.getComputedStyle(cell as HTMLElement).height).toBe('2.25rem');
   });
 
   it('keeps the reporting divergences: tabular figures and numeric alignment', () => {

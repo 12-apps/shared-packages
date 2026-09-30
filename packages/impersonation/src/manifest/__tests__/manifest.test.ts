@@ -25,6 +25,7 @@ import {
   serializeCookie,
 } from '../server';
 import { impersonationPreviewWebManifest, impersonationWebManifest } from '../web';
+import { createPreviewWebImpersonation } from '../../react/create-preview-web-impersonation';
 import { createWebImpersonation } from '../../react/create-web-impersonation';
 
 /** The manifest as an ADOPTER's type sees it — see the audit suite for why. */
@@ -65,7 +66,8 @@ describe('the impersonation manifests', () => {
     expect(impersonationManifest.web).toEqual(['surface', 'areas']);
     expect(impersonationPreviewManifest.web).toEqual(['surface']);
     expect(impersonationWebManifest.surface.create).toBe(createWebImpersonation);
-    expect(impersonationPreviewWebManifest.surface.create).toBe(createWebImpersonation);
+    // The banner-only factory, whose module graph never reaches the dialog.
+    expect(impersonationPreviewWebManifest.surface.create).toBe(createPreviewWebImpersonation);
   });
 
   it('routes only the operator start dialog, and only in the platform area', () => {

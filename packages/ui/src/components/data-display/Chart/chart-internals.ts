@@ -2,7 +2,8 @@ import { alpha, type Theme } from '@mui/material/styles/index.js';
 import type { CSSProperties } from 'react';
 
 import type { ChartProps, ChartSeries } from './Chart.types';
-import { accentFor} from '../../../tokens/scales';
+import { uiInk } from '../../../tokens/ink';
+import { accentFor, rem, remPx, sxRem } from '../../../tokens/scales';
 
 /**
  * Non-JSX internals of the prop-driven Chart: size/variant styling, palette
@@ -11,10 +12,12 @@ import { accentFor} from '../../../tokens/scales';
  */
 
 export interface SizeStyles {
+  /** The plot's height in rendered px — Recharts sizes from a number — through the type scale. */
   height: number;
   fontSize: string;
   /**
-   * Gap between an axis line and its tick labels, px.
+   * Gap between an axis line and its tick labels, in rendered px, through the
+   * type scale.
    *
    * Recharts' default of 2 is not enough. The bottom VALUE tick is centred on
    * the x-axis line, so its text box reaches ~0.79em BELOW that line, while
@@ -25,24 +28,39 @@ export interface SizeStyles {
   tickMargin: number;
 }
 
-const SIZE_PRESETS: Record<NonNullable<ChartProps['size']>, SizeStyles> = {
-  xs: { height: 200, fontSize: '0.75rem', tickMargin: 10 },
-  sm: { height: 300, fontSize: '0.875rem', tickMargin: 12 },
-  md: { height: 400, fontSize: '1rem', tickMargin: 14 },
-  lg: { height: 500, fontSize: '1.125rem', tickMargin: 16 },
-  xl: { height: 600, fontSize: '1.25rem', tickMargin: 18 },
-};
-
-export function getSizeStyles(size: ChartProps['size'], height?: number): SizeStyles {
-  const preset = SIZE_PRESETS[size ?? 'md'] ?? SIZE_PRESETS.md;
-  return { ...preset, height: height ?? preset.height };
+/** One size step, in design px: the plot's height, its type size and its tick margin. */
+interface SizePreset {
+  heightPx: number;
+  fontSize: (theme: Theme) => string;
+  tickMarginPx: number;
 }
 
-const NEON_PALETTE = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff0080', '#8000ff'];
+const SIZE_PRESETS: Record<NonNullable<ChartProps['size']>, SizePreset> = {
+  xs: { heightPx: 200, fontSize: sxRem(12), tickMarginPx: 10 },
+  sm: { heightPx: 300, fontSize: sxRem(14), tickMarginPx: 12 },
+  md: { heightPx: 400, fontSize: sxRem(16), tickMarginPx: 14 },
+  lg: { heightPx: 500, fontSize: sxRem(18), tickMarginPx: 16 },
+  xl: { heightPx: 600, fontSize: sxRem(20), tickMarginPx: 18 },
+};
+
+const presetOf = (size: ChartProps['size']): SizePreset => SIZE_PRESETS[size ?? 'md'] ?? SIZE_PRESETS.md;
+
+/** The plot's height in design px: the explicit `height`, else the size's preset. */
+export const plotHeightPx = (size: ChartProps['size'], height?: number): number =>
+  height ?? presetOf(size).heightPx;
+
+export function getSizeStyles(theme: Theme, size: ChartProps['size'], height?: number): SizeStyles {
+  const preset = presetOf(size);
+  return {
+    height: remPx(theme, plotHeightPx(size, height)),
+    fontSize: preset.fontSize(theme),
+    tickMargin: remPx(theme, preset.tickMarginPx),
+  };
+}
 
 export function getDefaultColors(theme: Theme, variant: ChartProps['variant'], colors?: string[]): string[] {
   if (colors) return colors;
-  if (variant === 'neon') return NEON_PALETTE;
+  if (variant === 'neon') return [...uiInk(theme).dataVizNeon.series];
   return [
     theme.palette.primary.main,
     theme.palette.secondary.main,
@@ -67,13 +85,13 @@ interface VariantOptions {
 
 function effectStyles(theme: Theme, options: VariantOptions): SxStyles {
   const accent = accentFor(theme, options.color).main;
-  const glow = options.glow ? { boxShadow: `0 0 30px ${alpha(accent, 0.4)}` } : {};
+  const glow = options.glow ? { boxShadow: `0 0 ${rem(theme, 30)} ${alpha(accent, 0.4)}` } : {};
   const pulse = options.pulse
     ? {
         animation: 'pulse 2s infinite',
         '@keyframes pulse': {
           '0%': { boxShadow: `0 0 0 0 ${alpha(accent, 0.4)}` },
-          '70%': { boxShadow: `0 0 0 20px ${alpha(accent, 0)}` },
+          '70%': { boxShadow: `0 0 0 ${rem(theme, 20)} ${alpha(accent, 0)}` },
           '100%': { boxShadow: `0 0 0 0 ${alpha(accent, 0)}` },
         },
       }
@@ -86,7 +104,7 @@ function variantSurface(theme: Theme, options: VariantOptions): SxStyles {
     case 'glass':
       return {
         backgroundColor: alpha(theme.palette.background.paper, options.glass ? 0.1 : 0.9),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
       };
     case 'gradient':
@@ -99,14 +117,16 @@ function variantSurface(theme: Theme, options: VariantOptions): SxStyles {
       return { boxShadow: theme.shadows[4] };
     case 'minimal':
       return { border: 'none', backgroundColor: 'transparent' };
-    case 'neon':
+    case 'neon': {
+      const neon = uiInk(theme).dataVizNeon;
       return {
-        backgroundColor: '#000',
-        border: `1px solid ${alpha('#00ffff', 0.3)}`,
+        backgroundColor: neon.ground,
+        border: `1px solid ${alpha(neon.accent, 0.3)}`,
         '& .recharts-cartesian-grid-horizontal line, & .recharts-cartesian-grid-vertical line': {
-          stroke: alpha('#00ffff', 0.1),
+          stroke: alpha(neon.accent, 0.1),
         },
       };
+    }
     default:
       return { backgroundColor: theme.palette.background.paper };
   }
@@ -159,14 +179,15 @@ interface AxisTextStyles {
 
 export function getAxisStyles(theme: Theme, variant: ChartProps['variant'], fontSize: string): AxisTextStyles {
   const neon = variant === 'neon';
+  const neonAccent = uiInk(theme).dataVizNeon.accent;
   return {
     axisStyle: {
       fontSize,
-      fill: neon ? '#00ffff' : theme.palette.text.secondary,
+      fill: neon ? neonAccent : theme.palette.text.secondary,
       // Ticks are columns of digits: they have to line up between rows.
       fontVariantNumeric: 'tabular-nums',
     },
-    gridStroke: neon ? alpha('#00ffff', 0.1) : theme.palette.divider,
+    gridStroke: neon ? alpha(neonAccent, 0.1) : theme.palette.divider,
     // The neon grid is already a 10%-alpha cyan; halving it again would erase it.
     gridOpacity: neon ? 1 : 0.5,
   };

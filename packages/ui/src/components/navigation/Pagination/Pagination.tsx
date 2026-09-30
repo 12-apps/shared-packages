@@ -14,6 +14,7 @@ import { makeTestId, muiSizeFor, resolvePaginationProps } from './Pagination.hel
 import { paginationStyles } from './Pagination.styles';
 import type { PaginationProps } from './Pagination.types';
 import { ItemsPerPageSelect, PageInfo } from './PaginationParts';
+import { sxRem } from '../../../tokens/relative';
 
 const StyledPagination = styled(MuiPagination, {
   shouldForwardProp: (prop) => !['customVariant', 'customSize'].includes(prop as string) })<{ customVariant?: string; customSize?: string }>(({ theme, customVariant, customSize }) => ({
@@ -80,7 +81,7 @@ const renderPaginationItem = ({
               '&.MuiPaginationItem-page': {
                 fontSize: 0,
                 overflow: 'hidden',
-                textIndent: '-9999px' } }}
+                textIndent: sxRem(-9999) } }}
           />
         );
       }

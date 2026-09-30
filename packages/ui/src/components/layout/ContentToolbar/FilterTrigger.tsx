@@ -6,6 +6,9 @@ import Button from '@mui/material/Button/index.js';
 import React from 'react';
 
 import type { FilterTriggerProps } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 /**
  * Labeled filter toggle: a "Filtros" button (styled like the sibling toolbar
@@ -31,12 +34,13 @@ export function FilterTrigger({
       aria-expanded={open}
       aria-label={open ? 'Close filters' : 'Open filters'}
       onClick={() => onOpenChange(!open)}
-      startIcon={<FilterIcon sx={{ fontSize: 16 }} />}
+      startIcon={<FilterIcon sx={{ fontSize: sxRem(16) }} />}
       sx={{
         minWidth: 0,
-        height: 32,
+        height: fieldHeight,
         px: 1,
         gap: 0.25,
+        borderRadius: fieldRadiusPx,
         textTransform: 'none',
         fontWeight: 600,
         color: active ? 'primary.main' : 'text.primary',
@@ -50,14 +54,14 @@ export function FilterTrigger({
           data-testid={`${testId}-count`}
           sx={{
             ml: 0.5,
-            minWidth: 18,
-            height: 18,
+            minWidth: sxRem(18),
+            height: sxRem(18),
             px: 0.5,
             borderRadius: 999,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '0.7rem',
+            fontSize: sxRem(11.2),
             fontWeight: 700,
             lineHeight: 1,
             bgcolor: 'primary.main',

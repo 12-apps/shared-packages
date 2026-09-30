@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutCopy } from "./copy-context";
 import { createPollLoop, type PollLoop, type PollingOptions, type PollSink } from "./poll-loop";
+import { useLiveWait } from "./live-context";
 import type { OrderStatus } from "./types";
 
 /** What a consumer reads off the wait, and the one action it can take. */
@@ -134,6 +135,7 @@ export function usePaymentPolling(
   // The live wait, so the returned action stays stable across renders while
   // still reaching whichever loop the effect currently owns.
   const loop = useRef<PollLoop | null>(null);
+  const { isLive, liveIntervalMs } = useLiveWait(loop); // FUT-649
 
   useEffect(() => {
     if (!orderId || !enabled) return undefined;
@@ -147,6 +149,7 @@ export function usePaymentPolling(
         slowIntervalMs,
         askTimeoutMs,
         askTimeoutError: transportCopy.offline,
+        ...{ isLive, liveIntervalMs },
       },
       sinkFor(orderId, setAnswer),
     );
@@ -169,6 +172,7 @@ export function usePaymentPolling(
     askTimeoutMs,
     client,
     transportCopy,
+    isLive, liveIntervalMs,
   ]);
 
   const checkAgain = useCallback(() => {

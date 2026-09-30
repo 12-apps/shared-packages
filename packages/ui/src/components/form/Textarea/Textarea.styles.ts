@@ -2,16 +2,18 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { absoluteInk, controlNeutral } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
-const glowAnimation = keyframes`
+const glowAnimation = (theme: Theme) => keyframes`
   0% {
-    box-shadow: 0 0 5px currentColor;
+    box-shadow: 0 0 ${rem(theme, 5)} currentColor;
   }
   50% {
-    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+    box-shadow: 0 0 ${rem(theme, 20)} currentColor, 0 0 ${rem(theme, 30)} currentColor;
   }
   100% {
-    box-shadow: 0 0 5px currentColor;
+    box-shadow: 0 0 ${rem(theme, 5)} currentColor;
   }
 `;
 
@@ -28,12 +30,12 @@ const glowAnimation = keyframes`
 // `;
 
 // Float animation for rich text toolbar
-export const floatAnimation = keyframes`
+export const floatAnimation = (theme: Theme) => keyframes`
   0% {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-3px);
+    transform: translateY(${rem(theme, -3)});
   }
   100% {
     transform: translateY(0px);
@@ -49,18 +51,8 @@ type ResolvedPalette = {
 
 type PartialPalette = { main: string; dark?: string; light?: string; contrastText?: string };
 
-// grey is indexed by weight rather than main/dark/light, so neutral is built by
-// hand. The literals are the MUI grey values, used if the theme omits a weight.
-const neutralPalette = (theme: Theme): ResolvedPalette => {
-  const grey = theme.palette.grey as unknown as Record<number, string>;
-
-  return {
-    main: grey?.[700] || '#616161',
-    dark: grey?.[800] || '#424242',
-    light: grey?.[500] || '#9e9e9e',
-    contrastText: '#fff',
-  };
-};
+// `neutral` is not a MUI palette entry, so it is the controls' neutral tone.
+const neutralPalette = (theme: Theme): ResolvedPalette => controlNeutral(theme);
 
 // Each slot falls back to the palette's own main, then to primary — a custom
 // theme can define main without dark or light.
@@ -71,7 +63,7 @@ const withFallbacks = (theme: Theme, palette: PartialPalette): ResolvedPalette =
   main: pick(palette?.main, theme.palette.primary.main),
   dark: pick(palette?.dark, palette?.main, theme.palette.primary.dark),
   light: pick(palette?.light, palette?.main, theme.palette.primary.light),
-  contrastText: pick(palette?.contrastText, '#fff'),
+  contrastText: pick(palette?.contrastText, absoluteInk(theme).white),
 });
 
 export const getColorFromTheme = (theme: Theme, color: string): ResolvedPalette => {
@@ -108,15 +100,15 @@ export const textareaEmphasisStyles = ({
 const glassStyles = glass
   ? {
       backgroundColor: alpha(theme.palette.background.paper, 0.1),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${fieldEdge(theme)}`,
       '&:hover': {
         backgroundColor: alpha(theme.palette.background.paper, 0.15),
-        backdropFilter: 'blur(25px)',
+        backdropFilter: `blur(${rem(theme, 25)})`,
       },
       '&:focus': {
         backgroundColor: alpha(theme.palette.background.paper, 0.2),
-        backdropFilter: 'blur(30px)',
+        backdropFilter: `blur(${rem(theme, 30)})`,
       },
     }
   : {};
@@ -126,7 +118,7 @@ const gradientStyles = gradient
   ? {
       background: `linear-gradient(${theme.palette.background.paper}, ${theme.palette.background.paper}) padding-box,
                linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.light}) border-box`,
-      border: '2px solid transparent',
+      border: `${rem(theme, 2)} solid transparent`,
       '&:focus': {
         background: `linear-gradient(${theme.palette.background.paper}, ${theme.palette.background.paper}) padding-box,
                  linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.dark}) border-box`,
@@ -137,8 +129,8 @@ const gradientStyles = gradient
 // Glow effect
 const glowStyles = glow
   ? {
-      animation: `${glowAnimation} 2s ease-in-out infinite`,
-      boxShadow: `0 0 10px ${alpha(colorPalette.main, 0.3)}`,
+      animation: `${glowAnimation(theme)} 2s ease-in-out infinite`,
+      boxShadow: `0 0 ${rem(theme, 10)} ${alpha(colorPalette.main, 0.3)}`,
     }
   : {};
 

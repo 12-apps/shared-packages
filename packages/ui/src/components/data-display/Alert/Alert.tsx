@@ -8,6 +8,8 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { absoluteInk, modeInk } from '../../../tokens/ink';
+
 import { resolveAlertProps, resolveAnnouncement, testIdFor } from './Alert.helpers';
 import type { AlertPalette } from './Alert.metrics';
 import {
@@ -37,7 +39,7 @@ import {
 import type { AlertColor } from '@mui/material/Alert/index.js';
 import type { AlertProps } from './Alert.types';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
-import { px } from '../../../tokens/theme';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
 
@@ -69,9 +71,9 @@ function pointerShadow(
   // white-on-gradient fell to 2.90:1 on hover and 2.41:1 pressed, under the 3:1
   // floor and below its own idle. Every other variant's surface tracks the mode,
   // so for them the two rules agree.
-  const ink = variant === 'gradient' || theme.palette.mode === 'light' ? '#000000' : '#ffffff';
+  const ink = variant === 'gradient' ? absoluteInk(theme).black : modeInk(theme);
   const glowShadow = glow
-    ? `0 0 ${GLOW.blur}px ${GLOW.spread}px ${alpha(colorPalette.main, GLOW.alpha)}`
+    ? `0 0 ${rems(theme, GLOW.blur, GLOW.spread)} ${alpha(colorPalette.main, GLOW.alpha)}`
     : null;
   return (alpha_) =>
     [`inset 0 0 0 100vmax ${alpha(ink, alpha_)}`, glowShadow].filter(Boolean).join(', ');
@@ -96,7 +98,7 @@ const StyledAlert = styled(MuiAlert, {
     transition: `${transition}, box-shadow ${seconds(ACTIVE.ms)} ${ALERT_EASING}`,
     position: 'relative',
     overflow: 'hidden',
-    animation: animate ? `${fadeInScale} ${seconds(FADE_IN.ms)} ease-out` : 'none',
+    animation: animate ? `${fadeInScale(theme)} ${seconds(FADE_IN.ms)} ease-out` : 'none',
     willChange: 'transform, opacity',
 
     ...alertLayoutStyles(theme, colorPalette, animate),
@@ -154,12 +156,12 @@ const StyledAlert = styled(MuiAlert, {
     // every keyboard focus, and it would also outrank the root's opacity
     // transition the way the hover block did.
     '&:focus-visible': {
-      outline: `${FOCUS.ringWidth}px solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
-      outlineOffset: `${FOCUS.offset}px`,
+      outline: `${rem(theme, FOCUS.ringWidth)} solid ${alpha(colorPalette.main, FOCUS.ringAlpha)}`,
+      outlineOffset: rem(theme, FOCUS.offset),
     },
 
     ...alertVariantStyles(theme, customVariant, colorPalette),
-    ...alertEmphasisStyles(colorPalette, Boolean(glow), Boolean(pulse)),
+    ...alertEmphasisStyles(theme, colorPalette, Boolean(glow), Boolean(pulse)),
   };
 });
 
@@ -186,7 +188,7 @@ const AlertContent: React.FC<{
         data-testid={testIdFor(dataTestId, 'title')}
         sx={{
           fontWeight: TITLE.fontWeight,
-          fontSize: px(TITLE.fontSize),
+          fontSize: sxRem(TITLE.fontSize),
           marginBottom: description ? TITLE.marginBottomUnits : 0,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
@@ -202,7 +204,7 @@ const AlertContent: React.FC<{
         data-testid={testIdFor(dataTestId, 'message')}
         sx={{
           opacity: DESCRIPTION.opacity,
-          fontSize: px(DESCRIPTION.fontSize),
+          fontSize: sxRem(DESCRIPTION.fontSize),
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
           wordBreak: 'break-word',
@@ -260,8 +262,8 @@ const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: 
         // translucent surface's contrast depends on what sits behind it, which
         // is why that test stops where it does and why this comment does not
         // borrow a guarantee it never made.
-        outline: `${FOCUS.ringWidth}px solid currentColor`,
-        outlineOffset: `${FOCUS.offset}px`,
+        outline: `${rem(theme, FOCUS.ringWidth)} solid currentColor`,
+        outlineOffset: rem(theme, FOCUS.offset),
         backgroundColor: alpha(theme.palette.action.focus, CLOSE_BUTTON.washAlpha),
       },
     })}

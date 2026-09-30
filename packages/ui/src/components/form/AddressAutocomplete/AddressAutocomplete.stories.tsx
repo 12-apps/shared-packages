@@ -109,7 +109,7 @@ export const GlassVariant: Story = {
         borderRadius: 2,
       }}
     >
-      <AddressAutocomplete copy={PT_BR_ADDRESS_AUTOCOMPLETE_COPY} {...args} />
+      <AddressAutocomplete {...args} />
     </Box>
   ),
 };

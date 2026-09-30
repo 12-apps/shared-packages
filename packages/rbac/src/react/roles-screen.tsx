@@ -16,7 +16,7 @@ import { EmptyState } from '@12-apps/ui/data-display/EmptyState';
 import { ErrorState } from '@12-apps/ui/data-display/ErrorState';
 import { LoadingState } from '@12-apps/ui/data-display/LoadingState';
 import { HeaderButton } from '@12-apps/ui/form/HeaderButton';
-import { Dashboard } from '@12-apps/ui/layout/Dashboard';
+import { Dashboard, markDashboardSlot } from '@12-apps/ui/layout/Dashboard';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { GovernanceCatalog } from '../governance';
@@ -279,7 +279,7 @@ function RolesHeader({
 }): JSX.Element {
   return (
     <Dashboard.Header title={copy.rolesList.title}>
-      <Dashboard.Info title={copy.rolesList.aboutTitle}>{copy.rolesList.aboutBody}</Dashboard.Info>
+      <Dashboard.Info title={copy.rolesList.aboutTitle} ariaLabel={copy.rolesList.aboutTitle}>{copy.rolesList.aboutBody}</Dashboard.Info>
       <Dashboard.Spacer />
       {/* Gated like the row menu and the batch actions. It never needed to be
           before: `rolesGate` refused the whole screen to anyone without
@@ -298,6 +298,10 @@ function RolesHeader({
     </Dashboard.Header>
   );
 }
+// `Dashboard` ranks only its direct children, by a marker on their type: this
+// wrapper has to claim the header slot, or the title and "Novo papel" sink
+// below the grid.
+markDashboardSlot(RolesHeader, 'header');
 
 export function RolesScreen(props: RolesScreenProps): JSX.Element {
   const { api, copy } = props;

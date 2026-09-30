@@ -121,6 +121,23 @@ export interface DiscountRule {
   perBuyerLimit: number | null;
   /** Redemptions this buyer has already PAID for. 0 for an anonymous cart. */
   buyerUsageCount: number;
+  /**
+   * The rule applies only to a buyer's FIRST purchase at the store
+   * (FUT-2825). Omitted = false, which is every rule that predates it.
+   *
+   * OPTIONAL for the reason `schedule` is: an adopter that does not offer
+   * first-purchase promotions keeps compiling, and keeps pricing exactly as
+   * before.
+   */
+  firstOrderOnly?: boolean;
+  /**
+   * Whether THIS buyer has no purchase at the store yet — the host's answer,
+   * since only the host knows its orders. `null` or omitted = unknown (an
+   * anonymous cart, the cached menu), which is NOT first-time: a discount the
+   * cart shows and checkout then takes away is worse than one that appears
+   * once the buyer is known.
+   */
+  buyerIsFirstTime?: boolean | null;
   /** False ⇒ exclusive: if it wins, nothing else applies. */
   stackable: boolean;
   /** Deterministic tie-break key, ascending. */

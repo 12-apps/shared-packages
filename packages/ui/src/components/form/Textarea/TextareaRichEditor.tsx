@@ -20,19 +20,22 @@ import { floatAnimation, getColorFromTheme } from './Textarea.styles';
 import type { RichEditorToolbarCopy } from '../../../copy';
 
 import { fieldEdge } from '../../../tokens/field-edge';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height';
+import { rem, rems } from '../../../tokens/relative';
 
 const RichToolbar = styled(Box)<{ glass?: boolean }>(({ theme, glass }) => ({
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(0.5),
   padding: theme.spacing(1),
-  borderRadius: `${theme.spacing(1)} ${theme.spacing(1)} 0 0`,
+  borderRadius: `${fieldRadius(theme)}px ${fieldRadius(theme)}px 0 0`,
   borderBottom: `1px solid ${theme.palette.divider}`,
   background: glass ? alpha(theme.palette.background.paper, 0.1) : theme.palette.background.paper,
   ...(glass && {
-    backdropFilter: 'blur(15px)' }),
+    backdropFilter: `blur(${rem(theme, 15)})` }),
   '& .MuiDivider-root': {
-    height: 24,
+    height: rem(theme, 24),
     margin: `0 ${theme.spacing(1)}` } }));
 
 const ToolbarButton = styled(IconButton, {
@@ -60,8 +63,8 @@ const ToolbarButton = styled(IconButton, {
   '&:hover': {
     color: theme.palette.primary.main,
     backgroundColor: alpha(theme.palette.primary.main, 0.15),
-    transform: 'translateY(-1px)',
-    animation: `${floatAnimation} 1.5s ease-in-out infinite`,
+    transform: `translateY(${rem(theme, -1)})`,
+    animation: `${floatAnimation(theme)} 1.5s ease-in-out infinite`,
 
     '&::before': {
       width: '100%',
@@ -78,16 +81,16 @@ const CharacterCount = styled(Box)<{ limit?: number; count: number }>(({ theme, 
     position: 'absolute',
     bottom: theme.spacing(1),
     right: theme.spacing(1),
-    fontSize: '0.75rem',
+    fontSize: rem(theme, 12),
     color: isError
       ? theme.palette.error.main
       : isWarning
         ? theme.palette.warning.main
         : theme.palette.text.secondary,
-    padding: '2px 6px',
+    padding: rems(theme, 2, 6),
     borderRadius: theme.spacing(0.5),
     backgroundColor: alpha(theme.palette.background.paper, 0.8),
-    backdropFilter: 'blur(10px)',
+    backdropFilter: `blur(${rem(theme, 10)})`,
     transition: 'all 0.3s ease' };
 });
 
@@ -101,35 +104,39 @@ const ContentEditableDiv = styled('div')<{
   if (!theme) return {};
   const colorPalette = getColorFromTheme(theme, customColor);
   const errorColor = theme.palette.error;
+  // The edge's colour once the field is engaged: the error's, else the accent.
+  const engaged = error ? errorColor.main : colorPalette.main;
 
   return {
-    minHeight: '120px',
+    minHeight: rem(theme, 120),
     padding: theme.spacing(1.5),
-    borderRadius: `0 0 ${theme.spacing(1)} ${theme.spacing(1)}`,
-    border: `2px solid ${error ? errorColor.main : focused ? colorPalette.main : fieldEdge(theme)}`,
+    borderRadius: `0 0 ${fieldRadius(theme)}px ${fieldRadius(theme)}px`,
+    border: `${FIELD_BORDER_WIDTH}px solid ${error || focused ? engaged : fieldEdge(theme)}`,
     borderTop: 'none',
     backgroundColor: glass
       ? alpha(theme.palette.background.paper, 0.1)
       : theme.palette.background.paper,
     color: theme.palette.text.primary,
     fontFamily: theme.typography.fontFamily,
-    fontSize: '1rem',
+    fontSize: rem(theme, 16),
     lineHeight: 1.5,
     outline: 'none',
     transition: 'all 0.3s ease',
     cursor: 'text',
 
     ...(glass && {
-      backdropFilter: 'blur(20px)' }),
+      backdropFilter: `blur(${rem(theme, 20)})` }),
 
     '&:hover': {
       backgroundColor: glass
         ? alpha(theme.palette.background.paper, 0.15)
         : alpha(theme.palette.background.paper, 0.9) },
 
+    // Focused, the 1px edge doubles inside the box (an inset shadow, so nothing
+    // moves), as every other field's does, under the halo.
     '&:focus': {
-      borderColor: error ? errorColor.main : colorPalette.main,
-      boxShadow: `0 0 0 3px ${alpha(error ? errorColor.main : colorPalette.main, 0.1)}` },
+      borderColor: engaged,
+      boxShadow: `inset 0 0 0 ${FIELD_BORDER_WIDTH}px ${engaged}, 0 0 0 ${rem(theme, 3)} ${alpha(engaged, 0.1)}` },
 
     '& > *': {
       margin: '0.5em 0' },

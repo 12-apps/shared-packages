@@ -1,4 +1,5 @@
 import type { SkeletonIntensity, SkeletonVariant } from './Skeleton.base';
+import { ABSOLUTE_INK } from '../../../tokens/ink.core';
 
 /**
  * THE NUMBERS BOTH `Skeleton` RENDERERS DRAW WITH.
@@ -53,10 +54,11 @@ export const SHIMMER_DURATION_MS = 2000;
 
 /**
  * MUI's `palette.common`, which is a pair of fixed hexes rather than anything
- * derived — so the shared theme has no slot for them and they are named here.
+ * derived — so the shared theme has no slot for them: the renderer-free
+ * absolutes stand in (`src/tokens/ink.core.ts`).
  */
-export const COMMON_BLACK = '#000';
-export const COMMON_WHITE = '#fff';
+export const COMMON_BLACK = ABSOLUTE_INK.black;
+export const COMMON_WHITE = ABSOLUTE_INK.white;
 
 /* ── MUI's own `Skeleton`, restated for the renderer that has no MUI ──────── */
 

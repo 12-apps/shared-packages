@@ -104,12 +104,30 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** One run of a highlighted label: plain text, or text the query matched. */
+export interface HighlightSegment {
+  text: string;
+  match: boolean;
+}
+
 /**
- * Wrap query matches in `<mark>` for the default suggestion renderer. Skipped for
- * fuzzy mode (non-contiguous matches) and empty queries. Returns HTML.
+ * Split `label` into the runs the query matches and the runs between them, in
+ * order, for the default suggestion renderer to wrap the matches in `<mark>`.
+ * Every occurrence of the query matches, case-insensitively and literally (regex
+ * metacharacters are escaped). Fuzzy mode (non-contiguous matches) and an empty
+ * query yield the whole label as one unmatched run.
+ *
+ * Returns TEXT, never markup: a label is caller data (in a consumer, a user's
+ * own display name), so the renderer must hand each run to React as a text
+ * child, which escapes it. Building an HTML string here and injecting it is how
+ * a label of `<img onerror=…>` once ran script in the host page.
  */
-export function highlightLabel(label: string, query: string, matchMode: MatchMode): string {
-  if (!query || matchMode === 'fuzzy') return label;
+export function highlightLabel(label: string, query: string, matchMode: MatchMode): HighlightSegment[] {
+  if (!query || matchMode === 'fuzzy') return [{ text: label, match: false }];
+  // The capturing group makes `split` keep each match, at the odd indices.
   const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-  return label.replace(regex, '<mark>$1</mark>');
+  return label
+    .split(regex)
+    .map((text, index) => ({ text, match: index % 2 === 1 }))
+    .filter((segment) => segment.text !== '');
 }

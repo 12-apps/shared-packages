@@ -10,7 +10,7 @@ import React from 'react';
 
 import { Menubar } from './Menubar';
 import type { MenubarItem } from './Menubar.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Menubar> = {
   args: { ariaLabel: 'Navegação principal' },

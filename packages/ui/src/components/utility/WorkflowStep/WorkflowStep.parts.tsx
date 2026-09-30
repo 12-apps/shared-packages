@@ -11,6 +11,8 @@ import type {
   StepIndicatorProps,
   WorkflowStepProps,
 } from './WorkflowStep.types';
+import { neutralTones } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 // `outlined` shows the surface through a coloured rim; the other three fill it and
 // differ only in what border they keep.
@@ -21,7 +23,7 @@ const indicatorVariantStyles = (
 ): CSSObject => {
   if (variant === 'outlined') {
     return {
-      border: `2px solid ${borderColor}`,
+      border: `${rem(theme, 2)} solid ${borderColor}`,
       backgroundColor: theme.palette.background.paper,
     };
   }
@@ -55,7 +57,7 @@ const StepItem = styled(Box, {
 }));
 
 const StepIndicator = styled(Box, {
-  shouldForwardProp: (prop) => !['size', 'variant', 'color', 'isActive', 'isCompleted', 'isError', 'interactive', 'disabled'].includes(prop as string),
+  shouldForwardProp: (prop) => !['size', 'variant', 'color', 'isActive', 'isCompleted', 'isError', 'interactive', 'animated', 'disabled'].includes(prop as string),
 })<{
   size: WorkflowStepProps['size'];
   variant: WorkflowStepProps['variant'];
@@ -77,13 +79,13 @@ const StepIndicator = styled(Box, {
   });
 
   return {
-    width: indicatorSize,
-    height: indicatorSize,
+    width: rem(theme, indicatorSize),
+    height: rem(theme, indicatorSize),
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: theme.typography.caption.fontSize,
+    fontSize: rem(theme, 12),
     fontWeight: theme.typography.fontWeightMedium,
     cursor: interactive && !disabled ? 'pointer' : 'default',
     transition: animated
@@ -102,8 +104,8 @@ const StepIndicator = styled(Box, {
         boxShadow: theme.shadows[2],
       },
       '&:focus-visible': {
-        outline: `2px solid ${palette.main}`,
-        outlineOffset: '2px',
+        outline: `${rem(theme, 2)} solid ${palette.main}`,
+        outlineOffset: rem(theme, 2),
       },
     }),
 
@@ -121,19 +123,22 @@ const StepContent = styled(Box, {
   orientation: WorkflowStepProps['orientation'];
   interactive: boolean;
   disabled: boolean;
-}>(({ theme, orientation, interactive, disabled }) => ({
+}>(({ theme, orientation, disabled }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: orientation === 'vertical' ? 'flex-start' : 'center',
   textAlign: orientation === 'vertical' ? 'left' : 'center',
   marginTop: orientation === 'vertical' ? theme.spacing(1) : theme.spacing(0.5),
   marginLeft: orientation === 'horizontal' ? theme.spacing(1) : 0,
-  cursor: interactive && !disabled ? 'pointer' : 'default',
+  // Inert (FUT-2773): the content block has no click handling of its own —
+  // the indicator is the step's one interactive element — so its cursor
+  // never claims to be clickable, whatever `interactive` says.
+  cursor: 'default',
   minWidth: 0,
   flex: 1,
 
   '& .step-title': {
-    fontSize: theme.typography.body2.fontSize,
+    fontSize: rem(theme, 14),
     fontWeight: theme.typography.fontWeightMedium,
     color: theme.palette.text.primary,
     marginBottom: theme.spacing(0.5),
@@ -144,7 +149,7 @@ const StepContent = styled(Box, {
   },
 
   '& .step-description': {
-    fontSize: theme.typography.caption.fontSize,
+    fontSize: rem(theme, 12),
     color: theme.palette.text.secondary,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -158,32 +163,29 @@ const StepContent = styled(Box, {
 }));
 
 const StepConnector = styled(Box, {
-  shouldForwardProp: (prop) => !['orientation', 'isCompleted', 'color', 'variant'].includes(prop as string),
+  shouldForwardProp: (prop) => !['orientation', 'isCompleted', 'color', 'variant', 'animated'].includes(prop as string),
 })<{
   orientation: WorkflowStepProps['orientation'];
   isCompleted: boolean;
   color: WorkflowStepProps['color'];
   variant: WorkflowStepProps['variant'];
-}>(({ theme, orientation, isCompleted, color, variant }) => {
-  const colorKey = color || 'primary';
-  const colorValue = colorKey === 'neutral' 
-    ? { main: theme.palette.grey[600] }
-    : theme.palette[colorKey as 'primary' | 'secondary' | 'success' | 'warning' | 'error'];
-  const connectorColor = isCompleted ? colorValue.main : theme.palette.grey[300];
+  animated: boolean;
+}>(({ theme, orientation, isCompleted, color, variant, animated }) => {
+  const connectorColor = isCompleted ? stepPalette(theme, color).main : neutralTones(theme).track;
 
   return {
     flex: 1,
     position: 'relative',
-    
+
     ...(orientation === 'horizontal' && {
-      height: '2px',
+      height: rem(theme, 2),
       backgroundColor: connectorColor,
       margin: `0 ${theme.spacing(1)}`,
       minWidth: theme.spacing(2),
     }),
-    
+
     ...(orientation === 'vertical' && {
-      width: '2px',
+      width: rem(theme, 2),
       backgroundColor: connectorColor,
       minHeight: theme.spacing(3),
       marginLeft: theme.spacing(2),
@@ -193,9 +195,11 @@ const StepConnector = styled(Box, {
       top: '100%',
     }),
 
-    transition: theme.transitions.create('background-color', {
-      duration: theme.transitions.duration.short,
-    }),
+    transition: animated
+      ? theme.transitions.create('background-color', {
+          duration: theme.transitions.duration.short,
+        })
+      : 'none',
 
     ...(variant === 'minimal' && {
       opacity: 0.6,
@@ -225,20 +229,22 @@ const StepIndicatorComponent = forwardRef<HTMLDivElement, StepIndicatorProps>(({
   onClick,
   'data-testid': dataTestId,
 }, ref) => {
+  const isDisabled = Boolean(disabled || step.disabled);
+
   const handleClick = useCallback(() => {
-    if (interactive && !disabled && onClick) {
+    if (interactive && !isDisabled && onClick) {
       onClick(index, step);
     }
-  }, [interactive, disabled, onClick, index, step]);
+  }, [interactive, isDisabled, onClick, index, step]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (interactive && !disabled && (event.key === 'Enter' || event.key === ' ')) {
+    if (interactive && !isDisabled && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();
       if (onClick) {
         onClick(index, step);
       }
     }
-  }, [interactive, disabled, onClick, index, step]);
+  }, [interactive, isDisabled, onClick, index, step]);
 
   const renderIndicatorContent = () => {
     if (isError && errorIcon) {
@@ -267,13 +273,14 @@ const StepIndicatorComponent = forwardRef<HTMLDivElement, StepIndicatorProps>(({
       isError={isError}
       interactive={interactive}
       animated={animated}
-      disabled={Boolean(disabled || step.disabled)}
+      disabled={isDisabled}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role={interactive ? 'button' : undefined}
-      tabIndex={interactive && !disabled && !step.disabled ? 0 : -1}
+      tabIndex={!interactive ? undefined : isDisabled ? -1 : 0}
       aria-label={`Step ${index + 1}: ${step.title}`}
       aria-current={isActive ? 'step' : undefined}
+      aria-disabled={interactive && isDisabled ? true : undefined}
       data-testid={dataTestId}
     >
       {renderIndicatorContent()}
@@ -291,6 +298,10 @@ const StepConnectorComponent = forwardRef<HTMLDivElement, StepConnectorProps>(({
   orientation,
   variant,
   color,
+  // Defaults to the connector's own prior, unconditional behaviour (FUT-2773):
+  // an external caller building a `StepConnectorProps` value that predates
+  // this field keeps the transition it always had.
+  animated = true,
   'data-testid': dataTestId,
 }, ref) => (
   <StepConnector
@@ -299,6 +310,7 @@ const StepConnectorComponent = forwardRef<HTMLDivElement, StepConnectorProps>(({
     isCompleted={isCompleted}
     color={color}
     variant={variant}
+    animated={animated}
     data-testid={dataTestId}
   />
 ));
@@ -306,51 +318,34 @@ const StepConnectorComponent = forwardRef<HTMLDivElement, StepConnectorProps>(({
 StepConnectorComponent.displayName = 'StepConnector';
 
 /**
- * Step content component
+ * Step content component.
+ *
+ * Inert on purpose (FUT-2773): the indicator is the step's one focusable
+ * `role="button"` element — it already carries `aria-label="Step N: <title>"`
+ * — so the title/description block gets no `role`, `tabIndex`, click or key
+ * handling of its own. Two independently-interactive elements per step gave
+ * assistive tech two tab stops for what a caller means as a single control.
  */
 const StepContentComponent = forwardRef<HTMLDivElement, StepContentProps>(({
   step,
-  index,
   orientation,
   interactive,
   disabled,
-  onClick,
   'data-testid': dataTestId,
-}, ref) => {
-  const handleClick = useCallback(() => {
-    if (interactive && !disabled && onClick) {
-      onClick(index, step);
-    }
-  }, [interactive, disabled, onClick, index, step]);
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (interactive && !disabled && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault();
-      if (onClick) {
-        onClick(index, step);
-      }
-    }
-  }, [interactive, disabled, onClick, index, step]);
-
-  return (
-    <StepContent
-      ref={ref}
-      orientation={orientation}
-      interactive={interactive}
-      disabled={Boolean(disabled || step.disabled)}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      role={interactive ? 'button' : undefined}
-      tabIndex={interactive && !disabled && !step.disabled ? 0 : -1}
-      data-testid={dataTestId}
-    >
-      <div className="step-title">{step.title}</div>
-      {step.description && (
-        <div className="step-description">{step.description}</div>
-      )}
-    </StepContent>
-  );
-});
+}, ref) => (
+  <StepContent
+    ref={ref}
+    orientation={orientation}
+    interactive={interactive}
+    disabled={Boolean(disabled || step.disabled)}
+    data-testid={dataTestId}
+  >
+    <div className="step-title">{step.title}</div>
+    {step.description && (
+      <div className="step-description">{step.description}</div>
+    )}
+  </StepContent>
+));
 
 StepContentComponent.displayName = 'StepContent';
 

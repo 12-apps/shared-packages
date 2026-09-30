@@ -5,6 +5,7 @@ import { iconFill } from './icon-color';
 import { iconSize, type IconBaseProps } from './Icon.types';
 import { ICON_PATHS } from './paths.generated';
 import { resolveTestId } from '../platform/test-id';
+import { sxRem } from '../tokens/relative';
 import { useUiTheme } from '../provider/use-ui-theme';
 
 export interface IconProps extends IconBaseProps {
@@ -20,7 +21,6 @@ export interface IconProps extends IconBaseProps {
 export const Icon = React.forwardRef<SVGSVGElement, IconProps>(
   ({ name, size, color, label, className, style, ...rest }, ref) => {
     const theme = useUiTheme();
-    const px = iconSize(size);
     const fill = iconFill(theme, color, 'currentColor');
     const testId = resolveTestId(rest, `icon-${name}`);
 
@@ -30,7 +30,7 @@ export const Icon = React.forwardRef<SVGSVGElement, IconProps>(
         viewBox="0 0 24 24"
         className={className}
         style={style}
-        sx={{ fontSize: px, color: fill }}
+        sx={{ fontSize: sxRem(iconSize(size)), color: fill }}
         titleAccess={label}
         aria-hidden={label ? undefined : true}
         data-testid={testId}

@@ -100,7 +100,7 @@ function workspace(packages) {
 }
 
 /** Runs the real scripts/publish.mjs over a scripted registry. */
-function release(packages, plan) {
+function release(packages, plan, branch = "") {
   const { root, bin, dirs } = workspace(packages);
   const calls = join(root, "calls.log");
   const planFile = join(root, "plan.json");
@@ -123,6 +123,8 @@ function release(packages, plan) {
       FAKE_NPM_ARGV: argv,
       GITHUB_STEP_SUMMARY: summary,
       GITHUB_ENV: handoff,
+      // The branch cd.yml checked out. Pinned per case so the runner's own never leaks in.
+      RELEASE_BRANCH: branch,
     },
   });
 
@@ -182,12 +184,22 @@ check(
   /no further\s+version/i.test(eneedauth.output),
   "the output does not say the package is wedged, only that it failed",
 );
+// The workflow is named EXACTLY, and `ci.yml` is asserted absent: the two are
+// what a Trusted Publisher is keyed on, so a remedy naming the wrong one sends
+// whoever reads it to a settings form that will not fix anything. The release
+// moved out of ci.yml into cd.yml and this hint did not follow — which cost a
+// cycle, and went unnoticed because the old name was pinned right here.
 check(
   "the diagnosis gives the remedy's coordinates",
-  [/trusted publisher/i, /npmjs\.com/i, /12-apps\/shared-packages/, /ci\.yml/].every((part) =>
+  [/trusted publisher/i, /npmjs\.com/i, /12-apps\/shared-packages/, /cd\.yml/].every((part) =>
     part.test(eneedauth.output),
   ),
   "the remedy does not name the Trusted Publisher setting, npmjs.com, the repo and the workflow",
+);
+check(
+  "the remedy does not name a workflow that does not publish",
+  !/\bci\.yml\b/.test(eneedauth.output),
+  "the remedy still points at ci.yml, which has not published since the release moved to cd.yml",
 );
 check(
   "ENEEDAUTH with no retryable marker is NOT retried",
@@ -332,6 +344,53 @@ check(
   `GITHUB_ENV got:\n${cascade.handoff}`,
 );
 
+// ── A maintenance branch publishes on its line's dist-tag, never `latest` ──
+// `npm publish` with no `--tag` means `latest`, so a 5.8.2 cut from a
+// release/<pkg>-5.8.x branch after 5.11.0 shipped would move every unpinned
+// install backwards. See ./lib/dist-tag.mjs.
+const LINE = "@selftest/line";
+const onLine = release([{ name: LINE }], { [LINE]: [{ status: 0, out: OK }] }, "release/app-shell-5.8.x");
+check(
+  "a maintenance branch publishes with --tag <its line>",
+  onLine.status === 0 &&
+    onLine.argv.length > 0 &&
+    onLine.argv.every((call) => /(^|\s)--tag app-shell-5\.8\.x(\s|$)/.test(call)),
+  `npm was invoked as:\n    ${onLine.argv.join("\n    ")}`,
+);
+check(
+  "a maintenance branch never publishes on latest",
+  onLine.argv.every((call) => !/\blatest\b/.test(call)),
+  `npm was invoked as:\n    ${onLine.argv.join("\n    ")}`,
+);
+const onMain = release([{ name: LINE }], { [LINE]: [{ status: 0, out: OK }] }, "main");
+check(
+  "main keeps npm's default dist-tag",
+  onMain.status === 0 && onMain.argv.length > 0 && onMain.argv.every((call) => !/--tag/.test(call)),
+  `npm was invoked as:\n    ${onMain.argv.join("\n    ")}`,
+);
+const stray = release([{ name: LINE }], { [LINE]: [{ status: 0, out: OK }] }, "feat/not-a-line");
+check(
+  "any other branch is refused before npm is asked anything",
+  stray.status !== 0 && stray.attempts(LINE) === 0 && /refusing to publish/.test(stray.output),
+  `exit ${stray.status} after ${stray.attempts(LINE)} npm call(s):\n${stray.output}`,
+);
+
+// ── The hand-over: tell verify-released.mjs propagation from an orphan ──────
+// A package this run just published must not read as STUCK there — it has not
+// had time to propagate. PUBLISH_ACCEPTED lets that step (and release-alert.mjs,
+// asking the same question) tell the two apart.
+const ACCEPTED_PKG = "@selftest/accepted";
+const accepted = release([{ name: ACCEPTED_PKG }], { [ACCEPTED_PKG]: [{ status: 0, out: OK }] });
+check(
+  "a version npm actually accepted this run is handed over as PUBLISH_ACCEPTED",
+  accepted.handoff.includes(`PUBLISH_ACCEPTED=${ACCEPTED_PKG}`),
+  `verify-released.mjs needs this to avoid calling its own propagating publish an\n    orphan. GITHUB_ENV got:\n${accepted.handoff}`,
+);
+check(
+  "a skipped (already-published) version is NOT handed over as accepted",
+  !skip.handoff.includes(`PUBLISH_ACCEPTED=${ONE}`),
+  `a skip means the version predates this run, so it must not suppress a real\n    orphan's remedy. GITHUB_ENV got:\n${skip.handoff}`,
+);
 if (failures.length > 0) {
   console.error(`\nscripts/publish.mjs misclassified ${failures.length} case(s):\n`);
   for (const failure of failures) console.error(`  ✗ ${failure}\n`);

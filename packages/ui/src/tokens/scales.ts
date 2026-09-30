@@ -14,6 +14,58 @@ export { headingMetrics } from './typography';
 // host can build a `UiTheme` from the same module path a native one does.
 export * from './theme';
 export * from './color';
+// The relative-size vocabulary every component writes its sizes in (FUT-2585).
+export { rem, rems, remPx, resetRootFontCache, sxRem } from './relative';
+// Every colour by role (FUT-2593): ink roles, neutral tones, the named sets.
+export * from './ink';
+export * from './ink.core';
+export { DEFAULT_FIELD_RADIUS, fieldRadius, fieldRadiusOverrides, fieldRadiusPx, fieldRootStyles } from './field-radius';
+export {
+  asFieldSize,
+  DEFAULT_FIELD_HEIGHT,
+  FIELD_BORDER_WIDTH,
+  FIELD_HEIGHT_SCALE,
+  fieldBorder,
+  fieldControlStyles,
+  fieldHeight,
+  fieldHeightOverrides,
+  fieldHeightPx,
+  fieldHeightRem,
+  fieldOverrides,
+  fieldTextFieldStyles,
+  mergeMuiComponents,
+} from './field-height';
+// The theme's density knob (FUT-2764): the factor table, the resolver, the
+// per-repository override and the standalone entry for a host that builds
+// `createTheme()` directly. `DensityLevel`/`ResolvedDensity` are already
+// exported above, through `./theme`.
+export {
+  DEFAULT_DENSITY,
+  DENSITY_FACTOR,
+  densityFieldHeight,
+  densityFontSize,
+  densitySpacingUnit,
+  densityThemeOptions,
+  resolveDensityFactor,
+  useDensity,
+} from './density';
+// The IconButton/Chip geometry overrides density threads through both
+// consumption paths (FUT-2766), and Checkbox/Radio/Switch's (FUT-2767) and
+// ToggleButton/Tab/TableCell/PaginationItem/Slider's (FUT-2768) — exported
+// standalone too, for a host that wants just these components' overrides
+// without the rest of density.
+export {
+  checkboxRadioDensityOverrides,
+  chipDensityOverrides,
+  iconButtonDensityOverrides,
+  paginationItemDensityOverrides,
+  sliderDensityOverrides,
+  switchDensityOverrides,
+  tabDensityOverrides,
+  tableCellDensityOverrides,
+  tabsIndicatorDensityOverrides,
+  toggleButtonDensityOverrides,
+} from './density-overrides';
 
 export interface Accent {
   main: string;

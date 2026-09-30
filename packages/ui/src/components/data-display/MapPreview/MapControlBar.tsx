@@ -13,6 +13,7 @@ import React from 'react';
 import { MAX_ZOOM, MIN_ZOOM } from './MapPreview.constants';
 import type { MapType } from './MapPreview.types';
 import type { MapPreviewCopy } from '../../../copy';
+import { rem } from '../../../tokens/relative';
 
 // Kept module-local: the inferred type of a styled() component cannot be named
 // across a module boundary here (TS2742).
@@ -28,8 +29,8 @@ const MapControls = styled(Box)(({ theme }) => ({
 
 const ControlButton = styled(IconButton)(({ theme }) => ({
   background: alpha(theme.palette.background.paper, 0.95),
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  backdropFilter: `blur(${rem(theme, 10)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
   border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
   boxShadow: theme.shadows[2],
   // Kept clickable while disabled so hover tooltips still work at the limits.

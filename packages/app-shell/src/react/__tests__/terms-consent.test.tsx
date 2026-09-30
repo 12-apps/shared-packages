@@ -89,16 +89,22 @@ function server(options: { stale: boolean; acceptOk?: boolean }): string[] {
   return calls;
 }
 
+/** How many times the dialog asked the server for the consent status. */
+function consentReads(calls: readonly string[]): number {
+  return calls.filter((call) => call.includes(CONSENT_STATUS_PATH)).length;
+}
+
 /**
  * A hand-driven stand-in for a host's event system.
  *
- * `connected` starts false and the test flips it, which is exactly the two moments
- * that matter: the reconnect after a deploy, and a pushed acceptance from the user's
- * other device.
+ * `connected` starts false and the test flips it, which is exactly the moments that
+ * matter: the first connect after mount, the drop and reconnect after a deploy, and a
+ * pushed acceptance from the user's other device.
  */
 function signal(): {
   hook: ConsentSignalHook;
   connect: () => void;
+  disconnect: () => void;
   push: () => void;
 } {
   // A container's properties, not closed-over bindings: the flakiness gate is right
@@ -116,6 +122,9 @@ function signal(): {
     },
     connect: () => {
       state.connected = true;
+    },
+    disconnect: () => {
+      state.connected = false;
     },
     push: () => {
       for (const listener of state.listeners) listener();
@@ -196,23 +205,49 @@ describe('TermsConsentDialog', () => {
  * into the notification.
  */
 describe('TermsConsentDialog · the realtime accelerator', () => {
-  it('asks again when the signal (re)connects, so an open tab learns about a bump', async () => {
+  it('asks nothing on the first connect, and exactly once after a drop and reconnect', async () => {
     const options = { stale: false };
-    server(options);
+    const calls = server(options);
     const stream = signal();
     const view = render(<TermsConsentDialog messages={CLUB_MESSAGES} useSignal={stream.hook} />);
+    const rerender = async (): Promise<void> => {
+      await act(async () => {
+        view.rerender(<TermsConsentDialog messages={CLUB_MESSAGES} useSignal={stream.hook} />);
+      });
+    };
 
-    await waitFor(() => expect(screen.queryByTestId('terms-consent-dialog')).toBeNull());
+    await waitFor(() => expect(consentReads(calls)).toBe(1));
 
-    // The bump lands while this tab is open: the next answer is "stale", and the
-    // reconnect is what goes and gets it.
-    options.stale = true;
+    // The first connect lands a moment after the mount answer, and repeats its
+    // question on every cold page load. It is not news.
     stream.connect();
+    await rerender();
+    expect(consentReads(calls)).toBe(1);
+
+    // The bump ships as a deploy: the stream drops and comes back, and the next
+    // answer is "stale". The reconnect is what goes and gets it — once.
+    options.stale = true;
+    stream.disconnect();
+    await rerender();
+    stream.connect();
+    await rerender();
+
+    expect(await screen.findByTestId('terms-consent-dialog')).toBeDefined();
+    expect(consentReads(calls)).toBe(2);
+  });
+
+  it('asks nothing extra when it mounts on a channel that is already connected', async () => {
+    const calls = server({ stale: false });
+    const stream = signal();
+    stream.connect();
+    const view = render(<TermsConsentDialog messages={CLUB_MESSAGES} useSignal={stream.hook} />);
+
+    await waitFor(() => expect(consentReads(calls)).toBe(1));
     await act(async () => {
       view.rerender(<TermsConsentDialog messages={CLUB_MESSAGES} useSignal={stream.hook} />);
     });
 
-    expect(await screen.findByTestId('terms-consent-dialog')).toBeDefined();
+    expect(consentReads(calls)).toBe(1);
   });
 
   it('re-reads on a pushed hint rather than trusting its payload', async () => {

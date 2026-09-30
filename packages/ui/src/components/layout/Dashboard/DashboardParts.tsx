@@ -31,15 +31,16 @@ import type {
   DashboardInfoProps,
   DashboardSettingsProps,
 } from './Dashboard.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** Flexible spacer — everything composed after it is pushed to the right. */
 export const DashboardSpacer = (): React.JSX.Element => <Box sx={{ flex: 1 }} aria-hidden />;
 DashboardSpacer.displayName = 'Dashboard.Spacer';
 
 export const DashboardInfo = ({
-  title = 'About this page',
+  title,
   children,
-  ariaLabel = 'Page information',
+  ariaLabel,
 }: DashboardInfoProps): React.JSX.Element => {
   const { testIdPrefix } = useDashboardContext();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
@@ -63,23 +64,26 @@ export const DashboardInfo = ({
         anchorEl={anchorEl}
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        slotProps={{ paper: { sx: { width: 360, maxWidth: '90vw' } } }}
+        slotProps={{ paper: { sx: { width: sxRem(360), maxWidth: '90vw' } } }}
         data-testid={`${testIdPrefix}-info-popover`}
       >
         <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', display: 'flex', gap: 1, alignItems: 'center' }}>
           <InfoIcon fontSize="small" sx={{ color: 'text.secondary' }} />
           <Typography sx={{ fontWeight: 600 }}>{title}</Typography>
         </Box>
-        <Box sx={{ px: 2, py: 1.5, fontSize: '0.875rem', color: 'text.secondary' }}>{children}</Box>
+        <Box sx={{ px: 2, py: 1.5, fontSize: sxRem(14), color: 'text.secondary' }}>{children}</Box>
       </Popover>
     </>
   );
 };
 DashboardInfo.displayName = 'Dashboard.Info';
 
-export const DashboardFilterToggle = ({ ariaLabel }: DashboardFilterToggleProps): React.JSX.Element => {
+export const DashboardFilterToggle = ({
+  hideLabel,
+  showLabel,
+}: DashboardFilterToggleProps): React.JSX.Element => {
   const { filtersVisible, toggleFilters, activeFilterCount, testIdPrefix } = useDashboardContext();
-  const label = ariaLabel ?? (filtersVisible ? 'Hide filters' : 'Show filters');
+  const label = filtersVisible ? hideLabel : showLabel;
   return (
     <Tooltip title={label}>
       <IconButton
@@ -100,10 +104,10 @@ export const DashboardFilterToggle = ({ ariaLabel }: DashboardFilterToggleProps)
 DashboardFilterToggle.displayName = 'Dashboard.FilterToggle';
 
 export const DashboardSettings = ({
-  title = 'Settings',
+  title,
   closeLabel,
   children,
-  ariaLabel = 'Settings',
+  ariaLabel,
   href,
   linkComponent,
 }: DashboardSettingsProps): React.JSX.Element => {
@@ -167,7 +171,7 @@ const DEFAULT_EXPORT_FORMATS: DashboardExportFormat[] = [
 export const DashboardExport = ({
   formats = DEFAULT_EXPORT_FORMATS,
   onExport,
-  label = 'Export',
+  label,
 }: DashboardExportProps): React.JSX.Element => {
   const { testIdPrefix } = useDashboardContext();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);

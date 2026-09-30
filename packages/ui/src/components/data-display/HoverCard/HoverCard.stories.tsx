@@ -67,6 +67,7 @@ export const Variants: Story = {
   render: () => (
     <Stack direction="row" spacing={3}>
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         title="Default Card"
         description="This is a default hover card with standard styling."
@@ -74,6 +75,7 @@ export const Variants: Story = {
         <Button variant="outlined">Default</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         variant="glass"
         title="Glass Card"
         description="This card uses glassmorphism effects."
@@ -81,6 +83,7 @@ export const Variants: Story = {
         <Button variant="outlined">Glass</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         variant="detailed"
         title="Detailed Card"
         description="This card has enhanced styling for detailed content."
@@ -96,6 +99,7 @@ export const Variants: Story = {
 export const UserProfile: Story = {
   render: () => (
     <HoverCard
+      loadingText="Carregando…"
       variant="detailed"
       title="Sarah Johnson"
       description="Senior Product Manager at TechCorp"
@@ -135,6 +139,7 @@ export const UserProfile: Story = {
 export const ProductInfo: Story = {
   render: () => (
     <HoverCard
+      loadingText="Carregando…"
       variant="default"
       title="Premium Subscription"
       description="Unlock all features with our premium plan"
@@ -209,6 +214,7 @@ export const CustomDelays: Story = {
   render: () => (
     <Stack direction="row" spacing={3}>
       <HoverCard
+        loadingText="Carregando…"
         title="Fast Hover"
         description="Shows quickly (100ms delay)"
         enterDelay={100}
@@ -217,6 +223,7 @@ export const CustomDelays: Story = {
         <Button variant="outlined">Fast</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Normal Hover"
         description="Shows after 700ms (default)"
         enterDelay={700}
@@ -225,6 +232,7 @@ export const CustomDelays: Story = {
         <Button variant="outlined">Normal</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Slow Hover"
         description="Shows after 1.5 seconds"
         enterDelay={1500}
@@ -239,7 +247,7 @@ export const CustomDelays: Story = {
 // Complex content
 export const ComplexContent: Story = {
   render: () => (
-    <HoverCard variant="detailed" maxWidth={350}>
+    <HoverCard loadingText="Carregando…" variant="detailed" maxWidth={350}>
       <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }}>
         View Analytics Dashboard
       </Typography>
@@ -314,6 +322,7 @@ export const Placements: Story = {
   render: () => (
     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, p: 8 }}>
       <HoverCard
+        loadingText="Carregando…"
         title="Top Placement"
         description="Appears above the trigger"
         placement="top"
@@ -323,6 +332,7 @@ export const Placements: Story = {
         <Button variant="outlined">Top</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Bottom Placement"
         description="Appears below the trigger"
         placement="bottom"
@@ -332,6 +342,7 @@ export const Placements: Story = {
         <Button variant="outlined">Bottom</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Left Placement"
         description="Appears to the left"
         placement="left"
@@ -341,6 +352,7 @@ export const Placements: Story = {
         <Button variant="outlined">Left</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Right Placement"
         description="Appears to the right"
         placement="right"
@@ -358,6 +370,7 @@ export const Animations: Story = {
   render: () => (
     <Stack direction="row" spacing={2}>
       <HoverCard
+        loadingText="Carregando…"
         title="Fade Animation"
         description="Fades in smoothly"
         animation="fade"
@@ -366,6 +379,7 @@ export const Animations: Story = {
         <Button variant="outlined">Fade</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Scale Animation"
         description="Scales up from center"
         animation="scale"
@@ -374,6 +388,7 @@ export const Animations: Story = {
         <Button variant="outlined">Scale</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Slide Up"
         description="Slides up from below"
         animation="slide-up"
@@ -382,6 +397,7 @@ export const Animations: Story = {
         <Button variant="outlined">Slide Up</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Slide Down"
         description="Slides down from above"
         animation="slide-down"
@@ -390,6 +406,7 @@ export const Animations: Story = {
         <Button variant="outlined">Slide Down</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Slide Left"
         description="Slides from the right"
         animation="slide-left"
@@ -398,6 +415,7 @@ export const Animations: Story = {
         <Button variant="outlined">Slide Left</Button>
       </HoverCard>
       <HoverCard
+        loadingText="Carregando…"
         title="Slide Right"
         description="Slides from the left"
         animation="slide-right"
@@ -415,6 +433,7 @@ export const InlineText: Story = {
     <Typography variant="body1">
       You can hover over{' '}
       <HoverCard
+        loadingText="Carregando…"
         title="Hover Definition"
         description="A hover card is a UI element that appears when you hover over a trigger element."
         variant="glass"
@@ -439,6 +458,7 @@ export const AllVariants: Story = {
       <Typography variant="h6">All HoverCard Variants</Typography>
       <Stack direction="row" spacing={3} flexWrap="wrap">
         <HoverCard
+          loadingText="Carregando…"
           variant="default"
           title="Default Variant"
           description="Standard hover card with default styling"
@@ -446,6 +466,7 @@ export const AllVariants: Story = {
           <Button variant="outlined">Default</Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           variant="glass"
           title="Glass Variant"
           description="Glassmorphism effect with blur and transparency"
@@ -453,6 +474,7 @@ export const AllVariants: Story = {
           <Button variant="outlined">Glass</Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           variant="detailed"
           title="Detailed Variant"
           description="Enhanced styling for rich content display"
@@ -470,12 +492,13 @@ export const AllSizes: Story = {
     <Stack spacing={3} alignItems="center">
       <Typography variant="h6">All HoverCard Sizes</Typography>
       <Stack direction="row" spacing={3} flexWrap="wrap">
-        <HoverCard title="Small Card" description="Compact size" maxWidth={200}>
+        <HoverCard loadingText="Carregando…" title="Small Card" description="Compact size" maxWidth={200}>
           <Button variant="outlined" size="small">
             Small (200px)
           </Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="Medium Card"
           description="Default medium size for standard content"
           maxWidth={300}
@@ -483,6 +506,7 @@ export const AllSizes: Story = {
           <Button variant="outlined">Medium (300px)</Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="Large Card"
           description="Large size for detailed information and rich content display"
           maxWidth={400}
@@ -492,6 +516,7 @@ export const AllSizes: Story = {
           </Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="Extra Large Card"
           description="Extra large size for complex content layouts and detailed information panels"
           maxWidth={500}
@@ -510,10 +535,11 @@ export const AllStates: Story = {
     <Stack spacing={3} alignItems="center">
       <Typography variant="h6">All HoverCard States</Typography>
       <Stack direction="row" spacing={3} flexWrap="wrap">
-        <HoverCard title="Normal State" description="Default interactive state">
+        <HoverCard loadingText="Carregando…" title="Normal State" description="Default interactive state">
           <Button variant="outlined">Normal</Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="With Glow"
           description="Glowing effect applied"
           glow={true}
@@ -523,12 +549,13 @@ export const AllStates: Story = {
             Glow Effect
           </Button>
         </HoverCard>
-        <HoverCard title="With Pulse" description="Pulsing animation effect" pulse={true}>
+        <HoverCard loadingText="Carregando…" title="With Pulse" description="Pulsing animation effect" pulse={true}>
           <Button variant="outlined" color="warning">
             Pulse Effect
           </Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="Combined Effects"
           description="Both glow and pulse"
           glow={true}
@@ -539,10 +566,10 @@ export const AllStates: Story = {
             Combined
           </Button>
         </HoverCard>
-        <HoverCard title="Loading State" description="Content is loading" loading={true}>
+        <HoverCard loadingText="Carregando…" title="Loading State" description="Content is loading" loading={true}>
           <Button variant="outlined">Loading</Button>
         </HoverCard>
-        <HoverCard title="Disabled State" description="This hover card is disabled" disabled={true}>
+        <HoverCard loadingText="Carregando…" title="Disabled State" description="This hover card is disabled" disabled={true}>
           <Button disabled>Disabled</Button>
         </HoverCard>
       </Stack>
@@ -559,6 +586,7 @@ const InteractiveStatesComponent = () => {
       <Typography variant="h6">Interactive HoverCard States</Typography>
       <Stack direction="row" spacing={3} flexWrap="wrap">
         <HoverCard
+          loadingText="Carregando…"
           title="Hover Interaction"
           description="Shows on hover with 700ms delay"
           enterDelay={700}
@@ -567,6 +595,7 @@ const InteractiveStatesComponent = () => {
           <Button variant="outlined">Hover Me (700ms delay)</Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="Quick Hover"
           description="Shows immediately on hover"
           enterDelay={0}
@@ -577,6 +606,7 @@ const InteractiveStatesComponent = () => {
           </Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="With Callbacks"
           description={`Opened: ${open ? 'Yes' : 'No'}`}
           onOpen={() => setOpen(true)}
@@ -586,7 +616,7 @@ const InteractiveStatesComponent = () => {
             Track State: {open ? 'Open' : 'Closed'}
           </Button>
         </HoverCard>
-        <HoverCard title="Click Counter" description={`Button clicked ${clickCount} times`}>
+        <HoverCard loadingText="Carregando…" title="Click Counter" description={`Button clicked ${clickCount} times`}>
           <Button variant="contained" onClick={() => setClickCount((c) => c + 1)}>
             Click Count: {clickCount}
           </Button>
@@ -604,16 +634,13 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Stack spacing={3} alignItems="center" sx={{ p: 2 }}>
       <Typography variant="h6">Responsive HoverCard</Typography>
       <Stack spacing={2} sx={{ width: '100%' }}>
         <HoverCard
+          loadingText="Carregando…"
           title="Mobile Optimized"
           description="Touch-enabled for mobile devices"
           touchEnabled={true}
@@ -625,6 +652,7 @@ export const Responsive: Story = {
           </Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="Tablet View"
           description="Optimized for tablet screens"
           placement="right"
@@ -635,6 +663,7 @@ export const Responsive: Story = {
           </Button>
         </HoverCard>
         <HoverCard
+          loadingText="Carregando…"
           title="Desktop View"
           description="Full-featured desktop experience with rich content"
           variant="detailed"

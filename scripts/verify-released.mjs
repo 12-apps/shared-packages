@@ -60,6 +60,9 @@ const INCOMPLETE = handedOver("PUBLISH_INCOMPLETE");
 const WEDGED = handedOver("PUBLISH_WEDGED");
 // Names scripts/first-publish.mjs put on the registry EARLIER IN THIS JOB.
 const BOOTSTRAPPED = handedOver("FIRST_PUBLISHED");
+// Names scripts/publish.mjs got an `ok` from npm for, THIS run. An absence here
+// is npm's read-after-write lag, not an orphan — see the ACCEPTED handling below.
+const ACCEPTED = handedOver("PUBLISH_ACCEPTED");
 
 function report(lines) {
   console.log(lines.join("\n"));
@@ -115,7 +118,24 @@ function remedy(name, tag) {
   );
 }
 
-for (const { name, tag, version } of orphans) {
+// A version THIS run's publish accepted is not an orphan at all — it is npm's
+// read-after-write lag, caught by the step most exposed to it (see the file
+// header). Reporting it as STUCK would print the delete remedy at a version
+// npm is about to serve, which is the exact harm this hand-off exists to end.
+const propagating = orphans.filter(({ name }) => ACCEPTED.has(name));
+const stuckOrphans = orphans.filter(({ name }) => !ACCEPTED.has(name));
+
+for (const { name, tag, version } of propagating) {
+  console.log(
+    `::warning::${name} is tagged ${tag} but ${version} is not on the registry yet — ` +
+      `accepted by npm this run, not yet served; not an orphan — do not delete the tag. ` +
+      `The registry was re-read for ${WAITED}s already; it can take several more minutes ` +
+      `to serve a version it has already accepted.`,
+  );
+  lines.push(`**propagating**: ${name} tagged ${tag}, ${version} accepted by npm this run, not yet served`);
+}
+
+for (const { name, tag, version } of stuckOrphans) {
   console.log(
     `::error::${name} is tagged ${tag} but ${version} is not on the registry. ` +
       `Releases for this package are STUCK: semantic-release sees the tag and ` +
@@ -154,7 +174,7 @@ function untaggedRemedy(prefix, version) {
 // author cannot clear — the tag only exists once a release cuts one, and the
 // recovery on the next push is what supplies it. Reported, never fatal.
 const bootstrapped = untagged.filter(({ name }) => BOOTSTRAPPED.has(name));
-const stuck = untagged.filter(({ name }) => !BOOTSTRAPPED.has(name));
+const stuckUntagged = untagged.filter(({ name }) => !BOOTSTRAPPED.has(name));
 
 for (const { name, prefix, versions } of bootstrapped) {
   const version = newestPublished(versions);
@@ -164,7 +184,7 @@ for (const { name, prefix, versions } of bootstrapped) {
   );
 }
 
-for (const { name, prefix, versions } of stuck) {
+for (const { name, prefix, versions } of stuckUntagged) {
   const version = newestPublished(versions);
   console.log(
     `::error::${name} is on the registry at ${version} but has no ${prefix}-v* tag. ` +
@@ -178,4 +198,4 @@ for (const { name, prefix, versions } of stuck) {
 
 report(lines);
 
-if (orphans.length > 0 || stuck.length > 0) process.exitCode = 1;
+if (stuckOrphans.length > 0 || stuckUntagged.length > 0) process.exitCode = 1;

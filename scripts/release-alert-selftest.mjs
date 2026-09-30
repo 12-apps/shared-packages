@@ -152,6 +152,7 @@ async function alert({ plan, issues = [], env = {}, createStatus = 201 }) {
         TAG_FAILED: "",
         PUBLISH_WEDGED: "",
         PUBLISH_INCOMPLETE: "",
+        PUBLISH_ACCEPTED: "",
         RELEASE_JOB_STATUS: "",
         ...env,
       },
@@ -279,6 +280,30 @@ check(
   "a failed release job alerts even when no package is stuck",
   jobFailed.creations.length === 1,
   "a run that shipped nothing is worth an alert even when it left no orphan behind",
+);
+
+// ── A version THIS run's publish accepted must not raise an alert ───────────
+//
+// release-alert.mjs asks the same question verify-released.mjs does, over the
+// same run, so it has to reach the same verdict: an absence npm accepted this
+// run is propagation lag, not a stuck package, and must not file an issue or
+// post the failing commit status.
+const propagating = await alert({
+  plan: STUCK,
+  env: { PUBLISH_ACCEPTED: "@selftest/auth" },
+});
+
+check(
+  "a package this run's publish accepted does not open an alert issue",
+  propagating.creations.length === 0,
+  `filing an issue for a version npm is still propagating is the exact false\n    alarm this ticket removes. Calls:\n    ${propagating.calls
+    .map((c) => `${c.method} ${c.path}`)
+    .join("\n    ")}`,
+);
+check(
+  "and it does not post the failing commit status either",
+  propagating.of("POST", "/statuses/").length === 0,
+  `Calls:\n    ${propagating.calls.map((c) => `${c.method} ${c.path}`).join("\n    ")}`,
 );
 
 // ── The no-credential case keeps its own remedy ─────────────────────────────

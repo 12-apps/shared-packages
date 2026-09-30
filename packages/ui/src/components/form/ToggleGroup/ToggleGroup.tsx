@@ -6,15 +6,19 @@ import type { Theme } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
 import type { ToggleGroupProps } from './ToggleGroup.types';
+import { asFieldSize, FIELD_BORDER_WIDTH, fieldHeight } from '../../../tokens/field-height';
+import { fieldRadius } from '../../../tokens/field-radius';
+import { controlNeutral } from '../../../tokens/ink';
+import { rem, remPx, rems } from '../../../tokens/relative';
+import { cssLengthToPx } from '../../../tokens/css-units';
+
+/** The glass frame's padding (4px at the design scale); its border is the field hairline. */
+const glassPadding = (theme: Theme): string => rem(theme, 4);
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
-    return {
-      main: theme.palette.grey[700],
-      dark: theme.palette.grey[800],
-      light: theme.palette.grey[500],
-      contrastText: theme.palette.getContrastText(theme.palette.grey[700]),
-    };
+    const neutral = controlNeutral(theme);
+    return { ...neutral, contrastText: theme.palette.getContrastText(neutral.main) };
   }
 
   const colorMap = {
@@ -37,25 +41,35 @@ const getColorFromTheme = (theme: Theme, color: string) => {
   };
 };
 
+/** The glass frame's radius: the field radius plus its padding, the buttons' margin and its border. */
+const glassFrameRadius = (theme: Theme): number =>
+  fieldRadius(theme) + remPx(theme, 4) + cssLengthToPx(theme.spacing(0.5), 4) + FIELD_BORDER_WIDTH;
+
 const StyledToggleGroup = styled(ToggleButtonGroup, {
   shouldForwardProp: (prop) => !['customColor', 'customSize', 'glass'].includes(prop as string),
 })<{
   customColor?: string;
   customSize?: string;
   glass?: boolean;
-}>(({ theme, glass }) => ({
-  backgroundColor: glass ? alpha(theme.palette.background.paper, 0.1) : 'transparent',
-  backdropFilter: glass ? 'blur(20px)' : 'none',
-  borderRadius: theme.spacing(1),
-  padding: glass ? 4 : 0,
-  border: glass ? `1px solid ${alpha(theme.palette.divider, 0.2)}` : 'none',
+}>(({ theme, glass }) => {
+  // Each button is the field, so it takes the field radius. The glass frame
+  // around them is inset by its padding, the buttons' margin and its border,
+  // and rounds by that much more so the two corners stay concentric.
+  const radius = fieldRadius(theme);
+  return {
+    backgroundColor: glass ? alpha(theme.palette.background.paper, 0.1) : 'transparent',
+    backdropFilter: glass ? `blur(${rem(theme, 20)})` : 'none',
+    borderRadius: glass ? glassFrameRadius(theme) : radius,
+    padding: glass ? glassPadding(theme) : 0,
+    border: glass ? `${FIELD_BORDER_WIDTH}px solid ${alpha(theme.palette.divider, 0.2)}` : 'none',
 
-  '& .MuiToggleButtonGroup-grouped': {
-    margin: theme.spacing(0.5),
-    border: 0,
-    borderRadius: `${theme.shape.borderRadius}px !important`,
-  },
-}));
+    '& .MuiToggleButtonGroup-grouped': {
+      margin: theme.spacing(0.5),
+      border: 0,
+      borderRadius: `${radius}px !important`,
+    },
+  };
+});
 
 export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
   (
@@ -77,11 +91,11 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
     const colorPalette = getColorFromTheme(theme, color);
 
     const sizeMap = {
-      xs: { padding: '4px 8px', fontSize: '0.75rem' },
-      sm: { padding: '6px 12px', fontSize: '0.875rem' },
-      md: { padding: '8px 16px', fontSize: '1rem' },
-      lg: { padding: '10px 20px', fontSize: '1.125rem' },
-      xl: { padding: '12px 24px', fontSize: '1.25rem' },
+      xs: { padding: rems(theme, 4, 8), fontSize: rem(theme, 12) },
+      sm: { padding: rems(theme, 6, 12), fontSize: rem(theme, 14) },
+      md: { padding: rems(theme, 8, 16), fontSize: rem(theme, 16) },
+      lg: { padding: rems(theme, 10, 20), fontSize: rem(theme, 18) },
+      xl: { padding: rems(theme, 12, 24), fontSize: rem(theme, 20) },
     };
 
     return (
@@ -107,6 +121,10 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
               fontWeight: 500,
               transition: 'all 0.3s ease',
               ...sizeMap[size as keyof typeof sizeMap],
+              // The theme's field height for the size; the label centres in it.
+              minHeight: (theme) => fieldHeight(theme, asFieldSize(size)),
+              paddingTop: 0,
+              paddingBottom: 0,
 
               '&.Mui-selected': {
                 backgroundColor: colorPalette.main,

@@ -22,7 +22,9 @@ export interface ColumnConfig {
   label: string;
   sortable?: boolean;
   filterable?: boolean;
+  /** A number is design px, scaled with the theme's type scale; a string is used as given. */
   width?: number | string;
+  /** Design px, scaled with the theme's type scale. */
   minWidth?: number;
   priority?: number; // 1 = highest priority, higher numbers = lower priority
   align?: 'left' | 'center' | 'right';
@@ -116,7 +118,10 @@ export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   // Advanced Features
   
   /**
-   * The density of the table rows
+   * The density of the table rows. Defaults to `'normal'` — NOT the host
+   * theme's density: a theme density still scales row height, but only once,
+   * through `rem()` (`resolveTableDensity`, FUT-2886). Pass this explicitly
+   * for a deliberate, per-table density on top of that.
    */
   density?: TableDensity;
   
@@ -191,7 +196,8 @@ export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   virtualScrolling?: boolean;
   
   /**
-   * Height of each row for virtual scrolling (required if virtualScrolling is true)
+   * Height of each row for virtual scrolling (default 52) — design px, scaled
+   * with the theme's type scale.
    */
   rowHeight?: number;
   
@@ -226,7 +232,11 @@ export interface TableProps extends Omit<MuiTableProps, 'variant'> {
   showColumnToggle?: boolean;
   
   /**
-   * Container height for virtual scrolling
+   * The scroller's height — with or without `virtualScrolling` (FUT-2677).
+   * The 400 default applies only when `virtualScrolling` is on and this is
+   * unset; without it, no `containerHeight` means no height at all. A number
+   * is design px, scaled with the theme's type scale; a string is used as
+   * given.
    */
   containerHeight?: number | string;
   
@@ -299,6 +309,25 @@ export interface TableHeaderProps {
   onSelectAll?: (selected: boolean) => void;
   density?: TableDensity;
   stickyHeader?: boolean;
+  /** The `<thead>`, so the virtual window can subtract its height from the scroller's offset. */
+  headRef?: React.Ref<globalThis.HTMLTableSectionElement>;
+}
+
+/**
+ * The rows a virtualised body mounts. Computed by `useVirtualScrolling` in the
+ * table, which owns the one scroll container, and handed down to the body.
+ *
+ * The mounted rows stay in the table's flow, between two spacer rows standing
+ * in for the rows above and below the window (FUT-2668).
+ */
+export interface VirtualWindow {
+  startIndex: number;
+  endIndex: number;
+  items: Record<string, unknown>[];
+  /** The rows above the window — `startIndex × rowHeight` — in design px. */
+  offsetY: number;
+  /** The rows below the window — `(total − endIndex) × rowHeight` — in design px. */
+  trailingPx: number;
 }
 
 export interface TableBodyProps {
@@ -315,10 +344,9 @@ export interface TableBodyProps {
   hoverable?: boolean;
   renderRow?: (rowData: Record<string, unknown>, index: number, isSelected: boolean) => React.ReactNode;
   renderCell?: (value: unknown, column: ColumnConfig, rowData: Record<string, unknown>, rowIndex: number) => React.ReactNode;
-  virtualScrolling?: boolean;
-  containerHeight?: number;
+  /** Set only when the body is virtualised: the rows in view and where they sit. */
+  virtualWindow?: VirtualWindow;
   rowHeight?: number;
-  overscan?: number;
 }
 
 export interface VirtualTableBodyProps extends TableBodyProps {

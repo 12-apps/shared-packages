@@ -25,6 +25,7 @@
 import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
@@ -38,9 +39,6 @@ import { DateRangeFields } from './DateRangePickerFields';
 import { DateRangeQuickList } from './DateRangePickerQuickList';
 
 const CALENDAR_CLASS = 'date-range-picker__calendar';
-
-/** Below this the picker is a phone layout. MUI's own `md`, written out. */
-const NARROW_QUERY = '(max-width:899.95px)';
 
 const ROOT_SX: SxProps<Theme> = {
   display: 'inline-flex',
@@ -119,13 +117,17 @@ type Picker = ReturnType<typeof useDateRangePicker>;
  * A media query rather than an `sx` breakpoint: this decides what to RENDER,
  * and CSS cannot un-render a second month.
  *
- * The query is a LITERAL, not `theme.breakpoints.down('md')`. The callback form
- * reads the theme from context and throws on a null one, so a consumer that
- * mounts this outside a `ThemeProvider` would crash — which the unit tests here
- * do, and which is a fair thing for a consumer to do.
+ * Below the theme's `md` the picker is a phone layout — the same breakpoint the
+ * `sx` blocks here switch on. The query is a STRING built from `useTheme()`,
+ * not `useMediaQuery`'s callback form: the callback reads the theme from
+ * context and throws on a null one, so a consumer that mounts this outside a
+ * `ThemeProvider` would crash — which the unit tests here do, and which is a
+ * fair thing for a consumer to do. `useTheme()` falls back to MUI's default
+ * theme there, whose `md` is the `(max-width:899.95px)` this used to spell out.
  */
 function useMonthCount(requested: number | undefined): number | undefined {
-  const narrow = useMediaQuery(NARROW_QUERY);
+  const theme = useTheme();
+  const narrow = useMediaQuery(theme.breakpoints.down('md'));
   return narrow ? 1 : requested;
 }
 

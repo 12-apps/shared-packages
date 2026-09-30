@@ -33,8 +33,10 @@
  */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import { distTagArgs } from './lib/dist-tag.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -101,18 +103,96 @@ const packageDirs = readFileSync(join(ROOT, 'release-packages.txt'), 'utf8')
 
 // ── The configs agree with each other ───────────────────────────────────────
 //
-// Every package's config is byte-identical by construction. That is not tidiness:
-// a release runs per package, so a parserOpts that reached 31 of them would give
-// one package different semantics from its siblings — and the difference would
-// surface as a package that mysteriously never cuts a major.
-const texts = new Set(
-  packageDirs.map((dir) => readFileSync(join(ROOT, dir, '.releaserc.json'), 'utf8')),
+// Every package releases by the same RULES. That is not tidiness: a release runs
+// per package, so a parserOpts that reached 31 of them would give one package
+// different semantics from its siblings — and the difference would surface as a
+// package that mysteriously never cuts a major.
+//
+// The rules are everything but `branches`. `branches` says WHERE a package may
+// release, not how its commits are read, and it is the one key that must be
+// able to differ: a semantic-release maintenance branch
+// (`release/<pkg>-<major>.<minor>.x`) is opted into by the one package whose old
+// line needs a fix, and every sibling logs "not configured" on it and cuts
+// nothing. Giving every package that entry instead would declare 37 lines that
+// do not exist, each ready to publish under another package's dist-tag.
+//
+// So the divergence is allowed in exactly one shape, and that shape is checked
+// as strictly as the rules are: `main` first, then only maintenance branches
+// named after the package's OWN directory, whose `range` is the line and whose
+// `channel` is the dist-tag scripts/publish.mjs will publish that branch under.
+// A branch publish.mjs would refuse, or would tag under a different name from
+// the channel semantic-release records, fails here instead of in CD.
+
+/** Why one maintenance entry is out of shape for the package in `dir`, or null. */
+function maintenanceProblem(dir, entry) {
+  const shown = JSON.stringify(entry);
+  const keys = entry !== null && typeof entry === 'object' ? Object.keys(entry).sort() : [];
+  if (keys.join() !== 'channel,name,range') {
+    return `${dir}: ${shown} is not a {name, range, channel} maintenance branch`;
+  }
+  let tag;
+  try {
+    tag = distTagArgs(entry.name)[1];
+  } catch (error) {
+    return `${dir}: ${shown}: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  const line = `${basename(dir)}-${entry.range}`;
+  if (/^\d+\.\d+\.x$/.test(entry.range) && tag === line && entry.channel === line) return null;
+  return (
+    `${dir}: ${shown} must be { name: "release/${line}", range: "<major>.<minor>.x", ` +
+    `channel: "${line}" } — its own line, published on dist-tag "${tag}"`
+  );
+}
+
+/** Every way one package's `branches` departs from `main` + its own maintenance lines. */
+function branchProblems(dir, branches) {
+  if (!Array.isArray(branches) || branches[0] !== 'main') {
+    return [`${dir}: \`branches\` must start with "main", got ${JSON.stringify(branches)}`];
+  }
+  return branches
+    .slice(1)
+    .map((entry) => maintenanceProblem(dir, entry))
+    .filter((problem) => problem !== null);
+}
+
+/** Distinct rule sets across packages, and every out-of-shape `branches`. */
+function releaseConfigProblems(configs) {
+  const rules = new Set(configs.map(({ cfg }) => JSON.stringify({ ...cfg, branches: undefined })));
+  const problems = configs.flatMap(({ dir, cfg }) => branchProblems(dir, cfg.branches));
+  return { ruleSets: rules.size, problems };
+}
+
+const committed = packageDirs.map((dir) => ({ dir, cfg: config(join(dir, '.releaserc.json')) }));
+const verdict = releaseConfigProblems(committed);
+check(
+  'every package releases by the same rules',
+  verdict.ruleSets === 1,
+  `${verdict.ruleSets} distinct rule sets across ${packageDirs.length} packages — a release runs\n    ` +
+    `per package, so one that differs releases by different rules than its siblings.`,
 );
 check(
-  'every package release config is identical',
-  texts.size === 1,
-  `${texts.size} distinct configs across ${packageDirs.length} packages — a release runs\n    ` +
-    `per package, so one that differs releases by different rules than its siblings.`,
+  'every package releases from main, plus only maintenance lines of its own',
+  verdict.problems.length === 0,
+  verdict.problems.join('\n    '),
+);
+
+// The allowance above must not blind the check it relaxes. Both mutations are
+// applied to a copy of the committed configs, and each must still be caught.
+const [first, ...rest] = committed;
+const drifted = structuredClone(first);
+pluginOptions(drifted.cfg, '@semantic-release/commit-analyzer').releaseRules = [];
+check(
+  'a package whose rules differ is still caught',
+  releaseConfigProblems([drifted, ...rest]).ruleSets === 2,
+  "dropping one package's releaseRules went unnoticed — the `branches` allowance hides rule drift",
+);
+const foreign = structuredClone(first);
+const sibling = `${basename(rest[0].dir)}-1.0.x`;
+foreign.cfg.branches = ['main', { name: `release/${sibling}`, range: '1.0.x', channel: sibling }];
+check(
+  "a maintenance line of another package's is refused",
+  branchProblems(foreign.dir, foreign.cfg.branches).length === 1,
+  `${first.dir} declaring ${sibling} went unnoticed — it would publish on another package's dist-tag`,
 );
 
 // ── Both plugins parse alike ────────────────────────────────────────────────

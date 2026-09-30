@@ -6,14 +6,13 @@ import { alpha, styled } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { BlockquoteProps } from './Blockquote.types';
+import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
 
 const getColorFromTheme = (theme: Theme, color: string) => {
   if (color === 'neutral') {
-    return {
-      main: theme.palette.grey?.[700] || '#616161',
-      light: theme.palette.grey?.[500] || '#9e9e9e',
-      dark: theme.palette.grey?.[800] || '#424242',
-    };
+    const { main, light, dark } = controlNeutral(theme);
+    return { main, light, dark };
   }
 
   const colorMap: Record<string, typeof theme.palette.primary> = {
@@ -41,7 +40,7 @@ const StyledBlockquote = styled('blockquote', {
     padding: 0,
     position: 'relative' as const,
     fontFamily: theme.typography.body1.fontFamily,
-    fontSize: '1.125rem',
+    fontSize: rem(theme, 18),
     lineHeight: 1.6,
     fontStyle: 'italic',
     color: theme.palette.text.primary,
@@ -52,22 +51,22 @@ const StyledBlockquote = styled('blockquote', {
     return {
       ...baseStyles,
       padding: theme.spacing(3),
-      border: `2px solid ${alpha(colorPalette.main, 0.2)}`,
+      border: `${rem(theme, 2)} solid ${alpha(colorPalette.main, 0.2)}`,
       borderRadius: theme.shape.borderRadius * 2,
       backgroundColor: alpha(colorPalette.main, 0.03),
       '&::before': {
         content: '""',
         position: 'absolute',
-        top: -1,
-        left: -1,
-        right: -1,
-        bottom: -1,
+        top: rem(theme, -1),
+        left: rem(theme, -1),
+        right: rem(theme, -1),
+        bottom: rem(theme, -1),
         background: `linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.light})`,
         borderRadius: theme.shape.borderRadius * 2,
-        padding: '2px',
-        WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+        padding: rem(theme, 2),
+        WebkitMask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
         WebkitMaskComposite: 'exclude',
-        mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+        mask: `linear-gradient(${absoluteInk(theme).white} 0 0) content-box, linear-gradient(${absoluteInk(theme).white} 0 0)`,
         maskComposite: 'exclude',
       },
     };
@@ -80,8 +79,8 @@ const StyledBlockquote = styled('blockquote', {
       backgroundColor:
         theme.palette.mode === 'dark'
           ? alpha(theme.palette.background.paper, 0.8)
-          : alpha(theme.palette.grey[50], 0.95),
-      backdropFilter: theme.palette.mode === 'dark' ? 'blur(10px)' : 'none',
+          : alpha(neutralTones(theme).canvas, 0.95),
+      backdropFilter: theme.palette.mode === 'dark' ? `blur(${rem(theme, 10)})` : 'none',
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
       borderRadius: theme.shape.borderRadius * 2,
       boxShadow: theme.palette.mode === 'dark' ? theme.shadows[4] : 'none',
@@ -93,7 +92,7 @@ const StyledBlockquote = styled('blockquote', {
   return {
     ...baseStyles,
     paddingLeft: theme.spacing(3),
-    borderLeft: `4px solid ${colorPalette.main}`,
+    borderLeft: `${rem(theme, 4)} solid ${colorPalette.main}`,
     backgroundColor: alpha(colorPalette.main, 0.05),
     padding: theme.spacing(2, 3),
     borderRadius: theme.shape.borderRadius,
@@ -107,7 +106,7 @@ const QuoteIcon = styled(FormatQuote)<{ customColor: string }>(({ theme, customC
     position: 'absolute',
     top: theme.spacing(1),
     left: theme.spacing(1),
-    fontSize: '2rem',
+    fontSize: rem(theme, 32),
     opacity: 0.3,
     transform: 'rotate(180deg)',
     color: colorPalette.main,
@@ -123,12 +122,12 @@ const CitationContainer = styled(Box)(({ theme }) => ({
 
 const AuthorName = styled(Typography)(({ theme }) => ({
   fontWeight: 600,
-  fontSize: '0.875rem',
+  fontSize: rem(theme, 14),
   marginBottom: theme.spacing(0.5),
 }));
 
-const SourceName = styled(Typography)(() => ({
-  fontSize: '0.75rem',
+const SourceName = styled(Typography)(({ theme }) => ({
+  fontSize: rem(theme, 12),
   opacity: 0.7,
 }));
 

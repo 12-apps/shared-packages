@@ -348,6 +348,10 @@ export const Integration: Story = {
     await expect(panel.getByText('8h — 22h')).toBeInTheDocument();
     await expect(panel.getByText(/Venda Nova/u)).toBeInTheDocument();
 
+    // The dialog's paper is the panel, named by the details' own id as the
+    // sheet is — its paper props add to the Dialog's rather than replace them.
+    await expect(panel.getByTestId('app-header-details')).toHaveClass('MuiDialog-paper');
+
     // And the way out is a single full-width action.
     await expect(panel.getByRole('button', { name: 'Trocar de loja' })).toBeInTheDocument();
   },

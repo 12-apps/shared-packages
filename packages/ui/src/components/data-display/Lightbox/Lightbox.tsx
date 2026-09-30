@@ -1,6 +1,7 @@
 import Dialog from '@mui/material/Dialog/index.js';
 import Fade from '@mui/material/Fade/index.js';
 import Typography from '@mui/material/Typography/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { makeTestId } from './Lightbox.constants';
@@ -12,16 +13,30 @@ import { LightboxOverlay } from './LightboxOverlay';
 import { LightboxStage } from './LightboxStage';
 import { LightboxThumbnails } from './LightboxThumbnails';
 import { useLightbox } from './useLightbox';
+import { scrim } from '../../../tokens/ink';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const DIALOG_STATIC_PROPS = {
   maxWidth: false,
   fullScreen: true,
   TransitionComponent: Fade,
   TransitionProps: { timeout: 300 },
-  PaperProps: { sx: { background: 'rgba(0, 0, 0, 0.9)', backdropFilter: 'blur(2px)' } },
-  'aria-label': 'Lightbox',
+  PaperProps: { sx: { background: (theme: Theme) => scrim(theme, 0.9), backdropFilter: (theme: Theme) => `blur(${rem(theme, 2)})` } },
+  // `aria-labelledby` is the one accessible name for the modal itself: MUI
+  // forwards it (with `aria-modal` and its own `role="dialog"`) onto the
+  // Paper, the element that is actually the WAI-ARIA dialog. A plain
+  // `aria-label` alongside it would land on the OUTER root instead — a
+  // second, non-modal `role="dialog"` this component sets of its own accord
+  // — duplicating (and, as a static English literal, contradicting) the name
+  // the Paper already carries.
+  //
+  // For the same reason, `role` is deliberately NOT set here (FUT-2861):
+  // `Dialog` destructures `aria-labelledby` and `aria-modal` by name and
+  // applies them to the Paper alongside its own hard-coded `role="dialog"`,
+  // but `role` itself is not one of the props it destructures — a `role`
+  // passed here falls into `...other` and lands a second, unlabelled
+  // `role="dialog"` on the outer Modal root instead of the Paper.
   'aria-labelledby': 'lightbox-title',
-  role: 'dialog',
   'aria-modal': 'true',
 } as const;
 
@@ -47,8 +62,8 @@ export const Lightbox = React.forwardRef<LightboxRef, LightboxProps>((componentP
       data-testid={dataTestId || 'lightbox'}
     >
       {/* Visually hidden title for screen readers */}
-      <Typography id="lightbox-title" variant="h6" sx={{ position: 'absolute', left: -10000 }}>
-        Lightbox - {currentItem?.alt || `Item ${currentIndex + 1} of ${items.length}`}
+      <Typography id="lightbox-title" variant="h6" sx={{ position: 'absolute', left: sxRem(-10000) }}>
+        {props.copy.dialogLabel} - {currentItem?.alt || props.copy.itemPosition(currentIndex + 1, items.length)}
       </Typography>
 
       <LightboxOverlay

@@ -1,0 +1,21 @@
+{
+  // The STORY half of the package, type-checked in a lane of its own
+  // (FUT-2699). `tsconfig.json`'s own `exclude` drops every `*.stories.tsx`,
+  // and that file is the only project `check-types` reads — so Storybook's
+  // esbuild is the only thing that ever looked at a story, and esbuild strips
+  // types without checking them. This project reads exactly what the other
+  // one skips.
+  //
+  // Kept separate rather than folded into `tsconfig.json` on purpose: this
+  // package's `build` compiles `tsconfig.json` for `dist/types` (`build:types`
+  // in package.json), and a story does not ship — pulling it into that program
+  // would fail the BUILD on a story's type error, not just a quality gate.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["src/**/*.stories.tsx"],
+  "exclude": ["node_modules", "dist", "**/*.native.ts", "**/*.native.tsx", "**/*.native.test.ts", "**/*.native.test.tsx"]
+}

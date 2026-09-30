@@ -10,6 +10,7 @@ import { LabelBody } from './Label.parts';
 import { labelStyles, sizeStyles, SR_ONLY_SX, textColor } from './Label.styles';
 import type { LabelStyleFlags } from './Label.styles';
 import type { LabelProps } from './Label.types';
+import { rem } from '../../../tokens/relative';
 
 const DEFAULTS = {
   required: false,
@@ -105,7 +106,7 @@ export const Label = forwardRef<globalThis.HTMLLabelElement, LabelProps>((props,
             display: 'block',
             color: error ? theme.palette.error.main : theme.palette.text.secondary,
             marginTop: theme.spacing(0.5),
-            fontSize: '0.75rem',
+            fontSize: rem(theme, 12),
           }}
         >
           {helperText}

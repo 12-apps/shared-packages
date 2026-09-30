@@ -6,12 +6,15 @@ import Typography from '@mui/material/Typography/index.js';
 import type { FC } from 'react';
 import React from 'react';
 
+import { sxRem } from '../../../tokens/relative';
+
 import { getMonthName } from './Calendar.dates';
 import type { CalendarProps, MonthMatrix } from './Calendar.types';
 import type { DayCellContext } from './CalendarDayCell';
 import { CalendarDayCell } from './CalendarDayCell';
 
-const SPACER_WIDTH = 32;
+/** The nav spacer's width and the weekday row's height, 32 design px through the type scale. */
+const SPACER_WIDTH = sxRem(32);
 
 const GRID_SX = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 } as const;
 
@@ -66,7 +69,7 @@ const WeekdayHeader: FC<{ weekdayNames: string[] }> = ({ weekdayNames }) => (
           alignItems: 'center',
           justifyContent: 'center',
           height: SPACER_WIDTH,
-          fontSize: '0.875rem',
+          fontSize: sxRem(14),
           fontWeight: 'bold',
           color: 'text.secondary',
         }}
@@ -109,7 +112,7 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
        January's 5th and February's. Without a per-month hook a test can only
        reach a day positionally, which is exactly what the flakiness gate
        refuses. Additive: `calendar-grid` below is unchanged. */
-    <Box sx={{ minWidth: 280 }} data-testid={`calendar-month-${monthIndex}`}>
+    <Box sx={{ minWidth: sxRem(280) }} data-testid={`calendar-month-${monthIndex}`}>
       <MonthNavHeader
         title={title}
         showPrevious={monthIndex === 0}

@@ -10,12 +10,15 @@ import Fade from '@mui/material/Fade/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
+import { alpha, keyframes, styled, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { TimelineItem, TimelineProps } from './Timeline.types';
+import { onMedia, uiInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
-const slideInAnimation = keyframes`from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); }`;
+const slideInAnimation = (theme: Theme) =>
+  keyframes`from { opacity: 0; transform: translateX(${rem(theme, -20)}); } to { opacity: 1; transform: translateX(0); }`;
 const pulseAnimation = keyframes`0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; }`;
 
 const TimelineItemContainer = styled(Box, {
@@ -30,7 +33,7 @@ const TimelineItemContainer = styled(Box, {
   gap: theme.spacing(2),
   position: 'relative',
   ...(animated && {
-    animation: `${slideInAnimation} 0.5s ease ${index * 0.1}s both`,
+    animation: `${slideInAnimation(theme)} 0.5s ease ${index * 0.1}s both`,
   }),
   ...(orientation === 'vertical' &&
     alternating && {
@@ -40,7 +43,7 @@ const TimelineItemContainer = styled(Box, {
   ...(orientation === 'horizontal' && {
     flexDirection: 'column',
     alignItems: 'center',
-    minWidth: 280,
+    minWidth: rem(theme, 280),
   }),
 }));
 
@@ -54,24 +57,24 @@ const TimelineConnector = styled(Box, {
   background: `linear-gradient(180deg, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.3)} 100%)`,
   ...(orientation === 'vertical'
     ? {
-        width: 2,
-        height: isLast ? 0 : 'calc(100% + 16px)',
-        left: 19,
-        top: 40,
+        width: rem(theme, 2),
+        height: isLast ? 0 : `calc(100% + ${rem(theme, 16)})`,
+        left: rem(theme, 19),
+        top: rem(theme, 40),
       }
     : {
-        height: 2,
-        width: isLast ? 0 : '240px',
-        top: 19,
-        left: 40,
+        height: rem(theme, 2),
+        width: isLast ? 0 : rem(theme, 240),
+        top: rem(theme, 19),
+        left: rem(theme, 40),
       }),
 }));
 
 const TimelineDot = styled(Box, {
   shouldForwardProp: (prop) => !['dotColor', 'hasIcon', 'animated'].includes(prop as string),
 })<{ dotColor?: string; hasIcon: boolean; animated: boolean }>(({ theme, dotColor, hasIcon, animated }) => ({
-  width: 40,
-  height: 40,
+  width: rem(theme, 40),
+  height: rem(theme, 40),
   borderRadius: '50%',
   display: 'flex',
   alignItems: 'center',
@@ -79,15 +82,15 @@ const TimelineDot = styled(Box, {
   background: dotColor
     ? `linear-gradient(135deg, ${dotColor} 0%, ${alpha(dotColor, 0.8)} 100%)`
     : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-  boxShadow: `0 4px 12px ${alpha(dotColor || theme.palette.primary.main, 0.3)}`,
-  border: `2px solid ${theme.palette.background.paper}`,
+  boxShadow: `${rems(theme, 0, 4, 12)} ${alpha(dotColor || theme.palette.primary.main, 0.3)}`,
+  border: `${rem(theme, 2)} solid ${theme.palette.background.paper}`,
   zIndex: 1,
   flexShrink: 0,
   ...(animated && {
     animation: `${pulseAnimation} 2s ease infinite`,
   }),
   '& svg': {
-    fontSize: hasIcon ? '1.2rem' : '0.8rem',
+    fontSize: rem(theme, hasIcon ? 19.2 : 12.8),
     color: theme.palette.background.paper,
   },
 }));
@@ -98,14 +101,14 @@ const TimelineCard = styled(Card, {
   ({ theme, timelineVariant, isClickable }) => ({
     flex: 1,
     background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.8)} 100%)`,
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
+    backdropFilter: `blur(${rem(theme, 10)})`,
+    WebkitBackdropFilter: `blur(${rem(theme, 10)})`,
     border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
     transition: theme.transitions.create(['transform', 'box-shadow']),
     ...(isClickable && {
       cursor: 'pointer',
       '&:hover': {
-        transform: 'translateY(-2px)',
+        transform: `translateY(${rem(theme, -2)})`,
         boxShadow: theme.shadows[8],
       },
     }),
@@ -123,15 +126,15 @@ const TimelineCard = styled(Card, {
 
 const TimelineTimestamp = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.secondary,
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 500,
-  letterSpacing: '0.5px',
+  letterSpacing: rem(theme, 0.5),
   textTransform: 'uppercase',
 }));
 
 const MetadataChip = styled(Chip)(({ theme }) => ({
-  height: 24,
-  fontSize: '0.75rem',
+  height: rem(theme, 24),
+  fontSize: rem(theme, 12),
   background: alpha(theme.palette.primary.main, 0.08),
   border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
 }));
@@ -172,10 +175,10 @@ const TimelineDetails: React.FC<{
                   e.stopPropagation();
                   item.action!.onClick();
                 }}
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                }}
+                sx={(theme) => ({
+                  background: `linear-gradient(135deg, ${uiInk(theme).celebration.violet[0]} 0%, ${uiInk(theme).celebration.violet[1]} 100%)`,
+                  color: onMedia(theme),
+                })}
               >
                 {item.action.label}
               </Button>

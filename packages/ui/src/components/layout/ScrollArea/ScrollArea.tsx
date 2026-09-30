@@ -4,11 +4,15 @@ import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Fab from '@mui/material/Fab/index.js';
 import Zoom from '@mui/material/Zoom/index.js';
 import { alpha, useTheme } from '@mui/material/styles/index.js';
+import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { rem, remPx, sxRem } from '../../../tokens/relative';
+
 import type { ResolvedScrollAreaProps } from './ScrollArea.helpers';
 import { resolveScrollAreaProps } from './ScrollArea.helpers';
+import { sizeCss } from './ScrollArea.styles';
 import type { ScrollAreaProps } from './ScrollArea.types';
 import { ScrollAreaContent } from './ScrollAreaContent';
 import { ScrollViewport } from './ScrollViewport';
@@ -101,6 +105,7 @@ const useScrollArea = (
     scrollToTopThreshold,
     smoothScroll } = props;
 
+  const theme = useTheme();
   const { scrollRef, setScrollRef, containerDimensions } = useObservedScrollRef({
     externalScrollRef,
     onResize });
@@ -117,12 +122,13 @@ const useScrollArea = (
       noteScroll();
 
       if (scrollToTopButton && scrollRef.current) {
-        setShowScrollToTop(scrollRef.current.scrollTop > scrollToTopThreshold);
+        // 100 design px unless the caller says, in the px `scrollTop` is measured in.
+        setShowScrollToTop(scrollRef.current.scrollTop > remPx(theme, scrollToTopThreshold ?? 100));
       }
 
       onScroll?.(event);
     },
-    [disabled, noteScroll, scrollToTopButton, scrollToTopThreshold, onScroll, scrollRef],
+    [disabled, noteScroll, scrollToTopButton, scrollToTopThreshold, onScroll, scrollRef, theme],
   );
 
   const scrollToTop = useCallback(() => {
@@ -175,13 +181,13 @@ const ScrollToTopFab: FC<{
         onClick={onClick}
         sx={{
           position: 'absolute',
-          bottom: 16,
-          right: 16,
+          bottom: sxRem(16),
+          right: sxRem(16),
           zIndex: 1,
           backgroundColor: glass
             ? alpha(theme.palette.primary.main, 0.2)
             : theme.palette.primary.main,
-          backdropFilter: glass ? 'blur(10px)' : 'none',
+          backdropFilter: glass ? `blur(${rem(theme, 10)})` : 'none',
           '&:hover': {
             backgroundColor: glass
               ? alpha(theme.palette.primary.main, 0.3)
@@ -193,16 +199,33 @@ const ScrollToTopFab: FC<{
   );
 };
 
+/** The outer box: its size props through the type scale, then the caller's `sx`. */
+function outerBoxSx(
+  theme: Theme,
+  size: Pick<ScrollAreaProps, 'width' | 'height' | 'maxHeight' | 'maxWidth'>,
+  sx: ScrollAreaProps['sx'],
+): SxProps<Theme> {
+  return {
+    position: 'relative',
+    width: sizeCss(theme, size.width),
+    height: sizeCss(theme, size.height),
+    maxHeight: sizeCss(theme, size.maxHeight),
+    maxWidth: sizeCss(theme, size.maxWidth),
+    ...sx,
+  } as SxProps<Theme>;
+}
+
 export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
+  const theme = useTheme();
   const resolved = resolveScrollAreaProps(componentProps);
   const {
     regionLabel,
     scrollToTopLabel,
     children,
-    width,
-    height,
-    maxHeight,
-    maxWidth,
+    width: _width,
+    height: _height,
+    maxHeight: _maxHeight,
+    maxWidth: _maxWidth,
     orientation: _orientation,
     scrollbarSize: _scrollbarSize,
     autoHide,
@@ -226,14 +249,8 @@ export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
     ...props
   } = resolved;
 
-  const {
-    scrollRef,
-    setScrollRef,
-    isScrolling,
-    showScrollToTop,
-    containerDimensions,
-    handleScroll,
-    scrollToTop } = useScrollArea({ ...resolved, externalScrollRef });
+  const { scrollRef, setScrollRef, isScrolling, showScrollToTop, containerDimensions, handleScroll, scrollToTop } =
+    useScrollArea({ ...resolved, externalScrollRef });
 
   // Auto-hide keeps the scrollbar out of the way until the user is scrolling.
   const shouldShowScrollbar = alwaysShowScrollbar || !autoHide || isScrolling;
@@ -241,7 +258,7 @@ export const ScrollArea: React.FC<ScrollAreaProps> = (componentProps) => {
   return (
     <Box
       data-testid={testId}
-      sx={{ position: 'relative', width, height, maxHeight, maxWidth, ...sx }}
+      sx={outerBoxSx(theme, resolved, sx)}
       {...props}
     >
       <ScrollViewport

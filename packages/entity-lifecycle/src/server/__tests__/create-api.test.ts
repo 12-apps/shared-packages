@@ -2,13 +2,14 @@
    nothing here is shared between tests: every `api`/`rows` binding is a fresh
    `buildApi()` created INSIDE its own `it`, backed by a fresh in-memory db.
    The rule flags the names, not an actual cross-test dependency. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EN_US_LIFECYCLE_MESSAGES } from '../en-US';
 import { PT_BR_LIFECYCLE_MESSAGES } from '../pt-BR';
 
 import type { EntityOps, Snapshot } from '../../types';
 import { createApiEntityLifecycle } from '../create-api-entity-lifecycle';
 import type { LifecycleActor, LifecycleRoute } from '../context';
+import type { LifecycleDb } from '../db';
 import type { LifecycleEntityRegistration } from '../registration';
 
 import { createMemoryLifecycleDb } from './memory-db';
@@ -58,12 +59,23 @@ function memoryEntityOps(): { ops: EntityOps; rows: Map<string, Snapshot & { _ar
   return { ops, rows };
 }
 
-function buildApi(registrations?: Partial<LifecycleEntityRegistration>[]) {
-  const db = createMemoryLifecycleDb();
+interface BuildOptions {
+  onApprovalsChanged?: (tenantId: string) => void;
+  /** Rewrap the in-memory db, e.g. to lose a decide race on purpose. */
+  wrapDb?: (db: LifecycleDb) => LifecycleDb;
+}
+
+function buildApi(
+  registrations?: Partial<LifecycleEntityRegistration>[],
+  options: BuildOptions = {},
+) {
+  const memory = createMemoryLifecycleDb();
+  const db = options.wrapDb ? options.wrapDb(memory) : memory;
   const { ops, rows } = memoryEntityOps();
   const api = createApiEntityLifecycle({
     messages: PT_BR_LIFECYCLE_MESSAGES,
     db: async () => db,
+    ...(options.onApprovalsChanged ? { onApprovalsChanged: options.onApprovalsChanged } : {}),
     entities: (registrations ?? [{}]).map((overrides, index) => ({
       entityType: overrides.entityType ?? (index === 0 ? 'product' : `type-${index}`),
       slug: overrides.slug ?? (index === 0 ? 'products' : `type-${index}s`),
@@ -651,6 +663,168 @@ describe('approvals', () => {
       requestId: supplierRequest.requestId,
     });
     expect(rejectDenied.status).toBe(403);
+  });
+});
+
+/**
+ * `onApprovalsChanged` (FUT-2520): the host hears about every committed change
+ * to a tenant's queue, once, whichever path wrote it — and about nothing else.
+ * The listener is decorated onto the shared approval store, so the generated
+ * routes and the host's own `entity(type).lifecycle` writes are both covered.
+ */
+describe('onApprovalsChanged', () => {
+  /**
+   * A db whose compare-and-set always matches no row, as when a concurrent
+   * decider got there between the route's read and the claim. The read still
+   * answers PENDING, so the loss happens INSIDE `decide`, which returns false.
+   */
+  const losingDecides = (db: LifecycleDb): LifecycleDb => ({
+    ...db,
+    changeRequest: { ...db.changeRequest, updateMany: async () => ({ count: 0 }) },
+  });
+
+  async function parkWith(api: ReturnType<typeof buildApi>['api']): Promise<string> {
+    const handle = api.entity('product');
+    const result = await handle.lifecycle.create(handle.context(editor), { name: 'Pendente' });
+    if (result.status !== 'pending-approval') throw new Error('expected a parked write');
+    return result.requestId;
+  }
+
+  it('fires once, with the tenant, for a parked write from the host handle', async () => {
+    const listener = vi.fn();
+    const { api } = buildApi(undefined, { onApprovalsChanged: listener });
+    await parkWith(api);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(TENANT);
+  });
+
+  it('fires once for a write parked by a GENERATED route (restore, 202)', async () => {
+    const listener = vi.fn();
+    const { api } = buildApi(undefined, { onApprovalsChanged: listener });
+    const handle = api.entity('product');
+    const created = await handle.lifecycle.create(handle.context(approver), { name: 'v1' });
+    if (created.status !== 'applied') throw new Error('expected applied');
+    await handle.lifecycle.update(handle.context(approver), created.entityId, { name: 'v2' });
+    expect(listener).not.toHaveBeenCalled();
+
+    const restore = routeOf(api.routes, 'POST', '/products/:id/versions/:version/restore');
+    const parked = await call(restore, editor, { id: created.entityId, version: '1' });
+    expect(parked.status).toBe(202);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(TENANT);
+  });
+
+  it('fires once for an approve and once for a reject', async () => {
+    const listener = vi.fn();
+    const { api } = buildApi(undefined, { onApprovalsChanged: listener });
+    const toApprove = await parkWith(api);
+    const toReject = await parkWith(api);
+    listener.mockClear();
+
+    const approved = await call(
+      routeOf(api.routes, 'POST', '/approvals/:requestId/approve'),
+      approver,
+      { requestId: toApprove },
+    );
+    expect(approved.status).toBe(200);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    const rejected = await call(
+      routeOf(api.routes, 'POST', '/approvals/:requestId/reject'),
+      approver,
+      { requestId: toReject },
+      { note: 'não agora' },
+    );
+    expect(rejected.status).toBe(204);
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener.mock.calls).toEqual([[TENANT], [TENANT]]);
+  });
+
+  it('fires twice for an approval whose apply fails: the claim, then the reopen', async () => {
+    const listener = vi.fn();
+    const failing: EntityOps = {
+      ...memoryEntityOps().ops,
+      applySnapshot: async () => {
+        throw new Error('apply failed');
+      },
+    };
+    const { api } = buildApi([{ ops: failing }], { onApprovalsChanged: listener });
+    const requestId = await parkWith(api);
+    listener.mockClear();
+
+    await expect(
+      call(routeOf(api.routes, 'POST', '/approvals/:requestId/approve'), approver, { requestId }),
+    ).rejects.toThrow('apply failed');
+    // decide(true) moved it to APPROVED, reopen moved it back: two harmless
+    // re-reads, and the request is PENDING (retryable) again.
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect((await api.stores.approvals?.get(TENANT, requestId))?.status).toBe('PENDING');
+  });
+
+  it('fires nothing for a decide that lost the race (409)', async () => {
+    const listener = vi.fn();
+    const { api } = buildApi(undefined, {
+      onApprovalsChanged: listener,
+      wrapDb: losingDecides,
+    });
+    const requestId = await parkWith(api);
+    listener.mockClear();
+
+    const approve = routeOf(api.routes, 'POST', '/approvals/:requestId/approve');
+    const reject = routeOf(api.routes, 'POST', '/approvals/:requestId/reject');
+    expect((await call(approve, approver, { requestId })).status).toBe(409);
+    expect((await call(reject, approver, { requestId }, {})).status).toBe(409);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('fires nothing for an applied (unintercepted) write', async () => {
+    const listener = vi.fn();
+    const { api } = buildApi(undefined, { onApprovalsChanged: listener });
+    const handle = api.entity('product');
+    const created = await handle.lifecycle.create(handle.context(approver), { name: 'Direto' });
+    if (created.status !== 'applied') throw new Error('expected applied');
+    await handle.lifecycle.update(handle.context(approver), created.entityId, { name: 'Direto 2' });
+    await handle.lifecycle.softDelete(handle.context(approver), created.entityId);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('never fails the write when the listener throws', async () => {
+    const listener = vi.fn(() => {
+      throw new Error('publisher down');
+    });
+    const { api, rows } = buildApi(undefined, { onApprovalsChanged: listener });
+    const requestId = await parkWith(api);
+
+    const approved = await call(
+      routeOf(api.routes, 'POST', '/approvals/:requestId/approve'),
+      approver,
+      { requestId },
+    );
+    expect(approved.status).toBe(200);
+    expect([...rows.values()].some((row) => row.name === 'Pendente')).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('absorbs an ASYNC listener\'s rejection instead of leaving it unhandled', async () => {
+    // A plain async function, not a `vi.fn`: the spy attaches its own handler
+    // to a returned promise, which would hide the unhandled rejection this
+    // case exists to catch (vitest fails the run on one).
+    const heard: string[] = [];
+    const listener = async (tenantId: string): Promise<void> => {
+      heard.push(tenantId);
+      throw new Error('publisher down');
+    };
+    const { api } = buildApi(undefined, { onApprovalsChanged: listener });
+    const requestId = await parkWith(api);
+
+    const rejected = await call(
+      routeOf(api.routes, 'POST', '/approvals/:requestId/reject'),
+      approver,
+      { requestId },
+      {},
+    );
+    expect(rejected.status).toBe(204);
+    expect(heard).toEqual([TENANT, TENANT]);
   });
 });
 

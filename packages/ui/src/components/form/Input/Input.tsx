@@ -1,6 +1,6 @@
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import InputAdornment from '@mui/material/InputAdornment/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { INPUT_LOADING } from './Input.metrics';
@@ -11,6 +11,7 @@ import {
   floatingLabelStyles,
   glowStyles,
   inputBaseStyles,
+  inputRadiusStyles,
   muiVariantFor,
   outlinedStyles,
   pulseStyles,
@@ -18,6 +19,9 @@ import {
 } from './Input.styles';
 import type { InputProps } from './Input.types';
 import { splitTestId } from '../../../platform/test-id';
+import { fieldControlStyles } from '../../../tokens/field-height';
+import { rem } from '../../../tokens/relative';
+import type { SizeValue } from '../../../tokens/vocabulary';
 
 /**
  * `TextFieldSlim`, not `TextField` — see `text-field-slim.tsx`. MUI's own
@@ -28,23 +32,27 @@ import { splitTestId } from '../../../platform/test-id';
  */
 const StyledTextField = styled(TextFieldSlim, {
   shouldForwardProp: (prop) =>
-    !['customVariant', 'floating', 'glow', 'pulse', 'loading'].includes(prop as string),
+    !['customVariant', 'fieldSize', 'floating', 'glow', 'pulse', 'loading'].includes(prop as string),
 })<{
   customVariant?: InputProps['variant'];
+  fieldSize: SizeValue;
   floating?: boolean;
   glow?: boolean;
   pulse?: boolean;
   loading?: boolean;
-}>(({ theme, customVariant, floating, glow, pulse, loading }) => ({
+}>(({ theme, customVariant, fieldSize, floating, glow, pulse, loading }) => ({
   position: 'relative',
+  // The theme's field height for this size (outlined family, one line).
+  ...fieldControlStyles(theme, fieldSize),
   opacity: loading ? INPUT_LOADING.opacity : 1,
 
   ...(glow ? glowStyles(theme) : {}),
-  ...(pulse ? pulseStyles(theme) : {}),
+  ...(pulse ? pulseStyles(theme, fieldSize) : {}),
   ...(floating ? floatingLabelStyles(theme) : {}),
 
   '& .MuiInputBase-root': {
     transition: 'all 0.3s ease',
+    ...inputRadiusStyles(theme, customVariant),
     ...inputBaseStyles(theme, customVariant),
   },
 
@@ -57,10 +65,11 @@ const EndAdornment: React.FC<{ loading: boolean; endAdornment?: React.ReactNode 
   loading,
   endAdornment,
 }) => {
+  const theme = useTheme();
   if (loading) {
     return (
       <InputAdornment position="end">
-        <CircularProgress size={INPUT_LOADING.spinnerSize} />
+        <CircularProgress size={rem(theme, INPUT_LOADING.spinnerSize)} />
       </InputAdornment>
     );
   }
@@ -79,6 +88,39 @@ const interactionProps = (
   disabled: loading || disabled,
   onClick: loading ? undefined : onClick,
 });
+
+/**
+ * The ARIA that describes the field has to sit on the `<input>`: the text
+ * field puts every attribute it does not recognise on its root `FormControl`,
+ * a `<div>` with no role, where a screen reader never reads it.
+ *
+ * `aria-label` has ridden `inputProps` since FUT-755. `aria-describedby` and
+ * `aria-busy` fell through to the div until FUT-2619, so CepField's input
+ * pointed at nothing while its lookup status lived in a live region beside it.
+ *
+ * `inputProps` are spread onto the `<input>` AFTER the `aria-describedby` MUI
+ * writes for helper text, so a caller's ids REPLACE the helper text's: MUI's
+ * `TextField` on its own keeps only one of the two. This joins both, helper
+ * text first. The helper id is MUI's `<id>-helper-text` (the parity test pins
+ * that spelling), which is why the field's id is fixed here rather than left
+ * to the text field.
+ */
+function inputAriaOf(a: {
+  id: string;
+  helperText: React.ReactNode;
+  label?: string;
+  describedBy?: string;
+  busy?: InputProps['aria-busy'];
+}): Record<string, unknown> {
+  const describedBy = [a.helperText ? `${a.id}-helper-text` : undefined, a.describedBy]
+    .filter(Boolean)
+    .join(' ');
+  return {
+    ...(a.label === undefined ? {} : { 'aria-label': a.label }),
+    ...(a.describedBy === undefined ? {} : { 'aria-describedby': describedBy }),
+    ...(a.busy === undefined ? {} : { 'aria-busy': a.busy }),
+  };
+}
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
@@ -99,16 +141,22 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onFocus,
       onBlur,
       'aria-label': ariaLabel,
+      'aria-describedby': ariaDescribedBy,
+      'aria-busy': ariaBusy,
+      inputProps,
       ...rest
     },
     ref,
   ) => {
     const { testId: dataTestId, rest: props } = splitTestId(rest);
+    const generatedId = React.useId();
+    const id = props.id ?? generatedId;
     return (
       <StyledTextField
         ref={ref}
         variant={muiVariantFor(variant)}
         customVariant={variant}
+        fieldSize={size}
         floating={floating}
         glow={glow}
         pulse={pulse}
@@ -127,10 +175,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
          * no accessible name, and a source grep saying "this input is labelled"
          * disagreed with the DOM. The reports search box and the block-title
          * inputs were both named in source and anonymous to a screen reader.
+         * `aria-describedby` and `aria-busy` are the same case: `inputAriaOf`.
          */
         inputProps={{
           'data-testid': dataTestId,
-          ...(ariaLabel === undefined ? {} : { 'aria-label': ariaLabel }),
+          ...inputProps,
+          ...inputAriaOf({ id, helperText, label: ariaLabel, describedBy: ariaDescribedBy, busy: ariaBusy }),
         }}
         InputProps={{
           startAdornment: startAdornment && (
@@ -140,6 +190,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         }}
         {...SIZE_MAP[size]}
         {...props}
+        id={id}
       />
     );
   },

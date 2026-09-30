@@ -2,11 +2,14 @@ import Alert from '@mui/material/Alert/index.js';
 import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import InputAdornment from '@mui/material/InputAdornment/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type { FC, ReactNode } from 'react';
 import React from 'react';
 
 import type { AddressAutocompleteProps } from './AddressAutocomplete.types';
 import { AddressTextField } from './AddressTextField';
+
+import { rem } from '../../../tokens/relative';
 
 export interface AddressFallbackFieldProps {
   copy: AddressAutocompleteProps['copy'];
@@ -31,6 +34,7 @@ export const AddressFallbackField: FC<AddressFallbackFieldProps> = ({
   fullWidth,
   mapsError,
 }) => {
+  const theme = useTheme();
   const startAdornment = icon ? <InputAdornment position="start">{icon}</InputAdornment> : undefined;
 
   if (!mapsError) {
@@ -43,7 +47,7 @@ export const AddressFallbackField: FC<AddressFallbackFieldProps> = ({
         fullWidth={fullWidth}
         InputProps={{
           startAdornment,
-          endAdornment: <CircularProgress color="inherit" size={20} />,
+          endAdornment: <CircularProgress color="inherit" size={rem(theme, 20)} />,
         }}
       />
     );

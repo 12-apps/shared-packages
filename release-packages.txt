@@ -30,6 +30,9 @@ packages/thermal-printing
 # and arithmetic. Same reasoning as the two above — a reader scanning for "what
 # needs nothing first" should meet it here.
 packages/qr
+# `@12-apps/desktop-shell` has no runtime dependency on anything here, so its
+# position is free; it sits beside the other leaves.
+packages/desktop-shell
 packages/feature-flags
 packages/request-scope
 packages/observability-backend

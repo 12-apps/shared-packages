@@ -337,6 +337,31 @@ sync, no migration to replay, and no `prisma:sync-*:check` for this package.
   bright lime comes back as a deeper lime, because one tone has to serve both text
   and background; `palette.primary.light` keeps their exact hex for decoration.
   Your own tokens are design decisions already made and are painted as given.
+- **`density` alone applies nothing — pass `densityTheme` too.** `createAppTheme`
+  refers to the density IMPLEMENTATION only by TYPE, so a host that never sets a
+  density never has `density.ts` or the `density-overrides*` modules in its
+  bundle. Import the implementation yourself and pass both:
+  ```ts
+  import { densityThemeOptions } from '@12-apps/ui/tokens';
+
+  createAppTheme('light', { density: 'compact', densityTheme: densityThemeOptions });
+  ```
+  `density` with no `densityTheme` builds the no-density theme and
+  `console.warn`s once, in development, naming the missing option — it does not
+  throw, and it does not reach for the implementation on its own.
+- **`theme.density` changes how `theme.components` merges hosts' overrides.**
+  With no `density`, `theme: { components }` REPLACES a whole MUI component
+  entry — your `MuiChip` entirely displaces the factory's, slot and all. With a
+  `density`, the same key merges by SLOT instead (`@12-apps/ui`'s
+  `mergeMuiComponents`): your `MuiChip.styleOverrides.label` sits beside
+  density's own `root`/`sizeSmall`/`labelSmall` rather than erasing them, and
+  `defaultProps`/`variants` merge too (shallow-merged, concatenated). Passing
+  a `density` therefore changes what an EXISTING `components` entry does, not
+  only what density itself draws — read `AppThemeOptions.density`'s own
+  docblock before combining the two.
+- **An explicit `fieldHeight` always wins over `density`.** `theme.fieldHeight`
+  and the `MuiOutlinedInput`/`MuiInputLabel` overrides both follow whichever
+  height you state, never the one your density level would have picked.
 - **Tell the theme what your page's background actually is** — and prefer
   `background` over `surface` for it. `theme: { background: { light: { default:
   '#FDF8F2', paper: '#FFFFFF' } } }` both PAINTS the page and becomes the hex the

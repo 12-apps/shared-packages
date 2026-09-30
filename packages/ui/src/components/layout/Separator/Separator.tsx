@@ -3,7 +3,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import { separatorMargin, separatorStyles } from './Separator.styles';
+import { labelledSeparatorLayout, separatorBlockMargin, separatorStyles } from './Separator.styles';
 import type { SeparatorProps } from './Separator.types';
 
 export const Separator: React.FC<SeparatorProps> = ({
@@ -18,10 +18,15 @@ export const Separator: React.FC<SeparatorProps> = ({
   'data-testid': dataTestId,
 }) => {
   const theme = useTheme();
-  const styles = separatorStyles(theme, { variant, orientation, size, color, margin, length });
+  const isHorizontal = orientation === 'horizontal';
+  const blockMargin = separatorBlockMargin(theme, size, margin, isHorizontal);
+  const styles = separatorStyles(theme, { variant, orientation, size, color, blockMargin, length });
 
   if (children) {
-    const isHorizontal = orientation === 'horizontal';
+    // The rules either side of the label sit INSIDE the row, which carries the
+    // margin; their own would add it a second time.
+    const layout = labelledSeparatorLayout(theme, isHorizontal, length);
+    const ruleStyles = { ...styles, margin: 0, ...layout.rule };
 
     return (
       <Box
@@ -30,15 +35,22 @@ export const Separator: React.FC<SeparatorProps> = ({
         // silently dropped it, so a LABELLED separator was the one variant no
         // test could address except through its own words.
         data-testid={dataTestId}
+        // The same semantics as the plain branch, on the group, as MUI's
+        // `Divider` does with children (FUT-2674). Without them a screen reader
+        // heard the label with nothing marking a boundary. The label stays
+        // inside, and the separator takes no name from it.
+        role="separator"
+        aria-orientation={orientation}
         sx={{
           display: 'flex',
           alignItems: 'center',
-          margin: separatorMargin(size, margin),
+          margin: blockMargin,
           flexDirection: isHorizontal ? 'row' : 'column',
           gap: theme.spacing(2),
+          ...layout.group,
         }}
       >
-        <Box sx={styles} />
+        <Box sx={ruleStyles} />
         {/*
           No background behind the label. The two rules and the words are a FLEX
           ROW — the rules stop where the label starts — so there is nothing for a
@@ -53,7 +65,7 @@ export const Separator: React.FC<SeparatorProps> = ({
         >
           {children}
         </Typography>
-        <Box sx={styles} />
+        <Box sx={ruleStyles} />
       </Box>
     );
   }

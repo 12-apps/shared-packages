@@ -27,6 +27,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { AnimatedIcon } from './AnimatedIcon';
+import type { AnimationVariant } from './AnimatedIcon.types';
 import { SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof AnimatedIcon> = {
@@ -497,7 +498,7 @@ export const CombinedEffects: Story = {
 export const InteractiveDemo: Story = {
   args: {},
   render: () => {
-    const [selectedVariant, setSelectedVariant] = React.useState<string>('spin');
+    const [selectedVariant, setSelectedVariant] = React.useState<AnimationVariant>('spin');
     const [effects, setEffects] = React.useState({
       glow: false,
       glass: false,
@@ -542,7 +543,9 @@ export const InteractiveDemo: Story = {
             Animation Variant
           </Typography>
           <Grid container spacing={1}>
-            {['spin', 'pulse', 'bounce', 'float', 'heartbeat', 'wobble', 'neonFlicker'].map(
+            {(
+              ['spin', 'pulse', 'bounce', 'float', 'heartbeat', 'wobble', 'neonFlicker'] as const
+            ).map(
               (variant) => (
                 <Grid item key={variant}>
                   <Chip
@@ -816,15 +819,17 @@ export const InteractiveStates: Story = {
         <Grid container spacing={3}>
           <Grid item xs={12} sm={6} md={4}>
             <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <AnimatedIcon
-                variant={isHovered ? 'pulse' : 'none'}
-                size="lg"
+              {/* `AnimatedIcon` forwards no `onMouseEnter`/`onMouseLeave` — hover is read from a
+                  wrapping element instead. */}
+              <Box
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                style={{ cursor: 'pointer' }}
+                sx={{ display: 'inline-block', cursor: 'pointer' }}
               >
-                <Home />
-              </AnimatedIcon>
+                <AnimatedIcon variant={isHovered ? 'pulse' : 'none'} size="lg">
+                  <Home />
+                </AnimatedIcon>
+              </Box>
               <Typography variant="subtitle2" sx={{ mt: 2 }}>
                 Hover to Activate
               </Typography>

@@ -4,6 +4,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Slider } from './Slider';
 import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
@@ -89,8 +91,10 @@ export const BasicInteraction: Story = {
       expect(slider).toHaveAttribute('aria-valuemax', '100');
       expect(slider).toHaveAttribute('aria-valuenow', '50');
 
-      // Verify slider is focusable
-      await userEvent.click(slider);
+      // Verify slider is focusable. A click on the thumb would also drag it
+      // to the pointer's position, so focus it directly instead.
+      // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+      slider.focus();
       await waitFor(() => expect(slider).toHaveFocus());
 
       // Verify slider ARIA label or accessible name
@@ -186,8 +190,8 @@ export const FormInteraction: Story = {
       const sliders = canvas.getAllByRole('slider');
       expect(sliders).toHaveLength(2);
 
-      const volumeSlider = sliders[0]; // First slider is Volume
-      const brightnessSlider = sliders[1]; // Second slider is Brightness
+      const volumeSlider = must(sliders[0]); // First slider is Volume
+      const brightnessSlider = must(sliders[1]); // Second slider is Brightness
 
       expect(volumeSlider).toBeInTheDocument();
       expect(brightnessSlider).toBeInTheDocument();
@@ -275,7 +279,10 @@ export const KeyboardNavigation: Story = {
       const slider = sliders[0] as HTMLElement; // First slider is the single-slider
       expect(slider).toBeInTheDocument();
 
-      await userEvent.click(slider);
+      // A click on the thumb would drag it to the pointer's position (x=0
+      // here), so focus it directly to test keyboard access, not dragging.
+      // eslint-disable-next-line test-flakiness/no-focus-check -- clicking would perform the action under test
+      slider.focus();
       await waitFor(() => expect(slider).toHaveFocus());
 
       // Verify keyboard accessibility attributes are present
@@ -407,7 +414,10 @@ export const FocusManagement: Story = {
       const toggleButton = canvas.getByTestId('toggle-button');
       const afterButton = canvas.getByTestId('after-button');
 
-      await userEvent.click(toggleButton);
+      // Focus the button without activating it — a click here would toggle
+      // showSlider off and unmount the slider this step is about to tab to.
+      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- clicking would perform the action under test
+      toggleButton.focus();
       await waitFor(() => expect(toggleButton).toHaveFocus());
 
       await userEvent.tab();
@@ -467,15 +477,15 @@ export const ResponsiveDesign: Story = {
   ),
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' }, type: 'mobile' },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' }, type: 'tablet' },
         desktop: { name: 'Desktop', styles: { width: '1200px', height: '800px' }, type: 'desktop' },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: { viewports: [375, 768, 1200], delay: 300 },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 

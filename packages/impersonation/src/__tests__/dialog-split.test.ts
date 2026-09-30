@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { createPreviewWebImpersonation } from '../react/create-preview-web-impersonation';
 import { createWebImpersonation } from '../react/create-web-impersonation';
 import type { ImpersonationLabels } from '../react/labels';
 
@@ -84,6 +85,31 @@ describe('the start dialog is loaded, not bundled with the banner', () => {
 
     expect(dialogImports(source).filter((s) => !s.startsWith('import type'))).toEqual([]);
     expect(source).toContain("import('./dialog')");
+  });
+
+  it('is not named at all by the banner-only factory, nor by what it builds on', () => {
+    // A dynamic import is still an edge: the bundler emits the chunk, and
+    // splits whatever it shares with the eager path. The preview factory's
+    // graph must stop at the banner, so no form of `./dialog` or
+    // `./dialog-lazy` may appear in either module.
+    for (const file of ['create-preview-web-impersonation.ts', 'web-impersonation-base.ts']) {
+      expect(read(file)).not.toMatch(/['"]\.\/dialog(?:-lazy)?['"]/);
+      for (const statement of read(file).matchAll(/^import(?! type)[^;]*?from '([^']+)';$/gm)) {
+        expect(statement[1]).not.toBe('./create-web-impersonation');
+      }
+    }
+  });
+
+  it('gives a banner-only host no dialog from the preview factory', () => {
+    const surface = createPreviewWebImpersonation({
+      platformPath: '/desk/session',
+      tenantPath: (slug) => `/branches/${slug}/desk`,
+      labels: LABELS,
+    });
+
+    expect(surface.dialog).toBeNull();
+    expect(typeof surface.banner).toBe('function');
+    expect(typeof surface.startPreview).toBe('function');
   });
 
   it('is still absent from the object a banner-only host gets back', () => {

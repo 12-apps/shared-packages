@@ -16,7 +16,15 @@ import React, { useState } from 'react';
 
 import { Command } from './Command';
 import type { CommandItem,CommandProps } from './Command.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
+import type { ColorValue } from '../../../tokens/scales';
+
+// MUI's own `Button.color` never adopted this package's colour vocabulary —
+// it has no `danger` or `neutral`, only `error` and `inherit`. The demo
+// trigger button below is a plain MUI `Button`, so it needs the translation
+// `Command` itself (which DOES take `ColorValue`) does not.
+const muiButtonColor = (color: ColorValue): 'primary' | 'secondary' | 'success' | 'warning' | 'info' | 'error' | 'inherit' =>
+  color === 'danger' ? 'error' : color === 'neutral' ? 'inherit' : color;
 
 const meta: Meta<typeof Command> = {
   title: 'Navigation/Command',
@@ -289,7 +297,7 @@ const ColorsComponent = () => {
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
       {colors.map((color) => (
         <React.Fragment key={color}>
-          <Button variant="contained" color={color} onClick={() => setOpenColor(color)}>
+          <Button variant="contained" color={muiButtonColor(color)} onClick={() => setOpenColor(color)}>
             {color}
           </Button>
           <Command

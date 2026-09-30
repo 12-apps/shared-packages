@@ -79,7 +79,7 @@ const VariantsComponent = () => {
           showValue
           unit="°C"
           value={values.default}
-          onChange={(e, newValue) => setValues((prev) => ({ ...prev, default: newValue }))}
+          onChange={(e, newValue) => setValues((prev) => ({ ...prev, default: newValue as number }))}
         />
       </Box>
 
@@ -93,7 +93,7 @@ const VariantsComponent = () => {
           showValue
           unit="$"
           value={values.range}
-          onChange={(e, newValue) => setValues((prev) => ({ ...prev, range: newValue }))}
+          onChange={(e, newValue) => setValues((prev) => ({ ...prev, range: newValue as number[] }))}
         />
       </Box>
 
@@ -107,7 +107,7 @@ const VariantsComponent = () => {
           showValue
           customMarks={marks}
           value={values.marks}
-          onChange={(e, newValue) => setValues((prev) => ({ ...prev, marks: newValue }))}
+          onChange={(e, newValue) => setValues((prev) => ({ ...prev, marks: newValue as number }))}
         />
       </Box>
 
@@ -123,7 +123,7 @@ const VariantsComponent = () => {
           unit="%"
           color="secondary"
           value={values.gradient}
-          onChange={(e, newValue) => setValues((prev) => ({ ...prev, gradient: newValue }))}
+          onChange={(e, newValue) => setValues((prev) => ({ ...prev, gradient: newValue as number }))}
         />
       </Box>
     </Box>
@@ -147,7 +147,7 @@ const ColorsComponent = () => {
             showValue
             unit="%"
             value={value}
-            onChange={(e, newValue) => setValue(newValue)}
+            onChange={(e, newValue) => setValue(newValue as number)}
           />
         </Box>
       ))}
@@ -172,7 +172,7 @@ const SizesComponent = () => {
             showValue
             unit="%"
             value={value}
-            onChange={(e, newValue) => setValue(newValue)}
+            onChange={(e, newValue) => setValue(newValue as number)}
           />
         </Box>
       ))}
@@ -203,7 +203,7 @@ const SpecialEffectsComponent = () => {
           showValue
           unit="%"
           value={values.glass}
-          onChange={(e, newValue) => setValues((prev) => ({ ...prev, glass: newValue }))}
+          onChange={(e, newValue) => setValues((prev) => ({ ...prev, glass: newValue as number }))}
         />
       </Box>
 
@@ -218,7 +218,7 @@ const SpecialEffectsComponent = () => {
           showValue
           unit="%"
           value={values.gradient}
-          onChange={(e, newValue) => setValues((prev) => ({ ...prev, gradient: newValue }))}
+          onChange={(e, newValue) => setValues((prev) => ({ ...prev, gradient: newValue as number }))}
         />
       </Box>
 
@@ -233,7 +233,7 @@ const SpecialEffectsComponent = () => {
           showValue
           unit="%"
           value={values.glow}
-          onChange={(e, newValue) => setValues((prev) => ({ ...prev, glow: newValue }))}
+          onChange={(e, newValue) => setValues((prev) => ({ ...prev, glow: newValue as number }))}
         />
       </Box>
     </Box>
@@ -284,7 +284,7 @@ const AllStatesComponent = () => {
           showValue
           unit="%"
           value={value}
-          onChange={(e, newValue) => setValue(newValue)}
+          onChange={(e, newValue) => setValue(newValue as number)}
         />
       </Box>
 
@@ -304,7 +304,7 @@ const AllStatesComponent = () => {
           showValue
           unit="%"
           value={value}
-          onChange={(e, newValue) => setValue(newValue)}
+          onChange={(e, newValue) => setValue(newValue as number)}
           autoFocus
         />
       </Box>
@@ -331,7 +331,7 @@ const InteractiveStatesComponent = () => {
           showValue
           unit="%"
           value={value}
-          onChange={(e, newValue) => setValue(newValue)}
+          onChange={(e, newValue) => setValue(newValue as number)}
         />
       </Box>
 
@@ -344,7 +344,7 @@ const InteractiveStatesComponent = () => {
           showValue
           unit="%"
           value={hoverValue}
-          onChange={(e, newValue) => setHoverValue(newValue)}
+          onChange={(e, newValue) => setHoverValue(newValue as number)}
           glow
         />
       </Box>
@@ -383,7 +383,7 @@ const ResponsiveComponent = () => {
           showValue
           unit="%"
           value={value}
-          onChange={(e, newValue) => setValue(newValue)}
+          onChange={(e, newValue) => setValue(newValue as number)}
           size="sm"
           sx={{ display: { xs: 'block', md: 'none' } }}
         />
@@ -392,7 +392,7 @@ const ResponsiveComponent = () => {
           showValue
           unit="%"
           value={value}
-          onChange={(e, newValue) => setValue(newValue)}
+          onChange={(e, newValue) => setValue(newValue as number)}
           size="lg"
           sx={{ display: { xs: 'none', md: 'block' } }}
         />
@@ -407,7 +407,7 @@ const ResponsiveComponent = () => {
           showValue
           unit="%"
           value={value}
-          onChange={(e, newValue) => setValue(newValue)}
+          onChange={(e, newValue) => setValue(newValue as number)}
           size="md"
         />
       </Box>

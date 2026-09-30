@@ -7,6 +7,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { StackedModalActions, StackedModalContent, ModalStackProvider, StackedModal } from './StackedModal';
 
 const meta: Meta<typeof StackedModal> = {
@@ -104,6 +106,7 @@ export const StackingBehavior: Story = {
     return (
       <TestWrapper>
         <StackedModal
+          backLabel="Voltar"
           open={firstOpen}
           onClose={() => setFirstOpen(false)}
           navigationTitle="First Modal"
@@ -119,6 +122,7 @@ export const StackingBehavior: Story = {
         </StackedModal>
 
         <StackedModal
+          backLabel="Voltar"
           open={secondOpen}
           onClose={() => setSecondOpen(false)}
           navigationTitle="Second Modal"
@@ -251,7 +255,7 @@ export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -268,13 +272,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   args: {
     open: true,
     onClose: fn(),
@@ -545,6 +549,7 @@ export const VisualStates: Story = {
       <Stack spacing={4}>
         {/* Normal state */}
         <StackedModal
+          backLabel="Voltar"
           open={true}
           onClose={fn()}
           navigationTitle="Normal State"
@@ -558,6 +563,7 @@ export const VisualStates: Story = {
 
         {/* Glass effect state */}
         <StackedModal
+          backLabel="Voltar"
           open={true}
           onClose={fn()}
           glass={true}
@@ -614,6 +620,7 @@ export const Performance: Story = {
       <TestWrapper>
         {modals.map((modal) => (
           <StackedModal
+            backLabel="Voltar"
             key={modal.id}
             open={modal.open}
             onClose={fn()}
@@ -659,6 +666,7 @@ export const EdgeCases: Story = {
       <Stack spacing={2}>
         {/* Modal with no content */}
         <StackedModal
+          backLabel="Voltar"
           open={true}
           onClose={fn()}
           navigationTitle="Empty Modal"
@@ -670,6 +678,7 @@ export const EdgeCases: Story = {
 
         {/* Modal with very long title */}
         <StackedModal
+          backLabel="Voltar"
           open={true}
           onClose={fn()}
           navigationTitle="This is a very long modal title that should be truncated with ellipsis when it exceeds the available space"
@@ -701,7 +710,7 @@ export const EdgeCases: Story = {
 
     await step('Long title truncation', async () => {
       const titleElements = screen.getAllByText(/This is a very long modal title/);
-      const titleElement = titleElements[0];
+      const titleElement = must(titleElements[0]);
       await expect(titleElement).toBeInTheDocument();
 
       // Check if title has proper text truncation styles
@@ -716,6 +725,7 @@ export const Integration: Story = {
   render: () => (
     <TestWrapper>
       <StackedModal
+        backLabel="Voltar"
         open={true}
         onClose={fn()}
         navigationTitle="Integration Test"
@@ -906,6 +916,7 @@ export const TestIdsWithStacking: Story = {
     return (
       <TestWrapper>
         <StackedModal
+          backLabel="Voltar"
           open={firstOpen}
           onClose={() => setFirstOpen(false)}
           navigationTitle="First Modal"
@@ -921,6 +932,7 @@ export const TestIdsWithStacking: Story = {
         </StackedModal>
 
         <StackedModal
+          backLabel="Voltar"
           open={secondOpen}
           onClose={() => setSecondOpen(false)}
           navigationTitle="Second Modal"

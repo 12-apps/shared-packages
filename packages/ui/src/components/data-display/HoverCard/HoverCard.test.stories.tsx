@@ -1,11 +1,17 @@
 import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
+import FormControl from '@mui/material/FormControl/index.js';
+import InputLabel from '@mui/material/InputLabel/index.js';
+import MenuItem from '@mui/material/MenuItem/index.js';
+import Popover from '@mui/material/Popover/index.js';
+import Select from '@mui/material/Select/index.js';
+import Snackbar from '@mui/material/Snackbar/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { HoverCard } from './HoverCard';
 
@@ -97,6 +103,7 @@ export const ControlledState: Story = {
           Toggle HoverCard (Controlled)
         </Button>
         <HoverCard
+          loadingText="Carregando…"
           title="Controlled HoverCard"
           description="This is controlled externally"
           onOpen={() => {
@@ -342,6 +349,7 @@ export const ResponsiveDesign: Story = {
     <Box sx={{ p: 2 }}>
       <Stack spacing={2}>
         <HoverCard
+          loadingText="Carregando…"
           title="Responsive HoverCard"
           description="This adapts to different screen sizes"
           maxWidth={300}
@@ -394,6 +402,7 @@ export const ThemeVariations: Story = {
       <Stack direction="row" spacing={4}>
         <ThemeProvider theme={lightTheme}>
           <HoverCard
+            loadingText="Carregando…"
             title="Light Theme"
             description="Card in light mode"
             variant="default"
@@ -408,6 +417,7 @@ export const ThemeVariations: Story = {
         <ThemeProvider theme={darkTheme}>
           <Box sx={{ bgcolor: 'grey.900', p: 2, borderRadius: 1 }}>
             <HoverCard
+              loadingText="Carregando…"
               title="Dark Theme"
               description="Card in dark mode"
               variant="default"
@@ -473,6 +483,7 @@ export const VisualStates: Story = {
   render: () => (
     <Stack direction="row" spacing={3} alignItems="center">
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         title="Default State"
         description="Standard appearance"
@@ -484,6 +495,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="glass"
         title="Glass Effect"
         description="Glassmorphism style"
@@ -495,6 +507,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         glow={true}
         title="Glow Effect"
@@ -507,6 +520,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         pulse={true}
         title="Pulse Effect"
@@ -519,6 +533,7 @@ export const VisualStates: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         variant="default"
         disabled={true}
         title="Disabled"
@@ -625,6 +640,7 @@ export const Performance: Story = {
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
         {items.map((item) => (
           <HoverCard
+            loadingText="Carregando…"
             key={item.id}
             title={item.title}
             description={item.description}
@@ -690,6 +706,7 @@ export const EdgeCases: Story = {
   render: () => (
     <Stack spacing={3}>
       <HoverCard
+        loadingText="Carregando…"
         title="Very Long Title That Should Wrap Properly in the HoverCard Component"
         description="This is an extremely long description that tests how the hover card handles text overflow and wrapping. It should display properly without breaking the layout or causing any visual issues in the component."
         maxWidth={250}
@@ -700,15 +717,16 @@ export const EdgeCases: Story = {
         <Button data-testid="long-content">Long Content</Button>
       </HoverCard>
 
-      <HoverCard title="" description="" enterDelay={100} onOpen={fn()} onClose={fn()}>
+      <HoverCard title="" description="" loadingText="Carregando…" enterDelay={100} onOpen={fn()} onClose={fn()}>
         <Button data-testid="empty-content">Empty Content</Button>
       </HoverCard>
 
-      <HoverCard loading={true} enterDelay={100} onOpen={fn()} onClose={fn()}>
+      <HoverCard loading={true} loadingText="Carregando…" enterDelay={100} onOpen={fn()} onClose={fn()}>
         <Button data-testid="loading-state">Loading State</Button>
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         title="With Custom Loading"
         loading={true}
         loadingComponent={<Typography>Custom Loading...</Typography>}
@@ -720,6 +738,7 @@ export const EdgeCases: Story = {
       </HoverCard>
 
       <HoverCard
+        loadingText="Carregando…"
         title="Touch Enabled"
         description="Works on touch devices"
         touchEnabled={true}
@@ -812,6 +831,7 @@ export const Integration: Story = {
   render: () => (
     <Stack spacing={3}>
       <HoverCard
+        loadingText="Carregando…"
         variant="detailed"
         title="User Profile"
         description="Senior Developer"
@@ -823,7 +843,7 @@ export const Integration: Story = {
         </Button>
       </HoverCard>
 
-      <HoverCard title="Card with Actions" enterDelay={100}>
+      <HoverCard title="Card with Actions" loadingText="Carregando…" enterDelay={100}>
         <Button data-testid="with-actions">Hover for Actions</Button>
         <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
           <Button size="small" variant="contained">
@@ -837,6 +857,7 @@ export const Integration: Story = {
 
       <Box sx={{ position: 'relative' }}>
         <HoverCard
+          loadingText="Carregando…"
           title="Positioned Element"
           description="Testing with different positions"
           placement="right"
@@ -849,7 +870,7 @@ export const Integration: Story = {
         </HoverCard>
       </Box>
 
-      <HoverCard variant="glass" title="Different Animations" animation="scale" enterDelay={100}>
+      <HoverCard variant="glass" title="Different Animations" loadingText="Carregando…" animation="scale" enterDelay={100}>
         <Button data-testid="with-animation">Scale Animation</Button>
       </HoverCard>
     </Stack>
@@ -929,5 +950,374 @@ export const Integration: Story = {
 
       await userEvent.unhover(trigger);
     });
+  },
+};
+
+// Test 12: A press inside a nested portal (a MUI Select's own menu) does not
+// close the card, but a press truly outside it — even with that menu still
+// open — does (FUT-2776).
+export const NestedPortalClickAway: Story = {
+  render: () => (
+    <Stack spacing={2} alignItems="flex-start">
+      <HoverCard
+        title="Preferências"
+        description="Escolha uma opção"
+        loadingText="Carregando…"
+        enterDelay={100}
+        exitDelay={0}
+        trigger={<Button>Abrir cartão</Button>}
+      >
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel id="nested-portal-select-label">Opção</InputLabel>
+          <Select
+            labelId="nested-portal-select-label"
+            label="Opção"
+            defaultValue=""
+            data-testid="nested-portal-select"
+          >
+            <MenuItem value="a">Opção A</MenuItem>
+            <MenuItem value="b">Opção B</MenuItem>
+          </Select>
+        </FormControl>
+      </HoverCard>
+      <Button data-testid="nested-portal-outside">Fora do cartão</Button>
+    </Stack>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await step('Open the card by hovering its trigger', async () => {
+      // `HoverCard.tsx` clones its `trigger` prop with the DEFAULT testid
+      // ('hover-card-trigger'), overriding whatever the caller sets — see
+      // `triggerProps` — so this queries that default, not a custom one.
+      const trigger = await canvas.findByTestId('hover-card-trigger');
+      await userEvent.hover(trigger);
+
+      await waitFor(
+        () => {
+          expect(body.getByText('Preferências')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step("Open the nested Select — its menu portals to document.body", async () => {
+      const combobox = body.getByRole('combobox', { name: /Opção/i });
+      await userEvent.click(combobox);
+
+      await waitFor(
+        () => {
+          expect(body.getByRole('listbox')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step('Picking an option inside that nested portal keeps the card open', async () => {
+      const option = body.getByRole('option', { name: 'Opção B' });
+      // A targeted dispatch, not `userEvent.click`: user-event also computes
+      // a realistic hover transition between the previous and the new
+      // target, and since the trigger sits right above the card in this
+      // layout, that transition's own mouseenter can re-open the card on its
+      // own — masking exactly the bug this step exists to catch. A plain
+      // `pointerdown` (matching `useClickAway`'s own listener) plus `click`
+      // (the option's own selection) isolates the ONE press under test.
+      fireEvent.pointerDown(option);
+      fireEvent.click(option);
+
+      // The Select closes its OWN menu on selection — that still works —
+      // but the card behind it (the thing under test) must not have closed.
+      await waitFor(
+        () => {
+          expect(body.queryByRole('listbox')).not.toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+
+      expect(body.getByText('Preferências')).toBeInTheDocument();
+      expect(body.getByRole('combobox', { name: /Opção/i })).toHaveTextContent('Opção B');
+    });
+
+    await step(
+      'A press truly outside the card and its nested portal still closes both, with the nested portal still open',
+      async () => {
+        const combobox = body.getByRole('combobox', { name: /Opção/i });
+        await userEvent.click(combobox);
+        await waitFor(
+          () => {
+            expect(body.getByRole('listbox')).toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+
+        const outside = await canvas.findByTestId('nested-portal-outside');
+        fireEvent.pointerDown(outside);
+        fireEvent.click(outside);
+
+        await waitFor(
+          () => {
+            expect(body.queryByText('Preferências')).not.toBeInTheDocument();
+            expect(body.queryByRole('listbox')).not.toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
+  },
+};
+
+// Test 13: An UNRELATED portal — not anything the card's own content renders
+// — that mounts to `document.body` only AFTER the card is already open must
+// NOT be treated as inside it: a press inside it closes the card like any
+// other outside press (FUT-2776 adversarial-review fix). The old
+// `MutationObserver` approach tracked body membership by TIMING, so a
+// Snackbar, a dev overlay or another component's Popover mounting at the
+// same time stopped closing the card too — this pins that it no longer does.
+export const UnrelatedPortalClickAway: Story = {
+  render: function UnrelatedPortalClickAwayRender() {
+    const [snackbarOpen, setSnackbarOpen] = React.useState(false);
+
+    return (
+      <Stack spacing={2} alignItems="flex-start">
+        <HoverCard
+          title="Preferências"
+          description="Escolha uma opção"
+          loadingText="Carregando…"
+          enterDelay={100}
+          exitDelay={0}
+          trigger={<Button>Abrir cartão</Button>}
+        >
+          <Typography>Conteúdo do cartão</Typography>
+        </HoverCard>
+        <Button data-testid="mount-unrelated-portal" onClick={() => setSnackbarOpen(true)}>
+          Mostrar aviso não relacionado
+        </Button>
+        <Snackbar
+          open={snackbarOpen}
+          message="Aviso não relacionado ao cartão"
+          action={
+            <Button data-testid="unrelated-portal-action" color="secondary" size="small">
+              Ação
+            </Button>
+          }
+        />
+      </Stack>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await step('Open the card by hovering its trigger', async () => {
+      const trigger = await canvas.findByTestId('hover-card-trigger');
+      await userEvent.hover(trigger);
+
+      await waitFor(
+        () => {
+          expect(body.getByText('Preferências')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step(
+      "Mount an UNRELATED portal (a Snackbar, not the card's own content) while the card is open",
+      async () => {
+        const mountButton = await canvas.findByTestId('mount-unrelated-portal');
+        await userEvent.click(mountButton);
+
+        await waitFor(
+          () => {
+            expect(body.getByTestId('unrelated-portal-action')).toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
+
+    await step('A press inside that unrelated portal still closes the card', async () => {
+      const action = body.getByTestId('unrelated-portal-action');
+      fireEvent.pointerDown(action);
+      fireEvent.click(action);
+
+      await waitFor(
+        () => {
+          expect(body.queryByText('Preferências')).not.toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+  },
+};
+
+// Test 14: A control inside the card's OWN nested portal that stops native
+// pointerdown propagation must not leave anything stale behind: the NEXT
+// press, genuinely outside the card, still closes it (FUT-2776 adversarial
+// review — real-Chromium companion to the unit test of the same name). The
+// first revision of this fix used a boolean "was the last press inside" flag
+// that was only cleared by a bubble-phase document listener; a stopped press
+// never reached that listener, so the flag stayed `true` and leaked into the
+// next, truly outside press.
+export const StoppingNestedPortalClickAway: Story = {
+  render: function StoppingNestedPortalClickAwayRender() {
+    const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
+
+    return (
+      <Stack spacing={2} alignItems="flex-start">
+        <HoverCard
+          title="Preferências"
+          description="Escolha uma opção"
+          loadingText="Carregando…"
+          enterDelay={100}
+          exitDelay={0}
+          trigger={<Button>Abrir cartão</Button>}
+        >
+          <Button
+            data-testid="open-nested-menu"
+            onClick={(event) => setMenuAnchor(event.currentTarget)}
+          >
+            Abrir menu aninhado
+          </Button>
+          <Popover open={Boolean(menuAnchor)} anchorEl={menuAnchor}>
+            <Button
+              data-testid="stops-propagation-option"
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              Opção que para a propagação
+            </Button>
+          </Popover>
+        </HoverCard>
+        <Button data-testid="stopping-nested-outside">Fora do cartão</Button>
+      </Stack>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await step('Open the card by hovering its trigger', async () => {
+      const trigger = await canvas.findByTestId('hover-card-trigger');
+      await userEvent.hover(trigger);
+
+      await waitFor(
+        () => {
+          expect(body.getByText('Preferências')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step("Open the nested menu, inside the card's own content", async () => {
+      const openMenu = body.getByTestId('open-nested-menu');
+      await userEvent.click(openMenu);
+
+      await waitFor(
+        () => {
+          expect(body.getByTestId('stops-propagation-option')).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
+    });
+
+    await step(
+      'Pressing the option that stops propagation keeps the card open — it is owned by the card',
+      async () => {
+        const option = body.getByTestId('stops-propagation-option');
+        fireEvent.pointerDown(option);
+
+        await waitFor(
+          () => {
+            expect(body.getByText('Preferências')).toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
+
+    await step(
+      'A later, genuinely outside press still closes the card: the stopped press left nothing stale behind',
+      async () => {
+        const outside = await canvas.findByTestId('stopping-nested-outside');
+        fireEvent.pointerDown(outside);
+        fireEvent.click(outside);
+
+        await waitFor(
+          () => {
+            expect(body.queryByText('Preferências')).not.toBeInTheDocument();
+          },
+          { timeout: 1000 },
+        );
+      },
+    );
+  },
+};
+
+// Test 15: TRUSTED-POINTER REGRESSION GUARD (FUT-2776, third review). A real
+// user picking an option in the card's own nested `Select` must not close
+// the card — the production bug this whole ticket is about. This story has
+// deliberately NO `play` function: `play` runs through `@testing-library`'s
+// `userEvent`/`fireEvent`, which — even inside a real browser — are
+// SCRIPT-dispatched events, indistinguishable here from jsdom. Only a
+// TRUSTED, OS-level pointer (what Playwright's `page.mouse` drives through
+// the browser's real input pipeline, via CDP) reproduces the bug: Chromium
+// runs a microtask queued by a capture-phase listener BEFORE the rest of
+// that same dispatch for trusted input, but always finishes the whole
+// dispatch first for script-dispatched input, trusted or not otherwise. An
+// earlier revision of `useClickAway` deferred with `queueMicrotask` and
+// passed every test here — including `StoppingNestedPortalClickAway` above
+// — while still closing the card on a real user's press, because every one
+// of those presses is script-dispatched. `parameters.trustedPointerRegression`
+// below is read by `.storybook/test-runner.ts`'s `postVisit` hook, which
+// drives the whole interaction with `page.mouse` instead: open the card,
+// open its nested `Select`, click an option, assert the card is STILL open,
+// then click truly outside and assert it closed. See that hook for the
+// actual assertions; this story only renders the fixture.
+export const TrustedPointerNestedSelectClickAway: Story = {
+  parameters: {
+    trustedPointerRegression: true,
+  },
+  render: function TrustedPointerNestedSelectClickAwayRender() {
+    return (
+      <Stack spacing={2} alignItems="flex-start">
+        <HoverCard
+          title="Preferências"
+          description="Escolha uma opção"
+          loadingText="Carregando…"
+          enterDelay={0}
+          exitDelay={0}
+          trigger={<Button>Abrir cartão</Button>}
+        >
+          <FormControl style={{ minWidth: 180 }}>
+            <InputLabel id="trusted-nested-select-label">Opção</InputLabel>
+            <Select
+              labelId="trusted-nested-select-label"
+              label="Opção"
+              data-testid="trusted-nested-select"
+              defaultValue=""
+            >
+              <MenuItem value="a" data-testid="trusted-nested-select-option-a">
+                Opção A
+              </MenuItem>
+              <MenuItem value="b" data-testid="trusted-nested-select-option-b">
+                Opção B
+              </MenuItem>
+            </Select>
+          </FormControl>
+        </HoverCard>
+        {/*
+          Fixed and pinned to a far corner, deliberately: a REAL `page.mouse`
+          click hit-tests at a screen coordinate, unlike `fireEvent`, which
+          targets a DOM node directly regardless of what visually sits on
+          top of it. The card's own popover can render anywhere near the
+          trigger depending on placement and viewport, so this button has to
+          be somewhere it provably never overlaps, not merely "elsewhere in
+          the layout".
+        */}
+        <Button data-testid="trusted-nested-outside" style={{ position: 'fixed', top: 16, right: 16 }}>
+          Fora do cartão
+        </Button>
+      </Stack>
+    );
   },
 };

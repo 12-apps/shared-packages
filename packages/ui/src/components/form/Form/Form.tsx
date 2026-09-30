@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box/index.js';
 import Stack from '@mui/material/Stack/index.js';
-import { styled } from '@mui/material/styles/index.js';
+import { styled, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type {
@@ -10,6 +10,7 @@ import type {
   FormMessageProps,
   FormProps,
 } from './Form.types';
+import { rem } from '../../../tokens/relative';
 
 const StyledForm = styled('form', {
   shouldForwardProp: (prop) => prop !== 'variant',
@@ -30,18 +31,14 @@ const spacingMap = {
   xl: 5,
 };
 
-const maxWidthMap = {
-  sm: '600px',
-  md: '900px',
-  lg: '1200px',
-  xl: '1536px',
-  full: '100%',
-};
+/** A form's width cap: the theme's breakpoint of that name, through the type scale; `full` is uncapped. */
+const formMaxWidth = (theme: Theme, maxWidth: NonNullable<FormProps['maxWidth']>): string =>
+  maxWidth === 'full' ? '100%' : rem(theme, theme.breakpoints.values[maxWidth]);
 
 export const Form = React.forwardRef<HTMLFormElement, FormProps>(
   ({ variant = 'vertical', maxWidth = 'full', spacing = 'md', children, dataTestId, ...props }, ref) => (
       <StyledForm ref={ref} variant={variant} role="form" data-testid={dataTestId} {...props}>
-        <Box sx={{ maxWidth: maxWidthMap[maxWidth], width: '100%' }}>
+        <Box sx={{ maxWidth: (theme) => formMaxWidth(theme, maxWidth), width: '100%' }}>
           {variant === 'inline' ? (
             children
           ) : (
@@ -99,7 +96,7 @@ const StyledFormField = styled(Box, {
   ({ theme, variant }) => ({
     display: variant === 'horizontal' ? 'grid' : 'flex',
     flexDirection: variant === 'horizontal' ? undefined : 'column',
-    gridTemplateColumns: variant === 'horizontal' ? '200px 1fr' : undefined,
+    gridTemplateColumns: variant === 'horizontal' ? `${rem(theme, 200)} 1fr` : undefined,
     columnGap: variant === 'horizontal' ? theme.spacing(1) : undefined,
     alignItems: variant === 'horizontal' ? 'center' : undefined,
   }),
@@ -130,7 +127,7 @@ export const FormField: React.FC<FormFieldProps> = ({
 const StyledFormLabel = styled('label', {
   shouldForwardProp: (prop) => prop !== 'error',
 })<{ error?: boolean }>(({ theme, error }) => ({
-  fontSize: '0.875rem',
+  fontSize: rem(theme, 14),
   fontWeight: 500,
   color: error ? theme.palette.error.main : theme.palette.text.primary,
   marginBottom: theme.spacing(0.5),
@@ -168,7 +165,7 @@ export const FormControl: React.FC<FormControlProps> = ({ fullWidth = true, chil
 const StyledFormMessage = styled('span', {
   shouldForwardProp: (prop) => prop !== 'error',
 })<{ error?: boolean }>(({ theme, error }) => ({
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   marginTop: theme.spacing(0.5),
   color: error ? theme.palette.error.main : theme.palette.text.secondary,
   display: 'block',

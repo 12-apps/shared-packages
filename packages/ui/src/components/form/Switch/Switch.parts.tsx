@@ -9,6 +9,7 @@ import { LABEL_GAP_UNITS, SWITCH_ICON_SIZES, TAP_TARGET_MIN } from './Switch.met
 import { onTrackInk, switchSx } from './Switch.styles';
 import type { SwitchFlags } from './Switch.styles';
 import type { SwitchProps } from './Switch.types';
+import { sxRem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 const StyledSwitch = styled(MuiSwitch, {
@@ -96,14 +97,14 @@ export const SwitchIcon: React.FC<SwitchIconProps> = ({
       sx={{
         position: 'absolute',
         top: '50%',
-        ...(isOn ? { left: shown ? 4 : '50%' } : { right: shown ? 4 : '50%' }),
+        ...(isOn ? { left: shown ? sxRem(4) : '50%' } : { right: shown ? sxRem(4) : '50%' }),
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         opacity: shown ? 1 : 0,
         transform: `${translate} scale(${shown && animated ? 1 : 0.8})`,
         pointerEvents: 'none',
         zIndex: 2,
         color: isOn ? onInk : 'text.secondary',
-        fontSize: SWITCH_ICON_SIZES[size as SizeValue] ?? SWITCH_ICON_SIZES.md,
+        fontSize: sxRem(SWITCH_ICON_SIZES[size as SizeValue] ?? SWITCH_ICON_SIZES.md),
       }}
     >
       {icon}
@@ -277,7 +278,7 @@ const SwitchLabel: React.FC<{
         // The floor applies to the row the label shares with the control. A
         // description already makes the row taller than 40px, so forcing it
         // there would only add blank space.
-        ...(description ? {} : { minHeight: TAP_TARGET_MIN }),
+        ...(description ? {} : { minHeight: sxRem(TAP_TARGET_MIN) }),
         // A disabled control's label toggles nothing, so it must not wear the
         // cursor that says it does.
         ...(htmlFor && !disabled ? { cursor: 'pointer' } : {}),

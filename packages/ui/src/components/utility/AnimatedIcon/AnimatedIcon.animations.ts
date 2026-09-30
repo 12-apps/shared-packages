@@ -1,4 +1,7 @@
 import { keyframes } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
+
+import { rem } from '../../../tokens/relative';
 
 export const rotateAnimation = keyframes`
   from {
@@ -24,61 +27,61 @@ export const pulseAnimation = keyframes`
   }
 `;
 
-export const translateAnimation = keyframes`
+export const translateAnimation = (theme: Theme) => keyframes`
   0% {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(${rem(theme, -8)});
   }
   100% {
     transform: translateY(0px);
   }
 `;
 
-export const glowPulseAnimation = keyframes`
+export const glowPulseAnimation = (theme: Theme) => keyframes`
   0% {
-    box-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
+    box-shadow: 0 0 ${rem(theme, 5)} currentColor, 0 0 ${rem(theme, 10)} currentColor, 0 0 ${rem(theme, 15)} currentColor;
   }
   50% {
-    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+    box-shadow: 0 0 ${rem(theme, 10)} currentColor, 0 0 ${rem(theme, 20)} currentColor, 0 0 ${rem(theme, 30)} currentColor;
   }
   100% {
-    box-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
+    box-shadow: 0 0 ${rem(theme, 5)} currentColor, 0 0 ${rem(theme, 10)} currentColor, 0 0 ${rem(theme, 15)} currentColor;
   }
 `;
 
 // New animation keyframes
-export const bounceAnimation = keyframes`
+export const bounceAnimation = (theme: Theme) => keyframes`
   0%, 20%, 50%, 80%, 100% {
     transform: translateY(0);
   }
   40% {
-    transform: translateY(-20px);
+    transform: translateY(${rem(theme, -20)});
   }
   60% {
-    transform: translateY(-10px);
+    transform: translateY(${rem(theme, -10)});
   }
 `;
 
-export const shakeAnimation = keyframes`
+export const shakeAnimation = (theme: Theme) => keyframes`
   0%, 100% {
     transform: translateX(0);
   }
   10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-4px);
+    transform: translateX(${rem(theme, -4)});
   }
   20%, 40%, 60%, 80% {
-    transform: translateX(4px);
+    transform: translateX(${rem(theme, 4)});
   }
 `;
 
-export const flipAnimation = keyframes`
+export const flipAnimation = (theme: Theme) => keyframes`
   0% {
-    transform: perspective(400px) rotateY(0);
+    transform: perspective(${rem(theme, 400)}) rotateY(0);
   }
   100% {
-    transform: perspective(400px) rotateY(360deg);
+    transform: perspective(${rem(theme, 400)}) rotateY(360deg);
   }
 `;
 
@@ -121,24 +124,24 @@ export const heartbeatAnimation = keyframes`
   }
 `;
 
-export const wobbleAnimation = keyframes`
+export const wobbleAnimation = (theme: Theme) => keyframes`
   0%, 100% {
     transform: translateX(0) rotate(0deg);
   }
   15% {
-    transform: translateX(-10px) rotate(-5deg);
+    transform: translateX(${rem(theme, -10)}) rotate(-5deg);
   }
   30% {
-    transform: translateX(8px) rotate(3deg);
+    transform: translateX(${rem(theme, 8)}) rotate(3deg);
   }
   45% {
-    transform: translateX(-6px) rotate(-3deg);
+    transform: translateX(${rem(theme, -6)}) rotate(-3deg);
   }
   60% {
-    transform: translateX(4px) rotate(2deg);
+    transform: translateX(${rem(theme, 4)}) rotate(2deg);
   }
   75% {
-    transform: translateX(-2px) rotate(-1deg);
+    transform: translateX(${rem(theme, -2)}) rotate(-1deg);
   }
 `;
 
@@ -179,15 +182,15 @@ export const swingAnimation = keyframes`
   }
 `;
 
-export const floatAnimation = keyframes`
+export const floatAnimation = (theme: Theme) => keyframes`
   0%, 100% {
     transform: translateY(0) translateX(0);
   }
   33% {
-    transform: translateY(-10px) translateX(-5px);
+    transform: translateY(${rem(theme, -10)}) translateX(${rem(theme, -5)});
   }
   66% {
-    transform: translateY(5px) translateX(5px);
+    transform: translateY(${rem(theme, 5)}) translateX(${rem(theme, 5)});
   }
 `;
 
@@ -217,46 +220,46 @@ export const rippleAnimation = keyframes`
   }
 `;
 
-export const neonFlickerAnimation = keyframes`
+export const neonFlickerAnimation = (theme: Theme) => keyframes`
   0%, 100% {
     opacity: 1;
-    filter: brightness(1) drop-shadow(0 0 10px currentColor);
+    filter: brightness(1) drop-shadow(0 0 ${rem(theme, 10)} currentColor);
   }
   10% {
     opacity: 0.8;
-    filter: brightness(0.8) drop-shadow(0 0 5px currentColor);
+    filter: brightness(0.8) drop-shadow(0 0 ${rem(theme, 5)} currentColor);
   }
   20% {
     opacity: 1;
-    filter: brightness(1.2) drop-shadow(0 0 15px currentColor);
+    filter: brightness(1.2) drop-shadow(0 0 ${rem(theme, 15)} currentColor);
   }
   30% {
     opacity: 0.9;
-    filter: brightness(0.9) drop-shadow(0 0 8px currentColor);
+    filter: brightness(0.9) drop-shadow(0 0 ${rem(theme, 8)} currentColor);
   }
   40% {
     opacity: 1;
-    filter: brightness(1.1) drop-shadow(0 0 12px currentColor);
+    filter: brightness(1.1) drop-shadow(0 0 ${rem(theme, 12)} currentColor);
   }
   50% {
     opacity: 0.95;
-    filter: brightness(1) drop-shadow(0 0 10px currentColor);
+    filter: brightness(1) drop-shadow(0 0 ${rem(theme, 10)} currentColor);
   }
   60% {
     opacity: 0.85;
-    filter: brightness(0.85) drop-shadow(0 0 6px currentColor);
+    filter: brightness(0.85) drop-shadow(0 0 ${rem(theme, 6)} currentColor);
   }
   70% {
     opacity: 1;
-    filter: brightness(1.15) drop-shadow(0 0 14px currentColor);
+    filter: brightness(1.15) drop-shadow(0 0 ${rem(theme, 14)} currentColor);
   }
   80% {
     opacity: 0.9;
-    filter: brightness(0.95) drop-shadow(0 0 9px currentColor);
+    filter: brightness(0.95) drop-shadow(0 0 ${rem(theme, 9)} currentColor);
   }
   90% {
     opacity: 1;
-    filter: brightness(1.05) drop-shadow(0 0 11px currentColor);
+    filter: brightness(1.05) drop-shadow(0 0 ${rem(theme, 11)} currentColor);
   }
 `;
 

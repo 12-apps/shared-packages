@@ -9,12 +9,15 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * spacing unit). Same number on both sides is the pixel-alignment claim, made
  * against a real bundle rather than a jsdom.
  */
+// `height` is the theme's field height for the size (2.5 × 16px at md, scaled
+// per step — `field-height.core.ts`): a button stands level with the field
+// beside it, so the height, not a vertical padding, is what it is drawn at.
 const BUTTON_SIZES = {
-  xs: { paddingVertical: 2, paddingHorizontal: 8, fontSize: 12 },
-  sm: { paddingVertical: 6, paddingHorizontal: 12, fontSize: 14 },
-  md: { paddingVertical: 8, paddingHorizontal: 16, fontSize: 16 },
-  lg: { paddingVertical: 10, paddingHorizontal: 20, fontSize: 18 },
-  xl: { paddingVertical: 12, paddingHorizontal: 24, fontSize: 20 },
+  xs: { height: 32, paddingHorizontal: 8, fontSize: 12 },
+  sm: { height: 40, paddingHorizontal: 12, fontSize: 14 },
+  md: { height: 40, paddingHorizontal: 16, fontSize: 16 },
+  lg: { height: 48, paddingHorizontal: 20, fontSize: 18 },
+  xl: { height: 56, paddingHorizontal: 24, fontSize: 20 },
 } as const;
 
 const TEXT_SIZES = { xs: 12, sm: 14, md: 16, lg: 18, xl: 20 } as const;
@@ -51,11 +54,12 @@ test.describe('the native build of @12-apps/ui, bundled by Metro, rendered throu
     await expect(page.getByTestId('text-heading')).toHaveRole('heading');
   });
 
-  test('Button pads and types each size like the web', async ({ page }) => {
+  test('Button stands, pads and types each size like the web', async ({ page }) => {
     await openGallery(page);
     for (const [size, metrics] of Object.entries(BUTTON_SIZES)) {
       const button = page.getByTestId(`button-size-${size}`);
-      expect(await px(button, 'padding-top')).toBe(metrics.paddingVertical);
+      expect(await px(button, 'min-height')).toBe(metrics.height);
+      expect(await px(button, 'padding-top')).toBe(0);
       expect(await px(button, 'padding-left')).toBe(metrics.paddingHorizontal);
       // The label node is the one carrying the size's own text.
       expect(await px(button.getByText(size, { exact: true }), 'font-size')).toBe(metrics.fontSize);
@@ -84,7 +88,9 @@ test.describe('the native build of @12-apps/ui, bundled by Metro, rendered throu
     const box = await page.getByTestId('button-icon-only').boundingBox();
     expect(box).not.toBeNull();
     expect(Math.round(box!.width)).toBe(Math.round(box!.height));
-    expect(await px(page.getByTestId('button-icon-only'), 'padding-top')).toBe(7);
+    // The field height, square: the side is the height, not padding round an icon.
+    expect(await px(page.getByTestId('button-icon-only'), 'min-height')).toBe(40);
+    expect(await px(page.getByTestId('button-icon-only'), 'padding-top')).toBe(0);
   });
 
   test('Button presses reach the handler through onClick', async ({ page }) => {

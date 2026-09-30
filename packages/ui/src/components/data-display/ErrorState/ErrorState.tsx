@@ -24,6 +24,7 @@ import {
 } from './ErrorState.metrics';
 import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
 import { resolveTestId } from '../../../platform/test-id';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const makeTestId =
   (dataTestId?: string) =>
@@ -49,14 +50,14 @@ const ErrorIcon: React.FC<{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: ERROR_ICON_BOX,
-        height: ERROR_ICON_BOX,
+        width: rem(theme, ERROR_ICON_BOX),
+        height: rem(theme, ERROR_ICON_BOX),
         borderRadius: '50%',
         backgroundColor: color.light,
         opacity: ERROR_ICON_BOX_OPACITY,
       }}
     >
-      {icon || <Fallback sx={{ fontSize: ERROR_ICON_SIZE, color: color.main }} />}
+      {icon || <Fallback sx={{ fontSize: sxRem(ERROR_ICON_SIZE), color: color.main }} />}
     </Box>
   );
 };
@@ -92,7 +93,7 @@ const ErrorText: React.FC<{
         color="text.secondary"
         data-testid={testId('message')}
         sx={{
-          maxWidth: ERROR_MESSAGE_MAX_WIDTH,
+          maxWidth: rem(theme, ERROR_MESSAGE_MAX_WIDTH),
           lineHeight: ERROR_MESSAGE_LINE_HEIGHT,
         }}
       >
@@ -133,7 +134,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo((props) => {
         justifyContent: 'center',
         textAlign: 'center',
         padding: theme.spacing(ERROR_STATE_PADDING_UNITS),
-        minHeight: ERROR_STATE_MIN_HEIGHT,
+        minHeight: rem(theme, ERROR_STATE_MIN_HEIGHT),
         gap: theme.spacing(ERROR_STATE_GAP_UNITS),
       }}
     >
@@ -150,7 +151,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo((props) => {
           data-testid={testId('retry-button')}
           sx={{
             mt: theme.spacing(RETRY_MARGIN_TOP_UNITS),
-            minWidth: RETRY_MIN_WIDTH,
+            minWidth: rem(theme, RETRY_MIN_WIDTH),
           }}
         >
           {retryLabel}

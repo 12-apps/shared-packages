@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type JSX } from "react";
+import { useState, type FormEvent, type JSX, type ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
@@ -35,6 +35,9 @@ interface SignupState {
   name: string;
   email: string;
   password: string;
+  /** The password broke the rule its hint states, so the field and hint say so in red. */
+  passwordFailed: boolean;
+  leavePassword: () => void;
   pending: boolean;
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
@@ -51,6 +54,65 @@ export interface SignupConfig {
   onBeforeSubmit: () => Promise<void>;
   onSignedIn: () => void;
   disabled?: boolean;
+  /**
+   * Where the submit button goes, and what sits beside it.
+   *
+   * Handed the button and returns what renders in its place, inside the form.
+   * The sign-up PAGE uses this to put the consent that enables the button
+   * directly above it, and the other ways in directly below it (see
+   * `SignupActions` in `pages/signup-actions.tsx`). Omitted, the button renders
+   * on its own, as it always has.
+   */
+  renderActions?: (submit: ReactNode) => ReactNode;
+}
+
+/**
+ * The rule the sign-up hint states: at least 8 characters, a letter and a number.
+ *
+ * A mirror of `checkPasswordPolicy`'s defaults (`../../password.ts`), which the
+ * browser cannot import (it hashes with `node:crypto`). The server stays the
+ * judge: this only decides when the hint turns red before a submit, and the
+ * common-password list is caught by the server's refusal instead.
+ */
+function meetsPasswordHint(password: string): boolean {
+  return password.length >= 8 && /\p{L}/u.test(password) && /\d/u.test(password);
+}
+
+/** A typed password the hint's rule refuses. An empty field has broken nothing yet. */
+function breaksHint(password: string): boolean {
+  return password !== "" && !meetsPasswordHint(password);
+}
+
+/**
+ * Whether the password has FAILED — refused by the server as weak, or left
+ * with a value that breaks the stated rule. Before either the hint stays in
+ * the secondary ink: a rule nobody has broken yet is not an error.
+ *
+ * Judged late and cleared early. Leaving the field is what judges it, never a
+ * keystroke — so passing through it empty judges nothing. Once the password
+ * keeps the rule again (or is cleared), the failure is spent, and a later slip
+ * waits for the next time the field is left.
+ */
+function usePasswordFailure(
+  password: string,
+  setPassword: (value: string) => void,
+): {
+  failed: boolean;
+  change: (value: string) => void;
+  leave: () => void;
+  refuse: (password: string) => void;
+} {
+  const [left, setLeft] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
+  return {
+    failed: password === refused || (left && breaksHint(password)),
+    change: (value) => {
+      setPassword(value);
+      if (!breaksHint(value)) setLeft(false);
+    },
+    leave: () => setLeft(breaksHint(password)),
+    refuse: setRefused,
+  };
 }
 
 function useSignup(config: SignupConfig): SignupState {
@@ -63,6 +125,7 @@ function useSignup(config: SignupConfig): SignupState {
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
   const [sent, setSent] = useState(false);
+  const passwordCheck = usePasswordFailure(password, setPassword);
 
   /** Register, then take whichever of the two paths the server reports. */
   async function register(): Promise<void> {
@@ -70,6 +133,7 @@ function useSignup(config: SignupConfig): SignupState {
     if (!result.ok) {
       setReason(result.reason);
       setViolations(result.violations ?? null);
+      if (result.reason === "weak-password") passwordCheck.refuse(password);
       return;
     }
     if (result.data.status === "verification-sent") {
@@ -111,16 +175,39 @@ function useSignup(config: SignupConfig): SignupState {
     name,
     email,
     password,
+    passwordFailed: passwordCheck.failed,
+    leavePassword: passwordCheck.leave,
     pending,
     reason,
     violations,
     sent,
     setName,
     setEmail,
-    setPassword,
+    setPassword: passwordCheck.change,
     dismiss: () => setReason(null),
     submit,
   };
+}
+
+/**
+ * The form's one submit. Its own component because the page may place it
+ * (`renderActions`) somewhere other than straight under the fields.
+ */
+function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boolean }): JSX.Element {
+  const { copy } = useScreens();
+  return (
+    <Button
+      type="submit"
+      variant="solid"
+      color="primary"
+      fullWidth
+      loading={form.pending}
+      disabled={gateClosed || form.pending || form.email.length === 0 || form.password.length === 0}
+      dataTestId="signup-submit"
+    >
+      {copy.signUp.submit}
+    </Button>
+  );
 }
 
 export function EmailSignupForm(props: SignupConfig): JSX.Element {
@@ -137,6 +224,8 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
       />
     );
   }
+
+  const submit = <SubmitButton form={form} gateClosed={props.disabled === true} />;
 
   return (
     <form onSubmit={(event) => void form.submit(event)} data-testid="email-signup-form">
@@ -178,25 +267,25 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
         onChange={form.setPassword}
         autoComplete="new-password"
         dataTestId="signup-password"
+        error={form.passwordFailed}
+        onBlur={form.leavePassword}
       />
       <Spacer size="xs" />
-      <Text color="secondary" size="sm">
+      <Text
+        color={form.passwordFailed ? "danger" : "secondary"}
+        size="sm"
+        data-testid="signup-password-hint"
+      >
         {copy.signUp.passwordHint}
       </Text>
-      <Spacer size="md" />
-      <Button
-        type="submit"
-        variant="solid"
-        color="primary"
-        fullWidth
-        loading={form.pending}
-        disabled={
-          props.disabled || form.pending || form.email.length === 0 || form.password.length === 0
-        }
-        dataTestId="signup-submit"
-      >
-        {copy.signUp.submit}
-      </Button>
+      {props.renderActions ? (
+        props.renderActions(submit)
+      ) : (
+        <>
+          <Spacer size="md" />
+          {submit}
+        </>
+      )}
     </form>
   );
 }

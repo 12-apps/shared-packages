@@ -27,6 +27,9 @@ import { PT_BR_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/pt-BR';
 import { EN_US_PAYMENTS_SETTINGS_COPY } from './components/settings-en-US';
 import type { PaymentsSettingsCopy } from './components/settings-copy';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from './components/settings-pt-BR';
+import type { TenderSplitCopy } from './tender-split/copy';
+import { EN_US_TENDER_SPLIT_COPY } from './tender-split/en-US';
+import { PT_BR_TENDER_SPLIT_COPY } from './tender-split/pt-BR';
 
 /**
  * Every surface this half renders, in both languages, keyed by tag.
@@ -53,6 +56,15 @@ export const ACTIVATION_STEP_COPY = {
   'pt-BR': PT_BR_ACTIVATION_STEP_COPY,
   'en-US': EN_US_ACTIVATION_STEP_COPY,
 } as const satisfies LocalePack<ActivationStepCopy>;
+
+/**
+ * `TenderSplit`'s words (`./tender-split`) — read by the OPERATOR recording
+ * money taken in person, so they resolve from the operator's preference.
+ */
+export const TENDER_SPLIT_COPY = {
+  'pt-BR': PT_BR_TENDER_SPLIT_COPY,
+  'en-US': EN_US_TENDER_SPLIT_COPY,
+} as const satisfies LocalePack<TenderSplitCopy>;
 
 export const CARD_COPY = {
   'pt-BR': PT_BR_CARD_COPY,
@@ -113,3 +125,4 @@ export {
 export { EN_US_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-en-US';
 export { EN_US_PAYMENTS_SETTINGS_COPY } from './components/settings-en-US';
 export { EN_US_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/en-US';
+export { EN_US_TENDER_SPLIT_COPY } from './tender-split/en-US';

@@ -85,7 +85,6 @@ const NAME_INPUT_SX = {
     fontSize: "1.125rem",
     fontWeight: 600,
     px: NAME_PAD_X,
-    py: "3px",
   },
 } as const;
 

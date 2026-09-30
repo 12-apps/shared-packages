@@ -9,6 +9,7 @@ import { categoryCheckState, isLeafCategory, leavesOf } from './category-tree';
 import { CategorySectionHeading, CategoryTreeRow } from './CategoryRows';
 import { emptySx, listSx, skeletonSx } from './CategorySelect.styles';
 import type { CategoryGroup } from './CategorySelect.types';
+import { sxRem } from '../../../tokens/relative';
 
 /** The design sets these labels in sentence case, not MUI's default caps. */
 const SENTENCE_CASE = { textTransform: 'none' } as const;
@@ -96,7 +97,7 @@ function NoResults({
     <Box sx={emptySx} data-testid={`${dataTestId}-no-results`}>
       <strong>{copy.noResults.title(query)}</strong>
       <p>{copy.noResults.hint}</p>
-      <Box sx={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+      <Box sx={{ display: 'flex', gap: sxRem(6), justifyContent: 'center' }}>
         <Button variant="outlined" size="small" sx={SENTENCE_CASE} onClick={onClearQuery}>
           {copy.noResults.clearSearch}
         </Button>
@@ -221,7 +222,7 @@ export function CategoryPanelList(props: PanelListProps): React.JSX.Element {
       aria-multiselectable={props.single ? undefined : true}
       tabIndex={-1}
       data-testid={`${dataTestId}-list`}
-      sx={listSx(sheet)}
+      sx={(theme) => listSx(theme, sheet)}
     >
       {body()}
     </Box>

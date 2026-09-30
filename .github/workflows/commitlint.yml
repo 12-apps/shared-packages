@@ -1,7 +1,12 @@
 name: Commit messages
 
-# Conventional-commit gate. The contract is in CONTRIBUTING.md; the rule set and
-# the runner live in 12-apps/ci so this repo needs no devDependency or config.
+# Conventional-commit gate. The contract is in CONTRIBUTING.md, and the runner
+# lives in 12-apps/ci. The rule set is `commitlint.config.mjs` at the repo root:
+# the shared workflow's own rules, copied verbatim and passed back through
+# `config-path`. It is in the repository because the pre-push hook
+# (`.githooks/pre-push`) lints the pushed commits with the same file, so a
+# message is refused on the machine instead of here, one push later. A hook
+# reading its own copy could disagree with this check; one file cannot.
 #
 # It is not cosmetic here. `.releaserc.json` runs @semantic-release/commit-analyzer,
 # which derives every package's version bump from the commit subjects that land on
@@ -23,3 +28,5 @@ permissions:
 jobs:
   commitlint:
     uses: 12-apps/ci/.github/workflows/commitlint.yml@v1
+    with:
+      config-path: commitlint.config.mjs

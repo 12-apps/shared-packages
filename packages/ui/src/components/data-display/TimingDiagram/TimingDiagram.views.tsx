@@ -2,21 +2,28 @@ import Box from '@mui/material/Box/index.js';
 import Tooltip from '@mui/material/Tooltip/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import type { FC, ReactElement } from 'react';
 import React from 'react';
 
 import type { TimingData } from './TimingDiagram.types';
+import type { TimingDiagramCopy } from '../../../copy';
+import { onMedia, sheen, uiInk } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
-// Color configurations
-export const phaseColors = {
-  dns: '#9C27B0', // Purple
-  connect: '#2196F3', // Blue
-  ssl: '#00BCD4', // Cyan
-  request: '#4CAF50', // Green
-  response: '#FF9800', // Orange
+export type PhaseKey = 'dns' | 'connect' | 'ssl' | 'request' | 'response';
+
+// Each phase's colour, from the theme's named timing set (`uiInk`).
+export const phaseColors = (theme: Theme): Record<PhaseKey, string> => {
+  const phases = uiInk(theme).timingPhases;
+  return {
+    dns: phases.dns,
+    connect: phases.connect,
+    ssl: phases.tls,
+    request: phases.request,
+    response: phases.response,
+  };
 };
-
-export type PhaseKey = keyof typeof phaseColors;
 
 export interface Phase {
   key: string;
@@ -28,10 +35,12 @@ export interface TimingViewProps {
   phases: Phase[];
   percentages: Record<string, number>;
   data: TimingData;
+  copy: TimingDiagramCopy;
   animated: boolean;
   showLabels: boolean;
   showTooltips: boolean;
-  height: number;
+  /** The waterfall's plot height in design px — drawn through `rem`. */
+  plotHeightPx: number;
 }
 
 export const formatTime = (ms: number): string => {
@@ -39,7 +48,7 @@ export const formatTime = (ms: number): string => {
   return `${(ms / 1000).toFixed(2)}s`;
 };
 
-const colorOf = (phase: Phase): string => phaseColors[phase.key as PhaseKey];
+const colorOf = (theme: Theme, phase: Phase): string => phaseColors(theme)[phase.key as PhaseKey];
 const widthOf = (percentages: Record<string, number>, phase: Phase): number =>
   percentages[phase.key] ?? 0;
 
@@ -72,31 +81,31 @@ const WaterfallContainer = styled(Box)(({ theme }) => ({
 
 const WaterfallBar = styled(Box, {
   shouldForwardProp: (prop) =>
-    !['phaseColor', 'offset', 'width', 'animated'].includes(prop as string),
+    !['phaseColor', 'offset', 'widthPct', 'animated'].includes(prop as string),
 })<{
   phaseColor: string;
   offset: number;
-  width: number;
+  widthPct: number;
   animated: boolean;
-}>(({ theme, phaseColor, offset, width, animated }) => ({
+}>(({ theme, phaseColor, offset, widthPct, animated }) => ({
   position: 'absolute',
-  height: 32,
+  height: rem(theme, 32),
   left: `${offset}%`,
-  width: `${width}%`,
+  width: `${widthPct}%`,
   background: `linear-gradient(90deg, ${phaseColor} 0%, ${alpha(phaseColor, 0.8)} 100%)`,
   borderRadius: theme.shape.borderRadius,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   color: theme.palette.getContrastText(phaseColor),
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 500,
-  boxShadow: `0 2px 8px ${alpha(phaseColor, 0.3)}`,
+  boxShadow: `${rems(theme, 0, 2, 8)} ${alpha(phaseColor, 0.3)}`,
   transition: animated ? 'all 0.5s ease' : 'none',
   animation: animated ? 'slideIn 0.5s ease' : 'none',
   '@keyframes slideIn': {
     from: {
-      transform: 'translateX(-20px)',
+      transform: `translateX(${rem(theme, -20)})`,
       opacity: 0,
     },
     to: {
@@ -105,8 +114,8 @@ const WaterfallBar = styled(Box, {
     },
   },
   '&:hover': {
-    transform: 'translateY(-2px)',
-    boxShadow: `0 4px 12px ${alpha(phaseColor, 0.5)}`,
+    transform: `translateY(${rem(theme, -2)})`,
+    boxShadow: `${rems(theme, 0, 4, 12)} ${alpha(phaseColor, 0.5)}`,
     zIndex: 10,
   },
 }));
@@ -120,7 +129,7 @@ const TimelineAxis = styled(Box)(({ theme }) => ({
 }));
 
 const TimeLabel = styled(Typography)(({ theme }) => ({
-  fontSize: '0.7rem',
+  fontSize: rem(theme, 11.2),
   color: theme.palette.text.secondary,
   fontWeight: 500,
 }));
@@ -132,13 +141,14 @@ export const WaterfallView: FC<TimingViewProps> = ({
   animated,
   showLabels,
   showTooltips,
-  height,
+  plotHeightPx,
 }) => {
+  const theme = useTheme();
   // Each bar starts where the previous one ended, so the row reads as a timeline.
   let offset = 0;
 
   return (
-    <WaterfallContainer style={{ height: height + 40 }} data-variant="waterfall">
+    <WaterfallContainer style={{ height: rem(theme, plotHeightPx + 40) }} data-variant="waterfall">
       {phases.map((phase, index) => {
         const width = widthOf(percentages, phase);
         const currentOffset = offset;
@@ -150,13 +160,13 @@ export const WaterfallView: FC<TimingViewProps> = ({
           <WaterfallBar
             key={phase.key}
             data-testid={`timing-segment-${phase.key}`}
-            phaseColor={colorOf(phase)}
+            phaseColor={colorOf(theme, phase)}
             offset={currentOffset}
-            width={width}
+            widthPct={width}
             animated={animated}
             data-animated={animated.toString()}
             style={{
-              top: index * 8,
+              top: rem(theme, index * 8),
               width: `${width}%`,
               left: `${currentOffset}%`,
             }}
@@ -167,7 +177,7 @@ export const WaterfallView: FC<TimingViewProps> = ({
           </WaterfallBar>,
         );
       })}
-      <TimelineAxis style={{ marginTop: height }}>
+      <TimelineAxis style={{ marginTop: rem(theme, plotHeightPx) }}>
         <TimeLabel>0ms</TimeLabel>
         <TimeLabel>{formatTime(data.total / 2)}</TimeLabel>
         <TimeLabel>{formatTime(data.total)}</TimeLabel>
@@ -181,7 +191,7 @@ const StackedBar = styled(Box, {
 })<{ animated: boolean }>(({ theme, animated }) => ({
   display: 'flex',
   width: '100%',
-  height: 40,
+  height: rem(theme, 40),
   borderRadius: theme.shape.borderRadius,
   overflow: 'hidden',
   boxShadow: theme.shadows[2],
@@ -197,15 +207,15 @@ const StackedBar = styled(Box, {
 }));
 
 const StackedSegment = styled(Box, {
-  shouldForwardProp: (prop) => !['phaseColor', 'width'].includes(prop as string),
-})<{ phaseColor: string; width: number }>(({ phaseColor, width }) => ({
-  width: `${width}%`,
+  shouldForwardProp: (prop) => !['phaseColor', 'widthPct'].includes(prop as string),
+})<{ phaseColor: string; widthPct: number }>(({ theme, phaseColor, widthPct }) => ({
+  width: `${widthPct}%`,
   background: `linear-gradient(135deg, ${phaseColor} 0%, ${alpha(phaseColor, 0.85)} 100%)`,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#fff',
-  fontSize: '0.7rem',
+  color: onMedia(theme),
+  fontSize: rem(theme, 11.2),
   fontWeight: 600,
   position: 'relative',
   transition: 'all 0.3s ease',
@@ -219,42 +229,46 @@ export const StackedView: FC<TimingViewProps> = ({
   phases,
   percentages,
   data,
+  copy,
   animated,
   showLabels,
   showTooltips,
-}) => (
-  <Box data-variant="stacked">
-    <StackedBar animated={animated} data-animated={animated.toString()}>
-      {phases.map((phase) => {
-        const width = widthOf(percentages, phase);
+}) => {
+  const theme = useTheme();
+  return (
+    <Box data-variant="stacked">
+      <StackedBar animated={animated} data-animated={animated.toString()}>
+        {phases.map((phase) => {
+          const width = widthOf(percentages, phase);
 
-        return withTooltip(
-          phase,
-          showTooltips,
-          <StackedSegment
-            key={phase.key}
-            data-testid={`timing-segment-${phase.key}`}
-            phaseColor={colorOf(phase)}
-            width={width}
-            style={{ width: `${width}%` }}
-          >
-            {showLabels && width > 10 && (
-              <span data-testid="timing-label">{formatTime(phase.value!)}</span>
-            )}
-          </StackedSegment>,
-        );
-      })}
-    </StackedBar>
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-      <Typography variant="caption" color="text.secondary">
-        0ms
-      </Typography>
-      <Typography variant="caption" color="text.secondary" fontWeight="bold">
-        Total: {formatTime(data.total)}
-      </Typography>
+          return withTooltip(
+            phase,
+            showTooltips,
+            <StackedSegment
+              key={phase.key}
+              data-testid={`timing-segment-${phase.key}`}
+              phaseColor={colorOf(theme, phase)}
+              widthPct={width}
+              style={{ width: `${width}%` }}
+            >
+              {showLabels && width > 10 && (
+                <span data-testid="timing-label">{formatTime(phase.value!)}</span>
+              )}
+            </StackedSegment>,
+          );
+        })}
+      </StackedBar>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+        <Typography variant="caption" color="text.secondary">
+          0ms
+        </Typography>
+        <Typography variant="caption" color="text.secondary" fontWeight="bold">
+          {copy.total(formatTime(data.total))}
+        </Typography>
+      </Box>
     </Box>
-  </Box>
-);
+  );
+};
 
 const HorizontalBar = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -264,29 +278,29 @@ const HorizontalBar = styled(Box)(({ theme }) => ({
 }));
 
 const HorizontalSegment = styled(Box, {
-  shouldForwardProp: (prop) => !['phaseColor', 'width', 'animated'].includes(prop as string),
+  shouldForwardProp: (prop) => !['phaseColor', 'widthPct', 'animated'].includes(prop as string),
 })<{
   phaseColor: string;
-  width: number;
+  widthPct: number;
   animated: boolean;
 }>(({ theme, phaseColor, animated }) => ({
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(2),
   '& .label': {
-    minWidth: 80,
-    fontSize: '0.85rem',
+    minWidth: rem(theme, 80),
+    fontSize: rem(theme, 13.6),
     fontWeight: 500,
     color: theme.palette.text.secondary,
   },
   '& .bar': {
     flex: 1,
-    height: 24,
+    height: rem(theme, 24),
     borderRadius: theme.shape.borderRadius,
     background: `linear-gradient(90deg, ${phaseColor} 0%, ${alpha(phaseColor, 0.7)} 100%)`,
     position: 'relative',
     overflow: 'hidden',
-    boxShadow: `0 2px 6px ${alpha(phaseColor, 0.25)}`,
+    boxShadow: `${rems(theme, 0, 2, 6)} ${alpha(phaseColor, 0.25)}`,
     ...(animated && {
       '&::after': {
         content: '""',
@@ -295,7 +309,7 @@ const HorizontalSegment = styled(Box, {
         left: 0,
         right: 0,
         bottom: 0,
-        background: `linear-gradient(90deg, transparent 0%, ${alpha('#fff', 0.3)} 50%, transparent 100%)`,
+        background: `linear-gradient(90deg, transparent 0%, ${sheen(theme, 0.3)} 50%, transparent 100%)`,
         animation: 'shimmer 2s infinite',
       },
       '@keyframes shimmer': {
@@ -305,9 +319,9 @@ const HorizontalSegment = styled(Box, {
     }),
   },
   '& .value': {
-    minWidth: 60,
+    minWidth: rem(theme, 60),
     textAlign: 'right',
-    fontSize: '0.85rem',
+    fontSize: rem(theme, 13.6),
     fontWeight: 600,
     color: phaseColor,
   },
@@ -317,6 +331,7 @@ export const HorizontalView: FC<TimingViewProps> = ({
   phases,
   percentages,
   data,
+  copy,
   animated,
 }) => {
   const theme = useTheme();
@@ -327,8 +342,8 @@ export const HorizontalView: FC<TimingViewProps> = ({
         <HorizontalSegment
           key={phase.key}
           data-testid={`timing-segment-${phase.key}`}
-          phaseColor={colorOf(phase)}
-          width={widthOf(percentages, phase)}
+          phaseColor={colorOf(theme, phase)}
+          widthPct={widthOf(percentages, phase)}
           animated={animated}
           data-animated={animated.toString()}
         >
@@ -341,7 +356,7 @@ export const HorizontalView: FC<TimingViewProps> = ({
       ))}
       <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}` }}>
         <Typography variant="body2" fontWeight="bold" color="primary">
-          Total Time: {formatTime(data.total)}
+          {copy.totalTime(formatTime(data.total))}
         </Typography>
       </Box>
     </HorizontalBar>

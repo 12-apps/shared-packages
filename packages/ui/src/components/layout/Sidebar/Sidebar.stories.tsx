@@ -13,6 +13,7 @@ import Box from '@mui/material/Box/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import List from '@mui/material/List/index.js';
 import ListItem from '@mui/material/ListItem/index.js';
+import ListItemButton from '@mui/material/ListItemButton/index.js';
 import ListItemIcon from '@mui/material/ListItemIcon/index.js';
 import ListItemText from '@mui/material/ListItemText/index.js';
 import Typography from '@mui/material/Typography/index.js';
@@ -94,10 +95,10 @@ const SidebarDemo = ({
         <SidebarContent>
           <List>
             {navigationItems.map((item, index) => (
-              <ListItem button key={index}>
+              <ListItemButton key={index}>
                 <ListItemIcon>{item.icon}</ListItemIcon>
                 <ListItemText primary={item.label} sx={{ display: open ? 'block' : 'none' }} />
-              </ListItem>
+              </ListItemButton>
             ))}
           </List>
         </SidebarContent>
@@ -164,10 +165,10 @@ export const Glass: Story = {
           <SidebarContent>
             <List>
               {navigationItems.map((item, index) => (
-                <ListItem button key={index} sx={{ color: 'white' }}>
+                <ListItemButton key={index} sx={{ color: 'white' }}>
                   <ListItemIcon sx={{ color: 'white' }}>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.label} />
-                </ListItem>
+                </ListItemButton>
               ))}
             </List>
           </SidebarContent>
@@ -259,12 +260,12 @@ const MiniDrawerComponent = () => {
 
         <List>
           {navigationItems.map((item, index) => (
-            <ListItem button key={index}>
+            <ListItemButton key={index}>
               <ListItemIcon sx={{ minWidth: open ? 56 : 40, justifyContent: 'center' }}>
                 {item.icon}
               </ListItemIcon>
               {open && <ListItemText primary={item.label} />}
-            </ListItem>
+            </ListItemButton>
           ))}
         </List>
       </Sidebar>
@@ -335,10 +336,10 @@ export const AllVariants: Story = {
             <SidebarContent>
               <List>
                 {navigationItems.slice(0, 3).map((item, index) => (
-                  <ListItem button key={index} sx={{ color: 'white' }}>
+                  <ListItemButton key={index} sx={{ color: 'white' }}>
                     <ListItemIcon sx={{ color: 'white' }}>{item.icon}</ListItemIcon>
                     <ListItemText primary={item.label} />
-                  </ListItem>
+                  </ListItemButton>
                 ))}
               </List>
             </SidebarContent>
@@ -374,10 +375,10 @@ export const AllSizes: Story = {
             <SidebarContent>
               <List>
                 {navigationItems.map((item, index) => (
-                  <ListItem button key={index}>
+                  <ListItemButton key={index}>
                     <ListItemIcon>{item.icon}</ListItemIcon>
                     <ListItemText primary={item.label} />
-                  </ListItem>
+                  </ListItemButton>
                 ))}
               </List>
             </SidebarContent>
@@ -400,10 +401,10 @@ export const AllSizes: Story = {
             <SidebarContent>
               <List>
                 {navigationItems.slice(0, 3).map((item, index) => (
-                  <ListItem button key={index}>
+                  <ListItemButton key={index}>
                     <ListItemIcon>{item.icon}</ListItemIcon>
                     <ListItemText primary={item.label} />
-                  </ListItem>
+                  </ListItemButton>
                 ))}
               </List>
             </SidebarContent>
@@ -447,10 +448,10 @@ export const AllStates: Story = {
               <SidebarContent>
                 <List>
                   {navigationItems.slice(0, 3).map((item, index) => (
-                    <ListItem button key={index}>
+                    <ListItemButton key={index}>
                       <ListItemIcon>{item.icon}</ListItemIcon>
                       <ListItemText primary={item.label} />
-                    </ListItem>
+                    </ListItemButton>
                   ))}
                 </List>
               </SidebarContent>
@@ -482,11 +483,11 @@ export const AllStates: Story = {
               <SidebarContent>
                 <List>
                   {navigationItems.slice(0, 3).map((item, index) => (
-                    <ListItem button key={index}>
+                    <ListItemButton key={index}>
                       <ListItemIcon sx={{ minWidth: 'auto', justifyContent: 'center' }}>
                         {item.icon}
                       </ListItemIcon>
-                    </ListItem>
+                    </ListItemButton>
                   ))}
                 </List>
               </SidebarContent>
@@ -515,8 +516,7 @@ export const InteractiveStates: Story = {
           <SidebarContent>
             <List>
               {navigationItems.map((item, index) => (
-                <ListItem
-                  button
+                <ListItemButton
                   key={index}
                   selected={activeItem === index}
                   onClick={() => setActiveItem(index)}
@@ -537,7 +537,7 @@ export const InteractiveStates: Story = {
                 >
                   <ListItemIcon>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.label} />
-                </ListItem>
+                </ListItemButton>
               ))}
             </List>
           </SidebarContent>
@@ -592,10 +592,10 @@ export const Responsive: Story = {
             <SidebarContent>
               <List>
                 {navigationItems.slice(0, 3).map((item, index) => (
-                  <ListItem button key={index}>
+                  <ListItemButton key={index}>
                     <ListItemIcon>{item.icon}</ListItemIcon>
                     <ListItemText primary={item.label} />
-                  </ListItem>
+                  </ListItemButton>
                 ))}
               </List>
             </SidebarContent>

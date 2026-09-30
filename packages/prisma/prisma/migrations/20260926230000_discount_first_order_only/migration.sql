@@ -1,0 +1,13 @@
+-- @12-apps/discounts: the first-purchase condition (FUT-2825).
+--
+-- "Só na primeira compra do cliente nesta loja" — a rule the engine screens
+-- against the host's answer to "has this buyer bought here before".
+--
+-- ── PURELY ADDITIVE ───────────────────────────────────────────────────────
+-- One NOT NULL column with a constant default, no backfill: FALSE is exactly
+-- what every existing row already means, so this migration cannot change the
+-- price of anything. Postgres adds a column with a constant default without
+-- rewriting the table.
+--
+-- Replay-safe like its predecessors: `IF NOT EXISTS`.
+ALTER TABLE "discounts" ADD COLUMN IF NOT EXISTS "first_order_only" BOOLEAN NOT NULL DEFAULT false;

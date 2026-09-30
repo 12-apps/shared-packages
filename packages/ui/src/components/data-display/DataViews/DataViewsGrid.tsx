@@ -22,6 +22,7 @@ import {
   type RangeFieldConfig,
   type RowAction,
 } from "./data-views-types";
+import type { DataViewRowDetail } from "./data-views-row-detail";
 import { useDataViewsState } from "./use-data-views-state";
 
 interface DataViewsGridProps<T extends Record<string, unknown>> {
@@ -116,6 +117,11 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    * `rowActions`/`bulkActions` still drive the multi-row bulk menu.
    */
   renderRowMenu?: (row: T) => React.ReactNode;
+  /**
+   * Opt-in expandable rows (table layout only): a chevron in a leading column
+   * opens `render(row)` under the row. See {@link DataViewRowDetail}.
+   */
+  rowDetail?: DataViewRowDetail<T>;
   /**
    * Opt-in "Grade" (cards) layout. When provided, a Grade/Tabela toggle appears in
    * the toolbar and the cards body renders each visible row via this function

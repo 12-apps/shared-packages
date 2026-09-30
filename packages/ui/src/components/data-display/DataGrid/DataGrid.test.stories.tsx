@@ -1,11 +1,17 @@
+import { createTheme, ThemeProvider } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_DATA_GRID_COPY, PT_BR_DATA_STATE_COPY } from '../../../pt-BR';
+import { Box } from '../../../mui/Box';
+import { muiThemeOptionsFrom } from '../../../provider/mui-bridge';
+import { createUiTheme } from '../../../tokens/theme';
+import { resolveDensityFactor, type DensityLevel } from '../../../tokens/density';
 import { DataGrid } from './DataGrid';
 import type { GridColumn } from './DataGrid.types';
 
 // Test data interface
-interface TestRow {
+interface TestRow extends Record<string, unknown> {
   id: number;
   name: string;
   email: string;
@@ -22,10 +28,10 @@ const generateTestData = (count: number): TestRow[] => Array.from({ length: coun
     role: i % 2 === 0 ? 'Engineer' : 'Designer',
     status: (i % 2 === 0 ? 'active' : 'inactive') as 'active' | 'inactive',
     salary: 50000 + i * 1000,
-    joinDate: new Date(2020, i % 12, 1).toISOString().split('T')[0],
+    joinDate: new Date(2020, i % 12, 1).toISOString().split('T')[0] ?? '',
   }));
 
-const testColumns: GridColumn<TestRow>[] = [
+const testColumns: GridColumn<Record<string, unknown>>[] = [
   { id: 'id', header: 'ID', accessor: 'id', type: 'number', width: 80 },
   {
     id: 'name',
@@ -44,6 +50,10 @@ const testColumns: GridColumn<TestRow>[] = [
 const meta: Meta<typeof DataGrid> = {
   title: 'Dashboards/DataGrid/Tests',
   component: DataGrid,
+  args: {
+    emptyText: PT_BR_DATA_STATE_COPY.empty,
+    copy: PT_BR_DATA_GRID_COPY,
+  },
   parameters: {
     layout: 'fullscreen',
     chromatic: { disableSnapshot: false },
@@ -133,7 +143,7 @@ export const ClientSortingTest: Story = {
 
     await step('Should sort by name ascending', async () => {
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       expect(nameHeader).toHaveAttribute('aria-sort', 'none');
 
       await userEvent.click(sortButton);
@@ -147,7 +157,7 @@ export const ClientSortingTest: Story = {
 
     await step('Should sort by name descending on second click', async () => {
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       await userEvent.click(sortButton);
       await waitFor(
         () => {
@@ -159,7 +169,7 @@ export const ClientSortingTest: Story = {
 
     await step('Should clear sort on third click', async () => {
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       await userEvent.click(sortButton);
       await waitFor(
         () => {
@@ -185,7 +195,7 @@ export const ServerSortingTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Should call onRequestData when sorting', async () => {
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       await userEvent.click(sortButton);
 
       await waitFor(() => {
@@ -218,15 +228,15 @@ export const SingleSelectionTest: Story = {
       const checkboxes = canvas.getAllByRole('checkbox');
       expect(checkboxes.length).toBeGreaterThan(0);
 
-      const firstRowCheckbox = checkboxes[0]; // Should be first row checkbox in single mode
-      expect(firstRowCheckbox).toHaveAttribute('aria-label', 'Select row 1');
+      const firstRowCheckbox = checkboxes[0]!; // Should be first row checkbox in single mode
+      expect(firstRowCheckbox).toHaveAttribute('aria-label', PT_BR_DATA_GRID_COPY.selectRow(1));
 
       await userEvent.click(firstRowCheckbox);
 
       // Check that the onChangeSelected callback was called with the correct row ID
       await waitFor(
         () => {
-          expect(args.selection.onChangeSelected).toHaveBeenCalledWith([1]); // Row ID should be 1
+          expect(args.selection!.onChangeSelected).toHaveBeenCalledWith([1]); // Row ID should be 1
         },
         { timeout: 3000 },
       );
@@ -234,19 +244,19 @@ export const SingleSelectionTest: Story = {
 
     await step('Should deselect when clicking another row in single mode', async () => {
       const checkboxes = canvas.getAllByRole('checkbox');
-      const firstRowCheckbox = checkboxes[0];
-      const secondRowCheckbox = checkboxes[1];
+      const firstRowCheckbox = checkboxes[0]!;
+      const secondRowCheckbox = checkboxes[1]!;
 
       // Click first row
       await userEvent.click(firstRowCheckbox);
       await waitFor(() => {
-        expect(args.selection.onChangeSelected).toHaveBeenCalledWith([1]);
+        expect(args.selection!.onChangeSelected).toHaveBeenCalledWith([1]);
       });
 
       // Click second row - should deselect first and select second
       await userEvent.click(secondRowCheckbox);
       await waitFor(() => {
-        expect(args.selection.onChangeSelected).toHaveBeenCalledWith([2]);
+        expect(args.selection!.onChangeSelected).toHaveBeenCalledWith([2]);
       });
     });
   },
@@ -265,8 +275,8 @@ export const MultiSelectionTest: Story = {
 
     await step('Should allow multiple row selection', async () => {
       const checkboxes = canvas.getAllByRole('checkbox');
-      const firstRowCheckbox = checkboxes[1]; // Skip header checkbox
-      const secondRowCheckbox = checkboxes[2];
+      const firstRowCheckbox = checkboxes[1]!; // Skip header checkbox
+      const secondRowCheckbox = checkboxes[2]!;
 
       await userEvent.click(firstRowCheckbox);
       await userEvent.click(secondRowCheckbox);
@@ -277,7 +287,11 @@ export const MultiSelectionTest: Story = {
 
     await step('Should support select all functionality', async () => {
       const checkboxes = canvas.getAllByRole('checkbox');
-      const headerCheckbox = checkboxes[0];
+      const headerCheckbox = checkboxes[0]!;
+      expect(headerCheckbox).toHaveAttribute(
+        'aria-label',
+        PT_BR_DATA_GRID_COPY.selectAllRows,
+      );
 
       await userEvent.click(headerCheckbox);
 
@@ -296,6 +310,9 @@ export const KeyboardNavigationTest: Story = {
     rows: generateTestData(5),
     columns: testColumns,
     selection: { mode: 'single' },
+    // Sorting has to be enabled for the header to render its "Sort by …"
+    // buttons — without it there is nothing for the step below to find.
+    sorting: { mode: 'client' },
     ariaLabel: 'Keyboard navigation data grid',
   },
   play: async ({ canvasElement, step }) => {
@@ -306,7 +323,7 @@ export const KeyboardNavigationTest: Story = {
       expect(grid).toBeInTheDocument();
 
       // Verify grid is accessible via keyboard
-      const firstCell = canvas.getAllByRole('gridcell')[0];
+      const firstCell = canvas.getAllByRole('gridcell')[0]!;
       expect(firstCell).toBeInTheDocument();
 
       // Test that cells can be focused
@@ -316,13 +333,13 @@ export const KeyboardNavigationTest: Story = {
 
     await step('Should allow keyboard interaction with interactive elements', async () => {
       // Test that sortable headers can be activated with keyboard
-      const sortButton = canvas.getByRole('button', { name: /sort by name/i });
+      const sortButton = canvas.getByRole('button', { name: /ordenar por name/i });
       expect(sortButton).toBeInTheDocument();
 
       // Test that checkboxes can be focused and activated
       const checkboxes = canvas.getAllByRole('checkbox');
       if (checkboxes.length > 0) {
-        const firstCheckbox = checkboxes[0];
+        const firstCheckbox = checkboxes[0]!;
         await userEvent.click(firstCheckbox);
         await waitFor(() => expect(document.activeElement).toBe(firstCheckbox));
       }
@@ -337,8 +354,10 @@ export const RowExpansionTest: Story = {
     rows: generateTestData(3),
     columns: testColumns,
     expansion: {
-      render: (row: TestRow) => (
-        <div data-testid={`expansion-${row.id}`}>Details for {row.name}</div>
+      render: (row: Record<string, unknown>) => (
+        <div data-testid={`expansion-${(row as TestRow).id}`}>
+          Details for {(row as TestRow).name}
+        </div>
       ),
     },
     ariaLabel: 'Row expansion data grid',
@@ -347,8 +366,8 @@ export const RowExpansionTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Should expand row when clicking expand button', async () => {
-      const expandButtons = canvas.getAllByLabelText(/expand row/i);
-      const firstExpandButton = expandButtons[0];
+      const expandButtons = canvas.getAllByLabelText(/expandir linha/i);
+      const firstExpandButton = expandButtons[0]!;
 
       await userEvent.click(firstExpandButton);
 
@@ -358,7 +377,7 @@ export const RowExpansionTest: Story = {
     });
 
     await step('Should collapse row when clicking collapse button', async () => {
-      const collapseButton = canvas.getByLabelText(/collapse row/i);
+      const collapseButton = canvas.getByLabelText(/recolher linha/i);
       await userEvent.click(collapseButton);
 
       const expansion = canvas.queryByTestId('expansion-1');
@@ -379,7 +398,7 @@ export const EmptyStateTest: Story = {
     const canvas = within(canvasElement);
 
     await step('Should display default empty message', async () => {
-      expect(canvas.getByText('No data available')).toBeInTheDocument();
+      expect(canvas.getByText(PT_BR_DATA_STATE_COPY.empty)).toBeInTheDocument();
     });
   },
 };
@@ -495,9 +514,7 @@ export const StickyHeaderTest: Story = {
 // 13. Responsive Design Tests
 export const ResponsiveDesignTest: Story = {
   name: 'Test: Responsive Design',
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   args: {
     rows: generateTestData(10),
     columns: testColumns,
@@ -597,7 +614,24 @@ export const EdgeCasesTest: Story = {
   },
 };
 
-// 17. Integration Tests
+// 17. Default Copy Fallback Test — no `ariaLabel` given, so the grid's own
+// accessible name must fall back to `copy.gridLabel` rather than an English
+// literal.
+export const DefaultCopyFallbackTest: Story = {
+  name: 'Test: Default Copy Fallbacks',
+  args: {
+    rows: generateTestData(3),
+    columns: testColumns,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const grid = canvas.getByRole('grid', { name: PT_BR_DATA_GRID_COPY.gridLabel });
+    expect(grid).toBeInTheDocument();
+  },
+};
+
+// 18. Integration Tests
 export const IntegrationTest: Story = {
   name: 'Test: Integration',
   args: {
@@ -606,7 +640,7 @@ export const IntegrationTest: Story = {
     selection: { mode: 'multi' },
     sorting: { mode: 'client', defaultSortBy: [{ id: 'name', dir: 'asc' }] },
     expansion: {
-      render: (row: TestRow) => <div>Expanded: {row.name}</div>,
+      render: (row: Record<string, unknown>) => <div>Expanded: {(row as TestRow).name}</div>,
     },
     virtualizeRows: true,
     stickyHeader: true,
@@ -621,20 +655,165 @@ export const IntegrationTest: Story = {
 
       // Test selection
       const checkboxes = canvas.getAllByRole('checkbox');
-      await userEvent.click(checkboxes[1]);
+      await userEvent.click(checkboxes[1]!);
 
       // Test sorting
       const nameHeader = canvas.getByRole('columnheader', { name: /name/i });
       expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
 
       // Test expansion
-      const expandButtons = canvas.getAllByLabelText(/expand row/i);
-      await userEvent.click(expandButtons[0]);
+      const expandButtons = canvas.getAllByLabelText(/expandir linha/i);
+      await userEvent.click(expandButtons[0]!);
 
       // All features should work together
       expect(checkboxes[1]).toBeChecked();
       expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
       expect(canvas.getByText('Expanded: User 1')).toBeInTheDocument();
+    });
+  },
+};
+
+// A row type that satisfies `DataGrid`'s own `T extends Record<string, unknown>`.
+// This story needs its own `<ThemeProvider>` wrapper (to set the density
+// level), which `args` has no slot for, so it renders explicitly against the
+// real generic component, `<DataGrid<ThemeDensityRow> .../>`, rather than
+// through `args`.
+interface ThemeDensityRow extends Record<string, unknown> {
+  id: number;
+  name: string;
+}
+
+const themeDensityRows: ThemeDensityRow[] = [
+  { id: 1, name: 'Ana' },
+  { id: 2, name: 'Bruno' },
+];
+
+const themeDensityColumns: GridColumn<ThemeDensityRow>[] = [
+  { id: 'id', header: 'ID', accessor: 'id', type: 'number' },
+  { id: 'name', header: 'Name', accessor: 'name', type: 'text' },
+];
+
+// 18. A THEME DENSITY NO LONGER PICKS THE GRID'S OWN DISCRETE DENSITY (FUT-2886):
+// with no explicit `density` prop, the grid's own density stays `'comfortable'`
+// (the grid's normal density) no matter what the theme's level is — it is not
+// re-picked through the old alias table (`mapThemeToGridDensity`, removed).
+export const ThemeDensityDefaultTest: Story = {
+  name: 'Test: Theme density no longer picks the grid density',
+  render: () => (
+    <ThemeProvider theme={createTheme({ density: resolveDensityFactor('compact') })}>
+      <DataGrid<ThemeDensityRow>
+        rows={themeDensityRows}
+        columns={themeDensityColumns}
+        ariaLabel="Theme-densitied data grid"
+        emptyText={PT_BR_DATA_STATE_COPY.empty}
+        copy={PT_BR_DATA_GRID_COPY}
+      />
+    </ThemeProvider>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step("Stays 'comfortable' under a compact theme, with no density prop", async () => {
+      const grid = canvas.getByRole('grid');
+      expect(grid).toHaveAttribute('data-density', 'comfortable');
+    });
+  },
+};
+
+// 19. A THEME DENSITY SCALES A GRID'S ROWS ONCE, THROUGH `rem()` (FUT-2886).
+//
+// FUT-2769 defaulted `density` itself from the theme (`mapThemeToGridDensity`),
+// which combined with `densityHeight`'s own discrete per-density row-height
+// table to scale row height TWICE under a themed density. With no `density`
+// prop, the grid's own discrete density is now always 'comfortable' — the
+// theme's factor is the ONLY thing that still scales it, applied once by the
+// `rem()` a comfortable row is drawn with: 0.9× at compact, 1.1× at
+// comfortable, ±1px. This is a real-Chromium measurement
+// (`getBoundingClientRect`) because jsdom does not lay out a row tall enough
+// to catch a sub-pixel compounding bug the way a real browser does;
+// `grid-density-theme-default.test.tsx` proves the discrete half of the same
+// rule (`data-density` stays `'comfortable'`) against jsdom.
+//
+// `createTheme({ density: resolveDensityFactor(level) })` — the pattern
+// `ThemeDensityDefaultTest` above uses — only sets `theme.density`, not
+// `typography.fontSize`: it proves which discrete density a component PICKS,
+// but nothing here actually scales through `rem()` on that theme. This story
+// is about the SCALING half, so it needs the real density theme builder
+// (`createUiTheme` + `muiThemeOptionsFrom`, the same pair Table's own
+// `ThemeDensityScalesRowHeightOnce` story uses).
+function densityTheme(level: DensityLevel) {
+  return createTheme(muiThemeOptionsFrom(createUiTheme({ density: level })));
+}
+
+/** A grid's first body row's rendered height, in a real browser. */
+function gridRowHeightPx(scope: HTMLElement): number {
+  const row = within(scope)
+    .getAllByRole('row')
+    .find((candidate) => !candidate.closest('[data-slot="header"]'));
+  if (!row) throw new Error('grid row not found');
+  return row.getBoundingClientRect().height;
+}
+
+const scaleRows: ThemeDensityRow[] = [{ id: 1, name: 'Ana' }];
+const scaleColumns: GridColumn<ThemeDensityRow>[] = [
+  { id: 'name', header: 'Nome', accessor: 'name' },
+];
+
+export const ThemeDensityScalesRowHeightOnce: Story = {
+  name: 'Test: A theme density scales row height once',
+  render: function ThemeDensityScalesRowHeightOnceGrid() {
+    return (
+      <Box display="flex" gap={4} alignItems="flex-start">
+        <ThemeProvider theme={densityTheme('compact')}>
+          <Box width={220} data-testid="density-compact">
+            <DataGrid<ThemeDensityRow>
+              rows={scaleRows}
+              columns={scaleColumns}
+              ariaLabel="Compact-themed data grid"
+              emptyText={PT_BR_DATA_STATE_COPY.empty}
+              copy={PT_BR_DATA_GRID_COPY}
+            />
+          </Box>
+        </ThemeProvider>
+        <ThemeProvider theme={densityTheme('normal')}>
+          <Box width={220} data-testid="density-normal">
+            <DataGrid<ThemeDensityRow>
+              rows={scaleRows}
+              columns={scaleColumns}
+              ariaLabel="Normal-themed data grid"
+              emptyText={PT_BR_DATA_STATE_COPY.empty}
+              copy={PT_BR_DATA_GRID_COPY}
+            />
+          </Box>
+        </ThemeProvider>
+        <ThemeProvider theme={densityTheme('comfortable')}>
+          <Box width={220} data-testid="density-comfortable">
+            <DataGrid<ThemeDensityRow>
+              rows={scaleRows}
+              columns={scaleColumns}
+              ariaLabel="Comfortable-themed data grid"
+              emptyText={PT_BR_DATA_STATE_COPY.empty}
+              copy={PT_BR_DATA_GRID_COPY}
+            />
+          </Box>
+        </ThemeProvider>
+      </Box>
+    );
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Measures each theme, at the same (unset) density prop', async () => {
+      const normal = gridRowHeightPx(canvas.getByTestId('density-normal'));
+      const compact = gridRowHeightPx(canvas.getByTestId('density-compact'));
+      const comfortable = gridRowHeightPx(canvas.getByTestId('density-comfortable'));
+
+      // Today's unfixed code re-picks a DIFFERENT discrete density ('compact'
+      // ⇒ 0.8x, 'comfortable' theme ⇒ 'spacious' ⇒ 1.2x) AND scales it by the
+      // theme's factor on top — failing both of these by a wide margin, not
+      // by a rounding error.
+      await expect(Math.abs(compact - normal * 0.9)).toBeLessThanOrEqual(1);
+      await expect(Math.abs(comfortable - normal * 1.1)).toBeLessThanOrEqual(1);
     });
   },
 };

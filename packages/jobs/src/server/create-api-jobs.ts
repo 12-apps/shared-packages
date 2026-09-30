@@ -1,5 +1,6 @@
 import { assertJobsRegistered, listJobs } from "../core/registry";
 import { assertValidRetention } from "../core/retention";
+import { assertValidStall } from "../core/stall";
 import {
   configureJobs,
   getJobDriver,
@@ -339,6 +340,9 @@ export function createApiJobs(config: JobsServerConfig): JobsApi {
   // all — silently, weeks before anyone notices. The driver re-checks it, for
   // a host that builds one directly off `@12-apps/jobs/bullmq`.
   assertValidRetention(config?.retention);
+  // And the stall settings: a lock of 0 or NaN expires at once, and every job
+  // would be reported stalled and re-run while it was still running.
+  assertValidStall(config?.stall);
 
   const state: RuntimeState = {
     starting: false,

@@ -9,7 +9,8 @@ import {
   defaultDimensions,
   muiAnimationFor,
   muiVariantFor,
-  skeletonStyles,
+  skeletonLength,
+  skeletonSx,
 } from './Skeleton.styles';
 import type { SkeletonProps } from './Skeleton.types';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
@@ -49,9 +50,10 @@ export const Skeleton: React.FC<SkeletonProps> = React.memo((rawProps) => {
     <MuiSkeleton
       variant={muiVariantFor(variant)}
       animation={muiAnimationFor(variant, animation)}
-      width={finalWidth}
-      height={finalHeight}
-      sx={skeletonStyles(theme, {
+      // A `0` stays `0`: MUI reads a falsy size as "size from children".
+      width={finalWidth === 0 ? 0 : skeletonLength(theme, finalWidth)}
+      height={finalHeight === 0 ? 0 : skeletonLength(theme, finalHeight)}
+      sx={skeletonSx(theme, {
         intensity,
         borderRadius,
         glassmorphism,

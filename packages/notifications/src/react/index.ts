@@ -9,6 +9,7 @@
 
 export {
   createWebNotifications,
+  type BadgeHookOptions,
   type NotificationsWebConfig,
   type WebNotifications,
 } from './create-web-notifications';

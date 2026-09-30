@@ -321,6 +321,25 @@ Your six endpoints must answer `2xx { data }` on success and non-2xx
 code is what lets a screen say "that link has expired" instead of "something
 went wrong" while the sentence itself stays in your language.
 
+### A refusal floats under your header
+
+The screens show a refusal (a wrong password, a taken e-mail) on a layer fixed
+near the top of the window, not in the form, so it is on screen wherever the
+page is scrolled. By default it sits an app bar's height plus a gap from the top
+(`theme.spacing(9.5)`, 76px on MUI's 8px unit), which clears a 64px header. A
+host whose fixed header is another height sets the offset on its root:
+
+```css
+:root {
+  --auth-refusal-top: 88px; /* a 76px header, then the 12px gap */
+}
+```
+
+With no fixed header at all, set it to the gap alone (`12px`). While the refusal
+is up it reserves its room as the root's `scroll-padding-top`, so keyboard focus
+scrolls clear of it, and it closes itself when focus lands on a control it
+covers at the top of the page, where no scrolling can clear it.
+
 ## 2.1 — the host drops to configuration
 
 Everything below already worked in 2.0; what changed is that a host no longer

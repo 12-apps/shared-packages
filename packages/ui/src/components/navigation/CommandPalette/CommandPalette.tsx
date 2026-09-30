@@ -19,12 +19,14 @@ import { PaletteResults } from './CommandPaletteResults';
 import { ShortcutChip } from './ShortcutChip';
 import type { CommandPaletteProps } from './CommandPalette.types';
 import type { CommandPaletteCopy } from '../../../copy';
+import { scrim } from '../../../tokens/ink';
+import { rem, sxRem } from '../../../tokens/relative';
 
 // Styled components
-const StyledDialog = styled(Dialog)(() => ({
+const StyledDialog = styled(Dialog)(({ theme }) => ({
   '& .MuiBackdrop-root': {
-    backgroundColor: alpha('#000', 0.6),
-    backdropFilter: 'blur(4px)' },
+    backgroundColor: scrim(theme, 0.6),
+    backdropFilter: `blur(${rem(theme, 4)})` },
   '& .MuiDialog-paper': {
     position: 'fixed',
     top: '20%',
@@ -36,10 +38,10 @@ const StyledDialog = styled(Dialog)(() => ({
 
 const PaletteContainer = styled(Paper)(({ theme }) => ({
   width: '100%',
-  maxWidth: 640,
+  maxWidth: rem(theme, 640),
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  backdropFilter: `blur(${rem(theme, 20)})`,
+  WebkitBackdropFilter: `blur(${rem(theme, 20)})`,
   border: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
   borderRadius: theme.shape.borderRadius * 2,
   overflow: 'hidden',
@@ -54,7 +56,7 @@ const SearchContainer = styled(Box)(({ theme }) => ({
 
 const SearchInput = styled(InputBase)(({ theme }) => ({
   flex: 1,
-  fontSize: '1.125rem',
+  fontSize: rem(theme, 18),
   fontWeight: 400,
   '& input': {
     padding: theme.spacing(0, 1),
@@ -114,7 +116,7 @@ const PaletteFooter: React.FC<{ commandCount: number; copy: CommandPaletteCopy }
     >
       <Box sx={{ display: 'flex', gap: 1 }}>
         <ShortcutChip
-          icon={<EnterIcon sx={{ fontSize: 12 }} />}
+          icon={<EnterIcon sx={{ fontSize: sxRem(12) }} />}
           label={copy.execute}
           size="small"
         />
@@ -134,8 +136,8 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
   onClose,
   commands,
   placeholder = 'Type a command or search...',
-  width = '640px',
-  maxHeight = '400px',
+  width,
+  maxHeight,
   showRecent = true,
   recentCommands = [],
   onCommandExecute,
@@ -172,7 +174,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
       data-testid={dataTestId}
     >
       <DialogContent sx={{ overflow: 'visible', p: 0 }}>
-        <PaletteContainer elevation={24} sx={{ width, maxHeight }}>
+        <PaletteContainer elevation={24} sx={{ width: width ?? sxRem(640), maxHeight: maxHeight ?? sxRem(400) }}>
           <PaletteSearch
             inputRef={searchInputRef}
             placeholder={placeholder}

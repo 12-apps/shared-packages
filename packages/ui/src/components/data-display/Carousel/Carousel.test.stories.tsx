@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Carousel } from './Carousel';
+import { PT_BR_CAROUSEL_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof Carousel> = {
+  args: { copy: PT_BR_CAROUSEL_COPY },
   title: 'Media/Carousel/Tests',
   component: Carousel,
   parameters: {
@@ -147,7 +149,7 @@ export const NavigationControls: Story = {
 
     if (indicators.length > 2) {
       // Click third indicator
-      await userEvent.click(indicators[2]);
+      await userEvent.click(indicators[2]!);
 
       await waitFor(
         () => {
@@ -161,7 +163,7 @@ export const NavigationControls: Story = {
     const thumbnails = canvas.getAllByRole('img');
     if (thumbnails.length > 4) {
       // Click fourth thumbnail (thumbnails include main images)
-      await userEvent.click(thumbnails[4]);
+      await userEvent.click(thumbnails[4]!);
 
       await waitFor(
         () => {
@@ -368,6 +370,9 @@ export const ResponsiveDesign: Story = {
     onChange: fn(),
   },
   parameters: {
+    // A `width: '100%'` carousel inside the meta's centered layout has no box
+    // to fill and collapses to 0px; padded gives it the canvas width.
+    layout: 'padded',
     viewport: {
       viewports: {
         mobile: { name: 'Mobile', styles: { width: '360px', height: '640px' } },
@@ -428,7 +433,7 @@ export const ThemeVariations: Story = {
     // Test glass effect styles
     const carousel = canvasElement.querySelector('[class*="MuiBox-root"]');
     if (carousel) {
-      const styles = window.getComputedStyle(carousel);
+      const styles = window.getComputedStyle(carousel) as CSSStyleDeclaration & { webkitBackdropFilter?: string };
 
       // Glass effect should have backdrop filter
       expect(styles.backdropFilter || styles.webkitBackdropFilter).toBeTruthy();
@@ -501,7 +506,7 @@ export const Performance: Story = {
       title: `Slide ${i + 1}`,
       description: `Description for slide ${i + 1}`,
       content: <div>Content {i + 1}</div>,
-      image: sampleItems[i % 4].image, // Reuse sample images
+      image: sampleItems[i % 4]!.image, // Reuse sample images
       alt: `Slide ${i + 1} image`,
     })),
     autoPlay: true,
@@ -687,7 +692,7 @@ export const Integration: Story = {
       .filter((btn) => btn.querySelector('[data-testid="FiberManualRecordIcon"]'));
 
     if (indicators.length > 2) {
-      await userEvent.click(indicators[2]);
+      await userEvent.click(indicators[2]!);
 
       await waitFor(() => {
         expect(canvas.getByText('Slide 3')).toBeVisible();

@@ -2,21 +2,25 @@ import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import type { CommandProps } from './Command.types';
-import { accentFor } from '../../../tokens/scales';
+import { accentFor, rem } from '../../../tokens/scales';
 
 type CommandVariant = NonNullable<CommandProps['variant']>;
 type CommandColor = NonNullable<CommandProps['color']>;
 type CommandSize = NonNullable<CommandProps['size']>;
 
-const SIZE_MAP: Record<CommandSize, { width: number; fontSize: string }> = {
-  xs: { width: 400, fontSize: '0.75rem' },
-  sm: { width: 450, fontSize: '0.875rem' },
-  md: { width: 500, fontSize: '1rem' },
-  lg: { width: 550, fontSize: '1.125rem' },
-  xl: { width: 600, fontSize: '1.25rem' },
+const SIZE_MAP: Record<CommandSize, { widthPx: number; fontPx: number }> = {
+  xs: { widthPx: 400, fontPx: 12 },
+  sm: { widthPx: 450, fontPx: 14 },
+  md: { widthPx: 500, fontPx: 16 },
+  lg: { widthPx: 550, fontPx: 18 },
+  xl: { widthPx: 600, fontPx: 20 },
 };
 
-export const commandSizeStyles = (size: CommandSize) => SIZE_MAP[size] || SIZE_MAP.md;
+/** The paper's width and type for a size, both design px read through the type scale. */
+export const commandSizeStyles = (theme: Theme, size: CommandSize) => {
+  const { widthPx, fontPx } = SIZE_MAP[size] || SIZE_MAP.md;
+  return { width: rem(theme, widthPx), fontSize: rem(theme, fontPx) };
+};
 
 const emphasisStyles = (
   theme: Theme,
@@ -25,13 +29,13 @@ const emphasisStyles = (
   pulse: boolean,
 ): CSSObject => ({
   ...(glow && {
-    boxShadow: `0 0 20px ${alpha(accentFor(theme, color).main, 0.4)}`,
+    boxShadow: `0 0 ${rem(theme, 20)} ${alpha(accentFor(theme, color).main, 0.4)}`,
   }),
   ...(pulse && {
     animation: 'pulse 2s infinite',
     '@keyframes pulse': {
       '0%': { boxShadow: `0 0 0 0 ${alpha(accentFor(theme, color).main, 0.4)}` },
-      '70%': { boxShadow: `0 0 0 10px ${alpha(accentFor(theme, color).main, 0)}` },
+      '70%': { boxShadow: `0 0 0 ${rem(theme, 10)} ${alpha(accentFor(theme, color).main, 0)}` },
       '100%': { boxShadow: `0 0 0 0 ${alpha(accentFor(theme, color).main, 0)}` },
     },
   }),
@@ -46,7 +50,7 @@ const surfaceStyles = (
     case 'glass':
       return {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: 'blur(20px)',
+        backdropFilter: `blur(${rem(theme, 20)})`,
         border: `1px solid ${alpha(accentFor(theme, color).main, 0.2)}`,
       };
     case 'gradient':

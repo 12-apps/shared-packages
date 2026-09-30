@@ -119,7 +119,18 @@ const AllVariantsComponent = () => {
           <Typography variant="subtitle2" gutterBottom>
             Detailed View
           </Typography>
-          <PasswordStrength copy={PT_BR_PASSWORD_STRENGTH_COPY} value={password} variant="detailed" showStrengthLabel={true} />
+          {/* There is no `detailed` variant — only linear/circular/steps.
+              The detailed LOOK is the linear meter plus its own opt-in
+              requirements checklist and suggestions, which is what this
+              shows instead. */}
+          <PasswordStrength
+            copy={PT_BR_PASSWORD_STRENGTH_COPY}
+            value={password}
+            variant="linear"
+            showStrengthLabel={true}
+            showRequirements
+            showSuggestions
+          />
         </Paper>
       </Box>
     </Stack>
@@ -511,14 +522,14 @@ export const InteractiveStates: Story = {
 export const Responsive: Story = {
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
         desktop: { name: 'Desktop', styles: { width: '1024px', height: '768px' } },
       },
-      defaultViewport: 'mobile',
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => (
     <Stack spacing={4}>
       <Typography variant="h6">Responsive Behavior</Typography>

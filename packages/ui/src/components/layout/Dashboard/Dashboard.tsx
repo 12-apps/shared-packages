@@ -31,6 +31,7 @@ import type {
   DashboardMoreFiltersProps,
   DashboardProps,
 } from './Dashboard.types';
+import { sxRem } from '../../../tokens/relative';
 
 /**
  * Ordered slot keys. The root reorders composed children into this sequence so
@@ -168,7 +169,7 @@ const DashboardBreadcrumb = ({
       className={className}
       aria-label="breadcrumb"
       data-testid={`${testIdPrefix}-breadcrumb`}
-      sx={{ fontSize: '0.875rem', color: 'text.secondary' }}
+      sx={{ fontSize: sxRem(14), color: 'text.secondary' }}
     >
       {items.map((item, index) => {
         const isLast = index === items.length - 1;
@@ -177,7 +178,7 @@ const DashboardBreadcrumb = ({
             <Typography
               key={`${item.label}-${index}`}
               component="span"
-              sx={{ fontSize: '0.875rem', color: isLast ? 'text.primary' : 'text.secondary' }}
+              sx={{ fontSize: sxRem(14), color: isLast ? 'text.primary' : 'text.secondary' }}
               aria-current={isLast ? 'page' : undefined}
             >
               {item.label}
@@ -194,7 +195,7 @@ const DashboardBreadcrumb = ({
             href={item.href}
             underline="hover"
             color="inherit"
-            sx={{ fontSize: '0.875rem' }}
+            sx={{ fontSize: sxRem(14) }}
           >
             {linkContent}
           </MuiLink>
@@ -216,7 +217,7 @@ const DashboardHeader = ({ title, children, className }: DashboardHeaderProps): 
     <Box
       className={className}
       data-testid={`${testIdPrefix}-header`}
-      sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', minHeight: 40 }}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', minHeight: sxRem(40) }}
     >
       <Typography variant="h5" component="h1" sx={{ fontWeight: 600, mr: 0.5 }}>
         {title}

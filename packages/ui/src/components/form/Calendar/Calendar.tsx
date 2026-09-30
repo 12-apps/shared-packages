@@ -3,6 +3,8 @@ import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import React from 'react';
 
+import { rem, sxRem } from '../../../tokens/relative';
+
 import { resolveCalendarProps } from './Calendar.helpers';
 import { useCalendar } from './Calendar.hooks';
 import type { CalendarProps } from './Calendar.types';
@@ -16,9 +18,9 @@ const containerSx = (monthsToShow: number): SxProps<Theme> => ({
   gap: 3,
   outline: 'none',
   '&:focus-within': {
-    outline: '2px solid',
+    outline: (theme: Theme) => `${rem(theme, 2)} solid`,
     outlineColor: 'primary.main',
-    outlineOffset: 2,
+    outlineOffset: sxRem(2),
   },
 });
 

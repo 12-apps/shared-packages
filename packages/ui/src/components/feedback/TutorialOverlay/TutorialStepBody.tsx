@@ -11,6 +11,9 @@ import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
 import React, {  } from 'react';
 
+import { onMedia, uiInk } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
+
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
 import type { TutorialCopy } from '../../../copy';
 
@@ -25,8 +28,8 @@ const StepIndicator = styled(Box)(({ theme }) => ({
 
 const StepDot = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'active' && prop !== 'completed' })<{ active?: boolean; completed?: boolean }>(({ theme, active, completed }) => ({
-  width: 8,
-  height: 8,
+  width: rem(theme, 8),
+  height: rem(theme, 8),
   borderRadius: '50%',
   background: completed
     ? theme.palette.success.main
@@ -106,7 +109,7 @@ const TutorialStepNav: React.FC<{
                 endIcon={<NextIcon />}
                 onClick={onNext}
                 disabled={requiresActionBeforeNext}
-                title={requiresActionBeforeNext ? 'Complete the required action first' : ''}
+                title={requiresActionBeforeNext ? copy.requiresAction : ''}
                 data-testid="tutorial-next-button"
               >
                 {copy.next}
@@ -117,11 +120,13 @@ const TutorialStepNav: React.FC<{
                 size="small"
                 endIcon={<CompleteIcon />}
                 onClick={onNext}
-                sx={{
-                  background: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)' }}
+                sx={(theme) => {
+                  const [from, to] = uiInk(theme).celebration.mint;
+                  return { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` };
+                }}
                 data-testid="tutorial-finish-button"
               >
-                {stepCount === 1 ? 'Complete' : 'Finish'}
+                {stepCount === 1 ? copy.complete : copy.finish}
               </Button>
             )}
           </Stack>
@@ -231,9 +236,10 @@ export const TutorialStepBody: React.FC<{
             variant="contained"
             size="small"
             onClick={step.action.onClick}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white' }}
+            sx={(theme) => {
+              const [from, to] = uiInk(theme).celebration.violet;
+              return { background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)`, color: onMedia(theme) };
+            }}
           >
             {step.action.label}
           </Button>

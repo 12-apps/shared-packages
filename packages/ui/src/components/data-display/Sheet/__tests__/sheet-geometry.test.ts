@@ -70,7 +70,7 @@ const SIZES: Size[] = ['xs', 'sm', 'md', 'lg', 'xl'];
 describe('a vertical sheet is a centred panel, not a band', () => {
   it.each(VERTICAL)('caps and centres a %s sheet', (position) => {
     const panel = sx({ position });
-    expect(panel.width).toBe('min(100%, 640px)');
+    expect(panel.width).toBe('min(100%, 40rem)');
     // `left: 0; right: 0` plus a definite width is over-constrained, and auto
     // margins are what resolve that to the middle. Without this the panel is
     // capped but pinned to the left edge, which is worse than full-bleed.
@@ -80,7 +80,7 @@ describe('a vertical sheet is a centred panel, not a band', () => {
   it.each(SIZES)('keeps the cross axis off the %s preset', (size) => {
     // One rule for every preset: `size` speaks for the main axis, and a width
     // that moved with it would give the same prop two meanings.
-    expect(sx({ position: 'bottom', size }).width).toBe('min(100%, 640px)');
+    expect(sx({ position: 'bottom', size }).width).toBe('min(100%, 40rem)');
   });
 
   it('gives the whole width back for fullHeight, as documented', () => {
@@ -89,7 +89,7 @@ describe('a vertical sheet is a centred panel, not a band', () => {
 
   it('leaves a side sheet on its own viewport-aware width', () => {
     const panel = sx({ position: 'right', size: 'lg' });
-    expect(panel.width).toBe('min(92vw, max(560px, 32vw))');
+    expect(panel.width).toBe('min(92vw, max(35rem, 32vw))');
     // The centring rule is the vertical axis's own; a side sheet is pinned to
     // its edge and auto margins would push it off it.
     expect(panel.marginInline).toBeUndefined();
@@ -98,11 +98,11 @@ describe('a vertical sheet is a centred panel, not a band', () => {
 
 describe('`size` is a ceiling for a vertical sheet', () => {
   it.each([
-    ['xs', 'min(200px, 100%)'],
-    ['sm', 'min(300px, 100%)'],
-    ['md', 'min(400px, 100%)'],
-    ['lg', 'min(500px, 100%)'],
-    ['xl', 'min(600px, 100%)'],
+    ['xs', 'min(12.5rem, 100%)'],
+    ['sm', 'min(18.75rem, 100%)'],
+    ['md', 'min(25rem, 100%)'],
+    ['lg', 'min(31.25rem, 100%)'],
+    ['xl', 'min(37.5rem, 100%)'],
   ] as const)('%s is a maxHeight, not a height', (size, expected) => {
     const panel = sx({ position: 'bottom', size });
     expect(panel.maxHeight).toBe(expected);
@@ -143,7 +143,7 @@ describe('`size` is a ceiling for a vertical sheet', () => {
     });
     expect(panel.height).toBe(320);
     expect(panel.maxHeight).toBeUndefined();
-    expect(panel.width).toBe('min(100%, 640px)');
+    expect(panel.width).toBe('min(100%, 40rem)');
   });
 });
 

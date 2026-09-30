@@ -13,6 +13,7 @@ export {
   createWebRbac,
   type RbacLocaleHook,
   type RbacWebConfig,
+  type TeamScreenRequest,
   type WebRbac,
 } from './create-web-rbac';
 export type {
@@ -56,7 +57,6 @@ export {
   type InviteFormValues,
   type InviteSelection,
 } from './team-invite-form';
-export { splitRoleSelection } from './team-role-dialog';
 
 // The screens themselves, for a host routing them rather than taking the
 // package's tabs. Each is a plain component over the props `createWebRbac`

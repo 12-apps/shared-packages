@@ -77,7 +77,7 @@ export interface AuthProvidersContext {
  *
  * Terms of service, an age check, an invite code — the CONTENT is the product's
  * and the package never inspects it. What is generic is the shape: something
- * rendered above the form, a boolean the form and the provider buttons both
+ * rendered beside what it enables, a boolean the form and the provider buttons both
  * respect, and a side effect that must run BEFORE either path proceeds.
  *
  * That last part is why this is not simply a `disabled` prop. The consent stamp
@@ -86,7 +86,10 @@ export interface AuthProvidersContext {
  * consented, and the record of it cannot depend on them making it back.
  */
 export interface AuthSignupGate {
-  /** Rendered above the form, handed the state it is meant to drive. */
+  /**
+   * Rendered directly above what it enables — the form's submit when e-mail is
+   * on, the provider buttons when it is off — and handed the state it drives.
+   */
   render: (state: {
     satisfied: boolean;
     setSatisfied: (next: boolean) => void;
@@ -155,9 +158,18 @@ export interface AuthRouteComponents {
   pages: AuthPages;
 }
 
-/** Ask the server whether e-mail sign-in is offered. */
-function useEmailEnabled(getSettings: () => Promise<EmailAuthSettings>): boolean {
-  const [enabled, setEnabled] = useState(false);
+/**
+ * Ask the server whether e-mail sign-in is offered — `null` until it answers.
+ *
+ * The two routes read the wait differently. Login treats it as "off": its
+ * providers sit above the form either way, so they are usable while the answer
+ * is in flight and the form simply arrives under them. Sign-up cannot, because
+ * the answer MOVES things there — with the form, the gate and the providers go
+ * down to its submit — and a Google button that jumped to the bottom of the
+ * card a moment after the page painted is one a thumb was already reaching for.
+ */
+function useEmailEnabled(getSettings: () => Promise<EmailAuthSettings>): boolean | null {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     let live = true;
     void getSettings()
@@ -260,7 +272,7 @@ interface RouteViewProps {
 function LoginView({ config, pages }: RouteViewProps): JSX.Element {
   const state = useRouteState(config);
   const navigate = config.useNavigate();
-  const emailEnabled = useEmailEnabled(config.getSettings);
+  const emailEnabled = useEmailEnabled(config.getSettings) ?? false;
   const denied = config.renderDenied?.();
 
   if (denied !== undefined && denied !== null) return <>{denied}</>;
@@ -290,7 +302,11 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
   const [satisfied, setSatisfied] = useState(gate === undefined);
   const [gateFailed, setGateFailed] = useState(false);
 
-  if (state.status === "loading" || state.status === "authenticated") {
+  if (
+    state.status === "loading" ||
+    state.status === "authenticated" ||
+    emailEnabled === null
+  ) {
     return <RouteSpinner testId="signup-loading" />;
   }
 
@@ -318,7 +334,11 @@ function SignupView({ config, pages }: RouteViewProps): JSX.Element {
           <Alert variant="danger" description={gate.failureMessage} />
         </div>
     ) : (
-      <FailureNotice failure={state.failure} errors={config.errors} />
+      // Nothing when there is nothing to say, so the notice mounts WHEN a
+      // failure arrives — which is when it is brought into view.
+      state.failure === null ? null : (
+        <FailureNotice failure={state.failure} errors={config.errors} />
+      )
     );
 
   return (

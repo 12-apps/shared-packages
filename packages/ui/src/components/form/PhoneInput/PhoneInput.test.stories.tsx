@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, Mock, userEvent, waitFor, within } from 'storybook/test';
+
+import { must } from '../../../test-utils/must';
 
 import { PhoneInput } from './PhoneInput';
+import { PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof PhoneInput> = {
   title: 'Form/PhoneInput/Tests',
@@ -17,6 +20,7 @@ const meta: Meta<typeof PhoneInput> = {
   },
   tags: ['autodocs', 'test'],
   args: {
+    copy: PT_BR_PHONE_INPUT_COPY,
     label: 'Phone Number',
     placeholder: 'Enter phone number',
     countryCode: 'US',
@@ -50,7 +54,7 @@ export const BasicInteraction: Story = {
     // Verify onChange was called with each keystroke
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalled();
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[0]).toContain('5551234567');
     });
 
@@ -86,9 +90,10 @@ export const FormInteraction: Story = {
     // Blur to trigger validation
     await userEvent.tab();
 
-    // Should show validation error - use regex to match partial text
+    // Should show the pt-BR validation error the copy pack feeds
+    const invalidNumberMessage = PT_BR_PHONE_INPUT_COPY.invalidNumber('United States');
     await waitFor(() => {
-      const helperText = canvas.getByText(/Invalid phone number/i);
+      const helperText = canvas.getByText(invalidNumberMessage);
       expect(helperText).toBeVisible();
     }, { timeout: 3000 });
 
@@ -98,9 +103,11 @@ export const FormInteraction: Story = {
     await userEvent.type(input, '5551234567');
     await userEvent.tab();
 
-    // Error should be gone
+    // Error should be gone. The step above already established the error was
+    // on screen, so this describes it disappearing, not something that never
+    // appeared.
     await waitFor(() => {
-      const errorText = canvas.queryByText(/Invalid phone number/i);
+      const errorText = canvas.queryByText(invalidNumberMessage);
       expect(errorText).not.toBeInTheDocument();
     }, { timeout: 3000 });
   },
@@ -164,7 +171,7 @@ export const ScreenReader: Story = {
     // Check for country selector accessibility using testId
     const countryButton = canvas.getByTestId('country-selector');
     await expect(countryButton).toHaveAttribute('aria-expanded', 'false');
-    await expect(countryButton).toHaveAttribute('aria-label', 'Select country');
+    await expect(countryButton).toHaveAttribute('aria-label', PT_BR_PHONE_INPUT_COPY.selectCountry);
 
     // Open menu and check expanded state
     await userEvent.click(countryButton);
@@ -202,12 +209,12 @@ export const FocusManagement: Story = {
 export const ResponsiveDesign: Story = {
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
       },
-      defaultViewport: 'mobile',
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const menuScope = within(document.body);
@@ -268,7 +275,9 @@ export const ThemeVariations: Story = {
 
     const styles = window.getComputedStyle(inputRoot!);
     // Glass effect should have backdrop blur
-    expect(styles.backdropFilter || styles.webkitBackdropFilter).toMatch(/blur/);
+    expect(
+      styles.backdropFilter || styles.getPropertyValue('-webkit-backdrop-filter'),
+    ).toMatch(/blur/);
 
     // Check hover effect
     await userEvent.hover(inputRoot!);
@@ -429,7 +438,7 @@ export const CountryCodeSelection: Story = {
 
     // Verify onChange called with German country code
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('DE');
     }, { timeout: 3000 });
   },
@@ -474,8 +483,8 @@ export const PhoneNumberFormatting: Story = {
 
     // Verify validation status in onChange
     await waitFor(() => {
-      const calls = args.onChange.mock.calls;
-      const lastCall = calls[calls.length - 1];
+      const calls = (args.onChange as Mock).mock.calls;
+      const lastCall = must(calls[calls.length - 1]);
       expect(lastCall[1]).toBe(true); // Should be valid
     }, { timeout: 3000 });
   },
@@ -522,7 +531,7 @@ export const Integration: Story = {
     // Verify onChange was called with country change
     await waitFor(() => {
       expect(args.onChange).toHaveBeenCalled();
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('US'); // Country code should be US
     }, { timeout: 3000 });
 
@@ -553,8 +562,9 @@ export const EnhancedValidation: Story = {
     await userEvent.type(input, '123');
     await userEvent.tab();
     
+    const invalidUsNumberMessage = PT_BR_PHONE_INPUT_COPY.invalidNumber('United States');
     await waitFor(() => {
-      const helperText = canvas.getByText(/Invalid phone number for United States/);
+      const helperText = canvas.getByText(invalidUsNumberMessage);
       expect(helperText).toBeVisible();
     });
 
@@ -563,14 +573,16 @@ export const EnhancedValidation: Story = {
     await userEvent.type(input, '2125551234');
     await userEvent.tab();
     
+    // The step above already established the error was on screen, so this
+    // describes it disappearing, not something that never appeared.
     await waitFor(() => {
-      const errorText = canvas.queryByText(/Invalid phone number/);
+      const errorText = canvas.queryByText(invalidUsNumberMessage);
       expect(errorText).not.toBeInTheDocument();
     });
 
     // Verify onChange called with validation result
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[1]).toBe(true); // Should be valid
       expect(lastCall[2]).toBe('US'); // Country code
     });
@@ -598,7 +610,7 @@ export const AutoCountryDetection: Story = {
 
     // Verify onChange called with German country
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('DE');
     }, { timeout: 3000 });
 
@@ -614,7 +626,7 @@ export const AutoCountryDetection: Story = {
 
     // Verify onChange called with UK country
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('GB');
     }, { timeout: 3000 });
   },
@@ -659,7 +671,7 @@ export const ExtendedCountrySupport: Story = {
 
     // Verify onChange called with Singapore country code
     await waitFor(() => {
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       expect(lastCall[2]).toBe('SG');
     }, { timeout: 3000 });
   },

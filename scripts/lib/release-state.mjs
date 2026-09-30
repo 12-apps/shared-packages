@@ -122,6 +122,28 @@ function registryVersions(name, { preferOnline = false } = {}) {
  * The schedule is therefore longer than the worst lag observed, and it is paid
  * only when something already looks wrong.
  *
+ * WORST LAG OBSERVED, updated as it recurs. `@12-apps/ui` (14 MB, 6,097 files)
+ * lagged 734s on 2026-09-23 and 370s the same night; five routine runs on
+ * 2026-09-25 lagged 369-554s. Both are well past this schedule's 240s total,
+ * which is why it gave up first, called `ui` STUCK, and printed the delete
+ * remedy at a human while npm was still indexing a tarball it had already
+ * accepted.
+ *
+ * The schedule is deliberately NOT lengthened to outrun that number. Every
+ * second here is paid by three readers on every run that has anything to
+ * re-check — this module, verify-released.mjs and release-alert.mjs — plus
+ * recover-orphans.mjs on the NEXT push, plus the daily watchdog, and worse: it
+ * is paid in full by a package that is genuinely, permanently orphaned, which
+ * gets no faster the longer this waits. Chasing `ui`'s 734s with a longer
+ * schedule only grows that bill and still loses to the next package whose
+ * tarball is bigger. The fix for a lag THIS schedule cannot outrun is not a
+ * longer schedule — it is not treating "still absent after re-reading" as
+ * proof of an orphan when this run's own publish is what makes it absent. See
+ * PUBLISH_ACCEPTED in scripts/publish.mjs, read by verify-released.mjs and
+ * release-alert.mjs, and the age guard in recover-orphans.mjs (RELEASE_
+ * ORPHAN_MIN_AGE_MIN): together they make a schedule this short SAFE to keep
+ * short, by making "ran out of patience" a warning instead of a deletion.
+ *
  * Comma-separated milliseconds in RELEASE_ABSENCE_RECHECK_MS override it. Empty
  * disables re-reading altogether, which is both the behaviour that shipped this
  * bug and what the self-tests use to stay instant.

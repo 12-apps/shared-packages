@@ -16,12 +16,15 @@ import IconButton from '@mui/material/IconButton/index.js';
 import TableCell from '@mui/material/TableCell/index.js';
 import TableRow from '@mui/material/TableRow/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
+
+import { rem } from '../../../tokens/relative';
 
 import { cellValue } from './DataGrid.rows';
 import type { DataGridModel } from './DataGrid.model';
 import type { DataGridProps, GridColumn, GridSort } from './DataGrid.types';
+import type { DataGridCopy } from '../../../copy';
 
 /** The glyph for a column's current sort state — unsorted included. */
 function SortIcon({ dir }: { dir: GridSort['dir'] | undefined }): React.JSX.Element {
@@ -35,13 +38,38 @@ function ariaSort(dir: GridSort['dir'] | undefined): 'none' | 'ascending' | 'des
   return dir === 'asc' ? 'ascending' : 'descending';
 }
 
+/**
+ * One of a column's `width`/`minWidth`/`maxWidth` as CSS. A number is design
+ * px through the type scale — except 1 or less, which `sx` has always read as a
+ * fraction of the table and still does; a string (`'312px'`, `'20%'`) is used as
+ * given.
+ */
+function columnLength(theme: Theme, value: number | string | undefined): string | undefined {
+  if (typeof value !== 'number') return value;
+  return value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value);
+}
+
+/** A column's size constraints, as the `sx` of its header and its cells. */
+function columnBox<T extends Record<string, unknown>>(
+  theme: Theme,
+  column: GridColumn<T>,
+): { minWidth?: string; maxWidth?: string; width?: string } {
+  return {
+    minWidth: columnLength(theme, column.minWidth),
+    maxWidth: columnLength(theme, column.maxWidth),
+    width: columnLength(theme, column.width),
+  };
+}
+
 export interface HeaderCellProps<T extends Record<string, unknown>> {
   column: GridColumn<T>;
   sort: GridSort | undefined;
   sortable: boolean;
   stickyHeader: boolean;
-  headerHeight: number;
+  /** The header row's height, as CSS. */
+  headerHeight: string;
   onSort: (columnId: string) => void;
+  copy: DataGridCopy;
 }
 
 export function HeaderCell<T extends Record<string, unknown>>({
@@ -51,6 +79,7 @@ export function HeaderCell<T extends Record<string, unknown>>({
   stickyHeader,
   headerHeight,
   onSort,
+  copy,
 }: HeaderCellProps<T>): React.JSX.Element {
   const theme = useTheme();
   const content = column.headerCell ? column.headerCell(column) : column.header;
@@ -65,9 +94,7 @@ export function HeaderCell<T extends Record<string, unknown>>({
         backgroundColor: theme.palette.background.paper,
         borderBottom: `1px solid ${theme.palette.divider}`,
         height: headerHeight,
-        minWidth: column.minWidth,
-        maxWidth: column.maxWidth,
-        width: column.width,
+        ...columnBox(theme, column),
       }}
       role="columnheader"
       aria-sort={ariaSort(sort?.dir)}
@@ -85,7 +112,7 @@ export function HeaderCell<T extends Record<string, unknown>>({
             '&:hover': { backgroundColor: 'transparent', opacity: 0.8 },
           }}
           endIcon={<SortIcon dir={sort?.dir} />}
-          aria-label={column.ariaLabel ?? `Sort by ${String(column.header)}`}
+          aria-label={column.ariaLabel ?? copy.sortBy(String(column.header))}
         >
           {content}
         </Button>
@@ -103,7 +130,8 @@ export interface DataCellProps<T extends Record<string, unknown>> {
   rowIndex: number;
   rowId: string | number;
   column: GridColumn<T>;
-  rowHeight: number;
+  /** The row's height, as CSS — `DataGridModel.rowHeight`. */
+  rowHeight: string;
   editing: NonNullable<DataGridProps<T>['editing']>;
   model: Pick<DataGridModel<T>, 'editingCell' | 'setEditingCell'>;
 }
@@ -117,6 +145,7 @@ export function DataCell<T extends Record<string, unknown>>({
   editing,
   model,
 }: DataCellProps<T>): React.JSX.Element {
+  const theme = useTheme();
   const value = cellValue(row, column);
   const isEditing =
     model.editingCell?.rowId === rowId && model.editingCell?.colId === column.id;
@@ -129,9 +158,7 @@ export function DataCell<T extends Record<string, unknown>>({
       data-col-id={column.id}
       data-editing={isEditing}
       sx={{
-        minWidth: column.minWidth,
-        maxWidth: column.maxWidth,
-        width: column.width,
+        ...columnBox(theme, column),
         height: rowHeight,
       }}
       role="gridcell"
@@ -166,6 +193,7 @@ export interface GridRowProps<T extends Record<string, unknown>> {
 
 /** The leading checkbox / chevron cells, which exist only for enabled features. */
 function RowControls<T extends Record<string, unknown>>({
+  row,
   index,
   rowId,
   isSelected,
@@ -181,19 +209,32 @@ function RowControls<T extends Record<string, unknown>>({
           <Checkbox
             checked={isSelected}
             onChange={(event) => model.onToggleRow(rowId, event.target.checked)}
-            inputProps={{ 'aria-label': `Select row ${index + 1}` }}
+            inputProps={{ 'aria-label': props.copy.selectRow(index + 1) }}
           />
         </TableCell>
       )}
       {expansion && (
         <TableCell padding="checkbox">
-          <IconButton
-            size="small"
-            onClick={() => model.onToggleExpansion(rowId)}
-            aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
-          >
-            {isExpanded ? <ExpandLess /> : <ExpandMore />}
-          </IconButton>
+          {expansion.isRowExpandable?.(row) === false ? null : (
+            <IconButton
+              size="small"
+              // Stopped so a host that opens the record on a row click does not
+              // ALSO open it here: the chevron is its own control.
+              onClick={(event) => {
+                event.stopPropagation();
+                model.onToggleExpansion(rowId);
+              }}
+              aria-expanded={isExpanded}
+              aria-label={
+                isExpanded
+                  ? (expansion.collapseLabel ?? props.copy.collapseRow)
+                  : (expansion.expandLabel ?? props.copy.expandRow)
+              }
+              data-slot="expand-toggle"
+            >
+              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+            </IconButton>
+          )}
         </TableCell>
       )}
     </>
@@ -234,8 +275,8 @@ export function GridRow<T extends Record<string, unknown>>(
           />
         ))}
       </TableRow>
-      {expansion && isExpanded && (
-        <TableRow>
+      {expansion && isExpanded && expansion.isRowExpandable?.(row) !== false && (
+        <TableRow data-slot="row-detail">
           <TableCell colSpan={totalColumns}>{expansion.render(row, index)}</TableCell>
         </TableRow>
       )}

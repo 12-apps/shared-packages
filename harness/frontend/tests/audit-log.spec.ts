@@ -169,7 +169,9 @@ test.describe('The trail', () => {
 test.describe('The filters', () => {
   test('an action pill narrows the trail through the backend', async ({ page }) => {
     await openTrail(page);
-    expect(await serverTotal(page)).toBe(4);
+    // Polled like every other count here: the counter reads `0 de 0` until the
+    // first page of the trail comes back, and the grid container is visible first.
+    await expect.poll(() => serverTotal(page)).toBe(4);
 
     await pickOption(page, 'action', 'Lamp extinguished');
 
@@ -287,7 +289,7 @@ test.describe('The filters', () => {
     // pager is not rendered at all. The number is the database's `count`, not a
     // row tally — which is what makes it the useful assertion when a filter
     // narrows.
-    expect(await serverTotal(page)).toBe(4);
+    await expect.poll(() => serverTotal(page)).toBe(4);
     await expect(page.getByTestId('audit-log-pagination')).toHaveCount(0);
   });
 });

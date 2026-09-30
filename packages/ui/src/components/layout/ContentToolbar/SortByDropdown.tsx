@@ -16,6 +16,9 @@ import type {
   SortFieldDefinition,
   SortOrderOption,
 } from './ContentToolbar.types';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { fieldHeight } from '../../../tokens/field-height';
+import { sxRem } from '../../../tokens/relative';
 
 function findActiveField<TField extends string>(
   fields: SortFieldDefinition<TField>[] | undefined,
@@ -66,13 +69,13 @@ function resolveTriggerParts(
   return { full, short: fieldDef?.label ?? full, arrowSuffix };
 }
 
-const sectionLabelSx = { px: 1, py: 0.75, fontSize: '0.75rem', fontWeight: 600, color: 'text.primary', lineHeight: 1.5 } as const;
+const sectionLabelSx = { px: 1, py: 0.75, fontSize: sxRem(12), fontWeight: 600, color: 'text.primary', lineHeight: 1.5 } as const;
 
 /** A fixed-width check slot (empty when unchecked) so labels align. */
 function SortCheck({ checked }: { checked: boolean }): React.JSX.Element {
   return (
-    <Box component="span" sx={{ display: 'flex', width: 16, flexShrink: 0, alignItems: 'center', justifyContent: 'center' }} aria-hidden>
-      {checked ? <CheckIcon sx={{ fontSize: 14 }} /> : null}
+    <Box component="span" sx={{ display: 'flex', width: sxRem(16), flexShrink: 0, alignItems: 'center', justifyContent: 'center' }} aria-hidden>
+      {checked ? <CheckIcon sx={{ fontSize: sxRem(14) }} /> : null}
     </Box>
   );
 }
@@ -134,7 +137,7 @@ function SortMenu<TField extends string>({
       onClose={close}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-      slotProps={{ paper: { sx: { minWidth: 180 } } }}
+      slotProps={{ paper: { sx: { minWidth: sxRem(180) } } }}
     >
       {orderOptions.length > 0 && [
         <ListSubheader key="order-label" sx={sectionLabelSx}>
@@ -203,10 +206,10 @@ export function SortByDropdown<TField extends string = string>({
   }
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.875rem' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: sxRem(14) }}>
       <Typography
         component="span"
-        sx={{ display: { xs: 'none', md: 'inline' }, color: 'text.secondary', fontSize: '0.875rem' }}
+        sx={{ display: { xs: 'none', md: 'inline' }, color: 'text.secondary', fontSize: sxRem(14) }}
       >
         {triggerPrefix}
       </Typography>
@@ -218,7 +221,7 @@ export function SortByDropdown<TField extends string = string>({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{ minWidth: 0, height: 32, px: 1, gap: 0.5, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
+        sx={{ minWidth: 0, height: fieldHeight, px: 1, gap: 0.5, borderRadius: fieldRadiusPx, color: 'text.primary', textTransform: 'none', fontWeight: 600 }}
       >
         {/* Full "Nome (crescente)" on md+; just the field name on mobile — the
             arrow already conveys the direction, so the parenthetical is dropped. */}
@@ -229,7 +232,7 @@ export function SortByDropdown<TField extends string = string>({
           {trigger.short}
         </Box>
         {trigger.arrowSuffix}
-        <ChevronDownIcon sx={{ fontSize: 14 }} />
+        <ChevronDownIcon sx={{ fontSize: sxRem(14) }} />
       </Button>
       <SortMenu
         orderHeading={orderHeading}

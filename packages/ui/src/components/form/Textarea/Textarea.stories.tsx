@@ -4,9 +4,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Edit3, FileText, MessageCircle, Star } from 'lucide-react';
 
 import { Textarea } from './Textarea';
+import { PT_BR_RICH_EDITOR_TOOLBAR_COPY } from '../../../pt-BR';
 import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
-const meta: Meta<typeof Textarea> = {
+const meta = {
   title: 'Form/Textarea',
   component: Textarea,
   parameters: {
@@ -31,7 +32,7 @@ const meta: Meta<typeof Textarea> = {
       options: ['start', 'end'],
     },
   },
-};
+} satisfies Meta<typeof Textarea>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -88,6 +89,7 @@ export const Variants: Story = {
         </Typography>
         <Textarea
           variant="rich"
+          richEditorCopy={PT_BR_RICH_EDITOR_TOOLBAR_COPY}
           placeholder="Rich text editor with formatting tools..."
           label="Rich Text Editor"
           helperText="Format your content with bold, italic, lists, and more"
@@ -100,6 +102,7 @@ export const Variants: Story = {
         </Typography>
         <Textarea
           variant="rich"
+          richEditorCopy={PT_BR_RICH_EDITOR_TOOLBAR_COPY}
           glass
           placeholder="Rich textarea with glass effect..."
           label="Glass Rich Editor"
@@ -229,6 +232,7 @@ export const RichTextShowcase: Story = {
         </Typography>
         <Textarea
           variant="rich"
+          richEditorCopy={PT_BR_RICH_EDITOR_TOOLBAR_COPY}
           color="primary"
           placeholder="Start writing your content..."
           label="Content Editor"
@@ -242,6 +246,7 @@ export const RichTextShowcase: Story = {
         </Typography>
         <Textarea
           variant="rich"
+          richEditorCopy={PT_BR_RICH_EDITOR_TOOLBAR_COPY}
           color="secondary"
           placeholder="Limited character content..."
           label="Limited Editor"
@@ -256,6 +261,7 @@ export const RichTextShowcase: Story = {
         </Typography>
         <Textarea
           variant="rich"
+          richEditorCopy={PT_BR_RICH_EDITOR_TOOLBAR_COPY}
           glass
           glassLabel
           color="success"
@@ -320,6 +326,7 @@ export const AllVariants: Story = {
         </Typography>
         <Textarea
           variant="rich"
+          richEditorCopy={PT_BR_RICH_EDITOR_TOOLBAR_COPY}
           placeholder="Rich text editor with formatting tools..."
           label="Rich Text Editor"
           helperText="Format your content with bold, italic, lists, and more"
@@ -467,7 +474,7 @@ export const Responsive: Story = {
           placeholder="This textarea adapts to container width..."
           label="Responsive Textarea"
           helperText="Adapts to container width and content height"
-          sx={{ width: '100%' }}
+          style={{ width: '100%' }}
         />
       </Box>
     </Box>

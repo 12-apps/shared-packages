@@ -15,7 +15,10 @@ import FilterAltOffRoundedIcon from "@mui/icons-material/FilterAltOffRounded";
 import Tooltip from "@mui/material/Tooltip/index.js";
 
 import { Box } from "../../../mui/Box";
+import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { fieldHeight } from "../../../tokens/field-height";
+import { sxRem } from "../../../tokens/relative";
 
 /**
  * "Limpar" — one gesture back to the unfiltered list.
@@ -40,7 +43,7 @@ export function ClearAllControl({
   testIdPrefix: string;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
-  // No border, no fill. Every other control on this row is an outlined pill
+  // No border, no fill. Every other control on this row is an outlined field
   // because it OPENS something; this one is an escape hatch, and giving it the
   // same weight made it read as a sixth filter. Quiet until hovered.
   const button = (
@@ -54,20 +57,20 @@ export function ClearAllControl({
         display: "inline-flex",
         alignItems: "center",
         gap: 0.5,
-        height: 34,
+        height: fieldHeight,
         px: compact ? 0.75 : 1,
         border: 0,
-        borderRadius: 1,
+        borderRadius: fieldRadiusPx,
         bgcolor: "transparent",
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.8125rem",
+        fontSize: sxRem(13),
         whiteSpace: "nowrap",
         color: "text.secondary",
         "&:hover": { color: "text.primary", bgcolor: "action.hover" },
       }}
     >
-      <FilterAltOffRoundedIcon sx={{ fontSize: 16 }} />
+      <FilterAltOffRoundedIcon sx={{ fontSize: sxRem(16) }} />
       {!compact && <Box component="span">{copy.filters.clear}</Box>}
     </Box>
   );
@@ -105,17 +108,17 @@ export function CloseSearchControl({
         sx={{
           display: "inline-flex",
           alignItems: "center",
-          height: 34,
+          height: fieldHeight,
           px: 0.75,
           border: 0,
-          borderRadius: 1,
+          borderRadius: fieldRadiusPx,
           bgcolor: "transparent",
           cursor: "pointer",
           color: "text.secondary",
           "&:hover": { color: "text.primary", bgcolor: "action.hover" },
         }}
       >
-        <CloseRoundedIcon sx={{ fontSize: 18 }} />
+        <CloseRoundedIcon sx={{ fontSize: sxRem(18) }} />
       </Box>
     </Tooltip>
   );

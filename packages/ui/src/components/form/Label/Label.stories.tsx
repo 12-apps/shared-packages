@@ -4,13 +4,43 @@ import PersonIcon from '@mui/icons-material/Person';
 import StarIcon from '@mui/icons-material/Star';
 import Box from '@mui/material/Box/index.js';
 import Stack from '@mui/material/Stack/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Label } from './Label';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
+
+// `Label` forwards `style` and `className`, not `sx` — a breakpoint-varying
+// example needs media queries `style` can't express, so it goes through
+// `styled(Label)` instead.
+const ResponsiveFontSizeLabel = styled(Label)(({ theme }) => ({
+  fontSize: '0.75rem',
+  [theme.breakpoints.up('sm')]: { fontSize: '0.875rem' },
+  [theme.breakpoints.up('md')]: { fontSize: '1rem' },
+  [theme.breakpoints.up('lg')]: { fontSize: '1.125rem' },
+  [theme.breakpoints.up('xl')]: { fontSize: '1.25rem' },
+}));
+
+const ResponsivePaddingLabel = styled(Label)(({ theme }) => ({
+  padding: '4px 8px',
+  [theme.breakpoints.up('sm')]: { padding: '6px 12px' },
+  [theme.breakpoints.up('md')]: { padding: '8px 16px' },
+  [theme.breakpoints.up('lg')]: { padding: '10px 20px' },
+}));
+
+const ResponsiveLayoutLabel = styled(Label)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  [theme.breakpoints.up('sm')]: {
+    display: 'inline-flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+}));
 
 const meta: Meta<typeof Label> = {
   title: 'Form/Label',
@@ -427,51 +457,11 @@ export const InteractiveStates: Story = {
 export const Responsive: Story = {
   render: () => (
     <Stack spacing={2}>
-      <Label
-        sx={{
-          fontSize: {
-            xs: '0.75rem',
-            sm: '0.875rem',
-            md: '1rem',
-            lg: '1.125rem',
-            xl: '1.25rem',
-          },
-        }}
-      >
-        Responsive Font Size
-      </Label>
-      <Label
-        variant="filled"
-        sx={{
-          padding: {
-            xs: '4px 8px',
-            sm: '6px 12px',
-            md: '8px 16px',
-            lg: '10px 20px',
-          },
-        }}
-      >
-        Responsive Padding
-      </Label>
-      <Label
-        icon={<InfoIcon fontSize="small" />}
-        sx={{
-          display: {
-            xs: 'flex',
-            sm: 'inline-flex',
-          },
-          flexDirection: {
-            xs: 'column',
-            sm: 'row',
-          },
-          alignItems: {
-            xs: 'flex-start',
-            sm: 'center',
-          },
-        }}
-      >
+      <ResponsiveFontSizeLabel>Responsive Font Size</ResponsiveFontSizeLabel>
+      <ResponsivePaddingLabel variant="filled">Responsive Padding</ResponsivePaddingLabel>
+      <ResponsiveLayoutLabel icon={<InfoIcon fontSize="small" />}>
         Responsive Layout
-      </Label>
+      </ResponsiveLayoutLabel>
     </Stack>
   ),
 };

@@ -4,13 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 import { expect, userEvent, waitFor,within } from 'storybook/test';
 
-// Type extension for performance.memory API
-interface PerformanceWithMemory {
-  memory?: {
-    usedJSHeapSize: number;
-  };
-  now?: () => number;
-}
+import { must } from '../../../test-utils/must';
 
 import { Text } from './Text';
 
@@ -155,7 +149,7 @@ export const KeyboardNavigation: Story = {
     ];
 
     // Test initial focus
-    await userEvent.click(focusableTexts[0]);
+    await userEvent.click(must(focusableTexts[0]));
     await waitFor(() => expect(focusableTexts[0]).toHaveFocus());
 
     // Test Tab navigation between elements
@@ -311,9 +305,7 @@ export const FocusManagement: Story = {
 
 // Responsive Design Tests
 export const ResponsiveDesign: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -344,18 +336,17 @@ export const ResponsiveDesign: Story = {
   render: () => (
     <Box sx={{ width: '100%', maxWidth: '320px' }}>
       <Stack spacing={2}>
-        <Text
-          data-testid="responsive-text"
-          sx={{
-            fontSize: { xs: '0.875rem', sm: '1rem', md: '1.125rem' },
-          }}
-        >
+        {/* `Text` has no `sx` prop — every size goes through the theme
+            vocabulary (`size`), not an ad hoc `sx` override — so a plain,
+            non-responsive `style` stands in here; the assertions below only
+            check presence, not the exact breakpoint values. */}
+        <Text data-testid="responsive-text" style={{ fontSize: '1.125rem' }}>
           Responsive text that scales with screen size
         </Text>
-        <Text data-testid="mobile-only" sx={{ display: { xs: 'block', md: 'none' } }}>
+        <Text data-testid="mobile-only" style={{ display: 'block' }}>
           Mobile only text
         </Text>
-        <Text data-testid="desktop-only" sx={{ display: { xs: 'none', md: 'block' } }}>
+        <Text data-testid="desktop-only" style={{ display: 'block' }}>
           Desktop only text
         </Text>
         <Text data-testid="body-responsive">Regular body text that adapts to screen size</Text>
@@ -513,7 +504,7 @@ export const VisualStates: Story = {
 
 // Performance Tests
 export const Performance: Story = {
-  // The web asserts the rendered TAG (`as="p"`) or a heap budget; react-native-web has neither.
+  // The web asserts DOM node identity across hovers; react-native-web renders no such nodes.
   tags: ['native-skip'],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -529,24 +520,20 @@ export const Performance: Story = {
     const largeTextElement = canvas.getByTestId('large-content');
     expect(largeTextElement).toBeInTheDocument();
 
-    // Test memory usage doesn't increase dramatically
-    const initialMemory =
-      (globalThis.performance as PerformanceWithMemory)?.memory?.usedJSHeapSize || 0;
-
-    // Trigger re-renders
+    // Re-rendering on hover must not remount the list. The heap delta that
+    // used to stand here measured when the garbage collector last ran, not the
+    // component: in a real browser it swung past its 1 MB budget (2.9 MB) with
+    // no code change (FUT-2619). Node identity is what a leak would break.
     for (let i = 0; i < 10; i++) {
-      await userEvent.hover(textElements[0]);
-      await userEvent.unhover(textElements[0]);
+      await userEvent.hover(must(textElements[0]));
+      await userEvent.unhover(must(textElements[0]));
     }
 
-    const finalMemory =
-      (globalThis.performance as PerformanceWithMemory)?.memory?.usedJSHeapSize || 0;
-
-    // Memory increase should be minimal (if memory API is available)
-    if (initialMemory > 0 && finalMemory > 0) {
-      const memoryIncrease = finalMemory - initialMemory;
-      expect(memoryIncrease).toBeLessThan(1000000); // Less than 1MB increase
-    }
+    const afterHover = canvas.getAllByText(/Performance text/);
+    expect(afterHover).toHaveLength(50);
+    afterHover.forEach((element, index) => {
+      expect(element).toBe(textElements[index]);
+    });
   },
   render: () => (
     <Stack spacing={1}>
@@ -609,7 +596,7 @@ export const EdgeCases: Story = {
   },
   render: () => (
     <Stack spacing={2}>
-      <Text data-testid="empty-text"></Text>
+      <Text data-testid="empty-text">{''}</Text>
       <Text data-testid="long-word">
         supercalifragilisticexpialidociousantidisestablishmentarianism
       </Text>
@@ -757,16 +744,10 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: { defaultViewport: 'mobile1' },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
-    <Text
-      sx={{
-        fontSize: { xs: '0.875rem', sm: '1rem', md: '1.125rem' },
-        lineHeight: { xs: 1.4, sm: 1.5, md: 1.6 },
-      }}
-    >
+    // `Text` has no `sx` prop — see the note on `ResponsiveDesign` above.
+    <Text style={{ fontSize: '1.125rem', lineHeight: 1.6 }}>
       This text adapts to different screen sizes
     </Text>
   ),

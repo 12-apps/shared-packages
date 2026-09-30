@@ -3,10 +3,75 @@ import Card from '@mui/material/Card/index.js';
 import CardContent from '@mui/material/CardContent/index.js';
 import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
+import { styled } from '@mui/material/styles/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Separator } from './Separator';
 import { SIZE_VALUES } from '../../../tokens/scales';
+
+// `Separator` only forwards `className` — it has no `sx` prop — so per-case
+// custom CSS (hover, an animated gradient, breakpoint-varying width/weight)
+// goes through `styled(Separator)`, the MUI-documented way to attach extra
+// CSS to a component that exposes only `className`.
+const HoverSeparator = styled(Separator)({
+  '&:hover': {
+    opacity: 0.7,
+    transition: 'opacity 0.2s ease-in-out',
+  },
+});
+
+const AnimatedGradientSeparator = styled(Separator)({
+  position: 'relative',
+  overflow: 'hidden',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: '-100%',
+    width: '100%',
+    height: '100%',
+    background: 'linear-gradient(90deg, transparent, rgba(25, 118, 210, 0.3), transparent)',
+    animation: 'shimmer 2s infinite',
+  },
+  '@keyframes shimmer': {
+    '0%': { left: '-100%' },
+    '100%': { left: '100%' },
+  },
+});
+
+const ResponsiveWidthSeparator = styled(Separator)(({ theme }) => ({
+  width: '100%',
+  marginLeft: 'auto',
+  marginRight: 'auto',
+  [theme.breakpoints.up('sm')]: { width: '80%' },
+  [theme.breakpoints.up('md')]: { width: '60%' },
+  [theme.breakpoints.up('lg')]: { width: '40%' },
+}));
+
+const ResponsiveThicknessSeparator = styled(Separator)(({ theme }) => ({
+  borderTopWidth: '1px',
+  [theme.breakpoints.up('sm')]: { borderTopWidth: '2px' },
+  [theme.breakpoints.up('md')]: { borderTopWidth: '3px' },
+  [theme.breakpoints.up('lg')]: { borderTopWidth: '4px' },
+}));
+
+const ResponsiveMarginSeparator = styled(Separator)(({ theme }) => ({
+  margin: '8px 0',
+  [theme.breakpoints.up('sm')]: { margin: '16px 0' },
+  [theme.breakpoints.up('md')]: { margin: '24px 0' },
+  [theme.breakpoints.up('lg')]: { margin: '32px 0' },
+}));
+
+const ResponsiveOrientationSeparator = styled(Separator)(({ theme }) => ({
+  transform: 'none',
+  height: '1px',
+  width: '100%',
+  [theme.breakpoints.up('md')]: {
+    transform: 'rotate(90deg)',
+    height: '60px',
+    width: '1px',
+  },
+}));
 
 const meta: Meta<typeof Separator> = {
   title: 'Layout/Separator',
@@ -408,6 +473,14 @@ export const AllStates: Story = {
 };
 
 export const InteractiveStates: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          '`Separator` has no `sx` prop and forwards no interactive attribute — it only ever renders a plain `<div role="separator">`. Custom CSS goes through `styled(Separator)`; a focus ring goes on a wrapping element the caller controls, not on the separator itself.',
+      },
+    },
+  },
   render: () => (
     <Stack spacing={4}>
       <Box>
@@ -415,15 +488,7 @@ export const InteractiveStates: Story = {
           Hover Effect (Custom Color)
         </Typography>
         <Typography>Hover over the separator below</Typography>
-        <Separator
-          color="#1976d2"
-          sx={{
-            '&:hover': {
-              opacity: 0.7,
-              transition: 'opacity 0.2s ease-in-out',
-            },
-          }}
-        />
+        <HoverSeparator color="#1976d2" />
         <Typography>Content after</Typography>
       </Box>
 
@@ -431,16 +496,25 @@ export const InteractiveStates: Story = {
         <Typography variant="h6" gutterBottom>
           Focus State (For Accessibility)
         </Typography>
-        <Typography>Tab-focusable separator with focus outline</Typography>
-        <Separator
+        <Typography>
+          `Separator` takes no `tabIndex` or other interactive prop — it is
+          decorative. Tab to the separator&apos;s WRAPPER below to see the
+          focus ring a caller places around it.
+        </Typography>
+        <Box
+          tabIndex={0}
           sx={{
-            '&:focus': {
+            display: 'inline-block',
+            width: '100%',
+            borderRadius: 1,
+            '&:focus-visible': {
               outline: '2px solid #1976d2',
               outlineOffset: '2px',
             },
           }}
-          tabIndex={0}
-        />
+        >
+          <Separator />
+        </Box>
         <Typography>Content after</Typography>
       </Box>
 
@@ -449,28 +523,7 @@ export const InteractiveStates: Story = {
           Animated Gradient
         </Typography>
         <Typography>Animated gradient separator</Typography>
-        <Separator
-          variant="gradient"
-          sx={{
-            position: 'relative',
-            overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: '-100%',
-              width: '100%',
-              height: '100%',
-              background:
-                'linear-gradient(90deg, transparent, rgba(25, 118, 210, 0.3), transparent)',
-              animation: 'shimmer 2s infinite',
-            },
-            '@keyframes shimmer': {
-              '0%': { left: '-100%' },
-              '100%': { left: '100%' },
-            },
-          }}
-        />
+        <AnimatedGradientSeparator variant="gradient" />
         <Typography>Content after</Typography>
       </Box>
     </Stack>
@@ -478,6 +531,14 @@ export const InteractiveStates: Story = {
 };
 
 export const Responsive: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          '`Separator` has no `sx` prop, so none of its own props take a breakpoint map either — every breakpoint-varying example here goes through `styled(Separator)` instead.',
+      },
+    },
+  },
   render: () => (
     <Stack spacing={4}>
       <Box>
@@ -485,17 +546,7 @@ export const Responsive: Story = {
           Responsive Width
         </Typography>
         <Typography>This separator adjusts to container width</Typography>
-        <Separator
-          sx={{
-            width: {
-              xs: '100%', // Full width on mobile
-              sm: '80%', // 80% width on small screens
-              md: '60%', // 60% width on medium screens
-              lg: '40%', // 40% width on large screens
-            },
-            mx: 'auto', // Center the separator
-          }}
-        />
+        <ResponsiveWidthSeparator />
         <Typography>Content after</Typography>
       </Box>
 
@@ -504,16 +555,7 @@ export const Responsive: Story = {
           Responsive Size
         </Typography>
         <Typography>Separator thickness changes with screen size</Typography>
-        <Separator
-          sx={{
-            borderTopWidth: {
-              xs: '1px', // Thin on mobile
-              sm: '2px', // Medium on small screens
-              md: '3px', // Thick on medium screens
-              lg: '4px', // Extra thick on large screens
-            },
-          }}
-        />
+        <ResponsiveThicknessSeparator />
         <Typography>Content after</Typography>
       </Box>
 
@@ -522,16 +564,7 @@ export const Responsive: Story = {
           Responsive Margin
         </Typography>
         <Typography>Separator margins adapt to screen size</Typography>
-        <Separator
-          sx={{
-            margin: {
-              xs: '8px 0', // Small margins on mobile
-              sm: '16px 0', // Medium margins on small screens
-              md: '24px 0', // Large margins on medium screens
-              lg: '32px 0', // Extra large margins on large screens
-            },
-          }}
-        />
+        <ResponsiveMarginSeparator />
         <Typography>Content after</Typography>
       </Box>
 
@@ -550,16 +583,7 @@ export const Responsive: Story = {
           }}
         >
           <Typography>Left Content</Typography>
-          <Separator
-            orientation="horizontal"
-            sx={{
-              // On mobile (xs), show as horizontal
-              // On desktop (md+), show as vertical
-              transform: { xs: 'none', md: 'rotate(90deg)' },
-              height: { xs: '1px', md: '60px' },
-              width: { xs: '100%', md: '1px' },
-            }}
-          />
+          <ResponsiveOrientationSeparator orientation="horizontal" />
           <Typography>Right Content</Typography>
         </Box>
       </Box>

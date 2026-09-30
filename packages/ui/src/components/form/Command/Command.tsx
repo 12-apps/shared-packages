@@ -15,7 +15,7 @@ import ListItemIcon from '@mui/material/ListItemIcon/index.js';
 import ListItemText from '@mui/material/ListItemText/index.js';
 import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { alpha, useTheme } from '@mui/material/styles/index.js';
+import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useMemo } from 'react';
 
 import { resolveCommandProps, useCommandPalette } from './Command.hooks';
@@ -29,8 +29,18 @@ import type {
   CommandListProps,
   CommandProps,
 } from './Command.types';
+import { rem, sxRem } from '../../../tokens/relative';
 
 export { CommandEmpty, CommandLoading, CommandSeparator } from './Command.parts';
+
+/**
+ * The list's `maxHeight`: a number is design px (400 when unset), read through
+ * the type scale; a string is any CSS length, and a number ≤ 1 stays the
+ * fraction `sx` reads it as (an `sx` callback's result still goes through the
+ * sizing transform).
+ */
+const contentMaxHeight = (theme: Theme, value: number | string = 400): number | string =>
+  typeof value === 'number' && value > 1 ? rem(theme, value) : value;
 
 const makeTestId = (dataTestId?: string) => (suffix: string) =>
   dataTestId ? `${dataTestId}-${suffix}` : undefined;
@@ -52,7 +62,7 @@ export const Command: React.FC<CommandProps> = (rawProps) => {
       PaperProps={{
         sx: {
           ...commandPaperStyles(theme, props),
-          ...commandSizeStyles(props.size),
+          ...commandSizeStyles(theme, props.size),
           overflow: 'hidden',
           ...props.style,
         },
@@ -77,7 +87,7 @@ export const Command: React.FC<CommandProps> = (rawProps) => {
 
         <Divider />
 
-        <DialogContent sx={{ p: 0, maxHeight: props.maxHeight, overflow: 'auto' }}>
+        <DialogContent sx={{ p: 0, maxHeight: (t: Theme) => contentMaxHeight(t, props.maxHeight), overflow: 'auto' }}>
           <CommandBody
             loading={props.loading}
             items={filteredItems}
@@ -299,7 +309,7 @@ const CommandItemComponent: React.FC<CommandItemProps> = ({
       }}
     >
       {icon && (
-        <ListItemIcon sx={{ minWidth: 40 }}>
+        <ListItemIcon sx={{ minWidth: sxRem(40) }}>
           {icon}
         </ListItemIcon>
       )}
@@ -308,11 +318,11 @@ const CommandItemComponent: React.FC<CommandItemProps> = ({
         primary={label}
         secondary={showDescription && description}
         primaryTypographyProps={{
-          fontSize: '0.875rem',
+          fontSize: rem(theme, 14),
           fontWeight: selected ? 600 : 400,
         }}
         secondaryTypographyProps={{
-          fontSize: '0.75rem',
+          fontSize: rem(theme, 12),
         }}
       />
 
@@ -322,8 +332,8 @@ const CommandItemComponent: React.FC<CommandItemProps> = ({
           size="small"
           variant="outlined"
           sx={{
-            height: 20,
-            fontSize: '0.7rem',
+            height: sxRem(20),
+            fontSize: rem(theme, 11.2),
             ml: 1,
           }}
         />

@@ -1,10 +1,13 @@
 import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import { rem, rems } from '../../../tokens/relative';
 
-export const slideIn = keyframes`
+import { EFFECT_GLOW } from '../../../tokens/ink.core';
+
+export const slideIn = (theme: Theme) => keyframes`
   from {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateX(${rem(theme, -20)});
   }
   to {
     opacity: 1;
@@ -12,27 +15,27 @@ export const slideIn = keyframes`
   }
 `;
 
-export const pulseGlow = keyframes`
+export const pulseGlow = (theme: Theme) => keyframes`
   0% {
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.muiBlue, 0.4)};
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+    box-shadow: 0 0 0 ${rem(theme, 10)} ${alpha(EFFECT_GLOW.muiBlue, 0)};
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.muiBlue, 0)};
   }
 `;
 
 const SIZE_STYLES: Record<string, (theme: Theme) => CSSObject> = {
   sm: (theme) => ({
     padding: theme.spacing(1, 1.5),
-    fontSize: '0.875rem',
+    fontSize: rem(theme, 14),
     '& .MuiListItemIcon-root': { transform: 'scale(0.85)' },
   }),
   lg: (theme) => ({
     padding: theme.spacing(2, 2.5),
-    fontSize: '1.125rem',
+    fontSize: rem(theme, 18),
     '& .MuiListItemIcon-root': { transform: 'scale(1.15)' },
   }),
 };
@@ -43,14 +46,14 @@ const horizontalStyles = (theme: Theme): CSSObject => ({
       borderRadius: theme.spacing(1.5),
       margin: theme.spacing(0, 0.5),
       background: alpha(theme.palette.background.paper, 0.6),
-      backdropFilter: 'blur(8px)',
+      backdropFilter: `blur(${rem(theme, 8)})`,
       border: `none`,
       // border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
     });
 
-const collapsedStyles = (): CSSObject => ({
+const collapsedStyles = (theme: Theme): CSSObject => ({
       justifyContent: 'center',
-      minHeight: 56,
+      minHeight: rem(theme, 56),
       '& .MuiListItemIcon-root': {
         margin: 0,
       },
@@ -136,7 +139,7 @@ const navInteractionStyles = (
           // Fancy hover for non-minimal variant
           background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)} 0%, ${alpha(theme.palette.primary.main, 0.08)} 100%)`,
           color: theme.palette.primary.main,
-          boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`,
+          boxShadow: `0 ${rems(theme, 8, 24)} ${alpha(theme.palette.primary.main, 0.15)}`,
           backgroundColor: alpha(theme.palette.primary.main, 0.04),
 
           '&::before': {
@@ -156,7 +159,7 @@ const navInteractionStyles = (
           },
 
           '& .MuiListItemText-primary': {
-            transform: 'translateX(4px)',
+            transform: `translateX(${rem(theme, 4)})`,
             transition: 'transform 0.3s ease',
           },
         },
@@ -193,7 +196,7 @@ export const navItemButtonStyles = ({
 }): CSSObject => ({
   ...(size ? (SIZE_STYLES[size]?.(theme) ?? {}) : {}),
   ...(variant === 'horizontal' ? horizontalStyles(theme) : {}),
-  ...(collapsed ? collapsedStyles() : {}),
+  ...(collapsed ? collapsedStyles(theme) : {}),
   ...(active ? activeStyles(theme, variant) : {}),
   ...navDecorationStyles(theme),
   ...navInteractionStyles(theme, minimal, collapsed, size),

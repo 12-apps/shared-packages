@@ -9,47 +9,49 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React, { cloneElement, isValidElement,useState } from 'react';
 
 import type { ContextMenuItem,ContextMenuProps } from './ContextMenu.types';
+import { absoluteInk, neutralTones, shadowInk, sheen } from '../../../tokens/ink';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 const StyledMenu = styled(Menu, {
   shouldForwardProp: (prop) => prop !== 'customVariant' && prop !== 'size',
 })<{ customVariant?: string; size?: string }>(({ theme, customVariant, size }) => ({
   '& .MuiPaper-root': {
-    minWidth: 160,
+    minWidth: rem(theme, 160),
     borderRadius: theme.spacing(1),
 
     ...(customVariant === 'glass' && {
       backgroundColor: alpha(theme.palette.background.paper, 0.85),
-      backdropFilter: 'blur(20px)',
+      backdropFilter: `blur(${rem(theme, 20)})`,
       border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
+      boxShadow: `0 ${rems(theme, 8, 32)} ${shadowInk(theme, 0.12)}`,
     }),
 
     ...(customVariant === 'dark' && {
-      backgroundColor: alpha(theme.palette.grey[900], 0.95),
-      color: theme.palette.common.white,
+      backgroundColor: alpha(neutralTones(theme).inverseSurface, 0.95),
+      color: absoluteInk(theme).white,
       '& .MuiMenuItem-root': {
-        color: theme.palette.common.white,
+        color: absoluteInk(theme).white,
       },
       '& .MuiListItemIcon-root': {
-        color: theme.palette.common.white,
+        color: absoluteInk(theme).white,
       },
       '& .MuiDivider-root': {
-        borderColor: alpha(theme.palette.common.white, 0.12),
+        borderColor: sheen(theme, 0.12),
       },
     }),
 
     ...(size === 'sm' && {
       '& .MuiMenuItem-root': {
-        fontSize: '0.875rem',
-        minHeight: 32,
+        fontSize: rem(theme, 14),
+        minHeight: rem(theme, 32),
         padding: theme.spacing(0.5, 1.5),
       },
     }),
 
     ...(size === 'lg' && {
       '& .MuiMenuItem-root': {
-        fontSize: '1.125rem',
-        minHeight: 48,
+        fontSize: rem(theme, 18),
+        minHeight: rem(theme, 48),
         padding: theme.spacing(1.5, 2),
       },
     }),
@@ -95,15 +97,15 @@ const StyledMenuItem = styled(MenuItem, {
 
 const MenuHeader = styled(Typography)(({ theme }) => ({
   padding: theme.spacing(1, 2),
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 600,
   textTransform: 'uppercase',
   color: theme.palette.text.secondary,
-  letterSpacing: 0.5,
+  letterSpacing: rem(theme, 0.5),
 }));
 
 const ShortcutText = styled(Typography)(({ theme }) => ({
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   color: theme.palette.text.secondary,
   marginLeft: 'auto',
   paddingLeft: theme.spacing(2),
@@ -133,7 +135,7 @@ const renderMenuItem = (
       dangerous={item.dangerous}
     >
       {hasIcon && (
-        <ListItemIcon sx={{ minWidth: size === 'sm' ? 32 : 40 }}>{item.icon}</ListItemIcon>
+        <ListItemIcon sx={{ minWidth: sxRem(size === 'sm' ? 32 : 40) }}>{item.icon}</ListItemIcon>
       )}
       <ListItemText primary={item.label} />
       {item.shortcut && <ShortcutText variant="caption">{item.shortcut}</ShortcutText>}

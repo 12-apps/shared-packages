@@ -13,7 +13,11 @@ export interface InfiniteScrollProps {
   variant?: InfiniteScrollVariant;
   hasMore: boolean;
   loading: boolean;
-  threshold?: number; // Distance from bottom/edge to trigger loading
+  /**
+   * How far before the end the next page is requested (default 150) — design
+   * px, scaled with the theme's type scale.
+   */
+  threshold?: number;
   loadMore: () => void | Promise<void>;
   loader?: ReactNode;
   endMessage?: ReactNode;
@@ -22,7 +26,11 @@ export interface InfiniteScrollProps {
   onError?: (error: Error) => void;
   className?: string;
   style?: React.CSSProperties;
-  // Horizontal specific
+  /**
+   * The `horizontal` variant's width. A number of 1 or less is a fraction of
+   * the parent (as in `sx`); a larger number is design px, scaled with the
+   * theme's type scale; a string is used as given.
+   */
   width?: number | string;
   scrollableTarget?: string | HTMLElement; // For custom scroll containers
   /**

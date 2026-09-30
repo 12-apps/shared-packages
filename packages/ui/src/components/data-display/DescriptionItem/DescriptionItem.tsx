@@ -1,6 +1,8 @@
 import Box from '@mui/material/Box/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import type { ReactNode } from 'react';
 
+import { rem } from '../../../tokens/relative';
 import { Text } from '../../typography/Text/Text';
 
 export interface DescriptionItemProps {
@@ -85,9 +87,9 @@ const containerSx = (isHorizontal: boolean, align: 'start' | 'center' | 'end') =
   textAlign: align,
 });
 
-const labelStyle = (isHorizontal: boolean) => ({
+const labelStyle = (theme: Theme, isHorizontal: boolean) => ({
   textTransform: 'uppercase' as const,
-  marginBottom: isHorizontal ? 0 : '0.25rem',
+  marginBottom: isHorizontal ? 0 : rem(theme, 4),
   minWidth: isHorizontal ? ('fit-content' as const) : undefined,
   flexShrink: isHorizontal ? 0 : undefined,
 });
@@ -105,6 +107,7 @@ export const DescriptionItem: React.FC<DescriptionItemProps> = ({
   className,
   'data-testid': dataTestId,
 }) => {
+  const theme = useTheme();
   const isHorizontal = orientation === 'horizontal';
   const testId = makeTestId(dataTestId);
 
@@ -118,7 +121,7 @@ export const DescriptionItem: React.FC<DescriptionItemProps> = ({
         variant="caption"
         size="xs"
         color="secondary"
-        style={labelStyle(isHorizontal)}
+        style={labelStyle(theme, isHorizontal)}
         data-testid={testId('label')}
       >
         {label}

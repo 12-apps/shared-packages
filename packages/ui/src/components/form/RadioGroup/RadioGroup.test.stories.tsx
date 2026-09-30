@@ -1,8 +1,13 @@
 import Box from '@mui/material/Box/index.js';
+import Radio from '@mui/material/Radio/index.js';
+import type { RadioProps } from '@mui/material/Radio/index.js';
+import Stack from '@mui/material/Stack/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Banknote, CreditCard, Globe, Heart, Shield,Smartphone, Star, Zap } from 'lucide-react';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, Mock, userEvent, waitFor, within } from 'storybook/test';
+
+import { must } from '../../../test-utils/must';
 
 import { RadioGroup } from './RadioGroup';
 
@@ -91,7 +96,7 @@ export const BasicInteraction: Story = {
       await userEvent.click(firstRadio);
       await expect(args.onChange).toHaveBeenCalledTimes(1);
       // Check that onChange was called - the first argument can be either a SyntheticEvent or a plain object
-      const firstCall = args.onChange.mock.calls[0];
+      const firstCall = must((args.onChange as Mock).mock.calls[0]);
       await expect(firstCall[1]).toBe('option1');
 
       // Verify testIds for individual radio buttons
@@ -105,7 +110,7 @@ export const BasicInteraction: Story = {
       await userEvent.click(secondRadio);
       await expect(args.onChange).toHaveBeenCalledTimes(2);
       // Check that onChange was called with the correct value
-      const secondCall = args.onChange.mock.calls[1];
+      const secondCall = must((args.onChange as Mock).mock.calls[1]);
       await expect(secondCall[1]).toBe('option2');
     });
   },
@@ -120,7 +125,7 @@ export const CardInteraction: Story = {
     label: 'Payment Method',
     value: '',
     onChange: fn(),
-    'data-testid': 'card-radio-group',
+    dataTestId: 'card-radio-group',
   },
   play: async ({ canvasElement, args, step }) => {
     const canvas = within(canvasElement);
@@ -138,7 +143,7 @@ export const CardInteraction: Story = {
       if (cardContainer) {
         await userEvent.click(cardContainer);
         await expect(args.onChange).toHaveBeenCalledTimes(1);
-        const firstCall = args.onChange.mock.calls[0];
+        const firstCall = must((args.onChange as Mock).mock.calls[0]);
         await expect(firstCall[1]).toBe('card');
       }
     });
@@ -166,7 +171,7 @@ export const ButtonInteraction: Story = {
     value: '',
     onChange: fn(),
     color: 'primary',
-    'data-testid': 'button-radio-group',
+    dataTestId: 'button-radio-group',
   },
   play: async ({ canvasElement, args, step }) => {
     const canvas = within(canvasElement);
@@ -198,7 +203,7 @@ export const SegmentInteraction: Story = {
     options: priorityOptions,
     value: '',
     onChange: fn(),
-    'data-testid': 'segment-radio-group',
+    dataTestId: 'segment-radio-group',
   },
   play: async ({ canvasElement, args, step }) => {
     const canvas = within(canvasElement);
@@ -376,7 +381,7 @@ export const ResponsiveDesign: Story = {
   },
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -393,13 +398,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
@@ -408,7 +413,7 @@ export const ResponsiveDesign: Story = {
       await expect(cards).toHaveLength(4);
 
       // Cards should be stacked vertically on mobile
-      const container = cards[0].closest('[class*="MuiBox"]');
+      const container = must(cards[0]).closest('[class*="MuiBox"]');
       if (container) {
         const computedStyle = window.getComputedStyle(container);
         // On mobile, direction should be column
@@ -634,7 +639,7 @@ export const PerformanceTest: Story = {
 
       // Verify onChange was called with the correct value
       await expect(args.onChange).toHaveBeenCalled();
-      const lastCall = args.onChange.mock.calls[args.onChange.mock.calls.length - 1];
+      const lastCall = must((args.onChange as Mock).mock.calls[(args.onChange as Mock).mock.calls.length - 1]);
       await expect(lastCall[1]).toBe('option-49'); // Option 50 has index 49
     });
   },
@@ -678,9 +683,73 @@ export const IntegrationTest: Story = {
       if (cardContainer) {
         await userEvent.click(cardContainer);
         await expect(args.onChange).toHaveBeenCalled();
-        const firstCall = args.onChange.mock.calls[0];
+        const firstCall = must((args.onChange as Mock).mock.calls[0]);
         await expect(firstCall[1]).toBe('card');
       }
+    });
+  },
+};
+
+/**
+ * `DefaultRadios` FORWARDS `size` TO THE RENDERED `Radio` GLYPH (FUT-2865).
+ *
+ * The default (unstyled-card/-button/-segment) variant is what a caller
+ * reaches by doing nothing at all — no `variant` prop. Before this fix its
+ * `<Radio>` was never given a `size` of any kind, so the glyph always drew at
+ * MUI's own default (`medium`) regardless of what `size` the caller passed.
+ * `CardRadios`/`ButtonRadios`/`SegmentRadios` already forwarded it correctly;
+ * this pins the fourth one against the same real Chromium measurement, and
+ * against a plain MUI `<Radio size=…>` as the independent source of truth for
+ * what each MUI size actually draws.
+ */
+export const SizeVocabulary: Story = {
+  name: '📐 Size Vocabulary Test',
+  render: () => (
+    <Stack direction="row" spacing={4} flexWrap="wrap" alignItems="center">
+      <RadioGroup options={[{ value: 'a', label: 'sm' }]} size="sm" dataTestId="rg-sm" />
+      <RadioGroup options={[{ value: 'a', label: 'md' }]} size="md" dataTestId="rg-md" />
+      <RadioGroup options={[{ value: 'a', label: 'lg' }]} size="lg" dataTestId="rg-lg" />
+      <RadioGroup options={[{ value: 'a', label: 'unset' }]} dataTestId="rg-unset" />
+      <Radio data-testid="mui-small" size="small" />
+      <Radio data-testid="mui-medium" size="medium" />
+      {/* MUI types Radio's size as small | medium only, though its glyph draws
+          'large' at 35px; the same one-site cast DefaultRadios uses. */}
+      <Radio data-testid="mui-large" size={'large' as RadioProps['size']} />
+    </Stack>
+  ),
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    const glyphWidth = (testId: string): number => {
+      const svg = canvas.getByTestId(testId).querySelector('svg');
+      if (!svg) throw new Error(`no glyph rendered for ${testId}`);
+      return svg.getBoundingClientRect().width;
+    };
+
+    // Chromium rounds layout to 1/64px, so these compare with 0 fractional
+    // digits (±0.5px) rather than as exact strings or exact floats.
+    await step('size="sm" draws the same glyph a plain MUI Radio size="small" draws', async () => {
+      await expect(glyphWidth('rg-sm-radio-0')).toBeCloseTo(glyphWidth('mui-small'), 0);
+    });
+
+    await step('size="md" draws the same glyph a plain MUI Radio size="medium" draws', async () => {
+      await expect(glyphWidth('rg-md-radio-0')).toBeCloseTo(glyphWidth('mui-medium'), 0);
+    });
+
+    await step('size="lg" draws the same glyph a plain MUI Radio size="large" draws', async () => {
+      await expect(glyphWidth('rg-lg-radio-0')).toBeCloseTo(glyphWidth('mui-large'), 0);
+    });
+
+    await step('size unset keeps drawing at MUI’s own default, exactly like size="md"', async () => {
+      await expect(glyphWidth('rg-unset-radio-0')).toBeCloseTo(glyphWidth('mui-medium'), 0);
+    });
+
+    await step('the three steps stay visibly distinct from each other', async () => {
+      const small = glyphWidth('mui-small');
+      const medium = glyphWidth('mui-medium');
+      const large = glyphWidth('mui-large');
+      await expect(medium).toBeGreaterThan(small);
+      await expect(large).toBeGreaterThan(medium);
     });
   },
 };

@@ -13,6 +13,8 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { ContextMenu } from './ContextMenu';
 import type { ContextMenuItem } from './ContextMenu.types';
 
@@ -174,7 +176,7 @@ export const BasicInteraction: Story = {
     await userEvent.click(copyItem);
 
     // Verify onClick was called and menu closed
-    expect(testMenuItems[0].onClick).toHaveBeenCalled();
+    expect(must(testMenuItems[0]).onClick).toHaveBeenCalled();
 
     // Menu should be closed
     await waitFor(() => {
@@ -278,7 +280,7 @@ export const ScreenReader: Story = {
     // Verify each menu item is accessible
     menuItems.forEach((item, index) => {
       expect(item).toHaveAttribute('role', 'menuitem');
-      expect(item).toHaveTextContent(testMenuItems[index].label);
+      expect(item).toHaveTextContent(must(testMenuItems[index]).label);
     });
 
     // Close menu
@@ -343,14 +345,14 @@ export const FocusManagement: Story = {
 export const ResponsiveDesign: Story = {
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
         desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px' } },
       },
-      defaultViewport: 'mobile',
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => (
     <Box
       sx={{
@@ -404,8 +406,11 @@ export const ResponsiveDesign: Story = {
     // NOT asserted here: it reads window/document dimensions, so the result depends
     // on the runner's screen size rather than on the component. That belongs in a
     // visual or e2e check pinned to a fixed viewport.
-    const menu = body.getByRole('menu');
-    expect(menu).toBeVisible();
+    // toBeVisible() is checked once MUI's enter transition settles, not
+    // mid-animation, when the menu measures 0×0 at opacity 0.
+    await waitFor(() => {
+      expect(body.getByRole('menu')).toBeVisible();
+    });
 
     // Close menu
     await userEvent.keyboard('{Escape}');

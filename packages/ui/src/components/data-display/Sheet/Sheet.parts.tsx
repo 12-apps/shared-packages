@@ -9,6 +9,8 @@ import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { scrim, sheen } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import { shimmerAnimation } from './Sheet.animations';
@@ -25,8 +27,8 @@ import type {
  * decorative one stays a neutral bar.
  */
 const handleSx = (theme: Theme, isDraggable: boolean) => ({
-  width: isDraggable ? 48 : 32,
-  height: isDraggable ? 6 : 4,
+  width: rem(theme, isDraggable ? 48 : 32),
+  height: rem(theme, isDraggable ? 6 : 4),
   backgroundColor: alpha(theme.palette.text.primary, 0.3),
   borderRadius: 3,
   transition: theme.transitions.create(['all'], {
@@ -45,18 +47,18 @@ const handleSx = (theme: Theme, isDraggable: boolean) => ({
     background: `linear-gradient(
       90deg,
       transparent,
-      ${alpha(theme.palette.common.white, 0.3)},
+      ${sheen(theme, 0.3)},
       transparent
     )`,
-    animation: isDraggable ? `${shimmerAnimation} 2s infinite` : 'none',
+    animation: isDraggable ? `${shimmerAnimation(theme)} 2s infinite` : 'none',
   },
   ...(isDraggable && {
     backgroundColor: alpha(theme.palette.primary.main, 0.4),
-    boxShadow: `0 2px 4px ${alpha(theme.palette.primary.main, 0.2)}`,
+    boxShadow: `${rems(theme, 0, 2, 4)} ${alpha(theme.palette.primary.main, 0.2)}`,
     '&:hover': {
       backgroundColor: theme.palette.primary.main,
       transform: 'scaleX(1.15) scaleY(1.2)',
-      boxShadow: `0 3px 6px ${alpha(theme.palette.primary.main, 0.3)}`,
+      boxShadow: `${rems(theme, 0, 3, 6)} ${alpha(theme.palette.primary.main, 0.3)}`,
     },
   }),
 });
@@ -223,9 +225,9 @@ export const SheetOverlay: React.FC<SheetOverlayProps> = (props) => {
           // One below the drawer: this backdrop replaces MUI's own (the drawer
           // is given a no-op BackdropComponent) and must sit under the panel.
           zIndex: theme.zIndex.drawer - 1,
-          backgroundColor: alpha(theme.palette.common.black, blur ? 0.6 : 0.5),
-          backdropFilter: blur ? 'blur(8px) saturate(180%)' : 'none',
-          WebkitBackdropFilter: blur ? 'blur(8px) saturate(180%)' : 'none',
+          backgroundColor: scrim(theme, blur ? 0.6 : 0.5),
+          backdropFilter: blur ? `blur(${rem(theme, 8)}) saturate(180%)` : 'none',
+          WebkitBackdropFilter: blur ? `blur(${rem(theme, 8)}) saturate(180%)` : 'none',
           ...style,
         }}
       />

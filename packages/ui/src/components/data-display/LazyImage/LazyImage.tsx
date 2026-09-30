@@ -1,11 +1,14 @@
 import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
-import { styled, useTheme } from '@mui/material/styles/index.js';
+import { styled, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 import { Skeleton } from '../../layout/Skeleton';
 import type { ResolvedLazyImageProps } from './LazyImage.hooks';
 import { imgPassThrough, resolveLazyImageProps, useLazyImage } from './LazyImage.hooks';
 import type { LazyImageProps } from './LazyImage.types';
+import { sheen } from '../../../tokens/ink';
+import { rem } from '../../../tokens/relative';
+import { fieldHeight } from '../../../tokens/field-height';
 
 const ImageContainer = styled(Box)(() => ({
   position: 'relative',
@@ -33,7 +36,7 @@ const SpinnerOverlay = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  backgroundColor: sheen(theme, 0.8),
   borderRadius: '50%',
   padding: theme.spacing(1),
 }));
@@ -51,13 +54,124 @@ const FallbackContainer = styled(Box)(({ theme }) => ({
   left: 0,
 }));
 
-/** The box the image occupies, shared by the real image and every stand-in for it. */
+type Length = number | string | undefined;
+
+/** A length prop as React `style` and MUI's `Skeleton` read it: a number is design px. */
+const styleLength = (theme: Theme, value: Length): string | undefined =>
+  typeof value === 'number' ? rem(theme, value) : value;
+
+/**
+ * A width or height above 0 and up to 1 is a fraction of the container's parent, as in `sx`.
+ * A negative number is no fraction: it stays a (negative, so invalid) length.
+ */
+const isFraction = (value: Length): value is number =>
+  typeof value === 'number' && value > 0 && value <= 1;
+
+/**
+ * A length prop as `sx` reads it on a width or height: a number of 1 or less is
+ * a fraction of the parent, and that stays so; any other number is design px.
+ */
+const sxLength = (theme: Theme, value: Length): string | undefined =>
+  isFraction(value) ? `${value * 100}%` : styleLength(theme, value);
+
+/**
+ * A width or height for what is drawn inside the container. The container alone
+ * takes a fraction, so everything in it fills it: a percentage here is measured
+ * against the container and would stack (FUT-2666). Otherwise the same as `styleLength`.
+ */
+const innerLength = (theme: Theme, value: Length): string | undefined =>
+  isFraction(value) ? '100%' : styleLength(theme, value);
+
+/**
+ * A width or height with its default. Only an unset or empty size takes it: `0`
+ * is a size, which `||` read as unset (FUT-2669), and `sx` reads `''` as `0%`.
+ */
+const orDefault = (value: Length, fallback: number | string): number | string =>
+  value === undefined || value === '' ? fallback : value;
+
+/**
+ * A width/height as `metrics` and the `ReactNode` `ErrorFallback` read it
+ * (FUT-2774 #4): an explicit empty string is normalized to "as if unset"
+ * rather than mapped to a component-wide default. Unlike `SkeletonIndicator`
+ * (a content-less box with nothing else to size by, hence its own deliberate
+ * `'100%'`/`'auto'` fallback), these draw the real image or a `ReactNode`
+ * fallback — both have their own intrinsic size, so leaving an unset width
+ * unset lets it size naturally (`brand-link.tsx`'s logo relies on exactly
+ * this: an unset width capped by its own `sx.maxWidth`).
+ */
+const emptyToUnset = (value: Length): Length => (value === '' ? undefined : value);
+
+/** A length, already resolved to CSS — {@link innerLength} or {@link sxLength}. */
+type LengthResolver = (theme: Theme, value: Length) => string | undefined;
+
+// A number + `%`, a (small/large/dynamic) viewport unit, or a container-query
+// unit, anywhere in a string, even nested in `calc()`/`min()`/`max()`/`clamp()`.
+const RELATIVE_LENGTH_UNIT = /[\d.]+(?:%|[dsl]?v(?:w|h|i|b|min|max)|cq(?:w|h|i|b|min|max))(?![a-zA-Z])/;
+// RELATIVE: {@link isFraction}, or that unit anywhere — borrowing it onto the
+// OTHER axis re-creates this collapse (all these units square, `LazyImage.md`).
+const isRelativeLength = (value: Length): boolean =>
+  isFraction(value) || (typeof value === 'string' && RELATIVE_LENGTH_UNIT.test(value));
+
+/** A resolved axis pair; `aspectRatio` is set when the OTHER axis comes from CSS, not a length. */
+type AxisPair = { width: string | undefined; height: string | undefined; aspectRatio?: string };
+
+/**
+ * The unset-axis DEFAULT for a PLACEHOLDER only (skeleton, `ReactNode`
+ * fallback) — never the real image/`metrics` (an unset width sizes it
+ * naturally; `brand-link.tsx`'s logo relies on that). Decision (FUT-2805): an
+ * unset axis borrows the set one (a square); neither set, both take the
+ * theme's field height; both set stays unchanged. `resolve` is `innerLength`
+ * (skeleton) or `sxLength` (the container). A RELATIVE single axis
+ * ({@link isRelativeLength}) cannot borrow the same way: it keeps its value
+ * and squares up via `aspectRatio: '1 / 1'`, the other axis explicitly
+ * `'auto'` (never `undefined` — `Skeleton`'s own default, a fixed `40`,
+ * would silently win otherwise).
+ */
+const placeholderAxis = (theme: Theme, width: Length, height: Length, resolve: LengthResolver): AxisPair => {
+  const w = emptyToUnset(width);
+  // `height` always arrives defaulted to the literal `'auto'` when unset
+  // (`LAZY_IMAGE_DEFAULTS`) — indistinguishable from an explicit `"auto"`,
+  // and no distinction is needed: both mean "no fixed height requested".
+  const h = height === 'auto' ? undefined : emptyToUnset(height);
+
+  if (w === undefined && h === undefined) {
+    const field = fieldHeight(theme);
+    return { width: field, height: field };
+  }
+  if (h === undefined) {
+    if (isRelativeLength(w)) return { width: resolve(theme, w), height: 'auto', aspectRatio: '1 / 1' };
+    const resolved = resolve(theme, w);
+    return { width: resolved, height: resolved };
+  }
+  if (w === undefined) {
+    if (isRelativeLength(h)) return { width: 'auto', height: resolve(theme, h), aspectRatio: '1 / 1' };
+    const resolved = resolve(theme, h);
+    return { width: resolved, height: resolved };
+  }
+  return { width: resolve(theme, w), height: resolve(theme, h) };
+};
+
+/**
+ * `ImageContainer`'s own axis: the ordinary `orDefault(...,'auto')` in every
+ * state, except a ReactNode `fallback` while showing — the one case where
+ * the container is the only thing that CAN fix its own collapse
+ * (`FallbackContainer` is `position: absolute`, never feeding shrink-to-fit).
+ */
+const containerAxisFor = (theme: Theme, props: ResolvedLazyImageProps, hasError: boolean): AxisPair => {
+  const { width, height, fallback } = props;
+  const needsPlaceholderSize = hasError && Boolean(fallback) && typeof fallback !== 'string';
+  return needsPlaceholderSize
+    ? placeholderAxis(theme, width, height, sxLength)
+    : { width: sxLength(theme, orDefault(width, 'auto')), height: sxLength(theme, orDefault(height, 'auto')) };
+};
+
+/** The box the image occupies, as CSS, shared by the real image and every stand-in for it. */
 interface BoxMetrics {
-  width?: number | string;
-  height?: number | string;
+  width?: string;
+  height?: string;
   objectFit: NonNullable<LazyImageProps['objectFit']>;
   objectPosition: string;
-  borderRadius?: number | string;
+  borderRadius?: string;
 }
 
 interface IndicatorProps {
@@ -65,17 +179,29 @@ interface IndicatorProps {
   metrics: BoxMetrics;
 }
 
-const SkeletonIndicator: React.FC<IndicatorProps> = ({ props, metrics }) => (
-  <Skeleton
-    variant="rectangular"
-    width={metrics.width || '100%'}
-    height={metrics.height || 200}
-    animation={props.skeletonProps.animation || 'pulse'}
-    intensity={props.skeletonProps.intensity}
-    borderRadius={props.borderRadius}
-    data-testid={`${props['data-testid']}-skeleton`}
-  />
-);
+const SkeletonIndicator: React.FC<IndicatorProps> = ({ props }) => {
+  const theme = useTheme();
+  // FUT-2805: replaces the old literal `'100%'`/`'auto'` fallbacks, which
+  // collapsed to 0 in a shrink-to-fit `ImageContainer` with nothing to
+  // resolve against.
+  const { width, height, aspectRatio } = placeholderAxis(theme, props.width, props.height, innerLength);
+  return (
+    <Skeleton
+      // FUT-2774 #5: `skeletonProps.variant` was typed but never read — the
+      // variant was hard-coded regardless of what a caller passed.
+      variant={props.skeletonProps.variant ?? 'rectangular'}
+      width={width}
+      height={height}
+      style={aspectRatio ? { aspectRatio } : undefined}
+      // FUT-2774 #5: `||` reads a caller's `false` the same as "unset", so
+      // `skeletonProps.animation={false}` could never turn the animation off.
+      animation={props.skeletonProps.animation ?? 'pulse'}
+      intensity={props.skeletonProps.intensity}
+      borderRadius={styleLength(theme, props.borderRadius)}
+      data-testid={`${props['data-testid']}-skeleton`}
+    />
+  );
+};
 
 const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
   const theme = useTheme();
@@ -84,8 +210,11 @@ const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
   return (
     <SpinnerOverlay>
       <CircularProgress
-        size={spinnerProps.size || 40}
-        thickness={spinnerProps.thickness || 4}
+        // FUT-2774 #5: `||` read `spinnerProps.size`/`thickness` of `0` the
+        // same as unset — the same class of bug FUT-2669 fixed for
+        // `width`/`height`, missed here.
+        size={styleLength(theme, spinnerProps.size ?? 40)}
+        thickness={spinnerProps.thickness ?? 4}
         sx={{ color: spinnerProps.color || theme.palette.primary.main }}
         data-testid={`${props['data-testid']}-spinner`}
       />
@@ -93,42 +222,62 @@ const SpinnerIndicator: React.FC<IndicatorProps> = ({ props }) => {
   );
 };
 
-const PlaceholderIndicator: React.FC<IndicatorProps & { hasSrc: boolean }> = ({
+/**
+ * The placeholder sits in the box's flow and gives the box its size: the box's
+ * own when one is set, the placeholder's when not. The real image is drawn over
+ * it (`OVER_PLACEHOLDER`) until it has faded in. Its load and error are not the
+ * image's, so neither reaches the caller; a failing one just retires.
+ */
+const PlaceholderIndicator: React.FC<IndicatorProps & { onError: () => void }> = ({
   props,
   metrics,
-  hasSrc,
+  onError,
 }) => {
-  // Once a src has been chosen the real <img> is on screen, so the placeholder
-  // would only stack behind it.
-  if (!props.placeholder || hasSrc) return null;
+  if (!props.placeholder) return null;
 
   return (
     <StyledImage
       src={props.placeholder}
       alt={`${props.alt} (loading)`}
       style={metrics}
+      decoding={props.decoding}
+      loading={props.lazy ? 'lazy' : props.loading}
+      onError={onError}
       data-testid={`${props['data-testid']}-placeholder`}
     />
   );
 };
 
 const LoadingIndicator: React.FC<
-  IndicatorProps & { kind: NonNullable<LazyImageProps['loadingState']>; hasSrc: boolean }
-> = ({ kind, hasSrc, ...rest }) => {
+  IndicatorProps & { kind: NonNullable<LazyImageProps['loadingState']>; onPlaceholderError: () => void }
+> = ({ kind, onPlaceholderError, ...rest }) => {
   switch (kind) {
     case 'skeleton':
       return <SkeletonIndicator {...rest} />;
     case 'spinner':
       return <SpinnerIndicator {...rest} />;
     case 'placeholder':
-      return <PlaceholderIndicator {...rest} hasSrc={hasSrc} />;
+      return <PlaceholderIndicator {...rest} onError={onPlaceholderError} />;
     default:
       return null;
   }
 };
 
+/**
+ * The real image while the placeholder is up: laid over it and cropped by
+ * `objectFit`, so the box never grows to hold both. It takes the flow back
+ * when the placeholder goes.
+ */
+const OVER_PLACEHOLDER: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+};
+
 const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
-  const { alt, fallback, borderRadius } = props;
+  const theme = useTheme();
+  const { alt, fallback, width, height, borderRadius } = props;
   const testId = props['data-testid'];
 
   if (!fallback) return null;
@@ -148,7 +297,14 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
 
   return (
     <FallbackContainer
-      sx={{ width: metrics.width, height: metrics.height, borderRadius }}
+      sx={{
+        // FUT-2774 #4 (see `emptyToUnset`); the collapse is fixed by
+        // `LazyImage` giving `ImageContainer` ITSELF a size now
+        // (`containerAxisFor`) — this `position: absolute` box just fills it.
+        width: innerLength(theme, emptyToUnset(width)),
+        height: innerLength(theme, orDefault(height, 'auto')),
+        borderRadius: styleLength(theme, borderRadius),
+      }}
       data-testid={`${testId}-fallback`}
     >
       {fallback}
@@ -162,31 +318,49 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
  */
 export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps) {
   const props = resolveLazyImageProps(rawProps);
+  const theme = useTheme();
   const {
     state,
     containerRef,
     effectiveLoadingState,
     handleImageLoad,
     handleImageError,
+    handlePlaceholderError,
     showImage,
     showLoading,
+    showPlaceholder,
   } = useLazyImage(props);
 
   const { width, height, borderRadius, alt } = props;
   const testId = props['data-testid'];
   const metrics: BoxMetrics = {
-    width,
-    height,
+    // FUT-2774 #4 (see `emptyToUnset`): `metrics` also sizes the REAL `<img>`,
+    // where an unset width means "the image's own intrinsic size" —
+    // `brand-link.tsx`'s logo relies on exactly that. `height`'s `'auto'`
+    // fallback has no such live case to protect: a percentage height against
+    // an auto-height containing block computes to `auto` regardless, so
+    // sharing `SkeletonIndicator`'s fallback changes nothing observable.
+    width: innerLength(theme, emptyToUnset(width)),
+    height: innerLength(theme, orDefault(height, 'auto')),
     objectFit: props.objectFit,
     objectPosition: props.objectPosition,
-    borderRadius,
+    borderRadius: styleLength(theme, borderRadius),
   };
+
+  const containerAxis = containerAxisFor(theme, props, state.hasError);
 
   return (
     <ImageContainer
       ref={containerRef}
       className={props.className}
-      sx={{ width: width || 'auto', height: height || 'auto', borderRadius }}
+      sx={{
+        width: containerAxis.width,
+        height: containerAxis.height,
+        aspectRatio: containerAxis.aspectRatio,
+        // The same px length the image gets (`metrics`): in `sx` a bare number
+        // would be a multiple of `shape.borderRadius`, and this box clips (FUT-2656).
+        borderRadius: metrics.borderRadius,
+      }}
       data-testid={testId}
     >
       {showLoading && (
@@ -194,7 +368,7 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
           kind={effectiveLoadingState}
           props={props}
           metrics={metrics}
-          hasSrc={Boolean(state.currentSrc)}
+          onPlaceholderError={handlePlaceholderError}
         />
       )}
 
@@ -209,7 +383,7 @@ export const LazyImage = React.memo<LazyImageProps>(function LazyImage(rawProps)
           isLoaded={!state.isLoading}
           decoding={props.decoding}
           loading={props.lazy ? 'lazy' : props.loading}
-          style={{ ...metrics, ...props.sx }}
+          style={{ ...metrics, ...props.sx, ...(showPlaceholder && OVER_PLACEHOLDER) }}
           aria-label={props['aria-label'] || alt}
           aria-describedby={props['aria-describedby']}
           role={props.role}

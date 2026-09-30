@@ -5,6 +5,8 @@ import Button from '@mui/material/Button/index.js';
 import type { ButtonProps } from '@mui/material/Button/index.js';
 import type { ReactNode } from 'react';
 
+import { sxRem } from '../../../tokens/relative';
+
 type Breakpoint = 'sm' | 'md' | 'lg';
 
 export interface HeaderButtonProps {
@@ -63,7 +65,7 @@ export function HeaderButton({
       aria-haspopup={aria['aria-haspopup']}
       aria-expanded={aria['aria-expanded']}
       data-testid={dataTestId}
-      sx={{ minWidth: 0, gap: 0.75, px: horizontalPad, py: 1, fontSize: '1rem', textTransform: 'none' }}
+      sx={{ minWidth: 0, gap: 0.75, px: horizontalPad, py: 1, fontSize: sxRem(16), textTransform: 'none' }}
     >
       <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }}>
         {icon}

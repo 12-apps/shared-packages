@@ -3,6 +3,7 @@
 import type { CategorySelectCopy } from '../../../copy';
 import Box from '@mui/material/Box/index.js';
 import InputBase from '@mui/material/InputBase/index.js';
+import { alpha, useTheme, type Theme } from '@mui/material/styles/index.js';
 
 import { SearchGlyph } from './CategoryIcons';
 import {
@@ -13,6 +14,9 @@ import {
   pinnedSx,
 } from './CategorySelect.styles';
 import type { CategorySelectionChip } from './CategorySelect.types';
+import { fieldBorder, fieldHeight } from '../../../tokens/field-height';
+import { fieldRadiusPx } from '../../../tokens/field-radius';
+import { rem, rems, sxRem } from '../../../tokens/relative';
 
 interface PanelHeadProps {
   query: string;
@@ -32,28 +36,27 @@ const searchFieldSx = {
   alignItems: 'center',
   '& input': {
     width: '100%',
-    height: 36,
-    padding: '0 30px 0 32px',
-    fontSize: 13,
-    border: '1px solid',
-    borderColor: 'divider',
-    borderRadius: '9px',
+    height: fieldHeight,
+    padding: (theme: Theme) => rems(theme, 0, 30, 0, 32),
+    fontSize: sxRem(13),
+    border: fieldBorder,
+    borderRadius: fieldRadiusPx,
     background: 'background.paper',
     color: 'text.primary',
     '&:focus': {
       outline: 'none',
       borderColor: 'primary.main',
-      boxShadow: (theme: { palette: { primary: { main: string } } }) =>
-        `0 0 0 3px ${theme.palette.primary.main}26`,
+      // 0x26 of 0xFF: the ring's old hex-alpha suffix, kept exact.
+      boxShadow: (theme: Theme) => `0 0 0 ${rem(theme, 3)} ${alpha(theme.palette.primary.main, 0x26 / 0xff)}`,
     },
   },
 } as const;
 
 const clearButtonSx = {
   position: 'absolute',
-  right: 7,
-  width: 20,
-  height: 20,
+  right: sxRem(7),
+  width: sxRem(20),
+  height: sxRem(20),
   border: 0,
   background: 'action.selected',
   color: 'text.secondary',
@@ -61,7 +64,7 @@ const clearButtonSx = {
   display: 'grid',
   placeItems: 'center',
   cursor: 'pointer',
-  fontSize: 12,
+  fontSize: sxRem(12),
   padding: 0,
   lineHeight: 1,
 } as const;
@@ -77,15 +80,16 @@ export function CategoryPanelHead({
   dataTestId,
   copy,
 }: PanelHeadProps): React.JSX.Element {
+  const theme = useTheme();
   return (
     <Box sx={(theme) => panelHeadSx(theme, sheet)}>
       <Box sx={searchFieldSx}>
         <SearchGlyph
           style={{
             position: 'absolute',
-            left: 10,
-            width: 15,
-            height: 15,
+            left: rem(theme, 10),
+            width: rem(theme, 15),
+            height: rem(theme, 15),
             opacity: 0.55,
             pointerEvents: 'none',
           }}
@@ -117,9 +121,9 @@ export function CategoryPanelHead({
           sx={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
-            marginTop: '8px',
-            fontSize: 12,
+            gap: sxRem(10),
+            marginTop: sxRem(8),
+            fontSize: sxRem(12),
           }}
         >
           {quickActions}

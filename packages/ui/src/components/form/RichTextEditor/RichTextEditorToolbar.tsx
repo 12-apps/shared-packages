@@ -20,6 +20,8 @@ import React from 'react';
 
 import type { ToolbarConfig } from './RichTextEditor.types';
 
+import { sxRem } from '../../../tokens/relative';
+
 type ResolvedToolbar = Required<Omit<ToolbarConfig, 'customItems'>> &
   Pick<ToolbarConfig, 'customItems'>;
 
@@ -148,7 +150,7 @@ export const RichTextEditorToolbar: FC<RichTextEditorToolbarProps> = ({
       variant="dense"
       data-testid="editor-toolbar"
       sx={{
-        minHeight: 48,
+        minHeight: sxRem(48),
         px: 1,
         borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
         backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.8),

@@ -1,17 +1,19 @@
-import type { CSSObject, Theme } from '@mui/material/styles/index.js';
+import type { CSSObject, SxProps, Theme } from '@mui/material/styles/index.js';
+
+import { rem, sxRem } from '../../../tokens/relative';
 
 import type { SettingsNavStatus, SettingsRailBreakpoint } from './SettingsLayout.types';
 
-/** Fixed width of the left navigation rail once it has its own column. */
-export const RAIL_WIDTH = 300;
+/** Fixed width of the left navigation rail once it has its own column (300 design px). */
+export const railWidth = (theme: Theme): string => rem(theme, 300);
 
 /** Visually hidden, still read aloud — for text a marker's colour cannot carry. */
-export const SR_ONLY_SX: CSSObject = {
+export const SR_ONLY_SX: SxProps<Theme> = {
   position: 'absolute',
-  width: '1px',
-  height: '1px',
+  width: sxRem(1),
+  height: sxRem(1),
   padding: 0,
-  margin: '-1px',
+  margin: sxRem(-1),
   overflow: 'hidden',
   clip: 'rect(0, 0, 0, 0)',
   whiteSpace: 'nowrap',

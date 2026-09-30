@@ -114,12 +114,14 @@ export const buildSuggestions = (
   );
 
 // Rendered by PasswordStrength; depends on nothing styled, so it lives beside
-// the pure helpers rather than in the component file.
-export const SuggestionsList: React.FC<{ suggestions: string[]; heading: string }> = ({
-  suggestions,
-  heading,
-}) => (
-  <Box>
+// the pure helpers rather than in the component file. `forwardRef` because it
+// is `Fade`'s child, and Fade reads `scrollTop` off the node it is handed.
+// Only the ref: Fade's injected `style` (opacity/visibility) is still dropped.
+export const SuggestionsList = React.forwardRef<
+  HTMLDivElement,
+  { suggestions: string[]; heading: string }
+>(({ suggestions, heading }, ref) => (
+  <Box ref={ref}>
     <Typography variant="caption" color="text.secondary" fontWeight="medium">
       {heading}
     </Typography>
@@ -131,4 +133,5 @@ export const SuggestionsList: React.FC<{ suggestions: string[]; heading: string 
       ))}
     </Box>
   </Box>
-);
+));
+SuggestionsList.displayName = 'SuggestionsList';

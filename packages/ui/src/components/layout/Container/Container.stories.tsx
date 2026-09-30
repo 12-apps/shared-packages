@@ -341,11 +341,7 @@ export const NonResponsive: Story = {
       </Paper>
     ),
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
 };
 
 // Custom Styling
@@ -554,9 +550,4 @@ export const Responsive: Story = {
       </Paper>
     </Container>
   ),
-  parameters: {
-    viewport: {
-      defaultViewport: 'responsive',
-    },
-  },
 };

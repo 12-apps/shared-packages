@@ -206,9 +206,11 @@ export function buildFlowSteps(opts: {
   connectPrompt: string;
   connections: readonly AiConnection[];
   onRetest: () => void;
+  pollIntervalMs?: number | undefined;
   copy: McpAiCopy;
 }): GuidedStep[] {
-  const { host, hosts, endpointUrl, connectPrompt, connections, onRetest, copy } = opts;
+  const { host, hosts, endpointUrl, connectPrompt, connections, onRetest, pollIntervalMs, copy } =
+    opts;
   const middle = host.pluginUrl
     ? simpleMiddle(hosts, connectPrompt, copy)
     : manualMiddle(host, hosts, endpointUrl, connectPrompt, copy);
@@ -221,6 +223,7 @@ export function buildFlowSteps(opts: {
         connections={connections}
         hosts={hosts}
         onRetest={onRetest}
+        pollIntervalMs={pollIntervalMs}
         copy={copy}
       />
     ),

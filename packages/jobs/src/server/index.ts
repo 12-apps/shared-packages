@@ -32,4 +32,5 @@ export type { JobsDriverChoice, JobsServerConfig, JobsSource } from "./config";
 // and `start()` throw without also reaching for the root entry point.
 export { NoJobsRegisteredError } from "../core/registry";
 export { InvalidJobRetentionError } from "../core/retention";
-export type { JobEvents, JobRetention } from "../core/types";
+export { InvalidJobStallError } from "../core/stall";
+export type { JobEvents, JobRetention, JobStallConfig } from "../core/types";

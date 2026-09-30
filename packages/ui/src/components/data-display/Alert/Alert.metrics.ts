@@ -1,5 +1,6 @@
 import type { AlertVariant } from './Alert.base';
 import { alpha, darken, lighten } from '../../../tokens/color';
+import { NEUTRAL_RAMP } from '../../../tokens/ink.core';
 import { contrastText, type UiGreyStep, type UiTheme } from '../../../tokens/theme';
 
 /**
@@ -161,9 +162,9 @@ export function alertPalette(theme: UiTheme, key: string | undefined): AlertPale
       return theme.palette[key];
     case 'neutral':
       return {
-        main: theme.palette.grey[NEUTRAL_GREY.main],
-        light: theme.palette.grey[NEUTRAL_GREY.light],
-        dark: theme.palette.grey[NEUTRAL_GREY.dark],
+        main: NEUTRAL_RAMP[NEUTRAL_GREY.main],
+        light: NEUTRAL_RAMP[NEUTRAL_GREY.light],
+        dark: NEUTRAL_RAMP[NEUTRAL_GREY.dark],
       };
     default:
       return theme.palette.info;

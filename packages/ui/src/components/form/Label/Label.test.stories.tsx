@@ -82,7 +82,7 @@ export const BasicInteraction: Story = {
     children: 'Interactive Label',
     htmlFor: 'test-input',
     onClick: fn(),
-    'data-testid': 'interactive-label',
+    dataTestId: 'interactive-label',
   },
   play: async ({ canvasElement, step, args }) => {
     const canvas = within(canvasElement);
@@ -119,7 +119,7 @@ export const RequiredFieldTest: Story = {
     children: 'Required Field',
     required: true,
     asteriskPlacement: 'end',
-    'data-testid': 'required-label',
+    dataTestId: 'required-label',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
@@ -244,24 +244,27 @@ export const KeyboardNavigation: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Tab navigation forward', async () => {
+    await step('Click on the label focuses its associated input', async () => {
       const firstLabel = canvas.getByTestId('first-label');
       const firstInputContainer = canvas.getByTestId('first-input');
       const firstInput = firstInputContainer.querySelector('input');
 
-      // Focus first label
+      // A <label htmlFor> hands focus to the control it labels, not to itself.
       await userEvent.click(firstLabel);
-      await waitFor(() => expect(firstLabel).toHaveFocus());
-
-      // Tab to input
-      await userEvent.tab();
       await waitFor(() => expect(firstInput).toHaveFocus());
+    });
+
+    await step('Tab navigation forward', async () => {
+      await userEvent.tab();
+      const secondLabel = canvas.getByTestId('second-label');
+      await waitFor(() => expect(secondLabel).toHaveFocus());
     });
 
     await step('Tab navigation backward', async () => {
       await userEvent.tab({ shift: true });
-      const firstLabel = canvas.getByTestId('first-label');
-      await waitFor(() => expect(firstLabel).toHaveFocus());
+      const firstInputContainer = canvas.getByTestId('first-input');
+      const firstInput = firstInputContainer.querySelector('input');
+      await waitFor(() => expect(firstInput).toHaveFocus());
     });
 
     await step('Enter key activation on clickable label', async () => {
@@ -283,7 +286,7 @@ export const ScreenReaderTest: Story = {
     tooltip: 'Additional information about this field',
     'aria-label': 'Accessible form label',
     'aria-describedby': 'helper-text',
-    'data-testid': 'accessible-label',
+    dataTestId: 'accessible-label',
   },
   render: (args) => (
     <Stack spacing={1}>
@@ -328,7 +331,7 @@ export const ScreenReaderOnlyTest: Story = {
     children: 'This label is only for screen readers',
     srOnly: true,
     htmlFor: 'sr-only-input',
-    'data-testid': 'sr-only-label',
+    dataTestId: 'sr-only-label',
   },
   render: (args) => (
     <Box>
@@ -403,7 +406,7 @@ export const ResponsiveDesign: Story = {
   ),
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -420,13 +423,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
@@ -490,7 +493,7 @@ export const ThemeVariations: Story = {
       const glassLabel = canvas.getByText('Glass with Glow');
       const computedStyle = window.getComputedStyle(glassLabel);
       // Glass effect uses backdrop-filter
-      expect(computedStyle.backdropFilter || computedStyle.webkitBackdropFilter).toBeDefined();
+      expect(computedStyle.backdropFilter || computedStyle.getPropertyValue('-webkit-backdrop-filter')).toBeDefined();
     });
   },
 };
@@ -884,7 +887,7 @@ export const TooltipIntegration: Story = {
     tooltip: 'This is additional information about the label',
     icon: <InfoIcon fontSize="small" />,
     iconPosition: 'end',
-    'data-testid': 'tooltip-label',
+    dataTestId: 'tooltip-label',
   },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);

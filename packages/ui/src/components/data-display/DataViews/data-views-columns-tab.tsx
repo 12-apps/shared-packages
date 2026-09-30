@@ -11,6 +11,7 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import type { HideableColumn } from "./data-views-columns";
+import { sxRem } from "../../../tokens/relative";
 
 /* ── Colunas ─────────────────────────────────────────────────────────────── */
 
@@ -130,7 +131,7 @@ function LinkButton({
         background: "none",
         cursor: "pointer",
         font: "inherit",
-        fontSize: "0.75rem",
+        fontSize: sxRem(12),
         p: 0,
         color: muted ? "text.secondary" : "primary.main",
         "&:hover": { textDecoration: "underline" },
@@ -236,7 +237,7 @@ function MoveButton({
         "&:hover": { bgcolor: "action.selected" },
       }}
     >
-      {up ? <ArrowUpwardRoundedIcon sx={{ fontSize: 14 }} /> : <ArrowDownwardRoundedIcon sx={{ fontSize: 14 }} />}
+      {up ? <ArrowUpwardRoundedIcon sx={{ fontSize: sxRem(14) }} /> : <ArrowDownwardRoundedIcon sx={{ fontSize: sxRem(14) }} />}
     </Box>
   );
 }

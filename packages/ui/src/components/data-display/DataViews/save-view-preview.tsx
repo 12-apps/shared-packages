@@ -11,6 +11,7 @@ import { useDataViewsCopy } from "./data-views-copy-context";
 import { Box } from "../../../mui/Box";
 import { Stack } from "../../../mui/Stack";
 import { Text } from "../../typography/Text";
+import { sxRem } from "../../../tokens/relative";
 
 export interface PreviewBoxProps {
   preview: { filters: string[]; columns: string[]; sort: string[] };
@@ -31,7 +32,7 @@ function SummaryRow({
   return (
     <Box sx={{ display: "flex", gap: 1.5 }} data-testid={testId}>
       <Text variant="caption" as="span">
-        <Box component="span" sx={{ width: 116, flexShrink: 0, color: "text.secondary" }}>
+        <Box component="span" sx={{ width: sxRem(116), flexShrink: 0, color: "text.secondary" }}>
           {label}
         </Box>
       </Text>
@@ -53,7 +54,7 @@ export function PreviewBox({ preview, testIdPrefix }: PreviewBoxProps): React.JS
       <Text variant="caption" as="p">
         <Box
           component="span"
-          sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600, color: "text.disabled" }}
+          sx={{ display: "block", mb: 1, textTransform: "uppercase", letterSpacing: sxRem(0.6), fontWeight: 600, color: "text.disabled" }}
         >
           {copy.saveView.previewHeading}
         </Box>

@@ -1,6 +1,9 @@
 import Box from '@mui/material/Box/index.js';
 import Stack from '@mui/material/Stack/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
+
+import { rem } from '../../../tokens/relative';
 
 import { FleetCanvas } from './FleetCanvas';
 import type { FleetMapState } from './FleetMap.hooks';
@@ -65,7 +68,7 @@ export function FleetBody({
           the six-width pass was taken at. */}
       <Box
         sx={{
-          flexBasis: { md: '280px', lg: '320px', xl: '380px' },
+          flexBasis: (theme: Theme) => ({ md: rem(theme, 280), lg: rem(theme, 320), xl: rem(theme, 380) }),
           flexShrink: 0,
           minWidth: 0,
           maxHeight: height,

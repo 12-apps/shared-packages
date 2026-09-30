@@ -296,7 +296,7 @@ export const ColorVariations: Story = {
         <Typography variant="caption" color="text.secondary" gutterBottom>
           Default Color
         </Typography>
-        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} color="default" variant="elevated" />
+        <Breadcrumbs copy={PT_BR_BREADCRUMB_COPY} items={items} variant="elevated" />
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" gutterBottom>
@@ -421,11 +421,7 @@ export const Responsive: Story = {
     collapseBehavior: 'menu',
     elevation: 2,
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
 };
 
 // Accessibility showcase

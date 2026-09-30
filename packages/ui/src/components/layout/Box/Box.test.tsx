@@ -14,12 +14,12 @@ import { Box, layoutToSx } from './Box';
  * these tests read what emotion actually painted.
  */
 describe('Box (web)', () => {
-  it('writes the resolved numbers as px, not as sx units', () => {
-    expect(layoutToSx({ paddingTop: 16, gap: 8, borderRadius: 8, width: 1, flex: 1, display: 'flex' })).toEqual({
+  it('writes the resolved numbers as lengths, not as sx units', () => {
+    expect(layoutToSx({ paddingTop: 16, gap: 8, borderRadius: 8, width: 1, flex: 1, display: 'flex' }, createTheme())).toEqual({
       paddingTop: '16px',
       gap: '8px',
       borderRadius: '8px',
-      width: '1px',
+      width: '0.0625rem',
       flex: 1,
       display: 'flex',
     });

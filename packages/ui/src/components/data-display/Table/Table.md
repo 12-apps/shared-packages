@@ -53,7 +53,7 @@ import { Table } from '@procurement/ui';
 - **selectable** `boolean` - Enable row selection
 - **selectedRows** `(string | number)[]` - Currently selected row IDs
 - **onSelectionChange** `(rows: (string | number)[]) => void` - Selection change handler
-- **stickyHeader** `boolean` - Keep header fixed when scrolling
+- **stickyHeader** `boolean` - Keep header fixed when scrolling. Sticks inside the `containerHeight` scroller — set both together, or the header has nothing to stick within
 - **responsive** `boolean` - Enable responsive column hiding
 - **virtualScrolling** `boolean` - Enable virtual scrolling for large datasets
 - **loading** `boolean` - Show loading state
@@ -67,7 +67,7 @@ import { Table } from '@procurement/ui';
 
 ### Container Props
 
-- **containerHeight** `number` - Fixed height for scrollable container
+- **containerHeight** `number | string` - Fixed height for the scrollable container, with or without `virtualScrolling` — a number is design px, a string is used as given (e.g. `'50vh'`)
 - **rowHeight** `number` - Height per row (for virtual scrolling)
 - **overscan** `number` - Number of rows to render outside viewport
 
@@ -127,6 +127,12 @@ Handle large datasets efficiently:
 />
 ```
 
+Only a numeric `containerHeight` virtualises; a string only sizes the scroll box. On the virtual path:
+
+- **Every row is exactly `rowHeight`** (default 52), whatever the `density`: the density still sets the header and the font size, but not the body's row height or vertical padding. A cell's content is centred vertically and clipped — taller or wider content does not grow the row — so pick a `rowHeight` the tallest cell fits in.
+- **Column widths come from the header** (`table-layout: fixed`): a column's `width`, with the columns that declare none sharing what is left. They hold still while rows scroll in and out. **`minWidth` is ignored** on this path; give a column that must not shrink a `width` its content and the density's side padding fit in. With `selectable`, the checkbox column is MUI's 48 wide with MUI's own checkbox padding.
+- The rows outside the window are two `aria-hidden` spacer rows at the top and bottom of the `<tbody>`, so `striped` stripes follow the mounted rows rather than the data index.
+
 ### Responsive Design
 Automatically hide/show columns based on viewport:
 
@@ -171,6 +177,17 @@ const columns = [
 - **compact** - Reduced padding for more data density
 - **normal** - Standard padding (default)
 - **comfortable** - Extra padding for improved readability
+
+**A theme density scales a table once, through `rem()`.** With no `density`
+prop, the table's own discrete density stays `'normal'` no matter what the
+host theme's density is set to — it is NOT re-picked from the theme. The
+theme's density factor still applies, exactly the way it scales every other
+size on the page, so a compact theme still gives smaller rows (≈0.9× normal)
+and a comfortable one still gives taller ones (≈1.1× normal); it does so by
+scaling the `'normal'` row through `rem()`, not by swapping in a different
+discrete row-height table. Pass `density` explicitly (or let a viewer's stored
+DataViews preference apply it) for a deliberate, second, per-table choice on
+top of that.
 
 ## Accessibility
 
@@ -241,3 +258,9 @@ const columns = [
   </Table>
 </TableContainer>
 ```
+
+On this path the caller supplies its own `TableContainer`, so the rounded clip
+is the caller's. Without `stickyHeader` the `<table>` still rounds and clips
+itself, as above; with `stickyHeader` the `<table>` does not, and the
+caller's own container should carry the radius that used to be the
+`<table>`'s (`theme.spacing(1)` at the default theme).

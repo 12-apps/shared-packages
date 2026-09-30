@@ -41,6 +41,28 @@
 // scripts/release-alert.mjs holds an issue open, where the old behaviour was a
 // package that silently never released again. It stops the moment the publish
 // works. Set RELEASE_AUTO_RECOVER=false to disable and report only.
+//
+// THE AGE GUARD, and why the schedule in lib/release-state.mjs is not enough on
+// its own. `releaseState` already re-reads the registry for minutes before
+// calling a tag orphaned (DEFAULT_RECHECK_MS there), which is what rules out
+// npm's read-after-write lag for scripts/verify-released.mjs and
+// scripts/release-alert.mjs — both of which only REPORT. This script DELETES,
+// and it runs unattended at the start of the NEXT push, by which point THIS
+// run's own hand-off (PUBLISH_ACCEPTED) is long gone — it lives only as long as
+// the job that set it. So a tag this run made minutes ago, still propagating
+// when the next push starts, would otherwise read as a plain orphan here and
+// lose its tag for real. The guard below is the second, independent check for
+// exactly that gap: an orphan whose GitHub Release is younger than
+// RELEASE_ORPHAN_MIN_AGE_MIN minutes (default 30) is left alone, because a
+// release that recent is far more likely to be propagating than genuinely
+// stuck — 734 seconds was measured once, and this script only gets to be wrong
+// in the direction that deletes something.
+//
+// `published_at` and not `created_at`: `created_at` is the TAGGED COMMIT's
+// date, which can be arbitrarily old — the release is cut long after the code
+// it names was written. A lightweight git tag carries no date at all. Only the
+// Release's own `published_at` says when npm was actually asked to serve this
+// version.
 import { spawnSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 
@@ -48,6 +70,10 @@ import { newestPublished, publishDirs, releaseState } from "./lib/release-state.
 
 const DIRS = publishDirs();
 const ENABLED = process.env.RELEASE_AUTO_RECOVER !== "false";
+// An override that is not a whole number of minutes falls back to 30: a NaN
+// floor would compare false against every age and switch the guard off.
+const MIN_AGE_RAW = Number.parseInt(process.env.RELEASE_ORPHAN_MIN_AGE_MIN ?? "", 10);
+const MIN_AGE_MIN = Number.isFinite(MIN_AGE_RAW) && MIN_AGE_RAW >= 0 ? MIN_AGE_RAW : 30;
 const REPO = process.env.GITHUB_REPOSITORY ?? "";
 const TOKEN = process.env.GITHUB_TOKEN ?? "";
 
@@ -74,20 +100,45 @@ async function api(path, init = {}) {
 }
 
 /**
- * Remove the GitHub Release for a tag, if there is one.
+ * Look up the GitHub Release for a tag, once, so the age guard and the
+ * deletion below can share the same read instead of asking the API twice.
+ *
+ * `release` is null when there is nothing to age-check or delete — no token,
+ * no Release, or the lookup itself failed — and `note` carries why, in the
+ * words the "no Release" caller has always used.
+ */
+async function findRelease(tag) {
+  if (!TOKEN || !REPO) return { release: null, note: "no GITHUB_TOKEN, left the GitHub Release in place" };
+  const found = await api(`/releases/tags/${tag}`);
+  if (found.status === 404) return { release: null, note: "no GitHub Release existed" };
+  if (!found.ok) return { release: null, note: `could not look up the GitHub Release (HTTP ${found.status})` };
+  return { release: await found.json(), note: null };
+}
+
+/**
+ * Remove a GitHub Release already looked up by `findRelease`.
  *
  * semantic-release creates the Release and pushes the tag as separate acts, so
  * either can exist without the other. A missing Release is therefore an ordinary
  * outcome and not a failure — the tag is the thing that has to go.
  */
-async function deleteRelease(tag) {
-  if (!TOKEN || !REPO) return "no GITHUB_TOKEN, left the GitHub Release in place";
-  const found = await api(`/releases/tags/${tag}`);
-  if (found.status === 404) return "no GitHub Release existed";
-  if (!found.ok) return `could not look up the GitHub Release (HTTP ${found.status})`;
-  const { id } = await found.json();
+async function deleteRelease({ id }) {
   const gone = await api(`/releases/${id}`, { method: "DELETE" });
   return gone.ok ? "deleted the GitHub Release" : `could not delete the GitHub Release (HTTP ${gone.status})`;
+}
+
+/**
+ * Minutes since a GitHub Release's `published_at`, or null when there is
+ * nothing to measure from — no Release, or one somehow missing the field.
+ *
+ * `published_at` and not `created_at` — see the file header for why the two
+ * are not interchangeable here.
+ */
+function ageMinutes(release) {
+  if (!release?.published_at) return null;
+  const publishedAt = Date.parse(release.published_at);
+  if (Number.isNaN(publishedAt)) return null;
+  return (Date.now() - publishedAt) / 60_000;
 }
 
 /**
@@ -208,7 +259,22 @@ if (orphans.length === 0 && untagged.length === 0) {
     // left by an EARLIER one — which is exactly the case whose remedy is to
     // delete the tag. The orphans a run makes itself are a different problem
     // with the opposite remedy, and scripts/verify-released.mjs handles those.
-    const releaseNote = await deleteRelease(tag);
+    const { release, note: lookupNote } = await findRelease(tag);
+    const age = ageMinutes(release);
+    if (age !== null && age < MIN_AGE_MIN) {
+      console.log(
+        `::notice::${tag} was published ${Math.round(age)} minute(s) ago, under the ` +
+          `${MIN_AGE_MIN}-minute age guard (RELEASE_ORPHAN_MIN_AGE_MIN) — leaving it in ` +
+          `case the registry is still catching up with what npm already accepted, ` +
+          `rather than deleting a tag that may be healthy.`,
+      );
+      lines.push(
+        `**skipped**: ${name} tagged ${tag} — its GitHub Release is only ${Math.round(age)}m old, ` +
+          `under the ${MIN_AGE_MIN}m age guard`,
+      );
+      continue;
+    }
+    const releaseNote = release ? await deleteRelease(release) : lookupNote;
     const { ok, note } = deleteTag(tag);
     if (ok) {
       console.log(

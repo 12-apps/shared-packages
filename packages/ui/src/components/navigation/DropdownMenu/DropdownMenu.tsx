@@ -12,6 +12,17 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import React, { cloneElement, isValidElement,useRef, useState } from 'react';
 
 import type { DropdownMenuItem,DropdownMenuProps } from './DropdownMenu.types';
+import { modeInk, shadowInk, sheen } from '../../../tokens/ink';
+import { rem, rems, sxRem } from '../../../tokens/relative';
+
+/**
+ * A caller's `maxHeight`/`minWidth` for `sx`: a string as given, a number as
+ * design px — except `≤ 1`, which `sx` has always read as a fraction.
+ */
+const sxBoxLength = (value: number | string): string | ((theme: Theme) => string) =>
+  typeof value === 'string'
+    ? value
+    : (theme) => (value <= 1 && value !== 0 ? `${value * 100}%` : rem(theme, value));
 
 // Resolves every light/dark decision once. The inline version repeated
 // `theme.palette.mode === 'dark' ? … : …` nine times, and two of those had the
@@ -21,7 +32,7 @@ const glassTokens = (theme: Theme) => {
   const isDark = theme.palette.mode === 'dark';
 
   return {
-    edge: isDark ? theme.palette.common.white : theme.palette.common.black,
+    edge: modeInk(theme),
     dropShadowAlpha: isDark ? 0.4 : 0.12,
     insetHighlightAlpha: isDark ? 0.2 : 0.8,
     sheenAlpha: isDark ? 0.1 : 0.8,
@@ -33,13 +44,13 @@ const glassMenuStyles = (theme: Theme): CSSObject => {
 
   return {
     backgroundColor: alpha(theme.palette.background.paper, 0.75),
-    backdropFilter: 'blur(24px) saturate(1.8)',
-    WebkitBackdropFilter: 'blur(24px) saturate(1.8)', // Safari support
+    backdropFilter: `blur(${rem(theme, 24)}) saturate(1.8)`,
+    WebkitBackdropFilter: `blur(${rem(theme, 24)}) saturate(1.8)`, // Safari support
     border: `1px solid ${alpha(edge, 0.12)}`,
     boxShadow: [
-      `0 8px 32px ${alpha(theme.palette.common.black, dropShadowAlpha)}`,
-      `0 0 0 1px ${alpha(edge, 0.05)}`,
-      `inset 0 1px 0 ${alpha(theme.palette.common.white, insetHighlightAlpha)}`,
+      `0 ${rems(theme, 8, 32)} ${shadowInk(theme, dropShadowAlpha)}`,
+      `0 0 0 ${rem(theme, 1)} ${alpha(edge, 0.05)}`,
+      `inset 0 ${rem(theme, 1)} 0 ${sheen(theme, insetHighlightAlpha)}`,
     ].join(', '),
     // Enhanced glass morphism with subtle gradient overlay
     '&::before': {
@@ -49,7 +60,7 @@ const glassMenuStyles = (theme: Theme): CSSObject => {
       left: 0,
       right: 0,
       bottom: 0,
-      background: `linear-gradient(135deg, ${alpha(theme.palette.common.white, sheenAlpha)} 0%, transparent 50%)`,
+      background: `linear-gradient(135deg, ${sheen(theme, sheenAlpha)} 0%, transparent 50%)`,
       borderRadius: 'inherit',
       pointerEvents: 'none',
       zIndex: 1,
@@ -66,28 +77,28 @@ const StyledMenu = styled(Menu, {
   shouldForwardProp: (prop) => prop !== 'customVariant' && prop !== 'size',
 })<{ customVariant?: string; size?: string }>(({ theme, customVariant, size }) => ({
   '& .MuiPaper-root': {
-    minWidth: 180,
+    minWidth: rem(theme, 180),
     borderRadius: theme.spacing(1),
 
     ...(customVariant === 'glass' && glassMenuStyles(theme)),
 
     ...(customVariant === 'minimal' && {
-      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.08)}`,
+      boxShadow: `0 ${rems(theme, 2, 8)} ${shadowInk(theme, 0.08)}`,
       border: `1px solid ${theme.palette.divider}`,
     }),
 
     ...(size === 'sm' && {
       '& .MuiMenuItem-root': {
-        fontSize: '0.875rem',
-        minHeight: 32,
+        fontSize: rem(theme, 14),
+        minHeight: rem(theme, 32),
         padding: theme.spacing(0.75, 2),
       },
     }),
 
     ...(size === 'lg' && {
       '& .MuiMenuItem-root': {
-        fontSize: '1.125rem',
-        minHeight: 48,
+        fontSize: rem(theme, 18),
+        minHeight: rem(theme, 48),
         padding: theme.spacing(1.5, 3),
       },
     }),
@@ -131,15 +142,15 @@ const StyledMenuItem = styled(MenuItem, {
 
 const MenuHeader = styled(Typography)(({ theme }) => ({
   padding: theme.spacing(1, 2),
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   fontWeight: 600,
   textTransform: 'uppercase',
   color: theme.palette.text.secondary,
-  letterSpacing: 0.5,
+  letterSpacing: rem(theme, 0.5),
 }));
 
 const ShortcutText = styled(Typography)(({ theme }) => ({
-  fontSize: '0.75rem',
+  fontSize: rem(theme, 12),
   color: theme.palette.text.secondary,
   marginLeft: 'auto',
   paddingLeft: theme.spacing(2),
@@ -189,7 +200,7 @@ const renderLeafMenuItem = (
       data-testid={item.dataTestId}
     >
       {hasIcon && (
-        <ListItemIcon sx={{ minWidth: size === 'sm' ? 32 : 40 }}>{item.icon}</ListItemIcon>
+        <ListItemIcon sx={{ minWidth: sxRem(size === 'sm' ? 32 : 40) }}>{item.icon}</ListItemIcon>
       )}
       <ListItemText primary={item.label} />
       {item.shortcut && <ShortcutText variant="caption">{item.shortcut}</ShortcutText>}
@@ -317,8 +328,8 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
       onOpen,
       onClose,
       size = 'md',
-      maxHeight = 400,
-      minWidth = 180,
+      maxHeight,
+      minWidth,
       closeOnItemClick = true,
       showIconSpace = false,
       anchorEl: providedAnchorEl,
@@ -362,8 +373,8 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
           size={size}
           PaperProps={{
             sx: {
-              maxHeight,
-              minWidth,
+              maxHeight: sxBoxLength(maxHeight ?? 400),
+              minWidth: sxBoxLength(minWidth ?? 180),
               overflow: 'auto',
             },
           }}

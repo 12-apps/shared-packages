@@ -103,7 +103,7 @@ export interface WebNotifications {
    * right now, and `useBellBadge` below is the door. Still the right hook for
    * anything that genuinely wants "how many unread rows".
    */
-  useUnreadCount: (options?: { enabled?: boolean }) => number;
+  useUnreadCount: (options?: BadgeHookOptions) => number;
   /**
    * The badge's NUMBER AND TONE, for a host with its own trigger chrome.
    *
@@ -119,13 +119,23 @@ export interface WebNotifications {
    * hook that bell uses. Without live activities configured it is
    * `useUnreadCount` plus `hasNew: count > 0`.
    */
-  useBellBadge: (options?: { enabled?: boolean }) => BellBadge;
+  useBellBadge: (options?: BadgeHookOptions) => BellBadge;
   /** The shared client state, for host glue. */
   store: InboxStore;
   /** The bound wire client. */
   api: NotificationsApiClient;
   /** The copy in force, so a host's own chrome can reuse a sentence. */
   messages: NotificationMessages;
+}
+
+/**
+ * What a host passes either badge hook: whether to run at all, and — for a host
+ * that holds its own realtime connection — whether that connection is up
+ * (`BadgeSyncOptions.live`).
+ */
+export interface BadgeHookOptions {
+  enabled?: boolean;
+  live?: boolean;
 }
 
 /** What the factory passes both badge hooks: whatever realtime wiring it has. */

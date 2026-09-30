@@ -10,10 +10,15 @@ import SearchIcon from "@mui/icons-material/Search";
 import IconButton from "@mui/material/IconButton/index.js";
 import InputAdornment from "@mui/material/InputAdornment/index.js";
 import TextField from "@mui/material/TextField/index.js";
+import type { Theme } from "@mui/material/styles/index.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Box } from "../../../mui/Box";
+import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { fieldHeight, fieldTextFieldStyles } from "../../../tokens/field-height";
+import { fieldEdge } from "../../../tokens/field-edge";
+import { rem, sxRem } from "../../../tokens/relative";
 
 /** How long the box waits after the last keystroke before it queries. */
 const SEARCH_DEBOUNCE_MS = 350;
@@ -29,8 +34,8 @@ const SEARCH_DEBOUNCE_MS = 350;
  * and if what is left would still be unreadable the bar hands it the whole
  * cluster instead (`searchTakeover`).
  */
-function boxWidth(fill: boolean): { flex: number; minWidth: number; maxWidth: number | "none" } {
-  return { flex: 1, minWidth: fill ? 0 : 200, maxWidth: fill ? "none" : 384 };
+function boxWidth(theme: Theme, fill: boolean): { flex: number; minWidth: number | string; maxWidth: string } {
+  return { flex: 1, minWidth: fill ? 0 : rem(theme, 200), maxWidth: fill ? "none" : rem(theme, 384) };
 }
 
 /**
@@ -149,7 +154,7 @@ export function InlineKeyword({
       InputProps={{
         startAdornment: (
           <InputAdornment position="start">
-            <SearchIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+            <SearchIcon sx={{ fontSize: sxRem(16), color: "text.secondary" }} />
           </InputAdornment>
         ),
         endAdornment: draft ? (
@@ -161,14 +166,15 @@ export function InlineKeyword({
               onClick={() => setDraft("")}
               sx={{ p: 0.25 }}
             >
-              <CloseIcon sx={{ fontSize: 14 }} />
+              <CloseIcon sx={{ fontSize: sxRem(14) }} />
             </IconButton>
           </InputAdornment>
         ) : undefined,
       }}
       // Takes the free space and gives it up first — step 3 of the ladder,
-      // which needs no flag because flex does it (see `computeSplit`).
-      sx={boxWidth(fill)}
+      // which needs no flag because flex does it (see `computeSplit`). The
+      // corner is the theme's field radius, so the box matches the pills beside it.
+      sx={(theme) => ({ ...boxWidth(theme, fill), ...fieldTextFieldStyles(theme) })}
     />
   );
 }
@@ -199,23 +205,25 @@ export function CollapsedSearch({
       data-testid={testId ? `${testId}-collapsed` : undefined}
       sx={{
         position: "relative",
+        width: fieldHeight,
+        height: fieldHeight,
         border: 1,
-        borderRadius: 1,
-        borderColor: active ? "primary.main" : "divider",
+        borderRadius: fieldRadiusPx,
+        borderColor: (theme) => (active ? theme.palette.primary.main : fieldEdge(theme)),
         color: active ? "primary.main" : "text.secondary",
         bgcolor: active ? "action.selected" : "background.paper",
       }}
     >
-      <SearchIcon sx={{ fontSize: 18 }} />
+      <SearchIcon sx={{ fontSize: sxRem(18) }} />
       {active && (
         <Box
           component="span"
           sx={{
             position: "absolute",
-            top: 2,
-            right: 2,
-            width: 6,
-            height: 6,
+            top: sxRem(2),
+            right: sxRem(2),
+            width: sxRem(6),
+            height: sxRem(6),
             borderRadius: "50%",
             bgcolor: "primary.main",
           }}

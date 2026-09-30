@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
+import { SIZE_VALUES } from '../../../tokens/scales';
 import { Code } from './Code';
 
 const meta: Meta<typeof Code> = {
@@ -333,11 +334,7 @@ const longContent = [
 };
 
 export const Responsive: Story = {
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   render: () => (
     <Box sx={{ width: '100%', p: 2 }}>
       <Stack spacing={2}>
@@ -388,7 +385,7 @@ $ npm run dev
   ➜  press h to show help`}
       </Code>
 
-      <Code variant="terminal">
+      <Code variant="highlight">
         {`$ git status
 On branch main
 Your branch is up to date with 'origin/main'.
@@ -412,7 +409,6 @@ export const WithLineNumbers: Story = {
       <Code variant="block" language="javascript" lineNumbers>
         {`// React component with hooks
 import React, { useState, useEffect } from 'react';
-import { SIZE_VALUES } from '../../../tokens/scales';
 
 function Counter() {
   const [count, setCount] = useState(0);
@@ -637,7 +633,7 @@ export const LongCodeWithWrap: Story = {
         <Typography variant="subtitle2" gutterBottom>
           Without wrapping (scrollable)
         </Typography>
-        <Code variant="block" language="javascript" wrap={false}>
+        <Code variant="block" language="javascript">
           {`const veryLongVariableName = "This is a very long string that would normally cause horizontal scrolling in the code block without wrapping enabled";`}
         </Code>
       </Box>
@@ -646,7 +642,7 @@ export const LongCodeWithWrap: Story = {
         <Typography variant="subtitle2" gutterBottom>
           With wrapping enabled
         </Typography>
-        <Code variant="block" language="javascript" wrap={true}>
+        <Code variant="block" language="javascript" style={{ whiteSpace: 'pre-wrap' }}>
           {`const veryLongVariableName = "This is a very long string that will wrap to the next line when wrapping is enabled in the code block";`}
         </Code>
       </Box>

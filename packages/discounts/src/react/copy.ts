@@ -51,6 +51,8 @@ export interface DiscountsScreenCopy {
   readonly empty: string;
   /** The exported file's base name, without extension. */
   readonly exportFileName: string;
+  /** The header's export trigger. */
+  readonly exportAction: string;
   /** While the first page is loading. */
   readonly loading: string;
   /** The read failed: a heading, and the button that tries again. */
@@ -142,6 +144,9 @@ export interface DiscountsFormCopy {
   readonly activeHint: string;
   readonly stackable: string;
   readonly stackableHint: string;
+  /** The first-purchase condition (FUT-2825), and what it does to the menu. */
+  readonly firstOrderOnly: string;
+  readonly firstOrderOnlyHint: string;
   /** The banner over a form the operator must fix before it will send. */
   readonly reviewFields: string;
   /** The banner over a write the SERVER refused. */

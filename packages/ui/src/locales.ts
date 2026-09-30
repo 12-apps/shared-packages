@@ -29,7 +29,9 @@ import type {
   ChromeCopy,
   CodeEditorCopy,
   CommandPaletteCopy,
+  SectionNavCopy,
   ConfirmActionCopy,
+  DataGridCopy,
   DataStateCopy,
   InstallPromptCopy,
   LightboxCopy,
@@ -38,6 +40,8 @@ import type {
   PhoneInputCopy,
   RichEditorToolbarCopy,
   SectionOnboardingCopy,
+  SettingCardCopy,
+  SettingSwitchCopy,
   SocialLoginCopy,
   TableFilterCopy,
   TimingDiagramCopy,
@@ -67,6 +71,7 @@ export const DATA_STATE_COPY = pack<DataStateCopy>(
   pt.PT_BR_DATA_STATE_COPY,
   en.EN_US_DATA_STATE_COPY,
 );
+export const DATA_GRID_COPY = pack<DataGridCopy>(pt.PT_BR_DATA_GRID_COPY, en.EN_US_DATA_GRID_COPY);
 export const DATA_VIEWS_COPY = pack<DataViewsCopy>(
   pt.PT_BR_DATA_VIEWS_COPY,
   en.EN_US_DATA_VIEWS_COPY,
@@ -115,11 +120,23 @@ export const TABLE_FILTER_COPY = pack<TableFilterCopy>(
   pt.PT_BR_TABLE_FILTER_COPY,
   en.EN_US_TABLE_FILTER_COPY,
 );
+export const SETTING_CARD_COPY = pack<SettingCardCopy>(
+  pt.PT_BR_SETTING_CARD_COPY,
+  en.EN_US_SETTING_CARD_COPY,
+);
+export const SETTING_SWITCH_COPY = pack<SettingSwitchCopy>(
+  pt.PT_BR_SETTING_SWITCH_COPY,
+  en.EN_US_SETTING_SWITCH_COPY,
+);
 
 // navigation
 export const COMMAND_PALETTE_COPY = pack<CommandPaletteCopy>(
   pt.PT_BR_COMMAND_PALETTE_COPY,
   en.EN_US_COMMAND_PALETTE_COPY,
+);
+export const SECTION_NAV_COPY = pack<SectionNavCopy>(
+  pt.PT_BR_SECTION_NAV_COPY,
+  en.EN_US_SECTION_NAV_COPY,
 );
 export const BREADCRUMB_COPY = pack<BreadcrumbCopy>(
   pt.PT_BR_BREADCRUMB_COPY,

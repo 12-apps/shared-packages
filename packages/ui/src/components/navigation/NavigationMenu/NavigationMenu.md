@@ -44,7 +44,7 @@ A flexible and feature-rich navigation menu component that supports horizontal, 
 | active       | `boolean`                                    | false     | Whether the item is currently active         |
 | disabled     | `boolean`                                    | false     | Whether the item is disabled                 |
 | onClick      | `(event: React.MouseEvent) => void`         | undefined | Click handler for the menu item              |
-| badge        | `number \| string`                          | undefined | Badge/notification count                     |
+| badge        | `number \| string`                          | undefined | Badge/notification count. A numeric or empty-string `0` renders nothing — pass the string `'0'` for a visible zero. |
 | children     | `NavigationMenuItem[]`                      | undefined | Nested items for submenu                     |
 | description  | `string`                                     | undefined | Description text for the item                |
 | showChevron  | `boolean`                                    | false     | Whether to show a chevron for submenu        |
@@ -392,6 +392,8 @@ const itemsWithBadges = [
 - Supports both numeric and string badges
 - Animated pulse effect for numeric badges
 - Gradient background with shadow for visual prominence
+- A zero count is hidden, the same way `Badge`'s `showZero: false` default hides
+  it: `badge: 0` renders no pill. Pass the string `'0'` to show a literal zero.
 
 ### Icon Hover Animations
 

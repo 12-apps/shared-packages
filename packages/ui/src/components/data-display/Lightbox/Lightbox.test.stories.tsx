@@ -119,7 +119,7 @@ export const BasicInteraction: Story = {
     });
 
     await step('Should close lightbox with close button', async () => {
-      const closeButton = document.querySelector('[aria-label="Close lightbox"]');
+      const closeButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`);
       expect(closeButton).toBeInTheDocument();
 
       await userEvent.click(closeButton!);
@@ -149,7 +149,7 @@ export const Navigation: Story = {
     });
 
     await step('Should navigate to next image', async () => {
-      const nextButton = document.querySelector('[aria-label="Next item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
       expect(nextButton).toBeInTheDocument();
 
       await userEvent.click(nextButton!);
@@ -161,7 +161,7 @@ export const Navigation: Story = {
     });
 
     await step('Should navigate to previous image', async () => {
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
+      const prevButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`);
       expect(prevButton).toBeInTheDocument();
 
       await userEvent.click(prevButton!);
@@ -243,9 +243,15 @@ export const AccessibilityCompliance: Story = {
       // Check if the title element exists (MUI Dialog might handle aria-labelledby differently)
       const title = document.getElementById('lightbox-title');
       expect(title).toBeInTheDocument();
+      // The hidden title carries the dialog's own accessible name — the pt-BR
+      // pack's word, never the package's own English literal.
+      expect(title?.textContent).toContain(PT_BR_LIGHTBOX_COPY.dialogLabel);
+      expect(title?.textContent).not.toBe('Lightbox - Test Image 1');
 
-      // Verify there's a dialog with proper labeling
-      const dialog = document.querySelector('[role="dialog"]');
+      // Verify there's a dialog with proper labeling — the one MUI actually
+      // marks `aria-modal`, since a `[role="dialog"]` query alone can also
+      // match this component's own outer (non-modal) root.
+      const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
       expect(dialog).toBeInTheDocument();
       const hasAriaLabel =
         dialog?.hasAttribute('aria-label') || dialog?.hasAttribute('aria-labelledby');
@@ -253,11 +259,11 @@ export const AccessibilityCompliance: Story = {
     });
 
     await step('Should have accessible controls', async () => {
-      const closeButton = document.querySelector('[aria-label="Close lightbox"]');
+      const closeButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`);
       expect(closeButton).toBeInTheDocument();
 
-      const nextButton = document.querySelector('[aria-label="Next item"]');
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
+      const prevButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`);
 
       if (nextButton) expect(nextButton).toBeInTheDocument();
       if (prevButton) expect(prevButton).toBeInTheDocument();
@@ -288,9 +294,9 @@ export const ZoomAndPan: Story = {
     });
 
     await step('Should show zoom controls', async () => {
-      const zoomIn = document.querySelector('[aria-label="Zoom in"]');
-      const zoomOut = document.querySelector('[aria-label="Zoom out"]');
-      const resetZoom = document.querySelector('[aria-label="Reset zoom"]');
+      const zoomIn = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.zoomIn}"]`);
+      const zoomOut = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.zoomOut}"]`);
+      const resetZoom = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.resetZoom}"]`);
 
       expect(zoomIn).toBeInTheDocument();
       expect(zoomOut).toBeInTheDocument();
@@ -298,7 +304,7 @@ export const ZoomAndPan: Story = {
     });
 
     await step('Should zoom in when zoom in button clicked', async () => {
-      const zoomInButton = document.querySelector('[aria-label="Zoom in"]');
+      const zoomInButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.zoomIn}"]`);
       const image = document.querySelector('img[alt="Test Image 1"]');
 
       await userEvent.click(zoomInButton!);
@@ -312,14 +318,14 @@ export const ZoomAndPan: Story = {
         // Matrix with scale > 1 will have values > 1 in first and fourth positions
         const matrixMatch = style.transform.match(/matrix\(([^,]+),/);
         if (matrixMatch) {
-          const scaleValue = parseFloat(matrixMatch[1]);
+          const scaleValue = parseFloat(matrixMatch[1] ?? '0');
           expect(scaleValue).toBeGreaterThan(1);
         }
       });
     });
 
     await step('Should reset zoom when reset button clicked', async () => {
-      const resetButton = document.querySelector('[aria-label="Reset zoom"]');
+      const resetButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.resetZoom}"]`);
       const image = document.querySelector('img[alt="Test Image 1"]');
 
       await userEvent.click(resetButton!);
@@ -400,7 +406,8 @@ export const AutoplayFunctionality: Story = {
     });
 
     await step('Should show autoplay controls', async () => {
-      const playPauseButton = document.querySelector('[aria-label*="slideshow"]');
+      const playPauseSelector = `[aria-label="${PT_BR_LIGHTBOX_COPY.play}"], [aria-label="${PT_BR_LIGHTBOX_COPY.pause}"]`;
+      const playPauseButton = document.querySelector(playPauseSelector);
       expect(playPauseButton).toBeInTheDocument();
     });
 
@@ -416,16 +423,15 @@ export const AutoplayFunctionality: Story = {
     });
 
     await step('Should pause autoplay when button clicked', async () => {
-      const pauseButton = document.querySelector('[aria-label="Pause slideshow"]');
-      if (pauseButton) {
-        await userEvent.click(pauseButton);
+      const pauseButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.pause}"]`);
+      expect(pauseButton).toBeInTheDocument();
+      await userEvent.click(pauseButton!);
 
-        // Verify it changes to play button
-        await waitFor(() => {
-          const playButton = document.querySelector('[aria-label="Start slideshow"]');
-          expect(playButton).toBeInTheDocument();
-        });
-      }
+      // Verify it changes to play button
+      await waitFor(() => {
+        const playButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.play}"]`);
+        expect(playButton).toBeInTheDocument();
+      });
     });
   },
 };
@@ -447,7 +453,7 @@ export const LoopNavigation: Story = {
     });
 
     await step('Should wrap to last image when going previous from first', async () => {
-      const prevButton = document.querySelector('[aria-label="Previous item"]');
+      const prevButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`);
       expect(prevButton).toBeInTheDocument();
       expect(prevButton).not.toBeDisabled();
 
@@ -460,7 +466,7 @@ export const LoopNavigation: Story = {
     });
 
     await step('Should wrap to first image when going next from last', async () => {
-      const nextButton = document.querySelector('[aria-label="Next item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
       expect(nextButton).toBeInTheDocument();
       expect(nextButton).not.toBeDisabled();
 
@@ -494,9 +500,9 @@ export const EdgeCases: Story = {
       // absence checks below describe what an empty gallery omits, rather than
       // passing because nothing had rendered yet.
       await waitFor(() => {
-        expect(document.querySelector('[aria-label="Close lightbox"]')).toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Next item"]')).not.toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Previous item"]')).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`)).toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`)).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`)).not.toBeInTheDocument();
       });
     });
   },
@@ -504,7 +510,7 @@ export const EdgeCases: Story = {
 
 // 10. Single Image Tests
 export const SingleImageGallery: Story = {
-  render: () => <LightboxTestWrapper items={[testImages[0]]} showControls={true} />,
+  render: () => <LightboxTestWrapper items={[testImages[0]!]} showControls={true} />,
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
@@ -522,9 +528,9 @@ export const SingleImageGallery: Story = {
       // The close button proves the overlay rendered, so the absences here are
       // about what a one-item gallery omits rather than about timing.
       await waitFor(() => {
-        expect(document.querySelector('[aria-label="Close lightbox"]')).toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Next item"]')).not.toBeInTheDocument();
-        expect(document.querySelector('[aria-label="Previous item"]')).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`)).toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`)).not.toBeInTheDocument();
+        expect(document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.previous}"]`)).not.toBeInTheDocument();
       });
     });
 
@@ -557,7 +563,7 @@ export const Performance: Story = {
     });
 
     await step('Should navigate between images', async () => {
-      const nextButton = document.querySelector('[aria-label="Next item"]');
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
       await userEvent.click(nextButton!);
 
       await waitFor(() => {
@@ -578,7 +584,7 @@ export const FocusManagement: Story = {
       await userEvent.click(openButton);
 
       await waitFor(() => {
-        const closeButton = document.querySelector('[aria-label="Close lightbox"]');
+        const closeButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.close}"]`);
         expect(closeButton).toBeInTheDocument();
         // Focus management is handled by MUI Dialog
         expect(document.activeElement).toBeDefined();
@@ -595,6 +601,93 @@ export const FocusManagement: Story = {
       const dialog = document.querySelector('[role="dialog"]');
       const activeElement = document.activeElement;
       expect(dialog!.contains(activeElement)).toBe(true);
+    });
+  },
+};
+
+// 13. Media Fallback Tests — items with no `alt` fall back to the pt-BR pack's
+// own words, never the package's English literals.
+const itemsWithNoAlt: LightboxItem[] = [
+  {
+    src: testImages[0]!.src,
+    type: 'image',
+  },
+  {
+    src: 'data:video/mp4;base64,',
+    type: 'video',
+  },
+];
+
+// 14. A single, labelled dialog role (FUT-2861) — MUI's outer Modal root used
+// to inherit this component's own static `role: 'dialog'`, alongside the
+// Paper's own `role="dialog"`, so an open Lightbox exposed two dialog-role
+// elements, the outer one unlabelled. Queried through `document.body`
+// because the Lightbox is portalled — its markup does not live under
+// `canvasElement`.
+export const SingleLabelledDialogRole: Story = {
+  render: () => <LightboxTestWrapper />,
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await step('Should open lightbox', async () => {
+      const openButton = canvas.getByTestId('open-lightbox');
+      await userEvent.click(openButton);
+
+      await waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).toBeInTheDocument();
+      });
+    });
+
+    await step('Should expose exactly one role="dialog" element, with an accessible name', async () => {
+      await waitFor(() => {
+        const dialogs = body.getAllByRole('dialog');
+        expect(dialogs).toHaveLength(1);
+        expect(dialogs[0]).toHaveAccessibleName();
+        expect(dialogs[0]).toHaveAttribute('aria-labelledby', 'lightbox-title');
+      });
+    });
+  },
+};
+
+export const MediaFallbacks: Story = {
+  render: () => <LightboxTestWrapper items={itemsWithNoAlt} thumbnails={true} />,
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+
+    await step('Should open lightbox', async () => {
+      const openButton = canvas.getByTestId('open-lightbox');
+      await userEvent.click(openButton);
+
+      await waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).toBeInTheDocument();
+      });
+    });
+
+    await step('Should fall back the first image alt and hidden title to the pt-BR pack', async () => {
+      const image = document.querySelector('img[alt]') as HTMLImageElement | null;
+      expect(image?.alt).toBe(PT_BR_LIGHTBOX_COPY.imageFallback(1, 2));
+
+      // The hidden title falls back to `itemPosition`, not `imageFallback` —
+      // it names the current item's POSITION, not its media kind, and stays
+      // the same whether the current item is a photo or a video.
+      const title = document.getElementById('lightbox-title');
+      expect(title?.textContent).toBe(
+        `${PT_BR_LIGHTBOX_COPY.dialogLabel} - ${PT_BR_LIGHTBOX_COPY.itemPosition(1, 2)}`,
+      );
+
+      const thumbnail = document.querySelector('img[alt^="Miniatura"]') as HTMLImageElement | null;
+      expect(thumbnail?.alt).toBe(PT_BR_LIGHTBOX_COPY.thumbnailFallback(1));
+    });
+
+    await step('Should fall back the video aria-label to the pt-BR pack', async () => {
+      const nextButton = document.querySelector(`[aria-label="${PT_BR_LIGHTBOX_COPY.next}"]`);
+      await userEvent.click(nextButton!);
+
+      await waitFor(() => {
+        const video = document.querySelector('video') as HTMLVideoElement | null;
+        expect(video?.getAttribute('aria-label')).toBe(PT_BR_LIGHTBOX_COPY.videoFallback(2, 2));
+      });
     });
   },
 };

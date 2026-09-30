@@ -1,7 +1,7 @@
 'use client';
 
 import Box from '@mui/material/Box/index.js';
-import type { Theme } from '@mui/material/styles/index.js';
+import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React, { useMemo, useState } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
@@ -47,7 +47,7 @@ const DEFAULTS = {
 } satisfies Partial<SettingsLayoutProps>;
 
 /** Stacked below the rail's breakpoint, two columns at and above it. */
-function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint'], fillHeight: boolean) {
+function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint'], fillHeight: boolean): SxProps<Theme> {
   return (theme: Theme) => ({
     display: 'flex',
     flexDirection: 'column' as const,

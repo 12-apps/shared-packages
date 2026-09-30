@@ -1,4 +1,7 @@
+import { useTheme } from '@mui/material/styles/index.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { remPx } from '../../../tokens/relative';
 
 import { calculateTooltipPosition, getElementBounds } from './TutorialOverlay.geometry';
 import type { TutorialOverlayProps } from './TutorialOverlay.types';
@@ -49,6 +52,7 @@ const useTooltipPlacement = ({
   isVisible: boolean;
   preferredPosition?: string;
 }) => {
+  const theme = useTheme();
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const [actualPlacement, setActualPlacement] = useState<string>('bottom');
@@ -60,11 +64,12 @@ const useTooltipPlacement = ({
       targetBounds,
       tooltipRef.current.getBoundingClientRect(),
       preferredPosition || 'auto',
+      remPx(theme, 16),
     );
 
     setTooltipPosition(position);
     setActualPlacement(placement);
-  }, [targetBounds, isVisible, preferredPosition]);
+  }, [targetBounds, isVisible, preferredPosition, theme]);
 
   return { tooltipRef, tooltipPosition, actualPlacement };
 };

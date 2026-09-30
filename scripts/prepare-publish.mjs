@@ -50,9 +50,17 @@ function readManifests() {
 // carries the tag from whichever release put it on the registry.
 //
 // Tags are `<directory-basename>-v<version>` — the --tag-format ci.yml passes,
-// which is NOT the npm package name. Prereleases are ignored on purpose: releases
-// only ever come off `main`, so a suffixed tag is not something this pipeline
-// produced.
+// which is NOT the npm package name. Prereleases are ignored on purpose: this
+// pipeline never cuts one, so a suffixed tag is not something it produced.
+//
+// Only tags REACHABLE from the checked-out commit (`--merged HEAD`). cd.yml also
+// releases maintenance branches (`release/<pkg>-<major>.<minor>.x`, cut from an
+// old tag), and it fetches every tag in the repo. Read all of them and a 5.8.2
+// cut from `release/app-shell-5.8.x` would publish `@12-apps/ui: ^6.32.0` — the
+// newest ui on main — when its own tree was built against ui 6.27.2, and the
+// maintenance line would drag in exactly the upgrade it exists to avoid. On
+// `main` nothing changes: every release tag is cut there, so every one is
+// reachable from it. ./prepare-publish-selftest.mjs holds both halves.
 const TAG = /^(.+)-v(\d+)\.(\d+)\.(\d+)$/;
 
 function parseTag(tag) {
@@ -71,7 +79,9 @@ function keepLatest(latest, { name, parts }) {
 }
 
 function releasedVersions() {
-  const tags = execFileSync("git", ["tag", "--list"], { encoding: "utf8" }).split("\n");
+  const tags = execFileSync("git", ["tag", "--list", "--merged", "HEAD"], {
+    encoding: "utf8",
+  }).split("\n");
   const latest = tags.map(parseTag).filter(Boolean).reduce(keepLatest, new Map());
   return new Map([...latest].map(([name, parts]) => [name, parts.join(".")]));
 }

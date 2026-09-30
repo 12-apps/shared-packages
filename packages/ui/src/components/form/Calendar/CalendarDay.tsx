@@ -3,9 +3,12 @@ import Box from '@mui/material/Box/index.js';
 import type { FC } from 'react';
 import React from 'react';
 
+import { rem, sxRem } from '../../../tokens/relative';
+
 import type { DayRenderArgs } from './Calendar.types';
 
-const CELL_SIZE = 40;
+/** A day cell's edge, 40 design px through the theme's type scale. */
+const CELL_SIZE = sxRem(40);
 
 interface DayState extends DayRenderArgs {
   outside: boolean;
@@ -72,9 +75,9 @@ const dayCellSx = (day: DayRenderArgs, visible: boolean): SxProps<Theme> => ({
     backgroundColor: hoverBackgroundFor(day),
   },
   '&:focus': {
-    outline: '2px solid',
+    outline: (theme: Theme) => `${rem(theme, 2)} solid`,
     outlineColor: 'primary.main',
-    outlineOffset: 1,
+    outlineOffset: sxRem(1),
   },
 });
 

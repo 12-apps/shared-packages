@@ -17,6 +17,7 @@ import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React, { useId } from 'react';
 
 import type { ResolvedQuickRange } from './DateRangePicker.types';
+import { rem, sxRem } from '../../../tokens/relative';
 
 const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
   display: 'block',
@@ -28,7 +29,7 @@ const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
   flex: { xs: '0 0 auto', md: '0 1 auto' },
   textAlign: 'left',
   font: 'inherit',
-  fontSize: '0.875rem',
+  fontSize: sxRem(14),
   fontWeight: active ? 600 : 400,
   lineHeight: 1.4,
   px: 1.5,
@@ -45,12 +46,16 @@ const optionSx = (active: boolean, overMax: boolean): SxProps<Theme> => ({
   color: overMax ? 'text.disabled' : active ? 'primary.main' : 'text.primary',
   backgroundColor: active ? 'action.selected' : 'transparent',
   '&:hover': { backgroundColor: overMax ? 'transparent' : 'action.hover' },
-  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 1 },
+  '&:focus-visible': {
+    outline: (theme: Theme) => `${rem(theme, 2)} solid`,
+    outlineColor: 'primary.main',
+    outlineOffset: sxRem(1),
+  },
 });
 
 const REASON_SX: SxProps<Theme> = {
   display: 'block',
-  fontSize: '0.6875rem',
+  fontSize: sxRem(11),
   lineHeight: 1.3,
   mt: 0.25,
   color: 'text.disabled',
@@ -106,8 +111,8 @@ export function DateRangeQuickList({
         '&::-webkit-scrollbar': { display: 'none' },
         alignContent: 'flex-start',
         gap: 0.5,
-        minWidth: { md: 168 },
-        maxWidth: { md: 200 },
+        minWidth: (theme: Theme) => ({ md: rem(theme, 168) }),
+        maxWidth: (theme: Theme) => ({ md: rem(theme, 200) }),
       }}
     >
       {options.map((option) => {

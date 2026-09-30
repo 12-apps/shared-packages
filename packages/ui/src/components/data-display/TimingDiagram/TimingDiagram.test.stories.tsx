@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent,waitFor, within } from 'storybook/test';
 
 import { TimingDiagram } from './TimingDiagram';
+import { PT_BR_TIMING_DIAGRAM_COPY } from '../../../pt-BR';
 
 const meta: Meta<typeof TimingDiagram> = {
+  args: { copy: PT_BR_TIMING_DIAGRAM_COPY },
   title: 'Charts/TimingDiagram/Tests',
   component: TimingDiagram,
   parameters: {
@@ -38,7 +40,7 @@ export const BasicInteraction: Story = {
     const canvas = within(canvasElement);
 
     // Verify the timing diagram renders
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check that all timing segments are rendered
@@ -107,7 +109,7 @@ export const StateChangeTest: Story = {
     const canvas = within(canvasElement);
 
     // Verify initial state
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check variant is applied
@@ -158,7 +160,7 @@ export const VisualStatesTest: Story = {
     const canvas = within(canvasElement);
 
     // Verify the component renders
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check that animations are disabled
@@ -203,7 +205,7 @@ export const VisualStatesTest: Story = {
 
     // Verify total time display
     const totalTimeElement = Array.from(container.querySelectorAll('.MuiTypography-body2')).find(
-      (el) => el.textContent?.includes('Total Time:'),
+      (el) => el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.totalTime('')),
     );
     await expect(totalTimeElement?.textContent).toContain('750ms');
 
@@ -223,16 +225,12 @@ export const ResponsiveDesignTest: Story = {
     showTooltips: true,
     animated: true,
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-  },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     // Verify responsive rendering
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check that it adapts to viewport
@@ -268,7 +266,7 @@ export const PerformanceTest: Story = {
     // Verify rendering with large data. The 1000ms budget that used to bracket
     // this query measured the machine the story runs on — the region being
     // present is the assertion.
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Verify large values are formatted correctly (seconds instead of ms)
@@ -327,7 +325,7 @@ export const EdgeCasesTest: Story = {
     const canvas = within(canvasElement);
 
     // Verify handling of minimal data
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Should handle missing phases gracefully - only non-zero phases rendered
@@ -398,12 +396,12 @@ export const AccessibilityTest: Story = {
     const canvas = within(canvasElement);
 
     // Check for proper ARIA attributes
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
-    await expect(container).toHaveAttribute('aria-label', 'Timing diagram');
+    await expect(container).toHaveAttribute('aria-label', PT_BR_TIMING_DIAGRAM_COPY.regionLabel);
 
     // Check heading structure
-    const heading = canvas.getByText('Request Timing');
+    const heading = canvas.getByText(PT_BR_TIMING_DIAGRAM_COPY.heading);
     await expect(heading).toBeInTheDocument();
     await expect(heading.tagName).toBe('H6');
 
@@ -421,9 +419,9 @@ export const AccessibilityTest: Story = {
     const legendItems = container.querySelectorAll('.MuiTypography-root');
     const hasLegendLabels = Array.from(legendItems).some(
       (el) =>
-        el.textContent?.includes('DNS Lookup') ||
-        el.textContent?.includes('Connection') ||
-        el.textContent?.includes('SSL/TLS'),
+        el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.dns) ||
+        el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.connect) ||
+        el.textContent?.includes(PT_BR_TIMING_DIAGRAM_COPY.ssl),
     );
     await expect(hasLegendLabels).toBe(true);
 
@@ -446,7 +444,7 @@ export const KeyboardNavigationTest: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Focus on the container
@@ -488,7 +486,7 @@ export const ScreenReaderTest: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check that timing values are available to screen readers
@@ -538,7 +536,7 @@ export const FocusManagementTest: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check container can receive focus
@@ -587,7 +585,7 @@ export const ThemeVariationsTest: Story = {
     const canvas = within(canvasElement);
 
     // Verify theme support
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check that segments have correct colors from phaseColors
@@ -641,13 +639,17 @@ export const IntegrationTest: Story = {
     const canvas = within(canvasElement);
 
     // Verify full integration
-    const container = canvas.getByRole('region', { name: /timing diagram/i });
+    const container = canvas.getByRole('region', { name: PT_BR_TIMING_DIAGRAM_COPY.regionLabel });
     await expect(container).toBeInTheDocument();
 
     // Check height prop affects waterfall container
     const waterfallContainer = container.querySelector('[data-variant="waterfall"]') as HTMLElement;
     await expect(waterfallContainer).toBeInTheDocument();
-    const containerHeight = parseInt(waterfallContainer.style.height || '0');
+    // The component writes this height through the theme's type scale
+    // (`rem(theme, plotHeightPx + 40)`), so the inline style is a rem string —
+    // parseInt-ing it truncates to the integer rem count, not the px value.
+    // getComputedStyle resolves it back to px.
+    const containerHeight = parseFloat(window.getComputedStyle(waterfallContainer).height || '0');
     await expect(containerHeight).toBe(100); // height (60) + 40
 
     // Verify waterfall cascading effect - each segment has different top position
@@ -656,7 +658,10 @@ export const IntegrationTest: Story = {
 
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i] as HTMLElement;
-      const topPos = parseInt(segment.style.top || '0');
+      // `top` is written through the theme's type scale too (`rem(theme, index
+      // * 8)`), so read the browser-resolved px rather than parseInt-ing the
+      // rem string.
+      const topPos = parseFloat(window.getComputedStyle(segment).top || '0');
       topPositions.push(topPos);
 
       // Each segment should be 8px lower than the previous
@@ -691,13 +696,21 @@ export const IntegrationTest: Story = {
       cumulativeOffset += parseFloat(sslSegment.style.width || '0');
     }
 
-    // Verify legend is displayed with all phases
+    // Verify legend is displayed with all phases — the pt-BR pack's own
+    // words, paired with the `sampleData` key each phase renders from (a
+    // label-derived key would have to un-translate the pack's word).
     const legendItems = container.querySelectorAll('.MuiBox-root');
-    const legendLabels = ['DNS Lookup', 'Connection', 'SSL/TLS', 'Request', 'Response'];
+    const legendLabels: Array<[string, keyof typeof sampleData]> = [
+      [PT_BR_TIMING_DIAGRAM_COPY.dns, 'dns'],
+      [PT_BR_TIMING_DIAGRAM_COPY.connect, 'connect'],
+      [PT_BR_TIMING_DIAGRAM_COPY.ssl, 'ssl'],
+      [PT_BR_TIMING_DIAGRAM_COPY.request, 'request'],
+      [PT_BR_TIMING_DIAGRAM_COPY.response, 'response'],
+    ];
 
-    for (const label of legendLabels) {
+    for (const [label, key] of legendLabels) {
       const legendItem = Array.from(legendItems).find((el) => el.textContent?.includes(label));
-      if (sampleData[label.toLowerCase().replace(/[^a-z]/g, '')] > 0) {
+      if (sampleData[key] > 0) {
         await expect(legendItem).toBeInTheDocument();
       }
     }

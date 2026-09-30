@@ -1,18 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { rem, remPx } from '../../../tokens/relative';
 
 import type { VirtualGridProps, VirtualListProps } from './VirtualList.types';
 
 type ScrollEvent = React.UIEvent<HTMLDivElement> | Event;
 type ListItems = VirtualListProps['items'];
 type ListVariant = NonNullable<VirtualListProps['variant']>;
-type ItemHeight = (index: number) => number;
+type ItemSize = (index: number) => number;
 
 // Handles both React synthetic events and native DOM events, since the same
 // handler serves an internal onScroll and an external container's listener.
 const scrollOffsets = (event: ScrollEvent) => {
   const target = (event as React.UIEvent<HTMLDivElement>).currentTarget || (event as Event).target;
   const element = target as HTMLElement;
-  return { top: element.scrollTop, left: element.scrollLeft };
+  return { scrollTop: element.scrollTop, scrollLeft: element.scrollLeft };
 };
 
 /**
@@ -47,7 +50,7 @@ const useScrollTop = (
 
   const handleScroll = useCallback(
     (event: ScrollEvent) => {
-      const { top, left } = scrollOffsets(event);
+      const { scrollTop: top, scrollLeft: left } = scrollOffsets(event);
       setScrollTop(top);
       report(top, left);
     },
@@ -59,63 +62,60 @@ const useScrollTop = (
   return { scrollTop, handleScroll };
 };
 
-interface HeightArgs {
-  items: ListItems;
-  variant: ListVariant;
-  itemHeight: number;
-  estimatedItemHeight: number;
+
+/**
+ * A `width` prop as CSS. `sx` reads a number of 1 or less as a fraction of the
+ * parent, and that stays so; a larger number is design px, through the type
+ * scale; a string is as given.
+ */
+export const widthCss = (theme: Theme, width: number | string): string => {
+  if (typeof width !== 'number') return width;
+  return width <= 1 && width !== 0 ? `${width * 100}%` : rem(theme, width);
+};
+
+/** Every item's height, its offset from the top, and their sum — all in DESIGN px. */
+interface DesignHeights {
+  size: ItemSize;
+  offset: ItemSize;
+  total: number;
 }
 
 /**
- * Fixed lists know every height up front. Variable ones prefer the item's own
- * declared height, fall back to a measurement taken on a previous render, and
- * only then guess.
+ * Fixed lists know every height up front; variable ones take the item's own
+ * declared height and otherwise the estimate.
+ *
+ * Kept in the caller's DESIGN px on purpose: the CSS draws a height with `rem`
+ * and the range maths reads it through `remPx`, so the two are one number at
+ * any type scale — never a row drawn at one pitch and positioned at another.
  */
-const useItemHeight = ({
-  items,
-  variant,
-  itemHeight,
-  estimatedItemHeight,
-}: HeightArgs): ItemHeight => {
-  const measured = useRef<Map<number, number>>(new Map());
-
-  return useCallback(
-    (index: number): number => {
-      if (variant !== 'variable') {
-        return itemHeight;
-      }
-
-      return items[index]?.height || measured.current.get(index) || estimatedItemHeight;
-    },
-    [variant, itemHeight, estimatedItemHeight, items],
-  );
-};
-
-const useTotalHeight = (
+const useDesignHeights = (
   items: ListItems,
   variant: ListVariant,
-  itemHeight: number,
-  getItemHeight: ItemHeight,
-) =>
+  fixed: number,
+  estimated: number,
+): DesignHeights =>
   useMemo(() => {
-    if (variant === 'fixed') {
-      return items.length * itemHeight;
+    if (variant !== 'variable') {
+      return { size: () => fixed, offset: (index) => index * fixed, total: items.length * fixed };
     }
 
-    let sum = 0;
+    const size = (index: number): number => items[index]?.height || estimated;
+    // Running sums, so an offset is a lookup rather than a walk from the top.
+    const starts = [0];
     for (let i = 0; i < items.length; i++) {
-      sum += getItemHeight(i);
+      starts.push((starts[i] ?? 0) + size(i));
     }
-    return sum;
-  }, [items.length, variant, itemHeight, getItemHeight]);
+    return { size, offset: (index) => starts[index] ?? 0, total: starts[items.length] ?? 0 };
+  }, [items, variant, fixed, estimated]);
 
+/** The range maths' inputs, in the px the scroll offset is measured in. */
 interface RangeArgs {
   count: number;
   scrollTop: number;
   height: number;
   overscan: number;
   itemHeight: number;
-  getItemHeight: ItemHeight;
+  getItemHeight: ItemSize;
 }
 
 // Walks forward accumulating heights until it passes the viewport's top edge, then
@@ -155,56 +155,38 @@ const fixedRange = ({ count, scrollTop, height, overscan, itemHeight }: RangeArg
   endIndex: Math.min(count - 1, Math.ceil((scrollTop + height) / itemHeight) + overscan),
 });
 
-const useItemOffset = (
-  variant: ListVariant,
-  itemHeight: number,
-  getItemHeight: ItemHeight,
-): ItemHeight =>
-  useCallback(
-    (index: number): number => {
-      if (variant === 'fixed') {
-        return index * itemHeight;
-      }
-
-      let offset = 0;
-      for (let i = 0; i < index; i++) {
-        offset += getItemHeight(i);
-      }
-      return offset;
-    },
-    [variant, itemHeight, getItemHeight],
-  );
-
-interface ListArgs {
-  items: ListItems;
-  variant: ListVariant;
-  height: number;
-  itemHeight: number;
-  estimatedItemHeight: number;
-  overscan: number;
-  onScroll: VirtualListProps['onScroll'];
-  scrollContainerRef: VirtualListProps['scrollContainerRef'];
-}
-
+/**
+ * `height`, `itemHeight`, `estimatedItemHeight` and an item's own `height` are
+ * design px. The range is computed in the px `scrollTop` is measured in
+ * (`remPx`), the viewport and the scroll content are drawn in `rem`, and each
+ * item's `top`/`height` is the `remPx` of its design offset and height.
+ */
 export const useVirtualList = ({
   items,
-  variant,
+  variant = 'fixed',
   height,
   itemHeight,
   estimatedItemHeight,
-  overscan,
+  overscan = 5,
   onScroll,
   scrollContainerRef,
-}: ListArgs) => {
-  const getItemHeight = useItemHeight({ items, variant, itemHeight, estimatedItemHeight });
-  const getItemOffset = useItemOffset(variant, itemHeight, getItemHeight);
-  const totalHeight = useTotalHeight(items, variant, itemHeight, getItemHeight);
+}: VirtualListProps) => {
+  const theme = useTheme();
+  // 40 design px when the caller does not size a row.
+  const design = useDesignHeights(items, variant, itemHeight ?? 40, estimatedItemHeight ?? 40);
 
   const report = useCallback((top: number) => onScroll?.(top), [onScroll]);
   const { scrollTop, handleScroll } = useScrollTop(scrollContainerRef, report);
 
   const visibleItems = useMemo(() => {
-    const args = { count: items.length, scrollTop, height, overscan, itemHeight, getItemHeight };
+    const args = {
+      count: items.length,
+      scrollTop,
+      height: remPx(theme, height),
+      overscan,
+      itemHeight: remPx(theme, design.size(0)),
+      getItemHeight: (index: number) => remPx(theme, design.size(index)),
+    };
     const { startIndex, endIndex } = variant === 'fixed' ? fixedRange(args) : variableRange(args);
     const result = [];
 
@@ -217,33 +199,26 @@ export const useVirtualList = ({
         index: i,
         style: {
           position: 'absolute' as const,
-          top: getItemOffset(i),
+          top: remPx(theme, design.offset(i)),
           left: 0,
           width: '100%',
-          height: getItemHeight(i),
+          height: remPx(theme, design.size(i)),
         },
       });
     }
 
     return result;
-  }, [items, scrollTop, height, overscan, variant, itemHeight, getItemOffset, getItemHeight]);
+  }, [items, scrollTop, height, overscan, variant, design, theme]);
 
-  return { totalHeight, visibleItems, handleScroll };
+  return {
+    totalHeight: rem(theme, design.total),
+    viewportHeight: rem(theme, height),
+    visibleItems,
+    handleScroll,
+  };
 };
 
-interface GridArgs {
-  items: VirtualGridProps['items'];
-  height: number;
-  width: number | string;
-  columnCount: number;
-  rowHeight: number;
-  columnWidth?: number;
-  gap: number;
-  overscan: number;
-  onScroll: VirtualGridProps['onScroll'];
-  scrollContainerRef: VirtualGridProps['scrollContainerRef'];
-}
-
+/** The column width in DESIGN px: the caller's, or an even share of a numeric width. */
 const useColumnWidth = (
   columnWidth: number | undefined,
   width: number | string,
@@ -257,21 +232,26 @@ const useColumnWidth = (
     return (containerWidth - (columnCount - 1) * gap) / columnCount;
   }, [columnWidth, width, columnCount, gap]);
 
+/**
+ * `height`, `rowHeight`, `columnWidth` and `gap` are design px: the range and
+ * every cell's box are computed through `remPx`, the viewport and the content
+ * are drawn through `rem`.
+ */
 export const useVirtualGrid = ({
   items,
   height,
-  width,
+  width = '100%',
   columnCount,
   rowHeight,
   columnWidth,
-  gap,
-  overscan,
+  gap = 0,
+  overscan = 5,
   onScroll,
   scrollContainerRef,
-}: GridArgs) => {
+}: VirtualGridProps) => {
+  const theme = useTheme();
   const rowCount = Math.ceil(items.length / columnCount);
-  const totalHeight = rowCount * (rowHeight + gap) - gap;
-  const computedColumnWidth = useColumnWidth(columnWidth, width, columnCount, gap);
+  const designColumn = useColumnWidth(columnWidth, width, columnCount, gap);
 
   const report = useCallback(
     (top: number, left: number) => onScroll?.(top, left),
@@ -280,9 +260,13 @@ export const useVirtualGrid = ({
   const { scrollTop, handleScroll } = useScrollTop(scrollContainerRef, report);
 
   const visibleItems = useMemo(() => {
-    const pitch = rowHeight + gap;
+    const pitch = remPx(theme, rowHeight + gap);
+    const stride = remPx(theme, designColumn + gap);
     const startRow = Math.max(0, Math.floor(scrollTop / pitch) - overscan);
-    const endRow = Math.min(rowCount - 1, Math.ceil((scrollTop + height) / pitch) + overscan);
+    const endRow = Math.min(
+      rowCount - 1,
+      Math.ceil((scrollTop + remPx(theme, height)) / pitch) + overscan,
+    );
 
     // Rows are contiguous in `items`, so the visible block is one index range
     // rather than a row loop wrapping a column loop.
@@ -305,15 +289,20 @@ export const useVirtualGrid = ({
         style: {
           position: 'absolute' as const,
           top: rowIndex * pitch,
-          left: columnIndex * (computedColumnWidth + gap),
-          width: computedColumnWidth,
-          height: rowHeight,
+          left: columnIndex * stride,
+          width: remPx(theme, designColumn),
+          height: remPx(theme, rowHeight),
         },
       });
     }
 
     return result;
-  }, [items, scrollTop, height, overscan, rowCount, columnCount, rowHeight, gap, computedColumnWidth]);
+  }, [items, scrollTop, height, overscan, rowCount, columnCount, rowHeight, gap, designColumn, theme]);
 
-  return { totalHeight, visibleItems, handleScroll };
+  return {
+    totalHeight: rem(theme, rowCount * (rowHeight + gap) - gap),
+    viewportHeight: rem(theme, height),
+    visibleItems,
+    handleScroll,
+  };
 };

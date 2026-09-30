@@ -1,5 +1,6 @@
 import type { SwitchVariant } from './Switch.base';
 import { alpha } from '../../../tokens/color';
+import { ABSOLUTE_INK, ELEVATION_SHADOWS, NEUTRAL_RAMP } from '../../../tokens/ink.core';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 /**
@@ -16,7 +17,7 @@ import type { SizeValue } from '../../../tokens/vocabulary';
  */
 
 /** MUI's `palette.common.black`, which `UiTheme` does not carry. */
-export const SWITCH_BLACK = '#000';
+export const SWITCH_BLACK = ABSOLUTE_INK.black;
 
 export interface SwitchGeometry {
   width: number;
@@ -82,16 +83,30 @@ export const thumbRadius = (look: SwitchLook, thumbSize: number): number => {
 export const THUMB_ELEVATION: Record<SwitchLook, number> = { ios: 0, android: 3, material: 2, default: 2 };
 
 export const MUI_SHADOWS: Record<number, string> = {
-  2: '0px 3px 1px -2px rgba(0,0,0,0.2),0px 2px 2px 0px rgba(0,0,0,0.14),0px 1px 5px 0px rgba(0,0,0,0.12)',
-  3: '0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12)',
+  2: ELEVATION_SHADOWS[2],
+  3: ELEVATION_SHADOWS[3],
 };
 
-/** The iOS thumb's own three-layer shadow, which the web writes out literally. */
-export const IOS_THUMB_SHADOW = `0 3px 1px 0 ${alpha(SWITCH_BLACK, 0.04)}, 0 3px 8px 0 ${alpha(SWITCH_BLACK, 0.12)}, 0 1px 0 0 ${alpha(SWITCH_BLACK, 0.08)}`;
+/**
+ * How a shadow builder writes one of its lengths. Native takes the px as they
+ * stand ({@link AS_PX}); the web hands in its type scale (`rem`), so the iOS
+ * shadows scale with the theme like every other length it draws.
+ */
+export type ShadowLength = (px: number) => string;
 
-/** The iOS track's inset hairline. */
-export const iosTrackShadow = (): string =>
-  `inset 0 0 0 0.5px ${alpha(SWITCH_BLACK, 0.1)}, inset 0 2px 3px ${alpha(SWITCH_BLACK, 0.12)}`;
+/** A length written as the px it was drawn at — what native reads. */
+export const AS_PX: ShadowLength = (value) => `${value}px`;
+
+/** The iOS thumb's own three-layer shadow. */
+export const iosThumbShadow = (length: ShadowLength = AS_PX): string =>
+  `0 ${length(3)} ${length(1)} 0 ${alpha(SWITCH_BLACK, 0.04)}, 0 ${length(3)} ${length(8)} 0 ${alpha(SWITCH_BLACK, 0.12)}, 0 ${length(1)} 0 0 ${alpha(SWITCH_BLACK, 0.08)}`;
+
+/** {@link iosThumbShadow} in px, as native draws it. */
+export const IOS_THUMB_SHADOW = iosThumbShadow();
+
+/** The iOS track's inset hairline and inner shade. */
+export const iosTrackShadow = (length: ShadowLength = AS_PX): string =>
+  `inset 0 0 0 ${length(0.5)} ${alpha(SWITCH_BLACK, 0.1)}, inset 0 ${length(2)} ${length(3)} ${alpha(SWITCH_BLACK, 0.12)}`;
 
 /** The resting track: a black wash on iOS, the disabled ink elsewhere. */
 export const TRACK_ALPHA = { ios: 0.1, android: 0.2, other: 0.3 } as const;
@@ -183,8 +198,12 @@ export const TAP_TARGET_MIN = 40;
  * from.
  */
 export const NEUTRAL_GREY = { main: 700, dark: 800, light: 500 } as const;
-export const NEUTRAL_FALLBACK = { main: '#616161', dark: '#424242', light: '#9e9e9e' } as const;
-export const NEUTRAL_CONTRAST = '#fff';
+export const NEUTRAL_FALLBACK = {
+  main: NEUTRAL_RAMP[NEUTRAL_GREY.main],
+  dark: NEUTRAL_RAMP[NEUTRAL_GREY.dark],
+  light: NEUTRAL_RAMP[NEUTRAL_GREY.light],
+} as const;
+export const NEUTRAL_CONTRAST = ABSOLUTE_INK.white;
 
 /**
  * The RESTING thumb — the knob while the switch is off (FUT-1924).
@@ -196,7 +215,7 @@ export const NEUTRAL_CONTRAST = '#fff';
  * does pick, and that is where a stated white was a defect. See `checkedInk`
  * in `Switch.styles.ts` and its native twin.
  */
-export const RESTING_THUMB = '#fff';
+export const RESTING_THUMB = ABSOLUTE_INK.white;
 
 /** Hover: the thumb lifts a shade and takes a halo of the hue. */
 export const SWITCH_HOVER = { thumbScale: 1.05, elevation: 4, blur: 12, alpha: 0.2 } as const;

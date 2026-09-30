@@ -51,17 +51,21 @@ import { Resizable } from '@procurement/ui';
 | -------------- | ---------------------------------------- | ------------------------------------ | ------------------------------------------------ |
 | `children`     | `ReactNode`                              | -                                    | Content to render inside the resizable container |
 | `variant`      | `'horizontal' \| 'vertical' \| 'both'`   | `'both'`                             | Resize direction constraint                      |
-| `width`        | `number`                                 | `300`                                | Initial width in pixels                          |
-| `height`       | `number`                                 | `200`                                | Initial height in pixels                         |
+| `width`        | `number`                                 | `200`                                | Initial width, design px (scales with the theme's type scale) |
+| `height`       | `number`                                 | `200`                                | Initial height, design px (scales with the theme's type scale) |
 | `minWidth`     | `number`                                 | `50`                                 | Minimum width constraint                         |
-| `maxWidth`     | `number`                                 | -                                    | Maximum width constraint                         |
+| `maxWidth`     | `number`                                 | `1000`                               | Maximum width constraint                         |
 | `minHeight`    | `number`                                 | `50`                                 | Minimum height constraint                        |
-| `maxHeight`    | `number`                                 | -                                    | Maximum height constraint                        |
-| `onResize`     | `(dimensions: ResizeDimensions) => void` | -                                    | Callback fired during resize with new dimensions |
+| `maxHeight`    | `number`                                 | `1000`                               | Maximum height constraint                        |
+| `onResize`     | `(width: number, height: number) => void` | -                                   | Fired during resize with the new size, in design px |
 | `disabled`     | `boolean`                                | `false`                              | Disables resize functionality                    |
 | `handles`      | `HandlePosition[]`                       | `['right', 'bottom', 'bottomRight']` | Array of handle positions                        |
 | `className`    | `string`                                 | -                                    | Additional CSS class name                        |
 | `data-testid`  | `string`                                 | -                                    | Test ID for automated testing                    |
+
+Every size prop — and what `onResize` reports — is in design px, the unit the
+whole package draws in, scaled with the theme's type scale (`remPx`). A drag
+follows the pointer in real pixels.
 
 ## Handle Positions
 

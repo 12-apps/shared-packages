@@ -27,6 +27,7 @@ useQuery({ /* … */ refetchInterval: reconcileRefetchInterval(status, POLL_MS, 
 | `./hono` | `eventsRouter` — one-call mount (`hono` is an optional peer) |
 | `./gateway` | `startRealtimeGateway`, plus a `realtime-gateway` bin (`ws` is an optional peer) |
 | `./react` | `createWebEvents` — client, reconnect policy, ws→sse demotion, liveness watch, hooks |
+| `./node` | the same client from a runtime with no `EventSource` — an event-stream `WireSource` over `fetch`, for a desktop agent, a worker or a CLI |
 | `./worker` | the SharedWorker body, for a host that wants one connection per person |
 | `./parity` | the publisher-parity gate: library + CLI |
 | `prisma/` | the outbox model + its migration, copied into a host's schema folder |

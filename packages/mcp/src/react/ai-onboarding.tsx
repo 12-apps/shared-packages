@@ -86,6 +86,17 @@ export interface AiIntegrationOnboardingProps {
    */
   onRetest?: () => void;
   /**
+   * How often the Confirmar step re-checks while it waits for the connection.
+   *
+   * The floor under whatever else tells the host a connection arrived. A host
+   * that hears the connection over its own realtime channel — and calls
+   * `onRetest` when it does — can pass a slower interval while that channel is
+   * live; the wait still ends on its own if a hint is lost. Read live, so a
+   * dropped channel is back on the fast interval at the next render.
+   * @default 3000
+   */
+  pollIntervalMs?: number;
+  /**
    * Revoke a connected assistant's access, from the completed status board. The
    * host ID is the board's card, NOT the connection — `claude` and
    * `claude-desktop` share one provider, so the app resolves which stored
@@ -104,6 +115,7 @@ interface FlowProps {
   permissionModel: string;
   connectPrompt: string;
   onRetest: () => void;
+  pollIntervalMs: number | undefined;
   onDisconnect: DisconnectHandler | undefined;
   devReset: boolean;
   copy: McpAiCopy;
@@ -124,6 +136,7 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
     permissionModel,
     connectPrompt,
     onRetest,
+    pollIntervalMs,
     onDisconnect,
     devReset,
     copy,
@@ -139,6 +152,7 @@ function AiOnboardingFlow(props: FlowProps): React.JSX.Element {
     connectPrompt,
     connections,
     onRetest,
+    pollIntervalMs,
     copy,
   });
   const connectedHostId = (state.data.connectedHost ??
@@ -205,6 +219,7 @@ export function AiIntegrationOnboarding({
   onRetest = () => {
     if (typeof window !== "undefined") window.location.reload();
   },
+  pollIntervalMs,
   onDisconnect,
   copy,
 }: AiIntegrationOnboardingProps): React.JSX.Element {
@@ -222,6 +237,7 @@ export function AiIntegrationOnboarding({
         permissionModel={permissionModel}
         connectPrompt={connectPrompt}
         onRetest={onRetest}
+        pollIntervalMs={pollIntervalMs}
         onDisconnect={onDisconnect}
         devReset={devReset}
         copy={copy}

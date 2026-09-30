@@ -11,6 +11,8 @@ import Box from '@mui/material/Box/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { must } from '../../../test-utils/must';
+
 import { Button } from '../../form/Button';
 import { DropdownMenu } from './DropdownMenu';
 import type { DropdownMenuItem } from './DropdownMenu.types';
@@ -33,12 +35,12 @@ const testItems = [
   { id: '1', label: 'Edit', icon: <Edit fontSize="small" />, onClick: fn() },
   { id: '2', label: 'Copy', icon: <FileCopy fontSize="small" />, onClick: fn() },
   { id: '3', label: 'Share', icon: <Share fontSize="small" />, onClick: fn() },
-  { id: 'divider1', type: 'divider' as const },
+  { id: 'divider1', label: '', type: 'divider' as const },
   {
     id: '4',
     label: 'Delete',
     icon: <Delete fontSize="small" />,
-    color: 'error' as const,
+    color: 'danger' as const,
     onClick: fn(),
   },
 ];
@@ -98,7 +100,7 @@ export const BasicInteraction: Story = {
 
     // Verify onClick was called
     await waitFor(() => {
-      expect(testItems[0].onClick).toHaveBeenCalled();
+      expect(must(testItems[0]).onClick).toHaveBeenCalled();
     });
 
     // Menu should close after item click
@@ -379,7 +381,7 @@ export const VisualStates: Story = {
     // Even if we bypass pointer checks, the handler must not be called
     const u = userEvent.setup({ pointerEventsCheck: 0 });
     await u.click(disabledLi);
-    expect(itemsWithDisabled[1].onClick).not.toHaveBeenCalled();
+    expect(must(itemsWithDisabled[1]).onClick).not.toHaveBeenCalled();
 
     // --- Enabled item assertions ---
     const enabledLi = await within(document.body).findByRole('menuitem', {
@@ -390,7 +392,7 @@ export const VisualStates: Story = {
     // pre-focused, and hover CSS isn’t reliable in JSDOM either way.
     // Click should invoke the spy
     await userEvent.click(enabledLi);
-    await waitFor(() => expect(itemsWithDisabled[0].onClick).toHaveBeenCalled());
+    await waitFor(() => expect(must(itemsWithDisabled[0]).onClick).toHaveBeenCalled());
   },
 };
 
@@ -545,12 +547,12 @@ export const Integration: Story = {
         icon: <Share fontSize="small" />,
         onClick: () => handleAction('export'),
       },
-      { id: 'divider1', type: 'divider' as const },
+      { id: 'divider1', label: '', type: 'divider' as const },
       {
         id: '3',
         label: 'Delete',
         icon: <Delete fontSize="small" />,
-        color: 'error' as const,
+        color: 'danger' as const,
         onClick: () => handleAction('delete'),
       },
     ];

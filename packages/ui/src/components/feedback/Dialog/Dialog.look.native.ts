@@ -121,6 +121,23 @@ function overlayFor(theme: UiTheme, variant: DialogVariant): ViewStyle {
 }
 
 /**
+ * The overlay's bottom inset while the soft keyboard covers `overlap` dp of it
+ * (FUT-3021), or nothing while it covers none.
+ *
+ * The inset grows by exactly the overlap, on top of the margin the variant
+ * already keeps, so the space the paper may fill — its `maxHeight: '100%'`, or
+ * the `height: '100%'` of `fullscreen` and `drawer` — shrinks by the same
+ * amount and ends where the keyboard starts. A centred paper re-centres in what
+ * is left, and a body taller than that scrolls inside `DialogContent` with the
+ * actions still on screen.
+ */
+export function dialogKeyboardLift(theme: UiTheme, variant: DialogVariant, overlap: number): ViewStyle | null {
+  if (overlap <= 0) return null;
+  const margin = variant === 'fullscreen' || variant === 'drawer' ? 0 : theme.spacing(DIALOG_MARGIN_UNITS);
+  return { paddingBottom: margin + overlap };
+}
+
+/**
  * Everything the dialog paints, decided once per render.
  *
  * The base carries what MUI's `Paper` gives every dialog — the paper colour and

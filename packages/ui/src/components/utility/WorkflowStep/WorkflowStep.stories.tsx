@@ -12,7 +12,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { WorkflowStep } from './WorkflowStep';
 import type { WorkflowStepItem } from './WorkflowStep.types';
-import { SIZE_VALUES } from '../../../tokens/scales';
+import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof WorkflowStep> = {
   title: 'Navigation/WorkflowStep',

@@ -317,12 +317,32 @@ Slides in from the right side of the screen, similar to a side panel or drawer.
 
 The Dialog component implements comprehensive accessibility features:
 
-- **ARIA Roles**: Uses `role="dialog"` with proper ARIA attributes
+- **ARIA Roles**: Uses `role="dialog"` with proper ARIA attributes (the `default`,
+  `glass` and `fullscreen` variants; the `drawer` variant does not — see below)
 - **ARIA Labels**: Proper labeling for title (`aria-labelledby`) and description (`aria-describedby`)
-- **Focus Management**:
+- **Focus Management** (FUT-2696):
   - Focus is trapped within dialog when open
   - Focus returns to trigger element when closed
-  - First focusable element receives focus on open
+  - On open, focus moves to the first tabbable descendant of the
+    `role="dialog"` paper — or, when the paper holds nothing focusable, to the
+    paper itself (`tabIndex={-1}`). This is NOT where MUI's own `FocusTrap`
+    would otherwise park it: left alone, `FocusTrap` focuses its root, which
+    for MUI's `Dialog` is `.MuiDialog-container` — the wrapper AROUND the
+    paper, and so outside the element a screen reader announces as the
+    dialog. `Dialog.tsx` corrects this itself, off `TransitionProps.onEntered`
+    (see `Dialog.focus.ts`), rather than relying on MUI's default.
+  - A caller's own `autoFocus` on a field inside the dialog keeps winning:
+    React applies it synchronously on mount, before `FocusTrap` or this fix
+    ever runs, so by the time either would move focus, it is already inside
+    the dialog and both back off.
+  - The `drawer` variant gets the same first-tabbable behaviour, but its
+    paper carries no `role="dialog"` — MUI's `Drawer` sets no `role` on it at
+    all, unlike `Dialog`'s paper — and there is no `.MuiDrawer-container`
+    wrapper either: `Slide` wraps the drawer's paper directly, so it IS
+    `FocusTrap`'s own root and was never reachable only from outside it the
+    way `.MuiDialog-container` was. The drawer therefore never had this bug;
+    the same fix on it only saves a caller an extra Tab press to reach the
+    panel's first control.
 - **Keyboard Navigation**:
   - `Escape` - Closes dialog (unless persistent mode is enabled)
   - `Tab` - Navigates between focusable elements

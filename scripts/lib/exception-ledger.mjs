@@ -46,6 +46,16 @@ const NOT_AN_ARGUMENT = /^\s*(exempt|permanent|vendor|n\/?a|todo|wontfix|by desi
 const MIN_WHY = 40;
 
 /**
+ * Is `why` a written argument rather than a label? The bar an `exempt` entry
+ * must clear here, and one a caller can hold every entry of its own ledger to
+ * (the ui-stories gate does: its ledger holds failing tests, and "known
+ * failure" is exactly the label this refuses).
+ */
+export function isArgument(why) {
+  return why.trim().length >= MIN_WHY && !NOT_AN_ARGUMENT.test(why);
+}
+
+/**
  * Normalize one raw ledger value into `{ kind, why }`.
  *
  * A string is `grandfathered` — that is what every entry was before this
@@ -109,7 +119,7 @@ export function checkLedger({ findings, ledger, label, ledgerPath, unlisted }) {
       );
       continue;
     }
-    if (kind === "exempt" && (why.trim().length < MIN_WHY || NOT_AN_ARGUMENT.test(why))) {
+    if (kind === "exempt" && !isArgument(why)) {
       failures.push(
         `${finding}: an "exempt" entry needs a written argument in its "why" — say what would ` +
           `break if this were changed, not that it is exempt`,

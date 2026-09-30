@@ -13,6 +13,8 @@ import {
   SECONDARY_BORDER_ALPHA,
 } from './Badge.metrics';
 import type { BadgePalette, BadgeSizeStyles } from './Badge.styles';
+import { absoluteInk, onMedia, sheen } from '../../../tokens/ink';
+import { rem, rems } from '../../../tokens/relative';
 
 const BADGE_VARIANTS: Record<
   string,
@@ -21,12 +23,12 @@ const BADGE_VARIANTS: Record<
   default: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: colorPalette.main,
         color:
-          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || '#fff',
+          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || absoluteInk(theme).white,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2 }),
+        borderRadius: sizeStyles.pillRadius }),
   dot: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: colorPalette.main,
         width: sizeStyles.dotSize,
@@ -37,75 +39,75 @@ const BADGE_VARIANTS: Record<
   count: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: colorPalette.main,
         color:
-          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || '#fff',
+          colorPalette.contrastText || theme.palette.getContrastText?.(colorPalette.main) || absoluteInk(theme).white,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
         borderRadius: '50%' }),
   gradient: (theme, colorPalette, sizeStyles) => ({
         background: `linear-gradient(135deg, ${colorPalette.main} 0%, ${colorPalette.dark || colorPalette.main} 100%)`,
-        color: '#fff',
+        color: onMedia(theme),
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2 }),
+        borderRadius: sizeStyles.pillRadius }),
   glass: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: alpha(colorPalette.main, GLASS_BACKGROUND_ALPHA),
-        backdropFilter: `blur(${GLASS_BLUR_PX}px) saturate(${GLASS_SATURATE * 100}%)`,
-        WebkitBackdropFilter: `blur(${GLASS_BLUR_PX}px) saturate(${GLASS_SATURATE * 100}%)`,
+        backdropFilter: `blur(${rem(theme, GLASS_BLUR_PX)}) saturate(${GLASS_SATURATE * 100}%)`,
+        WebkitBackdropFilter: `blur(${rem(theme, GLASS_BLUR_PX)}) saturate(${GLASS_SATURATE * 100}%)`,
         border: `1px solid ${alpha(colorPalette.main, GLASS_BORDER_ALPHA)}`,
         color: colorPalette.main,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2,
-        boxShadow: `inset 0 1px 1px ${alpha(theme.palette.common.white, GLASS_INSET_HIGHLIGHT_ALPHA)}` }),
+        borderRadius: sizeStyles.pillRadius,
+        boxShadow: `inset 0 ${rems(theme, 1, 1)} ${sheen(theme, GLASS_INSET_HIGHLIGHT_ALPHA)}` }),
   outline: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: 'transparent',
-        border: `${OUTLINE_BORDER_WIDTH}px solid ${colorPalette.main}`,
+        border: `${rem(theme, OUTLINE_BORDER_WIDTH)} solid ${colorPalette.main}`,
         color: colorPalette.main,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2 }),
+        borderRadius: sizeStyles.pillRadius }),
   secondary: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: alpha(colorPalette.main, SECONDARY_BACKGROUND_ALPHA),
         color: colorPalette.main,
         border: `1px solid ${alpha(colorPalette.main, SECONDARY_BORDER_ALPHA)}`,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2 }),
+        borderRadius: sizeStyles.pillRadius }),
   destructive: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: theme.palette.error.main,
         color: theme.palette.error.contrastText,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2,
+        borderRadius: sizeStyles.pillRadius,
         fontWeight: BADGE_DESTRUCTIVE_FONT_WEIGHT }),
   success: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: theme.palette.success.main,
         color: theme.palette.success.contrastText,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2 }),
+        borderRadius: sizeStyles.pillRadius }),
   warning: (theme, colorPalette, sizeStyles) => ({
         backgroundColor: theme.palette.warning.main,
         color: theme.palette.warning.contrastText,
         minWidth: sizeStyles.minWidth,
         height: sizeStyles.height,
-        fontSize: sizeStyles.fontSize,
+        fontSize: rem(theme, sizeStyles.step.fontSize),
         padding: sizeStyles.padding,
-        borderRadius: sizeStyles.height / 2 }) };
+        borderRadius: sizeStyles.pillRadius }) };
 
 export const badgeVariantStyles = (
   theme: Theme,

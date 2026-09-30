@@ -1,9 +1,12 @@
 "use client";
 
+import type { Theme } from "@mui/material/styles/index.js";
+
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { type GridColumn } from "../DataGrid";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 import { Box } from "../../../mui/Box";
+import { rem, sxRem } from "../../../tokens/relative";
 import { Button } from "../../form/Button";
 import { DropdownMenu, type DropdownMenuItem } from "../../navigation/DropdownMenu";
 
@@ -51,6 +54,8 @@ export function buildGridColumns<T extends Record<string, unknown>>(
 }
 
 interface ActionsColumnConfig<T extends Record<string, unknown>> {
+  /** Whose type scale the column's width is drawn at. */
+  theme: Theme;
   /** Actions that build the auto "⋮" kebab. Ignored when `renderRowMenu` is set. */
   rowActions: RowAction<T>[];
   /** Optional leading slot (e.g. a favourite star) rendered before the kebab. */
@@ -77,7 +82,7 @@ interface ActionsColumnConfig<T extends Record<string, unknown>> {
 export function buildRowActionsColumn<T extends Record<string, unknown>>(
   config: ActionsColumnConfig<T>,
 ): DataViewColumn<T> {
-  const { rowActions, leading, testIdPrefix, getRowId, renderRowMenu } = config;
+  const { theme, rowActions, leading, testIdPrefix, getRowId, renderRowMenu } = config;
   const kebabActions = rowActions.filter((action) => action.row !== false);
   return {
     id: "actions",
@@ -86,15 +91,15 @@ export function buildRowActionsColumn<T extends Record<string, unknown>>(
     enableSort: false,
     hideable: false,
     // Narrow: the column only holds the "⋮" kebab (plus an optional leading icon),
-    // so it needs room for just one or two icons.
-    width: leading ? 72 : 44,
+    // so it needs room for just one or two icons — 72 or 44 design px.
+    width: rem(theme, leading ? 72 : 44),
     cell: ({ row }) => (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: sxRem(2), justifyContent: "flex-end" }}>
         {leading?.(row)}
         {renderRowMenu
           ? renderRowMenu(row)
           : renderAutoKebab(kebabActions, row, testIdPrefix, getRowId)}
-      </span>
+      </Box>
     ),
   };
 }
@@ -264,9 +269,9 @@ export function togglePillValues(current: string[] | undefined, value: string, c
  */
 export function cardGridTracks(targetWidth: number) {
   return {
-    gridTemplateColumns: {
+    gridTemplateColumns: (theme: Theme) => ({
       xs: "1fr",
-      sm: `repeat(auto-fill, minmax(${targetWidth}px, 1fr))`,
-    },
+      sm: `repeat(auto-fill, minmax(${rem(theme, targetWidth)}, 1fr))`,
+    }),
   };
 }

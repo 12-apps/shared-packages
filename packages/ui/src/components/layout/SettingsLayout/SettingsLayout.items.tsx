@@ -8,9 +8,11 @@ import ListItemIcon from '@mui/material/ListItemIcon/index.js';
 import ListItemText from '@mui/material/ListItemText/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { alpha, useTheme } from '@mui/material/styles/index.js';
+import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { atLeastRail, TOUCH_TARGET } from './SettingsLayout.styles';
+import { rem } from '../../../tokens/relative';
 import { SettingsStatusMarker } from './SettingsStatusMarker';
 import type {
   SettingsLayoutProps,
@@ -84,7 +86,7 @@ export function SettingsRailItem({
   // below the breakpoint. Above it, the row goes back to rail density.
   const touchFloor =
     variant === 'drilldown'
-      ? { minHeight: TOUCH_TARGET, [atLeastRail(theme, breakpoint)]: { minHeight: 'auto' } }
+      ? { minHeight: rem(theme, TOUCH_TARGET), [atLeastRail(theme, breakpoint)]: { minHeight: 'auto' } }
       : null;
   const shared = {
     'data-testid': `${testIdPrefix}-item-${item.id}`,
@@ -161,12 +163,14 @@ interface RailGroupProps extends RailShape {
  * the rail column never does, so the second column is undone at exactly the
  * width where this stops being the page.
  */
-function indexListSx(shape: RailShape) {
+function indexListSx(shape: RailShape): Extract<SxProps<Theme>, (theme: Theme) => unknown> | null {
   if (shape.variant !== 'drilldown' || !shape.atIndex) return null;
   return (theme: import('@mui/material').Theme) => ({
     display: 'grid',
     gridTemplateColumns: '1fr',
-    columnGap: 8,
+    // One spacing unit (8px). This is an `sx` callback, where a bare 8 is
+    // EIGHT units — it drew a 64px gutter between the two columns.
+    columnGap: 1,
     [theme.breakpoints.up('sm')]: { gridTemplateColumns: '1fr 1fr' },
     [atLeastRail(theme, shape.breakpoint)]: { gridTemplateColumns: '1fr' },
   });

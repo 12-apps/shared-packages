@@ -442,7 +442,9 @@ export const FocusManagement: Story = {
 
     await step('Focus is maintained during tooltip display', async () => {
       const focusButton = canvas.getByTestId('focus-trigger');
-      await userEvent.tab();
+      // The autoFocus button from the previous step already holds focus —
+      // no need to Tab to it, and Tab would move focus to the next stop
+      // (first-element) instead of proving it stays on the trigger.
       await waitFor(() => expect(focusButton).toHaveFocus());
 
       // Hover to show tooltip
@@ -483,7 +485,7 @@ export const ResponsiveDesign: Story = {
   name: '📱 Responsive Design Test',
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         mobile: {
           name: 'Mobile',
           styles: { width: '375px', height: '667px' },
@@ -500,13 +502,13 @@ export const ResponsiveDesign: Story = {
           type: 'desktop',
         },
       },
-      defaultViewport: 'mobile',
     },
     chromatic: {
       viewports: [375, 768, 1920],
       delay: 300,
     },
   },
+  globals: { viewport: { value: 'mobile', isRotated: false } },
   render: () => (
     <Box
       sx={{
@@ -872,7 +874,7 @@ export const PerformanceTest: Story = {
       // version wrapped it in a 500ms budget on top of that. What this step can
       // honestly assert is that a tooltip trigger inside the container still
       // responds to hover.
-      const [firstItem] = canvas.getAllByTestId(/item-/);
+      const firstItem = canvas.getAllByTestId(/item-/)[0]!;
       await userEvent.hover(firstItem);
       await userEvent.unhover(firstItem);
       await expect(firstItem).toBeInTheDocument();

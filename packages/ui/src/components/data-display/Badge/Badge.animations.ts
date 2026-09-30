@@ -1,4 +1,7 @@
 import { keyframes } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
+
+import { rem, rems } from '../../../tokens/relative';
 
 import { BOUNCE, FADE_IN_SCALE, GLOW_PULSE, PULSE } from './Badge.metrics';
 
@@ -18,25 +21,25 @@ export const pulseAnimation = keyframes`
 `;
 
 // Define bounce animation
-export const bounceAnimation = keyframes`
+export const bounceAnimation = (theme: Theme) => keyframes`
   0%, 20%, 50%, 80%, 100% {
     transform: translateY(0) scale(1);
   }
   40% {
-    transform: translateY(-${BOUNCE.lift}px) scale(${BOUNCE.scale});
+    transform: translateY(${rem(theme, -BOUNCE.lift)}) scale(${BOUNCE.scale});
   }
   60% {
-    transform: translateY(-${BOUNCE.secondLift}px) scale(${BOUNCE.secondScale});
+    transform: translateY(${rem(theme, -BOUNCE.secondLift)}) scale(${BOUNCE.secondScale});
   }
 `;
 
 // Define shimmer animation
-export const shimmerAnimation = keyframes`
+export const shimmerAnimation = (theme: Theme) => keyframes`
   0% {
-    background-position: -1000px 0;
+    background-position: ${rem(theme, -1000)} 0;
   }
   100% {
-    background-position: 1000px 0;
+    background-position: ${rem(theme, 1000)} 0;
   }
 `;
 
@@ -56,14 +59,14 @@ export const fadeInScaleAnimation = keyframes`
 `;
 
 // Define glow pulse animation
-export const glowPulseAnimation = keyframes`
+export const glowPulseAnimation = (theme: Theme) => keyframes`
   0% {
-    box-shadow: 0 0 ${GLOW_PULSE.fromBlur}px ${GLOW_PULSE.fromSpread}px rgba(var(--glow-color), ${GLOW_PULSE.fromAlpha});
+    box-shadow: 0 0 ${rems(theme, GLOW_PULSE.fromBlur, GLOW_PULSE.fromSpread)} rgba(var(--glow-color), ${GLOW_PULSE.fromAlpha});
   }
   50% {
-    box-shadow: 0 0 ${GLOW_PULSE.toBlur}px ${GLOW_PULSE.toSpread}px rgba(var(--glow-color), ${GLOW_PULSE.toAlpha});
+    box-shadow: 0 0 ${rems(theme, GLOW_PULSE.toBlur, GLOW_PULSE.toSpread)} rgba(var(--glow-color), ${GLOW_PULSE.toAlpha});
   }
   100% {
-    box-shadow: 0 0 ${GLOW_PULSE.fromBlur}px ${GLOW_PULSE.fromSpread}px rgba(var(--glow-color), ${GLOW_PULSE.fromAlpha});
+    box-shadow: 0 0 ${rems(theme, GLOW_PULSE.fromBlur, GLOW_PULSE.fromSpread)} rgba(var(--glow-color), ${GLOW_PULSE.fromAlpha});
   }
 `;
