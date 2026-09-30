@@ -19,7 +19,7 @@ export const BoundedOverflow: Story = {
     {Array.from({ length: 30 }, (_, i) => <Text key={i}>Row {i + 1}</Text>)}
   </Screen>,
   play: async ({ canvasElement }) => {
-    const viewport = within(canvasElement).getByTestId('long-viewport');
+    const viewport = await within(canvasElement).findByTestId('long-viewport');
     /* eslint-disable test-flakiness/no-viewport-dependent -- scrolling is the subject; the decorator pins this viewport to 240 design px independent of the browser window */
     await expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
     viewport.scrollTop = viewport.scrollHeight;
@@ -30,7 +30,7 @@ export const BoundedOverflow: Story = {
 export const InputRemainsInteractive: Story = {
   render: () => <Screen dataTestId="form" p={2}><Input dataTestId="load" label="Load" /></Screen>,
   play: async ({ canvasElement }) => {
-    const input = within(canvasElement).getByTestId('load');
+    const input = await within(canvasElement).findByTestId('load');
     await userEvent.click(input);
     await userEvent.type(input, '42');
     await expect(input).toHaveValue('42');
@@ -38,7 +38,7 @@ export const InputRemainsInteractive: Story = {
 };
 export const EmptyScreen: Story = {
   render: () => <Screen dataTestId="empty" safeAreaEdges={[]} />,
-  play: async ({ canvasElement }) => { await expect(within(canvasElement).getByTestId('empty')).toBeVisible(); },
+  play: async ({ canvasElement }) => { await expect(await within(canvasElement).findByTestId('empty')).toBeVisible(); },
 };
 
 export const ChildViewportStaysBounded: Story = {
@@ -48,7 +48,7 @@ export const ChildViewportStaysBounded: Story = {
     </Screen>
   </Screen>,
   play: async ({ canvasElement }) => {
-    const viewport = within(canvasElement).getByTestId('child-viewport');
+    const viewport = await within(canvasElement).findByTestId('child-viewport');
     await expect(viewport.clientHeight).toBeGreaterThan(0);
     /* eslint-disable test-flakiness/no-viewport-dependent -- scrolling is the subject; the decorator pins this viewport to 240 design px independent of the browser window */
     await expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
