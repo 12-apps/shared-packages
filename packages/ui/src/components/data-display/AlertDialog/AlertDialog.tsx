@@ -1,22 +1,19 @@
 import Close from '@mui/icons-material/Close';
 import Error from '@mui/icons-material/Error';
 import Info from '@mui/icons-material/Info';
-import type { ButtonProps } from '@mui/material/Button/index.js';
-import Button from '@mui/material/Button/index.js';
-import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Dialog from '@mui/material/Dialog/index.js';
-import DialogActions from '@mui/material/DialogActions/index.js';
 import DialogContent from '@mui/material/DialogContent/index.js';
 import DialogContentText from '@mui/material/DialogContentText/index.js';
 import DialogTitle from '@mui/material/DialogTitle/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import { alpha, keyframes, styled, useTheme } from '@mui/material/styles/index.js';
+import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { neutralTones } from '../../../tokens/ink';
 
+import { AlertDialogFooter } from './AlertDialog.parts';
 import type { AlertDialogProps } from './AlertDialog.types';
 import { rem, rems } from '../../../tokens/relative';
 
@@ -140,11 +137,6 @@ const StyledDialogContent = styled(DialogContent)(({ theme }) => ({
   paddingBottom: theme.spacing(2),
 }));
 
-const StyledDialogActions = styled(DialogActions)(({ theme }) => ({
-  padding: theme.spacing(2, 3, 3, 3),
-  gap: theme.spacing(1),
-}));
-
 const CloseButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
   right: theme.spacing(1),
@@ -208,11 +200,6 @@ function ariaSlotProps(
   };
 }
 
-/** Both variants render a filled confirm; only the colour distinguishes them. */
-const CONFIRM_BUTTON_VARIANT: ButtonProps['variant'] = 'contained';
-const confirmButtonColor = (variant: AlertDialogProps['variant']): 'error' | 'primary' =>
-  variant === 'destructive' ? 'error' : 'primary';
-
 /** Title row: the variant icon (unless explicitly suppressed with `null`) + the title. */
 function AlertDialogHeader({
   title,
@@ -238,70 +225,6 @@ function AlertDialogHeader({
   );
 }
 
-/** Action row: the optional cancel button and the (variant-coloured) confirm. */
-function AlertDialogFooter({
-  variant,
-  cancelText = 'Cancel',
-  confirmText = 'Confirm',
-  showCancel = true,
-  loading = false,
-  confirmDisabled = false,
-  initialFocus = 'confirm',
-  onCancel,
-  onConfirm,
-  dataTestId,
-}: Pick<
-  AlertDialogProps,
-  | 'variant'
-  | 'cancelText'
-  | 'confirmText'
-  | 'showCancel'
-  | 'loading'
-  | 'confirmDisabled'
-  | 'initialFocus'
-> & {
-  onCancel: () => void;
-  onConfirm: () => void;
-  dataTestId: string;
-}): React.ReactElement {
-  const theme = useTheme();
-  return (
-    <StyledDialogActions data-testid={`${dataTestId}-actions`}>
-      {showCancel && (
-        <Button
-          onClick={onCancel}
-          variant="outlined"
-          color="inherit"
-          disabled={loading}
-          autoFocus={initialFocus === 'cancel'}
-          data-testid={`${dataTestId}-cancel-button`}
-        >
-          {cancelText}
-        </Button>
-      )}
-      <Button
-        onClick={onConfirm}
-        variant={CONFIRM_BUTTON_VARIANT}
-        color={confirmButtonColor(variant)}
-        disabled={confirmDisabled || loading}
-        startIcon={
-          loading ? (
-            <CircularProgress
-              size={rem(theme, 16)}
-              color="inherit"
-              data-testid={`${dataTestId}-loading-spinner`}
-            />
-          ) : undefined
-        }
-        autoFocus={initialFocus !== 'cancel'}
-        data-testid={`${dataTestId}-confirm-button`}
-      >
-        {confirmText}
-      </Button>
-    </StyledDialogActions>
-  );
-}
-
 export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
   ({
     variant = 'default',
@@ -318,6 +241,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
     loading,
     confirmDisabled,
     initialFocus,
+    emphasis,
     children,
     onClose,
     'data-testid': dataTestId = 'alert-dialog',
@@ -348,12 +272,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
           <Close />
         </CloseButton>
 
-        <AlertDialogHeader
-          title={title}
-          icon={icon}
-          variant={variant}
-          dataTestId={dataTestId}
-        />
+        <AlertDialogHeader title={title} icon={icon} variant={variant} dataTestId={dataTestId} />
 
         <StyledDialogContent data-testid={`${dataTestId}-content`}>
           {description && (
@@ -375,6 +294,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
           loading={loading}
           confirmDisabled={confirmDisabled}
           initialFocus={initialFocus}
+          emphasis={emphasis}
           onCancel={handleCancel}
           onConfirm={() => onConfirm?.()}
           dataTestId={dataTestId}
