@@ -80,20 +80,40 @@ describe('AlertDialog emphasis', () => {
     await waitFor(() => expect(cancelButton()).toHaveFocus());
   });
 
-  it('renders the confirm alone, as an outline, when the cancel is hidden', () => {
-    renderDialog({ emphasis: 'cancel', showCancel: false });
-
-    // The whole row, so "no cancel" is read from what IS there.
-    expect(actionOrder()).toEqual(['discard-confirm-button']);
-    expect(confirmButton()).toHaveClass('MuiButton-outlined', 'MuiButton-colorInherit');
-  });
-
-  it('wraps whole buttons instead of breaking a label', () => {
+  it('focuses the emphasised cancel when initialFocus is not given', async () => {
     renderDialog({ emphasis: 'cancel' });
 
-    const actions = getComputedStyle(screen.getByTestId('discard-actions'));
-    expect(actions.flexWrap).toBe('wrap-reverse');
-    // MUI's per-button left margin would indent a button that wrapped alone.
-    expect(getComputedStyle(confirmButton()).marginLeft).not.toBe('8px');
+    await waitFor(() => expect(cancelButton()).toHaveFocus());
+  });
+
+  it('keeps the confirm filled when the cancel it would defer to is hidden', () => {
+    renderDialog({ emphasis: 'cancel', showCancel: false });
+
+    // The whole row, so "no cancel" is read from what IS there — and a dialog
+    // with no cancel still has a primary.
+    expect(actionOrder()).toEqual(['discard-confirm-button']);
+    expect(confirmButton()).toHaveClass('MuiButton-contained', 'MuiButton-colorError');
+  });
+
+  it('wraps whole buttons instead of breaking a label, without MUI spacing', () => {
+    renderDialog({ emphasis: 'cancel' });
+
+    const actions = screen.getByTestId('discard-actions');
+    expect(getComputedStyle(actions).flexWrap).toBe('wrap-reverse');
+    // MUI's spacing is a left margin on every button after the first, which
+    // would indent a button that wrapped onto a line of its own.
+    expect(actions).not.toHaveClass('MuiDialogActions-spacing');
+  });
+
+  it('grows the buttons to share the row only when cancel is emphasised', () => {
+    renderDialog({ emphasis: 'cancel' });
+    expect(getComputedStyle(cancelButton()).flexGrow).toBe('1');
+    expect(getComputedStyle(confirmButton()).flexGrow).toBe('1');
+    cleanup();
+
+    // The default keeps every existing footer as it was: natural widths.
+    renderDialog();
+    expect(getComputedStyle(cancelButton()).flexGrow).not.toBe('1');
+    expect(getComputedStyle(confirmButton()).flexGrow).not.toBe('1');
   });
 });

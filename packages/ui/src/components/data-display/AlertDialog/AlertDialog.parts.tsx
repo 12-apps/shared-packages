@@ -18,22 +18,28 @@ import type { AlertDialogProps } from './AlertDialog.types';
  * The action row WRAPS WHOLE BUTTONS; it never breaks a label inside one. A pair
  * that did not fit side by side used to squeeze the longer label onto two
  * lines, so one button stood twice as tall as its neighbour. Now the row breaks
- * instead and each button takes the full width of its line. `wrap-reverse` puts
- * the LAST button — the primary, whichever `emphasis` picks — on top when it
- * stacks, the same slot it holds on the right when the row fits.
+ * instead. `wrap-reverse` puts the LAST button — the primary, whichever
+ * `emphasis` picks — on top when it stacks, the same slot it holds on the right
+ * when the row fits. A pair that fits is laid out exactly as before: natural
+ * widths, pushed to the right.
+ *
+ * `fill` — set only by `emphasis="cancel"` — lets the buttons grow to share the
+ * row, and so to take the full width of their line once it stacks. It is not
+ * the default because growing also stretches a pair that fits, which would
+ * redraw every existing dialog's footer.
  *
  * Rendered with `disableSpacing`: MUI's own spacing is a left margin on every
  * button after the first, which would indent a button that wrapped onto a line
  * of its own. The gaps below replace it, at the same 16px across.
  */
-const StyledDialogActions = styled(DialogActions)(({ theme }) => ({
+const StyledDialogActions = styled(DialogActions, {
+  shouldForwardProp: (prop) => prop !== 'fill',
+})<{ fill: boolean }>(({ theme, fill }) => ({
   padding: theme.spacing(2, 3, 3, 3),
   flexWrap: 'wrap-reverse',
   columnGap: theme.spacing(2),
   rowGap: theme.spacing(1),
-  '& > .MuiButton-root': {
-    flex: '1 1 auto',
-  },
+  ...(fill && { '& > .MuiButton-root': { flexGrow: 1 } }),
 }));
 
 const confirmButtonColor = (variant: AlertDialogProps['variant']): 'error' | 'primary' =>
@@ -64,6 +70,26 @@ const buttonLooks = (
         confirm: { variant: 'contained', color: confirmButtonColor(variant) },
       };
 
+/**
+ * The emphasis that applies: `cancel` only while the cancel is shown. A hidden
+ * cancel with the confirm stepped down would leave a dialog with no primary.
+ */
+const effectiveEmphasis = (
+  emphasis: AlertDialogProps['emphasis'],
+  showCancel: boolean,
+): NonNullable<AlertDialogProps['emphasis']> =>
+  emphasis === 'cancel' && showCancel ? 'cancel' : 'confirm';
+
+/**
+ * Whether the cancel owns focus on open: what `initialFocus` says, and when it
+ * says nothing, the emphasised button — so Enter on a steered question keeps
+ * the work instead of completing the loss.
+ */
+const focusesCancel = (
+  initialFocus: AlertDialogProps['initialFocus'],
+  emphasis: NonNullable<AlertDialogProps['emphasis']>,
+): boolean => (initialFocus ?? emphasis) === 'cancel';
+
 /** The two buttons in slot order: the emphasised one LAST, the primary slot. */
 const inSlotOrder = (
   emphasis: AlertDialogProps['emphasis'],
@@ -83,8 +109,8 @@ export function AlertDialogFooter({
   showCancel = true,
   loading = false,
   confirmDisabled = false,
-  initialFocus = 'confirm',
-  emphasis,
+  initialFocus,
+  emphasis: asked,
   onCancel,
   onConfirm,
   dataTestId,
@@ -104,7 +130,9 @@ export function AlertDialogFooter({
   dataTestId: string;
 }): React.ReactElement {
   const theme = useTheme();
+  const emphasis = effectiveEmphasis(asked, showCancel);
   const look = buttonLooks(emphasis, variant);
+  const cancelFocused = focusesCancel(initialFocus, emphasis);
   const cancel = showCancel && (
     <Button
       key="cancel"
@@ -112,7 +140,7 @@ export function AlertDialogFooter({
       variant={look.cancel.variant}
       color={look.cancel.color}
       disabled={loading}
-      autoFocus={initialFocus === 'cancel'}
+      autoFocus={cancelFocused}
       data-testid={`${dataTestId}-cancel-button`}
     >
       {cancelText}
@@ -134,14 +162,18 @@ export function AlertDialogFooter({
           />
         ) : undefined
       }
-      autoFocus={initialFocus !== 'cancel'}
+      autoFocus={!cancelFocused}
       data-testid={`${dataTestId}-confirm-button`}
     >
       {confirmText}
     </Button>
   );
   return (
-    <StyledDialogActions disableSpacing data-testid={`${dataTestId}-actions`}>
+    <StyledDialogActions
+      disableSpacing
+      fill={emphasis === 'cancel'}
+      data-testid={`${dataTestId}-actions`}
+    >
       {inSlotOrder(emphasis, cancel, confirm)}
     </StyledDialogActions>
   );
