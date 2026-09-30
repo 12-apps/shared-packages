@@ -37,7 +37,7 @@ describe('the default tooltip is opaque', () => {
 
   it('paints the InteractiveTooltip bubble solid, the one behind a settings card ⓘ', () => {
     render(
-      <InteractiveTooltip hoverContent="O texto completo" open>
+      <InteractiveTooltip hoverContent="O texto completo" pinnedContent="O texto completo" open>
         <span>ⓘ</span>
       </InteractiveTooltip>,
     );
