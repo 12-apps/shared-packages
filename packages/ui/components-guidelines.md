@@ -163,9 +163,10 @@ const Tile = styled('div')(({ theme }) => ({
 }));
 const Notice = styled('div')(({ theme }) => ({
   backgroundColor: softSignal(theme, 'warning'),
-  // `.dark`, not `.main`: stock `warning.main` on its own soft ground is
-  // 2.85:1 and fails AA. Measure the pair your palette makes.
-  color: theme.palette.warning.dark,
+  // Measure the pair your palette makes: stock `warning.main` on its own soft
+  // ground is 2.85:1 and even `warning.dark` is 3.47:1 — both fail AA for
+  // body text. Pick (or state) an ink that clears 4.5:1.
+  color: theme.palette.text.primary,
 }));
 ```
 
@@ -193,9 +194,12 @@ createTheme(base, {
   under it (FUT-854).
 - **A default needs a palette it can read.** Hex, `rgb()` and `hsl()` are
   composited here; anything else (`white`, `var(--…)`, `color(…)`) comes back
-  as a CSS `color-mix()` the browser resolves — opaque, but not a value you can
-  measure in a test. One theme is one mode: with MUI's CSS-variable colour
-  schemes the palette stays the light one, so state each mode's values.
+  as a CSS `color-mix()` the browser resolves: a CSS value for `sx`, `styled`
+  or `style`, NOT an input to colour arithmetic (`alpha`, `getContrastRatio`
+  throw on it; canvas and SVG attributes cannot resolve `var()`), and opaque
+  only if both inputs are. It needs Chrome 111+ / Safari 16.2+. One theme is one
+  mode: with MUI's CSS-variable colour schemes the palette stays the light one,
+  so state each mode's values.
 - **`surfaces().raised` is not `neutralTones().raised`.** The latter is a fixed
   step on the grey ramp (800) for a dark panel on a light UI; the former is the
   mode's own card surface, the one that reads as nearer than `sunken`.
