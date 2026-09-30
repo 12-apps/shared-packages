@@ -421,12 +421,27 @@ describe('charge-walk enforcement (server-side, before the adapter is called)', 
         expect(snapshot.hostedCheckoutUrl, `${adapter.name}/${method}`).toBeTruthy();
       }
     }
-    // The other half of the coupling: `NONE` is documented as legal for a
-    // HOSTED checkout, and such an adapter would be wrongly BLOCKED here on
-    // fields its own page collects. None declares it today — the moment one
-    // does, the exemption needs the per-method hosted flag, not a wider check.
+    // The other half of the coupling: `NONE` is documented as legal for
+    // EITHER "no card exists to tokenize" (a PIX-only adapter) OR a hosted
+    // checkout — the field alone cannot tell them apart, and only the second
+    // reading needs the exemption this gate does not give it. Itaú is the
+    // first adapter to declare `NONE` (PIX Recebimentos, no card product at
+    // all), so this is the moment the comment above anticipated: rather than
+    // widen the exemption, pin that a `NONE` adapter is genuinely the FIRST
+    // reading — nothing it charges is secretly hosted, and it declares no
+    // REQUIRED customer field the gate would need to (and safely does)
+    // enforce with no page of its own to fall back on.
     for (const adapter of LIVE_ADAPTERS) {
-      expect(adapter.capabilities.tokenization, adapter.name).not.toBe('NONE');
+      if (adapter.capabilities.tokenization !== 'NONE') continue;
+      const required = (adapter.customerSchema ?? []).filter((field) => field.required);
+      expect(required, `${adapter.name}: NONE must declare no required field`).toEqual([]);
+      for (const method of adapter.capabilities.methods) {
+        const snapshot = await adapter.createCharge(
+          { ...pixInput(`none-${method}`), method, customer: {} },
+          STUB_CREDS,
+        );
+        expect(snapshot.hostedCheckoutUrl, `${adapter.name}/${method}`).toBeFalsy();
+      }
     }
   });
 

@@ -206,15 +206,18 @@ function StepRow({ step, actions }: StepRowProps) {
   // A bordered row with the work on the left and the way to do it on the
   // right, so a step reads as a thing to tick off rather than as a paragraph.
   // The instructions on this screen are a CHECKLIST — each one is a piece of
-  // work the owner does somewhere else and comes back from.
+  // work the owner does somewhere else and comes back from. On a phone the
+  // row wraps: the text keeps a readable measure and the button drops under
+  // it, rather than squeezing the text to a word per line beside it.
   return (
     <Stack
       direction="row"
       gap="12px"
       alignItems="flex-start"
+      flexWrap="wrap"
       sx={{ border: `1px solid ${T.line}`, borderRadius: '9px', px: '14px', py: '12px' }}
     >
-      <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
+      <Stack spacing={1} sx={{ flex: '1 1 240px', minWidth: 0 }}>
         <StepText text={step.text} link={step.link} />
       {action ? (
         <Box>

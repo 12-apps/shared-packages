@@ -18,6 +18,11 @@ import type { CredentialFormCopy } from './settings-copy';
  * they can be read as the set of rules they are.
  */
 
+/** Whether a field exists in `environment` — see `CredentialFieldSpec.environments`. */
+export function appliesIn(spec: CredentialFieldSpec, environment: PaymentEnvironment): boolean {
+  return !spec.environments || spec.environments.includes(environment);
+}
+
 /**
  * Is there enough on record to make the probe WORTH RUNNING?
  *
@@ -44,7 +49,7 @@ export function credentialsComplete(
 ): boolean {
   const stored = config?.environments[environment] ?? {};
   return descriptor.credentialSchema.every((spec) => {
-    if (spec.advanced) return true;
+    if (spec.advanced || !appliesIn(spec, environment)) return true;
     const typed = values[spec.key];
     if (typed !== undefined && typed.trim() !== '') return true;
     return stored[spec.key]?.configured === true;

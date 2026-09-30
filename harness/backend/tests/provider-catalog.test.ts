@@ -6,11 +6,18 @@ import {
   type MerchantRef,
 } from '@12-apps/payments-backend';
 import { infinitePayProvider } from '@12-apps/payments-backend/providers/infinitepay';
+import { itauProvider } from '@12-apps/payments-backend/providers/itau';
 import { pagbankProvider } from '@12-apps/payments-backend/providers/pagbank';
 import { stoneProvider } from '@12-apps/payments-backend/providers/stone';
 import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 import { describe, expect, it } from 'vitest';
-import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
+import {
+  PT_BR_INFINITEPAY_COPY,
+  PT_BR_ITAU_COPY,
+  PT_BR_PAGBANK_COPY,
+  PT_BR_STONE_COPY,
+  PT_BR_STRIPE_COPY,
+} from '@12-apps/payments-backend';
 
 /**
  * The server half of the assertion the frontend harness makes in a browser.
@@ -18,7 +25,7 @@ import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STR
  * the origin host's settings page renders an EMPTY provider list, and the two ends of
  * that page are checked in different places: the frontend harness proves the
  * published UI renders whatever descriptors it is handed, and this proves the
- * published backend produces four of them through its own HTTP handler. A
+ * published backend produces every one of them through its own HTTP handler. A
  * regression in between now has nowhere left to hide.
  *
  * Everything under test is the PUBLISHED package — the registry, the four
@@ -26,7 +33,7 @@ import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STR
  * installed tarball, not from `packages/`.
  */
 const MERCHANT: MerchantRef = { kind: 'TENANT', id: 'harness-tenant' };
-const EXPECTED = ['pagbank', 'stone', 'infinitepay', 'stripe'];
+const EXPECTED = ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau'];
 
 function paymentsHttp() {
   const providers = defineProviders({
@@ -34,6 +41,7 @@ function paymentsHttp() {
     stone: stoneProvider(PT_BR_STONE_COPY),
     infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
     stripe: stripeProvider(PT_BR_STRIPE_COPY),
+    itau: itauProvider(PT_BR_ITAU_COPY),
   });
 
   // The store is the in-memory one the package itself publishes for hosts that

@@ -1,10 +1,12 @@
 import {
   PT_BR_INFINITEPAY_SETUP_GUIDE_COPY,
+  PT_BR_ITAU_SETUP_GUIDE_COPY,
   PT_BR_STONE_SETUP_GUIDE_COPY,
   PT_BR_STRIPE_SETUP_GUIDE_COPY,
 } from './setup-guide-pt-BR';
 import type {
   InfinitePayCopy,
+  ItauCopy,
   PagbankCopy,
   ProviderCopyPacks,
   StoneCopy,
@@ -98,6 +100,31 @@ export const PT_BR_STONE_COPY: StoneCopy = {
   payer: { boletoInstructions: 'Pagar até o vencimento', statementDescriptor: 'PEDIDO' },
 };
 
+export const PT_BR_ITAU_COPY: ItauCopy = {
+  displayName: 'Itaú',
+  setupGuide: PT_BR_ITAU_SETUP_GUIDE_COPY,
+  unreachable:
+    'Não conseguimos falar com o Itaú agora. ' +
+    'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
+  credentialsMissing: 'Preencha o Client ID, o Client Secret e a chave Pix.',
+  certificateMissing: 'Em produção, o Itaú exige o certificado e a chave privada gerados no portal do desenvolvedor.',
+  certificateInvalid: 'Não conseguimos ler o certificado ou a chave privada. Cole o arquivo .pem inteiro, da linha -----BEGIN até a linha -----END.',
+  certificateMismatch: 'A chave privada não pertence a este certificado. Confira se os dois foram gerados juntos.',
+  certificateExpired: 'O certificado venceu. Gere um novo certificado e uma nova chave privada no portal do desenvolvedor do Itaú e cole os dois aqui.',
+  certificateNotYetValid: 'O certificado ainda não está válido. Aguarde o início da validade ou use o certificado vigente.',
+  certificateRefused: 'O Itaú encerrou a conexão ao receber o certificado. Confira se ele é o de produção, gerado para este Client ID e não revogado — ou teste de novo em instantes.',
+  refused: 'Credenciais recusadas pelo Itaú.',
+  fields: {
+    clientId: 'Client ID',
+    clientSecret: 'Client Secret',
+    certificate: 'Certificado (.pem)',
+    privateKey: 'Chave privada do certificado (.pem)',
+    productionOnly: 'Obrigatório em produção.',
+    pixKey: 'Chave Pix cadastrada no Itaú',
+  },
+  payer: { chargeDescription: 'PEDIDO' },
+};
+
 export const PT_BR_PAGBANK_COPY: PagbankCopy = {
   unreachable:
     'Não conseguimos falar com o PagBank agora. ' +
@@ -139,4 +166,5 @@ export const PT_BR_PROVIDER_COPY: ProviderCopyPacks = {
   stone: PT_BR_STONE_COPY,
   infinitepay: PT_BR_INFINITEPAY_COPY,
   stripe: PT_BR_STRIPE_COPY,
+  itau: PT_BR_ITAU_COPY,
 };

@@ -14,7 +14,7 @@
  * mount makes that true by construction: `CATALOG_EXCLUDE` below leaves only
  * `getSettings` and `getSetupGuide` standing (the setup-guide modules are
  * pure — type-only imports), so a stray click cannot make a vendor adapter
- * place a cross-origin call or reach a crypto-backed path. `node:crypto` is
+ * place a cross-origin call or reach a crypto-backed path. `node:crypto` (and Itau's `node:https`) is
  * externalized by the build and only throws when CALLED; nothing on this page
  * calls it. Removing an entry from `CATALOG_EXCLUDE` re-opens exactly that
  * risk — `admin-probe-write` is the exclusion's live proof.
@@ -23,6 +23,7 @@ import type { JSX, ReactNode } from 'react';
 
 import { defineProviders, type PaymentsIntentKind } from '@12-apps/payments-backend';
 import { infinitePayProvider } from '@12-apps/payments-backend/providers/infinitepay';
+import { itauProvider } from '@12-apps/payments-backend/providers/itau';
 import { pagbankProvider } from '@12-apps/payments-backend/providers/pagbank';
 import { stoneProvider } from '@12-apps/payments-backend/providers/stone';
 import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
@@ -30,7 +31,13 @@ import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
 import { adminCase, RawRequestButton } from '../payments/admin-cases';
 import type { AdminStoreSpec, AdminWorld } from '../payments/admin-store';
 import { CaseTabs, PageIntro, type HarnessCase } from '../payments/panel';
-import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '@12-apps/payments-backend';
+import {
+  PT_BR_INFINITEPAY_COPY,
+  PT_BR_ITAU_COPY,
+  PT_BR_PAGBANK_COPY,
+  PT_BR_STONE_COPY,
+  PT_BR_STRIPE_COPY,
+} from '@12-apps/payments-backend';
 
 /** The published catalog, composed the way a host composes it. */
 const registry = defineProviders({
@@ -38,6 +45,7 @@ const registry = defineProviders({
   stone: stoneProvider(PT_BR_STONE_COPY),
   infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
   stripe: stripeProvider(PT_BR_STRIPE_COPY),
+  itau: itauProvider(PT_BR_ITAU_COPY),
 });
 
 /**
@@ -86,7 +94,7 @@ function probeWrite(world: AdminWorld): ReactNode {
 /**
  * Four cases, one mount shape. They exist so each spec lands on its own
  * world (distinct baseUrl = distinct localStorage ack scope and wire log):
- * `catalog` pins the four cards and read-only-ness, `slug-alias` lands
+ * `catalog` pins the five cards and read-only-ness, `slug-alias` lands
  * controlled on the raw `infinitepay` name and watches the canonical
  * `infinite-pay` respelling arrive with `{replace: true}`, `guides` opens the
  * one vendor that ships a setup guide and the one that ships none — plus a
@@ -128,7 +136,7 @@ export function PaymentsProviderSettingsPage(): JSX.Element {
   return (
     <>
       <PageIntro title="Provider settings · catalog">
-        The four published vendor adapters, projected by the real settings service into the real
+        The five published vendor adapters, projected by the real settings service into the real
         settings screen — read-only by construction, with selection kept in the hash query
         (controlled mode, the URL contract the production admin implements). The other pages of
         this parent exercise the writes, over fictional providers.

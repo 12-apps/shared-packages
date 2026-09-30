@@ -280,3 +280,42 @@ describe("the capability default picks the shape from what the store can do", ()
     expect(screen.queryAllByTestId("checkout-handoff-pending")).toHaveLength(0);
   });
 });
+
+describe("a PIX-on-page provider ahead of a hosted card provider", () => {
+  /**
+   * The chain an Itau-first, InfinitePay-second store publishes: the head takes
+   * PIX only and answers it with a code for this page; the tail takes the card
+   * on its own page. Routed whole to the hand-off before, it never painted the
+   * QR and never offered the card.
+   */
+  function mixedStore(): CheckoutProviderConfig {
+    return {
+      provider: "pixbank",
+      tokenization: "NONE",
+      publicKey: null,
+      mockTokenization: false,
+      methods: ["PIX", "CARD"],
+      chain: [
+        { provider: "pixbank", tokenization: "NONE", publicKey: null, mockTokenization: false, methods: ["PIX"], checkoutScreen: null },
+        { provider: "linkpay", tokenization: "REDIRECT", publicKey: null, mockTokenization: false, methods: ["PIX", "CARD"], checkoutScreen: null },
+      ],
+    };
+  }
+
+  it("keeps the PIX-or-card picker on our page", () => {
+    expect(methodChosenAtProvider(null, mixedStore())).toBe(false);
+  });
+
+  it("paints the PIX code here for a PIX order, instead of a hand-off spinner", () => {
+    render(
+      <CapabilityDefaultScreen
+        {...props({
+          config: mixedStore(),
+          method: "PIX",
+          order: { orderId: "o1", status: "AWAITING_PAYMENT", method: "PIX", totalLabel: "R$ 10,00" } as never,
+        })}
+      />,
+    );
+    expect(screen.getByTestId("stub-pix-view")).toBeTruthy();
+  });
+});

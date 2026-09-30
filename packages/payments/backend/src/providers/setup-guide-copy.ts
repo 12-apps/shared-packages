@@ -127,3 +127,27 @@ export interface InfinitePaySetupGuideCopy {
     webhookUrlLabel: string;
   };
 }
+
+/** Itau's walkthrough: credentials from the developer portal, then the webhook for the Pix key. */
+export interface ItauSetupGuideCopy {
+  stages: { credentials: string; webhook: string; activate: string };
+  credentials: {
+    title: string;
+    intro: string;
+    portal: string;
+    portalButton: string;
+    certificate: string;
+    paste: string;
+  };
+  webhook: {
+    title: string;
+    intro: string;
+    register: string;
+    /** What happens until it is registered — slower, never lost. */
+    withoutIt: string;
+    doneLabel: string;
+    doneValue: string;
+    confirmLabel: string;
+  };
+  webhookUrlLabel: string;
+}

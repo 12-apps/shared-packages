@@ -33,6 +33,20 @@ export interface CredentialFieldSpec {
    * hand-written provider→field table, which is only ever wrong silently.
    */
   role?: 'webhookSecret';
+  /**
+   * A value pasted as several lines — a PEM certificate or private key. The
+   * form renders a textarea instead of a single-line input, which would fold
+   * the newlines away (the server also re-wraps a folded PEM, but the owner
+   * should see what they pasted).
+   */
+  multiline?: boolean;
+  /**
+   * The environments this field exists in; omitted means every one. Itau's
+   * mTLS certificate is a PRODUCTION credential — the sandbox has no mTLS —
+   * so its form must neither show it on the Sandbox tab nor count it toward
+   * "complete enough to test" there.
+   */
+  environments?: readonly ('SANDBOX' | 'PRODUCTION')[];
   /** Monospace + letter-spaced: `$loja-l0ja` and `$loja-loja` are the same
    * shape in a proportional face, and a wrong handle is not an error — it is
    * somebody else's account. */

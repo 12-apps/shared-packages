@@ -1,6 +1,7 @@
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { ProviderCopyPacks } from './copy';
 import { infinitePayProvider } from './infinitepay';
+import { itauProvider } from './itau';
 import { pagbankProvider } from './pagbank';
 import { stoneProvider } from './stone';
 import { stripeProvider } from './stripe';
@@ -32,6 +33,7 @@ export const providerCatalog = {
   stone: stoneProvider,
   infinitepay: infinitePayProvider,
   stripe: stripeProvider,
+  itau: itauProvider,
 } as const satisfies {
   [K in keyof ProviderCopyPacks]: (copy: ProviderCopyPacks[K]) => PaymentProviderAdapter;
 };

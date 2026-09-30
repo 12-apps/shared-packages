@@ -127,4 +127,36 @@ describe('PaymentProviderSettings — the verification slot', () => {
     await waitFor(() => expect(screen.queryByTestId('payments-manual-fallback')).toBeNull());
     expect(slot.closest('[data-testid="payments-manual-fallback"]')).toBeNull();
   });
+
+  it('renders no activation step for a PIX-only provider that answers with a code', async () => {
+    // No card to verify and no hosted page to redirect to: the step could only
+    // fail. The toggle unlocks on the credential probe instead.
+    const renderVerification = vi.fn(() => <div data-testid="slot" />);
+    const pixOnly = [
+      {
+        name: 'pixbank',
+        displayName: 'Pix Bank',
+        authMode: 'credentials',
+        credentialSchema: [],
+        capabilities: { methods: ['PIX'], tokenization: 'NONE' },
+      },
+    ];
+    const view = {
+      providers: pixOnly,
+      configs: [{ provider: 'pixbank', status: 'VERIFIED', enabled: false, environments: {} }],
+      activeProvider: null,
+    } as unknown as MerchantSettingsView;
+    render(
+      <PaymentProviderSettings
+        copy={PT_BR_PAYMENTS_SETTINGS_COPY}
+        client={fakeClient(view)}
+        initialProvider="pixbank"
+        renderVerification={renderVerification}
+      />,
+    );
+
+    await screen.findByTestId('payments-status');
+    expect(renderVerification).not.toHaveBeenCalled();
+  });
 });
+

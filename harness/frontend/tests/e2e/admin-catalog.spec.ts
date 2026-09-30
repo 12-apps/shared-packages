@@ -23,7 +23,7 @@ test('the published adapters render as cards, and the mount is read-only by cons
 
   // Every published adapter gets a card and an unconnected badge — the real
   // descriptor projection, not a hand-written list.
-  for (const name of ['pagbank', 'stone', 'infinitepay', 'stripe']) {
+  for (const name of ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau']) {
     await expect(page.getByTestId(`payments-provider-card-${name}`)).toBeVisible();
     await expect(page.getByTestId(`payments-provider-badge-${name}`)).toHaveText('Não conectado');
   }
@@ -34,6 +34,9 @@ test('the published adapters render as cards, and the mount is read-only by cons
   await expect(page.getByTestId('payments-provider-card-stone')).toContainText('Stone');
   await expect(page.getByTestId('payments-provider-card-infinitepay')).toContainText('InfinitePay');
   await expect(page.getByTestId('payments-provider-card-stripe')).toContainText('Stripe');
+  // The accent lives in the copy pack (shipped source is ASCII), and the card
+  // shows the pack's spelling.
+  await expect(page.getByTestId('payments-provider-card-itau')).toContainText('Itaú');
 
   // A credentials provider opens onto the schema-driven form: environment
   // tabs, the SANDBOX notice, and a save button dead while nothing is edited.

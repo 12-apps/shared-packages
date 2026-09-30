@@ -4,9 +4,10 @@ The server half of the payments surface: a provider-agnostic gateway, the
 adapters behind it, the credential and charge stores, the webhook pipeline, and
 the background reconciliation that catches what a webhook missed.
 
-Four providers ship today — **PagBank**, **Stripe**, **Stone** and
-**InfinitePay** — behind one adapter contract. Adding a fifth is a catalog
-entry and an adapter; it is not a change to any host.
+Five providers ship today — **PagBank**, **Stripe**, **Stone**,
+**InfinitePay** and **Itaú** (Pix only, over mTLS) — behind one adapter
+contract. Adding a sixth is a catalog entry and an adapter; it is not a change
+to any host.
 
 ## The rule this package exists to enforce
 

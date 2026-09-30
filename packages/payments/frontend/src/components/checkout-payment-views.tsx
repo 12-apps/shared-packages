@@ -22,6 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
+import QRCode from 'react-qr-code';
 
 import type { ClientChargeView, Money } from '@12-apps/payments-backend';
 
@@ -55,9 +56,22 @@ export function PixPanel({ charge, copy }: { charge: ClientChargeView; copy: Leg
   if (!charge.pix) return null;
   return (
     <Stack spacing={1} alignItems="flex-start">
+      {/* The provider's own image when it sent one (Stone, Stripe); otherwise
+          drawn here from the BR Code, as `PixView` does — a provider that
+          returns only the code (PagBank, Itau) must still give the buyer
+          something to scan. */}
       {charge.pix.qrImageUrl ? (
         <Box component="img" src={charge.pix.qrImageUrl} alt={copy.qrAlt} sx={{ width: 220 }} />
-      ) : null}
+      ) : (
+        <Box
+          role="img"
+          aria-label={copy.qrAlt}
+          data-testid="payments-pix-qr-local"
+          sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}
+        >
+          <QRCode value={charge.pix.qrText} size={200} />
+        </Box>
+      )}
       <TextField fullWidth multiline size="small" label={copy.copyPasteLabel} value={charge.pix.qrText} />
       <Button
         size="small"

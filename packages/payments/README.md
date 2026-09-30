@@ -7,7 +7,7 @@ deliberately shaped so it can later become a standalone application
 
 | package                   | contents |
 | ------------------------- | -------- |
-| `@12-apps/payments-backend`  | normalized charge/refund/webhook domain, per-provider adapters (Stone, InfinitePay, Stripe), the gateway, merchant-scoped credential settings (masking, verify, single active provider), fetch-native HTTP handlers, storage ports with in-memory + Prisma implementations, and the OWNED Prisma schema fragment + migration |
+| `@12-apps/payments-backend`  | normalized charge/refund/webhook domain, per-provider adapters (PagBank, Stone, InfinitePay, Stripe, Itau), the gateway, merchant-scoped credential settings (masking, verify, single active provider), fetch-native HTTP handlers, storage ports with in-memory + Prisma implementations, and the OWNED Prisma schema fragment + migration |
 | `@12-apps/payments-frontend` | plug-and-play MUI components for the payment surfaces — `PaymentProviderSettings` (per-provider config page), `CheckoutPayment` (buyer payment step) and `CheckoutFlow` (the FULL three-step buyer checkout, host-composed through ports + design-system slots; see `ADOPTING.md` §3) — plus the headless hooks/clients they build on |
 
 Everything payment-related lives here: code, HTTP surface, UI, database
@@ -163,7 +163,9 @@ host, which finds them structurally under `backend/prisma/migrations/`.
 - Webhook idempotency: inbox dedup on `(merchant, provider, eventId)`.
 - Forward-only status: no regressions, no contradictory terminal overwrites.
 - Fail-closed webhooks: live merchants without a webhook secret reject every
-  delivery. The one branch that skips verification is stub mode, and every
+  delivery; for a provider whose deliveries are unsigned (InfinitePay, Itau),
+  `verify` re-asks the provider and rejects whatever it does not confirm. The
+  one branch that skips verification is stub mode, and every
   adapter reaches it through the same `stubDeliveryTrusted` predicate — a
   SANDBOX credential on a deployment that explicitly granted stub mode, and
   nothing else.

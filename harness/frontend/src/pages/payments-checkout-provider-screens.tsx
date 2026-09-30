@@ -1,7 +1,7 @@
 /**
  * The buyer screen comes from what the ADAPTER declared (FUT-596).
  *
- * Four stores, identical in every way a host can see except one declaration,
+ * Five stores, identical in every way a host can see except one declaration,
  * each driven through the real mount so the id makes the round trip it makes
  * in production: declared on the adapter → stamped by the gateway onto every
  * chain entry → published by `GET /checkout/config` → resolved to a component
@@ -36,7 +36,7 @@ export function PaymentsCheckoutProviderScreensPage(): JSX.Element {
   return (
     <>
       <PageIntro title="Checkout · provider screens (declared)">
-        The same checkout, four stores. Each declares a different screen id — or none — and the
+        The same checkout, five stores. Each declares a different screen id — or none — and the
         pane that renders is whichever the adapter asked for. Nothing here names a vendor: the id
         names the shape of the flow, so one declaration serves any provider of that shape.
       </PageIntro>
@@ -55,6 +55,16 @@ export function PaymentsCheckoutProviderScreensPage(): JSX.Element {
           checkoutCase('screen-unknown', 'Declares an unknown id', {
             chain: [
               mintable('do-futuro', ['PIX', 'CARD'], { checkoutScreen: 'boleto-and-wallet' }),
+            ],
+          }),
+          // A PIX-only head that answers with a CODE for this page (no image, no
+          // link, no card) ahead of a tail that takes the card on its own page.
+          // Routed whole to the hand-off before, it showed a spinner forever: no
+          // QR, no card. PIX must paint its code here and card must still leave.
+          checkoutCase('screen-pix-code-head', 'PIX code first, hosted card second', {
+            chain: [
+              { name: 'cerrado', tokenization: 'NONE', methods: ['PIX'], stub: true, settlesOnPoll: false },
+              hostedPage('boreal', ['PIX', 'CARD']),
             ],
           }),
         ]}

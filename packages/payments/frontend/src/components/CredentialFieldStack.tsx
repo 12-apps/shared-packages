@@ -2,10 +2,10 @@
 
 import { Stack } from '@mui/material';
 
-import type { ProviderDescriptor } from '@12-apps/payments-backend';
+import type { PaymentEnvironment, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import { CredentialField } from './CredentialFields';
-import { saveLabel } from './credential-rules';
+import { appliesIn, saveLabel } from './credential-rules';
 import { FormActions, ReverifyWarning } from './CredentialFormAlerts';
 import type { CredentialFormState } from './ProviderCredentialForm';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
@@ -20,10 +20,13 @@ import { usePaymentsSettingsCopy } from './settings-copy-context';
  */
 export function CredentialFields({
   descriptor,
+  environment,
   form,
   proven,
 }: {
   descriptor: ProviderDescriptor;
+  /** The tab on screen: a field declared for other environments is not drawn. */
+  environment: PaymentEnvironment;
   form: CredentialFormState;
   /** A real charge has landed through this connection — see `ReverifyWarning`. */
   proven: boolean;
@@ -32,7 +35,7 @@ export function CredentialFields({
   return (
     <Stack spacing={2}>
       {proven ? <ReverifyWarning displayName={descriptor.displayName} /> : null}
-      {descriptor.credentialSchema.map((spec) => (
+      {descriptor.credentialSchema.filter((spec) => appliesIn(spec, environment)).map((spec) => (
         <CredentialField
           key={spec.key}
           spec={spec}

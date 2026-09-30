@@ -19,11 +19,18 @@ import { defineProviders } from '../core/registry';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
 import { sha256Hex } from '../providers/shared';
+import { itauProvider } from '../providers/itau';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
 import { STUB_CREDS, TENANT, cardInput, pixInput } from './fixtures';
 import { EN_US_PAGBANK_COPY } from '../providers/en-US';
-import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY, PT_BR_STRIPE_COPY } from '../providers/pt-BR';
+import {
+  PT_BR_INFINITEPAY_COPY,
+  PT_BR_ITAU_COPY,
+  PT_BR_PAGBANK_COPY,
+  PT_BR_STONE_COPY,
+  PT_BR_STRIPE_COPY,
+} from '../providers/pt-BR';
 /**
  * The platform name every guide in this suite renders under.
  *
@@ -79,7 +86,7 @@ describe('provider skeletons (stub mode)', () => {
   });
 
   it('stub credentials verify ok everywhere', async () => {
-    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY), itauProvider(PT_BR_ITAU_COPY)]) {
       await expect(adapter.verifyCredentials(STUB_CREDS)).resolves.toMatchObject({ ok: true });
     }
   });
@@ -118,7 +125,7 @@ describe('provider skeletons (stub mode)', () => {
   it('every provider with a setup guide names the merchant webhook URL', () => {
     const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x', publicKeyUrl: 'https://host.example/pk' };
     expect(pagbankProvider(PT_BR_PAGBANK_COPY).setupGuide).toBeUndefined();
-    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY), itauProvider(PT_BR_ITAU_COPY)]) {
       const guide = adapter.setupGuide?.(ctx);
       // Stage ids are each vendor's own now that the guides are real
       // walkthroughs rather than one generic template — what every guide must
@@ -245,7 +252,7 @@ describe('provider skeletons (stub mode)', () => {
    */
   it('no guide ships an unpaired section, nor a section on its last stage', () => {
     const ctx = { brandName: HOST_BRAND, webhookUrl: 'https://host.example/api/webhooks/x' };
-    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY)]) {
+    for (const adapter of [stoneProvider(PT_BR_STONE_COPY), infinitePayProvider(PT_BR_INFINITEPAY_COPY), stripeProvider(PT_BR_STRIPE_COPY), itauProvider(PT_BR_ITAU_COPY)]) {
       const guide = adapter.setupGuide?.(ctx);
       const stageIds = guide?.stages.map((s) => s.id) ?? [];
       const sectionIds = guide?.sections.map((s) => s.id) ?? [];

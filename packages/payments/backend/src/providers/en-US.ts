@@ -1,10 +1,12 @@
 import {
   EN_US_INFINITEPAY_SETUP_GUIDE_COPY,
+  EN_US_ITAU_SETUP_GUIDE_COPY,
   EN_US_STONE_SETUP_GUIDE_COPY,
   EN_US_STRIPE_SETUP_GUIDE_COPY,
 } from './setup-guide-en-US';
 import type {
   InfinitePayCopy,
+  ItauCopy,
   PagbankCopy,
   ProviderCopyPacks,
   StoneCopy,
@@ -109,6 +111,29 @@ export const EN_US_STONE_COPY: StoneCopy = {
   payer: { boletoInstructions: 'Pay by the due date', statementDescriptor: 'ORDER' },
 };
 
+export const EN_US_ITAU_COPY: ItauCopy = {
+  displayName: 'Itaú',
+  setupGuide: EN_US_ITAU_SETUP_GUIDE_COPY,
+  unreachable: 'We could not reach Itaú just now. Your credentials were saved — test the connection again shortly.',
+  credentialsMissing: 'Fill in the Client ID, the Client Secret and the Pix key.',
+  certificateMissing: 'In production, Itaú requires the certificate and private key generated in its developer portal.',
+  certificateInvalid: 'We could not read the certificate or the private key. Paste the whole .pem file, from the -----BEGIN line to the -----END line.',
+  certificateMismatch: 'The private key does not belong to this certificate. Check that both were generated together.',
+  certificateExpired: 'The certificate has expired. Generate a new certificate and a new private key in the Itaú developer portal and paste both here.',
+  certificateNotYetValid: 'The certificate is not valid yet. Wait for its validity to begin, or use the current certificate.',
+  certificateRefused: 'Itaú closed the connection on the certificate. Check that it is the production one, issued for this Client ID and not revoked — or test again shortly.',
+  refused: 'Credentials refused by Itaú.',
+  fields: {
+    clientId: 'Client ID',
+    clientSecret: 'Client Secret',
+    certificate: 'Certificate (.pem)',
+    privateKey: 'Certificate private key (.pem)',
+    productionOnly: 'Required in production.',
+    pixKey: 'Pix key registered with Itaú',
+  },
+  payer: { chargeDescription: 'ORDER' },
+};
+
 export const EN_US_PAGBANK_COPY: PagbankCopy = {
   unreachable:
     'We could not reach PagBank just now. ' +
@@ -150,4 +175,5 @@ export const EN_US_PROVIDER_COPY: ProviderCopyPacks = {
   stone: EN_US_STONE_COPY,
   infinitepay: EN_US_INFINITEPAY_COPY,
   stripe: EN_US_STRIPE_COPY,
+  itau: EN_US_ITAU_COPY,
 };
