@@ -122,6 +122,22 @@ export const LogoutConfirmation: Story = {
   },
 };
 
+// Cancel as the primary: the confirm is the loss, so keeping the work is the
+// filled button. The labels are long on purpose — on a phone the row stacks,
+// primary on top, instead of breaking a label inside its button.
+export const CancelEmphasis: Story = {
+  render: (args) => <DialogWrapper {...args} />,
+  args: {
+    variant: 'destructive',
+    emphasis: 'cancel',
+    initialFocus: 'cancel',
+    title: 'Discard this order?',
+    description: 'You have already written 3 items. Leave now and the order is deleted.',
+    confirmText: 'Discard',
+    cancelText: 'Keep writing the order',
+  },
+};
+
 // Without cancel button
 export const WithoutCancel: Story = {
   render: (args) => <DialogWrapper {...args} />,

@@ -140,9 +140,26 @@ const StyledDialogContent = styled(DialogContent)(({ theme }) => ({
   paddingBottom: theme.spacing(2),
 }));
 
+/**
+ * The action row WRAPS WHOLE BUTTONS; it never breaks a label inside one. A pair
+ * that did not fit side by side used to squeeze the longer label onto two
+ * lines, so one button stood twice as tall as its neighbour. Now the row breaks
+ * instead and each button takes the full width of its line. `wrap-reverse` puts
+ * the LAST button — the primary, whichever `emphasis` picks — on top when it
+ * stacks, the same slot it holds on the right when the row fits.
+ *
+ * Rendered with `disableSpacing`: MUI's own spacing is a left margin on every
+ * button after the first, which would indent a button that wrapped onto a line
+ * of its own. The gaps below replace it, at the same 16px across.
+ */
 const StyledDialogActions = styled(DialogActions)(({ theme }) => ({
   padding: theme.spacing(2, 3, 3, 3),
-  gap: theme.spacing(1),
+  flexWrap: 'wrap-reverse',
+  columnGap: theme.spacing(2),
+  rowGap: theme.spacing(1),
+  '& > .MuiButton-root': {
+    flex: '1 1 auto',
+  },
 }));
 
 const CloseButton = styled(IconButton)(({ theme }) => ({
@@ -208,10 +225,33 @@ function ariaSlotProps(
   };
 }
 
-/** Both variants render a filled confirm; only the colour distinguishes them. */
-const CONFIRM_BUTTON_VARIANT: ButtonProps['variant'] = 'contained';
 const confirmButtonColor = (variant: AlertDialogProps['variant']): 'error' | 'primary' =>
   variant === 'destructive' ? 'error' : 'primary';
+
+interface ButtonLook {
+  variant: ButtonProps['variant'];
+  color: ButtonProps['color'];
+}
+
+/**
+ * How each button is drawn, by `emphasis`: the emphasised one is filled, the
+ * other a NEUTRAL outline. Primary / neutral both ways round — a confirm that
+ * steps down drops the variant's colour too, so the one filled button is the
+ * only coloured thing in the row and the eye has a single place to land.
+ */
+const buttonLooks = (
+  emphasis: NonNullable<AlertDialogProps['emphasis']>,
+  variant: AlertDialogProps['variant'],
+): { cancel: ButtonLook; confirm: ButtonLook } =>
+  emphasis === 'cancel'
+    ? {
+        cancel: { variant: 'contained', color: 'primary' },
+        confirm: { variant: 'outlined', color: 'inherit' },
+      }
+    : {
+        cancel: { variant: 'outlined', color: 'inherit' },
+        confirm: { variant: 'contained', color: confirmButtonColor(variant) },
+      };
 
 /** Title row: the variant icon (unless explicitly suppressed with `null`) + the title. */
 function AlertDialogHeader({
@@ -238,7 +278,11 @@ function AlertDialogHeader({
   );
 }
 
-/** Action row: the optional cancel button and the (variant-coloured) confirm. */
+/**
+ * Action row: the optional cancel button and the (variant-coloured) confirm,
+ * with the emphasised one LAST — the primary slot, on the right or, once the
+ * row stacks, on top. DOM order is the tab order, so it follows the same rule.
+ */
 function AlertDialogFooter({
   variant,
   cancelText = 'Cancel',
@@ -247,6 +291,7 @@ function AlertDialogFooter({
   loading = false,
   confirmDisabled = false,
   initialFocus = 'confirm',
+  emphasis = 'confirm',
   onCancel,
   onConfirm,
   dataTestId,
@@ -259,45 +304,52 @@ function AlertDialogFooter({
   | 'loading'
   | 'confirmDisabled'
   | 'initialFocus'
+  | 'emphasis'
 > & {
   onCancel: () => void;
   onConfirm: () => void;
   dataTestId: string;
 }): React.ReactElement {
   const theme = useTheme();
+  const look = buttonLooks(emphasis, variant);
+  const cancel = showCancel && (
+    <Button
+      key="cancel"
+      onClick={onCancel}
+      variant={look.cancel.variant}
+      color={look.cancel.color}
+      disabled={loading}
+      autoFocus={initialFocus === 'cancel'}
+      data-testid={`${dataTestId}-cancel-button`}
+    >
+      {cancelText}
+    </Button>
+  );
+  const confirm = (
+    <Button
+      key="confirm"
+      onClick={onConfirm}
+      variant={look.confirm.variant}
+      color={look.confirm.color}
+      disabled={confirmDisabled || loading}
+      startIcon={
+        loading ? (
+          <CircularProgress
+            size={rem(theme, 16)}
+            color="inherit"
+            data-testid={`${dataTestId}-loading-spinner`}
+          />
+        ) : undefined
+      }
+      autoFocus={initialFocus !== 'cancel'}
+      data-testid={`${dataTestId}-confirm-button`}
+    >
+      {confirmText}
+    </Button>
+  );
   return (
-    <StyledDialogActions data-testid={`${dataTestId}-actions`}>
-      {showCancel && (
-        <Button
-          onClick={onCancel}
-          variant="outlined"
-          color="inherit"
-          disabled={loading}
-          autoFocus={initialFocus === 'cancel'}
-          data-testid={`${dataTestId}-cancel-button`}
-        >
-          {cancelText}
-        </Button>
-      )}
-      <Button
-        onClick={onConfirm}
-        variant={CONFIRM_BUTTON_VARIANT}
-        color={confirmButtonColor(variant)}
-        disabled={confirmDisabled || loading}
-        startIcon={
-          loading ? (
-            <CircularProgress
-              size={rem(theme, 16)}
-              color="inherit"
-              data-testid={`${dataTestId}-loading-spinner`}
-            />
-          ) : undefined
-        }
-        autoFocus={initialFocus !== 'cancel'}
-        data-testid={`${dataTestId}-confirm-button`}
-      >
-        {confirmText}
-      </Button>
+    <StyledDialogActions disableSpacing data-testid={`${dataTestId}-actions`}>
+      {emphasis === 'cancel' ? [confirm, cancel] : [cancel, confirm]}
     </StyledDialogActions>
   );
 }
@@ -318,6 +370,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
     loading,
     confirmDisabled,
     initialFocus,
+    emphasis,
     children,
     onClose,
     'data-testid': dataTestId = 'alert-dialog',
@@ -375,6 +428,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
           loading={loading}
           confirmDisabled={confirmDisabled}
           initialFocus={initialFocus}
+          emphasis={emphasis}
           onCancel={handleCancel}
           onConfirm={() => onConfirm?.()}
           dataTestId={dataTestId}

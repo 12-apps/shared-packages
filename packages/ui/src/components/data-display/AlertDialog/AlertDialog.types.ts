@@ -75,6 +75,17 @@ export interface AlertDialogProps extends Omit<MuiDialogProps, 'variant'> {
   initialFocus?: 'confirm' | 'cancel';
 
   /**
+   * Which button is the filled, primary one. Defaults to `confirm`. Pass
+   * `cancel` when backing out is the action to steer toward — a "discard what
+   * you wrote?" question, where the confirm is the loss: cancel is then filled
+   * and takes the primary slot (right, or on top once the row stacks), and the
+   * confirm steps down to the neutral outline cancel normally wears — primary
+   * and neutral, whatever the variant. It only makes sense with the cancel
+   * button shown.
+   */
+  emphasis?: 'confirm' | 'cancel';
+
+  /**
    * Optional data-testid attribute for testing
    */
   'data-testid'?: string;
