@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createSettingsService, credentialStoreFrom } from '../config/service';
-import { CredentialsError, ProviderRequestError } from '../core/errors';
+import { AmbiguousChargeError, CredentialsError, ProviderRequestError } from '../core/errors';
 import { createPaymentsGateway } from '../core/gateway';
 import { isOutageSignal } from '../core/provider-health';
 import { defineProviders } from '../core/registry';
@@ -102,6 +102,41 @@ describe('itau at the head of the chain', () => {
     expect(stored.snapshot.provider).toBe('infinitepay');
     expect(stored.snapshot.amount.amountCents).toBe(12_50);
     expect(ledgerFor(scriptedAttempts, 'order-ambiguous-1')[0]?.[0]).toBe('itau');
+  });
+});
+
+describe('an ambiguous cob followed by a token 404', () => {
+  it('stops the walk rather than fail over — a 404 from the token endpoint says nothing about the cob', async () => {
+    // First mint answers, the cob PUT fails ambiguously (it may exist), then
+    // the probe's own mint 404s. Only the cob read may prove "not raised".
+    const mintAnswers = [JSON.stringify({ access_token: 't', expires_in: 300 })];
+    vi.stubGlobal('fetch', async (url: string) => {
+      if (!String(url).includes('/api/jwt')) return new Response('{}', { status: 502 });
+      const token = mintAnswers.shift();
+      return token ? new Response(token, { status: 200 }) : new Response('{}', { status: 404 });
+    });
+    try {
+      const credentials = createMemoryCredentialStore();
+      const probeAttempts = createMemoryAttemptLedger();
+      const probeGateway = createPaymentsGateway({
+        providers: defineProviders({
+          itau: itauProvider(PT_BR_ITAU_COPY),
+          infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+        } as const),
+        credentials,
+        charges: createMemoryChargeStore(),
+        webhooks: createMemoryWebhookInbox(),
+        attempts: probeAttempts,
+      });
+      credentials.set(TENANT, 'itau', { environment: 'SANDBOX', fields: { clientId: 'c', clientSecret: 's', pixKey: 'loja@example.com' } });
+      credentials.set(TENANT, 'infinitepay', STUB_CREDS);
+      const outcome = await probeGateway.charge(TENANT, pixInput('order-probe-404')).catch((error: unknown) => error);
+      expect(outcome).toBeInstanceOf(AmbiguousChargeError);
+      expect((outcome as AmbiguousChargeError).probeResult).toBe('PROBE_FAILED');
+      expect(ledgerFor(probeAttempts, 'order-probe-404').map(([provider]) => provider)).not.toContain('infinitepay');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

@@ -139,7 +139,7 @@ export const PT_BR_ITAU_SETUP_GUIDE_COPY: ItauSetupGuideCopy = {
     certificate:
       'Para produção, gere também o certificado (.pem) e guarde a chave privada criada junto com ele. O certificado vale 365 dias; o sandbox não usa certificado.',
     paste:
-      'Cole tudo no formulário abaixo — o certificado e a chave privada inteiros, do BEGIN ao END, na aba Produção — junto com a chave Pix cadastrada no Itaú. Depois clique em “Salvar e testar conexão”.',
+      'Cole tudo no formulário abaixo — o certificado e a chave privada inteiros, da linha -----BEGIN até a linha -----END, na aba Produção — junto com a chave Pix cadastrada no Itaú. Depois clique em “Salvar e testar conexão”.',
   },
   webhook: {
     title: 'Cadastrar a URL de notificação',
@@ -147,7 +147,7 @@ export const PT_BR_ITAU_SETUP_GUIDE_COPY: ItauSetupGuideCopy = {
     register:
       'Peça ao Itaú (pelo gerente ou pelo suporte do portal do desenvolvedor) para cadastrar esta URL como webhook da chave Pix desta conexão:',
     withoutIt:
-      'Enquanto a URL não estiver cadastrada, um Pix pago só é detectado quando a tela de pagamento consulta o status — o pedido confirma, mas pode demorar.',
+      'Enquanto a URL não estiver cadastrada, um Pix pago é detectado pela tela de pagamento ou pela verificação periódica — o pedido confirma, mas pode demorar.',
     doneLabel: 'Webhook',
     doneValue: 'Cadastrado no Itaú',
     confirmLabel: 'O Itaú já cadastrou a URL',

@@ -18,6 +18,11 @@ import type { CredentialFormCopy } from './settings-copy';
  * they can be read as the set of rules they are.
  */
 
+/** Whether a field exists in `environment` — see `CredentialFieldSpec.environments`. */
+export function appliesIn(spec: CredentialFieldSpec, environment: PaymentEnvironment): boolean {
+  return !spec.environments || spec.environments.includes(environment);
+}
+
 /**
  * Is there enough on record to make the probe WORTH RUNNING?
  *
@@ -36,11 +41,6 @@ import type { CredentialFormCopy } from './settings-copy';
  * prevent. A partial save is still a perfectly good save (blank fields preserve
  * what is stored); it simply is not yet a connection worth testing.
  */
-/** Whether a field exists in `environment` — see `CredentialFieldSpec.environments`. */
-export function appliesIn(spec: CredentialFieldSpec, environment: PaymentEnvironment): boolean {
-  return !spec.environments || spec.environments.includes(environment);
-}
-
 export function credentialsComplete(
   descriptor: ProviderDescriptor,
   config: MaskedProviderConfig | null,

@@ -5,6 +5,7 @@ import type {
   ChargeInput,
   ChargeSnapshot,
   CredentialFieldSpec,
+  ProbeCheck,
   ProbeOutcome,
   RefundInput,
   RefundSnapshot,
@@ -157,6 +158,28 @@ function setupMessage(problem: ItauSetupProblem, copy: ItauCopy): string {
   return copy[SETUP_COPY[problem]] as string;
 }
 
+/** The fields each setup problem is about — where the owner has to look. */
+const SETUP_FIELDS: Record<ItauSetupProblem, readonly string[]> = {
+  MISSING: ['clientId', 'clientSecret', 'pixKey'],
+  CERTIFICATE_MISSING: ['certificate', 'privateKey'],
+  CERTIFICATE_INVALID: ['certificate', 'privateKey'],
+  CERTIFICATE_MISMATCH: ['certificate', 'privateKey'],
+  CERTIFICATE_EXPIRED: ['certificate'],
+  CERTIFICATE_NOT_YET_VALID: ['certificate'],
+};
+
+/**
+ * A setup problem marked on its own boxes, not only in the banner under the
+ * form. For a MISSING problem only the empty boxes are marked: a filled one
+ * is not the fault, and a red border on it would blame a value that is fine.
+ */
+function setupChecks(problem: ItauSetupProblem, credentials: ResolvedCredentials, message: string): ProbeCheck[] {
+  const missing = problem === 'MISSING' || problem === 'CERTIFICATE_MISSING';
+  return SETUP_FIELDS[problem]
+    .filter((key) => !missing || !credentials.fields[key]?.trim())
+    .map((key) => ({ key, status: 'FAIL', message }));
+}
+
 /** Statuses that mean "try again later", not "these credentials are wrong". */
 const TRANSIENT_STATUSES = new Set([408, 425, 429]);
 
@@ -210,7 +233,10 @@ function tokenOutcome(error: ItauTokenError, copy: ItauCopy): ProbeOutcome | nul
 async function verifyItauCredentials(credentials: ResolvedCredentials, copy: ItauCopy): Promise<ProbeOutcome> {
   if (credentials.stub) return { ok: true, message: 'stub mode' };
   const problem = itauSetupProblem(credentials);
-  if (problem) return { ok: false, fault: 'REFUSED', message: setupMessage(problem, copy) };
+  if (problem) {
+    const message = setupMessage(problem, copy);
+    return { ok: false, fault: 'REFUSED', message, checks: setupChecks(problem, credentials, message) };
+  }
   try {
     await itauSession(credentials, 'typed');
     return { ok: true };
@@ -225,8 +251,14 @@ async function findChargeByReference(reference: string, credentials: ResolvedCre
   // Stub mode has no memory of what it raised, so it finds nothing — the same
   // answer Stone and PagBank give, and the one a scripted failover needs.
   if (credentials.stub) return null;
+  // The token is minted OUTSIDE the 404 catch: `null` is the walk's proof that
+  // nothing was raised, and only the cob read may give it. A 404 from the
+  // token endpoint (a routing blip, a deploy) says nothing about the cob, and
+  // read as "not found" it failed over past a charge that may exist.
+  const call = await itauSession(credentials);
+  const txid = itauTxId(reference);
   try {
-    return await getChargeLive(itauTxId(reference), credentials, reference);
+    return snapshotFromCob(await readCob(call, txid), reference);
   } catch (error) {
     if (error instanceof ProviderRequestError && error.options.httpStatus === 404) return null;
     throw error;

@@ -106,12 +106,12 @@ export const PT_BR_ITAU_COPY: ItauCopy = {
   unreachable:
     'Não conseguimos falar com o Itaú agora. ' +
     'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
-  credentialsMissing: 'Preencha Client ID, Client Secret e a chave Pix.',
+  credentialsMissing: 'Preencha o Client ID, o Client Secret e a chave Pix.',
   certificateMissing: 'Em produção, o Itaú exige o certificado e a chave privada gerados no portal do desenvolvedor.',
-  certificateInvalid: 'Não conseguimos ler o certificado ou a chave privada. Cole o arquivo .pem inteiro, do BEGIN ao END.',
+  certificateInvalid: 'Não conseguimos ler o certificado ou a chave privada. Cole o arquivo .pem inteiro, da linha -----BEGIN até a linha -----END.',
   certificateMismatch: 'A chave privada não pertence a este certificado. Confira se os dois foram gerados juntos.',
-  certificateExpired: 'O certificado venceu. Gere um novo no portal do desenvolvedor do Itaú e cole aqui.',
-  certificateNotYetValid: 'O certificado ainda não está válido. Confira a data e a hora do servidor ou aguarde o início da validade.',
+  certificateExpired: 'O certificado venceu. Gere um novo certificado e uma nova chave privada no portal do desenvolvedor do Itaú e cole os dois aqui.',
+  certificateNotYetValid: 'O certificado ainda não está válido. Aguarde o início da validade ou use o certificado vigente.',
   certificateRefused: 'O Itaú encerrou a conexão ao receber o certificado. Confira se ele é o de produção, gerado para este Client ID e não revogado — ou teste de novo em instantes.',
   refused: 'Credenciais recusadas pelo Itaú.',
   fields: {
@@ -119,7 +119,7 @@ export const PT_BR_ITAU_COPY: ItauCopy = {
     clientSecret: 'Client Secret',
     certificate: 'Certificado (.pem)',
     privateKey: 'Chave privada do certificado (.pem)',
-    productionOnly: 'Obrigatório em produção; o sandbox não usa certificado.',
+    productionOnly: 'Obrigatório em produção.',
     pixKey: 'Chave Pix cadastrada no Itaú',
   },
   payer: { chargeDescription: 'PEDIDO' },

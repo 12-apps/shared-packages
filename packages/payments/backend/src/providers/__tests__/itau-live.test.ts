@@ -147,7 +147,12 @@ describe('itau verifyCredentials', () => {
   it('refuses an incomplete credential set locally, naming what is missing', async () => {
     const calls = stubItauFetch(() => undefined);
     const outcome = await itauProvider(PT_BR_ITAU_COPY).verifyCredentials({ environment: 'SANDBOX', fields: { clientId: 'x' } });
-    expect(outcome).toEqual({ ok: false, fault: 'REFUSED', message: PT_BR_ITAU_COPY.credentialsMissing });
+    expect(outcome).toMatchObject({ ok: false, fault: 'REFUSED', message: PT_BR_ITAU_COPY.credentialsMissing });
+    // Marked on the EMPTY boxes only — the filled Client ID is not the fault.
+    expect(outcome.checks?.map((check) => [check.key, check.status])).toEqual([
+      ['clientSecret', 'FAIL'],
+      ['pixKey', 'FAIL'],
+    ]);
     expect(calls).toHaveLength(0);
   });
 
@@ -166,6 +171,7 @@ describe('itau verifyCredentials', () => {
       fields: { ...SANDBOX_CREDS.fields, certificate: own.cert, privateKey: other.key },
     });
     expect(outcome).toMatchObject({ ok: false, fault: 'REFUSED', message: PT_BR_ITAU_COPY.certificateMismatch });
+    expect(outcome.checks?.map((check) => check.key)).toEqual(['certificate', 'privateKey']);
   });
 
   it('reads a 503 or a 429 from the token mint as an outage, not as refused credentials', async () => {

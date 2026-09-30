@@ -164,6 +164,9 @@ function fieldSx(status?: 'PASS' | 'FAIL' | 'UNCHECKED') {
       '&.Mui-focused fieldset': { borderColor: T.brand, borderWidth: '2px' },
     },
     '& .MuiOutlinedInput-input': { padding: '10px 12px' },
+    // A multiline root pads itself too; the textarea's own padding above is
+    // the one that lines it up with the single-line boxes around it.
+    '& .MuiInputBase-multiline': { padding: 0 },
   } as const;
 }
 
