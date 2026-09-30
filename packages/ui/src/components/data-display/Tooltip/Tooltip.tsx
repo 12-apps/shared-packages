@@ -1,11 +1,11 @@
-import MuiTooltip from '@mui/material/Tooltip/index.js';
-import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
-import type { CSSObject, Theme } from '@mui/material/styles/index.js';
-import React from 'react';
+import MuiTooltip from "@mui/material/Tooltip/index.js";
+import { alpha, keyframes } from "@mui/material/styles/index.js";
+import type { CSSObject, Theme } from "@mui/material/styles/index.js";
+import React from "react";
 
-import type { TooltipProps } from './Tooltip.types';
-import { absoluteInk, neutralTones } from '../../../tokens/ink';
-import { rem, rems, sxRem } from '../../../tokens/relative';
+import type { TooltipProps } from "./Tooltip.types";
+import { absoluteInk, neutralTones } from "../../../tokens/ink";
+import { rem, rems, sxRem } from "../../../tokens/relative";
 
 // Define pulse animation
 const pulseAnimation = keyframes`
@@ -36,24 +36,24 @@ const getSizeStyles = (
 
 const variantStyles = (theme: Theme, variant?: string): CSSObject => {
   switch (variant) {
-    case 'default':
-      return {
-        backgroundColor: alpha(neutralTones(theme).inverseSurface, 0.9),
-        color: absoluteInk(theme).white,
-      };
-    case 'dark':
+    case "default":
       return {
         backgroundColor: neutralTones(theme).inverseSurface,
         color: absoluteInk(theme).white,
       };
-    case 'light':
+    case "dark":
+      return {
+        backgroundColor: neutralTones(theme).inverseSurface,
+        color: absoluteInk(theme).white,
+      };
+    case "light":
       return {
         backgroundColor: absoluteInk(theme).white,
         color: theme.palette.text.primary,
         border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
         boxShadow: theme.shadows[4],
       };
-    case 'glass':
+    case "glass":
       return {
         backgroundColor: alpha(theme.palette.background.paper, 0.1),
         backdropFilter: `blur(${rem(theme, 20)})`,
@@ -67,10 +67,14 @@ const variantStyles = (theme: Theme, variant?: string): CSSObject => {
 
 // glow and pulse are independent flags. The three combinations used to be spelled
 // out one by one, but each is just the union of whichever flags are set.
-const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObject => ({
+const emphasisStyles = (
+  theme: Theme,
+  glow?: boolean,
+  pulse?: boolean,
+): CSSObject => ({
   ...(glow && {
     boxShadow: `${rems(theme, 0, 0, 15, 3)} ${alpha(theme.palette.primary.main, 0.4)} !important`,
-    filter: 'brightness(1.05)',
+    filter: "brightness(1.05)",
   }),
   ...(pulse && {
     animation: `${pulseAnimation} 2s infinite`,
@@ -79,46 +83,48 @@ const emphasisStyles = (theme: Theme, glow?: boolean, pulse?: boolean): CSSObjec
 
 const arrowColor = (theme: Theme, variant?: string): string => {
   switch (variant) {
-    case 'light':
+    case "light":
       return absoluteInk(theme).white;
-    case 'glass':
+    case "glass":
       return alpha(theme.palette.background.paper, 0.1);
-    case 'dark':
+    case "dark":
       return neutralTones(theme).inverseSurface;
     default:
-      return alpha(neutralTones(theme).inverseSurface, 0.9);
+      return neutralTones(theme).inverseSurface;
   }
 };
 
-const StyledTooltip = styled(MuiTooltip, {
-  shouldForwardProp: (prop) =>
-    !['customVariant', 'customSize', 'glow', 'pulse'].includes(prop as string),
-})<{
-  customVariant?: string;
-  customSize?: string;
-  glow?: boolean;
-  pulse?: boolean;
-}>(({ theme, customVariant, customSize, glow, pulse }) => {
-  const sizeStyles = getSizeStyles(customSize);
-
-  return {
-    '& .MuiTooltip-tooltip': {
+/**
+ * The bubble's own look, applied to the BUBBLE (FUT-3093).
+ *
+ * It used to sit on a `styled(MuiTooltip)` root as `& .MuiTooltip-tooltip`, but
+ * MUI renders the bubble in a portal, outside that root — so none of it ever
+ * reached the screen, and every tooltip wore MUI's see-through grey instead of
+ * the variant it asked for. `slotProps.tooltip.sx` lands on the bubble itself.
+ * No `overflow: hidden`: now that it applies, it would clip an `arrow`.
+ */
+const bubbleSx =
+  (
+    variant: string,
+    size: string,
+    glow: boolean,
+    pulse: boolean,
+    maxWidth: number | undefined,
+  ) =>
+  (theme: Theme): CSSObject => {
+    const sizeStyles = getSizeStyles(size);
+    return {
       borderRadius: theme.spacing(1),
       fontSize: sizeStyles.fontSize(theme),
       padding: sizeStyles.padding(theme),
       fontWeight: 500,
-      transition: 'all 0.3s ease',
-      position: 'relative',
-      overflow: 'hidden',
-      ...variantStyles(theme, customVariant),
+      transition: "all 0.3s ease",
+      position: "relative",
+      maxWidth: tooltipCap(maxWidth)(theme),
+      ...variantStyles(theme, variant),
       ...emphasisStyles(theme, glow, pulse),
-    },
-
-    '& .MuiTooltip-arrow': {
-      color: arrowColor(theme, customVariant),
-    },
+    };
   };
-});
 
 /**
  * The tooltip's cap: 300 design px unless the caller says otherwise. `sx` has
@@ -134,8 +140,8 @@ const tooltipCap =
 export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
   (
     {
-      variant = 'default',
-      size = 'md',
+      variant = "default",
+      size = "md",
       glow = false,
       pulse = false,
       maxWidth,
@@ -146,18 +152,17 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
     ref,
   ) => {
     const childWithTestId = dataTestId
-      ? React.cloneElement(children as React.ReactElement<{ 'data-testid'?: string }>, {
-          'data-testid': `${dataTestId}-trigger`,
-        })
+      ? React.cloneElement(
+          children as React.ReactElement<{ "data-testid"?: string }>,
+          {
+            "data-testid": `${dataTestId}-trigger`,
+          },
+        )
       : children;
 
     return (
-      <StyledTooltip
+      <MuiTooltip
         ref={ref}
-        customVariant={variant}
-        customSize={size}
-        glow={glow}
-        pulse={pulse}
         enterDelay={0}
         leaveDelay={0}
         disableHoverListener={false}
@@ -165,17 +170,20 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
         disableTouchListener={false}
         slotProps={{
           tooltip: {
-            sx: { maxWidth: tooltipCap(maxWidth) },
-            role: 'tooltip',
-            ...(dataTestId && { 'data-testid': `${dataTestId}-content` }),
+            sx: bubbleSx(variant, size, glow, pulse, maxWidth),
+            role: "tooltip",
+            ...(dataTestId && { "data-testid": `${dataTestId}-content` }),
+          },
+          arrow: {
+            sx: (theme: Theme) => ({ color: arrowColor(theme, variant) }),
           },
         }}
         {...props}
       >
         {childWithTestId}
-      </StyledTooltip>
+      </MuiTooltip>
     );
   },
 );
 
-Tooltip.displayName = 'Tooltip';
+Tooltip.displayName = "Tooltip";
