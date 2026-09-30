@@ -338,7 +338,7 @@ export function ProviderForm(props: ProviderFormProps) {
     />
   ) : null;
 
-  const fields = summary ? null : <CredentialFields descriptor={descriptor} form={form} proven={Boolean(config?.chargeVerifiedAt)} />;
+  const fields = summary ? null : <CredentialFields descriptor={descriptor} environment={props.environment} form={form} proven={Boolean(config?.chargeVerifiedAt)} />;
 
   return (
     <Stack spacing={2}>

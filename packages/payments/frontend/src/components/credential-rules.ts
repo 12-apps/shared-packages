@@ -36,6 +36,11 @@ import type { CredentialFormCopy } from './settings-copy';
  * prevent. A partial save is still a perfectly good save (blank fields preserve
  * what is stored); it simply is not yet a connection worth testing.
  */
+/** Whether a field exists in `environment` — see `CredentialFieldSpec.environments`. */
+export function appliesIn(spec: CredentialFieldSpec, environment: PaymentEnvironment): boolean {
+  return !spec.environments || spec.environments.includes(environment);
+}
+
 export function credentialsComplete(
   descriptor: ProviderDescriptor,
   config: MaskedProviderConfig | null,
@@ -44,7 +49,7 @@ export function credentialsComplete(
 ): boolean {
   const stored = config?.environments[environment] ?? {};
   return descriptor.credentialSchema.every((spec) => {
-    if (spec.advanced) return true;
+    if (spec.advanced || !appliesIn(spec, environment)) return true;
     const typed = values[spec.key];
     if (typed !== undefined && typed.trim() !== '') return true;
     return stored[spec.key]?.configured === true;

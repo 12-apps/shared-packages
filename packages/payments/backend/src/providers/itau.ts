@@ -135,10 +135,11 @@ function itauCredentialSchema(fields: ItauCopy['fields']): CredentialFieldSpec[]
   return [
     { key: 'clientId', label: fields.clientId, secret: false, required: true },
     { key: 'clientSecret', label: fields.clientSecret, secret: true, required: true },
-    // Production-only (the sandbox has no mTLS), so not `required`: a
-    // production store missing either is refused by `verifyCredentials`.
-    { key: 'certificate', label: fields.certificate, secret: true, required: false, multiline: true, helperText: fields.productionOnly },
-    { key: 'privateKey', label: fields.privateKey, secret: true, required: false, multiline: true, helperText: fields.productionOnly },
+    // Production-only (the sandbox has no mTLS): shown and counted there alone,
+    // and not `required` — a production store missing either is refused by
+    // `verifyCredentials` with a sentence naming the certificate.
+    { key: 'certificate', label: fields.certificate, secret: true, required: false, multiline: true, environments: ['PRODUCTION'], helperText: fields.productionOnly },
+    { key: 'privateKey', label: fields.privateKey, secret: true, required: false, multiline: true, environments: ['PRODUCTION'], helperText: fields.productionOnly },
     { key: 'pixKey', label: fields.pixKey, secret: false, required: true, mono: true, confirmOnSave: true },
   ];
 }

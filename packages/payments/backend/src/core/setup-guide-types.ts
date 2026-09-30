@@ -40,6 +40,13 @@ export interface CredentialFieldSpec {
    * should see what they pasted).
    */
   multiline?: boolean;
+  /**
+   * The environments this field exists in; omitted means every one. Itau's
+   * mTLS certificate is a PRODUCTION credential — the sandbox has no mTLS —
+   * so its form must neither show it on the Sandbox tab nor count it toward
+   * "complete enough to test" there.
+   */
+  environments?: readonly ('SANDBOX' | 'PRODUCTION')[];
   /** Monospace + letter-spaced: `$loja-l0ja` and `$loja-loja` are the same
    * shape in a proportional face, and a wrong handle is not an error — it is
    * somebody else's account. */
