@@ -100,9 +100,19 @@ export function surfaces(theme: Theme): UiSurfaces {
  * Opaque on purpose. A translucent `alpha(main, 0.08)` is a different colour
  * on every surface it lands on, and its contrast with the signal's own text
  * cannot be known in advance; a composited value is the same colour anywhere.
+ *
+ * A palette MUI accepts but cannot decompose — a named colour (`white`), a
+ * `var(--…)`, a `color(display-p3 …)` — gets the same mix from the browser,
+ * as a CSS `color-mix()`, rather than throwing at render.
  */
 export function softSignal(theme: Theme, signal: SoftSignal): string {
   const stated = theme.uiSoftSignal?.[signal];
-  if (stated) return stated;
-  return blend(theme.palette.background.paper, theme.palette[signal].main, SOFT_SIGNAL_OPACITY);
+  if (stated !== undefined && stated !== '') return stated;
+  const paper = theme.palette.background.paper;
+  const main = theme.palette[signal].main;
+  try {
+    return blend(paper, main, SOFT_SIGNAL_OPACITY);
+  } catch {
+    return `color-mix(in srgb, ${main} ${SOFT_SIGNAL_OPACITY * 100}%, ${paper})`;
+  }
 }
