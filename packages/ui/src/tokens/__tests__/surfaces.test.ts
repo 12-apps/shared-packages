@@ -125,6 +125,25 @@ describe('a host override wins, per key', () => {
   });
 });
 
+describe('a palette the composite cannot read', () => {
+  it('hands the browser a color-mix for a named paper instead of throwing', () => {
+    const theme = createTheme({ palette: { background: { paper: 'white' } } });
+    expect(softSignal(theme, 'success')).toBe(`color-mix(in srgb, ${theme.palette.success.main} 8%, white)`);
+  });
+
+  it('does the same for a CSS variable', () => {
+    const theme = createTheme({ palette: { background: { paper: 'var(--paper)' } } });
+    expect(softSignal(theme, 'error')).toBe(`color-mix(in srgb, ${theme.palette.error.main} 8%, var(--paper))`);
+  });
+
+  it('treats an empty override as unstated, as surfaces() does', () => {
+    const theme = createTheme({ uiSoftSignal: { warning: '' } });
+    expect(softSignal(theme, 'warning')).toBe(
+      over(theme.palette.background.paper, theme.palette.warning.main, 0.08),
+    );
+  });
+});
+
 describe('dark mode resolves its own values', () => {
   const light = createTheme({ palette: { mode: 'light' } });
   const dark = createTheme({ palette: { mode: 'dark' } });
