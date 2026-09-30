@@ -806,7 +806,12 @@ to a private registry (the `exports` maps are ready), or vendor the
 or repo-specific package. Portability rules:
 
 - backend: no database/ORM/framework in core; adapters speak `fetch`; no
-  provider SDKs; Prisma coupling only via duck-typed delegates. A custom
+  provider SDKs; Prisma coupling only via duck-typed delegates. The one
+  transport that is not `fetch` is `providers/mtls.ts`, for a provider that
+  authenticates the CALLER with a client certificate (Itau): `fetch` can only
+  present one through undici's `Agent`, a dependency this package does not
+  take, so it goes over `node:https` behind the same `providerFetch` seam —
+  same retry rule, same error mapping, still no SDK. A custom
   `ProviderConfigStore` MUST implement `setActiveProvider` atomically —
   the interface requires it and there is no sequential fallback.
 - frontend: imports only TYPES from the backend package; talks only to the
