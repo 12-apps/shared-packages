@@ -25,5 +25,6 @@
   "tokens": "src/tokens/index.native.ts",
   "typography/Heading": "src/components/typography/Heading/index.native.ts",
   "typography/Paragraph": "src/components/typography/Paragraph/index.native.ts",
-  "typography/Text": "src/components/typography/Text/index.native.ts"
+  "typography/Text": "src/components/typography/Text/index.native.ts",
+  "layout/Screen": "src/components/layout/Screen/index.native.ts"
 }

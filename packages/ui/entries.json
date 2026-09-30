@@ -144,5 +144,6 @@
   "copy": "src/copy.ts",
   "pt-BR": "src/pt-BR.ts",
   "en-US": "src/en-US.ts",
-  "locales": "src/locales.ts"
+  "locales": "src/locales.ts",
+  "layout/Screen": "src/components/layout/Screen/index.ts"
 }

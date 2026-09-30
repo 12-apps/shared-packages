@@ -75,12 +75,14 @@ are used and the component still renders — only the renderer-specific extras
 
 Peer dependencies on native: `react-native` and `react-native-svg` (for
 `@12-apps/ui/icons`). Both are declared optional so a web consumer never
-installs them.
+installs them. `layout/Screen` additionally needs `react-native-safe-area-context`
+(5+), also optional for web-only consumers; it owns a provider if the navigator
+does not already supply one. See [Screen](./src/components/layout/Screen/Screen.md).
 
 ## Ledger
 
 <!-- native-parity:start -->
-Ported: **27 of 146** public subpaths carry a `react-native` condition.
+Ported: **28 of 147** public subpaths carry a `react-native` condition.
 
 | subpath | shared stories run natively | skipped (`native-skip`) | known gaps |
 |---|---|---|---|
@@ -111,4 +113,5 @@ Ported: **27 of 146** public subpaths carry a `react-native` condition.
 | `@12-apps/ui/typography/Heading` | 26 | 1 | `gradient` paints the gradient's first stop as a flat colour: React Native has no `background-clip: text` and no gradient fill in core. A host wanting the real thing adds a masked-gradient library. |
 | `@12-apps/ui/typography/Paragraph` | 17 | 1 | — |
 | `@12-apps/ui/typography/Text` | 26 | 3 | — |
+| `@12-apps/ui/layout/Screen` | 10 | 0 | Keyboard geometry uses React Native KeyboardAvoidingView; react-native-web unit/story lanes verify its wiring, not a real Android/iOS keyboard. Device keyboard/rotation QA remains explicit.; Web safe-area values come from CSS environment variables; native values come from the existing navigator or an internal safe-area provider. Browser keyboard resizing remains browser-managed. |
 <!-- native-parity:end -->

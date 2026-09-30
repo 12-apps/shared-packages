@@ -29,6 +29,7 @@ export default defineConfig({
       // Flow-typed internals. Naming the ESM entry keeps it inside Vite, where
       // the `.web.js` extension order below picks the web renderer.
       { find: /^react-native-svg$/, replacement: 'react-native-svg/lib/module/index.js' },
+      { find: /^react-native-safe-area-context$/, replacement: 'react-native-safe-area-context/lib/module/index.js' },
     ],
     extensions: ['.native.tsx', '.native.ts', '.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.mjs', '.js', '.jsx', '.json'],
   },
@@ -43,7 +44,7 @@ export default defineConfig({
         // extension order above applies inside them too. Left external, Node
         // loads react-native-svg's native entry, which imports React Native's
         // Flow-typed internals and dies on `import typeof`.
-        inline: [/node_modules\/react-native-web\//, /node_modules\/react-native-svg\//],
+        inline: [/node_modules\/react-native-web\//, /node_modules\/react-native-svg\//, /node_modules\/react-native-safe-area-context\//],
       },
     },
     pool: 'forks',

@@ -64,7 +64,7 @@ export default defineConfig(() => {
     clean: false,
     splitting: true,
     outDir: 'dist/native',
-    external: ['react', 'react/jsx-runtime', 'react-native', 'react-native-svg'],
+    external: ['react', 'react/jsx-runtime', 'react-native', 'react-native-svg', 'react-native-safe-area-context'],
     esbuildPlugins: [forbidWebOnly],
     esbuildOptions(options) {
       // Metro understands `.js`, and a chunk name that says where it came from

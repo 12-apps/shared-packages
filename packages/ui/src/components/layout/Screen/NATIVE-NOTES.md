@@ -1,0 +1,2 @@
+- Keyboard geometry uses React Native KeyboardAvoidingView; react-native-web unit/story lanes verify its wiring, not a real Android/iOS keyboard. Device keyboard/rotation QA remains explicit.
+- Web safe-area values come from CSS environment variables; native values come from the existing navigator or an internal safe-area provider. Browser keyboard resizing remains browser-managed.
