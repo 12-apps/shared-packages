@@ -7,7 +7,7 @@
  * outline — primary and neutral, whatever the variant. The default must stay
  * exactly what every existing dialog already draws.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AlertDialog } from '../AlertDialog';
@@ -73,17 +73,19 @@ describe('AlertDialog emphasis', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('still focuses the button initialFocus names, wherever it sits', () => {
+  it('still focuses the button initialFocus names, wherever it sits', async () => {
     renderDialog({ emphasis: 'cancel', initialFocus: 'cancel' });
 
-    expect(cancelButton()).toHaveFocus();
+    // MUI's focus trap moves focus after mount, so wait for it to land.
+    await waitFor(() => expect(cancelButton()).toHaveFocus());
   });
 
   it('renders the confirm alone, as an outline, when the cancel is hidden', () => {
     renderDialog({ emphasis: 'cancel', showCancel: false });
 
-    expect(screen.queryByTestId('discard-cancel-button')).toBeNull();
+    // The whole row, so "no cancel" is read from what IS there.
     expect(actionOrder()).toEqual(['discard-confirm-button']);
+    expect(confirmButton()).toHaveClass('MuiButton-outlined', 'MuiButton-colorInherit');
   });
 
   it('wraps whole buttons instead of breaking a label', () => {
