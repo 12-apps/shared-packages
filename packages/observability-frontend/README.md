@@ -299,7 +299,9 @@ With a rate above 0:
 - **Every span leaves through `beforeSendSpan`.** `traceLifecycle: "stream"` is
   a client option, not a per-integration one. Streamed spans never reach
   `beforeSendTransaction`, so that one hook, wrapped in `withStreamedSpan`, is
-  where the PII rules below run for spans, as `beforeSend` is for errors.
+  where the PII rules below run for spans, as `beforeSend` is for errors. It is
+  installed on the live client options together with the vitals, before the
+  integrations that make spans, so the scrub is not on the critical path either.
 - **The vitals integrations load after `load`.** `webVitalsIntegration` and
   `spanStreamingIntegration` come in through a dynamic import once the page has
   loaded. Measuring the first paint must not delay it. The host's bundler has to

@@ -11,12 +11,30 @@
  *
  * Both integrations are needed: `webVitalsIntegration` records the vitals as
  * spans, and `spanStreamingIntegration` is what buffers and sends a streamed
- * span. The client must already run with `traceLifecycle: "stream"` and a
- * `withStreamedSpan` `beforeSendSpan`, which `startObservability` sets.
+ * span. The client must already run with `traceLifecycle: "stream"`, which
+ * `startObservability` sets.
+ *
+ * The scrubbing hook is installed HERE, first, rather than at `init`: it is the
+ * one place every streamed span leaves through, and no span exists before
+ * these integrations do, so installing it with them keeps the scrub off the
+ * critical path without a span ever leaving unscrubbed. Sentry reads
+ * `beforeSendSpan` from the live client options on every span
+ * (`captureSpan`), which is what makes a late install take effect.
  */
-import { addIntegration, spanStreamingIntegration, webVitalsIntegration } from "@sentry/react";
+import {
+  addIntegration,
+  getClient,
+  spanStreamingIntegration,
+  webVitalsIntegration,
+  withStreamedSpan,
+} from "@sentry/react";
+
+import { scrubSpan } from "./span-scrub";
 
 export function installWebVitals(): void {
+  const client = getClient();
+  if (!client) return;
+  client.getOptions().beforeSendSpan = withStreamedSpan(scrubSpan);
   addIntegration(spanStreamingIntegration());
   addIntegration(webVitalsIntegration());
 }

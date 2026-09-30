@@ -13,31 +13,14 @@
  * through `scrubUrl` first, which drops the query and fragment, but `scrubUrl`
  * KEEPS the path, and on a host whose paths name a tenant the path is the
  * leak. This package cannot know which segment that is, so the host registers
- * the rule, in the same shape as `setErrorClassifiers`.
+ * the rule (`span-rule.ts`), in the same shape as `setErrorClassifiers`.
+ *
+ * It loads with the Web Vitals, after `load`, and `installWebVitals` installs
+ * the hook before any integration that makes a span: nothing here is on the
+ * critical path, and no span leaves before the hook is in place.
  */
 import { scrubUrl } from "./scrub";
-
-/**
- * Replace whatever in a page name or a URL PATH identifies someone. It receives
- * a span name (a route or a path) or the pathname of a URL, never an origin.
- */
-export type SpanTextScrubber = (text: string) => string;
-
-const identity: SpanTextScrubber = (text) => text;
-let hostScrubber: SpanTextScrubber = identity;
-
-/**
- * Register the host's rule for page names and paths. Call it before
- * `startObservability`, like `setErrorClassifiers`.
- */
-export function setSpanTextScrubber(scrubber: SpanTextScrubber): void {
-  hostScrubber = scrubber;
-}
-
-/** Test seam: back to the identity rule. */
-export function resetSpanTextScrubberForTests(): void {
-  hostScrubber = identity;
-}
+import { spanTextRule } from "./span-rule";
 
 /** Attributes that carry the page's NAME. */
 const NAME_ATTRIBUTES = new Set(["sentry.transaction", "sentry.segment.name"]);
@@ -53,21 +36,21 @@ function scrubPageUrl(value: string): string {
   const bare = scrubUrl(value);
   try {
     const url = new URL(bare);
-    return `${url.origin}${hostScrubber(url.pathname)}`;
+    return `${url.origin}${spanTextRule()(url.pathname)}`;
   } catch {
-    return hostScrubber(bare);
+    return spanTextRule()(bare);
   }
 }
 
 function scrubAttribute(key: string, value: unknown): unknown {
   if (typeof value !== "string") return value;
-  if (NAME_ATTRIBUTES.has(key)) return hostScrubber(value);
+  if (NAME_ATTRIBUTES.has(key)) return spanTextRule()(value);
   if (isUrlKey(key)) return scrubPageUrl(value);
   return value;
 }
 
 /** The shape of a streamed span, as far as scrubbing is concerned. */
-export interface ScrubbableSpan {
+interface ScrubbableSpan {
   name: string;
   attributes?: Record<string, unknown>;
 }
@@ -77,5 +60,5 @@ export function scrubSpan<T extends ScrubbableSpan>(span: T): T {
   const attributes = span.attributes
     ? Object.fromEntries(Object.entries(span.attributes).map(([k, v]) => [k, scrubAttribute(k, v)]))
     : span.attributes;
-  return { ...span, name: hostScrubber(span.name), attributes };
+  return { ...span, name: spanTextRule()(span.name), attributes };
 }

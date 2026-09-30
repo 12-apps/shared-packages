@@ -62,7 +62,7 @@ beforeEach(() => {
   resetObservabilityForTests();
   sentry.init.mockClear();
   sentry.captureException.mockClear();
-  sentry.addIntegration.mockClear();
+  sentry.addIntegration.mockReset();
   sentry.getClient.mockReturnValue(undefined);
 });
 
@@ -167,6 +167,20 @@ describe("startObservability", () => {
   });
 
   it("streams performance spans, through the scrubbing hook, when a rate is served", async () => {
+    const installOrder: string[] = [];
+    const clientOptions: Record<string, unknown> = {};
+    // A live options object, as Sentry's client returns: the hook is written
+    // onto it, and the order it lands in against the integrations is recorded.
+    const tracked = new Proxy(clientOptions, {
+      set(target, key, value) {
+        installOrder.push(String(key));
+        return Reflect.set(target, key, value);
+      },
+    });
+    sentry.getClient.mockReturnValue({ getOptions: () => tracked });
+    sentry.addIntegration.mockImplementation((integration: { name: string }) => {
+      installOrder.push(integration.name);
+    });
     serveConfig(
       jsonReply({ dsn: "https://k@o1.ingest.sentry.io/7", environment: "prd", release: "", tracesSampleRate: 1 }),
     );
@@ -177,13 +191,18 @@ describe("startObservability", () => {
     // Client-wide: every span then leaves through beforeSendSpan, never through
     // beforeSendTransaction, which is why the scrub lives on that one hook.
     expect(options.traceLifecycle).toBe("stream");
-    expect(typeof options.beforeSendSpan).toBe("function");
-    expect(sentry.withStreamedSpan).toHaveBeenCalled();
+    // Not at init: the hook ships with the vitals chunk, off the critical path.
+    expect(options.beforeSendSpan).toBeUndefined();
     // After load (jsdom's document is already complete), both integrations the
     // vitals need arrive: the recorder AND the one that sends a streamed span.
     await vi.waitFor(() => expect(sentry.addIntegration).toHaveBeenCalledTimes(2));
     expect(sentry.addIntegration).toHaveBeenCalledWith({ name: "SpanStreaming" });
     expect(sentry.addIntegration).toHaveBeenCalledWith({ name: "WebVitals" });
+    // ...and the scrub is on the live client options BEFORE either of them, so
+    // no span can leave unscrubbed.
+    expect(typeof clientOptions.beforeSendSpan).toBe("function");
+    expect(sentry.withStreamedSpan).toHaveBeenCalled();
+    expect(installOrder).toEqual(["beforeSendSpan", "SpanStreaming", "WebVitals"]);
   });
 
   it("installs no performance integration when no rate is served", async () => {

@@ -37,7 +37,6 @@ import { useEffect } from "react";
 import { DEFAULT_CONFIG_ENDPOINT, loadObservabilityConfig, type ObservabilityApp } from "./config";
 import { shouldReport, SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
 import { scrub, scrubUrl } from "./scrub";
-import { scrubSpan } from "./span-scrub";
 
 export type { ObservabilityApp } from "./config";
 export { DEFAULT_CONFIG_ENDPOINT } from "./config";
@@ -47,7 +46,7 @@ export {
   type ErrorClassifiers,
 } from "./noise";
 export { scrub, scrubUrl } from "./scrub";
-export { setSpanTextScrubber, resetSpanTextScrubberForTests, type SpanTextScrubber } from "./span-scrub";
+export { setSpanTextScrubber, resetSpanTextScrubberForTests, type SpanTextScrubber } from "./span-rule";
 export { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
 
 /** One buffered pre-init failure. */
@@ -200,14 +199,15 @@ export async function startObservability(
  * The client options for a performance rate. At 0 the SDK is exactly what it
  * was before FUT-2951: no tracing, no span hook. Above 0, spans are STREAMED
  * — a client-wide setting, so every span leaves through `beforeSendSpan` and
- * that one hook scrubs them all (see span-scrub.ts).
+ * that one hook scrubs them all. The hook itself is installed by
+ * `installWebVitals`, with the only integrations that make spans, so the scrub
+ * loads after `load` too (see web-vitals.ts).
  */
 function performanceOptions(rate: number): Partial<Sentry.BrowserOptions> {
   if (rate <= 0) return { tracesSampleRate: 0 };
   return {
     tracesSampleRate: rate,
     traceLifecycle: "stream",
-    beforeSendSpan: Sentry.withStreamedSpan(scrubSpan),
   };
 }
 

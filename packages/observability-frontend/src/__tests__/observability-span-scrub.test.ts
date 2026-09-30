@@ -8,7 +8,8 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resetSpanTextScrubberForTests, scrubSpan, setSpanTextScrubber } from "../span-scrub";
+import { resetSpanTextScrubberForTests, setSpanTextScrubber } from "../span-rule";
+import { scrubSpan } from "../span-scrub";
 
 const SLUG = "aliment-sabor";
 
