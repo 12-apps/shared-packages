@@ -21,15 +21,15 @@
  */
 
 /** No resource finished for this long: the page is done downloading. */
-export const QUIET_MS = 3000;
+const QUIET_MS = 3000;
 
 /** The latest, after `load`, the SDK waits for quiet. */
-export const CAP_MS = 20_000;
+const CAP_MS = 20_000;
 
 let limits = { quietMs: QUIET_MS, capMs: CAP_MS };
 
 /** Run `task` once the page has loaded. */
-export function afterLoad(task: () => void): void {
+function afterLoad(task: () => void): void {
   if (typeof window === "undefined") return;
   if (document.readyState === "complete") {
     task();
