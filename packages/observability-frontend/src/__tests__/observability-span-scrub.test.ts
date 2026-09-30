@@ -67,4 +67,11 @@ describe("scrubSpan", () => {
     setSpanTextScrubber(hideStore);
     expect(scrubSpan({ name: `/${SLUG}` })).toEqual({ name: "/:store", attributes: undefined });
   });
+
+  it("scrubs a span NAMED by a full URL as a URL: query gone, path through the rule, origin kept", () => {
+    // The browser's own timing spans are named by the document URL.
+    setSpanTextScrubber(hideStore);
+    const scrubbed = scrubSpan({ name: `https://shop.example/${SLUG}/delivery?token=abc#x`, attributes: {} });
+    expect(scrubbed.name).toBe("https://shop.example/:store/delivery");
+  });
 });

@@ -42,9 +42,19 @@ function scrubPageUrl(value: string): string {
   }
 }
 
+/**
+ * A page NAME, which is usually a path but can be the whole URL: the browser
+ * timing spans (`domContentLoadedEvent`, `connect`, `request`…) are named by
+ * the document's URL. Measured on the adopting storefront, eight of them
+ * carried the tenant's path until a URL name was scrubbed as a URL.
+ */
+function scrubName(value: string): string {
+  return /^https?:\/\//i.test(value) ? scrubPageUrl(value) : spanTextRule()(value);
+}
+
 function scrubAttribute(key: string, value: unknown): unknown {
   if (typeof value !== "string") return value;
-  if (NAME_ATTRIBUTES.has(key)) return spanTextRule()(value);
+  if (NAME_ATTRIBUTES.has(key)) return scrubName(value);
   if (isUrlKey(key)) return scrubPageUrl(value);
   return value;
 }
@@ -60,5 +70,5 @@ export function scrubSpan<T extends ScrubbableSpan>(span: T): T {
   const attributes = span.attributes
     ? Object.fromEntries(Object.entries(span.attributes).map(([k, v]) => [k, scrubAttribute(k, v)]))
     : span.attributes;
-  return { ...span, name: spanTextRule()(span.name), attributes };
+  return { ...span, name: scrubName(span.name), attributes };
 }
