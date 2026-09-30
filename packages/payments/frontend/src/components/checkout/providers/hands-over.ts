@@ -7,7 +7,7 @@
  * which decides whether the buyer is asked PIX-or-card here at all. It lived
  * inside `capability-default.tsx` while there was one caller.
  */
-import type { CheckoutProviderConfig } from "../types";
+import type { CheckoutChainLink, CheckoutProviderConfig } from "../types";
 
 /** Schemes that give the BROWSER a card form of its own. */
 const IN_BROWSER_TOKENIZATION: ReadonlySet<string> = new Set(["PUBLIC_KEY", "SDK"]);
@@ -30,7 +30,8 @@ const IN_BROWSER_TOKENIZATION: ReadonlySet<string> = new Set(["PUBLIC_KEY", "SDK
  *     hosted — this is the FUT-747 correction, and getting it wrong routed the
  *     simplest store there is (one PIX-only provider honestly declaring
  *     `NONE`) into a hand-off it had no link for.
- *   - Hosted only when NOBODY who takes a card takes it here.
+ *   - Hosted only when NOBODY who takes a card takes it here — and nobody
+ *     takes PIX here either (see {@link takesPixOnThisPage}).
  *   - No chain served (an older host, a still-loading config) ⇒ not hosted,
  *     which is what this checkout did before there was a chain to read.
  */
@@ -39,5 +40,19 @@ export function handsBuyerOver(config: CheckoutProviderConfig | null): boolean {
   if (!chain || chain.length === 0) return false;
   const cardCapable = chain.filter((link) => link.methods.includes("CARD"));
   if (cardCapable.length === 0) return false;
+  if (chain.some(takesPixOnThisPage)) return false;
   return !cardCapable.some((link) => IN_BROWSER_TOKENIZATION.has(link.tokenization));
+}
+
+/**
+ * A provider that answers PIX with a code for THIS page rather than a link to
+ * its own. Whenever the chain holds one, the store is not a hand-off: PIX is
+ * paid here, so the picker is ours to show, and a card that only a hosted
+ * provider takes still leaves through `handOverToProvider` the moment its
+ * order comes back with a link. Without this rule a PIX-only on-page provider
+ * ahead of a hosted card provider (Itau, then InfinitePay) was routed whole to
+ * the hand-off screen, which never paints the QR and never offers the card.
+ */
+function takesPixOnThisPage(link: CheckoutChainLink): boolean {
+  return link.methods.includes("PIX") && link.tokenization !== "REDIRECT";
 }

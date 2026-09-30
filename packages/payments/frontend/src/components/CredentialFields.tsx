@@ -68,6 +68,16 @@ const MONO_INPUT = {
   letterSpacing: '0.08em',
 } as const;
 
+/**
+ * A pasted PEM keeps its lines: a single-line input folds them away and the
+ * owner cannot see what they pasted. A textarea cannot be `type="password"`,
+ * so a multiline secret is shown while typed — it is still write-only, never
+ * echoed back after saving (the placeholder carries the masked hint).
+ */
+function multilineProps(spec: CredentialFieldSpec) {
+  return spec.multiline ? { multiline: true, minRows: 4, maxRows: 10, type: undefined } : {};
+}
+
 interface CredentialFieldProps {
   spec: CredentialFieldSpec;
   state: MaskedFieldState | undefined;
@@ -117,9 +127,12 @@ export function CredentialField({ spec, state, value, onChange, check }: Credent
         fullWidth
         id={inputId}
         {...presentation}
+        {...multilineProps(spec)}
         helperText={undefined}
         slotProps={
-          spec.mono ? { htmlInput: { sx: MONO_INPUT, spellCheck: false } } : { htmlInput: {} }
+          spec.mono || spec.multiline
+            ? { htmlInput: { sx: MONO_INPUT, spellCheck: false } }
+            : { htmlInput: {} }
         }
         sx={fieldSx(check?.status)}
         onChange={(e) => onChange(e.target.value)}

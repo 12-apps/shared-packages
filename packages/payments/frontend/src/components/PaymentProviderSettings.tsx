@@ -177,6 +177,11 @@ interface VerificationInputs {
   provider: string;
   displayName: string;
   config: MaskedProviderConfig | null;
+  /**
+   * Some activation flow can run for this provider at all — see
+   * {@link activationRunnable}. When none can, there is no step to show.
+   */
+  provable: boolean;
   /** An earlier step is unfinished: withhold the pay button, render the rest. */
   blocked: boolean;
   /** The walkthrough is on an earlier step; this one is not on screen at all. */
@@ -185,8 +190,24 @@ interface VerificationInputs {
   onSetupIncomplete: () => void;
 }
 
+/**
+ * Whether ANY activation flow can run for this provider: the card flow needs a
+ * card to charge, the redirect flow a hosted page to send the owner to. A
+ * PIX-only provider that answers with a code on this page (Itau) has neither,
+ * so the step could only ever fail with "the provider returned no payment
+ * link" — it is switched on once its credential probe passes instead, the rule
+ * `ProviderStatusBar`'s toggle already applies to a provider that declares no
+ * `activationCharge`. Every other provider keeps the step exactly as before.
+ */
+function activationRunnable(descriptor: { capabilities?: { methods?: readonly string[]; tokenization?: string } }): boolean {
+  const capabilities = descriptor.capabilities;
+  if (!capabilities?.methods) return true;
+  return capabilities.tokenization === 'REDIRECT' || capabilities.methods.includes('CARD');
+}
+
 /** The activation step's context, built from what this screen already knows. */
 function verificationFor(io: VerificationInputs): ReactNode {
+  if (!io.provable) return null;
   // `enabled` is deliberately NOT passed: the step used it to show a standing
   // "provider is active" banner, which kept reassuring a store whose every
   // charge was being refused. `proven` is a different kind of fact — it is
@@ -331,6 +352,7 @@ export function PaymentProviderSettings({
         render: renderVerification,
         provider: active.name,
         displayName: active.displayName,
+        provable: activationRunnable(active),
         config: activeConfig,
         blocked: guideAwaitsConfirmation(guide, ack.confirmed, loaded),
         // The walkthrough still has a step to show ⇒ this is not that step.
