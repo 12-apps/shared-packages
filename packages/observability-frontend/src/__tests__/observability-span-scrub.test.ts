@@ -12,7 +12,7 @@ import { resetSpanTextScrubberForTests, scrubSpan, setSpanTextScrubber } from ".
 
 const SLUG = "aliment-sabor";
 
-/** The host's rule, as future-pay registers it: the first path segment is the store. */
+/** A host's rule, as one adopter registers it: the first path segment is the tenant. */
 const hideStore = (text: string): string => text.replace(/\/[^/?#]+/, "/:store");
 
 function leakySpan() {

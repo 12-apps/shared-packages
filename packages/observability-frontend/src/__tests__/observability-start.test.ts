@@ -189,7 +189,9 @@ describe("startObservability", () => {
   it("installs no performance integration when no rate is served", async () => {
     serveConfig(jsonReply({ dsn: "https://k@o1.ingest.sentry.io/7", environment: "prd", release: "" }));
     await startObservability("storefront");
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Settles any `import("./web-vitals")` that WAS started, rather than
+    // waiting a fixed delay and hoping it was long enough.
+    await vi.dynamicImportSettled();
     expect(sentry.addIntegration).not.toHaveBeenCalled();
   });
 
