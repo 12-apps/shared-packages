@@ -19,6 +19,8 @@ export { rem, rems, remPx, resetRootFontCache, sxRem } from './relative';
 // Every colour by role (FUT-2593): ink roles, neutral tones, the named sets.
 export * from './ink';
 export * from './ink.core';
+// The surface and soft-signal roles (FUT-3098): `surfaces`, `softSignal`.
+export * from './surfaces';
 export { DEFAULT_FIELD_RADIUS, fieldRadius, fieldRadiusOverrides, fieldRadiusPx, fieldRootStyles } from './field-radius';
 export {
   asFieldSize,

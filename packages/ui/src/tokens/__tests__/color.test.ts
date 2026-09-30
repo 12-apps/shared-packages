@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   alpha,
+  blend,
   darken,
   decomposeColor,
   emphasize,
@@ -86,5 +87,31 @@ describe('color.ts matches @mui/system/colorManipulator', () => {
 
   it('refuses a colour format it does not implement', () => {
     expect(() => decomposeColor('color(display-p3 0 1 0)')).toThrow(/unsupported colour/);
+  });
+});
+
+/**
+ * `blend` has no MUI counterpart reachable from here (`@mui/material/styles`
+ * does not re-export it), so it is pinned by its arithmetic: each channel is
+ * `round(background × (1 − opacity) + overlay × opacity)`, which is MUI's own
+ * `blend` at its default gamma of 1.
+ */
+describe('blend', () => {
+  it('composites the overlay over the background, rounding each channel', () => {
+    // 255·0.92 + 46·0.08 = 238.28; 255·0.92 + 125·0.08 = 244.6; 255·0.92 + 50·0.08 = 238.6
+    expect(blend('#ffffff', '#2e7d32', 0.08)).toBe('rgb(238, 245, 239)');
+  });
+
+  it('returns an opaque rgb() whatever the inputs carry', () => {
+    expect(blend('rgba(255, 255, 255, 0.5)', '#6366F180', 0.5)).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
+  });
+
+  it('is the background at 0 and the overlay at 1', () => {
+    expect(blend('#abc', '#123456', 0)).toBe('rgb(170, 187, 204)');
+    expect(blend('#abc', '#123456', 1)).toBe('rgb(18, 52, 86)');
+  });
+
+  it('converts hsl() before mixing, rather than mixing hue as red', () => {
+    expect(blend('hsl(0, 0%, 100%)', 'hsl(0, 0%, 0%)', 0.5)).toBe(blend('#ffffff', '#000000', 0.5));
   });
 });

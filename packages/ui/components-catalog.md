@@ -904,6 +904,20 @@ const CustomCard = ({ children, ...props }) => (
 | Settings screen | SettingCard, SettingToggle in a SettingGrid | SettingGroup (one subject, main switch) |
 | Whole number entry | NumberField | Input (free text) |
 
+### Colour Roles from `@12-apps/ui/tokens`
+
+Before tinting a colour by hand, check for a role. Each reads the theme, and a
+host can replace it through the theme key named here:
+
+| Need | Use | Host override |
+|------|-----|---------------|
+| A ground below the page, a card on it, the card's border there | `surfaces(theme)` → `{ sunken, raised, borderOnSunken }` | `theme.uiSurfaces` |
+| A soft background for `success` / `warning` / `error` / `info` | `softSignal(theme, signal)` (opaque) | `theme.uiSoftSignal` |
+| A colour with no palette role (data-viz, map, social brand…) | `uiInk(theme)` | `theme.uiInk` |
+| A neutral by purpose (track, muted, inverse surface…) | `neutralTones(theme)` | the palette's grey ramp |
+
+Defaults and rules: `components-guidelines.md` › *Surface and soft-signal roles*.
+
 ### Component Documentation
 
 Each component includes comprehensive documentation located in its respective directory. The **Docs** field for each component above shows the exact path to its detailed documentation file.

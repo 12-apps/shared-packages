@@ -157,6 +157,27 @@ export function lighten(color: string, coefficient: number): string {
   return recomposeColor({ type: decomposed.type, values });
 }
 
+/**
+ * `overlay` laid over `background` at `opacity` (0 to 1), flattened to one
+ * OPAQUE `rgb()` — the colour a translucent wash actually shows, as a colour
+ * that stays that colour whatever it is later painted on.
+ *
+ * MUI's `blend` at its default gamma, rounding each channel as it does. One
+ * deliberate difference: an `hsl()` input is converted to rgb first, where
+ * MUI's reads hue, saturation and lightness as if they were red, green and
+ * blue. Any alpha on either input is ignored, as in MUI.
+ */
+export function blend(background: string, overlay: string, opacity: number): string {
+  const rgbOf = (color: string): number[] =>
+    decomposeColor(color.startsWith('hsl') ? hslToRgb(color) : color).values;
+  const base = rgbOf(background);
+  const top = rgbOf(overlay);
+  const amount = clamp(opacity);
+  const channel = (index: number): number =>
+    Math.round((base[index] ?? 0) * (1 - amount) + (top[index] ?? 0) * amount);
+  return recomposeColor({ type: 'rgb', values: [channel(0), channel(1), channel(2)] });
+}
+
 /** Darken a light colour or lighten a dark one, by `coefficient`. */
 export function emphasize(color: string, coefficient = 0.15): string {
   return getLuminance(color) > 0.5 ? darken(color, coefficient) : lighten(color, coefficient);
