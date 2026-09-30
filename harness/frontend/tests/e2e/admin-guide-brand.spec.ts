@@ -60,13 +60,13 @@ test('a guide that names the platform names THIS host', async ({ page }) => {
 });
 
 /**
- * The sweep: whatever any of the four published adapters puts on this screen,
+ * The sweep: whatever any of the published adapters puts on this screen,
  * none of it may name an adopter. Broader than the case above on purpose — a
  * brand can leak from a credential helper text or a link label just as easily
  * as from a guide step, and those have no seam of their own.
  */
 test('no published provider surface names an adopter of this package', async ({ page }) => {
-  for (const provider of ['pagbank', 'stone', 'infinitepay', 'stripe'] as const) {
+  for (const provider of ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau'] as const) {
     await page.getByTestId(`payments-provider-card-${provider}`).click();
     await expect(page.getByTestId('payments-provider-back')).toBeVisible();
 

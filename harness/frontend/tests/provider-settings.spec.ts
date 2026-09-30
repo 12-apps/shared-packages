@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
  * out at e2e time. A card missing here means the published adapters and the
  * published settings page no longer compose — the exact defect, one repo earlier.
  */
-const PROVIDERS = ['pagbank', 'stone', 'infinitepay', 'stripe'] as const;
+const PROVIDERS = ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau'] as const;
 
 test('the published adapters render as cards in the published settings page', async ({ page }) => {
   await page.goto('#/payments-provider-settings');
