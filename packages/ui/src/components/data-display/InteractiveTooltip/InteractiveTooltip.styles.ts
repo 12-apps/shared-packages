@@ -34,7 +34,7 @@ export const variantStyles = (theme: Theme, variant?: string): CSSObject => {
   switch (variant) {
     case 'default':
       return {
-        backgroundColor: alpha(neutralTones(theme).inverseSurface, 0.92),
+        backgroundColor: neutralTones(theme).inverseSurface,
         color: absoluteInk(theme).white,
         boxShadow: `${rems(theme, 0, 4, 12)} ${shadowInk(theme, 0.3)}`,
       };
@@ -98,6 +98,6 @@ export const arrowColor = (theme: Theme, variant?: string): string => {
     case 'dark':
       return absoluteInk(theme).black;
     default:
-      return alpha(neutralTones(theme).inverseSurface, 0.92);
+      return neutralTones(theme).inverseSurface;
   }
 };
