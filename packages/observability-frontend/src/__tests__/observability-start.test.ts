@@ -18,7 +18,7 @@ const sentry = vi.hoisted(() => ({
   withStreamedSpan: vi.fn((callback: unknown) => callback),
   addIntegration: vi.fn(),
   spanStreamingIntegration: vi.fn(() => ({ name: "SpanStreaming" })),
-  webVitalsIntegration: vi.fn(() => ({ name: "WebVitals" })),
+  browserTracingIntegration: vi.fn(() => ({ name: "BrowserTracing" })),
 }));
 
 vi.mock("@sentry/react", () => sentry);
@@ -197,12 +197,28 @@ describe("startObservability", () => {
     // vitals need arrive: the recorder AND the one that sends a streamed span.
     await vi.waitFor(() => expect(sentry.addIntegration).toHaveBeenCalledTimes(2));
     expect(sentry.addIntegration).toHaveBeenCalledWith({ name: "SpanStreaming" });
-    expect(sentry.addIntegration).toHaveBeenCalledWith({ name: "WebVitals" });
+    // Browser tracing, not the vitals integration alone: LCP and CLS report
+    // against the pageload span, which only browser tracing starts. It adds
+    // the vitals integration itself.
+    expect(sentry.addIntegration).toHaveBeenCalledWith({ name: "BrowserTracing" });
+    // At a rate of 1 every span is billed, so everything that is not a vital
+    // or its pageload is off — requests (and their propagation headers),
+    // resources, long tasks, marks and measures, route changes.
+    expect(sentry.browserTracingIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        traceFetch: false,
+        traceXHR: false,
+        instrumentNavigation: false,
+        enableLongTask: false,
+        enableLongAnimationFrame: false,
+        ignoreResourceSpans: expect.arrayContaining(["resource.script", "resource.css", "resource.img"]),
+      }),
+    );
     // ...and the scrub is on the live client options BEFORE either of them, so
     // no span can leave unscrubbed.
     expect(typeof clientOptions.beforeSendSpan).toBe("function");
     expect(sentry.withStreamedSpan).toHaveBeenCalled();
-    expect(installOrder).toEqual(["beforeSendSpan", "SpanStreaming", "WebVitals"]);
+    expect(installOrder).toEqual(["beforeSendSpan", "SpanStreaming", "BrowserTracing"]);
   });
 
   it("installs no performance integration when no rate is served", async () => {
