@@ -4,21 +4,39 @@
  * `.` is imported by each app's `main.tsx`, and `./react` by the app shell's
  * route boundary, which mounts before the first render. Anything either reaches
  * through a STATIC import lands in the app's entry chunk. The SDK must arrive
- * only through `index.ts`'s `import("./sdk")` after `load`: one value import of
- * `@sentry/*` anywhere on this graph puts about 28 KB brotli back on the
- * storefront's first paint, and every unit test still passes.
+ * only through `index.ts`'s `import("./sdk")` once the page has finished
+ * downloading: one value import of `@sentry/*` anywhere on this graph puts about
+ * 28 KB brotli back on the storefront's first paint, and every unit test still
+ * passes.
  *
  * FUT-1023's first attempt was defeated by exactly such an edge:
  * `react/error-boundary.tsx` imports `reportRouteCrash` from `../index`, which
  * then imported the SDK at its top.
  */
-import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+/** The `?raw` glob helper Vite injects; declared locally to avoid `any`. */
+interface RawGlob {
+  glob(
+    pattern: string[],
+    options: { query: "?raw"; import: "default"; eager: true },
+  ): Record<string, string>;
+}
+
+/**
+ * The package's checked-in source, inlined by Vite at transform time: the real
+ * bytes are under test with no filesystem call made while it runs. Keyed by
+ * path relative to `src/`.
+ */
+// eslint-disable-next-line test-flakiness/no-unmocked-fs -- not a filesystem call: `import.meta.glob` is erased by Vite at transform time and the contents are inlined into the bundle, so nothing is read while the test runs. The rule matches the identifier `glob`.
+const RAW = (import.meta as unknown as RawGlob).glob(["../**/*.ts", "../**/*.tsx", "!../**/__tests__/**"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+const SOURCES = new Map(Object.entries(RAW).map(([key, source]) => [path.posix.normalize(key.slice(3)), source]));
 
 /** The package's boot entries: the `.` and `./react` exports. */
 const BOOT_ENTRIES = ["index.ts", "react/index.ts"];
@@ -42,34 +60,28 @@ function staticSpecifiers(source: string): string[] {
 }
 
 function resolveLocal(from: string, specifier: string): string {
-  const base = path.resolve(path.dirname(from), specifier);
-  for (const candidate of [`${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]) {
-    try {
-      readFileSync(candidate);
-      return candidate;
-    } catch {
-      // not this one
-    }
-  }
-  throw new Error(`cannot resolve ${specifier} from ${from}`);
+  const base = path.posix.join(path.posix.dirname(from), specifier);
+  const file = [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`].find((candidate) => SOURCES.has(candidate));
+  if (file === undefined) throw new Error(`cannot resolve ${specifier} from ${from}`);
+  return file;
 }
 
 /** Every external package the boot entries reach statically, with the path to it. */
 function bootExternals(): Map<string, string> {
   const externals = new Map<string, string>();
   const seen = new Set<string>();
-  const queue = BOOT_ENTRIES.map((entry) => ({ file: path.join(SRC, entry), trail: entry }));
+  const queue = BOOT_ENTRIES.map((entry) => ({ file: entry, trail: entry }));
   while (queue.length > 0) {
     const next = queue.shift();
     if (next === undefined || seen.has(next.file)) continue;
     seen.add(next.file);
-    for (const specifier of staticSpecifiers(readFileSync(next.file, "utf8"))) {
+    for (const specifier of staticSpecifiers(SOURCES.get(next.file) ?? "")) {
       if (!specifier.startsWith(".")) {
         if (!externals.has(specifier)) externals.set(specifier, `${next.trail} -> ${specifier}`);
         continue;
       }
       const file = resolveLocal(next.file, specifier);
-      queue.push({ file, trail: `${next.trail} -> ${path.relative(SRC, file)}` });
+      queue.push({ file, trail: `${next.trail} -> ${file}` });
     }
   }
   return externals;
@@ -78,8 +90,8 @@ function bootExternals(): Map<string, string> {
 describe("the boot graph", () => {
   it("reaches no Sentry package through a static import", () => {
     const sentry = [...bootExternals()]
-      .filter(([specifier]) => specifier.startsWith("@sentry/"))
-      .map(([, trail]) => trail);
+      .filter((external) => external[0].startsWith("@sentry/"))
+      .map((external) => external[1]);
     expect(sentry).toEqual([]);
   });
 

@@ -31,20 +31,22 @@
  * browser could not fetch the entry bundle at all", which no in-page reporter
  * catches anyway.
  *
- * ## The SDK itself arrives after `load`
+ * ## The SDK itself arrives once the page has finished downloading
  *
  * Only the handlers and the buffer are eager. The SDK is fetched with a dynamic
- * `import()` of `./sdk` once the page has loaded, so its bytes (about 28 KB
- * brotli on the storefront) stop sharing a slow link with the entry chunk and
- * the first screen's data. `./sdk` names what is called, which is what keeps
- * the lazy chunk shaken (see there). That
+ * `import()` of `./sdk` once the network has gone quiet after `load` (see
+ * `quiet.ts` for why `load` alone is too early), and only when a DSN is served.
+ * Its bytes (about 28 KB brotli on the storefront) then stop sharing a slow link
+ * with the entry chunk, the route and the first screen's data. `./sdk` names
+ * what is called, which is what keeps the lazy chunk shaken (see there). That
  * was never what FUT-717 asked of the boot path: what must precede the first
  * render is the LISTENING, which is this module's own few lines.
  *
  * Until the SDK is up everything queues into the same bounded buffer: a global
  * error, a route crash, a warning. The context a shell sets is merged and
- * applied at init. What is lost against an eager SDK is the SDK's own
- * breadcrumbs from before `load`, and a report from a tab closed before `load`.
+ * applied at init. A report that would really be sent does not wait for quiet:
+ * it fetches the SDK at once (`pending.ts`). What is lost against an eager SDK
+ * is the SDK's own breadcrumbs from before it arrives.
  */
 import type * as SentryApi from "@sentry/react";
 import { useEffect } from "react";
@@ -53,6 +55,8 @@ import { beforeSend } from "./before-send";
 
 import { DEFAULT_CONFIG_ENDPOINT, loadObservabilityConfig, type ObservabilityApp } from "./config";
 import { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
+import { isUrgent, type Pending } from "./pending";
+import { whenNetworkQuiet } from "./quiet";
 import { scrub } from "./scrub";
 import type { Sdk } from "./sdk";
 
@@ -64,14 +68,9 @@ export {
   type ErrorClassifiers,
 } from "./noise";
 export { scrub, scrubUrl } from "./scrub";
+export { setQuietWindowForTests } from "./quiet";
 export { setSpanTextScrubber, resetSpanTextScrubberForTests, type SpanTextScrubber } from "./span-rule";
 export { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
-
-/** One report held until the SDK is up. */
-type Pending =
-  | { kind: "error"; error: unknown }
-  | { kind: "crash"; error: unknown; componentStack?: string | null }
-  | { kind: "warning"; message: string; context?: Record<string, unknown> };
 
 /**
  * Cap on the pre-init buffer.
@@ -92,8 +91,24 @@ let pending: Pending[] = [];
 let context: ObservabilityContext = {};
 let listening = false;
 
+/** Resolves the wait for quiet early; set while the SDK is not yet fetched. */
+let hurry: (() => void) | null = null;
+
 function hold(item: Pending): void {
-  if (pending.length < MAX_BUFFERED) pending.push(item);
+  if (pending.length >= MAX_BUFFERED) return;
+  pending.push(item);
+  if (isUrgent(item)) hurry?.();
+}
+
+/** Quiet, or the first urgent report, whichever comes first. */
+function whenSdkWanted(): Promise<void> {
+  if (pending.some(isUrgent)) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    hurry = () => resolve();
+    void whenNetworkQuiet().then(resolve);
+  }).finally(() => {
+    hurry = null;
+  });
 }
 
 function buffer(error: unknown): void {
@@ -150,7 +165,7 @@ export async function startObservability(
 
   // A chunk that fails to load (a deploy replaced it) costs reporting for this
   // tab and nothing else.
-  const loaded = await whenLoaded().then(loadSdk, () => null);
+  const loaded = await whenSdkWanted().then(loadSdk);
   if (loaded === null) return switchOff();
 
   // Ordered so nothing can slip between: the SDK installs its OWN global
@@ -193,11 +208,6 @@ function switchOff(): void {
   stopListening();
 }
 
-/** Resolves once the page has loaded, and never before the first paint. */
-function whenLoaded(): Promise<void> {
-  return new Promise((resolve) => afterLoad(resolve));
-}
-
 function loadSdk(): Promise<Sdk | null> {
   return import("./sdk").then(
     (module) => module.sdk,
@@ -230,16 +240,6 @@ function performanceOptions(rate: number): Partial<SentryApi.BrowserOptions> {
     tracesSampleRate: rate,
     traceLifecycle: "stream",
   };
-}
-
-/** Run `task` once the page has loaded, and never before the first paint. */
-function afterLoad(task: () => void): void {
-  if (typeof window === "undefined") return;
-  if (document.readyState === "complete") {
-    task();
-    return;
-  }
-  window.addEventListener("load", task, { once: true });
 }
 
 /** Fetch and install the Web Vitals integrations; a failure costs only the vitals. */

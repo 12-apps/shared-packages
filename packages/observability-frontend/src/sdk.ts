@@ -1,7 +1,8 @@
 /**
  * The part of the Sentry SDK that `index.ts` calls, as one lazily loaded module.
  *
- * `index.ts` reaches this through `import("./sdk")` once the page has loaded.
+ * `index.ts` reaches this through `import("./sdk")` once the page has finished
+ * downloading (`quiet.ts`).
  * Importing `@sentry/react` itself that way would hand Rollup a namespace it
  * cannot shake, and the chunk carried Replay, Feedback and the canvas recorder
  * nobody calls: 377,161 raw bytes, against the 98,430 the named imports below
