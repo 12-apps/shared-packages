@@ -29,7 +29,10 @@ import {
  * - the NEUTRAL tones, over the grey ramp, named by what they do rather than by
  *   their step, so a host that re-greys the ramp re-greys every one;
  * - `uiInk(theme)`, the colours with no palette role at all (`./ink.core.ts`),
- *   which a host can replace through `theme.uiInk`.
+ *   which a host can replace through `theme.uiInk`;
+ * - `surfaces(theme)` and `softSignal(theme, signal)` (`./surfaces.ts`), the
+ *   grounds a board and its cards sit on and a signal's soft background,
+ *   which a host can replace through `theme.uiSurfaces` / `theme.uiSoftSignal`.
  *
  * Every default is the value the component drew before, so moving a component
  * onto these changed nothing on screen. `scripts/ui-tokens-gate.mjs` refuses a

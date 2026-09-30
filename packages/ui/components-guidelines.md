@@ -141,6 +141,56 @@ gesture's physical swipe distance) goes in `.ui-tokens-exceptions.json` as an
 `exempt` entry WITH a written argument; everything else in that ledger is debt
 that only shrinks.
 
+#### Surface and soft-signal roles (FUT-3098)
+
+Three colours the palette has no role for have one in `@12-apps/ui/tokens`.
+Read them instead of computing a tint in the component:
+
+| role | accessor | default (a host that sets nothing is unchanged) |
+|---|---|---|
+| a ground BELOW the page — a board, a floor plan, a lane that holds cards | `surfaces(theme).sunken` | `background.default` (no step) |
+| a card lifted above that ground | `surfaces(theme).raised` | `background.paper` |
+| the border of a raised card on the sunken ground | `surfaces(theme).borderOnSunken` | `divider` |
+| the soft background of a signal (`'success' \| 'warning' \| 'error' \| 'info'`) | `softSignal(theme, signal)` | `palette[signal].main` at 8% (`SOFT_SIGNAL_OPACITY`) composited OPAQUE over `background.paper` |
+
+```ts
+import { softSignal, surfaces } from '@12-apps/ui/tokens';
+
+const Board = styled('div')(({ theme }) => ({ backgroundColor: surfaces(theme).sunken }));
+const Tile = styled('div')(({ theme }) => ({
+  backgroundColor: surfaces(theme).raised,
+  border: `1px solid ${surfaces(theme).borderOnSunken}`,
+}));
+const Notice = styled('div')(({ theme }) => ({
+  backgroundColor: softSignal(theme, 'warning'),
+  color: theme.palette.warning.main,
+}));
+```
+
+A host states its own values on the theme, per key, in the shape `uiInk`
+uses — **`theme.uiSurfaces`** and **`theme.uiSoftSignal`**. A key left out keeps
+its default. One theme is one mode, so each mode's theme carries that mode's
+values, and the defaults already resolve against the mode's own palette:
+
+```ts
+createTheme(base, {
+  uiSurfaces: { sunken: '#D7DDD5', raised: '#FAFBF9', borderOnSunken: '#A5AEA3' },
+  uiSoftSignal: { success: '#EAF1EB', warning: '#F1EFE6' },
+});
+```
+
+- **A soft value is opaque.** The default is composited with `blend` (in
+  `@12-apps/ui/tokens`, MUI's `blend`), so it is the same colour on any
+  surface and its contrast with the signal's own text can be measured once. A
+  host override must be opaque too: a translucent wash takes on whatever sits
+  under it (FUT-854).
+- **`surfaces().raised` is not `neutralTones().raised`.** The latter is a fixed
+  step on the grey ramp (800) for a dark panel on a light UI; the former is the
+  mode's own card surface, the one that reads as nearer than `sunken`.
+- The existing hand tints (`alpha(theme.palette.error.main, 0.05)` and the
+  like) are not migrated yet; that is a follow-up under FUT-2585, one component
+  family per PR. New code reads `softSignal`.
+
 #### The `density` theme knob (FUT-2764/2765)
 
 Because every size above is already RELATIVE to the theme, a single theme-level
