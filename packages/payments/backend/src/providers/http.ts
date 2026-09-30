@@ -49,12 +49,22 @@ function parseJsonOrUndefined(text: string): unknown {
   }
 }
 
-interface ProviderHttpInit {
+export interface ProviderHttpInit {
   method: HttpMethod;
   headers: Record<string, string>;
   /** Already-serialized body (JSON string or form encoding). */
   body?: string;
 }
+
+/**
+ * What actually puts a request on the wire. Global `fetch` for every adapter
+ * but one that must present a client certificate (`mtls.ts`) — a seam, so
+ * the retry rule and the error mapping below stay ONE implementation.
+ */
+export type ProviderTransport = (url: string, init: ProviderHttpInit) => Promise<Response>;
+
+const globalFetch: ProviderTransport = (url, init) =>
+  fetch(url, { method: init.method, headers: init.headers, body: init.body });
 
 /**
  * One authenticated call: retry-on-pre-send-only, non-2xx mapped to a
@@ -67,13 +77,10 @@ export async function providerFetch<T>(
   label: string,
   url: string,
   init: ProviderHttpInit,
+  transport: ProviderTransport = globalFetch,
 ): Promise<T> {
   return withNetworkRetry(async () => {
-    const res = await fetch(url, {
-      method: init.method,
-      headers: init.headers,
-      body: init.body,
-    });
+    const res = await transport(url, init);
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new ProviderRequestError(

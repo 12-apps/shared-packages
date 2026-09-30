@@ -14,6 +14,7 @@
  */
 export type {
   InfinitePayCopy,
+  ItauCopy,
   PagbankCopy,
   ProbeUnreachableCopy,
   ProviderCopyPacks,
@@ -24,6 +25,7 @@ export type {
 } from './copy';
 export {
   PT_BR_INFINITEPAY_COPY,
+  PT_BR_ITAU_COPY,
   PT_BR_PAGBANK_COPY,
   PT_BR_PROVIDER_COPY,
   PT_BR_STONE_COPY,
@@ -31,6 +33,7 @@ export {
 } from './pt-BR';
 export {
   EN_US_INFINITEPAY_COPY,
+  EN_US_ITAU_COPY,
   EN_US_PAGBANK_COPY,
   EN_US_PROVIDER_COPY,
   EN_US_STONE_COPY,

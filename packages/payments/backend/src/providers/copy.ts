@@ -258,24 +258,33 @@ export interface ProviderCopyPacks {
 }
 
 /**
- * Itaú (e.Rede / Pix Recebimentos) — PIX only. No `setupGuide` for the same
+ * Itaú (Pix Recebimentos) — PIX only. No `setupGuide` for the same
  * reason PagBank ships none: a merchant's contract with the bank (opening the
  * Pix Recebimentos API access, generating the mTLS certificate) happens on
  * paper before any credential exists to walk a stepper against.
  */
 export interface ItauCopy extends ProbeUnreachableCopy {
-  /** No token could be minted — nothing to probe with. */
+  /** Client id, client secret or Pix key is empty — nothing to probe with. */
   credentialsMissing: string;
-  /** Itaú answered 401/403: the client id/secret or certificate is refused. */
+  /** A production store with no certificate or private key: Itaú refuses the TLS handshake without both. */
+  certificateMissing: string;
+  /** The pasted certificate or private key is not a readable PEM (usually a truncated paste). */
+  certificateInvalid: string;
+  /** Both parse, but the key is not the certificate's own. */
+  certificateMismatch: string;
+  /** Itaú answered 4xx to the token mint: the client id/secret or certificate is refused. */
   refused: string;
   fields: {
     clientId: string;
     clientSecret: string;
     /** PEM-encoded mTLS client certificate, pasted whole. */
     certificate: string;
+    /** PEM-encoded private key of that certificate, pasted whole. */
+    privateKey: string;
+    /** Helper line under both mTLS fields — the sandbox takes neither. */
+    productionOnly: string;
     /** The store's own registered Pix key — what a charge is raised AGAINST. */
     pixKey: string;
-    webhookSecret: string;
   };
   payer: {
     /** `solicitacaoPagador` — the one line the buyer's bank app shows for this charge. */

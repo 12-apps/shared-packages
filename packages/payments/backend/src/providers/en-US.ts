@@ -112,14 +112,18 @@ export const EN_US_STONE_COPY: StoneCopy = {
 
 export const EN_US_ITAU_COPY: ItauCopy = {
   unreachable: 'We could not reach Itaú just now. Your credentials were saved — test the connection again shortly.',
-  credentialsMissing: 'Itaú credentials not configured.',
+  credentialsMissing: 'Fill in the Client ID, the Client Secret and the Pix key.',
+  certificateMissing: 'In production, Itaú requires the certificate and private key generated in its developer portal.',
+  certificateInvalid: 'We could not read the certificate or the private key. Paste the whole .pem file, from BEGIN to END.',
+  certificateMismatch: 'The private key does not belong to this certificate. Check that both were generated together.',
   refused: 'Credentials refused by Itaú.',
   fields: {
     clientId: 'Client ID',
     clientSecret: 'Client Secret',
     certificate: 'Certificate (.pem)',
+    privateKey: 'Certificate private key (.pem)',
+    productionOnly: 'Required in production; the sandbox takes no certificate.',
     pixKey: 'Pix key registered with Itaú',
-    webhookSecret: 'Webhook secret',
   },
   payer: { chargeDescription: 'ORDER' },
 };
