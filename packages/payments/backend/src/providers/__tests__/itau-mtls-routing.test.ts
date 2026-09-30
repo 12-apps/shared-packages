@@ -4,6 +4,8 @@ import { pixInput } from '../../__tests__/fixtures';
 import type { ProviderHttpInit } from '../http';
 import { mtlsTransport, type ClientIdentity } from '../mtls';
 import { itauProvider } from '../itau';
+import { normalizePem } from '../itau-http';
+import { EN_US_ITAU_COPY } from '../en-US';
 import { PT_BR_ITAU_COPY } from '../pt-BR';
 import { selfSignedIdentity } from './pki';
 
@@ -39,6 +41,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const PROD_FIELDS = { clientId: 'client-1', clientSecret: 'secret-1', pixKey: 'loja@example.com' };
+
 describe('itau production transport', () => {
   it('presents the pasted certificate on the token mint and the cob, at the production hosts', async () => {
     const merchant = selfSignedIdentity('merchant-a');
@@ -62,8 +66,45 @@ describe('itau production transport', () => {
       'https://sts.itau.com.br/api/oauth/token',
       'https://secure.gateway.api.itau/pix_recebimentos/v2/cob/<txid>',
     ]);
-    expect(sent.every((call) => call.identity.cert === merchant.cert.trim() && call.identity.key === merchant.key.trim())).toBe(true);
+    expect(sent.every((call) => call.identity.cert === normalizePem(merchant.cert) && call.identity.key === normalizePem(merchant.key))).toBe(true);
     expect(sent[1]?.init.headers['authorization']).toBe('Bearer prod-token');
     expect(plainFetch).not.toHaveBeenCalled();
+  });
+
+  it('connects with a PEM whose newlines a single-line paste folded into spaces', async () => {
+    const merchant = selfSignedIdentity('merchant-a');
+    const sent: Sent[] = [];
+    recordMtls(sent);
+    const folded = (pem: string) => pem.replace(/\n/g, ' ');
+    const outcome = await itauProvider(PT_BR_ITAU_COPY).verifyCredentials({
+      environment: 'PRODUCTION',
+      fields: { ...PROD_FIELDS, certificate: folded(merchant.cert), privateKey: folded(merchant.key) },
+    });
+    expect(outcome).toEqual({ ok: true });
+    expect(sent[0]?.identity.cert).toBe(normalizePem(merchant.cert));
+  });
+
+  it('names the certificate when Itau resets the handshake on it, instead of "unreachable"', async () => {
+    const merchant = selfSignedIdentity('merchant-a');
+    vi.mocked(mtlsTransport).mockImplementation(() => async () => {
+      throw Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
+    });
+    const outcome = await itauProvider(EN_US_ITAU_COPY).verifyCredentials(
+      { environment: 'PRODUCTION', fields: { ...PROD_FIELDS, certificate: merchant.cert, privateKey: merchant.key } },
+      'en-US',
+    );
+    expect(outcome).toEqual({ ok: false, fault: 'REFUSED', message: EN_US_ITAU_COPY.certificateRefused });
+  });
+
+  it('reads a refused connection as unreachable, not as a certificate problem', async () => {
+    const merchant = selfSignedIdentity('merchant-a');
+    vi.mocked(mtlsTransport).mockImplementation(() => async () => {
+      throw Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    });
+    const outcome = await itauProvider(PT_BR_ITAU_COPY).verifyCredentials({
+      environment: 'PRODUCTION',
+      fields: { ...PROD_FIELDS, certificate: merchant.cert, privateKey: merchant.key },
+    });
+    expect(outcome).toMatchObject({ ok: false, fault: 'UNREACHABLE' });
   });
 });

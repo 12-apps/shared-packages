@@ -27,6 +27,24 @@ interface ItauWebhookBody {
 
 type ConfirmableEntry = ItauPix & { txid: string; endToEndId: string };
 
+/**
+ * Bounds checked BEFORE any network call. The body is unsigned and the URL is
+ * public, so every entry would otherwise buy an attacker one authenticated
+ * `GET /cob` on the merchant's own credentials — enough to spend Itau's rate
+ * limit and have genuine deliveries fail closed. BACEN batches a handful of
+ * Pix per delivery; twenty is generous.
+ */
+const MAX_ENTRIES = 20;
+/** BACEN: a txid is 26–35 alphanumerics (what `itauTxId` mints); an end-to-end id is exactly 32. */
+const TXID_SHAPE = /^[a-zA-Z0-9]{26,35}$/;
+const E2E_SHAPE = /^[a-zA-Z0-9]{32}$/;
+
+/**
+ * The entries this adapter could have raised, or null for a body to refuse
+ * whole: unparseable, oversized, or naming a txid / end-to-end id no real
+ * Pix carries. A Pix paid to the key without a cob (a static QR, a manual
+ * transfer) has no txid — nothing this adapter raised — and is skipped.
+ */
 function entriesOf(rawBody: string): ConfirmableEntry[] | null {
   let body: ItauWebhookBody;
   try {
@@ -34,10 +52,12 @@ function entriesOf(rawBody: string): ConfirmableEntry[] | null {
   } catch {
     return null;
   }
-  if (!Array.isArray(body.pix)) return null;
-  // A Pix paid to the key without a cob (a static QR, a manual transfer) has
-  // no txid: nothing this adapter raised, so nothing to confirm or report.
-  return body.pix.filter((entry): entry is ConfirmableEntry => Boolean(entry.txid && entry.endToEndId));
+  if (!Array.isArray(body.pix) || body.pix.length > MAX_ENTRIES) return null;
+  const raised = body.pix.filter((entry) => entry.txid !== undefined);
+  const wellFormed = raised.every(
+    (entry) => TXID_SHAPE.test(String(entry.txid)) && E2E_SHAPE.test(String(entry.endToEndId ?? '')),
+  );
+  return wellFormed ? (raised as ConfirmableEntry[]) : null;
 }
 
 /** The Pix inside `cob` that `entry` claims to be, or undefined when the cob received no such Pix. */
@@ -46,21 +66,30 @@ function receivedPix(cob: ItauCob, entry: ConfirmableEntry): ItauPix | undefined
   return cob.pix?.find((pix) => pix.endToEndId === entry.endToEndId);
 }
 
+/** One read per distinct cob, however many entries name it. */
+async function cobsFor(credentials: ResolvedCredentials, entries: ConfirmableEntry[]): Promise<Map<string, ItauCob>> {
+  const call = await itauSession(credentials);
+  const cobs = new Map<string, ItauCob>();
+  for (const txid of new Set(entries.map((entry) => entry.txid))) cobs.set(txid, await readCob(call, txid));
+  return cobs;
+}
+
 /**
- * Authenticate a delivery by asking Itaú. FAIL CLOSED: a body that does not
- * parse, names no cob, or holds ONE entry Itaú will not confirm is refused
- * whole — Itaú retries, and a real payment also surfaces on `getCharge`.
+ * Authenticate a delivery by asking Itau. FAIL CLOSED: a body that does not
+ * parse, breaks the bounds above, names no cob, or holds ONE entry Itau will
+ * not confirm is refused whole — Itau retries, and a real payment also
+ * surfaces on `getCharge`.
  */
 export async function verifyItauWebhook(delivery: WebhookDelivery, credentials: ResolvedCredentials): Promise<boolean> {
   if (stubDeliveryTrusted(credentials)) return true;
   const entries = entriesOf(delivery.rawBody);
   if (!entries || entries.length === 0) return false;
   try {
-    const call = await itauSession(credentials);
-    for (const entry of entries) {
-      if (!receivedPix(await readCob(call, entry.txid), entry)) return false;
-    }
-    return true;
+    const cobs = await cobsFor(credentials, entries);
+    return entries.every((entry) => {
+      const cob = cobs.get(entry.txid);
+      return cob !== undefined && receivedPix(cob, entry) !== undefined;
+    });
   } catch {
     return false;
   }
@@ -120,12 +149,10 @@ export async function parseItauWebhook(
     return [{ provider: NAME, eventId: sha256Hex(delivery.rawBody), type: 'UNKNOWN', raw: delivery.rawBody }];
   }
   if (stubDeliveryTrusted(credentials)) return stubEvents(entries);
-  const call = await itauSession(credentials);
-  const events: NormalizedWebhookEvent[] = [];
-  for (const entry of entries) {
-    const cob = await readCob(call, entry.txid);
-    const pix = receivedPix(cob, entry);
-    if (pix) events.push(...eventsFor(cob, pix, entry));
-  }
-  return events;
+  const cobs = await cobsFor(credentials, entries);
+  return entries.flatMap((entry) => {
+    const cob = cobs.get(entry.txid);
+    const pix = cob ? receivedPix(cob, entry) : undefined;
+    return cob && pix ? eventsFor(cob, pix, entry) : [];
+  });
 }

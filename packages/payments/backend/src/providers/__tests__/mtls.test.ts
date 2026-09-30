@@ -1,3 +1,4 @@
+import { X509Certificate } from 'node:crypto';
 import { createServer, type Server } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import type { TLSSocket } from 'node:tls';
@@ -33,7 +34,9 @@ async function mutualTlsServer(status: number): Promise<{ server: Server; url: s
       });
     },
   );
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  // No host: bound dual-stack, so `localhost` reaches it whether it resolves to
+  // 127.0.0.1 or ::1 — the name must match the server certificate's SAN.
+  await new Promise<void>((resolve) => server.listen(0, resolve));
   const { port } = server.address() as AddressInfo;
   return { server, url: `https://localhost:${port}/pix` };
 }
@@ -62,9 +65,16 @@ describe('mtlsTransport', () => {
   it('is refused at the handshake with a certificate the server does not trust', async () => {
     const { server, url } = await mutualTlsServer(200);
     try {
-      await expect(
-        providerFetch('itau', 'probe', url, { method: 'GET', headers: {} }, mtlsTransport(STRANGER, { ca: SERVER.cert })),
-      ).rejects.toBeInstanceOf(Error);
+      const failure: { code?: string } = await providerFetch<{ code?: string }>(
+        'itau',
+        'probe',
+        url,
+        { method: 'GET', headers: {} },
+        mtlsTransport(STRANGER, { ca: SERVER.cert }),
+      ).catch((error: unknown) => error as { code?: string });
+      // A reset during the handshake (or a TLS alert naming the certificate):
+      // the shape `itau.ts` reads as "certificate refused", never a response.
+      expect(String(failure.code)).toMatch(/^(ECONNRESET|ERR_SSL_)/);
     } finally {
       await close(server);
     }
@@ -91,6 +101,14 @@ describe('identityProblem', () => {
 
   it('names a key that belongs to another certificate', () => {
     expect(identityProblem({ cert: MERCHANT.cert, key: STRANGER.key })).toBe('MISMATCH');
+  });
+
+  it('names a certificate outside its validity window', () => {
+    // Relative to the certificate's own window, so the clock never matters.
+    const window = new X509Certificate(MERCHANT.cert);
+    const dayMs = 24 * 3600 * 1000;
+    expect(identityProblem(MERCHANT, new Date(window.validTo).getTime() + dayMs)).toBe('EXPIRED');
+    expect(identityProblem(MERCHANT, new Date(window.validFrom).getTime() - dayMs)).toBe('NOT_YET_VALID');
   });
 
   it('names a truncated paste as unreadable', () => {

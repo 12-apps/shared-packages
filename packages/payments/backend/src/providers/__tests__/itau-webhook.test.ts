@@ -54,6 +54,33 @@ describe('itau webhook verify', () => {
     await expect(adapter.webhook.verify(delivery({ pix: [{ endToEndId: E2E }] }), SANDBOX_CREDS)).resolves.toBe(false);
   });
 
+  it('refuses an oversized batch before spending a single call on it', async () => {
+    const calls = stubItauFetch(() => ({ body: paidCob('12.50') }));
+    const flood = { pix: Array.from({ length: 21 }, () => GENUINE.pix[0]) };
+    await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery(flood), SANDBOX_CREDS)).resolves.toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('refuses a txid no real cob could carry, before any call', async () => {
+    const calls = stubItauFetch(() => ({ body: paidCob('12.50') }));
+    const bogus = { pix: [{ ...GENUINE.pix[0], txid: '..' }] };
+    await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery(bogus), SANDBOX_CREDS)).resolves.toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('reads each cob once, however many entries name it', async () => {
+    const calls = stubItauFetch(() => ({ body: paidCob('12.50') }));
+    const twice = { pix: [GENUINE.pix[0], GENUINE.pix[0]] };
+    await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery(twice), SANDBOX_CREDS)).resolves.toBe(true);
+    expect(calls.filter((call) => call.method === 'GET')).toHaveLength(1);
+  });
+
+  it('skips a Pix paid to the key without a cob, confirming the rest', async () => {
+    stubItauFetch(() => ({ body: paidCob('12.50') }));
+    const withStatic = { pix: [GENUINE.pix[0], { endToEndId: 'E60701190202609301200zzzzzzzzzzz', valor: '5.00' }] };
+    await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery(withStatic), SANDBOX_CREDS)).resolves.toBe(true);
+  });
+
   it('fails closed when Itau cannot be asked', async () => {
     vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
     await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery(GENUINE), SANDBOX_CREDS)).resolves.toBe(false);

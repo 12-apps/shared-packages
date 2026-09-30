@@ -12,9 +12,9 @@ import type { ProviderHttpInit, ProviderTransport } from './http';
  * the TLS layer (Itaú's Pix API refuses the handshake without one) therefore
  * goes through `node:https`, which takes `cert`/`key` per request.
  *
- * Per request, never pooled: adapters are stateless and one instance serves
- * every merchant, so an agent keyed by one merchant's certificate must never
- * be reachable from another merchant's call.
+ * Per request, never pooled (`agent: false`): adapters are stateless and one
+ * instance serves every merchant, and a kept-alive socket that the server has
+ * since closed would surface as an ambiguous reset on the NEXT charge.
  */
 
 /** A merchant's own mTLS identity, as pasted into the credential form. */
@@ -31,20 +31,26 @@ const IDLE_TIMEOUT_MS = 30_000;
 /** Statuses a `Response` must be built with a null body for. */
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
 
+type IdentityProblem = 'INVALID' | 'MISMATCH' | 'EXPIRED' | 'NOT_YET_VALID';
+
 /**
  * Whether a pasted certificate and key are usable together, checked locally
- * before any network call — so a truncated paste or a key from another
- * certificate reads as the credential problem it is, not as "unreachable".
+ * before any network call — so a truncated paste, a key from another
+ * certificate or a lapsed certificate reads as the credential problem it is.
+ * Left to the server, each of those surfaces as a reset handshake, which is
+ * indistinguishable from an outage.
  */
-export function identityProblem(identity: ClientIdentity): 'INVALID' | 'MISMATCH' | null {
+export function identityProblem(identity: ClientIdentity, nowMs = Date.now()): IdentityProblem | null {
   let certificate: X509Certificate;
   try {
     certificate = new X509Certificate(identity.cert);
-    const key = createPrivateKey(identity.key);
-    return certificate.checkPrivateKey(key) ? null : 'MISMATCH';
+    if (!certificate.checkPrivateKey(createPrivateKey(identity.key))) return 'MISMATCH';
   } catch {
     return 'INVALID';
   }
+  if (nowMs < new Date(certificate.validFrom).getTime()) return 'NOT_YET_VALID';
+  if (nowMs > new Date(certificate.validTo).getTime()) return 'EXPIRED';
+  return null;
 }
 
 /**
@@ -61,9 +67,14 @@ export function mtlsTransport(identity: ClientIdentity, trust?: { ca: string }):
         url,
         {
           method: init.method,
-          headers: init.headers,
+          // A length, as `fetch` sends — never chunked, which some bank gateways refuse.
+          headers:
+            init.body === undefined
+              ? init.headers
+              : { ...init.headers, 'content-length': String(Buffer.byteLength(init.body)) },
           cert: identity.cert,
           key: identity.key,
+          agent: false,
           // Omitted in production: the server is checked against Node's own
           // root store. Set only to trust a private CA (a test server).
           ...(trust ? { ca: trust.ca } : {}),
@@ -84,7 +95,6 @@ export function mtlsTransport(identity: ClientIdentity, trust?: { ca: string }):
         outgoing.destroy(Object.assign(new Error('mTLS request idle timeout'), { code: 'ETIMEDOUT' }));
       });
       outgoing.on('error', reject);
-      if (init.body !== undefined) outgoing.write(init.body);
-      outgoing.end();
+      outgoing.end(init.body);
     });
 }

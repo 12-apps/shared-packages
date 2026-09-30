@@ -1,5 +1,6 @@
 import type {
   InfinitePaySetupGuideCopy,
+  ItauSetupGuideCopy,
   StoneSetupGuideCopy,
   StripeSetupGuideCopy,
 } from './setup-guide-copy';
@@ -133,4 +134,31 @@ export const EN_US_INFINITEPAY_SETUP_GUIDE_COPY: InfinitePaySetupGuideCopy = {
     doneValue: 'Enabled on the InfinitePay account',
     webhookUrlLabel: 'Notification URL (you do not need to register it)',
   },
+};
+
+export const EN_US_ITAU_SETUP_GUIDE_COPY: ItauSetupGuideCopy = {
+  stages: { credentials: 'Generate credentials', webhook: 'Register webhook', activate: 'Start selling' },
+  credentials: {
+    title: 'Generate your Itaú credentials',
+    intro:
+      'Itaú Pix Recebimentos is contracted with the bank. Once your account manager grants access, the credentials come from the developer portal.',
+    portal: 'In the portal, create the Pix Recebimentos application and copy the Client ID and Client Secret.',
+    portalButton: 'Open the developer portal',
+    certificate:
+      'For production, also generate the certificate (.pem) and keep the private key created with it. The certificate is valid for 365 days; the sandbox uses none.',
+    paste:
+      'Paste everything into the form above — the whole certificate and private key, from BEGIN to END — with the Pix key registered at Itaú. Then click “Test connection”.',
+  },
+  webhook: {
+    title: 'Register the notification URL',
+    intro: 'Itaú announces every Pix received at the URL registered for your Pix key.',
+    register:
+      'Ask Itaú (your account manager, or developer-portal support) to register this URL as the webhook for the Pix key above:',
+    withoutIt:
+      'Until it is registered, a paid Pix is only detected when the payment screen checks its status — the order still confirms, just more slowly.',
+    doneLabel: 'Webhook',
+    doneValue: 'Registered with Itaú',
+    confirmLabel: 'Itaú has registered the URL',
+  },
+  webhookUrlLabel: 'Notification URL',
 };

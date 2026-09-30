@@ -39,7 +39,21 @@ describe('itau contract', () => {
     expect(fields.filter((field) => field.key === 'certificate' || field.key === 'privateKey').every((field) => field.secret)).toBe(true);
   });
 
-  it('does not claim a delivery proves which reference was paid — the txid is a one-way digest of it', () => {
+  it('needs no activation charge — it takes no card, the only proof the activation flow can run', () => {
+    expect(itauProvider(PT_BR_ITAU_COPY).capabilities.activationCharge).toBeFalsy();
+  });
+
+  it('finds nothing in stub mode, like every sibling adapter, so a scripted failover moves on', async () => {
+    await expect(itauProvider(PT_BR_ITAU_COPY).findChargeByReference?.('order-1', STUB_CREDS)).resolves.toBeNull();
+  });
+
+  it('renders the certificate and private key as multi-line fields', () => {
+    const schema = itauProvider(PT_BR_ITAU_COPY).credentialSchema;
+    const fields = typeof schema === 'function' ? schema({ locale: 'pt-BR' }) : schema;
+    expect(fields.filter((field) => field.multiline).map((field) => field.key)).toEqual(['certificate', 'privateKey']);
+  });
+
+  it('does not claim a delivery proves which reference was paid — the txid is a hash of it', () => {
     const adapter = itauProvider(PT_BR_ITAU_COPY);
     expect(adapter.verifyConfirmsPayment).toBeFalsy();
     expect(adapter.referenceOfDelivery).toBeUndefined();
@@ -47,22 +61,24 @@ describe('itau contract', () => {
 });
 
 describe('itauTxId', () => {
-  it('keeps only letters and digits, within the 26-35 char window', () => {
-    expect(itauTxId('order-abc-123-456-789-012-345-678')).toMatch(/^[a-zA-Z0-9]{26,35}$/);
+  it('is 26-35 letters and digits, whatever the reference looks like', () => {
+    for (const reference of ['o', 'order-abc-123', 'a'.repeat(80), 'verify-itau-cmabc123def456ghi789jkl01--lk3j9']) {
+      expect(itauTxId(reference)).toMatch(/^[a-zA-Z0-9]{26,35}$/);
+    }
   });
 
-  it('truncates a long alphanumeric reference to 35 chars', () => {
-    expect(itauTxId('a'.repeat(50))).toHaveLength(35);
+  it('is deterministic, so a reference finds the cob it raised', () => {
+    expect(itauTxId('order-1')).toBe(itauTxId('order-1'));
   });
 
-  it('pads a short reference to the 26-char floor, deterministically for the same input', () => {
-    const a = itauTxId('order-1');
-    expect(a.length).toBeGreaterThanOrEqual(26);
-    expect(a).toBe(itauTxId('order-1'));
+  it('keeps two attempts of one long reference apart (the --<attempt> suffix is not cut off)', () => {
+    const base = 'verify-itau-cmabc123def456ghi789jkl01';
+    expect(itauTxId(`${base}--lk3j9`)).not.toBe(itauTxId(`${base}--lk3ja`));
+    expect(itauTxId(base)).not.toBe(itauTxId(`${base}--lk3j9`));
   });
 
-  it('produces a DIFFERENT txid for two different short references (no collision from padding)', () => {
-    expect(itauTxId('order-1')).not.toBe(itauTxId('order-2'));
+  it('keeps references that differ only in punctuation apart', () => {
+    expect(itauTxId('order-12')).not.toBe(itauTxId('order_12'));
   });
 });
 
@@ -78,6 +94,7 @@ describe('itau Pix money and ids', () => {
   it('writes cents back as the two-decimal string BACEN takes', () => {
     expect(decimalFrom(1)).toBe('0.01');
     expect(decimalFrom(100_07)).toBe('100.07');
+    expect(() => decimalFrom(10.5)).toThrow(RangeError);
   });
 
   it('mints devolução ids that are BACEN-valid and distinct per refund on one Pix', () => {
@@ -89,6 +106,8 @@ describe('itau Pix money and ids', () => {
   it('sends a payer only when both halves BACEN requires are present', () => {
     expect(devedorOf(pixInput())).toEqual({ cpf: '12345678909', nome: 'Ana Buyer' });
     expect(devedorOf({ ...pixInput(), customer: { name: 'Ana Buyer' } })).toBeUndefined();
+    // A CPF that fails its check digits would make Itau refuse the whole cob.
+    expect(devedorOf({ ...pixInput(), customer: { name: 'Ana Buyer', taxId: '12345678900' } })).toBeUndefined();
     expect(devedorOf({ ...pixInput(), customer: { name: 'Loja', taxId: '12.345.678/0001-95' } })).toEqual({
       cnpj: '12345678000195',
       nome: 'Loja',

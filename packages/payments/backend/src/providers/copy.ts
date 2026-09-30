@@ -1,11 +1,12 @@
 import type {
   InfinitePaySetupGuideCopy,
+  ItauSetupGuideCopy,
   StoneSetupGuideCopy,
   StripeSetupGuideCopy,
 } from './setup-guide-copy';
 
 /**
- * Every owner-facing sentence the four built-in adapters can produce, as ports
+ * Every owner-facing sentence the built-in adapters can produce, as ports
  * (FUT-760).
  *
  * The split is the same one `CheckoutCopy` and `ActivationCopy` already draw.
@@ -258,12 +259,15 @@ export interface ProviderCopyPacks {
 }
 
 /**
- * Itaú (Pix Recebimentos) — PIX only. No `setupGuide` for the same
- * reason PagBank ships none: a merchant's contract with the bank (opening the
- * Pix Recebimentos API access, generating the mTLS certificate) happens on
- * paper before any credential exists to walk a stepper against.
+ * Itaú (Pix Recebimentos) — PIX only. Its walkthrough covers what the owner
+ * does by hand once the bank has opened API access: generate credentials and
+ * the mTLS certificate in the developer portal, then have the webhook
+ * registered for the Pix key (`itau-setup-guide.ts`).
  */
 export interface ItauCopy extends ProbeUnreachableCopy {
+  /** The bank's name as the merchant reads it on cards and in sentences — with its accent. */
+  displayName: string;
+  setupGuide: ItauSetupGuideCopy;
   /** Client id, client secret or Pix key is empty — nothing to probe with. */
   credentialsMissing: string;
   /** A production store with no certificate or private key: Itaú refuses the TLS handshake without both. */
@@ -272,6 +276,12 @@ export interface ItauCopy extends ProbeUnreachableCopy {
   certificateInvalid: string;
   /** Both parse, but the key is not the certificate's own. */
   certificateMismatch: string;
+  /** The certificate's validity window has closed — a new one must be generated in the portal. */
+  certificateExpired: string;
+  /** The certificate's validity window has not opened yet (a clock or a freshly issued certificate). */
+  certificateNotYetValid: string;
+  /** Itaú reset the handshake on our certificate: untrusted, revoked, or from the other environment. */
+  certificateRefused: string;
   /** Itaú answered 4xx to the token mint: the client id/secret or certificate is refused. */
   refused: string;
   fields: {

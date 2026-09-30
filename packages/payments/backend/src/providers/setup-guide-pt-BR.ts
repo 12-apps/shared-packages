@@ -1,5 +1,6 @@
 import type {
   InfinitePaySetupGuideCopy,
+  ItauSetupGuideCopy,
   StoneSetupGuideCopy,
   StripeSetupGuideCopy,
 } from './setup-guide-copy';
@@ -125,4 +126,31 @@ export const PT_BR_INFINITEPAY_SETUP_GUIDE_COPY: InfinitePaySetupGuideCopy = {
     doneValue: 'Habilitado na conta InfinitePay',
     webhookUrlLabel: 'URL de notificação (você não precisa cadastrar)',
   },
+};
+
+export const PT_BR_ITAU_SETUP_GUIDE_COPY: ItauSetupGuideCopy = {
+  stages: { credentials: 'Gerar credenciais', webhook: 'Cadastrar webhook', activate: 'Ativar vendas' },
+  credentials: {
+    title: 'Gerar suas credenciais no Itaú',
+    intro:
+      'O Pix Recebimentos do Itaú é contratado com o banco. Com o acesso liberado pelo seu gerente, as credenciais saem do portal do desenvolvedor.',
+    portal: 'No portal, crie a aplicação de Pix Recebimentos e copie o Client ID e o Client Secret.',
+    portalButton: 'Abrir o portal do desenvolvedor',
+    certificate:
+      'Para produção, gere também o certificado (.pem) e guarde a chave privada criada junto com ele. O certificado vale 365 dias; o sandbox não usa certificado.',
+    paste:
+      'Cole tudo no formulário acima — o certificado e a chave privada inteiros, do BEGIN ao END — junto com a chave Pix cadastrada no Itaú. Depois clique em “Testar conexão”.',
+  },
+  webhook: {
+    title: 'Cadastrar a URL de notificação',
+    intro: 'O Itaú avisa cada Pix recebido na URL cadastrada para a sua chave Pix.',
+    register:
+      'Peça ao Itaú (pelo gerente ou pelo suporte do portal do desenvolvedor) para cadastrar esta URL como webhook da chave Pix informada acima:',
+    withoutIt:
+      'Enquanto a URL não estiver cadastrada, um Pix pago só é detectado quando a tela de pagamento consulta o status — o pedido confirma, mas pode demorar.',
+    doneLabel: 'Webhook',
+    doneValue: 'Cadastrado no Itaú',
+    confirmLabel: 'O Itaú já cadastrou a URL',
+  },
+  webhookUrlLabel: 'URL de notificação',
 };

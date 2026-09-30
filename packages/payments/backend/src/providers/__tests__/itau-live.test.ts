@@ -168,6 +168,16 @@ describe('itau verifyCredentials', () => {
     expect(outcome).toMatchObject({ ok: false, fault: 'REFUSED', message: PT_BR_ITAU_COPY.certificateMismatch });
   });
 
+  it('reads a 503 or a 429 from the token mint as an outage, not as refused credentials', async () => {
+    for (const status of [503, 429]) {
+      vi.stubGlobal('fetch', async () => new Response('{}', { status }));
+      await expect(itauProvider(PT_BR_ITAU_COPY).verifyCredentials(SANDBOX_CREDS)).resolves.toMatchObject({
+        ok: false,
+        fault: 'UNREACHABLE',
+      });
+    }
+  });
+
   it('reads a 401 from the token mint as REFUSED, not as an outage', async () => {
     vi.stubGlobal('fetch', async () => new Response('{"error":"invalid_client"}', { status: 401 }));
     await expect(itauProvider(PT_BR_ITAU_COPY).verifyCredentials(SANDBOX_CREDS)).resolves.toEqual({

@@ -1,5 +1,6 @@
 import {
   PT_BR_INFINITEPAY_SETUP_GUIDE_COPY,
+  PT_BR_ITAU_SETUP_GUIDE_COPY,
   PT_BR_STONE_SETUP_GUIDE_COPY,
   PT_BR_STRIPE_SETUP_GUIDE_COPY,
 } from './setup-guide-pt-BR';
@@ -100,6 +101,8 @@ export const PT_BR_STONE_COPY: StoneCopy = {
 };
 
 export const PT_BR_ITAU_COPY: ItauCopy = {
+  displayName: 'Itaú',
+  setupGuide: PT_BR_ITAU_SETUP_GUIDE_COPY,
   unreachable:
     'Não conseguimos falar com o Itaú agora. ' +
     'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
@@ -107,6 +110,9 @@ export const PT_BR_ITAU_COPY: ItauCopy = {
   certificateMissing: 'Em produção, o Itaú exige o certificado e a chave privada gerados no portal do desenvolvedor.',
   certificateInvalid: 'Não conseguimos ler o certificado ou a chave privada. Cole o arquivo .pem inteiro, do BEGIN ao END.',
   certificateMismatch: 'A chave privada não pertence a este certificado. Confira se os dois foram gerados juntos.',
+  certificateExpired: 'O certificado venceu. Gere um novo no portal do desenvolvedor do Itaú e cole aqui.',
+  certificateNotYetValid: 'O certificado ainda não está válido. Confira a data e a hora do servidor ou aguarde o início da validade.',
+  certificateRefused: 'O Itaú recusou o certificado. Confira se ele é o de produção, gerado para este Client ID, e se não foi revogado.',
   refused: 'Credenciais recusadas pelo Itaú.',
   fields: {
     clientId: 'Client ID',

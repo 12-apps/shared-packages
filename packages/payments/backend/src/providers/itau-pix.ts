@@ -1,3 +1,4 @@
+import { isValidCpf } from '../core/cpf';
 import type { ChargeInput, ChargeSnapshot, RefundSnapshot } from '../core/types';
 import { NAME } from './itau-http';
 import { sha256Hex } from './shared';
@@ -39,15 +40,20 @@ export interface ItauCob {
  * `sanitizeTxId`, 1–25 chars). Deterministic, so `findChargeByReference` can
  * re-derive the txid a charge was raised under from the reference alone.
  *
- * It is NOT reversible: the txid is a digest of the reference, which is why
- * this adapter declares no `referenceOfDelivery` — a delivery names only this.
+ * A short readable prefix (so the bank's dashboard still hints at the order)
+ * plus a hash of the WHOLE reference — never a truncation of it. The repo's
+ * attempt convention appends `--<attempt>` (`core/reference.ts`), so a
+ * truncation cuts exactly the part that makes a retry distinct and hands it
+ * the previous attempt's cob; punctuation-only differences would collide too.
+ * The hash is also why a delivery's txid cannot be turned back into the
+ * reference, and why this adapter declares no `referenceOfDelivery`.
  */
+const TXID_PREFIX = 9;
+const TXID_HASH = 26;
+
 export function itauTxId(reference: string): string {
-  const alnum = reference.replace(/[^a-zA-Z0-9]/g, '');
-  if (alnum.length >= 26) return alnum.slice(0, 35);
-  // Short references are padded with a hash of the ORIGINAL reference, never
-  // a constant: constant padding would make every short reference collide.
-  return (alnum + sha256Hex(reference).toUpperCase()).slice(0, 35).padEnd(26, '0');
+  const readable = reference.replace(/[^a-zA-Z0-9]/g, '').slice(0, TXID_PREFIX);
+  return `${readable}${sha256Hex(reference).slice(0, TXID_HASH)}`;
 }
 
 /** A BACEN decimal string (`"12.50"`) in integer cents; undefined when absent or malformed. */
@@ -59,6 +65,7 @@ export function centsFrom(decimal: string | undefined): number | undefined {
 
 /** Integer cents as the two-decimal string every BACEN amount field takes. */
 export function decimalFrom(cents: number): string {
+  if (!Number.isInteger(cents) || cents < 0) throw new RangeError(`not a whole, non-negative cent amount: ${cents}`);
   return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
 }
 
@@ -109,8 +116,9 @@ function concludedStatusOf(pix: ItauPix | undefined): ChargeSnapshot['status'] {
 
 function expiresAtOf(cob: ItauCob): string | undefined {
   const { criacao, expiracao } = cob.calendario ?? {};
-  if (!criacao || !expiracao) return undefined;
-  return new Date(new Date(criacao).getTime() + expiracao * 1000).toISOString();
+  const createdMs = criacao ? new Date(criacao).getTime() : Number.NaN;
+  if (!expiracao || Number.isNaN(createdMs)) return undefined;
+  return new Date(createdMs + expiracao * 1000).toISOString();
 }
 
 /**
@@ -132,15 +140,21 @@ export function snapshotFromCob(cob: ItauCob, reference?: string): ChargeSnapsho
   };
 }
 
+/** BACEN caps `devedor.nome` at 200 characters. */
+const DEVEDOR_NAME_MAX = 200;
+
 /**
  * The payer, when the buyer gave both halves BACEN requires together — a
  * name alone or a document alone is refused as a malformed `devedor`.
  */
 export function devedorOf(input: ChargeInput): Record<string, string> | undefined {
-  const nome = input.customer.name?.trim();
-  const document = input.customer.taxId?.replace(/\D/g, '');
-  if (!nome || !document) return undefined;
-  if (document.length === 11) return { cpf: document, nome };
+  const nome = input.customer.name?.trim().slice(0, DEVEDOR_NAME_MAX);
+  const document = input.customer.taxId?.replace(/\D/g, '') ?? '';
+  if (!nome) return undefined;
+  // A CPF that fails its own check digits is left out rather than sent: Itau
+  // refuses the whole cob for a malformed devedor, and the buyer would lose
+  // the charge over a field nobody required.
+  if (document.length === 11) return isValidCpf(document) ? { cpf: document, nome } : undefined;
   if (document.length === 14) return { cnpj: document, nome };
   return undefined;
 }

@@ -39,7 +39,8 @@ async function storeWithItauFirstAndInfinitePaySecond() {
   });
 
   await settings.saveCredentials(TENANT, 'itau', { environment: 'SANDBOX', fields: {} });
-  await settings.applyChargeVerification(TENANT, 'itau', true);
+  // No activation charge for Itau: enabling it is a plain switch.
+  await settings.setEnabled(TENANT, 'itau', true);
   await settings.saveCredentials(TENANT, 'infinitepay', { environment: 'SANDBOX', fields: {} });
   await settings.applyChargeVerification(TENANT, 'infinitepay', true);
   // List order IS priority order — Itaú named first is Itaú at priority 0,

@@ -1,5 +1,6 @@
 import {
   EN_US_INFINITEPAY_SETUP_GUIDE_COPY,
+  EN_US_ITAU_SETUP_GUIDE_COPY,
   EN_US_STONE_SETUP_GUIDE_COPY,
   EN_US_STRIPE_SETUP_GUIDE_COPY,
 } from './setup-guide-en-US';
@@ -111,11 +112,16 @@ export const EN_US_STONE_COPY: StoneCopy = {
 };
 
 export const EN_US_ITAU_COPY: ItauCopy = {
+  displayName: 'Itaú',
+  setupGuide: EN_US_ITAU_SETUP_GUIDE_COPY,
   unreachable: 'We could not reach Itaú just now. Your credentials were saved — test the connection again shortly.',
   credentialsMissing: 'Fill in the Client ID, the Client Secret and the Pix key.',
   certificateMissing: 'In production, Itaú requires the certificate and private key generated in its developer portal.',
   certificateInvalid: 'We could not read the certificate or the private key. Paste the whole .pem file, from BEGIN to END.',
   certificateMismatch: 'The private key does not belong to this certificate. Check that both were generated together.',
+  certificateExpired: 'The certificate has expired. Generate a new one in the Itaú developer portal and paste it here.',
+  certificateNotYetValid: 'The certificate is not valid yet. Check the server clock, or wait for its validity to begin.',
+  certificateRefused: 'Itaú refused the certificate. Check that it is the production one, issued for this Client ID, and not revoked.',
   refused: 'Credentials refused by Itaú.',
   fields: {
     clientId: 'Client ID',
