@@ -6,6 +6,12 @@ import { Icon } from './Icon';
 import { ICON_PATHS } from './paths.generated';
 
 describe('Icon (web)', () => {
+  it.each(['Home', 'FitnessCenter', 'History'] as const)('renders the shared %s tab glyph', (name) => {
+    render(<Icon name={name} label={name} />);
+    const paths = screen.getByTestId(`icon-${name}`).querySelectorAll('path');
+    expect(Array.from(paths, (element) => element.getAttribute('d'))).toEqual(ICON_PATHS[name]);
+  });
+
   it('draws the generated path through SvgIcon at the md size', () => {
     render(<Icon name="Close" />);
     const svg = screen.getByTestId('icon-Close');

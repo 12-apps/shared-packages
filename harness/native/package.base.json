@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "main": "index.ts",
-  "description": "Consumer harness for the React Native half of @12-apps/ui: an Expo app, outside the workspace, bundled by real Metro against the PUBLISHED tarball. scripts/harness-install.mjs turns this into package.json by adding the @12-apps dependency as a file: tarball — which is why the name is absent here rather than pinned to a version nobody would remember to bump.",
-  "$comment:what-this-proves": "The web harness renders the MUI build through Vite; this one resolves the SAME import paths through Metro's `react-native` export condition. `expo export --platform android` bundles for a native platform without an emulator, and scripts/check-bundle.mjs reads that bundle for what must and must not be in it (the native renderer's own strings, no @mui, no react-dom). `expo export --platform web` renders the native build through react-native-web in a browser, where Playwright asserts test ids, the resolved numbers and screenshots — the only way a container without a device can look at the result.",
+  "description": "Consumer harness for the React Native half of @12-apps/ui: an Expo app, outside the workspace, bundled by real Metro against the PUBLISHED tarball. scripts/harness-install.mjs turns this into package.json by adding the @12-apps dependency as a file: tarball \u2014 which is why the name is absent here rather than pinned to a version nobody would remember to bump.",
+  "$comment:what-this-proves": "The web harness renders the MUI build through Vite; this one resolves the SAME import paths through Metro's `react-native` export condition. `expo export --platform android` bundles for a native platform without an emulator, and scripts/check-bundle.mjs reads that bundle for what must and must not be in it (the native renderer's own strings, no @mui, no react-dom). `expo export --platform web` renders the native build through react-native-web in a browser, where Playwright asserts test ids, the resolved numbers and screenshots \u2014 the only way a container without a device can look at the result.",
   "harnessPackages": [
     "@12-apps/ui"
   ],
@@ -24,7 +24,8 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-svg": "15.15.5",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "react-native-safe-area-context": "5.7.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

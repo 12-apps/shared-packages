@@ -57,7 +57,10 @@ const config: StorybookConfig = {
       resolve: {
         // Same reason as vitest.native.config.ts: keep react-native-svg on its
         // ESM entry so the `.web.js` extension order below reaches its web renderer.
-        alias: [{ find: /^react-native-svg$/, replacement: 'react-native-svg/lib/module/index.js' }],
+        alias: [
+          { find: /^react-native-svg$/, replacement: 'react-native-svg/lib/module/index.js' },
+          { find: /^react-native-safe-area-context$/, replacement: 'react-native-safe-area-context/lib/module/index.js' },
+        ],
         // The whole trick: `./Button` finds `Button.native.tsx` before `Button.tsx`.
         extensions: ['.native.tsx', '.native.ts', '.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.mjs', '.js', '.jsx', '.json'],
       },

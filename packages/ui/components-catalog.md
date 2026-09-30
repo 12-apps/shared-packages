@@ -501,6 +501,12 @@ Components for user input and form interactions.
 
 ## Layout Components
 
+### Screen
+**Purpose**: Bounded page viewport with safe-area edges, scrolling and keyboard lift
+**Native**: yes
+**Location**: `src/components/layout/Screen`
+**Docs**: `src/components/layout/Screen/Screen.md`
+
 Components for structuring and organizing page layouts.
 
 ### Box

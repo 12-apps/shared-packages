@@ -7,6 +7,12 @@ import { ICON_NAMES, ICON_PATHS } from './paths.generated';
 import { UiProvider } from '../provider/UiProvider.native';
 
 describe('Icon (native)', () => {
+  it.each(['Home', 'FitnessCenter', 'History'] as const)('renders the shared %s tab glyph', (name) => {
+    render(<Icon name={name} label={name} />);
+    const paths = screen.getByTestId(`icon-${name}`).querySelectorAll('path');
+    expect(Array.from(paths, (element) => element.getAttribute('d'))).toEqual(ICON_PATHS[name]);
+  });
+
   it('draws the generated path for the glyph, at the md size', () => {
     render(<Icon name="Close" />);
     const svg = screen.getByTestId('icon-Close');
