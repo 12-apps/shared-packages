@@ -45,7 +45,40 @@ export type ItauSetupProblem =
   | 'CERTIFICATE_EXPIRED'
   | 'CERTIFICATE_NOT_YET_VALID';
 
-const PEM_BLOCK = /-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/g;
+/** Far above any certificate chain; bounds the work a hostile paste can buy. */
+const PEM_MAX_LENGTH = 64 * 1024;
+const PEM_MAX_BLOCKS = 10;
+const PEM_BEGIN = '-----BEGIN ';
+const PEM_DASHES = '-----';
+const PEM_LABEL = /^[A-Z0-9 ]{1,40}$/;
+
+interface PemBlock {
+  label: string;
+  body: string;
+  /** Index just past this block's END line. */
+  next: number;
+}
+
+/**
+ * The next complete `BEGIN … END` block at or after `from`, found by
+ * `indexOf` rather than one regex over the whole paste: a lazy
+ * `BEGIN (…)-----([\s\S]*?)-----END \1` backtracks polynomially on a
+ * crafted string, and this text is whatever an owner (or an attacker with
+ * their session) pastes. Linear in the input.
+ */
+function nextPemBlock(text: string, from: number): PemBlock | null {
+  for (let cursor = from; ; ) {
+    const begin = text.indexOf(PEM_BEGIN, cursor);
+    if (begin < 0) return null;
+    const labelEnd = text.indexOf(PEM_DASHES, begin + PEM_BEGIN.length);
+    if (labelEnd < 0) return null;
+    const label = text.slice(begin + PEM_BEGIN.length, labelEnd);
+    const endLine = `-----END ${label}-----`;
+    const end = PEM_LABEL.test(label) ? text.indexOf(endLine, labelEnd) : -1;
+    if (end >= 0) return { label, body: text.slice(labelEnd + PEM_DASHES.length, end), next: end + endLine.length };
+    cursor = labelEnd + PEM_DASHES.length;
+  }
+}
 
 /**
  * A PEM as OpenSSL reads it, whatever a paste did to it. A single-line input,
@@ -56,10 +89,12 @@ const PEM_BLOCK = /-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END \1-----/g;
  * at all is returned trimmed, for `identityProblem` to call unreadable.
  */
 export function normalizePem(text: string): string {
-  const blocks = [...text.matchAll(PEM_BLOCK)].map(([, label, body = '']) => {
-    const lines = body.replace(/\s+/g, '').match(/.{1,64}/g) ?? [];
-    return [`-----BEGIN ${label}-----`, ...lines, `-----END ${label}-----`].join('\n');
-  });
+  if (text.length > PEM_MAX_LENGTH) return text.trim();
+  const blocks: string[] = [];
+  for (let block = nextPemBlock(text, 0); block && blocks.length < PEM_MAX_BLOCKS; block = nextPemBlock(text, block.next)) {
+    const lines = block.body.replace(/\s+/g, '').match(/.{1,64}/g) ?? [];
+    blocks.push([`-----BEGIN ${block.label}-----`, ...lines, `-----END ${block.label}-----`].join('\n'));
+  }
   return blocks.length > 0 ? `${blocks.join('\n')}\n` : text.trim();
 }
 
@@ -133,13 +168,30 @@ interface AccessToken {
  * operation's own calls (a refund's read-then-write) — never cached across
  * operations, which would make this stateless adapter hold merchant state.
  */
-export async function itauSession(credentials: ResolvedCredentials): Promise<ItauCall> {
+/**
+ * How a failed token mint is reported.
+ *
+ *   'typed' — as an {@link ItauTokenError}. For raising a charge (the walk
+ *             reads it as not charged and fails over) and for the credential
+ *             probe (which reads its detail).
+ *   'raw'   — as the failure itself. For everything that asks about money
+ *             already in flight — reading a charge, the walk's reference
+ *             probe, a refund, a webhook. A retriable 5xx must stay
+ *             retriable there, and the probe in particular must never answer
+ *             a mint outage with an error the walk could mistake for "nothing
+ *             was charged".
+ */
+type MintFailureMode = 'typed' | 'raw';
+
+export async function itauSession(credentials: ResolvedCredentials, mode: MintFailureMode = 'raw'): Promise<ItauCall> {
   const setup = itauSetupProblem(credentials);
   if (setup) throw new ItauSetupError(setup);
   const identity = identityOf(credentials);
   const transport: ProviderTransport | undefined = identity ? mtlsTransport(identity) : undefined;
   const hosts = itauHosts(credentials.environment);
-  const token = await mintToken(credentials, hosts.token, transport);
+  const token = await mintToken(credentials, hosts.token, transport).catch((error: unknown) => {
+    throw mode === 'raw' && error instanceof ItauTokenError ? rawMintFailure(error) : error;
+  });
   const headers: Record<string, string> = { authorization: `Bearer ${token}` };
   return <T>(label: string, path: string, init: Omit<ProviderHttpInit, 'headers'> & { json?: unknown }) =>
     providerFetch<T>(
@@ -151,6 +203,10 @@ export async function itauSession(credentials: ResolvedCredentials): Promise<Ita
         : { method: init.method, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(init.json) },
       transport,
     );
+}
+
+function rawMintFailure(error: ItauTokenError): unknown {
+  return error.detail.cause ?? new ProviderRequestError(NAME, error.message, { retriable: true });
 }
 
 async function mintToken(credentials: ResolvedCredentials, url: string, transport: ProviderTransport | undefined): Promise<string> {

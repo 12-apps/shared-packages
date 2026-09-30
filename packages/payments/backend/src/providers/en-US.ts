@@ -121,7 +121,7 @@ export const EN_US_ITAU_COPY: ItauCopy = {
   certificateMismatch: 'The private key does not belong to this certificate. Check that both were generated together.',
   certificateExpired: 'The certificate has expired. Generate a new one in the Itaú developer portal and paste it here.',
   certificateNotYetValid: 'The certificate is not valid yet. Check the server clock, or wait for its validity to begin.',
-  certificateRefused: 'Itaú refused the certificate. Check that it is the production one, issued for this Client ID, and not revoked.',
+  certificateRefused: 'Itaú closed the connection on the certificate. Check that it is the production one, issued for this Client ID and not revoked — or test again shortly.',
   refused: 'Credentials refused by Itaú.',
   fields: {
     clientId: 'Client ID',

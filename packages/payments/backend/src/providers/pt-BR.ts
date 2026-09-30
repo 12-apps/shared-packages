@@ -112,7 +112,7 @@ export const PT_BR_ITAU_COPY: ItauCopy = {
   certificateMismatch: 'A chave privada não pertence a este certificado. Confira se os dois foram gerados juntos.',
   certificateExpired: 'O certificado venceu. Gere um novo no portal do desenvolvedor do Itaú e cole aqui.',
   certificateNotYetValid: 'O certificado ainda não está válido. Confira a data e a hora do servidor ou aguarde o início da validade.',
-  certificateRefused: 'O Itaú recusou o certificado. Confira se ele é o de produção, gerado para este Client ID, e se não foi revogado.',
+  certificateRefused: 'O Itaú encerrou a conexão ao receber o certificado. Confira se ele é o de produção, gerado para este Client ID e não revogado — ou teste de novo em instantes.',
   refused: 'Credenciais recusadas pelo Itaú.',
   fields: {
     clientId: 'Client ID',

@@ -69,7 +69,7 @@ const DEFAULT_EXPIRY_SECONDS = 900;
 const PAYER_LINE_MAX = 140;
 
 async function createChargeLive(input: ChargeInput, credentials: ResolvedCredentials, copy: ItauCopy): Promise<ChargeSnapshot> {
-  const call = await itauSession(credentials);
+  const call = await itauSession(credentials, 'typed');
   const description = chargeDescription(input, PAYER_LINE_MAX);
   const devedor = devedorOf(input);
   const txid = itauTxId(input.reference);
@@ -173,8 +173,9 @@ function codeOf(error: unknown): string | undefined {
 /**
  * A handshake that died after we presented a client certificate: Itaú refuses
  * an untrusted, revoked or wrong-environment certificate by resetting the
- * connection, so Node never sees a status. Read as REFUSED with the
- * certificate named — "unreachable" there sends the owner to retry forever.
+ * connection, so Node never sees a status — and so does a flaky network. The
+ * probe names the certificate (a bare "unreachable" sends the owner to retry
+ * forever) without persisting a refusal the next attempt might contradict.
  * Server-certificate codes (`CERT_HAS_EXPIRED`, …) are about Itaú's side and
  * stay transport failures.
  */
@@ -186,7 +187,10 @@ function certificateRefused(error: ItauTokenError): boolean {
 
 function tokenOutcome(error: ItauTokenError, copy: ItauCopy): ProbeOutcome | null {
   const status = error.detail.httpStatus;
-  if (certificateRefused(error)) return { ok: false, fault: 'REFUSED', message: copy.certificateRefused };
+  // UNREACHABLE, not REFUSED: a verdict of REFUSED is persisted as FAILED, and
+  // one transient reset must not stamp a good certificate refused. The
+  // sentence names both causes, the certificate first.
+  if (certificateRefused(error)) return { ok: false, fault: 'UNREACHABLE', message: copy.certificateRefused };
   if (status === undefined) return unreachableOutcome(error.detail.cause, copy.unreachable);
   if (status >= 500 || TRANSIENT_STATUSES.has(status) || status < 400) {
     return { ok: false, fault: 'UNREACHABLE', message: copy.unreachable };
@@ -207,7 +211,7 @@ async function verifyItauCredentials(credentials: ResolvedCredentials, copy: Ita
   const problem = itauSetupProblem(credentials);
   if (problem) return { ok: false, fault: 'REFUSED', message: setupMessage(problem, copy) };
   try {
-    await itauSession(credentials);
+    await itauSession(credentials, 'typed');
     return { ok: true };
   } catch (error) {
     const outcome = error instanceof ItauTokenError ? tokenOutcome(error, copy) : null;

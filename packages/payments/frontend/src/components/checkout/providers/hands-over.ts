@@ -52,6 +52,11 @@ export function handsBuyerOver(config: CheckoutProviderConfig | null): boolean {
  * order comes back with a link. Without this rule a PIX-only on-page provider
  * ahead of a hosted card provider (Itau, then InfinitePay) was routed whole to
  * the hand-off screen, which never paints the QR and never offers the card.
+ *
+ * `NONE` is read as "no browser step" here. An adapter that declares `NONE`
+ * for a HOSTED checkout that also takes PIX (legal, though none ships) must
+ * declare `checkoutScreen: 'hosted-link'`, which `methodChosenAtProvider`
+ * honours before this rule is ever consulted.
  */
 function takesPixOnThisPage(link: CheckoutChainLink): boolean {
   return link.methods.includes("PIX") && link.tokenization !== "REDIRECT";

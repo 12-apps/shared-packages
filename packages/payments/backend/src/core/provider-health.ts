@@ -1,4 +1,4 @@
-import { ProviderRequestError } from './errors';
+import { CredentialsError, ProviderRequestError } from './errors';
 import { isTransportError } from './failover';
 import type { ProviderName } from './types';
 
@@ -72,6 +72,12 @@ export interface ProviderHealth {
  */
 export function isOutageSignal(error: unknown): boolean {
   if (isTransportError(error)) return true;
+  // A connection that could not be USED because its provider was down (a
+  // token service answering 5xx or resetting) is an outage wearing a
+  // credentials error: judged by the failure that caused it. A plain
+  // CredentialsError carries no cause, so a store that is simply not
+  // connected never trips the breaker.
+  if (error instanceof CredentialsError && error.cause !== undefined) return isOutageSignal(error.cause);
   if (error instanceof ProviderRequestError) {
     const status = error.options.httpStatus;
     return typeof status === 'number' && status >= 500;

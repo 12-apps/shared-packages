@@ -81,6 +81,12 @@ describe('itau webhook verify', () => {
     await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery(withStatic), SANDBOX_CREDS)).resolves.toBe(true);
   });
 
+  it('refuses a body holding a null entry, rather than throwing', async () => {
+    const calls = stubItauFetch(() => ({ body: paidCob('12.50') }));
+    await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery({ pix: [null] }), SANDBOX_CREDS)).resolves.toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
   it('fails closed when Itau cannot be asked', async () => {
     vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
     await expect(itauProvider(PT_BR_ITAU_COPY).webhook.verify(delivery(GENUINE), SANDBOX_CREDS)).resolves.toBe(false);

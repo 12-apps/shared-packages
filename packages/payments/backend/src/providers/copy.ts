@@ -280,7 +280,7 @@ export interface ItauCopy extends ProbeUnreachableCopy {
   certificateExpired: string;
   /** The certificate's validity window has not opened yet (a clock or a freshly issued certificate). */
   certificateNotYetValid: string;
-  /** Itaú reset the handshake on our certificate: untrusted, revoked, or from the other environment. */
+  /** Itaú reset the handshake on our certificate: untrusted, revoked, from the other environment — or a network blip. */
   certificateRefused: string;
   /** Itaú answered 4xx to the token mint: the client id/secret or certificate is refused. */
   refused: string;

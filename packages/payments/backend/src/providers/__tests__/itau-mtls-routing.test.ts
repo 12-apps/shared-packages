@@ -84,7 +84,7 @@ describe('itau production transport', () => {
     expect(sent[0]?.identity.cert).toBe(normalizePem(merchant.cert));
   });
 
-  it('names the certificate when Itau resets the handshake on it, instead of "unreachable"', async () => {
+  it('names the certificate when Itau resets the handshake on it, without persisting a refusal', async () => {
     const merchant = selfSignedIdentity('merchant-a');
     vi.mocked(mtlsTransport).mockImplementation(() => async () => {
       throw Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
@@ -93,7 +93,8 @@ describe('itau production transport', () => {
       { environment: 'PRODUCTION', fields: { ...PROD_FIELDS, certificate: merchant.cert, privateKey: merchant.key } },
       'en-US',
     );
-    expect(outcome).toEqual({ ok: false, fault: 'REFUSED', message: EN_US_ITAU_COPY.certificateRefused });
+    // UNREACHABLE (not persisted as FAILED): one network blip looks the same.
+    expect(outcome).toEqual({ ok: false, fault: 'UNREACHABLE', message: EN_US_ITAU_COPY.certificateRefused });
   });
 
   it('reads a refused connection as unreachable, not as a certificate problem', async () => {

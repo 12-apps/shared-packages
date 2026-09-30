@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createSettingsService, credentialStoreFrom } from '../config/service';
+import { CredentialsError, ProviderRequestError } from '../core/errors';
 import { createPaymentsGateway } from '../core/gateway';
+import { isOutageSignal } from '../core/provider-health';
 import { defineProviders } from '../core/registry';
 import type { ResolvedCredentials } from '../core/types';
 import {
@@ -13,6 +15,7 @@ import {
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { itauProvider } from '../providers/itau';
+import { ItauTokenError } from '../providers/itau-http';
 import { STUB_CHARGE_FAULT_FIELD } from '../providers/stub-fault';
 import { PT_BR_INFINITEPAY_COPY, PT_BR_ITAU_COPY } from '../providers/pt-BR';
 import { pixInput, STUB_CREDS, TENANT } from './fixtures';
@@ -101,3 +104,40 @@ describe('itau at the head of the chain', () => {
     expect(ledgerFor(scriptedAttempts, 'order-ambiguous-1')[0]?.[0]).toBe('itau');
   });
 });
+
+describe('a token-service outage', () => {
+  it('fails a charge over to the next provider — the mint is its own endpoint, nothing was charged', async () => {
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
+    try {
+      const credentials = createMemoryCredentialStore();
+      const outageGateway = createPaymentsGateway({
+        providers: defineProviders({
+          itau: itauProvider(PT_BR_ITAU_COPY),
+          infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+        } as const),
+        credentials,
+        charges: createMemoryChargeStore(),
+        webhooks: createMemoryWebhookInbox(),
+        attempts: createMemoryAttemptLedger(),
+      });
+      // A LIVE sandbox connection (no stub flag): the token mint really runs, and answers 503.
+      credentials.set(TENANT, 'itau', { environment: 'SANDBOX', fields: { clientId: 'c', clientSecret: 's', pixKey: 'loja@example.com' } });
+      credentials.set(TENANT, 'infinitepay', STUB_CREDS);
+      const stored = await outageGateway.charge(TENANT, pixInput('order-outage-1'));
+      expect(stored.snapshot.provider).toBe('infinitepay');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('counts toward the circuit breaker when its cause was a 5xx', () => {
+    const outage = new ItauTokenError('mint failed', {
+      mtls: false,
+      httpStatus: 503,
+      cause: new ProviderRequestError('itau', 'oauth/token 503', { httpStatus: 503 }),
+    });
+    expect(isOutageSignal(outage)).toBe(true);
+    expect(isOutageSignal(new CredentialsError('itau', 'not connected'))).toBe(false);
+  });
+});
+

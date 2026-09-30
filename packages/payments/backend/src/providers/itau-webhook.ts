@@ -53,6 +53,8 @@ function entriesOf(rawBody: string): ConfirmableEntry[] | null {
     return null;
   }
   if (!Array.isArray(body.pix) || body.pix.length > MAX_ENTRIES) return null;
+  // A forged body may hold anything; a null entry must be a refusal, not a 500.
+  if (!body.pix.every((entry) => entry !== null && typeof entry === 'object')) return null;
   const raised = body.pix.filter((entry) => entry.txid !== undefined);
   const wellFormed = raised.every(
     (entry) => TXID_SHAPE.test(String(entry.txid)) && E2E_SHAPE.test(String(entry.endToEndId ?? '')),

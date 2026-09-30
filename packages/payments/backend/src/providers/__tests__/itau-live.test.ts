@@ -187,3 +187,22 @@ describe('itau verifyCredentials', () => {
     });
   });
 });
+
+describe('a token-service outage, outside the charge path', () => {
+  it('reaches a refund as the retriable 5xx it is, not as "not connected"', async () => {
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
+    const failure = await itauProvider(PT_BR_ITAU_COPY)
+      .refund?.({ providerChargeId: TXID }, SANDBOX_CREDS)
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ProviderRequestError);
+    expect((failure as ProviderRequestError).options.httpStatus).toBe(503);
+  });
+
+  it('never lets the reference probe answer an outage with "nothing found"', async () => {
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
+    await expect(itauProvider(PT_BR_ITAU_COPY).findChargeByReference?.('order-1', SANDBOX_CREDS)).rejects.toBeInstanceOf(
+      ProviderRequestError,
+    );
+  });
+});
+
