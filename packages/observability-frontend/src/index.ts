@@ -30,13 +30,35 @@
  * if reporting turns out to be off. The only window left uncovered is "the
  * browser could not fetch the entry bundle at all", which no in-page reporter
  * catches anyway.
+ *
+ * ## The SDK itself arrives once the page has finished downloading
+ *
+ * Only the handlers and the buffer are eager. The SDK is fetched with a dynamic
+ * `import()` of `./sdk` once the network has gone quiet after `load` (see
+ * `quiet.ts` for why `load` alone is too early), and only when a DSN is served.
+ * Its bytes (about 28 KB brotli on the storefront) then stop sharing a slow link
+ * with the entry chunk, the route and the first screen's data. `./sdk` names
+ * what is called, which is what keeps the lazy chunk shaken (see there). That
+ * was never what FUT-717 asked of the boot path: what must precede the first
+ * render is the LISTENING, which is this module's own few lines.
+ *
+ * Until the SDK is up everything queues into the same bounded buffer: a global
+ * error, a route crash, a warning. The context a shell sets is merged and
+ * applied at init. A report that would really be sent does not wait for quiet:
+ * it fetches the SDK at once (`pending.ts`). What is lost against an eager SDK
+ * is the SDK's own breadcrumbs from before it arrives.
  */
-import * as Sentry from "@sentry/react";
+import type * as SentryApi from "@sentry/react";
 import { useEffect } from "react";
 
+import { beforeSend } from "./before-send";
+
 import { DEFAULT_CONFIG_ENDPOINT, loadObservabilityConfig, type ObservabilityApp } from "./config";
-import { shouldReport, SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
-import { scrub, scrubUrl } from "./scrub";
+import { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
+import { isUrgent, type Pending } from "./pending";
+import { whenNetworkQuiet } from "./quiet";
+import { scrub } from "./scrub";
+import type { Sdk } from "./sdk";
 
 export type { ObservabilityApp } from "./config";
 export { DEFAULT_CONFIG_ENDPOINT } from "./config";
@@ -46,14 +68,9 @@ export {
   type ErrorClassifiers,
 } from "./noise";
 export { scrub, scrubUrl } from "./scrub";
+export { setQuietWindowForTests } from "./quiet";
 export { setSpanTextScrubber, resetSpanTextScrubberForTests, type SpanTextScrubber } from "./span-rule";
 export { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "./noise";
-
-/** One buffered pre-init failure. */
-interface Pending {
-  error: unknown;
-  source?: string;
-}
 
 /**
  * Cap on the pre-init buffer.
@@ -64,12 +81,38 @@ interface Pending {
  */
 const MAX_BUFFERED = 20;
 
+/**
+ * `idle` before `startObservability`, `waiting` while the config and the SDK
+ * are in flight, then `on` or `off` for good.
+ */
+let phase: "idle" | "waiting" | "on" | "off" = "idle";
+let sdk: Sdk | null = null;
 let pending: Pending[] = [];
-let started = false;
+let context: ObservabilityContext = {};
 let listening = false;
 
+/** Resolves the wait for quiet early; set while the SDK is not yet fetched. */
+let hurry: (() => void) | null = null;
+
+function hold(item: Pending): void {
+  if (pending.length >= MAX_BUFFERED) return;
+  pending.push(item);
+  if (isUrgent(item)) hurry?.();
+}
+
+/** Quiet, or the first urgent report, whichever comes first. */
+function whenSdkWanted(): Promise<void> {
+  if (pending.some(isUrgent)) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    hurry = () => resolve();
+    void whenNetworkQuiet().then(resolve);
+  }).finally(() => {
+    hurry = null;
+  });
+}
+
 function buffer(error: unknown): void {
-  if (pending.length < MAX_BUFFERED) pending.push({ error });
+  hold({ kind: "error", error });
 }
 
 function onWindowError(event: ErrorEvent): void {
@@ -94,45 +137,6 @@ function stopListening(): void {
   listening = false;
 }
 
-/** Best-effort text for the noise filter to match against. */
-function describe(event: Sentry.ErrorEvent, error: unknown): string {
-  const values = event.exception?.values ?? [];
-  const frames = values
-    .flatMap((value) => value.stacktrace?.frames ?? [])
-    .map((frame) => frame.filename ?? "")
-    .join(" ");
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return [event.message ?? "", values.map((v) => v.value ?? "").join(" "), message, frames]
-    .join(" ")
-    .trim();
-}
-
-/**
- * The single choke point every event passes through, whoever produced it.
- *
- * Filtering at the call sites instead would miss the SDK's own global-handler
- * and breadcrumb instrumentation, which is where most events come from.
- */
-function beforeSend(
-  event: Sentry.ErrorEvent,
-  hint: Sentry.EventHint,
-): Sentry.ErrorEvent | null {
-  const error = hint.originalException;
-  const source = event.tags?.[SOURCE_TAG];
-  if (!shouldReport(error, { text: describe(event, error), source: String(source ?? "") }).report) {
-    return null;
-  }
-
-  // The request URL is evidence in its own right: a storefront path names the
-  // store, and a query string is where tokens and e-mails end up.
-  if (event.request?.url) event.request.url = scrubUrl(event.request.url);
-  for (const crumb of event.breadcrumbs ?? []) {
-    if (typeof crumb.data?.url === "string") crumb.data.url = scrubUrl(crumb.data.url);
-  }
-
-  return scrub(event) as Sentry.ErrorEvent;
-}
-
 /**
  * Install reporting for this app.
  *
@@ -144,8 +148,8 @@ export async function startObservability(
   app: ObservabilityApp,
   { endpoint = DEFAULT_CONFIG_ENDPOINT }: { endpoint?: string } = {},
 ): Promise<void> {
-  if (started) return;
-  started = true;
+  if (phase !== "idle") return;
+  phase = "waiting";
 
   // Synchronous, so an error thrown while the config is still in flight is
   // still caught. Everything after this point is allowed to be late.
@@ -155,18 +159,20 @@ export async function startObservability(
 
   // No DSN is the normal state in dev, CI and any deployment that has not
   // opted in. Drop the buffer and stop listening: holding a growing array of
-  // errors nobody will ever send is the only way this could hurt.
-  if (!config || config.dsn === "") {
-    pending = [];
-    stopListening();
-    return;
-  }
+  // errors nobody will ever send is the only way this could hurt. The SDK is
+  // never fetched.
+  if (!config || config.dsn === "") return switchOff();
+
+  // A chunk that fails to load (a deploy replaced it) costs reporting for this
+  // tab and nothing else.
+  const loaded = await whenSdkWanted().then(loadSdk);
+  if (loaded === null) return switchOff();
 
   // Ordered so nothing can slip between: the SDK installs its OWN global
   // handlers, so ours come off first to avoid reporting each error twice.
   stopListening();
 
-  Sentry.init({
+  loaded.init({
     dsn: config.dsn,
     environment: config.environment,
     // Must equal the release the source maps were uploaded under (FUT-723) or
@@ -185,14 +191,39 @@ export async function startObservability(
     // explicit decision that needs masking configured first.
     beforeSend,
   });
+  sdk = loaded;
+  phase = "on";
 
+  applyContext(loaded, context);
   const drained = pending;
   pending = [];
-  for (const item of drained) {
-    Sentry.captureException(item.error);
-  }
+  for (const item of drained) send(loaded, item);
 
-  if (config.tracesSampleRate > 0) afterLoad(loadWebVitals);
+  if (config.tracesSampleRate > 0) loadWebVitals();
+}
+
+function switchOff(): void {
+  phase = "off";
+  pending = [];
+  stopListening();
+}
+
+function loadSdk(): Promise<Sdk | null> {
+  return import("./sdk").then(
+    (module) => module.sdk,
+    () => null,
+  );
+}
+
+function send(client: Sdk, item: Pending): void {
+  if (item.kind === "error") client.captureException(item.error);
+  if (item.kind === "crash") sendRouteCrash(client, item.error, item.componentStack);
+  if (item.kind === "warning") sendWarning(client, item.message, item.context);
+}
+
+/** The SDK once it is up and initialised, else null. */
+function liveSdk(): Sdk | null {
+  return sdk?.getClient() ? sdk : null;
 }
 
 /**
@@ -203,22 +234,12 @@ export async function startObservability(
  * `installWebVitals`, with the only integrations that make spans, so the scrub
  * loads after `load` too (see web-vitals.ts).
  */
-function performanceOptions(rate: number): Partial<Sentry.BrowserOptions> {
+function performanceOptions(rate: number): Partial<SentryApi.BrowserOptions> {
   if (rate <= 0) return { tracesSampleRate: 0 };
   return {
     tracesSampleRate: rate,
     traceLifecycle: "stream",
   };
-}
-
-/** Run `task` once the page has loaded, and never before the first paint. */
-function afterLoad(task: () => void): void {
-  if (typeof window === "undefined") return;
-  if (document.readyState === "complete") {
-    task();
-    return;
-  }
-  window.addEventListener("load", task, { once: true });
 }
 
 /** Fetch and install the Web Vitals integrations; a failure costs only the vitals. */
@@ -256,18 +277,25 @@ export interface ObservabilityContext {
   impersonatedStore?: string | null;
 }
 
-export function setObservabilityContext(context: ObservabilityContext): void {
-  if (!Sentry.getClient()) return;
+export function setObservabilityContext(next: ObservabilityContext): void {
   // Only keys the caller actually passed are written. `undefined` means "I
   // don't know about this one", which must not erase what another component
-  // already set; `null` is the explicit "none".
-  if (context.tenant !== undefined) Sentry.setTag("tenant", context.tenant ?? "none");
-  if (context.role !== undefined) Sentry.setTag("role", context.role ?? "anonymous");
-  if (context.impersonating !== undefined) {
-    Sentry.setTag("impersonating", String(context.impersonating));
+  // already set; `null` is the explicit "none". Kept while the SDK is on its
+  // way, so a shell that knows the tenant before `load` still tags the report.
+  const known = Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined));
+  context = { ...context, ...known };
+  const live = liveSdk();
+  if (live) applyContext(live, known);
+}
+
+function applyContext(client: Sdk, values: ObservabilityContext): void {
+  if (values.tenant !== undefined) client.setTag("tenant", values.tenant ?? "none");
+  if (values.role !== undefined) client.setTag("role", values.role ?? "anonymous");
+  if (values.impersonating !== undefined) {
+    client.setTag("impersonating", String(values.impersonating));
   }
-  if (context.impersonatedStore !== undefined) {
-    Sentry.setTag("impersonated_store", context.impersonatedStore ?? "none");
+  if (values.impersonatedStore !== undefined) {
+    client.setTag("impersonated_store", values.impersonatedStore ?? "none");
   }
 }
 
@@ -293,13 +321,18 @@ export function useObservabilityContext(context: ObservabilityContext): void {
  * recovery. See `noise.ts`.
  */
 export function reportRouteCrash(error: unknown, componentStack?: string | null): void {
-  if (!Sentry.getClient()) return;
-  Sentry.withScope((scope) => {
+  const live = liveSdk();
+  if (live) sendRouteCrash(live, error, componentStack);
+  else if (phase === "waiting") hold({ kind: "crash", error, componentStack });
+}
+
+function sendRouteCrash(client: Sdk, error: unknown, componentStack?: string | null): void {
+  client.withScope((scope) => {
     scope.setTag(SOURCE_TAG, SOURCE_ROUTE_BOUNDARY);
     // The stack alone does not carry the component trace, and the component
     // trace is usually what names the page.
     if (componentStack) scope.setContext("react", { componentStack });
-    Sentry.captureException(error);
+    client.captureException(error);
   });
 }
 
@@ -317,20 +350,35 @@ export function reportRouteCrash(error: unknown, componentStack?: string | null)
  *
  * A no-op until a DSN is configured, like everything else here.
  */
-export function reportWarning(message: string, context?: Record<string, unknown>): void {
-  if (!Sentry.getClient()) return;
-  Sentry.withScope((scope) => {
+export function reportWarning(message: string, detail?: Record<string, unknown>): void {
+  const live = liveSdk();
+  if (live) sendWarning(live, message, detail);
+  else if (phase === "waiting") hold({ kind: "warning", message, context: detail });
+}
+
+function sendWarning(client: Sdk, message: string, detail?: Record<string, unknown>): void {
+  client.withScope((scope) => {
     scope.setLevel("warning");
     // Scrubbed and folded in as data rather than interpolated: the caller's
     // context can carry an id worth keeping next to a field that is not.
-    if (context) scope.setContext("detail", scrub(context) as Record<string, unknown>);
-    Sentry.captureMessage(message);
+    if (detail) scope.setContext("detail", scrub(detail) as Record<string, unknown>);
+    client.captureMessage(message);
   });
 }
 
 /** Test seam: forget that `startObservability` ran. */
 export function resetObservabilityForTests(): void {
   stopListening();
+  phase = "idle";
+  sdk = null;
   pending = [];
-  started = false;
+  context = {};
+}
+
+/**
+ * Test seam: report through `module` as if `startObservability` had loaded it,
+ * for a suite that drives a mocked client directly.
+ */
+export function adoptSdkForTests(module: unknown): void {
+  sdk = module as Sdk;
 }

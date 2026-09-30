@@ -9,12 +9,15 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const scope = vi.hoisted(() => ({ setTag: vi.fn(), setContext: vi.fn(), setLevel: vi.fn() }));
+
 const sentry = vi.hoisted(() => ({
   init: vi.fn(),
   captureException: vi.fn(),
   getClient: vi.fn(() => undefined as unknown),
   setTag: vi.fn(),
-  withScope: vi.fn(),
+  captureMessage: vi.fn(),
+  withScope: vi.fn((callback: (current: unknown) => void) => callback(scope)),
   withStreamedSpan: vi.fn((callback: unknown) => callback),
   addIntegration: vi.fn(),
   spanStreamingIntegration: vi.fn(() => ({ name: "SpanStreaming" })),
@@ -24,7 +27,15 @@ const sentry = vi.hoisted(() => ({
 vi.mock("@sentry/react", () => sentry);
 
 import { loadObservabilityConfig } from "../config";
-import { resetObservabilityForTests, startObservability } from "../index";
+import { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "../noise";
+import {
+  reportRouteCrash,
+  reportWarning,
+  resetObservabilityForTests,
+  setObservabilityContext,
+  setQuietWindowForTests,
+  startObservability,
+} from "../index";
 
 /**
  * Install a fetch stub for THIS test and hand back the URLs it saw.
@@ -60,15 +71,23 @@ const NO_DSN = jsonReply({ dsn: "", environment: "test", release: "" });
 beforeEach(() => {
   serveConfig(NO_DSN);
   resetObservabilityForTests();
+  // No wait for quiet unless a case asks for one: the cases below it are about
+  // what happens once the SDK is fetched, not when.
+  setQuietWindowForTests({ quietMs: 0, capMs: 0 });
   sentry.init.mockClear();
   sentry.captureException.mockClear();
+  sentry.captureMessage.mockClear();
+  sentry.setTag.mockClear();
+  scope.setTag.mockClear();
   sentry.addIntegration.mockReset();
   sentry.getClient.mockReturnValue(undefined);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   resetObservabilityForTests();
+  setQuietWindowForTests(null);
 });
 
 describe("loadObservabilityConfig", () => {
@@ -262,6 +281,199 @@ describe("startObservability", () => {
     );
     await startObservability("storefront");
     await startObservability("storefront");
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Hold the document in `loading` until the returned function fires `load`.
+ *
+ * jsdom's document is already complete, which is what every case above runs
+ * in; these need the window before it.
+ */
+function holdPageLoad(): () => void {
+  Object.defineProperty(document, "readyState", { configurable: true, get: () => "loading" });
+  return () => {
+    Reflect.deleteProperty(document, "readyState");
+    window.dispatchEvent(new Event("load"));
+  };
+}
+
+/** The SDK answers `getClient()` once `init` has run, as the real one does. */
+function clientAfterInit(): void {
+  sentry.init.mockImplementationOnce(() => {
+    sentry.getClient.mockReturnValue({ getOptions: () => ({}) });
+  });
+}
+
+const WITH_DSN = jsonReply({ dsn: "https://k@o1.ingest.sentry.io/7", environment: "prd", release: "" });
+
+describe("the SDK arrives after load", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(document, "readyState");
+  });
+
+  it("does not initialise the SDK before the page has loaded", async () => {
+    // The point of the lazy SDK: its bytes must not share the link with the
+    // entry chunk and the first screen's data. The config may arrive first.
+    serveConfig(WITH_DSN);
+    const fireLoad = holdPageLoad();
+    const listeners = vi.spyOn(window, "addEventListener");
+    const booting = startObservability("storefront");
+    // The config has been read and the SDK is now waiting on `load`.
+    await vi.waitFor(() =>
+      expect(listeners).toHaveBeenCalledWith("load", expect.any(Function), { once: true }),
+    );
+    listeners.mockRestore();
+    expect(sentry.init).not.toHaveBeenCalled();
+
+    fireLoad();
+    await booting;
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a route crash and a warning reported before the SDK was up", async () => {
+    serveConfig(WITH_DSN);
+    clientAfterInit();
+    const fireLoad = holdPageLoad();
+    const booting = startObservability("storefront");
+
+    const crash = new Error("page crashed during boot");
+    reportRouteCrash(crash, "at Menu");
+    reportWarning("contact not saved", { orderId: "o1" });
+    expect(sentry.captureException).not.toHaveBeenCalled();
+
+    fireLoad();
+    await booting;
+    expect(sentry.captureException).toHaveBeenCalledWith(crash);
+    // Still marked as the boundary's, which is what the noise filter reads.
+    expect(scope.setTag).toHaveBeenCalledWith(SOURCE_TAG, SOURCE_ROUTE_BOUNDARY);
+    expect(sentry.captureMessage).toHaveBeenCalledWith("contact not saved");
+  });
+
+  it("drops what it queued when reporting turns out to be off", async () => {
+    const booting = startObservability("storefront");
+    reportRouteCrash(new Error("boom"));
+    reportWarning("lost");
+    await booting;
+    expect(sentry.init).not.toHaveBeenCalled();
+    expect(sentry.captureException).not.toHaveBeenCalled();
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it("reports nothing that arrives after reporting was switched off", async () => {
+    await startObservability("storefront");
+    reportRouteCrash(new Error("late"));
+    expect(sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it("tags the report with the context a shell set before the SDK was up", async () => {
+    serveConfig(WITH_DSN);
+    clientAfterInit();
+    const fireLoad = holdPageLoad();
+    const booting = startObservability("storefront");
+
+    setObservabilityContext({ tenant: "aliment-sabor", role: null });
+    // A second component that knows nothing about the tenant must not erase it.
+    setObservabilityContext({ tenant: undefined, impersonating: false });
+
+    fireLoad();
+    await booting;
+    expect(sentry.setTag).toHaveBeenCalledWith("tenant", "aliment-sabor");
+    expect(sentry.setTag).toHaveBeenCalledWith("role", "anonymous");
+    expect(sentry.setTag).toHaveBeenCalledWith("impersonating", "false");
+    expect(sentry.setTag).not.toHaveBeenCalledWith("tenant", "none");
+  });
+});
+
+/**
+ * Stand in for the browser's resource timing: `finish()` reports that a
+ * download completed, to every observer the code under test created.
+ */
+function fakeResourceTiming(): { observers: Array<() => void>; finish: () => void } {
+  const observers: Array<() => void> = [];
+  class FakeObserver {
+    static supportedEntryTypes = ["resource"];
+    constructor(callback: () => void) {
+      observers.push(callback);
+    }
+    observe(): void {}
+    disconnect(): void {}
+  }
+  vi.stubGlobal("PerformanceObserver", FakeObserver);
+  return { observers, finish: () => observers.forEach((callback) => callback()) };
+}
+
+describe("the SDK waits for the page to finish downloading", () => {
+  it("until no resource has finished for the quiet window", async () => {
+    // `load` alone is too early in an SPA: the route and the first screen's
+    // data are fetched after it, and the SDK would share the link with them.
+    setQuietWindowForTests({ quietMs: 3000, capMs: 20_000 });
+    const timing = fakeResourceTiming();
+    serveConfig(WITH_DSN);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const booting = startObservability("storefront");
+    await vi.waitFor(() => expect(timing.observers).toHaveLength(1));
+
+    await vi.advanceTimersByTimeAsync(2000);
+    timing.finish();
+    await vi.advanceTimersByTimeAsync(2500);
+    // 4.5 s after load, but only 2.5 s after the last download.
+    expect(sentry.init).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(600);
+    await booting;
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+  });
+
+  it("but never past the cap, however busy the page stays", async () => {
+    setQuietWindowForTests({ quietMs: 3000, capMs: 20_000 });
+    const timing = fakeResourceTiming();
+    serveConfig(WITH_DSN);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const booting = startObservability("storefront");
+    await vi.waitFor(() => expect(timing.observers).toHaveLength(1));
+
+    for (let second = 1; second <= 19; second += 1) {
+      await vi.advanceTimersByTimeAsync(1000);
+      timing.finish();
+    }
+    expect(sentry.init).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1100);
+    await booting;
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+  });
+
+  it("except for a crash, which fetches it at once", async () => {
+    // The report worth most, from the tab most likely to be closed first.
+    setQuietWindowForTests({ quietMs: 60_000, capMs: 60_000 });
+    serveConfig(WITH_DSN);
+    clientAfterInit();
+    const booting = startObservability("storefront");
+    const crash = new Error("menu crashed");
+    reportRouteCrash(crash);
+
+    await booting;
+    expect(sentry.captureException).toHaveBeenCalledWith(crash);
+  });
+
+  it("while noise does not hurry it, and a warning does", async () => {
+    setQuietWindowForTests({ quietMs: 60_000, capMs: 60_000 });
+    const timing = fakeResourceTiming();
+    serveConfig(WITH_DSN);
+    const booting = startObservability("storefront");
+    await vi.waitFor(() => expect(timing.observers).toHaveLength(1));
+
+    // An extension's error: the filter drops it, so it buys no early SDK.
+    const foreign = new Error("boom");
+    foreign.stack = "Error: boom\n    at chrome-extension://abcdef/content.js:1:1";
+    window.dispatchEvent(new ErrorEvent("error", { error: foreign, message: foreign.message }));
+    await vi.dynamicImportSettled();
+    expect(sentry.init).not.toHaveBeenCalled();
+
+    reportWarning("contact not saved");
+    await booting;
     expect(sentry.init).toHaveBeenCalledTimes(1);
   });
 });
