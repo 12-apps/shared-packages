@@ -30,7 +30,7 @@ vi.mock("@sentry/react", () => sentry);
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { ObservabilitySelfCheck } from "../react/self-check";
-import { reportRouteCrash } from "../index";
+import { adoptSdkForTests, reportRouteCrash, resetObservabilityForTests } from "../index";
 
 /**
  * A minimal stand-in for whatever boundary wraps the page.
@@ -67,10 +67,14 @@ function clientWith(options: Record<string, unknown>): void {
 beforeEach(() => {
   sentry.getClient.mockReturnValue(undefined as unknown);
   sentry.captureException.mockClear();
+  // The page reads the SDK through its own static import; the reporting calls
+  // it triggers go through the one `startObservability` loads after `load`.
+  adoptSdkForTests(sentry);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  resetObservabilityForTests();
 });
 
 describe("ObservabilitySelfCheck", () => {

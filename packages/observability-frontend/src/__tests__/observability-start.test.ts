@@ -9,12 +9,15 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const scope = vi.hoisted(() => ({ setTag: vi.fn(), setContext: vi.fn(), setLevel: vi.fn() }));
+
 const sentry = vi.hoisted(() => ({
   init: vi.fn(),
   captureException: vi.fn(),
   getClient: vi.fn(() => undefined as unknown),
   setTag: vi.fn(),
-  withScope: vi.fn(),
+  captureMessage: vi.fn(),
+  withScope: vi.fn((callback: (current: unknown) => void) => callback(scope)),
   withStreamedSpan: vi.fn((callback: unknown) => callback),
   addIntegration: vi.fn(),
   spanStreamingIntegration: vi.fn(() => ({ name: "SpanStreaming" })),
@@ -24,7 +27,14 @@ const sentry = vi.hoisted(() => ({
 vi.mock("@sentry/react", () => sentry);
 
 import { loadObservabilityConfig } from "../config";
-import { resetObservabilityForTests, startObservability } from "../index";
+import { SOURCE_ROUTE_BOUNDARY, SOURCE_TAG } from "../noise";
+import {
+  reportRouteCrash,
+  reportWarning,
+  resetObservabilityForTests,
+  setObservabilityContext,
+  startObservability,
+} from "../index";
 
 /**
  * Install a fetch stub for THIS test and hand back the URLs it saw.
@@ -62,6 +72,9 @@ beforeEach(() => {
   resetObservabilityForTests();
   sentry.init.mockClear();
   sentry.captureException.mockClear();
+  sentry.captureMessage.mockClear();
+  sentry.setTag.mockClear();
+  scope.setTag.mockClear();
   sentry.addIntegration.mockReset();
   sentry.getClient.mockReturnValue(undefined);
 });
@@ -263,5 +276,106 @@ describe("startObservability", () => {
     await startObservability("storefront");
     await startObservability("storefront");
     expect(sentry.init).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Hold the document in `loading` until the returned function fires `load`.
+ *
+ * jsdom's document is already complete, which is what every case above runs
+ * in; these need the window before it.
+ */
+function holdPageLoad(): () => void {
+  Object.defineProperty(document, "readyState", { configurable: true, get: () => "loading" });
+  return () => {
+    Reflect.deleteProperty(document, "readyState");
+    window.dispatchEvent(new Event("load"));
+  };
+}
+
+/** The SDK answers `getClient()` once `init` has run, as the real one does. */
+function clientAfterInit(): void {
+  sentry.init.mockImplementationOnce(() => {
+    sentry.getClient.mockReturnValue({ getOptions: () => ({}) });
+  });
+}
+
+const WITH_DSN = jsonReply({ dsn: "https://k@o1.ingest.sentry.io/7", environment: "prd", release: "" });
+
+describe("the SDK arrives after load", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(document, "readyState");
+  });
+
+  it("does not initialise the SDK before the page has loaded", async () => {
+    // The point of the lazy SDK: its bytes must not share the link with the
+    // entry chunk and the first screen's data. The config may arrive first.
+    serveConfig(WITH_DSN);
+    const fireLoad = holdPageLoad();
+    const listeners = vi.spyOn(window, "addEventListener");
+    const booting = startObservability("storefront");
+    // The config has been read and the SDK is now waiting on `load`.
+    await vi.waitFor(() =>
+      expect(listeners).toHaveBeenCalledWith("load", expect.any(Function), { once: true }),
+    );
+    listeners.mockRestore();
+    expect(sentry.init).not.toHaveBeenCalled();
+
+    fireLoad();
+    await booting;
+    expect(sentry.init).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a route crash and a warning reported before the SDK was up", async () => {
+    serveConfig(WITH_DSN);
+    clientAfterInit();
+    const fireLoad = holdPageLoad();
+    const booting = startObservability("storefront");
+
+    const crash = new Error("page crashed during boot");
+    reportRouteCrash(crash, "at Menu");
+    reportWarning("contact not saved", { orderId: "o1" });
+    expect(sentry.captureException).not.toHaveBeenCalled();
+
+    fireLoad();
+    await booting;
+    expect(sentry.captureException).toHaveBeenCalledWith(crash);
+    // Still marked as the boundary's, which is what the noise filter reads.
+    expect(scope.setTag).toHaveBeenCalledWith(SOURCE_TAG, SOURCE_ROUTE_BOUNDARY);
+    expect(sentry.captureMessage).toHaveBeenCalledWith("contact not saved");
+  });
+
+  it("drops what it queued when reporting turns out to be off", async () => {
+    const booting = startObservability("storefront");
+    reportRouteCrash(new Error("boom"));
+    reportWarning("lost");
+    await booting;
+    expect(sentry.init).not.toHaveBeenCalled();
+    expect(sentry.captureException).not.toHaveBeenCalled();
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it("reports nothing that arrives after reporting was switched off", async () => {
+    await startObservability("storefront");
+    reportRouteCrash(new Error("late"));
+    expect(sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it("tags the report with the context a shell set before the SDK was up", async () => {
+    serveConfig(WITH_DSN);
+    clientAfterInit();
+    const fireLoad = holdPageLoad();
+    const booting = startObservability("storefront");
+
+    setObservabilityContext({ tenant: "aliment-sabor", role: null });
+    // A second component that knows nothing about the tenant must not erase it.
+    setObservabilityContext({ tenant: undefined, impersonating: false });
+
+    fireLoad();
+    await booting;
+    expect(sentry.setTag).toHaveBeenCalledWith("tenant", "aliment-sabor");
+    expect(sentry.setTag).toHaveBeenCalledWith("role", "anonymous");
+    expect(sentry.setTag).toHaveBeenCalledWith("impersonating", "false");
+    expect(sentry.setTag).not.toHaveBeenCalledWith("tenant", "none");
   });
 });
