@@ -245,35 +245,37 @@ function CircularView({
 
   return (
     <View ref={containerRef} testID={testID} style={[styles.inline, style]}>
-      <Animated.View
-        testID={elementTestID}
-        role="progressbar"
-        {...valueAria(value)}
-        style={[box, glow ? circularGlowStyle(theme, color) : null, pulseStyle]}
-        {...rest}
-      >
-        <Animated.View style={[box, spin]}>
-          <CircularDial
-            diameter={diameter}
-            thickness={thickness}
-            stroke={progressPalette(theme, color).main}
-            dashOffset={
-              indeterminate
-                ? circularCircumference(thickness) * (1 - CIRCULAR_INDETERMINATE.arc)
-                : circularDashOffset(displayValue, thickness)
-            }
-          />
+      <View style={[box, styles.inline]}>
+        <Animated.View
+          testID={elementTestID}
+          role="progressbar"
+          {...valueAria(value)}
+          style={[box, glow ? circularGlowStyle(theme, color) : null, pulseStyle]}
+          {...rest}
+        >
+          <Animated.View style={[box, spin]}>
+            <CircularDial
+              diameter={diameter}
+              thickness={thickness}
+              stroke={progressPalette(theme, color).main}
+              dashOffset={
+                indeterminate
+                  ? circularCircumference(thickness) * (1 - CIRCULAR_INDETERMINATE.arc)
+                  : circularDashOffset(displayValue, thickness)
+              }
+            />
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
-      {centerContent != null ? (
-        <View testID={`${testID}-center`} style={[StyleSheet.absoluteFill, styles.centre]}>
-          {renderTextChildren(centerContent, labelStyle(theme, size, true))}
-        </View>
-      ) : showLabel && !indeterminate ? (
-        <View style={[StyleSheet.absoluteFill, styles.centre]}>
-          <ProgressLabel size={size} label={displayLabel} testID={`${testID}-label`} muted />
-        </View>
-      ) : null}
+        {centerContent != null ? (
+          <View testID={`${testID}-center`} style={[StyleSheet.absoluteFill, styles.centre]}>
+            {renderTextChildren(centerContent, labelStyle(theme, size, true))}
+          </View>
+        ) : showLabel && !indeterminate ? (
+          <View style={[StyleSheet.absoluteFill, styles.centre]}>
+            <ProgressLabel size={size} label={displayLabel} testID={`${testID}-label`} muted />
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

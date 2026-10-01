@@ -2115,10 +2115,14 @@ export const Integration: Story = {
 };
 
 export const CustomCircularCenterTest: Story = {
+  // A stretching parent reproduces the native-web case where the outer View
+  // may be wider than the dial. The slot must follow the ring, not that View.
   render: () => (
-    <Progress variant="circular" value={50} showLabel label="Fallback" aria-label="Task progress"
-      circularSize={PROGRESS_SIZES.xl.circularSize * 3}
-      centerContent={<Stack alignItems="center"><Typography variant="h4">00:40</Typography><Typography>Step 2 of 4</Typography></Stack>} />
+    <Box sx={{ width: '100vw' }}>
+      <Progress variant="circular" value={50} showLabel label="Fallback" aria-label="Task progress"
+        circularSize={PROGRESS_SIZES.xl.circularSize * 3}
+        centerContent={<Stack alignItems="center"><Typography variant="h4">00:40</Typography><Typography>Step 2 of 4</Typography></Stack>} />
+    </Box>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -2126,5 +2130,9 @@ export const CustomCircularCenterTest: Story = {
     await expect(canvas.getByTestId('progress-center')).toHaveTextContent('Step 2 of 4');
     await expect(canvas.getByRole('progressbar', { name: 'Task progress' })).toHaveAttribute('aria-valuenow', '50');
     await expect(canvas.queryAllByText('Fallback')).toHaveLength(0);
+    const dial = canvas.getByTestId('progress-circular').getBoundingClientRect();
+    const center = canvas.getByTestId('progress-center').getBoundingClientRect();
+    await expect(Math.abs(dial.x + dial.width / 2 - center.x - center.width / 2)).toBeLessThan(1);
+    await expect(Math.abs(dial.y + dial.height / 2 - center.y - center.height / 2)).toBeLessThan(1);
   },
 };
