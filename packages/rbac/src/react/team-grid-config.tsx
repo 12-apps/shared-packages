@@ -291,10 +291,7 @@ export function teamColumns(
       header: copy.headers.name,
       accessor: (row) => row.name ?? row.email,
       searchable: true,
-      // A floor, so the name is not the column that gives way: at 390 the table
-      // handed the e-mail its width and stacked "Ana Beatriz Ramos" one word
-      // per line (ADR 0074 U1, FUT-3144). The table scrolls sideways instead.
-      minWidth: 200,
+      minWidth: 200, // at 390 names stacked one word per line (ADR 0074 U1, FUT-3144)
     },
     { id: 'email', header: copy.headers.email, accessor: 'email', searchable: true },
     {
