@@ -7,6 +7,7 @@ import React from 'react';
 import { expect, fireEvent, userEvent, waitFor,within } from 'storybook/test';
 
 import { Progress } from './Progress';
+import { PROGRESS_SIZES } from './Progress.metrics';
 
 const meta: Meta<typeof Progress> = {
   title: 'Feedback/Progress/Tests',
@@ -2110,5 +2111,20 @@ export const Integration: Story = {
         expect(hasProgressBar).toBeTruthy();
       }
     });
+  },
+};
+
+export const CustomCircularCenterTest: Story = {
+  render: () => (
+    <Progress variant="circular" value={50} showLabel label="Fallback" aria-label="Task progress"
+      circularSize={PROGRESS_SIZES.xl.circularSize * 3}
+      centerContent={<Stack alignItems="center"><Typography variant="h4">00:40</Typography><Typography>Step 2 of 4</Typography></Stack>} />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('progress-center')).toHaveTextContent('00:40');
+    await expect(canvas.getByTestId('progress-center')).toHaveTextContent('Step 2 of 4');
+    await expect(canvas.getByRole('progressbar', { name: 'Task progress' })).toHaveAttribute('aria-valuenow', '50');
+    await expect(canvas.queryAllByText('Fallback')).toHaveLength(0);
   },
 };

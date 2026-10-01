@@ -34,6 +34,7 @@ import {
 } from './Progress.metrics';
 import type { ProgressProps, ProgressSize, ProgressVariant } from './Progress.types.native';
 import { useLoopedProgress } from '../../../platform/animation';
+import { renderTextChildren } from '../../../platform/text-children';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import type { ColorValue } from '../../../tokens/vocabulary';
 
@@ -233,7 +234,8 @@ function CircularView({
   rest,
   thickness,
   circularSize,
-}: ViewArgs & { thickness: number; circularSize?: number }): React.JSX.Element {
+  centerContent,
+}: ViewArgs & { thickness: number; circularSize?: number; centerContent?: React.ReactNode }): React.JSX.Element {
   const theme = useUiTheme();
   const indeterminate = value === undefined;
   const pulseStyle = usePulseStyle(pulse);
@@ -263,7 +265,11 @@ function CircularView({
           />
         </Animated.View>
       </Animated.View>
-      {showLabel && !indeterminate ? (
+      {centerContent != null ? (
+        <View testID={`${testID}-center`} style={[StyleSheet.absoluteFill, styles.centre]}>
+          {renderTextChildren(centerContent, labelStyle(theme, size, true))}
+        </View>
+      ) : showLabel && !indeterminate ? (
         <View style={[StyleSheet.absoluteFill, styles.centre]}>
           <ProgressLabel size={size} label={displayLabel} testID={`${testID}-label`} muted />
         </View>
@@ -328,6 +334,7 @@ export const Progress = React.forwardRef<View, ProgressProps>((rawProps, ref) =>
     pulse,
     showLabel,
     label,
+    centerContent,
     segments,
     thickness,
     circularSize,
@@ -365,6 +372,7 @@ export const Progress = React.forwardRef<View, ProgressProps>((rawProps, ref) =>
         elementTestID={elementId ?? `${base}-circular`}
         thickness={thickness}
         circularSize={circularSize}
+        centerContent={centerContent}
       />
     );
   }

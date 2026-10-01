@@ -185,6 +185,9 @@ export function variantStylesOf(theme: Theme, opts: VariantStyleOptions): SxProp
     default:
       return {
         ...baseStylesOf(theme, opts),
+        // An auto cross-axis margin consumes the space above the paper while
+        // preserving the same themed bottom/side inset and modal focus path.
+        ...(opts.variant === 'bottom-sheet' ? { marginTop: 'auto' } : {}),
         ...decorations,
         ...defaultVariantStyles(theme, opts),
         ...NO_FOCUS_OUTLINE,

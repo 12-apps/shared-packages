@@ -192,7 +192,7 @@ Components for displaying data, visualizations, and information to users.
 ### Progress
 **Purpose**: Display progress indicators
 **Use Cases**: Loading states, task completion, upload progress
-**Features**: Linear/circular variants, determinate/indeterminate, labels
+**Features**: Linear/circular variants, determinate/indeterminate, labels, custom circular center content (web/native)
 **Location**: `src/components/data-display/Progress`
 **Docs**: `src/components/data-display/Progress/Progress.md`
 
@@ -254,7 +254,7 @@ Components for providing feedback to users about system state and actions.
 ### Dialog
 **Purpose**: Display modal dialogs
 **Use Cases**: Confirmations, forms, detailed information, alerts
-**Features**: Backdrop, animations, customizable size, accessibility
+**Features**: Backdrop, animations, customizable size, accessibility, inset bottom-sheet variant (web/native)
 **Location**: `src/components/feedback/Dialog`
 **Docs**: `src/components/feedback/Dialog/Dialog.md`
 
