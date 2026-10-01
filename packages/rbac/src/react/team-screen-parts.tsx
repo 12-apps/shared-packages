@@ -1,6 +1,6 @@
 'use client';
 
-import type { JSX } from 'react';
+import { useEffect, useRef, type JSX } from 'react';
 
 import AddIcon from '@mui/icons-material/Add';
 
@@ -195,6 +195,25 @@ export interface InviteRoleOptions {
   opening?: string;
 }
 
+/**
+ * Why an add was refused, at the top of the dialog (FUT-3137). The submit sits
+ * under the role list, so the content is usually scrolled to the bottom when
+ * the answer lands; the alert brings itself into view, or it would be as
+ * unseen as the page banner behind the modal it replaces.
+ */
+function InviteRefusal({ title, reason }: { title: string; reason: string }): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'nearest' });
+  }, [reason]);
+  return (
+    // The margin keeps the alert's edge off the scroller's when it scrolls up.
+    <Box ref={ref} sx={{ mb: 2, scrollMarginTop: '16px' }}>
+      <Alert variant="danger" title={title} description={reason} data-testid="invite-error" />
+    </Box>
+  );
+}
+
 export function InviteDialog({
   actions,
   copy,
@@ -218,6 +237,9 @@ export function InviteDialog({
     >
       {actions.showForm && (
         <DialogContent>
+          {actions.inviteError && (
+            <InviteRefusal title={copy.teamScreen.inviteFailedTitle} reason={actions.inviteError} />
+          )}
           <TeamInviteForm
             formKey={actions.formKey}
             copy={copy.teamScreen}

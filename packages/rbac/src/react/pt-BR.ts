@@ -108,6 +108,7 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     inviteHint:
       'Se a pessoa já tiver uma conta, o acesso é concedido na hora. Caso contrário, enviamos um convite por e-mail com um link para aceitar.',
     inviteDeferredTitle: 'Convite enviado',
+    inviteFailedTitle: 'Não foi possível adicionar',
     inviteDeferredBody:
       'Enviamos um e-mail com o link para aceitar o convite. O acesso vale assim que a pessoa aceitar.',
     inviteAddedTitle: 'Adicionado à equipe',

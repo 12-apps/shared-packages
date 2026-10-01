@@ -14,7 +14,7 @@
  */
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { labelsOf } from '../../core/compose';
 import { DEMO_CATALOG } from '../../__tests__/demo-catalog';
@@ -154,7 +154,9 @@ describe('the other outcomes are unchanged', () => {
     expect(bannersShown()).toEqual(['team-invite-notice']);
   });
 
-  it('a refused invite shows the error, keeps the dialog, and confirms nothing', async () => {
+  // FUT-3137: the reason goes to the dialog, which stays open; the page banner
+  // sits behind the modal, where a refusal used to land unseen.
+  it('a refused invite keeps the dialog open with the reason, and confirms nothing', async () => {
     const refresh = vi.fn();
     const hook = renderHook(() =>
       useTeamActions(clientAnswering({ ok: false, error: 'E-mail inválido.' }), copy, refresh),
@@ -171,9 +173,10 @@ describe('the other outcomes are unchanged', () => {
     expect(hook.result.current.notice).toBe(false);
     expect(hook.result.current.showForm).toBe(true);
     expect(refresh).not.toHaveBeenCalled();
+    expect(hook.result.current.inviteError).toBe('E-mail inválido.');
+    expect(hook.result.current.error).toBeNull();
     renderBanners(hook.result.current);
-    expect(screen.getByTestId('team-error').textContent).toContain('E-mail inválido.');
-    expect(bannersShown()).toEqual(['team-error']);
+    expect(bannersShown()).toEqual([]);
   });
 
   it('a new invite replaces the previous confirmation with its own outcome', async () => {
@@ -206,7 +209,7 @@ describe('the other outcomes are unchanged', () => {
     expect(hook.result.current.notice).toBe(true);
   });
 
-  it('a refusal after a confirmation leaves only the error', async () => {
+  it('a refusal after a confirmation clears the confirmation and says why in the dialog', async () => {
     let answer: RbacResult<InviteResultWire> = {
       ok: true,
       data: { status: 'added', userId: 'u-a' },
@@ -220,8 +223,34 @@ describe('the other outcomes are unchanged', () => {
 
     answer = { ok: false, error: 'Recusado.' };
     await act(() => hook.result.current.invite({ email: 'd@e.f', role: 'ADMIN', customRoles: [] }));
+    expect(hook.result.current.inviteError).toBe('Recusado.');
     renderBanners(hook.result.current, vi.fn());
-    expect(bannersShown()).toEqual(['team-error']);
+    expect(bannersShown()).toEqual([]);
+  });
+
+  it('a refusal is cleared by the next attempt, and by closing or reopening the dialog', async () => {
+    let answer: RbacResult<InviteResultWire> = { ok: false, error: 'Sem vagas.' };
+    const client = { inviteMember: vi.fn(async () => answer) } as unknown as RbacApiClient;
+    const hook = renderHook(() => useTeamActions(client, copy, vi.fn()));
+    const attempt = (): Promise<void> =>
+      hook.result.current.invite({ email: 'a@b.c', role: 'ADMIN', customRoles: [] });
+
+    act(() => hook.result.current.openForm());
+    await act(attempt);
+    expect(hook.result.current.inviteError).toBe('Sem vagas.');
+    act(() => hook.result.current.toggleForm());
+    expect(hook.result.current.inviteError).toBeNull();
+
+    act(() => hook.result.current.openForm());
+    await act(attempt);
+    act(() => hook.result.current.openForm());
+    expect(hook.result.current.inviteError).toBeNull();
+
+    await act(attempt);
+    answer = { ok: true, data: { status: 'added' } };
+    await act(attempt);
+    expect(hook.result.current.inviteError).toBeNull();
+    expect(hook.result.current.showForm).toBe(false);
   });
 });
 
@@ -260,9 +289,7 @@ describe('through the screen', () => {
     } as unknown as RbacApiClient;
   }
 
-  it("opens the new member's profile through the screen's onOpenMember", async () => {
-    const openMember = vi.fn();
-    const api = fakeApi();
+  function mountScreen(api: RbacApiClient, openMember = vi.fn()): void {
     render(
       <MemoryRouter>
         <RbacProvider permissions={new Set([MANAGE])}>
@@ -280,20 +307,64 @@ describe('through the screen', () => {
         </RbacProvider>
       </MemoryRouter>,
     );
+  }
+
+  /** Types `address` into the open dialog and submits it; answers the dialog and its field. */
+  async function submitInvite(
+    address: string,
+  ): Promise<{ dialog: HTMLElement; email: HTMLInputElement }> {
     const dialog = await screen.findByTestId('invite-dialog');
     const email = dialog.querySelector<HTMLInputElement>('input[name="email"]');
     if (!email) throw new Error('the invite form has no e-mail field');
-    fireEvent.change(email, { target: { value: 'ana@example.com' } });
+    fireEvent.change(email, { target: { value: address } });
     fireEvent.click(
       Array.from(dialog.querySelectorAll('button')).find(
         (b) => b.textContent === copy.teamScreen.inviteAction,
       ) as HTMLButtonElement,
     );
+    return { dialog, email };
+  }
+
+  it("opens the new member's profile through the screen's onOpenMember", async () => {
+    const openMember = vi.fn();
+    const api = fakeApi();
+    mountScreen(api, openMember);
+    await submitInvite('ana@example.com');
 
     const open = await screen.findByTestId('team-invite-added-open');
     expect(api.inviteMember).toHaveBeenCalledWith('ana@example.com', expect.anything());
     expect(screen.getByTestId('team-invite-added').textContent).toContain('ana@example.com');
     fireEvent.click(open);
     expect(openMember).toHaveBeenCalledWith('u-ana');
+  });
+
+  // FUT-3137: a refusal used to land in the page banner, behind the modal.
+  it('says a refused add inside the dialog and keeps what was typed', async () => {
+    const api = fakeApi();
+    const refusal = 'Este recurso não está incluído no seu plano.';
+    vi.mocked(api.inviteMember).mockResolvedValue({ ok: false, error: refusal });
+    // jsdom does no layout and has no scrollIntoView; record who asked for it.
+    const scrolled: Element[] = [];
+    const scrollIntoView = vi.fn(function (this: Element) {
+      scrolled.push(this);
+    });
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      value: scrollIntoView,
+      configurable: true,
+    });
+    onTestFinished(() => {
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+    });
+    mountScreen(api);
+    const typed = await submitInvite('ana@example.com');
+
+    const alert = await screen.findByTestId('invite-error');
+    expect(typed.dialog.contains(alert)).toBe(true);
+    expect(alert.textContent).toContain(copy.teamScreen.inviteFailedTitle);
+    expect(alert.textContent).toContain(refusal);
+    expect(typed.email.value).toBe('ana@example.com');
+    expect(screen.queryAllByTestId('team-error')).toHaveLength(0);
+    // The submit is under the role list: the reason scrolls itself into view.
+    expect(scrolled.some((el) => el.contains(alert))).toBe(true);
   });
 });
