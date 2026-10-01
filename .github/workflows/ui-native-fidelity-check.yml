@@ -36,6 +36,7 @@ jobs:
       - name: Install the locked workspace
         run: pnpm install --frozen-lockfile
       - name: Build both UI renderers and their dependencies
+        id: ui_build
         run: pnpm exec turbo run build --filter=@12-apps/ui
       - name: Check package types and lint
         working-directory: packages/ui
@@ -57,28 +58,34 @@ jobs:
         working-directory: packages/ui
         run: pnpm exec playwright install --with-deps chromium
       - name: Build the web Storybook
+        id: web_build
         run: pnpm --filter @12-apps/ui storybook:build
       - name: Drive the changed web Storybook components
         working-directory: packages/ui
         run: >-
           pnpm exec start-server-and-test 'http-server storybook-static -p 6008 --silent'
           http://127.0.0.1:6008
-          'test-storybook --url http://127.0.0.1:6008 --index-json --includeTags component:Progress component:Dialog component:Icon --maxWorkers=2'
+          'test-storybook --url http://127.0.0.1:6008 --index-json --includeTags component:Progress component:Dialog component:Icon --maxWorkers=2 --json --outputFile test-results/web-stories.json'
       - name: Capture and assert the new web states
+        if: ${{ !cancelled() && steps.web_build.outcome == 'success' }}
         working-directory: packages/ui
         run: >-
           pnpm exec start-server-and-test 'http-server storybook-static -p 6008 --silent'
           http://127.0.0.1:6008
           'node ../../scripts/verify-ui-native-fidelity.mjs web http://127.0.0.1:6008'
       - name: Build the native-renderer Storybook
+        id: native_build
+        if: ${{ !cancelled() && steps.ui_build.outcome == 'success' }}
         run: pnpm --filter @12-apps/ui storybook:native:build
       - name: Drive the changed native-renderer Storybook components
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
         working-directory: packages/ui
         run: >-
           pnpm exec start-server-and-test 'http-server storybook-native-static -p 6009 --silent'
           http://127.0.0.1:6009
-          'test-storybook --url http://127.0.0.1:6009 --config-dir .storybook-native --index-json --includeTags component:Progress component:Dialog component:Icon --excludeTags native-skip --maxWorkers=2'
+          'test-storybook --url http://127.0.0.1:6009 --config-dir .storybook-native --index-json --includeTags component:Progress component:Dialog component:Icon --excludeTags native-skip --maxWorkers=2 --json --outputFile test-results/native-stories.json'
       - name: Capture and assert the new native-renderer states
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
         working-directory: packages/ui
         run: >-
           pnpm exec start-server-and-test 'http-server storybook-native-static -p 6009 --silent'
