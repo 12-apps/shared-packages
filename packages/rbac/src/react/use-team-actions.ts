@@ -9,6 +9,7 @@ import type { RbacWebCopy } from './copy';
 import type { InviteSelection } from './team-invite-form';
 import type { TeamRow } from './team-grid-config';
 import { applyRoleSet, type MemberWithRoles } from './team-role-dialog';
+import type { RbacRefusal } from './transport';
 
 /**
  * Everything the roster WRITES, and the state those writes drive — extracted
@@ -47,9 +48,11 @@ export interface TeamActions {
    * Why the last invite was refused, shown INSIDE the dialog (FUT-3137); null
    * otherwise. Its own field rather than `error`: the page banner sits behind
    * the modal, so a refusal routed there was never seen. Cleared by the next
-   * attempt and whenever the dialog opens or closes.
+   * attempt and whenever the dialog opens or closes. Carries the server's
+   * status and body, so a host can offer the way out (an upgrade for a plan
+   * denial) beside the sentence.
    */
-  inviteError: string | null;
+  inviteRefusal: RbacRefusal | null;
   invite: (selection: InviteSelection) => Promise<void>;
   remove: (userId: string) => Promise<void>;
   toggleActive: (row: TeamRow) => Promise<void>;
@@ -102,27 +105,27 @@ function useInviteOutcome(): {
  */
 function useInviteDialog(): Pick<
   TeamActions,
-  'showForm' | 'toggleForm' | 'openForm' | 'formKey' | 'inviteError'
-> & { fail: (message: string) => void; succeed: () => void; clearError: () => void } {
+  'showForm' | 'toggleForm' | 'openForm' | 'formKey' | 'inviteRefusal'
+> & { fail: (refusal: RbacRefusal) => void; succeed: () => void; clearError: () => void } {
   const [showForm, setShowForm] = useState(false);
   const [formKey, setFormKey] = useState(0);
-  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteRefusal, setInviteRefusal] = useState<RbacRefusal | null>(null);
   // Stable, so a host effect that depends on it runs when the REQUEST changes.
   const openForm = useCallback(() => {
-    setInviteError(null);
+    setInviteRefusal(null);
     setShowForm(true);
   }, []);
   return {
     showForm,
     formKey,
-    inviteError,
+    inviteRefusal,
     openForm,
     toggleForm: () => {
-      setInviteError(null);
+      setInviteRefusal(null);
       setShowForm((open) => !open);
     },
-    fail: setInviteError,
-    clearError: () => setInviteError(null),
+    fail: ({ error, status, body }) => setInviteRefusal({ error, status, body }),
+    clearError: () => setInviteRefusal(null),
     // A fresh form for the next invite: the key remounts it empty.
     succeed: () => {
       setFormKey((key) => key + 1);
@@ -151,7 +154,7 @@ export function useTeamActions(
     if (!result.ok) {
       // Said where the operator is looking: the dialog stays open on what they
       // typed, with the reason above it (FUT-3137).
-      dialog.fail(result.error);
+      dialog.fail(result);
       return;
     }
     outcome.record(selection.email, result.data);
@@ -197,7 +200,7 @@ export function useTeamActions(
     toggleForm: dialog.toggleForm,
     openForm: dialog.openForm,
     formKey: dialog.formKey,
-    inviteError: dialog.inviteError,
+    inviteRefusal: dialog.inviteRefusal,
     invite,
     remove,
     toggleActive,

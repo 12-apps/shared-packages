@@ -88,6 +88,7 @@ export const EN_US_ENTITLEMENTS_WEB_COPY: EntitlementsWebCopy = {
     quotaUsage: ({ used, limit }) => `You are using ${used} of ${limit}.`,
     planPitch: { prefix: 'Available on the ', suffix: ' plan.' },
     allPlansLink: 'See every plan',
+    upgradeAction: 'See plans',
   },
   pageLock: {
     reasons: {

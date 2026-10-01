@@ -28,6 +28,7 @@ import {
   TeamBanners,
   TeamBody,
   type InviteRoleOptions,
+  type RefusalAction,
 } from './team-screen-parts';
 import {
   useCancelInviteConfirm,
@@ -96,6 +97,12 @@ export interface TeamScreenProps {
    */
   inviteRequested?: boolean;
   onInviteRequestHandled?: () => void;
+  /**
+   * The way out of a refused add, rendered inside the dialog's refusal
+   * (FUT-3137) — e.g. an upgrade button for a plan denial. See
+   * {@link RefusalAction}.
+   */
+  refusalAction?: RefusalAction;
 }
 
 /**
@@ -195,6 +202,26 @@ function rosterGate(
   return null;
 }
 
+/**
+ * The grid's URL-driven controls and its server paging, split out of the screen
+ * at the size gate. The controls are re-derived on every address-bar change so
+ * browser back/forward re-applies search, pills and sort; the grid merges them
+ * over its own state, so column visibility is never disturbed.
+ */
+function useTeamGridSync(
+  searchParams: URLSearchParams,
+  pagination: ReturnType<typeof useTeamData>['pagination'],
+) {
+  const syncState = useMemo(() => teamSyncState(searchParams), [searchParams]);
+  const server = useServerDataViews({
+    totalCount: pagination?.total ?? 0,
+    page: pagination?.page ?? 1,
+    pageSize: pagination?.pageSize ?? 20,
+    toParams: teamQueryToParams,
+  });
+  return { syncState, server };
+}
+
 export function TeamScreen(props: TeamScreenProps): JSX.Element {
   const { api, labels, copy } = props;
   const canManage = useCan()(props.managePermission);
@@ -208,16 +235,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
   const { customRoles, inviteRoles, editor, removeConfirm, cancelInviteConfirm, rowActions } =
     useRosterControls(props, data, actions);
 
-  // The URL-driven controls, re-derived on every address-bar change so browser
-  // back/forward re-applies search, pills and sort. The grid merges it over its
-  // own state, so column visibility is never disturbed.
-  const syncState = useMemo(() => teamSyncState(searchParams), [searchParams]);
-  const server = useServerDataViews({
-    totalCount: data.pagination?.total ?? 0,
-    page: data.pagination?.page ?? 1,
-    pageSize: data.pagination?.pageSize ?? 20,
-    toParams: teamQueryToParams,
-  });
+  const { syncState, server } = useTeamGridSync(searchParams, data.pagination);
 
   const blocked = rosterGate(data, copy);
   if (blocked) return blocked;
@@ -238,7 +256,13 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
           />
         </Dashboard.Header>
         {canManage && (
-          <InviteDialog actions={actions} copy={copy} labels={labels} roles={inviteRoles} />
+          <InviteDialog
+            actions={actions}
+            copy={copy}
+            labels={labels}
+            roles={inviteRoles}
+            refusalAction={props.refusalAction}
+          />
         )}
         <Dashboard.Body>
           <TeamBanners actions={actions} copy={copy} onOpenMember={props.onOpenMember} />

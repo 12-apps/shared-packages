@@ -24,7 +24,7 @@ import { RbacProvider } from '../context';
 import { createRbacLabels } from '../labels';
 import { PT_BR_RBAC_WEB_COPY } from '../pt-BR';
 import { TeamScreen } from '../team-screen';
-import { TeamBanners } from '../team-screen-parts';
+import { TeamBanners, type RefusalAction } from '../team-screen-parts';
 import type { RbacResult } from '../transport';
 import { useTeamActions, type TeamActions } from '../use-team-actions';
 
@@ -173,7 +173,7 @@ describe('the other outcomes are unchanged', () => {
     expect(hook.result.current.notice).toBe(false);
     expect(hook.result.current.showForm).toBe(true);
     expect(refresh).not.toHaveBeenCalled();
-    expect(hook.result.current.inviteError).toBe('E-mail inválido.');
+    expect(hook.result.current.inviteRefusal?.error).toBe('E-mail inválido.');
     expect(hook.result.current.error).toBeNull();
     renderBanners(hook.result.current);
     expect(bannersShown()).toEqual([]);
@@ -223,7 +223,7 @@ describe('the other outcomes are unchanged', () => {
 
     answer = { ok: false, error: 'Recusado.' };
     await act(() => hook.result.current.invite({ email: 'd@e.f', role: 'ADMIN', customRoles: [] }));
-    expect(hook.result.current.inviteError).toBe('Recusado.');
+    expect(hook.result.current.inviteRefusal?.error).toBe('Recusado.');
     renderBanners(hook.result.current, vi.fn());
     expect(bannersShown()).toEqual([]);
   });
@@ -237,19 +237,19 @@ describe('the other outcomes are unchanged', () => {
 
     act(() => hook.result.current.openForm());
     await act(attempt);
-    expect(hook.result.current.inviteError).toBe('Sem vagas.');
+    expect(hook.result.current.inviteRefusal?.error).toBe('Sem vagas.');
     act(() => hook.result.current.toggleForm());
-    expect(hook.result.current.inviteError).toBeNull();
+    expect(hook.result.current.inviteRefusal).toBeNull();
 
     act(() => hook.result.current.openForm());
     await act(attempt);
     act(() => hook.result.current.openForm());
-    expect(hook.result.current.inviteError).toBeNull();
+    expect(hook.result.current.inviteRefusal).toBeNull();
 
     await act(attempt);
     answer = { ok: true, data: { status: 'added' } };
     await act(attempt);
-    expect(hook.result.current.inviteError).toBeNull();
+    expect(hook.result.current.inviteRefusal).toBeNull();
     expect(hook.result.current.showForm).toBe(false);
   });
 });
@@ -289,7 +289,11 @@ describe('through the screen', () => {
     } as unknown as RbacApiClient;
   }
 
-  function mountScreen(api: RbacApiClient, openMember = vi.fn()): void {
+  function mountScreen(
+    api: RbacApiClient,
+    openMember = vi.fn(),
+    refusalAction?: RefusalAction,
+  ): void {
     render(
       <MemoryRouter>
         <RbacProvider permissions={new Set([MANAGE])}>
@@ -302,6 +306,7 @@ describe('through the screen', () => {
             managePermission={MANAGE}
             defaultInviteRole="CLERK"
             onOpenMember={openMember}
+            refusalAction={refusalAction}
             inviteRequested
           />
         </RbacProvider>
@@ -379,5 +384,38 @@ describe('through the screen', () => {
 
     const alert = await screen.findByTestId('invite-error');
     expect(typed.dialog.contains(alert)).toBe(true);
+  });
+
+  // The host's way out sits inside the refusal, and is handed what the server
+  // answered — the admin turns a seat 402 into its upgrade button.
+  it("renders the host's way out inside the refusal, given the server's answer", async () => {
+    const api = fakeApi();
+    const body = { error: 'Sem vagas.', code: 'quota_exceeded', feature: 'team.seats' };
+    vi.mocked(api.inviteMember).mockResolvedValue({
+      ok: false,
+      error: 'Sem vagas.',
+      status: 402,
+      body,
+    });
+    const action = vi.fn<RefusalAction>((refusal) =>
+      refusal.status === 402 ? <button data-testid="upgrade">Ver planos</button> : null,
+    );
+    mountScreen(api, vi.fn(), action);
+    await submitInvite('ana@example.com');
+
+    const alert = await screen.findByTestId('invite-error');
+    expect(alert.contains(screen.getByTestId('upgrade'))).toBe(true);
+    expect(action).toHaveBeenLastCalledWith({ error: 'Sem vagas.', status: 402, body });
+  });
+
+  it('shows no way out when the host does not recognise the refusal', async () => {
+    const api = fakeApi();
+    vi.mocked(api.inviteMember).mockResolvedValue({ ok: false, error: 'E-mail inválido.', status: 400 });
+    mountScreen(api, vi.fn(), () => null);
+    await submitInvite('ana@example.com');
+
+    const alert = await screen.findByTestId('invite-error');
+    expect(alert.textContent).toContain('E-mail inválido.');
+    expect(alert.querySelectorAll('button[data-testid="upgrade"]')).toHaveLength(0);
   });
 });

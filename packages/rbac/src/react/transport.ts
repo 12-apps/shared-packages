@@ -5,8 +5,20 @@
  * global. The default is same-origin `fetch` riding the browser's cookies.
  */
 
+/**
+ * Why a write was refused. `error` is the sentence to show. `status` and `body`
+ * are what the server answered — set by {@link httpRbacTransport}, absent from
+ * a failure that never reached it — for a host that recognises the answer
+ * (a plan denial it can offer an upgrade for, FUT-3137) and acts on it.
+ */
+export interface RbacRefusal {
+  error: string;
+  status?: number;
+  body?: unknown;
+}
+
 /** A write outcome the forms branch on — never a thrown mutation. */
-export type RbacResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type RbacResult<T> = { ok: true; data: T } | ({ ok: false } & RbacRefusal);
 
 export interface RbacTransport {
   /** A read. Returns the whole JSON payload (envelope included). */
@@ -50,7 +62,12 @@ export function httpRbacTransport(fallbackError: string): RbacTransport {
           | { data?: T; error?: string }
           | null;
         if (!response.ok) {
-          return { ok: false, error: payload?.error ?? fallbackError };
+          return {
+            ok: false,
+            error: payload?.error ?? fallbackError,
+            status: response.status,
+            body: payload,
+          };
         }
         return { ok: true, data: (payload?.data ?? payload) as T };
       } catch {

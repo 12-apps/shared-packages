@@ -142,6 +142,11 @@ export interface UpsellHostCopy {
    */
   planPitch: { prefix: string; suffix: string };
   allPlansLink: string;
+  /**
+   * The {@link UpgradeButton}'s label: the way out a host offers beside a
+   * refusal it shows (FUT-3137). Opens this prompt.
+   */
+  upgradeAction: string;
 }
 
 export interface PageLockCopy {

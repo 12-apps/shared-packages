@@ -56,6 +56,7 @@ export type {
 export { PT_BR_ENTITLEMENTS_WEB_COPY } from './pt-BR';
 export { EN_US_ENTITLEMENTS_WEB_COPY } from './en-US';
 export { ENTITLEMENTS_WEB_COPY } from './locales';
+export { UpgradeButton, type UpgradeButtonProps } from './upgrade-button';
 export {
   raiseUpsell,
   subscribeToUpsell,
