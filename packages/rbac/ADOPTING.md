@@ -94,8 +94,12 @@ reusable across repositories, exposing standardized surfaces. A host repo only
    entry never renders. The contract only the host can keep: scope by tenant
    AND pending (anything else is `not_found`), and write the new credential
    only once the mail has left, so `not_sent` leaves the previous link working.
-   A resend reports `team.invite_resend`. It needs two message keys,
-   `inviteNotFound` and `inviteNotSent`, which the shipped packs carry.
+   A resend reports `team.invite_resend`. It adds required keys an adopter
+   composing its OWN copy must supply (the shipped packs carry all of them):
+   `RbacMessages.inviteNotFound` and `inviteNotSent`; `RbacWebCopy`'s
+   `teamScreen.inviteResentTitle`, `teamScreen.inviteResentBody` and
+   `teamRowMenu.resendInvite`. A hand-written `RbacApiClient` (a test double)
+   needs `resendInvite`.
 6. **Audit is a sink, not a table.** Every write and every governance denial
    reports a `RbacAuditEntry` through `config.audit`, and the package FENCES
    every call — a throwing sink never turns the write (or a DENIAL) into a

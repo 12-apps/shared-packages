@@ -872,6 +872,18 @@ describe('team routes', () => {
       );
     });
 
+    it('refuses an admin-tier actor without team:manage, before the port is reached', async () => {
+      const { h, calls, actor } = await resendHost({ status: 'resent', email: 'x@example.com' });
+      // Admin tier (DIRECTOR) but a ceiling that leaves only the read: the tier
+      // check passes and the manageTeam gate must still refuse.
+      const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
+        actor: { ...actor, permissionCeiling: new Set(['team:read']) },
+        params: { inviteId: 'i1' },
+      });
+      expect(response.status).toBe(403);
+      expect(calls).toEqual([]);
+    });
+
     it('refuses a member below the admin tier, before the port is reached', async () => {
       const { h, calls } = await resendHost({ status: 'resent', email: 'x@example.com' });
       enrolMember(h.state, TENANT, 'clerk-1', 'CLERK');

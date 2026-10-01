@@ -605,6 +605,32 @@ describe('the roster composes what two reads say', () => {
       expect(await screen.findByTestId('team-actions-invite:inv-1')).toBeTruthy();
     });
 
+    it('sends ONE mail for a double click — a second send would retire the first link', async () => {
+      const deferred: { release: () => void } = { release: () => {} };
+      const gate = new Promise<void>((resolve) => {
+        deferred.release = resolve;
+      });
+      const api = apiStub({
+        teamContext: pendingContext(true),
+        resendInvite: vi.fn(async () => {
+          await gate;
+          return { ok: true as const, data: { status: 'resent' as const, email: 'nova@example.com' } };
+        }),
+      });
+      mountTeam(api, ['team:manage']);
+      for (let click = 0; click < 2; click += 1) {
+        fireEvent.click(await screen.findByTestId('team-actions-invite:inv-1'));
+        fireEvent.click(await screen.findByText(COPY.teamRowMenu.resendInvite));
+      }
+      await act(async () => {
+        deferred.release();
+        await gate;
+      });
+      await screen.findByTestId('team-invite-resent');
+      expect(api.resendInvite).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(api.listTeam).toHaveBeenCalledTimes(2));
+    });
+
     it('says a refusal in the error banner and refreshes the roster', async () => {
       const refusal = 'Este convite mudou ou não está mais pendente.';
       const api = apiStub({
