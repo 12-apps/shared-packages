@@ -164,6 +164,21 @@ const { stack, push, pop, clear } = useModalStack();
 - Semantic HTML structure
 - Accessible loading states
 
+### The title is one heading
+
+With a `navigationTitle`, the panel has exactly ONE heading: the title, an
+`h2`, carrying the id the dialog's `aria-labelledby` points at (the
+`aria-labelledby` prop's value, or `modal-title-<modalId>`). The bar around it
+(the ✕ or back button and the header actions) is a plain `div`, so the dialog's
+accessible name is the title alone, and a screen reader announces it once.
+
+Until 6.56.0 the bar was itself MUI's `DialogTitle` `h2` with the title nested
+in it as a second `h2`: the same words read twice, a heading inside a heading,
+and a dialog named by everything in the bar ("close Title Save").
+
+Without a `navigationTitle` the bar is still MUI's `h2` and holds the id, as
+before. Give such a panel its own `aria-labelledby` if it needs a name.
+
 ## Testing
 
 The StackedModal component provides comprehensive test IDs for all interactive elements through the `dataTestId` prop. When provided, it generates consistent test IDs for all child elements.
@@ -175,8 +190,8 @@ When you provide `dataTestId="my-modal"`, the following test IDs are automatical
 | Element | Test ID | Description |
 |---------|---------|-------------|
 | Modal Container | `my-modal` | The root dialog element |
-| Header | `my-modal-header` | The modal header container |
-| Title | `my-modal-title` | The navigation title text |
+| Header | `my-modal-header` | The modal header bar (a `div` when there is a title) |
+| Title | `my-modal-title` | The navigation title — the panel's one `h2` |
 | Close Button | `my-modal-close-button` | The close button (when no modals stacked) |
 | Back Button | `my-modal-back-button` | The back button (when modals are stacked) |
 | Header Actions | `my-modal-header-actions` | Container for header actions (desktop) |

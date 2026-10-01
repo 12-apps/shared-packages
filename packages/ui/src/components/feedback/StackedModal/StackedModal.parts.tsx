@@ -9,7 +9,7 @@ import IconButton from '@mui/material/IconButton/index.js';
 import Skeleton from '@mui/material/Skeleton/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { styled, useTheme } from '@mui/material/styles/index.js';
-import type { FC, ReactNode } from 'react';
+import type { ElementType, FC, ReactNode } from 'react';
 import React from 'react';
 import { rem } from '../../../tokens/relative';
 import { safeAreaBottom } from '../../../utils/viewport';
@@ -21,9 +21,10 @@ import {
   titleStyles,
 } from './StackedModal.styles';
 
+// `component` typed through: the bar is a `div` when it holds a title (`ModalHeader`).
 const StyledDialogTitle = styled(DialogTitle, {
   shouldForwardProp: (prop) => prop !== 'rtl',
-})<{ rtl?: boolean }>(({ theme, rtl }) => titleStyles(theme, rtl));
+})<{ rtl?: boolean; component?: ElementType }>(({ theme, rtl }) => titleStyles(theme, rtl));
 
 const DialogTitleLeft = styled(Box)(({ theme }) => titleLeftStyles(theme));
 const DialogTitleRight = styled(Box)(({ theme }) => titleRightStyles(theme));
@@ -186,7 +187,21 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
   rtl,
   dataTestId,
 }) => (
-  <StyledDialogTitle id={titleId} rtl={rtl} data-testid={testId(dataTestId, 'header')}>
+  // The BAR is not a heading: it holds the ✕ or back button and the header
+  // actions. The title inside it is the panel's one heading and carries the id
+  // the dialog's `aria-labelledby` names, so the dialog is named by the title
+  // alone — not "close Title Save" — and a screen reader hears it once.
+  //
+  // The bar's id is stated, never left to MUI: `DialogTitle` falls back to the
+  // Dialog's `aria-labelledby` and would claim the title's id a second time.
+  // With NO title the bar is drawn exactly as it always was — MUI's own `h2`,
+  // holding the id — so an untitled panel keeps its markup and its name.
+  <StyledDialogTitle
+    component={navigationTitle ? 'div' : 'h2'}
+    id={navigationTitle ? `${titleId}-bar` : titleId}
+    rtl={rtl}
+    data-testid={testId(dataTestId, 'header')}
+  >
     <DialogTitleLeft>
       <HeaderLeadingButton
         canGoBack={canGoBack}
@@ -199,6 +214,7 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
       />
       {navigationTitle && (
         <Typography
+          id={titleId}
           variant="h6"
           component="h2"
           noWrap
