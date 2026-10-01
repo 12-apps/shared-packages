@@ -60,6 +60,8 @@ jobs:
       - name: Build the web Storybook
         id: web_build
         run: pnpm --filter @12-apps/ui storybook:build
+      - name: Prepare structured result output
+        run: mkdir -p packages/ui/test-results
       - name: Drive the changed web Storybook components
         working-directory: packages/ui
         run: >-
