@@ -1142,7 +1142,7 @@ export const BottomSheetTest: Story = {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await userEvent.click(canvas.getByRole('button', { name: 'Open bottom sheet' }));
       const dialog = await body.findByRole('dialog');
-      await expect(within(dialog).getByText('End session?')).toBeVisible();
+      await waitFor(() => expect(within(dialog).getByText('End session?')).toBeVisible());
       await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
       await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
     }
