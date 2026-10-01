@@ -10,7 +10,7 @@
  * trail's "De" date stayed in the URL after the field was emptied.
  */
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "./test-utils";
+import { fireEvent, render, renderHook, screen, waitFor } from "./test-utils";
 import { ThemeProvider, createTheme } from "../../../../mui/styles";
 
 import { DataViewsTableBase } from "../DataViewsTableBase";
@@ -137,16 +137,9 @@ describe("urlSliceKey", () => {
 });
 
 describe("useUrlEchoGuard", () => {
-  function Probe({ onReady }: { onReady: (guard: ReturnType<typeof useUrlEchoGuard>) => void }): null {
-    onReady(useUrlEchoGuard({ totalCount: 0, page: 1, pageSize: 20, onQueryChange: vi.fn() }));
-    return null;
-  }
-
   function guard(): ReturnType<typeof useUrlEchoGuard> {
-    let captured: ReturnType<typeof useUrlEchoGuard> | undefined;
-    render(<Probe onReady={(g) => (captured = g)} />);
-    if (!captured) throw new Error("guard not captured");
-    return captured;
+    const server: DataViewServer = { totalCount: 0, page: 1, pageSize: 20, onQueryChange: vi.fn() };
+    return renderHook(() => useUrlEchoGuard(server)).result.current;
   }
 
   const query = (search: string): DataViewQuery => ({ ...urlState(search), ranges: {}, page: 1, pageSize: 20 });
