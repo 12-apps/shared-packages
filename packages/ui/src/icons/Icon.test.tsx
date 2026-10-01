@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 import { ICON_PATHS } from './paths.generated';
 
 describe('Icon (web)', () => {
-  it.each(['Home', 'FitnessCenter', 'History'] as const)('renders the shared %s tab glyph', (name) => {
+  it.each(['Home', 'FitnessCenter', 'History', 'VolumeUp', 'VolumeOff'] as const)('renders the shared %s glyph', (name) => {
     render(<Icon name={name} label={name} />);
     const paths = screen.getByTestId(`icon-${name}`).querySelectorAll('path');
     expect(Array.from(paths, (element) => element.getAttribute('d'))).toEqual(ICON_PATHS[name]);

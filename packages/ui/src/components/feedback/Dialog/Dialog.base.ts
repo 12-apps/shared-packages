@@ -13,7 +13,7 @@ import type { SizeValue } from '../../../tokens/vocabulary';
  * either side: MUI's own `onClose` reason argument is dropped by `Dialog.tsx`
  * before it reaches the caller, so both renderers pass a bare `() => void`.
  */
-export type DialogVariant = 'default' | 'glass' | 'fullscreen' | 'drawer';
+export type DialogVariant = 'default' | 'glass' | 'fullscreen' | 'drawer' | 'bottom-sheet';
 export type DialogSize = SizeValue;
 export type DialogBorderRadius = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type DialogActionsAlignment = 'left' | 'center' | 'right' | 'space-between';
@@ -21,6 +21,7 @@ export type DialogActionsAlignment = 'left' | 'center' | 'right' | 'space-betwee
 export interface DialogBaseProps {
   open: boolean;
   children: ReactNode;
+  /** `bottom-sheet` keeps the default paper and inset, aligned to the bottom. */
   variant?: DialogVariant;
   size?: DialogSize;
   title?: ReactNode;

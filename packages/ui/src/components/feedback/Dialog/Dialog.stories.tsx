@@ -22,7 +22,7 @@ const meta: Meta<typeof Dialog> = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['default', 'glass', 'fullscreen', 'drawer'],
+      options: ['default', 'glass', 'fullscreen', 'drawer', 'bottom-sheet'],
       description: 'Visual style variant of the dialog',
     },
     size: {
@@ -832,5 +832,26 @@ export const Responsive: Story = {
         desktop: { name: 'Desktop', styles: { width: '1920px', height: '1080px' } },
       },
     },
+  },
+};
+export const BottomSheet: Story = {
+  args: { open: false, children: null, variant: 'bottom-sheet', size: 'xs', showCloseButton: false },
+  render: (args) => {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <Button onClick={() => setOpen(true)}>Open bottom sheet</Button>
+        <Dialog {...args} open={open} title="End session?" onClose={() => setOpen(false)}>
+          <DialogContent>
+            <Typography>Save the completed work before leaving.</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
+              <Button fullWidth variant="contained" onClick={() => setOpen(false)}>Save and end</Button>
+              <Button fullWidth variant="outlined" onClick={() => setOpen(false)}>Discard</Button>
+              <Button fullWidth variant="outlined" onClick={() => setOpen(false)}>Continue</Button>
+            </Box>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
   },
 };

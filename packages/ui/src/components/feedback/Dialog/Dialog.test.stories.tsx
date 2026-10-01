@@ -1121,3 +1121,30 @@ export const DrawerGlassBackdropIsBlurred: Story = {
     await waitFor(() => expect(backdropFilterOf()).toBe('blur(8px)'));
   },
 };
+
+export const BottomSheetTest: Story = {
+  render: () => {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <Button onClick={() => setOpen(true)}>Open bottom sheet</Button>
+        <Dialog open={open} variant="bottom-sheet" size="xs" title="End session?" showCloseButton={false}
+          onClose={() => setOpen(false)} dataTestId="bottom-sheet">
+          <DialogContent>Save the completed work before leaving.</DialogContent>
+          <DialogActions><Button onClick={() => setOpen(false)}>Continue</Button></DialogActions>
+        </Dialog>
+      </>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await userEvent.click(canvas.getByRole('button', { name: 'Open bottom sheet' }));
+      const dialog = await body.findByRole('dialog');
+      await waitFor(() => expect(within(dialog).getByText('End session?')).toBeVisible());
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
+      await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
+    }
+  },
+};

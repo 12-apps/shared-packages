@@ -137,7 +137,7 @@ const ProgressLabel: React.FC<{ size: ProgressSize; label: string; testId: strin
 
 const CircularView = React.forwardRef<
   HTMLDivElement,
-  ViewProps & { thickness: number; circularSize?: number }
+  ViewProps & { thickness: number; circularSize?: number; centerContent?: React.ReactNode }
 >(
   (
     {
@@ -152,6 +152,7 @@ const CircularView = React.forwardRef<
       dataTestId,
       thickness,
       circularSize,
+      centerContent,
       ...props
     },
     ref,
@@ -172,8 +173,9 @@ const CircularView = React.forwardRef<
           data-testid={`${dataTestId}-circular`}
           {...props}
         />
-        {showLabel && value !== undefined && (
+        {(centerContent != null || (showLabel && value !== undefined)) && (
           <Box
+            data-testid={centerContent != null ? `${dataTestId}-center` : undefined}
             sx={{
               top: 0,
               left: 0,
@@ -185,7 +187,7 @@ const CircularView = React.forwardRef<
               justifyContent: 'center',
             }}
           >
-            <Typography
+            {centerContent ?? <Typography
               variant="caption"
               component="div"
               color="text.secondary"
@@ -193,7 +195,7 @@ const CircularView = React.forwardRef<
               data-testid={`${dataTestId}-label`}
             >
               {displayLabel}
-            </Typography>
+            </Typography>}
           </Box>
         )}
       </Box>
@@ -263,6 +265,7 @@ export const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
       pulse,
       showLabel,
       label,
+      centerContent,
       segments,
       thickness,
       circularSize,
@@ -290,7 +293,7 @@ export const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
 
     if (variant === 'circular') {
       return (
-        <CircularView ref={ref} {...shared} thickness={thickness} circularSize={circularSize} />
+        <CircularView ref={ref} {...shared} thickness={thickness} circularSize={circularSize} centerContent={centerContent} />
       );
     }
 

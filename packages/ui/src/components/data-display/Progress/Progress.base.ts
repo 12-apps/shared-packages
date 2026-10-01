@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
 
 /**
@@ -45,6 +47,14 @@ export interface ProgressBaseProps {
    * Custom label text
    */
   label?: string;
+
+  /**
+   * Custom content in the circular dial's center, independent of its value or
+   * animation. Replaces the visual label when non-null; ignored by other
+   * variants. Compose non-interactive content and name the progressbar with
+   * `aria-label` separately. Omit or pass null to keep `showLabel`/`label`.
+   */
+  centerContent?: ReactNode;
 
   /**
    * Number of segments for segmented variant

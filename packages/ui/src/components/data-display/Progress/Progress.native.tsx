@@ -34,6 +34,7 @@ import {
 } from './Progress.metrics';
 import type { ProgressProps, ProgressSize, ProgressVariant } from './Progress.types.native';
 import { useLoopedProgress } from '../../../platform/animation';
+import { renderTextChildren } from '../../../platform/text-children';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import type { ColorValue } from '../../../tokens/vocabulary';
 
@@ -233,7 +234,8 @@ function CircularView({
   rest,
   thickness,
   circularSize,
-}: ViewArgs & { thickness: number; circularSize?: number }): React.JSX.Element {
+  centerContent,
+}: ViewArgs & { thickness: number; circularSize?: number; centerContent?: React.ReactNode }): React.JSX.Element {
   const theme = useUiTheme();
   const indeterminate = value === undefined;
   const pulseStyle = usePulseStyle(pulse);
@@ -243,31 +245,37 @@ function CircularView({
 
   return (
     <View ref={containerRef} testID={testID} style={[styles.inline, style]}>
-      <Animated.View
-        testID={elementTestID}
-        role="progressbar"
-        {...valueAria(value)}
-        style={[box, glow ? circularGlowStyle(theme, color) : null, pulseStyle]}
-        {...rest}
-      >
-        <Animated.View style={[box, spin]}>
-          <CircularDial
-            diameter={diameter}
-            thickness={thickness}
-            stroke={progressPalette(theme, color).main}
-            dashOffset={
-              indeterminate
-                ? circularCircumference(thickness) * (1 - CIRCULAR_INDETERMINATE.arc)
-                : circularDashOffset(displayValue, thickness)
-            }
-          />
+      <View style={[box, styles.inline]}>
+        <Animated.View
+          testID={elementTestID}
+          role="progressbar"
+          {...valueAria(value)}
+          style={[box, glow ? circularGlowStyle(theme, color) : null, pulseStyle]}
+          {...rest}
+        >
+          <Animated.View style={[box, spin]}>
+            <CircularDial
+              diameter={diameter}
+              thickness={thickness}
+              stroke={progressPalette(theme, color).main}
+              dashOffset={
+                indeterminate
+                  ? circularCircumference(thickness) * (1 - CIRCULAR_INDETERMINATE.arc)
+                  : circularDashOffset(displayValue, thickness)
+              }
+            />
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
-      {showLabel && !indeterminate ? (
-        <View style={[StyleSheet.absoluteFill, styles.centre]}>
-          <ProgressLabel size={size} label={displayLabel} testID={`${testID}-label`} muted />
-        </View>
-      ) : null}
+        {centerContent != null ? (
+          <View testID={`${testID}-center`} style={[StyleSheet.absoluteFill, styles.centre]}>
+            {renderTextChildren(centerContent, labelStyle(theme, size, true))}
+          </View>
+        ) : showLabel && !indeterminate ? (
+          <View style={[StyleSheet.absoluteFill, styles.centre]}>
+            <ProgressLabel size={size} label={displayLabel} testID={`${testID}-label`} muted />
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -328,6 +336,7 @@ export const Progress = React.forwardRef<View, ProgressProps>((rawProps, ref) =>
     pulse,
     showLabel,
     label,
+    centerContent,
     segments,
     thickness,
     circularSize,
@@ -365,6 +374,7 @@ export const Progress = React.forwardRef<View, ProgressProps>((rawProps, ref) =>
         elementTestID={elementId ?? `${base}-circular`}
         thickness={thickness}
         circularSize={circularSize}
+        centerContent={centerContent}
       />
     );
   }
