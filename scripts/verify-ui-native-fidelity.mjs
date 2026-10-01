@@ -34,24 +34,36 @@ try {
       await page.goto(`${baseUrl}/iframe.html?id=feedback-progress--custom-circular-center&viewMode=story`, { waitUntil: 'networkidle' });
       await page.getByRole('progressbar', { name: 'Task progress' }).waitFor({ state: 'visible' });
       assert.equal(await page.getByTestId('progress-center').innerText().then((s) => s.includes('00:40')), true);
-      const dial = await boxes(page.getByTestId('progress'));
+      const dial = await boxes(page.getByTestId('progress-circular'));
       const center = await boxes(page.getByTestId('progress-center'));
       assert.ok(Math.abs(dial.x + dial.width / 2 - center.x - center.width / 2) < 1, 'center aligns horizontally');
       assert.ok(Math.abs(dial.y + dial.height / 2 - center.y - center.height / 2) < 1, 'center aligns vertically');
       await shot('circular-center');
       await page.goto(`${baseUrl}/iframe.html?id=overlays-dialog--bottom-sheet&viewMode=story`, { waitUntil: 'networkidle' });
-      for (const close of ['Continue', 'Escape']) {
+      for (const close of ['Save and end', 'Discard', 'Continue', 'Escape']) {
         await page.getByRole('button', { name: 'Open bottom sheet' }).click();
         await page.getByRole('dialog').waitFor({ state: 'visible' });
         const paper = page.getByTestId('dialog', { exact: true });
         await paper.waitFor({ state: 'visible' });
-        // MUI's enter animation is a transform. Wait until its final geometry,
-        // rather than taking a frame in the transition or sleeping a fixed time.
+        // Geometry alone is not completion: MUI Fade changes opacity without
+        // moving the paper. Require settled animations and effective opacity
+        // for both the paper's ancestor chain and the backdrop before shooting.
         await page.waitForFunction(({ height }) => {
           const node = document.querySelector('[data-testid="dialog"]');
           if (!node) return false;
+          const settled = (element) => {
+            let opacity = 1;
+            for (let current = element; current; current = current.parentElement) {
+              const style = getComputedStyle(current);
+              opacity *= Number(style.opacity);
+              if (style.visibility !== 'visible' || style.display === 'none') return false;
+              if (current.getAnimations().some((animation) => animation.playState === 'running')) return false;
+            }
+            return opacity >= 0.999;
+          };
+          const backdrop = document.querySelector('.MuiBackdrop-root, [data-testid="dialog-backdrop"]');
           const box = node.getBoundingClientRect();
-          return Math.abs(height - box.bottom - 16) < 1;
+          return Math.abs(height - box.bottom - 16) < 1 && settled(node) && (!backdrop || settled(backdrop));
         }, viewport);
         const rect = await boxes(paper);
         assert.ok(rect.x >= 0 && rect.x + rect.width <= viewport.width, 'paper fits horizontally');
@@ -60,12 +72,24 @@ try {
           const action = await boxes(page.getByRole('button', { name: label, exact: true }));
           assert.ok(action.y >= rect.y && action.y + action.height <= rect.y + rect.height, 'all actions remain inside paper');
         }
-        await shot(close === 'Continue' ? 'bottom-sheet' : 'bottom-sheet-reopened');
+        const actionId = close.toLowerCase().replaceAll(' ', '-');
+        await shot(`bottom-sheet-before-${actionId}`);
         if (close === 'Escape') await page.keyboard.press('Escape');
         else await page.getByRole('button', { name: close, exact: true }).click();
         await page.getByRole('dialog').waitFor({ state: 'hidden' });
-        await shot(close === 'Continue' ? 'continued' : 'dismissed');
+        await shot(`bottom-sheet-after-${actionId}`);
       }
+      await page.goto(`${baseUrl}/iframe.html?id=utility-icon--gallery&viewMode=story`, { waitUntil: 'networkidle' });
+      const soundOn = page.getByTestId('glyph-VolumeUp');
+      const soundOff = page.getByTestId('glyph-VolumeOff');
+      await soundOn.waitFor({ state: 'visible' });
+      await soundOff.waitFor({ state: 'visible' });
+      for (const name of ['VolumeUp', 'VolumeOff']) {
+        const icon = page.getByTestId(`icon-${name}`);
+        assert.equal(await icon.getAttribute('aria-hidden'), 'true', 'glyph remains decorative');
+        assert.ok(await icon.locator('path').count() > 0, 'generated path is rendered');
+      }
+      await shot('sound-glyphs');
       assert.deepEqual(errors, [], 'no runtime warning/error in the new states');
       results.push({ renderer, viewport, status: 'passed' });
     } catch (error) {

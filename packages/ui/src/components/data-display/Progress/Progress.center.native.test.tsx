@@ -20,6 +20,19 @@ describe('Progress circular center (native)', () => {
     expect(screen.queryAllByTestId('progress-label')).toHaveLength(0);
   });
 
+  it('bounds the center to the dial even when the outer wrapper is stretched', () => {
+    render(<Progress variant="circular" circularSize={90} value={50}
+      style={{ width: 600 }} centerContent="Center" />);
+    const dial = screen.getByTestId('progress-circular');
+    const center = screen.getByTestId('progress-center');
+    expect(screen.getByTestId('progress').style.width).toBe('600px');
+    expect(center.parentElement).toBe(dial.parentElement);
+    expect(center.parentElement?.style.width).toBe('90px');
+    expect(center.parentElement?.style.height).toBe('90px');
+    expect(dial.style.width).toBe('90px');
+    expect(dial.style.height).toBe('90px');
+  });
+
   it('wraps raw text and fragments in Text without showLabel, including indeterminate', () => {
     render(<Progress variant="circular" centerContent={<>Waiting {2}</>} testID="pending" />);
     const center = screen.getByTestId('pending-center');
