@@ -17,6 +17,13 @@ export interface ContentToolbarProps {
   hasSelection: boolean;
   /** Number of currently selected items. */
   selectedCount: number;
+  /**
+   * The words for that count — "1 selecionado", "3 selecionados".
+   * A function because the noun agrees with the number. REQUIRED: this package
+   * ships no default copy, and the English it used to hardcode here was the one
+   * string on a pt-BR admin list a host could not replace (FUT-1443).
+   */
+  selectedCountLabel: (count: number) => string;
   /** Select every item on the page. */
   selectAll: () => void;
   /** Clear the current selection. */

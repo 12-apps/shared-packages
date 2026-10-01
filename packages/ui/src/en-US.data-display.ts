@@ -230,6 +230,7 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
     clearSelection: "Clear selection",
     selectAll: "Select all",
     onThisPage: (count) => `${count} on this page`,
+    selectedCount: (count) => `${count} ${count === 1 ? "item selected" : "items selected"}`,
     selectRow: "Select",
     expandRow: "Expand details",
     collapseRow: "Collapse details",

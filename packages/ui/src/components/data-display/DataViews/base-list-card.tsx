@@ -11,10 +11,10 @@ import { type CardSurfaceProps } from "./card-surface";
 import { DropIndicator } from "./data-views-drag";
 import { useDisclosure } from "./base-list-card-disclosure";
 import { actionProps, metaShape, rowStyles, useRowShell } from "./base-list-card-geometry";
+import { StandaloneContainer, useRowLayout } from "./base-list-card-layout";
 import { DiscloseSlot, DragSlot, SelectSlot } from "./base-list-card-gutters";
 import { type DataViewsDensity } from "./data-views-layout-context";
-import { cellRailsTemplate } from "./list-card-rails";
-import { ListCardCells, cellTracks, useCellConfig, type ListCardCellConfig } from "./list-card-cells";
+import { ListCardCells, type ListCardCellConfig } from "./list-card-cells";
 import {
   ListCardActions,
   ListCardCaption,
@@ -42,6 +42,14 @@ import {
  * filter panel that opens and closes. Below `STACK_BREAK` it leaves the shared
  * rails entirely and goes two-line, which is the standard mobile transaction
  * row and beats truncating everything: title + value, then subtitle + status.
+ * A CONFIGURED row keeps the same two facts — its first cell in the title's
+ * place, its `strong` (else last) cell in the value's — and drops the rest
+ * into the expandable body's job. Standalone, the card renders inside a
+ * wrapper that is the query container, since a row cannot query itself.
+ *
+ * A row that OPENS something (a click handler, or a link it renders) ends in a
+ * chevron saying so, at every width — unless it expands, where the disclosure
+ * chevron is the only arrow it carries.
  */
 
 export interface BaseListCardProps extends CardSurfaceProps {
@@ -145,33 +153,6 @@ export interface BaseListCardProps extends CardSurfaceProps {
 }
 
 
-
-
-/**
- * Which cell config applies, and whether this row resolves its own tracks.
- *
- * The list's config wins over the card's: one declaration of the list's shape is
- * the point, so a row inside a group cannot introduce a column of its own. And
- * the template is standalone-only — inside a group the GROUP owns it and the row
- * is subgrid over it, because a row resolving its own tracks is exactly what
- * stops a list from lining up.
- */
-function useResolvedCells(
-  props: BaseListCardProps,
-  inGroup: boolean,
-): {
-  cells: readonly ListCardCellConfig<never>[] | null;
-  configured: boolean;
-  cellTemplate: string | null;
-} {
-  const groupCells = useCellConfig();
-  const cells = groupCells ?? props.cells ?? null;
-  const configured = cells != null && cells.length > 0 && props.row != null;
-  const cellTemplate = configured && !inGroup ? cellRailsTemplate(cellTracks(cells)) : null;
-  return { cells, configured, cellTemplate };
-}
-
-
 /**
  * The row's middle: either the list's configured cells, or the named slots.
  *
@@ -185,6 +166,7 @@ function RowContent({
   slot,
   actionable,
   meta,
+  opens,
 }: {
   card: BaseListCardProps;
   cells: readonly ListCardCellConfig<never>[] | null;
@@ -192,6 +174,8 @@ function RowContent({
   slot: (name: string) => string | undefined;
   actionable: boolean;
   meta: { columns: number; present: boolean };
+  /** Whether the row ends in the "this opens" chevron. */
+  opens: boolean;
 }): React.JSX.Element {
   if (configured && cells != null) {
     return (
@@ -206,6 +190,7 @@ function RowContent({
           actions={actionable ? card.actions : undefined}
           alwaysVisible={card.actionsAlwaysVisible}
           menu={card.menu}
+          opens={opens}
           testId={slot}
         />
       </>
@@ -227,6 +212,7 @@ function RowContent({
         actions={actionable ? card.actions : undefined}
         actionsAlwaysVisible={card.actionsAlwaysVisible}
         menu={card.menu}
+        opens={opens}
         testId={slot}
       />
     </>
@@ -294,46 +280,56 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
   const { actionable, selectable, slot, drag, reserve, pad, padY, acts } = shell;
   const meta = metaShape(props);
   const disclosure = useDisclosure(props);
-  const { cells, configured, cellTemplate } = useResolvedCells(props, shell.group != null);
+  const { cells, configured, cellTemplate, opens, stack } = useRowLayout(props, shell, disclosure.expandable);
 
   return (
-    <Card
-      variant="outlined"
-      className={props.className}
-      dataTestId={props.testId}
-      aria-label={props["aria-label"]}
-      aria-disabled={actionable ? undefined : true}
-      onContextMenu={props.onContextMenu}
-      {...(acts ? actionProps(onClick) : {})}
-      {...drag.itemProps}
-      // A PLAIN OBJECT: `Card` merges by spreading, so a function sx vanishes.
-      sx={rowStyles(props, shell, cellTemplate)}
-    >
-      {drag.dropEdge != null && <DropIndicator edge={drag.dropEdge} />}
-      <DiscloseSlot
-        expandable={disclosure.expandable}
-        expanded={disclosure.expanded}
-        reserve={reserve}
-        onToggle={disclosure.toggle}
-        controls={disclosure.regionId}
-        testId={slot("disclose")}
-      />
-      <DragSlot drag={drag} reserve={reserve} testId={slot("drag")} />
-      <SelectSlot
-        selectable={selectable}
-        selected={selected}
-        reserve={reserve}
-        onToggleSelect={props.onToggleSelect}
-        testId={slot("checkbox")}
-      />
-      <Box data-slot="leading" sx={{ display: "flex", alignItems: "center" }}>
-        {props.leading}
-      </Box>
-      <RowContent card={props} cells={cells} configured={configured} slot={slot} actionable={actionable} meta={meta} />
-      <ExpandableBody disclosure={disclosure} padY={padY} pad={pad}>
-        {props.children}
-      </ExpandableBody>
-    </Card>
+    <StandaloneContainer inGroup={shell.group != null}>
+      <Card
+        variant="outlined"
+        className={props.className}
+        dataTestId={props.testId}
+        aria-label={props["aria-label"]}
+        aria-disabled={actionable ? undefined : true}
+        onContextMenu={props.onContextMenu}
+        {...(acts ? actionProps(onClick) : {})}
+        {...drag.itemProps}
+        // A PLAIN OBJECT: `Card` merges by spreading, so a function sx vanishes.
+        sx={rowStyles(props, shell, cellTemplate, stack)}
+      >
+        {drag.dropEdge != null && <DropIndicator edge={drag.dropEdge} />}
+        <DiscloseSlot
+          expandable={disclosure.expandable}
+          expanded={disclosure.expanded}
+          reserve={reserve}
+          onToggle={disclosure.toggle}
+          controls={disclosure.regionId}
+          testId={slot("disclose")}
+        />
+        <DragSlot drag={drag} reserve={reserve} testId={slot("drag")} />
+        <SelectSlot
+          selectable={selectable}
+          selected={selected}
+          reserve={reserve}
+          onToggleSelect={props.onToggleSelect}
+          testId={slot("checkbox")}
+        />
+        <Box data-slot="leading" sx={{ display: "flex", alignItems: "center" }}>
+          {props.leading}
+        </Box>
+        <RowContent
+          card={props}
+          cells={cells}
+          configured={configured}
+          slot={slot}
+          actionable={actionable}
+          meta={meta}
+          opens={opens}
+        />
+        <ExpandableBody disclosure={disclosure} padY={padY} pad={pad}>
+          {props.children}
+        </ExpandableBody>
+      </Card>
+    </StandaloneContainer>
   );
 }
 

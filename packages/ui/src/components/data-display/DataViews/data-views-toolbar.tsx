@@ -160,6 +160,7 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
         clearAllText={copy.filters.clearAll}
         hasSelection={selectedRows.length > 0}
         selectedCount={selectedRows.length}
+        selectedCountLabel={copy.selection.selectedCount}
         selectAll={props.selectAll}
         clearSelection={props.clearSelection}
         selectAllTestId={`${testIdPrefix}-select-all`}

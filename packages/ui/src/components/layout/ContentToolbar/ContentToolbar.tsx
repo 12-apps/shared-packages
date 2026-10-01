@@ -27,6 +27,7 @@ type SelectionClusterProps = Pick<
   ContentToolbarProps,
   | 'hasSelection'
   | 'selectedCount'
+  | 'selectedCountLabel'
   | 'selectAll'
   | 'clearSelection'
   | 'actions'
@@ -43,6 +44,7 @@ type SelectionClusterProps = Pick<
 function SelectionCluster({
   hasSelection,
   selectedCount,
+  selectedCountLabel,
   selectAll,
   clearSelection,
   actions,
@@ -106,6 +108,7 @@ function SelectionCluster({
       {hasSelection ? (
         <SelectionState
           selectedCount={selectedCount}
+          selectedCountLabel={selectedCountLabel}
           clearSelection={clearSelection}
           clearAllTestId={clearAllTestId}
           clearAllText={clearAllText}
@@ -128,13 +131,14 @@ function SelectionCluster({
  */
 function SelectionState({
   selectedCount,
+  selectedCountLabel,
   clearSelection,
   clearAllTestId,
   clearAllText,
   selectionExtra,
 }: Pick<
   ContentToolbarProps,
-  'selectedCount' | 'clearSelection' | 'clearAllTestId' | 'clearAllText' | 'selectionExtra'
+  'selectedCount' | 'selectedCountLabel' | 'clearSelection' | 'clearAllTestId' | 'clearAllText' | 'selectionExtra'
 >): React.JSX.Element {
   return (
     <>
@@ -154,7 +158,7 @@ function SelectionState({
         data-testid="selected-count-indicator"
         sx={{ fontSize: sxRem(14), color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
       >
-        {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
+        {selectedCountLabel(selectedCount)}
       </Typography>
       {selectionExtra !== undefined && (
         <>
@@ -246,7 +250,7 @@ function BrowsingClusters({
 /**
  * Shared toolbar for content pages (Favorites, Personal Space, Recents, …). The
  * left cluster owns selection chrome — **Select All**, and once items are
- * selected, **Clear All** + an "N items selected" count + an optional `actions`
+ * selected, **Clear All** + the count (`selectedCountLabel`) + an optional `actions`
  * slot. The right cluster is a free `rightControls` slot for page-specific
  * controls (ViewSelector, SortByDropdown, MultiSelectDropdown, FilterTrigger).
  *
@@ -259,6 +263,7 @@ function BrowsingClusters({
  * <ContentToolbar
  *   hasSelection={selected.size > 0}
  *   selectedCount={selected.size}
+ *   selectedCountLabel={(n) => `${n} ${n === 1 ? 'selecionado' : 'selecionados'}`}
  *   selectAll={selectAll}
  *   clearSelection={clear}
  *   rightControls={
@@ -275,6 +280,7 @@ function BrowsingClusters({
 export function ContentToolbar({
   hasSelection,
   selectedCount,
+  selectedCountLabel,
   selectAll,
   clearSelection,
   rightControls,
@@ -317,6 +323,7 @@ export function ContentToolbar({
           clearAllText={clearAllText}
           hasSelection={hasSelection}
           selectedCount={selectedCount}
+          selectedCountLabel={selectedCountLabel}
           selectAll={selectAll}
           clearSelection={clearSelection}
           actions={actions}

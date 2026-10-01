@@ -74,7 +74,89 @@ interface RowSxOptions {
   divider: boolean;
   interactive: boolean;
   draggable: boolean;
+  /** What the two-line layout below `STACK_BREAK` has to place by name. */
+  stack: StackPlacement;
 }
+
+/**
+ * The slots the stacked row places that the named-slot rules cannot know about.
+ *
+ * For a CONFIGURED row, `firstCell` is the cell that takes the title's place and
+ * `valueCell` the one that takes the value's (null for a named-slot row, or for
+ * a one-cell row with no value to show). `expandable` decides whether the
+ * disclosure button gets a place or, when it is only a reserved empty gutter,
+ * none at all.
+ */
+export interface StackPlacement {
+  firstCell: string | null;
+  valueCell: string | null;
+  expandable: boolean;
+}
+
+/** A `[data-slot="cell-<id>"]` child selector, quoted so any id is safe. */
+const cellSlot = (id: string): string => `& > [data-slot=${JSON.stringify(`cell-${id}`)}]`;
+
+/**
+ * A configured row, stacked, keeps the SAME two facts a named-slot row keeps:
+ * what the record is (the first cell, in the title's place on line 1) and the
+ * figure it is about (the value cell, on line 2 from under the title to the
+ * right edge, where an `end` cell sits flush right). Every other cell goes, as
+ * `meta` goes — a row is a fixed-height scanning unit, and what does not fit
+ * belongs in its expandable body.
+ *
+ * Left to auto-placement these cells had flowed into whatever track was free:
+ * a name squeezed beside the glyph, an amount clipped to "R$ …".
+ *
+ * The hide-all rule comes first and the two named cells after it: the
+ * selectors have equal specificity, so the later rule wins for those cells.
+ */
+function stackedCells(stack: StackPlacement): Record<string, unknown> {
+  if (stack.firstCell == null) return {};
+  return {
+    '& > [data-slot^="cell-"]': { display: "none" },
+    [cellSlot(stack.firstCell)]: { display: "flex", gridArea: "1 / 3" },
+    ...(stack.valueCell == null ? {} : { [cellSlot(stack.valueCell)]: { display: "flex", gridArea: "2 / 3 / 3 / 5" } }),
+  };
+}
+
+/**
+ * TWO-LINE, below the point where the shared rails stop helping.
+ *
+ * The standard mobile transaction row: what the record IS and what it COST
+ * on the first line, the supporting detail on the second. Better than
+ * truncating four columns into ellipses, and the reason each slot carries a
+ * `data-slot` — the placement is explicit rather than whatever order the
+ * children happen to be in.
+ *
+ *   [ select ][ leading ][ title …………… ][   menu ]
+ *   [ (disclose) ]       [ (cells) …………… ][  value ]
+ *
+ * The MENU stays in the top-right corner at every width. It is the row's
+ * one fixed landmark — an overflow that moves to the second line on a phone
+ * is an overflow nobody finds twice.
+ */
+const stackedRowSx = (inGroup: boolean, railCount: number, stack: StackPlacement): Record<string, unknown> => ({
+  gridTemplateColumns: "auto auto minmax(0, 1fr) max-content",
+  // The GROUP's track count, which a configured list sets from its cells
+  // (`cellRailCount`) — not the named-slot RAIL_COUNT, which over-spans a
+  // configured group and adds an implicit track at its end.
+  ...(inGroup ? { gridColumn: `span ${railCount}` } : {}),
+  rowGap: 0.75,
+  columnGap: 1,
+  '& > [data-slot="drag"]': { display: "none" },
+  // The disclosure button, when there is one, under the checkbox: the head of
+  // the row, where it sits at every other width — never beside the menu, where
+  // it read as an "open" arrow. A reserved empty gutter takes no place at all.
+  '& > [data-slot="disclose"]': stack.expandable ? { gridArea: "2 / 1", justifySelf: "center" } : { display: "none" },
+  '& > [data-slot="select"]': { gridArea: "1 / 1" },
+  '& > [data-slot="leading"]': { gridArea: "1 / 2" },
+  '& > [data-slot="caption"]': { gridArea: "1 / 3" },
+  '& > [data-slot="actions"]': { gridArea: "1 / 4", justifyContent: "flex-end" },
+  '& > [data-slot="meta"]': { display: "none" },
+  // Second line, starting under the title rather than under the checkbox.
+  '& > [data-slot="value"]': { gridArea: "2 / 4", textAlign: "right" },
+  ...stackedCells(stack),
+});
 
 /**
  * DIVIDER COMPOSES WITH THE VARIANT — it changes the row's SHAPE, not its
@@ -91,7 +173,7 @@ interface RowSxOptions {
  * {@link rowStyles}.
  */
 export const rowSx = (theme: Theme, opts: RowSxOptions): Record<string, unknown> => {
-  const { inGroup, railCount, cellTemplate, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable } = opts;
+  const { inGroup, railCount, cellTemplate, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable, stack } = opts;
   return {
     position: "relative",
     borderRadius: CARD_RADIUS,
@@ -103,13 +185,14 @@ export const rowSx = (theme: Theme, opts: RowSxOptions): Record<string, unknown>
     // computed `grid-template-columns: 1222px` on a card asking for subgrid.)
     //
     // So inside a group the GROUP is the query container and the row is the
-    // subgrid; standalone, the row is both the container and its own grid.
+    // subgrid. Standalone, the row is its own grid but NOT its own container:
+    // a container query matches an ANCESTOR, never the element itself, so a
+    // row that was its own container placed its children for two lines while
+    // its own template stayed wide. A standalone card renders inside a wrapper
+    // that is the container (`BaseListCard`).
     ...(inGroup
       ? { gridColumn: `span ${railCount}`, gridTemplateColumns: "subgrid" }
-      : {
-          containerType: "inline-size",
-          gridTemplateColumns: cellTemplate ?? railsTemplateFor(gutters, metaColumns),
-        }),
+      : { gridTemplateColumns: cellTemplate ?? railsTemplateFor(gutters, metaColumns) }),
     alignItems: "center",
     // Wide enough that the meta cluster, the value and the status read as three
     // columns rather than one run of text — the complaint that started all this
@@ -128,34 +211,8 @@ export const rowSx = (theme: Theme, opts: RowSxOptions): Record<string, unknown>
       outlineColor: "primary.main",
       outlineOffset: rem(theme, 2),
     },
-    // TWO-LINE, below the point where the shared rails stop helping.
-    //
-    // The standard mobile transaction row: what the record IS and what it COST
-    // on the first line, the supporting detail on the second. Better than
-    // truncating four columns into ellipses, and the reason each slot carries a
-    // `data-slot` — the placement is explicit rather than whatever order the
-    // children happen to be in.
-    //
-    //   [ select ][ leading ][ title …………… ][   menu ]
-    //                        [ (cells) …………… ][  value ]
-    //
-    // The MENU stays in the top-right corner at every width. It is the row's
-    // one fixed landmark — an overflow that moves to the second line on a phone
-    // is an overflow nobody finds twice.
-    [`@container (max-width: ${rem(theme, STACK_BREAK)})`]: {
-      gridTemplateColumns: "auto auto minmax(0, 1fr) max-content",
-      ...(inGroup ? { gridColumn: `span ${RAIL_COUNT}` } : {}),
-      rowGap: 0.75,
-      columnGap: 1,
-      '& > [data-slot="drag"]': { display: "none" },
-      '& > [data-slot="select"]': { gridArea: "1 / 1" },
-      '& > [data-slot="leading"]': { gridArea: "1 / 2" },
-      '& > [data-slot="caption"]': { gridArea: "1 / 3" },
-      '& > [data-slot="actions"]': { gridArea: "1 / 4", justifyContent: "flex-end" },
-      '& > [data-slot="meta"]': { display: "none" },
-      // Second line, starting under the title rather than under the checkbox.
-      '& > [data-slot="value"]': { gridArea: "2 / 4", textAlign: "right" },
-    },
+    // TWO-LINE below STACK_BREAK: see {@link stackedRowSx}.
+    [`@container (max-width: ${rem(theme, STACK_BREAK)})`]: stackedRowSx(inGroup, railCount, stack),
     ...(divider
       ? { borderRadius: 0, borderWidth: 0, borderBottomWidth: 1, borderStyle: "solid" }
       : {}),
@@ -262,23 +319,37 @@ function rowSurface(
   return { ...surface, borderBottomColor: theme.palette.divider };
 }
 
+/**
+ * Which head gutters this row renders: the ones it uses, or all three when its
+ * group reserves them. ONE answer for the template and the slots, because a
+ * template that disagrees with the slots is exactly how cells slid two tracks.
+ */
+export function rowGutters(
+  props: BaseListCardProps,
+  shell: ReturnType<typeof useRowShell>,
+): { disclose: boolean; drag: boolean; select: boolean } {
+  const { selectable, drag, reserve } = shell;
+  return {
+    disclose: reserve || props.children != null,
+    drag: reserve || drag.draggable,
+    select: reserve || selectable,
+  };
+}
+
 export function rowStyles(
   props: BaseListCardProps,
   shell: ReturnType<typeof useRowShell>,
   cellTemplate: string | null,
+  stack: StackPlacement,
 ): Record<string, unknown> {
-  const { theme, group, selectable, drag, reserve, pad, padY, scale, acts } = shell;
+  const { theme, group, drag, pad, padY, scale, acts } = shell;
   return {
     ...rowSurface(props, shell),
     ...rowSx(theme, {
       inGroup: group !== null,
       railCount: group?.railCount ?? RAIL_COUNT,
       cellTemplate,
-      gutters: {
-        disclose: reserve || props.children != null,
-        drag: reserve || drag.draggable,
-        select: reserve || selectable,
-      },
+      gutters: rowGutters(props, shell),
       metaColumns: metaShape(props).columns,
       pad,
       padY,
@@ -286,6 +357,7 @@ export function rowStyles(
       divider: props.divider ?? false,
       interactive: acts || props.href != null,
       draggable: drag.draggable && drag.handleProps === undefined,
+      stack,
     }),
   };
 }

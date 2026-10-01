@@ -206,16 +206,32 @@ export const RAIL_COUNT = 8;
  */
 const CELL_FIXED_RAILS = 4;
 
-/** Tracks for a cell-configured row: gutters, leading, the cells, then the menu. */
-export function cellRailsTemplate(cells: readonly string[]): string {
+/**
+ * Tracks for a cell-configured row: gutters, leading, the cells, then the menu.
+ *
+ * `gutters` says which of the three head gutters RENDER. A group reserves all
+ * three (the default), so every row spans the same tracks. A standalone row
+ * renders a gutter only when it uses it, and a track whose slot renders nothing
+ * is not a reserved gap: grid auto-placement fills it with the NEXT slot. So the
+ * checkbox landed in the disclosure track, the glyph in the drag track, and
+ * every cell two tracks early, in a column sized for something else. The named-
+ * slot layout already drops absent gutters ({@link railsTemplateFor}); this is
+ * the same rule for configured cells.
+ */
+export function cellRailsTemplate(
+  cells: readonly string[],
+  gutters: { disclose: boolean; drag: boolean; select: boolean } = { disclose: true, drag: true, select: true },
+): string {
   return [
-    DEFAULT_RAILS.disclose,
-    DEFAULT_RAILS.drag,
-    DEFAULT_RAILS.select,
+    gutters.disclose ? DEFAULT_RAILS.disclose : null,
+    gutters.drag ? DEFAULT_RAILS.drag : null,
+    gutters.select ? DEFAULT_RAILS.select : null,
     DEFAULT_RAILS.leading,
     ...cells,
     DEFAULT_RAILS.actions,
-  ].join(" ");
+  ]
+    .filter((rail): rail is string => rail != null)
+    .join(" ");
 }
 
 /** How many tracks such a row spans — the fixed head/tail plus one per cell. */
