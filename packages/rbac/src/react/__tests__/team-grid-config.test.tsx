@@ -73,6 +73,15 @@ describe("teamColumns roles cell", () => {
   });
 });
 
+describe("teamColumns name column", () => {
+  it("keeps a width floor, so a phone scrolls the table instead of stacking the name", () => {
+    const name = teamColumns(labels, copy).find((c) => c.id === "name");
+
+    // ADR 0074 U1 (FUT-3144): at 390 "Ana Beatriz Ramos" wrapped one word per line.
+    expect(name?.minWidth).toBe(200);
+  });
+});
+
 describe("teamExportColumns", () => {
   it("translates every additional SEEDED role in the customRoles export column", () => {
     const column = teamExportColumns(labels, copy).find(
