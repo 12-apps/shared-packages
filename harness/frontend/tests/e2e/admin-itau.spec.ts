@@ -44,3 +44,21 @@ test('it ships a setup guide, like the providers beside it', async ({ page }) =>
   await expect(page.getByTestId('payments-setup-guide')).toBeVisible();
   await expect(page.locator('[data-testid^="payments-setup-section-"]')).toBeVisible();
 });
+
+test('on the narrowest phone, the guide portal button stays inside its step', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await openPage(page, 'payments-provider-settings');
+  await openAdminCase(page, 'guides');
+  await openProvider(page, 'itau');
+
+  const button = page.getByRole('link', { name: /Abrir o portal do desenvolvedor/ });
+  await expect(button).toBeVisible();
+  // The step row is the button's parent: its label is the longest of any
+  // guide's, and at 320px it used to run 47px past the step's border.
+  const spill = await button.evaluate((element) => {
+    const own = element.getBoundingClientRect();
+    const row = (element.parentElement as HTMLElement).getBoundingClientRect();
+    return Math.max(own.right - row.right, row.left - own.left);
+  });
+  expect(spill).toBeLessThanOrEqual(0.5);
+});
