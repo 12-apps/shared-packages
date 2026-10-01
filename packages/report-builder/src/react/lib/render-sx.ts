@@ -33,9 +33,12 @@ export const CHART_BOX_SX = {
   // The radius itself comes from the page's surface, which rounds every
   // container to one value; importing it here would close a cycle back through
   // `report-grid`, which renders this file.
+  "& .MuiPaper-root": { boxShadow: "none", backgroundImage: "none" },
   // No second padding either: the block card already pads its content, and the
   // chart's own 16px on each side came straight out of the plot on a phone.
-  "& .MuiPaper-root": { boxShadow: "none", backgroundImage: "none", padding: 0 },
+  // The CHART's paper only (`>`): the hover tooltip is a Paper drawn inside
+  // the chart too, and it keeps its padding around the amount it shows.
+  "& > .MuiPaper-root": { padding: 0 },
   "& .recharts-bar-rectangle path, & .recharts-rectangle, & path.recharts-sector": {
     fillOpacity: 0.82,
   },

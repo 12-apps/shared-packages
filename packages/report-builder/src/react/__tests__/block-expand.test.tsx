@@ -106,6 +106,9 @@ describe("a dashboard block's table is bounded", () => {
     expect(within(table).getAllByText(/^Produto \d+$/)).toHaveLength(30);
     expect(isBounded(table)).toBe(true);
     expect(emittedCss()).toMatch(/\.MuiTableHead-root \.MuiTableCell-root\{[^}]*position:sticky;top:0;/);
+    // The design system's table clips, which would pin the header to the
+    // table instead of the scroller: it must not, inside a bounded block.
+    expect(emittedCss()).toMatch(/\.MuiTableContainer-root \.MuiTable-root\{overflow:visible;\}/);
   });
 
   it("leaves a block with a chosen height to fill it, with no expand offered", () => {

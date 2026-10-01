@@ -12,6 +12,8 @@
  * author gave a height (`Altura`), and the dialog itself all draw it whole.
  */
 
+import type { Theme } from "@12-apps/ui/mui/styles";
+
 /** About ten 36px rows under the 36px header. */
 export const BOUNDED_TABLE_MAX_HEIGHT_PX = 400;
 
@@ -27,10 +29,19 @@ export const BOUNDED_TABLE_SX = {
     maxHeight: `${BOUNDED_TABLE_MAX_HEIGHT_PX}px`,
     overflowY: "auto",
   },
+  // The design system's table clips (`overflow: hidden`), and a clipping box
+  // between a sticky cell and its scroller pins the cell to the CLIPPING box,
+  // which never scrolls: the header scrolled away with the rows. The scroller
+  // above already clips, so the table need not.
+  "& .MuiTableContainer-root .MuiTable-root": { overflow: "visible" },
   "& .MuiTable-root .MuiTableHead-root .MuiTableCell-root": {
     position: "sticky",
     top: 0,
     zIndex: 1,
     backgroundColor: "background.paper",
+    // The table collapses its borders, and a collapsed border stays with the
+    // table, not with a stuck cell: scrolled, the rule under the header would
+    // vanish. An inset shadow is the cell's own, so it travels with it.
+    boxShadow: (theme: Theme) => `inset 0 -1px 0 ${theme.palette.divider}`,
   },
 } as const;

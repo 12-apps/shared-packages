@@ -20,7 +20,7 @@
  * `ReportRenderView` therefore takes a plain `asTable` boolean and holds no
  * state of its own: one code path, not a controlled/uncontrolled pair.
  */
-import { useCallback, useState, type JSX } from "react";
+import { useCallback, useEffect, useState, type JSX } from "react";
 
 import { exportColumnsFor } from "../report-render";
 import type { ReportRender } from "../reports-api";
@@ -106,6 +106,11 @@ export function useBlockTableView(render: ReportRender | undefined): BlockTableV
   const canToggle = render?.kind === "chart" && render.rows.length > 0;
   const showsTable =
     (render?.kind === "table" && render.rows.length > 0) || (asTable && canToggle);
+  // Forget an open dialog once its table is gone, so it never reopens by
+  // itself when the rows come back.
+  useEffect(() => {
+    if (!showsTable) setExpanded(false);
+  }, [showsTable]);
   return {
     render,
     asTable: asTable && canToggle,
