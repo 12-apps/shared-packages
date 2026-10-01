@@ -846,6 +846,36 @@ describe('team routes', () => {
     expect(data(response)).toEqual({ status: 'invited' });
     expect(invites).toEqual([{ email: 'novo@example.com' }]);
   });
+
+  // FUT-3135: the screen's confirmation opens the new member's profile, so a
+  // live grant carries the id the port reported — and only a live grant does.
+  it('POST /team answers the member id on a live grant, and none on a deferred one', async () => {
+    async function answer(result: { status: 'added' | 'invited'; userId?: string }) {
+      const h = createTestHost({
+        invites: {
+          invite: async () => result,
+          listPending: async () => [],
+          cancel: async () => undefined,
+        },
+      });
+      await h.api.seedTenantRoles(TENANT);
+      enrolMember(h.state, TENANT, 'owner-1', 'DIRECTOR');
+      return data(
+        await call(h, 'POST', '/team', {
+          actor: memberActor(TENANT, 'owner-1'),
+          body: { email: 'ana@example.com' },
+        }),
+      );
+    }
+    expect(await answer({ status: 'added', userId: 'u-ana' })).toEqual({
+      status: 'added',
+      userId: 'u-ana',
+    });
+    // A port that does not know the account still answers — without an id.
+    expect(await answer({ status: 'added' })).toEqual({ status: 'added' });
+    // An id on a deferred invite would name a membership that does not exist.
+    expect(await answer({ status: 'invited', userId: 'u-stray' })).toEqual({ status: 'invited' });
+  });
 });
 
 describe('person × role × tenant is N×M×J', () => {

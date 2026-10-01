@@ -110,6 +110,9 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     inviteDeferredTitle: 'Convite enviado',
     inviteDeferredBody:
       'Enviamos um e-mail com o link para aceitar o convite. O acesso vale assim que a pessoa aceitar.',
+    inviteAddedTitle: 'Adicionado à equipe',
+    inviteAddedBody: (email) => `${email} agora faz parte da equipe.`,
+    inviteAddedOpenAction: 'Ver perfil',
     errorTitle: 'Não foi possível atualizar a equipe',
     emptyState: 'Nenhum administrador cadastrado.',
     exportFileName: 'equipe',

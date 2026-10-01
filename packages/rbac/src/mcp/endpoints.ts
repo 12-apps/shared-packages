@@ -157,7 +157,10 @@ function teamEndpoints(
       {
         params: tenant,
         body: inviteBody,
-        response: envelope(z.object({ status: z.enum(["added", "invited"]) })),
+        // `userId` on a live grant, when the host's port reports it (FUT-3135).
+        response: envelope(
+          z.object({ status: z.enum(["added", "invited"]), userId: z.string().optional() }),
+        ),
       },
       { summary: summaries.inviteTenantAdmin, tags },
     ),
