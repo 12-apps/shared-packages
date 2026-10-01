@@ -210,6 +210,9 @@ export function MemberProfile({
           value={active}
           onChange={handleChange}
           variant="underline"
+          // Four tabs outgrow a phone (541px of labels at 320/390): without
+          // this the row clips and the last two are unreachable (FUT-3147).
+          scrollable
           dataTestId="member-profile-tabs"
         />
       </Dashboard.Body>
