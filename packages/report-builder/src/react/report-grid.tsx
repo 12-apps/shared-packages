@@ -9,20 +9,17 @@
  */
 import type { CSSProperties, JSX, ReactNode } from "react";
 
-import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Card } from "@12-apps/ui/layout/Card";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 import { useMeasuredWidth } from "@12-apps/ui/utility/Overflow";
 
-import type { DashboardBlockRender } from "./custom-reports-api";
 import { BLOCK_FILL_BODY_SX, BLOCK_FILL_CARD_SX, blockCellSx } from "./lib/block-cell";
 import type { DragReorder } from "./lib/drag-reorder";
 import { PRINT_BLOCK_ATTR } from "./lib/print-export";
 import { CONTAINER_RADIUS_PX, GRID_GAP_PX } from "./lib/report-surface";
 import { BLOCK_TOOLS_REVEAL_SX, TOOL_ROW, ToolRowProvider } from "./lib/tool-cluster";
-import { ReportRenderView } from "./report-render";
 
 /**
  * The canvas: twelve columns at EVERY width — a phone gets the same layout
@@ -72,7 +69,8 @@ export function ReportGrid({
 
 /**
  * One placed block: `span` columns on a desktop canvas, widened per tier below
- * it (`sm`/`md` = tablet, `xs` = phone) so narrow screens keep a real layout.
+ * it (`md` = tablet, `sm` = tablet with no half-width split, `xs` = phone) so
+ * narrow screens keep a real layout.
  *
  * The geometry — including why a block no longer GROWS past its span — is in
  * `lib/block-cell`, where it can be asserted on directly.
@@ -365,33 +363,5 @@ export function ReportBlockFrame({
         {fill ? <Box sx={BLOCK_FILL_BODY_SX}>{children}</Box> : children}
       </Stack>
     </Card>
-  );
-}
-
-/**
- * A rendered block's body: its result, or the compiler's actionable message
- * when THIS block's stored spec no longer compiles. A broken block never takes
- * the report down with it — the rest of the canvas still renders.
- */
-export function ReportBlockBody({
-  block,
-  dataTestId,
-  asTable = false,
-}: {
-  block: DashboardBlockRender;
-  dataTestId: string;
-  /** Chart blocks only: draw the rendering as its table (the header toggle). */
-  asTable?: boolean;
-}): JSX.Element {
-  if (block.status === "error") {
-    return (
-      <Alert severity="error" data-testid={`${dataTestId}-error`}>
-        {block.error}
-      </Alert>
-    );
-  }
-  const fill = block.height !== undefined;
-  return (
-    <ReportRenderView render={block.render} dataTestId={`${dataTestId}-render`} asTable={asTable} fill={fill} />
   );
 }

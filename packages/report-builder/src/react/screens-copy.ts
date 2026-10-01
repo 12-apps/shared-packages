@@ -217,6 +217,8 @@ export interface ReportBuilderPanelCopy {
   copyOf(title: string): string;
   viewAsChart: string;
   viewAsTable: string;
+  /** The block tool that opens a bounded table whole, in a dialog. */
+  expandTable: string;
   blockMenu: string;
   /** The per-row remove affordances, numbered because the rows are unlabelled. */
   removeFilter(position: number): string;

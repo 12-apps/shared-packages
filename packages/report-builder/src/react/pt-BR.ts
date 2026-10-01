@@ -168,6 +168,7 @@ export const PT_BR_REPORT_SCREENS_COPY: ReportScreensCopy = {
     copyOf: (title) => `${title} (cópia)`,
     viewAsChart: "Ver como gráfico",
     viewAsTable: "Ver como tabela",
+    expandTable: "Expandir tabela",
     blockMenu: "Mais ações do bloco",
     closePanel: "Fechar painel",
     panelIdle: "Bloco",

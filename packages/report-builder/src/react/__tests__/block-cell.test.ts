@@ -39,7 +39,7 @@ function resolveBasisPx(basis: string, containerPx: number): number {
 }
 
 /** The per-tier basis the cell computes, read without loosening the types. */
-function basisAt(sx: Record<string, unknown>, tier: 'xs' | 'sm' | 'lg'): string {
+function basisAt(sx: Record<string, unknown>, tier: 'xs' | 'sm' | 'md' | 'lg'): string {
   const basis = sx.flexBasis;
   if (typeof basis !== 'object' || basis === null) {
     throw new Error('flexBasis is not a per-tier object');
@@ -108,8 +108,26 @@ describe('blockCellSx — tier widening survives', () => {
   it('gives a 1/3 block the full width on a phone and half on a tablet', () => {
     const cell = blockCellSx(4);
     expect(resolveBasisPx(basisAt(cell, 'xs'), CANVAS_PX)).toBe(CANVAS_PX - 0.5);
-    expect(basisAt(cell, 'sm')).toBe(spanBasis(6));
+    expect(basisAt(cell, 'md')).toBe(spanBasis(6));
     expect(basisAt(cell, 'lg')).toBe(spanBasis(4));
+  });
+
+  /**
+   * FUT-3167: at 600 a half-width card is ~276px, and a sales table beside the
+   * payments donut showed product names with every figure scrolled out of
+   * sight. The canvas splits in two from `md`, never at `sm`.
+   */
+  it('never splits the canvas in two below md', () => {
+    for (const span of [4, 6, 8]) {
+      expect(basisAt(blockCellSx(span), 'sm'), `span ${span}`).toBe(spanBasis(REPORT_GRID_COLUMNS));
+    }
+    expect(basisAt(blockCellSx(6), 'md')).toBe(spanBasis(6));
+  });
+
+  it('keeps quarter and sixth tiles side by side below md', () => {
+    expect(basisAt(blockCellSx(3), 'sm')).toBe(spanBasis(3));
+    expect(basisAt(blockCellSx(2), 'sm')).toBe(spanBasis(3));
+    expect(basisAt(blockCellSx(1), 'sm')).toBe(spanBasis(2));
   });
 
   it('widens a 1-column block to three on a phone rather than leaving it a twelfth', () => {
@@ -120,11 +138,12 @@ describe('blockCellSx — tier widening survives', () => {
     for (let span = 1; span <= REPORT_GRID_COLUMNS; span += 1) {
       const cell = blockCellSx(span);
       const desktop = resolveBasisPx(basisAt(cell, 'lg'), CANVAS_PX);
-      expect(resolveBasisPx(basisAt(cell, 'sm'), CANVAS_PX), `span ${span}`).toBeGreaterThanOrEqual(
-        desktop,
-      );
+      const tablet = resolveBasisPx(basisAt(cell, 'md'), CANVAS_PX);
+      const smallTablet = resolveBasisPx(basisAt(cell, 'sm'), CANVAS_PX);
+      expect(tablet, `span ${span}`).toBeGreaterThanOrEqual(desktop);
+      expect(smallTablet, `span ${span}`).toBeGreaterThanOrEqual(tablet);
       expect(resolveBasisPx(basisAt(cell, 'xs'), CANVAS_PX), `span ${span}`).toBeGreaterThanOrEqual(
-        resolveBasisPx(basisAt(cell, 'sm'), CANVAS_PX),
+        smallTablet,
       );
     }
   });

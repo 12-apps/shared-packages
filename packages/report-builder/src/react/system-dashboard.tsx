@@ -25,6 +25,7 @@ import { Stack } from "@12-apps/ui/mui/Stack";
 
 import { findSystemDashboard } from "../server/system-reports";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
+import { BlockExpandDialog } from "./lib/block-expand-dialog";
 import { PRINT_REGION_ATTR, PrintStyles } from "./lib/print-export";
 import { ReportControls, ReportPageHeader, sectionBackTarget } from "./lib/report-chrome";
 import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
@@ -94,6 +95,7 @@ function DashboardBlock({
                 ? { filename: `relatorio-${report.key}`, dataTestId: `${testId}-export` }
                 : undefined
             }
+            expandable
           />
         }
       >
@@ -107,11 +109,27 @@ function DashboardBlock({
             dataTestId={`${testId}-render`}
             onWidenRange={widenAction(range, onRangeChange, ranges)}
             asTable={tableView.asTable}
+            bounded
           />
         ) : (
           <LoadingState dataTestId={`${testId}-loading`} />
         )}
       </ReportBlockFrame>
+      {report ? (
+        <BlockExpandDialog
+          open={tableView.expanded}
+          onClose={() => tableView.setExpanded(false)}
+          title={title}
+          description={navEntry?.description}
+          dataTestId={`${testId}-expanded`}
+        >
+          <ReportRenderView
+            render={report.render}
+            dataTestId={`${testId}-expanded-render`}
+            asTable={tableView.asTable}
+          />
+        </BlockExpandDialog>
+      ) : null}
     </ReportGridItem>
   );
 }
