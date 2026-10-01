@@ -122,6 +122,9 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     inviteDeferredTitle: 'Invitation sent',
     inviteDeferredBody:
       'We e-mailed them a link to accept the invitation. Access starts the moment they accept.',
+    inviteAddedTitle: 'Added to the team',
+    inviteAddedBody: (email) => `${email} is now on the team.`,
+    inviteAddedOpenAction: 'View profile',
     errorTitle: 'Could not update the team',
     emptyState: 'No administrators yet.',
     exportFileName: 'team',

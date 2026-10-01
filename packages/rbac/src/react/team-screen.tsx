@@ -241,7 +241,7 @@ export function TeamScreen(props: TeamScreenProps): JSX.Element {
           <InviteDialog actions={actions} copy={copy} labels={labels} roles={inviteRoles} />
         )}
         <Dashboard.Body>
-          <TeamBanners actions={actions} copy={copy} />
+          <TeamBanners actions={actions} copy={copy} onOpenMember={props.onOpenMember} />
           <TeamBody
             rows={data.rows}
             labels={labels}

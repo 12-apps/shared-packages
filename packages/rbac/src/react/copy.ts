@@ -163,6 +163,15 @@ export interface TeamScreenCopy {
   /** The success banner shown when a grant was DEFERRED to the person's signup. */
   inviteDeferredTitle: string;
   inviteDeferredBody: string;
+  /**
+   * The success banner for a LIVE grant — the address already had an account
+   * and is a member now (FUT-3135). The body names who, because the new row
+   * may be on a page the operator is not looking at; the action opens their
+   * profile, and shows only when the server reported the member's id.
+   */
+  inviteAddedTitle: string;
+  inviteAddedBody: (email: string) => string;
+  inviteAddedOpenAction: string;
   /** The banner over a failed roster mutation. */
   errorTitle: string;
   /** The grid's empty state. */

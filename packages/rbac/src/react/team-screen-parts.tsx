@@ -8,8 +8,10 @@ import type { useServerDataViews } from '@12-apps/app-shell/react';
 import { Alert } from '@12-apps/ui/data-display/Alert';
 import { DataViewsGrid, type RowAction } from '@12-apps/ui/data-display/DataViews';
 import { Dialog, DialogContent } from '@12-apps/ui/feedback/Dialog';
+import { Button } from '@12-apps/ui/form/Button';
 import { HeaderButton } from '@12-apps/ui/form/HeaderButton';
 import { Dashboard } from '@12-apps/ui/layout/Dashboard';
+import { Box } from '@12-apps/ui/mui/Box';
 import { Text } from '@12-apps/ui/typography/Text';
 import { exportRows } from '@12-apps/ui/utils';
 
@@ -26,7 +28,7 @@ import {
   type TeamExtraColumn,
 } from './team-grid-config';
 import { TeamInviteForm } from './team-invite-form';
-import type { TeamActions } from './use-team-actions';
+import type { AddedMember, TeamActions } from './use-team-actions';
 
 /**
  * The roster screen's chrome — the header controls, the banners, the invite
@@ -83,10 +85,70 @@ export function HeaderControls({
   );
 }
 
-/** The closable banners over the roster: the deferred-grant notice and errors. */
-export function TeamBanners({ actions, copy }: { actions: TeamActions; copy: RbacWebCopy }): JSX.Element {
+/**
+ * The live-grant confirmation (FUT-3135): who was added, and — when the server
+ * named the member and the host routes a profile — the way to them, since the
+ * roster's sort may have put the new row on another page.
+ */
+function AddedBanner({
+  added,
+  copy,
+  onDismiss,
+  onOpenMember,
+}: {
+  added: AddedMember;
+  copy: RbacWebCopy;
+  onDismiss: () => void;
+  onOpenMember?: (userId: string) => void;
+}): JSX.Element {
+  const { userId } = added;
+  return (
+    <Alert
+      closeLabel={copy.closeLabel}
+      variant="success"
+      title={copy.teamScreen.inviteAddedTitle}
+      description={copy.teamScreen.inviteAddedBody(added.email)}
+      closable
+      onClose={onDismiss}
+      data-testid="team-invite-added"
+    >
+      {userId && onOpenMember && (
+        <Box sx={{ mt: 1 }}>
+          <Button
+            size="sm"
+            variant="outline"
+            color="success"
+            onClick={() => onOpenMember(userId)}
+            dataTestId="team-invite-added-open"
+          >
+            {copy.teamScreen.inviteAddedOpenAction}
+          </Button>
+        </Box>
+      )}
+    </Alert>
+  );
+}
+
+/** The closable banners over the roster: the two invite outcomes and errors. */
+export function TeamBanners({
+  actions,
+  copy,
+  onOpenMember,
+}: {
+  actions: TeamActions;
+  copy: RbacWebCopy;
+  onOpenMember?: (userId: string) => void;
+}): JSX.Element {
   return (
     <>
+      {actions.added && (
+        <AddedBanner
+          added={actions.added}
+          copy={copy}
+          onDismiss={actions.dismissAdded}
+          onOpenMember={onOpenMember}
+        />
+      )}
       {actions.notice && (
         <Alert
           closeLabel={copy.closeLabel}

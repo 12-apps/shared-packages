@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { useRowConfirm, type RowConfirm } from '@12-apps/ui/data-display/CardKit';
 
-import type { RbacApiClient } from './api';
+import type { InviteResultWire, RbacApiClient } from './api';
 import type { RbacWebCopy } from './copy';
 import type { InviteSelection } from './team-invite-form';
 import type { TeamRow } from './team-grid-config';
@@ -16,6 +16,18 @@ import { applyRoleSet, type MemberWithRoles } from './team-role-dialog';
  * these are the parts a host might reasonably want to drive itself.
  */
 
+/**
+ * Who a LIVE grant just added — the confirmation's subject (FUT-3135).
+ *
+ * `userId` is present when the server reported it, and is what lets the banner
+ * open the member's profile: the roster is sorted, so the new row may be on a
+ * page the operator is not looking at.
+ */
+export interface AddedMember {
+  email: string;
+  userId?: string;
+}
+
 /** The roster's mutations plus the banner + dialog state they drive. */
 export interface TeamActions {
   error: string | null;
@@ -23,6 +35,9 @@ export interface TeamActions {
   /** The banner for a DEFERRED grant (an accountless address); null otherwise. */
   notice: boolean;
   dismissNotice: () => void;
+  /** The banner for a LIVE grant — who was added; null otherwise. */
+  added: AddedMember | null;
+  dismissAdded: () => void;
   showForm: boolean;
   toggleForm: () => void;
   /** Open the invite dialog (never closes it) — what a host's own "invite" entry calls. */
@@ -34,13 +49,52 @@ export interface TeamActions {
   cancelInvite: (inviteId: string) => Promise<void>;
 }
 
+/** The address as the server keys it — the route trims and lowercases too. */
+function addedMember(email: string, userId: string | undefined): AddedMember {
+  return { email: email.trim().toLowerCase(), ...(userId ? { userId } : {}) };
+}
+
+/**
+ * What the last invite came to, as the two banners read it — at most one of
+ * them set. Its own hook because the two are one piece of state with one rule,
+ * and because `useTeamActions` sits on the 80-line ceiling.
+ */
+function useInviteOutcome(): {
+  banners: Pick<TeamActions, 'notice' | 'dismissNotice' | 'added' | 'dismissAdded'>;
+  clear: () => void;
+  record: (email: string, result: InviteResultWire) => void;
+} {
+  const [notice, setNotice] = useState(false);
+  const [added, setAdded] = useState<AddedMember | null>(null);
+  return {
+    banners: {
+      notice,
+      dismissNotice: () => setNotice(false),
+      added,
+      dismissAdded: () => setAdded(null),
+    },
+    clear: () => {
+      setNotice(false);
+      setAdded(null);
+    },
+    // Both outcomes are SAID, because neither shows reliably in the table: a
+    // deferred grant has no membership yet, and a live one lands wherever the
+    // roster's sort puts it — often another page (FUT-3135). Every status but
+    // `invited` is a live grant; see `InviteResultWire`.
+    record: (email, result) => {
+      if (result.status === 'invited') setNotice(true);
+      else setAdded(addedMember(email, result.userId));
+    },
+  };
+}
+
 export function useTeamActions(
   api: RbacApiClient,
   copy: RbacWebCopy,
   refresh: () => void,
 ): TeamActions {
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState(false);
+  const outcome = useInviteOutcome();
   const [showForm, setShowForm] = useState(false);
   const [formKey, setFormKey] = useState(0);
   // Stable, so a host effect that depends on it runs when the REQUEST changes.
@@ -48,7 +102,7 @@ export function useTeamActions(
 
   async function invite(selection: InviteSelection): Promise<void> {
     setError(null);
-    setNotice(false);
+    outcome.clear();
     const result = await api.inviteMember(selection.email, {
       role: selection.role,
       customRoles: selection.customRoles,
@@ -57,10 +111,7 @@ export function useTeamActions(
       setError(result.error);
       return;
     }
-    // A live grant appears in the roster on refresh; a deferred one does NOT
-    // (there is no membership yet), so the dialog closing on an unchanged table
-    // would read as nothing having happened.
-    setNotice(result.data.status === 'invited');
+    outcome.record(selection.email, result.data);
     refresh();
     setFormKey((key) => key + 1);
     setShowForm(false);
@@ -99,8 +150,7 @@ export function useTeamActions(
   return {
     error,
     setError,
-    notice,
-    dismissNotice: () => setNotice(false),
+    ...outcome.banners,
     showForm,
     toggleForm: () => setShowForm((open) => !open),
     openForm,

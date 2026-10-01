@@ -92,14 +92,21 @@ export interface MemberDetailWire {
 /**
  * What `POST /team` answers.
  *
- * `granted` means the address already had an account and the membership exists
+ * `added` means the address already had an account and the membership exists
  * NOW; `invited` means it does not, and the grant is deferred until the person
- * accepts. The roster refreshes into a new row for the first and does not for
- * the second, which is why the screen has to tell them apart rather than
- * reporting "done" either way.
+ * accepts. The screen tells them apart rather than reporting "done" either way.
+ * `granted` is what this type used to claim the route sent — it never did (the
+ * route forwards the invites port's `added`) — and stays in the union so a
+ * host serving its own `POST /team` in that spelling still reads as a grant:
+ * the screen treats every status but `invited` as one.
+ *
+ * `userId` is the member a live grant created, when the host's port reports it.
+ * It is what lets the confirmation open that member's profile, since the
+ * roster's sort may have put the new row on another page (FUT-3135).
  */
 export interface InviteResultWire {
-  status: 'granted' | 'invited';
+  status: 'added' | 'granted' | 'invited';
+  userId?: string;
 }
 
 /**

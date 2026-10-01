@@ -136,7 +136,10 @@ function inviteRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
           },
         });
         await announceInvite(deps, actor, email, result);
-        return ok({ status: result.status });
+        // A live grant carries the member's id, so the screen's confirmation
+        // can open a profile the roster's sort may have paged away (FUT-3135).
+        const live = result.status === 'added' && result.userId;
+        return ok({ status: result.status, ...(live ? { userId: result.userId } : {}) });
       } catch (error) {
         return foldApiError(error);
       }
