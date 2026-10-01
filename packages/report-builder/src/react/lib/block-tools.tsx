@@ -20,7 +20,7 @@
  * `ReportRenderView` therefore takes a plain `asTable` boolean and holds no
  * state of its own: one code path, not a controlled/uncontrolled pair.
  */
-import { useCallback, useState, type JSX } from "react";
+import { useCallback, useEffect, useState, type JSX } from "react";
 
 import { exportColumnsFor } from "../report-render";
 import type { ReportRender } from "../reports-api";
@@ -49,6 +49,16 @@ function ChartGlyph(): JSX.Element {
   );
 }
 
+/** Two corners pulled apart — "open this bigger" (FUT-3167). */
+function ExpandGlyph(): JSX.Element {
+  return (
+    <Glyph>
+      <path d="M14 4h6v6M20 4l-7 7" />
+      <path d="M10 20H4v-6M4 20l7-7" />
+    </Glyph>
+  );
+}
+
 /** Arrow into a tray — the download convention, and the prototype's CSV glyph. */
 function DownloadGlyph(): JSX.Element {
   return (
@@ -68,6 +78,11 @@ interface BlockTableView {
   /** Whether this rendering HAS a table view: charts with rows, nothing else. */
   canToggle: boolean;
   toggle: () => void;
+  /** Whether a table is on screen right now: a table report, or a chart shown as one. */
+  showsTable: boolean;
+  /** The whole table, open in a dialog (FUT-3167) — see `BlockExpandDialog`. */
+  expanded: boolean;
+  setExpanded: (expanded: boolean) => void;
 }
 
 /**
@@ -87,18 +102,35 @@ export function useBlockTableView(render: ReportRender | undefined): BlockTableV
   const toggle = useCallback(() => {
     setAsTable((current) => !current);
   }, []);
+  const [expanded, setExpanded] = useState(false);
   const canToggle = render?.kind === "chart" && render.rows.length > 0;
-  return { render, asTable: asTable && canToggle, canToggle, toggle };
+  const showsTable =
+    (render?.kind === "table" && render.rows.length > 0) || (asTable && canToggle);
+  // Forget an open dialog once its table is gone, so it never reopens by
+  // itself when the rows come back.
+  useEffect(() => {
+    if (!showsTable) setExpanded(false);
+  }, [showsTable]);
+  return {
+    render,
+    asTable: asTable && canToggle,
+    canToggle,
+    toggle,
+    showsTable,
+    expanded: expanded && showsTable,
+    setExpanded,
+  };
 }
 
 /**
- * The viewer's cluster: the table toggle, then the CSV.
+ * The viewer's cluster: the table toggle, then "expand", then the CSV.
  *
  * RANKED in that order, which is what decides who keeps a visible slot when
- * the block is too narrow for both. The toggle is a chart's real accessibility
- * fallback — for a keyboard or screen-reader user it is the only way to read
- * the values at all — while a CSV is a deliberate, occasional export that a
- * menu row serves perfectly well.
+ * the block is too narrow for all of them. The toggle is a chart's real
+ * accessibility fallback — for a keyboard or screen-reader user it is the only
+ * way to read the values at all. Expand is how a table capped at ten rows is
+ * read in full. A CSV is a deliberate, occasional export that a menu row
+ * serves perfectly well.
  *
  * The CSV is built here rather than at each call site because it is the same
  * three lines everywhere: the rows on screen, `exportColumnsFor` over the SAME
@@ -110,6 +142,7 @@ export function BlockToolCluster({
   renderTestId,
   menuTestId,
   csv,
+  expandable = false,
 }: {
   view: BlockTableView;
   /**
@@ -121,6 +154,11 @@ export function BlockToolCluster({
   menuTestId: string;
   /** Omitted where the page exports from its own toolbar instead. */
   csv?: { filename: string; dataTestId: string };
+  /**
+   * Offer "expand" while a table is on screen — set where the block BOUNDS its
+   * table (a dashboard), never on a report's own page, which draws it whole.
+   */
+  expandable?: boolean;
 }): JSX.Element | null {
   const copy = useReportEngineCopy();
   const words = useReportCopy().screens.builder;
@@ -134,6 +172,15 @@ export function BlockToolCluster({
       pressed: view.asTable,
       onSelect: view.toggle,
       dataTestId: `${renderTestId}-as-table`,
+    });
+  }
+  if (expandable && view.showsTable) {
+    tools.push({
+      id: "expand",
+      label: words.expandTable,
+      icon: <ExpandGlyph />,
+      onSelect: () => view.setExpanded(true),
+      dataTestId: `${renderTestId}-expand`,
     });
   }
   if (csv !== undefined && render !== undefined) {

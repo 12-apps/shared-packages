@@ -82,7 +82,7 @@ function cartesianAxes(ctx: ChartRenderContext): React.ReactNode[] {
       // something.
       width="auto"
       tickMargin={axisConfig.tickMargin}
-      tickFormatter={props.valueFormatter}
+      tickFormatter={props.axisValueFormatter ?? props.valueFormatter}
       allowDecimals={props.allowDecimalTicks !== false}
     />,
   );

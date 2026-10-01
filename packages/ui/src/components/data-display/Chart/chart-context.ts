@@ -40,6 +40,26 @@ export interface ChartRenderContext {
   };
 }
 
+/**
+ * The chart types whose value axis sizes itself to its widest tick
+ * (`width="auto"`, `cartesianAxes`). Their left margin is only room for a
+ * rotated axis TITLE; without one it was 20px of nothing beside the ticks,
+ * taken out of the plot on a phone. Pie, radar and scatter keep it: a pie is
+ * centred between both margins, and scatter's axis is still fixed-width.
+ */
+const AUTO_WIDTH_VALUE_AXIS: ReadonlySet<NonNullable<ChartProps['type']>> = new Set([
+  'line',
+  'bar',
+  'area',
+  'composed',
+]);
+
+/** The default left margin in design px — see {@link AUTO_WIDTH_VALUE_AXIS}. */
+function leftMarginDesignPx(props: ChartProps): number {
+  const autoWidthAxis = AUTO_WIDTH_VALUE_AXIS.has(props.type ?? 'line');
+  return autoWidthAxis && !props.yAxisLabel ? 0 : 20;
+}
+
 export function buildChartContext(props: ChartProps, theme: Theme): ChartRenderContext {
   const sizeStyles = getSizeStyles(theme, props.size, props.height);
   const chartColors = getDefaultColors(theme, props.variant ?? 'default', props.colors);
@@ -72,7 +92,7 @@ export function buildChartContext(props: ChartProps, theme: Theme): ChartRenderC
       margin: {
         top: remPx(theme, 20),
         right: remPx(theme, 30),
-        left: remPx(theme, 20),
+        left: remPx(theme, leftMarginDesignPx(props)),
         bottom: remPx(theme, 20),
         ...marginPx(theme, props.margin),
       },

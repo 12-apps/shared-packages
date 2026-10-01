@@ -24,3 +24,34 @@ export function formatChartValue(value: number, format: ChartNumberFormat = 'dec
 export function chartValueFormatter(format?: ChartNumberFormat): (value: number) => string {
   return (value: number) => formatChartValue(value, format);
 }
+
+/** Whole reais, for an axis tick that has no centavos to show. */
+const brlWhole = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+/**
+ * Format a value-AXIS tick: {@link formatChartValue}, except that a `brl` tick
+ * on a whole real drops its ",00".
+ *
+ * An axis tick is a gridline's name, not an amount anybody reads to the
+ * centavo. Recharts picks round ticks (R$ 45, R$ 90, R$ 135…), so on a phone
+ * "R$ 180,00" spent a fifth of the card on two zeros and squeezed the plot it
+ * labels to ~160px at 390. A tick that does fall between reais keeps its
+ * centavos, so no tick is ever rounded into a value it is not. Tooltips keep
+ * the full amount: they ARE read to the centavo.
+ */
+export function formatChartAxisValue(value: number, format: ChartNumberFormat = 'decimal'): string {
+  if (format === 'brl' && Number.isFinite(value) && value % 100 === 0) {
+    return brlWhole.format(value / 100);
+  }
+  return formatChartValue(value, format);
+}
+
+/** Curried {@link formatChartAxisValue}, memo-friendly for the value axis. */
+export function chartAxisValueFormatter(format?: ChartNumberFormat): (value: number) => string {
+  return (value: number) => formatChartAxisValue(value, format);
+}

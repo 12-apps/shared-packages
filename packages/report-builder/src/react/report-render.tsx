@@ -29,45 +29,11 @@ import {
   type ReportKpiFigure,
   type ReportKpiFormat,
 } from "./lib/kpi-figures";
+import { BOUNDED_TABLE_SX } from "./lib/bounded-table";
+import { CHART_BOX_SX, TABULAR_FIGURES } from "./lib/render-sx";
 import { reportTableColumns } from "./lib/report-table-columns";
 import { GRID_GAP_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportRender, ReportRow, ReportTableColumn } from "./reports-api";
-
-/**
- * Every figure this file renders, in tabular figures.
- *
- * Nothing set `font-variant-numeric` anywhere, so a column of currency lined up
- * only because Roboto happens to ship uniform digit advances — a font swap in a
- * host's theme would have shredded it silently. It is declared once, on each
- * rendering's outermost box, and inherits into table cells, the KPI tile and
- * (SVG text inherits it too) the axis ticks.
- */
-const TABULAR_FIGURES = { fontVariantNumeric: "tabular-nums" } as const;
-
-/**
- * The chart's own box, and the two things it corrects in the chart library.
- *
- * **No shadow on a static card** (`visual-pass.md` §Depth). `SpecChart` renders
- * onto a MUI `Paper`, which arrives with elevation 1 — so a shadowed card sat
- * inside the bordered block card that already frames it. Shadows belong to
- * floating layers: menus, sheets, drag ghosts.
- *
- * **A large fill is never the accent at full strength.** A bar is ~150px of
- * solid `#6366f1` across a card, which dominates every other element on the
- * page including the controls that actually do something. Dropping the fill
- * short of opaque is the cheapest way to put it back behind the text, and it
- * costs the series nothing: the stroke and the legend swatch stay the accent.
- */
-const CHART_BOX_SX = {
-  ...TABULAR_FIGURES,
-  // The radius itself comes from the page's surface, which rounds every
-  // container to one value; importing it here would close a cycle back through
-  // `report-grid`, which renders this file.
-  "& .MuiPaper-root": { boxShadow: "none", backgroundImage: "none" },
-  "& .recharts-bar-rectangle path, & .recharts-rectangle, & path.recharts-sector": {
-    fillOpacity: 0.82,
-  },
-} as const;
 
 /**
  * The product's table, restated over the design system's own defaults.
@@ -150,14 +116,16 @@ function ReportTable({
   columns,
   rows,
   dataTestId,
+  bounded = false,
 }: {
   columns: readonly ReportTableColumn[];
   rows: ReportRow[];
   dataTestId: string;
+  bounded?: boolean;
 }): JSX.Element {
   const copy = useReportEngineCopy();
   return (
-    <Box sx={REPORT_TABLE_SX}>
+    <Box sx={bounded ? [REPORT_TABLE_SX, BOUNDED_TABLE_SX] : REPORT_TABLE_SX}>
       <Table
         emptyText={copy.labels.emptyTable}
         // The design system's own documented default (`TABLE_DEFAULTS.variant`),
@@ -301,6 +269,8 @@ interface ReportRenderViewProps {
    * saved before `Altura` existed does.
    */
   fill?: boolean;
+  /** Cap a table at ~10 rows and scroll it in place — see `lib/bounded-table`. */
+  bounded?: boolean;
 }
 
 /**
@@ -321,11 +291,13 @@ function ChartOrTable({
   dataTestId,
   asTable,
   fill,
+  bounded,
 }: {
   render: Extract<ReportRender, { kind: "chart" }>;
   dataTestId: string;
   asTable: boolean;
   fill: boolean;
+  bounded: boolean;
 }): JSX.Element {
   return (
     <Box sx={CHART_BOX_SX} data-testid={dataTestId}>
@@ -334,6 +306,7 @@ function ChartOrTable({
           columns={chartColumnsOf(render)}
           rows={render.rows}
           dataTestId={dataTestId}
+          bounded={bounded}
         />
       ) : (
         <SpecChart
@@ -362,6 +335,7 @@ export function ReportRenderView({
   onWidenRange,
   asTable = false,
   fill = false,
+  bounded = false,
 }: ReportRenderViewProps): JSX.Element {
   const rangeCopy = useReportCopy().screens.ranges;
   if (render.kind === "kpi") {
@@ -381,11 +355,13 @@ export function ReportRenderView({
     );
   }
   if (render.kind === "chart") {
-    return <ChartOrTable render={render} dataTestId={dataTestId} asTable={asTable} fill={fill} />;
+    return (
+      <ChartOrTable render={render} dataTestId={dataTestId} asTable={asTable} fill={fill} bounded={bounded} />
+    );
   }
   return (
     <Box sx={TABULAR_FIGURES} data-testid={dataTestId}>
-      <ReportTable columns={render.columns} rows={render.rows} dataTestId={dataTestId} />
+      <ReportTable columns={render.columns} rows={render.rows} dataTestId={dataTestId} bounded={bounded} />
     </Box>
   );
 }
