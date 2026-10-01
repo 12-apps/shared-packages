@@ -54,10 +54,10 @@ const AUTO_WIDTH_VALUE_AXIS: ReadonlySet<NonNullable<ChartProps['type']>> = new 
   'composed',
 ]);
 
-/** The default left margin — see {@link AUTO_WIDTH_VALUE_AXIS}. */
-function leftMarginPx(theme: Theme, props: ChartProps): number {
+/** The default left margin in design px — see {@link AUTO_WIDTH_VALUE_AXIS}. */
+function leftMarginDesignPx(props: ChartProps): number {
   const autoWidthAxis = AUTO_WIDTH_VALUE_AXIS.has(props.type ?? 'line');
-  return autoWidthAxis && !props.yAxisLabel ? 0 : remPx(theme, 20);
+  return autoWidthAxis && !props.yAxisLabel ? 0 : 20;
 }
 
 export function buildChartContext(props: ChartProps, theme: Theme): ChartRenderContext {
@@ -92,7 +92,7 @@ export function buildChartContext(props: ChartProps, theme: Theme): ChartRenderC
       margin: {
         top: remPx(theme, 20),
         right: remPx(theme, 30),
-        left: leftMarginPx(theme, props),
+        left: remPx(theme, leftMarginDesignPx(props)),
         bottom: remPx(theme, 20),
         ...marginPx(theme, props.margin),
       },
