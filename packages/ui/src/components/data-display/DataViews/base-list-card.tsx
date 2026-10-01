@@ -41,7 +41,8 @@ import {
  * same row renders full-bleed on a phone, in a 300px board column, and beside a
  * filter panel that opens and closes. Below `STACK_BREAK` it leaves the shared
  * rails entirely and goes two-line, which is the standard mobile transaction
- * row and beats truncating everything: title + value, then subtitle + status.
+ * row and beats truncating everything: the title (with its subtitle) on line
+ * 1, the value under it at the right edge.
  * A CONFIGURED row keeps the same two facts — its first cell in the title's
  * place, its `strong` (else last) cell in the value's — and drops the rest
  * into the expandable body's job. Standalone, the card renders inside a

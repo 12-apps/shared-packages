@@ -41,13 +41,13 @@ function useResolvedCells(
   return { cells, configured, cellTemplate };
 }
 
-
 /**
  * Whether the row ends in the "this opens" chevron: it is live and leads
  * somewhere it can actually go — a click handler, or a link the row renders.
  * Only a named-slot row with a title renders an anchor for `href` (the caption
- * wraps the title), so an `href` alone does not count elsewhere: a chevron on a row that cannot open is the promise the
- * disclosure chevron's docblock warns about. Not when the row expands either:
+ * wraps the title), so an `href` alone does not count elsewhere: a chevron on
+ * a row that cannot open is the promise the disclosure chevron's docblock
+ * warns about. Not when the row expands either:
  * the disclosure chevron already speaks, and a second arrow meaning something
  * else beside it would contradict it.
  */

@@ -243,6 +243,15 @@ describe("which cell stands in for the value when the row stacks", () => {
     expect(stackedValueOf([who(), { id: "total", primary: () => "R$ 9", strong: true }, balance()])).toBe("total");
   });
 
+  it("is the last cell when only the first is strong: the first already holds the title's place", () => {
+    expect(stackedValueOf([{ ...who(), strong: true }, { id: "note", primary: () => "nota" }, balance()])).toBe("balance");
+  });
+
+  it("is the first strong cell after the title when every cell is strong", () => {
+    const strong = (cell: ListCardCellConfig<Row>): ListCardCellConfig<Row> => ({ ...cell, strong: true });
+    expect(stackedValueOf([strong(who()), strong({ id: "total", primary: () => "R$ 9" }), strong(balance())])).toBe("total");
+  });
+
   it("is none for a one-cell row: the first cell already holds the title's place", () => {
     expect(stackedValueOf([who()])).toBeNull();
   });

@@ -122,8 +122,8 @@ function stackedCells(stack: StackPlacement): Record<string, unknown> {
 /**
  * TWO-LINE, below the point where the shared rails stop helping.
  *
- * The standard mobile transaction row: what the record IS and what it COST
- * on the first line, the supporting detail on the second. Better than
+ * The standard mobile transaction row: what the record IS on the first line,
+ * what it COSTS under it at the right edge. Better than
  * truncating four columns into ellipses, and the reason each slot carries a
  * `data-slot` — the placement is explicit rather than whatever order the
  * children happen to be in.
@@ -321,8 +321,10 @@ function rowSurface(
 
 /**
  * Which head gutters this row renders: the ones it uses, or all three when its
- * group reserves them. ONE answer for the template and the slots, because a
- * template that disagrees with the slots is exactly how cells slid two tracks.
+ * group reserves them. The template is built from this; the three gutter slots
+ * (`base-list-card-gutters.tsx`) apply the SAME conditions on their own — keep
+ * the two in step, because a template that disagrees with the slots is exactly
+ * how cells slid two tracks.
  */
 export function rowGutters(
   props: BaseListCardProps,

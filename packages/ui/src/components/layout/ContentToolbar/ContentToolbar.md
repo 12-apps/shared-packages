@@ -50,6 +50,7 @@ import {
 <ContentToolbar
   hasSelection={selected.size > 0}
   selectedCount={selected.size}
+  selectedCountLabel={(n) => `${n} ${n === 1 ? 'selecionado' : 'selecionados'}`}
   selectAll={selectAll}
   clearSelection={clear}
   actions={<DeleteButton />}
