@@ -237,3 +237,23 @@ describe('report table — one style for both call sites', () => {
     expect(screen.getByTestId('grafico-table')).not.toBeNull();
   });
 });
+
+describe('report table — the label column keeps a floor (FUT-3167)', () => {
+  it('gives the first text column a minimum width, and no other column one', () => {
+    const table = renderTableBlock();
+    const headers = Array.from(table.querySelectorAll('thead th'));
+    const minWidths = headers.map((th) => (th as HTMLElement).style.minWidth);
+
+    // The label ("Data (dia)") keeps its floor; the second text column and the
+    // money column size to their content as before.
+    expect(minWidths[0]).not.toBe('');
+    expect(minWidths.slice(1)).toEqual(['', '']);
+  });
+
+  it("gives the chart fallback's label column the same floor", () => {
+    const table = renderChartAsTable();
+    const first = table.querySelector('thead th') as HTMLElement;
+    expect(first.style.minWidth).not.toBe('');
+  });
+});
+

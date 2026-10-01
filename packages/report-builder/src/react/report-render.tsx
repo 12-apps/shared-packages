@@ -29,6 +29,7 @@ import {
   type ReportKpiFigure,
   type ReportKpiFormat,
 } from "./lib/kpi-figures";
+import { reportTableColumns } from "./lib/report-table-columns";
 import { GRID_GAP_PX, SECTION_LABEL_STYLE } from "./lib/report-surface";
 import type { ReportRender, ReportRow, ReportTableColumn } from "./reports-api";
 
@@ -171,16 +172,7 @@ function ReportTable({
         // own `.MuiTableCell-sizeSmall`, so the rows measured the 52px of
         // `density="normal"` however small the `size` said they were.
         density="compact"
-        columns={columns.map((column) => ({
-          key: column.key,
-          label: column.label,
-          // Numeric columns right, text left, derived from the column's
-          // format. A reporting requirement, not a divergence: it is what
-          // lets a reader compare magnitudes down a column at a glance.
-          align: column.format === "text" ? ("left" as const) : ("right" as const),
-          render: (value: unknown) =>
-            formatReportCell((value ?? null) as ReportRow[string], column.format, copy.values),
-        }))}
+        columns={reportTableColumns(columns, copy.values)}
         data={rows}
         data-testid={`${dataTestId}-table`}
       />
