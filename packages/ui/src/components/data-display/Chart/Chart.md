@@ -68,6 +68,9 @@ import { Chart } from '@procurement/ui';
 - `stacked` (boolean): Stack data series for bar/area charts
 - `showValues` (boolean): Display data values on chart
 - `valueFormatter` (function): Formats tooltip values and value-axis ticks
+- `axisValueFormatter` (function): Formats the value-axis ticks only, when they should read
+  shorter than the tooltip; falls back to `valueFormatter`. `SpecChart` sets it, so a `brl`
+  axis reads "R$ 180" while the tooltip keeps "R$ 180,00"
 - `allowDecimalTicks` (boolean): Allow half-steps on the value axis (default: true; set
   false for a COUNT metric, or the axis repeats itself — `0, 1, 1, 2, 2`)
 
@@ -97,7 +100,8 @@ axis corner, at every viewport.
 - `showLegend` (boolean): Show chart legend (default: true)
 - `showTooltip` (boolean): Show hover tooltips (default: true)
 - `showCartesianGrid` (boolean): Show grid lines (default: true)
-- `margin` (object): Chart margins configuration
+- `margin` (object): Chart margins configuration. A line, bar, area or composed chart
+  defaults to no left margin (its value axis sizes itself) unless it has a `yAxisLabel`
 - `colors` (string[]): Custom color palette
 - `responsive` (boolean): Enable responsive behavior (default: true)
 
