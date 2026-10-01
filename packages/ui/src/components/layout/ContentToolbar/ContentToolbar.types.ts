@@ -24,6 +24,13 @@ export interface ContentToolbarProps {
    * string on a pt-BR admin list a host could not replace (FUT-1443).
    */
   selectedCountLabel: (count: number) => string;
+  /**
+   * Whether EVERYTHING the select-all box covers is selected. When given, the
+   * box reads checked only then, and partial (indeterminate) while just some
+   * rows are — as the table's own header checkbox does. Omitted, it keeps
+   * reading checked for any selection.
+   */
+  allSelected?: boolean;
   /** Select every item on the page. */
   selectAll: () => void;
   /** Clear the current selection. */

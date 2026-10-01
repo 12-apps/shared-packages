@@ -16,7 +16,7 @@ import type { ListGroupConfig } from "./list-card-rails";
 import { InlineFilterControls } from "./data-views-inline-bar";
 import { toOverflowFields, useFilterOverflow, type OverflowSplit } from "./data-views-overflow";
 import { GridHeaderRow } from "./data-views-header-row";
-import { resolveSelectionExtra, type SelectionExtraRender } from "./data-views-selection-extra";
+import { allOnPageSelected, resolveSelectionExtra, type SelectionExtraRender } from "./data-views-selection-extra";
 import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { DataViewExport } from "./data-views-export";
@@ -284,6 +284,7 @@ function ShellStack<T extends Record<string, unknown>>({
           rowActions={props.rowActions}
           bulkActions={props.bulkActions}
           selectionExtra={resolveSelectionExtra(props)}
+          allOnPageSelected={allOnPageSelected(c, props.getRowId)}
           toolbarRightSlot={props.toolbarRightSlot}
           compactControls={showInline && split.compactControls}
           counterHidden={showInline && split.counterHidden}

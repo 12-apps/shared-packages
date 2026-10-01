@@ -28,6 +28,8 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
   bulkActions?: (selectedRows: T[], clearSelection: () => void) => React.ReactNode;
   /** A control between the count and the actions menu — see `selectionExtra`. */
   selectionExtra?: React.ReactNode;
+  /** Every row on the page is ticked: the select-all box reads checked, else partial. */
+  allOnPageSelected?: boolean;
   sortFields: SortFieldDefinition[];
   activeSortField: string;
   activeSortOrder: "asc" | "desc";
@@ -166,6 +168,7 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
         selectAllTestId={`${testIdPrefix}-select-all`}
         clearAllTestId={`${testIdPrefix}-clear-all`}
         selectionExtra={props.selectionExtra}
+        allSelected={props.allOnPageSelected}
         actions={renderBulkActions({
           rowActions: props.rowActions,
           bulkActions: props.bulkActions,
