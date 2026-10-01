@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { RbacRequest, RbacResponse, RbacRoute } from '../context';
+import type { RbacInviteResendResult, RbacRequest, RbacResponse, RbacRoute } from '../context';
 
 import { EN_US_RBAC_MESSAGES } from '../en-US';
 import { PT_BR_RBAC_MESSAGES } from '../pt-BR';
@@ -792,6 +792,96 @@ describe('team routes', () => {
       'team.invite_cancel',
     ]);
     expect(h.audits[0]).toMatchObject({ resourceId: 'novo@example.com' });
+  });
+
+  describe('resending a pending invite (FUT-3165)', () => {
+    async function resendHost(result: RbacInviteResendResult | null) {
+      const calls: [string, string][] = [];
+      const h = createTestHost({
+        invites: {
+          invite: async () => ({ status: 'invited' as const }),
+          listPending: async () => [],
+          cancel: async () => undefined,
+          ...(result === null
+            ? {}
+            : {
+                resend: async (tenantId: string, inviteId: string) => {
+                  calls.push([tenantId, inviteId]);
+                  return result;
+                },
+              }),
+        },
+      });
+      await h.api.seedTenantRoles(TENANT);
+      enrolMember(h.state, TENANT, 'owner-1', 'DIRECTOR');
+      return { h, calls, actor: memberActor(TENANT, 'owner-1') };
+    }
+
+    it('hands the port the tenant and the invite id, and answers the address', async () => {
+      const { h, calls, actor } = await resendHost({ status: 'resent', email: 'nova@example.com' });
+      const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
+        actor,
+        params: { inviteId: 'i1' },
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ data: { status: 'resent', email: 'nova@example.com' } });
+      expect(calls).toEqual([[TENANT, 'i1']]);
+      expect(h.audits.map((entry) => entry.action)).toEqual(['team.invite_resend']);
+    });
+
+    it('answers 404 with its sentence for an invite that is no longer pending', async () => {
+      const { h, actor } = await resendHost({ status: 'not_found' });
+      const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
+        actor,
+        params: { inviteId: 'gone' },
+      });
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: PT_BR_RBAC_MESSAGES.inviteNotFound });
+      expect(h.audits).toEqual([]);
+    });
+
+    it('answers 502 when the mail did not leave, and audits nothing', async () => {
+      const { h, actor } = await resendHost({ status: 'not_sent' });
+      const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
+        actor,
+        params: { inviteId: 'i1' },
+      });
+      expect(response.status).toBe(502);
+      expect(response.body).toEqual({ error: PT_BR_RBAC_MESSAGES.inviteNotSent });
+      expect(h.audits).toEqual([]);
+    });
+
+    it('answers 501 when the port cannot resend, and says so on the context', async () => {
+      const { h, actor } = await resendHost(null);
+      const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
+        actor,
+        params: { inviteId: 'i1' },
+      });
+      expect(response.status).toBe(501);
+      const context = await call(h, 'GET', '/team/context', { actor });
+      expect((context.body as { data: { invitesResendable: boolean } }).data.invitesResendable).toBe(
+        false,
+      );
+    });
+
+    it('reports invitesResendable when the port can resend', async () => {
+      const { h, actor } = await resendHost({ status: 'resent', email: 'x@example.com' });
+      const context = await call(h, 'GET', '/team/context', { actor });
+      expect((context.body as { data: { invitesResendable: boolean } }).data.invitesResendable).toBe(
+        true,
+      );
+    });
+
+    it('refuses a member below the admin tier, before the port is reached', async () => {
+      const { h, calls } = await resendHost({ status: 'resent', email: 'x@example.com' });
+      enrolMember(h.state, TENANT, 'clerk-1', 'CLERK');
+      const response = await call(h, 'POST', '/team/invites/:inviteId/resend', {
+        actor: memberActor(TENANT, 'clerk-1'),
+        params: { inviteId: 'i1' },
+      });
+      expect(response.status).toBe(403);
+      expect(calls).toEqual([]);
+    });
   });
 
   it('a platform admin reaches the roster with no membership', async () => {

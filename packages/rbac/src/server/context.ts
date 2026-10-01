@@ -87,7 +87,8 @@ export interface RbacAuditEntry {
     | 'team.member_remove'
     | 'team.member_status'
     | 'team.invite'
-    | 'team.invite_cancel';
+    | 'team.invite_cancel'
+    | 'team.invite_resend';
   resourceType: 'role' | 'membership' | 'governance';
   resourceId: string;
   before?: Record<string, unknown>;
@@ -145,7 +146,12 @@ export interface RbacUserDirectory {
 }
 
 /** The invites seam lives in `./invites`; re-exported so its import path is unchanged. */
-export type { RbacInviteRoles, RbacInvitesPort, RbacPendingInvite } from './invites';
+export type {
+  RbacInviteResendResult,
+  RbacInviteRoles,
+  RbacInvitesPort,
+  RbacPendingInvite,
+} from './invites';
 
 /** Every user-facing string this surface emits — REQUIRED host config; pt-BR ships as `./pt-BR`. */
 export interface RbacMessages {
@@ -164,6 +170,10 @@ export interface RbacMessages {
   invalidBody: string;
   notFound: string;
   invitesNotConfigured: string;
+  /** A resend named an invite that is no longer pending (cancelled, accepted). */
+  inviteNotFound: string;
+  /** A resend whose mail did not leave — nothing changed, the old link works. */
+  inviteNotSent: string;
   unauthenticated: string;
   baseRoleNotAssignable: string;
   governance: {
@@ -182,7 +192,7 @@ export interface RbacGatePermissions {
   manageRoles: string;
   /** Roster + member detail reads. */
   readTeam: string;
-  /** Member base-role set, enable/disable, invite cancel. */
+  /** Member base-role set, enable/disable, invite cancel and resend. */
   manageTeam: string;
 }
 

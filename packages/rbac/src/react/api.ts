@@ -70,6 +70,12 @@ export interface TeamContextWire {
   assignableRoles: string[];
   pendingInvites: { id: string; email: string; role: string }[];
   invitesEnabled: boolean;
+  /**
+   * Whether the host's invites port can mail a pending invite a fresh link.
+   * Optional on the wire: a server older than the resend route never sends it,
+   * and the screen reads absent as "no" rather than offering a dead entry.
+   */
+  invitesResendable?: boolean;
 }
 
 /**
@@ -157,6 +163,13 @@ export interface RbacApiClient {
   inviteMember(email: string, roles?: InviteRoles): Promise<RbacResult<InviteResultWire>>;
   /** Burn a pending accountless invite. Idempotent — a stale id is a no-op. */
   cancelInvite(inviteId: string): Promise<RbacResult<{ status: string }>>;
+  /**
+   * Mail a pending invite a fresh link (`POST /team/invites/:inviteId/resend`).
+   * The previous link stops working once the new one has gone out. Refused
+   * (404) for an invite that is no longer pending, (502) when the mail could
+   * not be sent — in which case nothing changed.
+   */
+  resendInvite(inviteId: string): Promise<RbacResult<{ status: 'resent'; email: string }>>;
   setMemberRole(userId: string, role: string): Promise<RbacResult<{ status: string }>>;
   grantMemberRole(userId: string, role: string): Promise<RbacResult<{ status: string }>>;
   revokeMemberRole(userId: string, role: string): Promise<RbacResult<{ status: string }>>;
@@ -220,6 +233,8 @@ export function createRbacApiClient(
       }),
     cancelInvite: (inviteId) =>
       transport.send(`${base}/team/invites/${seg(inviteId)}`, 'DELETE'),
+    resendInvite: (inviteId) =>
+      transport.send(`${base}/team/invites/${seg(inviteId)}/resend`, 'POST'),
     setMemberRole: (userId, role) =>
       transport.send(`${base}/team/${seg(userId)}`, 'PATCH', { role }),
     grantMemberRole: (userId, role) =>

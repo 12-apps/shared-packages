@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -128,6 +128,10 @@ function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
       data: { status: 'invited' as const },
     })),
     cancelInvite: vi.fn(async () => ({ ok: true as const, data: { status: 'cancelled' } })),
+    resendInvite: vi.fn(async () => ({
+      ok: true as const,
+      data: { status: 'resent' as const, email: 'nova@example.com' },
+    })),
     setMemberRole: vi.fn(async () => ({ ok: true as const, data: { status: 'updated' } })),
     grantMemberRole: vi.fn(async () => ({ ok: true as const, data: { status: 'granted' } })),
     revokeMemberRole: vi.fn(async () => ({ ok: true as const, data: { status: 'revoked' } })),
@@ -539,6 +543,91 @@ describe('the roster composes what two reads say', () => {
     fireEvent.click(await screen.findByTestId('team-cancel-invite-confirm-confirm-button'));
     await waitFor(() => {
       expect(api.cancelInvite).toHaveBeenCalledWith('inv-1');
+    });
+  });
+
+  describe('resending a pending invite (FUT-3165)', () => {
+    const pendingContext = (resendable: boolean | undefined) =>
+      vi.fn(async () => ({
+        customRolesByMember: [],
+        assignableRoles: [],
+        pendingInvites: [{ id: 'inv-1', email: 'nova@example.com', role: 'CLERK' }],
+        invitesEnabled: true,
+        ...(resendable === undefined ? {} : { invitesResendable: resendable }),
+      }));
+
+    it('offers resend beside cancel when the host can resend', async () => {
+      mountTeam(apiStub({ teamContext: pendingContext(true) }), ['team:manage']);
+      fireEvent.click(await screen.findByTestId('team-actions-invite:inv-1'));
+      await waitFor(() => {
+        expect(screen.getByText(COPY.teamRowMenu.resendInvite)).toBeTruthy();
+        expect(screen.getByText(COPY.teamRowMenu.cancelInvite)).toBeTruthy();
+      });
+    });
+
+    it('withholds resend when the host cannot — absent and false alike', async () => {
+      for (const resendable of [undefined, false]) {
+        mountTeam(apiStub({ teamContext: pendingContext(resendable) }), ['team:manage']);
+        fireEvent.click(await screen.findByTestId('team-actions-invite:inv-1'));
+        await waitFor(() => {
+          expect(screen.getByText(COPY.teamRowMenu.cancelInvite)).toBeTruthy();
+          expect(screen.queryByText(COPY.teamRowMenu.resendInvite)).toBeNull();
+        });
+        cleanup();
+      }
+    });
+
+    it('never offers resend on a member row', async () => {
+      mountTeam(apiStub({ teamContext: pendingContext(true) }), ['team:manage']);
+      fireEvent.click(await screen.findByTestId('team-actions-chef-1'));
+      await waitFor(() => {
+        expect(screen.getByText(COPY.teamRowMenu.editRoles)).toBeTruthy();
+        expect(screen.queryByText(COPY.teamRowMenu.resendInvite)).toBeNull();
+      });
+    });
+
+    it('sends the invite id and says who the new link went to', async () => {
+      const api = apiStub({ teamContext: pendingContext(true) });
+      mountTeam(api, ['team:manage']);
+      fireEvent.click(await screen.findByTestId('team-actions-invite:inv-1'));
+      const entry = await screen.findByText(COPY.teamRowMenu.resendInvite);
+      // The write resolves after the click returns; awaiting it inside act keeps
+      // the banner's state update inside the test.
+      await act(async () => {
+        fireEvent.click(entry);
+      });
+      const banner = await screen.findByTestId('team-invite-resent');
+      expect(api.resendInvite).toHaveBeenCalledWith('inv-1');
+      expect(api.resendInvite).toHaveBeenCalledTimes(1);
+      expect(banner.textContent).toContain(COPY.teamScreen.inviteResentBody('nova@example.com'));
+      // The roster re-reads after a resend; settle it inside the test.
+      await waitFor(() => expect(api.listTeam).toHaveBeenCalledTimes(2));
+      expect(await screen.findByTestId('team-actions-invite:inv-1')).toBeTruthy();
+    });
+
+    it('says a refusal in the error banner and refreshes the roster', async () => {
+      const refusal = 'Este convite mudou ou não está mais pendente.';
+      const api = apiStub({
+        teamContext: pendingContext(true),
+        resendInvite: vi.fn(async () => ({ ok: false as const, error: refusal, status: 404 })),
+      });
+      mountTeam(api, ['team:manage']);
+      await waitFor(() => expect(api.teamContext).toHaveBeenCalledTimes(1));
+      fireEvent.click(await screen.findByTestId('team-actions-invite:inv-1'));
+      const entry = await screen.findByText(COPY.teamRowMenu.resendInvite);
+      // The write resolves after the click returns; awaiting it inside act keeps
+      // the banner's state update inside the test.
+      await act(async () => {
+        fireEvent.click(entry);
+      });
+      const error = await screen.findByTestId('team-error');
+      expect(error.textContent).toContain(refusal);
+      await waitFor(() => {
+        expect(api.teamContext).toHaveBeenCalledTimes(2);
+        expect(api.listTeam).toHaveBeenCalledTimes(2);
+        expect(screen.queryByTestId('team-invite-resent')).toBeNull();
+      });
+      expect(await screen.findByTestId('team-actions-invite:inv-1')).toBeTruthy();
     });
   });
 

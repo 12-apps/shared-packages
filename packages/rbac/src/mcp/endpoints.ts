@@ -18,7 +18,7 @@ import type { RbacHttpMethod, RbacMcpEndpoint } from "./twin";
 import type { RbacMcpVocabulary } from "./vocabulary";
 
 /**
- * The seventeen tools this package's admin surface IS.
+ * The eighteen tools this package's admin surface IS.
  *
  * ## Why they live here now
  *
@@ -38,7 +38,7 @@ import type { RbacMcpVocabulary } from "./vocabulary";
  * The shape is this package's; the vocabulary and the sentences are the host's
  * — the same split `lifecycleMcpEndpoints` draws one package over. The mount
  * path, the permission catalog, which base roles a roster may assign, the two
- * search queries, the `permissionsExtras` widening and all seventeen summaries
+ * search queries, the `permissionsExtras` widening and all eighteen summaries
  * arrive as {@link RbacMcpVocabulary}. None of them is derivable here.
  *
  * ## The annotations
@@ -88,7 +88,7 @@ const statusOf = <T extends string>(literal: T) =>
 /**
  * One endpoint, with the five keys every entry here shares assembled once.
  *
- * Written out per entry, the seventeen tools are ~170 lines of the same five
+ * Written out per entry, the eighteen tools are ~170 lines of the same five
  * keys — which is both over the size gate and the shape that lets one entry
  * quietly differ from its neighbours. The builder makes the DIFFERENCES the
  * only thing each line carries.
@@ -248,6 +248,17 @@ function memberGrantEndpoints(
       ALTERS_ACCESS,
       { params: invite, response: statusOf("cancelled") },
       { summary: summaries.cancelTenantInvite, tags },
+    ),
+    endpoint(
+      "resendTenantInvite",
+      "post",
+      `${collectionPath}/team/invites/{inviteId}/resend`,
+      ALTERS_ACCESS,
+      {
+        params: invite,
+        response: envelope(z.object({ status: z.literal("resent"), email: z.string() })),
+      },
+      { summary: summaries.resendTenantInvite, tags },
     ),
     endpoint(
       "getTeamContext",
