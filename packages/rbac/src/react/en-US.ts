@@ -120,6 +120,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     inviteHint:
       'If they already have an account, access is granted right away. Otherwise we e-mail them an invitation with a link to accept.',
     inviteDeferredTitle: 'Invitation sent',
+    inviteFailedTitle: 'Could not add them',
     inviteDeferredBody:
       'We e-mailed them a link to accept the invitation. Access starts the moment they accept.',
     inviteAddedTitle: 'Added to the team',

@@ -19,6 +19,7 @@ import type { ComponentType, JSX } from 'react';
 import type { EntitlementsLinkProps, ResolvedWebConfig, WebEntitlementsConfig } from './web-config';
 import { PlanFeaturesScreen, PlanScreen, PlanSummary, PlansScreen } from './plan-page';
 import { UpsellPromptHost } from './upsell-host';
+import { UpgradeButton, type UpgradeButtonProps } from './upgrade-button';
 import { createWithEntitlement, type EntitlementGate } from './with-entitlement';
 
 /** The default link: a plain anchor. Pass the router's Link to replace it. */
@@ -50,6 +51,12 @@ export interface WebEntitlements {
   planSummary: ComponentType;
   /** Mount ONCE in the layout: the upgrade prompt every trigger lands on. */
   UpsellHost: ComponentType;
+  /**
+   * The way out of a refused request, for a host to render beside the refusal
+   * it shows: opens {@link UpsellHost} for a plan denial, renders nothing for
+   * anything else. Labelled from this surface's copy.
+   */
+  UpgradeButton: ComponentType<UpgradeButtonProps>;
   /** The page gate. Wrap a routed page's export; pairs with a server guard. */
   withEntitlement: EntitlementGate;
 }
@@ -124,12 +131,18 @@ export function createWebEntitlements(config: WebEntitlementsConfig): WebEntitle
   }
   Host.displayName = 'EntitlementsUpsellHost';
 
+  function Upgrade(props: UpgradeButtonProps): JSX.Element | null {
+    return <UpgradeButton {...props} label={resolved.copy.upsell.upgradeAction} />;
+  }
+  Upgrade.displayName = 'EntitlementsUpgradeButton';
+
   return {
     page: Page,
     plansPage: Plans,
     featuresPage: Features,
     planSummary: Summary,
     UpsellHost: Host,
+    UpgradeButton: Upgrade,
     withEntitlement: createWithEntitlement(config.copy.pageLock),
   };
 }

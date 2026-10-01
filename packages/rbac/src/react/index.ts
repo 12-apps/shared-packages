@@ -43,7 +43,13 @@ export {
   type TeamContextWire,
   type TeamMemberWire,
 } from './api';
-export { httpRbacTransport, type RbacResult, type RbacTransport } from './transport';
+export {
+  httpRbacTransport,
+  type RbacRefusal,
+  type RbacResult,
+  type RbacTransport,
+} from './transport';
+export type { RefusalAction } from './team-screen-parts';
 export {
   createRbacLabels,
   groupPermissions,

@@ -162,6 +162,8 @@ export interface TeamScreenCopy {
   inviteNoRole: string;
   /** The success banner shown when a grant was DEFERRED to the person's signup. */
   inviteDeferredTitle: string;
+  /** The heading over a refused invite's reason, shown inside the dialog (FUT-3137). */
+  inviteFailedTitle: string;
   inviteDeferredBody: string;
   /**
    * The success banner for a LIVE grant — the address already had an account

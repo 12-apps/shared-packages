@@ -1,6 +1,6 @@
 'use client';
 
-import type { JSX } from 'react';
+import { useEffect, useRef, type JSX, type ReactNode } from 'react';
 
 import AddIcon from '@mui/icons-material/Add';
 
@@ -28,7 +28,16 @@ import {
   type TeamExtraColumn,
 } from './team-grid-config';
 import { TeamInviteForm } from './team-invite-form';
+import type { RbacRefusal } from './transport';
 import type { AddedMember, TeamActions } from './use-team-actions';
+
+/**
+ * The host's way out of a refused write, rendered inside the refusal (FUT-3137)
+ * — an upgrade for a plan denial, say. Null for a refusal it does not
+ * recognise. A seam rather than a dependency: this package knows nothing of
+ * plans, and must stay liftable into a host that sells none.
+ */
+export type RefusalAction = (refusal: RbacRefusal) => ReactNode;
 
 /**
  * The roster screen's chrome — the header controls, the banners, the invite
@@ -195,16 +204,50 @@ export interface InviteRoleOptions {
   opening?: string;
 }
 
+/**
+ * Why an add was refused, at the top of the dialog (FUT-3137). The submit sits
+ * under the role list, so the content is usually scrolled to the bottom when
+ * the answer lands; the alert brings itself into view, or it would be as
+ * unseen as the page banner behind the modal it replaces.
+ */
+function InviteRefusal({
+  title,
+  refusal,
+  action,
+}: {
+  title: string;
+  refusal: RbacRefusal;
+  action?: RefusalAction;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Optional: a host's jsdom has none, and a throw here would unmount the screen.
+    ref.current?.scrollIntoView?.({ block: 'nearest' });
+    // Every refusal is a new object, so a second identical one scrolls again.
+  }, [refusal]);
+  const way = action?.(refusal);
+  return (
+    // The margin keeps the alert's edge off the scroller's when it scrolls up.
+    <Box ref={ref} sx={{ mb: 2, scrollMarginTop: '16px' }}>
+      <Alert variant="danger" title={title} description={refusal.error} data-testid="invite-error">
+        {way ? <Box sx={{ mt: 1 }}>{way}</Box> : null}
+      </Alert>
+    </Box>
+  );
+}
+
 export function InviteDialog({
   actions,
   copy,
   labels,
   roles,
+  refusalAction,
 }: {
   actions: TeamActions;
   copy: RbacWebCopy;
   labels: RbacLabels;
   roles: InviteRoleOptions;
+  refusalAction?: RefusalAction;
 }): JSX.Element {
   const opening = roles.opening ?? roles.system[0] ?? '';
   return (
@@ -218,6 +261,13 @@ export function InviteDialog({
     >
       {actions.showForm && (
         <DialogContent>
+          {actions.inviteRefusal && (
+            <InviteRefusal
+              title={copy.teamScreen.inviteFailedTitle}
+              refusal={actions.inviteRefusal}
+              action={refusalAction}
+            />
+          )}
           <TeamInviteForm
             formKey={actions.formKey}
             copy={copy.teamScreen}

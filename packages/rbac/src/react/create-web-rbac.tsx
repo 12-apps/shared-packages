@@ -218,6 +218,7 @@ function BoundTeamScreen({
       rowActionIds={parts.config.teamRowActionIds}
       inviteRequested={request?.inviteRequested}
       onInviteRequestHandled={request?.onInviteRequestHandled}
+      refusalAction={parts.config.refusalAction}
     />
   );
 }

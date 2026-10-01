@@ -19,6 +19,7 @@ import type { RoleMenuContext } from './role-actions-menu';
 import type { RoleSeedDefault } from './role-grid-config';
 import type { RolesScreenProps } from './roles-screen';
 import type { TeamExtraColumn } from './team-grid-config';
+import type { RefusalAction } from './team-screen-parts';
 import type { RbacTransport } from './transport';
 
 /** Which language the permission and role LABELS read in — the host's hook. */
@@ -111,6 +112,8 @@ export interface RbacWebConfig<P extends string = string> {
     /** Show who holds a role, from the catalog. */
     roleMembers?: (roleName: string) => void;
   };
+  /** The way out of a refused team add, inside its refusal — {@link RefusalAction}. */
+  refusalAction?: RefusalAction;
   /** See {@link RoleMenuContext.renderVersionHistory}. */
   renderVersionHistory?: RoleMenuContext['renderVersionHistory'];
   /**

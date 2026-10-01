@@ -9,6 +9,7 @@ import type { RbacWebCopy } from './copy';
 import type { InviteSelection } from './team-invite-form';
 import type { TeamRow } from './team-grid-config';
 import { applyRoleSet, type MemberWithRoles } from './team-role-dialog';
+import type { RbacRefusal } from './transport';
 
 /**
  * Everything the roster WRITES, and the state those writes drive — extracted
@@ -43,6 +44,15 @@ export interface TeamActions {
   /** Open the invite dialog (never closes it) — what a host's own "invite" entry calls. */
   openForm: () => void;
   formKey: number;
+  /**
+   * Why the last invite was refused, shown INSIDE the dialog (FUT-3137); null
+   * otherwise. Its own field rather than `error`: the page banner sits behind
+   * the modal, so a refusal routed there was never seen. Cleared by the next
+   * attempt and whenever the dialog opens or closes. Carries the server's
+   * status and body, so a host can offer the way out (an upgrade for a plan
+   * denial) beside the sentence.
+   */
+  inviteRefusal: RbacRefusal | null;
   invite: (selection: InviteSelection) => Promise<void>;
   remove: (userId: string) => Promise<void>;
   toggleActive: (row: TeamRow) => Promise<void>;
@@ -88,6 +98,42 @@ function useInviteOutcome(): {
   };
 }
 
+/**
+ * The invite dialog's own state: open or not, the form's remount key, and the
+ * refusal it shows (FUT-3137). Its own hook for the reason `useInviteOutcome`
+ * is — `useTeamActions` sits on the 80-line ceiling.
+ */
+function useInviteDialog(): Pick<
+  TeamActions,
+  'showForm' | 'toggleForm' | 'openForm' | 'formKey' | 'inviteRefusal'
+> & { fail: (refusal: RbacRefusal) => void; succeed: () => void; clearError: () => void } {
+  const [showForm, setShowForm] = useState(false);
+  const [formKey, setFormKey] = useState(0);
+  const [inviteRefusal, setInviteRefusal] = useState<RbacRefusal | null>(null);
+  // Stable, so a host effect that depends on it runs when the REQUEST changes.
+  const openForm = useCallback(() => {
+    setInviteRefusal(null);
+    setShowForm(true);
+  }, []);
+  return {
+    showForm,
+    formKey,
+    inviteRefusal,
+    openForm,
+    toggleForm: () => {
+      setInviteRefusal(null);
+      setShowForm((open) => !open);
+    },
+    fail: ({ error, status, body }) => setInviteRefusal({ error, status, body }),
+    clearError: () => setInviteRefusal(null),
+    // A fresh form for the next invite: the key remounts it empty.
+    succeed: () => {
+      setFormKey((key) => key + 1);
+      setShowForm(false);
+    },
+  };
+}
+
 export function useTeamActions(
   api: RbacApiClient,
   copy: RbacWebCopy,
@@ -95,26 +141,25 @@ export function useTeamActions(
 ): TeamActions {
   const [error, setError] = useState<string | null>(null);
   const outcome = useInviteOutcome();
-  const [showForm, setShowForm] = useState(false);
-  const [formKey, setFormKey] = useState(0);
-  // Stable, so a host effect that depends on it runs when the REQUEST changes.
-  const openForm = useCallback(() => setShowForm(true), []);
+  const dialog = useInviteDialog();
 
   async function invite(selection: InviteSelection): Promise<void> {
     setError(null);
     outcome.clear();
+    dialog.clearError();
     const result = await api.inviteMember(selection.email, {
       role: selection.role,
       customRoles: selection.customRoles,
     });
     if (!result.ok) {
-      setError(result.error);
+      // Said where the operator is looking: the dialog stays open on what they
+      // typed, with the reason above it (FUT-3137).
+      dialog.fail(result);
       return;
     }
     outcome.record(selection.email, result.data);
     refresh();
-    setFormKey((key) => key + 1);
-    setShowForm(false);
+    dialog.succeed();
   }
 
   /** Rejects on refusal so the confirm popup holds itself open with the reason. */
@@ -151,10 +196,11 @@ export function useTeamActions(
     error,
     setError,
     ...outcome.banners,
-    showForm,
-    toggleForm: () => setShowForm((open) => !open),
-    openForm,
-    formKey,
+    showForm: dialog.showForm,
+    toggleForm: dialog.toggleForm,
+    openForm: dialog.openForm,
+    formKey: dialog.formKey,
+    inviteRefusal: dialog.inviteRefusal,
     invite,
     remove,
     toggleActive,
