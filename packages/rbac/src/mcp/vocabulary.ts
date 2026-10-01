@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-/** The seventeen tools this package's endpoints are, as summary keys. */
+/** The eighteen tools this package's endpoints are, as summary keys. */
 export type RbacMcpOperation =
   | 'listTeamMembers'
   | 'inviteTenantAdmin'
@@ -10,6 +10,7 @@ export type RbacMcpOperation =
   | 'revokeMemberRole'
   | 'setMemberStatus'
   | 'cancelTenantInvite'
+  | 'resendTenantInvite'
   | 'getTeamContext'
   | 'getTeamMember'
   | 'listRoles'
@@ -71,7 +72,7 @@ export interface RbacMcpVocabulary {
    * advertises the permission list alone, which is exactly the bug.
    */
   permissionsExtras?: z.ZodType;
-  /** What each of the seventeen tools tells an agent it is for. */
+  /** What each of the eighteen tools tells an agent it is for. */
   summaries: Record<RbacMcpOperation, string>;
   /** Defaults to `['team']` / `['roles']` per half. */
   tags?: { team?: readonly string[]; roles?: readonly string[] };

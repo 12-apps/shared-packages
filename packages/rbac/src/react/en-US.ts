@@ -126,6 +126,8 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     inviteAddedTitle: 'Added to the team',
     inviteAddedBody: (email) => `${email} is now on the team.`,
     inviteAddedOpenAction: 'View profile',
+    inviteResentTitle: 'Invitation resent',
+    inviteResentBody: (email) => `We sent a new link to ${email}. The previous link no longer works.`,
     errorTitle: 'Could not update the team',
     emptyState: 'No administrators yet.',
     exportFileName: 'team',
@@ -136,7 +138,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     },
     cancelInviteConfirm: {
       title: 'Cancel this invitation?',
-      body: 'The link already sent stops working. To invite them again, send a new one.',
+      body: 'The link already sent stops working. To invite them again, add them to the team.',
       confirmLabel: 'Cancel invitation',
       // The ACT is a cancellation, so the back-out cannot also read "Cancel".
       cancelLabel: 'Go back',
@@ -171,6 +173,7 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     activate: 'Activate',
     deactivate: 'Deactivate',
     remove: 'Remove',
+    resendInvite: 'Resend invitation',
     cancelInvite: 'Cancel invitation',
     noActions: 'No actions available',
   },

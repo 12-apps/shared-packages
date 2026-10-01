@@ -32,7 +32,7 @@ import { parseBody, parseTeamListQuery, requireParam, type RoleWireSchemas } fro
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-interface TeamRouteDeps<P extends string> {
+export interface TeamRouteDeps<P extends string> {
   config: RbacServerConfig<P>;
   guards: RbacGuards<P>;
   governance: GrantGovernance;
@@ -50,7 +50,7 @@ interface TeamRouteDeps<P extends string> {
  * It used to answer a bare string and synthesize `'SUPERADMIN'` for the
  * platform case — see {@link RbacActorTier} for why that could not stay.
  */
-async function requireAdminTier<P extends string>(
+export async function requireAdminTier<P extends string>(
   deps: TeamRouteDeps<P>,
   actor: RbacActor,
   locale?: string,
@@ -70,7 +70,7 @@ async function requireAdminTier<P extends string>(
   return { role, isPlatformActor: false };
 }
 
-function requirePermission<P extends string>(
+export function requirePermission<P extends string>(
   deps: TeamRouteDeps<P>,
   actor: RbacActor,
   permission: string,
@@ -171,6 +171,7 @@ function contextRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
           assignableRoles,
           pendingInvites,
           invitesEnabled: Boolean(deps.config.invites),
+          invitesResendable: Boolean(deps.config.invites?.resend),
         });
       } catch (error) {
         return foldApiError(error);

@@ -34,6 +34,7 @@ const OPERATIONS = [
   "revokeMemberRole",
   "setMemberStatus",
   "cancelTenantInvite",
+  "resendTenantInvite",
   "getTeamContext",
   "getTeamMember",
   "listRoles",

@@ -164,6 +164,11 @@ function useRosterControls(
       toggleActive: (row) => void actions.toggleActive(row),
       remove: (row) => removeConfirm.request([row]),
       cancelInvite: (row) => cancelInviteConfirm.request([row]),
+      // Offered only when the host can resend — read off the context, so a
+      // host without the port is never shown an entry that can only fail.
+      ...(data.context?.invitesResendable
+        ? { resendInvite: (row: TeamRow) => void actions.resendInvite(row) }
+        : {}),
     },
     ownerSet,
     copy.teamRowMenu,

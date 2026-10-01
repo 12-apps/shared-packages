@@ -73,6 +73,12 @@ export const teamContextSchema = z.object({
    * invite someone and read the 501.
    */
   invitesEnabled: z.boolean(),
+  /**
+   * Whether a pending invite can be mailed a fresh link — the host's invites
+   * port has `resend` (FUT-3165). Optional: a server older than the resend
+   * route never sends it, and absent reads as "no".
+   */
+  invitesResendable: z.boolean().optional(),
 });
 
 /**

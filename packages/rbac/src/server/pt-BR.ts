@@ -23,6 +23,8 @@ export const PT_BR_RBAC_MESSAGES: RbacMessages = {
   invalidBody: 'Dados inválidos',
   notFound: 'Não encontrado.',
   invitesNotConfigured: 'Convites não estão configurados.',
+  inviteNotFound: 'Este convite mudou ou não está mais pendente. A lista foi atualizada.',
+  inviteNotSent: 'Não foi possível enviar o e-mail do convite. O link anterior continua valendo.',
   unauthenticated: 'Não autenticado.',
   baseRoleNotAssignable: 'Este papel não pode ser definido como papel principal.',
   governance: {
