@@ -11,7 +11,7 @@
  * would open a prompt with nothing to sell. A host can therefore hand it every
  * refusal without deciding which ones are a sale.
  */
-import type { JSX } from 'react';
+import type { ComponentProps, JSX } from 'react';
 
 import { Button } from '@12-apps/ui/form/Button';
 
@@ -23,11 +23,20 @@ export interface UpgradeButtonProps {
   status?: number;
   /** The parsed response body. */
   body?: unknown;
+  /**
+   * The colour of the refusal it sits in — `danger` (the default) inside a red
+   * alert. Outlined in that colour rather than a solid brand fill: beside a
+   * refusal whose sentence names free ways out first (another role, a freed
+   * seat), the paid one is offered, not pushed, and never outranks the form's
+   * own submit.
+   */
+  color?: ComponentProps<typeof Button>['color'];
 }
 
 export function UpgradeButton({
   status,
   body,
+  color = 'danger',
   label,
 }: UpgradeButtonProps & { label: string }): JSX.Element | null {
   const prompt = status === undefined ? null : upsellPromptFromPaymentRequired(status, body);
@@ -35,8 +44,8 @@ export function UpgradeButton({
   return (
     <Button
       size="sm"
-      variant="solid"
-      color="primary"
+      variant="outline"
+      color={color}
       onClick={() => raiseUpsell(prompt)}
       dataTestId="upgrade-button"
     >

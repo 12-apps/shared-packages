@@ -47,7 +47,7 @@ function buttons(): number {
 }
 
 describe('the upgrade button', () => {
-  it('offers the plan a spent quota needs, and opens the upgrade prompt on it', () => {
+  it('offers the plan a spent quota needs, and opens the upgrade prompt on it', async () => {
     const prompts = raised();
     const { UpgradeButton, UpsellHost } = surface();
     render(
@@ -69,7 +69,7 @@ describe('the upgrade button', () => {
         quota: { used: 3, limit: 1 },
       },
     ]);
-    expect(screen.getAllByTestId('upsell-modal').length).toBeGreaterThan(0);
+    expect((await screen.findAllByTestId('upsell-modal')).length).toBeGreaterThan(0);
   });
 
   it('reads its label from the surface copy', () => {
