@@ -240,7 +240,10 @@ function StepRow({ step, actions }: StepRowProps) {
           href={step.button.url}
           target="_blank"
           rel="noreferrer"
-          sx={{ ...BTN_SECONDARY_SX, px: '12px', py: '7px', fontSize: '12px', flexShrink: 0 }}
+          // Never narrower than its label beside the text, but never wider than
+          // the row once it has wrapped under it: at 320px "Abrir o portal do
+          // desenvolvedor ↗" was wider than the step and spilled out of it.
+          sx={{ ...BTN_SECONDARY_SX, px: '12px', py: '7px', fontSize: '12px', flexShrink: 0, maxWidth: '100%' }}
           // The mark is the promise: this leaves the store and opens the
           // provider's site. A button that reads the same as the in-page ones
           // and then navigates away is a small betrayal, and here it lands on
