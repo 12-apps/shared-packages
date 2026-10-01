@@ -365,6 +365,19 @@ describe('through the screen', () => {
     expect(typed.email.value).toBe('ana@example.com');
     expect(screen.queryAllByTestId('team-error')).toHaveLength(0);
     // The submit is under the role list: the reason scrolls itself into view.
-    expect(scrolled.some((el) => el.contains(alert))).toBe(true);
+    // The alert's own wrapper, not some ancestor that also holds the form.
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0]?.contains(alert)).toBe(true);
+    expect(scrolled[0]?.contains(typed.email)).toBe(false);
+  });
+
+  it('still says the refusal where the browser cannot scroll (jsdom, as a host tests it)', async () => {
+    const api = fakeApi();
+    vi.mocked(api.inviteMember).mockResolvedValue({ ok: false, error: 'Recusado.' });
+    mountScreen(api);
+    const typed = await submitInvite('ana@example.com');
+
+    const alert = await screen.findByTestId('invite-error');
+    expect(typed.dialog.contains(alert)).toBe(true);
   });
 });

@@ -204,7 +204,8 @@ export interface InviteRoleOptions {
 function InviteRefusal({ title, reason }: { title: string; reason: string }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'nearest' });
+    // Optional: a host's jsdom has none, and a throw here would unmount the screen.
+    ref.current?.scrollIntoView?.({ block: 'nearest' });
   }, [reason]);
   return (
     // The margin keeps the alert's edge off the scroller's when it scrolls up.
