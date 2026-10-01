@@ -291,6 +291,7 @@ export function teamColumns(
       header: copy.headers.name,
       accessor: (row) => row.name ?? row.email,
       searchable: true,
+      minWidth: 200, // at 390 names stacked one word per line (ADR 0074 U1, FUT-3144)
     },
     { id: 'email', header: copy.headers.email, accessor: 'email', searchable: true },
     {
