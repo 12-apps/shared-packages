@@ -82,6 +82,7 @@ function ToolbarHarness({ withSelection }: { withSelection: boolean }): React.JS
         clearAllText="Limpar seleção"
         hasSelection={selected.size > 0}
         selectedCount={selected.size}
+        selectedCountLabel={(n) => `${n} ${n === 1 ? "selecionado" : "selecionados"}`}
         selectAll={() => setSelected(new Set(['a', 'b', 'c', 'd']))}
         clearSelection={() => setSelected(new Set())}
         selectAllTestId="fav-select-all"
@@ -171,6 +172,7 @@ export const NarrowSelectionOverflow: Story = {
         clearAllText="Limpar filtros"
         hasSelection
         selectedCount={20}
+        selectedCountLabel={(n) => `${n} ${n === 1 ? "selecionado" : "selecionados"}`}
         selectAll={() => {}}
         clearSelection={() => {}}
         selectAllTestId="produtos-select-all"

@@ -83,7 +83,7 @@ describe("the selection-widening slot", () => {
     const { seen } = renderGrid();
     fireEvent.click(screen.getByLabelText("Selecionar linha 1"));
     await waitFor(() =>
-      expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("1 item selected"),
+      expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("1 selecionado"),
     );
     const last = latest(seen);
     expect(last.allOnPageSelected).toBe(false);
@@ -110,7 +110,7 @@ describe("the selection-widening slot", () => {
     fireEvent.click(screen.getByLabelText("Selecionar linha 2"));
     await waitFor(() => expect(widening()).not.toBeInTheDocument());
     // Still selecting — this is the partial state, not a cleared one.
-    expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("2 items selected");
+    expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("2 selecionados");
   });
 
   it("hands back a clearSelection that really clears", async () => {

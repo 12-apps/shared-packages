@@ -12,6 +12,7 @@ import {
   type KindListCardProps,
 } from "@12-apps/ui/data-display/CardKit";
 import { Chip } from "@12-apps/ui/data-display/Chip";
+import { Stack } from "@12-apps/ui/mui/Stack";
 import {
   BaseListCard,
   type ListCardCellConfig,
@@ -124,12 +125,17 @@ function RuleFacts({
       <Fact
         label={copy.screen.columns.window}
         value={
-          <Chip
-            label={copy.labels.window[row.windowState] ?? row.windowState}
-            size="sm"
-            variant={row.windowState === "RUNNING" ? "filled" : "outlined"}
-            color={WINDOW_COLOR[row.windowState] ?? "neutral"}
-          />
+          // The state AND its dates: a phone-width row hides the window cell
+          // (FUT-3184), so "Sem prazo" or the period has to be readable here.
+          <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+            <Chip
+              label={copy.labels.window[row.windowState] ?? row.windowState}
+              size="sm"
+              variant={row.windowState === "RUNNING" ? "filled" : "outlined"}
+              color={WINDOW_COLOR[row.windowState] ?? "neutral"}
+            />
+            <span>{row.windowLabel}</span>
+          </Stack>
         }
       />
       <Fact label={copy.card.usage} value={`${row.usageCount} / ${cap}`} />

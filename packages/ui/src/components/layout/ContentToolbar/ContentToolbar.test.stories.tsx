@@ -47,6 +47,7 @@ export const SelectAndClear: Story = {
         selectAllLabel="Selecionar todos os itens"
         hasSelection={selected.size > 0}
         selectedCount={selected.size}
+        selectedCountLabel={(n) => `${n} ${n === 1 ? "selecionado" : "selecionados"}`}
         selectAll={() => setSelected(new Set(['a', 'b', 'c']))}
         clearSelection={() => setSelected(new Set())}
         selectAllTestId="t-select-all"
@@ -62,7 +63,7 @@ export const SelectAndClear: Story = {
     });
     await step('Select All shows count + Clear All', async () => {
       await userEvent.click(canvas.getByTestId('t-select-all'));
-      await waitFor(() => expect(canvas.getByTestId('selected-count-indicator')).toHaveTextContent('3 items selected'));
+      await waitFor(() => expect(canvas.getByTestId('selected-count-indicator')).toHaveTextContent('3 selecionados'));
       await expect(canvas.getByTestId('t-clear-all')).toBeVisible();
     });
     await step('Clear All resets', async () => {
@@ -84,6 +85,7 @@ export const SortByInteraction: Story = {
         selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
+        selectedCountLabel={(n) => `${n} ${n === 1 ? "selecionado" : "selecionados"}`}
         selectAll={fn()}
         clearSelection={fn()}
         rightControls={
@@ -129,6 +131,7 @@ export const ContentTypeMultiSelect: Story = {
         selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
+        selectedCountLabel={(n) => `${n} ${n === 1 ? "selecionado" : "selecionados"}`}
         selectAll={fn()}
         clearSelection={fn()}
         rightControls={
@@ -191,6 +194,7 @@ export const MultiSelectSearch: Story = {
         selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
+        selectedCountLabel={(n) => `${n} ${n === 1 ? "selecionado" : "selecionados"}`}
         selectAll={fn()}
         clearSelection={fn()}
         rightControls={
@@ -257,6 +261,7 @@ export const FilterTriggerActiveDot: Story = {
         selectAllLabel="Selecionar todos os itens"
         hasSelection={false}
         selectedCount={0}
+        selectedCountLabel={(n) => `${n} ${n === 1 ? "selecionado" : "selecionados"}`}
         selectAll={fn()}
         clearSelection={fn()}
         rightControls={<FilterTrigger open={open} onOpenChange={setOpen} hasActiveFilters data-testid="filter-btn" />}

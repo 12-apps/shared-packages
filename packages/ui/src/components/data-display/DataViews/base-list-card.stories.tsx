@@ -531,6 +531,11 @@ export const NotDraggableWithoutAContainer: Story = {
  * The container query, at three widths. Below ~520px the labelled middle
  * columns go; below ~360px the value drops to its own line rather
  * than squeezing the title to two characters.
+ *
+ * The second row at each width is a STANDALONE configured row (no group): it
+ * keeps a track per cell it renders, and at 320 stacks the same way — first
+ * cell in the title's place, the `strong` total under it, the date gone. A
+ * click handler and no body to expand, so it ends in the "opens" chevron.
  */
 export const RespondsToItsOwnWidth: Story = {
   render: (args) => (
@@ -552,6 +557,18 @@ export const RespondsToItsOwnWidth: Story = {
               menu={kebab}
               onToggleSelect={() => {}}
             />
+            <Box sx={{ mt: 1 }}>
+              <StoryRow
+                args={args}
+                leading={marker}
+                row={PEDIDO_ROWS[1]}
+                cells={PEDIDO_CELLS}
+                menu={kebab}
+                onToggleSelect={() => {}}
+                onClick={() => {}}
+                testId={`standalone-cells-${width}`}
+              />
+            </Box>
           </Box>
         </Box>
       ))}

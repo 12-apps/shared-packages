@@ -1,5 +1,6 @@
 "use client";
 
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import { Fragment, type ReactNode } from "react";
 
 import { DescriptionItem, type DescriptionItemProps } from "../DescriptionItem";
@@ -242,19 +243,34 @@ export function ListCardActions({
   actions,
   alwaysVisible,
   menu,
+  opens = false,
   testId,
 }: {
   actions?: ReactNode;
   alwaysVisible?: boolean;
   menu?: ReactNode;
+  /** End the row with the "this opens" chevron. */
+  opens?: boolean;
   testId: (slot: string) => string | undefined;
 }): React.JSX.Element | null {
-  if (actions == null && menu == null) return null;
+  if (actions == null && menu == null && !opens) return null;
   return (
-    // z-index 1: above the stretched link, so these stay clickable.
+    // z-index 1: above the stretched link, so these stay clickable. The box
+    // itself lets clicks through (`pointer-events: none`, re-enabled on its
+    // children): only the controls inside it are meant to catch one, and the
+    // chevron, which re-disables it, must hand its click to the row or link
+    // underneath rather than swallow it.
     <Box
       data-slot="actions"
-      sx={{ display: "flex", alignItems: "center", gap: 0.5, position: "relative", zIndex: 1 }}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 0.5,
+        position: "relative",
+        zIndex: 1,
+        pointerEvents: "none",
+        "& > *": { pointerEvents: "auto" },
+      }}
     >
       {actions && (
         <Box
@@ -282,6 +298,31 @@ export function ListCardActions({
           {menu}
         </Box>
       )}
+      {opens && <OpenChevron testId={testId("open")} />}
+    </Box>
+  );
+}
+
+/**
+ * THE "THIS OPENS" CHEVRON, at the end of a row that leads somewhere.
+ *
+ * A row that navigates or opens a record looked exactly like a row that does
+ * nothing until a pointer hovered it, and a phone has no hover. Always visible —
+ * unlike `actions`, it is a statement about the row, not a control to reveal.
+ *
+ * Decorative to assistive tech (`aria-hidden`): the row itself is the button or
+ * the link, and already says so. It takes no click of its own for the same
+ * reason; the click falls through to the row.
+ */
+function OpenChevron({ testId }: { testId?: string }): React.JSX.Element {
+  return (
+    <Box
+      component="span"
+      aria-hidden
+      data-testid={testId}
+      sx={{ display: "flex", alignItems: "center", color: "text.secondary", pointerEvents: "none !important" }}
+    >
+      <KeyboardArrowRightIcon fontSize="small" />
     </Box>
   );
 }
@@ -293,6 +334,7 @@ export function ListCardTail({
   actions,
   actionsAlwaysVisible,
   menu,
+  opens,
   testId,
 }: {
   value?: ReactNode;
@@ -301,6 +343,7 @@ export function ListCardTail({
   actions?: ReactNode;
   actionsAlwaysVisible?: boolean;
   menu?: ReactNode;
+  opens?: boolean;
   testId: (slot: string) => string | undefined;
 }): React.JSX.Element {
   return (
@@ -319,6 +362,7 @@ export function ListCardTail({
         actions={actions}
         alwaysVisible={actionsAlwaysVisible}
         menu={menu}
+        opens={opens}
         testId={testId}
       />
     </>

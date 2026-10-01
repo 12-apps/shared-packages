@@ -13,8 +13,10 @@ pages and projects.
 ```
 
 - **Left cluster** — always shows **Select All**. Once `hasSelection` is true it
-  adds **Clear All**, an "N items selected" count, and two optional slots:
-  `selectionExtra` then `actions`.
+  adds **Clear All**, the selection count, and two optional slots:
+  `selectionExtra` then `actions`. The count's words come from the required
+  `selectedCountLabel(count)` ("1 selecionado", "3 selecionados"); the
+  package ships no default, and DataViews feeds it `copy.selection.selectedCount`.
 - **`selectionExtra` vs `actions`** — `actions` is what HAPPENS to the selection
   (delete, export, send). `selectionExtra` is what the selection IS: the
   "select all N matching the filter" widening a paginated list needs once its
@@ -48,6 +50,7 @@ import {
 <ContentToolbar
   hasSelection={selected.size > 0}
   selectedCount={selected.size}
+  selectedCountLabel={(n) => `${n} ${n === 1 ? 'selecionado' : 'selecionados'}`}
   selectAll={selectAll}
   clearSelection={clear}
   actions={<DeleteButton />}
