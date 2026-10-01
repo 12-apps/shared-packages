@@ -1,7 +1,7 @@
 "use client";
 
 import type { SortFieldDefinition } from "../../layout/ContentToolbar";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { DataViewsGrid } from "./DataViewsGrid";
 import type { SelectionExtraRender } from "./data-views-selection-extra";
@@ -14,6 +14,7 @@ import type { DataViewExport } from "./data-views-export";
 import type { ScopeConfig } from "./data-views-scopes";
 import type { DataViewRowDetail } from "./data-views-row-detail";
 import { ViewDialogs, ViewMutationErrorAlert } from "./data-views-table-parts";
+import { useUrlEchoGuard, useUrlSyncState } from "./data-views-url-echo";
 import {
   useSavedViewsController,
   type SavedViewsController,
@@ -23,7 +24,6 @@ import {
   type DataViewsLayout,
   type DataViewServer,
   type DataViewState,
-  type DataViewSyncState,
   type DataViewPersistence,
   type DataViewRouter,
   type FilterFieldConfig,
@@ -112,38 +112,6 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   server?: DataViewServer;
   /** Seed the initial view state (search/pills/ranges/sort) from the URL when no saved view applies. */
   initialState?: DataViewState;
-}
-
-/**
- * Derive the grid's reactive `syncState` from the URL-seeded `initialState` in
- * server mode so browser back/forward RE-APPLIES the search/pills/sort controls
- * (merging over live state, preserving hidden columns — see {@link DataViewSyncState}).
- * Client-mode tables (no `server`) get `undefined`. Callers memoize `initialState`
- * on the URL, so this reference only changes on genuine navigations.
- */
-function useUrlSyncState(
-  server: DataViewServer | undefined,
-  initialState: DataViewState | undefined,
-): DataViewSyncState | undefined {
-  const isServerMode = server !== undefined;
-  return useMemo<DataViewSyncState | undefined>(
-    () =>
-      isServerMode && initialState
-        ? {
-            search: initialState.search,
-            pills: initialState.pills,
-            ranges: initialState.ranges,
-            sortBy: initialState.sortBy,
-            // The scope belongs in the URL-driven slice alongside them: a
-            // `?view=recusados`-style deep link and browser back/forward must
-            // move the tab strip, and they must do it WITHOUT resetting the
-            // user's hidden columns — which is the whole reason this is a
-            // merging `syncState` and not a replacing `appliedState`.
-            scope: initialState.scope,
-          }
-        : undefined,
-    [isServerMode, initialState],
-  );
 }
 
 /**
@@ -294,14 +262,17 @@ export function DataViewsTableBase<T extends Record<string, unknown>>(
     dirty,
     onRequestDelete: setPendingDelete,
   });
-  // Server-mode lists re-apply URL-derived controls on back/forward (not just the mount seed).
-  const syncState = useUrlSyncState(server, initialState);
+  // Server-mode lists re-apply URL-derived controls on back/forward (not just
+  // the mount seed), but never the grid's own query echoing back through the URL.
+  const echo = useUrlEchoGuard(server);
+  const syncState = useUrlSyncState(echo.server, initialState, echo.consumeEcho);
 
   return (
     <>
       <ViewMutationErrorAlert error={ctl.mutationError} onClose={ctl.clearMutationError} testIdPrefix={testIdPrefix} />
       <DataViewsGrid<T>
         {...props}
+        server={echo.server}
         testIdPrefix={testIdPrefix}
         appliedState={ctl.applied}
         syncState={syncState}
