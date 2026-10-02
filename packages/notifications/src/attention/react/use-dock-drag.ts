@@ -126,6 +126,12 @@ export function useDockDrag(onMove: (position: AttentionDockPosition) => void): 
         reset();
         if (current === null || !current.moved || at === null) return;
         swallowClick.current = true;
+        // The click a mouse drag ends with arrives in this same task; a touch
+        // drag sends none, so the flag must not wait for one (a keyboard
+        // activation later would be swallowed).
+        window.setTimeout(() => {
+          swallowClick.current = false;
+        }, 0);
         const y = (at.top - EDGE_GAP_PX / 2) / Math.max(1, window.innerHeight - RESTING_SPAN_PX);
         onMove({
           side: at.left + current.width / 2 < window.innerWidth / 2 ? 'left' : 'right',

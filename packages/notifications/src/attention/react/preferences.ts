@@ -98,18 +98,20 @@ export function createAttentionPreferences(options: {
   const listeners = new Set<() => void>();
   let cachedRaw: string | null | undefined;
   let cached: AttentionPreferences = defaults;
-  // What this page chose when storage refused it (a full quota, a private
-  // window): the page keeps honouring it, it just does not outlive the tab.
+  // What this page chose when storage refused it (a full quota, blocked site
+  // data): it wins over whatever storage still holds, for this page, and just
+  // does not outlive the tab.
   let unsaved: string | null = null;
 
   const read = (): AttentionPreferences => {
-    let raw: string | null = null;
-    try {
-      raw = storage()?.getItem(options.storageKey) ?? null;
-    } catch {
-      raw = null;
+    let raw: string | null = unsaved;
+    if (raw === null) {
+      try {
+        raw = storage()?.getItem(options.storageKey) ?? null;
+      } catch {
+        raw = null;
+      }
     }
-    if (raw === null) raw = unsaved;
     // The same object while nothing changed, or `useSyncExternalStore` loops.
     if (raw !== cachedRaw) {
       cachedRaw = raw;
@@ -123,8 +125,12 @@ export function createAttentionPreferences(options: {
     readDefaults: () => defaults,
     write(patch) {
       const next = JSON.stringify({ ...read(), ...patch });
+      // Not stored — no storage at all (blocked site data), or a refused write
+      // (a full quota, where an OLDER value would otherwise win the next read).
       try {
-        storage()?.setItem(options.storageKey, next);
+        const target = storage();
+        if (target === null) throw new Error('no storage');
+        target.setItem(options.storageKey, next);
         unsaved = null;
       } catch {
         unsaved = next;

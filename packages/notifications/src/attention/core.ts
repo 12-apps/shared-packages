@@ -81,6 +81,12 @@ export interface AttentionKind<I extends AttentionItem = AttentionItem> {
   readonly severity?: (clock: AttentionClock<I>) => AttentionSeverity;
   /** Who may see it: any of these. Omitted, everyone the host shows the button to. */
   readonly permission?: string | readonly string[];
+  /**
+   * The kind's place inside its category; kinds sharing a rank are one tier,
+   * ordered by wait (a call and a bill, say). Omitted, the order they are
+   * listed in.
+   */
+  readonly rank?: number;
 }
 
 /** The host's wiring: the category order, and every kind. */
@@ -225,7 +231,7 @@ export function readAttention<I extends AttentionItem>(
   options: ReadAttentionOptions,
 ): AttentionReading<I> {
   const categoryOrder = new Map(registry.categories.map((category, index) => [category, index]));
-  const kindOrder = new Map(registry.kinds.map((kind, index) => [kind.id, index]));
+  const kindOrder = new Map(registry.kinds.map((kind, index) => [kind.id, kind.rank ?? index]));
   const entries = items
     .flatMap((item) => {
       const kind = registry.kind(item.kind);

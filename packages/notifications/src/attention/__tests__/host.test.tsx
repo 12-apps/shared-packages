@@ -127,8 +127,10 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  window.localStorage.clear();
+  // Mocks first: a case may have made storage itself throw.
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 describe('the attention button', () => {
@@ -546,5 +548,47 @@ describe('what the review caught', () => {
     expect(() => defineAttentionViews(registry, { bell: views.bell })).toThrow(AttentionWiringError);
     expect(() => defineAttentionViews(registry, { ...views, typo: views.bell })).toThrow(/undeclared/);
     expect(defineAttentionViews(registry, views)).toBe(views);
+  });
+
+  it('keeps a setting when site data is blocked outright', () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    const store = createAttentionPreferences({ storageKey: 'attention-blocked' });
+    store.write({ sound: 'all' });
+    expect(store.read().sound).toBe('all');
+  });
+
+  it('lets a refused write win over the older value storage still holds', () => {
+    window.localStorage.setItem('attention-quota', JSON.stringify({ sound: 'all' }));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    const store = createAttentionPreferences({ storageKey: 'attention-quota' });
+    store.write({ sound: 'off' });
+    expect(store.read().sound).toBe('off');
+  });
+
+  it('wakes the audio on the END of a touch, and keeps listening until it runs', () => {
+    const resume = vi.fn(() => Promise.resolve());
+    const context = {
+      state: 'suspended',
+      currentTime: 0,
+      destination: {},
+      resume,
+      createOscillator: vi.fn(),
+      createGain: vi.fn(),
+    };
+    vi.stubGlobal(
+      'AudioContext',
+      vi.fn(() => context),
+    );
+    renderHost([bell('1', 1)]);
+    fireEvent(window, new Event('touchend'));
+    expect(resume).toHaveBeenCalledTimes(1);
+    // Still suspended (refused): the next gesture tries again.
+    fireEvent(window, new Event('click'));
+    expect(resume).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
   });
 });

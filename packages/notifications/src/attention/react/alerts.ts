@@ -117,8 +117,17 @@ function prime(url: string): void {
       element.muted = false;
     })
     .catch(() => {
-      element.muted = false;
+      // Not a gesture after all: forget it, so the next gesture primes again.
+      primed.delete(url);
     });
+}
+
+/** Has the page's audio been woken up by a gesture yet? */
+function audioUnlocked(sounds?: AttentionSounds): boolean {
+  const context = sharedContext;
+  const toneReady = context === null || context.state === 'running';
+  const filesReady = [sounds?.urgent, sounds?.calm].every((url) => url === undefined || primed.has(url));
+  return toneReady && filesReady;
 }
 
 /**
@@ -177,21 +186,29 @@ export function vibrateFor(severity: AttentionSeverity): void {
   }
 }
 
-/** Unlock audio on the page's first tap or key press, once per mount. */
+/**
+ * The events that count as a user gesture. A TOUCH `pointerdown` is not one —
+ * on iPhone only the end of the touch is — so every candidate is listened to,
+ * and the listeners stay until the audio is actually running.
+ */
+const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+
+/** Unlock audio on the page's first real gesture. */
 function useAudioUnlock(sounds: AttentionSounds | undefined): void {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    const detach = (): void => {
+      for (const type of GESTURES) window.removeEventListener(type, unlock, true);
+    };
     const unlock = (): void => {
       unlockAttentionAudio(sounds);
-      window.removeEventListener('pointerdown', unlock, true);
-      window.removeEventListener('keydown', unlock, true);
+      // `resume()` and `play()` settle asynchronously: check after they do.
+      window.setTimeout(() => {
+        if (audioUnlocked(sounds)) detach();
+      }, 250);
     };
-    window.addEventListener('pointerdown', unlock, true);
-    window.addEventListener('keydown', unlock, true);
-    return () => {
-      window.removeEventListener('pointerdown', unlock, true);
-      window.removeEventListener('keydown', unlock, true);
-    };
+    for (const type of GESTURES) window.addEventListener(type, unlock, true);
+    return detach;
   }, [sounds]);
 }
 

@@ -33,16 +33,21 @@ function placement(
   live: { readonly left: number; readonly top: number } | null,
   position: AttentionDockPosition | null,
   bottom: string,
-): Record<string, number | string> {
+): Record<string, number | string | Record<string, string>> {
   if (live !== null) return { left: live.left, top: live.top };
   if (position === null) return { right: EDGE_GAP_PX, bottom };
+  const restore = (vh: string): string =>
+    `min(calc((${vh} - ${RESTING_SPAN_PX}px) * ${position.y} + ${EDGE_GAP_PX / 2}px), calc(${vh} - ${bottom} - ${RESTING_SPAN_PX - EDGE_GAP_PX}px))`;
   return {
     [position.side]: EDGE_GAP_PX,
-    // The mapping `useDockDrag` stored against `innerHeight`, which is the
-    // DYNAMIC viewport — `100vh` is the large one on a phone and would land it
-    // behind the browser's own bar. Never below the host's resting inset either,
-    // so a stored spot cannot sit on the host's bottom bar.
-    top: `min(calc((100dvh - ${RESTING_SPAN_PX}px) * ${position.y} + ${EDGE_GAP_PX / 2}px), calc(100dvh - ${bottom} - ${RESTING_SPAN_PX - EDGE_GAP_PX}px))`,
+    // Stored against `innerHeight`, which is the DYNAMIC viewport — `100vh` is
+    // the large one on a phone and would land it behind the browser's own bar.
+    // `100vh` stays as the fallback for engines without `dvh` (older WebViews),
+    // where the `dvh` declaration would otherwise drop the whole `top`. Never
+    // below the host's resting inset either, so a stored spot cannot sit on
+    // the host's bottom bar.
+    top: restore('100vh'),
+    '@supports (height: 100dvh)': { top: restore('100dvh') },
   };
 }
 

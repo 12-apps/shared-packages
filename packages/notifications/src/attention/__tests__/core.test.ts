@@ -195,3 +195,19 @@ describe('a channel level', () => {
     expect(channelWants('all', 'calm')).toBe(true);
   });
 });
+
+describe('a rank shared by two kinds', () => {
+  it('makes them one tier, ordered by wait', () => {
+    const tiered = defineAttention({
+      categories: ['floor'],
+      kinds: [
+        { id: 'call', category: 'floor', budgetMs: 5 * MIN, rank: 1 },
+        { id: 'bill', category: 'floor', budgetMs: 5 * MIN, rank: 1 },
+      ],
+    });
+    const ids = readAttention(tiered, [item('c', 'call', 2), item('b', 'bill', 4)], { now: NOW }).entries.map(
+      (entry) => entry.item.id,
+    );
+    expect(ids).toEqual(['b', 'c']);
+  });
+});
