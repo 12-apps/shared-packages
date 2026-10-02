@@ -134,6 +134,20 @@ export interface PushSubscriptionStore extends WebPushSubscriptionSource {
   isRegisteredTo(userId: string, endpoint: string): Promise<boolean>;
 }
 
+/**
+ * The attention level an update writes. Only when the app said so: a
+ * re-subscribe from a flow that does not know about attention must not wipe
+ * this device's choice. Except on a RE-OWN — the level was the previous
+ * person's choice, and the safe default for urgent alerts is "all".
+ */
+function attentionPushUpdate(
+  input: PushSubscriptionInput,
+  reowned: boolean,
+): { attentionPush?: AttentionChannelLevel | null } {
+  if (input.attentionPush !== undefined) return { attentionPush: input.attentionPush };
+  return reowned ? { attentionPush: null } : {};
+}
+
 /** The columns every save writes, on create and on update alike. */
 function savedColumns(userId: string, input: PushSubscriptionInput) {
   return {
@@ -170,7 +184,9 @@ export function createPushSubscriptionStore(
         create: {
           ...savedColumns(userId, input),
           endpoint: input.endpoint,
-          attentionPush: input.attentionPush ?? null,
+          // Only when set: NULL is the column's default, and a host that never
+          // migrated the column keeps working until it uses attention.
+          ...(input.attentionPush == null ? {} : { attentionPush: input.attentionPush }),
         },
         // Re-stamped on every save, so the same browser moving between a store's
         // app and the platform corrects its own scope rather than keeping the
@@ -178,9 +194,7 @@ export function createPushSubscriptionStore(
         // is not a re-own and must not log one.
         update: {
           ...savedColumns(userId, input),
-          // Only when the app said so: a re-subscribe from a flow that does not
-          // know about attention must not wipe this device's choice.
-          ...(input.attentionPush === undefined ? {} : { attentionPush: input.attentionPush }),
+          ...attentionPushUpdate(input, existing !== null && existing.userId !== userId),
         },
       });
     },

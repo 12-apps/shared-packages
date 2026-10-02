@@ -313,6 +313,27 @@ the subscription: `POST /push-subscriptions` takes an optional
 `push_subscriptions` row. Leaving it out keeps the stored level, so a
 re-subscribe from a flow that knows nothing about attention cannot reset it;
 `null` clears it. Re-post on every change of the level (`store.subscribe`).
+A host on the packaged client sends it through
+`api.savePushSubscription({ endpoint, keys, attentionPush })`.
+
+On the server, a generator marks its notification with the key from the
+framework-free entry:
+
+```ts
+import { ATTENTION_DATA_KEY } from '@12-apps/notifications/attention';
+
+generate: (p) => ({ title, body, link, data: { [ATTENTION_DATA_KEY]: p.late ? 'late' : 'calm' } }),
+```
+
+A level the transport does not recognise (a newer app's, an older server's)
+fails OPEN — the device takes every attention push — because an over-delivered
+alert costs a glance and a dropped one costs a table. A push filtered out on
+every device is recorded as `SENT` (it was delivered as the devices asked); it
+is not retried. On a live activity (`liveSubject`), give the CLOSING stage a
+severity every non-`off` level takes, or no `attention` key at all: a `late`
+device never receives a `calm` replacement, and its earlier entry stays in the
+tray.
+
 What the push may NOT do while the app is open on that device — interrupt
 someone already looking at the button — is the host's service worker's call:
 skip `showNotification` when a visible client exists.

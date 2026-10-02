@@ -164,6 +164,9 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     });
     expect(reading.head?.severity).toBe('late');
     expect(attention.ATTENTION_SEVERITIES).toEqual(['spent', 'late', 'calm']);
+    // The push half: the key a generator writes and the filter the transport applies.
+    expect(attention.ATTENTION_DATA_KEY).toBe('attention');
+    expect(attention.wantsAttentionPush('late', 'calm')).toBe(false);
   });
 
   it('the EMAIL entry carries the layout, framework-free', () => {

@@ -1,3 +1,4 @@
+import type { AttentionChannelLevel } from '../attention/core';
 import type { ChannelRow } from '../preferences-core';
 import type { NotificationChannel } from '../types';
 import type { ListNotificationsResult } from '../wire';
@@ -59,6 +60,8 @@ export interface NotificationsApiClient {
   savePushSubscription(input: {
     endpoint: string;
     keys: { p256dh: string; auth: string };
+    /** This device's attention-push level; absent keeps the stored one, `null` clears it. */
+    attentionPush?: AttentionChannelLevel | null;
   }): Promise<NotificationsResult<{ count: number }>>;
   removePushSubscription(endpoint: string): Promise<NotificationsResult<{ count: number }>>;
 }

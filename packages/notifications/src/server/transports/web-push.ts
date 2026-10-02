@@ -100,6 +100,10 @@ export interface WebPushSubscriptionSource {
    * parameters still type-checks, so an un-updated implementation silently
    * ignores the scope and keeps fanning out to every origin, with nothing
    * failing to compile to say so.
+   *
+   * The same holds for `attentionPush`, the row's attention level: a source
+   * that maps rows by hand and leaves it out returns `undefined`, which reads
+   * as "every attention push" — a device set to `off` keeps getting them.
    */
   list(
     userId: string,
