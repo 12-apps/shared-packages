@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import type { PGlite } from '@electric-sql/pglite';
 
 import type { Hosts } from './app';
+import { CHAT_MOUNT_PATH } from './chat-host';
 import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
@@ -92,6 +93,10 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // package's own).
   app.route(PAYMENTS_MOUNT_PATH, hosts.payments.router);
   mountPaymentsControls(app, pg);
+  // @12-apps/chat: one thread per demo request. Its prefix ends in two
+  // literals (`requests/…/chat`) that no mount above declares, so nothing
+  // above can answer for it and its position among them is free.
+  app.route(CHAT_MOUNT_PATH, hosts.chat.router);
 
 }
 

@@ -1,0 +1,59 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNED BY @12-apps/chat — the host's multi-file schema folder holds only a
+// COPY of this file (created/verified by `pnpm --filter @12-apps/chat
+// prisma:sync`): conversation threads live here, in the package, never in the
+// application.
+//
+// Self-contained on purpose: `tenant_id`, `thread_key` and `author_id` are
+// by-value String columns with NO foreign key into any host table, so the
+// models work in every repo without schema coupling. What a thread is ABOUT is
+// the host's business, carried in `thread_key` (a string the host composes);
+// who may read or write it is decided by the host for every request.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// One conversation. Created lazily, the first time a participant opens it.
+model ChatThread {
+  id            String           @id @default(uuid())
+  tenantId      String           @map("tenant_id")
+  threadKey     String           @map("thread_key")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  lastMessageAt DateTime?        @map("last_message_at")
+  messages      ChatMessage[]
+  readMarkers   ChatReadMarker[]
+
+  @@unique([tenantId, threadKey])
+  @@map("chat_threads")
+}
+
+// One message. `author_role` is the host's role key (what the thread SHOWS as
+// the author's name, via the host's label); `author_id` is the person behind
+// it, kept for moderation and never sent to the other participants.
+model ChatMessage {
+  id         String     @id @default(uuid())
+  threadId   String     @map("thread_id")
+  tenantId   String     @map("tenant_id")
+  authorRole String     @map("author_role")
+  authorId   String     @map("author_id")
+  body       String
+  quickKey   String?    @map("quick_key")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  thread     ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("chat_messages")
+}
+
+// How far one reader has read a thread. `reader_id` is the host's choice: a
+// person, or one shared id for a role whose members read as one (a team).
+model ChatReadMarker {
+  id         String     @id @default(uuid())
+  threadId   String     @map("thread_id")
+  role       String
+  readerId   String     @map("reader_id")
+  lastReadAt DateTime   @map("last_read_at")
+  thread     ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, role, readerId])
+  @@map("chat_read_markers")
+}

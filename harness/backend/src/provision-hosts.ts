@@ -25,6 +25,7 @@ import { auditHost, reseedAudit } from './audit-host';
 import { applyAuthMigrations, reseedAuth } from './auth-db';
 import { authHost } from './auth-host';
 import { billingHost, provisionBilling } from './billing-host';
+import { applyChatMigrations, chatHost } from './chat-host';
 import { applyDiscountMigrations } from './discounts-db';
 import { createDiscountCatalogTables, discountsHost, reseedDiscounts } from './discounts-host';
 import { createEntitlementsHost } from './entitlements-host';
@@ -122,8 +123,13 @@ async function provisionStored(pg: PGlite) {
   // and a consumer that re-wrote them would be testing its own SQL. See
   // `payments-stores.ts`.
   await applyPaymentsMigrations(pg);
-  const payments = paymentsHost(await createPrismaClient(pg));
-  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments };
+  // @12-apps/chat is the second, and shares the ONE client: a host has one
+  // generated client over one schema, and both packages' models are in it.
+  await applyChatMigrations(pg);
+  const prisma = await createPrismaClient(pg);
+  const payments = paymentsHost(prisma);
+  const chat = chatHost(prisma);
+  return { rbac, audit, lifecycle, notifications, shift, research, billing, storage, payments, chat };
 }
 
 export async function provisionHosts(pg: PGlite): Promise<Hosts> {
@@ -196,5 +202,6 @@ export interface Hosts {
   appShell: ReturnType<typeof appShellHost>;
   storage: Awaited<ReturnType<typeof createStorageHost>>;
   payments: ReturnType<typeof paymentsHost>;
+  chat: ReturnType<typeof chatHost>;
 }
 

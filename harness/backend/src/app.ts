@@ -114,6 +114,7 @@ import { localeProbes } from './i18n-host';
 import { provisionResearch, researchHost, reseedResearch } from './research-host';
 import { observability } from './observability-host';
 import { reseedBilling } from './billing-host';
+import { reseedChat } from './chat-host';
 import { provisionHosts, type Hosts } from './provision-hosts';
 
 // Re-exported: `mount-surfaces.ts` and the suites address `Hosts` through the
@@ -187,6 +188,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await reseedShifts(pg);
     await reseedResearch(pg);
     await reseedBilling(pg);
+    await reseedChat(pg, hosts.chat);
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();

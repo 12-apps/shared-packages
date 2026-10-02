@@ -1,6 +1,7 @@
 {
   "packages/audit/prisma/migrations/20260813120000_add_audit_log/migration.sql": "06f18dc3f4ba5c975a3446ccd2332ce7cebf6299c31bc44803236327c3e72a73",
   "packages/auth/prisma/migrations/20260819230000_auth_email_password/migration.sql": "e0d2ee4a595f18307b00a19707d4253da78a03f8d0f823d38fa4c18b7250c977",
+  "packages/chat/prisma/migrations/20261002120000_add_chat/migration.sql": "e1dff2c462e51ba09b3006173d11ea908123fa44f843f393ee5ccb80d354de31",
   "packages/discounts/prisma/migrations/20260821140000_discounts_package_owned/migration.sql": "a10924dab134019fbeb62b772db79a36dc423d7581644c3a20e3105798abd5c1",
   "packages/discounts/prisma/migrations/20260830120000_discount_weekly_schedule/migration.sql": "a9e7dc8afc8fb7bd152f31d1ab80fe9af04d8c2d7c3077737af4deead27c356b",
   "packages/discounts/prisma/migrations/20260926230000_discount_first_order_only/migration.sql": "e6a0b5614ac681fc889992a65100dfea9c64cc1d525d16e0d6fccdd1b16440b6",
@@ -64,6 +65,7 @@
   "packages/prisma/prisma/migrations/20260914210000_scope_push_subscriptions_per_store/migration.sql": "d782c2894d93bdf753fca03bd470f933452ec1f46f227fa042537a91a47a00ab",
   "packages/prisma/prisma/migrations/20260926230000_discount_first_order_only/migration.sql": "e6a0b5614ac681fc889992a65100dfea9c64cc1d525d16e0d6fccdd1b16440b6",
   "packages/prisma/prisma/migrations/20260927140000_add_notification_side/migration.sql": "84b63e6fe16c751513dd2b61123ab3e134d48fc45d18452e2fc13cd369fb287f",
+  "packages/prisma/prisma/migrations/20261002120000_add_chat/migration.sql": "e1dff2c462e51ba09b3006173d11ea908123fa44f843f393ee5ccb80d354de31",
   "packages/product-research/prisma/migrations/20260728120000_add_product_research/migration.sql": "1da080bdc4facd970b73cdaaf9739aa678267ea314e636d40f19ed108d0d2e2d",
   "packages/product-research/prisma/migrations/20260728170000_add_manual_price_entries/migration.sql": "2667f2660a8745bcf451b82dcf108f4d0b5fdcf528f8a80ca158424d9c47d660",
   "packages/product-research/prisma/migrations/20260729090000_integration_source_singleton/migration.sql": "ffa88e3bd6a2f78dade022c913d8931c0a202572ebe087bfb85637c7802b6aaf",

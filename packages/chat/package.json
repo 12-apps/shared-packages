@@ -1,0 +1,97 @@
+{
+  "name": "@12-apps/chat",
+  "version": "1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Conversation threads between the parties to one piece of work, each shown only by a host-chosen role label: framework-neutral HTTP routes with per-role write windows, a contact-info filter and quick replies, plus one thread screen built from @12-apps/ui primitives for web hosts and React Native hosts alike.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./client": "./src/client/index.ts",
+    "./react": "./src/react/index.ts",
+    "./native": "./src/native/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./manifest/web": "./src/manifest/web.ts",
+    "./manifest/native": "./src/manifest/native.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage coverage-native dist",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run && vitest run --config vitest.native.config.ts",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit && tsc --noEmit -p tsconfig.native.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.native.json",
+    "prisma:sync": "node scripts/sync-chat-schema.mjs",
+    "prisma:sync:check": "node scripts/sync-chat-schema.mjs --check"
+  },
+  "peerDependencies": {
+    "@12-apps/ui": ">=6.59.0",
+    "@12-apps/wiring": ">=1.17.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-native": ">=0.79.0"
+  },
+  "peerDependenciesMeta": {
+    "@12-apps/ui": {
+      "optional": true
+    },
+    "@12-apps/wiring": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/ui": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
+    "@testing-library/react": "^16.3.1",
+    "@types/node": "^22.10.6",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.5.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "jsdom": "^26.1.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.1",
+    "react-native-web": "0.20.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "wiring": {
+    "db": {
+      "partial": "prisma/chat.prisma",
+      "migrations": "prisma/migrations"
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/chat"
+  },
+  "files": [
+    "src",
+    "prisma",
+    "scripts",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/*.test.*"
+  ]
+}

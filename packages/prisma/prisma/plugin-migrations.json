@@ -42,6 +42,7 @@
     "20260910120000_add_refresh_grace_seal",
     "20260914210000_scope_push_subscriptions_per_store",
     "20260926230000_discount_first_order_only",
-    "20260927140000_add_notification_side"
+    "20260927140000_add_notification_side",
+    "20261002120000_add_chat"
   ]
 }

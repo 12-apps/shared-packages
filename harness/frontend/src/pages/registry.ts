@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
+import { ChatThreadPage } from './chat-thread';
 import { DiscountsPage } from './discounts';
 import { McpAiConnectPage } from './mcp-ai-connect';
 import { AUTH_PAGES, AUTH_SETTINGS_PAGE } from './auth-pages';
@@ -262,6 +263,16 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/audit',
     group: 'backoffice',
     Component: AuditLogPage,
+  },
+  // @12-apps/chat: one thread, seen by each party in turn. Backoffice because
+  // the page's picker is an operator's tool (who to look as); the thread
+  // itself sits inside whatever screen shows its subject in a real host.
+  {
+    slug: 'chat-thread',
+    title: 'Conversation',
+    pkg: '@12-apps/chat',
+    group: 'backoffice',
+    Component: ChatThreadPage,
   },
   {
     slug: 'feature-flags',

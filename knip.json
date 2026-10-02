@@ -106,6 +106,28 @@
         "playwright-bdd"
       ]
     },
+    "packages/chat": {
+      "entry": [
+        "src/index.ts",
+        "// The published subpaths: each is an `exports` target a host imports,",
+        "// never reached package-internally, so knip needs them named.",
+        "src/server/index.ts",
+        "src/client/index.ts",
+        "src/react/index.ts",
+        "src/native/index.ts",
+        "src/manifest/index.ts",
+        "src/manifest/server.ts",
+        "src/manifest/web.ts",
+        "src/manifest/native.ts",
+        "vitest.native.config.ts",
+        "scripts/*.mjs"
+      ],
+      "ignoreDependencies": [
+        "// Reached only through resolve.alias in vitest.native.config.ts,",
+        "// which knip does not read as an import (the ui package's position).",
+        "react-native-web"
+      ]
+    },
     "packages/discounts": {
       "entry": [
         "src/index.ts",
@@ -272,6 +294,7 @@
         "// import, so knip cannot see it.",
         "@12-apps/audit",
         "@12-apps/auth",
+        "@12-apps/chat",
         "@12-apps/discounts",
         "@12-apps/entitlements",
         "@12-apps/entity-lifecycle",
